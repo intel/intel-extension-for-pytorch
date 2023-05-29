@@ -198,7 +198,15 @@ class TestOptimizeCases(TestCase):
             dtype=torch.bfloat16,
             split_master_weight_for_bf16=False,
         )
-        self.assertTrue(hasattr(optimized_model.conv, "master_weight"))
+        self.assertEqual(optimized_model.conv.weight.dtype, torch.bfloat16)
+        def found_wrapper(parameter, params_attr):
+            for _, v in params_attr.items():
+                if parameter is v.parameter:
+                    return v
+            return None
+        wrapper = found_wrapper(optimized_model.conv.weight, getattr(optimized_sgd, 'params_attr'))
+        self.assertTrue(wrapper is not None)
+        self.assertEqual(wrapper.master_parameter.dtype, torch.float)
 
     def test_optimize_pretrain_model(self):
         optimizer_options = [
@@ -329,8 +337,9 @@ class TestOptimizeCases(TestCase):
             if level == "O1":
                 self.assertTrue(
                     M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr()
-                )
-                self.assertFalse(hasattr(M.linear, "weight"))
+                )                # linear is optimized and used same parameter with original model
+                self.assertTrue(M.linear.weight is opt_M.linear.weight)
+                self.assertTrue(isinstance(opt_M.linear, _IPEXLinear))
             # un-optimized part should be inplaced
             self.assertTrue(
                 M.embeddingbag.weight.data_ptr() == opt_M.embeddingbag.weight.data_ptr()

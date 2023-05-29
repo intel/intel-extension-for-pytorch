@@ -55,11 +55,10 @@ def patch_zero_grad_for_master_weight_training(optimizer):
     """
 
     def zero_grad(self, set_to_none: bool = False):
-        for p in self.params_attr:
-            if "bf16_param" in self.params_attr[p]:
-                _param = self.params_attr[p]["bf16_param"]
-            elif "fp16_param" in self.params_attr[p]:
-                _param = self.params_attr[p]["fp16_param"]
+        for _, v in self.params_attr.items():
+            _param = v.parameter
+            if _param is None:
+                continue
             if _param.grad is not None:
                 if set_to_none:
                     _param.grad = None
@@ -86,31 +85,27 @@ def patch_step_for_master_weight_training(optimizer):
 
     def master_param_non_fused_step(self, closure=None):
         # convert bf16 or fp16 weight'grad to float.
-        for k, value in self.params_attr.items():
-            for low_precision in ["bf16_param", "fp16_param"]:
-                if low_precision in value.keys():
-                    # check have grad
-                    if (
-                        value[low_precision].requires_grad
-                        and value[low_precision].grad is not None
-                    ):
-                        k.grad = value[low_precision].grad.detach().float()
+        for k, v in self.params_attr.items():
+            _param = v.parameter
+            if _param is None or _param is k:
+                continue
+            if _param.requires_grad and _param.grad is not None:
+                k.grad = _param.grad.detach().float()
 
         loss = self._original_step(closure)
         # sync mater weight to model's paramerter
-        for k, value in self.params_attr.items():
+        for k, v in self.params_attr.items():
+            _param = v.parameter
+            if _param is None or _param is k:
+                continue
             if k.device.type == "cpu":
-                if "bf16_param" in value.keys():
-                    torch.ops.torch_ipex.sync_master_weight_to_bf16(
-                        k, value["bf16_param"]
-                    )
-                if "fp16_param" in value.keys():
-                    torch.ops.torch_ipex.sync_master_weight_to_fp16(
-                        k, value["fp16_param"]
-                    )
+                if _param.dtype == torch.bfloat16:
+                    torch.ops.torch_ipex.sync_master_weight_to_bf16(k, _param)
+                else:
+                    assert _param.dtype == torch.float16
+                    torch.ops.torch_ipex.sync_master_weight_to_fp16(k, _param)
             elif k.device.type == "xpu":
-                if "bf16_param" in value.keys():
-                    value["bf16_param"].data = k.data.to(dtype=torch.bfloat16)
+                _param.data = k.data.to(dtype=torch.bfloat16)
             else:
                 pass
         return loss
@@ -123,23 +118,27 @@ def patch_step_for_master_weight_training(optimizer):
     # it needs to sync grad to the FP32's grad first. After that gradscaler
     # will update weight and it also needs to sync FP32 master weight back to weight.
     def sync_grad(self):
-        for k, value in self.params_attr.items():
+        for k, v in self.params_attr.items():
+            _param = v.parameter
+            if _param is None or _param is k:
+                continue
             assert (
-                "bf16_param" not in value.keys()
+                _param.dtype != torch.bfloat16
             ), "GradScaler is not recommended for bf16 training"
-            if "fp16_param" in value.keys():
-                if value["fp16_param"].requires_grad:
-                    k.grad = value["fp16_param"].grad.detach().float()
+            if _param.requires_grad:
+                k.grad = _param.grad.detach().float()
 
     def step_sync_weight(self, closure=None):
         loss = self._original_step(closure)
         # sync mater weight to model's paramerter
-        for k, value in self.params_attr.items():
+        for k, v in self.params_attr.items():
+            _param = v.parameter
+            if _param is None or _param is k:
+                continue
             assert (
-                "bf16_param" not in value.keys()
+                _param.dtype != torch.bfloat16
             ), "GradScaler is not recommended for bf16 training"
-            if "fp16_param" in value.keys():
-                torch.ops.torch_ipex.sync_master_weight_to_fp16(k, value["fp16_param"])
+            torch.ops.torch_ipex.sync_master_weight_to_fp16(k, _param)
         return loss
 
     if not hasattr(optimizer, "_original_step"):
@@ -154,26 +153,29 @@ def patch_step_for_master_weight_training(optimizer):
 
 
 def pack_state(state, state_key, state_value, attr):
-    if attr["op"] in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE_CPU():
+    if attr.num_modules != 1:
+        return
+    m_cls = list(attr.modules_cls)[0]
+    if m_cls in utils._parameter_wrapper.IPEX_WEIGHT_PREPACK_MODULE_CPU():
         if (
-            attr["op"] is torch.nn.Conv1d
-            or attr["op"] is torch.nn.Conv2d
-            or attr["op"] is torch.nn.Conv3d
+            m_cls is torch.nn.Conv1d
+            or m_cls is torch.nn.Conv2d
+            or m_cls is torch.nn.Conv3d
         ):
-            if attr["op"] is torch.nn.Conv2d:
+            if m_cls is torch.nn.Conv2d:
                 memory_format = torch.channels_last
-            elif attr["op"] is torch.nn.Conv3d:
+            elif m_cls is torch.nn.Conv3d:
                 memory_format = torch.channels_last_3d
             else:
                 memory_format = torch.contiguous_format
             value_temp = (
                 state_value.to(memory_format=memory_format)
-                if attr["weight_channels_last"]
+                if attr.weight_channels_last
                 else state_value
             )
-            state[state_key] = attr["ctx"].pack(value_temp)
+            state[state_key] = attr.op_ctx.pack(value_temp)
         else:
-            state[state_key] = attr["ctx"].pack(state_value)
+            state[state_key] = attr.op_ctx.pack(state_value)
 
 
 def patch_load_state_dict(optimizer):
@@ -183,17 +185,17 @@ def patch_load_state_dict(optimizer):
 
     def repack(self):
         for group in self.param_groups:
-            for i, p in enumerate(group["params"]):
+            for _, p in enumerate(group["params"]):
                 if p in self.params_attr and p.device.type == "cpu":
                     attr = self.params_attr[p]
-                    if "op" in attr:
+                    if attr.op_ctx is not None:
                         # weight attr need "op" info to pack state while bias attr not
                         state = self.state[p]
-                        public_p = attr["ctx"].to_public(p)
+                        plain_format_shape = attr.plain_format_shape
                         for state_key, state_value in state.items():
                             if (
                                 isinstance(state_value, torch.Tensor)
-                                and state_value.size() == public_p.size()
+                                and state_value.size() == plain_format_shape
                             ):
                                 # We have an assumption here that any tensor's in parameter state, if they
                                 # have same shapes with the parameter, they should share same layout with
@@ -305,62 +307,24 @@ def patch_load_state_dict(optimizer):
         )
 
 
-def refresh_optimizer_params_after_cast(
-    m, attr, float_param, master_weight_split, optimizer
-):
-    r"""
-    After casting nn.Modules parameters, need refresh corresponding parameters in optimizers
-    For master weight solution, the parameters in optimizers should be master weight (not BF16 weight)
-    """
-    if optimizer is None:
-        return
-    # update params
-    for group in optimizer.param_groups:
-        for i, p in enumerate(group["params"]):
-            if p is float_param:
-                if master_weight_split:
-                    group["params"][i] = getattr(m, attr)
-                else:
-                    group["params"][i] = getattr(m, "master_" + attr)
-                # update optimizer's state.
-                new_param = group["params"][i]
-                if p in optimizer.state:
-                    optimizer.state[new_param] = optimizer.state.pop(p)
-
-
-def pack_optimizer_params_and_states(optimizer, param_pair, attrs, pack_dtype):
+def pack_optimizer_states(optimizer, param, attr):
     """
     1. convert user's optimizer weights and related states to packed format
-    While optimizer is maintain "master weight", the key in attrs is "weight",
-    Need pass "weight" here as attr_key visit attr.
-    2. convert user's optimizer bias to new model's bias since there is a "clone"
     """
     if optimizer is None:
         return
-    for group in optimizer.param_groups:
-        for i, p in enumerate(group["params"]):
-            if p in param_pair:
-                new_param = param_pair[p]
-                group["params"][i] = new_param
-                # copy optimizer's state.
-                if p in optimizer.state:
-                    optimizer.state[new_param] = optimizer.state.pop(p)
-                    # Prepack the state according to the prepacked weight.
-                    # it covers both conv and linear now. TODO: LSTM or other ops.
-                    if new_param in attrs:
-                        attr = attrs[new_param]
-                        if "op" in attr:
-                            # weight attr need "op" info to pack state while bias attr not
-                            state = optimizer.state[new_param]
-                            for state_key, state_value in state.items():
-                                if (
-                                    isinstance(state_value, torch.Tensor)
-                                    and state_value.size() == p.size()
-                                ):
-                                    # We have an assumption here that any tensor's in parameter state, if they
-                                    # have same shapes with the parameter, they should share same layout with
-                                    # the parameter. Thus we need pack the state as we did to parameters.
-                                    pack_state(state, state_key, state_value, attr)
+    if param in optimizer.state:
+        state = optimizer.state[param]
+        plain_format_shape = attr.plain_format_shape
+        for state_key, state_value in state.items():
+            if (
+                isinstance(state_value, torch.Tensor)
+                and state_value.size() == plain_format_shape
+            ):
+                # We have an assumption here that any tensor's in parameter state, if they
+                # have same shapes with the parameter, they should share same layout with
+                # the parameter. Thus we need pack the state as we did to parameters.
+                pack_state(state, state_key, state_value, attr)
 
 
 def patch_state_dict(optimizer):
@@ -374,7 +338,7 @@ def patch_state_dict(optimizer):
         opt_temp = copy.deepcopy(opt)
         for (k1, _), (_, v2) in zip(opt.state.items(), opt_temp.state.items()):
             if k1 in opt.params_attr:
-                params_attr = opt.params_attr[k1]
+                attr = opt.params_attr[k1]
                 for state_key, state_value in v2.items():
                     if (
                         isinstance(state_value, torch.Tensor)
@@ -383,15 +347,9 @@ def patch_state_dict(optimizer):
                         # We have an assumption  here that any tensor's in parameter state, if they
                         # have same shapes with the parameter, they should share same layout with
                         # the parameter. Thus we need unpack the state as we did to parameters.
-                        if "op" in params_attr:
-                            # Secondly, unpack releated states
-                            if (
-                                params_attr["op"]
-                                in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE_CPU()
-                            ):
-                                state_value = params_attr["ctx"].to_public(state_value)
-                            else:
-                                AssertionError(False, "unsupported op to unpack")
+                        if attr.op_ctx is not None:
+                            assert attr.num_modules == 1
+                            state_value = attr.op_ctx.to_public(state_value)
                         v2[state_key] = state_value
         return opt_temp.state_dict()
 

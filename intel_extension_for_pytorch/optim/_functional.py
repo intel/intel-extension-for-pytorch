@@ -5,16 +5,19 @@ from typing import List, Optional
 
 
 def is_master_weight(param, params_attr):
+    if len(params_attr) == 0 or param not in params_attr:
+        return False
+    _param = params_attr[param].parameter
     return (
         param.dtype == torch.float
-        and param in params_attr
-        and "bf16_param" in params_attr[param]
+        and _param is not None
+        and _param.dtype == torch.bfloat16
     )
 
 
 def get_bf16_grad(param, params_attr):
     assert is_master_weight(param, params_attr)
-    return params_attr[param]["bf16_param"].grad
+    return params_attr[param].parameter.grad
 
 
 def get_param2(param, params_attr):
@@ -23,12 +26,11 @@ def get_param2(param, params_attr):
     # For master weight split case, param2 is the trail part of fp32 weight
     param2 = torch.Tensor()
     if param in params_attr:
-        if "trail" in params_attr[param]:
+        if params_attr[param].parameter_trail is not None:
             assert param.dtype is torch.bfloat16
-            param2 = params_attr[param]["trail"]
-        if "bf16_param" in params_attr[param]:
-            assert param.dtype is torch.float
-            param2 = params_attr[param]["bf16_param"]
+            param2 = params_attr[param].parameter_trail
+        elif is_master_weight(param, params_attr):
+            param2 = params_attr[param].parameter
     return param2
 
 

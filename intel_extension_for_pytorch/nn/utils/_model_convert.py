@@ -1,10 +1,9 @@
 import torch
 import copy
-import warnings
-import types
-
 from torch.nn.utils.rnn import PackedSequence
-
+from ._parameter_wrapper import get_shared_parameter_status
+import contextlib
+import types
 
 class _LSTM(torch.nn.LSTM):
     # This is a solution to swap the lstm module with the ipex counterpart
@@ -127,91 +126,44 @@ def replace_dropout_with_identity(model):
                 replace_dropout_with_identity(child)
 
 
-def _save_to_state_dict(self, destination, prefix, keep_vars):
-    # convert weights(bias) of module to float while saving check point
-    param_dict = {}
-    for name, para in self.named_parameters():
-        if not hasattr(self, name):
-            continue
-        param_dict.update({name: para})
-        temp_param = torch.nn.Parameter(
-            para.to(torch.float), requires_grad=para.requires_grad
-        )
-        setattr(self, name, temp_param)
-    super(type(self), self)._save_to_state_dict(destination, prefix, keep_vars)
-    for p in param_dict:
-        origin_param = param_dict[p]
-        setattr(self, p, origin_param)
-
-
-def convert_module_data_type(module, dtype):
-    # convert weights(bias) of module to dtype to reduce dtype reorder
+def convert_model_data_type(model, dtype):
+    # convert weights(bias) of model to dtype to reduce dtype reorder
     assert dtype in [
         torch.bfloat16,
         torch.float16,
-    ], "module convert only support bf16 and fp16"
-    module_convert_list_bf16 = [
-        torch.nn.Conv2d,
-        torch.nn.Conv3d,
-        torch.nn.ConvTranspose2d,
-        torch.nn.ConvTranspose3d,
-        torch.nn.Linear,
-        torch.nn.Embedding,
-        torch.nn.LSTM,
-    ]
+    ], "model convert only support bf16 and fp16"
 
-    module_convert_list_fp16 = [
-        torch.nn.Conv1d,
-        torch.nn.Conv2d,
-        torch.nn.Conv3d,
-        torch.nn.Linear,
-    ]
+    params_attr = {}
+    get_shared_parameter_status(model, params_attr)
 
-    module_convert_lists = {
-        torch.bfloat16: module_convert_list_bf16,
-        torch.float16: module_convert_list_fp16,
-    }
+    for _, param in model.named_parameters():
+        if param is None:
+            continue
+        if params_attr[param].can_cast_inference(dtype):
+            params_attr[param].cast_for_inference(dtype)
 
-    for module_cls in module_convert_lists[dtype]:
-        if isinstance(module, module_cls):
-            setattr(
-                module,
-                "_save_to_state_dict",
-                types.MethodType(_save_to_state_dict, module),
-            )
-            if module_cls is torch.nn.LSTM:
-                for name, param in module.named_parameters():
-                    ori_data = getattr(getattr(module, name), "data")
-                    ori_data_dtype = ori_data.dtype
-                    if (
-                        ori_data_dtype == torch.float
-                        or ori_data_dtype == torch.bfloat16
-                    ):
-                        casted_data = ori_data.detach().clone().to(dtype)
-                        setattr(getattr(module, name), "data", casted_data)
-                    else:
-                        warnings.warn(
-                            f"WARNING: Can't convert model's parameters dtyep from {ori_data_dtype} to {dtype}"
-                        )
-                        break
-            else:
-                ori_data_dtype = module.weight.dtype
-                # Assume weight and bias have same dtype, only need check weight dtype here.
-                if (
-                    ori_data_dtype == torch.float
-                    or ori_data_dtype == torch.bfloat16
-                    or ori_data_dtype == torch.half
-                ):
-                    weight_data = module.weight.detach().clone().to(dtype)
-                    module.weight.data = weight_data
-                    if hasattr(module, "bias") and module.bias is not None:
-                        bias_data = module.bias.detach().clone().to(dtype)
-                        module.bias.data = bias_data
-                else:
-                    warnings.warn(
-                        f"WARNING: Can't convert model's parameters dtype from {ori_data_dtype} to {dtype}"
-                    )
-            break
-    for child in module.children():
-        convert_module_data_type(child, dtype)
-    return module
+    def patch_state_dict():
+        def cast_back_state_dict(
+            self, *args, destination=None, prefix="", keep_vars=False
+        ):
+            with torch.no_grad(), contextlib.ExitStack() as stack:
+                for v in params_attr.values():
+                    stack.enter_context(v.inference_cast_save())
+                out = self._original_state_dict(
+                    *args,
+                    destination=destination,
+                    prefix=prefix,
+                    keep_vars=keep_vars
+                )
+            return out
+
+        if not hasattr(model, "_original_state_dict"):
+            setattr(model, "_original_state_dict", model.state_dict)
+        setattr(
+            model,
+            "state_dict",
+            types.MethodType(cast_back_state_dict, model),
+        )
+
+    patch_state_dict()
+    return params_attr, model
