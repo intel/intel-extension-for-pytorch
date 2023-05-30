@@ -3,9 +3,9 @@
 #include <ATen/WrapDimUtils.h>
 #include <ATen/native/TypeProperties.h>
 
+#include <aten/core/HostAllocator.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
-#include <runtime/CachingHostAllocator.h>
 #include <runtime/Memory.h>
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
@@ -232,8 +232,9 @@ void parallel_cat(
     // Re-allocate stackInputs every iteration to avoid read-after-write hazard
     {
       CatArrInputTensor<scalar_in_t, unsigned int>* stackInputs;
-      CachingHostAllocator::Instance()->malloc(
-          (void**)&stackInputs, tensorMetadataSize);
+      stackInputs = (CatArrInputTensor<scalar_in_t, unsigned int>*)
+                        HostAllocator::Instance()
+                            ->raw_allocate(tensorMetadataSize);
       for (batchCounter = 0; batchCounter < CAT_ARRAY_BATCH_SIZE &&
            (i + batchCounter) < inputs.size();
            ++batchCounter) {
@@ -266,7 +267,7 @@ void parallel_cat(
       }
       xpu::dpcpp::memcpyHostToDevice(
           d_inputs, stackInputs, tensorMetadataSize, /* async= */ true);
-      CachingHostAllocator::Instance()->release(stackInputs);
+      HostAllocator::Instance()->release(stackInputs);
     }
 
 #define HANDLE_CASE(DIMS)            \

@@ -1,9 +1,8 @@
 #pragma once
 
-#include <mutex>
-
 #include <c10/core/Allocator.h>
 #include <c10/core/Device.h>
+#include <mutex>
 
 #include <core/AllocationInfo.h>
 #include <core/Stream.h>

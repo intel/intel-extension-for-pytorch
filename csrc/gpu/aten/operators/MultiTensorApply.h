@@ -5,8 +5,8 @@
 #include "Loops.h"
 #include "MemoryAccess.h"
 // #include "autograd/function.h"
+#include <aten/core/HostAllocator.h>
 #include "c10/core/ScalarType.h"
-#include "runtime/CachingHostAllocator.h"
 #include "runtime/Memory.h"
 
 namespace at {
@@ -96,9 +96,11 @@ void multi_tensor_apply(
   // There might be some unkonw computation error when the passed
   // structure is too large in ATSP (>512 Byte) or ATSM(> 1MB). In this
   // implementation, metadata is copied into device by H2D.
-  xpu::dpcpp::CachingHostAllocator::Instance()->malloc(
-      (void**)&tlAddress,
-      sizeof(TLMetaForAddressScalar<scalar_t, depth>) * n_tensors);
+  tlAddress =
+      (TLMetaForAddressScalar<scalar_t, depth>*)
+          xpu::dpcpp::HostAllocator::Instance()
+              ->raw_allocate(
+                  sizeof(TLMetaForAddressScalar<scalar_t, depth>) * n_tensors);
   uint64_t totalWG = 0;
 
   // this loop record all the tensor address and numel info.
@@ -116,7 +118,7 @@ void multi_tensor_apply(
       tlAddress,
       sizeof(TLMetaForAddressScalar<scalar_t, depth>) * n_tensors,
       /*async*/ true);
-  xpu::dpcpp::CachingHostAllocator::Instance()->release(tlAddress);
+  xpu::dpcpp::HostAllocator::Instance()->release(tlAddress);
 
   auto wgMetaStorage = at::empty(
       {sizeof(TLMetaForWG) * totalWG},
@@ -124,8 +126,8 @@ void multi_tensor_apply(
   auto metaWGInput = static_cast<TLMetaForWG*>(wgMetaStorage.data_ptr());
   TLMetaForWG* tlWGMeta = nullptr;
 
-  xpu::dpcpp::CachingHostAllocator::Instance()->malloc(
-      (void**)&tlWGMeta, sizeof(TLMetaForWG) * totalWG);
+  tlWGMeta = (TLMetaForWG*)xpu::dpcpp::HostAllocator::Instance()->raw_allocate(
+      sizeof(TLMetaForWG) * totalWG);
   uint64_t posWG = 0;
   // this loop record the correspond tensor and chunk info for each work group.
   for (size_t t = 0; t < n_tensors; ++t) {
@@ -141,7 +143,7 @@ void multi_tensor_apply(
       "Work group index dose not equal to the allocated memory size, segment fault might occur");
   xpu::dpcpp::memcpyHostToDevice(
       metaWGInput, tlWGMeta, sizeof(TLMetaForWG) * totalWG, /*async*/ true);
-  xpu::dpcpp::CachingHostAllocator::Instance()->release(tlWGMeta);
+  xpu::dpcpp::HostAllocator::Instance()->release(tlWGMeta);
 
   multi_tensor_apply_kernel(
       metaAddressInput, metaWGInput, callable, totalWG, args...);
@@ -173,8 +175,8 @@ void multi_tensor_apply(
   // There might be some unkonw computation error when the passed
   // structure is too large in ATSP (>512 Byte) or ATSM(> 1MB). In this
   // implementation, metadata is copied into device by H2D.
-  xpu::dpcpp::CachingHostAllocator::Instance()->malloc(
-      (void**)&tlAddress, sizeof(TLMetaForAddress<depth>) * n_tensors);
+  tlAddress = (TLMetaForAddress<depth>*)xpu::dpcpp::HostAllocator::Instance()
+                  ->raw_allocate(sizeof(TLMetaForAddress<depth>) * n_tensors);
   uint64_t totalWG = 0;
 
   // this loop record all the tensor address and numel info.
@@ -191,7 +193,7 @@ void multi_tensor_apply(
       tlAddress,
       sizeof(TLMetaForAddress<depth>) * n_tensors,
       /*async*/ true);
-  xpu::dpcpp::CachingHostAllocator::Instance()->release(tlAddress);
+  xpu::dpcpp::HostAllocator::Instance()->release(tlAddress);
 
   auto wgMetaStorage = at::empty(
       {sizeof(TLMetaForWG) * totalWG},
@@ -199,8 +201,8 @@ void multi_tensor_apply(
   auto metaWGInput = static_cast<TLMetaForWG*>(wgMetaStorage.data_ptr());
   TLMetaForWG* tlWGMeta = nullptr;
 
-  xpu::dpcpp::CachingHostAllocator::Instance()->malloc(
-      (void**)&tlWGMeta, sizeof(TLMetaForWG) * totalWG);
+  tlWGMeta = (TLMetaForWG*)xpu::dpcpp::HostAllocator::Instance()->raw_allocate(
+      sizeof(TLMetaForWG) * totalWG);
   uint64_t posWG = 0;
   // this loop record the correspond tensor and chunk info for each work group.
   for (size_t t = 0; t < n_tensors; ++t) {
@@ -216,7 +218,7 @@ void multi_tensor_apply(
       "Work group index dose not equal to the allocated memory size, segment fault might occur");
   xpu::dpcpp::memcpyHostToDevice(
       metaWGInput, tlWGMeta, sizeof(TLMetaForWG) * totalWG, /*async*/ true);
-  xpu::dpcpp::CachingHostAllocator::Instance()->release(tlWGMeta);
+  xpu::dpcpp::HostAllocator::Instance()->release(tlWGMeta);
 
   multi_tensor_apply_kernel(
       metaAddressInput, metaWGInput, callable, totalWG, args...);

@@ -3,8 +3,11 @@
 #include <iostream>
 
 #include <ATen/ATen.h>
+#include <aten/quantized/QUtils.h>
+#include <aten/quantized/Quantizer.h>
 #include <core/MemoryFormat.h>
 #include <core/detail/TensorInfo.h>
+#include <oneDNN/Runtime.h>
 #include <oneapi/dnnl/dnnl.hpp>
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
@@ -26,8 +29,37 @@ using namespace dnnl;
 // oneDNN only supports dims <= 6 for now.
 #define MAX_ONEDNN_SUPPORTED_DIMS 6
 
+// sc&zp always have same md for PerTensor Quantization
+// Following two mds would have external linkage, but with same
+// address in different compiation unit.
+inline memory::desc Q_PER_TENSOR_SC_MD =
+    memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+inline memory::desc Q_PER_TENSOR_ZP_MD =
+    memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
+
 namespace xpu {
 namespace oneDNN {
+
+static inline std::pair<memory, memory> q_get_sc_zp_gpu_mem(
+    const Tensor qx,
+    dnnl::engine& engine) {
+  memory qx_sc_m, qx_zp_m;
+  using xpu::dpcpp::XPUQuantizerBase;
+  xpu::dpcpp::lru_key_t key_sc_zp;
+  float dnn_scale;
+  if (xpu::dpcpp::is_opaque_u8(qx)) {
+    dnn_scale = qx.q_scale();
+  } else {
+    dnn_scale = (qx.scalar_type() == kQUInt8) ? qx.q_scale() / 2 : qx.q_scale();
+  }
+  // TODO: Use correct zp after aymmetric is enabled
+  auto quant_base = xpu::dpcpp::fetch_cached_quantizer_base(dnn_scale, 0);
+  auto sc_ptr = quant_base.scale_ptr();
+  auto zp_ptr = quant_base.zero_point_ptr();
+  qx_sc_m = dpcpp_onednn_memory(Q_PER_TENSOR_SC_MD, engine, sc_ptr);
+  qx_zp_m = dpcpp_onednn_memory(Q_PER_TENSOR_ZP_MD, engine, zp_ptr);
+  return {qx_sc_m, qx_zp_m};
+}
 
 static inline memory::format_tag get_dnnl_default_format(
     int ndims,

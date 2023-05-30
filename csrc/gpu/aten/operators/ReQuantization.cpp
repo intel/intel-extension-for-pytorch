@@ -25,20 +25,23 @@ Tensor requantize(
   auto reorder_attr = xpu::oneDNN::ReorderAttr();
   int mask = 0;
   auto scale_in = src.is_quantized() ? static_cast<float>(src.q_scale()) : 1.f;
-  auto requant_scale = static_cast<float>((scale_out / scale_in));
+  float requant_scale = static_cast<float>((scale_out / scale_in));
+  // TODO:Remove this WA after asymmetric quantization
+  int32_t requant_zp = 0;
+  auto quant_base = fetch_cached_quantizer_base(requant_scale, requant_zp);
 
-  Tensor dnn_scale = at::empty({1}, at::dtype(at::kFloat).device(at::kXPU))
-                         .fill_(requant_scale);
-  // TODO: Remove workaround for dnnl symmetric quantization
-  Tensor dnn_zero_point = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
-  reorder_attr.set_dst_sc_and_zp_mask(mask);
+  reorder_attr.set_dst_sc_mask(mask);
+  if (requant_zp != 0)
+    reorder_attr.set_dst_zp_mask(mask);
   xpu::oneDNN::quantized_reorder(
       src,
       dst_,
-      /*src_scale=*/Tensor(),
-      /*src_zero_point=*/Tensor(),
-      dnn_scale,
-      dnn_zero_point,
+      /*src_scale=*/nullptr,
+      /*src_zero_point=*/nullptr,
+      quant_base.scale_ptr(),
+      /*dst_zero_point=*/nullptr,
+      {1},
+      {1},
       reorder_attr);
 
   return dst_;

@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
+#include <aten/core/HostAllocator.h>
 #include <core/detail/IndexUtils.h>
 #include <oneDNN/oneDNN.h>
-#include <runtime/CachingHostAllocator.h>
 #include <runtime/Memory.h>
 #include <runtime/Utils.h>
 #include <torch/custom_class.h>
@@ -173,8 +173,9 @@ void parallel_pad(
     // Re-allocate stackInputs every iteration to avoid read-after-write hazard
     {
       CatArrInputTensor<scalar_t, unsigned int>* stackInputs;
-      CachingHostAllocator::Instance()->malloc(
-          (void**)&stackInputs, tensorMetadataSize);
+      stackInputs = (CatArrInputTensor<scalar_t, unsigned int>*)
+                        xpu::dpcpp::HostAllocator::Instance()
+                            ->raw_allocate(tensorMetadataSize);
       for (batchCounter = 0; batchCounter < PAD_ARRAY_BATCH_SIZE &&
            (i + batchCounter) < inputs.size();
            ++batchCounter) {
@@ -191,7 +192,7 @@ void parallel_pad(
       }
       xpu::dpcpp::memcpyHostToDevice(
           d_inputs, stackInputs, tensorMetadataSize, /* async= */ true);
-      CachingHostAllocator::Instance()->release(stackInputs);
+      xpu::dpcpp::HostAllocator::Instance()->release(stackInputs);
     }
 
 #define HANDLE_CASE(DIMS)                            \

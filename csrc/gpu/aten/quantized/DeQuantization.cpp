@@ -14,6 +14,7 @@ using namespace dnnl;
 using namespace at::native;
 using namespace xpu::dpcpp;
 using namespace xpu::oneDNN;
+using namespace at::AtenIpexTypeQuantizedXPU;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -25,26 +26,26 @@ Tensor dequantize_tensor_per_tensor_affine(
     int64_t zero_point) {
   ReorderAttr rattr = ReorderAttr();
   int mask = 0;
-  rattr.set_src_sc_and_zp_mask(mask);
+  rattr.set_src_sc_mask(mask);
+  bool asymmetric = false;
+  if (asymmetric && zero_point != 0)
+    rattr.set_src_zp_mask(mask);
 
-  Tensor dnn_scale, dnn_zero_point;
-  if (is_opaque_u8(qtensor)) {
-    dnn_scale =
-        at::empty({1}, at::dtype(at::kFloat).device(at::kXPU)).fill_(scale);
-    dnn_zero_point = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
-  } else {
-    dnn_scale = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(qtensor);
-    dnn_zero_point = at::AtenIpexTypeQuantizedXPU::q_zero_point_tensor(qtensor);
-  }
-  // See [Note: Scale setting for reorder]
   Tensor rtensor_ = at::empty(qtensor.sizes(), rtensor.options());
+  // TODO: Revmoe WA after asymmetric
+  if ((!is_opaque_u8(qtensor)) && qtensor.scalar_type() == kQUInt8) {
+    scale = scale / 2.f;
+  }
+  auto quant_base = fetch_cached_quantizer_base(scale, 0);
   xpu::oneDNN::quantized_reorder(
       qtensor,
       rtensor_,
-      dnn_scale,
-      dnn_zero_point,
-      /*dst_scale=*/Tensor(),
-      /*dst_zero_point=*/Tensor(),
+      (float*)quant_base.scale_ptr(),
+      (int32_t*)quant_base.zero_point_ptr(),
+      /*dst_scale=*/nullptr,
+      /*dst_zero_point=*/nullptr,
+      {1},
+      {1},
       rattr);
   return rtensor_;
 }
@@ -57,7 +58,6 @@ Tensor dequantize_tensor_per_channel_affine(
     int64_t axis) {
   auto q_eng =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
-
   memory::dims q_dims = qtensor.dim() == 4 ? memory::dims(
                                                  {qtensor.size(0),
                                                   qtensor.size(1),
@@ -82,23 +82,18 @@ Tensor dequantize_tensor_per_channel_affine(
   ReorderAttr rattr;
   int mask = (1 << axis);
   // See [Note: Scale setting for reorder]
-  Tensor dnn_scale =
-      at::ones({num_channels}, at::dtype(at::kFloat).device(at::kXPU)) *
-      scales.to(at::kFloat);
-  // TODO: Remove workaround for dnnl symmetric quantization
-  Tensor dnn_zero_point =
-      at::zeros({num_channels}, at::dtype(at::kInt).device(at::kXPU));
-
-  rattr.set_src_sc_and_zp_mask(mask);
+  rattr.set_src_sc_mask(mask);
 
   Tensor rtensor_ = empty_opaque_tensor(r_md, rtensor.options(), c10::nullopt);
   xpu::oneDNN::quantized_reorder(
       qtensor,
       rtensor_,
-      dnn_scale,
-      dnn_zero_point,
-      /*dst_scale=*/Tensor(),
-      /*dst_zero_point=*/Tensor(),
+      (float*)scales.data_ptr(),
+      /*src_zero_point*/ nullptr,
+      /*dst_scale=*/nullptr,
+      /*dst_zero_point=*/nullptr,
+      /*scale_zp_sz*/ scales.sizes().vec(),
+      /*scale_zp_st*/ scales.strides().vec(),
       rattr);
 
   return rtensor_;

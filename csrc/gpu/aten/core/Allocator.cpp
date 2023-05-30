@@ -5,97 +5,100 @@
 #include <runtime/Exception.h>
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
+#include "DeviceAllocator.h"
+#include "HostAllocator.h"
 
 namespace xpu {
 namespace dpcpp {
 
-/// Device Allocator
-class DeviceAllocator final : public at::Allocator {
- public:
-  DeviceAllocator() {}
+void DeviceAllocator::deleter(void* ptr) {
+  auto* ctx = static_cast<at::AtenIpexTypeXPU::DPCPPTensorContext*>(ptr);
+  auto data = ctx->data();
+  Instance()->alloc()->free(data);
+  delete ctx;
+}
 
-  // Singleton
-  static DeviceAllocator* Instance();
+DataPtr DeviceAllocator::allocate(size_t size) const {
+  DeviceIndex curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  void* r = nullptr;
+  if (size != 0) {
+    auto stream = getCurrentDPCPPStream(curDevID);
+    Instance()->alloc()->malloc(&r, size, &dpcppGetQueueFromStream(stream));
+  }
+  auto ctx = new at::AtenIpexTypeXPU::DPCPPTensorContext(r);
+  return {r, ctx, &deleter, Device(DeviceType::XPU, curDevID)};
+}
 
-  static void deleter(void* ptr) {
-    auto* ctx = static_cast<at::AtenIpexTypeXPU::DPCPPTensorContext*>(ptr);
-    auto data = ctx->data();
-    Instance()->alloc()->free(data);
-    delete ctx;
+void* DeviceAllocator::raw_allocate(size_t size) {
+  DeviceIndex curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  void* r = nullptr;
+  if (size != 0) {
+    auto stream = getCurrentDPCPPStream(curDevID);
+    Instance()->alloc()->malloc(&r, size, &dpcppGetQueueFromStream(stream));
+  }
+  return r;
+}
+
+at::DeleterFnPtr DeviceAllocator::raw_deleter() const {
+  return &deleter;
+}
+
+void DeviceAllocator::emptyCache() {
+  alloc()->emptyCache();
+}
+
+void DeviceAllocator::cacheInfo(
+    DeviceId deviceIndex,
+    size_t* cachedAndFree,
+    size_t* largestBlock) {
+  alloc()->cacheInfo(deviceIndex, cachedAndFree, largestBlock);
+}
+
+void* DeviceAllocator::getBaseAllocation(void* ptr, size_t* size) {
+  return alloc()->getBaseAllocation(ptr, size);
+}
+
+void DeviceAllocator::recordStream(const at::DataPtr& ptr, DPCPPStream stream) {
+  if (!ptr.get()) {
+    return;
   }
 
-  DataPtr allocate(size_t size) const override {
-    DeviceIndex curDevID;
-    AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-    void* r = nullptr;
-    if (size != 0) {
-      auto stream = getCurrentDPCPPStream(curDevID);
-      Instance()->alloc()->malloc(&r, size, &dpcppGetQueueFromStream(stream));
-    }
-    auto ctx = new at::AtenIpexTypeXPU::DPCPPTensorContext(r);
-    return {r, ctx, &deleter, Device(DeviceType::XPU, curDevID)};
+  if (ptr.get_deleter() != &deleter) {
+    return;
   }
 
-  at::DeleterFnPtr raw_deleter() const override {
-    return &deleter;
-  }
+  alloc()->recordQueue(ptr.get(), &dpcppGetQueueFromStream(stream));
+}
 
-  void emptyCache() {
-    alloc()->emptyCache();
-  }
+std::mutex* DeviceAllocator::getFreeMutex() {
+  return alloc()->getDPCPPFreeMutex();
+}
 
-  void cacheInfo(
-      DeviceId deviceIndex,
-      size_t* cachedAndFree,
-      size_t* largestBlock) {
-    alloc()->cacheInfo(deviceIndex, cachedAndFree, largestBlock);
-  }
+DeviceStats DeviceAllocator::getDeviceStats(DeviceIndex device_index) {
+  return alloc()->getStatsForDevice(device_index);
+}
 
-  void* getBaseAllocation(void* ptr, size_t* size) {
-    return alloc()->getBaseAllocation(ptr, size);
-  }
+void DeviceAllocator::resetAccumulatedStats(DeviceIndex device_index) {
+  alloc()->resetAccumulatedStats(device_index);
+}
 
-  void recordStream(const at::DataPtr& ptr, DPCPPStream stream) {
-    if (!ptr.get()) {
-      return;
-    }
+void DeviceAllocator::resetPeakStats(DeviceIndex device_index) {
+  alloc()->resetPeakStats(device_index);
+}
 
-    if (ptr.get_deleter() != &deleter) {
-      return;
-    }
+void DeviceAllocator::dumpMemoryStatus(DeviceIndex device_index) {
+  alloc()->dumpMemoryStatus(device_index);
+}
 
-    alloc()->recordQueue(ptr.get(), &dpcppGetQueueFromStream(stream));
-  }
+std::vector<SegmentInfo> DeviceAllocator::snapshot() {
+  return alloc()->snapshot();
+}
 
-  std::mutex* getFreeMutex() {
-    return alloc()->getDPCPPFreeMutex();
-  }
-
-  DeviceStats getDeviceStats(DeviceIndex device_index) {
-    return alloc()->getStatsForDevice(device_index);
-  }
-
-  void resetAccumulatedStats(DeviceIndex device_index) {
-    alloc()->resetAccumulatedStats(device_index);
-  }
-
-  void resetPeakStats(DeviceIndex device_index) {
-    alloc()->resetPeakStats(device_index);
-  }
-
-  void dumpMemoryStatus(DeviceIndex device_index) {
-    alloc()->dumpMemoryStatus(device_index);
-  }
-
-  std::vector<SegmentInfo> snapshot() {
-    return alloc()->snapshot();
-  }
-
- private:
-  CachingDeviceAllocator* alloc() {
-    return CachingDeviceAllocator::Instance();
-  }
-};
+CachingDeviceAllocator* DeviceAllocator::alloc() {
+  return CachingDeviceAllocator::Instance();
+}
 
 static DeviceAllocator myInstance;
 
@@ -154,49 +157,50 @@ std::mutex* getFreeMutexOfDevAlloc() {
 }
 
 /// Host Allocator
-class HostAllocator final : public at::Allocator {
- public:
-  // Singleton
-  static HostAllocator* Instance() {
-    static HostAllocator myInstance;
-    return &myInstance;
-  }
+HostAllocator* HostAllocator::Instance() {
+  static HostAllocator myInstance;
+  return &myInstance;
+}
 
-  static void deleter(void* ptr) {
-    Instance()->release(ptr);
-  }
+void HostAllocator::deleter(void* ptr) {
+  Instance()->release(ptr);
+}
 
-  at::DataPtr allocate(size_t size) const override {
-    void* ptr = nullptr;
-    Instance()->alloc()->malloc(&ptr, size);
-    return {ptr, ptr, &deleter, at::DeviceType::CPU};
-  }
+at::DataPtr HostAllocator::allocate(size_t size) const {
+  void* ptr = nullptr;
+  Instance()->alloc()->malloc(&ptr, size);
+  return {ptr, ptr, &deleter, at::DeviceType::CPU};
+}
 
-  at::DeleterFnPtr raw_deleter() const override {
-    return &deleter;
-  }
+void* HostAllocator::raw_allocate(size_t size) {
+  void* ptr = nullptr;
+  Instance()->alloc()->malloc(&ptr, size);
+  return ptr;
+}
 
-  bool isHostPtr(void* ptr) {
-    return alloc()->isHostPtr(ptr);
-  }
+at::DeleterFnPtr HostAllocator::raw_deleter() const {
+  return &deleter;
+}
 
-  void emptyCache() {
-    alloc()->emptyCache();
-  }
+bool HostAllocator::isHostPtr(void* ptr) {
+  return alloc()->isHostPtr(ptr);
+}
 
-  void recordEvent(void* ptr, sycl::event& e) {
-    alloc()->recordEvent(ptr, e);
-  }
+void HostAllocator::emptyCache() {
+  alloc()->emptyCache();
+}
 
- private:
-  CachingHostAllocator* alloc() {
-    return CachingHostAllocator::Instance();
-  }
+void HostAllocator::recordEvent(void* ptr, sycl::event& e) {
+  alloc()->recordEvent(ptr, e);
+}
 
-  void release(void* ptr) {
-    alloc()->release(ptr);
-  }
-};
+CachingHostAllocator* HostAllocator::alloc() {
+  return CachingHostAllocator::Instance();
+}
+
+void HostAllocator::release(void* ptr) {
+  alloc()->release(ptr);
+}
 
 Allocator* getHostAllocator() {
   return HostAllocator::Instance();

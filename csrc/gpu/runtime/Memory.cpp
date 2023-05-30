@@ -1,5 +1,5 @@
+#include <aten/core/HostAllocator.h>
 #include <aten/operators/comm/ScalarType.h>
-#include <runtime/CachingHostAllocator.h>
 #include <runtime/Memory.h>
 #include <runtime/Utils.h>
 #include <utils/Profiler.h>
@@ -21,7 +21,7 @@ void memcpyHostToDevice(
   if (!async) {
     e.wait();
   } else {
-    CachingHostAllocator::Instance()->recordEvent(const_cast<void*>(src), e);
+    HostAllocator::Instance()->recordEvent(const_cast<void*>(src), e);
   }
 
   dpcpp_log("dpcpp_kernel", e);
@@ -42,7 +42,7 @@ void memcpyDeviceToHost(
   if (!async) {
     e.wait();
   } else {
-    CachingHostAllocator::Instance()->recordEvent(const_cast<void*>(dst), e);
+    HostAllocator::Instance()->recordEvent(const_cast<void*>(dst), e);
   }
 
   dpcpp_log("dpcpp_kernel", e);

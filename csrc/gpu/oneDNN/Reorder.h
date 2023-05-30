@@ -22,41 +22,61 @@ struct ReorderAttr {
  public:
   ReorderAttr(bool is_group = false)
       : pattr_(primitive_attr()),
-        src_has_sc_zp_(false),
-        dst_has_sc_zp_(false) {}
+        src_has_sc_(false),
+        src_has_zp_(false),
+        dst_has_sc_(false),
+        dst_has_zp_(false) {}
 
  public:
   // [Note: Scale setting for reorder]
   // For no post op on reorder, dst = src_scale * src / dst_scale;
   // dst_scale should be set carefully.
-  void set_src_sc_and_zp_mask(int mask) {
+  void set_src_sc_mask(int mask) {
     pattr_.set_scales_mask(DNNL_ARG_SRC, mask);
-    pattr_.set_zero_points_mask(DNNL_ARG_SRC, mask);
-    src_has_sc_zp_ = true;
+    src_has_sc_ = true;
   }
 
-  void set_dst_sc_and_zp_mask(int mask) {
+  void set_src_zp_mask(int mask) {
+    pattr_.set_zero_points_mask(DNNL_ARG_SRC, mask);
+    src_has_zp_ = true;
+  }
+
+  void set_dst_sc_mask(int mask) {
     pattr_.set_scales_mask(DNNL_ARG_DST, mask);
+    dst_has_sc_ = true;
+  }
+
+  void set_dst_zp_mask(int mask) {
     pattr_.set_zero_points_mask(DNNL_ARG_DST, mask);
-    dst_has_sc_zp_ = true;
+    dst_has_zp_ = true;
   }
 
   primitive_attr pattr() const {
     return pattr_;
   }
 
-  bool src_has_sc_zp() const {
-    return src_has_sc_zp_;
+  bool src_has_sc() const {
+    return src_has_sc_;
   }
 
-  bool dst_has_sc_zp() const {
-    return dst_has_sc_zp_;
+  bool src_has_zp() const {
+    return src_has_zp_;
+  }
+
+  bool dst_has_sc() const {
+    return dst_has_sc_;
+  }
+
+  bool dst_has_zp() const {
+    return dst_has_zp_;
   }
 
  private:
   primitive_attr pattr_;
-  bool src_has_sc_zp_;
-  bool dst_has_sc_zp_;
+  bool src_has_sc_;
+  bool src_has_zp_;
+  bool dst_has_sc_;
+  bool dst_has_zp_;
 };
 
 static inline memory::desc check_group_and_create_plain_md(
@@ -120,25 +140,13 @@ static inline void reorder(
 static inline void quantized_reorder(
     const Tensor& src,
     Tensor& dst,
-    const Tensor& src_scale,
-    const Tensor& src_zero_point,
-    const Tensor& dst_scale,
-    const Tensor& dst_zero_point,
-    const ReorderAttr& rattr = ReorderAttr()) {
-  RECORD_FUNCTION("dnnl_qreorder", std::vector<c10::IValue>({src}));
-  if (dst.is_same(src))
-    return;
-
-  if (rattr.src_has_sc_zp())
-    TORCH_CHECK(
-        src_scale.defined() && src_zero_point.defined(),
-        "Src scale and zero point should be defined for this reorder");
-
-  if (rattr.dst_has_sc_zp())
-    TORCH_CHECK(
-        dst_scale.defined() && dst_zero_point.defined(),
-        "Dst scale and zero point should be defined for this reorder");
-
+    float* src_scale,
+    int32_t* src_zero_point,
+    float* dst_scale,
+    int32_t* dst_zero_point,
+    std::vector<long> scale_zp_sz,
+    std::vector<long> scale_zp_st,
+    const ReorderAttr& rattr) {
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -166,37 +174,27 @@ static inline void quantized_reorder(
   memory::desc src_sc_md, src_zp_md, dst_sc_md, dst_zp_md;
   memory src_sc_mem, src_zp_mem, dst_sc_mem, dst_zp_mem;
 
-  if (rattr.src_has_sc_zp()) {
-    src_sc_md = memory::desc(
-        get_onednn_dims(src_scale),
-        memory::data_type::f32,
-        get_onednn_strides(src_scale));
-    src_sc_mem = dpcpp_onednn_memory(src_sc_md, engine, src_scale.data_ptr());
+  if (rattr.src_has_sc()) {
+    src_sc_md = memory::desc(scale_zp_sz, memory::data_type::f32, scale_zp_st);
+    src_sc_mem = dpcpp_onednn_memory(src_sc_md, engine, src_scale);
     reorder_args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, src_sc_mem});
+  }
 
-    src_zp_md = memory::desc(
-        get_onednn_dims(src_zero_point),
-        memory::data_type::s32,
-        memory::format_tag::x);
-    src_zp_mem =
-        dpcpp_onednn_memory(src_zp_md, engine, src_zero_point.data_ptr());
+  if (rattr.src_has_zp()) {
+    src_zp_md = memory::desc(scale_zp_sz, memory::data_type::s32, scale_zp_st);
+    src_zp_mem = dpcpp_onednn_memory(src_zp_md, engine, src_zero_point);
     reorder_args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, src_zp_mem});
   }
 
-  if (rattr.dst_has_sc_zp()) {
-    dst_sc_md = memory::desc(
-        get_onednn_dims(dst_scale),
-        memory::data_type::f32,
-        get_onednn_strides(dst_scale));
-    dst_sc_mem = dpcpp_onednn_memory(src_sc_md, engine, dst_scale.data_ptr());
+  if (rattr.dst_has_sc()) {
+    dst_sc_md = memory::desc(scale_zp_sz, memory::data_type::f32, scale_zp_st);
+    dst_sc_mem = dpcpp_onednn_memory(src_sc_md, engine, dst_scale);
     reorder_args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_DST, dst_sc_mem});
+  }
 
-    dst_zp_md = memory::desc(
-        get_onednn_dims(dst_zero_point),
-        memory::data_type::s32,
-        get_onednn_strides(dst_zero_point));
-    dst_zp_mem =
-        dpcpp_onednn_memory(dst_zp_md, engine, dst_zero_point.data_ptr());
+  if (rattr.dst_has_zp()) {
+    dst_zp_md = memory::desc(scale_zp_sz, memory::data_type::s32, scale_zp_st);
+    dst_zp_mem = dpcpp_onednn_memory(dst_zp_md, engine, dst_zero_point);
     reorder_args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zp_mem});
   }
 

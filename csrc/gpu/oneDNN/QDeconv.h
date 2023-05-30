@@ -359,38 +359,21 @@ static Tensor quantized_deconvolution(
 
   auto deconv_fwd = deconvolution_forward(deconv_fwd_pd);
 
-  Tensor src_sc;
-  memory::desc src_sc_md;
-  memory src_sc_m;
-  if (is_opaque_u8(src)) {
-    src_sc = at::empty({1}, at::dtype(at::kFloat).device(at::kXPU))
-                 .fill_(static_cast<float>(src.q_scale()));
-    src_sc_m = dpcpp_onednn_memory(src_sc_md, engine, src_sc.data_ptr());
-  } else {
-    src_sc = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(src);
-    src_sc_m = dpcpp_onednn_memory(src_sc_md, engine, src_sc.data_ptr());
-  }
+  memory src_sc_m, src_zp_m;
+  std::tie(src_sc_m, src_zp_m) = q_get_sc_zp_gpu_mem(src, engine);
   args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, src_sc_m});
 
 #ifdef BUILD_PRIOR_SYMM_QUANT
   // Only setting zp when zp is not zero
   // See: [Note: Use symmetric quant implementation when zp is 0]
-  Tensor src_zp;
-  memory::desc src_zp_md;
   memory src_zp_m;
   if (src_need_zp) {
-    src_zp = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
-    src_zp_md =
-        memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
-    src_zp_m = dpcpp_onednn_memory(src_zp_md, engine, src_zp.data_ptr());
     args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, src_zp_m});
   }
 #endif
 
-  Tensor dst_sc = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(dst);
-  memory::desc dst_sc_md =
-      memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
-  memory dst_sc_m = dpcpp_onednn_memory(dst_sc_md, engine, dst_sc.data_ptr());
+  memory dst_sc_m, dst_zp_m;
+  std::tie(dst_sc_m, dst_zp_m) = q_get_sc_zp_gpu_mem(dst, engine);
   args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_DST, dst_sc_m});
 
 #ifdef BUILD_PRIOR_SYMM_QUANT
@@ -398,58 +381,23 @@ static Tensor quantized_deconvolution(
   // See: [Note: Use symmetric quant implementation when zp is 0]
   Tensor dst_zp;
   if (dst_need_zp) {
-    dst_zp = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
-    memory::desc dst_zp_md =
-        memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
-    memory dst_zp_m = dpcpp_onednn_memory(dst_zp_md, engine, dst_zp.data_ptr());
     args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zp_m});
   }
 #endif
 
   if (wgh.qscheme() == kPerTensorAffine) {
-    Tensor wgh_sc = at::AtenIpexTypeQuantizedXPU::q_scale_tensor(wgh);
-    memory::desc wgh_sc_md =
-        memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
-    memory wgh_sc_m = dpcpp_onednn_memory(wgh_sc_md, engine, wgh_sc.data_ptr());
+    memory wgh_sc_m, wgh_zp_m;
+    std::tie(wgh_sc_m, wgh_zp_m) = q_get_sc_zp_gpu_mem(wgh, engine);
     args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});
 
-#ifdef BUILD_PRIOR_SYMM_QUANT
-    // Only setting zp when zp is not zero
-    // See: [Note: Use symmetric quant implementation when zp is 0]
-    Tensor wgh_zp;
-    memory::desc wgh_zp_md;
-    memory wgh_zp_m;
-    if (wgh_need_zp) {
-      wgh_zp = at::zeros({1}, at::dtype(at::kInt).device(at::kXPU));
-      wgh_zp_md =
-          memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
-      wgh_zp_m = dpcpp_onednn_memory(wgh_zp_md, engine, wgh_zp.data_ptr());
-      args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS, wgh_zp_m});
-    }
-#endif
     DPCPP_ONEDNN_EXEC(deconv_fwd, strm, args);
   } else {
     // Per-channel quantized
-    Tensor wgh_sc = wgh.q_per_channel_scales().to(at::kFloat);
+    Tensor wgh_sc = wgh.q_per_channel_scales();
     memory::desc wgh_sc_md = memory::desc(
         get_onednn_dims(wgh_sc), memory::data_type::f32, memory::format_tag::x);
     memory wgh_sc_m = dpcpp_onednn_memory(wgh_sc_md, engine, wgh_sc.data_ptr());
     args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});
-
-#ifdef BUILD_PRIOR_SYMM_QUANT
-    // Only setting mask when zp is not zero
-    // See: [Note: Use symmetric quant implementation when zp is 0]
-    Tensor wgh_zp;
-    memory::desc wgh_zp_md;
-    memory wgh_zp_m;
-    if (wgh_need_zp) {
-      wgh_zp = wgh.q_per_channel_zero_points().to(at::kInt);
-      wgh_zp_md =
-          memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
-      wgh_zp_m = dpcpp_onednn_memory(wgh_zp_md, engine, wgh_zp.data_ptr());
-      args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS, wgh_zp_m});
-    }
-#endif
 
     DPCPP_ONEDNN_EXEC(deconv_fwd, strm, args);
   }
