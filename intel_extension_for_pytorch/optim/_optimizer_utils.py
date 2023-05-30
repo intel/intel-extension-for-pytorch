@@ -71,8 +71,8 @@ def patch_zero_grad_for_master_weight_training(optimizer):
         self._original_zero_grad(set_to_none)
 
     if not hasattr(optimizer, "_original_zero_grad"):
-        setattr(optimizer, "_original_zero_grad", optimizer.zero_grad)
-        setattr(optimizer, "zero_grad", types.MethodType(zero_grad, optimizer))
+        setattr(optimizer, "_original_zero_grad", optimizer.zero_grad)  # noqa: B010
+        optimizer.zero_grad = types.MethodType(zero_grad, optimizer)
 
 
 def patch_step_for_master_weight_training(optimizer):
@@ -142,14 +142,10 @@ def patch_step_for_master_weight_training(optimizer):
         return loss
 
     if not hasattr(optimizer, "_original_step"):
-        setattr(optimizer, "_original_step", optimizer.step)
-        setattr(
-            optimizer, "step", types.MethodType(master_param_non_fused_step, optimizer)
-        )
-        setattr(optimizer, "sync_grad", types.MethodType(sync_grad, optimizer))
-        setattr(
-            optimizer, "step_sync_weight", types.MethodType(step_sync_weight, optimizer)
-        )
+        setattr(optimizer, "_original_step", optimizer.step)  # noqa: B010
+        optimizer.step = types.MethodType(master_param_non_fused_step, optimizer)
+        optimizer.sync_grad = types.MethodType(sync_grad, optimizer)
+        optimizer.step_sync_weight = types.MethodType(step_sync_weight, optimizer)
 
 
 def pack_state(state, state_key, state_value, attr):
@@ -301,10 +297,10 @@ def patch_load_state_dict(optimizer):
         repack(self)
 
     if not hasattr(optimizer, "_original_load_state_dict"):
-        setattr(optimizer, "_original_load_state_dict", optimizer.load_state_dict)
-        setattr(
-            optimizer, "load_state_dict", types.MethodType(load_state_dict, optimizer)
+        setattr(  # noqa: B010
+            optimizer, "_original_load_state_dict", optimizer.load_state_dict
         )
+        optimizer.load_state_dict = types.MethodType(load_state_dict, optimizer)
 
 
 def pack_optimizer_states(optimizer, param, attr):
@@ -354,11 +350,9 @@ def patch_state_dict(optimizer):
         return opt_temp.state_dict()
 
     if not hasattr(optimizer, "_original_state_dict"):
-        setattr(optimizer, "_original_state_dict", optimizer.state_dict)
-        setattr(
-            optimizer,
-            "state_dict",
-            types.MethodType(get_optimizer_unpacked_state_dict, optimizer),
+        setattr(optimizer, "_original_state_dict", optimizer.state_dict)  # noqa: B010
+        optimizer.state_dict = types.MethodType(
+            get_optimizer_unpacked_state_dict, optimizer
         )
 
 
@@ -368,7 +362,7 @@ def optimizer_fusion(optimizer, master_weight_split, device_type):
     """
 
     if not hasattr(optimizer, "params_attr"):
-        setattr(optimizer, "params_attr", {})
+        setattr(optimizer, "params_attr", {})  # noqa: B010
     try:
         if device_type == "cpu":
             step = OPTIMIZER_FUSED_STEP_MAPPING_CPU[type(optimizer)]
@@ -382,9 +376,9 @@ def optimizer_fusion(optimizer, master_weight_split, device_type):
             )
             return optimizer
         if not hasattr(optimizer, "_original_step"):
-            setattr(optimizer, "_original_step", optimizer.step)
-        setattr(optimizer, "step", types.MethodType(step, optimizer))
-        setattr(optimizer, "fused", True)
+            setattr(optimizer, "_original_step", optimizer.step)  # noqa: B010
+        optimizer.step = types.MethodType(step, optimizer)
+        setattr(optimizer, "fused", True)  # noqa: B010
     except KeyError:
         warnings.warn(
             "Does not suport fused step for "

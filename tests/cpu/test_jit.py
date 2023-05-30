@@ -74,7 +74,7 @@ def get_rand_seed():
 
 
 try:
-    import torchvision
+    import torchvision  # noqa: F401
 
     HAS_TORCHVISION = True
 except ImportError:
@@ -89,14 +89,14 @@ convtranspose_module = {2: torch.nn.ConvTranspose2d, 3: torch.nn.ConvTranspose3d
 bn_module = {2: torch.nn.BatchNorm2d, 3: torch.nn.BatchNorm3d}
 
 
-class EltwiseFusionOp:
-    def __init__(
-        self, ipex_eltwise_op, bf16_supported=True, prec=0.02, op_input_list={}
-    ):
-        self.ipex_eltwise_op = ipex_eltwise_op
-        self.bf16_supported = bf16_supported
-        self.prec = prec
-        self.op_input_list = op_input_list
+from typing import Dict, NamedTuple
+
+
+class EltwiseFusionOp(NamedTuple):
+    ipex_eltwise_op: str
+    bf16_supported: bool = True
+    prec: float = 0.02
+    op_input_list: Dict = {}
 
 
 unary_PyTorch_op_to_IPEX_op_map = {
@@ -1511,10 +1511,16 @@ class Tester(TestCase):
         kind_in_graph=None,
         kind_not_in_graph=None,
         prec=None,
-        levels=["O0", "O1"],
-        use_channels_last=[True, False],
-        use_te=[False, True],
+        levels=None,
+        use_channels_last=None,
+        use_te=None,
     ):
+        if levels is None:
+            levels = ["O0", "O1"]
+        if use_channels_last is None:
+            use_channels_last = [True, False]
+        if use_te is None:
+            use_te = [False, True]
         modelName = base_model.__class__.__name__
         options = itertools.product(levels, use_channels_last, use_te)
         for level, use_channels_last, use_te in options:
@@ -1620,10 +1626,16 @@ class Tester(TestCase):
         kind_in_graph=None,
         kind_not_in_graph=None,
         prec=None,
-        levels=["O0", "O1"],
-        use_channels_last=[True, False],
-        use_te=[True, False],
+        levels=None,
+        use_channels_last=None,
+        use_te=None,
     ):
+        if levels is None:
+            levels = ["O0", "O1"]
+        if use_channels_last is None:
+            use_channels_last = [True, False]
+        if use_te is None:
+            use_te = [True, False]
         modelName = base_model.__class__.__name__
         options = itertools.product(levels, use_channels_last, use_te)
         for level, use_channels_last, use_te in options:
@@ -1735,7 +1747,9 @@ class Tester(TestCase):
         self.assertTrue(any(n.kind() == imperative_node for n in trace_graph.nodes()))
 
     def test_concat_linear(self):
-        def check_op_count(graph_str, op_names=[]):
+        def check_op_count(graph_str, op_names=None):
+            if op_names is None:
+                op_names = []
             count = 0
             node_list = graph_str.strip().split("\n")
             for node in node_list:
@@ -5019,7 +5033,9 @@ class Tester(TestCase):
 
     def test_restore_inplace(self):
         class M(nn.Module):
-            def __init__(self, eltwise_fn, params_dict={}):
+            def __init__(self, eltwise_fn, params_dict=None):
+                if params_dict is None:
+                    params_dict = {}
                 super(M, self).__init__()
                 self.conv = torch.nn.Conv2d(3, 5, 3, 3)
                 self.eltwise = eltwise_fn
@@ -5086,7 +5102,9 @@ class Tester(TestCase):
     def test_enable_inplace(self):
         # M_apply_inplace is for testing success inplace replacement condition
         class M_apply_inplace(nn.Module):
-            def __init__(self, eltwise_fn, params_dict={}):
+            def __init__(self, eltwise_fn, params_dict=None):
+                if params_dict is None:
+                    params_dict = {}
                 super(M_apply_inplace, self).__init__()
                 self.eltwise = eltwise_fn
                 self.params_dict = params_dict
@@ -5101,7 +5119,9 @@ class Tester(TestCase):
 
         # M_remain_outplace is for testing failed inplace replacement condition
         class M_remain_outplace(nn.Module):
-            def __init__(self, eltwise_fn, params_dict={}):
+            def __init__(self, eltwise_fn, params_dict=None):
+                if params_dict is None:
+                    params_dict = {}
                 super(M_remain_outplace, self).__init__()
                 self.eltwise = eltwise_fn
                 self.params_dict = params_dict

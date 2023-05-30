@@ -5,9 +5,7 @@ import copy
 import logging
 import os
 import pkg_resources
-import types
 from intel_extension_for_pytorch import optim
-from  contextlib import ExitStack
 
 logger = logging.getLogger(__name__)
 
@@ -258,6 +256,7 @@ def is_with_hook_on_weight_or_bias(module):
 
 def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
     from ._parameter_wrapper import (
+        patch_state_dict,
         get_shared_parameter_status,
         IPEX_WEIGHT_PREPACK_MODULE_CPU,
     )
@@ -334,33 +333,10 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
             model, optimizer, params_attr
         )
 
-        def patch_state_dict():
-            def cast_back_state_dict(
-                self, *args, destination=None, prefix="", keep_vars=False
-            ):
-                with torch.no_grad(), ExitStack() as stack:
-                    for v in params_attr.values():
-                        stack.enter_context(v.prepack_cast_save())
-                    out = self._original_state_dict(
-                        *args,
-                        destination=destination,
-                        prefix=prefix,
-                        keep_vars=keep_vars
-                    )
-                return out
-
-            if not hasattr(opt_model, "_original_state_dict"):
-                setattr(opt_model, "_original_state_dict", opt_model.state_dict)
-            setattr(
-                opt_model,
-                "state_dict",
-                types.MethodType(cast_back_state_dict, opt_model),
-            )
-
-        patch_state_dict()
-        setattr(opt_model, "params_attr", params_attr)
+        patch_state_dict(opt_model, params_attr, "prepack")
+        setattr(opt_model, "params_attr", params_attr)  # noqa: B010
         if opt_optmizer is not None:
-            setattr(opt_optmizer, "params_attr", params_attr)
+            setattr(opt_optmizer, "params_attr", params_attr)  # noqa: B010
             optim._optimizer_utils.patch_load_state_dict(opt_optmizer)
             optim._optimizer_utils.patch_state_dict(opt_optmizer)
         return opt_model, opt_optmizer, params_attr

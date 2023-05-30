@@ -1,9 +1,8 @@
 import torch
 import copy
 from torch.nn.utils.rnn import PackedSequence
-from ._parameter_wrapper import get_shared_parameter_status
-import contextlib
-import types
+from ._parameter_wrapper import get_shared_parameter_status, patch_state_dict
+
 
 class _LSTM(torch.nn.LSTM):
     # This is a solution to swap the lstm module with the ipex counterpart
@@ -142,28 +141,5 @@ def convert_model_data_type(model, dtype):
         if params_attr[param].can_cast_inference(dtype):
             params_attr[param].cast_for_inference(dtype)
 
-    def patch_state_dict():
-        def cast_back_state_dict(
-            self, *args, destination=None, prefix="", keep_vars=False
-        ):
-            with torch.no_grad(), contextlib.ExitStack() as stack:
-                for v in params_attr.values():
-                    stack.enter_context(v.inference_cast_save())
-                out = self._original_state_dict(
-                    *args,
-                    destination=destination,
-                    prefix=prefix,
-                    keep_vars=keep_vars
-                )
-            return out
-
-        if not hasattr(model, "_original_state_dict"):
-            setattr(model, "_original_state_dict", model.state_dict)
-        setattr(
-            model,
-            "state_dict",
-            types.MethodType(cast_back_state_dict, model),
-        )
-
-    patch_state_dict()
+    patch_state_dict(model, params_attr, "inference")
     return params_attr, model

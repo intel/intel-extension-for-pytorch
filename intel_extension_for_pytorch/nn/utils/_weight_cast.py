@@ -2,8 +2,8 @@ import torch
 import sys
 from intel_extension_for_pytorch.optim import _optimizer_utils
 import types
-from ._parameter_wrapper import get_shared_parameter_status
-import contextlib
+from ._parameter_wrapper import get_shared_parameter_status, patch_state_dict
+
 
 def weight_dtype_convert_with_ipex(
     model, optimizer, params_attr, master_weight_split, dtype=torch.bfloat16
@@ -38,7 +38,7 @@ def weight_dtype_convert_with_ipex(
 
     def convert(module):
         if not hasattr(module, "master_weight_split"):
-            setattr(module, "master_weight_split", master_weight_split)
+            setattr(module, "master_weight_split", master_weight_split)  # noqa: B010
             # replace weight/bias
             for name, param in module._parameters.items():
                 if param is None:
@@ -54,10 +54,8 @@ def weight_dtype_convert_with_ipex(
                                 param_wrapper.parameter,
                             )
                     setattr(module, name + "_wrapper", param_wrapper)
-                    setattr(
-                        module,
-                        "_load_from_state_dict",
-                        types.MethodType(_load_from_state_dict, module),
+                    module._load_from_state_dict = types.MethodType(
+                        _load_from_state_dict, module
                     )
 
     def isCLIPTextEmbeddings(module):
@@ -76,35 +74,12 @@ def weight_dtype_convert_with_ipex(
 
     convert_rec(model)
 
-    def patch_state_dict():
-        def cast_back_state_dict(
-            self, *args, destination=None, prefix="", keep_vars=False
-        ):
-            with torch.no_grad(), contextlib.ExitStack() as stack:
-                for v in params_attr.values():
-                    stack.enter_context(v.training_cast_save())
-                out = self._original_state_dict(
-                    *args,
-                    destination=destination,
-                    prefix=prefix,
-                    keep_vars=keep_vars
-                )
-            return out
-
-        if not hasattr(model, "_original_state_dict"):
-            setattr(model, "_original_state_dict", model.state_dict)
-        setattr(
-            model,
-            "state_dict",
-            types.MethodType(cast_back_state_dict, model),
-        )
-
-    patch_state_dict()
+    patch_state_dict(model, params_attr, "training")
 
     if optimizer is not None:
         _optimizer_utils.patch_load_state_dict(optimizer)
         if not hasattr(optimizer, "params_attr"):
-            setattr(optimizer, "params_attr", params_attr)
+            setattr(optimizer, "params_attr", params_attr)  # noqa: B010
         if not master_weight_split:
             _optimizer_utils.patch_step_for_master_weight_training(optimizer)
             _optimizer_utils.patch_zero_grad_for_master_weight_training(optimizer)

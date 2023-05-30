@@ -12,11 +12,12 @@ def get_rand_seed():
 
 conv_module = {1: torch.nn.Conv1d, 2: torch.nn.Conv2d, 3: torch.nn.Conv3d}
 
+from typing import Dict, NamedTuple
 
-class EltwiseFusionOp:
-    def __init__(self, ipex_eltwise_op, op_input_list={}):
-        self.ipex_eltwise_op = ipex_eltwise_op
-        self.op_input_list = op_input_list
+
+class EltwiseFusionOp(NamedTuple):
+    ipex_eltwise_op: str
+    op_input_list: Dict = {}
 
 
 unary_PyTorch_op_to_IPEX_op_map = {

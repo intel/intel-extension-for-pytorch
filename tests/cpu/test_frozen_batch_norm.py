@@ -5,7 +5,7 @@ from common_utils import TestCase
 from intel_extension_for_pytorch.nn import FrozenBatchNorm2d
 
 try:
-    import torchvision
+    import torchvision  # noqa: F401
     from torchvision.ops.misc import FrozenBatchNorm2d as FrozenBN2d
 
     HAS_TORCHVISION = True

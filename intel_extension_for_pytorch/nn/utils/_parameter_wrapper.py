@@ -92,7 +92,7 @@ def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
 
     if dtype == torch.float16:
         return module_convert_list_fp16
-    elif inference == True:
+    elif inference:
         return module_convert_list_bf16_inference
     else:
         return module_convert_list_bf16_training
@@ -173,9 +173,31 @@ def get_shared_parameter_status(module, shared_p):
     for _, child in module._modules.items():
         get_shared_parameter_status(child, shared_p)
 
+
+def patch_state_dict(model, params_attr, mode):
+    def cast_back_state_dict(self, *args, destination=None, prefix="", keep_vars=False):
+        with torch.no_grad(), contextlib.ExitStack() as stack:
+            for v in params_attr.values():
+                if mode == "inference":
+                    stack.enter_context(v.inference_cast_save())
+                elif mode == "training":
+                    stack.enter_context(v.training_cast_save())
+                else:
+                    assert mode == "prepack"
+                    stack.enter_context(v.prepack_cast_save())
+            out = self._original_state_dict(
+                *args, destination=destination, prefix=prefix, keep_vars=keep_vars
+            )
+        return out
+
+    if not hasattr(model, "_original_state_dict"):
+        setattr(model, "_original_state_dict", model.state_dict)  # noqa: B010
+    model.state_dict = types.MethodType(cast_back_state_dict, model)
+
+
 class ParameterWrapper(object):
     def __init__(self):
-        # Holding module class with the same Parameter 
+        # Holding module class with the same Parameter
         # Used to inferring whether this Parameter can be cast or prepacked
         self.modules_cls: Set[type] = set()
         # We will only pack weight if there is only 1 module are using this Parameter
@@ -184,7 +206,7 @@ class ParameterWrapper(object):
         self.master_parameter: torch.nn.Parameter = None
         # Parameter in the module, for example, module.weight
         self.parameter: torch.nn.Parameter = None
-        # Parameter trail for split optimization 
+        # Parameter trail for split optimization
         self.parameter_trail: torch.Tensor = None
         # The original dtype for Paramter
         self.original_dtype: torch.dtype = None
@@ -193,7 +215,7 @@ class ParameterWrapper(object):
         # Whether using split optimization
         self.split: bool = None
         # Whether weight is channels last for Conv/Conv_transpose
-        self.weight_channels_last:bool = None
+        self.weight_channels_last: bool = None
         # op context for prepacked weight
         self.op_ctx = None
         # shape before weight prepack, need this to check
@@ -223,7 +245,6 @@ class ParameterWrapper(object):
         casted_param = self.parameter.to(dtype)
         with torch.no_grad():
             self.parameter.data = casted_param
-        self._register_save_context(self._inference_cast_before_save, self._inference_cast_after_save)
 
     def can_cast_training(self, dtype):
         if self.casted_dtype is not None:
@@ -231,7 +252,10 @@ class ParameterWrapper(object):
             assert dtype == self.casted_dtype
             return True
         ori_dtype = self.parameter.dtype
-        if ori_dtype not in (torch.float, torch.float32,):
+        if ori_dtype not in (
+            torch.float,
+            torch.float32,
+        ):
             warnings.warn(
                 f"WARNING: Can't convert model's parameters dtype from {ori_dtype} to {dtype}"
             )
@@ -262,16 +286,17 @@ class ParameterWrapper(object):
                 self.master_parameter.data.to(dtype),
                 requires_grad=self.master_parameter.requires_grad,
             )
-        self._register_save_context(self._training_cast_before_save, self._training_cast_after_save)
 
     def inference_cast_save(self):
         @contextlib.contextmanager
         def ctx():
-            self._inference_cast_before_save()
+            if self.original_dtype is not None:
+                self.parameter.data = self.parameter.to(self.original_dtype)
             try:
                 yield
             finally:
-                self._inference_cast_after_save()
+                if self.original_dtype is not None:
+                    self.parameter.data = self.parameter.to(self.casted_dtype)
 
         return ctx()
 
@@ -298,16 +323,11 @@ class ParameterWrapper(object):
         return ctx()
 
     def _inference_cast_before_save(self):
-        if self.original_dtype is None:
-            return
-        self.casted_dtype = self.parameter.dtype
-        with torch.no_grad():
+        if self.original_dtype is not None:
             self.parameter.data = self.parameter.to(self.original_dtype)
 
     def _inference_cast_after_save(self):
-        if self.original_dtype is None:
-            return
-        with torch.no_grad():
+        if self.original_dtype is not None:
             self.parameter.data = self.parameter.to(self.casted_dtype)
 
     def _training_cast_before_save(self):
@@ -340,32 +360,26 @@ class ParameterWrapper(object):
             with torch.no_grad():
                 self.parameter.data = top
         else:
-            self.parameter.data = self.master_parameter.data.to(
-                self.casted_dtype
-            )
+            self.parameter.data = self.master_parameter.data.to(self.casted_dtype)
 
     def _cast_unpack_before_save(self):
         if self.split is not None:
             self._training_cast_before_save()
-        else:
-            self._inference_cast_before_save()
+        elif self.original_dtype is not None:
+            self.parameter.data = self.parameter.to(self.original_dtype)
         if self.op_ctx is None:
             return
         with torch.no_grad():
             if self.master_parameter is not None:
-                self.parameter.data = self.op_ctx.to_public(
-                    self.master_parameter
-                )
+                self.parameter.data = self.op_ctx.to_public(self.master_parameter)
             else:
-                self.parameter.data = self.op_ctx.to_public(
-                    self.parameter
-                )
+                self.parameter.data = self.op_ctx.to_public(self.parameter)
 
     def _cast_unpack_after_save(self):
         if self.split is not None:
             self._training_cast_after_save()
-        else:
-            self._inference_cast_after_save()
+        elif self.original_dtype is not None:
+            self.parameter.data = self.parameter.to(self.casted_dtype)
         if self.op_ctx is None:
             return
         with torch.no_grad():
@@ -374,10 +388,6 @@ class ParameterWrapper(object):
             if self.parameter_trail is not None:
                 self.parameter_trail = self.op_ctx.pack(self.parameter_trail)
 
-    def _register_save_context(self, enter_fn, exit_fn):
-        self._before_save = enter_fn
-        self._after_save = exit_fn
-        
     def can_prepack(self, module, is_training):
         if self.num_modules != 1:
             return False
@@ -386,7 +396,9 @@ class ParameterWrapper(object):
     def prepack(self, module, is_training):
         self.plain_format_shape = module.weight.shape
         if module.__class__ not in IPEX_WEIGHT_PREPACK_MODULE_CPU():
-            raise ValueError("Cannot prepack module with class {}".format(module.__class__))
+            raise ValueError(
+                "Cannot prepack module with class {}".format(module.__class__)
+            )
         target_module = IPEX_WEIGHT_PREPACK_MODULE_CPU()[module.__class__]
         if target_module in (
             _IPEXConv1d,
@@ -405,13 +417,12 @@ class ParameterWrapper(object):
                 _IPEXLinearAllreduce,
             )
             self.linear_prepack(module, is_training)
-        self._register_save_context(self._cast_unpack_before_save, self._cast_unpack_after_save)
 
     def pack_weight(self, use_dnnl=True):
         if not use_dnnl:
             # TODO: Haozhe, LinWei
             # weired case that cannot override ".data" for mkl here
-            # The op_ctx seems not hold the original plain format weight 
+            # The op_ctx seems not hold the original plain format weight
             self.parameter = self.op_ctx.get_weight()
         else:
             with torch.no_grad():
@@ -496,8 +507,8 @@ class ParameterWrapper(object):
                 ], "Only float, bf16 and fp16 are supported"
                 use_dnnl = True
         module.use_dnnl = use_dnnl
-        if not hasattr(module, 'out_features'):
-            setattr(module, 'out_features', module.weight.shape[0])
+        if not hasattr(module, "out_features"):
+            setattr(module, "out_features", module.weight.shape[0])  # noqa: B010
         # prepare batch size
         module.batch_size_collapsed = None
         if hasattr(module, "input_shape"):
@@ -519,9 +530,10 @@ class ParameterWrapper(object):
         # load from state dict
         if self.split is not None:
             if self.split:
-                to_pack, self.parameter_trail = torch.ops.torch_ipex.split_float_bfloat16(
-                                param
-                )
+                (
+                    to_pack,
+                    self.parameter_trail,
+                ) = torch.ops.torch_ipex.split_float_bfloat16(param)
             else:
                 to_pack = param.to(torch.bfloat16)
         elif self.casted_dtype is not None:

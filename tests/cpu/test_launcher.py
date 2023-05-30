@@ -1,7 +1,11 @@
 import unittest
 from common_utils import TestCase
 from utils.cpuinfo import construct_numa_config
-from intel_extension_for_pytorch.cpu.launch import *
+from intel_extension_for_pytorch.cpu.launch import (
+    CPUPoolList,
+    Launcher,
+    DistributedTrainingLauncher,
+)
 import os
 from os.path import expanduser
 import glob

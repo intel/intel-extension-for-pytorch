@@ -52,38 +52,51 @@ class TestModule(torch.nn.Module):
 class TestWeightCastCases(TestCase):
     def is_master_weight_solution(self, module, dtype, split_master_weight):
         return (
-            type(module) in IPEX_WEIGHT_CONVERT_MODULE_CPU(False, dtype) and not split_master_weight
+            type(module) in IPEX_WEIGHT_CONVERT_MODULE_CPU(False, dtype)
+            and not split_master_weight
         )
 
     def is_master_weight_split_solution(self, module, split_master_weight):
-        return type(module) in IPEX_WEIGHT_CONVERT_MODULE_CPU(False, torch.bfloat16) and split_master_weight
+        return (
+            type(module) in IPEX_WEIGHT_CONVERT_MODULE_CPU(False, torch.bfloat16)
+            and split_master_weight
+        )
 
     def is_fp32_weight_solution(self, module, dtype):
         return type(module) not in IPEX_WEIGHT_CONVERT_MODULE_CPU(False, dtype)
-   
-    def master_weight_test(self, m, param_id, cast_dtype, optimizer_params_list, params_attr):
+
+    def master_weight_test(
+        self, m, param_id, cast_dtype, optimizer_params_list, params_attr
+    ):
         def found_wrapper(parameter, params_attr):
             for _, v in params_attr.items():
                 if parameter is v.parameter:
                     return v
             # not found
             self.assertTrue(False)
+
         for name, param in m.named_parameters():
             if hasattr(m, name):
                 param_wrapper = found_wrapper(param, params_attr)
                 self.assertTrue(param_wrapper.master_parameter.dtype == torch.float)
-                self.assertTrue(param_wrapper.master_parameter is optimizer_params_list[param_id])
+                self.assertTrue(
+                    param_wrapper.master_parameter is optimizer_params_list[param_id]
+                )
                 self.assertTrue(param_wrapper.parameter.dtype == cast_dtype)
                 self.assertTrue(param_wrapper.parameter is getattr(m, name))
                 param_id += 1
         return param_id
 
-    def master_weight_split_test(self, m, param_id, cast_dtype, optimizer_params_list, params_attr):
+    def master_weight_split_test(
+        self, m, param_id, cast_dtype, optimizer_params_list, params_attr
+    ):
         for name, param in m.named_parameters():
             if hasattr(m, name):
                 param_wrapper = params_attr[param]
                 self.assertTrue(param_wrapper.parameter.dtype == torch.bfloat16)
-                self.assertTrue(param_wrapper.parameter is optimizer_params_list[param_id])
+                self.assertTrue(
+                    param_wrapper.parameter is optimizer_params_list[param_id]
+                )
                 self.assertTrue(param_wrapper.parameter_trail.dtype == torch.bfloat16)
                 self.assertTrue(param_wrapper.parameter is getattr(m, name))
                 param_id += 1
@@ -111,20 +124,50 @@ class TestWeightCastCases(TestCase):
                         split_master_weight_for_bf16 = False
                     model = copy.deepcopy(M)
                     optimizer = pt_opt(model.parameters(), lr=0.01)
-                    model, opt, params_attr = cast(model, optimizer, {}, split_master_weight_for_bf16, cast_dtype)
-                    optimizer_params_list = opt.param_groups[0]['params']
+                    model, opt, params_attr = cast(
+                        model, optimizer, {}, split_master_weight_for_bf16, cast_dtype
+                    )
+                    optimizer_params_list = opt.param_groups[0]["params"]
                     param_id = 0
                     for _, sub_m in model.named_children():
-                        if self.is_master_weight_solution(sub_m, cast_dtype, split_master_weight_for_bf16):
-                            param_id = self.master_weight_test(sub_m, param_id, cast_dtype, optimizer_params_list, params_attr)
+                        if self.is_master_weight_solution(
+                            sub_m, cast_dtype, split_master_weight_for_bf16
+                        ):
+                            param_id = self.master_weight_test(
+                                sub_m,
+                                param_id,
+                                cast_dtype,
+                                optimizer_params_list,
+                                params_attr,
+                            )
                             for name, ssub_m in sub_m.named_children():
                                 if isinstance(ssub_m, torch.nn.ParameterList):
-                                    param_id = self.master_weight_test(ssub_m, param_id, cast_dtype, optimizer_params_list, params_attr)
-                        elif self.is_master_weight_split_solution(sub_m, split_master_weight_for_bf16):
-                             param_id = self.master_weight_split_test(sub_m, param_id, cast_dtype, optimizer_params_list, params_attr)
-                             for name, ssub_m in sub_m.named_children():
+                                    param_id = self.master_weight_test(
+                                        ssub_m,
+                                        param_id,
+                                        cast_dtype,
+                                        optimizer_params_list,
+                                        params_attr,
+                                    )
+                        elif self.is_master_weight_split_solution(
+                            sub_m, split_master_weight_for_bf16
+                        ):
+                            param_id = self.master_weight_split_test(
+                                sub_m,
+                                param_id,
+                                cast_dtype,
+                                optimizer_params_list,
+                                params_attr,
+                            )
+                            for name, ssub_m in sub_m.named_children():
                                 if isinstance(ssub_m, torch.nn.ParameterList):
-                                    param_id = self.master_weight_split_test(ssub_m, param_id, cast_dtype, optimizer_params_list, params_attr)
+                                    param_id = self.master_weight_split_test(
+                                        ssub_m,
+                                        param_id,
+                                        cast_dtype,
+                                        optimizer_params_list,
+                                        params_attr,
+                                    )
                         else:
                             self.assertTrue(
                                 self.is_fp32_weight_solution(sub_m, cast_dtype)

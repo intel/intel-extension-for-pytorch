@@ -55,7 +55,7 @@ def _copy_model_and_optimizer(model, optimizer):
         for k, value in zip(model.parameters(), new_model.parameters()):
             dic_param[k] = value
         if hasattr(optimizer, "params_attr"):
-            params_attr = getattr(optimizer, "params_attr")
+            params_attr = optimizer.params_attr
             param_key_pair = {}
             if len(params_attr) != 0:
                 new_params_attr = copy.deepcopy(params_attr)
@@ -71,7 +71,7 @@ def _copy_model_and_optimizer(model, optimizer):
                     dic_param = dic_param_for_master_case
                 for k, v in param_key_pair.items():
                     new_params_attr[dic_param[k]] = new_params_attr.pop(v)
-                setattr(new_optimizer, "params_attr", new_params_attr)
+                setattr(new_optimizer, "params_attr", new_params_attr)  # noqa: B010
 
         new_optimizer.state.clear()
         # deep copy param_groups
@@ -86,7 +86,7 @@ def _copy_model_and_optimizer(model, optimizer):
 
         def _attach_master_weight_split_attr(old_module, new_module):
             if hasattr(old_module, "master_weight_split"):
-                setattr(
+                setattr(  # noqa: B010
                     new_module, "master_weight_split", old_module.master_weight_split
                 )
             for (_, old_child), (_, new_child) in zip(
@@ -1004,10 +1004,11 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         transformers.optimization.AdamW: tpp.optim.AdamW,
         torch.optim.SGD: tpp.optim.SGD,
     }
-    assert (
-        dtype == torch.float or dtype == torch.bfloat16,
-        "TPP only supports torch.float and torch.bfloat16.",
-    )
+    if dtype not in (
+        torch.float,
+        torch.bfloat16,
+    ):
+        raise ValueError("TPP only supports torch.float and torch.bfloat16.")
 
     # setup the seed for libxsmm (can be only positive int value) which will imapct some ops using seed. e.g., dropout
     try:

@@ -11,7 +11,6 @@ from torch.ao.quantization.quantization_mappings import (
 import torch.fx.experimental.optimization as optimization
 from torch.ao.nn.quantized.modules.utils import _quantize_weight
 import torch.ao.nn.quantized.dynamic as nnqd
-
 import intel_extension_for_pytorch._C as core
 from intel_extension_for_pytorch.cpu.utils.linear_bn_folding import linear_bn_fuse
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
@@ -164,7 +163,7 @@ class DynamicQuantizedLinearLayer(_IPEXDynamicQuantizedLinear):
 
     @classmethod
     @functools.lru_cache(None)
-    def _float_module(self):
+    def _float_module(cls):
         _FLOAT_MODULE = [torch.nn.Linear]
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
@@ -192,7 +191,7 @@ class DynamicQuantizedLinearAllreduce(_IPEXDynamicQuantizedLinear):
 
     @classmethod
     @functools.lru_cache(None)
-    def _float_module(self):
+    def _float_module(cls):
         deepspeed_modules = may_import_deepspeed_modules()
         assert (
             deepspeed_modules is not None
