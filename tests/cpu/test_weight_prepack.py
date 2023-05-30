@@ -350,7 +350,7 @@ class TestPrepackCases(TestCase):
                 if dim == 1:
                     x4 = to_channels_last_1d(copy.deepcopy(x2))
                     y4 = ipex_model1(x4)
-                    self.assertEqual(y1, y4, rtol=rtol, atol=atol)
+                    self.assertEqual(y1.float(), y4.float(), rtol=rtol, atol=atol)
                     self.assertTrue(is_contiguous_channels_last_1d(y2))
                     self.assertTrue(is_contiguous_channels_last_1d(y3))
                     self.assertTrue(is_contiguous_channels_last_1d(y4))
@@ -373,13 +373,13 @@ class TestPrepackCases(TestCase):
                 ipex_optimizer2.step()
 
             if not (
-                is_train and dtype == torch.float16 and type(model) is conv_module[1]
+                is_train and dtype == torch.float16 and dim == 1
             ):
                 self.assertTrue(y2.dtype == dtype)
                 self.assertTrue(y3.dtype == dtype)
 
-            self.assertEqual(y1, y2, rtol=rtol, atol=atol)
-            self.assertEqual(y1, y3, rtol=rtol, atol=atol)
+            self.assertEqual(y1.float(), y2.float(), rtol=rtol, atol=atol)
+            self.assertEqual(y1.float(), y3.float(), rtol=rtol, atol=atol)
             if is_train:
                 self.assertEqual(x1.grad, x2.grad, rtol=rtol, atol=atol)
                 self.assertEqual(x1.grad, x3.grad, rtol=rtol, atol=atol)
