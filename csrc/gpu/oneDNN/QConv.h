@@ -26,56 +26,18 @@ using namespace at::AtenIpexTypeQuantizedXPU;
 namespace xpu {
 namespace oneDNN {
 
-static std::tuple<memory::desc, memory::desc, memory::desc>
-qconv_get_plain_usr_md(
+static std::tuple<memory::desc, memory::desc, memory::desc> qconv_get_usr_md(
     const at::Tensor& src,
     const at::Tensor& wgh,
     const at::Tensor& dst,
     int64_t groups,
-    bool is_channels_last_suggested) {
-  auto ndim = src.ndimension();
-  auto src_data_t =
-      is_opaque_u8(src) ? memory::data_type::s8 : get_onednn_dtype(src);
-  // 3D: n/c/w (n/w/c)
-  // 4D: n/c/h/w (n/h/w/c)
-  // 5D: n/c/d/h/w (n/d/h/w/c)
-  auto fmt_src = conv_src_fmt(ndim, is_channels_last_suggested);
-  auto src_usr_md = memory::desc(src.sizes().vec(), src_data_t, fmt_src);
-
-  auto dst_data_t = get_onednn_dtype(dst);
-  auto dst_usr_md = memory::desc(dst.sizes().vec(), dst_data_t, fmt_src);
-
-  memory::desc wgh_usr_md, wgh_md;
-  auto ic = src.size(1);
-  auto oc = dst.size(1);
-  memory::dims wgh_tz = compatible_wgh_dims(ndim, groups, oc, ic, wgh.sizes());
-  auto wei_data_t = memory::data_type::s8;
-  // 3D: (g)o/i/w ((g)o/w/i)
-  // 4D: (g)o/i/h/w ((g)o/h/w/i)
-  // 5D: (g)o/i/d/h/w ((g)o/d/h/w/i)
-  auto fmt_wgh = conv_wgh_fmt(ndim, groups != 1, is_channels_last_suggested);
-  if (is_channels_last_suggested) {
-    // TODO: remove this path when oneDNN fix the accuracy issue.
-    // in ChannelsLast senario, fmt_wgh should be nhwc instead of any
-    wgh_usr_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
-  } else {
-    wgh_usr_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
-  }
-
-  return {src_usr_md, wgh_usr_md, dst_usr_md};
-}
-
-static std::tuple<memory::desc, memory::desc, memory::desc>
-qconv_get_blocked_usr_md(
-    const at::Tensor& src,
-    const at::Tensor& wgh,
-    const at::Tensor& dst,
-    int64_t groups) {
+    int memory_layout) {
   // create memory desc from the src/wgh/dst tensors
   memory::desc src_usr_md, wgh_usr_md, dst_usr_md;
   auto ndim = src.ndimension();
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-  auto fmt_src = conv_src_fmt(ndim);
+  auto fmt_src =
+      conv_src_fmt(ndim, memory_layout == MEMORY_LAYOUT_FOR_CONV::ChannelsLast);
 
   if (src_ctx.is_plain()) {
     auto src_tz = src.sizes().vec();
@@ -102,7 +64,10 @@ qconv_get_blocked_usr_md(
     auto wei_data_t = memory::data_type::s8;
     memory::dims wgh_tz =
         compatible_wgh_dims(ndim, groups, oc, ic, wgh.sizes());
-    auto fmt_wgh = conv_wgh_fmt(ndim, groups != 1);
+    auto fmt_wgh = conv_wgh_fmt(
+        ndim,
+        groups != 1,
+        memory_layout == MEMORY_LAYOUT_FOR_CONV::ChannelsLast);
     wgh_usr_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
   } else {
     wgh_usr_md = wgh_ctx.meta();
@@ -353,13 +318,8 @@ static at::Tensor quantized_convolution(
   bool wgh_need_zp = requires_runtime_zp(wgh);
 #endif
 
-  if (is_onednn_layout_suggested) {
-    std::tie(src_usr_md, wgh_usr_md, dst_usr_md) =
-        qconv_get_blocked_usr_md(src, wgh, dst, groups);
-  } else {
-    std::tie(src_usr_md, wgh_usr_md, dst_usr_md) = qconv_get_plain_usr_md(
-        src, wgh, dst, groups, is_channels_last_suggested);
-  }
+  std::tie(src_usr_md, wgh_usr_md, dst_usr_md) =
+      qconv_get_usr_md(src, wgh, dst, groups, memory_layout_for_conv);
 
   if (load_from_cache) {
     conv_forward = fetch_m<convolution_forward>(key_primitive);

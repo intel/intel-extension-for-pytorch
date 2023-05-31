@@ -136,54 +136,18 @@ static std::tuple<
     memory::desc,
     memory::desc,
     memory::desc>
-conv_get_plain_md(
+conv_get_md(
     const at::Tensor& src,
     const at::Tensor& wgh,
     const at::Tensor& dst,
     int64_t groups,
-    bool is_channels_last_suggested) {
-  auto ndim = src.ndimension();
-  auto src_data_t = get_onednn_dtype_include_double(src);
-  // 3D: n/c/w (n/w/c)
-  // 4D: n/c/h/w (n/h/w/c)
-  // 5D: n/c/d/h/w (n/d/h/w/c)
-  auto fmt_src = conv_src_fmt(ndim, is_channels_last_suggested);
-  auto src_usr_md = memory::desc(src.sizes().vec(), src_data_t, fmt_src);
-
-  auto dst_data_t = get_onednn_dtype_include_double(dst);
-  auto dst_usr_md = memory::desc(dst.sizes().vec(), dst_data_t, fmt_src);
-
-  auto ic = src.size(1);
-  auto oc = dst.size(1);
-  memory::dims wgh_tz = compatible_wgh_dims(ndim, groups, oc, ic, wgh.sizes());
-  auto wei_data_t = get_onednn_dtype_include_double(wgh);
-  // 3D: (g)o/i/w ((g)o/w/i)
-  // 4D: (g)o/i/h/w ((g)o/h/w/i)
-  // 5D: (g)o/i/d/h/w ((g)o/d/h/w/i)
-  auto fmt_wgh = conv_wgh_fmt(ndim, groups != 1, is_channels_last_suggested);
-  auto wgh_usr_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
-
-  return {
-      src_usr_md, wgh_usr_md, dst_usr_md, src_usr_md, wgh_usr_md, dst_usr_md};
-}
-
-static std::tuple<
-    memory::desc,
-    memory::desc,
-    memory::desc,
-    memory::desc,
-    memory::desc,
-    memory::desc>
-conv_get_blocked_md(
-    const at::Tensor& src,
-    const at::Tensor& wgh,
-    const at::Tensor& dst,
-    int64_t groups) {
+    int memory_layout) {
   // create memory desc from the src/wgh/dst tensors
   memory::desc src_usr_md, wgh_usr_md, dst_usr_md;
   auto ndim = src.ndimension();
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-  auto fmt_src = conv_src_fmt(ndim);
+  auto fmt_src =
+      conv_src_fmt(ndim, memory_layout == MEMORY_LAYOUT_FOR_CONV::ChannelsLast);
   if (src_ctx.is_plain()) {
     auto src_tz = src.sizes().vec();
     auto src_data_t = get_onednn_dtype_include_double(src);
@@ -208,23 +172,32 @@ conv_get_blocked_md(
     auto wei_data_t = get_onednn_dtype_include_double(wgh);
     memory::dims wgh_tz =
         compatible_wgh_dims(ndim, groups, oc, ic, wgh.sizes());
-    auto fmt_wgh = conv_wgh_fmt(ndim, groups != 1);
+    auto fmt_wgh = conv_wgh_fmt(
+        ndim,
+        groups != 1,
+        memory_layout == MEMORY_LAYOUT_FOR_CONV::ChannelsLast);
     wgh_usr_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
   } else {
     wgh_usr_md = wgh_ctx.meta();
   }
 
   // create memory desc for conv primitive and query the blocked format
-  auto fmt_any = memory::format_tag::any;
-  auto src_md = src.size(1) == 3
-      ? src_usr_md
-      : memory::desc(
-            src_usr_md.get_dims(), src_usr_md.get_data_type(), fmt_any);
-  auto wgh_md =
-      memory::desc(wgh_usr_md.get_dims(), wgh_usr_md.get_data_type(), fmt_any);
-  auto dst_md =
-      memory::desc(dst_usr_md.get_dims(), dst_usr_md.get_data_type(), fmt_any);
-
+  memory::desc src_md, wgh_md, dst_md;
+  if (memory_layout == MEMORY_LAYOUT_FOR_CONV::Blocked) {
+    auto fmt_any = memory::format_tag::any;
+    src_md = src.size(1) == 3
+        ? src_usr_md
+        : memory::desc(
+              src_usr_md.get_dims(), src_usr_md.get_data_type(), fmt_any);
+    wgh_md = memory::desc(
+        wgh_usr_md.get_dims(), wgh_usr_md.get_data_type(), fmt_any);
+    dst_md = memory::desc(
+        dst_usr_md.get_dims(), dst_usr_md.get_data_type(), fmt_any);
+  } else {
+    src_md = src_usr_md;
+    wgh_md = wgh_usr_md;
+    dst_md = dst_usr_md;
+  }
   return {src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md};
 }
 
@@ -344,15 +317,9 @@ static at::Tensor convolution(
 
   // create usr_md for tensors, and md for conv primitive
   memory::desc src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md;
-  if (is_onednn_layout_suggested) {
-    std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
-        conv_get_blocked_md(src, wgh, dst, groups);
-  } else {
-    bool is_channels_last_suggested =
-        memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
-    std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
-        conv_get_plain_md(src, wgh, dst, groups, is_channels_last_suggested);
-  }
+  std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
+      conv_get_md(src, wgh, dst, groups, memory_layout_for_conv);
+
   auto bia_fmt = memory::format_tag::x;
   auto bia_md = bia.defined()
       ? memory::desc(
@@ -470,21 +437,11 @@ static void convolution_backward_weights(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto memory_layout_for_conv = get_memory_layout_for_conv(src, diff_dst);
-  bool is_onednn_layout_suggested =
-      memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked;
 
   // create memory desc
   memory::desc src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md;
-  if (is_onednn_layout_suggested) {
-    std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
-        conv_get_blocked_md(src, diff_wgh, diff_dst, groups);
-  } else {
-    bool is_channels_last_suggested =
-        memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
-    std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
-        conv_get_plain_md(
-            src, diff_wgh, diff_dst, groups, is_channels_last_suggested);
-  }
+  std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
+      conv_get_md(src, diff_wgh, diff_dst, groups, memory_layout_for_conv);
   memory::format_tag bia_fmt = memory::format_tag::x;
   auto bia_md = diff_bia.defined()
       ? memory::desc({diff_dst.size(1)}, src_md.get_data_type(), bia_fmt)
@@ -534,6 +491,8 @@ static void convolution_backward_weights(
   // create bwd memory
   Tensor expected_src, expected_diff_dst, expected_diff_wgh;
   memory src_m, diff_dst_m, diff_wgh_m;
+  bool is_onednn_layout_suggested =
+      memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked;
   if (is_onednn_layout_suggested) {
     auto expected_src_md = conv_bwd_w_pd.src_desc();
     auto expected_dst_md = conv_bwd_w_pd.diff_dst_desc();
@@ -619,21 +578,11 @@ static void convolution_backward_data(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto memory_layout_for_conv = get_memory_layout_for_conv(diff_dst, weight);
-  bool is_onednn_layout_suggested =
-      memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked;
 
   // create memory desc
   memory::desc src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md;
-  if (is_onednn_layout_suggested) {
-    std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
-        conv_get_blocked_md(diff_src, weight, diff_dst, groups);
-  } else {
-    bool is_channels_last_suggested =
-        memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
-    std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
-        conv_get_plain_md(
-            diff_src, weight, diff_dst, groups, is_channels_last_suggested);
-  }
+  std::tie(src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md) =
+      conv_get_md(diff_src, weight, diff_dst, groups, memory_layout_for_conv);
   memory::format_tag bia_fmt = memory::format_tag::x;
   auto bia_md = bias_defined
       ? memory::desc({diff_dst.size(1)}, wgh_md.get_data_type(), bia_fmt)
@@ -681,6 +630,8 @@ static void convolution_backward_data(
   // create memory
   Tensor expected_src, expected_wei, expected_dst;
   memory diff_dst_m, wei_m, diff_src_m;
+  bool is_onednn_layout_suggested =
+      memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked;
   if (is_onednn_layout_suggested) {
     auto expected_src_md = conv_backward_data_pd.diff_src_desc();
     auto expected_wgh_md = conv_backward_data_pd.weights_desc();
