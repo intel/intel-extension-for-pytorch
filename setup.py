@@ -74,8 +74,8 @@
 ##############################################################
 
 from __future__ import print_function
-from distutils.command.build_py import build_py
-from distutils.command.install import install
+from setuptools.command.build_py import build_py
+from setuptools.command.install import install
 from functools import lru_cache
 from subprocess import check_call
 from setuptools.command.build_clib import build_clib
@@ -870,9 +870,9 @@ class IPEXEggInfoBuild(egg_info, object):
 
 
 class IPEXInstallCmd(install, object):
-    def finalize_options(self):
+    def run(self):
         self.build_lib = os.path.relpath(get_package_base_dir())
-        return super(IPEXInstallCmd, self).finalize_options()
+        return super(IPEXInstallCmd, self).run()
 
 
 class IPEXPythonPackageBuild(build_py, object):
