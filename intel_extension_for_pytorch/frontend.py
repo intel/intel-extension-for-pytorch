@@ -27,6 +27,9 @@ from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
     _enable_dnnl,
     _disable_dnnl,
 )
+from intel_extension_for_pytorch.fx.concat_linear import (
+    _concat_linear as _concat_linear,
+)
 import intel_extension_for_pytorch._C as torch_ipex_cpp
 
 try:
@@ -149,6 +152,7 @@ class _O0:
         properties.fuse_update_step = False
         properties.auto_kernel_selection = False
         properties.graph_mode = False
+        properties.concat_linear = False
         return properties
 
 
@@ -165,6 +169,7 @@ class _O1:
         properties.fuse_update_step = True
         properties.auto_kernel_selection = False
         properties.graph_mode = False
+        properties.concat_linear = True
         return properties
 
 
@@ -289,6 +294,7 @@ def optimize(
     auto_kernel_selection=None,
     sample_input=None,
     graph_mode=None,
+    concat_linear=None,
 ):
     r"""
     Apply optimizations at Python frontend to the given model (nn.Module), as
@@ -377,6 +383,9 @@ def optimize(
             configuration set by ``level`` knob.
         graph_mode: (bool) [experimental]: It will automatically apply a combination of methods
             to generate graph or multiple subgraphs if True. The default value is ``False``.
+        concat_linear (bool): Whether to perform ``concat_linear``. It only
+            works for inference model. The default value is ``None``. Explicitly
+            setting this knob overwrites the configuration set by ``level`` knob.
 
     Returns:
         Model and optimizer (if given) modified according to the ``level`` knob
@@ -498,6 +507,8 @@ def optimize(
         opt_properties.auto_kernel_selection = auto_kernel_selection
     if graph_mode is not None:
         opt_properties.graph_mode = graph_mode
+    if concat_linear is not None:
+        opt_properties.concat_linear = concat_linear
 
     _disable_dnnl()
     if opt_properties.auto_kernel_selection:
@@ -576,6 +587,8 @@ def optimize(
                 )
         if opt_properties.replace_dropout_with_identity:
             utils._model_convert.replace_dropout_with_identity(optimized_model)
+        if opt_properties.concat_linear:
+            optimized_model = _concat_linear(optimized_model, inplace=True)
         if dtype in (
             torch.bfloat16,
             torch.float16,

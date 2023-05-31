@@ -274,6 +274,24 @@ auto bmm_outtrans_filter_v2 =
       return true;
     };
 
+auto split_replace_filter =
+    [](const Match& match,
+       const std::unordered_map<std::string, Value*>& vmap) {
+      const auto& match_vmap = match.values_map;
+      auto to_split =
+          graph_rewrite_helper::getValue("to_split", match_vmap, vmap)
+              ->type()
+              ->cast<TensorType>();
+      if (to_split->scalarType().value() != at::kBFloat16)
+        return false;
+      auto dim =
+          toIValue(graph_rewrite_helper::getValue("dim", match_vmap, vmap))
+              ->toInt();
+      if (dim != -1)
+        return false;
+      return true;
+    };
+
 // aten::matmul - always applies contiguous to the input tensors
 // ipex::matmul - allows non-contiguous input tensors with the conditions:
 // 1. tensor1.dim1 == tensor2.dim2
@@ -289,6 +307,20 @@ auto bmm_outtrans_filter_v2 =
 void FusedTransFreeMha(std::shared_ptr<Graph>& graph) {
   // ViT MHA Fusion is using DNNL Transpose-free Matmul primitive tags.
   // Todo: Transfer to the Flash Attention.
+  std::string aten_split_pattern = R"(
+      graph(%to_split: Tensor, %split_list: int[], %dim: int):
+        %out = aten::split_with_sizes(%to_split, %split_list, %dim)
+        return (%out) )";
+
+  std::string ipex_split_pattern = R"(
+      graph(%to_split: Tensor, %split_list: int[], %dim: int):
+        %out = ipex::split_tensor(%to_split, %split_list)
+        return (%out) )";
+
+  SubgraphRewriter split_replacer;
+  split_replacer.RegisterRewritePattern(aten_split_pattern, ipex_split_pattern);
+  split_replacer.runOnGraph(graph, split_replace_filter);
+
   std::string vit_mha_pattern = R"(
       graph(%bs: int, %seq: int, %qkv_div: int, %num_head: int, %head_size: int, %qkv: Tensor, %qkv_permute: int[], %select_dim: int, %key_select: int, %value_select: int, %trans_a: int, %trans_b: int, %scale, %dtype):
         %qkv_size = prim::ListConstruct(%bs, %seq, %qkv_div, %num_head, %head_size)

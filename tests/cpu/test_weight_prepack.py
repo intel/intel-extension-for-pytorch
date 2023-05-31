@@ -372,9 +372,7 @@ class TestPrepackCases(TestCase):
                 y3.backward(grad_x.to(dtype=dtype))
                 ipex_optimizer2.step()
 
-            if not (
-                is_train and dtype == torch.float16 and dim == 1
-            ):
+            if not (is_train and dtype == torch.float16 and dim == 1):
                 self.assertTrue(y2.dtype == dtype)
                 self.assertTrue(y3.dtype == dtype)
 

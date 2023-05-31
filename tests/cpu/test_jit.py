@@ -1762,7 +1762,12 @@ class Tester(TestCase):
 
         test_val1 = torch.rand([50, 5])
         # call mkl path(fp32)
-        model = ipex.optimize(origin_model, dtype=torch.float32, weights_prepack=False)
+        model = ipex.optimize(
+            origin_model,
+            concat_linear=False,
+            dtype=torch.float32,
+            weights_prepack=False,
+        )
         ori_res = model(test_val1)
         with torch.no_grad():
             model_jit = torch.jit.trace(model, (test_val1))
@@ -1776,7 +1781,7 @@ class Tester(TestCase):
             linear_count_ori = check_op_count(graph_opt, ["aten::linear"])
             self.assertEqual(linear_count_ori, 2)
         # call prepack mkl path(fp32)
-        model = ipex.optimize(origin_model, dtype=torch.float32)
+        model = ipex.optimize(origin_model, concat_linear=False, dtype=torch.float32)
         ori_res = model(test_val1)
         with torch.no_grad():
             model_jit = torch.jit.trace(model, (test_val1))
@@ -1794,7 +1799,10 @@ class Tester(TestCase):
 
         # call onednn path(fp32)
         model = ipex.optimize(
-            origin_model, dtype=torch.float32, auto_kernel_selection=True
+            origin_model,
+            concat_linear=False,
+            dtype=torch.float32,
+            auto_kernel_selection=True,
         )
         ori_res = model(test_val1)
         with torch.no_grad():
@@ -1809,7 +1817,7 @@ class Tester(TestCase):
             linear_count_ori = check_op_count(graph_opt, ["ipex_prepack::linear_run"])
             self.assertEqual(linear_count_ori, 2)
 
-        model = ipex.optimize(origin_model, dtype=torch.bfloat16)
+        model = ipex.optimize(origin_model, concat_linear=False, dtype=torch.bfloat16)
         test_val1 = test_val1.bfloat16()
         with torch.cpu.amp.autocast(), torch.no_grad():
             ori_res = model(test_val1)
@@ -1829,7 +1837,9 @@ class Tester(TestCase):
 
         test_val1 = torch.rand([40, 10])
         # Only verify Concat Linear OPs w/ or w/o bias, so use the default packed MKL path
-        model_v1 = ipex.optimize(origin_model_v1, dtype=torch.float32)
+        model_v1 = ipex.optimize(
+            origin_model_v1, concat_linear=False, dtype=torch.float32
+        )
         with torch.no_grad():
             ori_res_v1 = model_v1(test_val1)
             model_jit_v1 = torch.jit.trace(model_v1, (test_val1))
@@ -1847,7 +1857,9 @@ class Tester(TestCase):
             )
             self.assertEqual(linear_count_ori_v1, 2)
 
-        model_v1 = ipex.optimize(origin_model_v1, dtype=torch.bfloat16)
+        model_v1 = ipex.optimize(
+            origin_model_v1, concat_linear=False, dtype=torch.bfloat16
+        )
         test_val1 = test_val1.bfloat16()
         with torch.cpu.amp.autocast(), torch.no_grad():
             ori_res_v1 = model_v1(test_val1)
