@@ -22,7 +22,12 @@ at::Tensor quantized_max_pool2d(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
-  auto output = at::empty({0}, qx.options());
+  auto output = at::_empty_affine_quantized(
+      {0},
+      qx.options(),
+      qx.q_scale(),
+      qx.q_zero_point(),
+      MemoryFormat::Contiguous); // Relu fusion?
   auto indices = at::empty({0}, qx.options().dtype(kLong));
   auto output_and_indices = at::AtenIpexTypeXPU::max_pool2d_with_indices_out(
       qx, kernel_size, stride, padding, dilation, ceil_mode, output, indices);
