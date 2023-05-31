@@ -25,6 +25,9 @@ class TestTorchMethod(TestCase):
         output_xpu = input1_xpu * input2_xpu
         self.assertEqual(output, output_xpu.to("cpu"))
 
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_div(self, dtype=torch.float):
         input1 = torch.tensor([-1 + 1j, -2 + 2j, 3 - 3j])
         input2 = torch.tensor([-1 + 2j, 1 - 2j, 2 + 1j])

@@ -33,6 +33,9 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(y, y_xpu.cpu())
 
+    @pytest.mark.skipif(
+        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_sgn_complex_float(self, dtype=torch.complex64):
         x = torch.randn([1, 4], dtype=dtype)
         y = x.sgn()
