@@ -1,10 +1,8 @@
-From f0a55fc2cc4af937f812c4a1b14bdc077b2988b4 Mon Sep 17 00:00:00 2001
-From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
-Date: Fri, 21 Apr 2023 11:39:50 +0800
-Subject: [PATCH 02/10] remove dlpack dependency (#106) (#117)
+From f61ea2d96b8c556ccea6cd2c40c92ef44462c2fd Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <guangye.yu@intel.com>
+Date: Mon, 22 May 2023 09:55:53 +0000
+Subject: [PATCH 02/11] remove dlpack dependency
 
-* remove dlpack dependency
-* rich comments
 ---
  aten/src/ATen/DLConvertor.cpp            |  2 +-
  aten/src/ATen/detail/XPUHooksInterface.h | 11 ++++++++---
@@ -12,7 +10,7 @@ Subject: [PATCH 02/10] remove dlpack dependency (#106) (#117)
  3 files changed, 13 insertions(+), 5 deletions(-)
 
 diff --git a/aten/src/ATen/DLConvertor.cpp b/aten/src/ATen/DLConvertor.cpp
-index 68e5a42069c..84d198eba93 100644
+index 68e5a42069..84d198eba9 100644
 --- a/aten/src/ATen/DLConvertor.cpp
 +++ b/aten/src/ATen/DLConvertor.cpp
 @@ -92,7 +92,7 @@ DLDevice getDLDevice(const Tensor& tensor, const int64_t& device_id) {
@@ -83,5 +81,5 @@ index 3d33935d31..ef6960b23a 100644
    DLDeviceType device_type;
    /*!
 -- 
-2.25.1
+2.34.1
 

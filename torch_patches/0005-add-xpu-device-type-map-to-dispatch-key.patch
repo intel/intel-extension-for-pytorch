@@ -1,14 +1,14 @@
-From a5dec8aa8b6bb33e8a25ceeffa3e0fc00b62f346 Mon Sep 17 00:00:00 2001
-From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
-Date: Fri, 21 Apr 2023 12:05:18 +0800
-Subject: [PATCH 05/10] add xpu device type map to dispatch key (#105) (#120)
+From 7eaf44e4ced6303b8e06cd412eb3787d07698b1c Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <guangye.yu@intel.com>
+Date: Mon, 22 May 2023 09:57:58 +0000
+Subject: [PATCH 05/11] add xpu device type map to dispatch key
 
 ---
  torch/library.h | 2 ++
  1 file changed, 2 insertions(+)
 
 diff --git a/torch/library.h b/torch/library.h
-index 71b190e8a3e..a11fe6165d3 100644
+index 71b190e8a3..a11fe6165d 100644
 --- a/torch/library.h
 +++ b/torch/library.h
 @@ -362,6 +362,8 @@ inline CppFunction dispatch(c10::DeviceType type, Func&& raw_f) {
@@ -21,5 +21,5 @@ index 71b190e8a3e..a11fe6165d3 100644
          return c10::DispatchKey::MPS;
        case c10::DeviceType::Meta:
 -- 
-2.25.1
+2.34.1
 

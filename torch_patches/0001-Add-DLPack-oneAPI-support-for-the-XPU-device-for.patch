@@ -1,10 +1,9 @@
-From b53f0dfa108650b6f56ef89250d066105384b347 Mon Sep 17 00:00:00 2001
-From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
-Date: Fri, 21 Apr 2023 11:35:16 +0800
-Subject: [PATCH 01/10] Add DLPack oneAPI support for the XPU device for
- experimental. (#116)
+From 9b632c594f3b2729e53fe8b7c6688643e2b2ba4f Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <guangye.yu@intel.com>
+Date: Mon, 22 May 2023 09:55:33 +0000
+Subject: [PATCH 01/11] Add DLPack oneAPI support for the XPU device for 
+ experimental
 
-Co-authored-by: johnlu <chengjun.lu@intel.com>
 ---
  aten/src/ATen/Context.h                    |  8 +++
  aten/src/ATen/DLConvertor.cpp              | 16 +++--
@@ -21,7 +20,7 @@ Co-authored-by: johnlu <chengjun.lu@intel.com>
  create mode 100644 aten/src/ATen/detail/XPUHooksInterface.h
 
 diff --git a/aten/src/ATen/Context.h b/aten/src/ATen/Context.h
-index 8816fb0872a..679b8545cb9 100644
+index 8816fb0872..679b8545cb 100644
 --- a/aten/src/ATen/Context.h
 +++ b/aten/src/ATen/Context.h
 @@ -10,6 +10,7 @@
@@ -54,7 +53,7 @@ index 8816fb0872a..679b8545cb9 100644
  static inline size_t getNumGPUs() {
    // WARNING: DO NOT ADD LOGIC TO HANDLE OTHER DEVICE TYPES TO THIS
 diff --git a/aten/src/ATen/DLConvertor.cpp b/aten/src/ATen/DLConvertor.cpp
-index d795d3db44a..68e5a42069c 100644
+index d795d3db44..68e5a42069 100644
 --- a/aten/src/ATen/DLConvertor.cpp
 +++ b/aten/src/ATen/DLConvertor.cpp
 @@ -90,13 +90,17 @@ DLDevice getDLDevice(const Tensor& tensor, const int64_t& device_id) {
@@ -121,7 +120,7 @@ index 4b9da640fb..350480e213 100644
      if (!pair.second.empty()) {
 diff --git a/aten/src/ATen/detail/XPUHooksInterface.cpp b/aten/src/ATen/detail/XPUHooksInterface.cpp
 new file mode 100644
-index 00000000000..ad46a77959c
+index 0000000000..ad46a77959
 --- /dev/null
 +++ b/aten/src/ATen/detail/XPUHooksInterface.cpp
 @@ -0,0 +1,30 @@
@@ -465,7 +464,7 @@ index 0ad1e119bc..3d33935d31 100644
    DLDataType dtype;
    /*! \brief The shape of the tensor */
 diff --git a/torch/_tensor.py b/torch/_tensor.py
-index cabfcbf8983..411b2b8229f 100644
+index cabfcbf898..411b2b8229 100644
 --- a/torch/_tensor.py
 +++ b/torch/_tensor.py
 @@ -1362,6 +1362,8 @@ class Tensor(torch._C._TensorBase):
@@ -478,7 +477,7 @@ index cabfcbf8983..411b2b8229f 100644
              raise ValueError(
                  "Unknown device type {} for Dlpack".format(torch_device_type)
 diff --git a/torch/utils/dlpack.py b/torch/utils/dlpack.py
-index 49fe6b4ea1b..f903de94eb6 100644
+index 49fe6b4ea1..f903de94eb 100644
 --- a/torch/utils/dlpack.py
 +++ b/torch/utils/dlpack.py
 @@ -18,6 +18,7 @@ class DLDeviceType(enum.IntEnum):
@@ -490,5 +489,5 @@ index 49fe6b4ea1b..f903de94eb6 100644
  
  torch._C._add_docstr(to_dlpack, r"""to_dlpack(tensor) -> PyCapsule
 -- 
-2.25.1
+2.34.1
 
