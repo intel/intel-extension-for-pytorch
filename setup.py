@@ -623,7 +623,8 @@ class IPEXCPPLibBuild(build_clib, object):
             "LIBIPEX_VERSION": ipex_build_version,
         }
 
-        build_with_cpu = False if IS_WINDOWS else True  # Default ON
+        # build_with_cpu = False if IS_WINDOWS else True  # Default ON
+        build_with_cpu = False  # build without CPU when rebase code migration
         build_with_xpu = False  # Default OFF
 
         use_ninja = False
