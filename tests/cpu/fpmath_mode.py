@@ -1,6 +1,7 @@
 import argparse
 import torch
 import torch.nn as nn
+from torch.optim import SGD
 import intel_extension_for_pytorch as ipex
 
 
@@ -39,20 +40,33 @@ def run_model(args):
     inputs = torch.randn(1, 3, 224, 224).requires_grad_()
     inputs2 = torch.randn(50, 50, 1024).requires_grad_()
     if args.bias:
-        model = TestModel(112, 10, True).eval()
+        model = TestModel(112, 10, True)
     else:
-        model = TestModel(112, 10, False).eval()
+        model = TestModel(112, 10, False)
     model2 = TestLSTM().train()
-    model = ipex.optimize(
-        model, dtype=torch.float32, level="O1", auto_kernel_selection=True
-    )
+    if mode == "jit":
+        model = model.eval()
+        model = ipex.optimize(
+            model, dtype=torch.float32, level="O1", auto_kernel_selection=True
+        )
+    else:
+        model = model.train()
+        origin_optimizer1 = SGD(model.parameters(), lr=0.01, momentum=0.9)
+        model, _ = ipex.optimize(
+            model,
+            dtype=torch.float32,
+            optimizer=origin_optimizer1,
+            level="O1",
+            auto_kernel_selection=True,
+        )
     ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model2, None)
     if mode == "jit":
         model = torch.jit.trace(model, inputs).eval()
         model = torch.jit.freeze(model)
     output = model(inputs)
     output2 = model2(inputs2)
-    output.sum().backward()
+    if mode == "imperative":
+        output.sum().backward()
     output2.sum().backward()
 
 

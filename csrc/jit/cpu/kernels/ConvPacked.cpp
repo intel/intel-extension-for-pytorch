@@ -888,6 +888,10 @@ at::Tensor get_at_packed_weight(ContextConvolution& context) {
   return context.at_weight_;
 }
 
+c10::optional<at::Tensor> get_at_bias(ContextConvolution& context) {
+  return context.at_bias_;
+}
+
 at::Tensor pack(ContextConvolution& context, const at::Tensor& tensor) {
   auto ideep_tensor = itensor_view_from_dense(tensor);
   auto dtype = ideep_tensor.get_data_type();

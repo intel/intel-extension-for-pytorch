@@ -108,6 +108,10 @@ at::Tensor IpexConvolutionOpContext::get_at_packed_weight() {
       op_context_);
 }
 
+c10::optional<at::Tensor> IpexConvolutionOpContext::get_at_bias() {
+  return torch_ipex::cpu::detail::convolution::get_at_bias(op_context_);
+}
+
 at::Tensor IpexConvolutionOpContext::pack(const at::Tensor& tensor) {
   return torch_ipex::cpu::detail::convolution::pack(op_context_, tensor);
 }
@@ -173,6 +177,10 @@ at::Tensor IpexLinearOpContext::get_at_packed_weight() {
   return op_context_.at_weight_;
 }
 
+c10::optional<at::Tensor> IpexLinearOpContext::get_at_bias() {
+  return op_context_.at_bias_;
+}
+
 detail::ContextLinear& IpexLinearOpContext::get_context() {
   return op_context_;
 }
@@ -232,6 +240,10 @@ c10::intrusive_ptr<MKLOpContext> IpexLinearMKLOpContext::create_context(
 
 at::Tensor IpexLinearMKLOpContext::get_at_packed_weight() {
   return op_context_.at_weight_;
+}
+
+c10::optional<at::Tensor> IpexLinearMKLOpContext::get_at_bias() {
+  return op_context_.at_bias_;
 }
 
 at::Tensor IpexLinearMKLOpContext::get_data_handle() {
@@ -301,6 +313,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> IpexConvTransposeOpContext::
 at::Tensor IpexConvTransposeOpContext::get_at_packed_weight() {
   return torch_ipex::cpu::detail::conv_transpose::get_at_packed_weight(
       op_context_);
+}
+
+c10::optional<at::Tensor> IpexConvTransposeOpContext::get_at_bias() {
+  return op_context_.at_bias_;
 }
 
 at::Tensor IpexConvTransposeOpContext::pack(const at::Tensor& tensor) {

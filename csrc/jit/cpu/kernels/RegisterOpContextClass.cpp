@@ -38,6 +38,7 @@ TORCH_LIBRARY(ipex_prepack, m) {
       .def(
           "get_weight",
           &torch_ipex::cpu::ConvolutionOpContext::get_at_packed_weight)
+      .def("get_bias", &torch_ipex::cpu::ConvolutionOpContext::get_at_bias)
       .def("pack", &torch_ipex::cpu::ConvolutionOpContext::pack)
       .def("to_public", &torch_ipex::cpu::ConvolutionOpContext::to_public)
       .def(
@@ -61,6 +62,7 @@ TORCH_LIBRARY(ipex_prepack, m) {
           })
       .def(
           "get_weight", &torch_ipex::cpu::LinearOpContext::get_at_packed_weight)
+      .def("get_bias", &torch_ipex::cpu::LinearOpContext::get_at_bias)
       .def("pack", &torch_ipex::cpu::LinearOpContext::pack)
       .def("to_public", &torch_ipex::cpu::LinearOpContext::to_public)
       .def(
@@ -80,6 +82,7 @@ TORCH_LIBRARY(ipex_prepack, m) {
                 std::move(std::get<2>(state)));
           })
       .def("get_weight", &torch_ipex::cpu::MKLOpContext::get_at_packed_weight)
+      .def("get_bias", &torch_ipex::cpu::MKLOpContext::get_at_bias)
       .def("pack", &torch_ipex::cpu::MKLOpContext::pack)
       .def("to_public", &torch_ipex::cpu::MKLOpContext::to_public)
       .def("get_data_handle", &torch_ipex::cpu::MKLOpContext::get_data_handle)
@@ -106,6 +109,7 @@ TORCH_LIBRARY(ipex_prepack, m) {
       .def(
           "get_weight",
           &torch_ipex::cpu::ConvTransposeOpContext::get_at_packed_weight)
+      .def("get_bias", &torch_ipex::cpu::ConvTransposeOpContext::get_at_bias)
       .def("pack", &torch_ipex::cpu::ConvTransposeOpContext::pack)
       .def("to_public", &torch_ipex::cpu::ConvTransposeOpContext::to_public)
       .def(

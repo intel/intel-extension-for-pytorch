@@ -63,9 +63,10 @@ class TestFPMathCases(TestCase):
             assert (
                 num1 > 0 and num2 > 0 and num3 > 0 and num6 > 0
             ), "The implicit FP32 to BF16 data type conversion failed to enable."
-            assert (
-                num4 > 0 and num5 > 0 and num3 >= 3 and num7 > 0
-            ), "The implicit FP32 to BF16 data type conversion failed to enable in backward pass."
+            if mode == "imperative":
+                assert (
+                    num4 > 0 and num5 > 0 and num3 >= 3 and num7 > 0
+                ), "The implicit FP32 to BF16 data type conversion failed to enable in backward pass."
 
     @fpmath_mode_env
     def test_fpmath_strict(self):

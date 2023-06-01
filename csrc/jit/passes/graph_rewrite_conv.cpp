@@ -40,8 +40,14 @@ void replaceFrozenIPEXConvWithAtenConv(
         continue;
       auto conv_op_ctx =
           toIValue(prepack_node).value().toCustomClass<ConvolutionOpContext>();
-      at::Tensor weight_tensor = conv_op_ctx->to_public(
-          constant_as<at::Tensor>(n->namedInput("weight")).value());
+
+      // In inference case, the input weight tensor to this OP has been set to
+      // an empty tensor. Need to get the real weight tensor from the op
+      // context.
+      // Please refer to [ Note -- Fix the size of the saved TorchScript model ]
+      // for the details.
+      at::Tensor weight_tensor =
+          conv_op_ctx->to_public(conv_op_ctx->get_at_packed_weight());
       WithInsertPoint guard(n);
       auto graph = n->owningGraph();
 
@@ -49,10 +55,30 @@ void replaceFrozenIPEXConvWithAtenConv(
           input_size_option.value().size() == 4 ? aten::conv2d : aten::conv3d,
           1));
       aten_conv->addInput(n->inputs().at(0));
+
+      // weight
       IValue weight_value(weight_tensor);
       auto weight = graph->insertConstant(weight_value);
       aten_conv->addInput(weight);
-      aten_conv->addInput(n->inputs().at(2));
+
+      // bias
+      // In inference case, the input bias tensor to this OP has been set to an
+      // empty tensor. Need to get the real bias tensor from the op context.
+      // Please refer to [ Note -- Fix the size of the saved TorchScript model ]
+      // for the details.
+      at::Tensor bias_tensor;
+      auto may_get_bias_tensor = conv_op_ctx->get_at_bias();
+      if (may_get_bias_tensor.has_value()) {
+        bias_tensor = may_get_bias_tensor.value().set_requires_grad(false);
+        IValue bias_value(bias_tensor);
+        auto bias = graph->insertConstant(bias_value);
+        aten_conv->addInput(bias);
+      } else {
+        auto n = graph->createNone();
+        auto v = n->insertBefore(aten_conv)->output();
+        aten_conv->addInput(v);
+      }
+
       IValue stride_value(conv_op_ctx->get_stride());
       auto stride = graph->insertConstant(stride_value);
       aten_conv->addInput(stride);

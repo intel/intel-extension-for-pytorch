@@ -70,6 +70,8 @@ class ConvolutionOpContext : public torch::jit::CustomClassHolder {
   // weight This n-D ATen weight will be used for autograd and optimizer update
   virtual at::Tensor get_at_packed_weight() = 0;
 
+  virtual c10::optional<at::Tensor> get_at_bias() = 0;
+
   // Pack given tensor to same format with mkldnn packed weight
   virtual at::Tensor pack(const at::Tensor& tensor) = 0;
 
@@ -132,6 +134,8 @@ class IpexConvolutionOpContext final : public ConvolutionOpContext {
 
   virtual at::Tensor get_at_packed_weight() override;
 
+  virtual c10::optional<at::Tensor> get_at_bias() override;
+
   virtual at::Tensor pack(const at::Tensor& tensor) override;
 
   virtual at::Tensor to_public(const at::Tensor& tensor) override;
@@ -192,6 +196,8 @@ class LinearOpContext : public torch::jit::CustomClassHolder {
   // weight This n-D ATen weight will be used for autograd and optimizer update
   virtual at::Tensor get_at_packed_weight() = 0;
 
+  virtual c10::optional<at::Tensor> get_at_bias() = 0;
+
   // Pack given tensor to same format with mkldnn packed weight
   virtual at::Tensor pack(const at::Tensor& tensor) = 0;
 
@@ -239,6 +245,8 @@ class IpexLinearOpContext final : public LinearOpContext {
 
   virtual at::Tensor get_at_packed_weight() override;
 
+  virtual c10::optional<at::Tensor> get_at_bias() override;
+
   virtual at::Tensor pack(const at::Tensor& tensor) override;
 
   virtual at::Tensor to_public(const at::Tensor& tensor) override;
@@ -269,6 +277,8 @@ class MKLOpContext : public torch::jit::CustomClassHolder {
   }
 
   virtual at::Tensor get_at_packed_weight() = 0;
+
+  virtual c10::optional<at::Tensor> get_at_bias() = 0;
 
   virtual at::Tensor get_data_handle() = 0;
 
@@ -312,6 +322,8 @@ class IpexLinearMKLOpContext final : public MKLOpContext {
   }
 
   virtual at::Tensor get_at_packed_weight() override;
+
+  virtual c10::optional<at::Tensor> get_at_bias() override;
 
   virtual at::Tensor get_data_handle() override;
 
@@ -472,6 +484,8 @@ class ConvTransposeOpContext : public torch::jit::CustomClassHolder {
   // weight This n-D ATen weight will be used for autograd and optimizer update
   virtual at::Tensor get_at_packed_weight() = 0;
 
+  virtual c10::optional<at::Tensor> get_at_bias() = 0;
+
   // Pack given tensor to same format with mkldnn packed weight
   virtual at::Tensor pack(const at::Tensor& tensor) = 0;
 
@@ -531,6 +545,8 @@ class IpexConvTransposeOpContext final : public ConvTransposeOpContext {
       std::array<bool, 3> output_mask) override;
 
   virtual at::Tensor get_at_packed_weight() override;
+
+  virtual c10::optional<at::Tensor> get_at_bias() override;
 
   virtual at::Tensor pack(const at::Tensor& tensor) override;
 

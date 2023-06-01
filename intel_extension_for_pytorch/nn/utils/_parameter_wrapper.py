@@ -174,6 +174,16 @@ def get_shared_parameter_status(module, shared_p):
         get_shared_parameter_status(child, shared_p)
 
 
+def remove_empty_tensor(out):
+    empty_tensor_key = [
+        key for key in out.keys() if key.endswith("_ipex_module_empty_tensor")
+    ]
+
+    for key in empty_tensor_key:
+        del out[key]
+    return out
+
+
 def patch_state_dict(model, params_attr, mode):
     def cast_back_state_dict(self, *args, destination=None, prefix="", keep_vars=False):
         with torch.no_grad(), contextlib.ExitStack() as stack:
@@ -188,6 +198,8 @@ def patch_state_dict(model, params_attr, mode):
             out = self._original_state_dict(
                 *args, destination=destination, prefix=prefix, keep_vars=keep_vars
             )
+            # We don't save the _ipex_module_empty_tensor Parameter in the state dict
+            out = remove_empty_tensor(out)
         return out
 
     if not hasattr(model, "_original_state_dict"):

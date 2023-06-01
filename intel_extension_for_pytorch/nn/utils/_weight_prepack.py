@@ -80,11 +80,26 @@ class _IPEXConvNd(nn.Module):
             _ipex_module_load_from_state_dict_(self, state_dict, prefix)
 
     def forward(self, x):
+        # [ Note -- Fix the size of the saved TorchScript model ]
+        # In inference case:
+        # We pass empty tensors for weight and bias in forward to solve the size increase issue of the saved TorchScript model.
+        # For runtime memory usage, we don't have concern to use real tensors since
+        # self.weight and self.bias shares the storage with the tensors in self.ctx,
+        # thus the runtime memory won't grow.
+        # However, for the saved TorchScript model, after torch.jit.trace and torch.jit.freeze,
+        # self.ctx (with weight and bias inside), self.weight and self.bias will all be converted to prim::Constant on the graph
+        # and they will all be serialized which makes the saved model size grow.
+        # For inference, we pass in empty tensors in the forward function for weight and bias,
+        # since self.weight and self.bias are not used,
+        # they won't be on the traced graph, thus won't be saved later.
+        # In training case:
+        # Since autograd requires that grad shape to match the input tensor shape in the forward func,
+        # we can't use empty tensor here.
         if self.padding_mode != "zeros":
             return torch.ops.torch_ipex.convolution_forward(
                 F.pad(x, self._reversed_padding_repeated_twice, mode=self.padding_mode),
-                self.weight,
-                self.bias,
+                self.weight if self.training else self._ipex_module_empty_tensor,
+                self.bias if self.training else self._ipex_module_empty_tensor,
                 self.ctx.get_data_handle(),
                 self.weight_size,
                 self._real_padding,
@@ -94,8 +109,8 @@ class _IPEXConvNd(nn.Module):
             )
         return torch.ops.torch_ipex.convolution_forward(
             x,
-            self.weight,
-            self.bias,
+            self.weight if self.training else self._ipex_module_empty_tensor,
+            self.bias if self.training else self._ipex_module_empty_tensor,
             self.ctx.get_data_handle(),
             self.weight_size,
             self._real_padding,
@@ -318,6 +333,11 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
             optim._optimizer_utils.pack_optimizer_states(
                 optimizer, optimizer_para, param_wrapper
             )
+            new_m.training = is_training
+            if not is_training:
+                # This _ipex_module_empty_tensor has to be a Parameter so that dynamo
+                # could convert it into FakeTensor
+                new_m._ipex_module_empty_tensor = torch.nn.Parameter(torch.Tensor())
             return new_m
         else:
             return m

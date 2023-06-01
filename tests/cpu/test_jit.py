@@ -60,6 +60,7 @@ import contextlib
 import torch
 import torch.nn as nn
 import torch.fx.experimental.optimization as optimization
+from torch.testing import FileCheck
 import copy
 
 import intel_extension_for_pytorch as ipex
@@ -5300,6 +5301,33 @@ class Tester(TestCase):
                 kind_not_in_graph="aten::tanh_",
                 prec=0.02,
             )
+
+    def test_empty_weight_bias_inference(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv = nn.Conv2d(3, 5, 3)
+
+            def forward(self, x):
+                x = self.conv(x)
+                return x
+
+        model = M()
+        model.eval()
+        data = torch.randn(1, 3, 56, 56)
+        optimized = ipex.optimize(model)
+        with torch.no_grad():
+            traced_model = torch.jit.trace(optimized, data)
+            traced_model = torch.jit.freeze(traced_model)
+            traced_model(data)
+
+            graph = traced_model.graph
+            FileCheck().check_not("self.conv.weight").check_not("self.conv.bias").check(
+                "_ipex_module_empty_tensor"
+            ).run(graph)
+            y_ref = model(data)
+            y_traced = traced_model(data)
+            self.assertEqual(y_ref, y_traced)
 
 
 if __name__ == "__main__":

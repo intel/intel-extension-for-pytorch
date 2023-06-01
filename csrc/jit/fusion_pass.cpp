@@ -98,11 +98,16 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
 
   // Replace _convolution with conv2d or conv3d
   torch_ipex::jit::graph_rewrite_helper::replaceConvolutionWithAtenConv(graph);
+  GRAPH_DUMP(
+      "After replaceConvolutionWithAtenConv.Before replaceFrozenIPEXConvWithAtenConv",
+      graph);
 
   // Replace torch_ipex::convolution_forward with conv2d or conv3d when conv
   // weights are constant. Conv weights will be unpacked in this step.
   graph_rewrite::replaceFrozenIPEXConvWithAtenConv(graph);
-
+  GRAPH_DUMP(
+      "After replaceFrozenIPEXConvWithAtenConv.Before FrozenConvFolding",
+      graph);
   // convolution folding
   graph_rewrite::FrozenConvFolding(graph);
 
