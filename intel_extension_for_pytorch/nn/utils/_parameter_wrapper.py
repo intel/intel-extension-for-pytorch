@@ -134,6 +134,7 @@ def _should_prepack(module, is_training, is_xpu=False):
         torch.float,
         torch.float32,
         torch.bfloat16,
+        torch.half,
     ):
         return False
     return True

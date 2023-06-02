@@ -233,7 +233,9 @@ class AutocastCPUTestLists(object):
                 ),
             ),
         ]
-        self.torch_bf16_fp32 = []
+        self.torch_bf16_fp32 = [
+            ("_adaptive_avg_pool3d", dummy_bf16[3], {"output_size": (4, 4, 4)}),
+        ]
         self.nn_bf16 = [
             ("linear", mat0_fp32 + mat1_fp32),
         ]
@@ -243,6 +245,7 @@ class AutocastCPUTestLists(object):
                 dummy_bf16[3],
                 {"kernel_size": (3, 3, 3), "stride": (1, 1, 1)},
             ),
+            ("adaptive_avg_pool3d", dummy_bf16[3], {"output_size": (4, 4, 4)}),
         ]
         self.torch_bf16_fp32_multi_output = []
         self.nn_bf16_fp32_multi_output = []
@@ -311,7 +314,6 @@ class AutocastCPUTestLists(object):
         ]
         self.nn_fp16 = []
         self.torch_fp16_fp32 = [
-            ("relu", mat0_fp16),
             ("conv1d", conv_args_fp16[0]),
             ("conv2d", conv_args_fp16[1]),
             ("conv3d", conv_args_fp16[2]),
@@ -391,10 +393,23 @@ class AutocastCPUTestLists(object):
             ),
             ("layer_norm", pointwise0_fp16 + ((pointwise0_fp16[0].numel(),),)),
             ("dropout", mat0_fp16 + (0.5,) + (False,)),
-            ("tanh", mat0_fp16),
+            ("softmax", pointwise0_fp16 + (0,)),
+            ("log_softmax", pointwise0_fp16 + (0,)),
+            ("cumsum", pointwise0_fp16 + (0,)),
+            ("addcdiv", pointwise0_fp16 + pointwise1_fp16 + pointwise2_fp16),
+            ("addcmul", pointwise0_fp16 + pointwise1_fp16 + pointwise2_fp16),
+            (
+                "_scaled_dot_product_attention_math",
+                (
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
+                ),
+            ),
+            ("topk", pointwise0_fp16 + (2,)),
+            ("_adaptive_avg_pool3d", dummy_fp16[3], {"output_size": (4, 4, 4)}),
         ]
         self.nn_fp16_fp32 = [
-            ("mish", mat0_fp16),
             ("linear", mat0_fp16 + mat1_fp16),
             ("avg_pool2d", dummy_fp16[2], {"kernel_size": (3, 2), "stride": (1, 1)}),
             (
@@ -402,5 +417,105 @@ class AutocastCPUTestLists(object):
                 dummy_fp16[3],
                 {"kernel_size": (3, 3, 3), "stride": (1, 1, 1)},
             ),
-            ("gelu", mat0_fp16),
+            (
+                "scaled_dot_product_attention",
+                (
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
+                ),
+            ),
+            (
+                "_scaled_dot_product_attention",
+                (
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
+                ),
+            ),
+            ("adaptive_avg_pool2d", dummy_fp16[2], {"output_size": (4, 4)}),
+            ("adaptive_avg_pool3d", dummy_fp16[3], {"output_size": (4, 4, 4)}),
+            ("upsample_nearest1d", dummy_fp16[2], {"output_size": (n)}),
+            ("upsample_nearest2d", dummy_fp16[3], {"output_size": (n, n)}),
+            ("upsample_nearest3d", dummy_fp16[4], {"output_size": (n, n, n)}),
+            (
+                "upsample_linear1d",
+                dummy_fp16[2],
+                {"output_size": (n), "align_corners": False},
+            ),
+            (
+                "upsample_bilinear2d",
+                dummy_fp16[3],
+                {"output_size": (n, n), "align_corners": False},
+            ),
+            (
+                "_upsample_bilinear2d_aa",
+                dummy_fp16[3],
+                {"output_size": (n, n), "align_corners": False},
+            ),
+            (
+                "upsample_trilinear3d",
+                dummy_fp16[4],
+                {"output_size": (n, n, n), "align_corners": False},
+            ),
+        ]
+        self.torch_fallthrough_bf16 = [
+            ("softmax", pointwise0_bf16 + (0,)),
+            ("log_softmax", pointwise0_bf16 + (0,)),
+            ("topk", pointwise0_bf16 + (2,)),
+            ("layer_norm", pointwise0_bf16 + ((pointwise0_bf16[0].numel(),),)),
+            ("dropout", mat0_bf16 + (0.5,) + (False,)),
+            ("cumsum", pointwise0_bf16 + (0,)),
+            ("addcdiv", pointwise0_bf16 + pointwise1_bf16 + pointwise2_bf16),
+            ("addcmul", pointwise0_bf16 + pointwise1_bf16 + pointwise2_bf16),
+            (
+                "_scaled_dot_product_attention_math",
+                (
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
+                ),
+            ),
+        ]
+        self.nn_fallthrough_bf16 = [
+            (
+                "scaled_dot_product_attention",
+                (
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
+                ),
+            ),
+            (
+                "_scaled_dot_product_attention",
+                (
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
+                ),
+            ),
+            ("upsample_nearest1d", dummy_bf16[2], {"output_size": (n)}),
+            ("upsample_nearest2d", dummy_bf16[3], {"output_size": (n, n)}),
+            ("upsample_nearest3d", dummy_bf16[4], {"output_size": (n, n, n)}),
+            (
+                "upsample_linear1d",
+                dummy_bf16[2],
+                {"output_size": (n), "align_corners": False},
+            ),
+            (
+                "upsample_bilinear2d",
+                dummy_bf16[3],
+                {"output_size": (n, n), "align_corners": False},
+            ),
+            (
+                "_upsample_bilinear2d_aa",
+                dummy_bf16[3],
+                {"output_size": (n, n), "align_corners": False},
+            ),
+            (
+                "upsample_trilinear3d",
+                dummy_bf16[4],
+                {"output_size": (n, n, n), "align_corners": False},
+            ),
+            ("adaptive_avg_pool2d", dummy_bf16[2], {"output_size": (4, 4)}),
         ]
