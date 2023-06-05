@@ -4,6 +4,8 @@ endif()
 
 include(${IPEX_ROOT_DIR}/cmake/BuildFlags.cmake)
 
+set(CMAKE_CXX_STANDARD 17)
+
 find_package(pybind11)
 if(NOT pybind11_FOUND)
     find_package(pybind11 CONFIG)
@@ -71,6 +73,7 @@ function (print_python_config_summary)
   message(STATUS "  C++ compiler ID       : ${CMAKE_CXX_COMPILER_ID}")
   message(STATUS "  C++ compiler version  : ${CMAKE_CXX_COMPILER_VERSION}")
 
+  message(STATUS "  CXX standard          : ${CMAKE_CXX_STANDARD}")
   message(STATUS "  CXX flags             : ${CMAKE_CXX_FLAGS}")
   message(STATUS "  CXX Linker options    : ${CMAKE_SHARED_LINKER_FLAGS}")
   message(STATUS "  Link libraries        : ${PYTHON_LINK_LIBRARIES}")
