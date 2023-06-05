@@ -209,6 +209,20 @@ class LinearEltwise(nn.Module):
         self.kwargs = kwargs
 
     def forward(self, x):
+        x = x / 2  # keep same accuracy with LinearDivEltwise
+        a = self.linear(x)
+        b = self.eltwise(a, **self.kwargs)
+        return b
+
+
+class LinearDivEltwise(nn.Module):
+    def __init__(self, eltwise_fn, in_channels, out_channels, bias, **kwargs):
+        super(LinearDivEltwise, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=bias)
+        self.eltwise = eltwise_fn
+        self.kwargs = kwargs
+
+    def forward(self, x):
         a = self.linear(x)
         a = a / 2
         b = self.eltwise(a, **self.kwargs)
@@ -1787,7 +1801,9 @@ class Tester(TestCase):
         with torch.no_grad():
             model_jit = torch.jit.trace(model, (test_val1))
             graph_ori = str(model_jit.graph_for(test_val1))
-            linear_count_ori = check_op_count(graph_ori, ["torch_ipex::ipex_MKLSGEMM"])
+            linear_count_ori = check_op_count(
+                graph_ori, ["ipex_prepack::mkl_sgemm_run"]
+            )
             self.assertEqual(linear_count_ori, 4)
             model_jit = torch.jit.freeze(model_jit)
             jit_res = model_jit(test_val1)
@@ -1809,7 +1825,7 @@ class Tester(TestCase):
         with torch.no_grad():
             model_jit = torch.jit.trace(model, (test_val1))
             graph_ori = str(model_jit.graph_for(test_val1))
-            linear_count_ori = check_op_count(graph_ori, ["torch_ipex::ipex_linear"])
+            linear_count_ori = check_op_count(graph_ori, ["ipex_prepack::linear_run"])
             self.assertEqual(linear_count_ori, 4)
             model_jit = torch.jit.freeze(model_jit)
             jit_res = model_jit(test_val1)
@@ -1824,7 +1840,7 @@ class Tester(TestCase):
             ori_res = model(test_val1)
             model_jit = torch.jit.trace(model, (test_val1))
             graph_ori = str(model_jit.graph_for(test_val1))
-            linear_count_ori = check_op_count(graph_ori, ["torch_ipex::ipex_linear"])
+            linear_count_ori = check_op_count(graph_ori, ["ipex_prepack::linear_run"])
             self.assertEqual(linear_count_ori, 4)
             model_jit = torch.jit.freeze(model_jit)
             model_jit(test_val1)
@@ -1846,7 +1862,7 @@ class Tester(TestCase):
             model_jit_v1 = torch.jit.trace(model_v1, (test_val1))
             graph_ori_v1 = str(model_jit_v1.graph_for(test_val1))
             linear_count_ori_v1 = check_op_count(
-                graph_ori_v1, ["torch_ipex::ipex_MKLSGEMM"]
+                graph_ori_v1, ["ipex_prepack::mkl_sgemm_run"]
             )
             self.assertEqual(linear_count_ori_v1, 4)
             model_jit_v1 = torch.jit.freeze(model_jit_v1)
@@ -1867,7 +1883,7 @@ class Tester(TestCase):
             model_jit_v1 = torch.jit.trace(model_v1, (test_val1))
             graph_ori_v1 = str(model_jit_v1.graph_for(test_val1))
             linear_count_ori_v1 = check_op_count(
-                graph_ori_v1, ["torch_ipex::ipex_linear"]
+                graph_ori_v1, ["ipex_prepack::linear_run"]
             )
             self.assertEqual(linear_count_ori_v1, 4)
             model_jit_v1 = torch.jit.freeze(model_jit_v1)
@@ -4283,7 +4299,7 @@ class Tester(TestCase):
                 prec=0.2,
             )
 
-    def _test_linear_unary_fusion(self, op_list, seed=None):
+    def _test_linear_unary_fusion(self, op_list, seed=None, cls=None):
         batch_size = 3
         out_channels = 32
         in_channels = 3
@@ -4307,9 +4323,8 @@ class Tester(TestCase):
                 op_input_list = unary_fusion_op.op_input_list
 
                 x = torch.randn(input_size)
-                m = LinearEltwise(
-                    eltwise, in_channels, out_channels, bias, **op_input_list
-                )
+                _cls = cls if cls is not None else LinearDivEltwise
+                m = _cls(eltwise, in_channels, out_channels, bias, **op_input_list)
 
                 self._test_output(m, x, kind_in_graph="aten::linear")
                 self._test_mkl_fp32(m, x, kind_in_graph="ipex_prepack::mkl_sgemm_run")
@@ -5265,6 +5280,74 @@ class Tester(TestCase):
             tresult = traced_model(input)
             result = model(input)
             self.assertEqual(tresult, result)
+
+    def test_disable_linear_repack(self):
+        base = LinearRelu(10, 10).eval()
+        input = torch.rand(10, 10).bfloat16()
+        ipex._C.disable_jit_linear_repack()
+        model = copy.deepcopy(base)
+        model = ipex.optimize(model, dtype=torch.bfloat16)
+        weight_ptr = model.linear.weight.data_ptr()
+        trace_model = torch.jit.trace(model, input)
+        trace_model = torch.jit.freeze(trace_model)
+        trace_model(input)
+        trace_graph = trace_model.graph_for(input)
+        for n in trace_graph.nodes():
+            if type(n.output().toIValue()) == torch.ScriptObject:
+                # find ctx node
+                jit_weight_ptr = n.output().toIValue().get_weight().data_ptr()
+                # weight buffer should not be changed while not re-packing during jit optimization
+                self.assertEqual(weight_ptr, jit_weight_ptr)
+                break
+
+        ipex._C.enable_jit_linear_repack()
+        model = copy.deepcopy(base)
+        model = ipex.optimize(model, dtype=torch.bfloat16)
+        weight_ptr = model.linear.weight.data_ptr()
+        trace_model = torch.jit.trace(model, input)
+        trace_model = torch.jit.freeze(trace_model)
+        trace_model(input)
+        trace_graph = trace_model.graph_for(input)
+        for n in trace_graph.nodes():
+            if type(n.output().toIValue()) == torch.ScriptObject:
+                # find ctx node
+                jit_weight_ptr = n.output().toIValue().get_weight().data_ptr()
+                # weight buffer should be changed while not re-packing during jit optimization
+                self.assertNotEqual(weight_ptr, jit_weight_ptr)
+                break
+
+    def test_linear_fusion_without_repack(self):
+        import contextlib
+
+        def disable_repack():
+            @contextlib.contextmanager
+            def ctx():
+                ipex._C.disable_jit_linear_repack()
+                try:
+                    yield
+                finally:
+                    ipex._C.enable_jit_linear_repack()
+
+            return ctx()
+
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(disable_repack())
+            self._test_linear_unary_fusion(
+                unary_PyTorch_op_to_IPEX_op_map, cls=LinearEltwise
+            )
+            self._test_linear_unary_fusion(
+                PyTorch_op_to_IPEX_op_fixed_seed_map,
+                1654065112450588160,
+                cls=LinearEltwise,
+            )
+            self._test_linear_unary_fusion(
+                non_unary_PyTorch_op_to_IPEX_op_map, cls=LinearEltwise
+            )
+            self.test_linear_fusion_unsupported_case()
+            self.test_output_linear_swish()
+            self.test_output_linear_reshape_relu()
+            self.test_output_linear_add_relu()
+            self.test_output_linear_add()
 
     def test_replace_PythonGELU_with_AtenGELU(self):
         for i in range(5):

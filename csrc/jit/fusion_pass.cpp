@@ -1,5 +1,6 @@
 #include "fusion_pass.h"
 #include <string>
+#include "auto_opt_config.h"
 #include "codegen/onednn/interface.h"
 #include "cpu/kernels/Matmul.h"
 #include "passes/concat_linear.h"
@@ -132,8 +133,10 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // up fusion pass, will further abstract this as a class method.
   auto aten_linear_recorder = ATenLinearRecorder(graph);
   // linear folding
-  graph_rewrite::replaceFrozenIPEXLinearWithAtenLinear(
-      graph, aten_linear_recorder.use_mkl());
+  if (AutoOptConfig::singleton().get_jit_repack_for_linear()) {
+    graph_rewrite::replaceFrozenIPEXLinearWithAtenLinear(
+        graph, aten_linear_recorder.use_mkl());
+  }
   // concat multi-linear with same input
   torch_ipex::jit::FrozenConcatLinear(
       graph, aten_linear_recorder.get_records());

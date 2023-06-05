@@ -2,6 +2,7 @@
 #include <ideep.hpp>
 #include "passes/utils.h"
 
+#include "auto_opt_config.h"
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
 
@@ -93,6 +94,101 @@ void replaceFrozenIPEXLinearWithAtenLinear(
   EliminateDeadCode(graph);
 }
 
+void replaceAtenLinearWithPrepackNode(
+    Node* n,
+    std::unordered_set<Node*>& aten_linear,
+    const bool& use_mkl_sgemm) {
+  WithInsertPoint guard(n);
+  auto graph = n->owningGraph();
+  auto input_size_option =
+      n->inputs().at(0)->type()->cast<TensorType>()->sizes().concrete_sizes();
+  if (!(input_size_option.has_value() &&
+        input_size_option.value().size() >= 2)) {
+    return;
+  }
+  auto input_size = input_size_option.value();
+  int64_t b_size =
+      std::accumulate(
+          input_size.begin(), input_size.end(), 1, std::multiplies<double>()) /
+      input_size[input_size.size() - 1];
+  IValue batch_size_value(b_size);
+  auto batch_size = graph->insertConstant(batch_size_value);
+  auto tt = n->inputs().at(1)->type()->cast<TensorType>();
+  auto weight_size_option = tt->sizes().concrete_sizes();
+  if (!(weight_size_option.has_value() &&
+        weight_size_option.value().size() == 2)) {
+    return;
+  }
+  auto weight_dtype_option = tt->scalarType();
+  bool should_repack = aten_linear.find(n) == aten_linear.end() &&
+      AutoOptConfig::singleton().get_jit_repack_for_linear();
+
+  // we should pack aten linear to ipex prepack linear for 2 cases:
+  // (1): Repack case, this aten linear is created by ipex linear
+  // (2) BF16 case, we believe IPEX BF16 prepack linear always better than aten
+  // BF16 linear
+  bool should_pack_for_bf16 = weight_dtype_option.has_value() &&
+      weight_dtype_option.value() == at::ScalarType::BFloat16 &&
+      ideep::has_bf16_type_support();
+  bool should_pack = should_repack || should_pack_for_bf16;
+  if (!(should_pack))
+    return;
+
+  auto weight_size = weight_size_option.value();
+
+  // Note that once creating a graph node, make sure it is also inserted into
+  // the graph, for: PyTorch (when disabled TE) has a check on the graph node,
+  // pointing out that every mutable value in the system has a corresponding
+  // element. So if creating a graph node but not inserted, it will not pass
+  // the check since its graph element is not initialized. Details please
+  // refer to
+  // https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/ir/alias_analysis.cpp#L1956
+  auto use_mkl_sgemm_ =
+      use_mkl_sgemm && weight_dtype_option.value() != at::ScalarType::BFloat16;
+  auto prepack_node = graph->create(
+      use_mkl_sgemm_ ? Symbol::fromQualString("ipex_prepack::mkl_sgemm_prepack")
+                     : Symbol::fromQualString("ipex_prepack::linear_prepack"),
+      1);
+  for (auto i = 1; i < n->inputs().size(); ++i) {
+    Value* v = n->inputs().at(i);
+    prepack_node->addInput(v);
+  }
+  prepack_node->addInput(batch_size);
+  prepack_node->output()->setType(
+      use_mkl_sgemm_
+          ? getCustomClass("__torch__.torch.classes.ipex_prepack.MKLOpContext")
+          : getCustomClass(
+                "__torch__.torch.classes.ipex_prepack.LinearOpContext"));
+  graph->insertNode(prepack_node);
+  auto prepack_linear = graph->insertNode(graph->create(
+      use_mkl_sgemm_ ? Symbol::fromQualString("ipex_prepack::mkl_sgemm_run")
+                     : Symbol::fromQualString("ipex_prepack::linear_run"),
+      1));
+  prepack_linear->addInput(n->inputs().at(0));
+  prepack_linear->addInput(prepack_node->output());
+  prepack_linear->output()->setType(n->output()->type()->cast<TensorType>());
+  auto v = n->outputs().at(0);
+  n->output()->replaceAllUsesWith(prepack_linear->output());
+}
+
+void replaceIpexLinearWithLinearRunNode(Node* n) {
+  WithInsertPoint guard(n);
+  auto graph = n->owningGraph();
+  auto use_mkl_sgemm =
+      n->kind() == Symbol::fromQualString("torch_ipex::ipex_MKLSGEMM");
+  auto get_data_handle_node = n->inputs().at(3)->node();
+  auto linear_ctx = get_data_handle_node->inputs().at(0);
+  auto linear_run = graph->insertNode(graph->create(
+      use_mkl_sgemm ? Symbol::fromQualString("ipex_prepack::mkl_sgemm_run")
+                    : Symbol::fromQualString("ipex_prepack::linear_run"),
+      1));
+  linear_run->addInput(n->inputs().at(0));
+  linear_run->addInput(linear_ctx);
+  linear_run->output()->setType(n->output()->type()->cast<TensorType>());
+  n->output()->replaceAllUsesWith(linear_run->output());
+  return;
+}
+
 void insertPrePackedLinearOp(
     Block* b,
     std::unordered_set<Node*>& aten_linear,
@@ -101,75 +197,15 @@ void insertPrePackedLinearOp(
     for (Block* block : n->blocks()) {
       insertPrePackedLinearOp(block, aten_linear, use_mkl_sgemm);
     }
-    if (n->kind() != aten::linear)
-      continue;
-    WithInsertPoint guard(n);
-    auto graph = n->owningGraph();
-    auto input_size_option =
-        n->inputs().at(0)->type()->cast<TensorType>()->sizes().concrete_sizes();
-    if (!(input_size_option.has_value() &&
-          input_size_option.value().size() >= 2)) {
-      continue;
-    }
-    auto input_size = input_size_option.value();
-    int64_t b_size = std::accumulate(
-                         input_size.begin(),
-                         input_size.end(),
-                         1,
-                         std::multiplies<double>()) /
-        input_size[input_size.size() - 1];
-    IValue batch_size_value(b_size);
-    auto batch_size = graph->insertConstant(batch_size_value);
-    auto tt = n->inputs().at(1)->type()->cast<TensorType>();
-    auto weight_size_option = tt->sizes().concrete_sizes();
-    if (!(weight_size_option.has_value() &&
-          weight_size_option.value().size() == 2)) {
+    if (n->kind() == aten::linear) {
+      replaceAtenLinearWithPrepackNode(n, aten_linear, use_mkl_sgemm);
+    } else if (
+        n->kind() == Symbol::fromQualString("torch_ipex::ipex_linear") ||
+        n->kind() == Symbol::fromQualString("torch_ipex::ipex_MKLSGEMM")) {
+      replaceIpexLinearWithLinearRunNode(n);
+    } else {
       continue;
     }
-    auto weight_dtype_option = tt->scalarType();
-    if (!(weight_dtype_option.has_value() &&
-              (weight_dtype_option.value() == at::ScalarType::BFloat16) &&
-              ideep::has_bf16_type_support() ||
-          aten_linear.find(n) == aten_linear.end())) {
-      continue;
-    }
-    auto weight_size = weight_size_option.value();
-
-    // Note that once creating a graph node, make sure it is also inserted into
-    // the graph, for: PyTorch (when disabled TE) has a check on the graph node,
-    // pointing out that every mutable value in the system has a corresponding
-    // element. So if creating a graph node but not inserted, it will not pass
-    // the check since its graph element is not initialized. Details please
-    // refer to
-    // https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/ir/alias_analysis.cpp#L1956
-    auto use_mkl_sgemm_ = use_mkl_sgemm &&
-        weight_dtype_option.value() != at::ScalarType::BFloat16;
-    auto prepack_node = graph->create(
-        use_mkl_sgemm_
-            ? Symbol::fromQualString("ipex_prepack::mkl_sgemm_prepack")
-            : Symbol::fromQualString("ipex_prepack::linear_prepack"),
-        1);
-    for (auto i = 1; i < n->inputs().size(); ++i) {
-      Value* v = n->inputs().at(i);
-      prepack_node->addInput(v);
-    }
-    prepack_node->addInput(batch_size);
-    prepack_node->output()->setType(
-        use_mkl_sgemm_
-            ? getCustomClass(
-                  "__torch__.torch.classes.ipex_prepack.MKLOpContext")
-            : getCustomClass(
-                  "__torch__.torch.classes.ipex_prepack.LinearOpContext"));
-    graph->insertNode(prepack_node);
-    auto prepack_linear = graph->insertNode(graph->create(
-        use_mkl_sgemm_ ? Symbol::fromQualString("ipex_prepack::mkl_sgemm_run")
-                       : Symbol::fromQualString("ipex_prepack::linear_run"),
-        1));
-    prepack_linear->addInput(n->inputs().at(0));
-    prepack_linear->addInput(prepack_node->output());
-    prepack_linear->output()->setType(n->output()->type()->cast<TensorType>());
-    auto v = n->outputs().at(0);
-    n->output()->replaceAllUsesWith(prepack_linear->output());
   }
   EliminateDeadCode(b);
 }
