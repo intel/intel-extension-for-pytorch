@@ -314,7 +314,7 @@ class TestTorchMethod(TestCase):
                 )
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_div_rounding_mode(self, dtype=torch.float):
         a_cpu = torch.randn([100, 100])

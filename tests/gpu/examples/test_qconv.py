@@ -352,7 +352,7 @@ class TestTorchMethod(TestCase):
         reason="No qengine found. USE_FBGEMM=1 is needed for building pytorch",
     )
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_qconv_per_channel(self, dtype=torch.float):
         print(

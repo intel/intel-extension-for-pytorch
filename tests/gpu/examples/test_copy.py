@@ -36,7 +36,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(qtensor1.to(cpu_device), qtensor2.to(cpu_device))
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_2d_block_array(),
+        not torch.xpu.has_2d_block_array(),
         reason="Skipped on ATS-M due to memory limitation",
     )
     def test_copy_big_numel(self, dtype=torch.float):

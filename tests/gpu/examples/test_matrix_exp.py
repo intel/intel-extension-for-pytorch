@@ -10,7 +10,7 @@ import pytest
 class TestTorchMethod(TestCase):
     @dtypes([torch.bfloat16, torch.float, torch.double])
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_matrix_exp(self, dtype=torch.bfloat16):
         A = torch.randn([10, 20, 20], dtype=dtype)
@@ -21,7 +21,7 @@ class TestTorchMethod(TestCase):
 
     @dtypes([torch.float, torch.double])
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_matrix_exp_complex(self, dtype=torch.float):
         real = torch.randn([10, 20, 20], dtype=dtype)

@@ -93,7 +93,7 @@ OP_TEST_FOR_BACKWARD = [torch.logit]
 
 class TetsTorchMethod(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     @dtypes(FLOATING_DTYPES)
     def test_unary_op_for_floating(self, dtype=torch.float):
@@ -150,7 +150,7 @@ self.assertEqual(y_cpu, y_xpu.cpu())
             )
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     @dtypes([torch.float, torch.half, torch.bfloat16])
     def test_unary_op_signbit(self, dtype=torch.float):
@@ -187,7 +187,7 @@ self.assertEqual(y_cpu, y_xpu.cpu())
         self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     @dtypes(FLOATING_DTYPES)
     def test_unary_backward_for_floating(self, dtype=torch.float):

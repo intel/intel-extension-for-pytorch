@@ -7,7 +7,7 @@ import pytest
 
 class TestNNMethod(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_random(self):
         # This test is flaky with p<=(2/(ub-lb))^200=6e-36
@@ -305,7 +305,7 @@ class TestNNMethod(TestCase):
                 )
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_random_default(self):
         # TODO: https://github.com/pytorch/pytorch/issues/33793

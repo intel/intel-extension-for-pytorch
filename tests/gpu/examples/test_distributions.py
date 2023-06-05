@@ -147,7 +147,7 @@ class TestDistributions(TestCase):
         torch.set_default_dtype(dtype_origin)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_bernoulli(self):
         torch.set_default_dtype(torch.double)
@@ -282,7 +282,7 @@ class TestDistributions(TestCase):
         # self.assertEqual(Multinomial(total_count, s).sample().to(cpu_device), torch.tensor([[total_count, 0], [0, total_count]]))
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_normal(self):
         loc = torch.randn(5, 5, requires_grad=True, device=sycl_device)
@@ -405,7 +405,7 @@ class TestDistributions(TestCase):
         self.assertEqual(grad_xpu.grad.to("cpu"), grad_cpu.grad)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_binomial_log_prob(self):
         for prop in [0.0, 0.5, 0.3, 0.05, 0.02, 0.75, 0.9, 1.0]:
@@ -458,7 +458,7 @@ class TestDistributions(TestCase):
         self.assertEqual(dist.log_prob(simplex_sample).size(), torch.Size((3, 3)))
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_2d_block_array(),
+        not torch.xpu.has_2d_block_array(),
         reason="Failed on ATSM only, will be fixed soon.",
     )
     def test_dirichlet_mean_var(self):

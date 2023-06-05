@@ -28,7 +28,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(dst, dst_gpu)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_dequantize_per_channel(self, dtype=torch.float):
         src = torch.randn(1, 3, 2, 2)

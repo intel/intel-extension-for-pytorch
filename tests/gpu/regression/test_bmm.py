@@ -6,7 +6,7 @@ from torch.testing._internal.common_utils import TestCase
 
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(),
+        not torch.xpu.has_fp64_dtype(),
         reason="Complex128 not unsupported by this device",
     )
     def test_bmm(self):

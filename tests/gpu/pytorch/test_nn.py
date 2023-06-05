@@ -10953,7 +10953,7 @@ class TestNNDeviceType(NNTestCase):
     )  # We skip bfloat16 and float16 because the "exponential_dpcpp_" not implemented for 'BFloat16'
     @dtypes(torch.float, torch.double)
     @skipDPCPPIf(
-        not torch.xpu.utils.has_fp64_dtype(), "fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), "fp64 not support by this device"
     )
     def test_gumbel_softmax(self, device, dtype):
         self._test_gumbel_softmax_st_shapes(
@@ -11043,7 +11043,7 @@ class TestNNDeviceType(NNTestCase):
 
     @onlyDPCPP
     @skipDPCPPIf(
-        not torch.xpu.utils.has_fp64_dtype(), "fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), "fp64 not support by this device"
     )
     def test_CTCLoss_dpcpp(self, device):
         target_lengths = [30, 25, 20]
@@ -12235,7 +12235,7 @@ class TestNNDeviceType(NNTestCase):
 
     @onlyDPCPP
     @skipDPCPPIf(
-        not torch.xpu.utils.has_2d_block_array(),
+        not torch.xpu.has_2d_block_array(),
         reason="Randomly failed on ATSM only, will be fixed soon.",
     )
     def test_activations_bfloat16(self, device):

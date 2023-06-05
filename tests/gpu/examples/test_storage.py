@@ -32,7 +32,7 @@ class TestTorchMethod(TestCase):
         print(x.storage())
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_storage_double(self, dtype=torch.double):
         x = torch.ones(10, device=dpcpp_device, dtype=dtype)

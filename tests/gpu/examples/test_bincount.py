@@ -16,7 +16,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(torch.bincount(x_cpu), torch.bincount(x_dpcpp).cpu())
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_histc(self, dtype=torch.float):
         x_cpu = torch.randint(0, 8, (5,), dtype=torch.double)

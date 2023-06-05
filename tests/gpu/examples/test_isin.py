@@ -9,7 +9,7 @@ import pytest
 
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_isin(self, device="xpu", dtype=torch.float):
         def assert_isin_equal(a, b):
@@ -138,7 +138,7 @@ class TestTorchMethod(TestCase):
                     self.assertEqual(c, ec)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_isin_different_dtypes(self, device="xpu"):
         supported_types = all_types() if device == "cpu" else all_types_and(torch.half)

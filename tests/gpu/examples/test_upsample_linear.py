@@ -80,7 +80,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_upsamle_linear_2d_align_corners(self, dtype=torch.float):
         input_cpu = torch.randn((2, 3, 5, 5), dtype=torch.float64)

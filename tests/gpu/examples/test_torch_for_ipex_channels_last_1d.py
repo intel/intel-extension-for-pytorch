@@ -52,7 +52,7 @@ class TestNNMethod(TestCase):
         )
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_memory_format_operators(self):
         def _chunk_op(x, y):
@@ -264,7 +264,7 @@ class TestNNMethod(TestCase):
             )
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_memory_format_to(self):
         def get_generator(shape):
@@ -284,7 +284,7 @@ class TestNNMethod(TestCase):
         )
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_memory_format_type(self):
         def get_generator(shape):
@@ -304,7 +304,7 @@ class TestNNMethod(TestCase):
         )
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_memory_format_clone(self):
         def get_generator(shape):
@@ -324,7 +324,7 @@ class TestNNMethod(TestCase):
         )
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_memory_format_type_shortcuts(self):
         def get_generator(shape, dtype):

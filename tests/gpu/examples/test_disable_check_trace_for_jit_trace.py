@@ -60,7 +60,7 @@ class TestTorchMethod(TestCase):
 
         # check for each situation
         for example_input in example_inputs_list:
-            if torch.xpu.utils.has_2d_block_array():
+            if torch.xpu.has_2d_block_array():
                 # for the platform supports 2d block array, no need to disable the check trace default value
                 self.assertFalse(
                     need_to_disable_check_trace_for_XPU(module, example_input)

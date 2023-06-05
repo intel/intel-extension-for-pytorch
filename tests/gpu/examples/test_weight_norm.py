@@ -50,7 +50,7 @@ class TestNNMethod(TestCase):
         )
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_weight_norm(self):
         input = torch.randn(3, 5).to("xpu")
@@ -154,7 +154,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(g.grad, g_xpu.grad.cpu(), atol=1e-3, rtol=1e-5)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_2d_block_array(),
+        not torch.xpu.has_2d_block_array(),
         reason="Randomly failed on ATSM only, will be fixed soon.",
     )
     def test_weight_norm_large_batch(self):

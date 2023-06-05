@@ -29,7 +29,7 @@ def repeat_test_for_types(dtypes):
 
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_index_copy_dim_0(self, dtype=torch.float):
         x = torch.ones([5, 3], device=cpu_device, dtype=dtype)
@@ -47,7 +47,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(x, x_xpu.to(cpu_device))
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_index_copy_dim_1(self, dtype=torch.float):
         x = torch.zeros([3, 5], device=cpu_device, dtype=dtype)
@@ -63,7 +63,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(x, x_xpu.to(cpu_device))
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_index_copy_multi_dim(self, dtype=torch.float):
         x = torch.zeros([100, 3, 5], device=cpu_device, dtype=dtype)

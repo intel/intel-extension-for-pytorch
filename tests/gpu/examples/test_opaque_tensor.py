@@ -16,10 +16,10 @@ class TestTorchMethod(TestCase):
 
         ref = conv2(conv1(x))
 
-        torch.xpu.utils.enable_onednn_layout()
+        torch.xpu.enable_onednn_layout()
         with torch.inference_mode():
             y = conv2(conv1(x))
-        torch.xpu.utils.disable_onednn_layout()
+        torch.xpu.disable_onednn_layout()
 
         self.assertEqual(y.cpu(), ref.cpu())
 
@@ -33,11 +33,11 @@ class TestTorchMethod(TestCase):
         ).to("xpu")
         x = torch.randn(16, 64, 56, 56, dtype=dtype, device=torch.device("xpu"))
 
-        torch.xpu.utils.enable_onednn_layout()
+        torch.xpu.enable_onednn_layout()
         with torch.inference_mode():
             y = conv1(x)
             y = conv1(x)
-        torch.xpu.utils.disable_onednn_layout()
+        torch.xpu.disable_onednn_layout()
 
         w = conv1.weight * 2.22  # to_plain to check meta
         ref = ref * 2.22
@@ -53,11 +53,11 @@ class TestTorchMethod(TestCase):
         ref = conv1.weight.detach().clone()
         x = torch.randn(16, 64, 56, 56, dtype=dtype, device=torch.device("xpu"))
 
-        torch.xpu.utils.enable_onednn_layout()
+        torch.xpu.enable_onednn_layout()
         with torch.inference_mode():
             y = conv1(x)
             y = conv1(x)
-        torch.xpu.utils.disable_onednn_layout()
+        torch.xpu.disable_onednn_layout()
 
         w = conv1.weight * 2.22  # to_plain to check meta
         ref = ref * 2.22
@@ -76,11 +76,11 @@ class TestTorchMethod(TestCase):
 
         ref = b.detach().clone()
 
-        torch.xpu.utils.enable_onednn_layout()
+        torch.xpu.enable_onednn_layout()
         with torch.inference_mode():
             c = torch.ops.torch_ipex.linear_relu(a, b, a)
             c = torch.ops.torch_ipex.linear_relu(a, b, a)
-        torch.xpu.utils.disable_onednn_layout()
+        torch.xpu.disable_onednn_layout()
 
         b = b * 2.22  # to_plain to check meta
         ref = ref * 2.22

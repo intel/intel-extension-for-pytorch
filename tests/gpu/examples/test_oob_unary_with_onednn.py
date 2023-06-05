@@ -268,7 +268,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(inputs_gcpu, inputs_gxpu_block.cpu())
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_2d_block_array(),
+        not torch.xpu.has_2d_block_array(),
         reason="Failed on ATSM only, will be fixed soon.",
     )
     def test_relu_bwd(self):
@@ -277,7 +277,7 @@ class TestTorchMethod(TestCase):
         self.unary_bwd_case(torch.nn.functional.relu, torch.float, True)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_2d_block_array(),
+        not torch.xpu.has_2d_block_array(),
         reason="Failed on ATSM only, will be fixed soon.",
     )
     def test_gelu_bwd(self):
@@ -286,7 +286,7 @@ class TestTorchMethod(TestCase):
         self.unary_bwd_case(torch.nn.functional.gelu, torch.float, True)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_2d_block_array(),
+        not torch.xpu.has_2d_block_array(),
         reason="Failed on ATSM only, will be fixed soon.",
     )
     def test_silu_bwd(self):
@@ -295,7 +295,7 @@ class TestTorchMethod(TestCase):
         self.unary_bwd_case(torch.nn.functional.silu, torch.float, True)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_2d_block_array(),
+        not torch.xpu.has_2d_block_array(),
         reason="Failed on ATSM only, will be fixed soon.",
     )
     def test_tanh_bwd(self):
@@ -304,7 +304,7 @@ class TestTorchMethod(TestCase):
         self.unary_bwd_case(torch.nn.functional.tanh, torch.float, True)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_2d_block_array(),
+        not torch.xpu.has_2d_block_array(),
         reason="Failed on ATSM only, will be fixed soon.",
     )
     def test_elu_bwd(self):
@@ -313,7 +313,7 @@ class TestTorchMethod(TestCase):
         self.unary_bwd_case(torch.nn.functional.elu, torch.float, True)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_2d_block_array(),
+        not torch.xpu.has_2d_block_array(),
         reason="Failed on ATSM only, will be fixed soon.",
     )
     def test_sigmoid_bwd(self):

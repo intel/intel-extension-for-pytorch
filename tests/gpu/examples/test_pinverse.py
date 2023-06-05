@@ -8,7 +8,7 @@ import pytest
 class TestNNMethod(TestCase):
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_pinverse(self):
         a = torch.randn(5, 3)

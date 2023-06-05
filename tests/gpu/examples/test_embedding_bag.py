@@ -9,7 +9,7 @@ import pytest
 
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_embedding_bag_all(self, dtype=torch.float32):
         weight_elem = 56

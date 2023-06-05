@@ -74,7 +74,7 @@ class TestTorchMethod(TestCase):
         check(m, a, b, 0, alpha)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_addr_type_promotion(self, device="xpu", dtypes=torch.float32):
         dtypes = [torch.float64, torch.float32, torch.bfloat16]

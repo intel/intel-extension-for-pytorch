@@ -7,7 +7,7 @@ import pytest
 
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_fake_quantize_per_channel_affine(self, dtype=torch.float):
         src_cpu = torch.randn([1, 3, 2, 2], requires_grad=True, dtype=torch.float)
@@ -39,7 +39,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(src_cpu.grad, src_xpu.grad.cpu())
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_fake_quantize_learnable_per_channel_affine(self, dtype=torch.float):
         src_cpu = torch.randn([1, 3, 2, 2])
@@ -74,7 +74,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(dst_cpu, dst_xpu.cpu())
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_fake_quantize_learnable_per_channel_affine_backward(
         self, dtype=torch.float

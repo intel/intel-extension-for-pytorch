@@ -7,7 +7,7 @@ import pytest
 
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_conv_tbc(self, dtype=torch.float):
         input_cpu = torch.randn(3, 4, 5)

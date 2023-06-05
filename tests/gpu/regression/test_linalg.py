@@ -5,7 +5,7 @@ import intel_extension_for_pytorch  # noqa F401
 
 @pytest.mark.parametrize("prec", [torch.float32, torch.float64])
 @pytest.mark.skipif(
-    not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not unsupported by this device"
+    not torch.xpu.has_fp64_dtype(), reason="fp64 not unsupported by this device"
 )
 def test_slogdet(prec):
     device = torch.device("xpu")

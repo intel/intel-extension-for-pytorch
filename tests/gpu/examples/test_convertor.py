@@ -26,12 +26,12 @@ class TestTorchMethod(TestCase):
     def test_usm(self):
         src = torch.rand((2, 12), device=dpcpp_device)
         dst = src.clone().to(cpu_device).reshape(4, 6)
-        usm = intel_extension_for_pytorch.xpu.to_usm(src)
-        tensor = intel_extension_for_pytorch.xpu.from_usm(usm, dst.dtype, (4, 6))
+        usm = torch.xpu.to_usm(src)
+        tensor = torch.xpu.from_usm(usm, dst.dtype, (4, 6))
         self.assertEqual(tensor.to(cpu_device), dst)
 
         src = torch.rand((2, 12), device=dpcpp_device)
         dst = src.clone().to(cpu_device).reshape(4, 6)
-        usm = intel_extension_for_pytorch.xpu.to_usm(src)
-        tensor = intel_extension_for_pytorch.xpu.from_usm(usm, dst.dtype, (4, 6))
+        usm = torch.xpu.to_usm(src)
+        tensor = torch.xpu.from_usm(usm, dst.dtype, (4, 6))
         self.assertEqual(tensor.to(cpu_device), dst)

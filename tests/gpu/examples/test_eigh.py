@@ -21,7 +21,7 @@ dpcpp_device = torch.device("xpu")
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     @dtypes(torch.float32, torch.float64, torch.complex32, torch.complex64)
     @precisionOverride({torch.float32: 1e-4, torch.complex32: 1e-4,
@@ -37,7 +37,7 @@ class TestTorchMethod(TestCase):
 
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     @dtypes(torch.float32, torch.float64, torch.complex32, torch.complex64)
     @precisionOverride({torch.float32: 1e-4, torch.complex32: 1e-4,
@@ -63,7 +63,7 @@ class TestTorchMethod(TestCase):
 
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     @dtypes(torch.float32, torch.float64, torch.complex32, torch.complex64)
     @precisionOverride({torch.float32: 1e-4, torch.complex32: 1e-4,
@@ -85,7 +85,7 @@ class TestTorchMethod(TestCase):
     @dtypes(torch.float32, torch.float64)
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_eigh_errors_and_warnings(self, dtype=torch.float64, device=dpcpp_device):
         # eigh requires a square matrix
@@ -149,7 +149,7 @@ class TestTorchMethod(TestCase):
 
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     @dtypes(torch.float32, torch.float64, torch.complex32, torch.complex64)
     @precisionOverride({torch.float32: 1e-4, torch.complex32: 1e-4,
@@ -200,7 +200,7 @@ class TestTorchMethod(TestCase):
 
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     @dtypes(torch.float32, torch.float64, torch.complex32, torch.complex64)
     @precisionOverride({torch.float32: 1e-4, torch.complex32: 1e-4,
@@ -235,7 +235,7 @@ class TestTorchMethod(TestCase):
     @dtypes(torch.float64)
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_eigvals_numpy(self, device=dpcpp_device, dtype=torch.float64):
         def run_test(shape, *, symmetric=True):
@@ -281,7 +281,7 @@ class TestTorchMethod(TestCase):
     @dtypes(torch.float32, torch.float64)
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_eigvalsh_errors_and_warnings(
         self, device=dpcpp_device, dtype=torch.float64
@@ -328,7 +328,7 @@ class TestTorchMethod(TestCase):
     @dtypes(torch.float32, torch.float64, torch.complex64, torch.complex32)
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_linalg_eigh_out(self, device=dpcpp_device, dtype=torch.float64):
         matrix_cpu = random_hermitian_matrix(3, 1, dtype=dtype, device=dpcpp_device)

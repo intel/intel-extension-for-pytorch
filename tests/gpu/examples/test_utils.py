@@ -2,8 +2,6 @@ import numpy as np
 import torch
 import intel_extension_for_pytorch  # noqa
 from torch.testing._internal.common_utils import TestCase
-from intel_extension_for_pytorch.xpu.utils import using_tile_as_device, has_fp64_dtype
-from intel_extension_for_pytorch.xpu import getDeviceIdListForCard
 import pytest
 
 
@@ -87,29 +85,29 @@ class TestVerbose(TestCase):
 class TestDevicdeListForCard(TestCase):
     def test_devicelist_empty(self):
         if torch.xpu.device_count() > 0:
-            assert getDeviceIdListForCard(), "Device list should not be empty"
+            assert torch.xpu.getDeviceIdListForCard(), "Device list should not be empty"
 
     def test_devicelist_size(self):
         assert (
-            len(getDeviceIdListForCard()) <= torch.xpu.device_count()
+            len(torch.xpu.getDeviceIdListForCard()) <= torch.xpu.device_count()
         ), "The size of device list should not be larger than device count"
 
     def test_implicit_mode(self):
-        if not using_tile_as_device():
+        if not torch.xpu.using_tile_as_device():
             assert (
-                len(getDeviceIdListForCard()) == 1
+                len(torch.xpu.getDeviceIdListForCard()) == 1
             ), "The size of device list should be always 1 with implicit mode"
 
 
 class TestHasDtypes(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_has_fp64_dtype(self):
         y = (
             torch.tensor(1, device="xpu", dtype=torch.double) ** 2
         ).cpu().numpy() == np.array(1)
-        assert y == has_fp64_dtype(), "This Device Not Support FP64"
+        assert y == torch.xpu.has_fp64_dtype(), "This Device Not Support FP64"
 
 
 class TestDeviceCapability(TestCase):

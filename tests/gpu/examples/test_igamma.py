@@ -8,7 +8,7 @@ import pytest
 
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_igamma(self, dtype=torch.float):
         a = np.array([[1.6835, 1.8474, 1.1929], [1.0475, 1.7162, 1.4180]])
@@ -26,7 +26,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(y, y_dpcpp.cpu())
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_igammac(self, dtype=torch.float):
         a = np.array([[1.6835, 1.8474, 1.1929], [1.0475, 1.7162, 1.4180]])

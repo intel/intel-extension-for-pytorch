@@ -7,7 +7,7 @@ import pytest
 
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_erfcx(self, dtype=torch.float):
         dtypes = [torch.float32, torch.float64, torch.bfloat16]
@@ -41,7 +41,7 @@ class TestTorchMethod(TestCase):
             check_equal(t, torch.special.erfcx, special.erfcx)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_ndtri_entr(self, dtype=torch.float):
         dtypes = [torch.float32, torch.float64, torch.bfloat16]
@@ -134,7 +134,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_2d_block_array(),
+        not torch.xpu.has_2d_block_array(),
         reason="Randomly failed on ATSM only, will be fixed soon.",
     )
     def test_modified_bessel_k0(self, dtype=torch.float):
@@ -171,7 +171,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(result_xpu.to("cpu"), result_cpu)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_log_ndtr(self, dtype=torch.float):
         input0 = torch.randn(8192, 8192, device="cpu")

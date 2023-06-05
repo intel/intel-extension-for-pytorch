@@ -7,7 +7,7 @@ import intel_extension_for_pytorch  # noqa
 class TestNNMethod(TestCase):
     def test_searchsorted(self):
         dtypes = [torch.float32, torch.bfloat16]
-        if torch.xpu.utils.has_fp64_dtype():
+        if torch.xpu.has_fp64_dtype():
             dtypes.append(torch.float64)
         for dtype in dtypes:
             sorted_sequence = torch.tensor([[1, 3, 5, 7, 9], [2, 4, 6, 8, 10]])

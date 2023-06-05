@@ -7,7 +7,7 @@ import pytest
 
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_scatter(self, dtype=torch.float):
         x_cpu = torch.rand(2, 5)
@@ -63,7 +63,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(w2_cpu, w2_dpcpp.cpu())
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_scatter_out(self, dtype=torch.float):
         size = 10

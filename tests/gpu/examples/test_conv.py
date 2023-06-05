@@ -65,7 +65,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_conv2d_double(self, dtype=torch.double):
         x_cpu = torch.randn(

@@ -7,7 +7,7 @@ import pytest
 
 class TestNNMethod(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_TensorFactories(self, dtype=torch.float):
         x = torch.empty_strided((2, 3), (1, 2))

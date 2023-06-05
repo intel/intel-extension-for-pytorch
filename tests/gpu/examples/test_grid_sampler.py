@@ -9,7 +9,7 @@ import pytest
 
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_gridSampler(self, dtype=torch.float):
         inp = torch.ones(1, 1, 4, 4)
@@ -51,7 +51,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(out_cpu.cpu(), out_xpu.cpu())
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_gridSampler_2d_Bicubic(self, dtype=torch.float):
         N = random.randint(2, 8)
@@ -70,7 +70,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(out_cpu.cpu(), out_xpu.cpu())
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_gridSampler_bf16(self, dtype=torch.bfloat16):
         N = random.randint(2, 8)

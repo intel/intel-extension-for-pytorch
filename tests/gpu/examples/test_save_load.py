@@ -21,7 +21,7 @@ checkpoint_path_str = "./_checkpoint.test.case.test_xpu_checkpoint_save_load_int
 
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_save_load(self):
         a = torch.ones([10], dtype=torch.float64)
@@ -50,7 +50,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(b.device.__str__(), "xpu:1")
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_xpu_checkpoint_save_load_integrity_and_accuracy(self):
         device = "xpu"

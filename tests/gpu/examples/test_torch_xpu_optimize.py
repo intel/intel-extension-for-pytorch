@@ -176,7 +176,7 @@ class TestTorchMethod(TestCase):
         check_no_dropout_but_identity(optimized_module, check_pos)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_master_weight_fusion_optimizer(self):
         lr = 0.01
@@ -403,7 +403,7 @@ class TestTorchMethod(TestCase):
     def test_xpu_auto_channels_last(self):
         def check_layout_for_module(module):
             if module in AUTO_CHANNELS_LAST_SCOPE:
-                if torch.xpu.utils.has_fp64_dtype():
+                if torch.xpu.has_fp64_dtype():
                     self.assertTrue(
                         module.weight.is_contiguous(memory_format=torch.channels_last)
                     )

@@ -1935,7 +1935,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(y, y_script, atol=1e-3, rtol=1e-3)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_conv_mish_yolo_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
@@ -1954,7 +1954,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(y, y_script, atol=1e-3, rtol=1e-3)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_conv_mish_add_yolo_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)

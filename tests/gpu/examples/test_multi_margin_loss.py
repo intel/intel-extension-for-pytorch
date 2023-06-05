@@ -8,7 +8,7 @@ import pytest
 
 class TestNNMethod(TestCase):
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_multi_margin_loss(self, dtype=torch.float):
         input = torch.randn(3, 5)

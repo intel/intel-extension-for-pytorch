@@ -9,7 +9,7 @@ import intel_extension_for_pytorch  # noqa
 SIZE = 100
 
 
-if not torch.xpu.utils.has_fp64_dtype():
+if not torch.xpu.has_fp64_dtype():
     pytest.skip(allow_module_level=True)
 
 

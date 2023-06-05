@@ -20,7 +20,7 @@ class TestNN(NNTestCase):
     _do_xpu_non_default_stream = True
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_conv2d_depthwise(self, dtype=torch.float):
         torch.set_default_dtype(torch.double)
@@ -83,7 +83,7 @@ class TestNN(NNTestCase):
         torch.set_default_dtype(dtype_origin)
 
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_Conv3d_depthwise(self, dtype=torch.float):
         torch.set_default_dtype(torch.double)
@@ -147,7 +147,7 @@ class TestNN(NNTestCase):
 
     @dtypes(torch.double)
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_Conv2d_backward_depthwise(self, device="xpu", dtype=torch.double):
         torch.set_default_dtype(torch.double)
@@ -164,7 +164,7 @@ class TestNN(NNTestCase):
 
     @dtypes(torch.double)
     @pytest.mark.skipif(
-        not torch.xpu.utils.has_fp64_dtype(), reason="fp64 not support by this device"
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_Conv3d_backward_depthwise(self, device="xpu", dtype=torch.double):
         torch.set_default_dtype(torch.double)
