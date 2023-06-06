@@ -14,7 +14,7 @@ from ._functional import (
     lars_step,
 )
 from ._lamb import Lamb
-from .lars import Lars
+from ._lars import Lars
 from ..nn import utils
 
 IPEX_FUSED_OPTIMIZER_LIST_CPU = [
@@ -22,6 +22,7 @@ IPEX_FUSED_OPTIMIZER_LIST_CPU = [
     torch.optim.Adagrad,
     torch.optim.Adam,
     Lamb,
+    Lars,
 ]
 
 IPEX_FUSED_OPTIMIZER_LIST_XPU = [
@@ -36,6 +37,7 @@ OPTIMIZER_FUSED_STEP_MAPPING_CPU = {
     torch.optim.Adagrad: adagrad_step,
     torch.optim.Adam: adam_step,
     Lamb: lamb_step,
+    Lars: lars_step,
 }
 
 OPTIMIZER_FUSED_STEP_MAPPING_XPU = {
