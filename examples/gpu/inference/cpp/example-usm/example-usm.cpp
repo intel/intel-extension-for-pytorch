@@ -20,7 +20,11 @@ int main(int argc, const char* argv[]) {
   module.to(at::kXPU);
 
   std::vector<torch::jit::IValue> inputs;
-  queue sycl_queue=queue(gpu_selector());
+  // fetch sycl queue from c10::Stream on XPU device.
+  auto device_type = c10::DeviceType::XPU;
+  c10::impl::VirtualGuardImpl impl(device_type);
+  c10::Stream xpu_stream = impl.getStream(c10::Device(device_type));
+  auto& sycl_queue = xpu::get_queue_from_stream(xpu_stream);
   float *input_ptr = malloc_device<float>(224 * 224 * 3, sycl_queue);
   auto input = fromUSM(input_ptr, at::ScalarType::Float, {1, 3, 224, 224}, c10::nullopt, -1).to(at::kXPU);
   std::cout << "input tensor created from usm " << std::endl;
