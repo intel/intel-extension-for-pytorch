@@ -533,11 +533,11 @@ def optimize(
             )
             opt_properties.auto_kernel_selection = False
         if opt_properties.split_master_weight_for_bf16:
-            warnings.warn(
-                "Split Master Weight feature is not supported on XPU for now, disabled."
-            )
-            # TODO: for xpu, the split master weight will be supported soon
-            opt_properties.split_master_weight_for_bf16 = False
+            # currently split master weight for xpu only support sgd
+            if type(optimizer) is torch.optim.SGD:
+                opt_properties.split_master_weight_for_bf16 = True
+            else:
+                opt_properties.split_master_weight_for_bf16 = False
         if opt_properties.graph_mode:
             warnings.warn(
                 "Out-of-Box (OOB) solution for inference supposes to trace a model outside "

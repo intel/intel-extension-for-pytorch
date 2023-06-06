@@ -20,8 +20,8 @@ TEST_MODULE_CONVERT_LIST = [
     torch.nn.LSTM,
 ]
 
-SUPPORTED_FUSION_OPTIMIZER = ['Adam', 'SGD', 'AdamW', 'Lars', 'Lamb']
-
+# TODO: for now, only support SGD and AdamW
+SUPPORTED_FUSION_OPTIMIZER = ['Adam', 'SGD', 'AdamW', 'Lars', 'Lamb', 'splitSGD']
 
 class InferenceModel(nn.Module):
     def __init__(self):
@@ -227,6 +227,11 @@ class TestTorchMethod(TestCase):
                     optimizer_xpu_no_fuse = torch.optim.SGD(model_xpu_no_fuse.parameters(), lr=lr, momentum=momentum_value)
                     optimizer_xpu = torch.optim.SGD(model_xpu.parameters(), lr=lr, momentum=momentum_value)
                     model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
+            elif optimizer_string.lower() == 'splitsgd':
+                for momentum_value in [0, 0.9]:
+                    optimizer_xpu_no_fuse = torch.optim.SGD(model_xpu_no_fuse.parameters(), lr=lr, momentum=momentum_value)
+                    optimizer_xpu = torch.optim.SGD(model_xpu.parameters(), lr=lr, momentum=momentum_value)
+                    model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
             elif optimizer_string.lower() == 'adam':
                 beta1 = 0.9
                 beta2 = 0.999
@@ -272,10 +277,12 @@ class TestTorchMethod(TestCase):
                                                                               fuse_update_step=False)
 
                 # fusion
+                use_split_master_weight = True if 'split' in optimizer_string.lower() else False
                 model_xpu, optimizer_xpu = torch.xpu.optimize(model=model_xpu, 
                                                               dtype=dtype, 
                                                               optimizer=model_optimzier_item[1],
-                                                              fuse_update_step=True)
+                                                              fuse_update_step=True,
+                                                              split_master_weight_for_bf16=use_split_master_weight)
                 model_and_optimzier_list.append([model_xpu_no_fuse, model_xpu, optimizer_xpu_no_fuse, optimizer_xpu])
             return model_and_optimzier_list
 
