@@ -25,6 +25,7 @@ from torch.ao.quantization import (
     QConfig,
     PlaceholderObserver,
 )
+from torch.testing._internal.common_utils import run_tests
 
 default_weight_observer = PerChannelMinMaxObserver.with_args(
     dtype=torch.qint8, qscheme=torch.per_channel_symmetric
@@ -746,6 +747,90 @@ class TestDynamicQuantization(JitLlgaTestCase):
         for qconfig in dynamic_qconfig:
             graph = self.checkQuantizeTrace(m, [x, h, c], atol=2e-1, qconfig=qconfig)
             FileCheck().check_not("aten:lstm").check("aten::quantized_lstm").run(graph)
+
+
+class TestDictInput(JitLlgaTestCase):
+    def test_only_dict_input(self):
+        class SubModule(nn.Module):
+            def __init__(self):
+                super(SubModule, self).__init__()
+                self.linear = nn.Linear(3, 3)
+
+            def forward(self, x):
+                x = self.linear(x)
+                return x
+
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear1 = nn.Sequential(nn.Linear(3, 3))
+                self.linear2 = SubModule()
+                self.linear3 = nn.Linear(3, 3)
+
+            def forward(self, x1, x2, x3):
+                x1 = self.linear1(x1)
+                x2 = self.linear2(x2)
+                x3 = self.linear3(x3)
+                return x1 + x2 + x3
+
+        int8_bf16_list = [True, False]
+        for qconfig, int8_bf16 in itertools.product(static_qconfig, int8_bf16_list):
+            # Step1: Test model with tuple(x1, x2, x3) input.
+            m = M().eval()
+            m2 = copy.deepcopy(m).eval()
+            x1 = torch.randn(3, 3)
+            x2 = torch.randn(3, 3)
+            x3 = torch.randn(3, 3)
+            graph = self.checkQuantizeTrace(
+                m, [x1, x2, x3], atol=2e-1, qconfig=qconfig, int8_bf16=int8_bf16
+            )
+            FileCheck().check("aten::linear").run(graph)
+            patterns = [
+                [
+                    "aten::dequantize",
+                    "aten::linear",
+                ],
+                [
+                    "aten::dequantize",
+                    "aten::linear",
+                    "aten::add",
+                ],
+                [
+                    "aten::dequantize",
+                    "aten::linear",
+                    "aten::add",
+                ],
+            ]
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+            self.checkPatterns(graph, patterns)
+
+            # Step2: Test model with Dict{"x1": x1, "x2": x2, "x3": x3} input.
+            graph = self.checkQuantizeTrace(
+                m2,
+                atol=2e-1,
+                qconfig=qconfig,
+                int8_bf16=int8_bf16,
+                x_kwarg={"x1": x1, "x2": x2, "x3": x3},
+            )
+            FileCheck().check("aten::linear").run(graph)
+            patterns = [
+                [
+                    "aten::dequantize",
+                    "aten::linear",
+                ],
+                [
+                    "aten::dequantize",
+                    "aten::linear",
+                    "aten::add",
+                ],
+                [
+                    "aten::dequantize",
+                    "aten::linear",
+                    "aten::add",
+                ],
+            ]
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+            self.checkPatterns(graph, patterns)
 
 
 if __name__ == "__main__":

@@ -73,6 +73,7 @@ def auto_prepare(
     model: torch.nn.Module,
     configure: QConfig,
     example_inputs: Optional[Tuple[Any]],
+    example_kwarg_inputs: Optional[Dict[Any, Any]],
 ) -> torch.nn.Module:
     def convert_to_interception_proxy(x):
         if isinstance(x, torch.Tensor):
@@ -486,10 +487,20 @@ def auto_prepare(
     if not isinstance(configure.activation(), PlaceholderObserver):
         model.__class__ = QuantizationInterceptionModule
         # init model quantization state using example_inputs
-        assert (
-            example_inputs is not None
-        ), "IPEX: example inputs cannot be None for static quantization"
-        model(*example_inputs)
+        assert example_inputs is not None or example_kwarg_inputs is not None, (
+            "IPEX: example_inputs and example_kwarg_inputs cannot be None at same time "
+            "for static quantization."
+        )
+        if example_kwarg_inputs is None:
+            model(*example_inputs)
+        elif example_inputs is None:
+            model(**example_kwarg_inputs)
+        else:
+            AssertionError(
+                False,
+                "IPEX quantization.prepare: example_inputs and example_kwarg_inputs cannot be set at same time "
+                "for static quantization.",
+            )
     return model
 
 

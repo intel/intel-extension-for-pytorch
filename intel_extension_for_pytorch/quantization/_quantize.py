@@ -18,9 +18,17 @@ from intel_extension_for_pytorch.nn.utils._weight_prepack import (
 )
 from ._quantize_utils import auto_prepare, auto_convert, copy_prepared_model
 from .. import nn
+from typing import Dict
 
 
-def prepare(model, configure, example_inputs=None, inplace=False, bn_folding=True):
+def prepare(
+    model,
+    configure,
+    example_inputs=None,
+    inplace=False,
+    bn_folding=True,
+    example_kwarg_inputs=None,
+):
     r"""
     Prepare an FP32 torch.nn.Module model to do calibration or to convert to quantized model.
 
@@ -28,10 +36,14 @@ def prepare(model, configure, example_inputs=None, inplace=False, bn_folding=Tru
         model (torch.nn.Module): The FP32 model to be prepared.
         configure (torch.quantization.qconfig.QConfig): The observer settings about activation and weight.
         example_inputs (tuple or torch.Tensor): A tuple of example inputs that
-            will be passed to the function while running to init quantization state.
+            will be passed to the function while running to init quantization state. Only one of this
+            argument or ``example_kwarg_inputs`` should be specified.
         inplace: (bool): It will change the given model in-place if True. The default value is ``False``.
         bn_folding: (bool): whether to perform ``conv_bn`` and ``linear_bn`` folding.
-        The default value is ``True``.
+            The default value is ``True``.
+        example_kwarg_inputs (dict):  A dict of example inputs that will be passed to the function while
+            running to init quantization state. Only one of this argument or ``example_inputs`` should be
+            specified.
 
     Returns:
         torch.nn.Module
@@ -52,9 +64,10 @@ def prepare(model, configure, example_inputs=None, inplace=False, bn_folding=Tru
     if isinstance(configure, QConfigMapping):
         configure = configure.global_qconfig
     if not isinstance(configure.activation(), PlaceholderObserver):
-        assert (
-            example_inputs is not None
-        ), "IPEX quantization.prepare: example inputs cannot be None for static quantization"
+        assert example_inputs is not None or example_kwarg_inputs is not None, (
+            "IPEX quantization.prepare: example_inputs and example_kwarg_inputs cannot be none at same time "
+            "for static quantization."
+        )
     # auto model channels_last memory format conversion
     from ..frontend import (
         auto_channels_last,
@@ -81,12 +94,19 @@ def prepare(model, configure, example_inputs=None, inplace=False, bn_folding=Tru
 
     # replace dropout with identity to enable more fusion pattern.
     nn.utils._model_convert.replace_dropout_with_identity(prepare_model)
+    assert (
+        example_inputs is None or example_kwarg_inputs is None
+    ), "IPEX quantization.prepare: example_inputs and example_kwarg_inputs cannot be set at same time."
     # Special case for common case of passing a single Tensor
     if isinstance(example_inputs, (torch.Tensor, dict)):
         example_inputs = (example_inputs,)
     elif not isinstance(example_inputs, tuple) and example_inputs is not None:
         example_inputs = tuple(example_inputs)
-    return auto_prepare(prepare_model, configure, example_inputs)
+    if example_kwarg_inputs is not None:
+        assert isinstance(
+            example_kwarg_inputs, Dict
+        ), "IPEX quantization.prepare: example_kwarg_inputs must be type of Dict."
+    return auto_prepare(prepare_model, configure, example_inputs, example_kwarg_inputs)
 
 
 @functools.lru_cache(None)

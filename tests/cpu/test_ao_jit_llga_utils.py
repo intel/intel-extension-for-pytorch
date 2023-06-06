@@ -123,28 +123,58 @@ class JitLlgaTestCase(JitTestCase):
         for pat in fused_patterns:
             self.assertGraphContainsExactly(graph, pat, 0)
 
+    def model_forward_helper(
+        self,
+        model,
+        x=None,
+        x_kwarg=None,
+    ):
+        if x is None and x_kwarg is None:
+            raise AssertionError(
+                "x and x_kwarg cannot be none at same time for model_forward_helper."
+            )
+        if x_kwarg is None:
+            return model(*x)
+        elif x is None:
+            return model(**x_kwarg)
+        else:
+            raise AssertionError(
+                "x and x_kwarg cannot be set at same time for model_forward_helper."
+            )
+
     def checkQuantizeTrace(
         self,
         model,
-        x,
+        x=None,
         atol=1e-3,
         rtol=1e-2,
         x_var=None,
         qconfig=default_static_qconfig,
         int8_bf16=False,
         freeze=True,
+        x_kwarg=None,
     ):
+        if x is None and x_kwarg is None:
+            raise AssertionError(
+                "x and x_kwarg cannot be none at same time for checkQuantizeTrace."
+            )
+        elif x is not None and x_kwarg is not None:
+            raise AssertionError(
+                "x and x_kwarg cannot be set at same time for checkQuantizeTrace."
+            )
+
         graph, traced_model, fp32_model = self.prepareModel(
-            model, x, qconfig, int8_bf16, freeze=freeze
+            model, x, qconfig, int8_bf16, freeze=freeze, x_kwarg=x_kwarg
         )
         with torch.no_grad():
-            y = fp32_model(*x)
+            y = self.model_forward_helper(fp32_model, x, x_kwarg)
             y = y.to(torch.bfloat16) if int8_bf16 else y
-            y_llga = traced_model(*x)
+            y_llga = self.model_forward_helper(traced_model, x, x_kwarg)
             self.assertEqual(y, y_llga, atol=atol, rtol=rtol)
 
             # test Fallback when input shape changes:
             if x_var:
+                assert x_kwarg is None, "x_kwarg input doesn't suppport use with x_var"
                 y_var = fp32_model(*x_var)
                 y_var = y_var.to(torch.bfloat16) if int8_bf16 else y_var
                 y_var_llga = traced_model(*x_var)
@@ -161,35 +191,52 @@ class JitLlgaTestCase(JitTestCase):
         prepare_inplace=True,
         convert_inplace=True,
         freeze=True,
+        x_kwarg=None,
     ):
         model.eval()
         fp32_model = copy.deepcopy(model)
         with torch.no_grad(), torch._jit_internal._disable_emit_hooks():
             ipex.nn.utils._model_convert.replace_dropout_with_identity(model)
             model = ipex.quantization.prepare(
-                model, qconfig, x, inplace=prepare_inplace
+                model, qconfig, x, inplace=prepare_inplace, example_kwarg_inputs=x_kwarg
             )
             # do calibration
-            y = model(*x)
+            y = self.model_forward_helper(model, x, x_kwarg)
             # jit trace to insert quant/dequant
+
+            def jit_trace_helper(convert_model, x, x_kwarg):
+                if x_kwarg is None:
+                    return torch.jit.trace(convert_model, x)
+                elif x is None:
+                    return torch.jit.trace(convert_model, example_kwarg_inputs=x_kwarg)
+                else:
+                    raise AssertionError(
+                        "Can't set x and x_kwarg at same time for jit trace."
+                    )
+
             if int8_bf16:
                 with torch.cpu.amp.autocast():
                     convert_model = ipex.quantization.convert(
                         model, inplace=convert_inplace
                     )
-                    traced_model = torch.jit.trace(convert_model, x)
+                    traced_model = jit_trace_helper(convert_model, x, x_kwarg)
             else:
                 convert_model = ipex.quantization.convert(
                     model, inplace=convert_inplace
                 )
-                traced_model = torch.jit.trace(convert_model, x)
+                traced_model = jit_trace_helper(convert_model, x, x_kwarg)
             if freeze:
                 traced_model = torch.jit.freeze(traced_model)
 
             # warm up run
-            y0 = traced_model(*x)
+            y0 = self.model_forward_helper(traced_model, x, x_kwarg)
             # get the graph at the second run after freezing
-            graph = traced_model.graph_for(*x)
+            if x_kwarg is None:
+                graph = traced_model.graph_for(*x)
+            elif x is None:
+                graph = traced_model.graph_for(**x_kwarg)
+            else:
+                raise AssertionError("Can't set x and x_kwarg at same time")
             return graph, traced_model, fp32_model
 
     def checkPatterns(self, graph, patterns):
