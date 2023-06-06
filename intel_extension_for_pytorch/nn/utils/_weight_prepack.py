@@ -47,7 +47,15 @@ def _ipex_module_load_from_state_dict_(self, state_dict, prefix):
     self.weight_wrapper.load(self, loaded_weight)
 
 
-class _IPEXConvNd(nn.Module):
+class _IPEXPrepackModule(nn.Module):
+    def _get_forward_weight(self):
+        return self.weight if self.training else self._ipex_module_empty_tensor
+
+    def _get_forward_bias(self):
+        return self.bias if self.training else self._ipex_module_empty_tensor
+
+
+class _IPEXConvNd(_IPEXPrepackModule):
     __constants__ = [
         "stride",
         "padding",
@@ -98,8 +106,8 @@ class _IPEXConvNd(nn.Module):
         if self.padding_mode != "zeros":
             return torch.ops.torch_ipex.convolution_forward(
                 F.pad(x, self._reversed_padding_repeated_twice, mode=self.padding_mode),
-                self.weight if self.training else self._ipex_module_empty_tensor,
-                self.bias if self.training else self._ipex_module_empty_tensor,
+                self._get_forward_weight(),
+                self._get_forward_bias(),
                 self.ctx.get_data_handle(),
                 self.weight_size,
                 self._real_padding,
@@ -109,8 +117,8 @@ class _IPEXConvNd(nn.Module):
             )
         return torch.ops.torch_ipex.convolution_forward(
             x,
-            self.weight if self.training else self._ipex_module_empty_tensor,
-            self.bias if self.training else self._ipex_module_empty_tensor,
+            self._get_forward_weight(),
+            self._get_forward_bias(),
             self.ctx.get_data_handle(),
             self.weight_size,
             self._real_padding,
@@ -135,7 +143,7 @@ class _IPEXConv3d(_IPEXConvNd):
         super(_IPEXConv3d, self).__init__()
 
 
-class _IPEXLinear(torch.nn.Module):
+class _IPEXLinear(_IPEXPrepackModule):
     def __init__(self):
         super(_IPEXLinear, self).__init__()
 
@@ -145,11 +153,19 @@ class _IPEXLinear(torch.nn.Module):
     def forward(self, x):
         if self.use_dnnl:
             output = torch.ops.torch_ipex.ipex_linear(
-                x, self.weight, self.bias, self.ctx.get_data_handle(), self.out_features
+                x,
+                self._get_forward_weight(),
+                self._get_forward_bias(),
+                self.ctx.get_data_handle(),
+                self.out_features,
             )
         else:
             output = torch.ops.torch_ipex.ipex_MKLSGEMM(
-                x, self.weight, self.bias, self.ctx.get_data_handle(), self.out_features
+                x,
+                self._get_forward_weight(),
+                self._get_forward_bias(),
+                self.ctx.get_data_handle(),
+                self.out_features,
             )
 
         return self.post_ipex_gemm(output)
@@ -192,7 +208,7 @@ class _IPEXLinearAllreduce(_IPEXLinear):
         return output
 
 
-class _IPEXConvTransposeNd(nn.Module):
+class _IPEXConvTransposeNd(_IPEXPrepackModule):
     __constants__ = [
         "stride",
         "padding",
@@ -230,8 +246,8 @@ class _IPEXConvTransposeNd(nn.Module):
     def forward(self, x):
         return torch.ops.torch_ipex.conv_transpose(
             x,
-            self.weight,
-            self.bias,
+            self._get_forward_weight(),
+            self._get_forward_bias(),
             self.ctx.get_data_handle(),
             self.weight_size,
             self.padding,

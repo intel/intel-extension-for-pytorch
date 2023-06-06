@@ -4,6 +4,7 @@
 
 #include "auto_opt_config.h"
 #include "graph_rewrite.h"
+#include "graph_rewrite_helper.h"
 #include "graph_rewrite_utils.h"
 
 namespace torch_ipex {
@@ -54,16 +55,19 @@ void replaceFrozenIPEXLinearWithAtenLinear(
       if (!toIValue(prepack_node).has_value())
         continue;
       at::Tensor weight_tensor;
+      c10::optional<at::Tensor> may_get_bias_tensor;
       if (use_mkl_sgemm) {
         auto linear_op_ctx =
             toIValue(prepack_node).value().toCustomClass<MKLOpContext>();
-        weight_tensor = linear_op_ctx->to_public(
-            constant_as<at::Tensor>(n->namedInput("weight")).value());
+        weight_tensor =
+            linear_op_ctx->to_public(linear_op_ctx->get_at_packed_weight());
+        may_get_bias_tensor = linear_op_ctx->get_at_bias();
       } else {
         auto linear_op_ctx =
             toIValue(prepack_node).value().toCustomClass<LinearOpContext>();
-        weight_tensor = linear_op_ctx->to_public(
-            constant_as<at::Tensor>(n->namedInput("weight")).value());
+        weight_tensor =
+            linear_op_ctx->to_public(linear_op_ctx->get_at_packed_weight());
+        may_get_bias_tensor = linear_op_ctx->get_at_bias();
       }
       WithInsertPoint guard(n);
       auto graph = n->owningGraph();
@@ -73,7 +77,12 @@ void replaceFrozenIPEXLinearWithAtenLinear(
       IValue weight_value(weight_tensor);
       auto weight = graph->insertConstant(weight_value);
       aten_linear->addInput(weight);
-      aten_linear->addInput(n->inputs().at(2));
+
+      // bias
+      // Please refer to [ Note -- Fix the size of the saved TorchScript model ]
+      // for the details.
+      graph_rewrite_helper::insertBias(graph, aten_linear, may_get_bias_tensor);
+
       aten_linear->output()->setType(n->output()->type()->cast<TensorType>());
       n->output()->replaceAllUsesWith(aten_linear->output());
       get_data_handle_nodes.emplace_back(n->inputs().at(3)->node());

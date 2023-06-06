@@ -29,6 +29,11 @@ bool isClampFusable(
     const torch::jit::Match& match,
     const std::unordered_map<std::string, torch::jit::Value*>& vmap);
 
+void insertBias(
+    torch::jit::Graph* graph,
+    torch::jit::Node* node,
+    c10::optional<at::Tensor> bias);
+
 // This struct contains a compiled IR patterns slated for use in the
 // findPatternMatches function. The struct encapsulates the common
 // information from parseIR that is used in conjunction with the

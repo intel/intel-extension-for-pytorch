@@ -5387,30 +5387,45 @@ class Tester(TestCase):
 
     def test_empty_weight_bias_inference(self):
         class M(nn.Module):
-            def __init__(self):
+            def __init__(self, module):
                 super(M, self).__init__()
-                self.conv = nn.Conv2d(3, 5, 3)
+                self.module = module
 
             def forward(self, x):
-                x = self.conv(x)
+                x = self.module(x)
                 return x
 
-        model = M()
-        model.eval()
-        data = torch.randn(1, 3, 56, 56)
-        optimized = ipex.optimize(model)
-        with torch.no_grad():
-            traced_model = torch.jit.trace(optimized, data)
-            traced_model = torch.jit.freeze(traced_model)
-            traced_model(data)
+        modules = [nn.Conv2d(3, 5, 3), nn.Linear(3, 7), nn.ConvTranspose2d(3, 5, 3)]
+        inputs = [
+            torch.randn(1, 3, 56, 56),
+            torch.randn(2, 3),
+            torch.randn(1, 3, 56, 56),
+        ]
+        auto_kernel_selection_config = [True, False]
 
-            graph = traced_model.graph
-            FileCheck().check_not("self.conv.weight").check_not("self.conv.bias").check(
-                "_ipex_module_empty_tensor"
-            ).run(graph)
-            y_ref = model(data)
-            y_traced = traced_model(data)
-            self.assertEqual(y_ref, y_traced)
+        for module, data in zip(modules, inputs):
+            for auto_kernel_selection in auto_kernel_selection_config:
+                # Currently auto_kernel_selection only shows different behavior for nn.Linear
+                if auto_kernel_selection and not isinstance(module, nn.Linear):
+                    continue
+
+                model = M(module)
+                model.eval()
+                optimized = ipex.optimize(
+                    model, auto_kernel_selection=auto_kernel_selection
+                )
+                with torch.no_grad():
+                    traced_model = torch.jit.trace(optimized, data)
+                    traced_model = torch.jit.freeze(traced_model)
+                    traced_model(data)
+
+                    graph = traced_model.graph
+                    FileCheck().check_not("self.module.weight").check_not(
+                        "self.module.bias"
+                    ).check("_ipex_module_empty_tensor").run(graph)
+                    y_ref = model(data)
+                    y_traced = traced_model(data)
+                    self.assertEqual(y_ref, y_traced)
 
 
 if __name__ == "__main__":

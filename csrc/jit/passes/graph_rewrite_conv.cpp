@@ -2,6 +2,7 @@
 #include "aten/WeightPack.h"
 #include "cpu/kernels/OpContext.h"
 #include "graph_rewrite.h"
+#include "graph_rewrite_helper.h"
 #include "graph_rewrite_utils.h"
 #include "passes/utils.h"
 
@@ -66,18 +67,8 @@ void replaceFrozenIPEXConvWithAtenConv(
       // empty tensor. Need to get the real bias tensor from the op context.
       // Please refer to [ Note -- Fix the size of the saved TorchScript model ]
       // for the details.
-      at::Tensor bias_tensor;
       auto may_get_bias_tensor = conv_op_ctx->get_at_bias();
-      if (may_get_bias_tensor.has_value()) {
-        bias_tensor = may_get_bias_tensor.value().set_requires_grad(false);
-        IValue bias_value(bias_tensor);
-        auto bias = graph->insertConstant(bias_value);
-        aten_conv->addInput(bias);
-      } else {
-        auto n = graph->createNone();
-        auto v = n->insertBefore(aten_conv)->output();
-        aten_conv->addInput(v);
-      }
+      graph_rewrite_helper::insertBias(graph, aten_conv, may_get_bias_tensor);
 
       IValue stride_value(conv_op_ctx->get_stride());
       auto stride = graph->insertConstant(stride_value);
