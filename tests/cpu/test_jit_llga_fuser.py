@@ -325,7 +325,6 @@ class TestOp(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
 
     @llga_fp32_bf16_test_env
-    @unittest.skipIf(True, "Enable once cat is supported")
     def test_cat(self):
         def cat_along_dim(d):
             def forward_cat(*inputs):
