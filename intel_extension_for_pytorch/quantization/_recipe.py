@@ -46,6 +46,8 @@ conv_gemm_ops = [
     str(nn.Linear),
     str(torch.matmul),
     str(torch.Tensor.matmul),
+    str(torch.bmm),
+    str(torch.Tensor.bmm),
 ]
 conv_ops = [
     str(F.conv2d),
@@ -145,7 +147,11 @@ def _default_recipe_init(nodes):
 
             # For LSTM, if it's input is a PackedSequence, we don't support ot now.
             # TODO: support PackedSequence input for quantization LSTM.
-            if node.type in rnn_ops and len(node.input_tensor_infos) > 2:
+            if (
+                node.type in rnn_ops
+                and len(node.input_tensor_infos) > 2
+                and node.input_tensor_infos[1].orig_dtype == torch.int64
+            ):
                 for idx, tensor_info in enumerate(node.input_tensor_infos):
                     if tensor_info is not None:
                         tensor_info.inf_dtype = tensor_info.orig_dtype

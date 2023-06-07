@@ -22,7 +22,10 @@ class Hypertune:
 
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument("--conf_file", required=True)
+    action = parser.add_mutually_exclusive_group(required=True)
+    action.add_argument(
+        "--conf-file", "--conf_file", help="Configuration file for hypertuning"
+    )
     parser.add_argument(
         "program",
         type=str,

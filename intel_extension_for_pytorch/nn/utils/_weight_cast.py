@@ -1,8 +1,12 @@
 import torch
 import torch.nn as nn
+import sys
 from intel_extension_for_pytorch.optim import _optimizer_utils
 import types
 from ._model_convert import _LSTM
+from intel_extension_for_pytorch.nn.modules import (
+    MergedEmbeddingBag as MergedEmbeddingBag,
+)
 
 # IPEX does not cast all module parameters for acc reason, such as BN
 IPEX_WEIGHT_CAST_MODULE = {
@@ -18,15 +22,18 @@ IPEX_WEIGHT_CAST_MODULE = {
     torch.nn.EmbeddingBag,
     torch.nn.Embedding,
     _LSTM,
+    MergedEmbeddingBag,
 }
 
 
 def _save_to_state_dict(self, destination, prefix, keep_vars):
     param_dict = {}
     for name, para in self.named_parameters():
+        if not hasattr(self, name):
+            continue
         temp = para
         param_dict.update({name: para})
-        if self.master_weight_split:
+        if hasattr(self, name + "_trail"):
             temp_para = torch.nn.Parameter(
                 torch.ops.torch_ipex.cat_bfloat16_float(
                     para.data, getattr(self, name + "_trail")
@@ -34,12 +41,11 @@ def _save_to_state_dict(self, destination, prefix, keep_vars):
                 requires_grad=temp.requires_grad,
             )
             setattr(self, name, temp_para)
-        else:
+        elif hasattr(self, "master_" + name):
             temp_para = torch.nn.Parameter(
                 getattr(self, "master_" + name), requires_grad=temp.requires_grad
             )
             setattr(self, name, temp_para)
-
     super(type(self), self)._save_to_state_dict(destination, prefix, keep_vars)
     for p in param_dict:
         origin_param = param_dict[p]
@@ -156,17 +162,25 @@ def weight_dtype_convert_with_ipex(
                         sub_m.master_weight_split = master_weight_split
                         sub_m._save_to_state_dict = types.MethodType(_save_to_state_dict, sub_m)
                         sub_m.load_from_state_dict = types.MethodType(_load_from_state_dict, sub_m)
-
                         for name, para in sub_m.named_parameters():
                             cast_attr(
                                 sub_m, name, master_weight_split, params_attr, optimizer
                             )
         return m
 
+    def isCLIPTextEmbeddings(m):
+        mod = "transformers.models.clip.modeling_clip"
+        return (
+            mod in sys.modules
+            and hasattr(sys.modules[mod], "CLIPTextEmbeddings")
+            and isinstance(m, sys.modules[mod].CLIPTextEmbeddings)
+        )
+
     def convert_rec(m):
         new_m = convert(m)
         for name, sub_m in m.named_children():
-            setattr(new_m, name, convert_rec(sub_m))
+            if not isCLIPTextEmbeddings(sub_m):
+                setattr(new_m, name, convert_rec(sub_m))
         return new_m
 
     casted_model, casted_optimizer, params_attr = (

@@ -23,10 +23,10 @@ def inference(model, data):
 
         print(
             "@hypertune {'name': 'latency (ms)'}"
-        )  # Add print statement of the form @hypertune {'name': str, 'higher_is_better': bool, 'target_val': int or float}` # noqa B950
+        )  # Add print statement of the form @hypertune {'name': str, 'higher_is_better': bool, 'target_val': int or float}`
         print(
             latency
-        )  # Print the objective(s) you want to optimize. Make sure this is just an int or float to be minimzied or maximized. # noqa B950
+        )  # Print the objective(s) you want to optimize. Make sure this is just an int or float to be minimzied or maximized.
 
 
 def main(args):
@@ -47,17 +47,17 @@ def main(args):
     else:  # int8
         from intel_extension_for_pytorch.quantization import prepare, convert
 
-    qconfig = ipex.quantization.default_static_qconfig
-    model = prepare(model, qconfig, example_inputs=data, inplace=False)
+        qconfig = ipex.quantization.default_static_qconfig
+        model = prepare(model, qconfig, example_inputs=data, inplace=False)
 
-    # calibration
-    n_iter = 100
-    for i in range(n_iter):
-        model(data)
+        # calibration
+        n_iter = 100
+        for i in range(n_iter):
+            model(data)
 
-    model = convert(model)
+        model = convert(model)
 
-    with torch.cpu.amp.autocast(enabled=(args.dtype == "bfloat16")):
+    with torch.cpu.amp.autocast(enabled=args.dtype == "bfloat16"):
         if args.torchscript:
             with torch.no_grad():
                 model = torch.jit.trace(model, data)

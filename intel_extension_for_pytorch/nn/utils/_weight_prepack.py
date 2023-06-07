@@ -1,5 +1,8 @@
+# TODO: after IPEX XPU release 2.0, weight prepack file should be aligned
+# with IPEX CPU Master
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import copy
 import logging
 
@@ -85,12 +88,22 @@ class _IPEXConvNd(nn.Module):
         self.padding = dense_module.padding
         self.dilation = dense_module.dilation
         self.groups = dense_module.groups
+        self.padding_mode = dense_module.padding_mode
+        self._reversed_padding_repeated_twice = (
+            dense_module._reversed_padding_repeated_twice
+        )
         self.prepack_input_shape = (
             dense_module.input_shape if hasattr(dense_module, "input_shape") else []
         )
         self.weight_channels_last = dense_module.weight.is_contiguous(
             memory_format=torch.channels_last
         ) or dense_module.weight.is_contiguous(memory_format=torch.channels_last_3d)
+        self.weight_size = dense_module.weight.size()
+        self._real_padding = (
+            self.padding
+            if self.padding_mode == "zeros"
+            else tuple([0] * (len(self.weight_size) - 2))
+        )
 
         # TODO: ".clone()" will make weight shared by multiple module not shared anymore
         # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
@@ -110,7 +123,7 @@ class _IPEXConvNd(nn.Module):
             dense_module.weight,
             self.bias,
             self.stride,
-            self.padding,
+            self._real_padding,
             self.dilation,
             self.groups,
             self.weight_channels_last,
@@ -158,7 +171,7 @@ class _IPEXConvNd(nn.Module):
                 loaded_weight,
                 loaded_bias,
                 self.stride,
-                self.padding,
+                self._real_padding,
                 self.dilation,
                 self.groups,
                 self.weight_channels_last,
@@ -169,8 +182,28 @@ class _IPEXConvNd(nn.Module):
             )
 
     def forward(self, x):
+        if self.padding_mode != "zeros":
+            return torch.ops.torch_ipex.convolution_forward(
+                F.pad(x, self._reversed_padding_repeated_twice, mode=self.padding_mode),
+                self.weight,
+                self.bias,
+                self.ctx.get_data_handle(),
+                self.weight_size,
+                self._real_padding,
+                self.stride,
+                self.dilation,
+                self.weight_channels_last,
+            )
         return torch.ops.torch_ipex.convolution_forward(
-            x, self.weight, self.bias, self.ctx.get_data_handle()
+            x,
+            self.weight,
+            self.bias,
+            self.ctx.get_data_handle(),
+            self.weight_size,
+            self._real_padding,
+            self.stride,
+            self.dilation,
+            self.weight_channels_last,
         )
 
 
@@ -215,6 +248,8 @@ class _IPEXLinear(torch.nn.Module):
         else:
             self.register_parameter("bias", None)
 
+        self.out_features = dense_module.out_features
+
         # create linear op context
         if self.use_dnnl:
             self.ctx = torch.ops.ipex_prepack.linear_prepack(
@@ -242,11 +277,11 @@ class _IPEXLinear(torch.nn.Module):
     def forward(self, x):
         if self.use_dnnl:
             return torch.ops.torch_ipex.ipex_linear(
-                x, self.weight, self.bias, self.ctx.get_data_handle()
+                x, self.weight, self.bias, self.ctx.get_data_handle(), self.out_features
             )
         else:
             return torch.ops.torch_ipex.ipex_MKLSGEMM(
-                x, self.weight, self.bias, self.ctx.get_data_handle()
+                x, self.weight, self.bias, self.ctx.get_data_handle(), self.out_features
             )
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
@@ -310,6 +345,7 @@ class _IPEXConvTransposeNd(nn.Module):
         self.weight_channels_last = dense_module.weight.is_contiguous(
             memory_format=torch.channels_last
         ) or dense_module.weight.is_contiguous(memory_format=torch.channels_last_3d)
+        self.weight_size = dense_module.weight.size()
 
         if dense_module.bias is not None:
             self.bias = nn.Parameter(
@@ -389,7 +425,17 @@ class _IPEXConvTransposeNd(nn.Module):
 
     def forward(self, x):
         return torch.ops.torch_ipex.conv_transpose(
-            x, self.weight, self.bias, self.ctx.get_data_handle()
+            x,
+            self.weight,
+            self.bias,
+            self.ctx.get_data_handle(),
+            self.weight_size,
+            self.padding,
+            self.output_padding,
+            self.stride,
+            self.dilation,
+            self.groups,
+            self.weight_channels_last,
         )
 
 
@@ -456,7 +502,9 @@ def _should_prepack(module, is_training):
     return True
 
 
-def weight_prepack_with_ipex(module, optimizer, params_attr, device_type="cpu"):
+def weight_prepack_with_ipex(
+    module, optimizer, params_attr, inplace=False, device_type="cpu"
+):
     def convert(m, optimizer, params_attr):
         if _should_prepack(m, is_training=(optimizer is not None)) and (
             m.weight.dtype == torch.float32
@@ -526,6 +574,8 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, device_type="cpu"):
             optim._optimizer_utils.pack_optimizer_params_and_states(
                 optimizer, params_pair, params_attr, m.weight.dtype
             )
+            if inplace:
+                del m.weight
             return new_m
         else:
             return m
@@ -550,13 +600,22 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, device_type="cpu"):
 def record_input_shape_for_prepack(module, sample_input):
     def hook_function(self, input):
         # input for linear/conv/transpose conv received here will be Tuple[Tensor]
-        self.input_shape = input[0].shape
+        if (
+            self in [torch.nn.Conv1d, torch.nn.Conv2d, torch.nn.Conv3d]
+            and self.padding_mode != "zeros"
+        ):
+            self.input_shape = F.pad(
+                input[0], self._reversed_padding_repeated_twice, mode=self.padding_mode
+            ).shape
+        else:
+            self.input_shape = input[0].shape
 
     def register_hook_function(module):
         if type(module) in [
             torch.nn.Linear,
             torch.nn.Conv1d,
             torch.nn.Conv2d,
+            torch.nn.Conv3d,
             torch.nn.ConvTranspose2d,
         ]:
             module.register_forward_pre_hook(hook_function)

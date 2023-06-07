@@ -6,17 +6,15 @@ from typing import Optional, Tuple
 Tensor = torch.Tensor
 
 
+# TODO: remove indices and offsets because cpu 2.0 release code does not
+# contain these code, will add back after release 2.0
 def _embedding_bag_fast_path_sum(
     weights: Tensor,
-    indices: Tensor,
-    offsets: Tensor,
     mode: int = 0,
     scale_grad_by_freq: bool = False,
     per_sample_weights: Optional[Tensor] = None,
     padding_idx: Optional[int] = None,
 ) -> bool:
-    if indices.dtype != torch.int64 or offsets.dtype != torch.int64:
-        return False
     if mode != 0 or scale_grad_by_freq:
         return False
     if weights.stride(1) != 1 or weights.dtype not in (torch.float, torch.bfloat16):
@@ -78,8 +76,10 @@ def _embeddingbag(
     include_last_offset: bool = False,
     padding_idx: Optional[int] = None,
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+    # TODO: remove indices and offsets because cpu 2.0 release code does not
+    # contain these code, will add back after release 2.0
     if _embedding_bag_fast_path_sum(
-        weights, indices, offsets, mode, scale_grad_by_freq, per_sample_weights, padding_idx
+        weights, mode, scale_grad_by_freq, per_sample_weights, padding_idx
     ):
         ret = torch.ops.torch_ipex.embedding_bag(weights, indices, offsets, sparse, include_last_offset)
         # torch.embedding_bag expected 4 Tensor returned

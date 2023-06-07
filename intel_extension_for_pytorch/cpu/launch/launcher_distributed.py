@@ -191,12 +191,11 @@ class DistributedTrainingLauncher(Launcher):
                 )
 
         nodes_list = self.parse_list_argument(args.nodes_list)
-        if args.nprocs_per_node == 0:
-            args.nprocs_per_node = (
-                len(set([c.node for c in self.cpuinfo.pool_all]))
-                if len(nodes_list) == 0
-                else len(nodes_list)
-            )
+        args.nprocs_per_node = (
+            len(set([c.node for c in self.cpuinfo.pool_all]))
+            if len(nodes_list) == 0
+            else len(nodes_list)
+        )
         ncores_per_instance = args.ncores_per_instance
         if ncores_per_instance > 0:
             if (

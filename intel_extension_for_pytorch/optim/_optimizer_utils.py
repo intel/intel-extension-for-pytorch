@@ -123,7 +123,6 @@ def patch_step_for_master_weight_training(optimizer):
     # This is because gradscaler will unscale grad and
     # it needs to sync grad to the FP32's grad first. After that gradscaler
     # will update weight and it also needs to sync FP32 master weight back to weight.
-
     def sync_grad(self):
         for k, value in self.params_attr.items():
             assert (
@@ -398,6 +397,7 @@ def optimizer_fusion(optimizer, master_weight_split, device_type):
     r"""
     Patch "step" method to choose IPEX optimized fused update kernel.
     """
+
     if not hasattr(optimizer, "params_attr"):
         optimizer.params_attr = {}
     try:

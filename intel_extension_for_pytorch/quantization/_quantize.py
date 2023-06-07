@@ -39,16 +39,15 @@ def prepare(model, configure, example_inputs, inplace=False):
     try:
         prepare_model = optimization.fuse(model, inplace=inplace)
         prepare_model = linear_bn_fuse(prepare_model, inplace=inplace)
-    except Exception:
+    except:  # noqa E722
         if inplace:
             prepare_model = model
         else:
             try:
                 prepare_model = copy.deepcopy(model)
             except Exception:
-                assert_status = False
-                assert (
-                    assert_status
+                AssertionError(
+                    False
                 ), "The model's copy is failed, please try set inplace to True to do the prepare"
         warnings.warn("Conv BatchNorm folding failed during the prepare process.")
     # replace dropout with identity to enable more fusion pattern.
@@ -86,9 +85,8 @@ def convert(model, inplace=False):
         try:
             convert_model = copy_prepared_model(model)
         except Exception:
-            assert_status = False
-            assert (
-                assert_status
+            AssertionError(
+                False
             ), "The model's copy is failed, please try set inplace to True to do the convert"
 
     # If the module's activation's qconfig is PlaceholderObserver,

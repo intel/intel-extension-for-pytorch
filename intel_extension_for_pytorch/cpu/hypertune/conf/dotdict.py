@@ -25,9 +25,9 @@ class DotDict(dict):
         if isinstance(value, list) and len(value) == 1 and isinstance(value[0], dict):
             value = DotDict(value[0])
         if (
-            isinstance(value, list) and
-            len(value) > 1 and
-            all(isinstance(v, dict) for v in value)
+            isinstance(value, list)
+            and len(value) > 1
+            and all(isinstance(v, dict) for v in value)
         ):
             value = DotDict({k: v for d in value for k, v in d.items()})
         super(DotDict, self).__setitem__(key, value)

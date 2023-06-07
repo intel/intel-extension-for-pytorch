@@ -104,8 +104,6 @@ def _single_tensor_adagrad(
 
 
 # keep this function here if enable fused_foreach_adagrad_later
-
-
 def _multi_tensor_adagrad(
     params: List[Tensor],
     params2: List[Tensor],
@@ -345,8 +343,6 @@ def _single_tensor_sgd(
 
 
 # keep this function here if enable fused_foreach_sgd_later
-
-
 def _multi_tensor_sgd(
     params: List[Tensor],
     params2: List[Tensor],
@@ -473,7 +469,6 @@ def sgd_step(self, closure=None):
                 param2 = get_param2(p, self.params_attr)
                 params2.append(param2)
 
-        # TODO: for torch 1.10, the group['maximize'] and group['foreach'] are temp set False
         sgd(
             params_with_grad,
             params2,
@@ -549,7 +544,6 @@ def _lamb_impl(
     eps: float,
 ):
     r"""Functional API that performs Lamb algorithm computation."""
-
     for i, param in enumerate(params):
         grad = grads[i]
         exp_avg = exp_avgs[i]

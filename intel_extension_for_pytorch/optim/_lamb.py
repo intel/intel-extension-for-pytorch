@@ -70,7 +70,6 @@ class Lamb(torch.optim.Optimizer):
                     params_with_grad.append(p)
                     if grad.is_sparse:
                         raise RuntimeError("Lamb does not support sparse gradients")
-
                     grads.append(grad)
 
                     state = self.state[p]

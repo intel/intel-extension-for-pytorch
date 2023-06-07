@@ -37,7 +37,9 @@ functions_supported_by_quantization = set(
         F.linear,
         torch._C._nn.linear,
         torch.matmul,
+        torch.bmm,
         torch.Tensor.matmul,
+        torch.Tensor.bmm,
         F.embedding_bag,
         torch.embedding_bag,
     ]
@@ -408,7 +410,12 @@ def iterate_and_apply_convert(
                 if (
                     str(op)
                     in conv_linear_ops
-                    + [str(torch.matmul), str(torch.Tensor.matmul)]
+                    + [
+                        str(torch.matmul),
+                        str(torch.Tensor.matmul),
+                        str(torch.bmm),
+                        str(torch.Tensor.bmm),
+                    ]
                     + embedding_op
                     or str(type(op)) in conv_linear_modules
                 ):

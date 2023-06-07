@@ -37,6 +37,9 @@
 #include "aten/EmbeddingBag.h"
 #include "runtime/CPUPool.h"
 #include "runtime/TaskExecutor.h"
+#include "toolkit/sklearn.h"
+#include "tpp/optim.h"
+#include "tpp/utils.h"
 
 namespace torch_ipex {
 namespace {
@@ -223,10 +226,22 @@ void InitIpexModuleBindings(py::module m) {
         torch_ipex::runtime::set_mask_affinity_from_cpu_pool((*cpu_pool));
         return;
       });
-#if 0 // Only support in cpu-device.
+
   m.def("roc_auc_score", &toolkit::roc_auc_score);
   m.def("roc_auc_score_all", &toolkit::roc_auc_score_all);
-#endif
+
+  // libxsmm
+  m.def("xsmm_manual_seed", &torch_ipex::tpp::xsmm_manual_seed);
+  m.def("init_libxsmm", &torch_ipex::tpp::init_libxsmm);
+
+  // tpp-for-optimizer
+  m.def("tpp_dense_sparse_add_", &torch_ipex::tpp::dense_sparse_add_);
+  m.def("tpp_bf16_split_add_", &torch_ipex::tpp::bf16_split_add_);
+  m.def("tpp_fused_adamw", &torch_ipex::tpp::fused_adamw);
+  m.def("tpp_fused_split_adamw", &torch_ipex::tpp::fused_split_adamw);
+  m.def("tpp_clip_grad_norm", &torch_ipex::tpp::clip_grad_norm);
+  m.def("tpp_fused_lamb", &torch_ipex::tpp::fused_lamb);
+  m.def("tpp_fused_lamb_v2", &torch_ipex::tpp::fused_lamb_v2);
 }
 } // namespace
 

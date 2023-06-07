@@ -39,10 +39,9 @@ def _check_roi_boxes_shape(boxes: Union[Tensor, List[Tensor]]):
             boxes.size(1) == 5
         ), "The boxes tensor shape is not correct as Tensor[K, 5]"
     else:
-        assert_status = False
-        assert (
-            status
-        ), "boxes is expected to be a Tensor[L, 5] or a List[Tensor[K, 4]]"
+        raise ValueError(
+            "boxes is expected to be a Tensor[L, 5] or a List[Tensor[K, 4]]"
+        )
     return
 
 

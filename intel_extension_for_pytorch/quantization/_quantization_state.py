@@ -251,6 +251,10 @@ class AutoQuantizationState(torch.nn.Module):
             # TODO: do not run this twice on input and output
             if str(tensor_id) in self.tensor_id_to_observer:
                 observer = self.tensor_id_to_observer[str(tensor_id)]
+                if isinstance(arg, torch.Tensor) and arg.dtype != torch.float32:
+                    dtype = arg.dtype
+                    out = observer(arg.float())
+                    return out.to(dtype)
                 return observer(arg)
             else:
                 return arg
@@ -318,7 +322,7 @@ class AutoQuantizationState(torch.nn.Module):
             tensor_id = tensor_info.id
             if str(tensor_id) in self.tensor_id_to_observer:
                 obs = self.tensor_id_to_observer[str(tensor_id)]
-                obs(output)
+                obs(output.float())
 
         if isinstance(outputs, torch.Tensor):
             tensor_info = seen_q_op_info.output_tensor_infos[0]

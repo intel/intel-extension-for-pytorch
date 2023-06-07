@@ -205,18 +205,16 @@ def attach_scale_zp_values_to_model(
                 scale, zp = observer.calculate_qparams()
                 qstate.tensor_id_to_scale_zp[int(tensor_id)] = (scale, zp)
             else:
-                assert_status = False
-                assert (
-                    assert_status
+                AssertionError(
+                    False
                 ), "The observer's dtype only can be torch.quint8 or torch.qint8"
         for tensor_id, observer in qstate.weight_tensor_id_to_observer.items():
             if observer.dtype in quantized_dtype:
                 scale, zp = observer.calculate_qparams()
                 qstate.weight_tensor_id_to_scale_zp[tensor_id] = (scale, zp)
             else:
-                assert_status = False
-                assert (
-                    assert_status
+                AssertionError(
+                    False
                 ), "The observer's dtype only can be torch.quint8 or torch.qint8"
         qstate.tensor_id_to_observer.clear()
         qstate.weight_tensor_id_to_observer.clear()
@@ -251,17 +249,15 @@ def check_model_obsever_has_run(
             if observer.dtype in quantized_dtype:
                 return _check_observer_has_run(observer)
             else:
-                assert_status = False
-                assert (
-                    assert_status
+                AssertionError(
+                    False
                 ), "The observer's dtype only can be torch.quint8 or torch.qint8"
         for tensor_id, observer in qstate.weight_tensor_id_to_observer.items():
             if observer.dtype in quantized_dtype:
                 return _check_observer_has_run(observer)
             else:
-                assert_status = False
-                assert (
-                    assert_status
+                AssertionError(
+                    False
                 ), "The observer's dtype only can be torch.quint8 or torch.qint8"
 
     for _, child in module.named_children():
@@ -544,7 +540,11 @@ def set_node_output_quantized(nodes):
                     _reset_post_node_input_infos(node)
             else:
                 # TODO: enable PackedSequence input for LSTM.
-                if not (node.type in [nn.LSTM] and len(node.input_tensor_infos) > 2):
+                if not (
+                    node.type in [nn.LSTM]
+                    and len(node.input_tensor_infos) > 2
+                    and node.input_tensor_infos[1].orig_dtype == torch.int64
+                ):
                     if (
                         node.input_tensor_force_inf_dtype[0]
                         in [torch.qint8, torch.quint8]
