@@ -3,7 +3,6 @@ from torch.testing._internal.common_utils import TestCase
 import copy
 
 import intel_extension_for_pytorch  # noqa
-import pytest
 
 to_block_cpu_float = torch.nn.Conv2d(4, 4, kernel_size=3, padding=1)
 to_block_dpcpp_float = copy.deepcopy(to_block_cpu_float).xpu()
@@ -248,13 +247,14 @@ class TestTorchMethod(TestCase):
         outputs = fn(to_block_dpcpp(inputs))
         loss = outputs.mean()
         loss.backward()
-        inputs_gxpu_plain = inputs.grad
+        inputs_gxpu = inputs.grad
 
-        self.assertEqual(torch.xpu.is_onednn_layout(inputs_gxpu_plain), False)
-        self.assertEqual(inputs_gcpu, inputs_gxpu_plain.cpu())
+        expect_blocked = False if to_channels_last or torch.xpu.has_2d_block_array() else True
+        self.assertEqual(torch.xpu.is_onednn_layout(inputs_gxpu), expect_blocked)
+        self.assertEqual(inputs_gcpu, inputs_gxpu.cpu())
         if to_channels_last:
             self.assertTrue(
-                inputs_gxpu_plain.is_contiguous(memory_format=torch.channels_last)
+                inputs_gxpu.is_contiguous(memory_format=torch.channels_last)
             )
 
         with torch.xpu.onednn_layout():
@@ -267,55 +267,31 @@ class TestTorchMethod(TestCase):
             self.assertEqual(torch.xpu.is_onednn_layout(inputs_gxpu_block), True)
         self.assertEqual(inputs_gcpu, inputs_gxpu_block.cpu())
 
-    @pytest.mark.skipif(
-        not torch.xpu.has_2d_block_array(),
-        reason="Failed on ATSM only, will be fixed soon.",
-    )
     def test_relu_bwd(self):
         self.unary_bwd_case(torch.nn.functional.relu)
         self.unary_bwd_case(torch.nn.functional.relu, torch.bfloat16)
         self.unary_bwd_case(torch.nn.functional.relu, torch.float, True)
 
-    @pytest.mark.skipif(
-        not torch.xpu.has_2d_block_array(),
-        reason="Failed on ATSM only, will be fixed soon.",
-    )
     def test_gelu_bwd(self):
         self.unary_bwd_case(torch.nn.functional.gelu)
         self.unary_bwd_case(torch.nn.functional.gelu, torch.bfloat16)
         self.unary_bwd_case(torch.nn.functional.gelu, torch.float, True)
 
-    @pytest.mark.skipif(
-        not torch.xpu.has_2d_block_array(),
-        reason="Failed on ATSM only, will be fixed soon.",
-    )
     def test_silu_bwd(self):
         self.unary_bwd_case(torch.nn.functional.silu)
         # self.unary_bwd_case(torch.nn.functional.silu, torch.bfloat16)
         self.unary_bwd_case(torch.nn.functional.silu, torch.float, True)
 
-    @pytest.mark.skipif(
-        not torch.xpu.has_2d_block_array(),
-        reason="Failed on ATSM only, will be fixed soon.",
-    )
     def test_tanh_bwd(self):
         self.unary_bwd_case(torch.nn.functional.tanh)
         # self.unary_bwd_case(torch.nn.functional.tanh, torch.bfloat16)
         self.unary_bwd_case(torch.nn.functional.tanh, torch.float, True)
 
-    @pytest.mark.skipif(
-        not torch.xpu.has_2d_block_array(),
-        reason="Failed on ATSM only, will be fixed soon.",
-    )
     def test_elu_bwd(self):
         self.unary_bwd_case(torch.nn.functional.elu)
         self.unary_bwd_case(torch.nn.functional.elu, torch.bfloat16)
         self.unary_bwd_case(torch.nn.functional.elu, torch.float, True)
 
-    @pytest.mark.skipif(
-        not torch.xpu.has_2d_block_array(),
-        reason="Failed on ATSM only, will be fixed soon.",
-    )
     def test_sigmoid_bwd(self):
         self.unary_bwd_case(torch.nn.functional.sigmoid)
         self.unary_bwd_case(torch.nn.functional.sigmoid, torch.bfloat16)
