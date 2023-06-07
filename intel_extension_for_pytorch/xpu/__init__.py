@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 r"""
 This package is lazily initialized, so you can always import it.
 """
@@ -45,6 +46,14 @@ from intel_extension_for_pytorch._version import (
 
 default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]
+
+if hasattr(intel_extension_for_pytorch._C, '_exchangeDevice'):
+    _exchange_device = intel_extension_for_pytorch._C._exchangeDevice
+else:
+    def _exchange_device(device: int) -> int:
+        if device < 0:
+            return -1
+        raise RuntimeError("Intel® Extension for PyTorch* was compiled without XPU support")
 
 
 def is_initialized():
@@ -99,6 +108,19 @@ def getDeviceIdListForCard(card_id=-1) -> list:
         return []
 
 
+class _DeviceGuard:
+    def __init__(self, index: int):
+        self.idx = index
+        self.prev_idx = -1
+
+    def __enter__(self):
+        self.prev_idx = torch.xpu._exchange_device(self.idx)
+
+    def __exit__(self, type: Any, value: Any, traceback: Any):
+        torch.xpu._exchange_device(self.prev_idx)
+        return False
+
+
 class device(object):
     r"""Context-manager that changes the selected device.
 
@@ -107,22 +129,15 @@ class device(object):
             this argument is a negative integer or ``None``.
     """
 
-    def __init__(self, device):
+    def __init__(self, device: Any):
         self.idx = _get_device_index(device, optional=True)
         self.prev_idx = -1
 
     def __enter__(self):
-        if self.idx == -1:
-            return
-        self.prev_idx = intel_extension_for_pytorch._C._getDevice()
-        if self.prev_idx != self.idx:
-            intel_extension_for_pytorch._C._setDevice(self.idx)
-        if not torch.jit.is_scripting():
-            _lazy_init()
+        self.prev_idx = torch.xpu._exchange_device(self.idx)
 
-    def __exit__(self, *args):
-        if self.prev_idx != self.idx:
-            intel_extension_for_pytorch._C._setDevice(self.prev_idx)
+    def __exit__(self, type: Any, value: Any, traceback: Any):
+        torch.xpu._exchange_device(self.prev_idx)
         return False
 
 
