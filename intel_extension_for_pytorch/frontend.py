@@ -169,7 +169,7 @@ class _O1:
         properties.fuse_update_step = True
         properties.auto_kernel_selection = False
         properties.graph_mode = False
-        properties.concat_linear = True
+        properties.concat_linear = False
         return properties
 
 

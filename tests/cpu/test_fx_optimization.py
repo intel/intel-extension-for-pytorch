@@ -129,7 +129,9 @@ class FxTester(TestCase):
                 auto_cast = dtype == torch.bfloat16
                 with torch.cpu.amp.autocast(auto_cast, dtype=torch.bfloat16):
                     ref_out = model(**inputs)
-                ipex_model = ipex.optimize(model, dtype=dtype, inplace=inplace)
+                ipex_model = ipex.optimize(
+                    model, dtype=dtype, inplace=inplace, concat_linear=True
+                )
                 with torch.cpu.amp.autocast(auto_cast, dtype=torch.bfloat16):
                     out = ipex_model(**inputs)
                 if dtype == torch.bfloat16:
@@ -191,7 +193,9 @@ class FxTester(TestCase):
                     model1 = copy.deepcopy(base_model)
                     model2 = copy.deepcopy(base_model)
                     auto_cast = dtype == torch.bfloat16
-                    ipex_model1 = ipex.optimize(model1, dtype=dtype, inplace=inplace)
+                    ipex_model1 = ipex.optimize(
+                        model1, dtype=dtype, inplace=inplace, concat_linear=True
+                    )
                     check_unet_concated(ipex_model1)
                     ipex_model2 = ipex.optimize(
                         model2, dtype=dtype, inplace=inplace, concat_linear=False
