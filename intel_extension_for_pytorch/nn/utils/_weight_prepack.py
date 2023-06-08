@@ -319,7 +319,10 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
             if m.bias in params_attr:
                 param_wrapper = params_attr[m.bias]
             else:
-                assert m.bias.dtype in [torch.bfloat16, torch.half] and not m.master_weight_split
+                assert (
+                    m.bias.dtype in [torch.bfloat16, torch.half]
+                    and not m.master_weight_split
+                )
                 param_wrapper = found_wrapper(m.bias, params_attr)
                 assert param_wrapper is not None
             bias_wrapper = param_wrapper
@@ -328,7 +331,10 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
         if m.weight in params_attr:
             param_wrapper = params_attr[m.weight]
         else:
-            assert m.weight.dtype in [torch.bfloat16, torch.half] and not m.master_weight_split
+            assert (
+                m.weight.dtype in [torch.bfloat16, torch.half]
+                and not m.master_weight_split
+            )
             param_wrapper = found_wrapper(m.weight, params_attr)
             assert param_wrapper is not None
         if param_wrapper.can_prepack(m, is_training):

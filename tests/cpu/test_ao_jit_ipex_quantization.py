@@ -569,6 +569,64 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
                 new_json = json.load(f)
             self.assertTrue(old_json == new_json)
 
+    def test_observer_dtype_update(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = nn.Linear(4, 4)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        m = M()
+        x = torch.rand(4, 4)
+        prepared_model = ipex.quantization.prepare(
+            m, static_qconfig[0], example_inputs=x, inplace=False
+        )
+        prepared_model(x)
+        with tempfile.TemporaryDirectory() as tmp:
+            ref_path = os.path.join(tmp, "configure.json")
+            prepared_model.save_qconf_summary(ref_path)
+            with open(ref_path, "r") as f:
+                old_json = json.load(f)
+                # change observe's dtype.
+                old_json[" "]["q_op_infos"]["0"]["activation_observer"][
+                    "dtype"
+                ] = "torch.qint8"
+                old_json[" "]["q_op_infos"]["0"]["activation_observer"][
+                    "quant_min"
+                ] = -128
+                old_json[" "]["q_op_infos"]["0"]["activation_observer"][
+                    "quant_max"
+                ] = 127
+                new_path = os.path.join(tmp, "configure_new.json")
+                with open(new_path, "w") as fp:
+                    json.dump(old_json, fp, indent=4)
+                prepared_model.load_qconf_summary(new_path)
+                prepared_model(x)
+                convert_model = ipex.quantization.convert(prepared_model)
+                traced_model = torch.jit.trace(convert_model, x).eval()
+                traced_model = torch.jit.freeze(traced_model)
+                for _ in range(2):
+                    y_new = traced_model(x)
+
+                ref_qconfig = QConfig(
+                    activation=MinMaxObserver.with_args(
+                        qscheme=torch.per_tensor_affine, dtype=torch.qint8
+                    ),
+                    weight=default_weight_observer,
+                )
+                prepared_model = ipex.quantization.prepare(
+                    m, ref_qconfig, example_inputs=x, inplace=False
+                )
+                prepared_model(x)
+                convert_model = ipex.quantization.convert(prepared_model)
+                traced_model = torch.jit.trace(convert_model, x).eval()
+                traced_model = torch.jit.freeze(traced_model)
+                for _ in range(2):
+                    y_ref = traced_model(x)
+                self.assertEqual(y_ref, y_new)
+
     def test_subclass_format(self):
         class M(nn.Module):
             def __init__(self):

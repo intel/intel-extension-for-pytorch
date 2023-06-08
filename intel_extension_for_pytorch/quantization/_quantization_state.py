@@ -24,6 +24,7 @@ from ._quantization_state_utils import (
     _raise_obs_op_mismatch,
     ops_are_related,
     iterate_and_apply_convert,
+    set_tensor_info_dtype,
 )
 from ._smooth_quant import SmoothQuantActivationObserver, SmoothQuantWeightObserver
 
@@ -266,13 +267,32 @@ class AutoQuantizationState(torch.nn.Module):
             else:
                 return arg
 
+        # If user changes observer's dtype and re-do calibration, we need to update
+        # the tensor_info.inf_dtype  and force dtype with the new oberver's dtype.
+        quantized_dtype = [torch.quint8, torch.qint8]
+        for i, tensor_info in enumerate(seen_q_op_info.input_tensor_infos):
+            if (
+                tensor_info is not None
+                and str(tensor_info.id) in self.tensor_id_to_observer
+            ):
+                tensor_id = tensor_info.id
+                observer = self.tensor_id_to_observer[str(tensor_id)]
+                set_tensor_info_dtype(tensor_info, observer)
+                force_dtype = seen_q_op_info.input_tensor_force_inf_dtype[i]
+                if (
+                    force_dtype in quantized_dtype
+                    and force_dtype != tensor_info.orig_dtype
+                    and force_dtype != observer.dtype
+                ):
+                    seen_q_op_info.input_tensor_force_inf_dtype[i] = observer.dtype
         args = iterate_and_apply(
             args, seen_q_op_info.input_tensor_infos, _maybe_observe
         )
         # works for nn.module case
         weight_tensor_info = seen_q_op_info.weight_tensor_infos
-
         for i, tensor_info in enumerate(weight_tensor_info):
+            if tensor_info is None:
+                continue
             tensor_id = tensor_info.id
             if (
                 str(seen_q_op_info.idx) + "_" + str(tensor_id)
@@ -281,6 +301,7 @@ class AutoQuantizationState(torch.nn.Module):
                 observer = self.weight_tensor_id_to_observer[
                     str(seen_q_op_info.idx) + "_" + str(tensor_id)
                 ]
+                set_tensor_info_dtype(tensor_info, observer)
                 # if has bias, the dim is 1, we don't need run observer for it.
                 if isinstance(op, torch.nn.LSTM):
                     if op._flat_weights[i].dim() > 1:
@@ -328,8 +349,9 @@ class AutoQuantizationState(torch.nn.Module):
         def _observer_output(output, tensor_info):
             tensor_id = tensor_info.id
             if str(tensor_id) in self.tensor_id_to_observer:
-                obs = self.tensor_id_to_observer[str(tensor_id)]
-                obs(output.float())
+                observer = self.tensor_id_to_observer[str(tensor_id)]
+                set_tensor_info_dtype(tensor_info, observer)
+                observer(output.float())
 
         if isinstance(outputs, torch.Tensor):
             tensor_info = seen_q_op_info.output_tensor_infos[0]
