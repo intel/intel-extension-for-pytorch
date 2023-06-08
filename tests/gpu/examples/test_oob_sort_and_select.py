@@ -9,10 +9,10 @@ import intel_extension_for_pytorch  # noqa
 SIZE = 100
 
 
-if not torch.xpu.has_fp64_dtype():
-    pytest.skip(allow_module_level=True)
+# if not torch.xpu.has_fp64_dtype():
+#    pytest.skip(allow_module_level=True)
 
-
+@pytest.mark.skipif(not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device")
 class dtypes:
     def __init__(self, *args, device="xpu"):
         self.args = args
@@ -27,7 +27,7 @@ class dtypes:
 
         return new_fn
 
-
+@pytest.mark.skipif(not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device")
 class TestNNMethod(TestCase):
     def assertIsOrdered(self, order, x, mxx, ixx, task):
         SIZE = x.size(1)
