@@ -49,10 +49,10 @@ def _ipex_module_load_from_state_dict_(self, state_dict, prefix):
 
 class _IPEXPrepackModule(nn.Module):
     def _get_forward_weight(self):
-        return self.weight if self.training else self._ipex_module_empty_tensor
+        return self.weight if self.training else self._ipex_module_empty_weight_tensor
 
     def _get_forward_bias(self):
-        return self.bias if self.training else self._ipex_module_empty_tensor
+        return self.bias if self.training else self._ipex_module_empty_bias_tensor
 
 
 class _IPEXConvNd(_IPEXPrepackModule):
@@ -357,9 +357,17 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
             )
             new_m.training = is_training
             if not is_training:
-                # This _ipex_module_empty_tensor has to be a Parameter so that dynamo
-                # could convert it into FakeTensor
-                new_m._ipex_module_empty_tensor = torch.nn.Parameter(torch.Tensor())
+                # _ipex_module_empty_weight_tensor and _ipex_module_empty_bias_tensor
+                # have to be a Parameter so that dynamo could convert it into FakeTensor
+                new_m._ipex_module_empty_weight_tensor = torch.nn.Parameter(
+                    torch.Tensor().to(dtype=new_m.weight.dtype)
+                )
+                if new_m.bias is None:
+                    new_m.register_parameter("_ipex_module_empty_bias_tensor", None)
+                else:
+                    new_m._ipex_module_empty_bias_tensor = torch.nn.Parameter(
+                        torch.Tensor().to(dtype=new_m.bias.dtype)
+                    )
             return new_m
         else:
             return m

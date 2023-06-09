@@ -5395,7 +5395,11 @@ class Tester(TestCase):
                 x = self.module(x)
                 return x
 
-        modules = [nn.Conv2d(3, 5, 3), nn.Linear(3, 7), nn.ConvTranspose2d(3, 5, 3)]
+        modules = [
+            nn.Conv2d(3, 5, 3, bias=False),
+            nn.Linear(3, 7),
+            nn.ConvTranspose2d(3, 5, 3),
+        ]
         inputs = [
             torch.randn(1, 3, 56, 56),
             torch.randn(2, 3),
@@ -5422,7 +5426,7 @@ class Tester(TestCase):
                     graph = traced_model.graph
                     FileCheck().check_not("self.module.weight").check_not(
                         "self.module.bias"
-                    ).check("_ipex_module_empty_tensor").run(graph)
+                    ).check("_ipex_module_empty").run(graph)
                     y_ref = model(data)
                     y_traced = traced_model(data)
                     self.assertEqual(y_ref, y_traced)

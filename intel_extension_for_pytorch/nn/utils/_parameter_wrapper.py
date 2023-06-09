@@ -177,7 +177,11 @@ def get_shared_parameter_status(module, shared_p):
 
 def remove_empty_tensor(out):
     empty_tensor_key = [
-        key for key in out.keys() if key.endswith("_ipex_module_empty_tensor")
+        key
+        for key in out.keys()
+        if key.endswith(
+            ("_ipex_module_empty_weight_tensor", "_ipex_module_empty_bias_tensor")
+        )
     ]
 
     for key in empty_tensor_key:
@@ -199,7 +203,7 @@ def patch_state_dict(model, params_attr, mode):
             out = self._original_state_dict(
                 *args, destination=destination, prefix=prefix, keep_vars=keep_vars
             )
-            # We don't save the _ipex_module_empty_tensor Parameter in the state dict
+            # We don't save the _ipex_module_empty_weight_tensor or _ipex_module_empty_bias_tensor Parameter in the state dict
             out = remove_empty_tensor(out)
         return out
 
