@@ -75,7 +75,7 @@ class lru_cache {
   lru_cache(size_type capacity) : capacity_(capacity) {}
 
   size_type size() const {
-    map_.size();
+    return map_.size();
   }
   size_type max_size() const {
     return capacity_;
@@ -190,7 +190,7 @@ class lru_cache {
   size_type capacity_;
 };
 
-template <class value_t, size_t capacity = 128, class key_t = std::string>
+template <class value_t, class key_t = std::string, size_t capacity = 128>
 class computation_cache {
  public:
   using iterator = typename lru_cache<key_t, value_t>::iterator;
@@ -239,10 +239,11 @@ class computation_cache {
   }
 };
 
-template <class value_t, class key_t>
-struct lru_cache_standalone : public computation_cache<value_t, 128, key_t> {
+template <class value_t, class key_t, size_t capacity = 128>
+struct lru_cache_standalone
+    : public computation_cache<value_t, key_t, capacity> {
  public:
-  using cache = computation_cache<value_t, 128, key_t>;
+  using cache = computation_cache<value_t, key_t, capacity>;
 
   inline bool find_key(key_t key) {
     return cache::find(key) != cache::end();
@@ -267,26 +268,26 @@ struct lru_cache_standalone : public computation_cache<value_t, 128, key_t> {
   }
 };
 
-template <class value_t, class key_t>
+template <class value_t, class key_t, size_t capacity = 128>
 inline bool find_key(key_t key) {
-  return lru_cache_standalone<value_t, key_t>().find_key(key);
+  return lru_cache_standalone<value_t, key_t, capacity>().find_key(key);
 }
 
-template <class value_t, class key_t, typename... Ts>
+template <class value_t, class key_t, size_t capacity = 128, typename... Ts>
 inline value_t fetch_or_create_m(key_t key, Ts&&... args) {
-  return lru_cache_standalone<value_t, key_t>().fetch_or_create_m(
+  return lru_cache_standalone<value_t, key_t, capacity>().fetch_or_create_m(
       key, std::forward<Ts>(args)...);
 }
 
-template <class value_t, class key_t, typename... Ts>
+template <class value_t, class key_t, size_t capacity = 128, typename... Ts>
 inline value_t create_and_fetch_m(key_t key, Ts&&... args) {
-  return lru_cache_standalone<value_t, key_t>().create_and_fetch_m(
+  return lru_cache_standalone<value_t, key_t, capacity>().create_and_fetch_m(
       key, std::forward<Ts>(args)...);
 }
 
-template <class value_t, class key_t>
+template <class value_t, class key_t, size_t capacity = 128>
 inline value_t fetch_m(key_t key) {
-  return lru_cache_standalone<value_t, key_t>().fetch_m(key);
+  return lru_cache_standalone<value_t, key_t, capacity>().fetch_m(key);
 }
 
 template <typename T>

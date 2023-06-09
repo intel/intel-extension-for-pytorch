@@ -143,25 +143,34 @@ class XPUQuantizerBase {
 
 static inline XPUQuantizerBase<float, int32_t, false>
 fetch_cached_quantizer_base(float dnn_sc, int32_t dnn_zp) {
-  xpu::dpcpp::lru_key_t key_sc_zp;
+  using key_t = xpu::dpcpp::lru_key_t;
+  key_t key_sc_zp;
+
   // 0 here means dnn zero_point
   // TODO: remove after asymmetric is enabled
   dnn_zp = 0;
   xpu::dpcpp::create_key(key_sc_zp, dnn_sc, dnn_zp);
-  bool sc_zp_key_found =
-      xpu::dpcpp::find_key<XPUQuantizerBase<float, int32_t, false>>(key_sc_zp);
+
+  bool sc_zp_key_found = xpu::dpcpp::find_key<
+      XPUQuantizerBase<float, int32_t, false>,
+      xpu::dpcpp::lru_key_t,
+      /*capacity*/ 256>(key_sc_zp);
+
   XPUQuantizerBase<float, int32_t, false> quant_base;
   float* sc_ptr;
   int32_t* zp_ptr;
   if (sc_zp_key_found) {
-    quant_base =
-        xpu::dpcpp::fetch_m<XPUQuantizerBase<float, int32_t, false>>(key_sc_zp);
+    quant_base = xpu::dpcpp::fetch_m<
+        XPUQuantizerBase<float, int32_t, false>,
+        key_t,
+        /*capacity*/ 256>(key_sc_zp);
     sc_ptr = quant_base.scale_ptr();
     zp_ptr = quant_base.zero_point_ptr();
   } else {
-    quant_base =
-        xpu::dpcpp::fetch_or_create_m<XPUQuantizerBase<float, int32_t, false>>(
-            key_sc_zp, 1, dpcppGetCurrentQueue());
+    quant_base = xpu::dpcpp::create_and_fetch_m<
+        XPUQuantizerBase<float, int32_t, false>,
+        key_t,
+        /*capacity*/ 256>(key_sc_zp, /*size*/ 1, dpcppGetCurrentQueue());
     sc_ptr = quant_base.scale_ptr();
     float _scale = (float)dnn_sc;
     dpcppGetCurrentQueue().single_task([=]() { sc_ptr[0] = _scale; });

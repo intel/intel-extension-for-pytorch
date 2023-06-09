@@ -41,18 +41,16 @@ namespace xpu {
 namespace oneDNN {
 
 static inline std::pair<memory, memory> q_get_sc_zp_gpu_mem(
-    const Tensor qx,
+    const Tensor& qx,
     dnnl::engine& engine) {
   memory qx_sc_m, qx_zp_m;
   using xpu::dpcpp::XPUQuantizerBase;
-  xpu::dpcpp::lru_key_t key_sc_zp;
   float dnn_scale;
-  if (xpu::dpcpp::is_opaque_u8(qx)) {
-    dnn_scale = qx.q_scale();
-  } else {
-    dnn_scale = (qx.scalar_type() == kQUInt8) ? qx.q_scale() / 2 : qx.q_scale();
+  dnn_scale = qx.q_scale();
+  if (qx.scalar_type() == kQUInt8 && (!xpu::dpcpp::is_opaque_u8(qx))) {
+    dnn_scale /= 2.f;
   }
-  // TODO: Use correct zp after aymmetric is enabled
+
   auto quant_base = xpu::dpcpp::fetch_cached_quantizer_base(dnn_scale, 0);
   auto sc_ptr = quant_base.scale_ptr();
   auto zp_ptr = quant_base.zero_point_ptr();
