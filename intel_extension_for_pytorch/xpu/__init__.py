@@ -6,6 +6,7 @@ This package is lazily initialized, so you can always import it.
 from torch.storage import _LegacyStorage
 import sys
 import warnings
+from functools import lru_cache
 from typing import List, Optional, Tuple, Union, Dict
 
 import torch
@@ -16,7 +17,7 @@ from torch.storage import _StorageBase
 from torch import device as _device
 from torch._utils import classproperty, _get_device_index
 
-from .lazy_init import _lazy_init, _lazy_call
+from .lazy_init import _lazy_init, _lazy_call, _is_initialized
 from .streams import Stream, Event
 from .intrinsic import *
 from .cpp_extension import *
@@ -47,20 +48,17 @@ from intel_extension_for_pytorch._version import (
 default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]
 
-if hasattr(intel_extension_for_pytorch._C, '_exchangeDevice'):
+def _is_compiled() -> bool:
+    r"""Returns true if compile with XPU support."""
+    return hasattr(intel_extension_for_pytorch._C, '_getDeviceCount')
+
+if _is_compiled():
     _exchange_device = intel_extension_for_pytorch._C._exchangeDevice
 else:
     def _exchange_device(device: int) -> int:
         if device < 0:
             return -1
         raise RuntimeError("Intel® Extension for PyTorch* was compiled without XPU support")
-
-
-def is_initialized():
-    r"""Returns whether XPU state has been initialized."""
-    from .lazy_init import _initialized
-
-    return _initialized
 
 
 def init():
@@ -76,15 +74,16 @@ def init():
 
 # This API call _prefetchDeviceCount() if _lazy_init() has not been called such that
 # this API can be used before forking proces.
+@lru_cache(maxsize=1)
 def device_count() -> int:
     r"""Returns the number of XPUs device available."""
-    if hasattr(intel_extension_for_pytorch._C, "_getDeviceCount"):
-        if is_initialized():
+    if not _is_compiled():
+        return 0
+    else:
+        if _is_initialized():
             return intel_extension_for_pytorch._C._getDeviceCount()
         else:
             return intel_extension_for_pytorch._C._prefetchDeviceCount()
-    else:
-        return 0
 
 
 # This API can be used before forking process if _lazy_init() has not been called.
@@ -96,16 +95,17 @@ def is_available() -> bool:
 
 
 # This API can be used before forking process if _lazy_init() has not been called.
+@lru_cache(maxsize=1)
 def getDeviceIdListForCard(card_id=-1) -> list:
     r"""Returns the device list of card_id.
     By default, return device list of the card which contains max number of devices."""
-    if hasattr(intel_extension_for_pytorch._C, "_getDeviceIdListForCard"):
-        if is_initialized():
+    if not _is_compiled():
+        return []
+    else:
+        if _is_initialized():
             return intel_extension_for_pytorch._C._getDeviceIdListForCard(card_id)
         else:
             return intel_extension_for_pytorch._C._prefetchDeviceIdListForCard(card_id)
-    else:
-        return []
 
 
 class _DeviceGuard:

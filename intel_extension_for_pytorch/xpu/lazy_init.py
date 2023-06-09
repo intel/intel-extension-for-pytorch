@@ -39,7 +39,12 @@ class _LazySeedTracker:
 _lazy_seed_tracker = _LazySeedTracker()
 
 
-def is_initialized():
+def _is_initialized() -> bool:
+    r"""Returns whether XPU runtime has been initialized."""
+    return _initialized
+
+
+def is_initialized() -> bool:
     r"""Returns whether XPU state has been initialized."""
     return _initialized and not _is_in_bad_fork()
 
