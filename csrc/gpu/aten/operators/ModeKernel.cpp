@@ -341,6 +341,7 @@ void mode_impl(
 
     // the reduced maximal number is stored in the first slot
     auto most_appearance_time = scratch_value_ptr[outer_offset];
+    item.barrier(dpcpp_global_fence);
 
     // update the value by comparing that if the status is equal to the found
     // maximul appearance times, if equal, assign the global index scratch
@@ -601,24 +602,17 @@ static void mode_xpu_kernel(
   auto values_transposed = values.transpose(dim, ndim - 1);
   auto indices_transposed = indices.transpose(dim, ndim - 1);
 
-  // array size - WG number
-  auto max_Compute_Unit =
-      queue.get_device().template get_info<dpcpp_dev_max_compute_units>();
+  // max wg size
   auto max_WG_Size =
       queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
-  auto device_max_item_size = max_Compute_Unit * dpcppMaxWorkItemsPerEU();
+
+  // one wg is responsible for one problem batch
   auto group_number = problem_time;
 
   // When the problem size is larger than the max wg size,
   // the wg is set the upper limitation of a wg size
   if (problem_size > max_WG_Size) {
     auto group_size = max_WG_Size;
-
-    // max wg number for the problem
-    auto max_WG_Number = int(device_max_item_size / group_size);
-    if (group_number >= max_WG_Number) {
-      group_number = max_WG_Number;
-    }
 
     // sorted values and associated indices
     auto sort_tuple_ret =
@@ -669,7 +663,6 @@ static void mode_xpu_kernel(
   } else {
     // problem_size <= max_WG_Size, wg size is set the problem size
     auto group_size = problem_size;
-    auto max_WG_Number = int64_t(device_max_item_size / group_size);
 
     // scratch memory size needed by built-in sort
     auto sort_scratch_memory_size = sycl::ext::oneapi::experimental::
@@ -679,18 +672,6 @@ static void mode_xpu_kernel(
 
     auto values_info = getTensorInfo<scalar_t, int64_t>(values_transposed);
     auto indices_info = getTensorInfo<int64_t, int64_t>(indices_transposed);
-
-    // according to the slm size, group_number_by_slm means the suggested wg
-    // number
-    auto eu_number_per_subslice = 8;
-    auto group_number_by_slm = int64_t(
-        (dpcppLocalMemSize() * (dpcppGpuEuCount() / eu_number_per_subslice)) /
-        ((sizeof(ModeOpHelper) + sizeof(ModeOpValueIndex<scalar_t>)) *
-             group_size +
-         sort_scratch_memory_size));
-
-    // set the wg number to the minimal one
-    group_number = std::min(group_number_by_slm, problem_time);
 
     auto cgf = DPCPP_Q_CGF(cgh) {
       // SLM used for record status for mode
