@@ -39,7 +39,7 @@ def activation_replace(module):
     from transformers.activations import NewGELUActivation
 
     replace_dict = {
-        NewGELUActivation: torch.ops.torch_ipex.new_gelu
+        NewGELUActivation: torch.nn.GELU(approximate="tanh")
     }
     for m in replace_dict.keys():
         if isinstance(module, m):
