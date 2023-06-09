@@ -1,9 +1,4 @@
 ## Included by CMakeLists
-if(CPU_BUILD_OPTIONS_cmake_included)
-    return()
-endif()
-set(CPU_BUILD_OPTIONS_cmake_included true)
-
 if(BuildFlags_CPU_cmake_included)
     return()
 endif()

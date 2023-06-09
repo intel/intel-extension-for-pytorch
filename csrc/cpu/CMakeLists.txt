@@ -106,12 +106,18 @@ target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${PYTHON_INCLUDE_DIR})
 
 include(${IPEX_ROOT_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)
-  file(GLOB_RECURSE ALL_NATIVE_CSRC_FILES ${IPEX_CPU_ROOT_DIR}/**.[ch] ${IPEX_CPU_ROOT_DIR}/**.[ch]pp)
-  add_custom_target(CL_FORMAT_CPU_NATIVE_CSRC COMMAND ${CLANG_FORMAT_EXEC} -i -style=file ${ALL_NATIVE_CSRC_FILES})
+  file(GLOB_RECURSE ALL_CPU_NATIVE_CSRC_FILES ${IPEX_CPU_ROOT_DIR}/**.[ch] ${IPEX_CPU_ROOT_DIR}/**.[ch]pp)
+  add_custom_target(CL_FORMAT_CPU_NATIVE_CSRC COMMAND ${CLANG_FORMAT_EXEC} -i -style=file ${ALL_CPU_NATIVE_CSRC_FILES})
   add_dependencies(${PLUGIN_NAME_CPU} CL_FORMAT_CPU_NATIVE_CSRC)
 endif()
 
 include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
+set(args
+CC=${CMAKE_C_COMPILER}
+CXX=${CMAKE_CXX_COMPILER}
+FC=${CMAKE_Fortran_COMPILER}
+)
+
 ExternalProject_Add(libxsmm
   SOURCE_DIR ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm
   BUILD_IN_SOURCE 1
@@ -120,9 +126,11 @@ ExternalProject_Add(libxsmm
     make
     "AVX=3"
     "-j"
+    ${args}
   INSTALL_COMMAND ""
   )
 target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/lib/libxsmm.a)
+
 add_dependencies(${PLUGIN_NAME_CPU} dnnl)
 # If Graph Compiler is built, then it should link to its LLVM dependencies,
 # and not the LLVM symbols exposed by PyTorch.
