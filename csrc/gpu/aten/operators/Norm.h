@@ -95,6 +95,7 @@ static inline void norm_group_reduce(
 template <
     typename accscalar_t,
     typename index_t,
+    bool one_moment,
     typename reduce_op,
     typename nd_item_id,
     typename local_shared,
@@ -117,10 +118,14 @@ static void norm_global_reduce(
   index_t group_id_foreach = item_id.get_group(1);
 
   if (local_id == 0) {
-    // [Batch][2][workgroup_num_foreach]
-    auto idx = group_id * workgroup_num_foreach * 2 + group_id_foreach;
-    scratchpad_ptr[idx] = sum1;
-    scratchpad_ptr[workgroup_num_foreach + idx] = sum2;
+    if constexpr (one_moment) {
+      auto idx = group_id * workgroup_num_foreach + group_id_foreach;
+      scratchpad_ptr[idx] = sum1;
+    } else {
+      auto idx = group_id * workgroup_num_foreach * 2 + group_id_foreach;
+      scratchpad_ptr[idx] = sum1;
+      scratchpad_ptr[workgroup_num_foreach + idx] = sum2;
+    }
   }
   item_id.barrier(dpcpp_global_fence);
 
@@ -133,15 +138,25 @@ static void norm_global_reduce(
 
   // use the last workgroup for reduction
   if (last_workgroup[0]) {
-    sum1 = accscalar_t(0);
-    sum2 = accscalar_t(0);
-    for (int i = local_id; i < workgroup_num_foreach; i += workgroup_size) {
-      auto idx = group_id * workgroup_num_foreach * 2 + i;
-      sum1 = bin_op(sum1, scratchpad_ptr[idx]);
-      sum2 = bin_op(sum2, scratchpad_ptr[workgroup_num_foreach + idx]);
+    if constexpr (one_moment) {
+      sum1 = accscalar_t(0);
+      for (int i = local_id; i < workgroup_num_foreach; i += workgroup_size) {
+        auto idx = group_id * workgroup_num_foreach + i;
+        sum1 = bin_op(sum1, scratchpad_ptr[idx]);
+      }
+      sum1 = sycl::reduce_over_group(
+          item_id.get_group(), sum1, sycl::plus<accscalar_t>());
+    } else {
+      sum1 = accscalar_t(0);
+      sum2 = accscalar_t(0);
+      for (int i = local_id; i < workgroup_num_foreach; i += workgroup_size) {
+        auto idx = group_id * workgroup_num_foreach * 2 + i;
+        sum1 = bin_op(sum1, scratchpad_ptr[idx]);
+        sum2 = bin_op(sum2, scratchpad_ptr[workgroup_num_foreach + idx]);
+      }
+      norm_group_reduce<accscalar_t>(
+          item_id, sub_group_num, sum1, sum2, local_mean, local_rstd, bin_op);
     }
-    norm_group_reduce<accscalar_t>(
-        item_id, sub_group_num, sum1, sum2, local_mean, local_rstd, bin_op);
   }
 }
 
@@ -330,7 +345,11 @@ class NormConfig {
   }
 };
 
-template <typename scalar_t, typename mean_t, typename weight_t>
+template <
+    typename scalar_t,
+    typename mean_t,
+    typename weight_t,
+    bool one_moment = false>
 class NormForward {
  public:
   using accscalar_t = acc_type<scalar_t>;
@@ -461,7 +480,11 @@ class NormForward {
   accscalar_t eps;
 };
 
-template <typename scalar_t, typename mean_t, typename weight_t>
+template <
+    typename scalar_t,
+    typename mean_t,
+    typename weight_t,
+    bool one_moment = false>
 class NormBackward {
  public:
   using accscalar_t = acc_type<scalar_t>;
@@ -582,7 +605,8 @@ template <
     typename index_t,
     int vec_size,
     template <typename, typename, typename>
-    class Norm>
+    class Norm,
+    bool one_moment = false>
 void fused_norm_kernel(
     Norm<scalar_t, mean_t, weight_t>& norm,
     const NormConfig& cfg) {
@@ -607,15 +631,19 @@ void fused_norm_kernel(
           norm.template reduce_combine<vec_size, vec_t, weight_vec_t, index_t>(
               item_id, cfg, sum1, sum2);
 
-          norm_group_reduce<accscalar_t>(
-              item_id,
-              cfg.sub_group_num,
-              sum1,
-              sum2,
-              local_sum1,
-              local_sum2,
-              [](accscalar_t a, accscalar_t b) { return a + b; });
-
+          if constexpr (one_moment) {
+            sum1 = sycl::reduce_over_group(
+                item_id.get_group(), sum1, sycl::plus<accscalar_t>());
+          } else {
+            norm_group_reduce<accscalar_t>(
+                item_id,
+                cfg.sub_group_num,
+                sum1,
+                sum2,
+                local_sum1,
+                local_sum2,
+                [](accscalar_t a, accscalar_t b) { return a + b; });
+          }
           norm.template update<vec_size, index_t, vec_t, weight_vec_t>(
               item_id, cfg, sum1, sum2);
         });
@@ -628,22 +656,35 @@ template <
     typename mean_t,
     typename weight_t,
     template <typename, typename, typename>
-    class Norm>
+    class Norm,
+    bool one_moment = false>
 void launch_vectorized_fused_norm_kernel(
     Norm<scalar_t, mean_t, weight_t>& norm,
     const NormConfig& config,
     bool can_use_32bit_index) {
   int vec_size = norm.get_update_vec_size(config.WGPlane, config.max_vec_size);
-#define vectorized_fused_norm_kernel(vec_size)                                 \
-  {                                                                            \
-    if (can_use_32bit_index) {                                                 \
-      fused_norm_kernel<scalar_t, mean_t, weight_t, uint32_t, vec_size, Norm>( \
-          norm, config);                                                       \
-    } else {                                                                   \
-      fused_norm_kernel<scalar_t, mean_t, weight_t, uint64_t, vec_size, Norm>( \
-          norm, config);                                                       \
-    }                                                                          \
-    break;                                                                     \
+#define vectorized_fused_norm_kernel(vec_size) \
+  {                                            \
+    if (can_use_32bit_index) {                 \
+      fused_norm_kernel<                       \
+          scalar_t,                            \
+          mean_t,                              \
+          weight_t,                            \
+          uint32_t,                            \
+          vec_size,                            \
+          Norm,                                \
+          one_moment>(norm, config);           \
+    } else {                                   \
+      fused_norm_kernel<                       \
+          scalar_t,                            \
+          mean_t,                              \
+          weight_t,                            \
+          uint32_t,                            \
+          vec_size,                            \
+          Norm,                                \
+          one_moment>(norm, config);           \
+    }                                          \
+    break;                                     \
   }
 
   switch (vec_size) {
@@ -669,7 +710,8 @@ template <
     typename index_t,
     int vec_size,
     template <typename, typename, typename>
-    class Norm>
+    class Norm,
+    bool one_moment = false>
 void RowwiseMomentsDPCPPKernel(
     Norm<scalar_t, mean_t, weight_t>& norm,
     NormConfig& cfg) {
@@ -696,18 +738,21 @@ void RowwiseMomentsDPCPPKernel(
           accscalar_t sum2 = 0;
           norm.template reduce_combine<vec_size, vec_t, weight_vec_t, index_t>(
               item_id, cfg, sum1, sum2);
-
-          norm_group_reduce<accscalar_t>(
-              item_id,
-              cfg.sub_group_num,
-              sum1,
-              sum2,
-              local_sum1,
-              local_sum2,
-              [](accscalar_t a, accscalar_t b) { return a + b; });
-
+          if constexpr (one_moment) {
+            sum1 = sycl::reduce_over_group(
+                item_id.get_group(), sum1, sycl::plus<accscalar_t>());
+          } else {
+            norm_group_reduce<accscalar_t>(
+                item_id,
+                cfg.sub_group_num,
+                sum1,
+                sum2,
+                local_sum1,
+                local_sum2,
+                [](accscalar_t a, accscalar_t b) { return a + b; });
+          }
           if (cfg.workgroup_num_foreach > 1) {
-            norm_global_reduce<accscalar_t, index_t>(
+            norm_global_reduce<accscalar_t, index_t, one_moment>(
                 item_id,
                 cfg.workgroup_num_foreach,
                 cfg.workgroup_size,
@@ -738,7 +783,8 @@ template <
     typename mean_t,
     typename weight_t,
     template <typename, typename, typename>
-    class Norm>
+    class Norm,
+    bool one_moment = false>
 void RowwiseMomentsDPCPPKernelImpl(
     Norm<scalar_t, mean_t, weight_t>& norm,
     NormConfig& config,
@@ -754,7 +800,8 @@ void RowwiseMomentsDPCPPKernelImpl(
           weight_t,                            \
           uint32_t,                            \
           vec_size,                            \
-          Norm>(norm, config);                 \
+          Norm,                                \
+          one_moment>(norm, config);           \
     } else {                                   \
       RowwiseMomentsDPCPPKernel<               \
           scalar_t,                            \
@@ -762,7 +809,8 @@ void RowwiseMomentsDPCPPKernelImpl(
           weight_t,                            \
           uint64_t,                            \
           vec_size,                            \
-          Norm>(norm, config);                 \
+          Norm,                                \
+          one_moment>(norm, config);           \
     }                                          \
     break;                                     \
   }
@@ -789,7 +837,8 @@ template <
     typename index_t,
     int vec_size,
     template <typename, typename, typename>
-    class Norm>
+    class Norm,
+    bool one_moment = false>
 void NormUpdateKernel(
     Norm<scalar_t, mean_t, weight_t>& norm,
     const NormConfig& cfg) {
@@ -821,23 +870,36 @@ template <
     typename mean_t,
     typename weight_t,
     template <typename, typename, typename>
-    class Norm>
+    class Norm,
+    bool one_moment = false>
 void NormUpdateKernelImpl(
     Norm<scalar_t, mean_t, weight_t>& norm,
     const NormConfig& config,
     bool can_use_32bit_index) {
   int vec_size = norm.get_update_vec_size(config.WGPlane, config.max_vec_size);
 
-#define VecNormUpdateKernel(vec_size)                                         \
-  {                                                                           \
-    if (can_use_32bit_index) {                                                \
-      NormUpdateKernel<scalar_t, mean_t, weight_t, uint32_t, vec_size, Norm>( \
-          norm, config);                                                      \
-    } else {                                                                  \
-      NormUpdateKernel<scalar_t, mean_t, weight_t, uint64_t, vec_size, Norm>( \
-          norm, config);                                                      \
-    }                                                                         \
-    break;                                                                    \
+#define VecNormUpdateKernel(vec_size) \
+  {                                   \
+    if (can_use_32bit_index) {        \
+      NormUpdateKernel<               \
+          scalar_t,                   \
+          mean_t,                     \
+          weight_t,                   \
+          uint32_t,                   \
+          vec_size,                   \
+          Norm,                       \
+          one_moment>(norm, config);  \
+    } else {                          \
+      NormUpdateKernel<               \
+          scalar_t,                   \
+          mean_t,                     \
+          weight_t,                   \
+          uint64_t,                   \
+          vec_size,                   \
+          Norm,                       \
+          one_moment>(norm, config);  \
+    }                                 \
+    break;                            \
   }
 
   switch (vec_size) {
@@ -863,7 +925,8 @@ template <
     typename index_t,
     int vec_size,
     template <typename, typename, typename>
-    class Norm>
+    class Norm,
+    bool one_moment = false>
 void NormEltwiseUpdateKernel(Norm<scalar_t, mean_t, weight_t>& norm) {
   using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
@@ -891,7 +954,8 @@ template <
     typename mean_t,
     typename weight_t,
     template <typename, typename, typename>
-    class Norm>
+    class Norm,
+    bool one_moment = false>
 void NormEltwiseUpdateKernelImpl(
     Norm<scalar_t, mean_t, weight_t>& norm,
     const NormConfig& cfg,
