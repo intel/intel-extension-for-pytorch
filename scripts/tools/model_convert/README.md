@@ -1,5 +1,5 @@
 
-del Convert Tool
+# Model Script Convert Tool
 
 This tool can be used to help leverage effort to evaluate Pytorch model script on XPU backend for Intel® Extension for PyTorch*, but it is not a product-level tool.
 It provides implicit and explicit modes.
