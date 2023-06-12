@@ -2,6 +2,7 @@
 
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
+#include "csrc/utils/CustomOperatorRegistration.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -104,13 +105,11 @@ void adam_fused_step(
 
 namespace {
 
-TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def(
-      "adam_fused_step(Tensor(a!) param, Tensor(b!) exp_avg, Tensor(c!) "
-      "exp_avg_sq, Tensor(d!) max_exp_avg_sq, Tensor grad, Tensor trail, "
-      "bool amsgrad, float step, float beta1, float "
-      "beta2, float lr, float weight_decay, float eps) -> ()",
-      torch_ipex::cpu::adam_fused_step);
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
+      "adam_fused_step",
+      torch_ipex::cpu::adam_fused_step,
+      at::DispatchKey::CPU);
 }
 
 } // namespace

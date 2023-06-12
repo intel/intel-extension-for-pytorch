@@ -1,6 +1,7 @@
 #include "Converter.h"
 #include <ATen/Parallel.h>
 #include <torch/all.h>
+#include "csrc/utils/CustomOperatorRegistration.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -47,13 +48,15 @@ std::tuple<at::Tensor, at::Tensor> split_float_bfloat16(
 
 namespace {
 
-TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def(
-      "split_float_bfloat16(Tensor tensor) -> (Tensor top, Tensor bot)",
-      torch_ipex::cpu::bf16::converter::split_float_bfloat16);
-  m.def(
-      "cat_bfloat16_float(Tensor top_half, Tensor bot_half) -> Tensor",
-      torch_ipex::cpu::bf16::converter::cat_bfloat16_float);
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
+      "split_float_bfloat16",
+      torch_ipex::cpu::bf16::converter::split_float_bfloat16,
+      c10::DispatchKey::CPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "cat_bfloat16_float",
+      torch_ipex::cpu::bf16::converter::cat_bfloat16_float,
+      c10::DispatchKey::CPU);
 }
 
 } // namespace
