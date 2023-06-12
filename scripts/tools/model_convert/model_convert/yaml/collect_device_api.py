@@ -6,17 +6,14 @@ import ruamel.yaml as yaml
 def collect_device_api(device, save, file_path):
     """Collect cuda or xpu device api list."""
     if device == "cuda":
-        if torch.cuda.is_available():
-            cuda_api_list = dir(torch.cuda)
-            torch_cuda_api_list = []
-            for item in cuda_api_list:
-                torch_cuda_api_list.append("torch.cuda." + item)
-            print("torch cuda api list: {}".format(cuda_api_list))
-            if save:
-                with open(file_path, "w", encoding="utf-8") as f:
-                    yaml.dump(torch_cuda_api_list, f, Dumper=yaml.RoundTripDumper)
-        else:
-            print("cuda is not available, check your env first")
+        cuda_api_list = dir(torch.cuda)
+        torch_cuda_api_list = []
+        for item in cuda_api_list:
+            torch_cuda_api_list.append("torch.cuda." + item)
+        print("torch cuda api list: {}".format(cuda_api_list))
+        if save:
+            with open(file_path, "w", encoding="utf-8") as f:
+              yaml.dump(torch_cuda_api_list, f)
     else:
         import intel_extension_for_pytorch
 
@@ -28,7 +25,7 @@ def collect_device_api(device, save, file_path):
             print("torch xpu api list: {}".format(xpu_api_list))
             if save:
                 with open(file_path, "w", encoding="utf-8") as f:
-                    yaml.dump(torch_xpu_api_list, f, Dumper=yaml.RoundTripDumper)
+                    yaml.dump(torch_xpu_api_list, f)
         else:
             print("xpu is not available, check your env first")
 

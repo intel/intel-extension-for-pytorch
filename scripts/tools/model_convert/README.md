@@ -76,24 +76,24 @@ Following will explain how to use each option.
 * path option: you need to create a directory and then put all files into it.
 
 ```console
-$ python export.py -p ./demo
+$ python model_convert/export.py -p ./demo
 ```
 
 * aggressive option: aggressively change behavior, might not safe sometimes. 
 
 ```console
-$ python export.py -p ./demo -a
+$ python model_convert/export.py -p ./demo -a
 ```
 
 * in-place option: change the file directly if add option '-i' or '--in-place', won't generate new file.
 
 ```console
-$ python export.py -p ./demo -i
+$ python model_convert/export.py -p ./demo -i
 ```
 
 * verbose option: turn on verbose if add option '-i' or '--in-place'
 
 ```console
-$ python export.py -p ./demo -v
+$ python model_convert/export.py -p ./demo -v
 ```
 

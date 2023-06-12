@@ -24,21 +24,20 @@ def walkdir(path=".", aggressive=False):
 
 def model_script_convert(file_list, in_place, aggressive, verbose):
     """convert model script from cuda for xpu."""
-    torch_cuda_file_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "yaml/register_torch_cuda_api.yaml"
-    )
     torch_create_tensor_unsupported_file_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
         "yaml/register_torch_create_tensor_api_unsupported.yaml",
     )
 
-    with open(torch_cuda_file_path, "r", encoding="utf-8") as f:
-        cuda_list = yaml.load(f.read(), Loader=yaml.Loader)
     with open(torch_create_tensor_unsupported_file_path, "r", encoding="utf-8") as f:
-        create_tensor_unsupported_list = yaml.load(f.read(), Loader=yaml.Loader)
+        create_tensor_unsupported_list = yaml.load(f.read())
+
+    cuda_list = []
+    for item in dir(torch.cuda):
+        cuda_list.append("torch.cuda." + item)
+
     tmp_list = []
-    xpu_list = dir(torch.xpu)
-    for item in xpu_list:
+    for item in dir(torch.xpu):
         tmp_list.append("torch.cuda." + item)
     cuda_xpu_common_list = list(set(cuda_list).intersection(set(tmp_list)))
     cuda_support_xpu_not_list = list(set(cuda_list).difference(set(tmp_list)))
