@@ -22,6 +22,8 @@ supported:
   - _ctc_loss_backward
   - _ctc_loss_backward.Tensor
   - cumprod.out
+  - _cummax_helper
+  - _cummin_helper
   - cumsum.out  # newly added
   - _dirichlet_grad
   - _efficientzerotensor

@@ -30,6 +30,20 @@ struct MulOp {
   }
 };
 
+template <typename scalar_t>
+struct LessEqOp {
+  bool operator()(const scalar_t& lhs, const scalar_t& rhs) const {
+    return lhs <= rhs;
+  }
+};
+
+template <typename scalar_t>
+struct GreaterEqOp {
+  bool operator()(const scalar_t& lhs, const scalar_t& rhs) const {
+    return lhs >= rhs;
+  }
+};
+
 struct LogicalAll {
   unsigned char operator()(unsigned char const x, unsigned char const y) const {
     return (x && y);
