@@ -6,16 +6,16 @@ class GPTJRotaryEmbedding(torch.nn.Module):
         inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float().to(device) / dim))
         self.register_buffer("inv_freq", inv_freq)
         sinusoid_inp = torch.einsum("i , j -> i j", torch.arange(max_position_embeddings, dtype=torch.float, device=device), inv_freq).float()
-        embed_positions =  torch.cat((torch.sin(sinusoid_inp), torch.cos(sinusoid_inp)), dim=1)
+        embed_positions = torch.cat((torch.sin(sinusoid_inp), torch.cos(sinusoid_inp)), dim=1)
 
         sin, cos = torch.split(embed_positions, embed_positions.shape[-1] // 2, dim=-1)
         sin = torch.repeat_interleave(sin, 2, 1).to(dtype)
         cos = torch.repeat_interleave(cos, 2, 1).to(dtype)
         self.register_buffer("cos_cached", cos, persistent=False)
         self.register_buffer("sin_cached", sin, persistent=False)
-    
-    # the original rotary_every_two funtion used in the model
+
     def rotate_every_two(self, x: torch.Tensor) -> torch.Tensor:
+        # the original rotary_every_two funtion used in the model
         x1 = x[:, :, :, ::2]
         x2 = x[:, :, :, 1::2]
         x = torch.stack((-x2, x1), dim=-1)
