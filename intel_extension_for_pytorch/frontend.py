@@ -33,7 +33,7 @@ from intel_extension_for_pytorch.fx.concat_linear import (
 import intel_extension_for_pytorch._C as torch_ipex_cpp
 
 try:
-    from . import tpp
+    from .cpu import tpp
 except BaseException:
     warnings.warn(
         "Please install transformers repo when you want to use fast_bert API."

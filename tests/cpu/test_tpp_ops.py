@@ -75,7 +75,7 @@ class TPPOPsTester(TestCase):
 
     def test_tpp_bert_embeddings(self):
         hf_embs = transformers.models.bert.modeling_bert.BertEmbeddings(self.config)
-        tpp_embs = ipex.tpp.fused_bert.BertEmbeddings(self.config)
+        tpp_embs = ipex.cpu.tpp.fused_bert.BertEmbeddings(self.config)
         tpp_embs.load_state_dict(hf_embs.state_dict())
         for i, j in zip(tpp_embs.state_dict(), tpp_embs.state_dict()):
             assert i == j
@@ -96,11 +96,11 @@ class TPPOPsTester(TestCase):
         self.assertEqual(hf_res, tpp_res)
 
     def test_tpp_bert_self_attention(self):
-        ipex.tpp.fused_bert.unpad = False
+        ipex.cpu.tpp.fused_bert.unpad = False
         hf_self_att = transformers.models.bert.modeling_bert.BertSelfAttention(
             self.config
         )
-        tpp_self_att = ipex.tpp.fused_bert.BertSelfAttention(self.config)
+        tpp_self_att = ipex.cpu.tpp.fused_bert.BertSelfAttention(self.config)
         tpp_self_att.load_state_dict(hf_self_att.state_dict())
         hidden_states = torch.randn(
             self.batch, self.max_seq_len, self.config.hidden_size
@@ -112,7 +112,7 @@ class TPPOPsTester(TestCase):
             self.tpp_att_mask,
             self.seq_offsets,
             self.seq_spr_offsets,
-        ) = ipex.tpp.fused_bert.generate_mask(self.attention_mask)
+        ) = ipex.cpu.tpp.fused_bert.generate_mask(self.attention_mask)
         tpp_res = (
             tpp_self_att(
                 hidden_states.view(
@@ -130,7 +130,7 @@ class TPPOPsTester(TestCase):
 
     def test_tpp_bert_output(self):
         hf_self_out = transformers.models.bert.modeling_bert.BertSelfOutput(self.config)
-        tpp_self_out = ipex.tpp.fused_bert.BertSelfOutput(self.config)
+        tpp_self_out = ipex.cpu.tpp.fused_bert.BertSelfOutput(self.config)
         tpp_self_out.load_state_dict(hf_self_out.state_dict())
         hidden_states = torch.randn(
             self.batch, self.max_seq_len, self.config.hidden_size
@@ -158,7 +158,7 @@ class TPPOPsTester(TestCase):
         hf_intermediate = transformers.models.bert.modeling_bert.BertIntermediate(
             self.config
         )
-        tpp_intermediate = ipex.tpp.fused_bert.BertIntermediate(self.config)
+        tpp_intermediate = ipex.cpu.tpp.fused_bert.BertIntermediate(self.config)
         tpp_intermediate.load_state_dict(hf_intermediate.state_dict())
         hidden_states = torch.randn(
             self.batch, self.max_seq_len, self.config.hidden_size
