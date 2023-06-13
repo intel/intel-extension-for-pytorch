@@ -1,5 +1,6 @@
 import ctypes
 import intel_extension_for_pytorch
+from ..utils.capsule import get_pointer_from_capsule
 
 
 class Stream(intel_extension_for_pytorch._C._XPUStreamBase):
@@ -12,8 +13,20 @@ class Stream(intel_extension_for_pytorch._C._XPUStreamBase):
                 return super(Stream, cls).__new__(cls, priority=priority, **kwargs)
 
     @property
+    def sycl_queue(self):
+        r"""sycl_queue(self): -> PyCapsule
+
+        Returns the sycl queue of the corresponding Stream in a ``PyCapsule``, which encapsules
+        a void pointer address. Its capsule name is ``torch.xpu.Stream.sycl_queue``.
+        """
+        return super(Stream, self).sycl_queue
+
+    @property
     def _as_parameter_(self):
-        return ctypes.c_void_p(self.sycl_queue)
+        r"""Return the sycl queue void pointer address. Make it be easily used in
+        C/C++ code.
+        """
+        return ctypes.c_void_p(get_pointer_from_capsule(self.sycl_queue))
 
     def __eq__(self, o):
         if isinstance(o, Stream):
@@ -24,11 +37,7 @@ class Stream(intel_extension_for_pytorch._C._XPUStreamBase):
         return hash((self.sycl_queue, self.device))
 
     def __repr__(self):
-        return (
-            "<intel_extension_for_pytorch.Stream device={0} sycl_queue={1:#x}>".format(
-                self.device, self.sycl_queue
-            )
-        )
+        return ("<torch.xpu.Stream device={0} sycl_queue={1}>".format(self.device, self.sycl_queue))
 
     def wait_event(self, event):
         r"""Makes all future work submitted to the stream wait for an event.
@@ -79,7 +88,7 @@ class Event(intel_extension_for_pytorch._C._XPUEventBase):
     def record(self, stream=None):
         r"""Records the event in a given stream.
 
-        Uses ``intel_extension_for_pytorch.xpu.current_stream()`` if no stream is specified.
+        Uses ``torch.xpu.current_stream()`` if no stream is specified.
         """
         if stream is None:
             stream = intel_extension_for_pytorch.xpu.current_stream()
@@ -89,7 +98,7 @@ class Event(intel_extension_for_pytorch._C._XPUEventBase):
         r"""Makes all future work submitted to the given stream wait for this
         event.
 
-        Use ``intel_extension_for_pytorch.xpu.current_stream()`` if no stream is specified.
+        Use ``torch.xpu.current_stream()`` if no stream is specified.
         """
         if stream is None:
             stream = intel_extension_for_pytorch.xpu.current_stream()

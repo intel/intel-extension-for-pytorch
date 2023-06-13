@@ -610,6 +610,15 @@ void init_xpu_module(pybind11::module& m) {
     xpu::dpcpp::deviceSynchronize(device_index);
   });
 
+  m.def("sycl_device", [](const int& device_index) {
+    auto dev_id =
+        (device_index == -1) ? xpu::dpcpp::current_device() : device_index;
+    auto dev_ptr = xpu::dpcpp::sycl_device(device_index);
+    // NOTE: Here is a high dependency on the implementation of device pool
+    // using smart pointer in runtime.
+    return py::capsule(dev_ptr, "torch.xpu.device.sycl_device", nullptr);
+  });
+
   m.def("dump_memory_stat", [](const int& device_index) {
     return xpu::dpcpp::dumpMemoryStatusFromDevAlloc(device_index);
   });
