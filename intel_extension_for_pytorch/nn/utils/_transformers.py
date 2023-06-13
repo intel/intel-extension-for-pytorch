@@ -1,37 +1,7 @@
 import torch
 import torch.nn as nn
 from typing import Optional, Tuple, Union
-
-
-def create_sinusoidal_positions(num_pos: int, dim: int) -> torch.Tensor:
-    inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2) / dim))
-    sinusoid_inp = torch.einsum("i , j -> i j", torch.arange(num_pos, dtype=torch.float), inv_freq).float()
-    return torch.cat((torch.sin(sinusoid_inp), torch.cos(sinusoid_inp)), dim=1)
-
-@torch.fx.wrap
-def get_embed_positions(embed_positions, position_ids):
-    return embed_positions.to(position_ids.device).repeat(position_ids.shape[0], 1, 1)
-
-def fixed_pos_embedding(x, seq_dim=1, seq_len=None):
-    dim = x.shape[-1]
-    if seq_len is None:
-        seq_len = x.shape[seq_dim]
-    inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2) / dim))
-    sinusoid_inp = (
-        torch.einsum("i , j -> i j", torch.arange(seq_len, dtype=torch.float), inv_freq).to(x.device).float()
-    )
-    return torch.sin(sinusoid_inp), torch.cos(sinusoid_inp)
-
-
-def rotate_every_two(x):
-    x1 = x[:, :, :, ::2]
-    x2 = x[:, :, :, 1::2]
-    x = torch.stack((-x2, x1), dim=-1)
-    return x.flatten(-2)  # in einsum notation: rearrange(x, '... d j -> ... (d j)')
-
-
-def apply_rotary_pos_emb(tensor: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor) -> torch.Tensor:
-    torch.ops.torch_ipex.apply_rotary_embedding(tensor, sin, cos, tensor)
+from .RoPE import GPTJRotaryEmbedding
 
 def activation_replace(module):
     from transformers.activations import NewGELUActivation
@@ -46,16 +16,6 @@ def activation_replace(module):
 
 
 class IPEXGPTJAttention(nn.Module):
-    pos_embdding_dim = None
-    seq_len = None
-    rotary_embedding_dim = None
-    sin_result = None
-    cos_result = None
-    embedding_offset = None
-    sin_embedding = None
-    cos_embedding = None
-    position_ids = None
-
     def __init__(self, module):
         super().__init__()
 
@@ -86,21 +46,10 @@ class IPEXGPTJAttention(nn.Module):
         self.total_value = None
         self.prompt_len = None
 
+        self.device = module.k_proj.weight.device
+        self.dtype = module.k_proj.weight.dtype
+        self.rotary_emb = GPTJRotaryEmbedding(self.rotary_dim, device=self.device, dtype=self.dtype)
 
-    def _split_heads(self, tensor, num_attention_heads, attn_head_size, rotary):
-        """
-        Splits hidden dim into attn_head_size and num_attention_heads
-        """
-        new_shape = tensor.size()[:-1] + (num_attention_heads, attn_head_size)
-        tensor = tensor.view(new_shape)
-        if rotary:
-            return tensor
-        if len(tensor.shape) == 5:
-            return tensor.permute(0, 1, 3, 2, 4)  # (batch, blocks, head, block_length, head_features)
-        elif len(tensor.shape) == 4:
-            return tensor.permute(0, 2, 1, 3)  # (batch, head, seq_length, head_features)
-        else:
-            raise ValueError(f"Input tensor rank should be one of [4, 5], but is: {len(tensor.shape)}")
 
     def _merge_heads(self, tensor, num_attention_heads, attn_head_size):
         """
@@ -148,23 +97,6 @@ class IPEXGPTJAttention(nn.Module):
 
         return attn_output, attn_weights
 
-    def _get_embed_positions(self, position_ids):
-        embed_positions = self.embed_positions
-        if embed_positions.device != position_ids.device:
-            embed_positions = embed_positions.to(position_ids.device)
-            self.embed_positions = embed_positions
-        return embed_positions.repeat(position_ids.shape[0], 1, 1)
-
-    def get_rotary_emb(self, position_ids, embed_positions, dtype):
-        if IPEXGPTJAttention.position_ids is None or IPEXGPTJAttention.position_ids is not position_ids:
-            repeated_position_ids = position_ids.unsqueeze(-1).repeat(1, 1, embed_positions.shape[-1])
-            sincos = torch.gather(embed_positions, 1, repeated_position_ids)
-            sin, cos = torch.split(sincos, sincos.shape[-1] // 2, dim=-1)
-            IPEXGPTJAttention.sin_embedding = torch.repeat_interleave(sin[:, :, None, :], 2, 3).to(dtype)
-            IPEXGPTJAttention.cos_embedding = torch.repeat_interleave(cos[:, :, None, :], 2, 3).to(dtype)
-            IPEXGPTJAttention.position_ids = position_ids
-        return IPEXGPTJAttention.sin_embedding, IPEXGPTJAttention.cos_embedding
-
     def forward(
         self,
         hidden_states: Optional[torch.FloatTensor],
@@ -187,23 +119,11 @@ class IPEXGPTJAttention(nn.Module):
         key = key.view(new_shape)
         value = value.view(new_shape)
 
-
-        embed_positions = self._get_embed_positions(position_ids)
-
-        sin, cos = self.get_rotary_emb(position_ids, embed_positions, key.dtype)
-
-        if self.rotary_dim is not None:
-
-            apply_rotary_pos_emb(key[:, :, :, : self.rotary_dim], sin, cos)
-            apply_rotary_pos_emb(query[:, :, :, : self.rotary_dim], sin, cos)
-        else:
-
-            apply_rotary_pos_emb(key, sin, cos)
-            apply_rotary_pos_emb(query, sin, cos)
-
         key = key.permute(0, 2, 1, 3)
         query = query.permute(0, 2, 1, 3)
         value = value.permute(0, 2, 1, 3)
+        
+        query, key = self.rotary_emb(query, key, position_ids, self.rotary_dim)
 
         if layer_past is not None:
             past_key = layer_past[0]
