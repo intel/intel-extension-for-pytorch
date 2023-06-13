@@ -31,9 +31,7 @@ def rotate_every_two(x):
 
 
 def apply_rotary_pos_emb(tensor: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor) -> torch.Tensor:
-    tmp = rotate_every_two(tensor) * sin
-    tensor *= cos
-    tensor += tmp
+    torch.ops.torch_ipex.apply_rotary_embedding(tensor, sin, cos, tensor)
 
 def activation_replace(module):
     from transformers.activations import NewGELUActivation
@@ -157,13 +155,13 @@ class IPEXGPTJAttention(nn.Module):
             self.embed_positions = embed_positions
         return embed_positions.repeat(position_ids.shape[0], 1, 1)
 
-    def get_rotary_emb(self, position_ids, embed_positions):
+    def get_rotary_emb(self, position_ids, embed_positions, dtype):
         if IPEXGPTJAttention.position_ids is None or IPEXGPTJAttention.position_ids is not position_ids:
             repeated_position_ids = position_ids.unsqueeze(-1).repeat(1, 1, embed_positions.shape[-1])
             sincos = torch.gather(embed_positions, 1, repeated_position_ids)
             sin, cos = torch.split(sincos, sincos.shape[-1] // 2, dim=-1)
-            IPEXGPTJAttention.sin_embedding = torch.repeat_interleave(sin[:, :, None, :], 2, 3)
-            IPEXGPTJAttention.cos_embedding = torch.repeat_interleave(cos[:, :, None, :], 2, 3)
+            IPEXGPTJAttention.sin_embedding = torch.repeat_interleave(sin[:, :, None, :], 2, 3).to(dtype)
+            IPEXGPTJAttention.cos_embedding = torch.repeat_interleave(cos[:, :, None, :], 2, 3).to(dtype)
             IPEXGPTJAttention.position_ids = position_ids
         return IPEXGPTJAttention.sin_embedding, IPEXGPTJAttention.cos_embedding
 
@@ -192,7 +190,7 @@ class IPEXGPTJAttention(nn.Module):
 
         embed_positions = self._get_embed_positions(position_ids)
 
-        sin, cos = self.get_rotary_emb(position_ids, embed_positions)
+        sin, cos = self.get_rotary_emb(position_ids, embed_positions, key.dtype)
 
         if self.rotary_dim is not None:
 
