@@ -13,7 +13,8 @@ class GPTJRotaryEmbedding(torch.nn.Module):
         cos = torch.repeat_interleave(cos, 2, 1).to(dtype)
         self.register_buffer("cos_cached", cos, persistent=False)
         self.register_buffer("sin_cached", sin, persistent=False)
-
+    
+    # the original rotary_every_two funtion used in the model
     def rotate_every_two(self, x: torch.Tensor) -> torch.Tensor:
         x1 = x[:, :, :, ::2]
         x2 = x[:, :, :, 1::2]
