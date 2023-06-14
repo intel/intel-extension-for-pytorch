@@ -6,6 +6,7 @@
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
+#include "Loops.h"
 #include "comm/RegistrationDeclarations.h"
 
 #include <aten/operators/MemoryAccess.h>
@@ -14,6 +15,7 @@
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
 #include "comm/SimpleReduce.h"
+#include "utils/CustomOperatorRegistration.h"
 
 /*
 softmax forward and backward follow the same optimization routine, we take
@@ -514,6 +516,154 @@ void softmax_forward_kernel(
         });
   };
 
+  // launch kernel
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+template <
+    int INNER_LOOP,
+    int vec_size,
+    int SIMD,
+    typename scalar_t,
+    typename accscalar_t,
+    typename IndexType,
+    bool LogSoftMax,
+    int outer_loop,
+    typename inp_offset_calc_t>
+void dispatch_softmax_forward_add_kernel(
+    scalar_t* in_data,
+    scalar_t* other_data,
+    scalar_t* out_data,
+    int dim_size,
+    scalar_t alpha,
+    int outer_size,
+    int other_outer_size,
+    inp_offset_calc_t input_calc) {
+  using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+
+  int sub_group_num, global_size_row, local_size_row, range, local_size;
+  get_wgroup_size<SIMD, vec_size, outer_loop>(
+      dim_size,
+      outer_size,
+      sub_group_num,
+      range,
+      global_size_row,
+      local_size_row,
+      local_size);
+  sycl::range<1> local_range{local_size_row * local_size};
+  sycl::range<1> global_range{global_size_row * local_size_row * local_size};
+  auto other_offset = other_outer_size * dim_size;
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto local_max = dpcpp_local_acc_t<accscalar_t, 2>(
+        sycl::range<2>{local_size_row, sub_group_num}, cgh);
+    auto local_sum = dpcpp_local_acc_t<accscalar_t, 2>(
+        sycl::range<2>{local_size_row, sub_group_num}, cgh);
+    cgh.parallel_for(
+        sycl::nd_range<1>{global_range, local_range},
+        [=](sycl::nd_item<1> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
+          if (local_size == 1 && item_id.get_global_id(0) >= outer_size)
+            return;
+
+          uint32_t lid_row = 0;
+          uint32_t lid_col = item_id.get_local_id(0);
+          uint32_t group_offset = item_id.get_group(0) * dim_size;
+          if (local_size_row != 1) {
+            lid_row = item_id.get_local_id(0) / local_size;
+            lid_col = item_id.get_local_id(0) % local_size;
+            group_offset =
+                (item_id.get_group(0) * local_size_row + lid_row) * dim_size;
+          }
+          vec_t reg_in[outer_loop];
+          vec_t reg_tmp;
+          auto lid_offset = lid_col * vec_size;
+          auto local_stride = local_size * vec_size;
+          // load data and get max value
+          accscalar_t max_value = std::numeric_limits<accscalar_t>::lowest();
+#pragma unroll(outer_loop)
+          for (int i = 0; i < outer_loop; ++i) {
+            auto index = i * local_stride + lid_offset;
+            if (index >= dim_size)
+              break;
+
+            auto group_batch_offset = group_offset + index;
+#pragma unroll(vec_size)
+            for (int j = 0; j < vec_size; ++j) {
+              auto linear_offset = group_batch_offset + j;
+              scalar_t input_value = in_data[input_calc.get(linear_offset)[0]];
+              scalar_t other_value =
+                  other_data[input_calc.get(linear_offset)[1]];
+              reg_in[i][j] = input_value + alpha * other_value;
+            }
+
+#pragma unroll(vec_size)
+            for (int j = 0; j < vec_size; ++j) {
+              max_value = Numerics<accscalar_t>::max(
+                  max_value, accscalar_t(reg_in[i][j]));
+            }
+          }
+          if (local_size > 1) {
+            group_reduce<SIMD, accscalar_t>(
+                item_id,
+                lid_row,
+                sub_group_num,
+                max_value,
+                std::numeric_limits<accscalar_t>::lowest(),
+                local_max,
+                [](accscalar_t a, accscalar_t b) {
+                  return Numerics<accscalar_t>::max(a, b);
+                });
+          }
+
+          // get sum value
+          accscalar_t sum_value = 0;
+#pragma unroll(outer_loop)
+          for (int i = 0;
+               i < outer_loop && ((i * local_stride + lid_offset) < dim_size);
+               ++i) {
+#pragma unroll(vec_size)
+            for (int j = 0; j < vec_size; ++j) {
+              sum_value += Numerics<accscalar_t>::exp(reg_in[i][j] - max_value);
+            }
+          }
+          if (local_size > 1) {
+            group_reduce<SIMD, accscalar_t>(
+                item_id,
+                lid_row,
+                sub_group_num,
+                sum_value,
+                accscalar_t(0),
+                local_sum,
+                [](accscalar_t a, accscalar_t b) { return a + b; });
+          }
+          if constexpr (LogSoftMax)
+            sum_value = Numerics<accscalar_t>::log(sum_value);
+          else
+            sum_value = accscalar_t(1) / sum_value;
+
+        // update result
+#pragma unroll(outer_loop)
+          for (int i = 0; i < outer_loop; ++i) {
+            auto index = i * local_stride + lid_offset;
+            if (index >= dim_size)
+              break;
+
+#pragma unroll(vec_size)
+            for (int j = 0; j < vec_size; ++j) {
+              if constexpr (LogSoftMax) {
+                reg_in[i][j] =
+                    static_cast<scalar_t>(reg_in[i][j] - max_value - sum_value);
+              } else {
+                reg_in[i][j] = static_cast<scalar_t>(
+                    Numerics<accscalar_t>::exp(reg_in[i][j] - max_value) *
+                    sum_value);
+              }
+            }
+            *(reinterpret_cast<vec_t*>(out_data + group_offset + index)) =
+                reg_in[i];
+          }
+        });
+  };
   // launch kernel
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -1135,6 +1285,132 @@ void SpatialSoftMaxForward(Tensor& output, Tensor& input, int dim) {
 #undef SPATIAL_SOFTMAX_FORWARD_IMPL
 }
 
+template <typename scalar_t, typename accscalar_t>
+Tensor& add_view_softmax_impl(
+    const Tensor& input,
+    const Tensor& other,
+    int64_t dim,
+    const Scalar& alpha_scalar,
+    Tensor& output,
+    IntArrayRef sizes) {
+  auto alpha = alpha_scalar.to<scalar_t>();
+  auto view_output = input.view(sizes);
+  auto inner_size = view_output.stride(dim);
+  // decide indexing range: uint32_t (4GB) or uint64_t (>4GB)
+  bool can_use_32bit_index =
+      canUse32BitIndexMath(view_output) && canUse32BitIndexMath(output);
+  auto dim_size = view_output.size(dim);
+  auto outer_size = view_output.numel() / (inner_size * dim_size);
+  auto other_outer_size = outer_size;
+
+  constexpr int float4_size = sizeof(float) * 4;
+  constexpr int max_vec_size = float4_size / sizeof(scalar_t);
+  constexpr int INNER_LOOP = max_vec_size * 2;
+
+  bool fuse_pattern = false;
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int max_group_size = dpcppMaxWorkGroupSize(dev_id);
+  if (inner_size == 1 && can_use_32bit_index &&
+      max_group_size * INNER_LOOP >= dim_size)
+    fuse_pattern = true;
+  if (fuse_pattern) {
+    Tensor add_output = output.view(input.sizes());
+    auto iter = TensorIterator::binary_op(add_output, input, other);
+    auto input_calc = make_input_offset_calculator<2>(iter);
+
+    // decide vec_size: max_vec_size or 1
+    using vec_t =
+        at::native::Memory::aligned_vector_loop<scalar_t, max_vec_size>;
+    constexpr int align_bytes = alignof(vec_t);
+    int input_start =
+        ((uint64_t)input.data_ptr()) % align_bytes / sizeof(scalar_t);
+    int output_start =
+        ((uint64_t)output.data_ptr()) % align_bytes / sizeof(scalar_t);
+
+    // decide SIMD: SIMD32 or SIMD16
+    auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
+    auto sub_group_size = dev_prop->subgroup_sizes;
+    int SIMD = sub_group_size[1];
+    if (SIMD == SIMD32) {
+      if (dim_size < SIMD16 * INNER_LOOP)
+        SIMD = SIMD16;
+    }
+    // fused kernel
+#define DISPATCH_SOFTMAX_FORWARD_IMPL(vec_size, SIMD, outer_loop) \
+  {                                                               \
+    dispatch_softmax_forward_add_kernel<                          \
+        INNER_LOOP,                                               \
+        vec_size,                                                 \
+        SIMD,                                                     \
+        scalar_t,                                                 \
+        accscalar_t,                                              \
+        uint32_t,                                                 \
+        false,                                                    \
+        outer_loop>(                                              \
+        input.data_ptr<scalar_t>(),                               \
+        other.data_ptr<scalar_t>(),                               \
+        output.data_ptr<scalar_t>(),                              \
+        dim_size,                                                 \
+        alpha,                                                    \
+        outer_size,                                               \
+        other_outer_size,                                         \
+        input_calc);                                              \
+  }
+
+    // if the element number is smaller than max_work_group_size *
+    // INNER_LOOP, the fused path (dispatch_softmax_forward_add) will be
+    // selected. otherwise, the general path (add then softmax) will be
+    // selected.
+    auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+    int max_group_size = dpcppMaxWorkGroupSize(dev_id);
+    // it assumes vec_size * outer_loop * work_group_size >= dim_size
+    if (SIMD == SIMD32) {
+      // Ensure input/output tensor are aligned with max_vec_size
+      if (input_start == 0 && output_start == 0 &&
+          dim_size % max_vec_size == 0) {
+        constexpr int outer_loop = INNER_LOOP / max_vec_size;
+        DISPATCH_SOFTMAX_FORWARD_IMPL(
+            /*vec_size*/ max_vec_size, /*SIMD*/ SIMD32, outer_loop);
+      } else {
+        constexpr int outer_loop = INNER_LOOP;
+        DISPATCH_SOFTMAX_FORWARD_IMPL(
+            /*vec_size*/ 1, /*SIMD*/ SIMD32, outer_loop);
+      }
+    } else {
+      if (input_start == 0 && output_start == 0 &&
+          dim_size % max_vec_size == 0) {
+        if (max_vec_size >= 4 && dim_size <= 4 * SIMD) {
+          // if vec_size >= 4 and dim_size <= 4 * SIMD, take smaller vec_size
+          // and 1 outer_loop
+          constexpr int outer_loop = 1;
+          DISPATCH_SOFTMAX_FORWARD_IMPL(
+              /*vec_size*/ 4, /*SIMD*/ SIMD16, outer_loop);
+        } else if (dim_size <= max_vec_size * SIMD) {
+          // if dim_size <= max_vec_size * SIMD , take 1 outer_loop
+          constexpr int outer_loop = 1;
+          DISPATCH_SOFTMAX_FORWARD_IMPL(
+              /*vec_size*/ max_vec_size, /*SIMD*/ SIMD16, outer_loop);
+        } else {
+          // SIMD16 will use less register numbers than SIMD32
+          // if the SIMD = SIMD16, then outer_loop will be enlarged 2x
+          constexpr int outer_loop = INNER_LOOP / max_vec_size * 2;
+          DISPATCH_SOFTMAX_FORWARD_IMPL(
+              /*vec_size*/ max_vec_size, /*SIMD*/ SIMD16, outer_loop);
+        }
+      } else {
+        constexpr int outer_loop = INNER_LOOP * 2;
+        DISPATCH_SOFTMAX_FORWARD_IMPL(
+            /*vec_size*/ 1, /*SIMD*/ SIMD16, outer_loop);
+      }
+    }
+    return output;
+#undef DISPATCH_SOFTMAX_FORWARD_IMPL
+  } else {
+    Tensor add_out = at::add(input, other, alpha).view(sizes);
+    return at::softmax_out(output, add_out, dim);
+  }
+}
+
 template <typename scalar_t, typename accscalar_t, bool LogSoftMax>
 void SpatialSoftMaxBackward(
     Tensor& gradInput,
@@ -1316,6 +1592,91 @@ Tensor host_softmax(
   return output;
 }
 
+Tensor add_softmax(
+    const Tensor& input,
+    const Tensor& other,
+    Scalar alpha,
+    const int64_t dim,
+    c10::optional<ScalarType> dtype) {
+  RECORD_FUNCTION("torch_ipex::add_softmax", {});
+  if (other.numel() > input.numel()) {
+    return at::softmax(at::add(input, other, alpha), dim, dtype);
+  }
+  Tensor converted_input =
+      dtype.has_value() ? input.toType(dtype.value()) : input;
+  Tensor converted_other =
+      dtype.has_value() ? other.toType(dtype.value()) : other;
+  IntArrayRef sizes;
+  Tensor output;
+  if (other.numel() <= input.numel()) {
+    sizes = input.sizes();
+    output = at::empty_like(input);
+  } else {
+    sizes = other.sizes();
+    output = at::empty_like(other);
+  }
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      input.scalar_type(),
+      "add_softmax",
+      [&] {
+        using accscalar_t = acc_type<scalar_t>;
+        if (other.numel() <= input.numel()) {
+          impl::add_view_softmax_impl<scalar_t, accscalar_t>(
+              converted_input, converted_other, dim, alpha, output, sizes);
+        } else {
+          impl::add_view_softmax_impl<scalar_t, accscalar_t>(
+              converted_other, converted_input, dim, alpha, output, sizes);
+        }
+      });
+  return output;
+}
+
+Tensor add_view(
+    const Tensor& input,
+    const Tensor& other,
+    Scalar alpha,
+    IntArrayRef sizes) {
+  return at::add(input, other, alpha).view(sizes);
+}
+
+Tensor add_view_softmax(
+    const Tensor& input,
+    const Tensor& other,
+    Scalar alpha,
+    IntArrayRef sizes,
+    const int64_t dim,
+    c10::optional<ScalarType> dtype) {
+  RECORD_FUNCTION("torch_ipex::add_view_softmax", {});
+  Tensor converted_input =
+      dtype.has_value() ? input.toType(dtype.value()) : input;
+  Tensor converted_other =
+      dtype.has_value() ? other.toType(dtype.value()) : other;
+  Tensor output;
+  if (other.numel() <= input.numel()) {
+    output = at::empty_like(input).view(sizes);
+  } else {
+    output = at::empty_like(other).view(sizes);
+  }
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      input.scalar_type(),
+      "add_view_softmax",
+      [&] {
+        using accscalar_t = acc_type<scalar_t>;
+        if (other.numel() <= input.numel()) {
+          impl::add_view_softmax_impl<scalar_t, accscalar_t>(
+              converted_input, converted_other, dim, alpha, output, sizes);
+        } else {
+          impl::add_view_softmax_impl<scalar_t, accscalar_t>(
+              converted_other, converted_input, dim, alpha, output, sizes);
+        }
+      });
+  return output;
+}
+
 template <bool LogSoftMax>
 Tensor host_softmax_backward(
     const Tensor& grad_,
@@ -1451,6 +1812,14 @@ at::Tensor& _log_softmax_backward_data_out(
   host_softmax_backward<true>(grad_, output_, dim, half_to_float, out);
   return out;
 }
-
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  IPEX_OP_REGISTER("add_softmax", at::AtenIpexTypeXPU::add_softmax);
+  IPEX_OP_REGISTER("add_view", at::AtenIpexTypeXPU::add_view);
+  IPEX_OP_REGISTER("add_view_softmax", at::AtenIpexTypeXPU::add_view_softmax);
+}
+
+} // namespace

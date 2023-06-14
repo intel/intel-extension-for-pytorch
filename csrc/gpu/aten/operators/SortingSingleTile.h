@@ -76,7 +76,7 @@ class RadixSortUpsweep {
         num_bits(num_bits),
         item(item),
         local_storage(
-            reinterpret_cast<LocalStorage&>(*(slm.get_pointer().get()))) {
+            reinterpret_cast<LocalStorage&>(*(IPEXGetLocalAccPointer(slm)))) {
     wi_id = item.get_local_id(0);
     wg_id = item.get_group(0);
   }
@@ -490,7 +490,7 @@ void RadixSortScanBins(
             item,
             wg_offset,
             running_prefix,
-            (int32_t*)slm.get_pointer().get());
+            (int32_t*)IPEXGetLocalAccPointer(slm));
         wg_offset += TILE_ITEMS;
       }
 
@@ -501,7 +501,7 @@ void RadixSortScanBins(
             wg_offset,
             num_counts - wg_offset,
             running_prefix,
-            (int32_t*)slm.get_pointer().get());
+            (int32_t*)IPEXGetLocalAccPointer(slm));
       }
     };
 
@@ -596,7 +596,7 @@ class RadixSortDownsweep {
         num_bits(num_bits),
         item(item),
         local_storage(
-            reinterpret_cast<LocalStorage&>(*(slm.get_pointer().get()))) {
+            reinterpret_cast<LocalStorage&>(*(IPEXGetLocalAccPointer(slm)))) {
     wi_id = item.get_local_id(0);
     wg_id = item.get_group(0);
     int32_t bin_idx = wi_id;

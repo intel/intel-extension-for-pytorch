@@ -198,6 +198,10 @@ static auto q_conv2d_dequantize_sym =
     Symbol::fromQualString("torch_ipex::q_conv2d_dequantize");
 static auto softplus_tanh_sym =
     Symbol::fromQualString("torch_ipex::softplus_tanh");
+static auto add_softmax_sym = Symbol::fromQualString("torch_ipex::add_softmax");
+static auto add_view_sym = Symbol::fromQualString("torch_ipex::add_view");
+static auto add_view_softmax_sym =
+    Symbol::fromQualString("torch_ipex::add_view_softmax");
 static auto mish_compound_sym =
     Symbol::fromQualString("torch_ipex::mish_compound");
 static auto q_conv2d_dequantize_mish_compound_sym =

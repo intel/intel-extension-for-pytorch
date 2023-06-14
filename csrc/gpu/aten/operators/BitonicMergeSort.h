@@ -183,8 +183,8 @@ void bitonic_merge_sort_kernel(
 
           impl::bitonic_sort<KeyType, ValueType, dpcpp_local_fence>(
               item,
-              s_key.get_pointer().get(),
-              s_val.get_pointer().get(),
+              IPEXGetLocalAccPointer(s_key),
+              IPEXGetLocalAccPointer(s_val),
               comp_t,
               bitonic_blk_sort_sz,
               /* stride */ 1,
