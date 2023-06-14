@@ -1,6 +1,6 @@
 #pragma once
 
-#include "csrc/jit/cpu/kernels/OpContext.h"
+#include "csrc/cpu/jit/cpu/kernels/OpContext.h"
 
 #include <torch/csrc/jit/tensorexpr/expr.h>
 #include <torch/csrc/jit/tensorexpr/lowerings.h>

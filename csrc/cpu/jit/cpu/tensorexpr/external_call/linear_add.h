@@ -4,7 +4,7 @@
 
 #include <ideep.hpp>
 #include <ideep/utils.hpp>
-#include "csrc/jit/cpu/kernels/OpContext.h"
+#include "csrc/cpu/jit/cpu/kernels/OpContext.h"
 
 #include <torch/csrc/jit/tensorexpr/exceptions.h>
 #include <torch/csrc/jit/tensorexpr/expr.h>

@@ -5,9 +5,9 @@
 #include <torch/csrc/jit/tensorexpr/lowerings.h>
 #include <torch/library.h>
 
-#include "csrc/jit/cpu/kernels/Matmul.h"
-#include "csrc/jit/cpu/tensorexpr/nnc_lowering_register.h"
-#include "csrc/jit/cpu/tensorexpr/utils.h"
+#include "csrc/cpu/jit/cpu/kernels/Matmul.h"
+#include "csrc/cpu/jit/cpu/tensorexpr/nnc_lowering_register.h"
+#include "csrc/cpu/jit/cpu/tensorexpr/utils.h"
 
 #include "csrc/cpu/utils/library.h"
 
