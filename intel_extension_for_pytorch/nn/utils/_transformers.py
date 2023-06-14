@@ -122,7 +122,6 @@ class IPEXGPTJAttention(nn.Module):
         key = key.permute(0, 2, 1, 3)
         query = query.permute(0, 2, 1, 3)
         value = value.permute(0, 2, 1, 3)
-        
         query, key = self.rotary_emb(query, key, position_ids, self.rotary_dim)
 
         if layer_past is not None:

@@ -5,7 +5,8 @@ class GPTJRotaryEmbedding(torch.nn.Module):
         super().__init__()
         inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float().to(device) / dim))
         self.register_buffer("inv_freq", inv_freq)
-        sinusoid_inp = torch.einsum("i , j -> i j", torch.arange(max_position_embeddings, dtype=torch.float, device=device), inv_freq).float()
+        t = torch.arange(max_position_embeddings, dtype=torch.float, device=device)
+        sinusoid_inp = torch.einsum("i , j -> i j", t, inv_freq).float()
         embed_positions = torch.cat((torch.sin(sinusoid_inp), torch.cos(sinusoid_inp)), dim=1)
 
         sin, cos = torch.split(embed_positions, embed_positions.shape[-1] // 2, dim=-1)
