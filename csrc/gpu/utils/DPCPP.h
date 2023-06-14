@@ -626,3 +626,15 @@ using dpcpp_atomic_ref_rlx_dev_global_t = sycl::
 template <typename T>
 using dpcpp_atomic_ref_rlx_wg_local_t =
     sycl::atomic_ref<T, dpcpp_mem_odr_rlx, dpcpp_mem_scp_wg, dpcpp_local_space>;
+
+template <typename T, int Dims = 1>
+inline T* IPEXGetLocalAccPointer(
+    const sycl::local_accessor<T, Dims>& accessor) {
+  if constexpr (std::is_same_v<
+                    decltype(accessor.get_pointer()),
+                    sycl::local_ptr<T>>) {
+    return accessor.get_pointer().get();
+  } else {
+    return accessor.get_pointer();
+  }
+}

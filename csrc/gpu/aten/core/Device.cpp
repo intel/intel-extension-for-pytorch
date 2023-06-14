@@ -66,6 +66,11 @@ void set_device(DeviceIndex device) {
   AT_DPCPP_CHECK(dpcppSetDevice(static_cast<int>(device)));
 }
 
+void* sycl_device(DeviceIndex device) {
+  do_pre_init_hook();
+  return reinterpret_cast<void*>(&dpcppGetRawDevice(device));
+}
+
 DeviceIndex get_device_index_from_ptr(void* ptr) {
   DeviceIndex device_index;
   do_pre_init_hook();

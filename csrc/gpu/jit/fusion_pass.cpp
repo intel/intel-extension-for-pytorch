@@ -582,6 +582,14 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{Symbol::fromQualString("aten::softplus"),
       Symbol::fromQualString("aten::tanh")},
      xpu::softplus_tanh_sym},
+    // Swin-Transformer: add + softmax, add + view + softmax
+    {{Symbol::fromQualString("aten::add"),
+      Symbol::fromQualString("aten::softmax")},
+     xpu::add_softmax_sym},
+    {{Symbol::fromQualString("aten::add"),
+      Symbol::fromQualString("aten::view")},
+     xpu::add_view_sym},
+    {{xpu::add_view_sym, aten::softmax}, xpu::add_view_softmax_sym},
     // 'block_permution + copy'-> 'block permution'.
     {{Symbol::fromQualString("aten::permute"),
       Symbol::fromQualString("aten::contiguous")},

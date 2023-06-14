@@ -69,7 +69,7 @@ void nms_kernel_impl(
   const int col_size =
       nms_min(n_boxes - col_start * items_per_group, items_per_group);
 
-  auto block_boxes = (T*)acc.get_pointer().get(); // items_per_group * 4
+  auto block_boxes = (T*)(IPEXGetLocalAccPointer(acc)); // items_per_group * 4
   if (item.get_local_id(1) < col_size) {
     block_boxes[item.get_local_id(1) * 4 + 0] =
         dev_boxes[(items_per_group * col_start + item.get_local_id(1)) * 4 + 0];

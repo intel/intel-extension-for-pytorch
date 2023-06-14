@@ -112,6 +112,21 @@ class Mish(torch.nn.Module):
         x = x * (torch.tanh(torch.nn.functional.softplus(x)))
         return x
 
+class AddSoftmax(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x, y):
+        x = torch.softmax(x + y, dim=-1)
+        return x
+
+class AddViewSoftmax(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x, y):
+        x = torch.softmax((x + y).view(-1, x.size(2), x.size(3), x.size(4)), dim=-1)
+        return x
 
 class MatmulSum(torch.nn.Module):
     def __init__(self):
@@ -3163,6 +3178,53 @@ class TestNNMethod(TestCase):
             y_dpcpp = modelJit(x, a)
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+    def test_add_softmax_fusion(self, dtype=torch.float16):
+        m1 = torch.randn([4, 2, 4, 4], device=dpcpp_device, dtype=dtype)
+        m2 = torch.randn([1, 2, 1, 4], device=dpcpp_device, dtype=dtype)
+
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+        model = AddSoftmax()
+        raw = model(m2, m1)
+        modelJit = torch.jit.script(model)
+        with torch.no_grad():
+            real = modelJit(m2_dpcpp, m1_dpcpp)
+            print(modelJit.graph_for(m2_dpcpp, m1_dpcpp))
+            real = modelJit(m2_dpcpp, m1_dpcpp)
+        self.assertEqual(raw, real.to(cpu_device))
+        del modelJit
+
+    def test_add_view_softmax_fusion(self, dtype=torch.float16):
+        m1 = torch.randn([52, 14, 4, 19, 19], device=dpcpp_device, dtype=dtype)
+        m2 = torch.randn([1, 14, 1, 19, 19], device=dpcpp_device, dtype=dtype)
+
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+        model = AddViewSoftmax()
+        raw = model(m2, m1)
+        modelJit = torch.jit.script(model)
+        with torch.no_grad():
+            real = modelJit(m2_dpcpp, m1_dpcpp)
+            print(modelJit.graph_for(m2_dpcpp, m1_dpcpp))
+            real = modelJit(m2_dpcpp, m1_dpcpp)
+        self.assertEqual(raw, real.to(cpu_device))
+        del modelJit
+
+    def test_add_view_softmax_fallback(self, dtype=torch.float):
+        m1 = torch.randn([12, 6, 4, 19, 12 * 1024], device=cpu_device)
+        m2 = torch.randn([1, 6, 1, 19, 12 * 1024], device=cpu_device)
+
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+        model = AddViewSoftmax()
+        raw = model(m1, m2)
+        modelJit = torch.jit.script(model)
+        with torch.no_grad():
+            real = modelJit(m1_dpcpp, m2_dpcpp)
+            print(modelJit.graph_for(m1_dpcpp, m2_dpcpp))
+        self.assertEqual(raw, real.to(cpu_device))
         del modelJit
 
     # @pytest.mark.skip("oneDNN not implement yet")

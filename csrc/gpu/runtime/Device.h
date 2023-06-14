@@ -23,7 +23,7 @@ bool dpcppIsDevPoolInit();
 
 int dpcppGetDeviceIdFromPtr(DeviceId* device_id, void* ptr);
 
-sycl::device dpcppGetRawDevice(DeviceId device_id);
+sycl::device& dpcppGetRawDevice(DeviceId device_id);
 
 DeviceProp* dpcppGetCurrentDeviceProperties();
 

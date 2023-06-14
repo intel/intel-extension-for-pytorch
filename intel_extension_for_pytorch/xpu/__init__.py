@@ -8,6 +8,7 @@ import sys
 import warnings
 from functools import lru_cache
 from typing import List, Optional, Tuple, Union, Dict
+import ctypes
 
 import torch
 import intel_extension_for_pytorch
@@ -26,6 +27,7 @@ from .utils import *
 from .random import *
 from .memory import *
 from ..utils.channels_last_1d import is_contiguous_channels_last_1d, to_channels_last_1d
+from ..utils.capsule import get_pointer_from_capsule
 
 from .overrides import (
     override_tensor_totype,
@@ -122,7 +124,8 @@ class _DeviceGuard:
 
 
 class device(object):
-    r"""Context-manager that changes the selected device.
+    r"""Context-manager that changes the selected device and a wrapper encapsules
+    the sycl device from runtime.
 
     Arguments:
         device (torch.device or int): device index to select. It's a no-op if
@@ -139,6 +142,22 @@ class device(object):
     def __exit__(self, type: Any, value: Any, traceback: Any):
         torch.xpu._exchange_device(self.prev_idx)
         return False
+
+    @property
+    def sycl_device(self):
+        r"""sycl_device(self): -> PyCapsule
+
+        Returns the sycl device of the selected device in a ``PyCapsule``, which encapsules
+        a void pointer address. Its capsule name is ``torch.xpu.device.sycl_device``.
+        """
+        return intel_extension_for_pytorch._C.sycl_device(self.idx)
+
+    @property
+    def _as_parameter_(self):
+        r"""Return the sycl device void pointer address. Make it be easily used in
+        C/C++ code.
+        """
+        return ctypes.c_void_p(get_pointer_from_capsule(intel_extension_for_pytorch._C.sycl_device(self.idx)))
 
 
 class device_of(device):
@@ -336,7 +355,6 @@ def current_stream(device: Optional[_device_t] = None) -> Stream:
     streamdata = intel_extension_for_pytorch._C._getCurrentStream(
         _get_device_index(device, optional=True))
     return Stream(stream_id=streamdata[0], device_index=streamdata[1], device_type=streamdata[2])
-
 
 
 @staticmethod  # type: ignore[misc]

@@ -163,7 +163,7 @@ int dpcppSetDevice(DeviceId device_id) {
   return DPCPP_SUCCESS;
 }
 
-sycl::device dpcppGetRawDevice(DeviceId device_id) {
+sycl::device& dpcppGetRawDevice(DeviceId device_id) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
   if (device_id >= (DeviceId)gDevPool.devices.size()) {
@@ -234,7 +234,7 @@ static void initDevPropVectors() {
 
 static void initDeviceProperty(DeviceId device_id) {
   DeviceProp device_prop;
-  auto device = dpcppGetRawDevice(device_id);
+  auto& device = dpcppGetRawDevice(device_id);
 
   device_prop.dev_name = device.get_info<dpcpp_dev_name>();
   device_prop.dev_type = device.get_info<dpcpp_dev_type>();

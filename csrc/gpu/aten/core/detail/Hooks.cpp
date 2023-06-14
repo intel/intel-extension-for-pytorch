@@ -43,7 +43,7 @@ DLDevice_& XPUHooks::getDLPackDeviceFromATenDevice(
     const at::Device& aten_device,
     void* data) const {
   TORCH_CHECK(aten_device.is_xpu(), "Only the XPU device type is expected.");
-  sycl::device xpu_dev = xpu::dpcpp::dpcppGetRawDevice(aten_device.index());
+  sycl::device& xpu_dev = xpu::dpcpp::dpcppGetRawDevice(aten_device.index());
 
   sycl::device parent_root_device;
   if (Settings::I().is_tile_as_device_enabled()) {

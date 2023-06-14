@@ -148,7 +148,7 @@ int CachingDeviceAllocator::malloc_with_retry(
     DeviceId di,
     void** devPtr,
     size_t size) {
-  auto syclDev = dpcppGetRawDevice(di);
+  auto& syclDev = dpcppGetRawDevice(di);
   // Our minimum allocated memory is 512. Thus we set mem align to 512.
   *devPtr = sycl::aligned_alloc_device(
       kDevAlignment, size, syclDev, dpcppGetDeviceContext(di));
@@ -247,7 +247,7 @@ void CachingDeviceAllocator::malloc(
       update_stat_array(stats.segment, 1, stat_types);
       update_stat_array(stats.reserved_bytes, alloc_size, stat_types);
     } else {
-      auto dpcppDev = dpcppGetRawDevice(curDevID);
+      auto& dpcppDev = dpcppGetRawDevice(curDevID);
       size_t device_total = dpcppGlobalMemSize(curDevID);
       stats.num_ooms += 1;
 
@@ -721,7 +721,7 @@ std::vector<SegmentInfo> CachingDeviceAllocator::snapshot() const {
 
 void CachingDeviceAllocator::dumpMemoryStatus(DeviceId deviceIndex) {
   DeviceStats& stats = get_stats_for_device(deviceIndex);
-  auto dpcppDev = dpcppGetRawDevice(deviceIndex);
+  auto& dpcppDev = dpcppGetRawDevice(deviceIndex);
   size_t device_total = dpcppGlobalMemSize(deviceIndex);
   TORCH_WARN("GPU", deviceIndex, " memory status:");
   TORCH_WARN("Total capacity: ", format_size(device_total));

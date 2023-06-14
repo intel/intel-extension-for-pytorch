@@ -41,8 +41,6 @@ void multilabel_margin_loss_forward_kernel(
     auto smem = dpcpp_local_acc_t<acc_t>(work_group_size, cgh);
 
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
-      acc_t* local_memory = smem.get_pointer().get();
-
       int local_item_id = item_id.get_local_id(0);
       int global_item_id = item_id.get_group(0);
       int local_range = item_id.get_local_range(0);
@@ -94,8 +92,8 @@ void multilabel_margin_loss_forward_kernel(
       }
 
       acc_t total_sum = 0.0f;
-      total_sum =
-          GroupReduceSum(item_id, static_cast<acc_t>(sum), local_memory);
+      total_sum = GroupReduceSum(
+          item_id, static_cast<acc_t>(sum), IPEXGetLocalAccPointer(smem));
 
       if (local_item_id == 0) {
         if (size_average) {
@@ -136,7 +134,6 @@ void multilabel_margin_loss_backward_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto smem = dpcpp_local_acc_t<acc_t>(work_group_size, cgh);
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      acc_t* local_memory = smem.get_pointer().get();
       int local_id = item.get_local_id(0);
       int group_id = item.get_group(0);
       int local_range = item.get_local_range(0);
@@ -182,7 +179,8 @@ void multilabel_margin_loss_backward_kernel(
         item.barrier(dpcpp_global_fence);
 
         acc_t total_sum = 0.0f;
-        total_sum = GroupReduceSum(item, static_cast<acc_t>(sum), local_memory);
+        total_sum = GroupReduceSum(
+            item, static_cast<acc_t>(sum), IPEXGetLocalAccPointer(smem));
         if (local_id == 0) {
           grad_input_k[target_idx] += static_cast<scalar_t>(total_sum);
         }

@@ -118,8 +118,6 @@ void renorm_kernel(
         (work_group_size / 8) * sizeof(accscalar_t),
         cgh); // We use the smallest subgroup size to ensure enough space
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      accscalar_t* my_smem = smem.get_pointer().get();
-
       int tid = item.get_local_linear_id();
       int sgSize = item.get_local_range(0);
       auto group_idx = item.get_group(0);
@@ -142,17 +140,16 @@ void renorm_kernel(
         }
       }
 
-      v = GroupReduceSum(item, v, my_smem);
+      v = GroupReduceSum(item, v, IPEXGetLocalAccPointer(smem));
 
       if (tid == 0) {
-        my_smem[0] = std::pow(v, static_cast<accscalar_t>(1.0 / norm_type));
+        smem[0] = std::pow(v, static_cast<accscalar_t>(1.0 / norm_type));
       }
       item.barrier(dpcpp_local_fence);
 
-      if (my_smem[0] > max_norm) {
+      if (smem[0] > max_norm) {
         auto factor = static_cast<scalar_t>(
-            max_norm /
-            (my_smem[0] + std::numeric_limits<accscalar_t>::epsilon()));
+            max_norm / (smem[0] + std::numeric_limits<accscalar_t>::epsilon()));
         for (int i = tid; i < dim; i += sgSize) {
           weights[base_index + i * weights_stride1] *= factor;
         }
