@@ -609,6 +609,12 @@ supported:
   - trace
   - _transformer_decoder_only_layer_fwd
   - _transformer_encoder_layer_fwd
+  - scaled_dot_product_attention
+  - _fused_sdp_choice
+  - _scaled_dot_product_flash_attention
+  - _scaled_dot_product_flash_attention_backward
+  - _scaled_dot_product_efficient_attention
+  - _scaled_dot_product_efficient_attention_backward
   - triangular_solve
   - triangular_solve.X
   - tril.out
