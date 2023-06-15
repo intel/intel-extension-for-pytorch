@@ -50,6 +50,97 @@ class IPEXGPTJAttention(nn.Module):
         self.dtype = module.k_proj.weight.dtype
         self.rotary_emb = GPTJRotaryEmbedding(self.rotary_dim, device=self.device, dtype=self.dtype)
 
+        self.prev_len = 0
+        self.cur_len = 0
+        self.key_cached = None
+        self.value_cached = None
+        self.n_positions = 2048
+        self.seq_first = False
+
+    def get_qkv_with_greedy(self, hidden_states, layer_past, position_ids):
+        if layer_past is None:
+            # the first timestep
+            shape = [hidden_states.shape[0], self.num_attention_heads, self.n_positions, self.head_dim]
+            self.key_cached = torch.empty(shape, device=self.device, dtype=self.dtype)
+            self.value_cached = torch.empty(shape, device=self.device, dtype=self.dtype)
+            self.prev_len = 0
+                
+        query = self.q_proj(hidden_states)
+        key = self.k_proj(hidden_states)
+        value = self.v_proj(hidden_states)
+        new_shape = query.size()[:-1] + (self.num_attention_heads, self.head_dim)
+        query = query.view(new_shape)
+        key = key.view(new_shape)
+        value = value.view(new_shape)
+            
+        query, key = self.rotary_emb(query, key, position_ids, self.rotary_dim)
+        
+        query = query.permute(0, 2, 1, 3)
+        key = key.permute(0, 2, 1, 3)
+        value = value.permute(0, 2, 1, 3)
+
+        self.cur_len = self.prev_len + hidden_states.size(1) 
+        self.key_cached[:, :, self.prev_len : self.cur_len, :] = key 
+        self.value_cached[:, :, self.prev_len : self.cur_len, :] = value
+        key = self.key_cached[:, :, : self.cur_len, :]
+        value = self.value_cached[:, :, : self.cur_len, :]
+    
+        self.prev_len = self.cur_len
+        return query, key, value
+
+    def get_qkv_with_greedy_seq_first(self, hidden_states, layer_past, position_ids):
+        # greedy search path
+        if layer_past is None:
+            # the first timestep
+            shape = [hidden_states.shape[0], self.n_positions, self.num_attention_heads, self.head_dim]
+            self.key_cached = torch.empty(shape, device=self.device, dtype=self.dtype)
+            self.value_cached = torch.empty(shape, device=self.device, dtype=self.dtype)
+            self.prev_len = 0
+        
+        self.cur_len = self.prev_len + hidden_states.size(1) 
+        key = self.key_cached[:, self.prev_len : self.cur_len, :, :]
+        value = self.value_cached[:, self.prev_len : self.cur_len, :, :]
+            
+        query = self.q_proj(hidden_states)
+        shape = query.size()[:-1] + (self.embed_dim,)
+        torch.matmul(hidden_states, self.k_proj.weight.t(), out=key.view(shape))
+        torch.matmul(hidden_states, self.v_proj.weight.t(), out=value.view(shape))
+            
+        new_shape = query.size()[:-1] + (self.num_attention_heads, self.head_dim)
+        query = query.view(new_shape)
+        key = key.view(new_shape)
+        value = value.view(new_shape)
+        query, key = self.rotary_emb(query, key, position_ids, self.rotary_dim)
+
+        key = self.key_cached[:, : self.cur_len, :, :]
+        value = self.value_cached[:, : self.cur_len, :, :]
+    
+        query = query.permute(0, 2, 1, 3)
+        key = key.permute(0, 2, 1, 3)
+        value = value.permute(0, 2, 1, 3)
+        self.prev_len = self.cur_len
+        return query, key, value
+
+    def get_qkv_with_beam(self, hidden_states, layer_past, position_ids):
+        query = self.q_proj(hidden_states)
+        key = self.k_proj(hidden_states)
+        value = self.v_proj(hidden_states)
+        new_shape = query.size()[:-1] + (self.num_attention_heads, self.head_dim)
+        query = query.view(new_shape)
+        key = key.view(new_shape)
+        value = value.view(new_shape)
+        
+        query, key = self.rotary_emb(query, key, position_ids, self.rotary_dim)
+    
+        query = query.permute(0, 2, 1, 3)
+        key = key.permute(0, 2, 1, 3)
+        value = value.permute(0, 2, 1, 3)
+        if layer_past is not None:
+            past_key = layer_past[0]
+            past_value = layer_past[1]
+            key = torch.cat((past_key, key), dim=-2)
+            value = torch.cat((past_value, value), dim=-2)
+        return query, key, value
 
     def _merge_heads(self, tensor, num_attention_heads, attn_head_size):
         """
@@ -110,30 +201,21 @@ class IPEXGPTJAttention(nn.Module):
         Tuple[torch.Tensor, Tuple[torch.Tensor]],
         Optional[Tuple[torch.Tensor, Tuple[torch.Tensor], Tuple[torch.Tensor, ...]]],
     ]:
-        query = self.q_proj(hidden_states)
-        key = self.k_proj(hidden_states)
-        value = self.v_proj(hidden_states)
-
-        new_shape = query.size()[:-1] + (self.num_attention_heads, self.head_dim)
-        query = query.view(new_shape)
-        key = key.view(new_shape)
-        value = value.view(new_shape)
-
-        key = key.permute(0, 2, 1, 3)
-        query = query.permute(0, 2, 1, 3)
-        value = value.permute(0, 2, 1, 3)
-        query, key = self.rotary_emb(query, key, position_ids, self.rotary_dim)
-
-        if layer_past is not None:
-            past_key = layer_past[0]
-            past_value = layer_past[1]
-            key = torch.cat((past_key, key), dim=-2)
-            value = torch.cat((past_value, value), dim=-2)
+        
+        if hidden_states.shape[0] == 1:
+            # greedy search path
+            if self.seq_first:
+                query, key, value = self.get_qkv_with_greedy_seq_first(hidden_states, layer_past, position_ids)
+            else:
+                query, key, value = self.get_qkv_with_greedy(hidden_states, layer_past, position_ids)
+        else:
+            query, key, value = self.get_qkv_with_beam(self, hidden_states, layer_past, position_ids)
 
         if use_cache is True:
             present = (key, value)
         else:
             present = None
+        
 
         attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask)
 

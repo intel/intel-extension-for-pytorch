@@ -1,6 +1,10 @@
 import torch
 
 class GPTJRotaryEmbedding(torch.nn.Module):
+    sin = None
+    cos = None
+    position_ids = None
+
     def __init__(self, dim, max_position_embeddings=2048, base=10000, device=None, dtype=torch.float32):
         super().__init__()
         inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float().to(device) / dim))
@@ -25,9 +29,15 @@ class GPTJRotaryEmbedding(torch.nn.Module):
     def apply_rotary_pos_emb(self, tensor: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor) -> torch.Tensor:
         torch.ops.torch_ipex.apply_rotary_embedding(tensor, sin, cos, tensor)
 
+    def get_sin_cos(self, position_ids):
+        if GPTJRotaryEmbedding.position_ids is None or GPTJRotaryEmbedding.position_ids is not position_ids:
+            GPTJRotaryEmbedding.sin = self.sin_cached[position_ids].unsqueeze(2)
+            GPTJRotaryEmbedding.cos = self.cos_cached[position_ids].unsqueeze(2)
+            GPTJRotaryEmbedding.position_ids = position_ids
+        return GPTJRotaryEmbedding.sin, GPTJRotaryEmbedding.cos
+
     def forward(self, query, key, position_ids, rotary_dim=None):
-        sin = self.sin_cached[position_ids].unsqueeze(1)
-        cos = self.cos_cached[position_ids].unsqueeze(1)
+        sin, cos = self.get_sin_cos(position_ids)
         if rotary_dim is not None:
             self.apply_rotary_pos_emb(key[:, :, :, : rotary_dim], sin, cos)
             self.apply_rotary_pos_emb(query[:, :, :, : rotary_dim], sin, cos)
