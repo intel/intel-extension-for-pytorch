@@ -1,7 +1,7 @@
 From cc8b13beb272343d995410a0bc4fde7dc2e62a60 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Tue, 14 Mar 2023 12:41:58 +0800
-Subject: [PATCH 10/15] support type(torch.xpu.IntTensor) (#103)
+Subject: [PATCH 09/14] support type(torch.xpu.IntTensor) (#103)
 
 ---
  tools/autograd/templates/VariableType.h    |  1 +

@@ -1,7 +1,7 @@
 From f271950a9b7a4d6383388b6ee662bca65e2dfeef Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Thu, 16 Mar 2023 17:21:17 +0800
-Subject: [PATCH 11/15] add xpu device type map to dispatch key (#105)
+Subject: [PATCH 10/14] add xpu device type map to dispatch key (#105)
 
 ---
  torch/library.h | 2 ++

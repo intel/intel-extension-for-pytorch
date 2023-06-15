@@ -1,7 +1,7 @@
 From d1c6c10abe29483b9a5cdf49b4afd5ebca584efe Mon Sep 17 00:00:00 2001
 From: Jinghui <jinghui.gu@intel.com>
 Date: Fri, 17 Mar 2023 12:30:48 +0800
-Subject: [PATCH 08/15] Align with PyTorch master to fix __has_trivial_copy
+Subject: [PATCH 07/14] Align with PyTorch master to fix __has_trivial_copy
  warning (#107)
 
 Signed-off-by: Gu, Jinghui <jinghui.gu@intel.com>

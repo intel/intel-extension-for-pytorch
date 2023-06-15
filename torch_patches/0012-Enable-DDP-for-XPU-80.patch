@@ -1,7 +1,7 @@
 From a0aa7e5a0ead9a123de9b1dda1c0efee66efd142 Mon Sep 17 00:00:00 2001
 From: zhuhong61 <95205772+zhuhong61@users.noreply.github.com>
 Date: Thu, 10 Nov 2022 22:08:51 +0800
-Subject: [PATCH 13/15] Enable DDP for XPU (#80)
+Subject: [PATCH 12/14] Enable DDP for XPU (#80)
 
 * Enable xpu distributed data parallel (DDP) in a device-agnostic way
 * Support DDP both in xpu and cuda with minor code changes.
