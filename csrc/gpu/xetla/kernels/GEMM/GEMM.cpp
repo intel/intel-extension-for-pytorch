@@ -13,7 +13,7 @@ void hgemm_8x32_8x16x32_4(
     const int n,
     const int k) {
   // m == 1 && n == 4096 && k == 4096
-  hgemm_common<sycl::half, 8, 32, 8, 16, 32, 4, 1, 1, 3>(
+  hgemm_common<sycl::half, 8, 32, 8, 16, 32, 4, 1, 1, 3, true>(
       queue, out, a, b, m, n, k);
 }
 
@@ -26,7 +26,7 @@ void hgemm_8x32_8x16x64_8(
     const int n,
     const int k) {
   // m == 1 && n == 4096 && k == 16384
-  hgemm_common<sycl::half, 8, 32, 8, 16, 64, 8, 1, 1, 3>(
+  hgemm_common<sycl::half, 8, 32, 8, 16, 64, 8, 1, 1, 3, true>(
       queue, out, a, b, m, n, k);
 }
 
@@ -40,7 +40,7 @@ void hgemm_8x32_8x16x64_1(
     const int k) {
   // m == 1 && n == 16384 && k == 4096
   // m == 1 && n == 32000 && k == 4096
-  hgemm_common<sycl::half, 8, 32, 8, 16, 64, 1, 1, 1, 3>(
+  hgemm_common<sycl::half, 8, 32, 8, 16, 64, 1, 1, 1, 3, true>(
       queue, out, a, b, m, n, k);
 }
 

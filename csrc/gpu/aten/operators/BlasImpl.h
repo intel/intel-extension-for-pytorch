@@ -982,8 +982,7 @@ static Tensor& matmul_xetla(
   int k = tensor1.sizes()[1];
   *state = false;
 
-  bool is_contiguous =
-      tensor1.is_contiguous() && tensor2.transpose(0, 1).is_contiguous();
+  bool is_contiguous = tensor1.is_contiguous() && tensor2.is_contiguous();
   if (!is_contiguous)
     return output;
 
