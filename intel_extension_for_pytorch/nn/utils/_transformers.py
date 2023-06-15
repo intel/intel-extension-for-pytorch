@@ -209,7 +209,7 @@ class IPEXGPTJAttention(nn.Module):
             else:
                 query, key, value = self.get_qkv_with_greedy(hidden_states, layer_past, position_ids)
         else:
-            query, key, value = self.get_qkv_with_beam(self, hidden_states, layer_past, position_ids)
+            query, key, value = self.get_qkv_with_beam(hidden_states, layer_past, position_ids)
 
         if use_cache is True:
             present = (key, value)
