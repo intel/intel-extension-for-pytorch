@@ -203,14 +203,14 @@ class IPEXGPTJAttention(nn.Module):
         Optional[Tuple[torch.Tensor, Tuple[torch.Tensor], Tuple[torch.Tensor, ...]]],
     ]:
         
-        if hidden_states.shape[0] == 1:
-            # greedy search path
-            if self.seq_first:
-                query, key, value = self.get_qkv_with_greedy_seq_first(hidden_states, layer_past, position_ids)
-            else:
-                query, key, value = self.get_qkv_with_greedy(hidden_states, layer_past, position_ids)
-        else:
-            query, key, value = self.get_qkv_with_beam(hidden_states, layer_past, position_ids)
+        #if hidden_states.shape[0] == 1:
+        #    # greedy search path
+        #    if self.seq_first:
+        #        query, key, value = self.get_qkv_with_greedy_seq_first(hidden_states, layer_past, position_ids)
+        #    else:
+        #        query, key, value = self.get_qkv_with_greedy(hidden_states, layer_past, position_ids)
+        #else:
+        query, key, value = self.get_qkv_with_beam(hidden_states, layer_past, position_ids)
 
         if use_cache is True:
             present = (key, value)
