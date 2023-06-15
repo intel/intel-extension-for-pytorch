@@ -45,7 +45,7 @@ void replaceFrozenIPEXLinearWithAtenLinear(
     std::shared_ptr<torch::jit::Graph>& graph,
     const bool& use_mkl_sgemm);
 void insertPrePackedConvOp(std::shared_ptr<torch::jit::Graph>& graph);
-void fuseConvWithEltwise(std::shared_ptr<torch::jit::Graph>& graph);
+void fuseConvWithEltwiseAdd(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseConvAddRelu(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseBottleneck(std::shared_ptr<torch::jit::Graph>& graph);
 
@@ -60,6 +60,7 @@ void insertPrePackedLinearOp(
 void fuseLinearWithEltwise(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseLinearAddRelu(std::shared_ptr<torch::jit::Graph>& graph);
 
+void FuseRMSNorm(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseAddLayerNorm(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseMatmulDivOrMul(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseConcatBnRelu(std::shared_ptr<torch::jit::Graph>& graph);

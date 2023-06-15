@@ -58,9 +58,9 @@ struct LoweringFuncTrait<ConvFusedOp::kConvClamp>
     constexpr int lower_bound_idx = 0;
     constexpr int upper_bound_idx = 1;
     const float lower_bound =
-        static_cast<float>(((int64_t*)extra_args)[lower_bound_idx]);
+        static_cast<float>(((double*)extra_args)[lower_bound_idx]);
     const float upper_bound =
-        static_cast<float>(((int64_t*)extra_args)[upper_bound_idx]);
+        static_cast<float>(((double*)extra_args)[upper_bound_idx]);
     return ideep::attr_t::fuse_clamp(lower_bound, upper_bound);
   }
 };

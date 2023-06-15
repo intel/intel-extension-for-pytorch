@@ -53,9 +53,8 @@ class ConcatLinearLayers {
       }
 
       auto weight = n->namedInput("weight");
-      auto bias = n->namedInput("bias");
-      if (weight->type() == NoneType::get() ||
-          bias->type() == NoneType::get()) {
+
+      if (weight->type() == NoneType::get()) {
         continue;
       }
 
@@ -92,17 +91,24 @@ class ConcatLinearLayers {
 
       Tensor cat_weight = at::cat(weight_list, /*dim=*/0);
 
-      auto bias_list = c10::fmap(compatible_layers, [](Node* n) {
-        return constant_as<Tensor>(n->namedInput("bias")).value();
-      });
-      Tensor cat_bias = at::cat(bias_list, /*dim=*/0);
-      Value* cat_bias_value = graph_->insertConstant(cat_bias);
-
+      std::vector<Value*> linear_in;
       auto tensor_input = base_node->inputs().at(0);
       Value* cat_weight_value = graph_->insertConstant(cat_weight);
-      std::vector<Value*> linear_in = {
-          tensor_input, cat_weight_value, cat_bias_value};
+
+      if (base_node->namedInput("bias")->type() == NoneType::get()) {
+        linear_in = {
+            tensor_input, cat_weight_value, base_node->namedInput("bias")};
+      } else {
+        auto bias_list = c10::fmap(compatible_layers, [](Node* n) {
+          return constant_as<Tensor>(n->namedInput("bias")).value();
+        });
+        Tensor cat_bias = at::cat(bias_list, /*dim=*/0);
+        Value* cat_bias_value = graph_->insertConstant(cat_bias);
+        linear_in = {tensor_input, cat_weight_value, cat_bias_value};
+      }
+
       linear_node = graph_->create(aten::linear, linear_in);
+
       for (int i = 1; i < compatible_layers.size(); i++) {
         TORCH_CHECK(
             (aten_linear.find(base_node) != aten_linear.end()) ==
@@ -132,35 +138,46 @@ class ConcatLinearLayers {
 
     // Update the outputs of the nodes
     WithInsertPoint guard2(linear_node);
-    Value* neg1 = graph_->insertConstant(-1);
-    Value* one = graph_->insertConstant(1);
-
-    int64_t slice_start = 0;
-    Value* slice_start_val = graph_->insertConstant(0);
+    // Collect the value of N-dim of each weight
+    // for the input of aten::split_with_sizes
+    std::vector<int64_t> outchannel_sizes;
 
     for (Node* orig_node : compatible_layers) {
-      // for each node in the compatible_layers list,
-      // slide the output of the combined linear layer
-      // and use it instead of the output of the original node
-
-      int64_t slice_end;
       Tensor weight_tensor =
           constant_as<Tensor>(orig_node->namedInput("weight")).value();
-      slice_end = slice_start + weight_tensor.size(0);
+      outchannel_sizes.push_back(weight_tensor.size(0));
+    }
 
-      Value* slice_end_val = graph_->insertConstant(slice_end);
+    IValue split_value(outchannel_sizes);
+    auto split_idx = graph_->insertConstant(split_value);
+    auto neg1 = graph_->insertConstant(-1);
 
-      Node* slice = graph_->create(
-          aten::slice,
-          {linear_node->output(), neg1, slice_start_val, slice_end_val, one});
-      slice->output(0)->setType(
-          orig_node->output(0)->type()->expect<TensorType>());
-      slice->insertAfter(linear_node);
-      orig_node->replaceAllUsesWith(slice);
-      orig_node->destroy();
+    Node* split;
+    auto linear_output_dtype =
+        linear_node->output(0)->type()->cast<TensorType>()->scalarType();
 
-      slice_start = slice_end;
-      slice_start_val = slice_end_val;
+    if (linear_output_dtype != at::ScalarType::BFloat16) {
+      split = graph_->create(
+          aten::split_with_sizes, {linear_node->output(0), split_idx, neg1});
+    } else {
+      split = graph_->create(
+          Symbol::fromQualString("ipex::split_tensor"),
+          {linear_node->output(0), split_idx});
+    }
+
+    split->output(0)->setType(ListType::ofTensors());
+    split->insertAfter(linear_node);
+
+    auto ListUnpack = graph_->create(
+        prim::ListUnpack, {split->output(0)}, outchannel_sizes.size());
+    ListUnpack->insertAfter(split);
+
+    for (int i = 0; i < compatible_layers.size(); i++) {
+      ListUnpack->output(i)->setType(
+          compatible_layers[i]->output(0)->type()->expect<TensorType>());
+      compatible_layers[i]->output(0)->replaceAllUsesWith(
+          ListUnpack->output(i));
+      compatible_layers[i]->destroy();
     }
   }
 
@@ -194,8 +211,6 @@ class ConcatLinearLayers {
 
       auto base_weight =
           constant_as<Tensor>(base_node->namedInput("weight")).value();
-      auto base_bias =
-          constant_as<Tensor>(base_node->namedInput("bias")).value();
 
       // Now iterate over the rest of the users of the set to
       // see if there is anything that we can coaleasce `base_node` with.
@@ -209,22 +224,38 @@ class ConcatLinearLayers {
           continue;
         }
         auto weight = constant_as<Tensor>(node->namedInput("weight")).value();
-        auto bias = constant_as<Tensor>(node->namedInput("bias")).value();
 
         // For now we will just keep it simple and require matching types
         // Type promotion might cause performance to actually decrease.
         if (base_weight.dtype() != weight.dtype() ||
-            base_weight.device() != weight.device() ||
-            base_bias.dtype() != bias.dtype() ||
-            base_bias.device() != bias.device()) {
+            base_weight.device() != weight.device()) {
           continue;
         }
 
-        if (!isNonZeroDimEqual(base_weight, weight) ||
-            !isNonZeroDimEqual(base_bias, bias)) {
+        auto base_node_bias = base_node->namedInput("bias");
+        auto node_bias = node->namedInput("bias");
+        auto base_has_bias = (base_node_bias->type() != NoneType::get());
+        auto node_has_bias = (node_bias->type() != NoneType::get());
+
+        if (base_has_bias != node_has_bias) {
+          continue;
+        }
+
+        if (base_has_bias) {
+          auto base_bias = constant_as<Tensor>(base_node_bias).value();
+          auto bias = constant_as<Tensor>(node_bias).value();
+          if (base_bias.dtype() != bias.dtype() ||
+              base_bias.device() != bias.device() ||
+              !isNonZeroDimEqual(base_bias, bias)) {
+            continue;
+          }
+        }
+
+        if (!isNonZeroDimEqual(base_weight, weight)) {
           continue;
         }
         bool can_move_before_all = true;
+
         for (auto n : compatible_layers) {
           can_move_before_all &=
               getAliasDb()->moveBeforeTopologicallyValid(node, n);

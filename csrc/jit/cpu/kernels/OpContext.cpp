@@ -121,7 +121,7 @@ detail::ContextConvolution& IpexConvolutionOpContext::get_context() {
 
 at::Tensor IpexConvolutionOpContext::get_data_handle() {
   at::Tensor ptr = at::empty(1, at::kLong);
-  ptr.data_ptr<int64_t>()[0] = reinterpret_cast<int64_t>(this);
+  ptr[0] = reinterpret_cast<int64_t>(this);
   return ptr;
 }
 
@@ -142,7 +142,7 @@ c10::intrusive_ptr<LinearOpContext> IpexLinearOpContext::create_context(
 
 at::Tensor IpexLinearOpContext::get_data_handle() {
   at::Tensor ptr = at::empty(1, at::kLong);
-  ptr.data_ptr<int64_t>()[0] = reinterpret_cast<int64_t>(this);
+  ptr[0] = reinterpret_cast<int64_t>(this);
   return ptr;
 }
 
@@ -235,7 +235,7 @@ at::Tensor IpexLinearMKLOpContext::get_at_packed_weight() {
 
 at::Tensor IpexLinearMKLOpContext::get_data_handle() {
   at::Tensor ptr = at::empty(1, at::kLong);
-  ptr.data_ptr<int64_t>()[0] = reinterpret_cast<int64_t>(this);
+  ptr[0] = reinterpret_cast<int64_t>(this);
   return ptr;
 }
 
@@ -321,7 +321,7 @@ void IpexConvTransposeOpContext::may_repack(std::vector<int64_t> input_size) {
 
 at::Tensor IpexConvTransposeOpContext::get_data_handle() {
   at::Tensor ptr = at::empty(1, at::kLong);
-  ptr.data_ptr<int64_t>()[0] = reinterpret_cast<int64_t>(this);
+  ptr[0] = reinterpret_cast<int64_t>(this);
   return ptr;
 }
 

@@ -38,16 +38,24 @@ c10::optional<size_t> getDimensions(Value* v) {
 // contiguous
 std::vector<float> FloatTensorToVector(const at::Tensor& tensor) {
   std::vector<float> vectors;
-  for (int i = 0; i < tensor.numel(); i++) {
-    vectors.push_back(tensor[i].item().toFloat());
+  if (tensor.numel() == 1) {
+    vectors.push_back(tensor.item().toFloat());
+  } else {
+    for (int i = 0; i < tensor.numel(); i++) {
+      vectors.push_back(tensor[i].item().toFloat());
+    }
   }
   return vectors;
 }
 
 std::vector<int64_t> IntTensorToVector(const at::Tensor& tensor) {
   std::vector<int64_t> vectors;
-  for (int i = 0; i < tensor.numel(); i++) {
-    vectors.push_back(tensor[i].item().toInt());
+  if (tensor.numel() == 1) {
+    vectors.push_back(tensor.item().toInt());
+  } else {
+    for (int i = 0; i < tensor.numel(); i++) {
+      vectors.push_back(tensor[i].item().toInt());
+    }
   }
   return vectors;
 }
@@ -88,18 +96,16 @@ Operator makeBinaryOp(Node* node, opkind kind) {
 Operator makeDequantOp(Node* node, Node* input_node) {
   if (input_node->kind() == Symbol::aten("quantize_per_tensor")) {
     node->s_(Symbol::attr("qtype"), std::string("per_tensor"));
-
-    std::vector<int64_t> zps_vector = Operator::IntToVector(input_node, 2);
+    auto zps_vector = utils::getZPSVector(input_node);
     node->is_(Symbol::attr("zps"), zps_vector);
-
-    double scale = Operator::Float(input_node, 1);
+    auto scale = utils::getScale(input_node);
     node->fs_(Symbol::attr("scales"), {scale});
     return Operator(node, opkind::Dequantize)
         .setInput(0)
         .setOutput(0)
-        .setAttr("scales", Operator::FloatToVector(input_node, 1))
-        .setAttr("zps", Operator::IntToVector(input_node, 2))
-        .setAttr("qtype", std::string("per_tensor"));
+        .setAttr("qtype", std::string("per_tensor"))
+        .setAttr("scales", std::vector<float>{scale})
+        .setAttr("zps", zps_vector);
   } else if (input_node->kind() == Symbol::aten("quantize_per_channel")) {
     node->s_(Symbol::attr("qtype"), std::string("per_channel"));
     node->t_(Symbol::attr("zps"), Operator::Tensor(input_node, 2));
@@ -368,6 +374,8 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
     return Operator(node, opkind::MatMul).setInput(0, 1).setOutput(0);
   } else if (nodeKind == Symbol::aten("mm")) {
     return Operator(node, opkind::MatMul).setInput(0, 1).setOutput(0);
+  } else if (nodeKind == Symbol::aten("bmm")) {
+    return Operator(node, opkind::MatMul).setInput(0, 1).setOutput(0);
   } else if (nodeKind == Symbol::aten("linear")) {
     auto dim0 = getDimensions(node->input(0)).value_or(-1);
     auto dim1 = getDimensions(node->input(1)).value_or(-1);
@@ -388,11 +396,12 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
     //   ---/-----/-----\-----\---
     // dequant q_scale  q_zp  dtype
     // REQ(node->output(0)->uses().size() <= 2);
-    auto scale = toIValue(node->input(1));
-    REQ(scale.has_value() && scale->isDouble());
+    auto scale = node->input(1);
+    REQ(utils::isScaleSupported(scale));
 
-    auto zero_point = toIValue(node->input(2));
-    REQ(zero_point.has_value() && zero_point->isInt());
+    auto zero_point = node->input(2);
+    REQ(utils::isZeroPointSupported(zero_point));
+
     return Operator(node, opkind::Quantize)
         .setInput(0)
         .setOutput(0)
@@ -661,7 +670,6 @@ Node* LlgaGraphHelper::createSingletonSubgraph(Node* n, AliasDb& aliasDb) {
   auto group = SubgraphUtils::createSingletonSubgraphAndUpdateAliasing(
       n, Symbol::fromQualString(LlgaFusionGroupName()), aliasDb);
   opToOwningPartition_.add(group, partitionId);
-  LlgaNodeWrapper(group).initOutputLayouts();
   return group;
 }
 
@@ -740,25 +748,29 @@ LlgaNodeWrapper::LlgaNodeWrapper(const Node* node)
 }
 
 void LlgaNodeWrapper::setOpaqueLayout(size_t offset) {
-  TORCH_CHECK(offset < n->outputs().size(), "Invalid output offset ", offset);
+  const auto num_output = n->is(attr::output_layouts).size();
+  TORCH_CHECK(
+      offset < num_output,
+      "Out of range. (Invalid index ",
+      offset,
+      " for attr::output_layouts with size ",
+      num_output,
+      ")");
   auto& layouts =
       const_cast<std::vector<int64_t>&>(n->is(Symbol::attr("output_layouts")));
-  layouts.at(offset) = 1;
+  layouts.at(offset) = OPAQUE_LAYOUT;
 }
 
 bool LlgaNodeWrapper::useOpaqueLayout(size_t offset) const {
-  TORCH_CHECK(offset < n->outputs().size(), "Invalid output offset ", offset);
-  return n->is(Symbol::attr("output_layouts"))[offset] == 1;
-}
-
-void LlgaNodeWrapper::initOutputLayouts() {
-  if (n->hasAttribute(Symbol::attr("output_layouts"))) {
-    return;
-  }
-
-  // Init all output layouts as undef
-  std::vector<int64_t> layouts(n->outputs().size(), 0);
-  n->is_(Symbol::attr("output_layouts"), layouts);
+  const auto num_output = n->is(attr::output_layouts).size();
+  TORCH_CHECK(
+      offset < num_output,
+      "Out of range. (Invalid index ",
+      offset,
+      " for attr::output_layouts with size ",
+      num_output,
+      ")");
+  return n->is(attr::output_layouts)[offset] == OPAQUE_LAYOUT;
 }
 
 } // namespace onednn

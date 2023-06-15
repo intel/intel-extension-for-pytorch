@@ -1,6 +1,5 @@
 #include "cpu_feature.hpp"
 #include <stdio.h>
-#include <exception>
 #include "embedded_function.h"
 
 #ifdef __linux__
@@ -324,7 +323,7 @@ bool CPUFeature::init_amx() {
 }
 #else
 bool CPUFeature::init_amx() {
-  throw std::exception("DispatchStub: only support init amx on Linux now");
+  AT_ERROR("DispatchStub: only support init amx on Linux now");
   return false;
 }
 #endif

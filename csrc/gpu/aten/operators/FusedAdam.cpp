@@ -232,19 +232,26 @@ static void ComputeAdamKernelMasterWeight(
 } // namespace impl
 
 void adam_fused_step(
-    at::Tensor& param_,
-    at::Tensor& exp_avg_,
-    at::Tensor& exp_avg_sq_,
-    at::Tensor& max_exp_avg_sq_,
-    at::Tensor& grad_,
-    at::Tensor& param2_,
-    const bool amsgrad,
-    const double step,
-    const double beta1,
-    const double beta2,
-    const double learning_rate,
-    const double weight_decay,
-    const double eps) {
+    const at::Tensor& param,
+    const at::Tensor& exp_avg,
+    const at::Tensor& exp_avg_sq,
+    const at::Tensor& max_exp_avg_sq,
+    const at::Tensor& grad,
+    const at::Tensor& param2,
+    bool amsgrad,
+    double step,
+    double beta1,
+    double beta2,
+    double learning_rate,
+    double weight_decay,
+    double eps) {
+  // need to keep align with cpu semantic, conver tensor to non-const here
+  auto param_ = const_cast<at::Tensor&>(param);
+  auto exp_avg_ = const_cast<at::Tensor&>(exp_avg);
+  auto exp_avg_sq_ = const_cast<at::Tensor&>(exp_avg_sq);
+  auto max_exp_avg_sq_ = const_cast<at::Tensor&>(max_exp_avg_sq);
+  auto grad_ = const_cast<at::Tensor&>(grad);
+  auto param2_ = const_cast<at::Tensor&>(param2);
   // check whether enable param foreach
   TORCH_CHECK(
       learning_rate > 0, "Expect learning rate >= 0.0, got ", learning_rate);

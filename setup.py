@@ -98,8 +98,6 @@ import errno
 
 # FIXME: always set BUILD_WITH_XPU = ON in XPU repo
 os.environ["BUILD_WITH_XPU"] = "ON"
-# FIXME: always set BUILD_WITH_CPU = OFF when rebase code migration
-os.environ["BUILD_WITH_CPU"] = "OFF"
 
 PACKAGE_NAME = "intel_extension_for_pytorch"
 

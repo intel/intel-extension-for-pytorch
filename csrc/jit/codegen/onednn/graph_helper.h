@@ -10,6 +10,9 @@ namespace jit {
 namespace fuser {
 namespace onednn {
 
+#define STRIDED_LAYOUT 0
+#define OPAQUE_LAYOUT 1
+
 struct OpPartitionMap {
   void add(uint64_t opId, uint64_t partitionId) {
     opmap[opId] = partitionId;
@@ -99,8 +102,6 @@ class LlgaNodeWrapper {
   friend class LlgaGraphHelper;
 
  private:
-  void initOutputLayouts();
-
   torch::jit::Node* n;
 };
 

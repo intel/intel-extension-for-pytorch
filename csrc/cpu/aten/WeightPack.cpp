@@ -61,14 +61,14 @@ bool is_packed(const at::Tensor& weight) {
 std::tuple<ideep::tensor, ideep::tensor> CommonLstmWeightDesc::
     get_and_save_lstm_packed_weight() {
   ideep::tensor cached_weight_ih, cached_weight_hh;
-  // Don't pack when the weight is of rnn_packed format
+  // Don't pack when the weight is of opaque format (rnn_packed format).
   // When the weight is of rnn_packed format, if the seq_lens of
   // the input changes, the format of weight also changes.
   // oneDNN does not support reorder from rnn_packed back to public
   // format. LSTM based on BRGEMM kernel (on AVX512 and newest ISAs) will
   // use blocked format for weight of LSTM, which won't change when the
   // input seq_lens changes.
-  if (packed_desc_ih_.is_rnn_packed() || packed_desc_hh_.is_rnn_packed()) {
+  if (packed_desc_ih_.is_opaque() || packed_desc_hh_.is_opaque()) {
     return std::make_tuple(w1_src_, w2_src_);
   }
 

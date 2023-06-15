@@ -1,4 +1,3 @@
-
 set(PLUGIN_NAME_CPU intel-ext-pt-cpu)
 
 set(IPEX_CPU_CPP_THIRD_PARTY_ROOT "${IPEX_ROOT_DIR}/third_party")
@@ -43,8 +42,10 @@ set(IPEX_CPU_CPP_AUTOCAST_SRCS)
 set(IPEX_CPU_CPP_ATEN_SRCS)
 set(IPEX_CPU_CPP_DYNDISP_SRCS)
 set(IPEX_CPU_CPP_ISA_SRCS)
+set(IPEX_CPU_CPP_TOOLKIT_SRCS)
 set(IPEX_CPU_CPP_IDEEP_SRCS)
 set(IPEX_CPU_CPP_RUNTIME_SRCS)
+set (IPEX_CPU_CPP_TPP_SRCS)
 
 set(IPEX_JIT_CPP_SRCS)
 set(IPEX_UTLIS_CPP_SRCS)
@@ -58,14 +59,16 @@ add_subdirectory(${IPEX_CPU_ROOT_DIR}/autocast)
 add_subdirectory(${IPEX_CPU_ROOT_DIR}/dyndisp)
 add_subdirectory(${IPEX_CPU_ROOT_DIR}/ideep)
 add_subdirectory(${IPEX_CPU_ROOT_DIR}/isa)
+add_subdirectory(${IPEX_CPU_ROOT_DIR}/toolkit)
 add_subdirectory(${IPEX_CPU_ROOT_DIR}/runtime)
 add_subdirectory(${IPEX_CPU_ROOT_DIR}/utils)
+add_subdirectory(${IPEX_CPU_ROOT_DIR}/tpp)
 
 add_subdirectory(${IPEX_JIT_CPP_ROOT} jit_cpu)
 add_subdirectory(${IPEX_UTLIS_CPP_ROOT} csrc_utlis)
 
 set(IPEX_CPU_CPP_SRCS ${IPEX_CPU_CPP_DYNDISP_SRCS} ${IPEX_CPU_CPP_ISA_SRCS_GEN} ${IPEX_CPU_CPP_UTILS_SRCS} ${IPEX_CPU_CPP_QUANTIZATION_SRCS} ${IPEX_JIT_CPP_SRCS}
-    ${IPEX_CPU_CPP_ISA_SRCS} ${IPEX_CPU_CPP_IDEEP_SRCS} ${IPEX_CPU_CPP_AUTOCAST_SRCS} ${IPEX_CPU_CPP_ATEN_SRCS} ${IPEX_CPU_CPP_RUNTIME_SRCS} ${IPEX_UTLIS_CPP_SRCS})
+    ${IPEX_CPU_CPP_ISA_SRCS} ${IPEX_CPU_CPP_IDEEP_SRCS} ${IPEX_CPU_CPP_AUTOCAST_SRCS} ${IPEX_CPU_CPP_ATEN_SRCS} ${IPEX_CPU_CPP_RUNTIME_SRCS} ${IPEX_CPU_CPP_TOOLKIT_SRCS} ${IPEX_UTLIS_CPP_SRCS} ${IPEX_CPU_CPP_TPP_SRCS})
 
 list(REMOVE_ITEM IPEX_CPU_CPP_SRCS ${IPEX_CPU_CPP_ISA_SRCS_ORIGIN})
 
@@ -81,10 +84,12 @@ target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_ROOT_DIR})
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_ROOT_DIR})
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_ROOT_DIR}/aten)
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_ROOT_DIR}/utils)
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_ROOT_DIR}/tpp)
 
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_JIT_CPP_ROOT})
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_UTLIS_CPP_ROOT})
 
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/include)
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/include)
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/third_party/oneDNN/include)
 # TODO: once llga is merged into oneDNN, use oneDNN directly as the third_party instead of using that inside llga
@@ -101,6 +106,25 @@ if(CLANG_FORMAT)
   add_dependencies(${PLUGIN_NAME_CPU} CL_FORMAT_CPU_NATIVE_CSRC)
 endif()
 
+include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
+set(args
+CC=${CMAKE_C_COMPILER}
+CXX=${CMAKE_CXX_COMPILER}
+FC=${CMAKE_Fortran_COMPILER}
+)
+
+ExternalProject_Add(libxsmm
+  SOURCE_DIR ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm
+  BUILD_IN_SOURCE 1
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND
+    make
+    "AVX=3"
+    "-j"
+    ${args}
+  INSTALL_COMMAND ""
+  )
+target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/lib/libxsmm.a)
 add_dependencies(${PLUGIN_NAME_CPU} dnnl_graph)
 # If Graph Compiler is built, then it should link to its LLVM dependencies,
 # and not the LLVM symbols exposed by PyTorch.
@@ -114,7 +138,6 @@ if (DEFINED ENV{DNNL_GRAPH_BUILD_COMPILER_BACKEND})
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--exclude-libs=${DNNL_GRAPHCOMPILER_LLVM_LIB_EXCLUDE}")
   endif()
 endif()
-
 find_package(oneMKL QUIET)
 if (ONEMKL_FOUND)
   target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${ONEMKL_INCLUDE_DIR})

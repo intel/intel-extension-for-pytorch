@@ -111,7 +111,7 @@ status set_current_cpu_isa_level_to_onednn(cpu_isa isa) {
 cpu_isa ipex_isa_to_onednn_isa(CPUCapability ipex_isa) {
   switch (ipex_isa) {
     case CPUCapability::DEFAULT:
-      return cpu_isa::all;
+      return cpu_isa::isa_default;
     case CPUCapability::AVX2:
       return cpu_isa::avx2;
     case CPUCapability::AVX2_VNNI:
@@ -126,7 +126,7 @@ cpu_isa ipex_isa_to_onednn_isa(CPUCapability ipex_isa) {
       return cpu_isa::avx512_core_amx;
     case CPUCapability::NUM_OPTIONS:
       TORCH_WARN("DispatchStub: OutOfBoundaryISALevel for IPEX");
-      return cpu_isa::all;
+      return cpu_isa::isa_default;
 
     default:
       auto ipex_isa_str = CPUCapabilityToString(ipex_isa);
@@ -135,7 +135,7 @@ cpu_isa ipex_isa_to_onednn_isa(CPUCapability ipex_isa) {
           ipex_isa_str,
           "Please consider check whether this ISA is supported by oneDNN");
       TORCH_WARN(msg);
-      return cpu_isa::all;
+      return cpu_isa::isa_default;
   }
 }
 

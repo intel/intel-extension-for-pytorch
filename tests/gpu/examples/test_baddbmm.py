@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
-import pytest
+import pytest # noqa
 
 xpu_device = torch.device("xpu")
 cpu_device = torch.device("cpu")
@@ -10,7 +10,6 @@ checking_rtol = 3e-2
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skip("Skip this case due to random NaN in CPU reference.")
     def test_baddbmm_scale(self, dtype=torch.float):
         m1_cpu = torch.ones([6, 3, 4], dtype=dtype) * 0.25
         m2_cpu = torch.ones([6, 4, 2], dtype=dtype) * 1.5

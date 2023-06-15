@@ -107,9 +107,10 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::insertPrePackedConvOp(graph);
 
   // convolution fusion
-  GRAPH_DUMP("After insertPrePackedConvOp.Before fuseConvWithEltwise", graph);
-  graph_rewrite::fuseConvWithEltwise(graph);
-  GRAPH_DUMP("After fuseConvWithEltwise.Before fuseConvAddRelu", graph);
+  GRAPH_DUMP(
+      "After insertPrePackedConvOp.Before fuseConvWithEltwiseAdd", graph);
+  graph_rewrite::fuseConvWithEltwiseAdd(graph);
+  GRAPH_DUMP("After fuseConvWithEltwiseAdd.Before fuseConvAddRelu", graph);
   graph_rewrite::fuseConvAddRelu(graph);
   GRAPH_DUMP("After fuseConvAddRelu.Before fuseBottleneck", graph);
   graph_rewrite::fuseBottleneck(graph);
@@ -142,6 +143,8 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   GRAPH_DUMP("After fuseLinearAddRelu.", graph);
   graph_rewrite::FuseLinearSwishCustomized(graph);
 
+  // fuse rmsnorm
+  graph_rewrite::FuseRMSNorm(graph);
   // fuse add+layernorm
   graph_rewrite::FuseAddLayerNorm(graph);
 
@@ -178,14 +181,9 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // TODO: Some post processing?? ECS/EDC/Peephole???
 
   // This path contains two functions:
-  // 1. Fuse BF16 Mha for BERT and ViT
+  // 1. Fuse BF16 Mha for ViT because ViT has a special QKV split algorithm
   // 2. Replace the Matmul OP with MKL or DNNL Matmul kernels to enable
-  // transpose-free FP32 BMM.
-  // The BF16 Mha fusions depends on the FuseMHAScoreCalc and
-  // FuseMatmulDivOrMul since it uses the fused OPs from the two pathes.
-  // TODO: We will enable transpose-free BF16 BMM to benefit for most
-  // of the MHA patterns. Then the Matmul OP from the FuseMHAScoreCalc
-  // path will be removed in the future for simplicity.
+  // transpose-free FP32 and BF16 BMM.
   // This path should be executed after all the other Matmul-related
   // fusion are completed to prevent mismatching "aten::matmul".
   graph_rewrite::FusedTransFreeMha(graph);

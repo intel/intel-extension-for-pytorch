@@ -10,12 +10,12 @@ namespace cpu {
 DEFINE_DISPATCH(adam_fused_step_kernel_stub);
 
 void adam_fused_step(
-    at::Tensor& param_,
-    at::Tensor& exp_avg_,
-    at::Tensor& exp_avg_sq_,
-    at::Tensor& max_exp_avg_sq_,
-    at::Tensor& grad_,
-    at::Tensor& param2_,
+    const at::Tensor& param_,
+    const at::Tensor& exp_avg_,
+    const at::Tensor& exp_avg_sq_,
+    const at::Tensor& max_exp_avg_sq_,
+    const at::Tensor& grad_,
+    const at::Tensor& param2_,
     bool amsgrad,
     double step,
     double beta1,
@@ -104,10 +104,12 @@ void adam_fused_step(
 } // namespace torch_ipex
 
 namespace {
+
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
       "adam_fused_step",
       torch_ipex::cpu::adam_fused_step,
       at::DispatchKey::CPU);
 }
+
 } // namespace

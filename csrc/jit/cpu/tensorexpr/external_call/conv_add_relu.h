@@ -76,7 +76,7 @@ struct LoweringFuncTrait<ConvFusedOp::kConvAddReLU>
 
   static ideep::attr_t get_attr(int64_t* extra_args) {
     constexpr int alpha_idx = 0;
-    const float alpha = static_cast<float>(((int64_t*)extra_args)[alpha_idx]);
+    const float alpha = static_cast<float>(((double*)extra_args)[alpha_idx]);
     return ideep::attr_t::residual(alpha);
   }
 

@@ -52,7 +52,7 @@ struct LoweringFuncTrait<ConvFusedOp::kConvPow> : public ConvCommonOperations {
   static ideep::attr_t get_attr(int64_t* extra_args) {
     constexpr int exponent_idx = 0;
     const float exponent =
-        static_cast<float>(((int64_t*)extra_args)[exponent_idx]);
+        static_cast<float>(((double*)extra_args)[exponent_idx]);
     return ideep::attr_t::fuse_pow(1.0, 1.0, exponent);
   }
 };

@@ -64,12 +64,23 @@ class Operator {
   }
 
   static int64_t Int(const torch::jit::Node* node, size_t offset) {
-    return torch::jit::toIValue(node->input(offset))->toInt();
+    if (node->input(offset)->type()->isSubtypeOf(
+            torch::jit::TensorType::get())) {
+      // Composing FX with JIT tracing may cause scale/zps to be 0-dim tensors
+      return toIValue(node->input(offset)).value().toTensor().item().toInt();
+    } else {
+      return static_cast<int64_t>(toIValue(node->input(offset))->toInt());
+    }
   }
 
   static float Float(const torch::jit::Node* node, size_t offset) {
-    return static_cast<float>(
-        torch::jit::toIValue(node->input(offset))->toDouble());
+    if (node->input(offset)->type()->isSubtypeOf(
+            torch::jit::TensorType::get())) {
+      // Composing FX with JIT tracing may cause scale/zps to be 0-dim tensors
+      return toIValue(node->input(offset)).value().toTensor().item().toFloat();
+    } else {
+      return static_cast<float>(toIValue(node->input(offset))->toDouble());
+    }
   }
 
   static float ScalarToFloat(const torch::jit::Node* node, size_t offset) {

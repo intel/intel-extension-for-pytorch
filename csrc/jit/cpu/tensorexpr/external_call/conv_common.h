@@ -93,7 +93,9 @@ typedef enum _ConvFusedOp {
   kConvSquare,
   kConvTanh,
   kConvLeakyRelu,
-  kConvSilu
+  kConvSilu,
+  kConvAdd,
+  kConvHardsigmoid,
 } ConvFusedOp;
 
 static ideep::attr_t empty_attr;

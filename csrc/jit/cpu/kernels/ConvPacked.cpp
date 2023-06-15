@@ -305,13 +305,29 @@ at::Tensor convolution_add_relu_run(
       ideep::attr_t::residual(scale).set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
+at::Tensor convolution_swish_add_run(
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const c10::optional<at::Scalar>& alpha,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
+  RECORD_FUNCTION(
+      "ipex_prepack::convolution_swish_add_run",
+      c10::ArrayRef<c10::IValue>({}));
+  auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
+  return op_context->run(
+      input,
+      accumu,
+      ideep::attr_t::fuse_swish_sum(scale).set_fpmath_mode(
+          torch_ipex::fpmath_mode));
+}
+
 at::Tensor& convolution_bottleneck_run(
     at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context1,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context2,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context3) {
   RECORD_FUNCTION(
-      "ipex_prepack::convolution_bottleneck_runi_v1",
+      "ipex_prepack::convolution_bottleneck_run_v1",
       c10::ArrayRef<c10::IValue>({}));
 
   auto memory_format = input.dim() == 4 ? at::MemoryFormat::ChannelsLast
@@ -321,7 +337,7 @@ at::Tensor& convolution_bottleneck_run(
   auto& context1 = op_context1->get_context();
   auto& context2 = op_context2->get_context();
   auto& context3 = op_context3->get_context();
-  if (input.sizes().vec() == context1.conv_params_.pd.src_desc().dims() &&
+  if (input.sizes().vec() == context1.conv_params_.pd.src_desc().get_dims() &&
       omp_get_max_threads() == context1.conv_params_.pd_use_threads) {
     auto mkldnn_input = dnnl::memory(
         context1.conv_params_.pd.src_desc(),
@@ -392,7 +408,7 @@ at::Tensor convolution_bottleneck_run(
   auto& context4 = op_context4->get_context();
   auto& context3 = op_context3->get_context();
 
-  if (input_.sizes().vec() == context1.conv_params_.pd.src_desc().dims() &&
+  if (input_.sizes().vec() == context1.conv_params_.pd.src_desc().get_dims() &&
       omp_get_max_threads() == context1.conv_params_.pd_use_threads) {
     auto mkldnn_input = dnnl::memory(
         context1.conv_params_.pd.src_desc(),
@@ -405,7 +421,7 @@ at::Tensor convolution_bottleneck_run(
         context2.conv_params_.pd.dst_desc(), ideep::engine::cpu_engine());
 
     auto result = at::empty(
-        context3.conv_params_.pd.dst_desc().dims(),
+        context3.conv_params_.pd.dst_desc().get_dims(),
         input_.options().memory_format(input_.suggest_memory_format()));
 
     auto ouput3 = dnnl::memory(
@@ -636,12 +652,11 @@ at::Tensor run(
       context.dilation_,
       context.groups_);
 
-  if (input_.sizes().vec() == context.conv_params_.pd.src_desc().dims() &&
+  if (input_.sizes().vec() == context.conv_params_.pd.src_desc().get_dims() &&
       attr.has_same_postop_as(context.conv_params_.op_attr) &&
-      attr.get_output_scales() ==
-          context.conv_params_.op_attr.get_output_scales() &&
+      attr.get_all_scales() == context.conv_params_.op_attr.get_all_scales() &&
       omp_get_max_threads() == context.conv_params_.pd_use_threads) {
-    auto output_sizes = context.conv_params_.pd.dst_desc().dims();
+    auto output_sizes = context.conv_params_.pd.dst_desc().get_dims();
     auto output = at::empty(
         output_sizes,
         input_.options().memory_format(input_.suggest_memory_format()));
@@ -680,7 +695,8 @@ at::Tensor run(
       context.padding_,
       context.dilation_,
       context.groups_,
-      attr);
+      attr,
+      memory_format);
 }
 
 at::Tensor& run(
@@ -726,7 +742,7 @@ at::Tensor& run(
       context.dilation_,
       context.groups_);
 
-  if (input_.sizes().vec() == context.conv_params_.pd.src_desc().dims() &&
+  if (input_.sizes().vec() == context.conv_params_.pd.src_desc().get_dims() &&
       attr == context.conv_params_.op_attr &&
       omp_get_max_threads() == context.conv_params_.pd_use_threads) {
     const ideep::tensor mkldnn_input = itensor_view_from_dense(input_);
@@ -763,7 +779,7 @@ at::Tensor& run(
   return accumu;
 }
 
-void run_core_nhwc(
+void run_core_fast_path_nhwc(
     const ContextConvolution& context,
     void* input,
     void* output) {
@@ -788,14 +804,13 @@ void run_core_nhwc(
   }
 }
 
-void run_core(
+void run_core_fast_path(
     const ContextConvolution& context,
     const at::Tensor& input,
     at::Tensor& accumu) {
   auto input_layout = input.suggest_memory_format();
   bool use_channels_last = input_layout == at::MemoryFormat::ChannelsLast ||
-      input_layout == at::MemoryFormat::ChannelsLast3d ||
-      context.weight_is_channels_last_;
+      input_layout == at::MemoryFormat::ChannelsLast3d;
 
   const ideep::tensor mkldnn_input = itensor_view_from_dense(input);
   ideep::tensor mkldnn_output = itensor_view_from_dense(accumu);
@@ -831,6 +846,23 @@ void run_core(
           mkldnn_output);
     }
   }
+}
+
+void run_core_fallback(
+    const ContextConvolution& context,
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const ideep::attr_t& attr) {
+  convolution_kernel_output(
+      input,
+      context.weight_packed_,
+      context.bias_,
+      accumu,
+      context.stride_,
+      context.padding_,
+      context.dilation_,
+      context.groups_,
+      attr);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(

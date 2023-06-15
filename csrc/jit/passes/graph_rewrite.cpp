@@ -194,6 +194,25 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
 
 } // namespace graph_rewrite
 
+void FuseRMSNorm(std::shared_ptr<Graph>& graph) {
+  std::string aten_RMSNorm = R"(
+      graph(%hidden_states, %weight, %exponent:int, %dim:int[], %keepdim:bool, %dtype:NoneType, %eps:float, %alpha:int):
+        %s = aten::pow(%hidden_states, %exponent)
+        %v = aten::mean(%s, %dim, %keepdim, %dtype)
+        %m = aten::add(%v, %eps, %alpha)
+        %n = aten::rsqrt(%m)
+        %l = aten::mul(%hidden_states, %n)
+        %r = aten::mul(%weight, %l)
+        return (%r) )";
+  std::string fused_RMSNorm = R"(
+      graph(%hidden_states, %weight, %exponent:int, %dim:int[], %keepdim:bool, %dtype:NoneType, %eps:float, %alpha:int):
+        %r = ipex::RMSNorm(%hidden_states, %weight, %eps)
+        return (%r) )";
+  SubgraphRewriter rewriter_aten;
+  rewriter_aten.RegisterRewritePattern(aten_RMSNorm, fused_RMSNorm);
+  rewriter_aten.runOnGraph(graph);
+}
+
 void FuseAddLayerNorm(std::shared_ptr<Graph>& graph) {
   std::string aten_add_layernorm = R"(
       graph(%add_a, %add_b, %alpha, %shape:int[], %w, %b, %eps:float, %cudnn_enable:bool):
@@ -764,8 +783,7 @@ void preprocessSizeForQLstm(std::shared_ptr<Graph>& graph) {
       op_list_construct_same_states, op_list_construct_diff_states};
 
   auto pattern = at::jit::CodeTemplate(R"(
-     graph(%x, %scale, %zero_point, %quantize_dtype, %size_dim, %ld, %hidden_size, %scalar_type, %layout, %device, %pin_memory, %weight, %has_biases, %num_layers, %dropout, %train, %bidirectional, %batch_first):
-        %quantized_input = aten::quantize_per_tensor(%x, %scale, %zero_point, %quantize_dtype)
+     graph(%quantized_input, %size_dim, %ld, %hidden_size, %scalar_type, %layout, %device, %pin_memory, %weight, %has_biases, %num_layers, %dropout, %train, %bidirectional, %batch_first):
         %ret.3 = aten::dequantize(%quantized_input)
         %max_batch_size : int = aten::size(%ret.3, %size_dim)
         %ret.tensor : Tensor = prim::NumToTensor(%max_batch_size)
@@ -776,8 +794,7 @@ void preprocessSizeForQLstm(std::shared_ptr<Graph>& graph) {
         return (%res.1, %res.2, %res.3) )");
 
   auto replacement = at::jit::CodeTemplate(R"(
-     graph(%x, %scale, %zero_point, %quantize_dtype, %size_dim, %ld, %hidden_size, %scalar_type, %layout, %device, %pin_memory, %weight, %has_biases, %num_layers, %dropout, %train, %bidirectional, %batch_first):
-        %quantized_input = aten::quantize_per_tensor(%x, %scale, %zero_point, %quantize_dtype)
+     graph(%quantized_input, %size_dim, %ld, %hidden_size, %scalar_type, %layout, %device, %pin_memory, %weight, %has_biases, %num_layers, %dropout, %train, %bidirectional, %batch_first):
         %max_batch_size : int = aten::size(%quantized_input, %size_dim)
         %ret.3 = aten::dequantize(%quantized_input)
         %ret.tensor : Tensor = prim::NumToTensor(%max_batch_size)

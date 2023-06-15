@@ -15,7 +15,6 @@ from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
 
 import intel_extension_for_pytorch as ipex
 
-
 class TestDefaultRecipe(JitLlgaTestCase):
     def test_quantized_op_int8_int8(self):
         # Test one op which only support INT8+INT8, if its
@@ -34,17 +33,12 @@ class TestDefaultRecipe(JitLlgaTestCase):
 
         m = M()
         x = torch.rand(1, 2, 14, 14)
-
+       
         graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
         patterns = [
-            [
-                "aten::dequantize",
-                "aten::dequantize",
-                "aten::_convolution",
-                "aten::quantize_per_tensor",
-            ],
-            ["aten::dequantize", "aten::max_pool2d", "aten::quantize_per_tensor"],
-        ]
+                ["aten::dequantize", "aten::dequantize", "aten::_convolution", "aten::quantize_per_tensor"],
+                ["aten::dequantize", "aten::max_pool2d", "aten::quantize_per_tensor"],
+            ]
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
         self.checkPatterns(graph, patterns)
 
@@ -63,9 +57,7 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 return x
 
         class conv_swish(nn.Module):
-            def __init__(
-                self,
-            ):
+            def __init__(self, ):
                 super(conv_swish, self).__init__()
                 self.conv = torch.nn.Conv2d(2, 2, 1)
 
@@ -76,9 +68,7 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 return z
 
         class conv_eltwise(nn.Module):
-            def __init__(
-                self,
-            ):
+            def __init__(self, ):
                 super(conv_eltwise, self).__init__()
                 self.conv = torch.nn.Conv2d(2, 2, 1)
 
@@ -87,29 +77,12 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 x = x.relu_()
                 return x
 
-        # TODO: test more quantized modules(especially for fused module).
+        # TODO: test more quantized modules(especially for fused module). 
         quantized_modules = [conv_swish(), conv_eltwise()]
         patterns = [
-            [
-                [
-                    "aten::dequantize",
-                    "aten::dequantize",
-                    "aten::_convolution",
-                    "aten::sigmoid",
-                    "aten::mul",
-                    "aten::quantize_per_tensor",
-                ]
-            ],
-            [
-                [
-                    "aten::dequantize",
-                    "aten::dequantize",
-                    "aten::_convolution",
-                    "aten::relu",
-                    "aten::quantize_per_tensor",
-                ]
-            ],
-        ]
+                [["aten::dequantize", "aten::dequantize", "aten::_convolution", "aten::sigmoid", "aten::mul", "aten::quantize_per_tensor"]],
+                [["aten::dequantize", "aten::dequantize", "aten::_convolution", "aten::relu", "aten::quantize_per_tensor"]],
+            ]
         for quantized_modules, pattern in zip(quantized_modules, patterns):
             m = M(quantized_modules).eval()
 
@@ -120,6 +93,5 @@ class TestDefaultRecipe(JitLlgaTestCase):
             self.checkPatterns(graph, pattern)
             FileCheck().check("aten::dequantize").run(graph)
 
-
-if __name__ == "__main__":
-    run_tests()
+if __name__ == '__main__':
+    run_tests() 

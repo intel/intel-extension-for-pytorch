@@ -64,8 +64,8 @@ struct LoweringFuncTrait<ConvFusedOp::kConvElu> : public ConvCommonOperations {
     const float alpha = static_cast<float>(((int64_t*)extra_args)[alpha_idx]);
     const float scale = static_cast<float>(((int64_t*)extra_args)[scale_idx]);
     const float input_scale =
-        static_cast<float>(((int64_t*)extra_args)[input_scale_idx]);
-    return ideep::attr_t::fuse_elu(alpha, scale, input_scale);
+        static_cast<float>(((double*)extra_args)[input_scale_idx]);
+    return ideep::attr_t::fuse_elu(scale, alpha, input_scale);
   }
 };
 

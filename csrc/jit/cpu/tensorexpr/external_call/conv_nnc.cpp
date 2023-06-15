@@ -1,11 +1,13 @@
 #include "conv_nnc.h"
 
 #include "conv_abs.h"
+#include "conv_add.h"
 #include "conv_add_relu.h"
 #include "conv_clamp.h"
 #include "conv_elu.h"
 #include "conv_exp.h"
 #include "conv_gelu.h"
+#include "conv_hardsigmoid.h"
 #include "conv_hardswish.h"
 #include "conv_leaky_relu.h"
 #include "conv_log.h"
@@ -45,6 +47,8 @@ using SquareTrait = LoweringFuncTrait<ConvFusedOp::kConvSquare>;
 using TanhTrait = LoweringFuncTrait<ConvFusedOp::kConvTanh>;
 using LeakyReluTrait = LoweringFuncTrait<ConvFusedOp::kConvLeakyRelu>;
 using SiluTrait = LoweringFuncTrait<ConvFusedOp::kConvSilu>;
+using AddTrait = LoweringFuncTrait<ConvFusedOp::kConvAdd>;
+using HardsigmoidTrait = LoweringFuncTrait<ConvFusedOp::kConvHardsigmoid>;
 
 #define REG_NNC_OPERATOR(schema, trait)     \
   static NNCOperatorRegister schema##trait( \
@@ -69,4 +73,6 @@ REG_NNC_OPERATOR(kConvSquareSchema, SquareTrait);
 REG_NNC_OPERATOR(kConvTanhSchema, TanhTrait);
 REG_NNC_OPERATOR(kConvLeakyReluSchema, LeakyReluTrait);
 REG_NNC_OPERATOR(kConvSiluSchema, SiluTrait);
+REG_NNC_OPERATOR(kConvAddSchema, AddTrait);
+REG_NNC_OPERATOR(kConvHardsigmoidSchema, HardsigmoidTrait);
 } // namespace

@@ -2,6 +2,7 @@
 
 #include <ATen/Context.h>
 #include <ATen/InferSize.h>
+#include <ATen/Parallel.h>
 #include <c10/util/Exception.h>
 #include <c10/util/Logging.h>
 #include <torch/csrc/autograd/function.h>
@@ -61,27 +62,22 @@ void mkl_fp32_bmm_impl(
   const MKL_INT size_per_grp[GRP_COUNT] = {array_size};
   float *a_array[array_size], *b_array[array_size], *c_array[array_size];
 
-#ifdef _OPENMP
-#if (_OPENMP >= 201307)
-#pragma omp parallel for simd schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
-#else
-#pragma omp parallel for schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
-#endif
-#endif
-  for (int64_t i = 0; i < array_size; ++i) {
-    a_array[i] = batch1.data_ptr<float>();
-    b_array[i] = batch2.data_ptr<float>();
-    c_array[i] = out.data_ptr<float>();
-    int64_t count = 1;
-    for (int64_t j = batch_dim - 3; j >= 0; --j) {
-      a_array[i] += ((int64_t)(i / count) % batch1.size(j)) * batch1.stride(j);
-      b_array[i] += ((int64_t)(i / count) % batch2.size(j)) * batch2.stride(j);
-      c_array[i] += ((int64_t)(i / count) % out.size(j)) * out.stride(j);
-      count *= batch1.size(j);
+  at::parallel_for(0, array_size, 1, [&](int64_t begin, int64_t end) {
+    for (const auto i : c10::irange(begin, end)) {
+      a_array[i] = batch1.data_ptr<float>();
+      b_array[i] = batch2.data_ptr<float>();
+      c_array[i] = out.data_ptr<float>();
+      int64_t count = 1;
+      for (int64_t j = batch_dim - 3; j >= 0; --j) {
+        a_array[i] +=
+            ((int64_t)(i / count) % batch1.size(j)) * batch1.stride(j);
+        b_array[i] +=
+            ((int64_t)(i / count) % batch2.size(j)) * batch2.stride(j);
+        c_array[i] += ((int64_t)(i / count) % out.size(j)) * out.stride(j);
+        count *= batch1.size(j);
+      }
     }
-  }
+  });
 
   cblas_sgemm_batch(
       CblasRowMajor,
@@ -112,7 +108,7 @@ void mkl_fp32_bmm_impl(
  * @return output Tensor.
  * Since oneDNN 2.6.0, AMX and AVX512 brgemm are enabled for the DNNL MATMUL
  * primitive if the input tensors are with the following tags:
- * 3-dim - abc, acb; 4-dim - abcd, acbd, adbc, abdc.
+ * 2-dim - ab, ba; 3-dim - abc, acb; 4-dim - abcd, acbd, adbc, abdc.
  * If the input tensor has one of the above layouts, the contiguous should NOT
  * be applied to avoid unnecessary transpose (copy).
  * The MKL BMM kernel has better FP32 performance than that of the DNNL MATMUL
@@ -130,28 +126,40 @@ at::Tensor bmm_impl(
     const ideep::attr_t& attr,
     const std::vector<ideep::tensor>& postop_tensors,
     const float dst_coeff = 1.0f) {
+  RECORD_FUNCTION("dil_bmm", c10::ArrayRef<c10::IValue>({}));
   // The following conditions are strict to exclude some extreme cases when the
   // tensors have the undefined stride values. For the sake of reliability of
   // transpose-free Matmul kernel, contiguous will be applied to these tensors.
   auto check_tensor_dim_stride = [](at::Tensor tensor) {
-    // Check if the Tensor is 3-dim or 4-dim
-    if (tensor.dim() != 3 && tensor.dim() != 4)
+    // Check if the Tensor is 2-dim, 3-dim or 4-dim
+    if (tensor.dim() != 2 && tensor.dim() != 3 && tensor.dim() != 4) {
       return false;
+    }
     // Check the strides of the tensor are not out of the tensor's ranges.
-    if (tensor.stride(0) * tensor.size(0) != tensor.numel())
+    if (tensor.stride(0) * tensor.size(0) != tensor.numel()) {
+      if (tensor.dim() == 2 &&
+          tensor.stride(1) * tensor.size(1) == tensor.numel()) {
+        return true;
+      }
       return false;
+    }
     return true;
   };
+
   auto check_tensor_layout = [](at::Tensor tensor) {
     // Check if 'a' is the first dim
-    for (int64_t i = 1; i < tensor.dim(); ++i) {
-      if (tensor.stride(0) < tensor.stride(i))
-        return false;
+    if (tensor.dim() != 2) {
+      for (int64_t i = 1; i < tensor.dim(); ++i) {
+        if (tensor.stride(0) < tensor.stride(i)) {
+          return false;
+        }
+      }
     }
     // Check the minimum stride is at the last or second last index
     // and its value is 1.
-    if (!(tensor.stride(-1) == 1 || tensor.stride(-2) == 1))
+    if (!(tensor.stride(-1) == 1 || tensor.stride(-2) == 1)) {
       return false;
+    }
     return true;
   };
 
@@ -279,9 +287,7 @@ at::Tensor dil_bmm_add(
     const at::Tensor& batch1,
     const at::Tensor& batch2,
     const c10::Scalar& alpha) {
-#if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("dil_bmm_add", c10::ArrayRef<c10::IValue>({}));
-#endif
   auto batch1_dim = batch1.dim();
   auto batch2_dim = batch2.dim();
   if (batch1_dim == batch2_dim && batch1_dim >= 3) {

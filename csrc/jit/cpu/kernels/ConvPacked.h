@@ -93,6 +93,12 @@ at::Tensor convolution_add_relu_run(
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
 
+at::Tensor convolution_swish_add_run(
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const c10::optional<at::Scalar>& alpha,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
+
 at::Tensor& convolution_bottleneck_run(
     at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context1,
@@ -128,15 +134,21 @@ at::Tensor& run(
     at::Tensor& accumu,
     const ideep::attr_t& attr);
 
-void run_core(
+void run_core_fast_path_nhwc(
+    const ContextConvolution& context,
+    void* input,
+    void* output);
+
+void run_core_fast_path(
     const ContextConvolution& context,
     const at::Tensor& input,
     at::Tensor& accumu);
 
-void run_core_nhwc(
+void run_core_fallback(
     const ContextConvolution& context,
-    void* input,
-    void* output);
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const ideep::attr_t& attr);
 
 // Runing backward for conv by given grad_output, input and grad_masks.
 // Will using the mkldnn_weight/bias stored in the context

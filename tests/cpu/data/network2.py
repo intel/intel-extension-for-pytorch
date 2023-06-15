@@ -1,4 +1,4 @@
-"""
+'''
 From PyTorch:
 
 Copyright (c) 2016-     Facebook, Inc            (Adam Paszke)
@@ -42,12 +42,13 @@ indicate their copyright solely in the commit message of the change when it is
 committed.
 
 All rights reserved.
-"""
+'''
 
 import torch.nn as nn
 
 
 class Net(nn.Module):
+
     def __init__(self):
         super(Net, self).__init__()
         self.linear = nn.Linear(10, 20)
