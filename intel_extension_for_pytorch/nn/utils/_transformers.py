@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from typing import Optional, Tuple, Union
 from .RoPE import GPTJRotaryEmbedding
+import os
 
 def activation_replace(module):
     from transformers.activations import NewGELUActivation
@@ -216,8 +217,12 @@ class IPEXGPTJAttention(nn.Module):
         else:
             present = None
         
-
-        attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask)
+        do_flush = os.environ.get("FLUSH_ATTN", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
+        if do_flush:
+            attn_output = torch.nn.functional.scaled_dot_product_attention(query.to(value.dtype), key.to(value.dtype), value.half(), is_causal=True)
+            attn_weights = None
+        else:
+            attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask)
 
         attn_output = self._merge_heads(attn_output, self.num_attention_heads, self.head_dim)
         attn_output = self.out_proj(attn_output)
