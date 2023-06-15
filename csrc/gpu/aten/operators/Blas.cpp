@@ -147,7 +147,15 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
 #endif
   }
 
+#if defined(USE_XETLA)
+  bool state;
+  matmul_xetla(result, self, mat2, &state);
+  if (!state) {
+    xpu::oneDNN::matmul(result, self, mat2, at::Tensor(), true, Attr());
+  }
+#else
   xpu::oneDNN::matmul(result, self, mat2, at::Tensor(), true, Attr());
+#endif
   return result;
 }
 
