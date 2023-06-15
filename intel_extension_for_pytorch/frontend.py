@@ -319,7 +319,7 @@ def optimize_transformers(model, dtype=None, optimizer=None):
             else:
                 model_converter(child)
         return model
-    optimize_output = optimize(model, dtype=dtype, optimizer=optimizer)
+    optimize_output = optimize(model, dtype=dtype, optimizer=optimizer, inplace=True)
 
     if optimizer is None:
         model = optimize_output
