@@ -316,11 +316,13 @@ class DpcppBuildExtension(build_ext, object):
             cmd_line = []
 
             library_dirs_args = []
+            library_dirs_args += [f"-L{x}" for x in library_dirs]
 
             runtime_library_dirs_args = []
             runtime_library_dirs_args += [f"-L{x}" for x in runtime_library_dirs]
 
             libraries_args = []
+            libraries_args += [f"-l{x}" for x in libraries]
             common_args = [SHARED_FLAG] + [SYCL_FLAG]
 
             """
@@ -814,6 +816,7 @@ def _prepare_ldflags(extra_ldflags, verbose, is_standalone):
         python_lib_path = os.path.join(python_path, "libs")
 
         extra_ldflags.append('c10.lib')
+        extra_ldflags.append('torch_cpu.lib')
         extra_ldflags.append('torch.lib')
         if not is_standalone:
             extra_ldflags.append("torch_python.lib")
@@ -821,6 +824,7 @@ def _prepare_ldflags(extra_ldflags, verbose, is_standalone):
 
     else:
         extra_ldflags.append('-lc10')
+        extra_ldflags.append('-ltorch_cpu')
         extra_ldflags.append('-ltorch')
         if not is_standalone:
             extra_ldflags.append("-ltorch_python")
@@ -1471,17 +1475,9 @@ def DPCPPExtension(name, sources, *args, **kwargs):
     """
 
     library_dirs = kwargs.get("library_dirs", [])
-    library_dirs += library_paths()
     kwargs["library_dirs"] = library_dirs
 
     libraries = kwargs.get("libraries", [])
-    libraries.append("c10")
-    libraries.append("torch")
-    libraries.append("torch_cpu")
-    libraries.append("torch_python")
-
-    # Append oneDNN link parameters.
-    libraries.append("dnnl")
     kwargs["libraries"] = libraries
 
     include_dirs = kwargs.get("include_dirs", [])
