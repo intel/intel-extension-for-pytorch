@@ -4,50 +4,44 @@
 namespace xpu {
 namespace xetla {
 
-void gemm(
+void hgemm_8x32_8x16x32_4(
     sycl::queue& queue,
-    float* acc,
+    sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
     const int m,
     const int n,
     const int k) {
-  if (m == 1 && n == 4096 && k == 4096)
-    hgemm_splitk<
-        sycl::half,
-        /*WG_M*/ 8,
-        /*WG_N*/ 32,
-        /*SG_M*/ 8,
-        /*SG_N*/ 16,
-        /*KS*/ 8,
-        /*KN*/ 16>(queue, acc, a, b, m, n, k);
-  else if (m == 1 && n == 4096 && k == 16384)
-    hgemm_splitk<
-        sycl::half,
-        /*WG_M*/ 8,
-        /*WG_N*/ 128,
-        /*SG_M*/ 8,
-        /*SG_N*/ 16,
-        /*KS*/ 8,
-        /*KN*/ 64>(queue, acc, a, b, m, n, k);
-  else if (m == 1 && n == 16384 && k == 4096)
-    hgemm_splitk<
-        sycl::half,
-        /*WG_M*/ 8,
-        /*WG_N*/ 32,
-        /*SG_M*/ 8,
-        /*SG_N*/ 16,
-        /*KS*/ 8,
-        /*KN*/ 16>(queue, acc, a, b, m, n, k);
-  else if (m == 1 && n == 32000 && k == 4096)
-    hgemm_splitk<
-        sycl::half,
-        /*WG_M*/ 8,
-        /*WG_N*/ 32,
-        /*SG_M*/ 8,
-        /*SG_N*/ 16,
-        /*KS*/ 8,
-        /*KN*/ 16>(queue, acc, a, b, m, n, k);
+  // m == 1 && n == 4096 && k == 4096
+  hgemm_common<sycl::half, 8, 32, 8, 16, 32, 4, 1, 1, 3>(
+      queue, out, a, b, m, n, k);
+}
+
+void hgemm_8x32_8x16x64_8(
+    sycl::queue& queue,
+    sycl::half* out,
+    const sycl::half* a,
+    const sycl::half* b,
+    const int m,
+    const int n,
+    const int k) {
+  // m == 1 && n == 4096 && k == 16384
+  hgemm_common<sycl::half, 8, 32, 8, 16, 64, 8, 1, 1, 3>(
+      queue, out, a, b, m, n, k);
+}
+
+void hgemm_8x32_8x16x64_1(
+    sycl::queue& queue,
+    sycl::half* out,
+    const sycl::half* a,
+    const sycl::half* b,
+    const int m,
+    const int n,
+    const int k) {
+  // m == 1 && n == 16384 && k == 4096
+  // m == 1 && n == 32000 && k == 4096
+  hgemm_common<sycl::half, 8, 32, 8, 16, 64, 1, 1, 1, 3>(
+      queue, out, a, b, m, n, k);
 }
 
 } // namespace xetla

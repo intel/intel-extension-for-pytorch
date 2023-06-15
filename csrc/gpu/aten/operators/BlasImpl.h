@@ -971,94 +971,65 @@ static Tensor& matmul_fusion_variants(
   }
 }
 
-template <typename T, int vec_size>
-struct alignas(sizeof(T) * vec_size) aligned_array {
-  T val[vec_size];
-};
-
-template <typename in_t, typename out_t, int vec_size, typename item_t>
-inline void dtype_cast_kernel(
-    item_t& item,
-    const in_t* in,
-    out_t* out,
-    const int n) {
-  int group_work_size = item.get_local_range(0) * vec_size;
-  int index =
-      item.get_group(0) * group_work_size + item.get_local_id(0) * vec_size;
-  int remaining = n - index;
-  if (remaining < vec_size) {
-    for (int i = index; i < n; i++) {
-      out[i] = static_cast<out_t>(in[i]);
-    }
-  } else {
-    using in_vec_t = aligned_array<in_t, vec_size>;
-    using out_vec_t = aligned_array<out_t, vec_size>;
-    auto in_vec = *reinterpret_cast<in_vec_t*>(const_cast<in_t*>(&in[index]));
-    out_vec_t out_vec;
-#pragma unroll
-    for (int i = 0; i < vec_size; i++) {
-      out_vec.val[i] = static_cast<out_t>(in_vec.val[i]);
-    }
-    *reinterpret_cast<out_vec_t*>(&out[index]) = out_vec;
-  }
-}
-
-template <typename in_t, typename out_t, int vec_size>
-void dtype_cast(sycl::queue& q, const in_t* in, out_t* out, const int n) {
-  const int group_size = 256;
-  const int group_work_size = group_size * vec_size;
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      dtype_cast_kernel<in_t, out_t, vec_size>(item, in, out, n);
-    };
-    cgh.parallel_for(
-        sycl::nd_range<1>(
-            sycl::range<1>(
-                (n + group_work_size - 1) / group_work_size * group_size),
-            sycl::range<1>(group_size)),
-        kfn);
-  };
-  DPCPP_Q_SUBMIT(q, cgf);
-}
-
 static Tensor& matmul_xetla(
     Tensor& output,
     const Tensor& tensor1,
     const Tensor& tensor2,
     bool* state) {
-  RECORD_FUNCTION("torch_ipex::matmul_xetla", c10::ArrayRef<c10::IValue>({}));
   auto& q = dpcppGetCurrentQueue();
   int m = output.sizes()[0];
   int n = output.sizes()[1];
   int k = tensor1.sizes()[1];
   *state = false;
-  bool is_gpt_shape = (m == 1 && k == 4096 && n == 4096) ||
-      (m == 1 && k == 16384 && n == 4096) ||
-      (m == 1 && k == 4096 && n == 16384) ||
-      (m == 1 && k == 4096 && n == 32000);
+
   bool is_contiguous =
       tensor1.is_contiguous() && tensor2.transpose(0, 1).is_contiguous();
-  if (!is_gpt_shape || !is_contiguous)
+  if (!is_contiguous)
     return output;
+
   if (output.scalar_type() == kHalf) {
+    using namespace xpu::xetla;
     using scalar_t =
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
-    auto out_acc =
-        at::zeros({m * n}, output.options().dtype(kFloat)); // TODO: use empty
-    xpu::xetla::gemm(
-        q,
-        out_acc.data_ptr<float>(),
-        reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
-        reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
-        m,
-        n,
-        k);
-    dtype_cast<float, sycl::half, 4>(
-        q,
-        out_acc.data_ptr<float>(),
-        reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
-        m * n);
-    *state = true;
+    if (m == 1 && n == 4096 && k == 4096) {
+      RECORD_FUNCTION(
+          "torch_ipex::hgemm_8x32_8x16x32_4", c10::ArrayRef<c10::IValue>({}));
+      hgemm_8x32_8x16x32_4(
+          q,
+          reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
+          m,
+          n,
+          k);
+      *state = true;
+    } else if (m == 1 && n == 4096 && k == 16384) {
+      RECORD_FUNCTION(
+          "torch_ipex::hgemm_8x32_8x16x64_8", c10::ArrayRef<c10::IValue>({}));
+      hgemm_8x32_8x16x64_8(
+          q,
+          reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
+          m,
+          n,
+          k);
+      *state = true;
+    } else if (
+        (m == 1 && n == 16384 && k == 4096) ||
+        (m == 1 && n == 32000 && k == 4096)) {
+      RECORD_FUNCTION(
+          "torch_ipex::hgemm_8x32_8x16x64_1", c10::ArrayRef<c10::IValue>({}));
+      hgemm_8x32_8x16x64_1(
+          q,
+          reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
+          m,
+          n,
+          k);
+      *state = true;
+    }
   }
   return output;
 }
