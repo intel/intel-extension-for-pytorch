@@ -341,6 +341,10 @@ void LayerNormKernelImplInternal(
   bool can_use_32bit_index = canUse32BitIndexMath(X);
   LayerNormForward<scalar_t, mean_t, weight_t> layer_norm_forward(
       X_data, Y_data, mean_data, var_data, gamma_data, beta_data, eps, M, N);
+
+  // TODO: force it to use fused_norm_kernel
+  config.workgroup_num_foreach = 1;
+  config.WGPlane = config.Plane;
   if (config.workgroup_num_foreach == 1) {
     launch_vectorized_fused_norm_kernel<
         scalar_t,
