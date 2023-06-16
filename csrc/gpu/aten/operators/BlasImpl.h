@@ -1036,7 +1036,7 @@ static bool gemm_xetla(
 
     if (m == 1 && n == 4096 && k == 4096) {
       if (!bias.defined()) {
-        GEMM_XETLA_DISPATCH(hgemm_8x128_8x16x32_4);
+        GEMM_XETLA_DISPATCH(hgemm_32x64_8x16x16_2);
       } else {
         return false;
       }

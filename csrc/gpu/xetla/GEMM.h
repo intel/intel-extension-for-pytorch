@@ -32,6 +32,15 @@ void hgemm_8x32_8x16x64_1(
     const int n,
     const int k);
 
+void hgemm_32x64_8x16x16_2(
+    sycl::queue& queue,
+    sycl::half* out,
+    const sycl::half* a,
+    const sycl::half* b,
+    const int m,
+    const int n,
+    const int k);
+
 // m == 1 && n == 4096 && k == 4096
 void hgemm_8x128_8x16x32_4(
     sycl::queue& queue,
