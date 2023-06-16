@@ -1,17 +1,11 @@
 # This Python file uses the following encoding: utf-8
-
 import copy
-import pkg_resources
+import warnings
 
 import torch
 import torch._dynamo
 import torch.fx.experimental.optimization as optimization
-from torch._dynamo.backends.common import fake_tensor_unsupported
-from torch.jit._trace import TracerWarning
-from torch.utils._mode_utils import no_dispatch
-from torch._subclasses import FakeTensor
-import warnings
-from enum import IntFlag
+from enum import IntFlag, IntEnum
 
 from .nn import utils
 from .optim._optimizer_utils import (
@@ -19,32 +13,19 @@ from .optim._optimizer_utils import (
     IPEX_FUSED_OPTIMIZER_LIST_CPU,
     IPEX_FUSED_OPTIMIZER_LIST_XPU,
 )
-import intel_extension_for_pytorch._C as core
 from .utils.channels_last_1d import to_channels_last_1d
 from .cpu.utils.linear_bn_folding import linear_bn_fuse
-from enum import IntEnum
-from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
+from .cpu.graph_capture import GraphCapture
+from .nn.utils._lstm_convert import _LSTM, replace_lstm_with_ipex_lstm
+from .nn.utils._weight_prepack import _IPEXConv2d, _IPEXConvTranspose2d, _IPEXLinear
+from .nn.utils._weight_prepack import weight_prepack_with_ipex, record_input_shape_for_prepack
+from .cpu._auto_kernel_selection import (
     _enable_dnnl,
     _disable_dnnl,
 )
-from intel_extension_for_pytorch.fx.concat_linear import (
-    _concat_linear as _concat_linear,
-)
-import intel_extension_for_pytorch._C as torch_ipex_cpp
+from .fx.concat_linear import _concat_linear
 
-try:
-    from .cpu import tpp
-except BaseException:
-    warnings.warn(
-        "Please install transformers repo when you want to use fast_bert API."
-    )
-
-from typing import List
-import functools
-import logging
-import threading
-from typing import Callable, Dict, Optional, Union
-import builtins
+import intel_extension_for_pytorch._C as core
 
 
 def _copy_model_and_optimizer(model, optimizer):
@@ -101,7 +82,6 @@ def _copy_model_and_optimizer(model, optimizer):
         return new_model, new_optimizer
 
 
-# TODO: need discussion design here with CPU
 class auto_channels_last_flag(IntFlag):
     AUTO = -1
     DISABLE = 0
@@ -174,108 +154,6 @@ class _O1:
 
 
 opt_levels = {"O0": _O0(), "O1": _O1()}
-
-
-class RunMethods(IntEnum):
-    JIT = 1
-    TorchDynamo = 2
-    EagerInfer = 3
-    EagerTrain = 4
-
-
-class GraphCapture(object):
-    def __init__(self, model, train, dtype, weights_prepack):
-        self.model = copy.deepcopy(model)
-        self.train = train
-        self.dtype = dtype
-        self.weights_prepack = weights_prepack
-        self.method = None
-        self.lock = threading.Lock()
-
-    def __call__(self, func):
-        @fake_tensor_unsupported
-        def compiler(gm: torch.fx.GraphModule, example_inputs: List[torch.Tensor]):
-            try:
-                with torch.no_grad():
-                    traced_model = torch.jit.trace(gm.eval(), example_inputs)
-                    traced_model = torch.jit.freeze(traced_model)
-                return traced_model
-            except Exception:
-                warnings.warn("JIT trace failed during the 'compiler' process.")
-                return gm
-
-        @functools.wraps(func)
-        def forward(*input, **kwargs):
-            if torch.jit.is_tracing():
-                return func(*input, **kwargs)
-            with torch.cpu.amp.autocast(
-                enabled=(self.dtype == torch.bfloat16 or self.dtype == torch.half),
-                dtype=self.dtype,
-            ):
-                if self.method:
-                    if self.train:
-                        return func(*input, **kwargs)
-                    else:
-                        return self.model(*input, **kwargs)
-                else:
-                    # Lock the graph generation process to avoid multiple threads generating graph simultaneously.
-                    with self.lock:
-                        if self.method:
-                            if self.train:
-                                return func(*input, **kwargs)
-                            else:
-                                return self.model(*input, **kwargs)
-                        if self.train:
-                            warnings.warn(
-                                "graph capture does not support training yet."
-                            )
-                            self.method = RunMethods.EagerTrain
-                            return func(*input, **kwargs)
-                        else:
-                            try:
-                                # Try JIT trace.
-                                # Tracing only records operations done when the given function is run on the given
-                                # tensors. Therefore, the returned ScriptModule will always run the same traced graph
-                                # on any input. This has some important implications when your module is expected
-                                # to run different sets of operations, depending on the input and/or the module state.
-                                # In cases like these, tracing would not be appropriate, and the tracer will try to
-                                # emit warnings when doing something that may cause an incorrect trace to be produced.
-                                # Therefore, we catch these warnings and treat them as errors, and let TorchDynamo
-                                # handle such models appropriately.
-                                with warnings.catch_warnings():
-                                    warnings.filterwarnings(
-                                        "error", category=TracerWarning
-                                    )
-                                    traced_model = torch.jit.trace(
-                                        self.model.eval(), input
-                                    ).eval()
-                                    traced_model = torch.jit.freeze(traced_model)
-                                    output = traced_model(*input, **kwargs)
-                                    self.model = traced_model
-                                    self.method = RunMethods.JIT
-                                    logging.debug("generate graph by JIT trace.")
-                                    return output
-                            except BaseException:
-                                try:
-                                    # JIT trace failed, try torchdynamo with JIT trace backend.
-                                    torch._dynamo.reset()
-                                    dynamo_model = torch._dynamo.optimize(
-                                        compiler, dynamic=True
-                                    )(self.model)
-                                    output = dynamo_model(*input, **kwargs)
-                                    self.model = dynamo_model
-                                    self.method = RunMethods.TorchDynamo
-                                    logging.debug("generate graph by TorchDynamo.")
-                                    return output
-                                except BaseException:
-                                    warnings.warn(
-                                        "Both JIT and TorchDynamo failed, fallback to original model."
-                                    )
-                                    self.method = RunMethods.EagerInfer
-                                    torch._dynamo.reset()
-                                    return self.model(*input, **kwargs)
-
-        return forward
 
 
 def optimize(
@@ -532,14 +410,12 @@ def optimize(
                 "For XPU, the oob solution for inference is to trace model outside of the torch.xpu.optimize,"
                 + " so temp to disable the graph mode"
             )
-            # TODO: for xpu now, the oob solution for inference is to trace model outside of the torch.xpu.optimize.
             opt_properties.graph_mode = False
         if not inplace:
             warnings.warn(
                 "For XPU device to save valuable device memory, temp to do optimization on inplaced model,"
                 + " so make inplace to be true"
             )
-            # TODO: for xpu, inplace is true will add device memory pressure, so set inplace to be true
             inplace = True
         # for XPU, weight prepack is unsupported, so sample input is useless
         if opt_properties.weights_prepack:
@@ -566,9 +442,7 @@ def optimize(
     if sample_input is not None:
         if isinstance(sample_input, torch.Tensor):
             sample_input = (sample_input,)
-        utils._weight_prepack.record_input_shape_for_prepack(
-            optimized_model, sample_input
-        )
+        record_input_shape_for_prepack(optimized_model, sample_input)
     params_attr = {}
     if not model.training:
         if opt_properties.conv_bn_folding:
@@ -598,9 +472,7 @@ def optimize(
             )
 
     if opt_properties.optimize_lstm:
-        utils._model_convert.replace_lstm_with_ipex_lstm(
-            optimized_model, optimized_optimizer
-        )
+        replace_lstm_with_ipex_lstm(optimized_model, optimized_optimizer)
     if (
         model.training
         and opt_properties.split_master_weight_for_bf16
@@ -661,40 +533,29 @@ def optimize(
 
     # Since TorchDynamo cannot handle custom operations yet, for the case of inference graph mode,
     # the weights prepacking here is temporarily cancelled, and it will be completed on the graph.
-    if opt_properties.weights_prepack:
-        if device_type == "cpu":
-            if dtype == torch.bfloat16:
-                assert core.onednn_has_bf16_support(), (
-                    "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, "
-                    + "please set dtype to torch.float or set weights_prepack to False."
-                )
-            if dtype == torch.half:
-                assert core.onednn_has_fp16_support(), (
-                    "FP16 weight prepack needs the cpu support avx512_core_fp16, "
-                    + "please set dtype to torch.float or set weights_prepack to False."
-                )
-            (
-                optimized_model,
-                optimized_optimizer,
-                params_attr,
-            ) = utils._weight_prepack.weight_prepack_with_ipex(
-                optimized_model, optimized_optimizer, params_attr, "cpu"
+    if opt_properties.weights_prepack and device_type == "cpu":
+        if dtype == torch.bfloat16:
+            assert core.onednn_has_bf16_support(), (
+                "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, "
+                + "please set dtype to torch.float or set weights_prepack to False."
             )
-            torch._dynamo.allow_in_graph(utils._weight_prepack._IPEXConv2d)
-            torch._dynamo.allow_in_graph(utils._weight_prepack._IPEXConvTranspose2d)
-            torch._dynamo.allow_in_graph(utils._weight_prepack._IPEXLinear)
-            torch._dynamo.allow_in_graph(utils._model_convert._LSTM)
-        else:
-            assert (
-                device_type == "xpu"
-            ), "Unknown device type, only support device CPU and XPU"
-            (
-                optimized_model,
-                optimized_optimizer,
-                params_attr,
-            ) = utils._weight_prepack.weight_prepack_with_ipex(
-                optimized_model, optimized_optimizer, params_attr, "xpu"
+        if dtype == torch.half:
+            assert core.onednn_has_fp16_support(), (
+                "FP16 weight prepack needs the cpu support avx512_core_fp16, "
+                + "please set dtype to torch.float or set weights_prepack to False."
             )
+        (
+            optimized_model,
+            optimized_optimizer,
+            params_attr,
+        ) = weight_prepack_with_ipex(
+            optimized_model, optimized_optimizer, params_attr, "cpu"
+        )
+        torch._dynamo.allow_in_graph(_IPEXConv2d)
+        torch._dynamo.allow_in_graph(_IPEXConvTranspose2d)
+        torch._dynamo.allow_in_graph(_IPEXLinear)
+        torch._dynamo.allow_in_graph(_LSTM)
+
 
     if opt_properties.graph_mode:
         _old_forward = optimized_model.forward
@@ -706,7 +567,6 @@ def optimize(
         )
         optimized_model.forward = wrapper(_old_forward)
 
-    # TODO: model list, optimizer list.
     if optimizer is None:
         return optimized_model
 
@@ -718,95 +578,6 @@ def optimize(
             device_type,
         )
     return optimized_model, optimized_optimizer
-
-
-_compiler_backend = "torchscript"
-
-
-def _get_compiler_backend():
-    return _compiler_backend
-
-
-def _set_compiler_backend(backend="torchscript"):
-    global _compiler_backend
-    _compiler_backend = backend
-
-
-def compile(
-    model: torch.fx.GraphModule,
-    example_inputs: List[torch.Tensor],
-    mode: Union[str, None] = None,
-    options: Optional[Dict[str, Union[str, builtins.int, builtins.bool]]] = None,
-) -> Callable:
-    def defake(x):
-        if not isinstance(x, FakeTensor):
-            return x
-        if x._has_symbolic_sizes_strides:
-            size = [
-                s.node.shape_env.size_hint(s.node.expr)
-                if isinstance(s, torch.SymInt)
-                else s
-                for s in x.size()
-            ]
-            stride = [
-                s.node.shape_env.size_hint(s.node.expr)
-                if isinstance(s, torch.SymInt)
-                else s
-                for s in x.stride()
-            ]
-        else:
-            size = x.size()
-            stride = x.stride()
-        y = torch.empty_strided(
-            size,
-            stride,
-            dtype=x.dtype,
-            device=x.device,
-            requires_grad=x.requires_grad,
-        )
-        y.zero_()
-        return y
-
-    if _get_compiler_backend() == "inductor":
-        from ._inductor.compile_fx import compile_fx
-
-        return compile_fx(model, example_inputs, mode, options)
-
-    try:
-        with no_dispatch():
-            real_inputs = list(map(defake, example_inputs))
-            with torch.no_grad():
-                traced_model = torch.jit.trace(model.eval(), real_inputs)
-                traced_model = torch.jit.freeze(traced_model)
-            return traced_model
-    except Exception:
-        warnings.warn("JIT trace failed during the IPEX compile process.")
-        return model
-
-
-def enable_onednn_fusion(enabled):
-    r"""
-    Enables or disables oneDNN fusion functionality. If enabled, oneDNN
-    operators will be fused in runtime, when intel_extension_for_pytorch
-    is imported.
-
-    Args:
-        enabled (bool): Whether to enable oneDNN fusion functionality or not.
-            Default value is ``True``.
-
-    Examples:
-
-        >>> import intel_extension_for_pytorch as ipex
-        >>> # to enable the oneDNN fusion
-        >>> ipex.enable_onednn_fusion(True)
-        >>> # to disable the oneDNN fusion
-        >>> ipex.enable_onednn_fusion(False)
-    """
-
-    if enabled:
-        core.enable_jit_opt()
-    else:
-        core.disable_jit_opt()
 
 
 def _convert_convNd_deconvNd_weight_memory_format(module):
@@ -942,155 +713,3 @@ def get_fp32_math_mode(device="cpu"):
         raise RuntimeError(
             "Unexpected device type {}. ".format(device) + "Supported are 'cpu', 'xpu'."
         )
-
-
-def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
-    r"""
-    Use TPP to speedup training/inference. fast_bert API is still a experimental
-    feature and now only optimized for bert model.
-
-    Args:
-        model (torch.nn.Module): User model to apply optimizations on.
-        dtype (torch.dtype): Only works for ``torch.bfloat16`` and ``torch.float`` .
-            The default value is torch.float.
-        optimizer (torch.optim.Optimizer): User optimizer to apply optimizations
-            on, such as SGD. The default value is ``None``, meaning inference case.
-        unpad(bool): Unpad the squence to reduce the sparsity.
-        seed(string): The seed used for the libxsmm kernel. In general it should be same
-            to the torch.seed
-
-    .. warning::
-
-        Please invoke ``fast_bert`` function AFTER loading weights to model via
-        ``model.load_state_dict(torch.load(PATH))``.
-
-    .. warning::
-
-        This API can't be used when you have applied the ipex.optimize.
-
-    .. warning::
-
-        Please invoke ``optimize`` function BEFORE invoking DDP in distributed
-        training scenario.
-
-    Examples:
-
-        >>> # bfloat16 inference case.
-        >>> model = ...
-        >>> model.load_state_dict(torch.load(PATH))
-        >>> model.eval()
-        >>> optimized_model = ipex.tpp_bert(model, dtype=torch.bfloat16)
-        >>> # running evaluation step.
-        >>> # bfloat16 training case.
-        >>> optimizer = ...
-        >>> model.train()
-        >>> optimized_model, optimized_optimizer = ipex.fast_bert(model, dtype=torch.bfloat16,
-                optimizer=optimizer, unpad=True, seed=args.seed)
-        >>> # running training step.
-
-    """
-    # tpp bert optimization depends on the transformers repo to implementate the related module
-    installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
-    min_version = "4.6.0"
-    max_version = "4.20.0"
-    if "transformers" not in installed_pkg:
-        raise RuntimeError(
-            "Please installed the transformers with version: between {} and {}".format(
-                min_version, max_version
-            )
-        )
-
-    import transformers
-    from packaging import version
-
-    trans_version = transformers.__version__
-    if version.parse(trans_version) < version.parse(min_version) or version.parse(
-        trans_version
-    ) > version.parse(max_version):
-        raise RuntimeError(
-            "Please installed the transformers with version: between {} and {} while now transformers== {}".format(
-                min_version, max_version, trans_version
-            )
-        )
-    PT_OPTIMIZER_TO_TPP_OPTIMIZER = {
-        torch.optim.AdamW: tpp.optim.AdamW,
-        transformers.optimization.AdamW: tpp.optim.AdamW,
-        torch.optim.SGD: tpp.optim.SGD,
-    }
-    if dtype not in (
-        torch.float,
-        torch.bfloat16,
-    ):
-        raise ValueError("TPP only supports torch.float and torch.bfloat16.")
-
-    # setup the seed for libxsmm (can be only positive int value) which will imapct some ops using seed. e.g., dropout
-    try:
-        torch_ipex_cpp.xsmm_manual_seed(
-            torch.tensor(torch.initial_seed()).to(torch.int32).abs().item()
-        )
-    except BaseException:
-        warnings.warn(
-            "Set seed failed for libxsmm which may impact the training loss, you can call \
-                torch.manual_seed(N) before invoking fast_bert."
-        )
-    # replace the original transfomers module object with tpp module which has the same functionality but with more
-    # operator fusion optimization
-    new_model = copy.deepcopy(model)
-    tpp.fused_bert.layer_use_bf16 = True if dtype == torch.bfloat16 else False
-    if unpad:
-        tpp.fused_bert.unpad = True
-    else:
-        tpp.fused_bert.unpad = False
-    if isinstance(model, transformers.models.bert.modeling_bert.BertModel):
-        assert isinstance(
-            new_model.embeddings, transformers.models.bert.modeling_bert.BertEmbeddings
-        )
-        new_model.embeddings = tpp.fused_bert.BertEmbeddings(model.config)
-        assert isinstance(
-            new_model.encoder, transformers.models.bert.modeling_bert.BertEncoder
-        )
-        new_model.encoder = tpp.fused_bert.BertEncoder(model.config)
-    elif hasattr(model, "bert") and isinstance(
-        model.bert, transformers.models.bert.modeling_bert.BertModel
-    ):
-        assert isinstance(
-            new_model.bert.embeddings,
-            transformers.models.bert.modeling_bert.BertEmbeddings,
-        )
-        new_model.bert.embeddings = tpp.fused_bert.BertEmbeddings(model.bert.config)
-        assert isinstance(
-            new_model.bert.encoder, transformers.models.bert.modeling_bert.BertEncoder
-        )
-        new_model.bert.encoder = tpp.fused_bert.BertEncoder(model.bert.config)
-    else:
-        warnings.warn(
-            "fast_bert only supports instance of transformers.models.bert.modeling_bert.BertModel"
-        )
-        return model, optimizer
-    new_model.load_state_dict(
-        model.state_dict()
-    )  # copy the original params into the tpp module
-    tpp.block(new_model)  # get block format weights/bias
-    if optimizer is None:
-        return new_model
-    # replace the original pytorch/transformer optimizer with tpp optimizer for SGD/AdamW
-    # keep the original optimizer state and replace the params with the blocked tpp params
-    param_pair = {}
-    for param_ori, param_tpp in zip(model.parameters(), new_model.parameters()):
-        param_pair[param_ori] = param_tpp
-    if type(optimizer) not in PT_OPTIMIZER_TO_TPP_OPTIMIZER:
-        warnings.warn(
-            "Still return the origin optimize, the fast_bert can only replace the SGD, AdamW optimizer"
-        )
-        new_optimizer = optimizer
-    else:
-        new_optimizer = PT_OPTIMIZER_TO_TPP_OPTIMIZER[type(optimizer)]([{"params": []}])
-    new_optimizer.state = optimizer.state
-    new_optimizer.param_groups = optimizer.param_groups
-    for group in new_optimizer.param_groups:
-        for i, p in enumerate(group["params"]):
-            if p in param_pair:
-                new_param = param_pair[p]
-                group["params"][i] = new_param
-
-    return new_model, new_optimizer

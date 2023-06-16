@@ -59,7 +59,7 @@ def run_model(args):
             level="O1",
             auto_kernel_selection=True,
         )
-    ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model2, None)
+    ipex.nn.utils._lstm_convert.replace_lstm_with_ipex_lstm(model2, None)
     if mode == "jit":
         model = torch.jit.trace(model, inputs).eval()
         model = torch.jit.freeze(model)

@@ -6,7 +6,7 @@ import types
 import warnings
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _using_dnnl
 from intel_extension_for_pytorch import frontend
-from ._weight_prepack import (
+from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     _IPEXLinear,
     _IPEXConv1d,
     _IPEXConv2d,
@@ -54,7 +54,7 @@ def IPEX_GEMM_MODULE_CPU():
 
 @functools.lru_cache(None)
 def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
-    from ._model_convert import _LSTM
+    from ._lstm_convert import _LSTM
     from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBag
 
     module_convert_list_bf16_inference = [

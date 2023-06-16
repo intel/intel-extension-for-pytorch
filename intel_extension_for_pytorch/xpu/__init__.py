@@ -12,6 +12,7 @@ from .lazy_init import _lazy_init, _lazy_call
 from torch import device as _device
 from torch._utils import classproperty
 
+from ._proxy_module import *
 from .streams import Stream, Event
 from .intrinsic import *
 from .cpp_extension import *
