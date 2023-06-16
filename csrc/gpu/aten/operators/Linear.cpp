@@ -258,8 +258,8 @@ Tensor linear_gelu(
 #if defined(USE_XETLA)
   auto& q = dpcppGetCurrentQueue();
   int m = input.sizes()[0];
-  int n = input.sizes()[1];
-  int k = weight.sizes()[1];
+  int n = weight.sizes()[1];
+  int k = input.sizes()[1];
   bool is_a_contiguous = input.is_contiguous();
   bool is_b_row_major = weight.is_contiguous();
   bool is_b_col_major = weight.transpose(0, 1).is_contiguous();
