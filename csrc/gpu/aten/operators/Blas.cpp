@@ -67,10 +67,8 @@ Tensor& addmm_out(
   }
 
 #if defined(USE_XETLA)
-  bool state;
-  matmul_xetla(
-      result, mat1, mat2, self, alpha.to<float>(), beta.to<float>(), &state);
-  if (state) {
+  if (gemm_xetla(
+          result, mat1, mat2, self, alpha.to<float>(), beta.to<float>())) {
     return result;
   }
 #endif
@@ -157,14 +155,12 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
   }
 
 #if defined(USE_XETLA)
-  bool state;
-  matmul_xetla(result, self, mat2, at::Tensor(), 1.f, 1.f, &state);
-  if (!state) {
-    xpu::oneDNN::matmul(result, self, mat2, at::Tensor(), true, Attr());
+  if (gemm_xetla(result, self, mat2, at::Tensor())) {
+    return result;
   }
-#else
-  xpu::oneDNN::matmul(result, self, mat2, at::Tensor(), true, Attr());
 #endif
+
+  xpu::oneDNN::matmul(result, self, mat2, at::Tensor(), true, Attr());
   return result;
 }
 

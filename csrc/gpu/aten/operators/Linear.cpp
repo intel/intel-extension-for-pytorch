@@ -1,4 +1,5 @@
 #include "Linear.h"
+#include <xetla/GEMM.h>
 #include "utils/CustomOperatorRegistration.h"
 
 namespace at {
@@ -236,11 +237,54 @@ Tensor linear_scalar_sub(
   return linear_scalar_add(input, weight, bias, scalar, -scale);
 }
 
+#define GEMM_BIAS_XETLA_DISPATCH(F)                                     \
+  {                                                                     \
+    RECORD_FUNCTION("torch_ipex::" #F, c10::ArrayRef<c10::IValue>({})); \
+    F(q,                                                                \
+      reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),       \
+      reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),        \
+      reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),       \
+      reinterpret_cast<sycl::half*>(bias_.data_ptr<scalar_t>()),        \
+      m,                                                                \
+      n,                                                                \
+      k);                                                               \
+  }
+
 Tensor linear_gelu(
     const Tensor& input,
     const Tensor& weight,
     const c10::optional<Tensor>& bias,
     c10::string_view approximate) {
+#if defined(USE_XETLA)
+  auto& q = dpcppGetCurrentQueue();
+  int m = input.sizes()[0];
+  int n = input.sizes()[1];
+  int k = weight.sizes()[1];
+  bool is_a_contiguous = input.is_contiguous();
+  bool is_b_row_major = weight.is_contiguous();
+  bool is_b_col_major = weight.transpose(0, 1).is_contiguous();
+  bool is_half = input.scalar_type() == kHalf;
+  bool is_bias = false;
+  if (bias.has_value()) {
+    auto bias_ = bias.value();
+    if (bias_.defined() && bias_.dim() == 1 && bias_.sizes()[0] == n &&
+        bias_.is_contiguous()) {
+      is_bias = true;
+    }
+    if (is_a_contiguous && is_b_row_major && is_half && is_bias &&
+        approximate == "tanh") {
+      using scalar_t =
+          decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
+      using namespace xpu::xetla;
+      if (m == 1 && n == 16384 && k == 4096) {
+        auto output = at::empty({m, n}, input.options());
+        GEMM_BIAS_XETLA_DISPATCH(hgemm_bias_gelu_8x512_8x16x16_1);
+        return output;
+      }
+    }
+  }
+#endif
+
   RECORD_FUNCTION(
       "linear_gelu", std::vector<c10::IValue>({input, weight, bias}));
   auto linear_wrapper = LinearConverter();
@@ -260,6 +304,8 @@ Tensor linear_gelu(
   Tensor result;
   return linear_wrapper.call(result, input, weight, bias, post_op);
 }
+
+#undef GEMM_BIAS_XETLA_DISPATCH
 
 Tensor linear_hardsigmoid(
     const Tensor& input,

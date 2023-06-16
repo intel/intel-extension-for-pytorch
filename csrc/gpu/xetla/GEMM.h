@@ -65,5 +65,15 @@ void hgemm_bias_8x512_8x16x16_1(
     const int n,
     const int k);
 
+void hgemm_bias_gelu_8x512_8x16x16_1(
+    sycl::queue& queue,
+    sycl::half* out,
+    const sycl::half* a,
+    const sycl::half* b,
+    const sycl::half* bias,
+    const int m,
+    const int n,
+    const int k);
+
 } // namespace xetla
 } // namespace xpu

@@ -971,114 +971,99 @@ static Tensor& matmul_fusion_variants(
   }
 }
 
-static Tensor& matmul_xetla(
+#if defined(USE_XETLA)
+
+#define GEMM_XETLA_DISPATCH(F)                                          \
+  {                                                                     \
+    RECORD_FUNCTION("torch_ipex::" #F, c10::ArrayRef<c10::IValue>({})); \
+    F(q,                                                                \
+      reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),       \
+      reinterpret_cast<sycl::half*>(a.data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(b.data_ptr<scalar_t>()),            \
+      m,                                                                \
+      n,                                                                \
+      k);                                                               \
+  }
+
+#define GEMM_BIAS_XETLA_DISPATCH(F)                                     \
+  {                                                                     \
+    RECORD_FUNCTION("torch_ipex::" #F, c10::ArrayRef<c10::IValue>({})); \
+    F(q,                                                                \
+      reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),       \
+      reinterpret_cast<sycl::half*>(a.data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(b.data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(bias.data_ptr<scalar_t>()),         \
+      m,                                                                \
+      n,                                                                \
+      k);                                                               \
+  }
+
+static bool gemm_xetla(
     Tensor& output,
-    const Tensor& tensor1,
-    const Tensor& tensor2,
+    const Tensor& a,
+    const Tensor& b,
     const Tensor& bias,
-    const float alpha,
-    const float beta,
-    bool* state) {
+    const float alpha = 1.f,
+    const float beta = 0.f) {
   auto& q = dpcppGetCurrentQueue();
   int m = output.sizes()[0];
   int n = output.sizes()[1];
-  int k = tensor1.sizes()[1];
-  *state = false;
+  int k = a.sizes()[1];
 
-  if (!(alpha == 1.f && beta == 1.f))
-    return output;
-
-  if (bias.defined() && bias.dim() != 1 && bias.sizes()[0] != n) {
-    return output;
+  if (alpha != 1.f)
+    return false;
+  if (bias.defined()) {
+    if (!(bias.dim() == 1 && bias.sizes()[0] == n && bias.is_contiguous()))
+      return false;
+    if (beta != 1.f)
+      return false;
   }
 
-  bool is_contiguous =
-      tensor1.is_contiguous() && tensor2.is_contiguous(); // row major
+  bool is_a_contiguous = a.is_contiguous();
+  bool is_b_row_major = b.is_contiguous();
+  bool is_b_col_major = b.transpose(0, 1).is_contiguous();
+  if (is_b_col_major) // TODO: support col major
+    return false;
+  bool is_contiguous = (is_a_contiguous && is_b_row_major) ||
+      (is_a_contiguous && is_b_col_major);
   if (!is_contiguous)
-    return output;
+    return false;
 
   if (output.scalar_type() == kHalf) {
     using namespace xpu::xetla;
     using scalar_t =
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
+
     if (m == 1 && n == 4096 && k == 4096) {
       if (!bias.defined()) {
-        RECORD_FUNCTION(
-            "torch_ipex::hgemm_8x128_8x16x32_4",
-            c10::ArrayRef<c10::IValue>({}));
-        hgemm_8x128_8x16x32_4(
-            q,
-            reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
-            m,
-            n,
-            k);
+        GEMM_XETLA_DISPATCH(hgemm_8x128_8x16x32_4);
       } else {
-        return output;
+        return false;
       }
-      *state = true;
     } else if (m == 1 && n == 4096 && k == 16384) {
       if (!bias.defined()) {
-        RECORD_FUNCTION(
-            "torch_ipex::hgemm_8x32_8x16x64_8", c10::ArrayRef<c10::IValue>({}));
-        hgemm_8x32_8x16x64_8(
-            q,
-            reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
-            m,
-            n,
-            k);
+        GEMM_XETLA_DISPATCH(hgemm_8x32_8x16x64_8);
       } else {
-        RECORD_FUNCTION(
-            "torch_ipex::hgemm_bias_8x128_8x16x16_4",
-            c10::ArrayRef<c10::IValue>({}));
-        hgemm_bias_8x128_8x16x16_4(
-            q,
-            reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(bias.data_ptr<scalar_t>()),
-            m,
-            n,
-            k);
+        GEMM_BIAS_XETLA_DISPATCH(hgemm_bias_8x128_8x16x16_4);
       }
-      *state = true;
     } else if (
         (m == 1 && n == 16384 && k == 4096) ||
         (m == 1 && n == 32000 && k == 4096) ||
         (m == 1 && n == 50400 && k == 4096)) {
       if (!bias.defined()) {
-        RECORD_FUNCTION(
-            "torch_ipex::hgemm_8x32_8x16x64_1", c10::ArrayRef<c10::IValue>({}));
-        hgemm_8x32_8x16x64_1(
-            q,
-            reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
-            m,
-            n,
-            k);
+        GEMM_XETLA_DISPATCH(hgemm_8x32_8x16x64_1);
       } else {
-        RECORD_FUNCTION(
-            "torch_ipex::hgemm_bias_8x512_8x16x16_1",
-            c10::ArrayRef<c10::IValue>({}));
-        hgemm_bias_8x512_8x16x16_1(
-            q,
-            reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(bias.data_ptr<scalar_t>()),
-            m,
-            n,
-            k);
+        GEMM_BIAS_XETLA_DISPATCH(hgemm_bias_8x512_8x16x16_1);
       }
-      *state = true;
     }
   }
-  return output;
+  return true;
 }
+
+#undef GEMM_XETLA_DISPATCH
+#undef GEMM_BIAS_XETLA_DISPATCH
+
+#endif
 
 } // namespace impl
 } // namespace AtenIpexTypeXPU
