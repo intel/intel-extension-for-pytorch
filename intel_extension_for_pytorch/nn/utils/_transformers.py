@@ -274,7 +274,8 @@ class IPEXGPTJBlock(nn.Module):
         output_attentions: Optional[bool] = False,
     ) -> Union[Tuple[torch.Tensor], Optional[Tuple[torch.Tensor, Tuple[torch.FloatTensor, ...]]]]:
         residual = hidden_states
-        hidden_states = self.ln_1(hidden_states)
+        #hidden_states = self.ln_1(hidden_states)
+        hidden_states, mean, var = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.ln_1.normalized_shape, self.ln_1.weight, self.ln_1.bias, self.ln_1.eps)
         attn_outputs = self.attn(
             hidden_states=hidden_states,
             layer_past=layer_past,
