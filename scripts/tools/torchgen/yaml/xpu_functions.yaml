@@ -58,6 +58,8 @@ supported:
   - _lu_with_info
   - _make_per_channel_quantized_tensor
   - _make_per_tensor_quantized_tensor
+  - _masked_softmax
+  - _masked_softmax_backward
   - _pdist_backward
   - _pdist_forward
   - _pin_memory
