@@ -66,6 +66,15 @@ Tensor& addmm_out(
 #endif
   }
 
+#if defined(USE_XETLA)
+  bool state;
+  matmul_xetla(
+      result, mat1, mat2, self, alpha.to<float>(), beta.to<float>(), &state);
+  if (state) {
+    return result;
+  }
+#endif
+
   // general case
   Tensor bias = at::Tensor();
   Attr attr;
@@ -149,7 +158,7 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
 
 #if defined(USE_XETLA)
   bool state;
-  matmul_xetla(result, self, mat2, &state);
+  matmul_xetla(result, self, mat2, at::Tensor(), 1.f, 1.f, &state);
   if (!state) {
     xpu::oneDNN::matmul(result, self, mat2, at::Tensor(), true, Attr());
   }

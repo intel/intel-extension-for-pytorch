@@ -975,6 +975,9 @@ static Tensor& matmul_xetla(
     Tensor& output,
     const Tensor& tensor1,
     const Tensor& tensor2,
+    const Tensor& bias,
+    const float alpha,
+    const float beta,
     bool* state) {
   auto& q = dpcppGetCurrentQueue();
   int m = output.sizes()[0];
@@ -982,7 +985,15 @@ static Tensor& matmul_xetla(
   int k = tensor1.sizes()[1];
   *state = false;
 
-  bool is_contiguous = tensor1.is_contiguous() && tensor2.is_contiguous();
+  if (!(alpha == 1.f && beta == 1.f))
+    return output;
+
+  if (bias.defined() && bias.dim() != 1 && bias.sizes()[0] != n) {
+    return output;
+  }
+
+  bool is_contiguous =
+      tensor1.is_contiguous() && tensor2.is_contiguous(); // row major
   if (!is_contiguous)
     return output;
 
@@ -991,42 +1002,78 @@ static Tensor& matmul_xetla(
     using scalar_t =
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
     if (m == 1 && n == 4096 && k == 4096) {
-      RECORD_FUNCTION(
-          "torch_ipex::hgemm_8x32_8x16x32_4", c10::ArrayRef<c10::IValue>({}));
-      hgemm_8x32_8x16x32_4(
-          q,
-          reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
-          m,
-          n,
-          k);
+      if (!bias.defined()) {
+        RECORD_FUNCTION(
+            "torch_ipex::hgemm_8x128_8x16x32_4",
+            c10::ArrayRef<c10::IValue>({}));
+        hgemm_8x128_8x16x32_4(
+            q,
+            reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
+            m,
+            n,
+            k);
+      } else {
+        return output;
+      }
       *state = true;
     } else if (m == 1 && n == 4096 && k == 16384) {
-      RECORD_FUNCTION(
-          "torch_ipex::hgemm_8x32_8x16x64_8", c10::ArrayRef<c10::IValue>({}));
-      hgemm_8x32_8x16x64_8(
-          q,
-          reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
-          m,
-          n,
-          k);
+      if (!bias.defined()) {
+        RECORD_FUNCTION(
+            "torch_ipex::hgemm_8x32_8x16x64_8", c10::ArrayRef<c10::IValue>({}));
+        hgemm_8x32_8x16x64_8(
+            q,
+            reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
+            m,
+            n,
+            k);
+      } else {
+        RECORD_FUNCTION(
+            "torch_ipex::hgemm_bias_8x128_8x16x16_4",
+            c10::ArrayRef<c10::IValue>({}));
+        hgemm_bias_8x128_8x16x16_4(
+            q,
+            reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(bias.data_ptr<scalar_t>()),
+            m,
+            n,
+            k);
+      }
       *state = true;
     } else if (
         (m == 1 && n == 16384 && k == 4096) ||
-        (m == 1 && n == 32000 && k == 4096)) {
-      RECORD_FUNCTION(
-          "torch_ipex::hgemm_8x32_8x16x64_1", c10::ArrayRef<c10::IValue>({}));
-      hgemm_8x32_8x16x64_1(
-          q,
-          reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
-          m,
-          n,
-          k);
+        (m == 1 && n == 32000 && k == 4096) ||
+        (m == 1 && n == 50400 && k == 4096)) {
+      if (!bias.defined()) {
+        RECORD_FUNCTION(
+            "torch_ipex::hgemm_8x32_8x16x64_1", c10::ArrayRef<c10::IValue>({}));
+        hgemm_8x32_8x16x64_1(
+            q,
+            reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
+            m,
+            n,
+            k);
+      } else {
+        RECORD_FUNCTION(
+            "torch_ipex::hgemm_bias_8x512_8x16x16_1",
+            c10::ArrayRef<c10::IValue>({}));
+        hgemm_bias_8x512_8x16x16_1(
+            q,
+            reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(tensor1.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(tensor2.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(bias.data_ptr<scalar_t>()),
+            m,
+            n,
+            k);
+      }
       *state = true;
     }
   }
