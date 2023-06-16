@@ -1040,12 +1040,14 @@ static bool gemm_xetla(
       } else {
         return false;
       }
+      return true;
     } else if (m == 1 && n == 4096 && k == 16384) {
       if (!bias.defined()) {
         GEMM_XETLA_DISPATCH(hgemm_8x32_8x16x64_8);
       } else {
-        GEMM_BIAS_XETLA_DISPATCH(hgemm_bias_8x128_8x16x16_4);
+        GEMM_BIAS_XETLA_DISPATCH(hgemm_bias_32x64_8x16x16_2);
       }
+      return true;
     } else if (
         (m == 1 && n == 16384 && k == 4096) ||
         (m == 1 && n == 32000 && k == 4096) ||
@@ -1055,9 +1057,10 @@ static bool gemm_xetla(
       } else {
         GEMM_BIAS_XETLA_DISPATCH(hgemm_bias_8x512_8x16x16_1);
       }
+      return true;
     }
   }
-  return true;
+  return false;
 }
 
 #undef GEMM_XETLA_DISPATCH

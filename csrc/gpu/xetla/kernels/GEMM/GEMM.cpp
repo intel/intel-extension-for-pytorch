@@ -84,6 +84,20 @@ void hgemm_bias_8x128_8x16x16_4(
       queue, out, a, b, bias, m, n, k);
 }
 
+void hgemm_bias_32x64_8x16x16_2(
+    sycl::queue& queue,
+    sycl::half* out,
+    const sycl::half* a,
+    const sycl::half* b,
+    const sycl::half* bias,
+    const int m,
+    const int n,
+    const int k) {
+  // m == 1 && n == 4096 && k == 16384
+  hgemm_bias<sycl::half, 32, 64, 8, 16, 16, 2, 1, 1, 3, true>(
+      queue, out, a, b, bias, m, n, k);
+}
+
 void hgemm_bias_8x512_8x16x16_1(
     sycl::queue& queue,
     sycl::half* out,
