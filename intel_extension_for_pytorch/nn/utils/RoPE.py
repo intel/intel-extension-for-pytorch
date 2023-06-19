@@ -1,21 +1,38 @@
 import torch
+import torch.nn as nn
+from ._transformer_configuration import IPEXTransformerConfig
 
-class GPTJRotaryEmbedding(torch.nn.Module):
+class PositionalEmbedding(nn.Module):
+    def __init__(self, 
+                 config: IPEXTransformerConfig):
+        super().__init__()
+        self.config = config
+
+    def forward(query, key, position_ids):
+        return query, key
+
+class GPTJRotaryEmbedding(PositionalEmbedding):
     sin = None
     cos = None
     position_ids = None
 
-    def __init__(self, dim, max_position_embeddings=2048, base=10000, device=None, dtype=torch.float32):
-        super().__init__()
-        inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float().to(device) / dim))
+    def __init__(self,
+                 config: IPEXTransformerConfig):
+        super().__init__(config=config)
+        self.rotary_dim = config.rotary_dim
+        self.max_position_embedding = config.max_positions
+        self.base = config.positional_embedding_base
+        self.device = config.device
+        self.dtype = config.dtype
+        inv_freq = 1.0 / (self.base ** (torch.arange(0, self.rotary_dim, 2).float().to(self.device) / self.rotary_dim))
         self.register_buffer("inv_freq", inv_freq)
-        t = torch.arange(max_position_embeddings, dtype=torch.float, device=device)
+        t = torch.arange(self.max_position_embedding, dtype=torch.float, device=self.device)
         sinusoid_inp = torch.einsum("i , j -> i j", t, inv_freq).float()
         embed_positions = torch.cat((torch.sin(sinusoid_inp), torch.cos(sinusoid_inp)), dim=1)
 
         sin, cos = torch.split(embed_positions, embed_positions.shape[-1] // 2, dim=-1)
-        sin = torch.repeat_interleave(sin, 2, 1).to(dtype)
-        cos = torch.repeat_interleave(cos, 2, 1).to(dtype)
+        sin = torch.repeat_interleave(sin, 2, 1).to(self.dtype).to(self.device)
+        cos = torch.repeat_interleave(cos, 2, 1).to(self.dtype).to(self.device)
         self.register_buffer("cos_cached", cos, persistent=False)
         self.register_buffer("sin_cached", sin, persistent=False)
 
@@ -36,10 +53,10 @@ class GPTJRotaryEmbedding(torch.nn.Module):
             GPTJRotaryEmbedding.position_ids = position_ids
         return GPTJRotaryEmbedding.sin, GPTJRotaryEmbedding.cos
 
-    def forward(self, query, key, position_ids, rotary_dim=None):
+    def forward(self, query, key, position_ids):
         sin, cos = self.get_sin_cos(position_ids)
-        if rotary_dim is not None:
-            self.apply_rotary_pos_emb(query[:, :, :, : rotary_dim], key[:, :, :, : rotary_dim], sin, cos)
+        if self.rotary_dim is not None:
+            self.apply_rotary_pos_emb(query[:, :, :, : self.rotary_dim], key[:, :, :, : self.rotary_dim], sin, cos)
         else:
             self.apply_rotary_pos_emb(query, key, sin, cos)
         return query, key
@@ -48,17 +65,23 @@ class LlamaRotaryEmbedding(torch.nn.Module):
     sin = None
     cos = None
     position_ids = None
-    def __init__(self, dim, max_position_embeddings=2048, base=10000, device=None, dtype=torch.float32):
+    def __init__(self,
+                 config: IPEXTransformerConfig):
         super().__init__()
-        inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float().to(device) / dim))
+        self.rotary_dim = config.rotary_dim
+        self.max_position_embedding = config.max_positions
+        self.base = config.positional_embedding_base
+        self.device = config.device
+        self.dtype = config.dtype
+        inv_freq = 1.0 / (self.base ** (torch.arange(0, self.dim, 2).float().to(self.device) / self.dim))
         self.register_buffer("inv_freq", inv_freq)
-        self.max_seq_len_cached = max_position_embeddings
-        t = torch.arange(self.max_seq_len_cached, device=self.inv_freq.device, dtype=self.inv_freq.dtype)
+        self.max_seq_len_cached = self.max_position_embedding
+        t = torch.arange(self.max_seq_len_cached, device=inv_freq.device, dtype=inv_freq.dtype)
         freqs = torch.einsum("i,j->ij", t, self.inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = torch.cat((freqs, freqs), dim=-1)
-        self.register_buffer("cos_cached", emb.cos().to(dtype), persistent=False)
-        self.register_buffer("sin_cached", emb.sin().to(dtype), persistent=False)
+        self.register_buffer("cos_cached", emb.cos().to(self.dtype), persistent=False)
+        self.register_buffer("sin_cached", emb.sin().to(self.dtype), persistent=False)
 
     def rotate_half(self, x):
         """Rotates half the hidden dims of the input."""
@@ -77,12 +100,13 @@ class LlamaRotaryEmbedding(torch.nn.Module):
             LlamaRotaryEmbedding.cos = self.cos_cached[position_ids].unsqueeze(2)
             LlamaRotaryEmbedding.position_ids = position_ids
         return LlamaRotaryEmbedding.sin, LlamaRotaryEmbedding.cos
-    
-    def forward(self, key, value, position_ids, rotary_dim=None):
-        sin, cos = self.get_sin_cos(position_ids)
-        if rotary_dim is not None:
-            self.apply_rotary_pos_emb(key[:, :, :, : rotary_dim], sin, cos)
-            self.apply_rotary_pos_emb(query[:, :, :, : rotary_dim], sin, cos)
+
+    def forward(self, query, key, position_ids, rotary_dim=None):
+        cos = self.cos_cached[position_ids].unsqueeze(1)  
+        sin = self.sin_cached[position_ids].unsqueeze(1)
+        if self.rotary_dim is not None:
+            self.apply_rotary_pos_emb(key[:, :, :, : self.rotary_dim], sin, cos)
+            self.apply_rotary_pos_emb(query[:, :, :, : self.rotary_dim], sin, cos)
         else:
             self.apply_rotary_pos_emb(key, sin, cos)
             self.apply_rotary_pos_emb(query, sin, cos)

@@ -304,30 +304,23 @@ class GraphCapture(object):
 
 
 def optimize_transformers(model, dtype=None, optimizer=None):
-    def model_converter(model):
+    def model_converter(model, dtype):
         try:
             import transformers
             # from  import IPEXGPTJBlock
         except ImportError as e:
             print("Can not find transformers in your environment, disable ipex transformer optimize")
             return model
-        # supported_blocks = [transformers.models.gptj.modeling_gptj.GPTJBlock]
-        for child_name, child in model.named_children():
-            if isinstance(child, transformers.models.gptj.modeling_gptj.GPTJBlock):
-                ipex_block = utils._transformers.IPEXGPTJBlock(child)
-                setattr(model, child_name, ipex_block)
-            else:
-                model_converter(child)
+        utils._transformer_converter.transformer_frontend_replace(model, config=None, dtype=dtype)
         return model
     optimize_output = optimize(model, dtype=dtype, optimizer=optimizer, inplace=True)
-
     if optimizer is None:
         model = optimize_output
-        return model_converter(model)
+        return model_converter(model, dtype=dtype)
     else:
         model = optimize_output[0]
         optimizer = optimize_output[1]
-        return model_converter(model), optimizer
+        return model_converter(model, dtype=dtype), optimizer
 
 def optimize(
     model,
