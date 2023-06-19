@@ -57,7 +57,3 @@ In a word, to use cosim tool, you need to import cosim module and wrap your orig
 * Current cosim tool cannot support customizing parameters, such as device, dtype and tolerance, of cosim model. If needed, you must modify the correlated fields in file `cosim.py` by yourself. Or you can wait for further developing.
 
 * Some machines complain a memory lack issue. The optimize for this issue is in progress.
-
-## Author and Contact
-
-Xunsong, Huang (xunsong.huang@intel.com)

@@ -149,7 +149,7 @@ class CosimModule(nn.Module):
             assert type(origin_outputs) == type(cosim_outputs), (
                 f"origin_output's type({type(origin_outputs)}) is not equal"
                 f" to cosim output's type({type(cosim_outputs)})."
-                f" Please report to cosim tool's developer(xunsong.huang@intel.com)"
+                f" Please report to cosim tool's developer"
             )
             if origin_outputs is None:
                 diffs.append(None)
@@ -164,7 +164,6 @@ class CosimModule(nn.Module):
                         f"origin_output's type({type(oo)}) is not equal"
                         f" to cosim output's type({type(co)})."
                         f" Please report to cosim tool's developer"
-                        f"(xunsong.huang@intel.com)"
                     )
                     if oo is None:
                         diffs.append(None)
