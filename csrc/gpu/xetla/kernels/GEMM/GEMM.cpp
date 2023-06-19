@@ -128,5 +128,21 @@ void hgemm_bias_gelu_8x512_8x16x16_1(
       queue, out, a, b, bias, m, n, k);
 }
 
+void hgemm_bias_res_res_8x128_8x16x16_4(
+    sycl::queue& queue,
+    sycl::half* out,
+    const sycl::half* a,
+    const sycl::half* b,
+    const sycl::half* bias,
+    const sycl::half* res0,
+    const sycl::half* res1,
+    const int m,
+    const int n,
+    const int k) {
+  // m == 1 && n == 4096 && k == 16384
+  hgemm_bias_res_res<sycl::half, 8, 128, 8, 16, 16, 4, 1, 1, 3, true>(
+      queue, out, a, b, bias, res0, res1, m, n, k);
+}
+
 } // namespace xetla
 } // namespace xpu
