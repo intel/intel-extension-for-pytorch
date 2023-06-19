@@ -286,7 +286,7 @@ class IPEXTransformerMLP(nn.Module):
         self.fc_in = nn.Linear(config.embed_dim, config.intermediate_size, bias=config.enable_bias)
         self.fc_out = nn.Linear(config.intermediate_size, config.embed_dim, bias=config.enable_bias)
         self.act = ACT2FN[config.activation_function]
-        self.drop_out = nn.Dropout(config.residual_pdrop) if config.residual_pdrop is None else nn.Identity()
+        self.drop_out = nn.Dropout(config.residual_pdrop) if config.residual_pdrop is not None else nn.Identity()
 
     def forward(self, hidden_states: Optional[torch.Tensor]):
         if isinstance(self.act, nn.GELU):
@@ -398,14 +398,14 @@ class IPEXLlamaBlock(nn.Module):
         use_cache: Optional[bool] = False,
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         residual = hidden_states
-        
+
         hidden_states = self.input_layernorm(hidden_states)
-        
-        hidden_states, self_attn_weights, present_key_value = self.attn(
+
+        hidden_states, present_key_value = self.attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
             position_ids=position_ids,
-            past_key_value=past_key_value,
+            layer_past=past_key_value,
             output_attentions=output_attentions,
             use_cache=use_cache,
         )
@@ -455,9 +455,9 @@ class IPEXOptBlock(nn.Module):
 
         hidden_states, self_attn_weights, present_key_value = self.attn(
             hidden_states=hidden_states,
-            past_key_value=past_key_value,
+            layer_past=past_key_value,
             attention_mask=attention_mask,
-            layer_head_mask=layer_head_mask,
+            head_mask=layer_head_mask,
             output_attentions=output_attentions,
         )
         hidden_states = nn.functional.dropout(hidden_states, p=self.dropout_p, training=self.training)
