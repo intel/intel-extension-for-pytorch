@@ -256,16 +256,16 @@ Tensor linear_gelu(
     const c10::optional<Tensor>& bias,
     c10::string_view approximate) {
 #if defined(USE_XETLA)
-  auto& q = dpcppGetCurrentQueue();
-  int m = input.sizes()[0];
-  int n = weight.sizes()[0];
-  int k = input.sizes()[1];
-  bool is_a_contiguous = input.is_contiguous();
-  bool is_b_row_major = weight.transpose(0, 1).is_contiguous();
-  bool is_b_col_major = weight.is_contiguous();
-  bool is_half = input.scalar_type() == kHalf;
-  bool is_bias = false;
-  if (bias.has_value()) {
+  if (input.dim() == 3 && bias.has_value()) {
+    auto& q = dpcppGetCurrentQueue();
+    int m = input.sizes()[1];
+    int n = weight.sizes()[0];
+    int k = input.sizes()[2];
+    bool is_a_contiguous = input.is_contiguous();
+    bool is_b_row_major = weight.transpose(0, 1).is_contiguous();
+    bool is_b_col_major = weight.is_contiguous();
+    bool is_half = input.scalar_type() == kHalf;
+    bool is_bias = false;
     auto bias_ = bias.value();
     if (bias_.defined() && bias_.dim() == 1 && bias_.sizes()[0] == n &&
         bias_.is_contiguous()) {
