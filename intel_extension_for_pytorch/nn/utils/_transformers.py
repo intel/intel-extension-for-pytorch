@@ -246,11 +246,11 @@ class IPEXGPTJMLP(nn.Module):
         self.dropout = module.dropout
 
     def forward(self, hidden_states: Optional[torch.FloatTensor]) -> torch.FloatTensor:
-        # if isinstance(self.act, nn.GELU):
-        #     hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in.weight, self.fc_in.bias, self.act.approximate)
-        # else:
-        hidden_states = self.fc_in(hidden_states)
-        hidden_states = self.act(hidden_states)
+        if isinstance(self.act, nn.GELU):
+            hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in.weight, self.fc_in.bias, self.act.approximate)
+        else:
+            hidden_states = self.fc_in(hidden_states)
+            hidden_states = self.act(hidden_states)
         hidden_states = self.fc_out(hidden_states)
         hidden_states = self.dropout(hidden_states)
         return hidden_states
