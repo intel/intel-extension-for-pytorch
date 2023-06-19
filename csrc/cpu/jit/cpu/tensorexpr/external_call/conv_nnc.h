@@ -1,8 +1,8 @@
 #pragma once
 
-#include "csrc/jit/cpu/kernels/ConvPacked.h"
-#include "csrc/jit/cpu/kernels/OpContext.h"
-#include "csrc/jit/cpu/tensorexpr/utils.h"
+#include "csrc/cpu/jit/cpu/kernels/ConvPacked.h"
+#include "csrc/cpu/jit/cpu/kernels/OpContext.h"
+#include "csrc/cpu/jit/cpu/tensorexpr/utils.h"
 
 #include <ATen/ATen.h>
 #include <torch/csrc/jit/tensorexpr/expr.h>

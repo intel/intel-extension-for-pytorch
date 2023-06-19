@@ -11,7 +11,7 @@ target_include_directories(PY_CPU_OBJ PUBLIC ${IPEX_CPU_ROOT_DIR}/aten/utils)
 target_include_directories(PY_CPU_OBJ PUBLIC ${IPEX_CPU_ROOT_DIR}/dyndisp)
 target_include_directories(PY_CPU_OBJ PUBLIC ${IPEX_CPU_ROOT_DIR}/runtime)
 target_include_directories(PY_CPU_OBJ PUBLIC ${IPEX_ROOT_DIR}/csrc)
-target_include_directories(PY_CPU_OBJ PUBLIC ${IPEX_ROOT_DIR}/csrc/jit/codegen/onednn)
+target_include_directories(PY_CPU_OBJ PUBLIC ${IPEX_ROOT_DIR}/csrc/cpu/jit/codegen/onednn)
 target_include_directories(PY_CPU_OBJ PUBLIC ${IPEX_ROOT_DIR}/csrc/utils)
 target_include_directories(PY_CPU_OBJ PUBLIC ${IPEX_CPU_ROOT_DIR}/utils)
 

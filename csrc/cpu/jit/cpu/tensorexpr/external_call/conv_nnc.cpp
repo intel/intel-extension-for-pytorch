@@ -22,8 +22,8 @@
 #include "conv_square.h"
 #include "conv_tanh.h"
 
-#include "csrc/jit/cpu/tensorexpr/nnc_lowering_register.h"
-#include "csrc/jit/cpu/tensorexpr/operator_schema.h"
+#include "csrc/cpu/jit/cpu/tensorexpr/nnc_lowering_register.h"
+#include "csrc/cpu/jit/cpu/tensorexpr/operator_schema.h"
 
 namespace {
 
