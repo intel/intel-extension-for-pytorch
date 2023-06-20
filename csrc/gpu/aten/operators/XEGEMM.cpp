@@ -80,17 +80,23 @@ static Tensor hgemm_bias_res_res(
       k);                                                               \
   }
 
-static std::tuple<Tensor, Tensor, Tensor> hgemm_qkv(
+static void hgemm_qkv_out(
     const Tensor& input,
-    const Tensor& weight) {
+    const Tensor& weight,
+    const Tensor& out0,
+    const Tensor& out1,
+    const Tensor& out2) {
   // input: m,k; weight: 3,k,n
   TORCH_CHECK(input.dim() == 2 && weight.dim() == 3);
+  TORCH_CHECK(out0.dim() == 2 && out1.dim() == 2 && out2.dim() == 2);
   int m = input.sizes()[0];
   int k = input.sizes()[1];
   int n = weight.sizes()[2];
-  auto out0 = at::empty({m, n}, input.options());
-  auto out1 = at::empty({m, n}, input.options());
-  auto out2 = at::empty({m, n}, input.options());
+
+  TORCH_CHECK(
+      out0.sizes()[0] == m && out1.sizes()[0] == m && out2.sizes()[0] == m);
+  TORCH_CHECK(
+      out0.sizes()[1] == n && out1.sizes()[1] == n && out2.sizes()[1] == n);
 
   bool is_a_contiguous = input.is_contiguous();
   bool is_b_row_major = weight.is_contiguous();
@@ -104,10 +110,22 @@ static std::tuple<Tensor, Tensor, Tensor> hgemm_qkv(
       decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
   auto& q = dpcppGetCurrentQueue();
   GEMM_QKV_XETLA_DISPATCH(hgemm_qkv_8x128_8x16x32_4);
-  return std::forward_as_tuple(out0, out1, out2);
 }
 
 #undef GEMM_QKV_XETLA_DISPATCH
+
+static std::tuple<Tensor, Tensor, Tensor> hgemm_qkv(
+    const Tensor& input,
+    const Tensor& weight) {
+  int m = input.sizes()[0];
+  int k = input.sizes()[1];
+  int n = weight.sizes()[2];
+  auto out0 = at::empty({m, n}, input.options());
+  auto out1 = at::empty({m, n}, input.options());
+  auto out2 = at::empty({m, n}, input.options());
+  hgemm_qkv_out(input, weight, out0, out1, out2);
+  return std::forward_as_tuple(out0, out1, out2);
+}
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
@@ -116,6 +134,7 @@ namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER(
       "hgemm_bias_res_res.xpu", at::AtenIpexTypeXPU::hgemm_bias_res_res);
+  IPEX_OP_REGISTER("hgemm_qkv_out.xpu", at::AtenIpexTypeXPU::hgemm_qkv_out);
   IPEX_OP_REGISTER("hgemm_qkv.xpu", at::AtenIpexTypeXPU::hgemm_qkv);
 }
 } // namespace
