@@ -241,7 +241,6 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
         self.ipex_transformers_config = self.construct_transformer_config()
         self.ipex_optimized_module = self.construct_ipex_optimized_module()
         self.port_all_parameters_to_new_module()
-        self.port_all_parameters_to_new_module()
 
     def construct_transformer_config(self):
         n_positions = self.config.max_position_embeddings
@@ -267,12 +266,12 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
             attn_dropout=None,
             enable_bias=False,
             residual_pdrop=None,
-            scale_attention=False,
+            scale_attention=True,
             is_decoder=False,
             do_norm_before=None,
             ln_elementwise_affine=None,
             seq_first=False,
-            kv_cache_optimize=True,
+            kv_cache_optimize=False,
             positional_embedding_base=10000,
             sdp_fusion_enable=True,
             device=self.device,

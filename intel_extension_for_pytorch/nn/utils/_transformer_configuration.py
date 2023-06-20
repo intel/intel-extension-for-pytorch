@@ -44,7 +44,7 @@ class IPEXTransformerConfig():
         self.attn_dropout = attn_dropout
         self.enable_bias = enable_bias
         self.residual_pdrop = residual_pdrop
-        self.scale_attn = scale_attention # gptj and llama will need to scale attention weight
+        self.scale_attention = scale_attention # gptj and llama will need to scale attention weight
         self.is_decoder = is_decoder # opt parameter
         self.do_norm_before = do_norm_before
         self.ln_elementwise_affine = ln_elementwise_affine

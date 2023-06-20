@@ -31,7 +31,6 @@ ACT2CLS = {
 
 ACT2FN = ACT2CLS
 
-
 class IPEXTransformerAtten(nn.Module):
 
     layer_id_static = 0
@@ -49,9 +48,13 @@ class IPEXTransformerAtten(nn.Module):
         self.embed_dim = self.config.embed_dim
         self.num_attn_head = self.config.num_attention_heads
         IPEXTransformerAtten.layer_id_static += 1
-        self.position_emb = self.config.rotary_embedding_class(config=self.config)
         self.head_dim = self.config.embed_dim // self.config.num_attention_heads
-        self.scale_attn = torch.sqrt(torch.tensor(self.head_dim, device="xpu"))
+        self.position_emb = self.config.rotary_embedding_class(config=self.config)
+        # self.position_emb = LlamaRotaryEmbed(self.head_dim, max_position_embeddings=self.max_positions)
+        if self.config.scale_attention:
+            self.scale_attn = torch.sqrt(torch.tensor(self.head_dim, device="xpu"))
+        else:
+            self.scale_attn = None
         self.k_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=self.config.enable_bias)
         self.v_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=self.config.enable_bias)
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=self.config.enable_bias)
@@ -188,6 +191,10 @@ class IPEXTransformerAtten(nn.Module):
 
     def apply_rotary_embedding(self, key, query, position_ids):
         return self.position_emb(key, query, position_ids)
+        # cos, sin = self.position_emb(key, seq_len=key.shape[-2])
+        # query_states, key_states = apply_rotary_pos_emb(query, key, cos.to("xpu"), sin.to("xpu"), position_ids)
+        # return query_states, key_states
+        
 
     def naive_self_attention(self, query, key, value, attention_mask=None, head_mask=None):
         attn_weights = torch.matmul(query, key.transpose(-1, -2))
@@ -202,6 +209,7 @@ class IPEXTransformerAtten(nn.Module):
             attn_weights += casual_mask
         if self.scale_attn:
             attn_weights /= self.scale_attn
+
         if attention_mask is not None:
             attn_weights += attention_mask
             # the attn_weights should anyway bigger than dtype.min, I wonder if this is necessary
