@@ -1041,7 +1041,9 @@ static bool gemm_xetla(
         return false;
       }
       return true;
-    } else if (m == 1 && n == 4096 && k == 16384) {
+    } else if (
+        m == 1 && n == 4096 && k == 16384 ||
+        m == 1 && n == 4096 && k == 11008) {
       if (!bias.defined()) {
         GEMM_XETLA_DISPATCH(hgemm_8x32_8x16x64_8);
       } else {
@@ -1051,7 +1053,9 @@ static bool gemm_xetla(
     } else if (
         (m == 1 && n == 16384 && k == 4096) ||
         (m == 1 && n == 32000 && k == 4096) ||
-        (m == 1 && n == 50400 && k == 4096)) {
+        (m == 1 && n == 50400 && k == 4096) ||
+        (m == 1 && n == 11008 && k == 4096) ||
+        (m == 1 && n == 32000 && k == 5120)) {
       if (!bias.defined()) {
         GEMM_XETLA_DISPATCH(hgemm_8x32_8x16x64_1);
       } else {
