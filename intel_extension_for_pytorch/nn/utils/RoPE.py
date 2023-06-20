@@ -90,7 +90,7 @@ class LlamaRotaryEmbedding(torch.nn.Module):
         self.register_buffer("cos_cached", emb.cos().to(self.dtype), persistent=False)
         self.register_buffer("sin_cached", emb.sin().to(self.dtype), persistent=False)
 
-    def apply_rotary_pos_emb(self, query: torch.Tensor, key: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor) -> torch.Tensor:
+    def apply_rotary_pos_emb(self, query: torch.Tensor, key: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor):
         torch.ops.torch_ipex.apply_rotary_embedding_half(query, key, sin, cos, query, key)
 
     def get_sin_cos(self, seq_len, position_ids):
@@ -109,6 +109,7 @@ class LlamaRotaryEmbedding(torch.nn.Module):
         #     self.apply_rotary_pos_emb(query[:, :, :, : self.dim], key[:, :, :, : self.dim], sin, cos)
         # else:
         #     self.apply_rotary_pos_emb(query, key, sin, cos)
-        query = (query * cos) + (rotate_half(query) * sin)
-        key = (key * cos) + (rotate_half(key) * sin)
+        self.apply_rotary_pos_emb(query, key, sin, cos)
+        #query = (query * cos) + (rotate_half(query) * sin)
+        #key = (key * cos) + (rotate_half(key) * sin)
         return query, key
