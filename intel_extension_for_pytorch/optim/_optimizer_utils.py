@@ -56,7 +56,7 @@ def patch_zero_grad_for_master_weight_training(optimizer):
     So the 'zero_grad' should work on the 'bf16_params' or 'fp16_params' too.
     """
 
-    def zero_grad(self, set_to_none: bool = False):
+    def zero_grad(self, set_to_none: bool = True):
         for _, v in self.params_attr.items():
             _param = v.parameter
             if _param is None:
