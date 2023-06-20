@@ -632,6 +632,7 @@ supported:
   - upsample_bilinear2d_backward.grad_input
   - upsample_linear1d.out
   - upsample_linear1d_backward.grad_input
+  - upsample_nearest1d
   - upsample_nearest1d.out
   - upsample_nearest1d_backward.grad_input
   - upsample_nearest2d.out
