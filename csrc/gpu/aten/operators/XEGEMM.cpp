@@ -66,6 +66,49 @@ static Tensor hgemm_bias_res_res(
 
 #undef GEMM_XETLA_DISPATCH
 
+#define GEMM_QKV_XETLA_DISPATCH(F)                                      \
+  {                                                                     \
+    RECORD_FUNCTION("torch_ipex::" #F, c10::ArrayRef<c10::IValue>({})); \
+    F(q,                                                                \
+      reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),         \
+      reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),         \
+      reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),         \
+      reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),        \
+      reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),       \
+      m,                                                                \
+      n,                                                                \
+      k);                                                               \
+  }
+
+static std::tuple<Tensor, Tensor, Tensor> hgemm_qkv(
+    const Tensor& input,
+    const Tensor& weight) {
+  // input: m,k; weight: 3,k,n
+  TORCH_CHECK(input.dim() == 2 && weight.dim() == 3);
+  int m = input.sizes()[0];
+  int k = input.sizes()[1];
+  int n = weight.sizes()[2];
+  auto out0 = at::empty({m, n}, input.options());
+  auto out1 = at::empty({m, n}, input.options());
+  auto out2 = at::empty({m, n}, input.options());
+
+  bool is_a_contiguous = input.is_contiguous();
+  bool is_b_row_major = weight.is_contiguous();
+  bool is_b_col_major = weight.transpose(1, 2).is_contiguous();
+
+  TORCH_CHECK(is_a_contiguous && is_b_row_major);
+  TORCH_CHECK(input.scalar_type() == kHalf && weight.scalar_type() == kHalf);
+
+  using namespace xpu::xetla;
+  using scalar_t =
+      decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
+  auto& q = dpcppGetCurrentQueue();
+  GEMM_QKV_XETLA_DISPATCH(hgemm_qkv_8x128_8x16x32_4);
+  return std::forward_as_tuple(out0, out1, out2);
+}
+
+#undef GEMM_QKV_XETLA_DISPATCH
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
@@ -73,6 +116,7 @@ namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER(
       "hgemm_bias_res_res.xpu", at::AtenIpexTypeXPU::hgemm_bias_res_res);
+  IPEX_OP_REGISTER("hgemm_qkv.xpu", at::AtenIpexTypeXPU::hgemm_qkv);
 }
 } // namespace
 

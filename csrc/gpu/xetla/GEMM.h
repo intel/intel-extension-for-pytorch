@@ -106,5 +106,16 @@ void hgemm_bias_res_res_8x128_8x16x16_4(
     const int n,
     const int k);
 
+void hgemm_qkv_8x128_8x16x32_4(
+    sycl::queue& queue,
+    sycl::half* out0,
+    sycl::half* out1,
+    sycl::half* out2,
+    const sycl::half* a,
+    const sycl::half* b,
+    const int m,
+    const int n,
+    const int k);
+
 } // namespace xetla
 } // namespace xpu
