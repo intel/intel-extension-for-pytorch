@@ -44,7 +44,7 @@ class GPTJRotaryEmbedding(PositionalEmbedding):
         return x.flatten(-2)  # in einsum notation: rearrange(x, '... d j -> ... (d j)')
 
     def apply_rotary_pos_emb(self, query, key, sin, cos) -> torch.Tensor:
-        torch.ops.torch_ipex.apply_rotary_embedding_qk(query, key, sin, cos, query, key)
+        torch.ops.torch_ipex.apply_rotary_embedding_two(query, key, sin, cos, query, key)
 
     def get_sin_cos(self, position_ids):
         if GPTJRotaryEmbedding.position_ids is None or GPTJRotaryEmbedding.position_ids is not position_ids:
@@ -90,9 +90,7 @@ class LlamaRotaryEmbedding(torch.nn.Module):
         return torch.cat((-x2, x1), dim=-1)
 
     def apply_rotary_pos_emb(self, tensor: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor) -> torch.Tensor:
-        tmp = self.rotate_half(tensor) * sin
-        tensor *= cos
-        tensor += tmp
+        torch.ops.torch_ipex.apply_rotary_embedding_half(query, key, sin, cos, query, key)
 
     def get_sin_cos(self, position_ids):
         if LlamaRotaryEmbedding.position_ids is None or LlamaRotaryEmbedding.position_ids is not position_ids:
