@@ -56,6 +56,16 @@ class IPEXTransformerAtten(nn.Module):
         self.v_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=self.config.enable_bias)
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=self.config.enable_bias)
         self.out_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=self.config.enable_bias)
+       
+        self.qkv_fused = False 
+        self.q_wei = None
+        self.k_wei = None
+        self.v_wei = None
+        self.out_wei = None
+        self.qkv_wei = None 
+        col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
+        self.row_major = not col_major
+
         self.is_decoder = self.config.is_decoder
         self.residual_drop = nn.Dropout(self.config.residual_dropout) if self.config.residual_dropout is not None else nn.Identity()
         self.attn_drop = nn.Dropout(self.config.attn_dropout) if self.config.attn_dropout is not None else nn.Identity() 
@@ -95,10 +105,19 @@ class IPEXTransformerAtten(nn.Module):
         return query, key, value
 
     def qkv_normal(self, hidden_states, layer_past = None):
-        query = self.q_proj(hidden_states)
-        key = self.k_proj(hidden_states)
-        value = self.v_proj(hidden_states)
+        if self.row_major:
+            query = torch.matmul(hidden_states, self.q_wei)
+            key = torch.matmul(hidden_states, self.k_wei)
+            value = torch.matmul(hidden_states, self.v_wei)
+        else:
+            query = self.q_proj(hidden_states)
+            key = self.k_proj(hidden_states)
+            value = self.v_proj(hidden_states)
         return query, key, value
+    
+    def fused_qkv_normal(self, hidden_states, layer_past = None):
+        query, key, value = torch.ops.torch_ipex.hgemm_qkv(hidden_states.squeeze(0), self.qkv_wei)          
+        return query.unsqueeze(0), key.unsqueeze(0), value.unsqueeze(0)
 
     def compute_qkv(self,
                     hidden_state: torch.Tensor,
@@ -113,7 +132,10 @@ class IPEXTransformerAtten(nn.Module):
             else:
                 query, key, value = self.qkv_cache_optimized(hidden_states=hidden_state, layer_past=layer_past)
         else:
-            query, key, value = self.qkv_normal(hidden_states=hidden_state, layer_past=layer_past)
+            if self.qkv_fused:
+                query, key, value = self.fused_qkv_normal(hidden_states=hidden_state, layer_past=layer_past)
+            else:
+                query, key, value = self.qkv_normal(hidden_states=hidden_state, layer_past=layer_past)
 
         new_shape = query.size()[:-1] + (self.num_attn_head, self.head_dim)
         # reshape the qkv size to (bs,  seq_len, num_head, head_dim)
@@ -205,7 +227,10 @@ class IPEXTransformerAtten(nn.Module):
         # reshape the attn_output from [bs, head_num, seq_len, head_dim] back to [bs, seq_len, embedding_size]
         attn_output = attn_output.transpose(1, 2)
         attn_output = attn_output.reshape(attn_output.size()[:-2] + (self.embed_dim,))
-        attn_output = self.out_proj(attn_output)
+        if self.row_major:
+            attn_output = torch.matmul(attn_output, self.out_wei)
+        else:
+            attn_output = self.out_proj(attn_output)
         return self.residual_drop(attn_output)
 
     def forward(
@@ -289,28 +314,86 @@ class IPEXTransformerMLP(nn.Module):
         self.fc_out = nn.Linear(config.intermediate_size, config.embed_dim, bias=config.enable_bias)
         self.act = ACT2FN[config.activation_function]
         self.drop_out = nn.Dropout(config.residual_pdrop) if config.residual_pdrop is not None else nn.Identity()
+        
+        col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
+        self.row_major = not col_major
+        self.fc_in_wei = None 
+        self.fc_out_wei = None
 
     def forward(self, hidden_states: Optional[torch.Tensor]):
-        if isinstance(self.act, nn.GELU):
-            hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in.weight, self.fc_in.bias, self.act.approximate)
+        if self.row_major:
+            if isinstance(self.act, nn.GELU):
+                hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in.weight, self.fc_in.bias, self.act.approximate)
+            else:
+                shape = [hidden_states.shape[0] * hidden_states.shape[1], hidden_states.shape[2]]
+                out_shape = [hidden_states.shape[0], hidden_states.shape[1], self.fc_in_wei.shape[1]]
+                hidden_states = torch.addmm(self.fc_in.bias, hidden_states.view(shape), self.fc_in_wei)
+                hidden_states = hidden_states.view(out_shape)
+                hidden_states = self.act(hidden_states)
+            shape = [hidden_states.shape[0] * hidden_states.shape[1], hidden_states.shape[2]]
+            out_shape = [hidden_states.shape[0], hidden_states.shape[1], self.fc_out_wei.shape[1]]
+            hidden_states = torch.addmm(self.fc_out.bias, hidden_states.view(shape), self.fc_out_wei)
+            hidden_states = hidden_states.view(out_shape)
         else:
-            hidden_states = self.fc_in(hidden_states)
-            hidden_states = self.act(hidden_states)
-        hidden_states = self.fc_out(hidden_states)
+            if isinstance(self.act, nn.GELU):
+                hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in.weight, self.fc_in.bias, self.act.approximate)
+            else:
+                hidden_states = self.fc_in(hidden_states)
+                hidden_states = self.act(hidden_states)
+            hidden_states = self.fc_out(hidden_states)
         return self.drop_out(hidden_states)
 
 class IPEXGPTJMLP(IPEXTransformerMLP):
     def __init__(self, config: IPEXTransformerConfig):
         super().__init__(config)
+    
+    def forward(self, hidden_states: Optional[torch.Tensor], attn_output, residual):
+        if self.row_major:
+            shape = [hidden_states.shape[0] * hidden_states.shape[1], hidden_states.shape[2]]
+            out_shape = [hidden_states.shape[0], hidden_states.shape[1], self.fc_in_wei.shape[1]]
+            if isinstance(self.act, nn.GELU):
+                hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in.weight, self.fc_in.bias, self.act.approximate)
+            else:
+                hidden_states = torch.addmm(self.fc_in.bias, hidden_states.view(shape), self.fc_in_wei)
+                hidden_states = self.act(hidden_states)
+            hidden_states = hidden_states.view(out_shape)
+            
+            shape = [hidden_states.shape[0] * hidden_states.shape[1], hidden_states.shape[2]]
+            out_shape = [hidden_states.shape[0], hidden_states.shape[1], self.fc_out_wei.shape[1]]
+            hidden_states = torch.addmm(self.fc_out.bias, hidden_states.view(shape), self.fc_out_wei)
+            hidden_states = hidden_states.view(out_shape)
+            hidden_states += attn_output + residual
+            # hidden_states = torch.ops.torch_ipex.hgemm_bias_res_res(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output, residual)
+        else:
+            if isinstance(self.act, nn.GELU):
+                hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in.weight, self.fc_in.bias, self.act.approximate)
+            else:
+                hidden_states = self.fc_in(hidden_states)
+                hidden_states = self.act(hidden_states)
+            hidden_states = self.fc_out(hidden_states) + attn_output + residual
+        return hidden_states
+        # return self.drop_out(hidden_states)
 
 class IPEXLlamaMLP(IPEXTransformerMLP):
     def __init__(self,
                  config: IPEXTransformerConfig):
         super().__init__(config)
         self.up_proj = nn.Linear(config.embed_dim, config.intermediate_size, bias=config.enable_bias)
+        self.up_wei = None
 
     def forward(self, x):
-        return self.fc_out(self.act(self.fc_in(x)) * self.up_proj(x))
+        if self.row_major:
+            shape = [hidden_states.shape[0] * hidden_states.shape[1], hidden_states.shape[2]]
+            out_shape = [hidden_states.shape[0], hidden_states.shape[1], self.fc_out_wei.shape[1]]
+            hidden_states1 = torch.addmm(self.fc_in.bias, hidden_states.view(shape), self.fc_in_wei)
+            hidden_states1 = self.act(hidden_states1)
+            hidden_states2 = self.addmm(self.up_proj.bias, hidden_states.view(shape), self.up_wei)
+            hidden_states = hidden_states1 * hidden_states2
+            hidden_states = self.addmm(self.fc_out.bias, hidden_states, self.fc_out_wei)
+            hidden_states = hidden_states.view(out_shape)
+        else:    
+            hidden_states = self.fc_out(self.act(self.fc_in(x)) * self.up_proj(x))
+        return hidden_states
 
 class IPEXOptMLP(IPEXTransformerMLP):
     def __init__(self, config: IPEXTransformerConfig):
@@ -352,8 +435,7 @@ class IPEXGPTJBlock(nn.Module):
         attn_output = attn_outputs[0]
         outputs = attn_outputs[1: ]
 
-        feed_forward_hidden_states = self.mlp(hidden_states)
-        hidden_states = attn_output + feed_forward_hidden_states + residual
+        hidden_states = self.mlp(hidden_states, attn_output, residual)
         if use_cache:
             outputs = (hidden_states, ) + outputs
         else:
@@ -372,6 +454,10 @@ class LlamaRMSNorm(nn.Module):
         self.variance_epsilon = config.norm_eps
 
     def forward(self, hidden_states: torch.Tensor):
+        hsz = hidden_states.shape[-1]
+        output = torch.ops.torch_ipex.rms_norm(hidden_states, [hsz], self.weight)
+        return output
+        '''
         variance = hidden_states.to(torch.float32).pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
 
@@ -380,6 +466,7 @@ class LlamaRMSNorm(nn.Module):
             hidden_states = hidden_states.to(self.weight.dtype)
 
         return self.weight * hidden_states
+        '''
 
 class IPEXLlamaBlock(nn.Module):
     def __init__(self, 
