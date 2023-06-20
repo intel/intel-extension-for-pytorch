@@ -381,18 +381,15 @@ class IPEXLlamaMLP(IPEXTransformerMLP):
         self.up_proj = nn.Linear(config.embed_dim, config.intermediate_size, bias=config.enable_bias)
         self.up_wei = None
 
-    def forward(self, x):
+    def forward(self, hidden_states):
         if self.row_major:
-            shape = [hidden_states.shape[0] * hidden_states.shape[1], hidden_states.shape[2]]
-            out_shape = [hidden_states.shape[0], hidden_states.shape[1], self.fc_out_wei.shape[1]]
-            hidden_states1 = torch.addmm(self.fc_in.bias, hidden_states.view(shape), self.fc_in_wei)
+            hidden_states1 = torch.matmul(hidden_states, self.fc_in_wei)
             hidden_states1 = self.act(hidden_states1)
-            hidden_states2 = self.addmm(self.up_proj.bias, hidden_states.view(shape), self.up_wei)
+            hidden_states2 = torch.matmul(hidden_states, self.up_wei)
             hidden_states = hidden_states1 * hidden_states2
-            hidden_states = self.addmm(self.fc_out.bias, hidden_states, self.fc_out_wei)
-            hidden_states = hidden_states.view(out_shape)
+            hidden_states = torch.matmul(hidden_states, self.fc_out_wei)
         else:    
-            hidden_states = self.fc_out(self.act(self.fc_in(x)) * self.up_proj(x))
+            hidden_states = self.fc_out(self.act(self.fc_in(hidden_states)) * self.up_proj(hidden_states))
         return hidden_states
 
 class IPEXOptMLP(IPEXTransformerMLP):
@@ -456,7 +453,7 @@ class LlamaRMSNorm(nn.Module):
     def forward(self, hidden_states: torch.Tensor):
         hsz = hidden_states.shape[-1]
         output = torch.ops.torch_ipex.rms_norm(hidden_states, [hsz], self.weight)
-        return output
+        return output[0]
         '''
         variance = hidden_states.to(torch.float32).pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
@@ -488,8 +485,10 @@ class IPEXLlamaBlock(nn.Module):
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         residual = hidden_states
 
+        print("-----flag1={}".format(hidden_states.shape))
         hidden_states = self.input_layernorm(hidden_states)
 
+        print("-----flag2={}".format(hidden_states.shape))
         hidden_states, present_key_value, self_attn_weights = self.attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
@@ -498,13 +497,19 @@ class IPEXLlamaBlock(nn.Module):
             output_attentions=output_attentions,
             use_cache=use_cache,
         )
+        print("-----flag3={}".format(hidden_states.shape))
 
         hidden_states = residual + hidden_states
+        print("-----flag4={}".format(hidden_states.shape))
 
         residual = hidden_states
+        print("-----flag5={}".format(hidden_states.shape))
         hidden_states = self.post_attn_layernorm(hidden_states)
+        print("-----flag6={}".format(hidden_states.shape))
         hidden_states = self.mlp(hidden_states)
+        print("-----flag7={}".format(hidden_states.shape))
         hidden_states = residual + hidden_states
+        print("-----flag8={}".format(hidden_states.shape))
 
         outputs = (hidden_states, )
 
