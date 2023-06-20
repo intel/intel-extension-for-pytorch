@@ -403,7 +403,7 @@ class IPEXLlamaBlock(nn.Module):
 
         hidden_states = self.input_layernorm(hidden_states)
 
-        hidden_states, present_key_value = self.attn(
+        hidden_states, present_key_value, self_attn_weights = self.attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
             position_ids=position_ids,

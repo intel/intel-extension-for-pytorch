@@ -68,7 +68,7 @@ class LlamaRotaryEmbedding(torch.nn.Module):
     def __init__(self,
                  config: IPEXTransformerConfig):
         super().__init__()
-        self.rotary_dim = config.rotary_dim
+        self.dim = int(config.embed_dim / config.num_attention_heads)
         self.max_position_embedding = config.max_positions
         self.base = config.positional_embedding_base
         self.device = config.device
@@ -89,7 +89,7 @@ class LlamaRotaryEmbedding(torch.nn.Module):
         x2 = x[..., x.shape[-1] // 2 :]
         return torch.cat((-x2, x1), dim=-1)
 
-    def apply_rotary_pos_emb(self, tensor: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor) -> torch.Tensor:
+    def apply_rotary_pos_emb(self, query: torch.Tensor, key: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor) -> torch.Tensor:
         torch.ops.torch_ipex.apply_rotary_embedding_half(query, key, sin, cos, query, key)
 
     def get_sin_cos(self, position_ids):
@@ -102,10 +102,8 @@ class LlamaRotaryEmbedding(torch.nn.Module):
     def forward(self, query, key, position_ids):
         cos = self.cos_cached[position_ids].unsqueeze(1)  
         sin = self.sin_cached[position_ids].unsqueeze(1)
-        if self.rotary_dim is not None:
-            self.apply_rotary_pos_emb(key[:, :, :, : self.rotary_dim], sin, cos)
-            self.apply_rotary_pos_emb(query[:, :, :, : self.rotary_dim], sin, cos)
+        if self.dim is not None:
+            self.apply_rotary_pos_emb(query[:, :, :, : self.dim], key[:, :, :, : self.dim], sin, cos)
         else:
-            self.apply_rotary_pos_emb(key, sin, cos)
-            self.apply_rotary_pos_emb(query, sin, cos)
+            self.apply_rotary_pos_emb(query, key, sin, cos)
         return query, key
