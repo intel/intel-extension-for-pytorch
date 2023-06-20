@@ -8,7 +8,7 @@ class PositionalEmbedding(nn.Module):
         super().__init__()
         self.config = config
 
-    def forward(query, key, position_ids):
+    def forward(self, query, key, position_ids):
         return query, key
 
 class GPTJRotaryEmbedding(PositionalEmbedding):
@@ -99,7 +99,7 @@ class LlamaRotaryEmbedding(torch.nn.Module):
             LlamaRotaryEmbedding.position_ids = position_ids
         return LlamaRotaryEmbedding.sin, LlamaRotaryEmbedding.cos
 
-    def forward(self, query, key, position_ids, rotary_dim=None):
+    def forward(self, query, key, position_ids):
         cos = self.cos_cached[position_ids].unsqueeze(1)  
         sin = self.sin_cached[position_ids].unsqueeze(1)
         if self.rotary_dim is not None:

@@ -236,6 +236,8 @@ class IPEXTransformerAtten(nn.Module):
         outputs = (attn_output, present)
         if output_attentions:
             outputs += (attn_weight, )
+        else:
+            outputs += (None, )
 
         return outputs          # return as (attn_output, present, output_atten)
 
@@ -272,9 +274,9 @@ class IPEXOptAtten(IPEXTransformerAtten):
             key_states = self.k_proj(hidden_state)
             value_state = self.v_proj(hidden_state)
 
-        query_states = query_states.view(bs, seq_len, self.num_attn_head, self.head_dim).transpose(1, 2)
-        key_states = key_states.view(bs, seq_len, self.num_attn_head, self.head_dim).transpose(1, 2)
-        value_state = value_state.view(bs, seq_len, self.num_attn_head, self.head_dim).transpose(1, 2)
+        query_states = query_states.view(bs, seq_len, self.num_attn_head, self.head_dim)
+        key_states = key_states.view(bs, seq_len, self.num_attn_head, self.head_dim)
+        value_state = value_state.view(bs, seq_len, self.num_attn_head, self.head_dim)
 
         return query_states, key_states, value_state
 
@@ -453,7 +455,7 @@ class IPEXOptBlock(nn.Module):
         if self.do_layer_norm_before:
             hidden_states = self.self_attn_layer_norm(hidden_states)
 
-        hidden_states, self_attn_weights, present_key_value = self.attn(
+        hidden_states, present_key_value, self_attn_weights = self.attn(
             hidden_states=hidden_states,
             layer_past=past_key_value,
             attention_mask=attention_mask,
@@ -488,5 +490,5 @@ class IPEXOptBlock(nn.Module):
 
         if use_cache:
             outputs += (present_key_value, )
-        return outputs
 
+        return outputs

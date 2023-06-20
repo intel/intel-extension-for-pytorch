@@ -148,7 +148,7 @@ class IPEXOptConverter(IPEXTransformerConverter):
         do_layer_norm_before = self.config.do_layer_norm_before
         enable_bias = self.config.enable_bias
         layer_norm_eltwise_affine = self.config.layer_norm_elementwise_affine
-        is_decoder = self.config.is_decoder
+        # is_decoder = self.config.is_decoder
         return IPEXTransformerConfig(
             embed_dim=embed_dim,
             intermediate_size=intermediate_size,
@@ -166,11 +166,11 @@ class IPEXOptConverter(IPEXTransformerConverter):
             enable_bias=enable_bias,
             residual_pdrop=resid_pdrop,
             scale_attention=False,
-            is_decoder=is_decoder,
+            is_decoder=True,
             do_norm_before=do_layer_norm_before,
             ln_elementwise_affine=layer_norm_eltwise_affine,
             seq_first=False,
-            kv_cache_optimize=True,
+            kv_cache_optimize=False,
             positional_embedding_base=10000,
             sdp_fusion_enable=False,
             device=self.device,
@@ -236,7 +236,7 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
             intermediate_size=intermediate_size,
             num_attention_heads=num_head,
             max_positions=n_positions,
-            rotary_embedding_class=PositionalEmbedding,
+            rotary_embedding_class=LlamaRotaryEmbedding,
             rotary_dim=None,
             rotate_half=True,
             rotate_every_two=False,
