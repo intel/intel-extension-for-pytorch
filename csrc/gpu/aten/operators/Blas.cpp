@@ -2,6 +2,11 @@
 #include <ATen/native/Resize.h>
 #include "BlasImpl.h"
 #include "utils/CustomOperatorRegistration.h"
+
+#if defined(USE_XETLA)
+#include "XEGEMM.h"
+#endif
+
 namespace at {
 namespace AtenIpexTypeXPU {
 
@@ -67,9 +72,17 @@ Tensor& addmm_out(
   }
 
 #if defined(USE_XETLA)
-  if (gemm_xetla(
-          result, mat1, mat2, self, alpha.to<float>(), beta.to<float>())) {
-    return result;
+  if (alpha.to<float>() == 1.f && beta.to<float>() == 1.f) {
+    auto policy = HGEMMXetla()
+                      .add_matrix_c(result)
+                      .add_matrix_a(mat1)
+                      .add_matrix_b(mat2)
+                      .add_epilogue(self, HGEMMXetla::EpilogueType::BIAS)
+                      .build();
+    if (policy.fallback() == false) {
+      policy.run();
+      return result;
+    }
   }
 #endif
 
@@ -155,7 +168,13 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
   }
 
 #if defined(USE_XETLA)
-  if (gemm_xetla(result, self, mat2, at::Tensor())) {
+  auto policy = HGEMMXetla()
+                    .add_matrix_c(result)
+                    .add_matrix_a(self)
+                    .add_matrix_b(mat2)
+                    .build();
+  if (policy.fallback() == false) {
+    policy.run();
     return result;
   }
 #endif
