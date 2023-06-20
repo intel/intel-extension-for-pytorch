@@ -10,6 +10,7 @@ checking_rtol = 3e-2
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.has_fp64_dtype(), reason="Skip this case due to random NaN on CPU reference.")
     def test_baddbmm_scale(self, dtype=torch.float):
         m1_cpu = torch.ones([6, 3, 4], dtype=dtype) * 0.25
         m2_cpu = torch.ones([6, 4, 2], dtype=dtype) * 1.5
