@@ -1378,9 +1378,77 @@ static void apply_triangular_solve(
     Tensor& B,
     bool left,
     bool upper,
-    oneapi::mkl::transpose transpose,
+    bool transpose,
     bool unitriangular) {
 #ifdef USE_ONEMKL
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  oneapi::mkl::transpose trans =
+      transpose ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N;
+  oneapi::mkl::uplo uplo = upper ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
+  oneapi::mkl::diag diag =
+      unitriangular ? oneapi::mkl::diag::U : oneapi::mkl::diag::N;
+  oneapi::mkl::side side =
+      left ? oneapi::mkl::side::left : oneapi::mkl::side::right;
+
+  auto A_data = A.data_ptr<scalar_t>();
+  auto B_data = B.data_ptr<scalar_t>();
+  auto A_mat_stride = native::matrixStride(A);
+  auto B_mat_stride = native::matrixStride(B);
+  auto batch_size = native::batchCount(A);
+
+  auto m = left ? A.size(-1) : B.size(-2);
+  auto n = B.size(-1);
+  auto lda = std::max<int64_t>(1, A.size(-2));
+  auto ldb = std::max<int64_t>(1, B.size(-2));
+  scalar_t alpha = 1.;
+  for (const auto i : c10::irange(batch_size)) {
+    scalar_t* A_working_ptr = &A_data[i * A_mat_stride];
+    scalar_t* B_working_ptr = &B_data[i * B_mat_stride];
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::blas::column_major::trsm,
+        dpcpp_queue,
+        side,
+        uplo,
+        trans,
+        diag,
+        m,
+        n,
+        alpha,
+        A_working_ptr,
+        lda,
+        B_working_ptr,
+        ldb);
+  }
+#else
+  AT_ERROR("triangular_solve: oneMKL library not found in compilation");
+#endif
+}
+
+template <typename scalar_t>
+static void trans_and_apply_triangular_solve(
+    Tensor& A,
+    Tensor& B,
+    bool left,
+    bool upper,
+    bool contig,
+    bool conj,
+    bool unitriangular) {
+#ifdef USE_ONEMKL
+  auto trans = oneapi::mkl::transpose::N;
+  if (conj) {
+    if (contig) {
+      TORCH_INTERNAL_ASSERT(false, "Invalid transpose type");
+    } else {
+      trans = oneapi::mkl::transpose::C;
+    }
+  } else {
+    if (contig) {
+      trans = oneapi::mkl::transpose::N;
+    } else {
+      trans = oneapi::mkl::transpose::T;
+    }
+  }
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   oneapi::mkl::uplo uplo = upper ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
   oneapi::mkl::diag diag =
@@ -1408,7 +1476,7 @@ static void apply_triangular_solve(
         dpcpp_queue,
         side,
         uplo,
-        transpose,
+        trans,
         diag,
         m,
         n,
@@ -1429,9 +1497,11 @@ void apply_triangular_solve<c10::complex<float>>(
     Tensor& B,
     bool left,
     bool upper,
-    oneapi::mkl::transpose transpose,
+    bool transpose,
     bool unitriangular) {
 #ifdef USE_ONEMKL
+  oneapi::mkl::transpose trans =
+      transpose ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   oneapi::mkl::uplo uplo = upper ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
   oneapi::mkl::diag diag =
@@ -1459,7 +1529,73 @@ void apply_triangular_solve<c10::complex<float>>(
         dpcpp_queue,
         side,
         uplo,
-        transpose,
+        trans,
+        diag,
+        m,
+        n,
+        alpha,
+        reinterpret_cast<std::complex<float>*>(A_working_ptr),
+        lda,
+        reinterpret_cast<std::complex<float>*>(B_working_ptr),
+        ldb);
+  }
+#else
+  AT_ERROR("triangular_solve: oneMKL library not found in compilation");
+#endif
+}
+
+template <>
+void trans_and_apply_triangular_solve<c10::complex<float>>(
+    Tensor& A,
+    Tensor& B,
+    bool left,
+    bool upper,
+    bool contig,
+    bool conj,
+    bool unitriangular) {
+#ifdef USE_ONEMKL
+  auto trans = oneapi::mkl::transpose::N;
+  if (conj) {
+    if (contig) {
+      TORCH_INTERNAL_ASSERT(false, "Invalid transpose type");
+    } else {
+      trans = oneapi::mkl::transpose::C;
+    }
+  } else {
+    if (contig) {
+      trans = oneapi::mkl::transpose::N;
+    } else {
+      trans = oneapi::mkl::transpose::T;
+    }
+  }
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  oneapi::mkl::uplo uplo = upper ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
+  oneapi::mkl::diag diag =
+      unitriangular ? oneapi::mkl::diag::U : oneapi::mkl::diag::N;
+  oneapi::mkl::side side =
+      left ? oneapi::mkl::side::left : oneapi::mkl::side::right;
+
+  auto A_data = A.data_ptr<c10::complex<float>>();
+  auto B_data = B.data_ptr<c10::complex<float>>();
+  auto A_mat_stride = native::matrixStride(A);
+  auto B_mat_stride = native::matrixStride(B);
+  auto batch_size = native::batchCount(A);
+
+  auto m = left ? A.size(-1) : B.size(-2);
+  auto n = B.size(-1);
+  auto lda = std::max<int64_t>(1, A.size(-2));
+  auto ldb = std::max<int64_t>(1, B.size(-2));
+  std::complex<float> alpha = 1.f;
+  for (const auto i : c10::irange(batch_size)) {
+    c10::complex<float>* A_working_ptr = &A_data[i * A_mat_stride];
+    c10::complex<float>* B_working_ptr = &B_data[i * B_mat_stride];
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::blas::column_major::trsm,
+        dpcpp_queue,
+        side,
+        uplo,
+        trans,
         diag,
         m,
         n,
@@ -1480,9 +1616,11 @@ void apply_triangular_solve<c10::complex<double>>(
     Tensor& B,
     bool left,
     bool upper,
-    oneapi::mkl::transpose transpose,
+    bool transpose,
     bool unitriangular) {
 #ifdef USE_ONEMKL
+  oneapi::mkl::transpose trans =
+      transpose ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   oneapi::mkl::uplo uplo = upper ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
   oneapi::mkl::diag diag =
@@ -1510,7 +1648,73 @@ void apply_triangular_solve<c10::complex<double>>(
         dpcpp_queue,
         side,
         uplo,
-        transpose,
+        trans,
+        diag,
+        m,
+        n,
+        alpha,
+        reinterpret_cast<std::complex<double>*>(A_working_ptr),
+        lda,
+        reinterpret_cast<std::complex<double>*>(B_working_ptr),
+        ldb);
+  }
+#else
+  AT_ERROR("triangular_solve: oneMKL library not found in compilation");
+#endif
+}
+
+template <>
+void trans_and_apply_triangular_solve<c10::complex<double>>(
+    Tensor& A,
+    Tensor& B,
+    bool left,
+    bool upper,
+    bool contig,
+    bool conj,
+    bool unitriangular) {
+#ifdef USE_ONEMKL
+  auto trans = oneapi::mkl::transpose::N;
+  if (conj) {
+    if (contig) {
+      TORCH_INTERNAL_ASSERT(false, "Invalid transpose type");
+    } else {
+      trans = oneapi::mkl::transpose::C;
+    }
+  } else {
+    if (contig) {
+      trans = oneapi::mkl::transpose::N;
+    } else {
+      trans = oneapi::mkl::transpose::T;
+    }
+  }
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  oneapi::mkl::uplo uplo = upper ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
+  oneapi::mkl::diag diag =
+      unitriangular ? oneapi::mkl::diag::U : oneapi::mkl::diag::N;
+  oneapi::mkl::side side =
+      left ? oneapi::mkl::side::left : oneapi::mkl::side::right;
+
+  auto A_data = A.data_ptr<c10::complex<double>>();
+  auto B_data = B.data_ptr<c10::complex<double>>();
+  auto A_mat_stride = native::matrixStride(A);
+  auto B_mat_stride = native::matrixStride(B);
+  auto batch_size = native::batchCount(A);
+
+  auto m = left ? A.size(-1) : B.size(-2);
+  auto n = B.size(-1);
+  auto lda = std::max<int64_t>(1, A.size(-2));
+  auto ldb = std::max<int64_t>(1, B.size(-2));
+  std::complex<double> alpha = 1.;
+  for (const auto i : c10::irange(batch_size)) {
+    c10::complex<double>* A_working_ptr = &A_data[i * A_mat_stride];
+    c10::complex<double>* B_working_ptr = &B_data[i * B_mat_stride];
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::blas::column_major::trsm,
+        dpcpp_queue,
+        side,
+        uplo,
+        trans,
         diag,
         m,
         n,
@@ -2715,9 +2919,6 @@ std::tuple<Tensor, Tensor> _triangular_solve_helper(
   result.copy_(other);
   clone_input.copy_(input);
 
-  oneapi::mkl::transpose trans =
-      transpose ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N;
-
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
       clone_input.scalar_type(), "triangular_solve_xpu", [&] {
         impl::apply_triangular_solve<scalar_t>(
@@ -2725,7 +2926,7 @@ std::tuple<Tensor, Tensor> _triangular_solve_helper(
             result,
             /*left=*/true,
             upper,
-            trans,
+            transpose,
             unitriangular);
       });
 
@@ -3593,39 +3794,6 @@ std::tuple<Tensor&, Tensor&, Tensor&> linalg_lu_factor_ex_out(
   return std::tuple<Tensor&, Tensor&, Tensor&>(LU, pivots, info);
 }
 
-// support float double and complex
-void triangular_solve_kernel(
-    Tensor& A,
-    Tensor& B,
-    bool left,
-    bool upper,
-    oneapi::mkl::transpose transpose,
-    bool unitriangular) {
-  auto scalar_t = A.scalar_type();
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
-      scalar_t, "triangular_solve_xpu", [&] {
-        impl::apply_triangular_solve<scalar_t>(
-            A, B, left, upper, transpose, unitriangular);
-      });
-}
-
-inline oneapi::mkl::transpose to_transpose_type(
-    const bool contig,
-    const bool conj) {
-  if (conj) {
-    if (contig) {
-      TORCH_INTERNAL_ASSERT(false, "Invalid transpose type");
-    } else {
-      return oneapi::mkl::transpose::C;
-    }
-  } else {
-    if (contig) {
-      return oneapi::mkl::transpose::N;
-    } else {
-      return oneapi::mkl::transpose::T;
-    }
-  }
-}
 /*
 Solves the matrix equation AX = B for A triangular.
 'left' If true solves AX = B, if false solves XA = B
@@ -3817,13 +3985,11 @@ Tensor& linalg_solve_triangular_out(
     upper = !upper;
   }
 
-  triangular_solve_kernel(
-      A_f,
-      out_f,
-      left,
-      upper,
-      to_transpose_type(A_is_f_contig, A_is_conj),
-      unitriangular);
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      A_f.scalar_type(), "apply_triangular_solve", [&] {
+        impl::trans_and_apply_triangular_solve<scalar_t>(
+            A_f, out_f, left, upper, A_is_f_contig, A_is_conj, unitriangular);
+      });
 
   if (transpose_out_f) {
     out_f.transpose_(-2, -1);
