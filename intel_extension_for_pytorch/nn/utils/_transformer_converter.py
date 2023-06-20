@@ -274,7 +274,7 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
             seq_first=False,
             kv_cache_optimize=True,
             positional_embedding_base=10000,
-            sdp_fusion_enable=False,
+            sdp_fusion_enable=True,
             device=self.device,
             dtype=self.dtype
         )

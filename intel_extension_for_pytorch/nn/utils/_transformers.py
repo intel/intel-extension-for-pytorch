@@ -485,10 +485,8 @@ class IPEXLlamaBlock(nn.Module):
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         residual = hidden_states
 
-        print("-----flag1={}".format(hidden_states.shape))
         hidden_states = self.input_layernorm(hidden_states)
 
-        print("-----flag2={}".format(hidden_states.shape))
         hidden_states, present_key_value, self_attn_weights = self.attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
@@ -497,19 +495,13 @@ class IPEXLlamaBlock(nn.Module):
             output_attentions=output_attentions,
             use_cache=use_cache,
         )
-        print("-----flag3={}".format(hidden_states.shape))
 
         hidden_states = residual + hidden_states
-        print("-----flag4={}".format(hidden_states.shape))
 
         residual = hidden_states
-        print("-----flag5={}".format(hidden_states.shape))
         hidden_states = self.post_attn_layernorm(hidden_states)
-        print("-----flag6={}".format(hidden_states.shape))
         hidden_states = self.mlp(hidden_states)
-        print("-----flag7={}".format(hidden_states.shape))
         hidden_states = residual + hidden_states
-        print("-----flag8={}".format(hidden_states.shape))
 
         outputs = (hidden_states, )
 
