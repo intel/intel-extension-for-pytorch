@@ -234,7 +234,9 @@ class HGEMMXetla final {
     using scalar_t =
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
     auto& q = dpcppGetCurrentQueue();
-    if (n_ >= 4096 && n_ < 5120) {
+    if (m_ == 32) {
+      HGEMM_COMMON_DISPATCH(_32x256_8x32x16_1_);
+    } else if (n_ >= 4096 && n_ < 5120) {
       HGEMM_COMMON_DISPATCH(_32x64_8x16x16_2_);
       return;
     } else if (n_ >= 5120 && n_ < 11008) {
