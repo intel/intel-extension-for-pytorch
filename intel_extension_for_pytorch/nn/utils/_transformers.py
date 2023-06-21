@@ -379,10 +379,13 @@ class IPEXLlamaMLP(IPEXTransformerMLP):
 
     def forward(self, hidden_states):
         if self.row_major:
-            hidden_states1 = torch.matmul(hidden_states, self.fc_in_wei)
-            hidden_states1 = self.act(hidden_states1)
-            hidden_states2 = torch.matmul(hidden_states, self.up_wei)
-            hidden_states = hidden_states1 * hidden_states2
+            hidden_states1 = torch.ops.torch_ipex.hgemm_silu(hidden_states[0], self.fc_in_wei)
+            #hidden_states1 = torch.matmul(hidden_states, self.fc_in_wei)
+            #hidden_states1 = self.act(hidden_states1)
+            hidden_states = torch.ops.torch_ipex.hgemm_resmul(hidden_states[0], self.up_wei, hidden_states1)
+            hidden_states = hidden_states.unsqueeze(0)
+            #hidden_states2 = torch.matmul(hidden_states, self.up_wei)
+            #hidden_states = hidden_states1 * hidden_states2
             hidden_states = torch.matmul(hidden_states, self.fc_out_wei)
         else:    
             hidden_states = self.fc_out(self.act(self.fc_in(hidden_states)) * self.up_proj(hidden_states))
