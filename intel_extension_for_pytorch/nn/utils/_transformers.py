@@ -231,15 +231,20 @@ class IPEXTransformerAtten(nn.Module):
             attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask)
         return attn_output, attn_weights
 
-    def get_final_output(self, attn_output: torch.Tensor):
+    def get_final_output(self, attn_output: torch.Tensor, residual: Optional[torch.Tensor] = None):
         # reshape the attn_output from [bs, head_num, seq_len, head_dim] back to [bs, seq_len, embedding_size]
         attn_output = attn_output.transpose(1, 2)
         attn_output = attn_output.reshape(attn_output.size()[:-2] + (self.embed_dim,))
         if self.row_major:
-            attn_output = torch.matmul(attn_output, self.out_wei)
+            if residual is None:
+                attn_output = torch.matmul(attn_output, self.out_wei)
+            else:
+                attn_output = torch.addmm(residual[0], attn_output[0], self.out_wei)
+                attn_output = attn_output.unsqueeze(0)
         else:
-            attn_output = self.out_proj(attn_output)
-        return self.residual_drop(attn_output)
+            attn_output = self.out_proj(attn_output) + residual
+        return attn_output
+        # return self.residual_drop(attn_output)
 
     def forward(
         self,
@@ -250,7 +255,8 @@ class IPEXTransformerAtten(nn.Module):
         position_ids: Optional[torch.LongTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
         use_cache: Optional[bool] = False,
-        output_attentions: Optional[bool] = False
+        output_attentions: Optional[bool] = False,
+        residual: Optional[torch.Tensor] = None
     ):
 
         query, key, value = self.compute_qkv(hidden_state=hidden_states, key_value_state=key_value_states, layer_past=layer_past)
@@ -265,7 +271,7 @@ class IPEXTransformerAtten(nn.Module):
             present = None 
 
         attn_output, attn_weight = self.self_attention(query, key, value, attention_mask, head_mask)
-        attn_output = self.get_final_output(attn_output=attn_output)
+        attn_output = self.get_final_output(attn_output=attn_output, residual=residual)
         outputs = (attn_output, present)
         if output_attentions:
             outputs += (attn_weight, )
@@ -377,18 +383,15 @@ class IPEXLlamaMLP(IPEXTransformerMLP):
         self.up_proj = nn.Linear(config.embed_dim, config.intermediate_size, bias=config.enable_bias)
         self.up_wei = None
 
-    def forward(self, hidden_states):
+    def forward(self, hidden_states, residual):
         if self.row_major:
             hidden_states1 = torch.ops.torch_ipex.hgemm_silu(hidden_states[0], self.fc_in_wei)
-            #hidden_states1 = torch.matmul(hidden_states, self.fc_in_wei)
-            #hidden_states1 = self.act(hidden_states1)
             hidden_states = torch.ops.torch_ipex.hgemm_resmul(hidden_states[0], self.up_wei, hidden_states1)
+            hidden_states = torch.addmm(residual[0], hidden_states, self.fc_out_wei)
             hidden_states = hidden_states.unsqueeze(0)
-            #hidden_states2 = torch.matmul(hidden_states, self.up_wei)
-            #hidden_states = hidden_states1 * hidden_states2
-            hidden_states = torch.matmul(hidden_states, self.fc_out_wei)
         else:    
             hidden_states = self.fc_out(self.act(self.fc_in(hidden_states)) * self.up_proj(hidden_states))
+            hidden_states += residual
         return hidden_states
 
 class IPEXOptMLP(IPEXTransformerMLP):
@@ -496,15 +499,16 @@ class IPEXLlamaBlock(nn.Module):
             layer_past=past_key_value,
             output_attentions=output_attentions,
             use_cache=use_cache,
+            residual=residual
         )
 
-        hidden_states = residual + hidden_states
+        #hidden_states = residual + hidden_states
 
         residual = hidden_states
         hidden_states = self.post_attn_layernorm(hidden_states)
         #hidden_states, mean, var = torch.ops.torch_ipex.fast_rms_norm(hidden_states, [hidden_states.shape[-1]], self.post_attn_layernorm.weight, None, self.post_attn_layernorm.variance_epsilon)
-        hidden_states = self.mlp(hidden_states)
-        hidden_states = residual + hidden_states
+        hidden_states = self.mlp(hidden_states, residual)
+        #hidden_states = residual + hidden_states
 
         outputs = (hidden_states, )
 

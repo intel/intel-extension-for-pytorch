@@ -401,7 +401,6 @@ std::tuple<Tensor, Tensor, Tensor> add_add_layer_norm(
     const c10::optional<at::Tensor>& weight_opt,
     const c10::optional<at::Tensor>& bias_opt,
     double epsilon) {
-  RECORD_FUNCTION("add_add_layer_norm", std::vector<c10::IValue>({input}));
   c10::MaybeOwned<Tensor> weight_maybe_owned =
       at::borrow_from_optional_tensor(weight_opt);
   const Tensor& weight = *weight_maybe_owned;
@@ -506,7 +505,6 @@ std::tuple<Tensor, Tensor, Tensor> add_add_rms_norm(
     const c10::optional<at::Tensor>& weight_opt,
     const c10::optional<at::Tensor>& bias_opt,
     double epsilon) {
-  RECORD_FUNCTION("add_add_rms_norm", std::vector<c10::IValue>({input}));
   c10::MaybeOwned<Tensor> weight_maybe_owned =
       at::borrow_from_optional_tensor(weight_opt);
   const Tensor& weight = *weight_maybe_owned;
