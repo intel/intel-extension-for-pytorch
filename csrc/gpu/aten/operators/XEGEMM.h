@@ -89,24 +89,31 @@ using namespace xpu::xetla;
       k_);                                                              \
   }
 
-#define HGEMM_COMMON_DISPATCH(F)                                      \
-  {                                                                   \
-    if (num_epilogues_ == 0)                                          \
-      HGEMM_DISPATCH(hgemm##F)                                        \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS)        \
-      HGEMM_BIAS_DISPATCH(hgemm_bias##F)                              \
-    else if (                                                         \
-        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&           \
-        epilogue_type_[1] == RES_ADD && epilogue_type_[2] == RES_ADD) \
-      HGEMM_BIAS_RES_RES_DISPATCH(hgemm_bias_res_res##F)              \
-    else if (                                                         \
-        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&           \
-        epilogue_type_[1] == GELU)                                    \
-      HGEMM_BIAS_GELU_DISPATCH(hgemm_bias_gelu##F)                    \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL)     \
-      HGEMM_RESMUL_DISPATCH(hgemm_resmul##F)                          \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == SILU)        \
-      HGEMM_SILU_DISPATCH(hgemm_silu##F)                              \
+#define HGEMM_COMMON_DISPATCH_IMPL(DISPATCHER, F) \
+  if (is_b_row_major_)                            \
+    DISPATCHER(F##true_)                          \
+  else                                            \
+    DISPATCHER(F##false_)
+
+#define HGEMM_COMMON_DISPATCH(F)                                               \
+  {                                                                            \
+    if (num_epilogues_ == 0)                                                   \
+      HGEMM_COMMON_DISPATCH_IMPL(HGEMM_DISPATCH, hgemm##F)                     \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS)                 \
+      HGEMM_COMMON_DISPATCH_IMPL(HGEMM_BIAS_DISPATCH, hgemm_bias##F)           \
+    else if (                                                                  \
+        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                    \
+        epilogue_type_[1] == RES_ADD && epilogue_type_[2] == RES_ADD)          \
+      HGEMM_COMMON_DISPATCH_IMPL(                                              \
+          HGEMM_BIAS_RES_RES_DISPATCH, hgemm_bias_res_res##F)                  \
+    else if (                                                                  \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                    \
+        epilogue_type_[1] == GELU)                                             \
+      HGEMM_COMMON_DISPATCH_IMPL(HGEMM_BIAS_GELU_DISPATCH, hgemm_bias_gelu##F) \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL)              \
+      HGEMM_COMMON_DISPATCH_IMPL(HGEMM_RESMUL_DISPATCH, hgemm_resmul##F)       \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == SILU)                 \
+      HGEMM_COMMON_DISPATCH_IMPL(HGEMM_SILU_DISPATCH, hgemm_silu##F)           \
   }
 
 class HGEMMXetla final {
@@ -176,7 +183,7 @@ class HGEMMXetla final {
     n_ = b_sizes[1];
     bool ck0 = b_sizes[0] == k_;
     bool ck1 = c_sizes[0] == m_ && c_sizes[1] == n_;
-    bool ck2 = is_a_row_major_ && is_b_row_major_; // TODO:
+    bool ck2 = is_a_row_major_;
     if (!(ck0 && ck1 && ck2))
       return *this;
     if (!(m_ <= 32 && n_ >= 4096 && k_ >= 4096)) // TODO:
