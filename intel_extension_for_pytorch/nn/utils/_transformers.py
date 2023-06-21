@@ -448,8 +448,10 @@ class LlamaRMSNorm(nn.Module):
 
     def forward(self, hidden_states: torch.Tensor):
         hsz = hidden_states.shape[-1]
-        output = torch.ops.torch_ipex.rms_norm(hidden_states, [hsz], self.weight)
-        return output[0]
+        hidden_states, mean, var = torch.ops.torch_ipex.fast_rms_norm(hidden_states, [hsz], self.weight, None, self.variance_epsilon)
+        #output = torch.ops.torch_ipex.rms_norm(hidden_states, [hsz], self.weight)
+        #return output[0]
+        return hidden_states
         '''
         variance = hidden_states.to(torch.float32).pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
@@ -482,6 +484,7 @@ class IPEXLlamaBlock(nn.Module):
         residual = hidden_states
 
         hidden_states = self.input_layernorm(hidden_states)
+        #hidden_states, mean, var = torch.ops.torch_ipex.fast_rms_norm(hidden_states, [hidden_states.shape[-1]], self.input_layernorm.weight, None, self.input_layernorm.variance_epsilon)
 
         hidden_states, present_key_value, self_attn_weights = self.attn(
             hidden_states=hidden_states,
@@ -496,6 +499,7 @@ class IPEXLlamaBlock(nn.Module):
 
         residual = hidden_states
         hidden_states = self.post_attn_layernorm(hidden_states)
+        #hidden_states, mean, var = torch.ops.torch_ipex.fast_rms_norm(hidden_states, [hidden_states.shape[-1]], self.post_attn_layernorm.weight, None, self.post_attn_layernorm.variance_epsilon)
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
 

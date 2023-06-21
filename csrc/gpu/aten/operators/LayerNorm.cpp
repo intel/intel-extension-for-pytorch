@@ -12,56 +12,6 @@ using namespace at::AtenIpexTypeXPU::normalization;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-inline std::pair<int64_t, int64_t> _check_layer_norm_inputs(
-    const Tensor& input,
-    IntArrayRef normalized_shape,
-    const Tensor& weight /* optional */,
-    const Tensor& bias /* optional */) {
-  const int normalized_ndim = normalized_shape.size();
-  TORCH_CHECK(
-      normalized_ndim >= 1,
-      "Expected normalized_shape to be at least 1-dimensional, i.e., ",
-      "containing at least one element, but got normalized_shape = ",
-      normalized_shape);
-  TORCH_CHECK(
-      !weight.defined() || weight.sizes().equals(normalized_shape),
-      "Expected weight to be of same shape as normalized_shape, but got ",
-      "weight of shape ",
-      weight.sizes(),
-      " and normalized_shape = ",
-      normalized_shape);
-  TORCH_CHECK(
-      !bias.defined() || bias.sizes().equals(normalized_shape),
-      "Expected bias to be of same shape as normalized_shape, but got ",
-      "bias of shape ",
-      bias.sizes(),
-      " and normalized_shape = ",
-      normalized_shape);
-  const auto input_shape = input.sizes();
-  const auto input_ndim = input.dim();
-
-  if (input_ndim < normalized_ndim ||
-      !input_shape.slice(input_ndim - normalized_ndim)
-           .equals(normalized_shape)) {
-    std::stringstream ss;
-    ss << "Given normalized_shape=" << normalized_shape
-       << ", expected input with shape [*";
-    for (auto size : normalized_shape) {
-      ss << ", " << size;
-    }
-    ss << "], but got input of size" << input_shape;
-    AT_ERROR(ss.str());
-  }
-
-  const int axis = input_ndim - normalized_ndim;
-  const int64_t M =
-      c10::multiply_integers(input_shape.cbegin(), input_shape.cbegin() + axis);
-  const int64_t N =
-      c10::multiply_integers(input_shape.cbegin() + axis, input_shape.cend());
-
-  return std::make_pair(M, N);
-}
-
 template <typename scalar_t, typename mean_t, typename weight_t>
 class LayerNormForward : public NormForward<scalar_t, mean_t, weight_t> {
  public:
