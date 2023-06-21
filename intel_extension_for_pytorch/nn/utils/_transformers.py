@@ -333,15 +333,9 @@ class IPEXTransformerMLP(nn.Module):
             if isinstance(self.act, nn.GELU):
                 hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in.weight, self.fc_in.bias, self.act.approximate)
             else:
-                shape = [hidden_states.shape[0] * hidden_states.shape[1], hidden_states.shape[2]]
-                out_shape = [hidden_states.shape[0], hidden_states.shape[1], self.fc_in_wei.shape[1]]
-                hidden_states = torch.addmm(self.fc_in.bias, hidden_states.view(shape), self.fc_in_wei)
-                hidden_states = hidden_states.view(out_shape)
+                hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                 hidden_states = self.act(hidden_states)
-            shape = [hidden_states.shape[0] * hidden_states.shape[1], hidden_states.shape[2]]
-            out_shape = [hidden_states.shape[0], hidden_states.shape[1], self.fc_out_wei.shape[1]]
-            hidden_states = torch.addmm(self.fc_out.bias, hidden_states.view(shape), self.fc_out_wei)
-            hidden_states = hidden_states.view(out_shape)
+            hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_out_wei, self.fc_out.bias)
         else:
             if isinstance(self.act, nn.GELU):
                 hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in.weight, self.fc_in.bias, self.act.approximate)
@@ -357,19 +351,13 @@ class IPEXGPTJMLP(IPEXTransformerMLP):
     
     def forward(self, hidden_states: Optional[torch.Tensor], attn_output, residual):
         if self.row_major:
-            shape = [hidden_states.shape[0] * hidden_states.shape[1], hidden_states.shape[2]]
-            out_shape = [hidden_states.shape[0], hidden_states.shape[1], self.fc_in_wei.shape[1]]
             if isinstance(self.act, nn.GELU):
                 hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in.weight, self.fc_in.bias, self.act.approximate)
             else:
-                hidden_states = torch.addmm(self.fc_in.bias, hidden_states.view(shape), self.fc_in_wei)
+                hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                 hidden_states = self.act(hidden_states)
-            hidden_states = hidden_states.view(out_shape)
             
-            shape = [hidden_states.shape[0] * hidden_states.shape[1], hidden_states.shape[2]]
-            out_shape = [hidden_states.shape[0], hidden_states.shape[1], self.fc_out_wei.shape[1]]
-            hidden_states = torch.addmm(self.fc_out.bias, hidden_states.view(shape), self.fc_out_wei)
-            hidden_states = hidden_states.view(out_shape)
+            hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_out_wei, self.fc_out.bias)
             hidden_states += attn_output + residual
             # hidden_states = torch.ops.torch_ipex.hgemm_bias_res_res(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output, residual)
         else:

@@ -1147,7 +1147,44 @@ at::Tensor t_matmul_gelu(
       result, tensor1, tensor2, false, attr, is_fused);
 }
 
+Tensor matmul_bias_out(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias_opt) {
+  // See [Note: hacky wrapper removal for optional tensor]
+  auto bias = bias_opt.has_value()
+      ? c10::MaybeOwned<Tensor>::borrowed(*bias_opt)
+      : c10::MaybeOwned<Tensor>::owned(c10::in_place);
+
+  if (input.dim() == 2 && bias->defined()) {
+    // Fused op is marginally faster.
+    return at::addmm(*bias, input, weight);
+  }
+  if (input.dim() == 3 && bias->defined() && input.is_contiguous() &&
+      !input.is_xla()) {
+    // Also hit the fused path for contiguous 3D input, if not using xla
+    // backend. Reshaping/flattening has some performance implications on xla.
+    const auto input_sizes = input.sym_sizes();
+    const auto result = at::addmm(
+        *bias,
+        input.view_symint({input_sizes[0] * input_sizes[1], input_sizes[2]}),
+        weight);
+    return result.view_symint(
+        {input_sizes[0], input_sizes[1], result.sym_size(1)});
+  }
+  auto output = at::matmul(input, weight);
+  if (bias->defined()) {
+    output = at::add(output, *bias);
+  }
+  return output;
+}
 } // namespace AtenIpexTypeXPU
+
+namespace {
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER("matmul_bias_out", at::AtenIpexTypeXPU::matmul_bias_out);
+}
+} // namespace
 
 namespace AtenIpexTypeQuantizedXPU {
 
