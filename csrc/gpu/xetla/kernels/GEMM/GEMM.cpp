@@ -99,6 +99,8 @@ namespace xetla {
 
 HGEMM_IMPL_FUNC(32, 64, 8, 16, 16, 2)
 HGEMM_IMPL_FUNC(8, 512, 8, 16, 16, 1)
+HGEMM_IMPL_FUNC(16, 256, 8, 16, 16, 1)
+HGEMM_IMPL_FUNC(8, 128, 8, 16, 16, 4)
 
 void hgemm_qkv_8x128_8x16x32_4(
     sycl::queue& queue,
@@ -111,6 +113,20 @@ void hgemm_qkv_8x128_8x16x32_4(
     const int n,
     const int k) {
   hgemm_qkv<sycl::half, 8, 128, 8, 16, 32, 4, 1, 1, 3, true>(
+      queue, out0, out1, out2, a, b, m, n, k);
+}
+
+void hgemm_qkv_16x256_8x16x16_1(
+    sycl::queue& queue,
+    sycl::half* out0,
+    sycl::half* out1,
+    sycl::half* out2,
+    const sycl::half* a,
+    const sycl::half* b,
+    const int m,
+    const int n,
+    const int k) {
+  hgemm_qkv<sycl::half, 16, 256, 8, 16, 16, 1, 1, 1, 3, true>(
       queue, out0, out1, out2, a, b, m, n, k);
 }
 

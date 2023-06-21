@@ -85,7 +85,7 @@ static void hgemm_qkv_out(
   using scalar_t =
       decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
   auto& q = dpcppGetCurrentQueue();
-  GEMM_QKV_XETLA_DISPATCH(hgemm_qkv_8x128_8x16x32_4);
+  GEMM_QKV_XETLA_DISPATCH(hgemm_qkv_16x256_8x16x16_1);
 }
 
 #undef GEMM_QKV_XETLA_DISPATCH
