@@ -263,10 +263,11 @@ Tensor linear_gelu(
     auto bias_ = bias.value();
     auto output = at::empty({m, n}, input.options());
     auto input_ = input.squeeze(0);
+    auto w = weight.transpose(0, 1);
     auto policy = HGEMMXetla()
                       .add_matrix_c(output)
                       .add_matrix_a(input_)
-                      .add_matrix_b(weight)
+                      .add_matrix_b(w)
                       .add_epilogue(bias_, HGEMMXetla::EpilogueType::BIAS)
                       .add_epilogue(Tensor(), HGEMMXetla::EpilogueType::GELU)
                       .build();
