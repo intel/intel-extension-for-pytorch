@@ -19,25 +19,41 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_efficient_attention(
     const Tensor& value,
     bool compute_log_sumexp,
     bool is_causal) {
-  RECORD_FUNCTION("xetla_fsdp_forward_no_mask_no_casual_no_stride", {});
-  // auto result = naive_scaled_dot_product(query, key, value, is_causal);
-  // std::cout << "this is _scaled_dot_product_efficient_attention!!!!!\n";
 #if defined(USE_XETLA)
-  // std::cout << "go fmha_forward ......\n";
   auto output = at::empty_like(query);
   auto output_lm = at::empty_like(query);
   auto dpcpp_queue = dpcppGetCurrentQueue();
-  gpu::xetla::fmha_forward_op(
-      dpcpp_queue,
-      query.data_ptr(),
-      key.data_ptr(),
-      value.data_ptr(),
-      output.data_ptr(),
-      query.size(0),
-      query.size(1),
-      query.size(3),
-      query.size(2),
-      key.size(2));
+  bool is_strided = (key.strides()[1] == key.sizes()[3] &&
+                     key.strides()[2] == (key.sizes()[1] * key.sizes()[3]))
+      ? true
+      : false;
+  if (!is_strided) {
+    RECORD_FUNCTION("xetla_fsdp_forward_no_mask_no_causal_no_strided", {});
+    gpu::xetla::fmha_forward_op(
+        dpcpp_queue,
+        query.data_ptr(),
+        key.data_ptr(),
+        value.data_ptr(),
+        output.data_ptr(),
+        query.size(0),
+        query.size(1),
+        query.size(3),
+        query.size(2),
+        key.size(2));
+  } else {
+    RECORD_FUNCTION("xetla_fsdp_forward_no_mask_no_causal", {});
+    gpu::xetla::fmha_forward_op_strided(
+        dpcpp_queue,
+        query.data_ptr(),
+        key.data_ptr(),
+        value.data_ptr(),
+        output.data_ptr(),
+        query.size(0),
+        query.size(1),
+        query.size(3),
+        query.size(2),
+        key.size(2));
+  }
   return std::forward_as_tuple(output, output_lm);
 #else
   auto result = naive_scaled_dot_product(query, key, value, is_causal);
@@ -162,13 +178,11 @@ Tensor scaled_dot_product_attention(
             query_, key, value, compute_logsumexp, is_causal);
         return std::get<0>(out_and_lse);
       } else {
-        // std::cout << "will go math!!!!!!\n";
         return std::get<0>(at::_scaled_dot_product_attention_math(
             query_, key, value, attn_mask_, dropout_p, is_causal));
       }
     }
     case sdp::SDPBackend::math:
-      // std::cout << "will go math!!!!!!\n";
       return std::get<0>(at::_scaled_dot_product_attention_math(
           query_, key, value, attn_mask_, dropout_p, is_causal));
     default:
@@ -181,10 +195,3 @@ Tensor scaled_dot_product_attention(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
-  //
-// namespace {
-// IPEX_LIBRARY_FRAGMENT() {
-//  IPEX_OP_REGISTER_DISPATCH(
-//      "mha_forward", at::AtenIpexTypeXPU::mha_forward, c10::DispatchKey::XPU);
-//}
-//} // namespace
