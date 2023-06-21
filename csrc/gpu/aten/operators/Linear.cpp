@@ -260,12 +260,14 @@ Tensor linear_gelu(
     int m = input.sizes()[1];
     int n = weight.sizes()[0];
     int k = input.sizes()[2];
+    auto bias_ = bias.value();
     auto output = at::empty({m, n}, input.options());
     auto input_ = input.squeeze(0);
     auto policy = HGEMMXetla()
                       .add_matrix_c(output)
                       .add_matrix_a(input_)
                       .add_matrix_b(weight)
+                      .add_epilogue(bias_, HGEMMXetla::EpilogueType::BIAS)
                       .add_epilogue(Tensor(), HGEMMXetla::EpilogueType::GELU)
                       .build();
     if (policy.fallback() == false) {
