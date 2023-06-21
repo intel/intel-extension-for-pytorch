@@ -109,6 +109,32 @@ SET(AMX_CODE "
   }
 ")
 
+SET(AVX512_FP16_CODE "
+  #include <stdint.h>
+  #include <immintrin.h>
+
+  int main() {
+    __m512 src;
+    // detect avx512f and avx512_bf16
+    _mm512_cvtneps_pbh(src);
+    // Enhance check logical for Ubuntu 18.04 + gcc 11.1. Which compiler is not fully support BF16.
+    __m128 a;
+    __m128bh b;
+    b = _mm_cvtneps_pbh(a);
+
+    // detect AMX
+    _tile_dpbusd (1, 2, 3);
+
+    // detect avx512f and avx512_fp16
+    _mm512_cvtxps_ph(src);
+    // Enhance check logical for Ubuntu 20.04 + gcc 12.1. Which compiler is not fully support FP16.
+    __m128 a1;
+    __m128h b1;
+    b1 = _mm_cvtxps_ph(a1);
+    return 0;
+  }
+")
+
 MACRO(CHECK_SSE lang type flags)
   SET(__FLAG_I 1)
   SET(CMAKE_REQUIRED_FLAGS_SAVE ${CMAKE_REQUIRED_FLAGS})
@@ -164,3 +190,10 @@ CHECK_SSE(C "AMX" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mavx512bf16 -mf
  -mamx-tile -mamx-int8 -mamx-bf16;/arch:AVX512")
 CHECK_SSE(CXX "AMX" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mavx512bf16 -mfma\
  -mamx-tile -mamx-int8 -mamx-bf16;/arch:AVX512")
+
+# gcc starts to support avx512fp16 from version 12.1
+# https://gcc.gnu.org/onlinedocs/gcc-12.1.0/gcc/x86-Options.html#x86-Options
+CHECK_SSE(C "AVX512_FP16" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mavx512bf16 -mfma\
+ -mamx-tile -mamx-int8 -mamx-bf16 -mavx512fp16;/arch:AVX512")
+CHECK_SSE(CXX "AVX512_FP16" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mavx512bf16 -mfma\
+ -mamx-tile -mamx-int8 -mamx-bf16 -mavx512fp16;/arch:AVX512")

@@ -371,6 +371,11 @@ bool CPUFeature::isa_level_amx() {
   return b_is_support;
 }
 
+bool CPUFeature::isa_level_avx512_fp16() {
+  static bool b_is_support = isa_level_amx() && cpuid_avx512_fp16();
+  return b_is_support;
+}
+
 __forceinline void print_bool_status(const char* p_name, bool b_status) {
   printf("%s:\t\t\t%s\n", p_name, (b_status ? "true" : "false"));
 }
