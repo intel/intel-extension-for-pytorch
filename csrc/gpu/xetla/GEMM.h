@@ -65,6 +65,16 @@ namespace xetla {
           const sycl::half* b,                                                                     \
           const int m,                                                                             \
           const int n,                                                                             \
+          const int k);                                                                            \
+  void                                                                                             \
+      hgemm_res_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##SLM_KS##_##B_ROW_MAJOR##_(          \
+          sycl::queue& queue,                                                                      \
+          sycl::half* out,                                                                         \
+          const sycl::half* a,                                                                     \
+          const sycl::half* b,                                                                     \
+          const sycl::half* res,                                                                   \
+          const int m,                                                                             \
+          const int n,                                                                             \
           const int k);
 
 HGEMM_DESC_FUNC(32, 64, 8, 16, 16, 2, true)

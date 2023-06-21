@@ -142,6 +142,29 @@ namespace xetla {
         1,                                                                                         \
         3,                                                                                         \
         B_ROW_MAJOR>(queue, out, a, b, m, n, k);                                                   \
+  }                                                                                                \
+  void                                                                                             \
+      hgemm_res_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##SLM_KS##_##B_ROW_MAJOR##_(          \
+          sycl::queue& queue,                                                                      \
+          sycl::half* out,                                                                         \
+          const sycl::half* a,                                                                     \
+          const sycl::half* b,                                                                     \
+          const sycl::half* res,                                                                   \
+          const int m,                                                                             \
+          const int n,                                                                             \
+          const int k) {                                                                           \
+    hgemm_res<                                                                                     \
+        sycl::half,                                                                                \
+        WG_M,                                                                                      \
+        WG_N,                                                                                      \
+        SG_M,                                                                                      \
+        SG_N,                                                                                      \
+        SG_K,                                                                                      \
+        SLM_KS,                                                                                    \
+        1,                                                                                         \
+        1,                                                                                         \
+        3,                                                                                         \
+        B_ROW_MAJOR>(queue, out, a, b, res, m, n, k);                                              \
   }
 
 HGEMM_IMPL_FUNC(32, 64, 8, 16, 16, 2, true)

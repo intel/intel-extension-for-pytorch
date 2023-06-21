@@ -89,6 +89,18 @@ using namespace xpu::xetla;
       k_);                                                              \
   }
 
+#define HGEMM_RES_DISPATCH(F)                                             \
+  {                                                                       \
+    RECORD_FUNCTION("torch_ipex::" #F, c10::ArrayRef<c10::IValue>({}));   \
+    F(q,                                                                  \
+      reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+      m_,                                                                 \
+      n_,                                                                 \
+      k_);                                                                \
+  }
 #define HGEMM_COMMON_DISPATCH_IMPL(DISPATCHER, F) \
   if (is_b_row_major_)                            \
     DISPATCHER(F##true_)                          \
@@ -114,6 +126,8 @@ using namespace xpu::xetla;
       HGEMM_COMMON_DISPATCH_IMPL(HGEMM_RESMUL_DISPATCH, hgemm_resmul##F)       \
     else if (num_epilogues_ == 1 && epilogue_type_[0] == SILU)                 \
       HGEMM_COMMON_DISPATCH_IMPL(HGEMM_SILU_DISPATCH, hgemm_silu##F)           \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD)              \
+      HGEMM_COMMON_DISPATCH_IMPL(HGEMM_RES_DISPATCH, hgemm_res##F)             \
   }
 
 class HGEMMXetla final {

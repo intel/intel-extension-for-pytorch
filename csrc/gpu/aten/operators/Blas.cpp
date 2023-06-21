@@ -73,15 +73,28 @@ Tensor& addmm_out(
 
 #if defined(USE_XETLA)
   if (alpha.to<float>() == 1.f && beta.to<float>() == 1.f) {
-    auto policy = HGEMMXetla()
-                      .add_matrix_c(result)
-                      .add_matrix_a(mat1)
-                      .add_matrix_b(mat2)
-                      .add_epilogue(self, HGEMMXetla::EpilogueType::BIAS)
-                      .build();
-    if (policy.fallback() == false) {
-      policy.run();
-      return result;
+    if (self.dim() == 1) {
+      auto policy = HGEMMXetla()
+                        .add_matrix_c(result)
+                        .add_matrix_a(mat1)
+                        .add_matrix_b(mat2)
+                        .add_epilogue(self, HGEMMXetla::EpilogueType::BIAS)
+                        .build();
+      if (policy.fallback() == false) {
+        policy.run();
+        return result;
+      }
+    } else if (self.dim() == 2) {
+      auto policy = HGEMMXetla()
+                        .add_matrix_c(result)
+                        .add_matrix_a(mat1)
+                        .add_matrix_b(mat2)
+                        .add_epilogue(self, HGEMMXetla::EpilogueType::RES_ADD)
+                        .build();
+      if (policy.fallback() == false) {
+        policy.run();
+        return result;
+      }
     }
   }
 #endif
