@@ -86,8 +86,8 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
             is_decoder=False,
             do_norm_before=False,
             ln_elementwise_affine=False,
-            seq_first=False,
-            kv_cache_optimize=False,
+            seq_first=True,
+            kv_cache_optimize=True,
             positional_embedding_base=10000,
             sdp_fusion_enable=True,
             device=self.device,
@@ -106,22 +106,21 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
         self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
         self.ipex_optimized_module.attn.out_proj.weight = self.module.attn.out_proj.weight
         self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
-         
-        self.ipex_optimized_module.attn.q_wei = self.ipex_optimized_module.attn.q_proj.weight.t().contiguous()
-        self.ipex_optimized_module.attn.k_wei = self.ipex_optimized_module.attn.k_proj.weight.t().contiguous()
-        self.ipex_optimized_module.attn.v_wei = self.ipex_optimized_module.attn.v_proj.weight.t().contiguous()
-        self.ipex_optimized_module.attn.out_wei = self.ipex_optimized_module.attn.out_proj.weight.t().contiguous()
-        shape = [3, -1, self.ipex_optimized_module.attn.q_wei.shape[-1]]
-        self.ipex_optimized_module.attn.qkv_wei = torch.cat([self.ipex_optimized_module.attn.q_wei, self.ipex_optimized_module.attn.k_wei, self.ipex_optimized_module.attn.v_wei], dim=0).view(shape)
-        
+
+        self.ipex_optimized_module.attn.q_wei = self.ipex_optimized_module.attn.q_proj.weight.transpose(0, 1).contiguous()
+        self.ipex_optimized_module.attn.k_wei = self.ipex_optimized_module.attn.k_proj.weight.transpose(0, 1).contiguous()
+        self.ipex_optimized_module.attn.v_wei = self.ipex_optimized_module.attn.v_proj.weight.transpose(0, 1).contiguous()
+        self.ipex_optimized_module.attn.out_wei = self.ipex_optimized_module.attn.out_proj.weight.transpose(0, 1).contiguous()
+        self.ipex_optimized_module.attn.qkv_wei = torch.stack([self.ipex_optimized_module.attn.q_wei, self.ipex_optimized_module.attn.k_wei, self.ipex_optimized_module.attn.v_wei]).contiguous()
+
 
     def port_mlp_parameters(self):
         self.ipex_optimized_module.mlp.fc_in.weight = self.module.mlp.fc_in.weight
         self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
         self.ipex_optimized_module.mlp.fc_out.weight = self.module.mlp.fc_out.weight
         self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
-        self.ipex_optimized_module.mlp.fc_in_wei = self.ipex_optimized_module.mlp.fc_in.weight.t().contiguous()
-        self.ipex_optimized_module.mlp.fc_out_wei = self.ipex_optimized_module.mlp.fc_out.weight.t().contiguous()
+        self.ipex_optimized_module.mlp.fc_in_wei = self.ipex_optimized_module.mlp.fc_in.weight.transpose(0, 1).contiguous()
+        self.ipex_optimized_module.mlp.fc_out_wei = self.ipex_optimized_module.mlp.fc_out.weight.transpose(0, 1).contiguous()
 
         
     def port_layer_norm_parameters(self):
@@ -201,20 +200,20 @@ class IPEXOptConverter(IPEXTransformerConverter):
         self.ipex_optimized_module.attn.out_proj.weight = self.module.self_attn.out_proj.weight
         self.ipex_optimized_module.attn.out_proj.bias = self.module.self_attn.out_proj.bias
         
-        self.ipex_optimized_module.attn.q_wei = self.ipex_optimized_module.attn.q_proj.weight.t().contiguous()
-        self.ipex_optimized_module.attn.k_wei = self.ipex_optimized_module.attn.k_proj.weight.t().contiguous()
-        self.ipex_optimized_module.attn.v_wei = self.ipex_optimized_module.attn.v_proj.weight.t().contiguous()
-        self.ipex_optimized_module.attn.out_wei = self.ipex_optimized_module.attn.out_proj.weight.t().contiguous()
-        shape = [3, -1, self.ipex_optimized_module.attn.q_wei.shape[-1]]
-        self.ipex_optimized_module.attn.qkv_wei = torch.cat([self.ipex_optimized_module.attn.q_wei, self.ipex_optimized_module.attn.k_wei, self.ipex_optimized_module.attn.v_wei], dim=0).view(shape)
+        self.ipex_optimized_module.attn.q_wei = self.ipex_optimized_module.attn.q_proj.weight.transpose(0, 1).contiguous()
+        self.ipex_optimized_module.attn.k_wei = self.ipex_optimized_module.attn.k_proj.weight.transpose(0, 1).contiguous()
+        self.ipex_optimized_module.attn.v_wei = self.ipex_optimized_module.attn.v_proj.weight.transpose(0, 1).contiguous()
+        self.ipex_optimized_module.attn.out_wei = self.ipex_optimized_module.attn.out_proj.weight.transpose(0, 1).contiguous()
+        # shape = [3, -1, self.ipex_optimized_module.attn.q_wei.shape[-1]]
+        self.ipex_optimized_module.attn.qkv_wei = torch.stack([self.ipex_optimized_module.attn.q_wei, self.ipex_optimized_module.attn.k_wei, self.ipex_optimized_module.attn.v_wei]).contiguous()
 
     def port_mlp_parameters(self):
         self.ipex_optimized_module.mlp.fc_in.weight = self.module.fc1.weight
         self.ipex_optimized_module.mlp.fc_in.bias = self.module.fc1.bias
         self.ipex_optimized_module.mlp.fc_out.weight = self.module.fc2.weight
         self.ipex_optimized_module.mlp.fc_out.bias = self.module.fc2.bias
-        self.ipex_optimized_module.mlp.fc_in_wei = self.ipex_optimized_module.mlp.fc_in.weight.t().contiguous()
-        self.ipex_optimized_module.mlp.fc_out_wei = self.ipex_optimized_module.mlp.fc_out.weight.t().contiguous()
+        self.ipex_optimized_module.mlp.fc_in_wei = self.ipex_optimized_module.mlp.fc_in.weight.transpose(0, 1)
+        self.ipex_optimized_module.mlp.fc_out_wei = self.ipex_optimized_module.mlp.fc_out.weight.transpose(0, 1)
 
     def port_layer_norm_parameters(self):
         self.ipex_optimized_module.self_attn_layer_norm.weight = self.module.self_attn_layer_norm.weight
@@ -270,8 +269,8 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
             is_decoder=False,
             do_norm_before=None,
             ln_elementwise_affine=None,
-            seq_first=False,
-            kv_cache_optimize=False,
+            seq_first=True,
+            kv_cache_optimize=True,
             positional_embedding_base=10000,
             sdp_fusion_enable=True,
             device=self.device,

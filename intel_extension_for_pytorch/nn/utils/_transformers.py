@@ -50,7 +50,6 @@ class IPEXTransformerAtten(nn.Module):
         IPEXTransformerAtten.layer_id_static += 1
         self.head_dim = self.config.embed_dim // self.config.num_attention_heads
         self.position_emb = self.config.rotary_embedding_class(config=self.config)
-        # self.position_emb = LlamaRotaryEmbed(self.head_dim, max_position_embeddings=self.max_positions)
         if self.config.scale_attention:
             self.scale_attn = torch.sqrt(torch.tensor(self.head_dim, device="xpu"))
         else:
@@ -59,8 +58,8 @@ class IPEXTransformerAtten(nn.Module):
         self.v_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=self.config.enable_bias)
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=self.config.enable_bias)
         self.out_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=self.config.enable_bias)
-       
-        self.qkv_fused = False 
+
+        self.qkv_fused = True 
         self.q_wei = None
         self.k_wei = None
         self.v_wei = None
@@ -75,19 +74,6 @@ class IPEXTransformerAtten(nn.Module):
         if self.use_casual_mask:
             IPEXTransformerAtten.attention_mask = (1 - torch.tril(torch.ones((self.max_positions, self.max_positions), dtype=torch.float, device=self.config.device)).view(1, 1, self.max_positions, self.max_positions)) * -66504.0
 
-    def qkv_cache_optimized(self, hidden_states, layer_past = None):
-        if layer_past is None:
-            # the first timestep
-            shape = [hidden_states.shape[0], self.num_attn_head, self.max_positions, self.head_dim]
-            self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-            self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-            self.prev_len = 0
-
-        query = self.q_proj(hidden_states)
-        key = self.k_proj(hidden_states)
-        value = self.v_proj(hidden_states)
-        return query, key, value
-
     def qkv_cache_optimized_seq_first(self, hidden_states, layer_past = None):
         # greedy search path
         if layer_past is None:
@@ -101,11 +87,11 @@ class IPEXTransformerAtten(nn.Module):
         key = self.key_cached[:, self.prev_len : self.cur_len, :, :]
         value = self.value_cached[:, self.prev_len : self.cur_len, :, :]
 
-        query = self.q_proj(hidden_states)
-        shape = query.size()[:-1] + (self.embed_dim,)
-        torch.matmul(hidden_states, self.k_proj.weight.t(), out=key.view(shape))
-        torch.matmul(hidden_states, self.v_proj.weight.t(), out=value.view(shape))
-        return query, key, value
+        query = torch.empty_like(hidden_states).squeeze(0)
+        key = key.view([-1, self.embed_dim])
+        value = value.view([-1, self.embed_dim])
+        torch.ops.torch_ipex.hgemm_qkv_out(hidden_states.squeeze(0), self.qkv_wei, query, key, value)
+        return query.unsqueeze(0), key.unsqueeze(0), value.unsqueeze(0)
 
     def qkv_normal(self, hidden_states, layer_past = None):
         if self.row_major:
@@ -117,10 +103,7 @@ class IPEXTransformerAtten(nn.Module):
             key = self.k_proj(hidden_states)
             value = self.v_proj(hidden_states)
         return query, key, value
-    
-    def fused_qkv_normal(self, hidden_states, layer_past = None):
-        query, key, value = torch.ops.torch_ipex.hgemm_qkv(hidden_states.squeeze(0), self.qkv_wei)          
-        return query.unsqueeze(0), key.unsqueeze(0), value.unsqueeze(0)
+
 
     def compute_qkv(self,
                     hidden_state: torch.Tensor,
@@ -130,15 +113,10 @@ class IPEXTransformerAtten(nn.Module):
             self.kv_cache_optimize = False
             print("Warning: kv cache optimize can only be enabled in greedy search. Set kv_cache_optimize to False !")
         if self.kv_cache_optimize:
-            if self.seq_first:
-                query, key, value = self.qkv_cache_optimized_seq_first(hidden_states=hidden_state, layer_past=layer_past)
-            else:
-                query, key, value = self.qkv_cache_optimized(hidden_states=hidden_state, layer_past=layer_past)
+            query, key, value = self.qkv_cache_optimized_seq_first(hidden_states=hidden_state, layer_past=layer_past)
         else:
-            if self.qkv_fused:
-                query, key, value = self.fused_qkv_normal(hidden_states=hidden_state, layer_past=layer_past)
-            else:
-                query, key, value = self.qkv_normal(hidden_states=hidden_state, layer_past=layer_past)
+            # qkv fusion now is only support on greedy search 
+            query, key, value = self.qkv_normal(hidden_states=hidden_state, layer_past=layer_past)
 
         new_shape = query.size()[:-1] + (self.num_attn_head, self.head_dim)
         # reshape the qkv size to (bs,  seq_len, num_head, head_dim)
@@ -149,25 +127,13 @@ class IPEXTransformerAtten(nn.Module):
         return query, key, value
 
     def optimized_combine(self, query, key, value, layer_past = None):
-        if self.seq_first:
-            key = self.key_cached[:, : self.cur_len, :, :]
-            value = self.value_cached[:, : self.cur_len, :, :]
+        key = self.key_cached[:, : self.cur_len, :, :]
+        value = self.value_cached[:, : self.cur_len, :, :]
 
-            query = query.permute(0, 2, 1, 3)
-            key = key.permute(0, 2, 1, 3)
-            value = value.permute(0, 2, 1, 3)
-            self.prev_len = self.cur_len
-        else:
-            query = query.permute(0, 2, 1, 3)
-            key = key.permute(0, 2, 1, 3)
-            value = value.permute(0, 2, 1, 3)
-
-            self.cur_len = self.prev_len + query.size(2) 
-            self.key_cached[:, :, self.prev_len : self.cur_len, :] = key 
-            self.value_cached[:, :, self.prev_len : self.cur_len, :] = value
-            key = self.key_cached[:, :, : self.cur_len, :]
-            value = self.value_cached[:, :, : self.cur_len, :]
-            self.prev_len = self.cur_len
+        query = query.permute(0, 2, 1, 3)
+        key = key.permute(0, 2, 1, 3)
+        value = value.permute(0, 2, 1, 3)
+        self.prev_len = self.cur_len
 
         return query, key, value
 
@@ -191,9 +157,6 @@ class IPEXTransformerAtten(nn.Module):
 
     def apply_rotary_embedding(self, key, query, position_ids):
         return self.position_emb(key, query, position_ids)
-        # cos, sin = self.position_emb(key, seq_len=key.shape[-2])
-        # query_states, key_states = apply_rotary_pos_emb(query, key, cos.to("xpu"), sin.to("xpu"), position_ids)
-        # return query_states, key_states
         
 
     def naive_self_attention(self, query, key, value, attention_mask=None, head_mask=None):
@@ -272,6 +235,7 @@ class IPEXTransformerAtten(nn.Module):
 
         attn_output, attn_weight = self.self_attention(query, key, value, attention_mask, head_mask)
         attn_output = self.get_final_output(attn_output=attn_output, residual=residual)
+
         outputs = (attn_output, present)
         if output_attentions:
             outputs += (attn_weight, )
@@ -301,7 +265,8 @@ class IPEXOptAtten(IPEXTransformerAtten):
         is_cross_attention = key_value_state is not None
 
         bs, seq_len, _ = hidden_state.size()
-        query_states = self.q_proj(hidden_state) * self.scaling
+        query_states = self.q_proj(hidden_state) 
+        query_states = query_states * self.scaling
 
         if is_cross_attention and layer_past is not None:
             key_states = layer_past[0]
@@ -343,11 +308,8 @@ class IPEXTransformerMLP(nn.Module):
                 hidden_states = self.act(hidden_states)
             hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_out_wei, self.fc_out.bias)
         else:
-            if isinstance(self.act, nn.GELU):
-                hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in.weight, self.fc_in.bias, self.act.approximate)
-            else:
-                hidden_states = self.fc_in(hidden_states)
-                hidden_states = self.act(hidden_states)
+            hidden_states = self.fc_in(hidden_states)
+            hidden_states = self.act(hidden_states)
             hidden_states = self.fc_out(hidden_states)
         return self.drop_out(hidden_states)
 
@@ -362,19 +324,15 @@ class IPEXGPTJMLP(IPEXTransformerMLP):
             else:
                 hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                 hidden_states = self.act(hidden_states)
-            
-            hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_out_wei, self.fc_out.bias)
-            hidden_states += attn_output + residual
-            # hidden_states = torch.ops.torch_ipex.hgemm_bias_res_res(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output, residual)
+            if hidden_states.dim()== 3:
+                hidden_states = hidden_states.squeeze(0)
+            hidden_states = torch.ops.torch_ipex.hgemm_bias_res_res(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output.squeeze(0), residual.squeeze(0)).unsqueeze(0)
         else:
-            if isinstance(self.act, nn.GELU):
-                hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in.weight, self.fc_in.bias, self.act.approximate)
-            else:
-                hidden_states = self.fc_in(hidden_states)
-                hidden_states = self.act(hidden_states)
+            hidden_states = self.fc_in(hidden_states)
+            hidden_states = self.act(hidden_states)
+
             hidden_states = self.fc_out(hidden_states) + attn_output + residual
         return hidden_states
-        # return self.drop_out(hidden_states)
 
 class IPEXLlamaMLP(IPEXTransformerMLP):
     def __init__(self,
@@ -385,8 +343,14 @@ class IPEXLlamaMLP(IPEXTransformerMLP):
 
     def forward(self, hidden_states, residual):
         if self.row_major:
-            hidden_states1 = torch.ops.torch_ipex.hgemm_silu(hidden_states[0], self.fc_in_wei)
-            hidden_states = torch.ops.torch_ipex.hgemm_resmul(hidden_states[0], self.up_wei, hidden_states1)
+            if hidden_states.dim() == 3:
+                hidden_states = hidden_states.squeeze(0)
+            if isinstance(self.act, nn.SiLU):
+                hidden_states1 = torch.ops.torch_ipex.hgemm_silu(hidden_states, self.fc_in_wei)
+            else:
+                hidden_states1 = torch.matmul(hidden_states, self.fc_in_wei)
+                hidden_states1 = self.act(hidden_states1)
+            hidden_states = torch.ops.torch_ipex.hgemm_resmul(hidden_states, self.up_wei, hidden_states1)
             hidden_states = torch.addmm(residual[0], hidden_states, self.fc_out_wei)
             hidden_states = hidden_states.unsqueeze(0)
         else:    
@@ -420,7 +384,6 @@ class IPEXGPTJBlock(nn.Module):
         output_attentions: Optional[bool] = False
     ) ->  Union[Tuple[torch.Tensor], Optional[Tuple[torch.Tensor, Tuple[torch.FloatTensor, ...]]]]:
         residual = hidden_states
-        # hidden_states = self.ln(hidden_states)
         hidden_states, mean, var = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.ln.normalized_shape, self.ln.weight, self.ln.bias, self.ln.eps)
         attn_outputs = self.attn(
             hidden_states=hidden_states,
@@ -490,7 +453,6 @@ class IPEXLlamaBlock(nn.Module):
         residual = hidden_states
 
         hidden_states = self.input_layernorm(hidden_states)
-        #hidden_states, mean, var = torch.ops.torch_ipex.fast_rms_norm(hidden_states, [hidden_states.shape[-1]], self.input_layernorm.weight, None, self.input_layernorm.variance_epsilon)
 
         hidden_states, present_key_value, self_attn_weights = self.attn(
             hidden_states=hidden_states,
@@ -502,13 +464,9 @@ class IPEXLlamaBlock(nn.Module):
             residual=residual
         )
 
-        #hidden_states = residual + hidden_states
-
         residual = hidden_states
         hidden_states = self.post_attn_layernorm(hidden_states)
-        #hidden_states, mean, var = torch.ops.torch_ipex.fast_rms_norm(hidden_states, [hidden_states.shape[-1]], self.post_attn_layernorm.weight, None, self.post_attn_layernorm.variance_epsilon)
         hidden_states = self.mlp(hidden_states, residual)
-        #hidden_states = residual + hidden_states
 
         outputs = (hidden_states, )
 
