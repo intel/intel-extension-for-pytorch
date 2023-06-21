@@ -44,7 +44,24 @@ namespace xetla {
           const sycl::half* bias,                                                  \
           const int m,                                                             \
           const int n,                                                             \
-          const int k);
+          const int k);                                                            \
+  void hgemm_resmul_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##SLM_KS##_(      \
+      sycl::queue& queue,                                                          \
+      sycl::half* out,                                                             \
+      const sycl::half* a,                                                         \
+      const sycl::half* b,                                                         \
+      const sycl::half* mul,                                                       \
+      const int m,                                                                 \
+      const int n,                                                                 \
+      const int k);                                                                \
+  void hgemm_silu_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##SLM_KS##_(        \
+      sycl::queue& queue,                                                          \
+      sycl::half* out,                                                             \
+      const sycl::half* a,                                                         \
+      const sycl::half* b,                                                         \
+      const int m,                                                                 \
+      const int n,                                                                 \
+      const int k);
 
 HGEMM_DESC_FUNC(32, 64, 8, 16, 16, 2)
 HGEMM_DESC_FUNC(8, 512, 8, 16, 16, 1)

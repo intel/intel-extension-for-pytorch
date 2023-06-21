@@ -40,6 +40,47 @@ static Tensor hgemm_bias_res_res(
   return output;
 }
 
+static Tensor hgemm_resmul(
+    const Tensor& a,
+    const Tensor& b,
+    const Tensor& res) {
+  // a: m x k, b: k x n, res: m, n
+  TORCH_CHECK(a.dim() == 2 && b.dim() == 2 && res.dim() == 2);
+  int m = a.sizes()[0];
+  int n = b.sizes()[1];
+  int k = a.sizes()[1];
+  auto output = at::empty({m, n}, a.options());
+
+  auto policy = HGEMMXetla()
+                    .add_matrix_c(output)
+                    .add_matrix_a(a)
+                    .add_matrix_b(b)
+                    .add_epilogue(res, HGEMMXetla::EpilogueType::RES_MUL)
+                    .build();
+  TORCH_CHECK(policy.fallback() == false);
+  policy.run();
+  return output;
+}
+
+static Tensor hgemm_silu(const Tensor& a, const Tensor& b) {
+  // a: m x k, b: k x n
+  TORCH_CHECK(a.dim() == 2 && b.dim() == 2);
+  int m = a.sizes()[0];
+  int n = b.sizes()[1];
+  int k = a.sizes()[1];
+  auto output = at::empty({m, n}, a.options());
+
+  auto policy = HGEMMXetla()
+                    .add_matrix_c(output)
+                    .add_matrix_a(a)
+                    .add_matrix_b(b)
+                    .add_epilogue(Tensor(), HGEMMXetla::EpilogueType::SILU)
+                    .build();
+  TORCH_CHECK(policy.fallback() == false);
+  policy.run();
+  return output;
+}
+
 #undef GEMM_XETLA_DISPATCH
 
 #define GEMM_QKV_XETLA_DISPATCH(F)                                      \
@@ -110,6 +151,8 @@ namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER(
       "hgemm_bias_res_res.xpu", at::AtenIpexTypeXPU::hgemm_bias_res_res);
+  IPEX_OP_REGISTER("hgemm_resmul.xpu", at::AtenIpexTypeXPU::hgemm_resmul);
+  IPEX_OP_REGISTER("hgemm_silu.xpu", at::AtenIpexTypeXPU::hgemm_silu);
   IPEX_OP_REGISTER("hgemm_qkv_out.xpu", at::AtenIpexTypeXPU::hgemm_qkv_out);
   IPEX_OP_REGISTER("hgemm_qkv.xpu", at::AtenIpexTypeXPU::hgemm_qkv);
 }

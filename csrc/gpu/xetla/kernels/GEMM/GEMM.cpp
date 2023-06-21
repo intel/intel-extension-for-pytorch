@@ -95,6 +95,49 @@ namespace xetla {
         1,                                                                         \
         3,                                                                         \
         true>(queue, out, a, b, bias, m, n, k);                                    \
+  }                                                                                \
+  void hgemm_resmul_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##SLM_KS##_(      \
+      sycl::queue& queue,                                                          \
+      sycl::half* out,                                                             \
+      const sycl::half* a,                                                         \
+      const sycl::half* b,                                                         \
+      const sycl::half* mul,                                                       \
+      const int m,                                                                 \
+      const int n,                                                                 \
+      const int k) {                                                               \
+    hgemm_mul<                                                                     \
+        sycl::half,                                                                \
+        WG_M,                                                                      \
+        WG_N,                                                                      \
+        SG_M,                                                                      \
+        SG_N,                                                                      \
+        SG_K,                                                                      \
+        SLM_KS,                                                                    \
+        1,                                                                         \
+        1,                                                                         \
+        3,                                                                         \
+        true>(queue, out, a, b, mul, m, n, k);                                     \
+  }                                                                                \
+  void hgemm_silu_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##SLM_KS##_(        \
+      sycl::queue& queue,                                                          \
+      sycl::half* out,                                                             \
+      const sycl::half* a,                                                         \
+      const sycl::half* b,                                                         \
+      const int m,                                                                 \
+      const int n,                                                                 \
+      const int k) {                                                               \
+    hgemm_silu<                                                                    \
+        sycl::half,                                                                \
+        WG_M,                                                                      \
+        WG_N,                                                                      \
+        SG_M,                                                                      \
+        SG_N,                                                                      \
+        SG_K,                                                                      \
+        SLM_KS,                                                                    \
+        1,                                                                         \
+        1,                                                                         \
+        3,                                                                         \
+        true>(queue, out, a, b, m, n, k);                                          \
   }
 
 HGEMM_IMPL_FUNC(32, 64, 8, 16, 16, 2)

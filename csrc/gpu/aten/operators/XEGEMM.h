@@ -64,6 +64,31 @@ using namespace xpu::xetla;
       k_);                                                                \
   }
 
+#define HGEMM_RESMUL_DISPATCH(F)                                          \
+  {                                                                       \
+    RECORD_FUNCTION("torch_ipex::" #F, c10::ArrayRef<c10::IValue>({}));   \
+    F(q,                                                                  \
+      reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+      m_,                                                                 \
+      n_,                                                                 \
+      k_);                                                                \
+  }
+
+#define HGEMM_SILU_DISPATCH(F)                                          \
+  {                                                                     \
+    RECORD_FUNCTION("torch_ipex::" #F, c10::ArrayRef<c10::IValue>({})); \
+    F(q,                                                                \
+      reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),          \
+      reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),          \
+      reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),          \
+      m_,                                                               \
+      n_,                                                               \
+      k_);                                                              \
+  }
+
 #define HGEMM_COMMON_DISPATCH(F)                                      \
   {                                                                   \
     if (num_epilogues_ == 0)                                          \
@@ -78,6 +103,10 @@ using namespace xpu::xetla;
         num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&           \
         epilogue_type_[1] == GELU)                                    \
       HGEMM_BIAS_GELU_DISPATCH(hgemm_bias_gelu##F)                    \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL)     \
+      HGEMM_RESMUL_DISPATCH(hgemm_resmul##F)                          \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == SILU)        \
+      HGEMM_SILU_DISPATCH(hgemm_silu##F)                              \
   }
 
 class HGEMMXetla final {
@@ -86,6 +115,8 @@ class HGEMMXetla final {
     BIAS = 0,
     RES_ADD,
     GELU,
+    RES_MUL,
+    SILU,
   };
 
  private:
@@ -159,6 +190,7 @@ class HGEMMXetla final {
           if (!ck)
             return *this;
         } break;
+        case RES_MUL:
         case RES_ADD: {
           bool ck = epilogues_[i]->dim() == 2;
           ck = ck && epilogues_[i]->sizes()[0] == m_ &&
@@ -168,7 +200,8 @@ class HGEMMXetla final {
           if (!ck)
             return *this;
         } break;
-        case GELU: {
+        case GELU:
+        case SILU: {
         } break;
       }
     }
