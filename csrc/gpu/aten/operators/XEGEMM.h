@@ -181,13 +181,13 @@ class HGEMMXetla final {
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
     auto& q = dpcppGetCurrentQueue();
     if (n_ >= 4096 && n_ < 16384 && k_ >= 4096 && k_ < 16384) {
-      HGEMM_COMMON_DISPATCH(_32x64_8x16x16_2);
+      HGEMM_COMMON_DISPATCH(_32x64_8x16x16_2_);
       return;
     } else if (n_ >= 4096 && n_ < 16384 && k_ >= 16384) {
-      HGEMM_COMMON_DISPATCH(_32x64_8x16x16_2);
+      HGEMM_COMMON_DISPATCH(_32x64_8x16x16_2_);
       return;
     } else {
-      HGEMM_COMMON_DISPATCH(_8x512_8x16x16_1);
+      HGEMM_COMMON_DISPATCH(_8x512_8x16x16_1_);
       return;
     }
   }

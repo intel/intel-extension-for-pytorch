@@ -4,115 +4,101 @@
 namespace xpu {
 namespace xetla {
 
-// 32x64_8x16x16_2
+#define HGEMM_IMPL_FUNC(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS)                      \
+  void hgemm_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##SLM_KS##_(             \
+      sycl::queue& queue,                                                          \
+      sycl::half* out,                                                             \
+      const sycl::half* a,                                                         \
+      const sycl::half* b,                                                         \
+      const int m,                                                                 \
+      const int n,                                                                 \
+      const int k) {                                                               \
+    hgemm_common<                                                                  \
+        sycl::half,                                                                \
+        WG_M,                                                                      \
+        WG_N,                                                                      \
+        SG_M,                                                                      \
+        SG_N,                                                                      \
+        SG_K,                                                                      \
+        SLM_KS,                                                                    \
+        1,                                                                         \
+        1,                                                                         \
+        3,                                                                         \
+        true>(queue, out, a, b, m, n, k);                                          \
+  }                                                                                \
+  void hgemm_bias_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##SLM_KS##_(        \
+      sycl::queue& queue,                                                          \
+      sycl::half* out,                                                             \
+      const sycl::half* a,                                                         \
+      const sycl::half* b,                                                         \
+      const sycl::half* bias,                                                      \
+      const int m,                                                                 \
+      const int n,                                                                 \
+      const int k) {                                                               \
+    hgemm_bias<                                                                    \
+        sycl::half,                                                                \
+        WG_M,                                                                      \
+        WG_N,                                                                      \
+        SG_M,                                                                      \
+        SG_N,                                                                      \
+        SG_K,                                                                      \
+        SLM_KS,                                                                    \
+        1,                                                                         \
+        1,                                                                         \
+        3,                                                                         \
+        true>(queue, out, a, b, bias, m, n, k);                                    \
+  }                                                                                \
+  void                                                                             \
+      hgemm_bias_res_res_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##SLM_KS##_( \
+          sycl::queue& queue,                                                      \
+          sycl::half* out,                                                         \
+          const sycl::half* a,                                                     \
+          const sycl::half* b,                                                     \
+          const sycl::half* bias,                                                  \
+          const sycl::half* res0,                                                  \
+          const sycl::half* res1,                                                  \
+          const int m,                                                             \
+          const int n,                                                             \
+          const int k) {                                                           \
+    hgemm_bias_res_res<                                                            \
+        sycl::half,                                                                \
+        WG_M,                                                                      \
+        WG_N,                                                                      \
+        SG_M,                                                                      \
+        SG_N,                                                                      \
+        SG_K,                                                                      \
+        SLM_KS,                                                                    \
+        1,                                                                         \
+        1,                                                                         \
+        3,                                                                         \
+        true>(queue, out, a, b, bias, res0, res1, m, n, k);                        \
+  }                                                                                \
+  void                                                                             \
+      hgemm_bias_gelu_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##SLM_KS##_(    \
+          sycl::queue& queue,                                                      \
+          sycl::half* out,                                                         \
+          const sycl::half* a,                                                     \
+          const sycl::half* b,                                                     \
+          const sycl::half* bias,                                                  \
+          const int m,                                                             \
+          const int n,                                                             \
+          const int k) {                                                           \
+    hgemm_bias_gelu<                                                               \
+        sycl::half,                                                                \
+        WG_M,                                                                      \
+        WG_N,                                                                      \
+        SG_M,                                                                      \
+        SG_N,                                                                      \
+        SG_K,                                                                      \
+        SLM_KS,                                                                    \
+        1,                                                                         \
+        1,                                                                         \
+        3,                                                                         \
+        true>(queue, out, a, b, bias, m, n, k);                                    \
+  }
 
-void hgemm_32x64_8x16x16_2(
-    sycl::queue& queue,
-    sycl::half* out,
-    const sycl::half* a,
-    const sycl::half* b,
-    const int m,
-    const int n,
-    const int k) {
-  hgemm_common<sycl::half, 32, 64, 8, 16, 16, 2, 1, 1, 3, true>(
-      queue, out, a, b, m, n, k);
-}
-
-void hgemm_bias_32x64_8x16x16_2(
-    sycl::queue& queue,
-    sycl::half* out,
-    const sycl::half* a,
-    const sycl::half* b,
-    const sycl::half* bias,
-    const int m,
-    const int n,
-    const int k) {
-  hgemm_bias<sycl::half, 32, 64, 8, 16, 16, 2, 1, 1, 3, true>(
-      queue, out, a, b, bias, m, n, k);
-}
-
-void hgemm_bias_res_res_32x64_8x16x16_2(
-    sycl::queue& queue,
-    sycl::half* out,
-    const sycl::half* a,
-    const sycl::half* b,
-    const sycl::half* bias,
-    const sycl::half* res0,
-    const sycl::half* res1,
-    const int m,
-    const int n,
-    const int k) {
-  hgemm_bias_res_res<sycl::half, 32, 64, 8, 16, 16, 2, 1, 1, 3, true>(
-      queue, out, a, b, bias, res0, res1, m, n, k);
-}
-
-void hgemm_bias_gelu_32x64_8x16x16_2(
-    sycl::queue& queue,
-    sycl::half* out,
-    const sycl::half* a,
-    const sycl::half* b,
-    const sycl::half* bias,
-    const int m,
-    const int n,
-    const int k) {
-  hgemm_bias_gelu<sycl::half, 32, 64, 8, 16, 16, 2, 1, 1, 3, true>(
-      queue, out, a, b, bias, m, n, k);
-}
-
-// 8x512_8x16x16_1
-
-void hgemm_8x512_8x16x16_1(
-    sycl::queue& queue,
-    sycl::half* out,
-    const sycl::half* a,
-    const sycl::half* b,
-    const int m,
-    const int n,
-    const int k) {
-  hgemm_common<sycl::half, 8, 512, 8, 16, 16, 1, 1, 1, 3, true>(
-      queue, out, a, b, m, n, k);
-}
-
-void hgemm_bias_8x512_8x16x16_1(
-    sycl::queue& queue,
-    sycl::half* out,
-    const sycl::half* a,
-    const sycl::half* b,
-    const sycl::half* bias,
-    const int m,
-    const int n,
-    const int k) {
-  hgemm_bias<sycl::half, 8, 512, 8, 16, 16, 1, 1, 1, 3, true>(
-      queue, out, a, b, bias, m, n, k);
-}
-
-void hgemm_bias_res_res_8x512_8x16x16_1(
-    sycl::queue& queue,
-    sycl::half* out,
-    const sycl::half* a,
-    const sycl::half* b,
-    const sycl::half* bias,
-    const sycl::half* res0,
-    const sycl::half* res1,
-    const int m,
-    const int n,
-    const int k) {
-  hgemm_bias_res_res<sycl::half, 8, 512, 8, 16, 16, 1, 1, 1, 3, true>(
-      queue, out, a, b, bias, res0, res1, m, n, k);
-}
-
-void hgemm_bias_gelu_8x512_8x16x16_1(
-    sycl::queue& queue,
-    sycl::half* out,
-    const sycl::half* a,
-    const sycl::half* b,
-    const sycl::half* bias,
-    const int m,
-    const int n,
-    const int k) {
-  hgemm_bias_gelu<sycl::half, 8, 512, 8, 16, 16, 1, 1, 1, 3, true>(
-      queue, out, a, b, bias, m, n, k);
-}
+HGEMM_IMPL_FUNC(32, 64, 8, 16, 16, 2)
+HGEMM_IMPL_FUNC(8, 512, 8, 16, 16, 1)
 
 void hgemm_qkv_8x128_8x16x32_4(
     sycl::queue& queue,
