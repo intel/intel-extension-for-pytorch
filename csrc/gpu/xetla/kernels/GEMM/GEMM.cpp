@@ -172,12 +172,14 @@ HGEMM_IMPL_FUNC(8, 512, 8, 16, 16, 1, true)
 HGEMM_IMPL_FUNC(16, 256, 8, 16, 16, 1, true)
 HGEMM_IMPL_FUNC(8, 128, 8, 16, 16, 4, true)
 HGEMM_IMPL_FUNC(32, 256, 8, 32, 16, 1, true)
+HGEMM_IMPL_FUNC(16, 128, 8, 16, 16, 1, true)
 
 HGEMM_IMPL_FUNC(32, 64, 8, 16, 16, 2, false)
 HGEMM_IMPL_FUNC(8, 512, 8, 16, 16, 1, false)
 HGEMM_IMPL_FUNC(16, 256, 8, 16, 16, 1, false)
 HGEMM_IMPL_FUNC(8, 128, 8, 16, 16, 4, false)
 HGEMM_IMPL_FUNC(32, 256, 8, 32, 16, 1, false)
+HGEMM_IMPL_FUNC(16, 128, 8, 16, 16, 1, false)
 
 void hgemm_qkv_8x128_8x16x32_4(
     sycl::queue& queue,
