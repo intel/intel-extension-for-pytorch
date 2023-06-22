@@ -237,10 +237,11 @@ class HGEMMXetla final {
     auto& q = dpcppGetCurrentQueue();
     if (m_ >= 32) {
       HGEMM_COMMON_DISPATCH(_32x256_8x32x16_1_);
-    } else if (n_ == 13824 && k_ == 4096) {
-      HGEMM_COMMON_DISPATCH(_16x128_8x16x16_1_);
+    } else if (n_ == 13824 && (k_ == 4096 || k_ == 5120)) {
+      HGEMM_COMMON_DISPATCH(
+          _8x256_8x32x16_2_); // HGEMM_IMPL_FUNC(8, 256, 8, 32, 16, 2, false)
       return;
-    } else if (n_ == 4096 && k_ == 13824) {
+    } else if ((n_ == 4096 || n_ == 5120) && k_ == 13824) {
       HGEMM_COMMON_DISPATCH(_8x128_8x16x16_4_);
       return;
     } else if (n_ >= 4096 && n_ < 5120) {
