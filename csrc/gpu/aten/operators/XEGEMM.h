@@ -200,7 +200,8 @@ class HGEMMXetla final {
     bool ck2 = is_a_row_major_;
     if (!(ck0 && ck1 && ck2))
       return *this;
-    if (!(m_ <= 32 && n_ >= 4096 && k_ >= 4096)) // TODO:
+    // if (!(m_ <= 32 && n_ >= 4096 && k_ >= 4096)) // TODO:
+    if (!(n_ >= 4096 && k_ >= 4096))
       return *this;
     for (int i = 0; i < num_epilogues_; i++) {
       switch (epilogue_type_[i]) {
@@ -234,7 +235,7 @@ class HGEMMXetla final {
     using scalar_t =
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
     auto& q = dpcppGetCurrentQueue();
-    if (m_ == 32) {
+    if (m_ >= 32) {
       HGEMM_COMMON_DISPATCH(_32x256_8x32x16_1_);
     } else if (n_ >= 4096 && n_ < 5120) {
       HGEMM_COMMON_DISPATCH(_32x64_8x16x16_2_);
