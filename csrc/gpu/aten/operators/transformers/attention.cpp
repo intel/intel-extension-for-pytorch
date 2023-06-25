@@ -27,32 +27,62 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_efficient_attention(
                      key.strides()[2] == (key.sizes()[1] * key.sizes()[3]))
       ? true
       : false;
-  if (!is_strided) {
-    RECORD_FUNCTION("xetla_fsdp_forward_no_mask_no_causal_no_strided", {});
-    gpu::xetla::fmha_forward_op(
-        dpcpp_queue,
-        query.data_ptr(),
-        key.data_ptr(),
-        value.data_ptr(),
-        output.data_ptr(),
-        query.size(0),
-        query.size(1),
-        query.size(3),
-        query.size(2),
-        key.size(2));
+  if (is_causal) {
+    if (!is_strided) {
+      RECORD_FUNCTION("xetla_fsdp_forward_no_mask_no_strided", {});
+      gpu::xetla::fmha_forward_op_causal(
+          dpcpp_queue,
+          query.data_ptr(),
+          key.data_ptr(),
+          value.data_ptr(),
+          output.data_ptr(),
+          query.size(0),
+          query.size(1),
+          query.size(3),
+          query.size(2),
+          key.size(2));
+    } else {
+      RECORD_FUNCTION("xetla_fsdp_forward_no_mask", {});
+      gpu::xetla::fmha_forward_op_causal_strided(
+          dpcpp_queue,
+          query.data_ptr(),
+          key.data_ptr(),
+          value.data_ptr(),
+          output.data_ptr(),
+          query.size(0),
+          query.size(1),
+          query.size(3),
+          query.size(2),
+          key.size(2));
+    }
   } else {
-    RECORD_FUNCTION("xetla_fsdp_forward_no_mask_no_causal", {});
-    gpu::xetla::fmha_forward_op_strided(
-        dpcpp_queue,
-        query.data_ptr(),
-        key.data_ptr(),
-        value.data_ptr(),
-        output.data_ptr(),
-        query.size(0),
-        query.size(1),
-        query.size(3),
-        query.size(2),
-        key.size(2));
+    if (!is_strided) {
+      RECORD_FUNCTION("xetla_fsdp_forward_no_mask_no_causal_no_strided", {});
+      gpu::xetla::fmha_forward_op(
+          dpcpp_queue,
+          query.data_ptr(),
+          key.data_ptr(),
+          value.data_ptr(),
+          output.data_ptr(),
+          query.size(0),
+          query.size(1),
+          query.size(3),
+          query.size(2),
+          key.size(2));
+    } else {
+      RECORD_FUNCTION("xetla_fsdp_forward_no_mask_no_causal", {});
+      gpu::xetla::fmha_forward_op_strided(
+          dpcpp_queue,
+          query.data_ptr(),
+          key.data_ptr(),
+          value.data_ptr(),
+          output.data_ptr(),
+          query.size(0),
+          query.size(1),
+          query.size(3),
+          query.size(2),
+          key.size(2));
+    }
   }
   return std::forward_as_tuple(output, output_lm);
 #else
@@ -170,17 +200,12 @@ Tensor scaled_dot_product_attention(
           query_, key, value, attn_mask_, dropout_p, is_causal));
     }
     case sdp::SDPBackend::efficient_attention: {
-      if (query_.sizes()[2] == 1) {
-        bool compute_logsumexp =
-            (query_.requires_grad() || key.requires_grad() ||
-             value.requires_grad());
-        auto out_and_lse = at::_scaled_dot_product_efficient_attention(
-            query_, key, value, compute_logsumexp, is_causal);
-        return std::get<0>(out_and_lse);
-      } else {
-        return std::get<0>(at::_scaled_dot_product_attention_math(
-            query_, key, value, attn_mask_, dropout_p, is_causal));
-      }
+      bool compute_logsumexp =
+          (query_.requires_grad() || key.requires_grad() ||
+           value.requires_grad());
+      auto out_and_lse = at::_scaled_dot_product_efficient_attention(
+          query_, key, value, compute_logsumexp, is_causal);
+      return std::get<0>(out_and_lse);
     }
     case sdp::SDPBackend::math:
       return std::get<0>(at::_scaled_dot_product_attention_math(
