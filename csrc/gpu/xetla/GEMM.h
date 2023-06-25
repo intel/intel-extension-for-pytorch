@@ -85,6 +85,7 @@ HGEMM_DESC_FUNC(32, 256, 8, 32, 16, 1, true)
 HGEMM_DESC_FUNC(16, 128, 8, 16, 16, 1, true)
 HGEMM_DESC_FUNC(8, 256, 8, 32, 16, 2, true)
 HGEMM_DESC_FUNC(8, 512, 8, 32, 16, 2, true)
+HGEMM_DESC_FUNC(256, 256, 32, 64, 32, 1, true)
 
 HGEMM_DESC_FUNC(32, 64, 8, 16, 16, 2, false)
 HGEMM_DESC_FUNC(8, 512, 8, 16, 16, 1, false)
@@ -94,6 +95,7 @@ HGEMM_DESC_FUNC(32, 256, 8, 32, 16, 1, false)
 HGEMM_DESC_FUNC(16, 128, 8, 16, 16, 1, false)
 HGEMM_DESC_FUNC(8, 256, 8, 32, 16, 2, false)
 HGEMM_DESC_FUNC(8, 512, 8, 32, 16, 2, false)
+HGEMM_DESC_FUNC(256, 256, 32, 64, 32, 1, false)
 
 void hgemm_qkv_8x128_8x16x32_4(
     sycl::queue& queue,
@@ -107,6 +109,17 @@ void hgemm_qkv_8x128_8x16x32_4(
     const int k);
 
 void hgemm_qkv_16x256_8x16x16_1(
+    sycl::queue& queue,
+    sycl::half* out0,
+    sycl::half* out1,
+    sycl::half* out2,
+    const sycl::half* a,
+    const sycl::half* b,
+    const int m,
+    const int n,
+    const int k);
+
+void hgemm_qkv_256x256_32x64x32_1(
     sycl::queue& queue,
     sycl::half* out0,
     sycl::half* out1,
