@@ -778,7 +778,22 @@ void fmha_forward(
     uint32_t num_queries,
     uint32_t num_keys) {
   // RECORD_FUNCTION("fmha_forward", {});
-  if (head_size <= 64) {
+  if (num_queries <= 8 /* inference, common beam */) { // skinny
+    if (head_size <= 128) {
+      if (num_keys > 64) {
+        CALL_IMPL_FUNC(fmha_policy_f1_t1024_h128);
+      } else {
+        CALL_IMPL_FUNC(fmha_policy_f1_t64_h128);
+      }
+    } else if (head_size <= 256) {
+      if (num_keys > 64) {
+        CALL_IMPL_FUNC(fmha_policy_f1_t1024_h256);
+      } else {
+        CALL_IMPL_FUNC(fmha_policy_f1_t64_h256);
+      }
+    }
+#if 0 // comment for now
+  } else if (head_size <= 64) {
     if (num_queries == 512 && num_keys == 512) {
       CALL_IMPL_FUNC(fmha_policy_f512_t512_h64);
     } else if (num_queries == 384 && num_keys == 384) {
@@ -807,6 +822,7 @@ void fmha_forward(
     } else if (num_queries == 64 && num_keys == 77) {
       CALL_IMPL_FUNC(fmha_policy_f64_t77_h160);
     }
+#endif
   } else if (head_size <= 256) {
     CALL_IMPL_FUNC(fmha_policy_f64_t64_h256);
   } else {
