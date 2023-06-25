@@ -71,8 +71,8 @@ Tensor quantize_tensor_per_channel_affine(
   xpu::oneDNN::ReorderAttr rattr = xpu::oneDNN::ReorderAttr();
   int mask = (1 << axis);
   // See [Note: Scale setting for reorder]
-  std::vector<long> scale_zp_sz = scales.sizes().vec();
-  std::vector<long> scale_zp_st = scales.strides().vec();
+  memory::dims scale_zp_sz = scales.sizes().vec();
+  memory::dims scale_zp_st = scales.strides().vec();
   rattr.set_dst_sc_mask(mask);
   xpu::oneDNN::quantized_reorder(
       rtensor,
@@ -114,8 +114,8 @@ Tensor quantize_tensor_per_tensor_affine(
   bool asymmetric = false;
   if (asymmetric && zero_point != 0)
     rattr.set_dst_zp_mask(mask);
-  std::vector<long> scale_zp_sz = {1};
-  std::vector<long> scale_zp_st = {1};
+  const memory::dim scale_zp_sz = 1;
+  const memory::dim scale_zp_st = 1;
   float dnn_scale = scale;
   // TODO: Remove workaround for dnnl symmetric quantization
   int dnn_zero_point = 0;
@@ -145,8 +145,8 @@ Tensor quantize_tensor_per_tensor_affine(
         /*src_zero_point*/ nullptr,
         quant_base.scale_ptr(),
         quant_base.zero_point_ptr(),
-        scale_zp_sz,
-        scale_zp_st,
+        {scale_zp_sz},
+        {scale_zp_st},
         rattr);
     auto q_opt_ctx =
         at::AtenIpexTypeXPU::DPCPPTensorContext::release_tensor_ctx(
@@ -161,8 +161,8 @@ Tensor quantize_tensor_per_tensor_affine(
         /*srd_zero_point=*/nullptr,
         quant_base.scale_ptr(),
         quant_base.zero_point_ptr(),
-        scale_zp_sz,
-        scale_zp_st,
+        {scale_zp_sz},
+        {scale_zp_st},
         rattr);
   }
 

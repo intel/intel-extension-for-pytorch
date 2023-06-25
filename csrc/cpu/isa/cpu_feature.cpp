@@ -1,4 +1,5 @@
 #include "cpu_feature.hpp"
+#include <c10/util/Exception.h>
 #include <stdio.h>
 #include "embedded_function.h"
 
