@@ -39,13 +39,14 @@ void linear_kernel_output(
   // (output = output.reshape(output_size_reshaped)) output.sizes().vec() will
   // trigger a copy and can hold the sizes vector.
   auto output_size = output.sizes().vec();
-  auto output_memory_format = output.suggest_memory_format();
+  bool out_is_contiguous = output.is_contiguous();
+  auto output_ = out_is_contiguous ? output : output.contiguous();
   if (dim != 2) {
     std::vector<int64_t> output_size_reshaped = {
         self_reshaped.size(0), mkldnn_weight.get_dim(0)};
-    output = output.reshape(output_size_reshaped);
+    output_ = output_.reshape(output_size_reshaped);
   }
-  ideep::tensor mkldnn_output = itensor_view_from_dense(output);
+  ideep::tensor mkldnn_output = itensor_view_from_dense(output_);
 
   if (bias.defined()) {
     auto bias_ = self.is_contiguous() ? bias : bias.contiguous();
@@ -59,8 +60,10 @@ void linear_kernel_output(
             mkldnn_input, mkldnn_weight, mkldnn_output, attr);
   }
   if (self.dim() != 2) {
-    output = output.reshape(output_size);
-    output = output.to(output_memory_format);
+    output_ = output_.reshape(output_size);
+  }
+  if (!out_is_contiguous || !output.is_same(output_)) {
+    output.copy_(output_);
   }
 }
 
