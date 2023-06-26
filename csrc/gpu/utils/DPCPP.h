@@ -68,10 +68,10 @@ inline constexpr std::string_view ASPECT_FP64_IS_NOT_SUPPORTED(
     "aspect fp64 is not supported");
 inline constexpr std::string_view FP64_ERROR_FROM_MKL(
     "double type is not supported");
+inline constexpr std::string_view OUT_OF_RESOURCES("PI_ERROR_OUT_OF_RESOURCES");
 
-#ifdef USE_FP64_EXCE_HINT
-#define DPCPP_FP64_EXCEP_TRY try {
-#define DPCPP_FP64_EXCEP_CATCH                                             \
+#define DPCPP_EXCEP_TRY try {
+#define DPCPP_EXCEP_CATCH                                                  \
   }                                                                        \
   catch (const sycl::exception& ep) {                                      \
     const std::string_view err_msg(ep.what());                             \
@@ -80,18 +80,17 @@ inline constexpr std::string_view FP64_ERROR_FROM_MKL(
         err_msg.find(FP64_ERROR_FROM_MKL) != std::string::npos) {          \
       throw std::runtime_error(                                            \
           "FP64 data type is unsupported on current platform.");           \
+    } else if (err_msg.find(OUT_OF_RESOURCES) != std::string::npos) {      \
+      throw std::runtime_error(                                            \
+          "Allocation is out of device memory on current platform.");      \
     } else {                                                               \
       throw ep;                                                            \
     }                                                                      \
   }
-#else
-#define DPCPP_FP64_EXCEP_TRY
-#define DPCPP_FP64_EXCEP_CATCH
-#endif
 
 #define DPCPP_EXT_SUBMIT(q, str, ker_submit)                                  \
   {                                                                           \
-    DPCPP_FP64_EXCEP_TRY                                                      \
+    DPCPP_EXCEP_TRY                                                           \
     static auto verbose = xpu::dpcpp::Settings::I().get_verbose_level();      \
     if (verbose) {                                                            \
       IPEX_TIMER(t, verbose, __func__);                                       \
@@ -122,12 +121,12 @@ inline constexpr std::string_view FP64_ERROR_FROM_MKL(
       DPCPP_E_SYNC_FOR_DEBUG(e);                                              \
     }                                                                         \
     (q).throw_asynchronous();                                                 \
-    DPCPP_FP64_EXCEP_CATCH                                                    \
+    DPCPP_EXCEP_CATCH                                                         \
   }
 
 #define DPCPP_Q_SUBMIT(q, cgf, ...)                                            \
   {                                                                            \
-    DPCPP_FP64_EXCEP_TRY                                                       \
+    DPCPP_EXCEP_TRY                                                            \
     static auto verbose = xpu::dpcpp::Settings::I().get_verbose_level();       \
     if (verbose) {                                                             \
       IPEX_TIMER(t, verbose, __func__);                                        \
@@ -146,7 +145,7 @@ inline constexpr std::string_view FP64_ERROR_FROM_MKL(
       xpu::dpcpp::dpcpp_log("dpcpp_kernel", e);                                \
       DPCPP_E_SYNC_FOR_DEBUG(e);                                               \
     }                                                                          \
-    DPCPP_FP64_EXCEP_CATCH                                                     \
+    DPCPP_EXCEP_CATCH                                                          \
   }
 
 #if !defined(__INTEL_LLVM_COMPILER) || \
