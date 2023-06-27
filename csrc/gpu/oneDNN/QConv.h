@@ -41,8 +41,9 @@ static std::tuple<memory::desc, memory::desc, memory::desc> qconv_get_usr_md(
 
   if (src_ctx.is_plain()) {
     auto src_tz = src.sizes().vec();
-    auto src_data_t =
-        is_opaque_u8(src) ? memory::data_type::s8 : get_onednn_dtype(src);
+    auto src_data_t = (src.scalar_type() == at::kQInt8 || is_opaque_u8(src))
+        ? memory::data_type::s8
+        : memory::data_type::u8;
     src_usr_md = memory::desc(src_tz, src_data_t, fmt_src);
   } else {
     src_usr_md = src_ctx.meta();
@@ -248,8 +249,9 @@ static at::Tensor quantized_convolution(
   // input tensors config
   memory::dims src_dims = src.sizes().vec();
   memory::dims wgh_dims = wgh.sizes().vec();
-  auto src_data_t = is_opaque_u8(src) ? memory::data_type::s8
-                                      : get_onednn_dtype_include_double(src);
+  auto src_data_t = (src.scalar_type() == at::kQInt8 || is_opaque_u8(src))
+      ? memory::data_type::s8
+      : memory::data_type::u8;
   auto dst_data_t = get_onednn_dtype_include_double(dst);
   // conv config
   memory::dims _stride = stride.vec();
@@ -448,8 +450,6 @@ static at::Tensor quantized_convolution(
   }
 #endif
 
-  memory dst_sc_m, dst_zp_m;
-  std::tie(dst_sc_m, dst_zp_m) = q_get_sc_zp_gpu_mem(dst, engine);
   // dst scale is no need for setting, since it is fused in postop via linear
 
 #ifdef BUILD_PRIOR_SYMM_QUANT
@@ -471,8 +471,8 @@ static at::Tensor quantized_convolution(
 #endif
 
   if (wgh.qscheme() == kPerTensorAffine) {
-    memory wgh_sc_m, wgh_zp_m;
-    std::tie(wgh_sc_m, wgh_zp_m) = q_get_sc_zp_gpu_mem(wgh, engine);
+    memory wgh_sc_m;
+    wgh_sc_m = q_get_wgh_sc_gpu_mem(wgh, engine);
     args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});
     DPCPP_ONEDNN_EXEC(conv_forward, strm, args);
   } else {

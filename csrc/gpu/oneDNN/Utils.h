@@ -59,6 +59,16 @@ static inline std::pair<memory, memory> q_get_sc_zp_gpu_mem(
   return {qx_sc_m, qx_zp_m};
 }
 
+static inline memory q_get_wgh_sc_gpu_mem(
+    const Tensor& qw,
+    dnnl::engine& engine) {
+  float dnn_scale = qw.q_scale();
+  auto quant_base = xpu::dpcpp::fetch_cached_quantizer_base(dnn_scale, 0);
+  auto sc_ptr = quant_base.scale_ptr();
+  memory sc_m = dpcpp_onednn_memory(Q_PER_TENSOR_SC_MD, engine, sc_ptr);
+  return sc_m;
+}
+
 static inline memory::format_tag get_dnnl_default_format(
     int ndims,
     bool is_channels_last = false,

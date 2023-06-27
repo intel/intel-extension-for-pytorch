@@ -383,8 +383,8 @@ static inline void matmul(
 #endif
 
     if (is_per_tensor_quantized) {
-      memory m2_sc_m, m2_zp_m;
-      std::tie(m2_sc_m, m2_zp_m) = q_get_sc_zp_gpu_mem(m2, engine);
+      memory m2_sc_m;
+      m2_sc_m = q_get_wgh_sc_gpu_mem(m2, engine);
       args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, m2_sc_m});
 
       DPCPP_ONEDNN_EXEC(matmul_p, strm, args);

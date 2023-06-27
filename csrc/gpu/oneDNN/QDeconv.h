@@ -24,8 +24,9 @@ qdeconv_get_blocked_md(
   auto fmt_src = deconv_src_fmt(ndim);
   if (src_ctx.is_plain()) {
     auto src_tz = src.sizes().vec();
-    auto src_data_t = is_opaque_u8(src) ? memory::data_type::s8
-                                        : get_onednn_dtype_include_double(src);
+    auto src_data_t = (src.scalar_type() == at::kQInt8 || is_opaque_u8(src))
+        ? memory::data_type::s8
+        : memory::data_type::u8;
     src_usr_md = memory::desc(src_tz, src_data_t, fmt_src);
   } else {
     src_usr_md = src_ctx.meta();
@@ -81,8 +82,9 @@ qdeconv_get_plain_md(
     int64_t groups,
     bool is_channels_last_suggested) {
   auto ndim = src.ndimension();
-  auto src_data_t = is_opaque_u8(src) ? memory::data_type::s8
-                                      : get_onednn_dtype_include_double(src);
+  auto src_data_t = (src.scalar_type() == at::kQInt8 || is_opaque_u8(src))
+      ? memory::data_type::s8
+      : memory::data_type::u8;
 
   // TODO: support channels last
   auto fmt_src = deconv_src_fmt(ndim, is_channels_last_suggested);
