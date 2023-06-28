@@ -12,12 +12,17 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-static Tensor hgemm_bias_res_res(
-    const Tensor& a,
-    const Tensor& b,
-    const Tensor& bias,
-    const Tensor& res0,
-    const Tensor& res1) {
+static Tensor mm_bias_resadd_resadd(
+    const Tensor& a_,
+    const Tensor& b_,
+    const Tensor& bias_,
+    const Tensor& res0_,
+    const Tensor& res1_) {
+  auto a = a_.flatten(0, -2);
+  auto b = b_.flatten(0, -2);
+  auto bias = bias_.flatten();
+  auto res0 = res0_.flatten(0, -2);
+  auto res1 = res1_.flatten(0, -2);
   // a: m x k, b: k x n, bias: n, res0/1: m x n
   TORCH_CHECK(
       a.dim() == 2 && b.dim() == 2 && bias.dim() == 1 && res0.dim() == 2 &&
@@ -40,10 +45,13 @@ static Tensor hgemm_bias_res_res(
   return output;
 }
 
-static Tensor hgemm_resmul(
-    const Tensor& a,
-    const Tensor& b,
-    const Tensor& res) {
+static Tensor mm_resmul(
+    const Tensor& a_,
+    const Tensor& b_,
+    const Tensor& res_) {
+  auto a = a_.flatten(0, -2);
+  auto b = b_.flatten(0, -2);
+  auto res = res_.flatten(0, -2);
   // a: m x k, b: k x n, res: m, n
   TORCH_CHECK(a.dim() == 2 && b.dim() == 2 && res.dim() == 2);
   int m = a.sizes()[0];
@@ -62,7 +70,9 @@ static Tensor hgemm_resmul(
   return output;
 }
 
-static Tensor hgemm_silu(const Tensor& a, const Tensor& b) {
+static Tensor mm_silu(const Tensor& a_, const Tensor& b_) {
+  auto a = a_.flatten(0, -2);
+  auto b = b_.flatten(0, -2);
   // a: m x k, b: k x n
   TORCH_CHECK(a.dim() == 2 && b.dim() == 2);
   int m = a.sizes()[0];
@@ -97,12 +107,16 @@ static Tensor hgemm_silu(const Tensor& a, const Tensor& b) {
       k);                                                               \
   }
 
-static void hgemm_qkv_out(
-    const Tensor& input,
+static void mm_qkv_out(
+    const Tensor& input_,
     const Tensor& weight,
-    const Tensor& out0,
-    const Tensor& out1,
-    const Tensor& out2) {
+    const Tensor& out0_,
+    const Tensor& out1_,
+    const Tensor& out2_) {
+  auto input = input_.flatten(0, -2);
+  auto out0 = out0_.flatten(0, -2);
+  auto out1 = out1_.flatten(0, -2);
+  auto out2 = out2_.flatten(0, -2);
   // input: m,k; weight: 3,k,n
   TORCH_CHECK(input.dim() == 2 && weight.dim() == 3);
   TORCH_CHECK(out0.dim() == 2 && out1.dim() == 2 && out2.dim() == 2);
@@ -135,7 +149,7 @@ static void hgemm_qkv_out(
 
 #undef GEMM_QKV_XETLA_DISPATCH
 
-static std::tuple<Tensor, Tensor, Tensor> hgemm_qkv(
+static std::tuple<Tensor, Tensor, Tensor> mm_qkv(
     const Tensor& input,
     const Tensor& weight) {
   int m = input.sizes()[0];
@@ -144,7 +158,7 @@ static std::tuple<Tensor, Tensor, Tensor> hgemm_qkv(
   auto out0 = at::empty({m, n}, input.options());
   auto out1 = at::empty({m, n}, input.options());
   auto out2 = at::empty({m, n}, input.options());
-  hgemm_qkv_out(input, weight, out0, out1, out2);
+  mm_qkv_out(input, weight, out0, out1, out2);
   return std::forward_as_tuple(out0, out1, out2);
 }
 
@@ -154,11 +168,11 @@ static std::tuple<Tensor, Tensor, Tensor> hgemm_qkv(
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER(
-      "hgemm_bias_res_res.xpu", at::AtenIpexTypeXPU::hgemm_bias_res_res);
-  IPEX_OP_REGISTER("hgemm_resmul.xpu", at::AtenIpexTypeXPU::hgemm_resmul);
-  IPEX_OP_REGISTER("hgemm_silu.xpu", at::AtenIpexTypeXPU::hgemm_silu);
-  IPEX_OP_REGISTER("hgemm_qkv_out.xpu", at::AtenIpexTypeXPU::hgemm_qkv_out);
-  IPEX_OP_REGISTER("hgemm_qkv.xpu", at::AtenIpexTypeXPU::hgemm_qkv);
+      "mm_bias_resadd_resadd.xpu", at::AtenIpexTypeXPU::mm_bias_resadd_resadd);
+  IPEX_OP_REGISTER("mm_resmul.xpu", at::AtenIpexTypeXPU::mm_resmul);
+  IPEX_OP_REGISTER("mm_silu.xpu", at::AtenIpexTypeXPU::mm_silu);
+  IPEX_OP_REGISTER("mm_qkv_out.xpu", at::AtenIpexTypeXPU::mm_qkv_out);
+  IPEX_OP_REGISTER("mm_qkv.xpu", at::AtenIpexTypeXPU::mm_qkv);
 }
 } // namespace
 

@@ -90,7 +90,7 @@ class IPEXTransformerAtten(nn.Module):
         query = torch.empty_like(hidden_states).squeeze(0)
         key = key.view([-1, self.embed_dim])
         value = value.view([-1, self.embed_dim])
-        torch.ops.torch_ipex.hgemm_qkv_out(hidden_states.squeeze(0), self.qkv_wei, query, key, value)
+        torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, query, key, value)
         return query.unsqueeze(0), key.unsqueeze(0), value.unsqueeze(0)
 
     def qkv_normal(self, hidden_states, layer_past = None):
@@ -329,7 +329,7 @@ class IPEXGPTJMLP(IPEXTransformerMLP):
                 hidden_states = self.act(hidden_states)
             if hidden_states.dim()== 3:
                 hidden_states = hidden_states.squeeze(0)
-            hidden_states = torch.ops.torch_ipex.hgemm_bias_res_res(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output.squeeze(0), residual.squeeze(0)).unsqueeze(0)
+            hidden_states = torch.ops.torch_ipex.mm_bias_resadd_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output, residual).unsqueeze(0)
         else:
             hidden_states = self.fc_in(hidden_states)
             hidden_states = self.act(hidden_states)
@@ -349,11 +349,11 @@ class IPEXLlamaMLP(IPEXTransformerMLP):
             if hidden_states.dim() == 3:
                 hidden_states = hidden_states.squeeze(0)
             if isinstance(self.act, nn.SiLU):
-                hidden_states1 = torch.ops.torch_ipex.hgemm_silu(hidden_states, self.fc_in_wei)
+                hidden_states1 = torch.ops.torch_ipex.mm_silu(hidden_states, self.fc_in_wei)
             else:
                 hidden_states1 = torch.matmul(hidden_states, self.fc_in_wei)
                 hidden_states1 = self.act(hidden_states1)
-            hidden_states = torch.ops.torch_ipex.hgemm_resmul(hidden_states, self.up_wei, hidden_states1)
+            hidden_states = torch.ops.torch_ipex.mm_resmul(hidden_states, self.up_wei, hidden_states1)
             hidden_states = torch.addmm(residual[0], hidden_states, self.fc_out_wei)
             hidden_states = hidden_states.unsqueeze(0)
         else:    
