@@ -6,7 +6,7 @@ import intel_extension_for_pytorch  # noqa
 
 class TestNNMethod(TestCase):
     def test_sort(self):
-        for dtype in [torch.bfloat16, torch.half]:
+        for dtype in [torch.bfloat16, torch.half, torch.bool]:
             for i in range(100):
                 a = random.randint(1, 3)
                 b = random.randint(1, 5)
@@ -22,7 +22,7 @@ class TestNNMethod(TestCase):
                 descending = b % 2 == 0
                 x_cpu = torch.sort(x_cpu, dim=dim, descending=descending)[0]
                 x_xpu = torch.sort(x_xpu, dim=dim, descending=descending)[0]
-                maxdiff = float((x_cpu - x_xpu.cpu().float()).abs().max())
+                maxdiff = float((x_cpu.float() - x_xpu.cpu().float()).abs().max())
                 print(abcd, ", dim:", dim, ", maxdiff:", maxdiff)
                 assert maxdiff < 1e-5
 

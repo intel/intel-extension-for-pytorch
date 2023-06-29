@@ -76,6 +76,7 @@ inline void device_radix_sort_kernel(
   ValueT* value_dst = value_temp;
   int begin_bit = 0;
   int end_bit = KeyTraits<KeyT>::endbit();
+  int count = 0;
 
   while (true) {
 #define RADIX_NUMERIC_MIN(A, B) (((A) > (B)) ? (B) : (A))
@@ -154,11 +155,21 @@ inline void device_radix_sort_kernel(
 
     std::swap(key_src, key_dst);
     std::swap(value_src, value_dst);
+    count++;
 
     item.barrier(dpcpp_local_fence);
     begin_bit += RADIX_BITS;
     if (begin_bit >= end_bit)
       break;
+  }
+  if (count % 2 == 1) {
+    for (int ITEM = 0; ITEM < keys_per_thread; ++ITEM) {
+      int offset = lid * keys_per_thread + ITEM;
+      if (offset < nsort) {
+        key_dst[offset * stride] = key_src[offset * stride];
+        value_dst[offset * stride] = value_src[offset * stride];
+      }
+    }
   }
 }
 
