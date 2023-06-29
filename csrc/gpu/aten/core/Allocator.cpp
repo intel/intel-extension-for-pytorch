@@ -182,7 +182,7 @@ at::DeleterFnPtr HostAllocator::raw_deleter() const {
   return &deleter;
 }
 
-bool HostAllocator::isHostPtr(void* ptr) {
+bool HostAllocator::isHostPtr(const void* ptr) {
   return alloc()->isHostPtr(ptr);
 }
 
@@ -210,7 +210,7 @@ void emptyCacheInHostAlloc() {
   HostAllocator::Instance()->emptyCache();
 }
 
-bool isAllocatedByHostAlloc(void* ptr) {
+bool isAllocatedByHostAlloc(const void* ptr) {
   return HostAllocator::Instance()->isHostPtr(ptr);
 }
 

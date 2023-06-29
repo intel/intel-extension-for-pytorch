@@ -70,7 +70,7 @@ void CachingHostAllocator::processEvents() {
   }
 }
 
-bool CachingHostAllocator::isHostPtr(void* ptr) {
+bool CachingHostAllocator::isHostPtr(const void* ptr) {
 #if defined(USE_MULTI_CONTEXT)
   int count;
   AT_DPCPP_CHECK(dpcppGetDeviceCount(&count));

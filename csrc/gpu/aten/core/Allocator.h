@@ -44,7 +44,7 @@ Allocator* getHostAllocator();
 // Releases all cached host memory allocations
 void emptyCacheInHostAlloc();
 
-bool isAllocatedByHostAlloc(void* ptr);
+bool isAllocatedByHostAlloc(const void* ptr);
 
 } // namespace dpcpp
 } // namespace xpu

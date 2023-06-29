@@ -87,7 +87,7 @@ class CachingHostAllocator final {
  public:
   static CachingHostAllocator* Instance(); // Singleton
 
-  bool isHostPtr(void* ptr);
+  bool isHostPtr(const void* ptr);
 
   void emptyCache();
 

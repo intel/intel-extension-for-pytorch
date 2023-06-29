@@ -23,7 +23,7 @@ class HostAllocator final : public at::Allocator {
 
   void* raw_allocate(size_t size);
 
-  bool isHostPtr(void* ptr);
+  bool isHostPtr(const void* ptr);
   void emptyCache();
 
   void recordEvent(void* ptr, sycl::event& e);
