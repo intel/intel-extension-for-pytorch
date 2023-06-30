@@ -198,6 +198,6 @@ csrc/aten/generated/*
 # Clion files
 .idea
 
-# experimental log files
-tests/gpu/experimental/log/**/*.log
-tests/gpu/experimental/log/**/*.txt
+# pytorch ported UT log files
+tests/gpu/pytorch/*-reports
+genxir
