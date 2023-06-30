@@ -37,6 +37,7 @@ from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl
 from .cpu.utils.verbose import verbose
 from .cpu.tpp.fused_bert import fast_bert
 from ._inductor.compiler import _set_compiler_backend, _get_compiler_backend, compile
+from ._inductor.dynamo_backends import *
 from .cpu.onednn_fusion import enable_onednn_fusion
 
 from . import _C
