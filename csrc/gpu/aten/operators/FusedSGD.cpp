@@ -86,7 +86,7 @@ static void ComputeSplitSGDKernel(
           auto res =
               static_cast<float>(weight_elem + grad_elem_fp32 * negative_lr);
 
-          return unpack_float_bfloat16(weight_elem);
+          return unpack_float_bfloat16(res);
         });
   } else {
     // use momentum
@@ -142,7 +142,7 @@ static void ComputeSplitSGDKernel(
           auto res = static_cast<float>(
               temp_master_weight_value + grad_elem_fp32 * negative_lr);
 
-          std::tie(top_elem, tail_elem) = unpack_float_bfloat16(weight_elem);
+          std::tie(top_elem, tail_elem) = unpack_float_bfloat16(res);
           return std::tuple<at::BFloat16, at::BFloat16, float>(
               top_elem,
               tail_elem,
