@@ -1127,25 +1127,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> ipex_lstm(
   return std::make_tuple(output, hy, cy);
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor> ipex_lstm_meta(
-    const at::Tensor& input,
-    std::vector<at::Tensor> hx,
-    std::vector<at::Tensor> params,
-    bool has_biases,
-    int64_t num_layers,
-    double dropout_p,
-    bool train,
-    bool bidirectional,
-    bool batch_first) {
-  auto input_size = input.sym_sizes();
-  c10::SymDimVector output_size(input_size.begin(), input_size.end() - 1);
-  output_size.push_back(
-      bidirectional ? hx[0].sym_size(2) * 2 : hx[0].sym_size(2));
-  auto output = at::empty_symint(output_size, input.options());
-  auto hy = at::empty_symint(hx[0].sym_sizes(), hx[0].options());
-  auto cy = at::empty_symint(hx[1].sym_sizes(), hx[1].options());
-  return std::make_tuple(output, hy, cy);
-}
 } // namespace torch_ipex
 
 namespace torch_ipex {
@@ -1275,7 +1256,6 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       c10::DispatchKey::AutocastCPU,
       torch_ipex::autocast::ipex_lstm);
   m.impl("ipex_lstm", c10::DispatchKey::CPU, torch_ipex::ipex_lstm);
-  m.impl("ipex_lstm", c10::DispatchKey::Meta, torch_ipex::ipex_lstm_meta);
   m.def(
       "ipex_lstm_layer(Tensor input, Tensor weight0, Tensor weight1, Tensor "
       "weight2, Tensor weight3, Tensor hx_, Tensor cx_, bool reverse, int[] "

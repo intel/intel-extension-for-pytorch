@@ -48,13 +48,6 @@ at::Tensor mkl_sgemm_forward(
     const at::Tensor& op_context,
     const c10::optional<int64_t> out_features);
 
-at::Tensor mkl_sgemm_forward_meta(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const c10::optional<at::Tensor>& bias,
-    const at::Tensor& op_context,
-    const c10::optional<int64_t> out_features);
-
 namespace {
 
 void _mkl_sgemm_packB_impl(

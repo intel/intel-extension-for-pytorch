@@ -67,15 +67,6 @@ at::Tensor ROIAlign_forward(
     int64_t sampling_ratio,
     bool aligned);
 
-at::Tensor ROIAlign_forward_meta(
-    const at::Tensor& input,
-    const at::Tensor& rois,
-    double spatial_scale,
-    c10::SymInt pooled_height,
-    c10::SymInt pooled_width,
-    int64_t sampling_ratio,
-    bool aligned);
-
 namespace {
 
 template <typename T>

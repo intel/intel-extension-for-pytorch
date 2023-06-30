@@ -102,16 +102,5 @@ at::Tensor convolution_forward(
     c10::optional<at::IntArrayRef> dilation,
     c10::optional<bool> weight_channels_last);
 
-at::Tensor convolution_forward_meta(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const c10::optional<at::Tensor>& bias_opt,
-    const at::Tensor& op_context,
-    c10::optional<at::IntArrayRef> kernel_size,
-    c10::optional<at::IntArrayRef> padding,
-    c10::optional<at::IntArrayRef> stride,
-    c10::optional<at::IntArrayRef> dilation,
-    c10::optional<bool> weight_channels_last);
-
 } // namespace cpu
 } // namespace torch_ipex

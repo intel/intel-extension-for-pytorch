@@ -85,22 +85,6 @@ at::Tensor mkl_sgemm_forward(
       ->run(input);
 }
 
-at::Tensor mkl_sgemm_forward_meta(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const c10::optional<at::Tensor>& bias,
-    const at::Tensor& op_context,
-    const c10::optional<int64_t> out_features) {
-  TORCH_CHECK(
-      out_features.has_value(),
-      "out_features must have value for mkl_sgemm_forward_meta");
-  auto input_size = input.sym_sizes();
-  c10::SymDimVector output_size(input_size.begin(), input_size.end() - 1);
-  output_size.push_back(out_features.value());
-  auto output = at::empty_symint(output_size, input.options());
-  return output;
-}
-
 } // namespace cpu
 } // namespace torch_ipex
 
@@ -114,10 +98,6 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "ipex_MKLSGEMM",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::mkl_sgemm_forward);
-  m.impl(
-      "ipex_MKLSGEMM",
-      c10::DispatchKey::Meta,
-      torch_ipex::cpu::mkl_sgemm_forward_meta);
 }
 
 } // namespace

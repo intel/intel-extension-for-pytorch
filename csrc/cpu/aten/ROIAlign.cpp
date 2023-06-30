@@ -200,20 +200,6 @@ at::Tensor ROIAlign_forward(
       aligned);
 }
 
-at::Tensor ROIAlign_forward_meta(
-    const at::Tensor& input,
-    const at::Tensor& rois,
-    double spatial_scale,
-    c10::SymInt pooled_height,
-    c10::SymInt pooled_width,
-    int64_t sampling_ratio,
-    bool aligned) {
-  auto num_rois = rois.sym_size(0);
-  auto channels = input.sym_size(1);
-  return at::empty_symint(
-      {num_rois, channels, pooled_height, pooled_width}, input.options());
-}
-
 } // namespace cpu
 } // namespace torch_ipex
 
@@ -273,10 +259,6 @@ IPEX_TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "ROIAlign_forward",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::ROIAlign_forward_impl);
-  m.impl(
-      "ROIAlign_forward",
-      c10::DispatchKey::Meta,
-      torch_ipex::cpu::ROIAlign_forward_meta);
   // bw
   m.def(
       "ROIAlign_backward(Tensor grad, Tensor rois, float spatial_scale, int pooled_height, int pooled_width, int batch_size, int channels, int height, int width, int sampling_ratio, bool aligned, bool is_channels_last) -> Tensor");

@@ -369,7 +369,7 @@ class RoIAlignTester(TestCase):
         ):
             torch._dynamo.reset()
             torchcompile_fn = torch.compile(
-                torchvision_fn, backend=backend, dynamic=dynamic
+                fn, backend=backend, dynamic=dynamic
             )
             x = x.to(dtype=dtype)
             rois = rois.to(dtype=dtype)

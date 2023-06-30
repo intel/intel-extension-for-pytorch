@@ -288,22 +288,6 @@ at::Tensor ipex_linear(
       input, weight, bias, NotFused, op_context, out_features);
 }
 
-at::Tensor linear_forward_meta(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const c10::optional<at::Tensor>& bias,
-    const at::Tensor& op_context,
-    const c10::optional<int64_t> out_features) {
-  TORCH_CHECK(
-      out_features.has_value(),
-      "out_features must have value for linear_forward_meta");
-  auto input_size = input.sym_sizes();
-  c10::SymDimVector output_size(input_size.begin(), input_size.end() - 1);
-  output_size.push_back(out_features.value());
-  auto output = at::empty_symint(output_size, input.options());
-  return output;
-}
-
 at::Tensor ipex_linear_eltwise(
     const at::Tensor& input,
     const at::Tensor& weight,
@@ -313,23 +297,6 @@ at::Tensor ipex_linear_eltwise(
     const c10::optional<int64_t> out_features) {
   return IPEXLinearOp::apply(
       input, weight, bias, eltwise, op_context, out_features);
-}
-
-at::Tensor linear_eltwise_forward_meta(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const c10::optional<at::Tensor>& bias,
-    const int64_t eltwise,
-    const at::Tensor& op_context,
-    const c10::optional<int64_t> out_features) {
-  TORCH_CHECK(
-      out_features.has_value(),
-      "out_features must have value for linear_eltwise_forward_meta");
-  auto input_size = input.sym_sizes();
-  c10::SymDimVector output_size(input_size.begin(), input_size.end() - 1);
-  output_size.push_back(out_features.value());
-  auto output = at::empty_symint(output_size, input.options());
-  return output;
 }
 
 DEFINE_DISPATCH(woq_linear_packB_stub);
@@ -479,10 +446,6 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       c10::DispatchKey::AutocastCPU,
       torch_ipex::autocast::ipex_linear);
   m.impl("ipex_linear", c10::DispatchKey::CPU, torch_ipex::cpu::linear_forward);
-  m.impl(
-      "ipex_linear",
-      c10::DispatchKey::Meta,
-      torch_ipex::cpu::linear_forward_meta);
   m.def("ipex_woq_linear(Tensor input, Tensor W_prepack) -> Tensor");
   m.impl(
       "ipex_woq_linear",
@@ -508,10 +471,6 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "ipex_linear_eltwise",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::linear_eltwise_forward);
-  m.impl(
-      "ipex_linear_eltwise",
-      c10::DispatchKey::Meta,
-      torch_ipex::cpu::linear_eltwise_forward_meta);
   // bw
   m.def(
       "linear_backward(Tensor input, Tensor grad_output, bool[3] out_mask, "

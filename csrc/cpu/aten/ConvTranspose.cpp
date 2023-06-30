@@ -541,53 +541,6 @@ at::Tensor conv_transpose(
       weight_channels_last);
 }
 
-at::Tensor conv_transpose_forward_meta(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const c10::optional<at::Tensor>& bias_opt,
-    const at::Tensor& op_context,
-    c10::optional<at::IntArrayRef> weight_size,
-    c10::optional<at::IntArrayRef> padding,
-    c10::optional<at::IntArrayRef> output_padding,
-    c10::optional<at::IntArrayRef> stride,
-    c10::optional<at::IntArrayRef> dilation,
-    c10::optional<int64_t> groups,
-    c10::optional<bool> weight_channels_last) {
-  TORCH_CHECK(
-      weight_size.has_value() && padding.has_value() &&
-          output_padding.has_value() && stride.has_value() &&
-          dilation.has_value() && groups.has_value() &&
-          weight_channels_last.has_value(),
-      "weight_size, padding, output_padding, stride, dilation, groups and weight_channels_last must have value for conv_transpose_forward_meta");
-  auto input_size = input.sym_sizes();
-  c10::SymDimVector output_sizes = conv_input_size(
-      input_size,
-      weight_size.value(),
-      padding.value(),
-      output_padding.value(),
-      stride.value(),
-      dilation.value(),
-      groups.value());
-  auto output = at::empty_symint(output_sizes, input.options());
-
-  bool use_channels_last =
-      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
-      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d ||
-      weight_channels_last.value();
-  auto memory_format = at::MemoryFormat::Contiguous;
-  if (use_channels_last) {
-    // TODO: support ConvTranspose1d
-    if (input.dim() == 4) {
-      memory_format = at::MemoryFormat::ChannelsLast;
-    } else if (input.dim() == 5) {
-      memory_format = at::MemoryFormat::ChannelsLast3d;
-    }
-  }
-
-  output = output.contiguous(memory_format);
-  return output;
-}
-
 } // namespace cpu
 } // namespace torch_ipex
 
@@ -644,10 +597,6 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "conv_transpose",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::conv_transpose_forward);
-  m.impl(
-      "conv_transpose",
-      c10::DispatchKey::Meta,
-      torch_ipex::cpu::conv_transpose_forward_meta);
   m.impl(
       "conv_transpose",
       c10::DispatchKey::AutocastCPU,

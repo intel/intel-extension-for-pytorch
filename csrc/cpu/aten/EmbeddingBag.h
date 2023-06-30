@@ -11,13 +11,6 @@ at::Tensor embedding_bag(
     bool sparse,
     bool include_last_offset);
 
-at::Tensor embedding_bag_meta(
-    const at::Tensor& weight,
-    const at::Tensor& indices,
-    const at::Tensor& offsets,
-    bool sparse,
-    bool include_last_offset);
-
 } // namespace torch_ipex
 
 namespace torch_ipex {
