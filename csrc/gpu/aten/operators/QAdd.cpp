@@ -1,8 +1,10 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
+#include <ATen/core/op_registration/adaption.h>
 #include <ATen/core/op_registration/op_registration.h>
 #include <torch/custom_class.h>
+#include "utils/CustomOperatorRegistration.h"
 
 #include <oneDNN/oneDNN.h>
 #include <quantized/QUtils.h>
@@ -73,8 +75,8 @@ Tensor q_add_relu(Tensor qa, Tensor qb, double scale, int64_t zero_point) {
 }
 
 TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
-  m.impl("add", q_add);
-  m.impl("add_relu", q_add_relu);
+  IPEX_QOP_REGISTER("add", q_add);
+  IPEX_QOP_REGISTER("add_relu", q_add_relu);
 }
 
 } // namespace AtenIpexTypeQuantizedXPU

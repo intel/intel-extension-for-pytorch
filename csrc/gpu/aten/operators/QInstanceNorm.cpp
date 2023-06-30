@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <oneDNN/oneDNN.h>
 #include <torch/library.h>
+#include "utils/CustomOperatorRegistration.h"
 
 using namespace dnnl;
 using namespace xpu::dpcpp;
@@ -53,23 +54,25 @@ at::Tensor quantized_native_instance_norm(
   return q_out.view(qinput.sizes());
 }
 
+Tensor q_instance_norm(
+    Tensor qx,
+    c10::optional<Tensor> weight,
+    c10::optional<Tensor> bias,
+    double eps,
+    double output_scale,
+    int64_t output_zero_point) {
+  return quantized_native_instance_norm(
+      qx,
+      weight.has_value() ? *weight : Tensor(),
+      bias.has_value() ? *bias : Tensor(),
+      eps,
+      output_scale,
+      output_zero_point);
+}
+
 TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
-  m.impl(
-      TORCH_SELECTIVE_NAME("quantized::instance_norm"),
-      [](Tensor qx,
-         c10::optional<Tensor> weight,
-         c10::optional<Tensor> bias,
-         double eps,
-         double output_scale,
-         int64_t output_zero_point) {
-        return quantized_native_instance_norm(
-            qx,
-            weight.has_value() ? *weight : Tensor(),
-            bias.has_value() ? *bias : Tensor(),
-            eps,
-            output_scale,
-            output_zero_point);
-      });
+  IPEX_QOP_REGISTER(
+      TORCH_SELECTIVE_NAME("quantized::instance_norm"), q_instance_norm);
 }
 
 } // namespace AtenIpexTypeXPU

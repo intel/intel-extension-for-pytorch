@@ -4,6 +4,7 @@
 #include <quantized/QUtils.h>
 #include <quantized/Quantizer.h>
 
+#include <ATen/core/op_registration/adaption.h>
 #include "CatImpl.h"
 #include "ReQuantization.h"
 #include "comm/ParamUtils.h"
@@ -45,6 +46,11 @@ Tensor q_cat(
     int64_t dim,
     c10::optional<double> scale,
     c10::optional<int64_t> zero_point) {
+  const OptionalDeviceGuard device_guard(device_of(tensors.get(0)));
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, tensors, "q_cat", "tensors");
   double scale_out =
       scale.has_value() ? scale.value() : tensors.get(0).q_scale();
   int64_t zero_point_out = zero_point.has_value()

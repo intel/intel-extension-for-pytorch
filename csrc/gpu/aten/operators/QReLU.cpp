@@ -78,14 +78,11 @@ void q_relu_xpu(const Tensor& qx, Tensor& qy) {
   });
 }
 
-Tensor relu_quantized_xpu(const Tensor& qx) {
+Tensor relu(const Tensor& qx) {
   Tensor qy;
   q_relu_xpu(qx, qy);
   return qy;
 }
 
-TORCH_LIBRARY_IMPL(aten, QuantizedXPU, m) {
-  m.impl(TORCH_SELECTIVE_NAME("aten::relu"), relu_quantized_xpu);
-}
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at
