@@ -40,7 +40,7 @@ RUN curl -fsSL -v -o ~/miniconda.sh -O  https://repo.anaconda.com/miniconda/Mini
 FROM dev-base AS build
 COPY --from=conda /opt/conda /opt/conda
 RUN --mount=type=cache,target=/opt/ccache \
-    curl -fsSL -v -o compile_bundle.sh -O https://github.com/intel/intel-extension-for-pytorch/blob/master/scripts/compile_bundle.sh && \
+    curl -fsSL -v -o compile_bundle.sh -O https://raw.githubusercontent.com/intel/intel-extension-for-pytorch/master/scripts/compile_bundle.sh && \
     bash compile_bundle.sh && \
     python -m pip install --no-cache-dir intel-extension-for-pytorch/dist/*.whl && \
     rm -rf intel-extension-for-pytorch llvm-project compile_bundle.sh
