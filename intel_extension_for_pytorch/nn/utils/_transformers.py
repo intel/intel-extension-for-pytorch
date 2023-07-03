@@ -329,8 +329,7 @@ class IPEXGPTJMLP(IPEXTransformerMLP):
             else:
                 hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                 hidden_states = self.act(hidden_states)
-            shape = hidden_states.shape
-            hidden_states = torch.ops.torch_ipex.mm_bias_resadd_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output, residual).view(shape)
+            hidden_states = torch.ops.torch_ipex.mm_bias_resadd_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output, residual).unsqueeze(0)
         else:
             hidden_states = self.fc_in(hidden_states)
             hidden_states = self.act(hidden_states)
@@ -346,17 +345,16 @@ class IPEXLlamaMLP(IPEXTransformerMLP):
 
     def forward(self, hidden_states, residual):
         if self.row_major:
-            if hidden_states.dim() == 3:
-                hidden_states = hidden_states.squeeze(0)
             if isinstance(self.act, nn.SiLU):
                 hidden_states1 = torch.ops.torch_ipex.mm_silu(hidden_states, self.fc_in_wei)
             else:
                 hidden_states1 = torch.matmul(hidden_states, self.fc_in_wei)
                 hidden_states1 = self.act(hidden_states1)
             hidden_states = torch.ops.torch_ipex.mm_resmul(hidden_states, self.up_wei, hidden_states1)
-            hidden_states = torch.addmm(residual[0], hidden_states, self.fc_out_wei)
-            hidden_states = hidden_states.unsqueeze(0)
-        else:    
+            shape = list(hidden_states.size())
+            shape[-1] = self.fc_out_wei.shape[-1]
+            hidden_states = torch.addmm(residual.flatten(0, -2), hidden_states.flatten(0, -2), self.fc_out_wei).view(shape)
+        else:
             hidden_states = self.fc_out(self.act(self.fc_in(hidden_states)) * self.up_proj(hidden_states))
             hidden_states += residual
         return hidden_states
