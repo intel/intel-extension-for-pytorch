@@ -72,7 +72,9 @@ class IPEXTransformerAtten(nn.Module):
         self.residual_drop = nn.Dropout(self.config.residual_dropout) if self.config.residual_dropout is not None else nn.Identity()
         self.attn_drop = nn.Dropout(self.config.attn_dropout) if self.config.attn_dropout is not None else nn.Identity() 
         if self.use_casual_mask:
-            IPEXTransformerAtten.attention_mask = (1 - torch.tril(torch.ones((self.max_positions, self.max_positions), dtype=torch.float, device=self.config.device)).view(1, 1, self.max_positions, self.max_positions)) * -66504.0
+            mask = torch.ones((self.max_positions, self.max_positions), dtype=torch.float)
+            mask = (1 - torch.tril(mask).view(1, 1, self.max_positions, self.max_positions)) * (-66504.0)
+            IPEXTransformerAtten.attention_mask = mask.to(self.config.device) 
 
     def qkv_cache_optimized_seq_first(self, hidden_states, layer_past = None):
         # greedy search path
@@ -83,15 +85,14 @@ class IPEXTransformerAtten(nn.Module):
             self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.prev_len = 0
 
-        self.cur_len = self.prev_len + hidden_states.size(1) 
+        self.cur_len = self.prev_len + hidden_states.size(1)
+        query = torch.empty_like(hidden_states)
         key = self.key_cached[:, self.prev_len : self.cur_len, :, :]
         value = self.value_cached[:, self.prev_len : self.cur_len, :, :]
-
-        query = torch.empty_like(hidden_states).squeeze(0)
-        key = key.view([-1, self.embed_dim])
-        value = value.view([-1, self.embed_dim])
+        key = key.view(query.shape)
+        value = value.view(query.shape)
         torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, query, key, value)
-        return query.unsqueeze(0), key.unsqueeze(0), value.unsqueeze(0)
+        return query, key, value
 
     def qkv_normal(self, hidden_states, layer_past = None):
         if self.row_major:
@@ -205,8 +206,9 @@ class IPEXTransformerAtten(nn.Module):
             if residual is None:
                 attn_output = torch.matmul(attn_output, self.out_wei)
             else:
-                attn_output = torch.addmm(residual[0], attn_output[0], self.out_wei)
-                attn_output = attn_output.unsqueeze(0)
+                shape = attn_output.shape
+                attn_output = torch.addmm(residual.flatten(0, -2), attn_output.flatten(0, -2), self.out_wei)
+                attn_output = attn_output.view(shape)
         else:
             attn_output = self.out_proj(attn_output) + residual
         return attn_output
@@ -327,13 +329,11 @@ class IPEXGPTJMLP(IPEXTransformerMLP):
             else:
                 hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                 hidden_states = self.act(hidden_states)
-            if hidden_states.dim()== 3:
-                hidden_states = hidden_states.squeeze(0)
-            hidden_states = torch.ops.torch_ipex.mm_bias_resadd_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output, residual).unsqueeze(0)
+            shape = hidden_states.shape
+            hidden_states = torch.ops.torch_ipex.mm_bias_resadd_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output, residual).view(shape)
         else:
             hidden_states = self.fc_in(hidden_states)
             hidden_states = self.act(hidden_states)
-
             hidden_states = self.fc_out(hidden_states) + attn_output + residual
         return hidden_states
 

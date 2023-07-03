@@ -42,7 +42,9 @@ static Tensor mm_bias_resadd_resadd(
                     .build();
   TORCH_CHECK(policy.fallback() == false);
   policy.run();
-  return output;
+  auto sizes = a_.sym_sizes().vec();
+  sizes[sizes.size() - 1] = n;
+  return output.view_symint(sizes);
 }
 
 static Tensor mm_resmul(
@@ -67,7 +69,9 @@ static Tensor mm_resmul(
                     .build();
   TORCH_CHECK(policy.fallback() == false);
   policy.run();
-  return output;
+  auto sizes = a_.sym_sizes().vec();
+  sizes[sizes.size() - 1] = n;
+  return output.view_symint(sizes);
 }
 
 static Tensor mm_silu(const Tensor& a_, const Tensor& b_) {
@@ -88,7 +92,9 @@ static Tensor mm_silu(const Tensor& a_, const Tensor& b_) {
                     .build();
   TORCH_CHECK(policy.fallback() == false);
   policy.run();
-  return output;
+  auto sizes = a_.sym_sizes().vec();
+  sizes[sizes.size() - 1] = n;
+  return output.view_symint(sizes);
 }
 
 #undef GEMM_XETLA_DISPATCH
@@ -141,9 +147,9 @@ static void mm_qkv_out(
       decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
   auto& q = dpcppGetCurrentQueue();
   if (m <= 32) {
-    GEMM_QKV_XETLA_DISPATCH(hgemm_qkv_16x256_8x16x16_1);
+    GEMM_QKV_XETLA_DISPATCH(hgemm_qkv_16x256_8x16x16_1_true_);
   } else {
-    GEMM_QKV_XETLA_DISPATCH(hgemm_qkv_256x256_32x64x32_1);
+    GEMM_QKV_XETLA_DISPATCH(hgemm_qkv_256x256_32x64x32_1_true_);
   }
 }
 
@@ -152,14 +158,20 @@ static void mm_qkv_out(
 static std::tuple<Tensor, Tensor, Tensor> mm_qkv(
     const Tensor& input,
     const Tensor& weight) {
-  int m = input.sizes()[0];
-  int k = input.sizes()[1];
+  auto input_flat = input.flatten(0, -2);
+  int m = input_flat.sizes()[0];
+  int k = input_flat.sizes()[1];
   int n = weight.sizes()[2];
   auto out0 = at::empty({m, n}, input.options());
   auto out1 = at::empty({m, n}, input.options());
   auto out2 = at::empty({m, n}, input.options());
   mm_qkv_out(input, weight, out0, out1, out2);
-  return std::forward_as_tuple(out0, out1, out2);
+  auto sizes = input.sym_sizes().vec();
+  sizes[sizes.size() - 1] = n;
+  return std::forward_as_tuple(
+      out0.view_symint(sizes),
+      out1.view_symint(sizes),
+      out2.view_symint(sizes));
 }
 
 } // namespace AtenIpexTypeXPU
