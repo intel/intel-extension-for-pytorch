@@ -294,7 +294,6 @@ bool LayerNormKernelImplInternal(
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int workgroup_size = dpcppMaxWorkGroupSize(dev_id);
   bool fast_path_success = (N <= workgroup_size * reg_num_per_item);
-
   if (!fast_path_success)
     return fast_path_success;
 
@@ -303,7 +302,6 @@ bool LayerNormKernelImplInternal(
   while ((vec_size >> 1) * workgroup_size >= N) {
     vec_size = vec_size >> 1;
   }
-
   scalar_t* add1_data = add1.defined() ? add1.data_ptr<scalar_t>() : nullptr;
   scalar_t* add2_data = add2.defined() ? add2.data_ptr<scalar_t>() : nullptr;
   scalar_t* X_data = X.data_ptr<scalar_t>();
@@ -344,6 +342,7 @@ bool LayerNormKernelImpl(
     Tensor& Y,
     Tensor& mean,
     Tensor& rstd) {
+  bool success = false;
   AT_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -353,26 +352,23 @@ bool LayerNormKernelImpl(
         if (gamma.scalar_type() == kFloat) {
           mean = at::empty({M}, X.options().dtype(kFloat));
           rstd = at::empty({M}, X.options().dtype(kFloat));
-          return LayerNormKernelImplInternal<
-              scalar_t,
-              float,
-              float,
-              one_moment>(
-              add1,
-              add2,
-              X,
-              gamma,
-              beta,
-              M,
-              N,
-              static_cast<acc_type<scalar_t>>(eps),
-              Y,
-              mean,
-              rstd);
+          success =
+              LayerNormKernelImplInternal<scalar_t, float, float, one_moment>(
+                  add1,
+                  add2,
+                  X,
+                  gamma,
+                  beta,
+                  M,
+                  N,
+                  static_cast<acc_type<scalar_t>>(eps),
+                  Y,
+                  mean,
+                  rstd);
         } else {
           mean = at::empty({M}, X.options());
           rstd = at::empty({M}, X.options());
-          return LayerNormKernelImplInternal<
+          success = LayerNormKernelImplInternal<
               scalar_t,
               scalar_t,
               scalar_t,
@@ -390,7 +386,7 @@ bool LayerNormKernelImpl(
               rstd);
         }
       });
-  return true;
+  return success;
 }
 
 std::tuple<Tensor, Tensor, Tensor> add_add_layer_norm(
@@ -407,7 +403,6 @@ std::tuple<Tensor, Tensor, Tensor> add_add_layer_norm(
   c10::MaybeOwned<Tensor> bias_maybe_owned =
       at::borrow_from_optional_tensor(bias_opt);
   const Tensor& bias = *bias_maybe_owned;
-
   auto M_N = _check_layer_norm_inputs(input, normalized_shape, weight, bias);
   auto M = M_N.first;
   auto N = M_N.second;
@@ -459,9 +454,8 @@ std::tuple<Tensor, Tensor, Tensor> add_add_layer_norm(
     if (!(can_be_fused && fast_path_success)) {
       input_ = add1_.defined() ? input_ + add1_ : input_;
       input_ = add2_.defined() ? input_ + add2_ : input_;
-      std::tuple<Tensor, Tensor, Tensor>(output, mean, rstd) =
-          at::AtenIpexTypeXPU::native_layer_norm(
-              input_, normalized_shape, weight_opt, bias_opt, epsilon);
+      return at::AtenIpexTypeXPU::native_layer_norm(
+          input_, normalized_shape, weight_opt, bias_opt, epsilon);
     }
   }
   return std::make_tuple(output.reshape(input.sizes()), mean, rstd);
@@ -535,7 +529,6 @@ std::tuple<Tensor, Tensor, Tensor> add_add_rms_norm(
     weight_ =
         weight_.defined() ? to_plain_if_needed(weight_).contiguous() : weight_;
     bias_ = bias_.defined() ? to_plain_if_needed(bias_).contiguous() : bias_;
-
     bool can_be_fused = true;
     if (add1.defined() &&
         (input_.sizes() != add1_.sizes() || input_.dtype() != add1_.dtype())) {
@@ -561,6 +554,7 @@ std::tuple<Tensor, Tensor, Tensor> add_add_rms_norm(
           mean,
           rstd);
     }
+
     if (!(can_be_fused && fast_path_success)) {
       input_ = add1_.defined() ? input_ + add1_ : input_;
       input_ = add2_.defined() ? input_ + add2_ : input_;

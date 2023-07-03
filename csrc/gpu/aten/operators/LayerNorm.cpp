@@ -293,8 +293,8 @@ void LayerNormKernelImplInternal(
       X_data, Y_data, mean_data, var_data, gamma_data, beta_data, eps, M, N);
 
   // TODO: force it to use fused_norm_kernel
-  config.workgroup_num_foreach = 1;
-  config.WGPlane = config.Plane;
+  // config.workgroup_num_foreach = 1;
+  // config.WGPlane = config.Plane;
   if (config.workgroup_num_foreach == 1) {
     launch_vectorized_fused_norm_kernel<
         scalar_t,
