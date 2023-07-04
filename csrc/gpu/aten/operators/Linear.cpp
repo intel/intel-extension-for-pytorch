@@ -256,17 +256,17 @@ Tensor linear_gelu(
     const c10::optional<Tensor>& bias,
     c10::string_view approximate) {
 #if defined(USE_XETLA)
-  if (input.dim() == 3 && bias.has_value() && approximate == "tanh") {
-    int m = input.sizes()[1];
+  auto input_flat = input.flatten(0, -2);
+  if (bias.has_value() && approximate == "tanh") {
+    int m = input_flat.sizes()[0];
     int n = weight.sizes()[0];
-    int k = input.sizes()[2];
+    int k = input_flat.sizes()[1];
     auto bias_ = bias.value();
     auto output = at::empty({m, n}, input.options());
-    auto input_ = input.squeeze(0);
     auto w = weight.transpose(0, 1);
     auto policy = HGEMMXetla()
                       .add_matrix_c(output)
-                      .add_matrix_a(input_)
+                      .add_matrix_a(input_flat)
                       .add_matrix_b(w)
                       .add_epilogue(bias_, HGEMMXetla::EpilogueType::BIAS)
                       .add_epilogue(Tensor(), HGEMMXetla::EpilogueType::GELU)
