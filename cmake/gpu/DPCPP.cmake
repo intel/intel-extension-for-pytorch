@@ -88,7 +88,7 @@ find_library(OpenCL_LIBRARY
         NO_DEFAULT_PATH)
 set(OpenCL_INCLUDE_DIR ${SYCL_INCLUDE_DIR} CACHE STRING "")
 
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} ${SYCL_FLAGS}")
+set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} ${SYCL_FLAGS})
 
 # The fast-math will be enabled by default in ICPX.
 # Refer to [https://clang.llvm.org/docs/UsersManual.html#cmdoption-fno-fast-math]
@@ -99,18 +99,18 @@ set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} ${SYCL_FLAGS}")
 # 3. The approx-func allows certain math function calls (such as log, sqrt, pow, etc)
 # to be replaced with an approximately equivalent set of instructions or
 # alternative math function calls, which have great errors.
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fhonor-nans")
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fhonor-infinities")
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fno-associative-math")
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fno-approx-func")
+set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -fhonor-nans)
+set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -fhonor-infinities)
+set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -fno-associative-math)
+set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -fno-approx-func)
 
 # Explicitly limit the index range (< Max int32) in kernel
-# set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-id-queries-fit-in-int")
+# set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -fsycl-id-queries-fit-in-int)
 
 # Set compilation optimization level
 if (BUILD_OPT_LEVEL)
   if("${BUILD_OPT_LEVEL}" STREQUAL "1" OR "${BUILD_OPT_LEVEL}" STREQUAL "0")
-    set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -O${BUILD_OPT_LEVEL}")
+    set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -O${BUILD_OPT_LEVEL})
   else()
     message(WARNING "UNKNOWN BUILD_OPT_LEVEL ${BUILD_OPT_LEVEL}")
   endif()
@@ -124,48 +124,61 @@ if ((DEFINED ENV{MAX_JOBS}) AND ("$ENV{MAX_JOBS}" LESS_EQUAL ${proc_cnt}))
 else()
   set(SYCL_MAX_PARALLEL_LINK_JOBS ${proc_cnt})
 endif()
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-max-parallel-link-jobs=${SYCL_MAX_PARALLEL_LINK_JOBS}")
-
-if (NOT WINDOWS)
-  # If FP64 is unsupported on certain GPU arch, warning all kernels with double
-  # data type operations, and finish/return WITHOUT any computations.
-  set(IPEX_OFFLINE_COMP_OPTIONS "${IPEX_OFFLINE_COMP_OPTIONS} -cl-poison-unsupported-fp64-kernels")
-  # Use IGC auto large GRF option explicitly for current stage. The option is default in previous IGC.
-  # Before fully controlling large GRF setting (trade off concurrency and memory spill), we will keep it, let compiler to choose.
-  set(IPEX_OFFLINE_COMP_OPTIONS "${IPEX_OFFLINE_COMP_OPTIONS} -cl-intel-enable-auto-large-GRF-mode")
-
-  # Apply offline compiler options
-  set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -Xs '-options \"${IPEX_OFFLINE_COMP_OPTIONS}\"'")
-else()
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /Xs \"-options -cl-poison-unsupported-fp64-kernels -cl-intel-enable-auto-large-GRF-mode\"")
-endif()
-
+set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} -fsycl-max-parallel-link-jobs=${SYCL_MAX_PARALLEL_LINK_JOBS})
 
 if(BUILD_BY_PER_KERNEL)
-  set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-device-code-split=per_kernel")
+  set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -fsycl-device-code-split=per_kernel)
 endif()
 
-# Set AOT targt list
+# Set AOT targt list in link flags
 if(USE_AOT_DEVLIST)
-  set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-targets=spir64_gen,spir64")
-  set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -Xs '-device ${USE_AOT_DEVLIST}'")
+  set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} -fsycl-targets=spir64_gen,spir64)
 endif()
 
 # Make assert available in sycl kernel
 if(USE_SYCL_ASSERT)
-  set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -DSYCL_FALLBACK_ASSERT=1")
+  set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -DSYCL_FALLBACK_ASSERT=1)
 endif()
 
 # Disable ITT annotation instrument in sycl kernel
 if(NOT USE_ITT_ANNOTATION)
-  set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fno-sycl-instrument-device-code")
+  set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -fno-sycl-instrument-device-code)
 endif()
 
 # Handle huge binary issue for multi-target AOT build
 if(NOT BUILD_SEPARATE_OPS)
   if(BUILD_BY_PER_KERNEL OR USE_AOT_DEVLIST)
-    set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-link-huge-device-code")
+    set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} -fsycl-link-huge-device-code)
   endif()
 endif()
+
+# WARNING: Append link flags in kernel flags before adding offline options
+set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} ${IPEX_SYCL_LINK_FLAGS})
+
+# Use IGC auto large GRF option explicitly for current stage. The option is default in previous IGC.
+# Before fully controlling large GRF setting (trade off concurrency and memory spill), we will keep it, let compiler to choose.
+set(IPEX_OFFLINE_OPTIONS "${IPEX_OFFLINE_OPTIONS} -cl-intel-enable-auto-large-GRF-mode")
+
+# If FP64 is unsupported on certain GPU arch, warning all kernels with double
+# data type operations, and finish/return WITHOUT any computations.
+set(IPEX_OFFLINE_OPTIONS "${IPEX_OFFLINE_OPTIONS} -cl-poison-unsupported-fp64-kernels")
+
+set(IPEX_OFFLINE_OPTIONS "-options '${IPEX_OFFLINE_OPTIONS}'")
+
+# Set AOT targt list in offline options
+if(USE_AOT_DEVLIST)
+  # WARNING: Do NOT change the order between AOT device list and options
+  set(IPEX_OFFLINE_OPTIONS "-device ${USE_AOT_DEVLIST} ${IPEX_OFFLINE_OPTIONS}")
+endif()
+
+# WARNING: No more offline options after this line
+if(NOT WINDOWS)
+  set(IPEX_OFFLINE_OPTIONS -Xs ${IPEX_OFFLINE_OPTIONS})
+else()
+  set(IPEX_OFFLINE_OPTIONS /Xs ${IPEX_OFFLINE_OPTIONS})
+endif()
+
+# WARNING: Offline options must be appended at the end of link flags
+set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} ${IPEX_OFFLINE_OPTIONS})
 
 message(STATUS "DPCPP found. Compiling with SYCL support")

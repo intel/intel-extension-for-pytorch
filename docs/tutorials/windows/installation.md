@@ -57,9 +57,6 @@ Install the required packages:
 pip install -r requirements.txt
 ```
 Install Intel® Extension for PyTorch*:
-
-**Note**: Windows compiler check needs to be **comment out** at **third_party/oneDNN/cmake/dpcpp_driver_check.cmake#L36**
-    
 ```
 set BUILD_WITH_CPU=0
 set USE_MULTI_CONTEXT=1
