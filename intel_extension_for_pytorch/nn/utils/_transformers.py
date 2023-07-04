@@ -68,6 +68,9 @@ class IPEXTransformerAtten(nn.Module):
         col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         self.row_major = not col_major
 
+        beam = os.environ.get("Beam", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
+        self.greedy = not beam
+
         self.is_decoder = self.config.is_decoder
         self.residual_drop = nn.Dropout(self.config.residual_dropout) if self.config.residual_dropout is not None else nn.Identity()
         self.attn_drop = nn.Dropout(self.config.attn_dropout) if self.config.attn_dropout is not None else nn.Identity() 
@@ -76,7 +79,7 @@ class IPEXTransformerAtten(nn.Module):
             mask = (1 - torch.tril(mask).view(1, 1, self.max_positions, self.max_positions)) * (-66504.0)
             IPEXTransformerAtten.attention_mask = mask.to(self.config.device) 
 
-    def qkv_cache_optimized_seq_first(self, hidden_states, layer_past = None):
+    def qkv_cache_optimized_greedy(self, hidden_states, layer_past = None):
         # greedy search path
         if layer_past is None:
             # the first timestep
@@ -92,6 +95,34 @@ class IPEXTransformerAtten(nn.Module):
         key = key.view(query.shape)
         value = value.view(query.shape)
         torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, query, key, value)
+        return query, key, value
+
+    def qkv_cache_optimized_beam(self, hidden_states, layer_past = None):
+        # beam search path
+        if layer_past is None:
+            # the first timestep
+            cached_shape = [self.max_positions, hidden_states.shape[0], self.num_attn_head * self.head_dim]
+            self.key_cached = torch.empty(cached_shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            self.value_cached = torch.empty(cached_shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            self.prev_len = 0
+
+        self.cur_len = self.prev_len + hidden_states.size(1)
+        query = torch.empty_like(hidden_states)
+        key_cached = self.key_cached[self.prev_len : self.cur_len, :, :].transpose(0, 1)
+        value_cached = self.value_cached[self.prev_len : self.cur_len, :, :].transpose(0, 1)
+        if key_cached.is_contiguous():
+            key = key_cached
+        else:
+            key = torch.empty_like(hidden_states)
+        if value_cached.is_contiguous():
+            value = value_cached
+        else:
+            value = torch.empty_like(hidden_states)
+
+        torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, query, key, value)
+
+        self.key_cached[self.prev_len : self.cur_len, :, :] = key.transpose(0, 1)
+        self.value_cached[self.prev_len : self.cur_len, :, :] = value.transpose(0, 1)
         return query, key, value
 
     def qkv_normal(self, hidden_states, layer_past = None):
@@ -114,7 +145,10 @@ class IPEXTransformerAtten(nn.Module):
             self.kv_cache_optimize = False
             print("Warning: kv cache optimize can only be enabled in greedy search. Set kv_cache_optimize to False !")
         if self.kv_cache_optimize:
-            query, key, value = self.qkv_cache_optimized_seq_first(hidden_states=hidden_state, layer_past=layer_past)
+            if self.greedy:
+                query, key, value = self.qkv_cache_optimized_greedy(hidden_states=hidden_state, layer_past=layer_past)
+            else:
+                query, key, value = self.qkv_cache_optimized_beam(hidden_states=hidden_state, layer_past=layer_past)
         else:
             # qkv fusion now is only support on greedy search 
             query, key, value = self.qkv_normal(hidden_states=hidden_state, layer_past=layer_past)
@@ -128,12 +162,20 @@ class IPEXTransformerAtten(nn.Module):
         return query, key, value
 
     def optimized_combine(self, query, key, value, layer_past = None):
-        key = self.key_cached[:, : self.cur_len, :, :]
-        value = self.value_cached[:, : self.cur_len, :, :]
+        if self.greedy:
+            key = self.key_cached[:, : self.cur_len, :, :]  # [beam, seq_len, head, head_dim]
+            value = self.value_cached[:, : self.cur_len, :, :]  # [beam, seq_len, head, head_dim]
+            query = query.permute(0, 2, 1, 3) # [beam, head, seq_len, head_dim]
+            key = key.permute(0, 2, 1, 3)  # [beam, head, seq_len, head_dim]
+            value = value.permute(0, 2, 1, 3)  # [beam, head, seq_len, head_dim]
+        else:
+            shape = [self.cur_len, self.key_cached.shape[1], query.shape[2], query.shape[3]]
+            key = self.key_cached[: self.cur_len, :, :].view(shape)  # [seq_len, beam, head*head_dim]
+            value = self.value_cached[: self.cur_len, :, :].view(shape) # [seq_len, beam, head*head_dim]
+            query = query.permute(0, 2, 1, 3)  # [beam, head, seq_len, head_dim]
+            key = key.permute(1, 2, 0, 3)  # [beam, head, seq_len, head_dim]
+            value = value.permute(1, 2, 0, 3)  # [beam, head, seq_len, head_dim]
 
-        query = query.permute(0, 2, 1, 3)
-        key = key.permute(0, 2, 1, 3)
-        value = value.permute(0, 2, 1, 3)
         self.prev_len = self.cur_len
 
         return query, key, value
@@ -236,7 +278,7 @@ class IPEXTransformerAtten(nn.Module):
         if use_cache or self.is_decoder:
             present = (key, value)
         else:
-            present = None 
+            present = None
 
         attn_output, attn_weight = self.self_attention(query, key, value, attention_mask, head_mask)
         attn_output = self.get_final_output(attn_output=attn_output, residual=residual)
@@ -298,10 +340,10 @@ class IPEXTransformerMLP(nn.Module):
         self.fc_out = nn.Linear(config.intermediate_size, config.embed_dim, bias=config.enable_bias)
         self.act = ACT2FN[config.activation_function]
         self.drop_out = nn.Dropout(config.residual_pdrop) if config.residual_pdrop is not None else nn.Identity()
-        
+
         col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         self.row_major = not col_major
-        self.fc_in_wei = None 
+        self.fc_in_wei = None
         self.fc_out_wei = None
 
     def forward(self, hidden_states: Optional[torch.Tensor]):
@@ -321,7 +363,7 @@ class IPEXTransformerMLP(nn.Module):
 class IPEXGPTJMLP(IPEXTransformerMLP):
     def __init__(self, config: IPEXTransformerConfig):
         super().__init__(config)
-    
+
     def forward(self, hidden_states: Optional[torch.Tensor], attn_output, residual):
         if self.row_major:
             if isinstance(self.act, nn.GELU):
@@ -329,7 +371,7 @@ class IPEXGPTJMLP(IPEXTransformerMLP):
             else:
                 hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                 hidden_states = self.act(hidden_states)
-            hidden_states = torch.ops.torch_ipex.mm_bias_resadd_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output, residual).unsqueeze(0)
+            hidden_states = torch.ops.torch_ipex.mm_bias_resadd_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output, residual)
         else:
             hidden_states = self.fc_in(hidden_states)
             hidden_states = self.act(hidden_states)
