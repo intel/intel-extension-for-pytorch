@@ -273,7 +273,7 @@ Tensor linear_gelu(
                       .build();
     if (policy.fallback() == false) {
       policy.run();
-      return output;
+      return resize_as_mat1(input, output);
     }
   }
 #endif

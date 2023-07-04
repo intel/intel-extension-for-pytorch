@@ -42,9 +42,7 @@ static Tensor mm_bias_resadd_resadd(
                     .build();
   TORCH_CHECK(policy.fallback() == false);
   policy.run();
-  auto sizes = a_.sym_sizes().vec();
-  sizes[sizes.size() - 1] = n;
-  return output.view_symint(sizes);
+  return resize_as_mat1(a_, output);
 }
 
 static Tensor mm_resmul(
@@ -69,9 +67,7 @@ static Tensor mm_resmul(
                     .build();
   TORCH_CHECK(policy.fallback() == false);
   policy.run();
-  auto sizes = a_.sym_sizes().vec();
-  sizes[sizes.size() - 1] = n;
-  return output.view_symint(sizes);
+  return resize_as_mat1(a_, output);
 }
 
 static Tensor mm_silu(const Tensor& a_, const Tensor& b_) {
@@ -92,9 +88,7 @@ static Tensor mm_silu(const Tensor& a_, const Tensor& b_) {
                     .build();
   TORCH_CHECK(policy.fallback() == false);
   policy.run();
-  auto sizes = a_.sym_sizes().vec();
-  sizes[sizes.size() - 1] = n;
-  return output.view_symint(sizes);
+  return resize_as_mat1(a_, output);
 }
 
 #undef GEMM_XETLA_DISPATCH

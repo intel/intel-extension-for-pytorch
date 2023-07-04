@@ -130,6 +130,14 @@ using namespace xpu::xetla;
       HGEMM_COMMON_DISPATCH_IMPL(HGEMM_RES_DISPATCH, hgemm_res##F)             \
   }
 
+inline Tensor resize_as_mat1(const Tensor& mat1, const Tensor& output) {
+  auto output_ = output.flatten(0, -2);
+  int n = output_.sizes()[1];
+  auto sizes = mat1.sym_sizes().vec();
+  sizes[sizes.size() - 1] = n;
+  return output.view_symint(sizes);
+}
+
 class HGEMMXetla final {
  public:
   enum EpilogueType {
