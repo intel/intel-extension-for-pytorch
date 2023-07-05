@@ -26,7 +26,9 @@ class IPEXTransformerConfig():
                  positional_embedding_base = 10000,
                  sdp_fusion_enable = True,
                  device = "cpu",
-                 dtype = torch.half
+                 dtype = torch.half,
+                 tp_size = 1,
+                 tp_group = None
                 #  opt_drop_out = 1.0
                  ) -> None:
         self.embed_dim = embed_dim
@@ -54,3 +56,5 @@ class IPEXTransformerConfig():
         self.sdp_fusion_enable = sdp_fusion_enable
         self.device = device
         self.dtype = dtype
+        self.tp_size = tp_size
+        self.tp_group = tp_group

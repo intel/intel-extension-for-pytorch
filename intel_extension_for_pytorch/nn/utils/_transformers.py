@@ -1,9 +1,12 @@
 import torch
 import torch.nn as nn
 from typing import Optional, Tuple, Union
+
+from intel_extension_for_pytorch.nn.utils._transformer_configuration import IPEXTransformerConfig
 from .RoPE import GPTJRotaryEmbedding, LlamaRotaryEmbedding, PositionalEmbedding
 from ._transformer_configuration import IPEXTransformerConfig
 import os
+import math
 
 def activation_replace(module):
     from transformers.activations import NewGELUActivation
@@ -20,13 +23,22 @@ def activation_replace(module):
 from collections import OrderedDict
 
 
+
+class BloomGELU(nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+    def forward(self, x):
+        return x * 0.5 * (1.0 + torch.tanh(0.79788456 * x * (1 + 0.044715 * x * x)))
+
 ACT2CLS = {
     "gelu": nn.GELU(),
     "gelu_new": nn.GELU(approximate='tanh'),
     "relu": nn.ReLU(),
     "sigmoid": nn.Sigmoid(),
     "silu": nn.SiLU(),
-    "tanh": nn.Tanh()
+    "tanh": nn.Tanh(),
+    "bloom_gelu": nn.GELU(approximate='tanh') 
 }
 
 ACT2FN = ACT2CLS
@@ -47,6 +59,9 @@ class IPEXTransformerAtten(nn.Module):
         self.layer_id = IPEXTransformerAtten.layer_id_static
         self.embed_dim = self.config.embed_dim
         self.num_attn_head = self.config.num_attention_heads
+        self.tp_size = self.config.tp_size
+        self.tp_group = self.config.tp_group
+        self.num_attn_head = self.num_attn_head // self.tp_size
         IPEXTransformerAtten.layer_id_static += 1
         self.head_dim = self.config.embed_dim // self.config.num_attention_heads
         self.position_emb = self.config.rotary_embedding_class(config=self.config)
@@ -65,6 +80,8 @@ class IPEXTransformerAtten(nn.Module):
         self.v_wei = None
         self.out_wei = None
         self.qkv_wei = None 
+        self.qkv_bias = None
+        self.out_bias = None
         col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         self.row_major = not col_major
 
@@ -89,6 +106,7 @@ class IPEXTransformerAtten(nn.Module):
             self.prev_len = 0
 
         self.cur_len = self.prev_len + hidden_states.size(1)
+
         query = torch.empty_like(hidden_states)
         key = self.key_cached[:, self.prev_len : self.cur_len, :, :]
         value = self.value_cached[:, self.prev_len : self.cur_len, :, :]
@@ -119,8 +137,7 @@ class IPEXTransformerAtten(nn.Module):
         else:
             value = torch.empty_like(hidden_states)
 
-        torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, query, key, value)
-
+        torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, None, query, key, value)
         self.key_cached[self.prev_len : self.cur_len, :, :] = key.transpose(0, 1)
         self.value_cached[self.prev_len : self.cur_len, :, :] = value.transpose(0, 1)
         return query, key, value
@@ -200,35 +217,79 @@ class IPEXTransformerAtten(nn.Module):
 
     def apply_rotary_embedding(self, key, query, position_ids):
         return self.position_emb(key, query, position_ids)
-        
 
-    def naive_self_attention(self, query, key, value, attention_mask=None, head_mask=None):
-        attn_weights = torch.matmul(query, key.transpose(-1, -2))
-        if self.use_casual_mask:
-            # convert the casual mask dtype to target dtype, this should only happen once
-            IPEXTransformerAtten.attention_mask.to(attn_weights.dtype)
-            query_length, key_length = query.size(-2), key.size(-2)
-            casual_mask = IPEXTransformerAtten.attention_mask[:, :, key_length - query_length : key_length, :key_length]
-            # # TODO: Maybe we can move this line to the initializer
-            # casual_mask *= -66504.0
-            # replace torch.where as torch.add might helps with the host overhead
-            attn_weights += casual_mask
-        if self.scale_attn:
-            attn_weights /= self.scale_attn
+    def all_reduce_if_necessary(self, reduce_target):
+        if self.tp_group is not None:
+            try:
+                from deepspeed import comm as dist
+            except ImportError as e:
+                print("Can not find deepspeed. If you are using multi-tile feature, please make sure the deepspeed is correctly installed in your environment")
+                return 
+            dist.all_reduce(reduce_target, group=self.tp_group)
+            return reduce_target
+        else:
+            return reduce_target
 
-        if attention_mask is not None:
-            attn_weights += attention_mask
-            # the attn_weights should anyway bigger than dtype.min, I wonder if this is necessary
-            attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min))
-        attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float).to(query.dtype)
-        attn_weights = self.attn_drop(attn_weights)
-        if head_mask is not None:
-            attn_weights = attn_weights * head_mask
-        attn_output = torch.matmul(attn_weights, value)
+
+    def naive_self_attention(self, query, key, value, attention_mask=None, head_mask=None, alibi : torch.Tensor=None):
+        if alibi is not None:
+            batch_size, num_heads, q_length, dim = query.shape
+            _, _, kv_length, _ = key.shape
+            batch1 = query.view(-1, q_length, dim)
+            batch2 = key.view(-1, kv_length, dim).transpose(1, 2).contiguous()
+            matmul_result = alibi.baddbmm(
+                batch1=batch1,
+                batch2=batch2,
+                beta=1.0,
+                alpha=1.0/self.scale_attn,
+            )
+
+            # change view to [batch_size, num_heads, q_length, kv_length]
+            attention_scores = matmul_result.view(batch_size, num_heads, q_length, kv_length)
+            input_dtype = attention_scores.dtype 
+            if input_dtype == torch.float16:
+                attention_scores = attention_scores.to(torch.float)
+            attn_weights = torch.masked_fill(attention_scores, attention_mask, torch.finfo(attention_scores.dtype).min)
+            attention_probs = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(input_dtype)
+
+            # [batch_size, num_heads, q_length, kv_length]
+            attention_probs = self.attn_drop(attention_probs)
+
+            if head_mask is not None:
+                attention_probs = attention_probs * head_mask
+            # change view [batch_size x num_heads, q_length, kv_length]
+            # attention_probs_reshaped = attention_probs.view(batch_size * num_heads, q_length, kv_length)
+
+            # matmul: [batch_size * num_heads, q_length, head_dim]
+            attn_output = torch.matmul(attention_probs, value)
+        else:
+            attn_weights = torch.matmul(query, key.transpose(-1, -2))
+
+            if self.use_casual_mask:
+                # convert the casual mask dtype to target dtype, this should only happen once
+                IPEXTransformerAtten.attention_mask.to(attn_weights.dtype)
+                query_length, key_length = query.size(-2), key.size(-2)
+                casual_mask = IPEXTransformerAtten.attention_mask[:, :, key_length - query_length : key_length, :key_length]
+                # # TODO: Maybe we can move this line to the initializer
+                # casual_mask *= -66504.0
+                # replace torch.where as torch.add might helps with the host overhead
+                attn_weights += casual_mask
+            if self.scale_attn:
+                attn_weights /= self.scale_attn
+
+            if attention_mask is not None:
+                attn_weights += attention_mask
+                # the attn_weights should anyway bigger than dtype.min, I wonder if this is necessary
+                attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min))
+            attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float).to(query.dtype)
+            attn_weights = self.attn_drop(attn_weights)
+            if head_mask is not None:
+                attn_weights = attn_weights * head_mask
+            attn_output = torch.matmul(attn_weights, value)
 
         return attn_output, attn_weights
 
-    def self_attention(self, query, key, value, attention_mask=None, head_mask=None):
+    def self_attention(self, query, key, value, attention_mask=None, head_mask=None, alibi=None):
         do_sdp_fusion = os.environ.get("ENABLE_SDP_FUSION", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         if self.config.sdp_fusion_enable and do_sdp_fusion:
             if query.shape[2] <= 1:
@@ -237,13 +298,13 @@ class IPEXTransformerAtten(nn.Module):
                 attn_output = torch.nn.functional.scaled_dot_product_attention(query, key, value, is_causal=True)
             attn_weights = None
         else:
-            attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask)
+            attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi)
         return attn_output, attn_weights
 
     def get_final_output(self, attn_output: torch.Tensor, residual: Optional[torch.Tensor] = None):
         # reshape the attn_output from [bs, head_num, seq_len, head_dim] back to [bs, seq_len, embedding_size]
         attn_output = attn_output.transpose(1, 2)
-        attn_output = attn_output.reshape(attn_output.size()[:-2] + (self.embed_dim,))
+        attn_output = attn_output.reshape(attn_output.size()[:-2] + (self.embed_dim // self.tp_size,))
         if self.row_major:
             if residual is None:
                 attn_output = torch.matmul(attn_output, self.out_wei)
@@ -253,6 +314,7 @@ class IPEXTransformerAtten(nn.Module):
                 attn_output = attn_output.view(shape)
         else:
             attn_output = self.out_proj(attn_output) + residual
+        self.all_reduce_if_necessary(attn_output)
         return attn_output
         # return self.residual_drop(attn_output)
 
@@ -266,7 +328,8 @@ class IPEXTransformerAtten(nn.Module):
         head_mask: Optional[torch.FloatTensor] = None,
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
-        residual: Optional[torch.Tensor] = None
+        residual: Optional[torch.Tensor] = None,
+        alibi: torch.Tensor = None
     ):
 
         query, key, value = self.compute_qkv(hidden_state=hidden_states, key_value_state=key_value_states, layer_past=layer_past)
@@ -280,7 +343,7 @@ class IPEXTransformerAtten(nn.Module):
         else:
             present = None
 
-        attn_output, attn_weight = self.self_attention(query, key, value, attention_mask, head_mask)
+        attn_output, attn_weight = self.self_attention(query, key, value, attention_mask, head_mask, alibi)
         attn_output = self.get_final_output(attn_output=attn_output, residual=residual)
 
         outputs = (attn_output, present)
@@ -298,6 +361,23 @@ class IPEXGPTJAttn(IPEXTransformerAtten):
 class IPEXLlamaAttn(IPEXTransformerAtten):
     def __init__(self, config) -> None:
         super().__init__(config)
+
+class IPEXBloomAttn(IPEXTransformerAtten):
+    def __init__(self, config) -> None:
+        super().__init__(config)
+        self.query_key_value = nn.Linear(self.embed_dim, 3 * self.embed_dim, bias=True)
+
+    def compute_qkv(self, hidden_state: torch.Tensor, key_value_state: torch.Tensor = None, layer_past: Tuple[torch.Tensor] = None):
+        if self.row_major:
+            out = torch.ops.torch_ipex.mm_qkv(hidden_state, self.qkv_wei, self.qkv_bias)
+        else:
+            fused_qkv = self.query_key_value(hidden_state)
+            batch_size, seq_length, three_times_hidden_size = fused_qkv.shape
+            fused_qkv = fused_qkv.view(batch_size, seq_length, self.num_attn_head, 3, self.head_dim)
+            out = (fused_qkv[..., 0, :], fused_qkv[..., 1, :], fused_qkv[..., 2, :])
+        return out
+
+
 
 class IPEXOptAtten(IPEXTransformerAtten):
     def __init__(self, 
@@ -341,15 +421,30 @@ class IPEXTransformerMLP(nn.Module):
         self.act = ACT2FN[config.activation_function]
         self.drop_out = nn.Dropout(config.residual_pdrop) if config.residual_pdrop is not None else nn.Identity()
 
+        self.tp_size = config.tp_size
+        self.tp_group = config.tp_group
         col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         self.row_major = not col_major
         self.fc_in_wei = None
         self.fc_out_wei = None
+        self.fc_in_bias = None
+        self.fc_out_bias = None
+    
+    def all_reduce_if_necessary(self, target):
+        if self.tp_group is not None:
+            try:
+                from deepspeed import comm as dist
+            except ImportError as e:
+                print("Can not find deepspeed. If you are using multi-tile feature, please make sure the deepspeed is correctly installed in your environment")
+                return 
+            dist.all_reduce(target, group=self.tp_group)
+        return target
+            
 
     def forward(self, hidden_states: Optional[torch.Tensor]):
         if self.row_major:
             if isinstance(self.act, nn.GELU):
-                hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in.weight, self.fc_in.bias, self.act.approximate)
+                hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in_wei.t(), self.fc_in.bias, self.act.approximate)
             else:
                 hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                 hidden_states = self.act(hidden_states)
@@ -367,7 +462,7 @@ class IPEXGPTJMLP(IPEXTransformerMLP):
     def forward(self, hidden_states: Optional[torch.Tensor], attn_output, residual):
         if self.row_major:
             if isinstance(self.act, nn.GELU):
-                hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in.weight, self.fc_in.bias, self.act.approximate)
+                hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in_wei.transpose(0, 1), self.fc_in.bias, self.act.approximate)
             else:
                 hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                 hidden_states = self.act(hidden_states)
@@ -404,6 +499,16 @@ class IPEXLlamaMLP(IPEXTransformerMLP):
 class IPEXOptMLP(IPEXTransformerMLP):
     def __init__(self, config: IPEXTransformerConfig):
         super().__init__(config)
+
+class IPEXBloomMLP(IPEXTransformerMLP):
+    def __init__(self, config: IPEXTransformerConfig):
+        super().__init__(config)
+
+    def forward(self, hidden_states, residual: torch.Tensor):
+        intermediate_output = self.act(self.fc_in(hidden_states))
+        output = self.fc_out(intermediate_output) + residual
+        output = self.all_reduce_if_necessary(output)
+        return output
 
 
 class IPEXGPTJBlock(nn.Module):
@@ -583,4 +688,58 @@ class IPEXOptBlock(nn.Module):
         if use_cache:
             outputs += (present_key_value, )
 
+        return outputs
+
+
+class IPEXBloomBlock(nn.Module):
+    def __init__(self, 
+                 config: IPEXTransformerConfig):
+        super().__init__()
+        self.config = config
+        self.input_layernorm = nn.LayerNorm(config.embed_dim, eps=config.norm_eps)
+        self.self_attention = IPEXBloomAttn(config)
+        self.post_attention_layernorm = nn.LayerNorm(config.embed_dim, eps=config.norm_eps)
+        self.mlp = IPEXBloomMLP(config)
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        alibi: torch.Tensor,
+        attention_mask: torch.Tensor,
+        layer_past: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        head_mask: Optional[torch.Tensor] = None,
+        use_cache: bool = False,
+        output_attentions: bool = False,
+    ):
+        layernorm_output = self.input_layernorm(hidden_states)
+        if self.config.do_norm_before:
+            residual = layernorm_output
+        else:
+            residual = hidden_states
+        attn_outputs = self.self_attention(
+            hidden_states = layernorm_output,
+            layer_past = layer_past,
+            attention_mask = attention_mask,
+            head_mask = head_mask,
+            use_cache = use_cache,
+            output_attentions = output_attentions,
+            residual=residual,
+            alibi=alibi
+        )
+
+        attention_output = attn_outputs[0]
+
+        outputs = attn_outputs[1:]
+        layernorm_output = self.post_attention_layernorm(attention_output)
+        if self.config.do_norm_before:
+            redisual = layernorm_output
+        else:
+            residual = attention_output
+
+        output = self.mlp(layernorm_output, residual)
+
+        if use_cache:
+            outputs = (output, ) + outputs
+        else:
+            outputs = (output, ) + outputs[1:]
         return outputs

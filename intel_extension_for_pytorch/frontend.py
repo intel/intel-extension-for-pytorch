@@ -8,6 +8,7 @@ import torch.fx.experimental.optimization as optimization
 from torch.jit._trace import TracerWarning
 import warnings
 from enum import IntFlag
+from .nn.utils._transformer_converter import transformer_frontend_replace
 
 from .nn import utils
 from .optim._optimizer_utils import (
@@ -311,7 +312,7 @@ def optimize_transformers(model, dtype=None, optimizer=None):
         except ImportError as e:
             print("Can not find transformers in your environment, disable ipex transformer optimize")
             return model
-        utils._transformer_converter.transformer_frontend_replace(model, config=None, dtype=dtype)
+        transformer_frontend_replace(model, config=None, dtype=dtype)
         return model
     optimize_output = optimize(model, dtype=dtype, optimizer=optimizer, inplace=True)
     if optimizer is None:
