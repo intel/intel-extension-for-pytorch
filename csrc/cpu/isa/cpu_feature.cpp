@@ -174,7 +174,6 @@ bool CPUFeature::os_avx2() {
   read_cpuid(0, &eax, &ebx, &ecx, &edx);
   uint32_t max_basic_id = eax;
   if (max_basic_id >= 0x00000007) {
-    uint32_t max_sub_leaf = 0;
     read_cpuidex(0x00000007, 0, &eax, &ebx, &ecx, &edx);
 
     support_avx2 = check_reg_bit(ebx, 5);

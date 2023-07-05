@@ -274,6 +274,7 @@ struct RegisterHIPDispatch {
 
 #define DEFINE_DISPATCH(name) struct name name
 
+#undef REGISTER_ARCH_DISPATCH
 #define REGISTER_ARCH_DISPATCH(name, arch, fn) \
   template <>                                  \
   decltype(fn) DispatchStub<decltype(fn), struct name>::arch = fn;
@@ -291,6 +292,7 @@ struct RegisterHIPDispatch {
 #define REGISTER_AVX2_DISPATCH(name, fn)
 #endif
 
+#undef REGISTER_NO_CPU_DISPATCH
 #define REGISTER_NO_CPU_DISPATCH(name, fn_type)                        \
   REGISTER_ARCH_DISPATCH(name, DEFAULT, static_cast<fn_type>(nullptr)) \
   REGISTER_AVX512_DISPATCH(name, static_cast<fn_type>(nullptr))        \
@@ -321,6 +323,7 @@ ToDo: Fix warning: "REGISTER_HIP_DISPATCH" redefined to stock pytorch.
 #elif defined(CPU_CAPABILITY)
 #define REGISTER_DISPATCH(name, fn) \
   REGISTER_ARCH_DISPATCH(name, CPU_CAPABILITY, fn)
+#undef REGISTER_NO_AVX512_DISPATCH
 #define REGISTER_NO_AVX512_DISPATCH(name, fn_type) \
   REGISTER_AVX512_DISPATCH(name, static_cast<fn_type>(nullptr))
 #endif
