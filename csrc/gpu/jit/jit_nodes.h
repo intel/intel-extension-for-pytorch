@@ -21,7 +21,7 @@ at::Tensor dequant_pixelshuffle_quant(
 at::Tensor batch_norm(
     const at::Tensor& input,
     const at::Tensor& weight,
-    const at::Tensor& bias,
+    const c10::optional<at::Tensor>& bias,
     const at::Tensor& running_mean,
     const at::Tensor& running_var,
     bool train,
@@ -37,7 +37,7 @@ at::Tensor fold_weight(
 
 at::Tensor fold_bias(
     const at::Tensor& weight,
-    const at::Tensor& bias,
+    const c10::optional<at::Tensor>& bias,
     const at::Tensor& bn_weight,
     const at::Tensor& bn_bias,
     const at::Tensor& running_mean,

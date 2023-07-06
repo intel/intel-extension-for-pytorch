@@ -16,7 +16,6 @@
 #include "comm/AccumulateType.h"
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
-#include "jit/dpcpp_ops.h"
 #include "utils/CustomOperatorRegistration.h"
 
 using namespace xpu::dpcpp;
