@@ -497,13 +497,17 @@ def _convert_to_bloom_cache_ipex(
         )
 def transformer_frontend_replace(model, config = None, dtype = torch.float):
     import transformers
-    try:
-        import deepspeed
-    except ImportError as e:
-        print("Warning: we didn't find Deepspeed in your env, multi-tile optimization will be closed")
-    else:
-        if isinstance(model, deepspeed.InferenceEngine):
-            IPEXTransformerConverter.update_tp_data(model._config.tensor_parallel.tp_size, model._config.tensor_parallel.tp_group)
+    deepspeed_optimize = os.environ.get("IPEX_DEEPSPEED_OPTIMIZE", "ON").upper() in ["1", "ON", "YES", "Y", "TRUE"]
+    if deepspeed_optimize: 
+        try:
+            import deepspeed
+        except ImportError as e:
+            print("Warning: we didn't find Deepspeed in your env, multi-tile optimization will be closed")
+            os.environ["IPEX_DEEPSPEED_OPTIMIZE"] = "OFF"
+            deepspeed_optimize = False
+        else:
+            if isinstance(model, deepspeed.InferenceEngine):
+                IPEXTransformerConverter.update_tp_data(model._config.tensor_parallel.tp_size, model._config.tensor_parallel.tp_group)
 
     transformers_converter = {
         transformers.models.gptj.modeling_gptj.GPTJBlock: IPEXGPTJConverter,
@@ -511,8 +515,9 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
         transformers.models.opt.modeling_opt.OPTDecoderLayer: IPEXOptConverter,
         transformers.models.bloom.modeling_bloom.BloomBlock: IPEXBloomConverter
     }
-
-    if config is None and hasattr(model, "config"):
+    
+    no_deepspeed_engine = not deepspeed_optimize or isinstance(model, deepspeed.InferenceEngine)
+    if config is None and hasattr(model, "config") and no_deepspeed_engine:
         config = model.config
         config.dtype = dtype
         config.device = model.device
