@@ -868,7 +868,7 @@ class CPUOPsTester(TestCase):
             self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
             self.assertEqual(x1.grad, x2.grad)
 
-            for dtype in [torch.bfloat16, torch.double, torch.int64]:
+            for dtype in [torch.bfloat16, torch.double, torch.int64, torch.float16]:
                 x3 = x.clone().detach().to(dtype)
                 x4 = x.clone().detach().to(dtype).to(memory_format=torch.channels_last)
                 if dtype != torch.int64:
@@ -1312,7 +1312,7 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y1_5.dtype == torch.float32)
 
     def test_cat(self):
-        for datatype in [torch.float32, torch.double, torch.bfloat16]:
+        for datatype in [torch.float32, torch.double, torch.bfloat16, torch.float16]:
             for dim, size in itertools.product([0, 1], [[2, 1], [2, 2], [5, 10]]):
                 x = torch.randn(size, dtype=datatype)
                 y = torch.cat([x, x], dim)

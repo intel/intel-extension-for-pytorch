@@ -224,7 +224,7 @@ at::Tensor& cat_out_cpu(
   ScalarType dtype = materialized[valid].get().scalar_type();
   bool serial_dtype =
       (dtype == ScalarType::Double || dtype == ScalarType::Float ||
-       dtype == ScalarType::BFloat16);
+       dtype == ScalarType::BFloat16 || dtype == ScalarType::Half);
   if (all_contiguous && all_same_dtype && serial_dtype) {
     cat_contig_stub(kCPU, result, materialized, dim, all_same_sizes_and_stride);
     return result;
