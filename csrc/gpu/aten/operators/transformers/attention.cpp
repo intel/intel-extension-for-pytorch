@@ -218,5 +218,47 @@ Tensor scaled_dot_product_attention(
   }
 }
 
+Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const c10::optional<Tensor>& bias,
+    const c10::optional<Tensor>& alibi,
+    const c10::optional<Tensor>& head_mask,
+    const double alpha,
+    const double beta,
+    const double dropout_p,
+    bool is_causal) {
+  auto output = at::empty_like(query);
+  auto dpcpp_queue = dpcppGetCurrentQueue();
+  RECORD_FUNCTION("xetla_fsdp_forward_atten_mask_alibi_strided", {});
+  gpu::xetla::fmha_forward_op_attn_mask_alibi_strided(
+      dpcpp_queue,
+      query.data_ptr(),
+      key.data_ptr(),
+      value.data_ptr(),
+      output.data_ptr(),
+      bias.has_value() ? bias.value().data_ptr() : (void*)nullptr,
+      alibi.has_value() ? bias.value().data_ptr() : (void*)nullptr,
+      head_mask.has_value() ? head_mask.value().data_ptr() : (void*)nullptr,
+      alpha,
+      beta,
+      dropout_p,
+      query.size(0),
+      query.size(1),
+      query.size(3),
+      query.size(2),
+      key.size(2));
+  return output;
+}
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
+      "xetla_fsdp_forward_atten_mask_alibi_strided.xpu",
+      at::AtenIpexTypeXPU::xetla_fsdp_forward_atten_mask_alibi_strided,
+      c10::DispatchKey::XPU);
+}
+} // namespace

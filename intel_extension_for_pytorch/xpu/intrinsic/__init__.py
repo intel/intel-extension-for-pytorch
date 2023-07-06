@@ -13,6 +13,7 @@ __all__ = [
     'nms',
     'locations_to_boxes',
     'roi_align',
+    'IpexSDP',
 ]
 
 
@@ -79,4 +80,29 @@ def roi_align(
         output_size[1],
         sampling_ratio,
         aligned,
+    )
+
+def IpexSDP(
+    query_,
+    key_,
+    value_,
+    bias_ = None,
+    alibi_ = None,
+    head_mask_ = None,
+    alpha = 1.0,
+    beta = 1.0,
+    dropout_p = 0.0,
+    is_causal = False
+) -> Tensor:
+    return torch.ops.torch_ipex.xetla_fsdp_forward_atten_mask_alibi_strided(
+        query,
+        key,
+        value,
+        bias,
+        alibi,
+        head_mask,
+        alpha,
+        beta,
+        dropout_p,
+        is_causal
     )

@@ -877,4 +877,26 @@ void fmha_forward_op_strided(
       num_keys);
 }
 
+void fmha_forward_op_attn_mask_alibi_strided(
+    sycl::queue& q,
+    void* query,
+    void* key,
+    void* value,
+    void* out,
+    void* bias,
+    void* alibi,
+    void* head_mask,
+    const double alpha,
+    const double beta,
+    const double dropout_p,
+    uint32_t num_batches,
+    uint32_t num_heads,
+    uint32_t head_size,
+    uint32_t num_queries,
+    uint32_t num_keys) {
+  std::cout << "kernel is WIP ....\n";
+
+  // TODO: implement sdp kernel with alibi
+}
+
 } // namespace gpu::xetla
