@@ -197,10 +197,10 @@ static void mm_qkv_out(
       decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
   auto& q = dpcppGetCurrentQueue();
   if (m <= 32) {
-    if (n <= 4096) {
+    if (n >= 2048) {
       GEMM_QKV_XETLA_DISPATCH(_16x256_8x16x16_1_true_);
     } else {
-      GEMM_QKV_XETLA_DISPATCH(_32x128_8x32x32_1_true_);
+      GEMM_QKV_XETLA_DISPATCH(_8x128_8x16x32_4_true_);
     }
   } else {
     GEMM_QKV_XETLA_DISPATCH(_256x256_32x64x32_1_true_);
