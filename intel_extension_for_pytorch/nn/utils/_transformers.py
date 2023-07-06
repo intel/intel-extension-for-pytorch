@@ -730,7 +730,8 @@ class IPEXBloomBlock(nn.Module):
         use_cache: bool = False,
         output_attentions: bool = False,
     ):
-        layernorm_output = self.input_layernorm(hidden_states)
+        #layernorm_output = self.input_layernorm(hidden_states)
+        layernorm_output, _, _ = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.input_layernorm.normalized_shape, self.input_layernorm.weight, self.input_layernorm.bias, self.input_layernorm.eps)
         if self.config.do_norm_before:
             residual = layernorm_output
         else:
@@ -749,7 +750,8 @@ class IPEXBloomBlock(nn.Module):
         attention_output = attn_outputs[0]
 
         outputs = attn_outputs[1:]
-        layernorm_output = self.post_attention_layernorm(attention_output)
+        #layernorm_output = self.post_attention_layernorm(attention_output)
+        layernorm_output, _, _ = torch.ops.torch_ipex.fast_layer_norm(attention_output, self.post_attention_layernorm.normalized_shape, self.post_attention_layernorm.weight, self.post_attention_layernorm.bias, self.post_attention_layernorm.eps)
         if self.config.do_norm_before:
             redisual = layernorm_output
         else:
