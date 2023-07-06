@@ -17,16 +17,16 @@
 # Manage SYCL-related compiler flags
 #===============================================================================
 
-if(DPCPP_cmake_included)
+if(IntelSYCL_cmake_included)
   return()
 endif()
-set(DPCPP_cmake_included true)
+set(IntelSYCL_cmake_included true)
 
 include(FindPackageHandleStandardArgs)
 
-find_package(IntelDPCPP REQUIRED)
-if(NOT IntelDPCPP_FOUND)
-  message(FATAL_ERROR "Cannot find IntelDPCPP compiler!")
+find_package(IntelSYCL REQUIRED)
+if(NOT IntelSYCL_FOUND)
+  message(FATAL_ERROR "Cannot find IntelSYCL compiler!")
 endif()
 
 # Try to find Intel SYCL version.hpp header
@@ -87,8 +87,6 @@ find_library(OpenCL_LIBRARY
         HINTS ${SYCL_LIBRARY_DIR}
         NO_DEFAULT_PATH)
 set(OpenCL_INCLUDE_DIR ${SYCL_INCLUDE_DIR} CACHE STRING "")
-
-set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} ${SYCL_FLAGS})
 
 # The fast-math will be enabled by default in ICPX.
 # Refer to [https://clang.llvm.org/docs/UsersManual.html#cmdoption-fno-fast-math]
@@ -153,7 +151,7 @@ if(NOT BUILD_SEPARATE_OPS)
 endif()
 
 # WARNING: Append link flags in kernel flags before adding offline options
-set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} ${IPEX_SYCL_LINK_FLAGS})
+set(IPEX_SYCL_KERNEL_FLAGS ${SYCL_FLAGS} ${IPEX_SYCL_KERNEL_FLAGS} ${IPEX_SYCL_LINK_FLAGS})
 
 # Use IGC auto large GRF option explicitly for current stage. The option is default in previous IGC.
 # Before fully controlling large GRF setting (trade off concurrency and memory spill), we will keep it, let compiler to choose.
@@ -179,6 +177,6 @@ else()
 endif()
 
 # WARNING: Offline options must be appended at the end of link flags
-set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} ${IPEX_OFFLINE_OPTIONS})
+set(IPEX_SYCL_LINK_FLAGS ${SYCL_FLAGS} ${IPEX_SYCL_LINK_FLAGS} ${IPEX_OFFLINE_OPTIONS})
 
-message(STATUS "DPCPP found. Compiling with SYCL support")
+message(STATUS "IntelSYCL found. Compiling with SYCL support")

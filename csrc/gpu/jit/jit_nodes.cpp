@@ -6,6 +6,7 @@
 #include <oneapi/dnnl/dnnl.hpp>
 
 #include <oneDNN/oneDNN.h>
+#include "jit_nodes.h"
 #include "utils/CustomOperatorRegistration.h"
 
 using namespace xpu::oneDNN;

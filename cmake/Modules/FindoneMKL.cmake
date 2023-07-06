@@ -32,16 +32,14 @@ set(ONEMKL_CPU_LIBS)
 
 set(mkl_root_hint)
 if(BUILD_WITH_XPU)
-  if(DEFINED ENV{MKL_DPCPP_ROOT})
-    set(mkl_root_hint $ENV{MKL_DPCPP_ROOT})
-  elseif(DEFINED ENV{MKLROOT})
+  if(DEFINED ENV{MKLROOT})
     set(mkl_root_hint $ENV{MKLROOT})
   elseif(DEFINED ENV{MKL_ROOT})
     set(mkl_root_hint $ENV{MKL_ROOT})
   elseif(MKL_ROOT)
     set(mkl_root_hint ${MKL_ROOT})
   else()
-    message(FATAL_ERROR "Please set oneMKL root path by MKL_DPCPP_ROOT, or MKLROOT, or MKL_ROOT.")
+    message(FATAL_ERROR "Please set oneMKL root path by MKLROOT, or MKL_ROOT.")
   endif()
 else()
   # install mkl-include and mkl-static for CPU build
@@ -60,7 +58,7 @@ else()
   get_filename_component(mkl_root_hint "${mkl_inc}/../" ABSOLUTE)
 endif()
 
-# Try to find Intel MKL DPCPP header
+# Try to find Intel MKL header
 find_file(MKL_HEADER NAMES mkl.h PATHS ${mkl_root_hint}
     PATH_SUFFIXES include NO_DEFAULT_PATH)
 
