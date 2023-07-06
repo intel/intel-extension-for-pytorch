@@ -132,6 +132,7 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
             self.ipex_optimized_module.attn.out_wei = self.ipex_optimized_module.attn.out_proj.weight.transpose(0, 1).contiguous()
             del self.ipex_optimized_module.attn.out_proj.weight
             self.ipex_optimized_module.attn.qkv_wei = torch.stack([self.ipex_optimized_module.attn.q_wei, self.ipex_optimized_module.attn.k_wei, self.ipex_optimized_module.attn.v_wei]).contiguous()
+            self.ipex_optimized_module.attn.qkv_bias = None
             del self.ipex_optimized_module.attn.q_wei
             del self.ipex_optimized_module.attn.k_wei
             del self.ipex_optimized_module.attn.v_wei
@@ -239,6 +240,7 @@ class IPEXOptConverter(IPEXTransformerConverter):
             self.ipex_optimized_module.attn.out_wei = self.ipex_optimized_module.attn.out_proj.weight.transpose(0, 1).contiguous()
             del self.ipex_optimized_module.attn.out_proj.weight 
             self.ipex_optimized_module.attn.qkv_wei = torch.stack([self.ipex_optimized_module.attn.q_wei, self.ipex_optimized_module.attn.k_wei, self.ipex_optimized_module.attn.v_wei]).contiguous()
+            self.ipex_optimized_module.attn.qkv_bias = None
             del self.ipex_optimized_module.attn.q_wei
             del self.ipex_optimized_module.attn.k_wei
             del self.ipex_optimized_module.attn.v_wei
@@ -341,6 +343,7 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
             del self.module.self_attn.v_proj.weight
             shape = [3, -1, self.ipex_optimized_module.attn.q_wei.shape[-1]]
             self.ipex_optimized_module.attn.qkv_wei = torch.cat([self.ipex_optimized_module.attn.q_wei, self.ipex_optimized_module.attn.k_wei, self.ipex_optimized_module.attn.v_wei], dim=0).view(shape)
+            self.ipex_optimized_module.attn.qkv_bias = None
             del self.ipex_optimized_module.attn.q_wei
             del self.ipex_optimized_module.attn.k_wei
             del self.ipex_optimized_module.attn.v_wei
@@ -419,7 +422,7 @@ class IPEXBloomConverter(IPEXTransformerConverter):
             do_norm_before=before_norm,
             ln_elementwise_affine=None,
             seq_first=False,
-            kv_cache_optimize=False,
+            kv_cache_optimize=True,
             positional_embedding_base=10000,
             sdp_fusion_enable=False,
             device=self.device,

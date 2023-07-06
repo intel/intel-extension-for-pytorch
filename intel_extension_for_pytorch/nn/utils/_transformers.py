@@ -112,7 +112,7 @@ class IPEXTransformerAtten(nn.Module):
         value = self.value_cached[:, self.prev_len : self.cur_len, :, :]
         key = key.view(query.shape)
         value = value.view(query.shape)
-        torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, None, query, key, value)
+        torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
         return query, key, value
 
     def qkv_cache_optimized_beam(self, hidden_states, layer_past = None):
@@ -137,7 +137,7 @@ class IPEXTransformerAtten(nn.Module):
         else:
             value = torch.empty_like(hidden_states)
 
-        torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, None, query, key, value)
+        torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
         self.key_cached[self.prev_len : self.cur_len, :, :] = key.transpose(0, 1)
         self.value_cached[self.prev_len : self.cur_len, :, :] = value.transpose(0, 1)
         return query, key, value
@@ -236,7 +236,7 @@ class IPEXTransformerAtten(nn.Module):
             batch_size, num_heads, q_length, dim = query.shape
             _, _, kv_length, _ = key.shape
             batch1 = query.view(-1, q_length, dim)
-            batch2 = key.view(-1, kv_length, dim).transpose(1, 2).contiguous()
+            batch2 = key.view(-1, kv_length, dim).transpose(1, 2)
             matmul_result = alibi.baddbmm(
                 batch1=batch1,
                 batch2=batch2,
@@ -246,19 +246,17 @@ class IPEXTransformerAtten(nn.Module):
 
             # change view to [batch_size, num_heads, q_length, kv_length]
             attention_scores = matmul_result.view(batch_size, num_heads, q_length, kv_length)
-            input_dtype = attention_scores.dtype 
-            if input_dtype == torch.float16:
-                attention_scores = attention_scores.to(torch.float)
+            #input_dtype = attention_scores.dtype 
+            #if input_dtype == torch.float16:
+            #    attention_scores = attention_scores.to(torch.float)
             attn_weights = torch.masked_fill(attention_scores, attention_mask, torch.finfo(attention_scores.dtype).min)
-            attention_probs = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(input_dtype)
+            attention_probs = nn.functional.softmax(attn_weights, dim=-1)
 
             # [batch_size, num_heads, q_length, kv_length]
             attention_probs = self.attn_drop(attention_probs)
 
             if head_mask is not None:
                 attention_probs = attention_probs * head_mask
-            # change view [batch_size x num_heads, q_length, kv_length]
-            # attention_probs_reshaped = attention_probs.view(batch_size * num_heads, q_length, kv_length)
 
             # matmul: [batch_size * num_heads, q_length, head_dim]
             attn_output = torch.matmul(attention_probs, value)
