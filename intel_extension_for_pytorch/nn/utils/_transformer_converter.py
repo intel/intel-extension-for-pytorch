@@ -422,7 +422,7 @@ class IPEXBloomConverter(IPEXTransformerConverter):
             do_norm_before=before_norm,
             ln_elementwise_affine=None,
             seq_first=False,
-            kv_cache_optimize=True,
+            kv_cache_optimize=False,
             positional_embedding_base=10000,
             sdp_fusion_enable=False,
             device=self.device,

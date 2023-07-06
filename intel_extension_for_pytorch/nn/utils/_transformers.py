@@ -43,6 +43,16 @@ ACT2CLS = {
 
 ACT2FN = ACT2CLS
 
+class IPEXEmptyLinear(nn.Module):
+    def __init__(self):
+        super(IPEXEmptyLinear, self).__init__()
+        # we set the weight and bias to None to avoid any possible memory presure
+        self.weight = None
+        self.bias = None
+
+    def forward(self, input):
+        return torch.nn.functional.linear(input, self.weight, bias=self.bias)
+
 class IPEXTransformerAtten(nn.Module):
 
     layer_id_static = 0
@@ -69,10 +79,10 @@ class IPEXTransformerAtten(nn.Module):
             self.scale_attn = torch.sqrt(torch.tensor(self.head_dim, device="xpu"))
         else:
             self.scale_attn = None
-        self.k_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=self.config.enable_bias)
-        self.v_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=self.config.enable_bias)
-        self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=self.config.enable_bias)
-        self.out_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=self.config.enable_bias)
+        self.k_proj = IPEXEmptyLinear()
+        self.v_proj = IPEXEmptyLinear()
+        self.q_proj = IPEXEmptyLinear()
+        self.out_proj = IPEXEmptyLinear()
 
         self.qkv_fused = True 
         self.q_wei = None
@@ -370,7 +380,7 @@ class IPEXLlamaAttn(IPEXTransformerAtten):
 class IPEXBloomAttn(IPEXTransformerAtten):
     def __init__(self, config) -> None:
         super().__init__(config)
-        self.query_key_value = nn.Linear(self.embed_dim, 3 * self.embed_dim, bias=True)
+        self.query_key_value = IPEXEmptyLinear()
 
     def qkv_normal(self, hidden_states, layer_past = None):
         if self.row_major:
@@ -425,8 +435,8 @@ class IPEXTransformerMLP(nn.Module):
     def __init__(self,
                  config: IPEXTransformerConfig):
         super().__init__()
-        self.fc_in = nn.Linear(config.embed_dim, config.intermediate_size, bias=config.enable_bias)
-        self.fc_out = nn.Linear(config.intermediate_size, config.embed_dim, bias=config.enable_bias)
+        self.fc_in = IPEXEmptyLinear()
+        self.fc_out = IPEXEmptyLinear()
         self.act = ACT2FN[config.activation_function]
         self.drop_out = nn.Dropout(config.residual_pdrop) if config.residual_pdrop is not None else nn.Identity()
 
@@ -486,7 +496,7 @@ class IPEXLlamaMLP(IPEXTransformerMLP):
     def __init__(self,
                  config: IPEXTransformerConfig):
         super().__init__(config)
-        self.up_proj = nn.Linear(config.embed_dim, config.intermediate_size, bias=config.enable_bias)
+        self.up_proj = IPEXEmptyLinear()
         self.up_wei = None
 
     def forward(self, hidden_states, residual):
