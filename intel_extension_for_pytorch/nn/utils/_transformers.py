@@ -112,7 +112,7 @@ class IPEXTransformerAtten(nn.Module):
         value = self.value_cached[:, self.prev_len : self.cur_len, :, :]
         key = key.view(query.shape)
         value = value.view(query.shape)
-        torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, query, key, value)
+        torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, None, query, key, value)
         return query, key, value
 
     def qkv_cache_optimized_beam(self, hidden_states, layer_past = None):
@@ -308,13 +308,20 @@ class IPEXTransformerAtten(nn.Module):
         if self.row_major:
             if residual is None:
                 attn_output = torch.matmul(attn_output, self.out_wei)
+                self.all_reduce_if_necessary(attn_output)
+                if self.out_bias is not None:
+                    attn_output += self.out_bias
             else:
                 shape = attn_output.shape
-                attn_output = torch.addmm(residual.flatten(0, -2), attn_output.flatten(0, -2), self.out_wei)
+                if self.out_bias is not None:
+                    attn_output = torch.ops.torch_ipex.mm_bias_resadd(attn_output, self.out_wei, self.out_bias, residual, 1.0/self.tp_size)
+                else:
+                    attn_output = torch.addmm(residual.flatten(0, -2), attn_output.flatten(0, -2), self.out_wei, beta=1.0/self.tp_size)
                 attn_output = attn_output.view(shape)
         else:
-            attn_output = self.out_proj(attn_output) + residual
-        self.all_reduce_if_necessary(attn_output)
+            attn_output = torch.matmul(attn_output, self.out_proj.weight.t())
+            self.all_reduce_if_necessary(attn_output)
+            attn_output += self.out_proj.bias + residual
         return attn_output
         # return self.residual_drop(attn_output)
 
@@ -366,17 +373,23 @@ class IPEXBloomAttn(IPEXTransformerAtten):
     def __init__(self, config) -> None:
         super().__init__(config)
         self.query_key_value = nn.Linear(self.embed_dim, 3 * self.embed_dim, bias=True)
-
-    def compute_qkv(self, hidden_state: torch.Tensor, key_value_state: torch.Tensor = None, layer_past: Tuple[torch.Tensor] = None):
+    def qkv_normal(self, hidden_states, layer_past = None):
         if self.row_major:
-            out = torch.ops.torch_ipex.mm_qkv(hidden_state, self.qkv_wei, self.qkv_bias)
+            query = torch.empty_like(hidden_states)
+            key = torch.empty_like(hidden_states)
+            value = torch.empty_like(hidden_states)
+            torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
+            print("---query={}".format(query.shape))
+            print("---key={}".format(key.shape))
+            print("---value={}".format(value.shape))
         else:
-            fused_qkv = self.query_key_value(hidden_state)
+            fused_qkv = self.query_key_value(hidden_states)
             batch_size, seq_length, three_times_hidden_size = fused_qkv.shape
             fused_qkv = fused_qkv.view(batch_size, seq_length, self.num_attn_head, 3, self.head_dim)
-            out = (fused_qkv[..., 0, :], fused_qkv[..., 1, :], fused_qkv[..., 2, :])
-        return out
-
+            query = fused_qkv[..., 0, :].reshape(batch_size, seq_length, -1)
+            key = fused_qkv[..., 1, :].reshape(batch_size, seq_length, -1)
+            value = fused_qkv[..., 2, :].reshape(batch_size, seq_length, -1)
+        return query, key, value
 
 
 class IPEXOptAtten(IPEXTransformerAtten):
@@ -505,9 +518,19 @@ class IPEXBloomMLP(IPEXTransformerMLP):
         super().__init__(config)
 
     def forward(self, hidden_states, residual: torch.Tensor):
-        intermediate_output = self.act(self.fc_in(hidden_states))
-        output = self.fc_out(intermediate_output) + residual
-        output = self.all_reduce_if_necessary(output)
+        if self.row_major:
+            if isinstance(self.act, nn.GELU):
+                hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in_wei.t(), self.fc_in.bias, self.act.approximate)
+            else:
+                hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
+                hidden_states = self.act(hidden_states)
+            hidden_states = torch.ops.torch_ipex.mm_bias_resadd(hidden_states, self.fc_out_wei, self.fc_out_bias, residual, 1.0/self.tp_size)
+            output = self.all_reduce_if_necessary(hidden_states)
+        else:
+            intermediate_output = self.act(self.fc_in(hidden_states))
+            output = torch.matmul(intermediate_output, self.fc_out.weight.t())
+            output = self.all_reduce_if_necessary(output)
+            output += self.fc_out.bias + residual
         return output
 
 

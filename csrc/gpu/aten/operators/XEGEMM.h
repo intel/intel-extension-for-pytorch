@@ -101,6 +101,22 @@ using namespace xpu::xetla;
       n_,                                                                 \
       k_);                                                                \
   }
+
+#define HGEMM_BIAS_XRES_DISPATCH(F)                                       \
+  {                                                                       \
+    RECORD_FUNCTION("torch_ipex::" #F, c10::ArrayRef<c10::IValue>({}));   \
+    F(q,                                                                  \
+      reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+      reinterpret_cast<sycl::half*>(epilogues_[1]->data_ptr<scalar_t>()), \
+      (scalar_t)pf32[1],                                                  \
+      m_,                                                                 \
+      n_,                                                                 \
+      k_);                                                                \
+  }
+
 #define HGEMM_COMMON_DISPATCH_IMPL(DISPATCHER, F) \
   if (is_b_row_major_)                            \
     DISPATCHER(F##true_)                          \
@@ -128,6 +144,10 @@ using namespace xpu::xetla;
       HGEMM_COMMON_DISPATCH_IMPL(HGEMM_SILU_DISPATCH, hgemm_silu##F)           \
     else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD)              \
       HGEMM_COMMON_DISPATCH_IMPL(HGEMM_RES_DISPATCH, hgemm_res##F)             \
+    else if (                                                                  \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                    \
+        epilogue_type_[1] == SCALED_RES_ADD)                                   \
+      HGEMM_COMMON_DISPATCH_IMPL(HGEMM_BIAS_XRES_DISPATCH, hgemm_bias_res##F)  \
   }
 
 inline Tensor resize_as_mat1(const Tensor& mat1, const Tensor& output) {
@@ -146,6 +166,7 @@ class HGEMMXetla final {
     GELU,
     RES_MUL,
     SILU,
+    SCALED_RES_ADD,
   };
 
  private:
@@ -155,6 +176,7 @@ class HGEMMXetla final {
   Tensor *a_, *b_, *c_;
   Tensor* epilogues_[MAX_EPILOGUES];
   EpilogueType epilogue_type_[MAX_EPILOGUES];
+  float pf32[MAX_EPILOGUES];
   int num_epilogues_ = 0;
   bool is_a_row_major_;
   bool is_a_col_major_;
@@ -182,6 +204,15 @@ class HGEMMXetla final {
   }
   HGEMMXetla& add_epilogue(const Tensor& t, EpilogueType eptype) {
     epilogues_[num_epilogues_] = const_cast<Tensor*>(&t);
+    epilogue_type_[num_epilogues_++] = eptype;
+    return *this;
+  }
+  HGEMMXetla& add_epilogue(
+      const Tensor& t,
+      EpilogueType eptype,
+      const float x) {
+    epilogues_[num_epilogues_] = const_cast<Tensor*>(&t);
+    pf32[num_epilogues_] = x;
     epilogue_type_[num_epilogues_++] = eptype;
     return *this;
   }

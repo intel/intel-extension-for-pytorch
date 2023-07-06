@@ -437,12 +437,13 @@ class IPEXBloomConverter(IPEXTransformerConverter):
         self.ipex_optimized_module.self_attention.out_proj.bias = nn.Parameter(self.module.self_attention.dense.bias)
 
         if self.row_major:
-            self.ipex_optimized_module.self_attention.qkv_wei = self.ipex_optimized_module.self_attention.query_key_value.weight.transpose(0, 1).contiguous()
-            self.ipex_optimized_module.self_attention.qkv_bias = self.ipex_optimized_module.self_attention.query_key_value.bias 
+            shape = self.ipex_optimized_module.self_attention.query_key_value.weight.shape
+            self.ipex_optimized_module.self_attention.qkv_wei = self.ipex_optimized_module.self_attention.query_key_value.weight.view([3, shape[0]//3, shape[1]]).transpose(1, 2).contiguous()
+            self.ipex_optimized_module.self_attention.qkv_bias = self.ipex_optimized_module.self_attention.query_key_value.bias.view([3, -1])
             del self.ipex_optimized_module.self_attention.query_key_value.weight
             del self.ipex_optimized_module.self_attention.query_key_value.bias
             self.ipex_optimized_module.self_attention.out_wei = self.ipex_optimized_module.self_attention.out_proj.weight.transpose(0, 1).contiguous()
-            self.ipex_optimized_module.self_attention.out_bias = self.ipex_optimized_module.self_attention.out_proj.bias
+            self.ipex_optimized_module.self_attention.out_bias = self.ipex_optimized_module.self_attention.out_proj.bias / self.tp_size
             del self.ipex_optimized_module.self_attention.out_proj.weight
             del self.ipex_optimized_module.self_attention.out_proj.bias
 
@@ -454,11 +455,9 @@ class IPEXBloomConverter(IPEXTransformerConverter):
         
         if self.row_major:
             self.ipex_optimized_module.mlp.fc_in_wei = self.ipex_optimized_module.mlp.fc_in.weight.transpose(0, 1).contiguous()
-            self.ipex_optimized_module.mlp.fc_in_bias = self.ipex_optimized_module.mlp.fc_in.bias
             del self.ipex_optimized_module.mlp.fc_in.weight
-            del self.ipex_optimized_module.mlp.fc_in.bias
             self.ipex_optimized_module.mlp.fc_out_wei = self.ipex_optimized_module.mlp.fc_out.weight.transpose(0, 1).contiguous()
-            self.ipex_optimized_module.mlp.fc_out_bias = self.ipex_optimized_module.mlp.fc_out.bias
+            self.ipex_optimized_module.mlp.fc_out_bias = self.ipex_optimized_module.mlp.fc_out.bias / self.tp_size
             del self.ipex_optimized_module.mlp.fc_out.weight
             del self.ipex_optimized_module.mlp.fc_out.bias
 
