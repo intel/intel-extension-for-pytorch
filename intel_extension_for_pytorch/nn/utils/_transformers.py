@@ -373,15 +373,13 @@ class IPEXBloomAttn(IPEXTransformerAtten):
     def __init__(self, config) -> None:
         super().__init__(config)
         self.query_key_value = nn.Linear(self.embed_dim, 3 * self.embed_dim, bias=True)
+
     def qkv_normal(self, hidden_states, layer_past = None):
         if self.row_major:
             query = torch.empty_like(hidden_states)
             key = torch.empty_like(hidden_states)
             value = torch.empty_like(hidden_states)
             torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
-            print("---query={}".format(query.shape))
-            print("---key={}".format(key.shape))
-            print("---value={}".format(value.shape))
         else:
             fused_qkv = self.query_key_value(hidden_states)
             batch_size, seq_length, three_times_hidden_size = fused_qkv.shape

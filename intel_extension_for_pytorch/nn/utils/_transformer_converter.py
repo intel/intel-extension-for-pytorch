@@ -437,9 +437,11 @@ class IPEXBloomConverter(IPEXTransformerConverter):
         self.ipex_optimized_module.self_attention.out_proj.bias = nn.Parameter(self.module.self_attention.dense.bias)
 
         if self.row_major:
-            shape = self.ipex_optimized_module.self_attention.query_key_value.weight.shape
-            self.ipex_optimized_module.self_attention.qkv_wei = self.ipex_optimized_module.self_attention.query_key_value.weight.view([3, shape[0]//3, shape[1]]).transpose(1, 2).contiguous()
-            self.ipex_optimized_module.self_attention.qkv_bias = self.ipex_optimized_module.self_attention.query_key_value.bias.view([3, -1])
+            embed_dim = self.config.hidden_size
+            num_head = self.config.n_head
+            shape = [num_head, 3, -1, embed_dim]
+            self.ipex_optimized_module.self_attention.qkv_wei = self.ipex_optimized_module.self_attention.query_key_value.weight.view(shape).contiguous().transpose(0, 1).contiguous().view([3, -1, embed_dim]).transpose(1, 2).contiguous()
+            self.ipex_optimized_module.self_attention.qkv_bias = self.ipex_optimized_module.self_attention.query_key_value.bias.view([num_head, 3, -1]).transpose(0, 1).contiguous().view([3, -1])
             del self.ipex_optimized_module.self_attention.query_key_value.weight
             del self.ipex_optimized_module.self_attention.query_key_value.bias
             self.ipex_optimized_module.self_attention.out_wei = self.ipex_optimized_module.self_attention.out_proj.weight.transpose(0, 1).contiguous()
