@@ -240,7 +240,7 @@ class HGEMMXetla final {
     if (!(ck0 && ck1 && ck2))
       return *this;
     // if (!(m_ <= 32 && n_ >= 4096 && k_ >= 4096)) // TODO:
-    if (!(n_ >= 4096 && k_ >= 4096))
+    if (!(n_ >= 4096 && k_ >= 1024))
       return *this;
     for (int i = 0; i < num_epilogues_; i++) {
       switch (epilogue_type_[i]) {
