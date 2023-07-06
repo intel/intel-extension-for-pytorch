@@ -42,7 +42,8 @@ class BatchKernelConfig {
       int64_t stride,
       int64_t problem_batch,
       bool problem_along_x,
-      std::vector<Policy> policies)
+      std::vector<Policy> policies,
+      int64_t prefer_wg_size = 0)
       : batch_(batch),
         problem_(problem),
         stride_(stride),
@@ -59,6 +60,10 @@ class BatchKernelConfig {
         wg_range_x_(0),
         wg_range_y_(0) {
     int64_t wg_size = dpcppMaxWorkGroupSize();
+    if (prefer_wg_size != 0 && prefer_wg_size % 32 == 0 &&
+        prefer_wg_size < wg_size) {
+      wg_size = prefer_wg_size;
+    }
     int64_t sg_size = dpcppMaxSubGroupSize();
     wg_range_x_ = sg_size;
     wg_range_y_ = wg_size / wg_range_x_;
@@ -154,7 +159,8 @@ class BatchKernelConfig {
       int64_t stride,
       int64_t problem_batch,
       bool problem_along_x,
-      Policy policy = Policy::pSegment)
+      Policy policy = Policy::pSegment,
+      int64_t prefer_wg_size = 0)
       : BatchKernelConfig(
             batch,
             problem,
@@ -164,7 +170,8 @@ class BatchKernelConfig {
             [&policy]() {
               std::vector<Policy> policies = {policy};
               return policies;
-            }()) {}
+            }(),
+            prefer_wg_size) {}
 
   sycl::range<2> global_size() const {
     return {glb_range_y_, glb_range_x_};

@@ -36,7 +36,9 @@ class IndexKernelConfig : public BatchKernelConfig {
             problem,
             stride,
             problem_batch,
-            problem_along_x),
+            problem_along_x,
+            Policy::pSegment,
+            dpcppMaxWorkItemsPerEU()),
         sinfo_(sinfo),
         dinfo_(dinfo),
         iinfo_(iinfo),
@@ -165,7 +167,10 @@ class IndexKernelConfig : public BatchKernelConfig {
   FuncType func_;
 };
 
-template <class IdxConfig, bool TrivialOffCal>
+template <
+    class IdxConfig,
+    bool TrivialOffCal = false,
+    bool known_problem_inner = false>
 class IndexKernel {
  public:
   using ValType = typename IdxConfig::ValType;
@@ -180,10 +185,15 @@ class IndexKernel {
       int64_t& glb_batch_group,
       int64_t& glb_batch_group_loc_off) const {
     idx_logical_off = id.glb_batch % cfg_.index_num_;
-    int64_t idx_off = IndexToOffset<IdxType, int64_t>::get(
-        idx_logical_off,
-        cfg_.iinfo_,
-        IndexToOffset<IdxType, int64_t>::NON_STRICT_CONTIGUOUS);
+    int64_t idx_off;
+    if constexpr (TrivialOffCal) {
+      idx_off = idx_logical_off;
+    } else {
+      idx_off = IndexToOffset<IdxType, int64_t>::get(
+          idx_logical_off,
+          cfg_.iinfo_,
+          IndexToOffset<IdxType, int64_t>::NON_STRICT_CONTIGUOUS);
+    }
     glb_batch_group = id.glb_batch / cfg_.index_num_;
     glb_batch_group_loc_off = cfg_.iinfo_.data[idx_off];
     glb_batch_group_loc_off = glb_batch_group_loc_off >= 0
@@ -191,7 +201,7 @@ class IndexKernel {
         : cfg_.indexing_dimension_size_ + glb_batch_group_loc_off;
   }
 
-  int64_t indexing_logical_off(
+  int64_t inline indexing_logical_off(
       BatchKernelConfig::ItemDesc& id,
       int64_t glb_batch_group,
       int64_t glb_batch_group_loc_off) const {
@@ -199,37 +209,55 @@ class IndexKernel {
     int64_t glb_batch_group_glb_off =
         glb_batch_group * cfg_.indexing_dimension_size_ +
         glb_batch_group_loc_off;
-    if (cfg_.problem_inner_) {
+    auto stride = cfg_.stride_;
+    if constexpr (known_problem_inner) {
       si = 0;
-      pi = id.chunk * id.chunk_size + id.chunk_off;
+      pi = id.glb_problem;
       bi = glb_batch_group_glb_off;
+      return (pi + bi * cfg_.problem_) * stride;
     } else {
-      si = glb_batch_group_glb_off;
-      pi = id.chunk * id.chunk_size + id.chunk_off;
-      bi = 0;
+      if (cfg_.problem_inner_) {
+        si = 0;
+        pi = id.glb_problem;
+        bi = glb_batch_group_glb_off;
+        return (pi + bi * cfg_.problem_) * stride;
+      } else {
+        si = glb_batch_group_glb_off;
+        pi = id.glb_problem;
+        bi = 0;
+        return si + pi * stride;
+      }
     }
-    return si + pi * cfg_.stride_ + bi * cfg_.problem_ * cfg_.stride_;
   }
 
-  int64_t fixing_logical_off(
+  int64_t inline fixing_logical_off(
       BatchKernelConfig::ItemDesc& id,
       int64_t glb_batch_group,
       int64_t idx_logical_off) const {
     int64_t si, pi, bi, stride;
     int64_t glb_batch_group_glb_off =
         glb_batch_group * cfg_.index_num_ + idx_logical_off;
-    if (cfg_.problem_inner_) {
+    if constexpr (known_problem_inner) {
       si = 0;
-      pi = id.chunk * id.chunk_size + id.chunk_off;
-      bi = glb_batch_group_glb_off;
       stride = 1;
+      pi = id.glb_problem;
+      bi = glb_batch_group_glb_off;
+      return pi + bi * cfg_.problem_;
     } else {
-      si = glb_batch_group_glb_off;
-      pi = id.chunk * id.chunk_size + id.chunk_off;
-      bi = 0;
-      stride = cfg_.index_num_;
+      if (cfg_.problem_inner_) {
+        si = 0;
+        stride = 1;
+        pi = id.glb_problem;
+        bi = glb_batch_group_glb_off;
+        return pi + bi * cfg_.problem_;
+      } else {
+        bi = 0;
+        si = glb_batch_group_glb_off;
+        pi = id.glb_problem;
+        stride = cfg_.index_num_;
+        return si + pi * stride;
+      }
     }
-    return si + pi * stride + bi * stride * cfg_.problem_;
   }
 
   void operator()(sycl::nd_item<2> item) const {
@@ -257,7 +285,7 @@ class IndexKernel {
     glb_indexing_logical_off =
         indexing_logical_off(id, glb_batch_group, glb_batch_group_loc_off);
 
-    if (cfg_.sinfo_.data != nullptr && cfg_.sinfo_.data != nullptr) {
+    if (cfg_.sinfo_.data != nullptr && cfg_.dinfo_.data != nullptr) {
       glb_fixing_logical_off =
           fixing_logical_off(id, glb_batch_group, idx_logical_off);
     }
@@ -297,7 +325,6 @@ class IndexKernel {
             IndexToOffset<ValType, int64_t>::NON_STRICT_CONTIGUOUS);
       }
     }
-
     cfg_.func_(
         cfg_.dinfo_.data,
         cfg_.sinfo_.data,
@@ -311,11 +338,14 @@ class IndexKernel {
   IdxConfig cfg_;
 };
 
-template <class IdxConfig, bool TrivialOffCal = false>
+template <
+    class IdxConfig,
+    bool TrivialOffCal = false,
+    bool known_problem_inner = false>
 static inline void launch_index_kernel(IdxConfig& cfg) {
   auto& queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    IndexKernel<IdxConfig, TrivialOffCal> idx_ker(cfg);
+    IndexKernel<IdxConfig, TrivialOffCal, known_problem_inner> idx_ker(cfg);
     __cgh.parallel_for(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), idx_ker);
   };
@@ -473,7 +503,11 @@ static inline void _index_select_kernel(
           dim,
           false,
           IndexSelectOperator<scalar_t>());
-  launch_index_kernel<decltype(cfg), TrivialOffCal>(cfg);
+  if (cfg.problem_inner_) {
+    launch_index_kernel<decltype(cfg), TrivialOffCal, true>(cfg);
+  } else {
+    launch_index_kernel<decltype(cfg), TrivialOffCal, false>(cfg);
+  }
 }
 
 // DPCPP suggest: it’s possible (and even desirable) to oversubscribe tasks to
