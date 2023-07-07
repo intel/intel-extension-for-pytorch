@@ -24,6 +24,7 @@ namespace fmha {
 template <
     typename fmha_policy,
     typename scalar_t,
+    bool kUseAlibi,
     bool kUseBias,
     bool kIsCausal,
     bool kIsTraining>
@@ -39,11 +40,9 @@ class fmha_forward_causal_strided_t {
     scalar_t* Q_ptr; // [B, N, F, H] - query
     scalar_t* K_ptr; // [B, N, T, H] - key
     scalar_t* V_ptr; // [B, N, T, H] - value
+    scalar_t* A_ptr = nullptr; // [B, N, 1, T] - Alibi
     scalar_t* B_ptr = nullptr; // [B, 1, F, T] - bias
     uint8_t* Dp_ptr = nullptr; // [B, N, F, T] - dropout mask
-    // Dropout scale is computed from dropout prob
-    accum_t dp_prob;
-    accum_t dp_scale;
     // Output tensor
     scalar_t* O_ptr; // raw: [B, N, F, H]; permute: [B, F, N, H] - output
     // Dimension size
@@ -55,35 +54,41 @@ class fmha_forward_causal_strided_t {
     // Softmax scale is the reciprocal square root of head size by default
     accum_t sm_scale;
 
+    // Dropout scale is computed from dropout prob
+    accum_t dp_prob;
+    accum_t dp_scale;
+
     inline arguments_t() = default;
     inline arguments_t(
         scalar_t* query,
         scalar_t* key,
         scalar_t* value,
+        scalar_t* alibi,
         scalar_t* bias,
         uint8_t* dropout,
-        accum_t dropout_prob,
         scalar_t* out,
         uint32_t num_batches,
         uint32_t num_heads,
         uint32_t head_size,
         uint32_t num_queries,
         uint32_t num_keys,
-        accum_t sm_scale)
+        accum_t sm_scale,
+        accum_t dropout_prob)
         : Q_ptr(query),
           K_ptr(key),
           V_ptr(value),
+          A_ptr(alibi),
           B_ptr(bias),
           Dp_ptr(dropout),
-          dp_prob(dropout_prob),
-          dp_scale(1.f / (1.f - dropout_prob)),
           O_ptr(out),
           uB(num_batches),
           uN(num_heads),
           uH(head_size),
           uF(num_queries),
           uT(num_keys),
-          sm_scale(sm_scale) {}
+          sm_scale(sm_scale),
+          dp_prob(dropout_prob),
+          dp_scale(1.f / (1.f - dropout_prob)) {}
   };
 
  private:
@@ -134,6 +139,8 @@ class fmha_forward_causal_strided_t {
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Oi_t =
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+  using mem_desc_Ai_t =
+      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
 
   // ------------------- // Slm and nbarrier // ------------------- //
   static constexpr uint32_t slm_size_Qi = kBr * kHm * sizeof(scalar_t);
@@ -167,6 +174,7 @@ class fmha_forward_causal_strided_t {
     mem_desc_Vj_t mem_desc_Vj;
     mem_desc_Bij_t mem_desc_Bij;
     mem_desc_Oi_t mem_desc_Oi;
+    mem_desc_Ai_t mem_desc_Ai;
 
     inline context_t() = default;
 
@@ -235,6 +243,20 @@ class fmha_forward_causal_strided_t {
           {args.uH * args.uN, end_x, args.uH * args.uN},
           {start_acc, start_x});
 
+      // B, N, 1, T
+      if constexpr (kUseAlibi) {
+        start_x = startT;
+        end_x = start_x + kBc;
+        boundary_x = args.uT;
+        end_x = end_x > boundary_x ? boundary_x : end_x;
+
+        uint32_t gid = ei.get_group(0);
+        int32_t start_y = gid;
+
+        mem_desc_Ai.init(
+            args.A_ptr, {end_x, start_y + 1, args.uT}, {start_x, start_y});
+      }
+
       if constexpr (kUseBias) {
         start_x = startT;
         end_x = start_x + kBc;
@@ -275,9 +297,24 @@ class fmha_forward_causal_strided_t {
     brgemm(ctx.g, matAccSij, brgemm_args, 0, /* nbarrier_base */ nbarrier_cnt);
 
     // Multiply by softmax scaling factor
+    // bmm * alpha
     matAccSij.reg *= args.sm_scale;
 
-    // Add bias if needed
+    // + beta * alibi
+    if constexpr (kUseAlibi) {
+      using alibi_op_t = subgroup::bias_add_op_t<scalar_t, gpu_arch::Xe>;
+      using alibi_args_t = typename alibi_op_t::arguments_t;
+
+      int32_t tile_offset_x = ctx.sg_idx * kSgBc;
+      int32_t tile_offset_y = 0;
+      ctx.mem_desc_Ai.update_coord(tile_offset_x, tile_offset_y);
+
+      alibi_op_t alibi_op;
+      alibi_args_t alibi_args(ctx.mem_desc_Ai.base, ctx.mem_desc_Ai.shape);
+      alibi_op(matAccSij, ctx.mem_desc_Ai.coord, alibi_args);
+    }
+
+    // Add attn_mask if needed
     if constexpr (kUseBias) {
       using bias_op_t = subgroup::
           elemwise_reduce_op_t<reduce_op::sum, scalar_t, gpu_arch::Xe>;
@@ -601,6 +638,7 @@ class FmhaForwardKernel;
 template <
     typename fmha_policy,
     typename T,
+    bool kUseAlibi,
     bool kUseBias,
     bool kIsCausal,
     bool kIsTraining>
@@ -609,20 +647,35 @@ void fmha_forward_causal_strided_impl(
     T* query,
     T* key,
     T* value,
+    T* alibi,
     T* bias,
     uint8_t* dropout,
-    float dropout_prob,
     T* out,
+    float alpha,
+    float beta, // TODO:
+    float dropout_prob,
     uint32_t num_batches,
     uint32_t num_heads,
     uint32_t head_size,
     uint32_t num_queries,
-    uint32_t num_keys,
-    float head_scale) {
+    uint32_t num_keys) {
+  // printf(
+  //     "B, N, F, T, H: %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d, alibi @ 0x%llx\n",
+  //     num_batches,
+  //     num_heads,
+  //     num_queries,
+  //     num_keys,
+  //     head_size,
+  //     kUseAlibi,
+  //     kUseBias,
+  //     kIsCausal,
+  //     kIsTraining,
+  //     (unsigned long long)alibi);
   // fmha forward kernel
   using fmha_forward_op_t = fmha_forward_causal_strided_t<
       fmha_policy,
       T,
+      kUseAlibi,
       kUseBias,
       kIsCausal,
       kIsTraining>;
@@ -641,16 +694,17 @@ void fmha_forward_causal_strided_impl(
           query,
           key,
           value,
+          alibi,
           bias,
           dropout,
-          dropout_prob,
           out,
           num_batches,
           num_heads,
           head_size,
           num_queries,
           num_keys,
-          head_scale);
+          alpha,
+          dropout_prob);
 
       // call the functor
       fmha_fwd_op(ei, args);
@@ -686,6 +740,7 @@ void fmha_forward_causal_strided_impl(
   fmha::fmha_forward_causal_strided_impl< \
       P,                                  \
       T,                                  \
+      kUseAlibi,                          \
       kUseBias,                           \
       kIsCausal,                          \
       kIsTraining>(                       \
@@ -693,19 +748,22 @@ void fmha_forward_causal_strided_impl(
       query,                              \
       key,                                \
       value,                              \
+      alibi,                              \
       bias,                               \
       dropout,                            \
-      dropout_prob,                       \
       out,                                \
+      alpha,                              \
+      beta,                               \
+      dropout_prob,                       \
       num_batches,                        \
       num_heads,                          \
       head_size,                          \
       num_queries,                        \
-      num_keys,                           \
-      head_scale)
+      num_keys)
 /// @brief Main execution function for flash mha forward.
 template <
     typename T,
+    bool kUseAlibi = false,
     bool kUseBias = false,
     bool kIsCausal = false,
     bool kIsTraining = false>
@@ -714,16 +772,18 @@ void fmha_forward_causal_strided(
     T* query,
     T* key,
     T* value,
+    T* alibi,
     T* bias,
     uint8_t* dropout,
-    float dropout_prob,
     T* out,
+    float alpha,
+    float beta,
+    float dropout_prob,
     uint32_t num_batches,
     uint32_t num_heads,
     uint32_t head_size,
     uint32_t num_queries,
-    uint32_t num_keys,
-    float head_scale) {
+    uint32_t num_keys) {
   if (head_size <= 64) {
     CALL_IMPL_FUNC(fmha_policy_64x128x64);
   } else if (head_size <= 128) {
@@ -745,33 +805,101 @@ void fmha_forward_causal_strided(
 
 #undef CALL_IMPL_FUNC
 
-void fmha_forward_op_causal_strided(
+void fmha_forward_kernel(
     sycl::queue& q,
     void* query,
     void* key,
     void* value,
+    void* alibi,
+    void* attn_mask,
+    uint8_t* dropout,
     void* out,
+    float alpha,
+    float beta,
+    float dropout_prob,
     uint32_t num_batches,
     uint32_t num_heads,
     uint32_t head_size,
     uint32_t num_queries,
-    uint32_t num_keys) {
+    uint32_t num_keys,
+    bool is_causal) {
   using T = sycl::half;
-  const float head_scale = sycl::rsqrt(float(head_size));
-  fmha_forward_causal_strided<T, false, true, false>(
-      q,
-      (T*)query,
-      (T*)key,
-      (T*)value,
-      (T*)nullptr,
-      (uint8_t*)nullptr,
-      1.0,
-      (T*)out,
-      num_batches,
-      num_heads,
-      head_size,
-      num_queries,
-      num_keys,
-      head_scale);
+  if (is_causal) {
+    if (alibi) {
+      fmha_forward_causal_strided<T, true, false, true, false>(
+          q,
+          (T*)query,
+          (T*)key,
+          (T*)value,
+          (T*)alibi,
+          (T*)attn_mask,
+          dropout,
+          (T*)out,
+          alpha,
+          beta,
+          dropout_prob,
+          num_batches,
+          num_heads,
+          head_size,
+          num_queries,
+          num_keys);
+    } else {
+      fmha_forward_causal_strided<T, false, false, true, false>(
+          q,
+          (T*)query,
+          (T*)key,
+          (T*)value,
+          (T*)alibi,
+          (T*)attn_mask,
+          dropout,
+          (T*)out,
+          alpha,
+          beta,
+          dropout_prob,
+          num_batches,
+          num_heads,
+          head_size,
+          num_queries,
+          num_keys);
+    }
+  } else {
+    if (alibi) {
+      fmha_forward_causal_strided<T, true, false, false, false>(
+          q,
+          (T*)query,
+          (T*)key,
+          (T*)value,
+          (T*)alibi,
+          (T*)attn_mask,
+          dropout,
+          (T*)out,
+          alpha,
+          beta,
+          dropout_prob,
+          num_batches,
+          num_heads,
+          head_size,
+          num_queries,
+          num_keys);
+    } else {
+      fmha_forward_causal_strided<T, false, false, false, false>(
+          q,
+          (T*)query,
+          (T*)key,
+          (T*)value,
+          (T*)alibi,
+          (T*)attn_mask,
+          dropout,
+          (T*)out,
+          alpha,
+          beta,
+          dropout_prob,
+          num_batches,
+          num_heads,
+          head_size,
+          num_queries,
+          num_keys);
+    }
+  }
 }
 } // namespace gpu::xetla

@@ -43,17 +43,28 @@ void fmha_forward_op_strided(
     uint32_t num_queries,
     uint32_t num_keys);
 
-void fmha_forward_op_causal_strided(
+// * General interface kernel for FSDP
+// * causal
+// * permutation t, n, h
+// * alibi
+void fmha_forward_kernel(
     sycl::queue& q,
     void* query,
     void* key,
     void* value,
+    void* alibi,
+    void* attn_mask,
+    uint8_t* dropout,
     void* out,
+    float alpha,
+    float beta,
+    float dropout_prob,
     uint32_t num_batches,
     uint32_t num_heads,
     uint32_t head_size,
     uint32_t num_queries,
-    uint32_t num_keys);
+    uint32_t num_keys,
+    bool is_causal);
 
 void fmha_forward_op_attn_mask_alibi_strided(
     sycl::queue& q,
