@@ -304,7 +304,7 @@ class IPEXTransformerAtten(nn.Module):
         do_sdp_fusion = os.environ.get("ENABLE_SDP_FUSION", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         if self.config.sdp_fusion_enable and do_sdp_fusion:
             attn_weights = None
-            is_causal = True
+            is_causal = True if attention_mask is None else False
             if query.shape[2] <= 1:
                 is_causal = False
 
@@ -314,7 +314,7 @@ class IPEXTransformerAtten(nn.Module):
                 dropout = 0.0
                 alpha = 1.0/self.scale_attn 
                 beta = 1.0
-                attn_output = torch.xpu.IpexSDP(query, key, value, attention_mask, head_mask, alibi, alpha, beta, dropout, is_causal)
+                attn_output = torch.xpu.IpexSDP(query, key, value, attention_mask, alibi, head_mask, alpha, beta, dropout, is_causal)
         else:
             attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi)
         return attn_output, attn_weights

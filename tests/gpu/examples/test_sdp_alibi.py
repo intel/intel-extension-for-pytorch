@@ -20,7 +20,7 @@ class TestTorchMethod(TestCase):
         dropout = 0.0
         is_causal = False
 
-        out = torch.xpu.IpexSDP(query.xpu(), key.xpu(), value.xpu(), atten_mask, head_mask, alibi, alpha, beta, dropout, is_causal)
+        out = torch.xpu.IpexSDP(query.xpu(), key.xpu(), value.xpu(), atten_mask, alibi, head_mask, alpha, beta, dropout, is_causal)
 
         print('out = ', out)
 
