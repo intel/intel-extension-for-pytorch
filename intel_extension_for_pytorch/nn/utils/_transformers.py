@@ -253,8 +253,8 @@ class IPEXTransformerAtten(nn.Module):
             matmul_result = alibi.baddbmm(
                 batch1=batch1,
                 batch2=batch2,
-                beta=1.0,
-                alpha=1.0/self.scale_attn,
+                beta=self.beta,
+                alpha=self.inv_norm_factor,
             )
 
             # change view to [batch_size, num_heads, q_length, kv_length]
@@ -312,8 +312,8 @@ class IPEXTransformerAtten(nn.Module):
                 attn_output = torch.nn.functional.scaled_dot_product_attention(query, key, value, is_causal=is_causal)
             else:
                 dropout = 0.0
-                alpha = 1.0/self.scale_attn 
-                beta = 1.0
+                alpha = self.inv_norm_factor 
+                beta = self.beta
                 attn_output = torch.xpu.IpexSDP(query, key, value, attention_mask, alibi, head_mask, alpha, beta, dropout, is_causal)
         else:
             attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi)
@@ -393,6 +393,8 @@ class IPEXBloomAttn(IPEXTransformerAtten):
     def __init__(self, config) -> None:
         super().__init__(config)
         self.query_key_value = IPEXEmptyLinear()
+        self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
+        self.beta = 1.0
 
     def qkv_normal(self, hidden_states, layer_past = None):
         if self.row_major:
