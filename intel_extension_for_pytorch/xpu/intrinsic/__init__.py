@@ -83,12 +83,12 @@ def roi_align(
     )
 
 def IpexSDP(
-    query_,
-    key_,
-    value_,
-    bias_ = None,
-    alibi_ = None,
-    head_mask_ = None,
+    query,
+    key,
+    value,
+    bias = None,
+    alibi = None,
+    head_mask = None,
     alpha = 1.0,
     beta = 1.0,
     dropout_p = 0.0,

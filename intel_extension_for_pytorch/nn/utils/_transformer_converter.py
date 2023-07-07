@@ -424,7 +424,7 @@ class IPEXBloomConverter(IPEXTransformerConverter):
             seq_first=False,
             kv_cache_optimize=False,
             positional_embedding_base=10000,
-            sdp_fusion_enable=False,
+            sdp_fusion_enable=True,
             device=self.device,
             dtype=self.dtype,
             tp_size=IPEXTransformerConverter.tp_size,

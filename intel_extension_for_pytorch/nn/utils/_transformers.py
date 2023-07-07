@@ -303,11 +303,18 @@ class IPEXTransformerAtten(nn.Module):
     def self_attention(self, query, key, value, attention_mask=None, head_mask=None, alibi=None):
         do_sdp_fusion = os.environ.get("ENABLE_SDP_FUSION", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         if self.config.sdp_fusion_enable and do_sdp_fusion:
-            if query.shape[2] <= 1:
-                attn_output = torch.nn.functional.scaled_dot_product_attention(query, key, value, is_causal=False)
-            else:
-                attn_output = torch.nn.functional.scaled_dot_product_attention(query, key, value, is_causal=True)
             attn_weights = None
+            is_causal = True
+            if query.shape[2] <= 1:
+                is_causal = False
+
+            if alibi is None:
+                attn_output = torch.nn.functional.scaled_dot_product_attention(query, key, value, is_causal=is_causal)
+            else:
+                dropout = 0.0
+                alpha = 1.0/self.scale_attn 
+                beta = 1.0
+                attn_output = torch.xpu.IpexSDP(query, key, value, attention_mask, head_mask, alibi, alpha, beta, dropout, is_causal)
         else:
             attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi)
         return attn_output, attn_weights
