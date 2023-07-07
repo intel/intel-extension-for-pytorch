@@ -155,6 +155,28 @@ def meta_convolution_forward(
     out = out.to(memory_format=memory_format)  # type: ignore[call-overload]
     return out
 
+@register_meta("convolution_backward")
+def meta_convolution_backward(
+    input,
+    weight,
+    bias,
+    grad_output,
+    out_mask,
+    W_prepack,
+):
+    backend_grad_input = None
+    backend_grad_weight = None
+    backend_grad_bias = None
+
+    if out_mask[0]:
+        backend_grad_input = grad_output.new_empty(input.size())
+    if out_mask[1]:
+        backend_grad_weight = grad_output.new_empty(weight.size())
+    if out_mask[2]:
+        backend_grad_bias = grad_output.new_empty(bias.size())
+
+    return (backend_grad_input, backend_grad_weight, backend_grad_bias)
+
 @register_meta("conv_transpose")
 def meta_conv_transpose(
     input,
@@ -192,6 +214,28 @@ def meta_conv_transpose(
     out = out.to(memory_format=memory_format)  # type: ignore[call-overload]
     return out
 
+@register_meta("conv_transpose_backward")
+def meta_conv_transpose_backward(
+    input,
+    weight,
+    bias,
+    grad_output,
+    out_mask,
+    W_prepack,
+):
+    backend_grad_input = None
+    backend_grad_weight = None
+    backend_grad_bias = None
+
+    if out_mask[0]:
+        backend_grad_input = grad_output.new_empty(input.size())
+    if out_mask[1]:
+        backend_grad_weight = grad_output.new_empty(weight.size())
+    if out_mask[2]:
+        backend_grad_bias = grad_output.new_empty(bias.size())
+
+    return (backend_grad_input, backend_grad_weight, backend_grad_bias)
+
 @register_meta("ipex_linear")
 def meta_ipex_linear(
     input,
@@ -201,6 +245,28 @@ def meta_ipex_linear(
     out_features,
 ):
     return input.new_empty((*input.shape[:-1], out_features))
+
+@register_meta("linear_backward")
+def meta_linear_backward(
+    input,
+    weight,
+    bias,
+    grad_output,
+    out_mask,
+    W_prepack,
+):
+    backend_grad_input = None
+    backend_grad_weight = None
+    backend_grad_bias = None
+
+    if out_mask[0]:
+        backend_grad_input = grad_output.new_empty(input.size())
+    if out_mask[1]:
+        backend_grad_weight = grad_output.new_empty(weight.size())
+    if out_mask[2]:
+        backend_grad_bias = grad_output.new_empty(bias.size())
+
+    return (backend_grad_input, backend_grad_weight, backend_grad_bias)
 
 @register_meta("ipex_MKLSGEMM")
 def meta_ipex_MKLSGEMM(
@@ -256,3 +322,20 @@ def meta_ROIAlign_forward(
     aligned
 ):
     return input.new_empty((rois.shape[0], input.shape[1], pooled_height, pooled_width))
+
+@register_meta("ROIAlign_backward")
+def meta_ROIAlign_backward(
+    grad,
+    rois,
+    spatial_scale,
+    pooled_height,
+    pooled_width,
+    batch_size,
+    channels,
+    height,
+    width,
+    sampling_ratio,
+    aligned,
+    is_channels_last,
+):
+    return grad.new_empty((batch_size, channels, height, width))

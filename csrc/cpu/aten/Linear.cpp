@@ -177,6 +177,8 @@ at::Tensor linear_eltwise_forward(
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward(
     const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
     const at::Tensor& grad_output,
     std::array<bool, 3> output_mask,
     const at::Tensor& op_context) {
@@ -226,12 +228,13 @@ at::Tensor IPEXLinearOp::forward(
   ctx->saved_data["bias_requires_grad"] =
       bias.has_value() && bias.value().requires_grad() ? true : false;
   ctx->saved_data["eltwise"] = eltwise;
+  ctx->saved_data["bias"] = bias;
   auto output =
       _forward(input, weight, bias, eltwise, op_context, out_features);
   if (eltwise == NotFused)
-    ctx->save_for_backward({input});
+    ctx->save_for_backward({input, weight});
   else
-    ctx->save_for_backward({input, output});
+    ctx->save_for_backward({input, weight, output});
   return output;
 }
 
@@ -242,6 +245,7 @@ torch::autograd::tensor_list IPEXLinearOp::backward(
 
   auto saved = ctx->get_saved_variables();
   at::Tensor input = saved[0];
+  at::Tensor weight = saved[1];
   auto op_context = ctx->saved_data["op_context"].toTensor();
   std::array<bool, 3> output_mask;
   output_mask[0] = ctx->saved_data["input_requires_grad"].toBool();
@@ -249,11 +253,12 @@ torch::autograd::tensor_list IPEXLinearOp::backward(
   output_mask[2] = ctx->saved_data["bias_requires_grad"].toBool();
   int64_t eltwise = ctx->saved_data["eltwise"].toInt();
   auto batch_size = ctx->saved_data["batch_size"].toOptional<int64_t>();
+  auto bias = ctx->saved_data["bias"].toOptional<at::Tensor>();
   at::Tensor grad_output;
   if (eltwise == NotFused) {
     grad_output = grad_outputs[0];
   } else {
-    at::Tensor output = saved[1];
+    at::Tensor output = saved[2];
     grad_output = eltwise == ReLU
         ? relu_use_dst_for_bwd(grad_outputs[0], output)
         : sigmoid_use_dst_for_bwd(grad_outputs[0], output);
@@ -264,7 +269,7 @@ torch::autograd::tensor_list IPEXLinearOp::backward(
                        .findSchemaOrThrow("torch_ipex::linear_backward", "")
                        .typed<decltype(linear_backward)>();
   std::tie(grad_input, grad_weight, grad_bias) =
-      op.call(input, grad_output, output_mask, op_context);
+      op.call(input, weight, bias, grad_output, output_mask, op_context);
   // must have save nums of output with inputs args
   return {
       grad_input,
@@ -473,7 +478,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       torch_ipex::cpu::linear_eltwise_forward);
   // bw
   m.def(
-      "linear_backward(Tensor input, Tensor grad_output, bool[3] out_mask, "
+      "linear_backward(Tensor input, Tensor weight, Tensor? bias, Tensor grad_output, bool[3] out_mask, "
       "Tensor W_prepack) -> (Tensor, Tensor, Tensor)");
   m.impl(
       "linear_backward",

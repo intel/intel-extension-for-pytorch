@@ -370,6 +370,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward_kernel(
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward(
     const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias_opt,
     const at::Tensor& grad_output,
     std::array<bool, 3> output_mask,
     const at::Tensor& op_context) {
@@ -426,7 +428,8 @@ at::Tensor IPEXConvolutionOp::forward(
   ctx->saved_data["weight_requires_grad"] = weight.requires_grad();
   ctx->saved_data["bias_requires_grad"] =
       bias_opt.has_value() && bias_opt.value().requires_grad() ? true : false;
-  ctx->save_for_backward({input});
+  ctx->saved_data["bias_opt"] = bias_opt;
+  ctx->save_for_backward({input, weight});
 
   return _forward(
       input,
@@ -453,13 +456,15 @@ torch::autograd::variable_list IPEXConvolutionOp::backward(
   output_mask[2] = ctx->saved_data["bias_requires_grad"].toBool();
   auto saved = ctx->get_saved_variables();
   at::Tensor input = saved[0];
+  at::Tensor weight = saved[1];
+  auto bias_opt = ctx->saved_data["bias_opt"].toOptional<at::Tensor>();
   at::Tensor grad_input, grad_weight, grad_bias;
   static auto op =
       torch::Dispatcher::singleton()
           .findSchemaOrThrow("torch_ipex::convolution_backward", "")
           .typed<decltype(convolution_backward)>();
-  std::tie(grad_input, grad_weight, grad_bias) =
-      op.call(input, grad_outputs[0], output_mask, op_context);
+  std::tie(grad_input, grad_weight, grad_bias) = op.call(
+      input, weight, bias_opt, grad_outputs[0], output_mask, op_context);
   return {
       grad_input,
       grad_weight,
@@ -564,7 +569,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       torch_ipex::cpu::convolution_forward_impl);
   // bw
   m.def(
-      "convolution_backward(Tensor input, Tensor grad_output, bool[3] out_mask, "
+      "convolution_backward(Tensor input, Tensor weight, Tensor? bias, Tensor grad_output, bool[3] out_mask, "
       "Tensor W_prepack) -> (Tensor, Tensor, Tensor)");
   m.impl(
       "convolution_backward",
