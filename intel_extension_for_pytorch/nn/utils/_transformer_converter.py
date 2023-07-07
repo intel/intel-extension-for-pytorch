@@ -517,7 +517,7 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
         transformers.models.bloom.modeling_bloom.BloomBlock: IPEXBloomConverter
     }
     
-    no_deepspeed_engine = not deepspeed_optimize or isinstance(model, deepspeed.InferenceEngine)
+    no_deepspeed_engine = not deepspeed_optimize or not isinstance(model, deepspeed.InferenceEngine)
     if config is None and hasattr(model, "config") and no_deepspeed_engine:
         config = model.config
         config.dtype = dtype
