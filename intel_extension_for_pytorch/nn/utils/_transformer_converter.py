@@ -207,10 +207,10 @@ class IPEXOptConverter(IPEXTransformerConverter):
             is_decoder=True,
             do_norm_before=do_layer_norm_before,
             ln_elementwise_affine=layer_norm_eltwise_affine,
-            seq_first=False,
+            seq_first=True,
             kv_cache_optimize=False,
             positional_embedding_base=10000,
-            sdp_fusion_enable=False,
+            sdp_fusion_enable=True,
             device=self.device,
             dtype=self.dtype,
             tp_size=IPEXTransformerConverter.tp_size,
@@ -239,11 +239,11 @@ class IPEXOptConverter(IPEXTransformerConverter):
             del self.ipex_optimized_module.attn.v_proj.weight
             self.ipex_optimized_module.attn.out_wei = self.ipex_optimized_module.attn.out_proj.weight.transpose(0, 1).contiguous()
             del self.ipex_optimized_module.attn.out_proj.weight 
-            self.ipex_optimized_module.attn.qkv_wei = torch.stack([self.ipex_optimized_module.attn.q_wei, self.ipex_optimized_module.attn.k_wei, self.ipex_optimized_module.attn.v_wei]).contiguous()
-            self.ipex_optimized_module.attn.qkv_bias = None
-            del self.ipex_optimized_module.attn.q_wei
-            del self.ipex_optimized_module.attn.k_wei
-            del self.ipex_optimized_module.attn.v_wei
+            #self.ipex_optimized_module.attn.qkv_wei = torch.stack([self.ipex_optimized_module.attn.q_wei, self.ipex_optimized_module.attn.k_wei, self.ipex_optimized_module.attn.v_wei]).contiguous()
+            #self.ipex_optimized_module.attn.qkv_bias = None
+            #del self.ipex_optimized_module.attn.q_wei
+            #del self.ipex_optimized_module.attn.k_wei
+            #del self.ipex_optimized_module.attn.v_wei
 
     def port_mlp_parameters(self):
         self.ipex_optimized_module.mlp.fc_in.weight = self.module.fc1.weight

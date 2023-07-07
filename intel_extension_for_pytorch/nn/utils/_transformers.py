@@ -417,18 +417,29 @@ class IPEXOptAtten(IPEXTransformerAtten):
         is_cross_attention = key_value_state is not None
 
         bs, seq_len, _ = hidden_state.size()
-        query_states = self.q_proj(hidden_state) 
+        if self.row_major:
+            query_states = torch.matmul(hidden_state, self.q_wei)
+        else:
+            query_states = self.q_proj(hidden_state) 
         query_states = query_states * self.scaling
 
         if is_cross_attention and layer_past is not None:
             key_states = layer_past[0]
             value_state = layer_past[1]
         elif is_cross_attention:
-            key_states = self.k_proj(key_value_state)
-            value_state = self.v_proj(key_value_state)
+            if self.row_major:
+                key_states = torch.matmul(key_value_state, self.k_wei)
+                value_state = torch.matmul(key_value_state, self.v_wei)
+            else:
+                key_states = self.k_proj(key_value_state)
+                value_state = self.v_proj(key_value_state)
         else:
-            key_states = self.k_proj(hidden_state)
-            value_state = self.v_proj(hidden_state)
+            if self.row_major:
+                key_states = torch.matmul(hidden_state, self.k_wei)
+                value_state = torch.matmul(hidden_state, self.v_wei)
+            else:
+                key_states = self.k_proj(hidden_state)
+                value_state = self.v_proj(hidden_state)
 
         query_states = query_states.view(bs, seq_len, self.num_attn_head, self.head_dim)
         key_states = key_states.view(bs, seq_len, self.num_attn_head, self.head_dim)
