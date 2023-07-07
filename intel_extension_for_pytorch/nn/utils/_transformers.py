@@ -117,11 +117,14 @@ class IPEXTransformerAtten(nn.Module):
 
         self.cur_len = self.prev_len + hidden_states.size(1)
 
-        query = torch.empty_like(hidden_states)
+        shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
+        query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+        
         key = self.key_cached[:, self.prev_len : self.cur_len, :, :]
         value = self.value_cached[:, self.prev_len : self.cur_len, :, :]
-        key = key.view(query.shape)
-        value = value.view(query.shape)
+        key = key.view(shape)
+        value = value.view(shape)
+       
         torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
         return query, key, value
 
@@ -171,7 +174,7 @@ class IPEXTransformerAtten(nn.Module):
         if self.kv_cache_optimize and hidden_state.size(0) != 1:
             self.kv_cache_optimize = False
             print("Warning: kv cache optimize can only be enabled in greedy search. Set kv_cache_optimize to False !")
-        if self.kv_cache_optimize:
+        if self.kv_cache_optimize and self.row_major:
             if self.greedy:
                 query, key, value = self.qkv_cache_optimized_greedy(hidden_states=hidden_state, layer_past=layer_past)
             else:
@@ -219,7 +222,7 @@ class IPEXTransformerAtten(nn.Module):
         return query, key, value
 
     def combine_with_cache(self, query, key, value, layer_past = None):
-        if self.kv_cache_optimize:
+        if self.kv_cache_optimize and self.row_major:
             query, key, value = self.optimized_combine(query, key, value, layer_past=layer_past)
         else:
             query, key, value = self.normal_combine(query, key, value, layer_past=layer_past)
@@ -313,6 +316,7 @@ class IPEXTransformerAtten(nn.Module):
         # reshape the attn_output from [bs, head_num, seq_len, head_dim] back to [bs, seq_len, embedding_size]
         attn_output = attn_output.transpose(1, 2)
         attn_output = attn_output.reshape(attn_output.size()[:-2] + (self.embed_dim // self.tp_size,))
+
         if self.row_major:
             if residual is None:
                 attn_output = torch.matmul(attn_output, self.out_wei)
@@ -320,12 +324,13 @@ class IPEXTransformerAtten(nn.Module):
                 if self.out_bias is not None:
                     attn_output += self.out_bias
             else:
-                shape = attn_output.shape
+                shape = [attn_output.shape[0], attn_output.shape[1], self.embed_dim]
                 if self.out_bias is not None:
                     attn_output = torch.ops.torch_ipex.mm_bias_resadd(attn_output, self.out_wei, self.out_bias, residual, 1.0/self.tp_size)
                 else:
                     attn_output = torch.addmm(residual.flatten(0, -2), attn_output.flatten(0, -2), self.out_wei, beta=1.0/self.tp_size)
                 attn_output = attn_output.view(shape)
+                self.all_reduce_if_necessary(attn_output)
         else:
             attn_output = torch.matmul(attn_output, self.out_proj.weight.t())
             self.all_reduce_if_necessary(attn_output)
@@ -384,9 +389,10 @@ class IPEXBloomAttn(IPEXTransformerAtten):
 
     def qkv_normal(self, hidden_states, layer_past = None):
         if self.row_major:
-            query = torch.empty_like(hidden_states)
-            key = torch.empty_like(hidden_states)
-            value = torch.empty_like(hidden_states)
+            shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
+            query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            key = torch.empty_like(query)
+            value = torch.empty_like(query)
             torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
         else:
             fused_qkv = self.query_key_value(hidden_states)

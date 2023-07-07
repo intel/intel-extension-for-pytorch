@@ -439,9 +439,10 @@ class IPEXBloomConverter(IPEXTransformerConverter):
         self.ipex_optimized_module.self_attention.out_proj.weight = nn.Parameter(self.module.self_attention.dense.weight)
         self.ipex_optimized_module.self_attention.out_proj.bias = nn.Parameter(self.module.self_attention.dense.bias)
 
+        tp_size = self.ipex_transformers_config.tp_size
         if self.row_major:
             embed_dim = self.config.hidden_size
-            num_head = self.config.n_head
+            num_head = self.config.n_head // tp_size
             shape = [num_head, 3, -1, embed_dim]
             self.ipex_optimized_module.self_attention.qkv_wei = self.ipex_optimized_module.self_attention.query_key_value.weight.view(shape).contiguous().transpose(0, 1).contiguous().view([3, -1, embed_dim]).transpose(1, 2).contiguous()
             self.ipex_optimized_module.self_attention.qkv_bias = self.ipex_optimized_module.self_attention.query_key_value.bias.view([num_head, 3, -1]).transpose(0, 1).contiguous().view([3, -1])
