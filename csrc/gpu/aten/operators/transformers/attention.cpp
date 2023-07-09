@@ -262,6 +262,49 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
       is_causal);
   return output;
 }
+
+Tensor xetla_fsdp_index_forward(
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const Tensor& key_cache,
+    const Tensor& value_cache,
+    const Tensor& index,
+    const int64_t timestamp,
+    const c10::optional<Tensor>& attn_mask,
+    double dropout_p,
+    bool is_causal) {
+  /* query: [q_seq_lenth, batch_size * beam_num, num_head, head_dim]
+     key, key_cache : [kv_seq_lenth, batch_size * beam_num, num_head, head_dim]
+     value, value_cache: [kv_seq_lenth, batch_size * beam_num, num_head,
+     head_dim] output: [batch_size*beam_num, q_seq_lenth, num_head, head_dim]
+     index: [kv_seq_len, beam_num] */
+  auto out_sz = {
+      query.sizes()[1], query.sizes()[0], query.sizes()[2], query.sizes()[3]};
+  // TODO: need to confirm the stride of output
+  auto output = at::empty({out_sz}, query.options());
+  auto dpcpp_queue = dpcppGetCurrentQueue();
+  RECORD_FUNCTION("xetla_fsdp_index_forward", {});
+  gpu::xetla::fmha_forward_index_kernel(
+      dpcpp_queue,
+      query.data_ptr(),
+      key.data_ptr(),
+      value.data_ptr(),
+      key_cache.data_ptr(),
+      value_cache.data_ptr(),
+      output.data_ptr(),
+      index.data_ptr(),
+      attn_mask.has_value() ? attn_mask.value().data_ptr() : (void*)nullptr,
+      dropout_p,
+      timestamp,
+      query.size(1) /*num_batches*/,
+      query.size(2) /*num_heads*/,
+      query.size(3) /*head_size*/,
+      query.size(0) /*num_queries*/,
+      key.size(0) /*num_keys*/,
+      is_causal);
+  return output;
+}
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
@@ -270,6 +313,13 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
       "xetla_fsdp_forward_atten_mask_alibi_strided.xpu",
       at::AtenIpexTypeXPU::xetla_fsdp_forward_atten_mask_alibi_strided,
+      c10::DispatchKey::XPU);
+}
+
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
+      "xetla_fsdp_index_forward.xpu",
+      at::AtenIpexTypeXPU::xetla_fsdp_index_forward,
       c10::DispatchKey::XPU);
 }
 } // namespace

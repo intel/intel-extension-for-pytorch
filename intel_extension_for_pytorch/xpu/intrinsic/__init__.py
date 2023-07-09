@@ -14,6 +14,7 @@ __all__ = [
     'locations_to_boxes',
     'roi_align',
     'IpexSDP',
+    'IpexSDP_Index',
 ]
 
 
@@ -103,6 +104,31 @@ def IpexSDP(
         head_mask,
         alpha,
         beta,
+        dropout_p,
+        is_causal
+    )
+
+def IpexSDP_Index(
+    query,
+    key,
+    value,
+    key_cache,
+    value_cache,
+    index,
+    timestamp,
+    attn_mask,
+    dropout_p = 0.0,
+    is_causal = False
+) -> Tensor:
+    return torch.ops.torch_ipex.xetla_fsdp_index_forward(
+        query,
+        key,
+        value,
+        key_cache,
+        value_cache,
+        index,
+        timestamp,
+        attn_mask,
         dropout_p,
         is_causal
     )

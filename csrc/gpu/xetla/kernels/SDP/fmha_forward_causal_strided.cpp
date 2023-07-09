@@ -902,4 +902,25 @@ void fmha_forward_kernel(
     }
   }
 }
+void fmha_forward_index_kernel(
+    sycl::queue& q,
+    void* query,
+    void* key,
+    void* value,
+    void* key_cache,
+    void* value_cache,
+    void* out,
+    void* index,
+    void* attn_mask,
+    float dropout_p,
+    uint32_t timestamp,
+    uint32_t num_batches,
+    uint32_t num_heads,
+    uint32_t head_size,
+    uint32_t num_queries,
+    uint32_t num_keys,
+    bool is_causal) {
+  std::cout << "fmha_forward_index_kernel is WIP.......\n";
+  // TODO: enable kernel
+}
 } // namespace gpu::xetla

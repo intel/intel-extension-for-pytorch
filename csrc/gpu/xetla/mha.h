@@ -4,7 +4,6 @@
 
 #include <sycl/sycl.hpp>
 
-// namespace xpu {
 namespace gpu::xetla {
 
 void fmha_forward_op(
@@ -84,5 +83,23 @@ void fmha_forward_op_attn_mask_alibi_strided(
     uint32_t num_queries,
     uint32_t num_keys);
 
+void fmha_forward_index_kernel(
+    sycl::queue& q,
+    void* query,
+    void* key,
+    void* value,
+    void* key_cache,
+    void* value_cache,
+    void* out,
+    void* index,
+    void* attn_mask,
+    float dropout_p,
+    uint32_t timestamp,
+    uint32_t num_batches,
+    uint32_t num_heads,
+    uint32_t head_size,
+    uint32_t num_queries,
+    uint32_t num_keys,
+    bool is_causal);
+
 } // namespace gpu::xetla
-//} // namespace xpu
