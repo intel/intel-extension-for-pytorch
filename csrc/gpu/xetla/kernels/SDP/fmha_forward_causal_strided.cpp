@@ -660,8 +660,8 @@ void fmha_forward_causal_strided_impl(
     uint32_t num_queries,
     uint32_t num_keys) {
   // printf(
-  //     "B, N, F, T, H: %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d, alibi @ 0x%llx\n",
-  //     num_batches,
+  //     "B, N, F, T, H: %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d,
+  //     IsCausal: %d, IsTraining: %d, alibi @ 0x%llx\n", num_batches,
   //     num_heads,
   //     num_queries,
   //     num_keys,

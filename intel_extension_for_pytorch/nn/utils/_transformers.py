@@ -307,14 +307,19 @@ class IPEXTransformerAtten(nn.Module):
             is_causal = True if attention_mask is None else False
             if query.shape[2] <= 1:
                 is_causal = False
-
             if alibi is None:
                 attn_output = torch.nn.functional.scaled_dot_product_attention(query, key, value, is_causal=is_causal)
             else:
                 dropout = 0.0
                 alpha = self.inv_norm_factor 
                 beta = self.beta
-                attn_output = torch.xpu.IpexSDP(query, key, value, attention_mask, alibi, head_mask, alpha, beta, dropout, is_causal)
+                if type(self) == IPEXBloomAttn:
+                    if query.shape[2] <= 1:
+                        attn_output = torch.xpu.IpexSDP(query, key, value, None, alibi, head_mask, alpha, beta, dropout, False)
+                    else:
+                        attn_output = torch.xpu.IpexSDP(query, key, value, None, alibi, head_mask, alpha, beta, dropout, True)
+                else:
+                    attn_output = torch.xpu.IpexSDP(query, key, value, attention_mask, alibi, head_mask, alpha, beta, dropout, is_causal)
         else:
             attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi)
         return attn_output, attn_weights
