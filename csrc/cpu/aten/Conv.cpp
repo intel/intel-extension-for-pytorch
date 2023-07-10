@@ -374,7 +374,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward(
     const c10::optional<at::Tensor>& bias_opt,
     const at::Tensor& grad_output,
     std::array<bool, 3> output_mask,
-    const at::Tensor& op_context) {
+    const at::Tensor& op_context,
+    c10::optional<bool> weight_channels_last) {
   return reinterpret_cast<IpexConvolutionOpContext*>(
              op_context.data_ptr<int64_t>()[0])
       ->run_backward(input, grad_output, output_mask);
@@ -429,6 +430,7 @@ at::Tensor IPEXConvolutionOp::forward(
   ctx->saved_data["bias_requires_grad"] =
       bias_opt.has_value() && bias_opt.value().requires_grad() ? true : false;
   ctx->saved_data["bias_opt"] = bias_opt;
+  ctx->saved_data["weight_channels_last"] = weight_channels_last;
   ctx->save_for_backward({input, weight});
 
   return _forward(
@@ -454,17 +456,25 @@ torch::autograd::variable_list IPEXConvolutionOp::backward(
   output_mask[0] = ctx->saved_data["input_requires_grad"].toBool();
   output_mask[1] = ctx->saved_data["weight_requires_grad"].toBool();
   output_mask[2] = ctx->saved_data["bias_requires_grad"].toBool();
+  auto bias_opt = ctx->saved_data["bias_opt"].toOptional<at::Tensor>();
+  auto weight_channels_last =
+      ctx->saved_data["weight_channels_last"].toOptional<bool>();
   auto saved = ctx->get_saved_variables();
   at::Tensor input = saved[0];
   at::Tensor weight = saved[1];
-  auto bias_opt = ctx->saved_data["bias_opt"].toOptional<at::Tensor>();
   at::Tensor grad_input, grad_weight, grad_bias;
   static auto op =
       torch::Dispatcher::singleton()
           .findSchemaOrThrow("torch_ipex::convolution_backward", "")
           .typed<decltype(convolution_backward)>();
   std::tie(grad_input, grad_weight, grad_bias) = op.call(
-      input, weight, bias_opt, grad_outputs[0], output_mask, op_context);
+      input,
+      weight,
+      bias_opt,
+      grad_outputs[0],
+      output_mask,
+      op_context,
+      weight_channels_last);
   return {
       grad_input,
       grad_weight,
@@ -570,7 +580,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   // bw
   m.def(
       "convolution_backward(Tensor input, Tensor weight, Tensor? bias, Tensor grad_output, bool[3] out_mask, "
-      "Tensor W_prepack) -> (Tensor, Tensor, Tensor)");
+      "Tensor W_prepack, bool? weight_channels_last) -> (Tensor, Tensor, Tensor)");
   m.impl(
       "convolution_backward",
       c10::DispatchKey::CPU,

@@ -5,16 +5,21 @@ import torch
 import torch.library
 from torch._prims_common import IntLike
 
+
 @functools.lru_cache(None)
 def get_meta_lib():
     return torch.library.Library("torch_ipex", "IMPL", "Meta")
 
+
 def register_meta(op_name, overload_name="default"):
     def wrapper(fn):
-        get_meta_lib().impl(getattr(getattr(torch.ops.torch_ipex, op_name), overload_name), fn)
+        get_meta_lib().impl(
+            getattr(getattr(torch.ops.torch_ipex, op_name), overload_name), fn
+        )
         return fn
 
     return wrapper
+
 
 def calc_conv_nd_return_shape(
     input_tensor,
@@ -114,11 +119,14 @@ def calc_conv_nd_return_shape(
 
     return ret_shape
 
+
 def is_channels_last(ten):
     return torch._prims_common.suggest_memory_format(ten) == torch.channels_last
 
+
 def is_channels_last_3d(ten):
     return torch._prims_common.suggest_memory_format(ten) == torch.channels_last_3d
+
 
 @register_meta("convolution_forward")
 def meta_convolution_forward(
@@ -143,7 +151,9 @@ def meta_convolution_forward(
         None,
     )
 
-    use_channels_last = is_channels_last(input) or is_channels_last_3d(input) or weight_channels_last
+    use_channels_last = (
+        is_channels_last(input) or is_channels_last_3d(input) or weight_channels_last
+    )
     memory_format = torch.contiguous_format
     if use_channels_last:
         if input.dim() == 4:
@@ -155,6 +165,7 @@ def meta_convolution_forward(
     out = out.to(memory_format=memory_format)  # type: ignore[call-overload]
     return out
 
+
 @register_meta("convolution_backward")
 def meta_convolution_backward(
     input,
@@ -163,19 +174,33 @@ def meta_convolution_backward(
     grad_output,
     out_mask,
     W_prepack,
+    weight_channels_last,
 ):
+    use_channels_last = (
+        is_channels_last(input) or is_channels_last_3d(input) or weight_channels_last
+    )
+    memory_format = torch.contiguous_format
+    if use_channels_last:
+        if input.dim() == 4:
+            memory_format = torch.channels_last
+        elif input.dim() == 5:
+            memory_format = torch.channels_last_3d
+
     backend_grad_input = None
     backend_grad_weight = None
     backend_grad_bias = None
 
     if out_mask[0]:
-        backend_grad_input = grad_output.new_empty(input.size())
+        backend_grad_input = grad_output.new_empty(input.size()).to(
+            memory_format=memory_format
+        )
     if out_mask[1]:
         backend_grad_weight = grad_output.new_empty(weight.size())
     if out_mask[2]:
         backend_grad_bias = grad_output.new_empty(bias.size())
 
     return (backend_grad_input, backend_grad_weight, backend_grad_bias)
+
 
 @register_meta("conv_transpose")
 def meta_conv_transpose(
@@ -202,7 +227,9 @@ def meta_conv_transpose(
         output_padding,
     )
 
-    use_channels_last = is_channels_last(input) or is_channels_last_3d(input) or weight_channels_last
+    use_channels_last = (
+        is_channels_last(input) or is_channels_last_3d(input) or weight_channels_last
+    )
     memory_format = torch.contiguous_format
     if use_channels_last:
         if input.dim() == 4:
@@ -214,6 +241,7 @@ def meta_conv_transpose(
     out = out.to(memory_format=memory_format)  # type: ignore[call-overload]
     return out
 
+
 @register_meta("conv_transpose_backward")
 def meta_conv_transpose_backward(
     input,
@@ -222,19 +250,33 @@ def meta_conv_transpose_backward(
     grad_output,
     out_mask,
     W_prepack,
+    weight_channels_last,
 ):
+    use_channels_last = (
+        is_channels_last(input) or is_channels_last_3d(input) or weight_channels_last
+    )
+    memory_format = torch.contiguous_format
+    if use_channels_last:
+        if input.dim() == 4:
+            memory_format = torch.channels_last
+        elif input.dim() == 5:
+            memory_format = torch.channels_last_3d
+
     backend_grad_input = None
     backend_grad_weight = None
     backend_grad_bias = None
 
     if out_mask[0]:
-        backend_grad_input = grad_output.new_empty(input.size())
+        backend_grad_input = grad_output.new_empty(input.size()).to(
+            memory_format=memory_format
+        )
     if out_mask[1]:
         backend_grad_weight = grad_output.new_empty(weight.size())
     if out_mask[2]:
         backend_grad_bias = grad_output.new_empty(bias.size())
 
     return (backend_grad_input, backend_grad_weight, backend_grad_bias)
+
 
 @register_meta("ipex_linear")
 def meta_ipex_linear(
@@ -245,6 +287,7 @@ def meta_ipex_linear(
     out_features,
 ):
     return input.new_empty((*input.shape[:-1], out_features))
+
 
 @register_meta("linear_backward")
 def meta_linear_backward(
@@ -268,6 +311,7 @@ def meta_linear_backward(
 
     return (backend_grad_input, backend_grad_weight, backend_grad_bias)
 
+
 @register_meta("ipex_MKLSGEMM")
 def meta_ipex_MKLSGEMM(
     input,
@@ -277,6 +321,7 @@ def meta_ipex_MKLSGEMM(
     out_features,
 ):
     return input.new_empty((*input.shape[:-1], out_features))
+
 
 @register_meta("embedding_bag")
 def meta_embedding_bag(
@@ -291,6 +336,7 @@ def meta_embedding_bag(
         num_bags = indices.shape[0]
     shape_out = [num_bags, weight.shape[1]]
     return weight.new_empty(shape_out)
+
 
 @register_meta("ipex_lstm")
 def meta_ipex_lstm(
@@ -311,17 +357,15 @@ def meta_ipex_lstm(
     cy = hx[1].new_empty(hx[1].size())
     return (out, hy, cy)
 
+
 @register_meta("ROIAlign_forward")
 def meta_ROIAlign_forward(
-    input,
-    rois,
-    spatial_scale,
-    pooled_height,
-    pooled_width,
-    sampling_ratio,
-    aligned
+    input, rois, spatial_scale, pooled_height, pooled_width, sampling_ratio, aligned
 ):
-    return input.new_empty((rois.shape[0], input.shape[1], pooled_height, pooled_width))
+    return input.new_empty(
+        (rois.shape[0], input.shape[1], pooled_height, pooled_width)
+    ).to(memory_format=torch._prims_common.suggest_memory_format(input))
+
 
 @register_meta("ROIAlign_backward")
 def meta_ROIAlign_backward(
@@ -338,4 +382,8 @@ def meta_ROIAlign_backward(
     aligned,
     is_channels_last,
 ):
-    return grad.new_empty((batch_size, channels, height, width))
+    return grad.new_empty((batch_size, channels, height, width)).to(
+        memory_format=torch.channels_last
+        if is_channels_last
+        else torch.contiguous_format
+    )
