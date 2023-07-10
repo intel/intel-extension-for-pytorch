@@ -104,7 +104,9 @@ using namespace xpu::xetla;
 
 #define HGEMM_BIAS_XRES_DISPATCH(F)                                       \
   {                                                                       \
-    RECORD_FUNCTION("torch_ipex::" #F, c10::ArrayRef<c10::IValue>({}));   \
+    char str__[100];                                                      \
+    sprintf(str__, "%s(%d, %d, %d)", "" #F, m_, n_, k_);                  \
+    RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));               \
     F(q,                                                                  \
       reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),            \
       reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),            \
