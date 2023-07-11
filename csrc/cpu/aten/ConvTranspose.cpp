@@ -445,7 +445,19 @@ conv_transpose_backward_kernel_impl(
   RECORD_FUNCTION(
       "torch_ipex::conv_transpose_backward", c10::ArrayRef<c10::IValue>({}));
 
-  auto memory_format = input.suggest_memory_format();
+  bool use_channels_last =
+      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
+      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d ||
+      weight_channels_last;
+
+  auto memory_format = at::MemoryFormat::Contiguous;
+  if (use_channels_last) {
+    if (input.dim() == 4) {
+      memory_format = at::MemoryFormat::ChannelsLast;
+    } else {
+      memory_format = at::MemoryFormat::ChannelsLast3d;
+    }
+  }
   at::Tensor grad_output = grad_output_t.contiguous(memory_format);
 
   at::Tensor grad_input, grad_weight, grad_bias;

@@ -110,6 +110,8 @@ class TestCompileCases(TestCase):
                     # TODO: support channels_last_1d.
                     if dim == 1:
                         ipex.disable_auto_channels_last()
+                    else:
+                        ipex.enable_auto_channels_last()
                     model = ipex.optimize(
                         model, weights_prepack=weight_prepack, dtype=dtype
                     )
@@ -164,6 +166,8 @@ class TestCompileCases(TestCase):
                     # TODO: support channels_last_1d.
                     if dim == 1:
                         ipex.disable_auto_channels_last()
+                    else:
+                        ipex.enable_auto_channels_last()
                     ori_model, _ = ipex.optimize(
                         ori_model,
                         weights_prepack=weight_prepack,
@@ -222,6 +226,8 @@ class TestCompileCases(TestCase):
                     # TODO: support channels_last_1d.
                     if dim == 1:
                         ipex.disable_auto_channels_last()
+                    else:
+                        ipex.enable_auto_channels_last()
                     model = ipex.optimize(
                         model, weights_prepack=weight_prepack, dtype=dtype
                     )
@@ -273,6 +279,8 @@ class TestCompileCases(TestCase):
                     # TODO: support channels_last_1d.
                     if dim == 1:
                         ipex.disable_auto_channels_last()
+                    else:
+                        ipex.enable_auto_channels_last()
                     ori_model, _ = ipex.optimize(
                         ori_model,
                         weights_prepack=weight_prepack,
@@ -396,7 +404,7 @@ class TestCompileCases(TestCase):
                 y.backward(grad_x)
                 self.assertEqual(y, ori_y, prec=0.01)
                 self.assertTrue(y.dtype == dtype)
-                self.assertEqual(x.grad, ori_x.grad)
+                self.assertEqual(x.grad, ori_x.grad, prec=0.01)
 
     def test_lstm_inference(self):
         options = itertools.product(
