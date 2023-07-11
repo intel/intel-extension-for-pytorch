@@ -77,7 +77,7 @@ class IPEXTransformerAtten(nn.Module):
         self.head_dim = self.config.embed_dim // self.config.num_attention_heads
         self.position_emb = self.config.rotary_embedding_class(config=self.config)
         if self.config.scale_attention:
-            self.scale_attn = torch.sqrt(torch.tensor(self.head_dim, device="xpu"))
+            self.scale_attn = torch.sqrt(torch.tensor(self.head_dim, device=self.config.device))
         else:
             self.scale_attn = None
         self.k_proj = IPEXEmptyLinear()
