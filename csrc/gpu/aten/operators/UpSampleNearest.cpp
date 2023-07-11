@@ -676,7 +676,6 @@ static void upsample_nearest2d_out_template(
   if (input_.numel() == 0) {
     return;
   }
-
   int output_height = output_size[0];
   int output_width = output_size[1];
 
@@ -911,7 +910,7 @@ static void upsample_nearest3d_out_template(
       "' but got '",
       output.device(),
       "' for nearest output");
-  // TODO: remove this when the cuda kernel is updated to support the
+  // TODO: remove this when the kernel is updated to support the
   // channels_last memory format. This is a temporary hack to prevent a silence
   // correctness issue when calling this kernel with tensors in channels_last
   // format.
@@ -1083,15 +1082,65 @@ Tensor& upsample_nearest3d_out(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w,
     Tensor& output) {
+  TORCH_CHECK(
+      input.device() == output.device(),
+      "expected device '",
+      input.device(),
+      "' but got '",
+      output.device(),
+      "' for nearest output");
+
+  int output_depth = output_size[0];
+  int output_height = output_size[1];
+  int output_width = output_size[2];
+
+  int input_depth = input.size(2);
+  int input_height = input.size(3);
+  int input_width = input.size(4);
+  bool onednn_path = (output_depth % input_depth == 0) &&
+      (output_height % input_height == 0) && (output_width % input_width == 0);
+
+  // temp fix: restore onednn path for integral scale cases
+  // TODO: optimize perf for sycl implementation for both integral and
+  // non-integral scale cases
+  if (onednn_path) {
+    xpu::oneDNN::resample(
+        input,
+        output,
+        output_size,
+        algorithm::resampling_nearest,
+        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
+        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f,
+        scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0f);
+  } else {
+    at::AtenIpexTypeXPU::to_plain_if_needed_(input);
+    upsample_nearest3d_out_template(
+        output,
+        input,
+        output_size,
+        scales_d,
+        scales_h,
+        scales_w,
+        Nearest_index_op());
+  }
+  return output;
+}
+
+Tensor upsample_nearest3d(
+    const Tensor& input,
+    c10::OptionalIntArrayRef output_size,
+    c10::optional<ArrayRef<double>> scale_factors) {
   at::AtenIpexTypeXPU::to_plain_if_needed_(input);
-  upsample_nearest3d_out_template(
-      output,
-      input,
-      output_size,
-      scales_d,
-      scales_h,
-      scales_w,
-      Nearest_index_op());
+  auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
+  auto scale_d = get_scale_value(scale_factors, 0);
+  auto scale_h = get_scale_value(scale_factors, 1);
+  auto scale_w = get_scale_value(scale_factors, 2);
+  auto output = at::empty(
+      {input.size(0), input.size(1), osize[0], osize[1], osize[2]},
+      input.options());
+
+  at::AtenIpexTypeXPU::upsample_nearest3d_out(
+      input, osize, scale_d, scale_h, scale_w, output);
   return output;
 }
 
@@ -1112,24 +1161,6 @@ Tensor _upsample_nearest_exact3d(
       scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0f,
       scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0f,
       scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0f);
-  return output;
-}
-
-Tensor upsample_nearest3d(
-    const Tensor& input,
-    c10::OptionalIntArrayRef output_size,
-    c10::optional<ArrayRef<double>> scale_factors) {
-  at::AtenIpexTypeXPU::to_plain_if_needed_(input);
-  auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
-  auto scale_d = get_scale_value(scale_factors, 0);
-  auto scale_h = get_scale_value(scale_factors, 1);
-  auto scale_w = get_scale_value(scale_factors, 2);
-  auto output = at::empty(
-      {input.size(0), input.size(1), osize[0], osize[1], osize[2]},
-      input.options());
-
-  upsample_nearest3d_out_template(
-      output, input, osize, scale_d, scale_h, scale_w, Nearest_index_op());
   return output;
 }
 
@@ -1161,16 +1192,43 @@ Tensor& upsample_nearest3d_backward_out(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w,
     Tensor& grad_input) {
-  at::AtenIpexTypeXPU::to_plain_if_needed_(grad_output);
-  upsample_nearest3d_backward_out_template(
-      grad_input,
-      grad_output,
-      output_size,
-      input_size,
-      scales_d,
-      scales_h,
-      scales_w,
-      Nearest_bw_index_op());
+  int output_depth = output_size[0];
+  int output_height = output_size[1];
+  int output_width = output_size[2];
+
+  int input_depth = input_size[2];
+  int input_height = input_size[3];
+  int input_width = input_size[4];
+  bool onednn_path =
+      ((output_depth % input_depth == 0) &&
+       (output_height % input_height == 0) &&
+       (output_width % input_width == 0));
+
+  // temp fix: restore onednn path for integral scale cases
+  // TODO: optimize perf for sycl implementation for both integral and
+  // non-integral scale cases
+  if (onednn_path) {
+    xpu::oneDNN::resample_backward(
+        grad_input,
+        grad_output,
+        input_size,
+        output_size,
+        algorithm::resampling_nearest,
+        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
+        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f,
+        scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0f);
+  } else {
+    at::AtenIpexTypeXPU::to_plain_if_needed_(grad_output);
+    upsample_nearest3d_backward_out_template(
+        grad_input,
+        grad_output,
+        output_size,
+        input_size,
+        scales_d,
+        scales_h,
+        scales_w,
+        Nearest_bw_index_op());
+  }
   return grad_input;
 }
 
@@ -1196,9 +1254,30 @@ Tensor& upsample_nearest2d_out(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w,
     Tensor& output) {
-  at::AtenIpexTypeXPU::to_plain_if_needed_(input);
-  upsample_nearest2d_out_template(
-      output, input, output_size, scales_h, scales_w, Nearest_index_op());
+  int output_height = output_size[0];
+  int output_width = output_size[1];
+
+  int input_height = input.size(2);
+  int input_width = input.size(3);
+  bool onednn_path =
+      (output_height % input_height == 0) && (output_width % input_width == 0);
+
+  // temp fix: restore onednn path for integral scale cases
+  // TODO: optimize perf for sycl implementation for both integral and
+  // non-integral scale cases
+  if (onednn_path) {
+    xpu::oneDNN::resample(
+        input,
+        output,
+        output_size,
+        algorithm::resampling_nearest,
+        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
+        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
+  } else {
+    at::AtenIpexTypeXPU::to_plain_if_needed_(input);
+    upsample_nearest2d_out_template(
+        output, input, output_size, scales_h, scales_w, Nearest_index_op());
+  }
   return output;
 }
 
@@ -1227,15 +1306,38 @@ Tensor& upsample_nearest2d_backward_out(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w,
     Tensor& grad_input) {
-  at::AtenIpexTypeXPU::to_plain_if_needed_(grad_output);
-  upsample_nearest2d_backward_out_template(
-      grad_input,
-      grad_output,
-      output_size,
-      input_size,
-      scales_h,
-      scales_w,
-      Nearest_bw_index_op());
+  auto compute_eng = Settings::I().get_compute_eng();
+  int output_height = output_size[0];
+  int output_width = output_size[1];
+
+  int input_height = input_size[2];
+  int input_width = input_size[3];
+  bool onednn_path =
+      (output_height % input_height == 0) && (output_width % input_width == 0);
+
+  // temp fix: restore onednn path for integral scale cases
+  // TODO: optimize perf for sycl implementation for both integral and
+  // non-integral scale cases
+  if (onednn_path) {
+    xpu::oneDNN::resample_backward(
+        grad_input,
+        grad_output,
+        input_size,
+        output_size,
+        algorithm::resampling_nearest,
+        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
+        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
+  } else {
+    at::AtenIpexTypeXPU::to_plain_if_needed_(grad_output);
+    upsample_nearest2d_backward_out_template(
+        grad_input,
+        grad_output,
+        output_size,
+        input_size,
+        scales_h,
+        scales_w,
+        Nearest_bw_index_op());
+  }
   return grad_input;
 }
 
@@ -1268,18 +1370,37 @@ Tensor upsample_nearest1d(
       output_width,
       ")");
 
-  at::AtenIpexTypeXPU::to_plain_if_needed_(input);
-  auto output = at::empty(
-      {nbatch, channels, output_width},
-      input.options(),
-      suggest_memory_format_dpcpp(input));
-  if (suggest_memory_format_dpcpp(input) == CHANNELSLAST1D_DPCPP) {
-    auto tmp = output.contiguous(at::MemoryFormat::Contiguous);
-    output = convert_tensor_to_channels_last_1d(tmp);
+  // temp fix: restore onednn path for integral scale cases
+  // TODO: optimize perf for sycl implementation for both integral and
+  // non-integral scale cases
+  bool onednn_path = (output_width % input_width == 0);
+  if (onednn_path) {
+    auto output = at::empty(
+        {nbatch, channels, output_width},
+        input.options(),
+        suggest_memory_format_dpcpp(input));
+
+    xpu::oneDNN::resample(
+        input,
+        output,
+        output_size,
+        algorithm::resampling_nearest,
+        scales.has_value() ? static_cast<double>(scales.value()) : 0.0f);
+    return output;
+  } else {
+    at::AtenIpexTypeXPU::to_plain_if_needed_(input);
+    auto output = at::empty(
+        {nbatch, channels, output_width},
+        input.options(),
+        suggest_memory_format_dpcpp(input));
+    if (suggest_memory_format_dpcpp(input) == CHANNELSLAST1D_DPCPP) {
+      auto tmp = output.contiguous(at::MemoryFormat::Contiguous);
+      output = convert_tensor_to_channels_last_1d(tmp);
+    }
+    upsample_nearest1d_out_template(
+        output, input, output_size, scales, Nearest_index_op());
+    return output;
   }
-  upsample_nearest1d_out_template(
-      output, input, output_size, scales, Nearest_index_op());
-  return output;
 }
 
 Tensor& upsample_nearest1d_out(
@@ -1287,9 +1408,25 @@ Tensor& upsample_nearest1d_out(
     IntArrayRef output_size,
     c10::optional<double> scales,
     Tensor& output) {
-  at::AtenIpexTypeXPU::to_plain_if_needed_(input);
-  upsample_nearest1d_out_template(
-      output, input, output_size, scales, Nearest_index_op());
+  int64_t output_width = output_size[0];
+  int64_t input_width = input.size(2);
+
+  bool onednn_path = (output_width % input_width == 0);
+  // temp fix: restore onednn path for integral scale cases
+  // TODO: optimize perf for sycl implementation for both integral and
+  // non-integral scale cases
+  if (onednn_path) {
+    xpu::oneDNN::resample(
+        input,
+        output,
+        output_size,
+        algorithm::resampling_nearest,
+        scales.has_value() ? static_cast<double>(scales.value()) : 0.0f);
+  } else {
+    at::AtenIpexTypeXPU::to_plain_if_needed_(input);
+    upsample_nearest1d_out_template(
+        output, input, output_size, scales, Nearest_index_op());
+  }
   return output;
 }
 
@@ -1315,14 +1452,31 @@ Tensor& upsample_nearest1d_backward_out(
     IntArrayRef input_size,
     c10::optional<double> scales,
     Tensor& grad_input) {
-  at::AtenIpexTypeXPU::to_plain_if_needed_(grad_output);
-  upsample_nearest1d_backward_out_template(
-      grad_input,
-      grad_output,
-      output_size,
-      input_size,
-      scales,
-      Nearest_bw_index_op());
+  int64_t output_width = output_size[0];
+  int64_t input_width = input_size[2];
+
+  bool onednn_path = (output_width % input_width == 0);
+  // temp fix: restore onednn path for integral scale cases
+  // TODO: optimize perf for sycl implementation for both integral and
+  // non-integral scale cases
+  if (onednn_path) {
+    xpu::oneDNN::resample_backward(
+        grad_input,
+        grad_output,
+        input_size,
+        output_size,
+        algorithm::resampling_nearest,
+        scales.has_value() ? static_cast<double>(scales.value()) : 0.0f);
+  } else {
+    at::AtenIpexTypeXPU::to_plain_if_needed_(grad_output);
+    upsample_nearest1d_backward_out_template(
+        grad_input,
+        grad_output,
+        output_size,
+        input_size,
+        scales,
+        Nearest_bw_index_op());
+  }
   return grad_input;
 }
 
@@ -1474,14 +1628,40 @@ Tensor upsample_nearest2d(
     IntArrayRef output_size,
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
-  to_plain_if_needed_(input);
+  int output_height = output_size[0];
+  int output_width = output_size[1];
 
-  return q_upsample_nearest2d_template(
-      input,
-      output_size,
-      scales_h,
-      scales_w,
-      at::AtenIpexTypeXPU::Nearest_index_op());
+  int input_height = input.size(2);
+  int input_width = input.size(3);
+  bool onednn_path =
+      (output_height % input_height == 0) && (output_width % input_width == 0);
+  // temp fix: restore onednn path for integral scale cases
+  // TODO: optimize perf for sycl implementation for both integral and
+  // non-integral scale cases
+  if (onednn_path) {
+    Tensor output = at::_empty_affine_quantized(
+        input.sizes(),
+        input.options().dtype(toQIntType(input.scalar_type())),
+        input.q_scale(),
+        input.q_zero_point());
+    xpu::oneDNN::resample(
+        input,
+        output,
+        output_size,
+        algorithm::resampling_nearest,
+        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
+        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
+    return output;
+  } else {
+    to_plain_if_needed_(input);
+
+    return q_upsample_nearest2d_template(
+        input,
+        output_size,
+        scales_h,
+        scales_w,
+        at::AtenIpexTypeXPU::Nearest_index_op());
+  }
 }
 
 Tensor upsample_nearest3d(
