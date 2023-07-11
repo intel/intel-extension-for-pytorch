@@ -60,6 +60,7 @@ import contextlib
 import torch
 import torch.nn as nn
 import torch.fx.experimental.optimization as optimization
+from torch.optim import SGD
 from torch.testing import FileCheck
 import copy
 
@@ -5405,15 +5406,25 @@ class Tester(TestCase):
             torch.randn(2, 3),
             torch.randn(1, 3, 56, 56),
         ]
-        auto_kernel_selection_config = [True, False]
 
         for module, data in zip(modules, inputs):
-            for auto_kernel_selection in auto_kernel_selection_config:
+            for auto_kernel_selection, train_and_eval in itertools.product(
+                [True, False], [True, False]
+            ):
                 # Currently auto_kernel_selection only shows different behavior for nn.Linear
                 if auto_kernel_selection and not isinstance(module, nn.Linear):
                     continue
 
                 model = M(module)
+                if train_and_eval:
+                    model.train()
+                    origin_optimizer1 = SGD(model.parameters(), lr=0.01, momentum=0.9)
+                    model, _ = ipex.optimize(
+                        model,
+                        optimizer=origin_optimizer1,
+                        auto_kernel_selection=auto_kernel_selection,
+                    )
+
                 model.eval()
                 optimized = ipex.optimize(
                     model, auto_kernel_selection=auto_kernel_selection

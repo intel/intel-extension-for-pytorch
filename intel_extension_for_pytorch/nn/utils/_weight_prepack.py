@@ -356,18 +356,21 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
                 optimizer, optimizer_para, param_wrapper
             )
             new_m.training = is_training
-            if not is_training:
-                # _ipex_module_empty_weight_tensor and _ipex_module_empty_bias_tensor
-                # have to be a Parameter so that dynamo could convert it into FakeTensor
-                new_m._ipex_module_empty_weight_tensor = torch.nn.Parameter(
-                    torch.Tensor().to(dtype=new_m.weight.dtype)
+            # _ipex_module_empty_weight_tensor and _ipex_module_empty_bias_tensor
+            # have to be a Parameter so that dynamo could convert it into FakeTensor
+            # These empty tensors will only be used during inference but we'll set
+            # it in both training and eval mode to supprt the use case of the below
+            # workflow:
+            # model.train() -> ipex.optimize(model) -> model.eval()
+            new_m._ipex_module_empty_weight_tensor = torch.nn.Parameter(
+                torch.Tensor().to(dtype=new_m.weight.dtype)
+            )
+            if new_m.bias is None:
+                new_m.register_parameter("_ipex_module_empty_bias_tensor", None)
+            else:
+                new_m._ipex_module_empty_bias_tensor = torch.nn.Parameter(
+                    torch.Tensor().to(dtype=new_m.bias.dtype)
                 )
-                if new_m.bias is None:
-                    new_m.register_parameter("_ipex_module_empty_bias_tensor", None)
-                else:
-                    new_m._ipex_module_empty_bias_tensor = torch.nn.Parameter(
-                        torch.Tensor().to(dtype=new_m.bias.dtype)
-                    )
             return new_m
         else:
             return m

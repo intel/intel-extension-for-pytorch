@@ -59,6 +59,7 @@ import gc
 import types
 import inspect
 import argparse
+import itertools
 import unittest
 import warnings
 import random
@@ -1755,3 +1756,14 @@ class TestModule(torch.nn.Module):
         for idx in range(len(weight.storage())):
             if weight.storage()[idx] == 0:
                 weight.grad.storage()[idx] = 0
+
+
+def _empty_weight_bias_parameter_names(prefixes):
+    param_names = [
+        "_ipex_module_empty_weight_tensor",
+        "_ipex_module_empty_bias_tensor",
+    ]
+    return [
+        f"{prefix}.{param_name}"
+        for prefix, param_name in itertools.product(prefixes, param_names)
+    ]
