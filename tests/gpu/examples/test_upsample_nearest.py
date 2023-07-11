@@ -24,9 +24,6 @@ class TestNNMethod(TestCase):
         output_dpcpp = torch.nn.functional.interpolate(
             input_dpcpp, scale_factor=scales, mode="nearest", recompute_scale_factor=rsf
         )
-        print("cpu result = ", output_cpu)
-        print("dpcpp result = ", output_dpcpp.cpu())
-        print("fwd result diff = ", output_cpu - output_dpcpp.cpu())
         self.assertEqual(output_cpu, output_dpcpp.cpu())
 
         grad_out_cpu = torch.randn((2, 3, 30), dtype=torch.float32, device=cpu_device)
@@ -38,9 +35,6 @@ class TestNNMethod(TestCase):
         output_dpcpp.backward(grad_out_dpcpp)
         grad_cpu = input_cpu.grad
         grad_dpcpp = input_dpcpp.grad
-        print("x_cpu grad = ", grad_cpu)
-        print("x_dpcpp grad = ", grad_dpcpp.cpu())
-        print("bwd result diff = ", grad_cpu - grad_dpcpp.cpu())
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
 
         # #### upsample nearest 2D #####
@@ -57,9 +51,6 @@ class TestNNMethod(TestCase):
         output_dpcpp = torch.nn.functional.interpolate(
             input_dpcpp, scale_factor=scales, mode="nearest", recompute_scale_factor=rsf
         )
-        print("cpu result = ", output_cpu)
-        print("dpcpp result = ", output_dpcpp.cpu())
-        print("fwd result diff = ", output_cpu - output_dpcpp.cpu())
         self.assertEqual(output_cpu, output_dpcpp.cpu())
 
         grad_out_cpu = torch.randn(
@@ -73,9 +64,6 @@ class TestNNMethod(TestCase):
         output_dpcpp.backward(grad_out_dpcpp)
         grad_cpu = input_cpu.grad
         grad_dpcpp = input_dpcpp.grad
-        print("x_cpu grad = ", grad_cpu)
-        print("x_dpcpp grad = ", grad_dpcpp.cpu())
-        print("bwd result diff = ", grad_cpu - grad_dpcpp.cpu())
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
 
         # #### upsample nearest 3D #####
@@ -92,9 +80,6 @@ class TestNNMethod(TestCase):
         output_dpcpp = torch.nn.functional.interpolate(
             input_dpcpp, scale_factor=scales, mode="nearest", recompute_scale_factor=rsf
         )
-        print("cpu result = ", output_cpu)
-        print("dpcpp result = ", output_dpcpp.cpu())
-        print("fwd result diff = ", output_cpu - output_dpcpp.cpu())
         self.assertEqual(output_cpu, output_dpcpp.cpu())
 
         grad_out_cpu = torch.randn(
@@ -108,9 +93,6 @@ class TestNNMethod(TestCase):
         output_dpcpp.backward(grad_out_dpcpp)
         grad_cpu = input_cpu.grad
         grad_dpcpp = input_dpcpp.grad
-        print("x_cpu grad = ", grad_cpu)
-        print("x_dpcpp grad = ", grad_dpcpp.cpu())
-        print("bwd result diff = ", grad_cpu - grad_dpcpp.cpu())
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
 
     def test_upsample_nearest_with_non_integral_scales(self, dtype=torch.float):
@@ -249,9 +231,6 @@ class TestNNMethod(TestCase):
             mode="nearest-exact",
             recompute_scale_factor=rsf,
         )
-        print("cpu result = ", output_cpu)
-        print("dpcpp result = ", output_dpcpp.cpu())
-        print("fwd result diff = ", output_cpu - output_dpcpp.cpu())
         self.assertEqual(output_cpu, output_dpcpp.cpu())
 
     def test__upsample_nearest_exact1d_out_bf16(self, dtype=torch.bfloat16):
@@ -274,9 +253,6 @@ class TestNNMethod(TestCase):
             mode="nearest-exact",
             recompute_scale_factor=rsf,
         )
-        print("cpu result = ", output_cpu)
-        print("dpcpp result = ", output_dpcpp.cpu())
-        print("fwd result diff = ", output_cpu - output_dpcpp.cpu())
         self.assertEqualIgnoreType(output_cpu, output_dpcpp.cpu())
 
     def test__upsample_nearest_exact1d_out_f16(self, dtype=torch.float16):
@@ -299,9 +275,6 @@ class TestNNMethod(TestCase):
             mode="nearest-exact",
             recompute_scale_factor=rsf,
         )
-        print("cpu result = ", output_cpu)
-        print("dpcpp result = ", output_dpcpp.cpu())
-        print("fwd result diff = ", output_cpu - output_dpcpp.cpu())
         self.assertEqualIgnoreType(output_cpu, output_dpcpp.cpu())
 
     def test_upsample_nearest_exact1d(self, dtype=torch.float):
@@ -325,9 +298,6 @@ class TestNNMethod(TestCase):
             mode="nearest-exact",
             recompute_scale_factor=rsf,
         )
-        print("cpu result = ", output_cpu)
-        print("dpcpp result = ", output_dpcpp.cpu())
-        print("fwd result diff = ", output_cpu - output_dpcpp.cpu())
         self.assertEqual(output_cpu, output_dpcpp.cpu())
 
         grad_out_cpu = torch.ones_like(output_cpu)
@@ -339,9 +309,6 @@ class TestNNMethod(TestCase):
         output_dpcpp.backward(grad_out_dpcpp)
         grad_cpu = input_cpu.grad
         grad_dpcpp = input_dpcpp.grad
-        print("x_cpu grad = ", grad_cpu)
-        print("x_dpcpp grad = ", grad_dpcpp.cpu())
-        print("bwd result diff = ", grad_cpu - grad_dpcpp.cpu())
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
 
     def test_upsample_nearest_exact2d_f32(self, dtype=torch.float):
@@ -365,9 +332,6 @@ class TestNNMethod(TestCase):
             mode="nearest-exact",
             recompute_scale_factor=rsf,
         )
-        print("cpu result = ", output_cpu)
-        print("dpcpp result = ", output_dpcpp.cpu())
-        print("fwd result diff = ", output_cpu - output_dpcpp.cpu())
         self.assertEqual(output_cpu, output_dpcpp.cpu())
 
         grad_out_cpu = torch.ones_like(output_cpu)
@@ -379,9 +343,6 @@ class TestNNMethod(TestCase):
         output_dpcpp.backward(grad_out_dpcpp)
         grad_cpu = input_cpu.grad
         grad_dpcpp = input_dpcpp.grad
-        print("x_cpu grad = ", grad_cpu)
-        print("x_dpcpp grad = ", grad_dpcpp.cpu())
-        print("bwd result diff = ", grad_cpu - grad_dpcpp.cpu())
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
 
     def test_upsample_nearest_exact2d_f16(self, dtype=torch.float16):
@@ -405,9 +366,6 @@ class TestNNMethod(TestCase):
             mode="nearest-exact",
             recompute_scale_factor=rsf,
         )
-        print("cpu result = ", output_cpu)
-        print("dpcpp result = ", output_dpcpp.cpu())
-        print("fwd result diff = ", output_cpu - output_dpcpp.cpu())
         self.assertEqualIgnoreType(output_cpu, output_dpcpp.cpu())
 
         grad_out_cpu = torch.ones_like(output_cpu)
@@ -419,9 +377,6 @@ class TestNNMethod(TestCase):
         output_dpcpp.backward(grad_out_dpcpp)
         grad_cpu = input_cpu.grad
         grad_dpcpp = input_dpcpp.grad
-        print("x_cpu grad = ", grad_cpu)
-        print("x_dpcpp grad = ", grad_dpcpp.cpu())
-        print("bwd result diff = ", grad_cpu - grad_dpcpp.cpu())
         self.assertEqualIgnoreType(grad_cpu, grad_dpcpp.cpu())
 
     def test_upsample_nearest_exact2d_bf16(self, dtype=torch.bfloat16):
@@ -445,9 +400,6 @@ class TestNNMethod(TestCase):
             mode="nearest-exact",
             recompute_scale_factor=rsf,
         )
-        print("cpu result = ", output_cpu)
-        print("dpcpp result = ", output_dpcpp.cpu())
-        print("fwd result diff = ", output_cpu - output_dpcpp.cpu())
         self.assertEqualIgnoreType(output_cpu, output_dpcpp.cpu())
 
         grad_out_cpu = torch.ones_like(output_cpu)
@@ -459,9 +411,6 @@ class TestNNMethod(TestCase):
         output_dpcpp.backward(grad_out_dpcpp)
         grad_cpu = input_cpu.grad
         grad_dpcpp = input_dpcpp.grad
-        print("x_cpu grad = ", grad_cpu)
-        print("x_dpcpp grad = ", grad_dpcpp.cpu())
-        print("bwd result diff = ", grad_cpu - grad_dpcpp.cpu())
         self.assertEqualIgnoreType(grad_cpu, grad_dpcpp.cpu())
 
     def test_upsample_nearest_exact3d_f32(self, dtype=torch.float):
@@ -485,9 +434,6 @@ class TestNNMethod(TestCase):
             mode="nearest-exact",
             recompute_scale_factor=rsf,
         )
-        print("cpu result = ", output_cpu)
-        print("dpcpp result = ", output_dpcpp.cpu())
-        print("fwd result diff = ", output_cpu - output_dpcpp.cpu())
         self.assertEqual(output_cpu, output_dpcpp.cpu())
 
         grad_out_cpu = torch.ones_like(output_cpu)
@@ -499,9 +445,6 @@ class TestNNMethod(TestCase):
         output_dpcpp.backward(grad_out_dpcpp)
         grad_cpu = input_cpu.grad
         grad_dpcpp = input_dpcpp.grad
-        print("x_cpu grad = ", grad_cpu)
-        print("x_dpcpp grad = ", grad_dpcpp.cpu())
-        print("bwd result diff = ", grad_cpu - grad_dpcpp.cpu())
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
 
     def test_upsample_nearest_exact3d_f16(self, dtype=torch.float16):
@@ -525,9 +468,6 @@ class TestNNMethod(TestCase):
             mode="nearest-exact",
             recompute_scale_factor=rsf,
         )
-        print("cpu result = ", output_cpu)
-        print("dpcpp result = ", output_dpcpp.cpu())
-        print("fwd result diff = ", output_cpu - output_dpcpp.cpu())
         self.assertEqualIgnoreType(output_cpu, output_dpcpp.cpu())
 
         grad_out_cpu = torch.ones_like(output_cpu)
@@ -539,9 +479,6 @@ class TestNNMethod(TestCase):
         output_dpcpp.backward(grad_out_dpcpp)
         grad_cpu = input_cpu.grad
         grad_dpcpp = input_dpcpp.grad
-        print("x_cpu grad = ", grad_cpu)
-        print("x_dpcpp grad = ", grad_dpcpp.cpu())
-        print("bwd result diff = ", grad_cpu - grad_dpcpp.cpu())
         self.assertEqualIgnoreType(grad_cpu, grad_dpcpp.cpu())
 
     def test_upsample_nearest_exact3d_bf16(self, dtype=torch.bfloat16):
@@ -565,9 +502,6 @@ class TestNNMethod(TestCase):
             mode="nearest-exact",
             recompute_scale_factor=rsf,
         )
-        print("cpu result = ", output_cpu)
-        print("dpcpp result = ", output_dpcpp.cpu())
-        print("fwd result diff = ", output_cpu - output_dpcpp.cpu())
         self.assertEqualIgnoreType(output_cpu, output_dpcpp.cpu())
 
         grad_out_cpu = torch.ones_like(output_cpu)
@@ -579,9 +513,6 @@ class TestNNMethod(TestCase):
         output_dpcpp.backward(grad_out_dpcpp)
         grad_cpu = input_cpu.grad
         grad_dpcpp = input_dpcpp.grad
-        print("x_cpu grad = ", grad_cpu)
-        print("x_dpcpp grad = ", grad_dpcpp.cpu())
-        print("bwd result diff = ", grad_cpu - grad_dpcpp.cpu())
         self.assertEqualIgnoreType(grad_cpu, grad_dpcpp.cpu())
 
     def test_q_upsample_nearest_2d(self, dtype=torch.float):
