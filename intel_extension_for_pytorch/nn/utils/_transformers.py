@@ -57,6 +57,7 @@ class IPEXTransformerAtten(nn.Module):
 
     layer_id_static = 0
     casual_attention_mask = None
+    aligned_alibi = None
 
     def __init__(self, config) -> None:
         super(IPEXTransformerAtten, self).__init__()
@@ -243,6 +244,13 @@ class IPEXTransformerAtten(nn.Module):
         else:
             return reduce_target
 
+    def get_aligned_alibi(self, alibi):
+        if self.layer_id == 0:
+            shape = [alibi.shape[0], alibi.shape[1], 2048] # [beam*num_head, q_len, kv_len]
+            IPEXTransformerAtten.aligned_alibi = torch.zeros(shape, device=alibi.device, dtype=alibi.dtype)
+            kv_len = alibi.shape[2]
+            IPEXTransformerAtten.aligned_alibi[:, :, 0 : kv_len] = alibi
+        return IPEXTransformerAtten.aligned_alibi
 
     def naive_self_attention(self, query, key, value, attention_mask=None, head_mask=None, alibi : torch.Tensor=None):
         if alibi is not None:
@@ -313,13 +321,14 @@ class IPEXTransformerAtten(nn.Module):
                 dropout = 0.0
                 alpha = self.inv_norm_factor 
                 beta = self.beta
+                aligned_alibi = self.get_aligned_alibi(alibi)
                 if type(self) == IPEXBloomAttn:
                     if query.shape[2] <= 1:
-                        attn_output = torch.xpu.IpexSDP(query, key, value, None, alibi, head_mask, alpha, beta, dropout, False)
+                        attn_output = torch.xpu.IpexSDP(query, key, value, None, aligned_alibi, head_mask, alpha, beta, dropout, False)
                     else:
-                        attn_output = torch.xpu.IpexSDP(query, key, value, None, alibi, head_mask, alpha, beta, dropout, True)
+                        attn_output = torch.xpu.IpexSDP(query, key, value, None, aligned_alibi, head_mask, alpha, beta, dropout, True)
                 else:
-                    attn_output = torch.xpu.IpexSDP(query, key, value, attention_mask, alibi, head_mask, alpha, beta, dropout, is_causal)
+                    attn_output = torch.xpu.IpexSDP(query, key, value, attention_mask, aligned_alibi, head_mask, alpha, beta, dropout, is_causal)
         else:
             attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi)
         return attn_output, attn_weights
