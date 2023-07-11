@@ -60,6 +60,7 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_efficient_attention(
           query.size(3),
           query.size(2),
           key.size(2),
+          /* ablibi padded size */ 0,
           is_causal);
     }
   } else {
@@ -242,6 +243,15 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   auto output = at::empty_like(query);
   auto dpcpp_queue = dpcppGetCurrentQueue();
   RECORD_FUNCTION("xetla_fsdp_forward_atten_mask_alibi_strided", {});
+
+  // check alibi padded
+  uint32_t alibi_padded_block_size =
+      alibi.has_value() ? alibi.value().size(-1) : 0;
+  TORCH_CHECK(
+      (alibi_padded_block_size != 0 &&
+       alibi_padded_block_size * key.itemsize() % 8 == 0),
+      "XeTLA SDP Alibi needs 8bytes aligned on leading dimension ...");
+
   gpu::xetla::fmha_forward_kernel(
       dpcpp_queue,
       query.data_ptr(),
@@ -259,6 +269,7 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
       query.size(3),
       query.size(2),
       key.size(2),
+      alibi_padded_block_size,
       is_causal);
   return output;
 }

@@ -57,6 +57,7 @@ class fmha_forward_causal_strided_t {
     // Dropout scale is computed from dropout prob
     accum_t dp_prob;
     accum_t dp_scale;
+    uint32_t uAT;
 
     inline arguments_t() = default;
     inline arguments_t(
@@ -73,7 +74,8 @@ class fmha_forward_causal_strided_t {
         uint32_t num_queries,
         uint32_t num_keys,
         accum_t sm_scale,
-        accum_t dropout_prob)
+        accum_t dropout_prob,
+        uint32_t alibi_padded_block_size)
         : Q_ptr(query),
           K_ptr(key),
           V_ptr(value),
@@ -88,7 +90,8 @@ class fmha_forward_causal_strided_t {
           uT(num_keys),
           sm_scale(sm_scale),
           dp_prob(dropout_prob),
-          dp_scale(1.f / (1.f - dropout_prob)) {}
+          dp_scale(1.f / (1.f - dropout_prob)),
+          uAT(alibi_padded_block_size) {}
   };
 
  private:
@@ -244,17 +247,18 @@ class fmha_forward_causal_strided_t {
           {start_acc, start_x});
 
       // B, N, 1, T
+      // gid * T + startT
       if constexpr (kUseAlibi) {
-        start_x = startT;
-        end_x = start_x + kBc;
+        uint32_t gid = ei.get_group(0);
+        int32_t batch_start = gid * args.uAT;
+        int32_t start_x = batch_start + startT;
+        int32_t end_x = startT + kBc;
         boundary_x = args.uT;
         end_x = end_x > boundary_x ? boundary_x : end_x;
-
-        uint32_t gid = ei.get_group(0);
-        int32_t start_y = gid;
+        end_x += batch_start;
 
         mem_desc_Ai.init(
-            args.A_ptr, {end_x, start_y + 1, args.uT}, {start_x, start_y});
+            args.A_ptr, {end_x, 1, args.uAT * args.uN * args.uB}, {start_x, 0});
       }
 
       if constexpr (kUseBias) {
@@ -658,19 +662,23 @@ void fmha_forward_causal_strided_impl(
     uint32_t num_heads,
     uint32_t head_size,
     uint32_t num_queries,
-    uint32_t num_keys) {
-  // printf(
-  //     "B, N, F, T, H: %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d,
-  //     IsCausal: %d, IsTraining: %d, alibi @ 0x%llx\n", num_batches,
-  //     num_heads,
-  //     num_queries,
-  //     num_keys,
-  //     head_size,
-  //     kUseAlibi,
-  //     kUseBias,
-  //     kIsCausal,
-  //     kIsTraining,
-  //     (unsigned long long)alibi);
+    uint32_t num_keys,
+    uint32_t alibi_padded_block_size) {
+#ifdef SDP_DBG
+  printf(
+      "B, N, F, T, H: %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d, alibi @ 0x%llx, uAT %d\n",
+      num_batches,
+      num_heads,
+      num_queries,
+      num_keys,
+      head_size,
+      kUseAlibi,
+      kUseBias,
+      kIsCausal,
+      kIsTraining,
+      (unsigned long long)alibi,
+      alibi_padded_block_size);
+#endif
   // fmha forward kernel
   using fmha_forward_op_t = fmha_forward_causal_strided_t<
       fmha_policy,
@@ -704,7 +712,8 @@ void fmha_forward_causal_strided_impl(
           num_queries,
           num_keys,
           alpha,
-          dropout_prob);
+          dropout_prob,
+          alibi_padded_block_size);
 
       // call the functor
       fmha_fwd_op(ei, args);
@@ -759,7 +768,8 @@ void fmha_forward_causal_strided_impl(
       num_heads,                          \
       head_size,                          \
       num_queries,                        \
-      num_keys)
+      num_keys,                           \
+      alibi_padded_block_size)
 /// @brief Main execution function for flash mha forward.
 template <
     typename T,
@@ -783,7 +793,8 @@ void fmha_forward_causal_strided(
     uint32_t num_heads,
     uint32_t head_size,
     uint32_t num_queries,
-    uint32_t num_keys) {
+    uint32_t num_keys,
+    uint32_t alibi_padded_block_size) {
   if (head_size <= 64) {
     CALL_IMPL_FUNC(fmha_policy_64x128x64);
   } else if (head_size <= 128) {
@@ -822,6 +833,7 @@ void fmha_forward_kernel(
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,
+    uint32_t alibi_padded_block_size,
     bool is_causal) {
   using T = sycl::half;
   if (is_causal) {
@@ -842,7 +854,8 @@ void fmha_forward_kernel(
           num_heads,
           head_size,
           num_queries,
-          num_keys);
+          num_keys,
+          alibi_padded_block_size);
     } else {
       fmha_forward_causal_strided<T, false, false, true, false>(
           q,
@@ -860,7 +873,8 @@ void fmha_forward_kernel(
           num_heads,
           head_size,
           num_queries,
-          num_keys);
+          num_keys,
+          alibi_padded_block_size);
     }
   } else {
     if (attn_mask) {
@@ -881,7 +895,8 @@ void fmha_forward_kernel(
             num_heads,
             head_size,
             num_queries,
-            num_keys);
+            num_keys,
+            alibi_padded_block_size);
       } else {
         fmha_forward_causal_strided<T, false, true, false, false>(
             q,
@@ -899,7 +914,8 @@ void fmha_forward_kernel(
             num_heads,
             head_size,
             num_queries,
-            num_keys);
+            num_keys,
+            alibi_padded_block_size);
       }
     } else {
       if (alibi) {
@@ -919,7 +935,8 @@ void fmha_forward_kernel(
             num_heads,
             head_size,
             num_queries,
-            num_keys);
+            num_keys,
+            alibi_padded_block_size);
       } else {
         fmha_forward_causal_strided<T, false, false, false, false>(
             q,
@@ -937,11 +954,13 @@ void fmha_forward_kernel(
             num_heads,
             head_size,
             num_queries,
-            num_keys);
+            num_keys,
+            alibi_padded_block_size);
       }
     }
   }
 }
+
 void fmha_forward_index_kernel(
     sycl::queue& q,
     void* query,
