@@ -245,12 +245,13 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   RECORD_FUNCTION("xetla_fsdp_forward_atten_mask_alibi_strided", {});
 
   // check alibi padded
-  uint32_t alibi_padded_block_size =
-      alibi.has_value() ? alibi.value().size(-1) : 0;
-  TORCH_CHECK(
-      (alibi_padded_block_size != 0 &&
-       alibi_padded_block_size * key.itemsize() % 8 == 0),
-      "XeTLA SDP Alibi needs 8bytes aligned on leading dimension ...");
+  uint32_t alibi_padded_block_size = 0;
+  if (alibi.has_value()) {
+    alibi_padded_block_size = alibi.value().size(-1);
+    TORCH_CHECK(
+        (alibi_padded_block_size * key.itemsize() % 8 == 0),
+        "XeTLA SDP Alibi needs 8bytes aligned on leading dimension ...");
+  }
 
   gpu::xetla::fmha_forward_kernel(
       dpcpp_queue,
