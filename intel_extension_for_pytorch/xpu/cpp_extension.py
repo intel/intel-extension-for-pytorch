@@ -196,9 +196,7 @@ class DpcppBuildExtension(build_ext, object):
         super(DpcppBuildExtension, self).__init__(*args, **kwargs)
         self.no_python_abi_suffix = kwargs.get("no_python_abi_suffix", False)
 
-        # When use_ninja is enabled, the linker seems g++, which will leads to the sycl kernel can not be launched. So
-        # we change default value to False and raise an error if use_ninja is available.
-        self.use_ninja = kwargs.get('use_ninja', False)
+        self.use_ninja = kwargs.get('use_ninja', True)
         if self.use_ninja:
             # Test if we can use ninja. Fallback otherwise.
             msg = (
@@ -207,9 +205,6 @@ class DpcppBuildExtension(build_ext, object):
             )
             if not is_ninja_available():
                 warnings.warn(msg.format("we could not find ninja."))
-                self.use_ninja = False
-            else:
-                warnings.warn(msg.format('we have not ninja path.'))
                 self.use_ninja = False
 
     def finalize_options(self) -> None:
@@ -435,11 +430,39 @@ class DpcppBuildExtension(build_ext, object):
             # Return *all* object filenames, not just the ones we just built.
             return objects
 
+        def unix_wrap_ninja_link_shared_object(
+            objects,
+            output_libname,
+            output_dir=None,
+            libraries=None,
+            library_dirs=None,
+            runtime_library_dirs=None,
+            export_symbols=None,
+            debug=0,
+            extra_preargs=None,
+            extra_postargs=None,
+            build_temp=None,
+            target_lang=None,
+        ):
+            output_libname = os.path.abspath(output_libname)
+            build_directory = os.path.dirname(output_libname)
+            # create output directories avoid linker error.
+            create_parent_dirs_by_path(output_libname)
+
+            ldflags = [SHARED_FLAG] + [SYCL_FLAG]
+            ldflags += [f"-L{x}" for x in library_dirs]
+            ldflags += [f"-L{x}" for x in runtime_library_dirs]
+            ldflags += extra_postargs
+            ldflags += [f"-l{x}" for x in libraries]
+
+            _write_ninja_file_and_link_library(objects, output_libname, build_directory, ldflags, verbose=True)
+
         if self.compiler.compiler_type == "msvc":
             raise "Not implemented"
         else:
             if self.use_ninja:
                 self.compiler.compile = unix_wrap_ninja_compile
+                self.compiler.link_shared_object = unix_wrap_ninja_link_shared_object
             else:
                 self.compiler._compile = unix_wrap_single_compile
                 self.compiler.link_shared_object = unix_wrap_single_link_shared_object
@@ -717,6 +740,36 @@ def _write_ninja_file_and_compile_objects(
         # It would be better if we could tell users the name of the extension
         # that failed to build but there isn't a good way to get it here.
         error_prefix="Error compiling objects for extension",
+    )
+
+
+def _write_ninja_file_and_link_library(
+    objects,
+    output_libname,
+    build_directory,
+    ldflags,
+    verbose: bool
+) -> None:
+    build_file_path = os.path.join(build_directory, "build.ninja")
+    if verbose:
+        print(f"Emitting ninja build file {build_file_path}...")
+    _write_ninja_file(
+        path=build_file_path,
+        cflags=None,
+        post_cflags=None,
+        sources=None,
+        objects=objects,
+        ldflags=ldflags,
+        library_target=output_libname,
+    )
+    if verbose:
+        print("Linking libraries...")
+    _run_ninja_build(
+        build_directory,
+        verbose,
+        # It would be better if we could tell users the name of the extension
+        # that failed to build but there isn't a good way to get it here.
+        error_prefix="Error linking libraries for extension",
     )
 
 
@@ -1247,8 +1300,8 @@ def _write_ninja_file(
     ldflags = sanitize_flags(ldflags)
 
     # Sanity checks...
-    assert len(sources) == len(objects)
-    assert len(sources) > 0
+    # assert len(sources) == len(objects)
+    # assert len(sources) > 0
 
     if IS_WINDOWS:
         compiler = os.environ.get("CXX", "cl")
@@ -1258,6 +1311,7 @@ def _write_ninja_file(
     # Version 1.3 is required for the `deps` directive.
     config = ["ninja_required_version = 1.3"]
     config.append(f"cxx = {compiler}")
+    config.append(f"ldxx = {compiler}")
 
     flags = [f'cflags = {" ".join(cflags)}']
     flags.append(f'post_cflags = {" ".join(post_cflags)}')
@@ -1265,32 +1319,35 @@ def _write_ninja_file(
 
     # Turn into absolute paths so we can emit them into the ninja build
     # file wherever it is.
-    sources = [os.path.abspath(file) for file in sources]
+    if sources is not None:
+        sources = [os.path.abspath(file) for file in sources]
 
-    # See https://ninja-build.org/build.ninja.html for reference.
-    compile_rule = ["rule compile"]
-    if IS_WINDOWS:
-        compile_rule.append(
-            "  command = cl /showIncludes $cflags -c $in /Fo$out $post_cflags"
-        )
-        compile_rule.append("  deps = msvc")
-    else:
-        compile_rule.append(
-            "  command = $cxx -MMD -MF $out.d $cflags -c $in -o $out $post_cflags"
-        )
-        compile_rule.append("  depfile = $out.d")
-        compile_rule.append("  deps = gcc")
-
-    # Emit one build rule per source to enable incremental build.
-    build = []
-    for source_file, object_file in zip(sources, objects):
-        rule = "compile"
+        # See https://ninja-build.org/build.ninja.html for reference.
+        compile_rule = ["rule compile"]
         if IS_WINDOWS:
-            source_file = source_file.replace(":", "$:")
-            object_file = object_file.replace(":", "$:")
-        source_file = source_file.replace(" ", "$ ")
-        object_file = object_file.replace(" ", "$ ")
-        build.append(f"build {object_file}: {rule} {source_file}")
+            compile_rule.append(
+                "  command = cl /showIncludes $cflags -c $in /Fo$out $post_cflags"
+            )
+            compile_rule.append("  deps = msvc")
+        else:
+            compile_rule.append(
+                "  command = $cxx -MMD -MF $out.d $cflags -c $in -o $out $post_cflags"
+            )
+            compile_rule.append("  depfile = $out.d")
+            compile_rule.append("  deps = gcc")
+
+        # Emit one build rule per source to enable incremental build.
+        build = []
+        for source_file, object_file in zip(sources, objects):
+            rule = "compile"
+            if IS_WINDOWS:
+                source_file = source_file.replace(":", "$:")
+                object_file = object_file.replace(":", "$:")
+            source_file = source_file.replace(" ", "$ ")
+            object_file = object_file.replace(" ", "$ ")
+            build.append(f"build {object_file}: {rule} {source_file}")
+    else:
+        compile_rule, build = [], []
 
     if library_target is not None:
         link_rule = ["rule link"]
@@ -1308,7 +1365,7 @@ def _write_ninja_file(
                 f'  command = "{cl_path}/link.exe" $in /nologo $ldflags /out:$out'
             )
         else:
-            link_rule.append("  command = $cxx $in $ldflags -o $out")
+            link_rule.append("  command = $ldxx $in $ldflags -o $out")
 
         link = [f'build {library_target}: link {" ".join(objects)}']
 

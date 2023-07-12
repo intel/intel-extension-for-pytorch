@@ -10,7 +10,6 @@ cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 class TestDPCPPExtensionMethod(TestCase):
-    @pytest.mark.skipif(True, reason="Building dpcp extension with ninja has a link error.")
     def test_add_ninja(self):
         import mod_test_add_ninja
         a = torch.rand(2, 3).to(dpcpp_device)
