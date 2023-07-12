@@ -133,27 +133,20 @@ class IPEXTransformerAtten(nn.Module):
         # beam search path
         if layer_past is None:
             # the first timestep
-            cached_shape = [self.max_positions, hidden_states.shape[0], self.num_attn_head * self.head_dim]
-            self.key_cached = torch.empty(cached_shape, device=hidden_states.device, dtype=hidden_states.dtype)
-            self.value_cached = torch.empty(cached_shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            shape = [self.max_positions, hidden_states.shape[0], self.num_attn_head, self.head_dim]
+            self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.prev_len = 0
 
         self.cur_len = self.prev_len + hidden_states.size(1)
-        query = torch.empty_like(hidden_states)
-        key_cached = self.key_cached[self.prev_len : self.cur_len, :, :].transpose(0, 1)
-        value_cached = self.value_cached[self.prev_len : self.cur_len, :, :].transpose(0, 1)
-        if key_cached.is_contiguous():
-            key = key_cached
-        else:
-            key = torch.empty_like(hidden_states)
-        if value_cached.is_contiguous():
-            value = value_cached
-        else:
-            value = torch.empty_like(hidden_states)
+
+        shape = [hidden_states.shape[1], hidden_states.shape[0], self.num_attn_head * self.head_dim]
+        query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+
+        key = self.key_cached[self.prev_len : self.cur_len, :, :]
+        value = self.value_cached[self.prev_len : self.cur_len, :, :]
 
         torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
-        self.key_cached[self.prev_len : self.cur_len, :, :] = key.transpose(0, 1)
-        self.value_cached[self.prev_len : self.cur_len, :, :] = value.transpose(0, 1)
         return query, key, value
 
     def qkv_normal(self, hidden_states, layer_past = None):
