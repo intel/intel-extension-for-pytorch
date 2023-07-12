@@ -312,7 +312,7 @@ class IPEXTransformerAtten(nn.Module):
             beta = 1.0 # TODO: ignored by native
             is_causal = False
             if self.use_casual_mask == True and query.shape[2] != 1:
-                is_causal = True;
+                is_causal = True
 
             if alibi is None:
                 attn_output = torch.xpu.IpexSDP(query, key, value, None, attention_mask, head_mask, alpha, beta, dropout, is_causal)
@@ -345,7 +345,7 @@ class IPEXTransformerAtten(nn.Module):
         else:
             attn_output = torch.matmul(attn_output, self.out_proj.weight.t())
             self.all_reduce_if_necessary(attn_output)
-            attn_output += self.out_proj.bias + residual
+            attn_output += residual
         return attn_output
         # return self.residual_drop(attn_output)
 
