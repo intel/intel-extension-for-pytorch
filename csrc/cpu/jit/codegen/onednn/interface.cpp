@@ -90,13 +90,6 @@ void fuseGraph(std::shared_ptr<Graph>& g) {
     // PropagateLayout must be placed after CreateLlgaSubgraphs
     PropagateLayout(g);
     GRAPH_DUMP("After PropagateLayout. Before RevertPrepareBinaryForLLGA", g);
-    // Add shape guard for profiling mode and wipe the tensor type information
-    // from the IR
-    prepareFusionGroupAndGuardOutputs(g->block());
-    GRAPH_DUMP(
-        "After prepareFusionGroupAndGuardOutputs. Before "
-        "RevertPrepareBinaryForLLGA",
-        g);
     RevertPrepareBinaryForLLGA(g);
     GRAPH_DUMP("After RevertPrepareBinaryForLLGA. Before IpexQuantFusion", g);
     IpexQuantFusion(g);
@@ -131,61 +124,6 @@ torch::jit::RegisterOperators LLGAFusionGroupOp({
     torch::jit::Operator(
         Symbol::fromQualString(fuser::onednn::LlgaFusionGroupName()),
         createLlgaKernel,
-        AliasAnalysisKind::PURE_FUNCTION),
-});
-
-Operation createLlgaGuardKernel(const Node* node) {
-  return [node](Stack* stack) {
-    RECORD_FUNCTION(
-        fuser::onednn::LlgaGuardName(), c10::ArrayRef<c10::IValue>());
-
-    GRAPH_DEBUG("Guarding node: ", node->kind().toQualString());
-    std::vector<TypePtr> types = node->tys(attr::types);
-    const auto num_inputs = types.size();
-
-    GRAPH_DEBUG("num_inputs to guard: ", num_inputs);
-
-    for (size_t i = 0; i < num_inputs; i++) {
-      GRAPH_DEBUG("checking input ", i);
-      auto& input = peek(stack, i, num_inputs);
-      const c10::TensorTypePtr& guard_tensor_type =
-          types[i]->cast<TensorType>();
-
-      if (!input.isTensor()) {
-        GRAPH_DEBUG("input ", i, " is not a tensor, return false");
-        push(stack, IValue(false));
-        return;
-      }
-      const at::Tensor& tensor = input.toTensor();
-
-      // If input tensor is of mkldnn, it's originated from an upstream
-      // LLGA partition that has passed the check on input shapes.
-      // It is valid to continue here as long as the output shapes from
-      // oneDNN graph partitions are determined by the input shapes.
-      if (tensor.is_mkldnn()) {
-        GRAPH_DEBUG("input ", i, " is_mkldnn, continue");
-        continue;
-      }
-
-      if (!guard_tensor_type->matchTensor(tensor)) {
-        GRAPH_DEBUG("input ", i, " check failed, return false");
-        push(stack, IValue(false));
-        return;
-      }
-    }
-
-    // TODO: check type and return the right flag
-    // naively return true;
-    GRAPH_DEBUG("all check done, return true");
-    push(stack, IValue(true));
-    return;
-  };
-}
-
-torch::jit::RegisterOperators LLGAGuardOp({
-    torch::jit::Operator(
-        Symbol::fromQualString(fuser::onednn::LlgaGuardName()),
-        createLlgaGuardKernel,
         AliasAnalysisKind::PURE_FUNCTION),
 });
 

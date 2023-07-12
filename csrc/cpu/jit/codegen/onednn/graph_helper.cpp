@@ -261,8 +261,12 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
     REQ(node->input(1)->mustNotBeNone());
     auto numInputs = node->inputs().size();
     bool keep_dims = false;
-    if (numInputs == 3) {
+    if (numInputs >= 3) {
       keep_dims = toIValue(node->namedInput("keepdim"))->toBool();
+      if (numInputs == 4) {
+        // we don't support typecast with mean
+        REQ(toIValue(node->namedInput("dtype"))->isNone());
+      }
     }
     std::vector<int64_t> dims{};
     auto ivalue_dim = toIValue(node->namedInput("dim"));

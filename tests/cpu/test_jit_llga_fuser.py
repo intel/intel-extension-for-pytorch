@@ -980,8 +980,8 @@ class TestDebugLog(JitLlgaTestCase):
             stderr=subprocess.STDOUT,
         ) as p:
             for line in p.stdout.readlines():
-                line = str(line, "utf-8").strip()
-                if line.__contains__("LLGA_bridge::prepareRunArgs"):
+                line = str(line, 'utf-8').strip()
+                if line.__contains__("LLGA_bridge::prepareKernel"):
                     num += 1
                 if line.__contains__("Executing partition"):
                     num_debug_str += 1

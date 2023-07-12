@@ -99,6 +99,8 @@ struct LlgaTensorDesc {
     }
   }
 
+  LlgaTensorDesc convertDimsToUnknown();
+
   LlgaTensorDesc supplementTensorInfo(const at::Tensor& t) const;
 
   at::ScalarType aten_scalar_type() const;
@@ -232,7 +234,7 @@ struct LlgaTensorDesc {
 
  private:
   bool is_dimensionality_unknown() const {
-    return sizes_.size() == 0;
+    return (sizes_.size() == 0);
   }
 
   size_t tid_;

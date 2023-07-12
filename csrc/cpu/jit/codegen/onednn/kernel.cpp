@@ -19,6 +19,12 @@ using namespace dnnl::graph;
 
 using data_type = dnnl::graph::logical_tensor::data_type;
 
+thread_local std::list<LlgaKernel::key_value_pair_t>
+    LlgaKernel::cache_items_list_;
+thread_local std::unordered_map<size_t, LlgaKernel::list_iterator_t>
+    LlgaKernel::cache_items_map_;
+thread_local int LlgaKernel::capacity_ = 7500;
+
 LlgaKernel::LlgaKernel(const Node* fusionNode)
     : fusionNode_(fusionNode),
       graph_(fusionNode->g(attr::Subgraph)),
@@ -82,49 +88,56 @@ std::map<size_t, int64_t> LlgaKernel::initializeTensorIdToOccurence() const {
   return tensorIdToOccurence;
 }
 
-void LlgaKernel::initializeConstantInputs() {
-  for (auto& lt : partition_.get_input_ports()) {
-    auto inputId = lt.get_id();
-    if (initializedInputIds_.find(inputId) == initializedInputIds_.end()) {
-      TORCH_CHECK(
-          tensorIdToValue_.count(inputId) > 0,
-          "inputs with inputId ",
-          inputId,
-          " is missing");
-      auto* value = tensorIdToValue_[inputId];
-
-      TORCH_CHECK(
-          value->node()->kind() == prim::Constant &&
-              value->type()->cast<TensorType>(),
-          "inputs with inputId ",
-          inputId,
-          " should be a Constant tensor");
-      constantValues_.emplace_back(value);
-
-      auto const_tensor = toIValue(value)->toTensor();
-      constantInputs_.emplace_back(const_tensor);
-    }
-  }
-}
-
 ArgSpecs LlgaKernel::initializeInputSpecs(const TensorArgs& inputs) {
   ArgSpecs inputSpecs;
   inputSpecs.reserve(nPartitionInputs_);
+  std::call_once(tracedInputShapesInitialized_, [&]() {
+    auto numInputs = inputs.size();
+    for (size_t i = 0; i < numInputs; i++) {
+      tracedInputShapes_.push_back(inputs[i].sizes().vec());
+      tracedInputStrides_.push_back(inputs[i].strides().vec());
+    }
+  });
   GRAPH_DEBUG("Initializing graph input logical tensors");
-
+  // initializeTensorIdToOccurence can also be called just once for the first
+  // input shape
   std::map<size_t, int64_t> tensorIdToOccurence =
       initializeTensorIdToOccurence();
   for (size_t i = 0; i < nGraphInputs_; i++) {
     auto spec = ArgSpec(graph_->inputs()[i]).supplementTensorInfo(inputs[i]);
-    initializedInputIds_.insert(spec.tid());
-
     int64_t occurence = tensorIdToOccurence[spec.tid()];
     inputSpecs.insert(inputSpecs.end(), occurence, spec);
-    runArgsIdx_.insert(runArgsIdx_.end(), occurence, i);
   }
 
-  GRAPH_DEBUG("Initializing constant input tensors");
-  initializeConstantInputs();
+  std::call_once(constantSpecInitializedFlag_, [&]() {
+    for (size_t i = 0; i < nGraphInputs_; i++) {
+      auto spec = ArgSpec(graph_->inputs()[i]).supplementTensorInfo(inputs[i]);
+      int64_t occurence = tensorIdToOccurence[spec.tid()];
+      initializedInputIds_.insert(spec.tid());
+      runArgsIdx_.insert(runArgsIdx_.end(), occurence, i);
+    }
+    for (auto& lt : partition_.get_input_ports()) {
+      auto inputId = lt.get_id();
+      if (initializedInputIds_.find(inputId) == initializedInputIds_.end()) {
+        TORCH_CHECK(
+            tensorIdToValue_.count(inputId) > 0,
+            "inputs with inputId ",
+            inputId,
+            " is missing");
+        auto* value = tensorIdToValue_[inputId];
+
+        TORCH_CHECK(
+            value->node()->kind() == prim::Constant &&
+                value->type()->cast<TensorType>(),
+            "inputs with inputId ",
+            inputId,
+            " should be a Constant tensor");
+        constantValues_.emplace_back(value);
+        auto const_tensor = toIValue(value)->toTensor();
+        constantInputs_.emplace_back(const_tensor);
+      }
+    }
+  });
 
   TORCH_CHECK(
       inputSpecs.size() + constantValues_.size() == nPartitionInputs_,
@@ -139,11 +152,28 @@ ArgSpecs LlgaKernel::initializeInputSpecs(const TensorArgs& inputs) {
   return inputSpecs;
 }
 
-ArgSpecs LlgaKernel::initializeOutputSpecs() const {
+ArgSpecs LlgaKernel::initializeOutputSpecs(
+    const TensorArgs& inputs,
+    bool convertDimsToUnknown = false) {
   ArgSpecs outputSpecs;
   outputSpecs.reserve(nOutputs_);
+
+  if (convertDimsToUnknown == false) {
+    auto numInputs = inputs.size();
+    for (auto i = 0; i < numInputs; i++) {
+      if (!((inputs[i].sizes().vec() == tracedInputShapes_[i]) &&
+            (inputs[i].strides().vec() == tracedInputStrides_[i]))) {
+        convertDimsToUnknown = true;
+        break;
+      }
+    }
+  }
+
   for (size_t i = 0; i < nOutputs_; i++) {
     auto spec = ArgSpec(graph_->outputs()[i]);
+    if (convertDimsToUnknown) {
+      spec = spec.convertDimsToUnknown();
+    }
 
     if (spec.is_quantized())
       spec = getQuantizedSpec(spec, i);
@@ -155,41 +185,49 @@ ArgSpecs LlgaKernel::initializeOutputSpecs() const {
   return outputSpecs;
 }
 
-std::tuple<RunArgs, RunArgs> LlgaKernel::prepareRunArgs(
+void LlgaKernel::prepareAndCacheRunArgs(
+    RunArgs& runInputs,
+    RunArgs& runOutputs,
     const TensorArgs& inputs,
-    TensorArgs& outputs) const {
-  RECORD_FUNCTION(
-      "LLGA_bridge::prepareRunArgs", c10::ArrayRef<c10::IValue>({}));
+    TensorArgs& outputs,
+    ArgSpecs& inputSpecs,
+    ArgSpecs& outputSpecs) {
+  auto sizeOfRunArgsIdx = runArgsIdx_.size();
+  auto numOfConstantInputs = constantInputs_.size();
+  runInputs.reserve(sizeOfRunArgsIdx + numOfConstantInputs);
+  runOutputs.reserve(nOutputs_);
 
-  RunArgs runInputs, runOutputs;
-  for (size_t i = 0; i < runArgsIdx_.size(); i++) {
-    auto spec = inputSpecs_[i];
-    auto input = inputs[runArgsIdx_[i]];
+  for (size_t i = 0; i < sizeOfRunArgsIdx; i++) {
+    auto& spec = inputSpecs[i];
+    auto& input = inputs[runArgsIdx_[i]];
     runInputs.push_back(
         {spec.logical_tensor(), Engine::getEngine(), input.data_ptr()});
   }
-  for (size_t i = 0; i < constantInputs_.size(); i++) {
+
+  for (size_t i = 0; i < numOfConstantInputs; i++) {
     // constantInputSpecs are placed after graphInputSpecs
     auto constantInputSpecIdx = nGraphInputs_ + i;
-    auto constantInputSpec = inputSpecs_[constantInputSpecIdx];
+    auto& constantInputSpec = inputSpecs[constantInputSpecIdx];
     runInputs.push_back(
         {constantInputSpec.logical_tensor(),
          Engine::getEngine(),
          constantInputs_[i].data_ptr()});
   }
 
+  outputTensorTypes_.reserve(nOutputs_);
+  std::fill(outputTensorTypes_.begin(), outputTensorTypes_.end(), undefined);
   for (size_t i = 0; i < nOutputs_; i++) {
-    auto spec = outputSpecs_[i];
+    auto& spec = outputSpecs[i];
     auto opt = c10::TensorOptions(spec.aten_scalar_type()).device(device_);
 
     auto outputId = spec.tid();
-    auto iter = inplacePairs_.find(outputId);
-    if (iter != inplacePairs_.end()) {
+    auto inputOffset = inplacePairOffsets_[i];
+    if (inputOffset != INT16_MIN) {
       // output reuses one of input tensors
 #ifdef GRAPH_DEBUG_ENABLED
       GRAPH_DEBUG("Inplace computation");
 #endif
-      auto inputOffset = iter->second;
+      GRAPH_DEBUG("INPUT INDEX OF INPLACE PAIR IS ", inputOffset);
       auto inputTensor = inputs[inputOffset];
       auto dataType = spec.dtype();
       if (C10_UNLIKELY(!useOpaqueLayout(i) && inputTensor.is_mkldnn())) {
@@ -207,9 +245,11 @@ std::tuple<RunArgs, RunArgs> LlgaKernel::prepareRunArgs(
           case data_type::f32:
           case data_type::bf16:
             inputTensor = LlgaTensorImpl::llga_to_aten_tensor(llgaImpl);
+            outputTensorTypes_[i] = unquantizedInplaceCompute;
             break;
           case data_type::s8:
           case data_type::u8:
+            outputTensorTypes_[i] = quantizedInplaceCompute;
             inputTensor = LlgaTensorImpl::llga_to_aten_tensor(
                 llgaImpl, spec.get_quantizer());
             break;
@@ -218,6 +258,8 @@ std::tuple<RunArgs, RunArgs> LlgaKernel::prepareRunArgs(
             TORCH_CHECK(
                 false, "Invalid data type ", static_cast<size_t>(dataType));
         }
+      } else {
+        outputTensorTypes_[i] = unwrappedInplaceCompute;
       }
       outputs.push_back(inputTensor);
       runOutputs.push_back(
@@ -232,6 +274,7 @@ std::tuple<RunArgs, RunArgs> LlgaKernel::prepareRunArgs(
       auto tensor = empty_llga(spec, opt);
       outputs.push_back(tensor);
       runOutputs.push_back(llga_from_aten_tensor(tensor));
+      outputTensorTypes_[i] = betweenPartitions;
     } else {
 #ifdef GRAPH_DEBUG_ENABLED
       GRAPH_DEBUG("Neither opaque nor inplace");
@@ -249,63 +292,164 @@ std::tuple<RunArgs, RunArgs> LlgaKernel::prepareRunArgs(
         outputs.push_back(qtensor);
         runOutputs.push_back(
             {spec.logical_tensor(), Engine::getEngine(), qtensor.data_ptr()});
+        outputTensorTypes_[i] = quantizedInputToFW;
       } else {
         auto tensor = at::empty_strided(spec.sizes(), spec.strides(), opt);
         outputs.push_back(tensor);
         runOutputs.push_back(
             {spec.logical_tensor(), Engine::getEngine(), tensor.data_ptr()});
+        outputTensorTypes_[i] = unquantizedInputToFW;
       }
     }
   }
-
-  return std::make_tuple(runInputs, runOutputs);
+  TORCH_CHECK(
+      std::find(
+          outputTensorTypes_.begin(), outputTensorTypes_.end(), undefined) ==
+          outputTensorTypes_.end(),
+      "outputTensorTypes_ elements should not be undefined");
 }
 
-compiled_partition LlgaKernel::compile(const partition& partition) {
-  auto inputs = fmap(inputSpecs_, toLogicalTensor);
-  auto outputs = fmap(outputSpecs_, toLogicalTensor);
-  auto compilation = partition.compile(inputs, outputs, Engine::getEngine());
+void LlgaKernel::prepareRunArgs(
+    RunArgs& runInputs,
+    RunArgs& runOutputs,
+    const TensorArgs& inputs,
+    TensorArgs& outputs,
+    ArgSpecs& outputSpecs) {
+  auto sizeOfRunArgsIdx = runArgsIdx_.size();
+  for (size_t i = 0; i < sizeOfRunArgsIdx; i++) {
+    auto& input = inputs[runArgsIdx_[i]];
+    runInputs[i].set_data_handle(input.data_ptr());
+  }
+
+  for (size_t i = 0; i < nOutputs_; i++) {
+    auto typeOfOutput = static_cast<int64_t>(outputTensorTypes_[i]);
+    auto& spec = outputSpecs[i];
+    auto opt = c10::TensorOptions(spec.aten_scalar_type()).device(device_);
+
+    switch (typeOfOutput) {
+      case unwrappedInplaceCompute: {
+        auto inputTensor = inputs[inplacePairOffsets_[i]];
+        runOutputs[i].set_data_handle(inputTensor.data_ptr());
+        outputs.push_back(std::move(inputTensor));
+        break;
+      }
+      case quantizedInplaceCompute: {
+        auto inputTensor = inputs[inplacePairOffsets_[i]];
+        auto llgaImpl =
+            static_cast<LlgaTensorImpl*>(inputTensor.unsafeGetTensorImpl());
+        inputTensor =
+            LlgaTensorImpl::llga_to_aten_tensor(llgaImpl, spec.get_quantizer());
+        runOutputs[i].set_data_handle(inputTensor.data_ptr());
+        outputs.push_back(std::move(inputTensor));
+        break;
+      }
+      case unquantizedInplaceCompute: {
+        auto inputTensor = inputs[inplacePairOffsets_[i]];
+        auto llgaImpl =
+            static_cast<LlgaTensorImpl*>(inputTensor.unsafeGetTensorImpl());
+        inputTensor = LlgaTensorImpl::llga_to_aten_tensor(llgaImpl);
+        runOutputs[i].set_data_handle(inputTensor.data_ptr());
+        outputs.push_back(std::move(inputTensor));
+        break;
+      }
+      case betweenPartitions: {
+        outputs.emplace_back(empty_llga(spec, opt));
+        runOutputs[i].set_data_handle(outputs[i].data_ptr());
+        break;
+      }
+      case quantizedInputToFW: {
+        at::QuantizerPtr quantizer = spec.get_quantizer();
+        outputs.emplace_back(at::new_qtensor(spec.sizes(), opt, quantizer)
+                                 .as_strided_(spec.sizes(), spec.strides()));
+        runOutputs[i].set_data_handle(outputs[i].data_ptr());
+        break;
+      }
+      case unquantizedInputToFW: {
+        outputs.emplace_back(
+            at::empty_strided(spec.sizes(), spec.strides(), opt));
+        runOutputs[i].set_data_handle(outputs[i].data_ptr());
+        break;
+      }
+    }
+  }
+}
+
+std::pair<compiled_partition, ArgSpecs> LlgaKernel::compile(
+    const partition& partition,
+    const TensorArgs& inputs,
+    ArgSpecs& inputSpecs) {
+  RECORD_FUNCTION("LLGA_bridge::compileKernel", c10::ArrayRef<c10::IValue>({}));
+  auto inputLogicalTensors = fmap(inputSpecs, toLogicalTensor);
+  auto outputSpecs = initializeOutputSpecs(inputs);
+  auto outputLogicalTensors = fmap(outputSpecs, toLogicalTensor);
+  compiled_partition compilation;
+  try {
+    compilation = partition.compile(
+        inputLogicalTensors, outputLogicalTensors, Engine::getEngine());
+  } catch (std::exception& e) {
+    // if partition compilation failed, check if outputSpecs had concrete shapes
+    // & strides
+    bool concreteOutputStrides = false;
+    for (auto outputSpec : outputSpecs) {
+      if (outputSpec.sizes().size()) {
+        if (outputSpec.sizes()[0] != INT64_MIN) {
+          concreteOutputStrides = true;
+          break;
+        }
+      }
+    }
+    if (concreteOutputStrides) {
+      // recompute outputSpecs and output logical tensors
+      // with INT64_MIN sizes & strides
+      outputSpecs = initializeOutputSpecs(inputs, true);
+      outputLogicalTensors = fmap(outputSpecs, toLogicalTensor);
+      compilation = partition.compile(
+          inputLogicalTensors, outputLogicalTensors, Engine::getEngine());
+    } else {
+      // there's nothing we can do
+      throw;
+    }
+  }
 
   // Since layouts of opaque outputs would be known after compilation,
   // we need to query them out from compilation and update outputSpecs
   for (size_t i = 0; i < nOutputs_; i++) {
-    auto tid = outputSpecs_[i].tid();
-    outputSpecs_[i] =
-        outputSpecs_[i].update_desc(compilation.query_logical_tensor(tid));
+    auto tid = outputSpecs[i].tid();
+    outputSpecs[i] =
+        outputSpecs[i].update_desc(compilation.query_logical_tensor(tid));
   }
 
-  // Build static mapping from output id to input offset
+  inplacePairOffsets_.resize(nOutputs_);
+  std::fill(inplacePairOffsets_.begin(), inplacePairOffsets_.end(), INT16_MIN);
+
+  // Build static mapping from output offset to input offset
   // in accordance with available inplace options
   for (auto&& option : compilation.get_inplace_ports()) {
     size_t inputId = option.first;
     size_t outputId = option.second;
     auto inputSpecIter =
-        std::find_if(inputSpecs_.begin(), inputSpecs_.end(), [&](auto& spec) {
+        std::find_if(inputSpecs.begin(), inputSpecs.end(), [&](auto& spec) {
           return spec.tid() == inputId;
         });
-    TORCH_CHECK(inputSpecIter != inputSpecs_.end(), "In-place input not found");
-    auto inputOffset = inputSpecIter - inputSpecs_.begin();
-    inplacePairs_[outputId] = inputOffset;
+    TORCH_CHECK(inputSpecIter != inputSpecs.end(), "In-place input not found");
+    auto inputOffset = inputSpecIter - inputSpecs.begin();
+    auto outputSpecIter =
+        std::find_if(outputSpecs.begin(), outputSpecs.end(), [&](auto& spec) {
+          return spec.tid() == outputId;
+        });
+    TORCH_CHECK(
+        outputSpecIter != outputSpecs.end(), "In-place output not found");
+    auto outputOffset = outputSpecIter - outputSpecs.begin();
+    inplacePairOffsets_[outputOffset] = inputOffset;
   }
 
-  return compilation;
+  return std::make_pair(compilation, outputSpecs);
 }
 
-dnnl::graph::compiled_partition& LlgaKernel::compileAndCache(
-    const dnnl::graph::partition& partition,
-    int n_thread) {
-  // index starts from 0 while min(omp_get_max_threads) = 1
-  int i_thread = n_thread - 1;
-  std::call_once(compilation_initialized_flags_[i_thread], [&]() {
-    GRAPH_DEBUG("Compiling partition for i_thread ", i_thread);
-    compilations_[i_thread] = compile(partition_);
-  });
-  return compilations_[i_thread];
-}
-
-void LlgaKernel::run(Stack& stack) {
-  GRAPH_DEBUG("In ", debugName(), "\n");
-
+LlgaKernel::cp_entry& LlgaKernel::compileAndCache(
+    Stack& stack,
+    TensorArgs& outputs) {
+  RECORD_FUNCTION("LLGA_bridge::prepareKernel", c10::ArrayRef<c10::IValue>({}));
   // Grab input values from stack
   auto stackInputs = last(stack, nGraphInputs_);
   auto inputs = fmap(stackInputs, [&](const IValue& v) {
@@ -313,46 +457,80 @@ void LlgaKernel::run(Stack& stack) {
         v.isTensor(), "Stack values for LLGA partition must be Tensor type");
     return v.toTensor();
   });
-
-  // Input and output specs are not related to omp_num_threads
-  std::call_once(
-      spec_initialized_flag_,
-      [&](const TensorArgs& inputs) {
-#ifdef GRAPH_DEBUG_ENABLED
-        GRAPH_DEBUG("Initializing input logical tensors");
-#endif
-        inputSpecs_ = initializeInputSpecs(inputs);
-#ifdef GRAPH_DEBUG_ENABLED
-        GRAPH_DEBUG("Initializing output logical tensors");
-#endif
-        outputSpecs_ = initializeOutputSpecs();
-      },
-      inputs);
-
-  TensorArgs outputs;
-  RunArgs runInputs, runOutputs;
-  dnnl::graph::compiled_partition compilation;
-
-  int n_thread = omp_get_max_threads();
-  if (n_thread > 0 && n_thread <= MAX_COMPILATION_CACHE_SIZE) {
-#ifdef GRAPH_DEBUG_ENABLED
-    GRAPH_DEBUG("Cached compilation");
-#endif
-    compilation = compileAndCache(partition_, n_thread);
+  std::vector<int64_t> key;
+  key.reserve(1024);
+  key.push_back(omp_get_max_threads());
+  // fusionNode_ may be reassigned to another LlgaFusionGroup after ~LlgaKernel
+  // would be called, and another LlgaFusionGroup may be created for another
+  // graph. But since JIT graphs have had a memory leak issue for years now,
+  // torch::jit::Graph::~Graph is not called after a model is traced.
+  // So we would use 2 pieces of info that make a partition unique.
+  key.push_back((uintptr_t)((void*)fusionNode_));
+  key.push_back((uintptr_t)((void*)graph_.get()));
+  for (auto& in : inputs) {
+    auto shape_vec = in.sizes().vec();
+    key.insert(key.end(), shape_vec.begin(), shape_vec.end());
+  }
+  auto hashed_key = c10::get_hash(key);
+  auto iter = cache_items_map_.find(hashed_key);
+  if (iter == cache_items_map_.end()) {
+    GRAPH_DEBUG("Compiling partition");
+    cp_entry compiledPartitionEntry;
+    auto input_shape = inputs[0].sizes().vec();
+    auto inputSpecs = initializeInputSpecs(inputs);
+    auto compilationOutput = compile(partition_, inputs, inputSpecs);
+    compiledPartitionEntry.outputSpecs_ = std::move(compilationOutput.second);
+    compiledPartitionEntry.cp_ = std::move(compilationOutput.first);
+    prepareAndCacheRunArgs(
+        compiledPartitionEntry.inputLLGATensors_,
+        compiledPartitionEntry.outputLLGATensors_,
+        inputs,
+        outputs,
+        inputSpecs,
+        compiledPartitionEntry.outputSpecs_);
+    cache_items_list_.push_front(
+        key_value_pair_t(hashed_key, std::move(compiledPartitionEntry)));
+    cache_items_map_[hashed_key] = cache_items_list_.begin();
+    if (cache_items_map_.size() > capacity_) {
+      auto last = cache_items_list_.end();
+      last--;
+      cache_items_map_.erase(last->first);
+      cache_items_list_.pop_back();
+    }
+    // If hash computation cost is higher than copying this struct,
+    // then remove std::move above & return compiledPartitionEntry instead
+    return cache_items_map_[hashed_key]->second;
   } else {
 #ifdef GRAPH_DEBUG_ENABLED
-    GRAPH_DEBUG("Runtime compilation");
+    GRAPH_DEBUG("Cached compiled partition is available");
 #endif
-    compilation = compile(partition_);
+    cache_items_list_.splice(
+        cache_items_list_.begin(), cache_items_list_, iter->second);
+    prepareRunArgs(
+        iter->second->second.inputLLGATensors_,
+        iter->second->second.outputLLGATensors_,
+        inputs,
+        outputs,
+        iter->second->second.outputSpecs_);
+    return iter->second->second;
   }
-#ifdef GRAPH_DEBUG_ENABLED
-  GRAPH_DEBUG("Preparing runtime tensors");
-#endif
-  std::tie(runInputs, runOutputs) = prepareRunArgs(inputs, outputs);
+}
+
+void LlgaKernel::run(Stack& stack) {
+  GRAPH_DEBUG("In ", debugName(), "\n");
+  TensorArgs outputs;
+  outputs.reserve(nOutputs_);
+
+  auto& compiledPartitionEntry = compileAndCache(stack, outputs);
+
 #ifdef GRAPH_DEBUG_ENABLED
   GRAPH_DEBUG("Executing partition");
 #endif
-  compilation.execute(Stream::getStream(), runInputs, runOutputs);
+  compiledPartitionEntry.cp_.execute(
+      Stream::getStream(),
+      compiledPartitionEntry.inputLLGATensors_,
+      compiledPartitionEntry.outputLLGATensors_);
+
 #ifdef GRAPH_DEBUG_ENABLED
   GRAPH_DEBUG("Partition executed");
 #endif

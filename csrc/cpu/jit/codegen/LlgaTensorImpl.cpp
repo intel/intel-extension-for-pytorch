@@ -118,6 +118,16 @@ LlgaTensorDesc LlgaTensorDesc::supplementTensorInfo(const at::Tensor& t) const {
   }
 }
 
+LlgaTensorDesc LlgaTensorDesc::convertDimsToUnknown() {
+  if (!is_dimensionality_unknown() && !is_opaque()) {
+    for (int i = 0; i < sizes_.size(); i++) {
+      sizes_[i] = INT64_MIN;
+      strides_[i] = INT64_MIN;
+    }
+  }
+  return {tid_, sizes_, strides_, dtype_, property_type_, is_scalar_tensor_};
+}
+
 at::ScalarType LlgaTensorDesc::aten_scalar_type() const {
   switch (dtype_) {
     case data_type::f32:
