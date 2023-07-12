@@ -139,7 +139,7 @@ class TestEMB(TestCase):
             )
 
     def test_emb_fast_path(self):
-        for options in ([True, False], [True, False]):
+        for options in itertools.product([True, False], [True, False]):
             include_last_offset, sparse = options
             self._test_emb(
                 mode="sum", sparse=sparse, include_last_offset=include_last_offset
