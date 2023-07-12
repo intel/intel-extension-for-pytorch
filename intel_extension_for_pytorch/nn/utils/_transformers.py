@@ -324,11 +324,11 @@ class IPEXTransformerAtten(nn.Module):
                 aligned_alibi = self.get_aligned_alibi(alibi)
                 if type(self) == IPEXBloomAttn:
                     if query.shape[2] <= 1:
-                        attn_output = torch.xpu.IpexSDP(query, key, value, None, aligned_alibi, head_mask, alpha, beta, dropout, False)
+                        attn_output = torch.xpu.IpexSDP(query, key, value, aligned_alibi, None, head_mask, alpha, beta, dropout, False)
                     else:
-                        attn_output = torch.xpu.IpexSDP(query, key, value, None, aligned_alibi, head_mask, alpha, beta, dropout, True)
+                        attn_output = torch.xpu.IpexSDP(query, key, value, aligned_alibi, None, head_mask, alpha, beta, dropout, True)
                 else:
-                    attn_output = torch.xpu.IpexSDP(query, key, value, attention_mask, aligned_alibi, head_mask, alpha, beta, dropout, is_causal)
+                    attn_output = torch.xpu.IpexSDP(query, key, value, aligned_alibi, attention_mask, head_mask, alpha, beta, dropout, is_causal)
         else:
             attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi)
         return attn_output, attn_weights
