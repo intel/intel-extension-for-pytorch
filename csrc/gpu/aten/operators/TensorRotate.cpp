@@ -202,7 +202,8 @@ void apply_rotary_embedding_half_kernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
-  int64_t wg_size = std::min(max_wg_size, problem_size);
+  // int64_t wg_size = std::min(max_wg_size, problem_size);
+  int64_t wg_size = max_wg_size;
   int64_t work_group_num = (total_size + problem_size - 1) / problem_size;
   int64_t problem_half = problem_size / 2;
 
@@ -220,15 +221,15 @@ void apply_rotary_embedding_half_kernel(
           auto global_offset2 = i < problem_half
               ? group_idx * problem_size + problem_half + i
               : group_idx * problem_size - problem_half + i;
-          scalar_t scale = i < problem_half ? -1 : 1;
+          float scale = i < problem_half ? -1 : 1;
           const auto offset1 = offset_calc.get(global_offset1);
           const auto offset2 = offset_calc.get(global_offset2);
-          scalar_t query_val1 = *(query + offset1[2]);
-          scalar_t query_val2 = *(query + offset2[2]);
-          scalar_t sin_val = *(sin + offset1[4]);
-          scalar_t cos_val = *(cos + offset1[5]);
-          *(query_out + offset1[0]) =
-              scale * query_val2 * sin_val + query_val1 * cos_val;
+          float query_val1 = *(query + offset1[2]);
+          float query_val2 = *(query + offset2[2]);
+          float sin_val = *(sin + offset1[4]);
+          float cos_val = *(cos + offset1[5]);
+          *(query_out + offset1[0]) = static_cast<scalar_t>(
+              scale * query_val2 * sin_val + query_val1 * cos_val);
         }
       } else {
         for (int i = item_idx; i < problem_size; i += item_range) {
@@ -236,15 +237,15 @@ void apply_rotary_embedding_half_kernel(
           auto global_offset2 = i < problem_half
               ? group_idx * problem_size + problem_half + i
               : group_idx * problem_size - problem_half + i;
-          scalar_t scale = i < problem_half ? -1 : 1;
+          float scale = i < problem_half ? -1 : 1;
           const auto offset1 = offset_calc.get(global_offset1);
           const auto offset2 = offset_calc.get(global_offset2);
-          scalar_t key_val1 = *(key + offset1[3]);
-          scalar_t key_val2 = *(key + offset2[3]);
-          scalar_t sin_val = *(sin + offset1[4]);
-          scalar_t cos_val = *(cos + offset1[5]);
-          *(key_out + offset1[1]) =
-              scale * key_val2 * sin_val + key_val1 * cos_val;
+          float key_val1 = *(key + offset1[3]);
+          float key_val2 = *(key + offset2[3]);
+          float sin_val = *(sin + offset1[4]);
+          float cos_val = *(cos + offset1[5]);
+          *(key_out + offset1[1]) = static_cast<scalar_t>(
+              scale * key_val2 * sin_val + key_val1 * cos_val);
         }
       }
     };
