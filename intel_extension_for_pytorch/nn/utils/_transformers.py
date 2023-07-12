@@ -312,23 +312,20 @@ class IPEXTransformerAtten(nn.Module):
         do_sdp_fusion = os.environ.get("ENABLE_SDP_FUSION", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         if self.config.sdp_fusion_enable and do_sdp_fusion:
             attn_weights = None
-            is_causal = True if attention_mask is None else False
-            if query.shape[2] <= 1:
-                is_causal = False
+
+            # parameters
+            dropout = 0.0
+            alpha = 1.0 / math.sqrt(self.head_dim)
+            beta = 1.0 # TODO: ignored by native
+            is_causal = False
+            if self.use_casual_mask == True and query.shape[2] != 1:
+                is_causal = True;
+
             if alibi is None:
-                attn_output = torch.nn.functional.scaled_dot_product_attention(query, key, value, is_causal=is_causal)
+                attn_output = torch.xpu.IpexSDP(query, key, value, None, attention_mask, head_mask, alpha, beta, dropout, is_causal)
             else:
-                dropout = 0.0
-                alpha = self.inv_norm_factor 
-                beta = self.beta
                 aligned_alibi = self.get_aligned_alibi(alibi)
-                if type(self) == IPEXBloomAttn:
-                    if query.shape[2] <= 1:
-                        attn_output = torch.xpu.IpexSDP(query, key, value, aligned_alibi, None, head_mask, alpha, beta, dropout, False)
-                    else:
-                        attn_output = torch.xpu.IpexSDP(query, key, value, aligned_alibi, None, head_mask, alpha, beta, dropout, True)
-                else:
-                    attn_output = torch.xpu.IpexSDP(query, key, value, aligned_alibi, attention_mask, head_mask, alpha, beta, dropout, is_causal)
+                attn_output = torch.xpu.IpexSDP(query, key, value, aligned_alibi, attention_mask, head_mask, alpha, beta, dropout, is_causal)
         else:
             attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi)
         return attn_output, attn_weights
