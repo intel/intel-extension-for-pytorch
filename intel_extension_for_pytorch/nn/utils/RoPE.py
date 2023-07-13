@@ -102,7 +102,6 @@ class LlamaRotaryEmbedding(torch.nn.Module):
         return LlamaRotaryEmbedding.sin, LlamaRotaryEmbedding.cos
 
     def forward(self, query, key, position_ids):
-        kv_len = key.size(1)
-        sin, cos = self.get_sin_cos(kv_len, position_ids)
+        sin, cos = self.get_sin_cos(position_ids)
         self.apply_rotary_pos_emb(query, key, sin, cos)
         return query, key
