@@ -43,7 +43,7 @@ static inline void get_dnnl_format(
         /*w*/ input.size(3)};
   } else {
     std::stringstream ss;
-    ss << "DPCPP softmax backend got shape=" << input_sizes
+    ss << "softmax backend got shape=" << input_sizes
        << ", expected input with rank 1 to  rank 4 shape";
     AT_ERROR(ss.str());
   }

@@ -117,7 +117,7 @@ static void initGlobalDevicePoolState() {
 
   auto device_count = gDevPool.devices.size();
   if (device_count <= 0) {
-    TORCH_WARN("DPCPP Device count is zero!");
+    TORCH_WARN("XPU Device count is zero!");
   }
 
 #if defined(USE_MULTI_CONTEXT)
