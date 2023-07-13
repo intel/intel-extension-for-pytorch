@@ -39,17 +39,17 @@ static inline void isOnSameDevice(
   if ((t1->device().type() != at::kXPU) || (t2->device().type() != at::kXPU)) {
     std::ostringstream oss;
     if (t1->device().type() != at::kXPU) {
-      oss << "Tensor for " << t1 << " is not on DPCPP, ";
+      oss << "Tensor for " << t1 << " is not on XPU, ";
     }
     if (t2->device().type() != at::kXPU) {
-      oss << "Tensor for " << t2 << " is not on DPCPP, ";
+      oss << "Tensor for " << t2 << " is not on XPU, ";
     }
     oss << "but expected "
         << ((!(t1->device().type() == at::kXPU ||
                t2->device().type() == at::kXPU))
                 ? "them"
                 : "it")
-        << " to be on DPCPP (while checking arguments for " << c << ")";
+        << " to be on XPU (while checking arguments for " << c << ")";
     TORCH_CHECK(0, oss.str());
   }
   TORCH_CHECK(

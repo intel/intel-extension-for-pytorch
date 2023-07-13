@@ -116,8 +116,7 @@ std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> native_batch_norm_out(
       input.scalar_type() != at::ScalarType::Half &&
       input.scalar_type() != at::ScalarType::BFloat16) {
     std::stringstream ss;
-    ss << "DPCPP batch_norm backend got unsupported type="
-       << input.scalar_type();
+    ss << "batch_norm backend got unsupported type=" << input.scalar_type();
     TORCH_CHECK(0, ss.str());
   }
 
@@ -219,8 +218,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm_backward(
       input.scalar_type() != at::ScalarType::Half &&
       input.scalar_type() != at::ScalarType::BFloat16) {
     std::stringstream ss;
-    ss << "DPCPP batch_norm backend got unsupported type="
-       << input.scalar_type();
+    ss << "batch_norm backend got unsupported type=" << input.scalar_type();
     TORCH_CHECK(0, ss.str());
   } else {
     return xpu::oneDNN::batch_normalization_backward(
@@ -262,8 +260,7 @@ at::Tensor& batch_norm_elemt_out(
       input.scalar_type() != at::ScalarType::Half &&
       input.scalar_type() != at::ScalarType::BFloat16) {
     std::stringstream ss;
-    ss << "DPCPP batch_norm backend got unsupported type="
-       << input.scalar_type();
+    ss << "batch_norm backend got unsupported type=" << input.scalar_type();
     TORCH_CHECK(0, ss.str());
   }
 

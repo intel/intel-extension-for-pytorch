@@ -29,7 +29,7 @@ bool XPUHooks::hasXPU() const {
 }
 
 std::string XPUHooks::showConfig() const {
-  return "DPCPP backend version: 1.0";
+  return "XPU backend version: 1.0";
 }
 
 at::Device XPUHooks::getATenDeviceFromDLPackDevice(

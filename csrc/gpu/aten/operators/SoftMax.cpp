@@ -1815,7 +1815,7 @@ Tensor host_softmax(
     Tensor& output) {
   AT_ASSERTM(
       !half_to_float,
-      "softmax with half to float conversion is not supported on DPCPP");
+      "softmax with half to float conversion is not supported on XPU");
   TORCH_CHECK(
       input_.is_contiguous(),
       "** host_softmax only supports contiguous input tensor");
@@ -1939,7 +1939,7 @@ Tensor host_softmax_backward(
     Tensor& gI) {
   AT_ASSERTM(
       !half_to_float,
-      "softmax with half to float conversion is not supported on DPCPP");
+      "softmax with half to float conversion is not supported on XPU");
   TORCH_CHECK(
       grad_.is_contiguous(),
       "** host_softmax_backward only supports contiguous grad tensor");
@@ -1978,7 +1978,7 @@ Tensor host_softmax_backward(
   return gI;
 }
 
-// We now use DPCPP softmax fwd kernel instead of oneDNN softmax fwd kernel
+// We now use SYCL softmax fwd kernel instead of oneDNN softmax fwd kernel
 Tensor& _softmax_out(
     const Tensor& input_,
     int64_t dim,
@@ -1991,7 +1991,7 @@ Tensor& _softmax_out(
   // 3.check the tensors are blocked format or not
   // when satify the aformentioned two conditions,
   // the oneDNN path will be selected,
-  // all the other cases will go to DPCPP path
+  // all the other cases will go to SYCL path
   if (xpu::oneDNN::softmax_valid(input_) &&
       xpu::oneDNN::is_onednn_layout(input_)) {
     xpu::oneDNN::softmax(input_, dim, half_to_float, out);
@@ -2014,7 +2014,7 @@ Tensor& _softmax_backward_data_out(
     TORCH_CHECK(
         !half_to_float,
         "softmax backward with half to float "
-        "conversion is not supported on DPCPP");
+        "conversion is not supported on XPU");
   }
 
   // 1.check the tensors type are supported by oneDNN or not
@@ -2022,7 +2022,7 @@ Tensor& _softmax_backward_data_out(
   // 3.check the tensors are blocked format or not
   // when satify the aformentioned conditions,
   // the oneDNN path will be selected,
-  // all the other cases will go to DPCPP path
+  // all the other cases will go to SYCL path
   if (xpu::oneDNN::softmax_backward_valid(grad_output, output, grad_input) &&
       IPEX_ANY(xpu::oneDNN::is_onednn_layout, grad_output, output)) {
     xpu::oneDNN::softmax_backward(
@@ -2057,7 +2057,7 @@ at::Tensor& _log_softmax_backward_data_out(
   if (half_to_float) {
     TORCH_INTERNAL_ASSERT(
         !half_to_float,
-        "softmax with half to float conversion is not supported on DPCPP");
+        "softmax with half to float conversion is not supported on XPU");
   }
 
   auto grad_ = grad_output.contiguous();

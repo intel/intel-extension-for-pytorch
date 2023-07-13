@@ -54,7 +54,7 @@ static void update_stat(Stat& stat, int64_t amount) {
 
   TORCH_INTERNAL_ASSERT(
       stat.current >= 0,
-      "Negative tracked stat in DPCPP Caching allocator (likely logic error).");
+      "Negative tracked stat in XPU Caching allocator (likely logic error).");
 
   stat.peak = std::max(stat.current, stat.peak);
   if (amount > 0) {
@@ -253,7 +253,7 @@ void CachingDeviceAllocator::malloc(
 
       TORCH_CHECK(
           false,
-          "DPCPP out of memory. Tried to allocate ",
+          "XPU out of memory. Tried to allocate ",
           format_size(alloc_size),
           " (GPU ",
           (int)curDevID,
