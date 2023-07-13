@@ -113,42 +113,39 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
         return IPEXGPTJBlock(self.ipex_transformers_config)
 
     def port_attn_parameters(self):
-        self.ipex_optimized_module.attn.k_proj.weight = self.module.attn.k_proj.weight
-        self.ipex_optimized_module.attn.k_proj.bias = self.module.attn.k_proj.bias
-        self.ipex_optimized_module.attn.q_proj.weight = self.module.attn.q_proj.weight
-        self.ipex_optimized_module.attn.q_proj.bias = self.module.attn.q_proj.bias
-        self.ipex_optimized_module.attn.v_proj.weight = self.module.attn.v_proj.weight
-        self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
-        self.ipex_optimized_module.attn.out_proj.weight = self.module.attn.out_proj.weight
-        self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
-
         if self.row_major:
-            self.ipex_optimized_module.attn.q_wei = self.ipex_optimized_module.attn.q_proj.weight.transpose(0, 1).contiguous()
-            del self.ipex_optimized_module.attn.q_proj.weight
-            self.ipex_optimized_module.attn.k_wei = self.ipex_optimized_module.attn.k_proj.weight.transpose(0, 1).contiguous()
-            del self.ipex_optimized_module.attn.k_proj.weight
-            self.ipex_optimized_module.attn.v_wei = self.ipex_optimized_module.attn.v_proj.weight.transpose(0, 1).contiguous()
-            del self.ipex_optimized_module.attn.v_proj.weight
-            self.ipex_optimized_module.attn.out_wei = self.ipex_optimized_module.attn.out_proj.weight.transpose(0, 1).contiguous()
-            del self.ipex_optimized_module.attn.out_proj.weight
+            self.ipex_optimized_module.attn.q_wei = self.module.attn.q_proj.weight.transpose(0, 1).contiguous()
+            self.ipex_optimized_module.attn.q_proj.bias = self.module.attn.q_proj.bias
+            self.ipex_optimized_module.attn.k_wei = self.module.attn.k_proj.weight.transpose(0, 1).contiguous()
+            self.ipex_optimized_module.attn.k_proj.bias = self.module.attn.k_proj.bias
+            self.ipex_optimized_module.attn.v_wei = self.module.attn.v_proj.weight.transpose(0, 1).contiguous()
+            self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
+            self.ipex_optimized_module.attn.out_wei = self.module.attn.out_proj.weight.transpose(0, 1).contiguous()
+            self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
+
             self.ipex_optimized_module.attn.qkv_wei = torch.stack([self.ipex_optimized_module.attn.q_wei, self.ipex_optimized_module.attn.k_wei, self.ipex_optimized_module.attn.v_wei]).contiguous()
             self.ipex_optimized_module.attn.qkv_bias = None
-            del self.ipex_optimized_module.attn.q_wei
-            del self.ipex_optimized_module.attn.k_wei
-            del self.ipex_optimized_module.attn.v_wei
-
+        else:
+            self.ipex_optimized_module.attn.k_proj.weight = self.module.attn.k_proj.weight
+            self.ipex_optimized_module.attn.k_proj.bias = self.module.attn.k_proj.bias
+            self.ipex_optimized_module.attn.q_proj.weight = self.module.attn.q_proj.weight
+            self.ipex_optimized_module.attn.q_proj.bias = self.module.attn.q_proj.bias
+            self.ipex_optimized_module.attn.v_proj.weight = self.module.attn.v_proj.weight
+            self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
+            self.ipex_optimized_module.attn.out_proj.weight = self.module.attn.out_proj.weight
+            self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
 
     def port_mlp_parameters(self):
-        self.ipex_optimized_module.mlp.fc_in.weight = self.module.mlp.fc_in.weight
-        self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
-        self.ipex_optimized_module.mlp.fc_out.weight = self.module.mlp.fc_out.weight
-        self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
-
         if self.row_major:
-            self.ipex_optimized_module.mlp.fc_in_wei = self.ipex_optimized_module.mlp.fc_in.weight.transpose(0, 1).contiguous()
-            del self.ipex_optimized_module.mlp.fc_in.weight
-            self.ipex_optimized_module.mlp.fc_out_wei = self.ipex_optimized_module.mlp.fc_out.weight.transpose(0, 1).contiguous()
-            del self.ipex_optimized_module.mlp.fc_out.weight
+            self.ipex_optimized_module.mlp.fc_in_wei = self.module.mlp.fc_in.weight.transpose(0, 1).contiguous()
+            self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
+            self.ipex_optimized_module.mlp.fc_out_wei = self.module.mlp.fc_out.weight.transpose(0, 1).contiguous()
+            self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
+        else:
+            self.ipex_optimized_module.mlp.fc_in.weight = self.module.mlp.fc_in.weight
+            self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
+            self.ipex_optimized_module.mlp.fc_out.weight = self.module.mlp.fc_out.weight
+            self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
 
     def port_layer_norm_parameters(self):
         self.ipex_optimized_module.ln.weight = self.module.ln_1.weight
@@ -221,41 +218,46 @@ class IPEXOptConverter(IPEXTransformerConverter):
         return IPEXOptBlock(self.ipex_transformers_config)
 
     def port_attn_parameters(self):
-        self.ipex_optimized_module.attn.k_proj.weight = self.module.self_attn.k_proj.weight
-        self.ipex_optimized_module.attn.k_proj.bias = self.module.self_attn.k_proj.bias
-        self.ipex_optimized_module.attn.q_proj.weight = self.module.self_attn.q_proj.weight
-        self.ipex_optimized_module.attn.q_proj.bias = self.module.self_attn.q_proj.bias
-        self.ipex_optimized_module.attn.v_proj.weight = self.module.self_attn.v_proj.weight
-        self.ipex_optimized_module.attn.v_proj.bias = self.module.self_attn.v_proj.bias
-        self.ipex_optimized_module.attn.out_proj.weight = self.module.self_attn.out_proj.weight
-        self.ipex_optimized_module.attn.out_proj.bias = self.module.self_attn.out_proj.bias
-
         if self.row_major:
-            self.ipex_optimized_module.attn.q_wei = self.ipex_optimized_module.attn.q_proj.weight.transpose(0, 1).contiguous()
-            del self.ipex_optimized_module.attn.q_proj.weight
-            self.ipex_optimized_module.attn.k_wei = self.ipex_optimized_module.attn.k_proj.weight.transpose(0, 1).contiguous()
-            del self.ipex_optimized_module.attn.k_proj.weight
-            self.ipex_optimized_module.attn.v_wei = self.ipex_optimized_module.attn.v_proj.weight.transpose(0, 1).contiguous()
-            del self.ipex_optimized_module.attn.v_proj.weight
-            self.ipex_optimized_module.attn.out_wei = self.ipex_optimized_module.attn.out_proj.weight.transpose(0, 1).contiguous()
-            del self.ipex_optimized_module.attn.out_proj.weight 
-            #self.ipex_optimized_module.attn.qkv_wei = torch.stack([self.ipex_optimized_module.attn.q_wei, self.ipex_optimized_module.attn.k_wei, self.ipex_optimized_module.attn.v_wei]).contiguous()
-            #self.ipex_optimized_module.attn.qkv_bias = None
-            #del self.ipex_optimized_module.attn.q_wei
-            #del self.ipex_optimized_module.attn.k_wei
-            #del self.ipex_optimized_module.attn.v_wei
+            self.module.self_attn.q_proj.weight.data = self.module.self_attn.q_proj.weight.transpose(0, 1).contiguous()
+            self.ipex_optimized_module.attn.q_wei = self.module.self_attn.q_proj.weight
+            self.ipex_optimized_module.attn.q_proj.bias = self.module.self_attn.q_proj.bias
+
+            self.module.self_attn.k_proj.weight.data = self.module.self_attn.k_proj.weight.transpose(0, 1).contiguous()
+            self.ipex_optimized_module.attn.k_wei = self.module.self_attn.k_proj.weight
+            self.ipex_optimized_module.attn.k_proj.bias = self.module.self_attn.k_proj.bias
+
+            self.module.self_attn.v_proj.weight.data = self.module.self_attn.v_proj.weight.transpose(0, 1).contiguous()
+            self.ipex_optimized_module.attn.v_wei = self.module.self_attn.v_proj.weight
+            self.ipex_optimized_module.attn.v_proj.bias = self.module.self_attn.v_proj.bias
+
+            self.module.self_attn.out_proj.weight.data = self.module.self_attn.out_proj.weight.transpose(0, 1).contiguous()
+            self.ipex_optimized_module.attn.out_wei = self.module.self_attn.out_proj.weight
+            self.ipex_optimized_module.attn.out_proj.bias = self.module.self_attn.out_proj.bias
+        else:
+            self.ipex_optimized_module.attn.k_proj.weight = self.module.self_attn.k_proj.weight
+            self.ipex_optimized_module.attn.k_proj.bias = self.module.self_attn.k_proj.bias
+            self.ipex_optimized_module.attn.q_proj.weight = self.module.self_attn.q_proj.weight
+            self.ipex_optimized_module.attn.q_proj.bias = self.module.self_attn.q_proj.bias
+            self.ipex_optimized_module.attn.v_proj.weight = self.module.self_attn.v_proj.weight
+            self.ipex_optimized_module.attn.v_proj.bias = self.module.self_attn.v_proj.bias
+            self.ipex_optimized_module.attn.out_proj.weight = self.module.self_attn.out_proj.weight
+            self.ipex_optimized_module.attn.out_proj.bias = self.module.self_attn.out_proj.bias
 
     def port_mlp_parameters(self):
-        self.ipex_optimized_module.mlp.fc_in.weight = self.module.fc1.weight
-        self.ipex_optimized_module.mlp.fc_in.bias = self.module.fc1.bias
-        self.ipex_optimized_module.mlp.fc_out.weight = self.module.fc2.weight
-        self.ipex_optimized_module.mlp.fc_out.bias = self.module.fc2.bias
-
         if self.row_major:
-            self.ipex_optimized_module.mlp.fc_in_wei = self.ipex_optimized_module.mlp.fc_in.weight.transpose(0, 1)
-            del self.ipex_optimized_module.mlp.fc_in.weight
-            self.ipex_optimized_module.mlp.fc_out_wei = self.ipex_optimized_module.mlp.fc_out.weight.transpose(0, 1)
-            del self.ipex_optimized_module.mlp.fc_out.weight
+            self.module.fc1.weight.data = self.module.fc1.weight.transpose(0, 1).contiguous()
+            self.ipex_optimized_module.mlp.fc_in_wei = self.module.fc1.weight.data
+            self.ipex_optimized_module.mlp.fc_in_bias = self.module.fc1.bias
+
+            self.module.fc2.weight.data = self.module.fc2.weight.transpose(0, 1).contiguous()
+            self.ipex_optimized_module.mlp.fc_out_wei = self.module.fc2.weight
+            self.ipex_optimized_module.mlp.fc_out_bias = self.module.fc2.bias
+        else:
+            self.ipex_optimized_module.mlp.fc_in.weight = self.module.fc1.weight
+            self.ipex_optimized_module.mlp.fc_in.bias = self.module.fc1.bias
+            self.ipex_optimized_module.mlp.fc_out.weight = self.module.fc2.weight
+            self.ipex_optimized_module.mlp.fc_out.bias = self.module.fc2.bias
 
     def port_layer_norm_parameters(self):
         self.ipex_optimized_module.self_attn_layer_norm.weight = self.module.self_attn_layer_norm.weight
@@ -325,48 +327,60 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
         return IPEXLlamaBlock(self.ipex_transformers_config)
 
     def port_attn_parameters(self):
-        self.ipex_optimized_module.attn.k_proj.weight = self.module.self_attn.k_proj.weight
-        self.ipex_optimized_module.attn.k_proj.bias = self.module.self_attn.k_proj.bias
-        self.ipex_optimized_module.attn.q_proj.weight = self.module.self_attn.q_proj.weight
-        self.ipex_optimized_module.attn.q_proj.bias = self.module.self_attn.q_proj.bias
-        self.ipex_optimized_module.attn.v_proj.weight = self.module.self_attn.v_proj.weight
-        self.ipex_optimized_module.attn.v_proj.bias = self.module.self_attn.v_proj.bias
-        self.ipex_optimized_module.attn.out_proj.weight = self.module.self_attn.o_proj.weight
-        self.ipex_optimized_module.attn.out_proj.bias = self.module.self_attn.o_proj.bias
-
         if self.row_major:
-            self.ipex_optimized_module.attn.q_wei = self.ipex_optimized_module.attn.q_proj.weight.t().contiguous()
-            del self.module.self_attn.q_proj.weight
-            self.ipex_optimized_module.attn.k_wei = self.ipex_optimized_module.attn.k_proj.weight.t().contiguous()
-            del self.module.self_attn.k_proj.weight
-            self.ipex_optimized_module.attn.v_wei = self.ipex_optimized_module.attn.v_proj.weight.t().contiguous()
-            del self.module.self_attn.v_proj.weight
-            shape = [3, -1, self.ipex_optimized_module.attn.q_wei.shape[-1]]
-            self.ipex_optimized_module.attn.qkv_wei = torch.cat([self.ipex_optimized_module.attn.q_wei, self.ipex_optimized_module.attn.k_wei, self.ipex_optimized_module.attn.v_wei], dim=0).view(shape)
-            self.ipex_optimized_module.attn.qkv_bias = None
-            del self.ipex_optimized_module.attn.q_wei
-            del self.ipex_optimized_module.attn.k_wei
-            del self.ipex_optimized_module.attn.v_wei
+            self.module.self_attn.q_proj.weight.data = self.module.self_attn.q_proj.weight.t().contiguous()
+            self.module.self_attn.k_proj.weight.data = self.module.self_attn.k_proj.weight.t().contiguous()
+            self.module.self_attn.v_proj.weight.data = self.module.self_attn.v_proj.weight.t().contiguous()
 
-            self.ipex_optimized_module.attn.out_wei = self.ipex_optimized_module.attn.out_proj.weight.t().contiguous()
-            del self.ipex_optimized_module.attn.out_proj.weight
+            shape = [3, -1, self.module.self_attn.q_proj.weight.shape[-1]]
+            self.ipex_optimized_module.attn.qkv_wei = torch.cat([self.module.self_attn.q_proj.weight.data, 
+                                                                 self.module.self_attn.k_proj.weight.data, 
+                                                                 self.module.self_attn.v_proj.weight.data], dim=0).view(shape)
+            self.module.self_attn.q_proj.weight.data = self.ipex_optimized_module.attn.qkv_wei[0, :, :]
+            self.module.self_attn.k_proj.weight.data = self.ipex_optimized_module.attn.qkv_wei[1, :, :]
+            self.module.self_attn.v_proj.weight.data = self.ipex_optimized_module.attn.qkv_wei[2, :, :]
+            self.module.self_attn.q_wei = self.module.self_attn.q_proj.weight
+            self.module.self_attn.k_wei = self.module.self_attn.k_proj.weight
+            self.module.self_attn.v_wei = self.module.self_attn.v_proj.weight
+
+            self.ipex_optimized_module.attn.q_proj.bias = self.module.self_attn.q_proj.bias
+            self.ipex_optimized_module.attn.k_proj.bias = self.module.self_attn.k_proj.bias
+            self.ipex_optimized_module.attn.v_proj.bias = self.module.self_attn.v_proj.bias
+
+            self.module.self_attn.o_proj.weight.data = self.module.self_attn.o_proj.weight.t().contiguous()
+            self.ipex_optimized_module.attn.out_wei = self.module.self_attn.o_proj.weight
+            self.ipex_optimized_module.attn.out_bias = self.module.self_attn.o_proj.bias
+        else:
+            self.ipex_optimized_module.attn.k_proj.weight = self.module.self_attn.k_proj.weight
+            self.ipex_optimized_module.attn.k_proj.bias = self.module.self_attn.k_proj.bias
+            self.ipex_optimized_module.attn.q_proj.weight = self.module.self_attn.q_proj.weight
+            self.ipex_optimized_module.attn.q_proj.bias = self.module.self_attn.q_proj.bias
+            self.ipex_optimized_module.attn.v_proj.weight = self.module.self_attn.v_proj.weight
+            self.ipex_optimized_module.attn.v_proj.bias = self.module.self_attn.v_proj.bias
+            self.ipex_optimized_module.attn.out_proj.weight = self.module.self_attn.o_proj.weight
+            self.ipex_optimized_module.attn.out_proj.bias = self.module.self_attn.o_proj.bias
 
 
     def port_mlp_parameters(self):
-        self.ipex_optimized_module.mlp.fc_in.weight = self.module.mlp.gate_proj.weight
-        self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.gate_proj.bias
-        self.ipex_optimized_module.mlp.fc_out.weight = self.module.mlp.down_proj.weight
-        self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.down_proj.bias
-        self.ipex_optimized_module.mlp.up_proj.weight = self.module.mlp.up_proj.weight
-        self.ipex_optimized_module.mlp.up_proj.bias = self.module.mlp.up_proj.bias
-
         if self.row_major:
-            self.ipex_optimized_module.mlp.fc_in_wei = self.ipex_optimized_module.mlp.fc_in.weight.t().contiguous()
-            del self.ipex_optimized_module.mlp.fc_in.weight
-            self.ipex_optimized_module.mlp.fc_out_wei = self.ipex_optimized_module.mlp.fc_out.weight.t().contiguous()
-            del self.ipex_optimized_module.mlp.fc_out.weight
-            self.ipex_optimized_module.mlp.up_wei = self.ipex_optimized_module.mlp.up_proj.weight.t().contiguous()
-            del self.ipex_optimized_module.mlp.up_proj.weight
+            self.module.mlp.gate_proj.weight.data = self.module.mlp.gate_proj.weight.t().contiguous()
+            self.ipex_optimized_module.mlp.fc_in_wei = self.module.mlp.gate_proj.weight
+            self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.gate_proj.bias
+
+            self.module.mlp.down_proj.weight.data = self.module.mlp.down_proj.weight.t().contiguous()
+            self.ipex_optimized_module.mlp.fc_out_wei = self.module.mlp.down_proj.weight
+            self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.down_proj.bias
+
+            self.module.mlp.up_proj.weight.data = self.module.mlp.up_proj.weight.t().contiguous()
+            self.ipex_optimized_module.mlp.up_wei = self.module.mlp.up_proj.weight
+            self.ipex_optimized_module.mlp.up_proj.bias = self.module.mlp.up_proj.bias
+        else:
+            self.ipex_optimized_module.mlp.fc_in.weight = self.module.mlp.gate_proj.weight
+            self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.gate_proj.bias
+            self.ipex_optimized_module.mlp.fc_out.weight = self.module.mlp.down_proj.weight
+            self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.down_proj.bias
+            self.ipex_optimized_module.mlp.up_proj.weight = self.module.mlp.up_proj.weight
+            self.ipex_optimized_module.mlp.up_proj.bias = self.module.mlp.up_proj.bias
 
     def port_layer_norm_parameters(self):
         self.ipex_optimized_module.input_layernorm.weight = self.module.input_layernorm.weight
@@ -434,38 +448,49 @@ class IPEXBloomConverter(IPEXTransformerConverter):
         return IPEXBloomBlock(self.ipex_transformers_config)
 
     def port_attn_parameters(self):
-        self.ipex_optimized_module.self_attention.query_key_value.weight = nn.Parameter(self.module.self_attention.query_key_value.weight)
-        self.ipex_optimized_module.self_attention.query_key_value.bias = nn.Parameter(self.module.self_attention.query_key_value.bias)
-        self.ipex_optimized_module.self_attention.out_proj.weight = nn.Parameter(self.module.self_attention.dense.weight)
-        self.ipex_optimized_module.self_attention.out_proj.bias = nn.Parameter(self.module.self_attention.dense.bias)
-
         tp_size = self.ipex_transformers_config.tp_size
         if self.row_major:
             embed_dim = self.config.hidden_size
             num_head = self.config.n_head // tp_size
             shape = [num_head, 3, -1, embed_dim]
-            self.ipex_optimized_module.self_attention.qkv_wei = self.ipex_optimized_module.self_attention.query_key_value.weight.view(shape).contiguous().transpose(0, 1).contiguous().view([3, -1, embed_dim]).transpose(1, 2).contiguous()
-            self.ipex_optimized_module.self_attention.qkv_bias = self.ipex_optimized_module.self_attention.query_key_value.bias.view([num_head, 3, -1]).transpose(0, 1).contiguous().view([3, -1])
-            del self.ipex_optimized_module.self_attention.query_key_value.weight
-            del self.ipex_optimized_module.self_attention.query_key_value.bias
-            self.ipex_optimized_module.self_attention.out_wei = self.ipex_optimized_module.self_attention.out_proj.weight.transpose(0, 1).contiguous()
-            self.ipex_optimized_module.self_attention.out_bias = self.ipex_optimized_module.self_attention.out_proj.bias / self.tp_size
-            del self.ipex_optimized_module.self_attention.out_proj.weight
-            del self.ipex_optimized_module.self_attention.out_proj.bias
+
+            self.module.self_attention.query_key_value.weight.data = \
+                self.module.self_attention.query_key_value.weight.view(shape).contiguous().transpose(0, 1).contiguous().view([3, -1, embed_dim]).transpose(1, 2).contiguous()
+            self.ipex_optimized_module.self_attention.qkv_wei = \
+                self.module.self_attention.query_key_value.weight
+
+            self.module.self_attention.query_key_value.bias.data = \
+                self.module.self_attention.query_key_value.bias.view([num_head, 3, -1]).transpose(0, 1).contiguous().view([3, -1])
+            self.ipex_optimized_module.self_attention.qkv_bias = \
+                self.module.self_attention.query_key_value.bias
+
+            self.module.self_attention.dense.weight.data = \
+                self.module.self_attention.dense.weight.transpose(0, 1).contiguous()
+            self.ipex_optimized_module.self_attention.out_wei = self.module.self_attention.dense.weight
+            self.module.self_attention.dense.bias.data = self.module.self_attention.dense.bias.data / self.tp_size
+            self.ipex_optimized_module.self_attention.out_bias = self.module.self_attention.dense.bias
+        else:
+            self.ipex_optimized_module.self_attention.query_key_value.weight = nn.Parameter(self.module.self_attention.query_key_value.weight)
+            self.ipex_optimized_module.self_attention.query_key_value.bias = nn.Parameter(self.module.self_attention.query_key_value.bias)
+            self.ipex_optimized_module.self_attention.out_proj.weight = nn.Parameter(self.module.self_attention.dense.weight)
+            self.ipex_optimized_module.self_attention.out_proj.bias = nn.Parameter(self.module.self_attention.dense.bias)
+
 
     def port_mlp_parameters(self):
-        self.ipex_optimized_module.mlp.fc_in.weight = nn.Parameter(self.module.mlp.dense_h_to_4h.weight)
-        self.ipex_optimized_module.mlp.fc_in.bias = nn.Parameter(self.module.mlp.dense_h_to_4h.bias)
-        self.ipex_optimized_module.mlp.fc_out.weight = nn.Parameter(self.module.mlp.dense_4h_to_h.weight)
-        self.ipex_optimized_module.mlp.fc_out.bias = nn.Parameter(self.module.mlp.dense_4h_to_h.bias)
-        
         if self.row_major:
-            self.ipex_optimized_module.mlp.fc_in_wei = self.ipex_optimized_module.mlp.fc_in.weight.transpose(0, 1).contiguous()
-            del self.ipex_optimized_module.mlp.fc_in.weight
-            self.ipex_optimized_module.mlp.fc_out_wei = self.ipex_optimized_module.mlp.fc_out.weight.transpose(0, 1).contiguous()
-            self.ipex_optimized_module.mlp.fc_out_bias = self.ipex_optimized_module.mlp.fc_out.bias / self.tp_size
-            del self.ipex_optimized_module.mlp.fc_out.weight
-            del self.ipex_optimized_module.mlp.fc_out.bias
+            self.module.mlp.dense_h_to_4h.weight.data = self.module.mlp.dense_h_to_4h.weight.transpose(0, 1).contiguous()
+            self.ipex_optimized_module.mlp.fc_in_wei = self.module.mlp.dense_h_to_4h.weight
+            self.ipex_optimized_module.mlp.fc_in.bias = nn.Parameter(self.module.mlp.dense_h_to_4h.bias)
+
+            self.module.mlp.dense_4h_to_h.weight.data = self.module.mlp.dense_4h_to_h.weight.transpose(0, 1).contiguous()
+            self.ipex_optimized_module.mlp.fc_out_wei = self.module.mlp.dense_4h_to_h.weight
+            self.module.mlp.dense_4h_to_h.bias.data = self.module.mlp.dense_4h_to_h.bias.data / self.tp_size
+            self.ipex_optimized_module.mlp.fc_out_bias = self.module.mlp.dense_4h_to_h.bias
+        else:
+            self.ipex_optimized_module.mlp.fc_in.weight = nn.Parameter(self.module.mlp.dense_h_to_4h.weight)
+            self.ipex_optimized_module.mlp.fc_in.bias = nn.Parameter(self.module.mlp.dense_h_to_4h.bias)
+            self.ipex_optimized_module.mlp.fc_out.weight = nn.Parameter(self.module.mlp.dense_4h_to_h.weight)
+            self.ipex_optimized_module.mlp.fc_out.bias = nn.Parameter(self.module.mlp.dense_4h_to_h.bias)
 
     def port_layer_norm_parameters(self):
         self.ipex_optimized_module.input_layernorm.weight = nn.Parameter(self.module.input_layernorm.weight)
@@ -516,7 +541,7 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
         transformers.models.opt.modeling_opt.OPTDecoderLayer: IPEXOptConverter,
         transformers.models.bloom.modeling_bloom.BloomBlock: IPEXBloomConverter
     }
-    
+
     no_deepspeed_engine = not deepspeed_optimize or not isinstance(model, deepspeed.InferenceEngine)
     if config is None and hasattr(model, "config") and no_deepspeed_engine:
         config = model.config
@@ -524,6 +549,7 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
         config.device = model.device
     if hasattr(model, "_convert_to_bloom_cache"):
         setattr(model, "_convert_to_bloom_cache", _convert_to_bloom_cache_ipex)
+
     for name, module in model.named_children():
         for m, converter in transformers_converter.items():
             if isinstance(module, m):

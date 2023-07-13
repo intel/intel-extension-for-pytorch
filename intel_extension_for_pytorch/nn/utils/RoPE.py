@@ -87,7 +87,6 @@ class LlamaRotaryEmbedding(torch.nn.Module):
         freqs = torch.einsum("i,j->ij", t, self.inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = torch.cat((freqs, freqs), dim=-1)
-        print(emb.size())
         self.register_buffer("cos_cached", emb.cos().to(self.dtype).to(self.device), persistent=False)
         self.register_buffer("sin_cached", emb.sin().to(self.dtype).to(self.device), persistent=False)
 
