@@ -209,8 +209,6 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
   MAKE_REGISTER_FUNC_TWO_POLICIES(
       scaled_dot_product_attention, fallthrough, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
-      _scaled_dot_product_attention, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
       _scaled_dot_product_attention_math, fallthrough, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(addcdiv, fallthrough, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(addcmul, fallthrough, fp32)
