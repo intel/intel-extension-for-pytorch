@@ -64,6 +64,7 @@ void fmha_forward_kernel(
     uint32_t num_queries,
     uint32_t num_keys,
     uint32_t alibi_padded_block_size,
+    uint32_t attn_mask_padded_block_size,
     bool is_causal);
 
 void fmha_forward_op_attn_mask_alibi_strided(

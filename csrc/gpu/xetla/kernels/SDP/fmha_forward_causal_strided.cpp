@@ -58,6 +58,7 @@ class fmha_forward_causal_strided_t {
     accum_t dp_prob;
     accum_t dp_scale;
     uint32_t uAT;
+    uint32_t uMT;
 
     inline arguments_t() = default;
     inline arguments_t(
@@ -75,7 +76,8 @@ class fmha_forward_causal_strided_t {
         uint32_t num_keys,
         accum_t sm_scale,
         accum_t dropout_prob,
-        uint32_t alibi_padded_block_size)
+        uint32_t alibi_padded_block_size,
+        uint32_t attn_mask_padded_block_size)
         : Q_ptr(query),
           K_ptr(key),
           V_ptr(value),
@@ -91,7 +93,8 @@ class fmha_forward_causal_strided_t {
           sm_scale(sm_scale),
           dp_prob(dropout_prob),
           dp_scale(1.f / (1.f - dropout_prob)),
-          uAT(alibi_padded_block_size) {}
+          uAT(alibi_padded_block_size),
+          uMT(attn_mask_padded_block_size) {}
   };
 
  private:
@@ -273,7 +276,7 @@ class fmha_forward_causal_strided_t {
         end_y = end_y > boundary_y ? boundary_y : end_y;
 
         mem_desc_Bij.init(
-            args.B_ptr, {end_x, end_y, args.uT}, {start_x, start_y});
+            args.B_ptr, {end_x, end_y, args.uMT}, {start_x, start_y});
       }
     }
   };
@@ -663,10 +666,11 @@ void fmha_forward_causal_strided_impl(
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,
-    uint32_t alibi_padded_block_size) {
+    uint32_t alibi_padded_block_size,
+    uint32_t attn_mask_padded_block_size) {
 #ifdef SDP_DBG
   printf(
-      "B, N, F, T, H: %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d, alibi @ 0x%llx, uAT %d\n",
+      "B, N, F, T, H: %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d, alibi @ 0x%llx, uAT %d, uMT %d\n",
       num_batches,
       num_heads,
       num_queries,
@@ -677,7 +681,8 @@ void fmha_forward_causal_strided_impl(
       kIsCausal,
       kIsTraining,
       (unsigned long long)alibi,
-      alibi_padded_block_size);
+      alibi_padded_block_size,
+      attn_mask_padded_block_size);
 #endif
   // fmha forward kernel
   using fmha_forward_op_t = fmha_forward_causal_strided_t<
@@ -713,7 +718,8 @@ void fmha_forward_causal_strided_impl(
           num_keys,
           alpha,
           dropout_prob,
-          alibi_padded_block_size);
+          alibi_padded_block_size,
+          attn_mask_padded_block_size);
 
       // call the functor
       fmha_fwd_op(ei, args);
@@ -769,7 +775,8 @@ void fmha_forward_causal_strided_impl(
       head_size,                          \
       num_queries,                        \
       num_keys,                           \
-      alibi_padded_block_size)
+      alibi_padded_block_size,            \
+      attn_mask_padded_block_size)
 /// @brief Main execution function for flash mha forward.
 template <
     typename T,
@@ -794,7 +801,8 @@ void fmha_forward_causal_strided(
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,
-    uint32_t alibi_padded_block_size) {
+    uint32_t alibi_padded_block_size,
+    uint32_t attn_mask_padded_block_size) {
   if (head_size <= 64) {
     CALL_IMPL_FUNC(fmha_policy_64x128x64);
   } else if (head_size <= 128) {
@@ -834,6 +842,7 @@ void fmha_forward_kernel(
     uint32_t num_queries,
     uint32_t num_keys,
     uint32_t alibi_padded_block_size,
+    uint32_t attn_mask_padded_block_size,
     bool is_causal) {
   using T = sycl::half;
   if (is_causal) {
@@ -855,7 +864,8 @@ void fmha_forward_kernel(
           head_size,
           num_queries,
           num_keys,
-          alibi_padded_block_size);
+          alibi_padded_block_size,
+          attn_mask_padded_block_size);
     } else {
       fmha_forward_causal_strided<T, false, false, true, false>(
           q,
@@ -874,7 +884,8 @@ void fmha_forward_kernel(
           head_size,
           num_queries,
           num_keys,
-          alibi_padded_block_size);
+          alibi_padded_block_size,
+          attn_mask_padded_block_size);
     }
   } else {
     if (attn_mask) {
@@ -896,7 +907,8 @@ void fmha_forward_kernel(
             head_size,
             num_queries,
             num_keys,
-            alibi_padded_block_size);
+            alibi_padded_block_size,
+            attn_mask_padded_block_size);
       } else {
         fmha_forward_causal_strided<T, false, true, false, false>(
             q,
@@ -915,7 +927,8 @@ void fmha_forward_kernel(
             head_size,
             num_queries,
             num_keys,
-            alibi_padded_block_size);
+            alibi_padded_block_size,
+            attn_mask_padded_block_size);
       }
     } else {
       if (alibi) {
@@ -936,7 +949,8 @@ void fmha_forward_kernel(
             head_size,
             num_queries,
             num_keys,
-            alibi_padded_block_size);
+            alibi_padded_block_size,
+            attn_mask_padded_block_size);
       } else {
         fmha_forward_causal_strided<T, false, false, false, false>(
             q,
@@ -955,7 +969,8 @@ void fmha_forward_kernel(
             head_size,
             num_queries,
             num_keys,
-            alibi_padded_block_size);
+            alibi_padded_block_size,
+            attn_mask_padded_block_size);
       }
     }
   }

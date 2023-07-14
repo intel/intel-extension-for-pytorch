@@ -57,7 +57,8 @@ class IPEXTransformerAtten(nn.Module):
 
     layer_id_static = 0
     casual_attention_mask = None
-    aligned_alibi = None
+    blocked_alibi = None
+    blocked_attn_mask = None
 
     def __init__(self, config) -> None:
         super(IPEXTransformerAtten, self).__init__()
@@ -237,13 +238,19 @@ class IPEXTransformerAtten(nn.Module):
         else:
             return reduce_target
 
-    def get_aligned_alibi(self, alibi):
+    def get_blocked_alibi(self, alibi):
         if self.layer_id == 0:
-            shape = [alibi.shape[0], alibi.shape[1], 2048] # [beam*num_head, q_len, kv_len]
-            IPEXTransformerAtten.aligned_alibi = torch.zeros(shape, device=alibi.device, dtype=alibi.dtype)
+            shape = [alibi.shape[0], alibi.shape[1], self.max_positions] # [beam*num_head, q_len, kv_len]
+            IPEXTransformerAtten.blocked_alibi = torch.empty(shape, device=alibi.device, dtype=alibi.dtype)
             kv_len = alibi.shape[2]
-            IPEXTransformerAtten.aligned_alibi[:, :, 0 : kv_len] = alibi
-        return IPEXTransformerAtten.aligned_alibi
+            IPEXTransformerAtten.blocked_alibi[:, :, 0 : kv_len] = alibi
+        return IPEXTransformerAtten.blocked_alibi
+
+    def get_blocked_attn_mask(self, attn_mask):
+        if self.layer_id == 0:
+            IPEXTransformerAtten.blocked_attn_mask = torch.empty((attn_mask.shape[0], attn_mask.shape[1], attn_mask.shape[2], self.max_positions), device=attn_mask.device, dtype=attn_mask.dtype)
+            IPEXTransformerAtten.blocked_attn_mask[:, :, :, 0 : attn_mask.shape[3]] = attn_mask
+        return IPEXTransformerAtten.blocked_attn_mask
 
     def naive_self_attention(self, query, key, value, attention_mask=None, head_mask=None, alibi : torch.Tensor=None):
         if alibi is not None:
@@ -314,11 +321,15 @@ class IPEXTransformerAtten(nn.Module):
             if self.use_casual_mask == True and query.shape[2] != 1:
                 is_causal = True
 
-            if alibi is None:
-                attn_output = torch.xpu.IpexSDP(query, key, value, None, attention_mask, head_mask, alpha, beta, dropout, is_causal)
-            else:
-                aligned_alibi = self.get_aligned_alibi(alibi)
-                attn_output = torch.xpu.IpexSDP(query, key, value, aligned_alibi, attention_mask, head_mask, alpha, beta, dropout, is_causal)
+            blocked_alibi = None
+            if alibi != None:
+                blocked_alibi = self.get_blocked_alibi(alibi)
+
+            blocked_attn_mask = None
+            if attention_mask != None:
+                blocked_attn_mask = self.get_blocked_attn_mask(attention_mask)
+
+            attn_output = torch.xpu.IpexSDP(query, key, value, blocked_alibi, blocked_attn_mask, head_mask, alpha, beta, dropout, is_causal)
         else:
             attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi)
         return attn_output, attn_weights
