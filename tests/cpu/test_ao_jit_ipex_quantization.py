@@ -179,30 +179,67 @@ class TestIpexOps(JitLlgaTestCase):
         class M(nn.Module):
             def __init__(self):
                 super(M, self).__init__()
-                self.m = nn.EmbeddingBag(10, 3, mode="sum", sparse=True)
+                self.m = nn.EmbeddingBag(10, 110, mode="sum", sparse=True)
 
             def forward(self, input, offset):
                 x = self.m(input, offset)
                 return x
 
+        def get_input(bag_size_1):
+            if bag_size_1:
+                return torch.LongTensor(
+                    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+                ), torch.LongTensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+            else:
+                return torch.LongTensor(
+                    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+                ), torch.LongTensor([0])
+
+        def fake_quant(tensor, scale, zp):
+            qtensor = torch.quantize_per_tensor(tensor, scale, zp, torch.qint8)
+            return qtensor.dequantize()
+
+        def get_expect(module, input, offsets):
+            def _calculate_scale(max_val, min_val):
+                min_val_neg = torch.min(min_val, torch.zeros_like(min_val))
+                max_val_pos = torch.max(max_val, torch.zeros_like(max_val))
+                max_val_pos = torch.max(-min_val_neg, max_val_pos)
+                scale = max_val_pos / 127.5
+                scale = max(scale.item(), torch.finfo(torch.float32).eps)
+                return scale
+
+            _module = copy.deepcopy(module)
+            y = _module(input, offsets)
+            o_scale = _calculate_scale(y.max(), y.min())
+            if isinstance(_module, nn.EmbeddingBag):
+                w_scale = _calculate_scale(_module.weight.max(), _module.weight.min())
+                _module.weight.data = fake_quant(_module.weight, w_scale, 0)
+            else:
+                w_scale = _calculate_scale(
+                    _module.m.weight.max(), _module.m.weight.min()
+                )
+                _module.m.weight.data = fake_quant(_module.m.weight, w_scale, 0)
+            expect = _module(input, offsets)
+            return fake_quant(expect, o_scale, 0)
+
         # This will call in F.embeddingbag
-        m = nn.EmbeddingBag(10, 3, mode="sum", sparse=True)
-        input = torch.LongTensor([1, 2, 4, 5, 4, 3, 2, 9])
-        offsets = torch.LongTensor([0, 1, 2, 3, 4, 5, 6, 7])
-
-        graph = self.checkQuantizeTrace(
-            m, [input, offsets], atol=1e-2, qconfig=static_qconfig[1]
-        )
-        self.assertGraphContainsExactly(graph, "ipex::qembedding_bag", 1)
-        # test nn.EmbeddingBag
-        m = M().eval()
-        input = torch.LongTensor([1, 2, 4, 5, 4, 3, 2, 9])
-        offsets = torch.LongTensor([0, 1, 2, 3, 4, 5, 6, 7])
-
-        graph = self.checkQuantizeTrace(
-            m, [input, offsets], atol=1e-2, qconfig=static_qconfig[1]
-        )
-        self.assertGraphContainsExactly(graph, "ipex::qembedding_bag", 1)
+        with torch.no_grad():
+            for bag_size_1 in [True, False]:
+                input, offsets = get_input(bag_size_1)
+                m = nn.EmbeddingBag(10, 110, mode="sum", sparse=True)
+                y = get_expect(m, input, offsets)
+                tol = 1e-2 if bag_size_1 else 5e-2
+                graph = self.checkQuantizeTrace(
+                    m, [input, offsets], qconfig=static_qconfig[1], expect_result=y
+                )
+                self.assertGraphContainsExactly(graph, "ipex::qembedding_bag", 1)
+                # test nn.EmbeddingBag
+                m = M().eval()
+                y = get_expect(m, input, offsets)
+                graph = self.checkQuantizeTrace(
+                    m, [input, offsets], qconfig=static_qconfig[1], expect_result=y
+                )
+                self.assertGraphContainsExactly(graph, "ipex::qembedding_bag", 1)
 
     def test_interaction_int8(self):
         class M(nn.Module):

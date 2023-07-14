@@ -293,9 +293,11 @@ at::Tensor embedding_bag_int8_kernel_impl(
     const at::Tensor& qweight,
     const at::Tensor& indices,
     const at::Tensor& offsets,
+    double output_scale,
     bool include_last_offset) {
   int64_t ddim = qweight.size(1);
-  double scale = at::native::q_scale_quant(qweight);
+  double weight_scale = at::native::q_scale_quant(qweight);
+  double inv_o_scale = 1.0 / output_scale;
   int8_t* qweight_data =
       reinterpret_cast<int8_t*>(qweight.data_ptr<at::qint8>());
   int64_t output_size = offsets.numel();
@@ -309,28 +311,49 @@ at::Tensor embedding_bag_int8_kernel_impl(
 
   // init output tensor
   at::QuantizerPtr output_quantizer =
-      at::make_per_tensor_affine_quantizer(scale, /*zp=*/0, at::kQInt8);
+      at::make_per_tensor_affine_quantizer(output_scale, /*zp=*/0, at::kQInt8);
   at::Tensor output = at::new_qtensor(
       /*sizes=*/{output_size, qweight.size(1)},
       qweight.options(),
       output_quantizer);
   int8_t* output_data = reinterpret_cast<int8_t*>(output.data_ptr<at::qint8>());
-
+  bool need_requantize = (output_scale - weight_scale) > 0.0001;
   at::parallel_for(0, output_size, 16, [&](int64_t start, int64_t end) {
+    float fp32_buffer[ddim] __attribute__((aligned(64)));
     for (int64_t i = start; i < end; i++) {
       int8_t* out_data_ptr = &output_data[i * ddim];
       auto inputs_start = offsets_data[i];
       auto inputs_end = i == last_offset ? last_index : offsets_data[i + 1];
-      if (inputs_start >= inputs_end) {
-        zero_ker(out_data_ptr, ddim);
-      } else {
+      if (inputs_end - inputs_start <= 1 and !need_requantize) {
+        // Do not re-quantize when bag-size == 1 for performance consideraion
+        // It is proved to be have enough accuracy on DLRM-V1
+        // We can revise this if other models with embeddingbag are not accurate
+        // enough
         int8_t* select_data_ptr =
             &qweight_data[indices_accessor[inputs_start] * ddim];
         move_ker(out_data_ptr, select_data_ptr, ddim);
-      }
-      for (int64_t s = (inputs_start + 1); s < inputs_end; s++) {
-        int8_t* select_data_ptr = &qweight_data[indices_accessor[s] * ddim];
-        add_ker(out_data_ptr, select_data_ptr, ddim);
+      } else {
+        zero_ker(&fp32_buffer[0], ddim);
+        for (int64_t s = inputs_start; s < inputs_end; s++) {
+          int8_t* select_data_ptr = &qweight_data[indices_accessor[s] * ddim];
+          scale_fp32_and_fma(
+              &fp32_buffer[0], select_data_ptr, weight_scale, ddim);
+        }
+#ifdef CPU_CAPABILITY_AVX2
+        at::vec::QuantizeAvx2<c10::qint8::underlying>(
+            &fp32_buffer[0],
+            out_data_ptr,
+            ddim,
+            inv_o_scale,
+            /*zp=*/0);
+#else
+        at::vec::QuantizeAvx512<c10::qint8::underlying>(
+            &fp32_buffer[0],
+            out_data_ptr,
+            ddim,
+            inv_o_scale,
+            /*zp=*/0);
+#endif
       }
     }
   });

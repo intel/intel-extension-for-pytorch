@@ -114,10 +114,10 @@ at::Tensor dil_qembeddingbag(
     at::ScalarType o_dtype) {
   /*
   pointer to torch_ipex::cpu::embedding_bag_int8_kernel_impl(
-      weight, indices, offsets, include_last_offset);
+      weight, indices, offsets, o_scale, include_last_offset);
   */
   return torch_ipex::cpu::embedding_bag_int8_kernel_stub(
-      kCPU, weight, indices, offsets, include_last_offset);
+      kCPU, weight, indices, offsets, o_scale, include_last_offset);
 }
 
 } // namespace cpu

@@ -32,7 +32,7 @@ inline __attribute__((always_inline)) void zero_ker(int8_t* out, int64_t len) {
   }
 
   if (i < len) {
-    auto mask = ((1 << (len - i)) - 1);
+    __mmask64 mask = ((size_t(1) << (len - i)) - 1);
     _mm512_mask_storeu_epi8(out + i, mask, zero_512);
   }
 }
@@ -88,7 +88,7 @@ inline __attribute__((always_inline)) void move_ker(
   }
 
   if (i < len) {
-    auto mask = ((1 << (len - i)) - 1);
+    __mmask64 mask = ((size_t(1) << (len - i)) - 1);
     auto in0 = _mm512_maskz_loadu_epi8(mask, in + i);
     _mm512_mask_storeu_epi8(out + i, mask, in0);
   }
@@ -107,7 +107,7 @@ inline __attribute__((always_inline)) void move_ker(
   }
 
   if (i < len) {
-    auto mask = ((1 << (len - i)) - 1);
+    __mmask64 mask = ((size_t(1) << (len - i)) - 1);
     auto in0 = _mm512_maskz_loadu_epi8(mask, in + i);
     _mm512_mask_storeu_epi8(out + i, mask, in0);
   }
@@ -126,7 +126,7 @@ inline __attribute__((always_inline)) void move_ker(
   }
 
   if (i < len) {
-    auto mask = ((1 << (len - i)) - 1);
+    __mmask64 mask = (size_t(1) << (len - i)) - 1;
     auto in0 = _mm512_maskz_loadu_epi8(mask, in + i);
     _mm512_mask_storeu_epi8(out + i, mask, in0);
   }
@@ -897,6 +897,25 @@ static inline void scale_int32_and_store_int8_maskz_16(
   auto out_i8 = _mm512_cvtsepi32_epi8(_mm512_cvt_roundps_epi32(
       in0_32f, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC)));
   _mm_mask_storeu_epi8((void*)out, mask, out_i8);
+}
+
+static inline __attribute__((always_inline)) void scale_fp32_and_fma(
+    float* out,
+    const int8_t* in,
+    float scale,
+    int64_t len) {
+  int64_t i;
+  __m512 scale_vec512 = _mm512_set1_ps(scale);
+  for (i = 0; i < len - 15; i += 16) {
+    auto i8 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(in + i));
+    auto i32 = _mm512_cvtepi8_epi32(i8);
+    auto f32 = _mm512_cvtepi32_ps(i32);
+    auto fma_out = _mm512_fmadd_ps(scale_vec512, f32, _mm512_loadu_ps(out + i));
+    _mm512_storeu_ps(out + i, fma_out);
+  }
+  for (; i < len; i++) {
+    out[i] = std::fma(scale, float(in[i]), out[i]);
+  }
 }
 
 } // namespace kernel
