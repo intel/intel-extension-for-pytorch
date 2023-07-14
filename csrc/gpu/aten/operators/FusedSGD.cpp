@@ -123,7 +123,7 @@ static void ComputeSplitSGDKernel(
           auto temp_momentum_buffer_value = grad_elem_fp32;
           if (momentum_buf_initialized) {
             // buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
-            temp_momentum_buffer_value = weight_elem;
+            temp_momentum_buffer_value = momentum_elem;
             temp_momentum_buffer_value =
                 momentum_value * temp_momentum_buffer_value;
             temp_momentum_buffer_value += grad_elem_fp32 * pre_dampening;
