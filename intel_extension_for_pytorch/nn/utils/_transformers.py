@@ -324,13 +324,21 @@ class IPEXTransformerAtten(nn.Module):
             if self.use_casual_mask == True and query.shape[2] != 1:
                 is_causal = True
 
+            blocked_attn_mask = None
+            if attention_mask != None:
+                # transform the attention_mask to casual mask if the attention_mask is in bool
+                if attention_mask.dtype == torch.bool:
+                    blocked_attn_mask = None
+                    if query.shape[2] != 1:
+                        is_causal = True
+                else:
+                    blocked_attn_mask = self.get_blocked_attn_mask(attention_mask)
+
+
             blocked_alibi = None
             if alibi != None:
                 blocked_alibi = self.get_blocked_alibi(alibi)
 
-            blocked_attn_mask = None
-            if attention_mask != None:
-                blocked_attn_mask = self.get_blocked_attn_mask(attention_mask)
 
             attn_output = torch.xpu.IpexSDP(query, key, value, blocked_alibi, blocked_attn_mask, head_mask, alpha, beta, dropout, is_causal)
         else:
