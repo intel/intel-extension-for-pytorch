@@ -112,18 +112,19 @@ class IPEXTransformerAtten(nn.Module):
         # greedy search path
         if layer_past is None:
             # the first timestep
-            shape = [hidden_states.shape[0], self.max_positions, self.num_attn_head, self.head_dim]
+            shape = [self.max_positions, hidden_states.shape[0], self.num_attn_head, self.head_dim]
             self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.prev_len = 0
 
         self.cur_len = self.prev_len + hidden_states.size(1)
 
-        shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
+        shape = [hidden_states.shape[1], hidden_states.shape[0], self.num_attn_head * self.head_dim]
         query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
         
-        key = self.key_cached[:, self.prev_len : self.cur_len, :, :]
-        value = self.value_cached[:, self.prev_len : self.cur_len, :, :]
+        key = self.key_cached[self.prev_len : self.cur_len, :, :, :]
+        value = self.value_cached[self.prev_len : self.cur_len, :, :, :]
+
         key = key.view(shape)
         value = value.view(shape)
        
@@ -144,8 +145,11 @@ class IPEXTransformerAtten(nn.Module):
         shape = [hidden_states.shape[1], hidden_states.shape[0], self.num_attn_head * self.head_dim]
         query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
 
-        key = self.key_cached[self.prev_len : self.cur_len, :, :]
-        value = self.value_cached[self.prev_len : self.cur_len, :, :]
+        key = self.key_cached[self.prev_len : self.cur_len, :, :, :]
+        value = self.value_cached[self.prev_len : self.cur_len, :, :, :]
+
+        key = key.view(shape)
+        value = value.view(shape)
 
         torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
         return query, key, value
@@ -166,9 +170,9 @@ class IPEXTransformerAtten(nn.Module):
                     hidden_state: torch.Tensor,
                     key_value_state: Optional[torch.Tensor] = None,
                     layer_past: Optional[Tuple[torch.Tensor]] = None):
-        if self.kv_cache_optimize and hidden_state.size(0) != 1:
-            self.kv_cache_optimize = False
-            print("Warning: kv cache optimize can only be enabled in greedy search. Set kv_cache_optimize to False !")
+        # if self.kv_cache_optimize and hidden_state.size(0) != 1:
+        #     self.kv_cache_optimize = False
+        #     print("Warning: kv cache optimize can only be enabled in greedy search. Set kv_cache_optimize to False !")
         if self.kv_cache_optimize and self.row_major:
             if self.greedy:
                 query, key, value = self.qkv_cache_optimized_greedy(hidden_states=hidden_state, layer_past=layer_past)
@@ -188,18 +192,17 @@ class IPEXTransformerAtten(nn.Module):
 
     def optimized_combine(self, query, key, value, layer_past = None):
         if self.greedy:
-            key = self.key_cached[:, : self.cur_len, :, :]  # [beam, seq_len, head, head_dim]
-            value = self.value_cached[:, : self.cur_len, :, :]  # [beam, seq_len, head, head_dim]
-            query = query.permute(0, 2, 1, 3) # [beam, head, seq_len, head_dim]
-            key = key.permute(0, 2, 1, 3)  # [beam, head, seq_len, head_dim]
-            value = value.permute(0, 2, 1, 3)  # [beam, head, seq_len, head_dim]
+            key = self.key_cached[: self.cur_len, :, :, :]  # [seq_len, bs, head, head_dim]
+            value = self.value_cached[: self.cur_len, :, :, :]  # [seq_len, bs, head, head_dim]
+            query = query.permute(1, 2, 0, 3) # [bs, head, seq_len, head_dim]
+            key = key.permute(1, 2, 0, 3)  # [bs, head, seq_len, head_dim]
+            value = value.permute(1, 2, 0, 3)  # [bs, head, seq_len, head_dim]
         else:
-            shape = [self.cur_len, self.key_cached.shape[1], query.shape[2], query.shape[3]]
-            key = self.key_cached[: self.cur_len, :, :].view(shape)  # [seq_len, beam, head*head_dim]
-            value = self.value_cached[: self.cur_len, :, :].view(shape) # [seq_len, beam, head*head_dim]
-            query = query.permute(0, 2, 1, 3)  # [beam, head, seq_len, head_dim]
-            key = key.permute(1, 2, 0, 3)  # [beam, head, seq_len, head_dim]
-            value = value.permute(1, 2, 0, 3)  # [beam, head, seq_len, head_dim]
+            key = self.key_cached[: self.cur_len, :, :, :]  # [seq_len, bs*beam, head, head_dim]
+            value = self.value_cached[: self.cur_len, :, :, :] # [seq_len, bs*beam, head, head_dim]
+            query = query.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
+            key = key.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
+            value = value.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
 
         self.prev_len = self.cur_len
 

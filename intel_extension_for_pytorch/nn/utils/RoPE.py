@@ -55,8 +55,8 @@ class GPTJRotaryEmbedding(PositionalEmbedding):
 
     def get_sin_cos(self, position_ids):
         if GPTJRotaryEmbedding.position_ids is None or GPTJRotaryEmbedding.position_ids is not position_ids:
-            GPTJRotaryEmbedding.sin = self.sin_cached[position_ids].unsqueeze(2)
-            GPTJRotaryEmbedding.cos = self.cos_cached[position_ids].unsqueeze(2)
+            GPTJRotaryEmbedding.sin = self.sin_cached[position_ids.transpose(0, 1)].unsqueeze(2)
+            GPTJRotaryEmbedding.cos = self.cos_cached[position_ids.transpose(0, 1)].unsqueeze(2)
             GPTJRotaryEmbedding.position_ids = position_ids
         return GPTJRotaryEmbedding.sin, GPTJRotaryEmbedding.cos
 
@@ -95,8 +95,8 @@ class LlamaRotaryEmbedding(torch.nn.Module):
 
     def get_sin_cos(self, position_ids):
         if LlamaRotaryEmbedding.position_ids is None or LlamaRotaryEmbedding.position_ids is not position_ids:
-            LlamaRotaryEmbedding.sin = self.sin_cached[position_ids].unsqueeze(2)
-            LlamaRotaryEmbedding.cos = self.cos_cached[position_ids].unsqueeze(2)
+            LlamaRotaryEmbedding.sin = self.sin_cached[position_ids.transpose(0, 1)].unsqueeze(2)
+            LlamaRotaryEmbedding.cos = self.cos_cached[position_ids.transpose(0, 1)].unsqueeze(2)
             LlamaRotaryEmbedding.position_ids = position_ids
         return LlamaRotaryEmbedding.sin, LlamaRotaryEmbedding.cos
 
