@@ -12,6 +12,7 @@ from typing import Optional, Tuple, Union
 import torch.nn as nn
 # from transformers.models.llama.configuration_llama import 
 
+MAX_SEQ_LEN = int(os.environ.get("MAX_SEQ_LEN", "0"))
 
 class IPEXTransformerConverter:
     tp_group = None
@@ -69,7 +70,7 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
         self.port_all_parameters_to_new_module()
 
     def construct_transformer_config(self):
-        n_positions = self.config.n_positions
+        n_positions = max(self.config.n_positions, MAX_SEQ_LEN)
         embed_dim = self.config.n_embd
         num_head = self.config.n_head
         rotary_dim = self.config.rotary_dim
@@ -173,7 +174,7 @@ class IPEXOptConverter(IPEXTransformerConverter):
         self.port_all_parameters_to_new_module()
 
     def construct_transformer_config(self):
-        n_positions = self.config.max_position_embeddings
+        n_positions = max(self.config.max_position_embeddings, MAX_SEQ_LEN)
         embed_dim = self.config.hidden_size
         num_head = self.config.num_attention_heads
         activate_function = self.config.activation_function
@@ -286,7 +287,7 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
         self.port_all_parameters_to_new_module()
 
     def construct_transformer_config(self):
-        n_positions = self.config.max_position_embeddings
+        n_positions = max(self.config.max_position_embeddings, MAX_SEQ_LEN)
         embed_dim = self.config.hidden_size
         num_head = self.config.num_attention_heads
         activate_function = self.config.hidden_act
@@ -405,7 +406,7 @@ class IPEXBloomConverter(IPEXTransformerConverter):
 
     def construct_transformer_config(self):
         # bloom don't have n_position attribute, we set it as 2048 just like other LLM models.
-        n_positions = 2048
+        n_positions = max(2048, MAX_SEQ_LEN)
         embed_dim = self.config.hidden_size
         num_head = self.config.n_head
         hidden_dropout = self.config.hidden_dropout
