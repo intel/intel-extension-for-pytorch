@@ -3,6 +3,7 @@ from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
+import pytest
 
 cpu_device = torch.device("cpu")
 sycl_device = torch.device("xpu")
@@ -95,6 +96,7 @@ class TestNNMethod(TestCase):
         grad_dpcpp = input_dpcpp.grad
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
 
+    @pytest.mark.skipif(not torch.xpu.has_fp64_dtype(), reason="[oneDNN rls-v3.3-pc] hang on ATS-M, will be fixed soon.")
     def test_upsample_nearest_with_non_integral_scales(self, dtype=torch.float):
         # 2D, CF
         x = torch.rand(1, 3, 180, 320)
