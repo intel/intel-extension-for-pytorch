@@ -11,7 +11,7 @@ from test_ao_jit_llga_utils import (
     llga_fp32_bf16_test_env,
     get_eltwise_fn,
 )
-from torch.testing._internal.common_utils import TEST_SCIPY
+from torch.testing._internal.common_utils import run_tests, TEST_SCIPY
 
 
 import intel_extension_for_pytorch as ipex
@@ -752,6 +752,25 @@ class TestFusionPattern(JitLlgaTestCase):
         x = torch.randn(3, 32, 32, 32)
         graph, _ = self.checkTrace(m, [x])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+
+    @llga_fp32_bf16_test_env
+    def test_do_not_map_select(self):
+        class M(nn.Module):
+            def __init__(
+                self,
+            ):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                z = y.expand_as(x)
+                x = torch.masked_fill(x, z, 1)
+                return x
+
+        m = M()
+        x = torch.randn(3, 32, 32, 32)
+        y = torch.randn(3, 32, 32, 1).to(torch.bool)
+        graph, _ = self.checkTrace(m, [x, y])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
 
     @llga_fp32_bf16_test_env
     def test_avg_pool2d_add(self):
