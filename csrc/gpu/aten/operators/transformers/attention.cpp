@@ -286,6 +286,15 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   return output;
 }
 
+// brief:
+// * query       : [q_seq_len, bs * beam, num_head, head_dim]
+// * key         : [kv_in_len, bs, num_head, head_dim]
+// * value       : [kv_in_len, bs, num_head, head_dim]
+// * key_cache   : [kv_out_len, bs * beam, num_head, head_dim]
+// * value_cache : [kv_out_len, bs * beam, num_head, head_dim]
+// * index       : [kv_out_len, bs * beam]
+// * output      : [bs * beam, q_seq_len, num_head, head_dim]
+// * timestep    : current time step of output seq
 Tensor xetla_fsdp_index_forward(
     const Tensor& query,
     const Tensor& key,
@@ -293,19 +302,21 @@ Tensor xetla_fsdp_index_forward(
     const Tensor& key_cache,
     const Tensor& value_cache,
     const Tensor& index,
-    const int64_t timestamp,
+    const c10::optional<Tensor>& alibi,
     const c10::optional<Tensor>& attn_mask,
-    double dropout_p,
+    const c10::optional<Tensor>& head_mask,
+    const int64_t timestep,
+    const double alpha,
+    const double beta,
+    const double dropout_p,
     bool is_causal) {
-  /* query: [q_seq_lenth, batch_size * beam_num, num_head, head_dim]
-     key, key_cache : [kv_seq_lenth, batch_size * beam_num, num_head, head_dim]
-     value, value_cache: [kv_seq_lenth, batch_size * beam_num, num_head,
-     head_dim] output: [batch_size*beam_num, q_seq_lenth, num_head, head_dim]
-     index: [kv_seq_len, beam_num] */
-  auto out_sz = {
-      query.sizes()[1], query.sizes()[0], query.sizes()[2], query.sizes()[3]};
-  // TODO: need to confirm the stride of output
-  auto output = at::empty({out_sz}, query.options());
+  TORCH_CHECK(
+      !head_mask.has_value(),
+      "Unsupported feature in fsdp kernel, head_mask ...");
+
+  auto output = at::empty(
+      {query.size(1), query.size(0), query.size(2), query.size(3)},
+      query.options());
   auto dpcpp_queue = dpcppGetCurrentQueue();
   RECORD_FUNCTION("xetla_fsdp_index_forward", {});
   gpu::xetla::fmha_forward_index_kernel(
@@ -315,17 +326,22 @@ Tensor xetla_fsdp_index_forward(
       value.data_ptr(),
       key_cache.data_ptr(),
       value_cache.data_ptr(),
-      output.data_ptr(),
       index.data_ptr(),
+      alibi.has_value() ? alibi.value().data_ptr() : (void*)nullptr,
       attn_mask.has_value() ? attn_mask.value().data_ptr() : (void*)nullptr,
+      nullptr, /* dropout */
+      output.data_ptr(),
+      timestep,
+      alpha,
+      beta,
       dropout_p,
-      timestamp,
-      query.size(1) /*num_batches*/,
-      query.size(2) /*num_heads*/,
-      query.size(3) /*head_size*/,
-      query.size(0) /*num_queries*/,
-      key.size(0) /*num_keys*/,
+      query.size(0),
+      query.size(1),
+      query.size(3),
+      query.size(2),
+      key.size(2),
       is_causal);
+  output = output.permute({0, 2, 1, 3});
   return output;
 }
 } // namespace AtenIpexTypeXPU

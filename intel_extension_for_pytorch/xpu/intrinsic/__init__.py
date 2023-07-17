@@ -115,8 +115,12 @@ def IpexSDP_Index(
     key_cache,
     value_cache,
     index,
-    timestamp,
+    alibi,
     attn_mask,
+    head_mask,
+    timestep,
+    alpha,
+    beta,
     dropout_p = 0.0,
     is_causal = False
 ) -> Tensor:
@@ -127,8 +131,12 @@ def IpexSDP_Index(
         key_cache,
         value_cache,
         index,
-        timestamp,
+        alibi,
         attn_mask,
+        head_mask,
+        timestep,
+        alpha,
+        beta,
         dropout_p,
         is_causal
     )
