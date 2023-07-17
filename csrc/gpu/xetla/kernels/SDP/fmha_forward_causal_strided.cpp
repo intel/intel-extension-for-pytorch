@@ -267,7 +267,7 @@ class fmha_forward_causal_strided_t {
       if constexpr (kUseBias) {
         start_x = startT;
         end_x = start_x + kBc;
-        boundary_x = args.uT;
+        boundary_x = args.uMT;
         end_x = end_x > boundary_x ? boundary_x : end_x;
 
         int32_t start_y = batch_id * args.uF + ei.get_group(1) * kBr;

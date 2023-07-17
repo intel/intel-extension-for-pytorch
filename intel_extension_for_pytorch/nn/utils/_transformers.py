@@ -281,7 +281,7 @@ class IPEXTransformerAtten(nn.Module):
 
     def get_blocked_attn_mask(self, attn_mask):
         if self.layer_id == 0:
-            IPEXTransformerAtten.blocked_attn_mask = torch.empty((attn_mask.shape[0], attn_mask.shape[1], attn_mask.shape[2], self.max_positions), device=attn_mask.device, dtype=attn_mask.dtype)
+            IPEXTransformerAtten.blocked_attn_mask = torch.zeros((attn_mask.shape[0], attn_mask.shape[1], attn_mask.shape[2], self.max_positions), device=attn_mask.device, dtype=attn_mask.dtype)
             IPEXTransformerAtten.blocked_attn_mask[:, :, :, 0 : attn_mask.shape[3]] = attn_mask
         return IPEXTransformerAtten.blocked_attn_mask
 
