@@ -6,7 +6,7 @@
 Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started
 ============================================================================
 
-Intel® Extension for PyTorch* extends optimizations to large language models (LLM). Optimizations are at development and experimental phase at this moment. You are welcomed to have a try with these optimizations on 4th Gen Intel® Xeon® Scalable processors.
+Intel® Extension for PyTorch* extends optimizations to large language models (LLM). Optimizations are at development and experimental phase at this moment. You are welcomed to have a try with these optimizations on Intel® Data Center GPU Max Series.
 
 System Requirements
 ===================
@@ -19,34 +19,38 @@ System Requirements
    * - Hardware
      - Intel® Data Center GPU Max Series
    * - OS
-     - CentOS/RHEL 8
+     - Ubuntu 22.04
+   * - Linux Kernel
+     - 5.15.0-76-generic
    * - Intel® oneAPI Base Toolkit
      - 2023.1
    * - Driver
-     - `627.2 <https://dgpu-docs.intel.com/releases/stable_627_7_20230526.html>`_.
+     - `627.7 <https://dgpu-docs.intel.com/releases/stable_627_7_20230526.html>`_
 
 Installation
 ============
 
-
+No prebuilt wheel files are provided. Please follow instructions below to compile from source.
 
 Compile From Source
 -------------------
 
+Replace the place holders *<DPCPP_ROOT_PATH>* and *<ONEMKL_ROOT_PATH>* to path to DPC++ compiler and oneMKL in oneAPI installation directory.
+
+For example, if oneAPI is installed in */opt/intel*, *<DPCPP_ROOT_PATH>* is */opt/intel/oneapi/compiler/2023.1.0/*, *<ONEMKL_ROOT_PATH>* is */opt/intel/oneapi/mkl/2023.1.0*.
+
 .. code:: shell
 
-  wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/scripts/compile_bundle.sh
-  bash compile_bundle.sh
-
+  wget https://github.com/intel/intel-extension-for-pytorch/raw/dev/LLM/scripts/compile_bundle.sh
+  bash compile_bundle.sh <DPCPP_ROOT_PATH> <ONEMKL_ROOT_PATH> pvc
 
 Launch Examples
 ===============
 
-
 Supported Models
 ----------------
 
-The following model llama is supported.
+The following model LLaMA is supported.
 
 .. list-table::
    :widths: auto
@@ -54,14 +58,14 @@ The following model llama is supported.
    :stub-columns: 1
 
    * - LLaMA
-     - Model directory path output from the `transformers conversion tool <https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/convert_llama_weights_to_hf.py>`_.*
+     - Model directory path output from the `transformers conversion tool <https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/convert_llama_weights_to_hf.py>`_.* Verified 7B and 13B.
 
 \* LLaMA model conversion steps:
 
-  1. Request access to the model at `Meta website <>`_.
+  1. Request access to the model at `Meta website <https://ai.meta.com/blog/large-language-model-llama-meta-ai/>`_.
   2. Decompress the downloaded model file.
   3. Convert the LLaMA model with the conversion script.
-  4. Launch example scripts with the place holder *<MODEL_ID>* substituted with the output_dir *<OUTPUT_DIR>* of the conversion script.
+  4. Launch example scripts.
 
 
 .. code:: shell
@@ -86,16 +90,16 @@ Install Dependencies
 
 .. code:: shell
 
+  conda install -y libstdcxx-ng=12 -c conda-forge
   conda install gperftools -c conda-forge
   conda install intel-openmp
   python -m pip install transformers==4.29.2 cpuid accelerate datasets sentencepiece protobuf==3.20.3
 
 
-
 Run Examples
 ------------
 
-The following python scripts are provided in Github repo `example directory <https://github.com/intel/intel-extension-for-pytorch/tree/dev/llama/examples/gpu/inference/python/llm/text-generation/>`_ to launch inference workloads with supported models. 
+The following python scripts are provided in Github repo `example directory <https://github.com/intel/intel-extension-for-pytorch/tree/dev/llm/examples/gpu/inference/python/llm/text-generation/>`_ to launch inference workloads with supported models. 
 
 - run_llama.py
 
@@ -108,17 +112,18 @@ To get these Python scripts, you can either get the entire Github repository dow
 
 .. code:: shell
 
-  # Get the sample prompt.json
-  $ wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.txt
-
   # Get the example scripts with git command
   $ git clone https://github.com/intel/intel-extension-for-pytorch.git
   $ cd intel-extension-for-pytorch
-  $ git checkout dev/llama
+  $ git checkout dev/LLM
   $ cd examples/gpu/inference/python/llm/text-generation
 
   # Get individual example scripts
-  $ wget https://github.com/intel/intel-extension-for-pytorch/raw/dev/llama/examples/gpu/inference/python/llm/text-generation/run_llama.py  
+  $ wget https://github.com/intel/intel-extension-for-pytorch/raw/dev/llm/examples/gpu/inference/python/llm/text-generation/run_llama.py  
+
+  # Get the sample prompt.json
+  # Make sure the downloaded prompt.json file is under the same directory as that of the python scripts mentioned above.
+  $ wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.txt
 
 The following environment variables are required to run llama on Intel® Data Center GPU Max Series.
 
@@ -163,10 +168,3 @@ Single Instance Accuracy
    python -u run_llama.py --device xpu --dtype float16 --accuracy_only --lambada --model "/path/to/output/7B-path" --greedy
    
    python -u run_llama.py --device xpu --dtype float16 --accuracy_only --lambada --model "/path/to/output/13B-path" --greedy
-
-
-
-Performance
------------
-
-Check `blog <>`_ for performance numbers benchmarked by Intel.
