@@ -96,6 +96,8 @@ class IPEXTransformerAtten(nn.Module):
         self.out_bias = None
         col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         self.row_major = not col_major
+        self.key_cached = None
+        self.value_cached = None
 
         beam = os.environ.get("Beam", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         self.greedy = not beam
@@ -107,8 +109,23 @@ class IPEXTransformerAtten(nn.Module):
             mask = torch.ones((self.max_positions, self.max_positions), dtype=torch.float)
             mask = (1 - torch.tril(mask).view(1, 1, self.max_positions, self.max_positions)) * (-66504.0)
             IPEXTransformerAtten.attention_mask = mask.to(self.config.device) 
+    
+    def checking_cache(self, layer_past):
+        acc_test = os.environ.get("LLM_ACC_TEST", "OFF").upper() in ["1", "ON", "Y", "YES", "TRUE"]
+        if not acc_test:
+            return True
+        if layer_past is None:
+            return True
+        prev_key, prev_value = layer_past[0], layer_past[1]
+        prev_key_len = prev_key.size(2)
+        if not torch.equal(self.key_cached[:prev_key_len, :, :, :], prev_key):
+            return False
+        if not torch.equal(self.value_cached[:prev_key_len, :, :, :], prev_value):
+            return False
+        return True
 
     def qkv_cache_optimized_greedy(self, hidden_states, layer_past = None):
+
         # greedy search path
         if layer_past is None:
             # the first timestep
@@ -116,6 +133,19 @@ class IPEXTransformerAtten(nn.Module):
             self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.prev_len = 0
+        elif self.key_cached is None or self.value_cached is None:
+            prev_key, value_key = layer_past[0], layer_past[1]
+            self.prev_len = prev_key.size(2)
+            shape = [self.max_positions, hidden_states.shape[0], self.num_attn_head, self.head_dim]
+            self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+        else:
+            self.prev_len = layer_past[0].size(2)
+
+        if not self.checking_cache(layer_past):
+            self.prev_len = layer_past[0].size(2)
+            self.key_cached[:self.prev_len, :, :, :] = layer_past[0].permute(2, 0, 1, 3)
+            self.value_cached[:self.prev_len,: , :, :] = layer_past[1].permute(2, 0, 1, 3)
 
         self.cur_len = self.prev_len + hidden_states.size(1)
 
@@ -127,7 +157,7 @@ class IPEXTransformerAtten(nn.Module):
 
         key = key.view(shape)
         value = value.view(shape)
-       
+
         torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
         return query, key, value
 
@@ -204,7 +234,7 @@ class IPEXTransformerAtten(nn.Module):
             key = key.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
             value = value.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
 
-        self.prev_len = self.cur_len
+        # self.prev_len = self.cur_len
 
         return query, key, value
 
@@ -298,7 +328,6 @@ class IPEXTransformerAtten(nn.Module):
                 attn_weights += casual_mask
             if self.scale_attn:
                 attn_weights /= self.scale_attn
-
             if attention_mask is not None:
                 attn_weights += attention_mask
                 # the attn_weights should anyway bigger than dtype.min, I wonder if this is necessary
