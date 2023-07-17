@@ -277,7 +277,6 @@ std::vector<at::Tensor> dil_mat_split(
   int64_t sequenceSize = mat.dim() > 2 ? mat.size(1) : mat.size(0);
   int64_t total_size = (mat.dim() > 2 ? mat.size(2) : mat.size(1));
   int64_t split_size = split_list.size();
-
   std::vector<at::Tensor> split_mat;
   for (int i = 0; i < split_size; ++i) {
     split_mat.push_back(
@@ -285,8 +284,8 @@ std::vector<at::Tensor> dil_mat_split(
             ? at::empty({batchSize, sequenceSize, split_list[i]}, mat.dtype())
             : at::empty({sequenceSize, split_list[i]}, mat.dtype()));
   }
-
-  T* src = mat.data_ptr<T>();
+  auto mat_ = mat.contiguous();
+  T* src = mat_.data_ptr<T>();
   at::parallel_for(
       0, batchSize * sequenceSize, 1, [&](int64_t begin, int64_t end) {
         for (const auto i : c10::irange(begin, end)) {
