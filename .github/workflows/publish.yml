@@ -21,6 +21,7 @@ jobs:
           path: docs
       - name: Create symlinks for the latest doc version
         run: |
+		  ls $GITHUB_WORKSPACE
           git config user.name github-actions
           git config user.email github-actions@github.com
           cd ${GITHUB_WORKSPACE}/gh-pages
