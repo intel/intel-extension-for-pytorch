@@ -98,8 +98,8 @@ Install Dependencies
 
 .. code:: shell
 
-  conda install gperftools -c conda-forge
-  conda install intel-openmp
+  conda install -y gperftools -c conda-forge
+  conda install -y intel-openmp
   python -m pip install transformers==4.28.1 cpuid accelerate datasets sentencepiece protobuf==3.20.3
 
   # [Optional] install neural-compressor for GPT-J INT8 only
@@ -146,21 +146,21 @@ To get these Python scripts, you can either get the entire Github repository dow
 .. code:: shell
 
   # Get the example scripts with git command
-  $ git clone https://github.com/intel/intel-extension-for-pytorch.git
-  $ cd intel-extension-for-pytorch
-  $ git checkout v2.1.0.dev+cpu.llm
-  $ cd examples/cpu/inference/python/llm
+  git clone https://github.com/intel/intel-extension-for-pytorch.git
+  cd intel-extension-for-pytorch
+  git checkout v2.1.0.dev+cpu.llm
+  cd examples/cpu/inference/python/llm
 
   # Alternatively, get individual example scripts
-  $ wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/run_generation.py
-  $ wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/run_generation_with_deepspeed.py
-  $ wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/run_gpt-j_int8.py
-  $ wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/run_gpt-neox_int8.py
-  $ wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/run_llama_int8.py
+  wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/run_generation.py
+  wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/run_generation_with_deepspeed.py
+  wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/run_gpt-j_int8.py
+  wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/run_gpt-neox_int8.py
+  wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/examples/cpu/inference/python/llm/run_llama_int8.py
 
   # Get the sample prompt.json
   # Make sure the downloaded prompt.json file is under the same directory as that of the python scripts mentioned above.
-  $ wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
+  wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
 
 The following environment variables are required to achieve a good performance on 4th Gen Intel® Xeon® Scalable processors.
 
