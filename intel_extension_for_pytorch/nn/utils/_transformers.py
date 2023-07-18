@@ -102,6 +102,10 @@ class IPEXTransformerAtten(nn.Module):
         beam = os.environ.get("Beam", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         self.greedy = not beam
 
+        seq_first = os.environ.get("SEQ_FIRST", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
+        disable_kv_cache = os.environ.get("DISABLE_KV_CACHE", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
+        self.kv_cache = not disable_kv_cache
+
         self.is_decoder = self.config.is_decoder
         self.residual_drop = nn.Dropout(self.config.residual_dropout) if self.config.residual_dropout is not None else nn.Identity()
         self.attn_drop = nn.Dropout(self.config.attn_dropout) if self.config.attn_dropout is not None else nn.Identity() 
@@ -125,18 +129,18 @@ class IPEXTransformerAtten(nn.Module):
         return True
 
     def qkv_cache_optimized_greedy(self, hidden_states, layer_past = None):
-
         # greedy search path
+        # hidden_states has already been converted to [seq, beam, hidden_size]
         if layer_past is None:
             # the first timestep
-            shape = [self.max_positions, hidden_states.shape[0], self.num_attn_head, self.head_dim]
+            shape = [self.max_positions, hidden_states.shape[1], self.num_attn_head, self.head_dim]
             self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.prev_len = 0
         elif self.key_cached is None or self.value_cached is None:
             prev_key, value_key = layer_past[0], layer_past[1]
             self.prev_len = prev_key.size(2)
-            shape = [self.max_positions, hidden_states.shape[0], self.num_attn_head, self.head_dim]
+            shape = [self.max_positions, hidden_states.shape[1], self.num_attn_head, self.head_dim]
             self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
         else:
@@ -147,14 +151,12 @@ class IPEXTransformerAtten(nn.Module):
             self.key_cached[:self.prev_len, :, :, :] = layer_past[0].permute(2, 0, 1, 3)
             self.value_cached[:self.prev_len,: , :, :] = layer_past[1].permute(2, 0, 1, 3)
 
-        self.cur_len = self.prev_len + hidden_states.size(1)
+        self.cur_len = self.prev_len + hidden_states.size(0)
 
-        shape = [hidden_states.shape[1], hidden_states.shape[0], self.num_attn_head * self.head_dim]
+        shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
         query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-        
         key = self.key_cached[self.prev_len : self.cur_len, :, :, :]
         value = self.value_cached[self.prev_len : self.cur_len, :, :, :]
-
         key = key.view(shape)
         value = value.view(shape)
 
@@ -163,18 +165,18 @@ class IPEXTransformerAtten(nn.Module):
 
     def qkv_cache_optimized_beam(self, hidden_states, layer_past = None):
         # beam search path
+        # hidden_states has already been converted to [seq, beam, hidden_size]
         if layer_past is None:
             # the first timestep
-            shape = [self.max_positions, hidden_states.shape[0], self.num_attn_head, self.head_dim]
+            shape = [self.max_positions, hidden_states.shape[1], self.num_attn_head, self.head_dim]
             self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.prev_len = 0
 
-        self.cur_len = self.prev_len + hidden_states.size(1)
+        self.cur_len = self.prev_len + hidden_states.size(0)
 
-        shape = [hidden_states.shape[1], hidden_states.shape[0], self.num_attn_head * self.head_dim]
+        shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
         query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-
         key = self.key_cached[self.prev_len : self.cur_len, :, :, :]
         value = self.value_cached[self.prev_len : self.cur_len, :, :, :]
 
@@ -200,10 +202,7 @@ class IPEXTransformerAtten(nn.Module):
                     hidden_state: torch.Tensor,
                     key_value_state: Optional[torch.Tensor] = None,
                     layer_past: Optional[Tuple[torch.Tensor]] = None):
-        # if self.kv_cache_optimize and hidden_state.size(0) != 1:
-        #     self.kv_cache_optimize = False
-        #     print("Warning: kv cache optimize can only be enabled in greedy search. Set kv_cache_optimize to False !")
-        if self.kv_cache_optimize and self.row_major:
+        if self.kv_cache_optimize and self.row_major and self.kv_cache:
             if self.greedy:
                 query, key, value = self.qkv_cache_optimized_greedy(hidden_states=hidden_state, layer_past=layer_past)
             else:
@@ -213,7 +212,7 @@ class IPEXTransformerAtten(nn.Module):
             query, key, value = self.qkv_normal(hidden_states=hidden_state, layer_past=layer_past)
 
         new_shape = query.size()[:-1] + (self.num_attn_head, self.head_dim)
-        # reshape the qkv size to (bs,  seq_len, num_head, head_dim)
+        # reshape the qkv size to (seq_len, bs*beam, num_head, head_dim)
         query = query.view(new_shape)
         key = key.view(new_shape)
         value = value.view(new_shape)
@@ -221,27 +220,22 @@ class IPEXTransformerAtten(nn.Module):
         return query, key, value
 
     def optimized_combine(self, query, key, value, layer_past = None):
-        if self.greedy:
-            key = self.key_cached[: self.cur_len, :, :, :]  # [seq_len, bs, head, head_dim]
-            value = self.value_cached[: self.cur_len, :, :, :]  # [seq_len, bs, head, head_dim]
-            query = query.permute(1, 2, 0, 3) # [bs, head, seq_len, head_dim]
-            key = key.permute(1, 2, 0, 3)  # [bs, head, seq_len, head_dim]
-            value = value.permute(1, 2, 0, 3)  # [bs, head, seq_len, head_dim]
-        else:
-            key = self.key_cached[: self.cur_len, :, :, :]  # [seq_len, bs*beam, head, head_dim]
-            value = self.value_cached[: self.cur_len, :, :, :] # [seq_len, bs*beam, head, head_dim]
-            query = query.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
-            key = key.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
-            value = value.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
+        # query/key/value has been converted to [seq, bs*beam, num_head, head_dim]
+        key = self.key_cached[: self.cur_len, :, :, :]  # [seq_len, bs*beam, head, head_dim]
+        value = self.value_cached[: self.cur_len, :, :, :] # [seq_len, bs*beam, head, head_dim]
+        query = query.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
+        key = key.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
+        value = value.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
 
         # self.prev_len = self.cur_len
 
         return query, key, value
 
     def normal_combine(self, query, key, value, layer_past = None):
-        query = query.permute(0, 2, 1, 3)
-        key = key.permute(0, 2, 1, 3)
-        value = value.permute(0, 2, 1, 3)
+        # query/key/value has been converted to [seq, bs*beam, num_head, head_dim]
+        query = query.permute(1, 2, 0, 3)
+        key = key.permute(1, 2, 0, 3)
+        value = value.permute(1, 2, 0, 3)
         if layer_past is not None:
             past_key = layer_past[0]
             past_value = layer_past[1]
@@ -250,7 +244,7 @@ class IPEXTransformerAtten(nn.Module):
         return query, key, value
 
     def combine_with_cache(self, query, key, value, layer_past = None):
-        if self.kv_cache_optimize and self.row_major:
+        if self.kv_cache_optimize and self.row_major and self.kv_cache:
             query, key, value = self.optimized_combine(query, key, value, layer_past=layer_past)
         else:
             query, key, value = self.normal_combine(query, key, value, layer_past=layer_past)
@@ -375,8 +369,8 @@ class IPEXTransformerAtten(nn.Module):
         return attn_output, attn_weights
 
     def get_final_output(self, attn_output: torch.Tensor, residual: Optional[torch.Tensor] = None):
-        # reshape the attn_output from [bs, head_num, seq_len, head_dim] back to [bs, seq_len, embedding_size]
-        attn_output = attn_output.transpose(1, 2)
+        # reshape the attn_output from [bs, head_num, seq_len, head_dim] back to [seq_len, bs, embedding_size]
+        attn_output = attn_output.permute(2, 0, 1, 3)
         attn_output = attn_output.reshape(attn_output.size()[:-2] + (self.embed_dim // self.tp_size,))
 
         if self.row_major:
@@ -413,6 +407,7 @@ class IPEXTransformerAtten(nn.Module):
         residual: Optional[torch.Tensor] = None,
         alibi: torch.Tensor = None
     ):
+
 
         query, key, value = self.compute_qkv(hidden_state=hidden_states, key_value_state=key_value_states, layer_past=layer_past)
 
@@ -539,7 +534,6 @@ class IPEXTransformerMLP(nn.Module):
                 return 
             dist.all_reduce(target, group=self.tp_group)
         return target
-            
 
     def forward(self, hidden_states: Optional[torch.Tensor]):
         if self.row_major:
@@ -641,6 +635,11 @@ class IPEXGPTJBlock(nn.Module):
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False
     ) ->  Union[Tuple[torch.Tensor], Optional[Tuple[torch.Tensor, Tuple[torch.FloatTensor, ...]]]]:
+
+        # convert layout form [beam, seq, hidden_size] to [seq, beam, hidden_size]
+        hidden_states = hidden_states.transpose(0, 1).contiguous()
+        position_ids = position_ids.transpose(0, 1).contiguous()
+
         residual = hidden_states
         hidden_states, mean, var = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.ln.normalized_shape, self.ln.weight, self.ln.bias, self.ln.eps)
         attn_outputs = self.attn(
@@ -656,6 +655,9 @@ class IPEXGPTJBlock(nn.Module):
         outputs = attn_outputs[1: ]
 
         hidden_states = self.mlp(hidden_states, attn_output, residual)
+
+        # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
+        hidden_states = hidden_states.transpose(0, 1)
         if use_cache:
             outputs = (hidden_states, ) + outputs
         else:
@@ -708,8 +710,11 @@ class IPEXLlamaBlock(nn.Module):
         output_attentions: Optional[bool] = False,
         use_cache: Optional[bool] = False,
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
-        residual = hidden_states
+        # convert layout form [beam, seq, hidden_size] to [seq, beam, hidden_size]
+        hidden_states = hidden_states.transpose(0, 1).contiguous()
+        position_ids = position_ids.transpose(0, 1).contiguous()
 
+        residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
 
         hidden_states, present_key_value, self_attn_weights = self.attn(
@@ -725,9 +730,9 @@ class IPEXLlamaBlock(nn.Module):
         residual = hidden_states
         hidden_states = self.post_attn_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states, residual)
+        hidden_states = hidden_states.transpose(0, 1)
 
         outputs = (hidden_states, )
-
         if output_attentions:
             outputs += (self_attn_weights, )
 
@@ -757,8 +762,9 @@ class IPEXOptBlock(nn.Module):
         past_key_value: Optional[Tuple[torch.Tensor]] = None,
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
 
+        # convert layout form [beam, seq, hidden_size] to [seq, beam, hidden_size]
+        hidden_states = hidden_states.transpose(0, 1).contiguous()
         residual = hidden_states
-
         if self.do_layer_norm_before:
             hidden_states = self.self_attn_layer_norm(hidden_states)
 
@@ -789,6 +795,7 @@ class IPEXOptBlock(nn.Module):
 
         if not self.do_layer_norm_before:
             hidden_states = self.final_layer_norm(hidden_states)
+        hidden_states = hidden_states.transpose(0, 1)
 
         outputs = (hidden_states,)
 
@@ -821,6 +828,9 @@ class IPEXBloomBlock(nn.Module):
         use_cache: bool = False,
         output_attentions: bool = False,
     ):
+        # convert layout form [beam, seq, hidden_size] to [seq, beam, hidden_size]
+        hidden_states = hidden_states.transpose(0, 1).contiguous()
+
         #layernorm_output = self.input_layernorm(hidden_states)
         layernorm_output, _, _ = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.input_layernorm.normalized_shape, self.input_layernorm.weight, self.input_layernorm.bias, self.input_layernorm.eps)
         if self.config.do_norm_before:
@@ -849,6 +859,7 @@ class IPEXBloomBlock(nn.Module):
             residual = attention_output
 
         output = self.mlp(layernorm_output, residual)
+        output = output.transpose(0, 1)
 
         if use_cache:
             outputs = (output, ) + outputs
