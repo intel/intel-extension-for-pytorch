@@ -235,9 +235,9 @@ python<span class="w"> </span>-u<span class="w"> </span>run_llama.py<span class=
 <h4>Single Instance Accuracy<a class="headerlink" href="#single-instance-accuracy" title="Permalink to this heading"></a></h4>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>examples/gpu/inference/python/llm/casual-language-modeling/
 
-python<span class="w"> </span>-u<span class="w"> </span>run_llama.py<span class="w"> </span>--device<span class="w"> </span>xpu<span class="w"> </span>--dtype<span class="w"> </span>float16<span class="w"> </span>--accuracy_only<span class="w"> </span>--lambada<span class="w"> </span>--model<span class="w"> </span><span class="s2">&quot;/path/to/output/7B-path&quot;</span><span class="w"> </span>--greedy
+<span class="nv">LLM_ACC_TEST</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python<span class="w"> </span>-u<span class="w"> </span>run_llama.py<span class="w"> </span>--device<span class="w"> </span>xpu<span class="w"> </span>--dtype<span class="w"> </span>float16<span class="w"> </span>--accuracy_only<span class="w"> </span>--lambada<span class="w"> </span>--model<span class="w"> </span><span class="s2">&quot;/path/to/output/7B-path&quot;</span><span class="w"> </span>--greedy
 
-python<span class="w"> </span>-u<span class="w"> </span>run_llama.py<span class="w"> </span>--device<span class="w"> </span>xpu<span class="w"> </span>--dtype<span class="w"> </span>float16<span class="w"> </span>--accuracy_only<span class="w"> </span>--lambada<span class="w"> </span>--model<span class="w"> </span><span class="s2">&quot;/path/to/output/13B-path&quot;</span><span class="w"> </span>--greedy
+<span class="nv">LLM_ACC_TEST</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python<span class="w"> </span>-u<span class="w"> </span>run_llama.py<span class="w"> </span>--device<span class="w"> </span>xpu<span class="w"> </span>--dtype<span class="w"> </span>float16<span class="w"> </span>--accuracy_only<span class="w"> </span>--lambada<span class="w"> </span>--model<span class="w"> </span><span class="s2">&quot;/path/to/output/13B-path&quot;</span><span class="w"> </span>--greedy
 </pre></div>
 </div>
 </section>
