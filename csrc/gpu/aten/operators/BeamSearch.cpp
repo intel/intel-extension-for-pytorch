@@ -338,7 +338,6 @@ void update_beam_indices_kernel(
     scalar_t* src_cache_indices,
     scalar_t* out_cache_indices,
     scalar_t* beam_ids,
-    int32_t max_length,
     int32_t step,
     int32_t beam_size,
     int32_t batch_size) {
@@ -359,7 +358,7 @@ void update_beam_indices_kernel(
       int32_t offset = num_step * batch_size * beam_size;
 
       if (sentence_id < batch_size * beam_size && time_step < num_step) {
-        const scalar_t src_beam = beam_ids[offset + sentence_id];
+        const scalar_t src_beam = beam_ids[sentence_id];
         const int32_t src_offset = batch_size * beam_size * time_step +
             batch_id * beam_size + src_beam;
         const int32_t out_offset =
@@ -379,21 +378,21 @@ void update_beam_indices_kernel(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-Tensor& update_beam_indices_for_cache(
+Tensor update_beam_indices_for_cache(
     const Tensor& src_cache_indices,
-    Tensor& out_cache_indices,
     const Tensor& beam_ids,
-    int64_t max_length,
-    int64_t step,
     int64_t beam_size,
     int64_t batch_size) {
+  Tensor out_cache_indices = at::empty(
+      {src_cache_indices.size(0) + 1, src_cache_indices.size(1)},
+      src_cache_indices.options());
+  const int step = src_cache_indices.size(0);
   IPEX_DISPATCH_INTEGRAL_TYPES(
       src_cache_indices.scalar_type(), "update_beam_indices_for_cache", [&]() {
         update_beam_indices_kernel(
             src_cache_indices.data_ptr<scalar_t>(),
             out_cache_indices.data_ptr<scalar_t>(),
             beam_ids.data_ptr<scalar_t>(),
-            max_length,
             step,
             beam_size,
             batch_size);
