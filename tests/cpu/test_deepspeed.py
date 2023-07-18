@@ -89,25 +89,26 @@ class DeepspeedTester(TestCase):
     def test_ipex_optimize(self):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
-            LinearAllreduce, LinearLayer = deepspeed_modules
-            x = torch.randn(2, 4)
-            m_linear = DeepSpeedTestM().eval()
-            y = m_linear(x)
+            with torch.no_grad():
+                LinearAllreduce, LinearLayer = deepspeed_modules
+                x = torch.randn(2, 4)
+                m_linear = DeepSpeedTestM().eval()
+                y = m_linear(x)
 
-            ds_model = self._get_ds_model(m_linear)
-            self.assertTrue(module_found(ds_model, LinearLayer))
-            self.assertTrue(module_found(ds_model, LinearAllreduce))
+                ds_model = self._get_ds_model(m_linear)
+                self.assertTrue(module_found(ds_model, LinearLayer))
+                self.assertTrue(module_found(ds_model, LinearAllreduce))
 
-            optimized = ipex.optimize(ds_model.eval(), inplace=True)
-            jit_optimized = torch.jit.trace(optimized, x)
-            jit_optimized = torch.jit.freeze(jit_optimized)
-            self.assertTrue(module_found(optimized, _IPEXLinear))
-            self.assertTrue(module_found(optimized, _IPEXLinearAllreduce))
+                optimized = ipex.optimize(ds_model.eval(), inplace=True)
+                jit_optimized = torch.jit.trace(optimized, x)
+                jit_optimized = torch.jit.freeze(jit_optimized)
+                self.assertTrue(module_found(optimized, _IPEXLinear))
+                self.assertTrue(module_found(optimized, _IPEXLinearAllreduce))
 
-            optimized = optimized(x)
-            jit_res = jit_optimized(x)
-            self.assertEqual(y, jit_res)
-            self.assertEqual(y, optimized)
+                optimized = optimized(x)
+                jit_res = jit_optimized(x)
+                self.assertEqual(y, jit_res)
+                self.assertEqual(y, optimized)
 
     def test_dynamic_quantization(self):
         deepspeed_modules = may_import_deepspeed_modules()
