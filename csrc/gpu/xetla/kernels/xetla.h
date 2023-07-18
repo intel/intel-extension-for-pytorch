@@ -2,6 +2,7 @@
 
 #include <sycl/sycl.hpp>
 #include <xetla.hpp>
+//#include "/4T-720/xiaoli/gpt/ipex/third_party/xetla/include/xetla.hpp"
 
 using namespace sycl;
 using namespace gpu::xetla;

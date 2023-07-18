@@ -13,6 +13,8 @@ __all__ = [
     'nms',
     'locations_to_boxes',
     'roi_align',
+    'IpexSDP',
+    'IpexSDP_Index',
 ]
 
 
@@ -79,4 +81,54 @@ def roi_align(
         output_size[1],
         sampling_ratio,
         aligned,
+    )
+
+def IpexSDP(
+    query,
+    key,
+    value,
+    alibi = None,
+    bias = None,
+    head_mask = None,
+    alpha = 1.0,
+    beta = 1.0,
+    dropout_p = 0.0,
+    is_causal = False
+) -> Tensor:
+    return torch.ops.torch_ipex.xetla_fsdp_forward_atten_mask_alibi_strided(
+        query,
+        key,
+        value,
+        alibi,
+        bias,
+        head_mask,
+        alpha,
+        beta,
+        dropout_p,
+        is_causal
+    )
+
+def IpexSDP_Index(
+    query,
+    key,
+    value,
+    key_cache,
+    value_cache,
+    index,
+    timestamp,
+    attn_mask,
+    dropout_p = 0.0,
+    is_causal = False
+) -> Tensor:
+    return torch.ops.torch_ipex.xetla_fsdp_index_forward(
+        query,
+        key,
+        value,
+        key_cache,
+        value_cache,
+        index,
+        timestamp,
+        attn_mask,
+        dropout_p,
+        is_causal
     )

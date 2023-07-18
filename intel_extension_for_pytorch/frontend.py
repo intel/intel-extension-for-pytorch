@@ -8,6 +8,7 @@ import torch.fx.experimental.optimization as optimization
 from torch.jit._trace import TracerWarning
 import warnings
 from enum import IntFlag
+from .nn.utils._transformer_converter import transformer_frontend_replace
 
 from .nn import utils
 from .optim._optimizer_utils import (
@@ -155,7 +156,6 @@ class _Properties(object):
         self.fuse_update_step = None
         self.auto_kernel_selection = None
         self.graph_mode = None
-        self.optimize_transformers = None
 
 
 # O0 properties
@@ -171,7 +171,6 @@ class _O0:
         properties.fuse_update_step = False
         properties.auto_kernel_selection = False
         properties.graph_mode = False
-        properties.optimize_transformers = False
         return properties
 
 
@@ -188,7 +187,6 @@ class _O1:
         properties.fuse_update_step = True
         properties.auto_kernel_selection = False
         properties.graph_mode = False
-        properties.optimize_transformers = True
         return properties
 
 
@@ -306,6 +304,25 @@ class GraphCapture(object):
         return forward
 
 
+def optimize_transformers(model, dtype=None, optimizer=None):
+    def model_converter(model, dtype):
+        try:
+            import transformers
+            # from  import IPEXGPTJBlock
+        except ImportError as e:
+            print("Can not find transformers in your environment, disable ipex transformer optimize")
+            return model
+        transformer_frontend_replace(model, config=None, dtype=dtype)
+        return model
+    optimize_output = optimize(model, dtype=dtype, optimizer=optimizer, inplace=True)
+    if optimizer is None:
+        model = optimize_output
+        return model_converter(model, dtype=dtype)
+    else:
+        model = optimize_output[0]
+        optimizer = optimize_output[1]
+        return model_converter(model, dtype=dtype), optimizer
+
 def optimize(
     model,
     dtype=None,
@@ -322,7 +339,6 @@ def optimize(
     auto_kernel_selection=None,
     sample_input=None,
     graph_mode=None,
-    optimize_transformers=None
 ):
     r"""
     Apply optimizations at Python frontend to the given model (nn.Module), as
@@ -533,17 +549,11 @@ def optimize(
         opt_properties.auto_kernel_selection = auto_kernel_selection
     if graph_mode is not None:
         opt_properties.graph_mode = graph_mode
-    if optimize_transformers is not None:
-        opt_properties.optimize_transformers = optimize_transformers
 
     _disable_dnnl()
     if opt_properties.auto_kernel_selection:
         _enable_dnnl()
 
-    if device_type == "cpu":
-        if opt_properties.optimize_transformers:
-            warnings.warn("Transformer opitmization is only support on XPU new.")
-            opt_properties.optimize_transformers = False
     # when on xpu, some features are not supported
     if device_type == "xpu":
         if opt_properties.auto_kernel_selection:
@@ -629,8 +639,6 @@ def optimize(
         utils._model_convert.replace_lstm_with_ipex_lstm(
             optimized_model, optimized_optimizer
         )
-    if opt_properties.optimize_transformers:
-        utils._model_convert.replace_transformer_with_ipex_transformer(optimized_model)
     if (
         model.training
         and opt_properties.split_master_weight_for_bf16

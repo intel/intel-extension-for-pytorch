@@ -273,15 +273,12 @@ def get_submodule_commit(base_dir, submodule_dir):
 
 
 def get_build_version(ipex_git_sha):
-    pkg_type = "xpu" if _check_env_flag("BUILD_WITH_XPU") else "cpu"
     ipex_version = os.getenv("IPEX_VERSION", get_version_num())
     if _check_env_flag("IPEX_VERSIONED_BUILD", default="1"):
         try:
             ipex_version += "+git" + ipex_git_sha[:7]
         except Exception:
             pass
-    else:
-        ipex_version += "+" + pkg_type
     return ipex_version
 
 

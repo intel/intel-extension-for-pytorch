@@ -1,4 +1,5 @@
 #include "Linear.h"
+#include "XEGEMM.h"
 #include "utils/CustomOperatorRegistration.h"
 
 namespace at {
@@ -236,11 +237,47 @@ Tensor linear_scalar_sub(
   return linear_scalar_add(input, weight, bias, scalar, -scale);
 }
 
+#define GEMM_BIAS_XETLA_DISPATCH(F)                                     \
+  {                                                                     \
+    RECORD_FUNCTION("torch_ipex::" #F, c10::ArrayRef<c10::IValue>({})); \
+    F(q,                                                                \
+      reinterpret_cast<sycl::half*>(output.data_ptr<scalar_t>()),       \
+      reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),        \
+      reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),       \
+      reinterpret_cast<sycl::half*>(bias_.data_ptr<scalar_t>()),        \
+      m,                                                                \
+      n,                                                                \
+      k);                                                               \
+  }
+
 Tensor linear_gelu(
     const Tensor& input,
     const Tensor& weight,
     const c10::optional<Tensor>& bias,
     c10::string_view approximate) {
+#if defined(USE_XETLA)
+  auto input_flat = input.flatten(0, -2);
+  if (bias.has_value() && approximate == "tanh") {
+    int m = input_flat.sizes()[0];
+    int n = weight.sizes()[0];
+    int k = input_flat.sizes()[1];
+    auto bias_ = bias.value();
+    auto output = at::empty({m, n}, input.options());
+    auto w = weight.transpose(0, 1);
+    auto policy = HGEMMXetla()
+                      .add_matrix_c(output)
+                      .add_matrix_a(input_flat)
+                      .add_matrix_b(w)
+                      .add_epilogue(bias_, HGEMMXetla::EpilogueType::BIAS)
+                      .add_epilogue(Tensor(), HGEMMXetla::EpilogueType::GELU)
+                      .build();
+    if (policy.fallback() == false) {
+      policy.run();
+      return resize_as_mat1(input, output);
+    }
+  }
+#endif
+
   RECORD_FUNCTION(
       "linear_gelu", std::vector<c10::IValue>({input, weight, bias}));
   auto linear_wrapper = LinearConverter();
@@ -260,6 +297,8 @@ Tensor linear_gelu(
   Tensor result;
   return linear_wrapper.call(result, input, weight, bias, post_op);
 }
+
+#undef GEMM_BIAS_XETLA_DISPATCH
 
 Tensor linear_hardsigmoid(
     const Tensor& input,

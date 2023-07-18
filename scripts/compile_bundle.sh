@@ -5,11 +5,10 @@
 #
 set -ueo pipefail
 
-VER_LLVM="llvmorg-13.0.0"
 VER_PYTORCH="v2.0.1"
 VER_TORCHVISION="v0.15.2"
 VER_TORCHAUDIO="v2.0.2"
-VER_IPEX="xpu-master"
+VER_IPEX="dev/LLM"
 VER_GCC=11
 
 if [[ $# -lt 2 ]]; then
@@ -40,12 +39,12 @@ fi
 
 # Check existance of required Linux commands
 for APP in python git patch pkg-config nproc bzip2 gcc g++; do
-    command -v $APP || (echo "Error: Command \"${APP}\" not found." ; exit 4)
+    command -v $APP > /dev/null || (echo "Error: Command \"${APP}\" not found." ; exit 4)
 done
 
 # Check existance of required libs
-for LIB_NAME in libpng libjpeg; do
-    pkg-config --exists $LIB_NAME || (echo "Error: \"${LIB_NAME}\" not found in pkg-config." ; exit 5)
+for LIB_NAME in libpng libjpeg blas lapack; do
+    pkg-config --exists $LIB_NAME > /dev/null || (echo "Error: \"${LIB_NAME}\" not found in pkg-config." ; exit 5)
 done
 
 if [ $(gcc -dumpversion) -ne $VER_GCC ]; then
@@ -71,9 +70,6 @@ set -x
 python -m pip install cmake astunparse numpy ninja pyyaml mkl-static mkl-include setuptools cffi typing_extensions future six requests dataclasses Pillow
 
 # Checkout individual components
-if [ ! -d llvm-project ]; then
-    git clone https://github.com/llvm/llvm-project.git
-fi
 if [ ! -d pytorch ]; then
     git clone https://github.com/pytorch/pytorch.git
 fi
@@ -88,13 +84,7 @@ if [ ! -d intel-extension-for-pytorch ]; then
 fi
 
 # Checkout required branch/commit and update submodules
-cd llvm-project
-if [ ! -z ${VER_LLVM} ]; then
-    git checkout ${VER_LLVM}
-fi
-git submodule sync
-git submodule update --init --recursive
-cd ../pytorch
+cd pytorch
 if [ ! -z ${VER_PYTORCH} ]; then
     git checkout ${VER_PYTORCH}
 fi
@@ -120,31 +110,11 @@ git submodule sync
 git submodule update --init --recursive
 
 # Compile individual component
-#  LLVM
-cd ../llvm-project
-if [ -d build ]; then
-    rm -rf build
-fi
-mkdir build
-cd build
-cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=1" -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF ../llvm/
-cmake --build . -j $MAX_JOBS
-LLVM_ROOT="$(pwd)/../release"
-if [ -d ${LLVM_ROOT} ]; then
-    rm -rf ${LLVM_ROOT}
-fi
-cmake -DCMAKE_INSTALL_PREFIX=${LLVM_ROOT}/../release/ -P cmake_install.cmake
-ln -s ${LLVM_ROOT}/bin/llvm-config ${LLVM_ROOT}/bin/llvm-config-13
-export PATH=${LLVM_ROOT}/bin:$PATH
-export LD_LIBRARY_PATH=${LLVM_ROOT}/lib:$LD_LIBRARY_PATH
-cd ..
 #  PyTorch
 cd ../pytorch
 git stash
 git clean -f
 git apply ../intel-extension-for-pytorch/torch_patches/*.patch
-export USE_LLVM=${LLVM_ROOT}
-export LLVM_DIR=${USE_LLVM}/lib/cmake/llvm
 # Ensure cmake can find python packages when using conda or virtualenv
 if [ -n "${CONDA_PREFIX-}" ]; then
     export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(command -v conda))/../"}
@@ -162,8 +132,6 @@ unset USE_NUMA
 unset _GLIBCXX_USE_CXX11_ABI
 unset USE_STATIC_MKL
 unset CMAKE_PREFIX_PATH
-unset LLVM_DIR
-unset USE_LLVM
 python -m pip uninstall -y mkl-static mkl-include
 python -m pip install --force-reinstall dist/*.whl
 #  TorchVision
@@ -188,14 +156,18 @@ python -m pip install -r requirements.txt
 if [[ ! ${AOT} == "" ]]; then
     export USE_AOT_DEVLIST=${AOT}
 fi
-export USE_LLVM=${LLVM_ROOT}
-export LLVM_DIR=${USE_LLVM}/lib/cmake/llvm
-export DNNL_GRAPH_BUILD_COMPILER_BACKEND=1
+export BUILD_SEPARATE_OPS=ON
+export USE_XETLA=ON
+export BUILD_WITH_CPU=OFF
+export IPEX_VERSION=2.0.110.dev0+xpu.llm
+export IPEX_VERSIONED_BUILD=0
 python setup.py clean
 python setup.py bdist_wheel 2>&1 | tee build.log
-unset DNNL_GRAPH_BUILD_COMPILER_BACKEND
-unset LLVM_DIR
-unset USE_LLVM
+unset IPEX_VERSIONED_BUILD
+unset IPEX_VERSION
+unset BUILD_WITH_CPU
+unset USE_XETLA
+unset BUILD_SEPARATE_OPS
 if [[ ! ${AOT} == "" ]]; then
     unset USE_AOT_DEVLIST
 fi

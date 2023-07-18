@@ -1,43 +1,170 @@
 .. meta::
    :description: This website introduces Intel® Extension for PyTorch*
-   :keywords: Intel optimization, PyTorch, Intel® Extension for PyTorch*, GPU, discrete GPU, Intel discrete GPU
+   :keywords: Intel optimization, PyTorch, Intel® Extension for PyTorch*, LLM
 
-Welcome to Intel® Extension for PyTorch* Documentation
-######################################################
+============================================================================
+Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started
+============================================================================
 
-Intel® Extension for PyTorch* extends PyTorch* with up-to-date features optimizations for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel X\ :sup:`e`\  Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch* `xpu` device, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs with PyTorch*.
+Intel® Extension for PyTorch* extends optimizations to large language models (LLM). Optimizations are at development and experimental phase at this moment. You are welcomed to have a try with these optimizations on Intel® Data Center GPU Max Series.
 
-Intel® Extension for PyTorch* provides optimizations for both eager mode and graph mode, however, compared to eager mode, graph mode in PyTorch* normally yields better performance from optimization techniques, such as operation fusion. Intel® Extension for PyTorch* amplifies them with more comprehensive graph optimizations. Therefore we recommend you to take advantage of Intel® Extension for PyTorch* with `TorchScript <https://pytorch.org/docs/stable/jit.html>`_ whenever your workload supports it. You could choose to run with `torch.jit.trace()` function or `torch.jit.script()` function, but based on our evaluation, `torch.jit.trace()` supports more workloads so we recommend you to use `torch.jit.trace()` as your first choice.
+System Requirements
+===================
 
-The extension can be loaded as a Python module for Python programs or linked as a C++ library for C++ programs. In Python scripts users can enable it dynamically by importing `intel_extension_for_pytorch`.
+.. list-table::
+   :widths: auto
+   :header-rows: 0
+   :stub-columns: 1
 
-Intel® Extension for PyTorch* is structured as shown in the following figure:
+   * - Hardware
+     - Intel® Data Center GPU Max Series
+   * - OS
+     - Ubuntu 22.04
+   * - Linux Kernel
+     - 5.15.0-76-generic
+   * - Intel® oneAPI Base Toolkit
+     - 2023.1
+   * - Driver
+     - `627.7 <https://dgpu-docs.intel.com/releases/stable_627_7_20230526.html>`_
 
-.. figure:: ./images/intel_extension_for_pytorch_structure.png
-  :width: 800
-  :align: center
-  :alt: Architecture of Intel® Extension for PyTorch*
+Installation
+============
 
-|
+No prebuilt wheel files are provided. Please follow instructions below to compile from source.
 
-Optimizations for both eager mode and graph mode contribute to extra performance accelerations with the extension. In eager mode, the PyTorch frontend is extended with custom Python modules (such as fusion modules), optimal optimizers, and INT8 quantization APIs. Further performance boost is available by converting the eager-mode model into graph mode via extended graph fusion passes. In the graph mode, the fusions reduce operator/kernel invocation overheads, and thus increase performance. On CPU, Intel® Extension for PyTorch* dispatches the operators into their underlying kernels automatically based on ISA that it detects and leverages vectorization and matrix acceleration units available on Intel hardware. Intel® Extension for PyTorch* runtime extension brings better efficiency with finer-grained thread runtime control and weight sharing. On GPU, optimized operators and kernels are implemented and registered through PyTorch dispatching mechanism. These operators and kernels are accelerated from native vectorization feature and matrix calculation feature of Intel GPU hardware. Intel® Extension for PyTorch* for GPU utilizes the `DPC++ <https://github.com/intel/llvm#oneapi-dpc-compiler>`_ compiler that supports the latest `SYCL* <https://registry.khronos.org/SYCL/specs/sycl-2020/html/sycl-2020.html>`_ standard and also a number of extensions to the SYCL* standard, which can be found in the `sycl/doc/extensions <https://github.com/intel/llvm/tree/sycl/sycl/doc/extensions>`_ directory.
+Compile From Source
+-------------------
 
-.. note:: GPU features are not included in CPU only packages.
+Replace the place holders *<DPCPP_ROOT_PATH>* and *<ONEMKL_ROOT_PATH>* to path to DPC++ compiler and oneMKL in oneAPI installation directory.
 
-Intel® Extension for PyTorch* has been released as an open–source project at `Github <https://github.com/intel/intel-extension-for-pytorch>`_. Source code is available at `xpu-master branch <https://github.com/intel/intel-extension-for-pytorch/tree/xpu-master>`_. Check `the tutorial <https://intel.github.io/intel-extension-for-pytorch/xpu/latest/>`_ for detailed information. Due to different development schedule, optimizations for CPU only might have a newer code base. Source code is available at `master branch <https://github.com/intel/intel-extension-for-pytorch/tree/master>`_. Check `the CPU tutorial <https://intel.github.io/intel-extension-for-pytorch/cpu/latest/>`_ for detailed information on the CPU side.
+For example, if oneAPI is installed in */opt/intel*, *<DPCPP_ROOT_PATH>* is */opt/intel/oneapi/compiler/2023.1.0/*, *<ONEMKL_ROOT_PATH>* is */opt/intel/oneapi/mkl/2023.1.0*.
 
-.. toctree::
-   :hidden:
-   :maxdepth: 1
+.. code:: shell
 
-   tutorials/getting_started
-   tutorials/features
-   tutorials/releases
-   tutorials/installation
-   tutorials/examples
-   tutorials/api_doc
-   tutorials/performance_tuning
-   tutorials/technical_details
-   tutorials/blogs_publications
-   tutorials/contribution
-   tutorials/license
+  wget https://github.com/intel/intel-extension-for-pytorch/raw/dev/LLM/scripts/compile_bundle.sh
+  bash compile_bundle.sh <DPCPP_ROOT_PATH> <ONEMKL_ROOT_PATH> pvc
+
+Launch Examples
+===============
+
+Supported Models
+----------------
+
+The following model LLaMA is supported.
+
+.. list-table::
+   :widths: auto
+   :header-rows: 0
+   :stub-columns: 1
+
+   * - LLaMA
+     - Model directory path output from the `transformers conversion tool <https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/convert_llama_weights_to_hf.py>`_.* Verified 7B and 13B.
+
+\* LLaMA model conversion steps:
+
+  1. Request access to the model at `Meta website <https://ai.meta.com/blog/large-language-model-llama-meta-ai/>`_.
+  2. Decompress the downloaded model file.
+  3. Convert the LLaMA model with the conversion script.
+  4. Launch example scripts.
+
+
+.. code:: shell
+
+  $ wget https://github.com/huggingface/transformers/raw/main/src/transformers/models/llama/convert_llama_weights_to_hf.py
+  $ python convert_llama_weights_to_hf.py --help
+  usage: convert_llama_weights_to_hf.py [-h] [--input_dir INPUT_DIR]
+                                        [--model_size {7B,13B,30B,65B,tokenizer_only}]
+                                        [--output_dir OUTPUT_DIR]
+
+  options:
+    -h, --help            show this help message and exit
+    --input_dir INPUT_DIR
+                          Location of LLaMA weights, which contains tokenizer.model and model
+                          folders
+    --model_size {7B,13B,30B,65B,tokenizer_only}
+    --output_dir OUTPUT_DIR
+                          Location to write HF model and tokenizer
+
+Install Dependencies
+--------------------
+
+.. code:: shell
+
+  conda install -y libstdcxx-ng=12 -c conda-forge
+  conda install gperftools -c conda-forge
+  conda install intel-openmp
+  python -m pip install transformers==4.29.2 cpuid accelerate datasets sentencepiece protobuf==3.20.3
+
+
+Run Examples
+------------
+
+The following python scripts are provided in Github repo `example directory <https://github.com/intel/intel-extension-for-pytorch/tree/dev/llm/examples/gpu/inference/python/llm/text-generation/>`_ to launch inference workloads with supported models. 
+
+- run_llama.py
+
+Preparations
+^^^^^^^^^^^^
+
+A separate *prompt.json* file is required to run performance benchmarks. You can use the command below to download a sample file. For simple testing, an argument *\-\-prompt* is provided by the scripts to take a text for processing.
+
+To get these Python scripts, you can either get the entire Github repository down with git command, or use the following wget commands to get individual scripts.
+
+.. code:: shell
+
+  # Get the example scripts with git command
+  $ git clone https://github.com/intel/intel-extension-for-pytorch.git
+  $ cd intel-extension-for-pytorch
+  $ git checkout dev/LLM
+  $ cd examples/gpu/inference/python/llm/text-generation
+
+  # Get individual example scripts
+  $ wget https://github.com/intel/intel-extension-for-pytorch/raw/dev/llm/examples/gpu/inference/python/llm/text-generation/run_llama.py  
+
+  # Get the sample prompt.json
+  # Make sure the downloaded prompt.json file is under the same directory as that of the python scripts mentioned above.
+  $ wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.txt
+
+The following environment variables are required to run llama on Intel® Data Center GPU Max Series.
+
+.. code:: shell
+
+  export LD_PRELOAD=${CONDA_PREFIX}/lib/libstdc++.so.6
+  #  default installation location {ONEAPI_ROOT} is /opt/intel/oneapi for root account, ${HOME}/intel/oneapi for other accounts.
+  source ${ONEAPI_ROOT}/setvars.sh
+  export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=1 ENABLE_SDP_FUSION=1
+
+Single Instance Performance
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code:: shell
+
+   # Get prompt file to the path of scripts
+   mv PATH/TO/prompt.json WORK_DIR
+
+   # Run model 
+
+   # 7B 32 in 32 out
+   python -u run_llama.py --device xpu --model-dir "/path/to/output/7B-path" --dtype float16 --ipex --greedy
+
+   # 7B 1024 in 128 out
+   python -u run_llama.py --device xpu --model-dir "/path/to/output/7B-path" --dtype float16 --ipex --greedy  --input-tokens 1024 --max-new-tokens 128
+
+   # 13B 32 in 32 out
+   python -u run_llama.py --device xpu --model-dir "/path/to/output/13B-path" --dtype float16 --ipex --greedy
+
+   # 13B 1024 in 128 out
+   python -u run_llama.py --device xpu --model-dir "/path/to/output/13B-path" --dtype float16 --ipex --greedy  --input-tokens 1024 --max-new-tokens 128
+
+
+
+Single Instance Accuracy
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code:: shell
+
+   cd examples/gpu/inference/python/llm/casual-language-modeling/
+
+   LLM_ACC_TEST=1 python -u run_llama.py --device xpu --dtype float16 --accuracy_only --lambada --model "/path/to/output/7B-path" --greedy
+   
+   LLM_ACC_TEST=1 python -u run_llama.py --device xpu --dtype float16 --accuracy_only --lambada --model "/path/to/output/13B-path" --greedy
