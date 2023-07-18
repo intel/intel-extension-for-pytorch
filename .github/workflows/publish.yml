@@ -7,63 +7,76 @@ on:
 
 jobs:
   build:
-
     runs-on: self-hosted
-
     steps:
-    - uses: actions/checkout@v3
-      with:
-        ref: docs
-    - name: Create symlinks for the latest doc version
-      run: |
-        export PATH="$HOME/.local/bin:$PATH"
-        echo -e "import argparse\nfrom os import listdir\nfrom os.path import isdir, join\nimport re\nclass cDirs:\n  def __init__(self, str_ver):\n    self.major = 0\n    self.minor = 0\n    self.patch = 0\n    self.post  = ''\n    matches = re.match('(\d+)\.(\d+)\.(\d+)(.*)', str_ver)\n    if matches and len(matches.groups()) == 4:\n      self.major = int(matches.group(1))\n      self.minor = int(matches.group(2))\n      self.patch = int(matches.group(3))\n      self.post  = matches.group(4)\n  def __repr__(self):\n    return f'{self.major}.{self.minor}.{self.patch}{self.post}'\nparser = argparse.ArgumentParser()\nparser.add_argument('path')\nargs = parser.parse_args()\ndirs = [cDirs(d) for d in listdir(args.path) if isdir(join(args.path, d)) and d != '.git']\ndirs.sort(key=lambda x: (x.major, x.minor, x.patch, x.post), reverse=True)\nfor d in dirs:\n  if str(d) != '0.0.0':\n    print(d)" > versions_scan.py
-        LATEST_CPU=""
-        LATEST_XPU=""
-        sed -i "/<li class=\"toctree-l1\">/d" index.html
-        txt="\            <li class=\"toctree-l1\"><a class=\"reference internal\" href=\"cpu/latest\">latest</a></li>"
-        while read -r line;
-        do
-            if [ -z ${LATEST_CPU} ]; then
-                LATEST_CPU=${line}
-            fi
-            txt="${txt}\n            <li class=\"toctree-l1\"><a class=\"reference internal\" href=\"cpu/${line}\">v${line}</a></li>"
-        done < <(python versions_scan.py ./cpu)
-        ln=$(grep "<ul id=\"ul_cpu\">" -n index.html | cut -d ":" -f 1)
-        ln=$((ln+1))
-        sed -i "${ln} i ${txt}" index.html
-        txt="\            <li class=\"toctree-l1\"><a class=\"reference internal\" href=\"xpu/latest\">latest</a></li>"
-        while read -r line;
-        do
-            if [ -z ${LATEST_XPU} ]; then
-                LATEST_XPU=${line}
-            fi
-            txt="${txt}\n            <li class=\"toctree-l1\"><a class=\"reference internal\" href=\"xpu/${line}\">v${line}</a></li>"
-        done < <(python versions_scan.py ./xpu)
-        ln=$(grep "<ul id=\"ul_gpu\">" -n index.html | cut -d ":" -f 1)
-        ln=$((ln+1))
-        sed -i "${ln} i ${txt}" index.html
-        cd cpu
-        if [ -L latest ]; then
-            rm latest
-        fi
-        ln -s ${LATEST_CPU} latest
-        cd ../xpu
-        if [ -L latest ]; then
-            rm latest
-        fi
-        ln -s ${LATEST_XPU} latest
-        cd ..
-        if [ -L latest ]; then
-            rm latest
-        fi
-        ln -s cpu/latest latest
-        rm versions_scan.py
-        if [ ! -f .nojekyll ]; then
-            touch .nojekyll
-        fi
-    - name: Push docs
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: .
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: docs
+      - name: Create symlinks for the latest doc version
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          echo -e "import argparse\nfrom os import listdir\nfrom os.path import isdir, join\nimport re\nclass cDirs:\n  def __init__(self, str_ver):\n    self.major = 0\n    self.minor = 0\n    self.patch = 0\n    self.post  = ''\n    matches = re.match('(\d+)\.(\d+)\.(\d+)(.*)', str_ver)\n    if matches and len(matches.groups()) == 4:\n      self.major = int(matches.group(1))\n      self.minor = int(matches.group(2))\n      self.patch = int(matches.group(3))\n      self.post  = matches.group(4)\n  def __repr__(self):\n    return f'{self.major}.{self.minor}.{self.patch}{self.post}'\nparser = argparse.ArgumentParser()\nparser.add_argument('path')\nargs = parser.parse_args()\ndirs = [cDirs(d) for d in listdir(args.path) if isdir(join(args.path, d)) and d != '.git']\ndirs.sort(key=lambda x: (x.major, x.minor, x.patch, x.post), reverse=True)\nfor d in dirs:\n  if str(d) != '0.0.0':\n    print(d)" > versions_scan.py
+          LATEST_CPU=""
+          LATEST_XPU=""
+          sed -i "/<li class=\"toctree-l1\">/d" index.html
+          txt="\            <li class=\"toctree-l1\"><a class=\"reference internal\" href=\"cpu/latest\">latest</a></li>"
+          while read -r line;
+          do
+              if [ -z ${LATEST_CPU} ]; then
+                  LATEST_CPU=${line}
+              fi
+              txt="${txt}\n            <li class=\"toctree-l1\"><a class=\"reference internal\" href=\"cpu/${line}\">v${line}</a></li>"
+          done < <(python versions_scan.py ./cpu)
+          ln=$(grep "<ul id=\"ul_cpu\">" -n index.html | cut -d ":" -f 1)
+          ln=$((ln+1))
+          sed -i "${ln} i ${txt}" index.html
+          txt="\            <li class=\"toctree-l1\"><a class=\"reference internal\" href=\"xpu/latest\">latest</a></li>"
+          while read -r line;
+          do
+              if [ -z ${LATEST_XPU} ]; then
+                  LATEST_XPU=${line}
+              fi
+              txt="${txt}\n            <li class=\"toctree-l1\"><a class=\"reference internal\" href=\"xpu/${line}\">v${line}</a></li>"
+          done < <(python versions_scan.py ./xpu)
+          ln=$(grep "<ul id=\"ul_gpu\">" -n index.html | cut -d ":" -f 1)
+          ln=$((ln+1))
+          sed -i "${ln} i ${txt}" index.html
+          cd cpu
+          if [ -L latest ]; then
+              rm latest
+          fi
+          ln -s ${LATEST_CPU} latest
+          cd ../xpu
+          if [ -L latest ]; then
+              rm latest
+          fi
+          ln -s ${LATEST_XPU} latest
+          cd ..
+          if [ -L latest ]; then
+              rm latest
+          fi
+          ln -s cpu/latest latest
+          rm versions_scan.py
+          if [ ! -f .nojekyll ]; then
+              touch .nojekyll
+          fi
+      - name: Upload Artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: '.'
+
+  deploy:
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: gh-pages
+      url: ${{steps.depolyment.outputs.page_url}}
+    runs-on: self-hosted
+    needs: build
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v2
