@@ -50,40 +50,22 @@ Launch Examples
 Supported Models
 ----------------
 
-The following model LLaMA is supported.
+The following model Llama 2 is supported.
 
 .. list-table::
    :widths: auto
    :header-rows: 0
    :stub-columns: 1
 
-   * - LLaMA
-     - Model directory path output from the `transformers conversion tool <https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/convert_llama_weights_to_hf.py>`_.* Verified 7B and 13B.
+   * - Llama 2
+     - Model directory path output from the `transformers conversion tool <https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/convert_llama_weights_to_hf.py>`_.* Verified `meta-llama/Llama-2-7b-chat <https://huggingface.co/meta-llama/Llama-2-7b-chat>`_ and `meta-llama/Llama-2-13b-chat <https://huggingface.co/meta-llama/Llama-2-13b-chat>`_.
 
-\* LLaMA model conversion steps:
+\* Llama 2 model conversion steps:
 
-  1. Request access to the model at `Meta website <https://ai.meta.com/blog/large-language-model-llama-meta-ai/>`_.
+  1. Follow `instructions <https://github.com/facebookresearch/llama#access-on-hugging-face>`_ to download model files for conversion.
   2. Decompress the downloaded model file.
-  3. Convert the LLaMA model with the conversion script.
-  4. Launch example scripts.
-
-
-.. code:: shell
-
-  $ wget https://github.com/huggingface/transformers/raw/main/src/transformers/models/llama/convert_llama_weights_to_hf.py
-  $ python convert_llama_weights_to_hf.py --help
-  usage: convert_llama_weights_to_hf.py [-h] [--input_dir INPUT_DIR]
-                                        [--model_size {7B,13B,30B,65B,tokenizer_only}]
-                                        [--output_dir OUTPUT_DIR]
-
-  options:
-    -h, --help            show this help message and exit
-    --input_dir INPUT_DIR
-                          Location of LLaMA weights, which contains tokenizer.model and model
-                          folders
-    --model_size {7B,13B,30B,65B,tokenizer_only}
-    --output_dir OUTPUT_DIR
-                          Location to write HF model and tokenizer
+  3. Follow `instructions <https://github.com/facebookresearch/llama-recipes#model-conversion-to-hugging-face>`_ to convert the model.
+  4. Launch example scripts with the place holder *<MODEL_ID>* substituted by the *\-\-output_dir* argument value of the conversion script.
 
 Install Dependencies
 --------------------

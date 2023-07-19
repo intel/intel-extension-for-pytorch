@@ -135,39 +135,23 @@ bash<span class="w"> </span>compile_bundle.sh<span class="w"> </span>&lt;DPCPP_R
 <h2>Launch Examples<a class="headerlink" href="#launch-examples" title="Permalink to this heading"></a></h2>
 <section id="supported-models">
 <h3>Supported Models<a class="headerlink" href="#supported-models" title="Permalink to this heading"></a></h3>
-<p>The following model LLaMA is supported.</p>
+<p>The following model Llama 2 is supported.</p>
 <table class="docutils align-default">
 <tbody>
-<tr class="row-odd"><th class="stub"><p>LLaMA</p></th>
-<td><p>Model directory path output from the <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/convert_llama_weights_to_hf.py">transformers conversion tool</a>.* Verified 7B and 13B.</p></td>
+<tr class="row-odd"><th class="stub"><p>Llama 2</p></th>
+<td><p>Model directory path output from the <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/convert_llama_weights_to_hf.py">transformers conversion tool</a>.* Verified <a class="reference external" href="https://huggingface.co/meta-llama/Llama-2-7b-chat">meta-llama/Llama-2-7b-chat</a> and <a class="reference external" href="https://huggingface.co/meta-llama/Llama-2-13b-chat">meta-llama/Llama-2-13b-chat</a>.</p></td>
 </tr>
 </tbody>
 </table>
-<p>* LLaMA model conversion steps:</p>
+<p>* Llama 2 model conversion steps:</p>
 <blockquote>
 <div><ol class="arabic simple">
-<li><p>Request access to the model at <a class="reference external" href="https://ai.meta.com/blog/large-language-model-llama-meta-ai/">Meta website</a>.</p></li>
+<li><p>Follow <a class="reference external" href="https://github.com/facebookresearch/llama#access-on-hugging-face">instructions</a> to download model files for conversion.</p></li>
 <li><p>Decompress the downloaded model file.</p></li>
-<li><p>Convert the LLaMA model with the conversion script.</p></li>
-<li><p>Launch example scripts.</p></li>
+<li><p>Follow <a class="reference external" href="https://github.com/facebookresearch/llama-recipes#model-conversion-to-hugging-face">instructions</a> to convert the model.</p></li>
+<li><p>Launch example scripts with the place holder <em>&lt;MODEL_ID&gt;</em> substituted by the <em>--output_dir</em> argument value of the conversion script.</p></li>
 </ol>
 </div></blockquote>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>wget<span class="w"> </span>https://github.com/huggingface/transformers/raw/main/src/transformers/models/llama/convert_llama_weights_to_hf.py
-$<span class="w"> </span>python<span class="w"> </span>convert_llama_weights_to_hf.py<span class="w"> </span>--help
-usage:<span class="w"> </span>convert_llama_weights_to_hf.py<span class="w"> </span><span class="o">[</span>-h<span class="o">]</span><span class="w"> </span><span class="o">[</span>--input_dir<span class="w"> </span>INPUT_DIR<span class="o">]</span>
-<span class="w">                                      </span><span class="o">[</span>--model_size<span class="w"> </span><span class="o">{</span>7B,13B,30B,65B,tokenizer_only<span class="o">}]</span>
-<span class="w">                                      </span><span class="o">[</span>--output_dir<span class="w"> </span>OUTPUT_DIR<span class="o">]</span>
-
-options:
-<span class="w">  </span>-h,<span class="w"> </span>--help<span class="w">            </span>show<span class="w"> </span>this<span class="w"> </span><span class="nb">help</span><span class="w"> </span>message<span class="w"> </span>and<span class="w"> </span><span class="nb">exit</span>
-<span class="w">  </span>--input_dir<span class="w"> </span>INPUT_DIR
-<span class="w">                        </span>Location<span class="w"> </span>of<span class="w"> </span>LLaMA<span class="w"> </span>weights,<span class="w"> </span>which<span class="w"> </span>contains<span class="w"> </span>tokenizer.model<span class="w"> </span>and<span class="w"> </span>model
-<span class="w">                        </span>folders
-<span class="w">  </span>--model_size<span class="w"> </span><span class="o">{</span>7B,13B,30B,65B,tokenizer_only<span class="o">}</span>
-<span class="w">  </span>--output_dir<span class="w"> </span>OUTPUT_DIR
-<span class="w">                        </span>Location<span class="w"> </span>to<span class="w"> </span>write<span class="w"> </span>HF<span class="w"> </span>model<span class="w"> </span>and<span class="w"> </span>tokenizer
-</pre></div>
-</div>
 </section>
 <section id="install-dependencies">
 <h3>Install Dependencies<a class="headerlink" href="#install-dependencies" title="Permalink to this heading"></a></h3>
