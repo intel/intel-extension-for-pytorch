@@ -286,15 +286,20 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   return output;
 }
 
-// brief:
-// * query       : [q_seq_len, bs * beam, num_head, head_dim]
-// * key         : [kv_in_len, bs, num_head, head_dim]
-// * value       : [kv_in_len, bs, num_head, head_dim]
-// * key_cache   : [kv_out_len, bs * beam, num_head, head_dim]
-// * value_cache : [kv_out_len, bs * beam, num_head, head_dim]
-// * index       : [kv_out_len, bs * beam]
-// * output      : [bs * beam, q_seq_len, num_head, head_dim]
-// * timestep    : current time step of output seq
+// @brief
+// *query       shape  : [bs * beam, num_head, q_seq_len, head_dim]
+//              layout : [q_seq_len, bs * beam, num_head, head_dim]
+// *key         shape  : [bs, num_head, kv_in_len, head_dim]
+//              layout : [kv_in_len, bs, num_head, head_dim]
+// *value       shape  : [bs, num_head, kv_in_len, head_dim]
+//              layout : [kv_in_len, bs, num_head, head_dim]
+// *key_cache   shape  : [kv_out_len, bs * beam, num_head, head_dim]
+//              layout : [kv_out_len, bs * beam, num_head, head_dim]
+// *index       shape  : [kv_out_len, bs * beam]
+//              layout : [kv_out_len, bs * beam]
+// *output      shape  : [bs * beam, num_head, kv_in_len + kv_out_len, head_dim]
+//              layout : [bs * beam, kv_in_len + kv_out_len, num_head, head_dim]
+// *timestep           : current time step of output seq
 Tensor xetla_fsdp_index_forward(
     const Tensor& query,
     const Tensor& key,
@@ -314,6 +319,9 @@ Tensor xetla_fsdp_index_forward(
       !head_mask.has_value(),
       "Unsupported feature in fsdp kernel, head_mask ...");
 
+  uint32_t beam_width = query.size(0) / key.size(0);
+  uint32_t num_keys_in = key.size(2);
+  uint32_t num_keys_out = key_cache.size(0);
   auto output = at::empty(
       {query.size(1), query.size(0), query.size(2), query.size(3)},
       query.options());
@@ -326,7 +334,7 @@ Tensor xetla_fsdp_index_forward(
       value.data_ptr(),
       key_cache.data_ptr(),
       value_cache.data_ptr(),
-      index.data_ptr(),
+      index.data_ptr<int32_t>(),
       alibi.has_value() ? alibi.value().data_ptr() : (void*)nullptr,
       attn_mask.has_value() ? attn_mask.value().data_ptr() : (void*)nullptr,
       nullptr, /* dropout */
@@ -336,10 +344,12 @@ Tensor xetla_fsdp_index_forward(
       beta,
       dropout_p,
       query.size(0),
+      beam_width,
       query.size(1),
       query.size(3),
       query.size(2),
-      key.size(2),
+      num_keys_in,
+      num_keys_out,
       is_causal);
   output = output.permute({0, 2, 1, 3});
   return output;

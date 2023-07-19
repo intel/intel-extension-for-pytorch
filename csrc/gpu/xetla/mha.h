@@ -74,7 +74,7 @@ void fmha_forward_index_kernel(
     void* value,
     void* key_cache,
     void* value_cache,
-    void* index,
+    int32_t* index,
     void* alibi,
     void* attn_mask,
     uint8_t* dropout,
@@ -84,10 +84,12 @@ void fmha_forward_index_kernel(
     float beta,
     float dropout_p,
     uint32_t num_batches,
+    uint32_t beam_width,
     uint32_t num_heads,
-    uint32_t head_size,
+    uint32_t head_dim,
     uint32_t num_queries,
-    uint32_t num_keys,
+    uint32_t num_keys_in,
+    uint32_t num_keys_out,
     bool is_causal);
 
 } // namespace gpu::xetla
