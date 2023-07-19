@@ -554,8 +554,8 @@ class ParameterWrapper(object):
             )
 
             Apply_TPPLinear_weight_prepack(module, dtype=module.weight.dtype)
-            self.parameter.data = module.weight.data
             self.parameter = module.weight
+            self.parameter.data = module.weight.data
 
     def load_cast_and_prepack(self, module, param):
         # load from state dict
