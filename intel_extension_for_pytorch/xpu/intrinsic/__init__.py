@@ -93,7 +93,8 @@ def IpexSDP(
     alpha = 1.0,
     beta = 1.0,
     dropout_p = 0.0,
-    is_causal = False
+    is_causal = False,
+    seq_last = False
 ) -> Tensor:
     return torch.ops.torch_ipex.xetla_fsdp_forward_atten_mask_alibi_strided(
         query,
@@ -105,7 +106,8 @@ def IpexSDP(
         alpha,
         beta,
         dropout_p,
-        is_causal
+        is_causal,
+        seq_last
     )
 
 def IpexSDP_Index(

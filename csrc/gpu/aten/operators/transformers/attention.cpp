@@ -62,7 +62,8 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_efficient_attention(
           key.size(2),
           /* ablibi padded size */ 0,
           /* attn_mask padded size */ 0,
-          is_causal);
+          is_causal,
+          false);
     }
   } else {
     if (!is_strided) {
@@ -237,7 +238,8 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
     const double alpha,
     const double beta,
     const double dropout_p,
-    bool is_causal) {
+    bool is_causal,
+    bool seq_last) {
   TORCH_CHECK(
       !head_mask.has_value(),
       "Unsupported feature in fsdp kernel, head_mask ...");
@@ -282,7 +284,8 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
       key.size(2),
       alibi_padded_block_size,
       attn_mask_padded_block_size,
-      is_causal);
+      is_causal,
+      seq_last);
   return output;
 }
 

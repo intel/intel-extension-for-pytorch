@@ -60,12 +60,13 @@ void fmha_forward_kernel(
     float dropout_prob,
     uint32_t num_batches,
     uint32_t num_heads,
-    uint32_t head_size,
+    uint32_t head_dim,
     uint32_t num_queries,
     uint32_t num_keys,
     uint32_t alibi_padded_block_size,
     uint32_t attn_mask_padded_block_size,
-    bool is_causal);
+    bool is_causal,
+    bool seq_last);
 
 void fmha_forward_index_kernel(
     sycl::queue& q,

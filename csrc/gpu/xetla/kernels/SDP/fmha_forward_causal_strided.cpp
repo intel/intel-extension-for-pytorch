@@ -27,6 +27,7 @@ template <
     bool kUseAlibi,
     bool kUseBias,
     bool kIsCausal,
+    bool kSeqLast,
     bool kIsTraining>
 class fmha_forward_causal_strided_t {
  public:
@@ -202,23 +203,46 @@ class fmha_forward_causal_strided_t {
       uint32_t batch_id = gid / args.uN; // get batch idx
       uint32_t head_id = gid % args.uN; // get head idx
 
-      // startF
-      int32_t start_y = batch_id * args.uF + ei.get_group(1) * kBr;
-      uint32_t end_y = start_y + kBr;
-      // boundaryF
-      uint32_t boundary_y = (batch_id + 1) * args.uF;
-      end_y = end_y > boundary_y ? boundary_y : end_y;
+      if constexpr (kSeqLast) { // 2d mem: [F, BxNxH]
+        // startF
+        int32_t start_y = ei.get_group(1) * kBr;
+        uint32_t end_y = start_y + kBr;
+        // boundaryF
+        uint32_t boundary_y = args.uF;
+        end_y = end_y > boundary_y ? boundary_y : end_y;
 
-      uint32_t start_acc = head_id * args.uH;
+        // XXX: code-gen crash
+        uint32_t b_stride = args.uN * args.uH;
+        int32_t start_acc = batch_id * b_stride + head_id * args.uH;
+        uint32_t end_x = start_acc + args.uH;
 
-      mem_desc_Qi.init(
-          args.Q_ptr,
-          {args.uH * args.uN, end_y, args.uH * args.uN},
-          {start_acc, start_y});
-      mem_desc_Oi.init(
-          args.O_ptr,
-          {args.uH * args.uN, end_y, args.uH * args.uN},
-          {start_acc, start_y});
+        mem_desc_Qi.init(
+            args.Q_ptr,
+            {end_x, end_y, b_stride * args.uB},
+            {start_acc, start_y});
+        mem_desc_Oi.init(
+            args.O_ptr,
+            {end_x, end_y, b_stride * args.uB},
+            {start_acc, start_y});
+      } else { // 2d mem: [BxF, NxH]
+        // startF
+        int32_t start_y = batch_id * args.uF + ei.get_group(1) * kBr;
+        uint32_t end_y = start_y + kBr;
+        // boundaryF
+        uint32_t boundary_y = (batch_id + 1) * args.uF;
+        end_y = end_y > boundary_y ? boundary_y : end_y;
+
+        int32_t start_acc = head_id * args.uH;
+
+        mem_desc_Qi.init(
+            args.Q_ptr,
+            {args.uH * args.uN, end_y, args.uH * args.uN},
+            {start_acc, start_y});
+        mem_desc_Oi.init(
+            args.O_ptr,
+            {args.uH * args.uN, end_y, args.uH * args.uN},
+            {start_acc, start_y});
+      }
 
       mem_desc_Qi_L.init(Qi_slm, {kHm, kBr, kHm}, {0, 0});
       mem_desc_Pij_L.init(Pij_slm, {kBc, kBr, kBc}, {0, 0});
@@ -232,31 +256,53 @@ class fmha_forward_causal_strided_t {
       uint32_t gid = ei.get_group(0);
       uint32_t batch_id = gid / args.uN; // get batch idx
       uint32_t head_id = gid % args.uN; // get head idx
+
       // TODO: what's this startT for
-      int32_t start_x = batch_id * args.uT + startT;
-      uint32_t end_x = start_x + kBc;
-      uint32_t boundary_x = (batch_id + 1) * args.uT;
-      end_x = end_x > boundary_x ? boundary_x : end_x;
 
-      uint32_t start_acc = head_id * args.uH;
+      if constexpr (kSeqLast) {
+        int32_t start_x = startT;
+        uint32_t end_x = start_x + kBc;
+        uint32_t boundary_x = args.uT;
+        end_x = end_x > boundary_x ? boundary_x : end_x;
 
-      mem_desc_Kj_T.init(
-          args.K_ptr,
-          {end_x, args.uH * args.uN, args.uH * args.uN},
-          {start_x, start_acc});
-      mem_desc_Vj.init(
-          args.V_ptr,
-          {args.uH * args.uN, end_x, args.uH * args.uN},
-          {start_acc, start_x});
+        // XXX: code-gen crash
+        uint32_t b_stride = args.uN * args.uH;
+        int32_t start_acc = batch_id * b_stride + head_id * args.uH;
+        uint32_t end_y = start_acc + args.uH;
+
+        mem_desc_Kj_T.init(
+            args.K_ptr,
+            {end_x, end_y, b_stride * args.uB},
+            {start_x, start_acc});
+        mem_desc_Vj.init(
+            args.V_ptr,
+            {end_y, end_x, b_stride * args.uB},
+            {start_acc, start_x});
+      } else {
+        int32_t start_x = batch_id * args.uT + startT;
+        uint32_t end_x = start_x + kBc;
+        uint32_t boundary_x = (batch_id + 1) * args.uT;
+        end_x = end_x > boundary_x ? boundary_x : end_x;
+
+        int32_t start_acc = head_id * args.uH;
+
+        mem_desc_Kj_T.init(
+            args.K_ptr,
+            {end_x, args.uH * args.uN, args.uH * args.uN},
+            {start_x, start_acc});
+        mem_desc_Vj.init(
+            args.V_ptr,
+            {args.uH * args.uN, end_x, args.uH * args.uN},
+            {start_acc, start_x});
+      }
 
       // B, N, 1, T
       // gid * T + startT
       if constexpr (kUseAlibi) {
-        uint32_t gid = ei.get_group(0);
         int32_t batch_start = gid * args.uAT;
         int32_t start_x = batch_start + startT;
-        int32_t end_x = startT + kBc;
-        boundary_x = args.uT;
+        uint32_t end_x = startT + kBc;
+        uint32_t boundary_x = args.uT;
         end_x = end_x > boundary_x ? boundary_x : end_x;
         end_x += batch_start;
 
@@ -265,9 +311,9 @@ class fmha_forward_causal_strided_t {
       }
 
       if constexpr (kUseBias) {
-        start_x = startT;
-        end_x = start_x + kBc;
-        boundary_x = args.uMT;
+        int32_t start_x = startT;
+        uint32_t end_x = start_x + kBc;
+        uint32_t boundary_x = args.uMT;
         end_x = end_x > boundary_x ? boundary_x : end_x;
 
         int32_t start_y = batch_id * args.uF + ei.get_group(1) * kBr;
@@ -648,6 +694,7 @@ template <
     bool kUseAlibi,
     bool kUseBias,
     bool kIsCausal,
+    bool kSeqLast,
     bool kIsTraining>
 void fmha_forward_causal_strided_impl(
     sycl::queue& q,
@@ -670,7 +717,7 @@ void fmha_forward_causal_strided_impl(
     uint32_t attn_mask_padded_block_size) {
 #ifdef SDP_DBG
   printf(
-      "B, N, F, T, H: %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d, alibi @ 0x%llx, uAT %d, uMT %d\n",
+      "B, N, F, T, H: %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d, alibi @ 0x%llx, uAT %d, uMT %d, kSeqLast %d\n",
       num_batches,
       num_heads,
       num_queries,
@@ -682,7 +729,8 @@ void fmha_forward_causal_strided_impl(
       kIsTraining,
       (unsigned long long)alibi,
       alibi_padded_block_size,
-      attn_mask_padded_block_size);
+      attn_mask_padded_block_size,
+      kSeqLast);
 #endif
   // fmha forward kernel
   using fmha_forward_op_t = fmha_forward_causal_strided_t<
@@ -691,6 +739,7 @@ void fmha_forward_causal_strided_impl(
       kUseAlibi,
       kUseBias,
       kIsCausal,
+      kSeqLast,
       kIsTraining>;
 
   sycl::nd_range<3> NdRange =
@@ -758,6 +807,7 @@ void fmha_forward_causal_strided_impl(
       kUseAlibi,                          \
       kUseBias,                           \
       kIsCausal,                          \
+      kSeqLast,                           \
       kIsTraining>(                       \
       q,                                  \
       query,                              \
@@ -783,6 +833,7 @@ template <
     bool kUseAlibi = false,
     bool kUseBias = false,
     bool kIsCausal = false,
+    bool kSeqLast = false,
     bool kIsTraining = false>
 void fmha_forward_causal_strided(
     sycl::queue& q,
@@ -843,54 +894,13 @@ void fmha_forward_kernel(
     uint32_t num_keys,
     uint32_t alibi_padded_block_size,
     uint32_t attn_mask_padded_block_size,
-    bool is_causal) {
+    bool is_causal,
+    bool seq_last) {
   using T = sycl::half;
-  if (is_causal) {
-    if (alibi) {
-      fmha_forward_causal_strided<T, true, false, true, false>(
-          q,
-          (T*)query,
-          (T*)key,
-          (T*)value,
-          (T*)alibi,
-          (T*)attn_mask,
-          dropout,
-          (T*)out,
-          alpha,
-          beta,
-          dropout_prob,
-          num_batches,
-          num_heads,
-          head_size,
-          num_queries,
-          num_keys,
-          alibi_padded_block_size,
-          attn_mask_padded_block_size);
-    } else {
-      fmha_forward_causal_strided<T, false, false, true, false>(
-          q,
-          (T*)query,
-          (T*)key,
-          (T*)value,
-          (T*)alibi,
-          (T*)attn_mask,
-          dropout,
-          (T*)out,
-          alpha,
-          beta,
-          dropout_prob,
-          num_batches,
-          num_heads,
-          head_size,
-          num_queries,
-          num_keys,
-          alibi_padded_block_size,
-          attn_mask_padded_block_size);
-    }
-  } else {
-    if (attn_mask) {
+  if (seq_last) {
+    if (is_causal) {
       if (alibi) {
-        fmha_forward_causal_strided<T, true, true, false, false>(
+        fmha_forward_causal_strided<T, true, false, true, true, false>(
             q,
             (T*)query,
             (T*)key,
@@ -910,7 +920,7 @@ void fmha_forward_kernel(
             alibi_padded_block_size,
             attn_mask_padded_block_size);
       } else {
-        fmha_forward_causal_strided<T, false, true, false, false>(
+        fmha_forward_causal_strided<T, false, false, true, true, false>(
             q,
             (T*)query,
             (T*)key,
@@ -931,8 +941,96 @@ void fmha_forward_kernel(
             attn_mask_padded_block_size);
       }
     } else {
+      if (attn_mask) {
+        if (alibi) {
+          fmha_forward_causal_strided<T, true, true, false, true, false>(
+              q,
+              (T*)query,
+              (T*)key,
+              (T*)value,
+              (T*)alibi,
+              (T*)attn_mask,
+              dropout,
+              (T*)out,
+              alpha,
+              beta,
+              dropout_prob,
+              num_batches,
+              num_heads,
+              head_size,
+              num_queries,
+              num_keys,
+              alibi_padded_block_size,
+              attn_mask_padded_block_size);
+        } else {
+          fmha_forward_causal_strided<T, false, true, false, true, false>(
+              q,
+              (T*)query,
+              (T*)key,
+              (T*)value,
+              (T*)alibi,
+              (T*)attn_mask,
+              dropout,
+              (T*)out,
+              alpha,
+              beta,
+              dropout_prob,
+              num_batches,
+              num_heads,
+              head_size,
+              num_queries,
+              num_keys,
+              alibi_padded_block_size,
+              attn_mask_padded_block_size);
+        }
+      } else {
+        if (alibi) {
+          fmha_forward_causal_strided<T, true, false, false, true, false>(
+              q,
+              (T*)query,
+              (T*)key,
+              (T*)value,
+              (T*)alibi,
+              (T*)attn_mask,
+              dropout,
+              (T*)out,
+              alpha,
+              beta,
+              dropout_prob,
+              num_batches,
+              num_heads,
+              head_size,
+              num_queries,
+              num_keys,
+              alibi_padded_block_size,
+              attn_mask_padded_block_size);
+        } else {
+          fmha_forward_causal_strided<T, false, false, false, true, false>(
+              q,
+              (T*)query,
+              (T*)key,
+              (T*)value,
+              (T*)alibi,
+              (T*)attn_mask,
+              dropout,
+              (T*)out,
+              alpha,
+              beta,
+              dropout_prob,
+              num_batches,
+              num_heads,
+              head_size,
+              num_queries,
+              num_keys,
+              alibi_padded_block_size,
+              attn_mask_padded_block_size);
+        }
+      }
+    }
+  } else {
+    if (is_causal) {
       if (alibi) {
-        fmha_forward_causal_strided<T, true, false, false, false>(
+        fmha_forward_causal_strided<T, true, false, true, false, false>(
             q,
             (T*)query,
             (T*)key,
@@ -952,7 +1050,7 @@ void fmha_forward_kernel(
             alibi_padded_block_size,
             attn_mask_padded_block_size);
       } else {
-        fmha_forward_causal_strided<T, false, false, false, false>(
+        fmha_forward_causal_strided<T, false, false, true, false, false>(
             q,
             (T*)query,
             (T*)key,
@@ -971,6 +1069,92 @@ void fmha_forward_kernel(
             num_keys,
             alibi_padded_block_size,
             attn_mask_padded_block_size);
+      }
+    } else {
+      if (attn_mask) {
+        if (alibi) {
+          fmha_forward_causal_strided<T, true, true, false, false, false>(
+              q,
+              (T*)query,
+              (T*)key,
+              (T*)value,
+              (T*)alibi,
+              (T*)attn_mask,
+              dropout,
+              (T*)out,
+              alpha,
+              beta,
+              dropout_prob,
+              num_batches,
+              num_heads,
+              head_size,
+              num_queries,
+              num_keys,
+              alibi_padded_block_size,
+              attn_mask_padded_block_size);
+        } else {
+          fmha_forward_causal_strided<T, false, true, false, false, false>(
+              q,
+              (T*)query,
+              (T*)key,
+              (T*)value,
+              (T*)alibi,
+              (T*)attn_mask,
+              dropout,
+              (T*)out,
+              alpha,
+              beta,
+              dropout_prob,
+              num_batches,
+              num_heads,
+              head_size,
+              num_queries,
+              num_keys,
+              alibi_padded_block_size,
+              attn_mask_padded_block_size);
+        }
+      } else {
+        if (alibi) {
+          fmha_forward_causal_strided<T, true, false, false, false, false>(
+              q,
+              (T*)query,
+              (T*)key,
+              (T*)value,
+              (T*)alibi,
+              (T*)attn_mask,
+              dropout,
+              (T*)out,
+              alpha,
+              beta,
+              dropout_prob,
+              num_batches,
+              num_heads,
+              head_size,
+              num_queries,
+              num_keys,
+              alibi_padded_block_size,
+              attn_mask_padded_block_size);
+        } else {
+          fmha_forward_causal_strided<T, false, false, false, false, false>(
+              q,
+              (T*)query,
+              (T*)key,
+              (T*)value,
+              (T*)alibi,
+              (T*)attn_mask,
+              dropout,
+              (T*)out,
+              alpha,
+              beta,
+              dropout_prob,
+              num_batches,
+              num_heads,
+              head_size,
+              num_queries,
+              num_keys,
+              alibi_padded_block_size,
+              attn_mask_padded_block_size);
+        }
       }
     }
   }
