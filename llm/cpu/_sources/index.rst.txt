@@ -203,7 +203,7 @@ Single Instance Performance
   ## GPT-NEOX quantization
   python run_gpt-neox_int8.py --ipex-weight-only-quantization --lambada --output-dir "saved_results" --jit --int8 -m <GPT-NEOX MODEL_ID>
 
-  ## (2) Run int8 performance test
+  ## (2) Run int8 performance test (note that GPT-NEOX uses --int8 instead of --int8-bf16-mixed)
   OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run_<MODEL>_int8.py -m <MODEL_ID> --quantized-model-path "./saved_results/best_model.pt" --benchmark --jit --int8-bf16-mixed
 
 Single Instance Accuracy
@@ -212,7 +212,7 @@ Single Instance Accuracy
 .. code:: shell
 
   # bfloat16
-  OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run_generation.py --accuracy-only -m <MODEL_ID> --dtype bfloat16 --ipex --jit
+  OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run_generation.py --accuracy-only -m <MODEL_ID> --dtype bfloat16 --ipex --jit --lambada
 
   # Quantization as a performance part
   # (1) Do quantization to get the quantized model as mentioned above

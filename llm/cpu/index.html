@@ -283,7 +283,7 @@ python<span class="w"> </span>run_llama_int8.py<span class="w"> </span>--ipex-sm
 <span class="c1">## GPT-NEOX quantization</span>
 python<span class="w"> </span>run_gpt-neox_int8.py<span class="w"> </span>--ipex-weight-only-quantization<span class="w"> </span>--lambada<span class="w"> </span>--output-dir<span class="w"> </span><span class="s2">&quot;saved_results&quot;</span><span class="w"> </span>--jit<span class="w"> </span>--int8<span class="w"> </span>-m<span class="w"> </span>&lt;GPT-NEOX<span class="w"> </span>MODEL_ID&gt;
 
-<span class="c1">## (2) Run int8 performance test</span>
+<span class="c1">## (2) Run int8 performance test (note that GPT-NEOX uses --int8 instead of --int8-bf16-mixed)</span>
 <span class="nv">OMP_NUM_THREADS</span><span class="o">=</span>&lt;physical<span class="w"> </span>cores<span class="w"> </span>num&gt;<span class="w"> </span>numactl<span class="w"> </span>-m<span class="w"> </span>&lt;node<span class="w"> </span>N&gt;<span class="w"> </span>-C<span class="w"> </span>&lt;cpu<span class="w"> </span>list&gt;<span class="w"> </span>python<span class="w"> </span>run_&lt;MODEL&gt;_int8.py<span class="w"> </span>-m<span class="w"> </span>&lt;MODEL_ID&gt;<span class="w"> </span>--quantized-model-path<span class="w"> </span><span class="s2">&quot;./saved_results/best_model.pt&quot;</span><span class="w"> </span>--benchmark<span class="w"> </span>--jit<span class="w"> </span>--int8-bf16-mixed
 </pre></div>
 </div>
@@ -291,7 +291,7 @@ python<span class="w"> </span>run_gpt-neox_int8.py<span class="w"> </span>--ipex
 <section id="single-instance-accuracy">
 <h4>Single Instance Accuracy<a class="headerlink" href="#single-instance-accuracy" title="Permalink to this heading"></a></h4>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="c1"># bfloat16</span>
-<span class="nv">OMP_NUM_THREADS</span><span class="o">=</span>&lt;physical<span class="w"> </span>cores<span class="w"> </span>num&gt;<span class="w"> </span>numactl<span class="w"> </span>-m<span class="w"> </span>&lt;node<span class="w"> </span>N&gt;<span class="w"> </span>-C<span class="w"> </span>&lt;physical<span class="w"> </span>cores<span class="w"> </span>list&gt;<span class="w"> </span>python<span class="w"> </span>run_generation.py<span class="w"> </span>--accuracy-only<span class="w"> </span>-m<span class="w"> </span>&lt;MODEL_ID&gt;<span class="w"> </span>--dtype<span class="w"> </span>bfloat16<span class="w"> </span>--ipex<span class="w"> </span>--jit
+<span class="nv">OMP_NUM_THREADS</span><span class="o">=</span>&lt;physical<span class="w"> </span>cores<span class="w"> </span>num&gt;<span class="w"> </span>numactl<span class="w"> </span>-m<span class="w"> </span>&lt;node<span class="w"> </span>N&gt;<span class="w"> </span>-C<span class="w"> </span>&lt;physical<span class="w"> </span>cores<span class="w"> </span>list&gt;<span class="w"> </span>python<span class="w"> </span>run_generation.py<span class="w"> </span>--accuracy-only<span class="w"> </span>-m<span class="w"> </span>&lt;MODEL_ID&gt;<span class="w"> </span>--dtype<span class="w"> </span>bfloat16<span class="w"> </span>--ipex<span class="w"> </span>--jit<span class="w"> </span>--lambada
 
 <span class="c1"># Quantization as a performance part</span>
 <span class="c1"># (1) Do quantization to get the quantized model as mentioned above</span>
