@@ -7,18 +7,42 @@ namespace torch_ipex {
 namespace cpu {
 
 namespace {
-at::Tensor fc_in_kernel_impl(
+at::Tensor tpp_linear_nobias_forward_cpu(at::Tensor& t_in, at::Tensor& t_wt);
+
+at::Tensor tpp_linear_bias_forward_cpu(
     at::Tensor& t_in,
     at::Tensor& t_wt,
     at::Tensor& t_bias);
 
-at::Tensor fc_plain_kernel_impl(
+at::Tensor tpp_linear_gelu_forward_cpu(
     at::Tensor& t_in,
     at::Tensor& t_wt,
     at::Tensor& t_bias);
 
+at::Tensor tpp_linear_silu_forward_cpu(
+    at::Tensor& t_in,
+    at::Tensor& t_wt,
+    at::Tensor& t_bias);
 
-at::Tensor fc_out_kernel_impl(
+at::Tensor tpp_linear_relu_forward_cpu(
+    at::Tensor& t_in,
+    at::Tensor& t_wt,
+    at::Tensor& t_bias);
+
+at::Tensor tpp_linear_add_forward_cpu(
+    at::Tensor& t_in,
+    at::Tensor& t_in1,
+    at::Tensor& t_wt,
+    at::Tensor& t_bias,
+    double scale);
+
+at::Tensor tpp_linear_mul_forward_cpu(
+    at::Tensor& t_in,
+    at::Tensor& t_in1,
+    at::Tensor& t_wt,
+    at::Tensor& t_bias);
+
+at::Tensor tpp_linear_add_add_forward_cpu(
     at::Tensor& t_in,
     at::Tensor& t_in1,
     at::Tensor& t_in2,
@@ -26,17 +50,29 @@ at::Tensor fc_out_kernel_impl(
     at::Tensor& t_bias,
     double scale);
 
-at::Tensor qkv_kernel_impl(at::Tensor& t_in, at::Tensor& t_wt);
-
 } // namespace
 
-using fc_in_kernel_impl_fn =
+using tpp_linear_nobias_impl_fn = at::Tensor (*)(at::Tensor&, at::Tensor&);
+
+using tpp_linear_bias_kernel_impl_fn =
     at::Tensor (*)(at::Tensor&, at::Tensor&, at::Tensor&);
 
-using fc_plain_kernel_impl_fn =
+using tpp_linear_gelu_kernel_impl_fn =
     at::Tensor (*)(at::Tensor&, at::Tensor&, at::Tensor&);
 
-using fc_out_kernel_impl_fn = at::Tensor (*)(
+using tpp_linear_silu_kernel_impl_fn =
+    at::Tensor (*)(at::Tensor&, at::Tensor&, at::Tensor&);
+
+using tpp_linear_relu_kernel_impl_fn =
+    at::Tensor (*)(at::Tensor&, at::Tensor&, at::Tensor&);
+
+using tpp_linear_add_kernel_impl_fn =
+    at::Tensor (*)(at::Tensor&, at::Tensor&, at::Tensor&, at::Tensor&, double);
+
+using tpp_linear_mul_kernel_impl_fn =
+    at::Tensor (*)(at::Tensor&, at::Tensor&, at::Tensor&, at::Tensor&);
+
+using tpp_linear_add_add_kernel_impl_fn = at::Tensor (*)(
     at::Tensor&,
     at::Tensor&,
     at::Tensor&,
@@ -44,12 +80,16 @@ using fc_out_kernel_impl_fn = at::Tensor (*)(
     at::Tensor&,
     double);
 
-using qkv_kernel_impl_fn = at::Tensor (*)(at::Tensor&, at::Tensor&);
-
-DECLARE_DISPATCH(fc_plain_kernel_impl_fn, fc_plain_kernel_stub);
-DECLARE_DISPATCH(fc_in_kernel_impl_fn, fc_in_kernel_stub);
-DECLARE_DISPATCH(fc_out_kernel_impl_fn, fc_out_kernel_stub);
-DECLARE_DISPATCH(qkv_kernel_impl_fn, qkv_kernel_stub);
+DECLARE_DISPATCH(tpp_linear_nobias_impl_fn, tpp_linear_nobias_kernel_stub);
+DECLARE_DISPATCH(tpp_linear_bias_kernel_impl_fn, tpp_linear_bias_kernel_stub);
+DECLARE_DISPATCH(tpp_linear_gelu_kernel_impl_fn, tpp_linear_gelu_kernel_stub);
+DECLARE_DISPATCH(tpp_linear_silu_kernel_impl_fn, tpp_linear_silu_kernel_stub);
+DECLARE_DISPATCH(tpp_linear_relu_kernel_impl_fn, tpp_linear_relu_kernel_stub);
+DECLARE_DISPATCH(tpp_linear_add_kernel_impl_fn, tpp_linear_add_kernel_stub);
+DECLARE_DISPATCH(tpp_linear_mul_kernel_impl_fn, tpp_linear_mul_kernel_stub);
+DECLARE_DISPATCH(
+    tpp_linear_add_add_kernel_impl_fn,
+    tpp_linear_add_add_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

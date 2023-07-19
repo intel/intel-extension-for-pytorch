@@ -10,9 +10,14 @@ from intel_extension_for_pytorch.cpu.tpp.utils.blocked_layout import (
     BlockedParameter,
     get_vnni_blocking,
 )
+
+from intel_extension_for_pytorch.cpu._auto_kernel_selection import _using_tpp
+
 logger = logging.getLogger(__name__)
 
 USE_LOW_PREC_PARAMS = True
+
+
 def TPPLinear_weight_prepack(m, bk=None, bc=None, layer_dtype=torch.float32):
     m.__class__ = _IPEXLinear
     m.weight = BlockedParameter(m.weight.data)
@@ -44,18 +49,21 @@ def TPPLinear_weight_prepack(m, bk=None, bc=None, layer_dtype=torch.float32):
         m.bias.set_blocking_param((None, None, layer_dtype))
     return m
 
-def Apply_TPPLinear_weight_prepack(m, dtype, device='cpu'):
-    if m.bias is not None and m.weight.size()[0] == 50400:
+
+def Apply_TPPLinear_weight_prepack(m, dtype, device="cpu"):
+    if m.weight.size()[0] == 50400 or m.weight.size()[0] == 32000:
         m = TPPLinear_weight_prepack(m, 100, 64, dtype)
     else:
         m = TPPLinear_weight_prepack(m, 16, 64, dtype)
 
     block(m)
 
+
 def block(model):
     for m in model.modules():
         if hasattr(m, "maybe_block_params"):
             m.maybe_block_params()
+
 
 def may_import_deepspeed_modules():
     try:
@@ -71,7 +79,8 @@ def may_import_deepspeed_modules():
 installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
 if "deepspeed" in installed_pkg:
     from deepspeed import comm
-    DS_SHM_ALLREDUCE = os.getenv('DS_SHM_ALLREDUCE')
+
+    DS_SHM_ALLREDUCE = os.getenv("DS_SHM_ALLREDUCE")
 
     def _all_reduce(self, reduceOp, tag, ranks, group_size):
         if DS_SHM_ALLREDUCE == "1":
@@ -99,8 +108,8 @@ def _all_reduce_and_bias_add(mp_group, original_bias, output):
         )
 
     if original_bias is not None:
-        output += original_bias    
-    
+        output += original_bias
+
     return output
 
 
@@ -213,6 +222,7 @@ class _IPEXConv3d(_IPEXConvNd):
 class _IPEXLinear(_IPEXPrepackModule):
     def __init__(self):
         super(_IPEXLinear, self).__init__()
+
     def maybe_block_params(self):
         self.weight.block()
         if self.bias is not None:
@@ -231,10 +241,11 @@ class _IPEXLinear(_IPEXPrepackModule):
                 self.out_features,
             )
         elif self.use_tpp:
+            x = x.to(self.weight.dtype).contiguous()
             if self.bias is not None:
-                output = torch.ops.torch_ipex.fc_plain_gemm(x, self.weight, self.bias)
+                output = torch.ops.torch_ipex.tpp_linear_bias(x, self.weight, self.bias)
             else:
-                output = torch.ops.torch_ipex.qkv_gemm(x, self.weight)
+                output = torch.ops.torch_ipex.tpp_linear(x, self.weight)
         else:
             output = torch.ops.torch_ipex.ipex_MKLSGEMM(
                 x,
@@ -436,7 +447,14 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
             all_reduce_bias = m.bias
             if isinstance(new_m, _IPEXLinearAllreduce):
                 m.bias = None
-            param_wrapper.prepack(m, is_training)
+            if _using_tpp():
+                weight_key = m.weight
+                param_wrapper.prepack(m, is_training)
+                params_attr[m.weight] = params_attr.pop(weight_key)
+                del weight_key
+            else:
+                param_wrapper.prepack(m, is_training)
+
             new_m.__dict__ = m.__dict__
             if isinstance(new_m, _IPEXLinearAllreduce):
                 new_m.original_bias = all_reduce_bias

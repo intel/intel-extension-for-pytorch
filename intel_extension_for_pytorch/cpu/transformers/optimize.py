@@ -142,6 +142,7 @@ def _optimize_transformers(
                 GPTNeoXMLP_forward,
                 GPTNeoXLayer_forward,
                 LlamaMLP_forward,
+                LlamaMLP_forward_distributed,
                 LlamaDecoderLayer_forward,
             )
             from .models import (
@@ -252,8 +253,8 @@ def _optimize_transformers(
                     # linear-wise optimizations
                     _enable_tpp()
                     _model = optimize(_model.eval(), dtype=dtype, inplace=True)
-                    # linear-postop-wise optimizations
 
+                    # linear-postop-wise optimizations
                     is_distributed(_model)
                     if not distributed:
                         convert_forward(
@@ -266,7 +267,23 @@ def _optimize_transformers(
                             transformers.models.gptj.modeling_gptj.GPTJMLP,
                             GPTJMLP_forward,
                         )
+                        convert_forward(
+                            _model,
+                            transformers.models.llama.modeling_llama.LlamaDecoderLayer,
+                            LlamaDecoderLayer_forward,
+                        )
+                        convert_forward(
+                            _model,
+                            transformers.models.llama.modeling_llama.LlamaMLP,
+                            LlamaMLP_forward,
+                        )
+
                     else:
+                        convert_forward(
+                            _model,
+                            transformers.models.llama.modeling_llama.LlamaMLP,
+                            LlamaMLP_forward_distributed,
+                        )
                         convert_forward(
                             _model,
                             transformers.models.gptj.modeling_gptj.GPTJMLP,

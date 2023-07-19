@@ -158,6 +158,16 @@ class ScopedTPP {
   template <typename... Types>
   void operator()(Types... vars) {
     ScopedTimer _t(t);
+#ifdef DEBUG_TRACE_TPP
+    if (omp_get_thread_num() == 0) {
+      auto cur_class_name = get_class_name<T>();
+      if (cur_class_name != prev_class_name) {
+        std::cout << "Calling impl " << impl << " for " << cur_class_name
+                  << std::endl;
+        prev_class_name = cur_class_name;
+      }
+    }
+#endif
     if (impl == 0) {
       func(vars...);
     } else if (impl == 1) {

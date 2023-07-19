@@ -55,8 +55,24 @@ def GPTNeoXLayer_forward(
     return outputs
 
 
+def LlamaMLP_forward_distributed(self, x):
+    gate = torch.ops.torch_ipex.tpp_linear_silu(
+        x, self.gate_proj.weight, x.new_empty(0)
+    )
+    up = torch.ops.torch_ipex.tpp_linear_mul(
+        x, gate, self.up_proj.weight, x.new_empty(0)
+    )
+    return self.down_proj(up)
+
+
 def LlamaMLP_forward(self, x):
-    return self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+    gate = torch.ops.torch_ipex.tpp_linear_silu(
+        x, self.gate_proj.weight, x.new_empty(0)
+    )
+    up = torch.ops.torch_ipex.tpp_linear_mul(
+        x, gate, self.up_proj.weight, x.new_empty(0)
+    )
+    return up
 
 
 def LlamaDecoderLayer_forward(
@@ -86,8 +102,13 @@ def LlamaDecoderLayer_forward(
     # Fully Connected
     residual = hidden_states
     hidden_states = self.post_attention_layernorm(hidden_states)
-    hidden_states = self.mlp(hidden_states)
-    hidden_states = residual + hidden_states
+    hidden_states = torch.ops.torch_ipex.tpp_linear_add(
+        self.mlp(hidden_states),
+        residual,
+        self.mlp.down_proj.weight,
+        hidden_states.new_empty(0),
+        1.0,
+    )
 
     outputs = (hidden_states,)
 
@@ -103,7 +124,7 @@ def LlamaDecoderLayer_forward(
 def GPTJMLP_forward(
     self, hidden_states: Optional[torch.FloatTensor]
 ) -> torch.FloatTensor:
-    hidden_states = torch.ops.torch_ipex.fc_in_gemm(
+    hidden_states = torch.ops.torch_ipex.tpp_linear_gelu(
         hidden_states, self.fc_in.weight, self.fc_in.bias
     )
     return hidden_states
@@ -112,7 +133,7 @@ def GPTJMLP_forward(
 def GPTJMLP_forward_distributed(
     self, hidden_states: Optional[torch.FloatTensor]
 ) -> torch.FloatTensor:
-    hidden_states = torch.ops.torch_ipex.fc_in_gemm(
+    hidden_states = torch.ops.torch_ipex.tpp_linear_gelu(
         hidden_states, self.fc_in.weight, self.fc_in.bias
     )
     hidden_states = self.fc_out(hidden_states)
@@ -147,7 +168,7 @@ def GPTJBlock_forward(
     outputs = attn_outputs[1:]
 
     feed_forward_hidden_states = self.mlp(hidden_states)
-    hidden_states = torch.ops.torch_ipex.fc_out_gemm(
+    hidden_states = torch.ops.torch_ipex.tpp_linear_add_add(
         feed_forward_hidden_states,
         attn_output,
         residual,

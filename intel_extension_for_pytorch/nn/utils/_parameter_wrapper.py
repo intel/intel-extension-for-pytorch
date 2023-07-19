@@ -4,7 +4,10 @@ import functools
 import contextlib
 import types
 import warnings
-from intel_extension_for_pytorch.cpu._auto_kernel_selection import _using_dnnl, _using_tpp
+from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
+    _using_dnnl,
+    _using_tpp,
+)
 from intel_extension_for_pytorch import frontend
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     _IPEXLinear,
@@ -546,8 +549,13 @@ class ParameterWrapper(object):
                 )
             self.pack_weight(use_dnnl)
         else:
-            from intel_extension_for_pytorch.nn.utils import Apply_TPPLinear_weight_prepack
+            from intel_extension_for_pytorch.nn.utils import (
+                Apply_TPPLinear_weight_prepack,
+            )
+
             Apply_TPPLinear_weight_prepack(module, dtype=module.weight.dtype)
+            self.parameter.data = module.weight.data
+            self.parameter = module.weight
 
     def load_cast_and_prepack(self, module, param):
         # load from state dict
