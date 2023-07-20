@@ -51,7 +51,7 @@ class ifmha_forward_t {
     scalar_t* V0_ptr; // [T0,B,1,N,H] - value0
     scalar_t* V1_ptr; // [T1,B,Bm,N,H] - value1
     index_t* I_ptr; // [T1,B,Bm] - index
-    scalar_t* B_ptr = nullptr; // [B,Bm,1,F,T] - bias
+    scalar_t* B_ptr = nullptr; // [B,Bm,1,F,PT] - bias
     uint8_t* Dp_ptr = nullptr; // [B,Bm,N,F,T] - dropout mask
     scalar_t* O_ptr; // [B,Bm,1,N,H] - output
     // Dropout scale is computed from dropout prob
@@ -66,6 +66,7 @@ class ifmha_forward_t {
     uint32_t uH;
     uint32_t uT0;
     uint32_t uT1;
+    uint32_t uPT;
     uint32_t uT;
 
     inline arguments_t(
@@ -74,7 +75,7 @@ class ifmha_forward_t {
         scalar_t* key1,
         scalar_t* value0,
         scalar_t* value1,
-        int32_t* index,
+        index_t* index,
         scalar_t* bias,
         uint8_t* dropout,
         accum_t dropout_prob,
@@ -85,7 +86,8 @@ class ifmha_forward_t {
         uint32_t num_heads,
         uint32_t head_size,
         uint32_t kv_len0,
-        uint32_t kv_len1)
+        uint32_t kv_len1,
+        uint32_t padded_kvlen)
         : Q_ptr(query),
           K0_ptr(key0),
           K1_ptr(key1),
@@ -104,6 +106,7 @@ class ifmha_forward_t {
           uH(head_size),
           uT0(kv_len0),
           uT1(kv_len1),
+          uPT(padded_kvlen),
           uT(kv_len0 + kv_len1) {}
   };
 
@@ -113,26 +116,23 @@ class ifmha_forward_t {
   static constexpr uint32_t kHm = ifmha_policy::kHm;
   static constexpr uint32_t kSgBc = ifmha_policy::kSgBc;
   static constexpr uint32_t kSgHm = ifmha_policy::kSgHm;
+  static constexpr uint32_t wg_size = kBc / kSgBc;
 
-  using tile_shape_Bc = group::tile_shape_t<kBc, 1, kSgBc, 1>;
-  using tile_shape_Hm = group::tile_shape_t<kHm, 1, kSgHm, 1>;
-  using work_group_t = typename tile_shape_Bc::work_group_t;
-  static constexpr uint32_t wg_size = work_group_t::size;
-
+  static_assert(kBc % kSgBc == 0, "kBc should be a multiple of kSgBc");
   static_assert(
-      kHm / kSgHm == kBc / kSgBc,
+      (kHm % accum_step == 0) && (kHm % kSgHm == 0),
+      "kHm should be a multiple of accum_step and kSgHm");
+  static_assert(
+      kHm / kSgHm == wg_size,
       "wg_size must be the same between Hm and Bc");
   static_assert(wg_size <= 32, "The number of threads should be less than 32!");
-
-  static constexpr uint32_t kHt =
-      (kHm + accum_step - 1) / accum_step * accum_step;
 
   // --------------------- // Memory desc // ---------------------- //
   // suffix: L -> local;
   using mem_desc_Qi_t =
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Qi_L_t =
-      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
+      mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>;
   using mem_desc_Bij_t =
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Ot_L_t =
@@ -147,8 +147,8 @@ class ifmha_forward_t {
       imem_desc_t<scalar_t, kSgBc, mem_layout::row_major, mem_space::global>;
 
   // ------------------- // Slm and nbarrier // ------------------- //
-  static constexpr uint32_t slm_size_Qi = kHm * sizeof(scalar_t);
-  static constexpr uint32_t slm_size_Ot = kHt * wg_size * sizeof(accum_t);
+  static constexpr uint32_t slm_size_Qi = kHm * sizeof(accum_t);
+  static constexpr uint32_t slm_size_Ot = kHm * wg_size * sizeof(accum_t);
   static constexpr uint32_t slm_size_softmax =
       (wg_size > 1) ? wg_size * sizeof(accum_t) : 0;
   // Slm addr to store inermediate results
@@ -168,8 +168,8 @@ class ifmha_forward_t {
     // nbarrier
     xetla_nbarrier_t<wg_size, wg_size> nbarrier;
     // softmax statistics
-    xetla_vector<accum_t, 1> softmax_m;
-    xetla_vector<accum_t, 1> softmax_l;
+    accum_t softmax_m;
+    accum_t softmax_l;
     // mem desc variables
     mem_desc_Qi_t desc_Qi;
     mem_desc_Qi_L_t desc_Qi_L;
@@ -187,7 +187,7 @@ class ifmha_forward_t {
     inline void init_context(xetla_exec_item<2>& ei, arguments_t& args) {
       // thread id
       sg_id = ei.get_local_linear_id();
-      // loop_count of gemm_sij
+      // loop_count is used in gemm_Sij and gemm_Oi
       loop_count = (args.uH + accum_step - 1) / accum_step;
       // nbarrier
       nbarrier.init_nbarrier(0, nbarrier_role::producer_consumer);
@@ -197,17 +197,20 @@ class ifmha_forward_t {
 
       // mem desc variables
       uint32_t gid = ei.get_group(0);
-      int32_t start_y = gid;
-      uint32_t end_y = start_y + 1;
 
-      desc_Qi.init(args.Q_ptr, {args.uH, end_y, args.uH}, {0, start_y});
-      desc_Oi.init(args.O_ptr, {args.uH, end_y, args.uH}, {0, start_y});
+      int32_t start_x = sg_id * kSgHm;
+      int32_t start_y = gid;
+      uint32_t end_y = gid + 1;
+      desc_Qi.init(args.Q_ptr, {args.uH, end_y, args.uH}, {start_x, start_y});
+      desc_Oi.init(args.O_ptr, {args.uH, end_y, args.uH}, {start_x, start_y});
+      desc_Qi_L.init(Qi_slm, {kHm, 1, kHm}, {0, 0});
+
+      start_y = sg_id;
+      desc_Ot0_L.init(Ot_slm, {kHm, wg_size, kHm}, {0, start_y});
+      desc_Ot1_L.init(Ot_slm, {kHm, wg_size, kHm}, {start_x, 0});
+
       idesc_Kj.init(args.K0_ptr, args.K1_ptr, args.uH);
       idesc_Vj.init(args.V0_ptr, args.V1_ptr, args.uH);
-
-      desc_Qi_L.init(Qi_slm, {kHm, 1, kHm}, {0, 0});
-      desc_Ot0_L.init(Ot_slm, {kHt, wg_size, kHt}, {0, int(sg_id)});
-      desc_Ot1_L.init(Ot_slm, {kHt, wg_size, kHt}, {int(sg_id * kSgHm), 0});
     }
 
     inline void load_index(
@@ -243,37 +246,53 @@ class ifmha_forward_t {
         xetla_exec_item<2>& ei,
         arguments_t& args,
         uint32_t start_T) {
-      uint32_t start_T_sg = start_T + sg_id * kSgBc;
-      uint32_t end_T_sg = std::min(start_T_sg + kSgBc, args.uT);
+      uint32_t sg_start_T = start_T + sg_id * kSgBc;
+      uint32_t sg_end_T = std::min(sg_start_T + kSgBc, args.uT);
 
       auto gid = ei.get_group(0);
       auto nid = gid % args.uN;
       auto bid = gid / (args.uBm * args.uN);
 
       // compute index for buffer0
-      uint32_t end_T_0 = std::min(end_T_sg, args.uT0);
-      uint32_t lanes0 = std::max(end_T_0 - start_T_sg, uint32_t(0));
+      uint32_t start_T0 = std::min(sg_start_T, args.uT0);
+      uint32_t end_T0 = std::min(sg_end_T, args.uT0);
+
+      uint32_t lanes0 = end_T0 - start_T0;
       xetla_vector<int32_t, kSgBc> index0;
+
       if (lanes0 > 0) {
-        int32_t offset = start_T_sg * args.uB * args.uN + bid * args.uN + nid;
-        index0 = xetla_vector_gen<int32_t, kSgBc>(offset, args.uB * args.uN);
+        int32_t offset = start_T0 * args.uB * args.uN + bid * args.uN + nid;
+        int32_t step = args.uB * args.uN;
+        index0 = xetla_vector_gen<int32_t, kSgBc>(offset, step);
       }
 
       // compute index for buffer1
-      uint32_t start_T_1 = start_T_sg > args.uT0 ? start_T_sg - args.uT0 : 0;
-      uint32_t end_T_1 = end_T_sg > args.uT0 ? end_T_sg - args.uT0 : 0;
-      uint32_t lanes1 = end_T_1 - start_T_1;
+      uint32_t start_T1 = (sg_start_T > args.uT0) ? (sg_start_T - args.uT0) : 0;
+      uint32_t end_T1 = (sg_end_T > args.uT0) ? (sg_end_T - args.uT0) : 0;
+
+      uint32_t lanes1 = end_T1 > start_T1 ? (end_T1 - start_T1) : 0;
       xetla_vector<int32_t, kSgBc> index1;
+
       if (lanes1 > 0) {
-        load_index(ei, args, index1, start_T_1);
-        index1 = index1 * args.uB * args.uBm * args.uN + gid;
+        // TODO: change to vector usage
+        load_index(ei, args, index1, start_T1);
+        for (int i = 0; i < kSgBc; ++i) {
+          index1[i] = (start_T1 + i) * args.uB * args.uBm * args.uN +
+              bid * args.uBm * args.uN + index1[i] * args.uN + nid;
+        }
       }
 
       idesc_Kj.update_index(index0, index1, lanes0, lanes1);
       idesc_Vj.update_index(index0, index1, lanes0, lanes1);
 
       if constexpr (kUseBias) {
-        // TODO
+        int32_t start_x = start_T;
+        uint32_t end_x = start_x + kBc;
+        uint32_t boundary_x = args.uPT;
+        end_x = end_x > boundary_x ? boundary_x : end_x;
+        int32_t start_y = gid / args.uN;
+        uint32_t end_y = start_y + 1;
+        desc_Bij.init(args.B_ptr, {end_x, end_y, args.uPT}, {start_x, start_y});
       }
     }
   };
@@ -286,110 +305,99 @@ class ifmha_forward_t {
   using matSij_t = subgroup::tile_t<accum_t, matSij_tile_desc_t>;
 
   /// @brief gemm_Sij is used to compute Sij = Qi x Kj.T
-  inline void gemm_Sij(matSij_t& matSij, arguments_t& args) {
+  inline void gemm_Sij(matSij_t& matSij) {
     using matQi_tile_desc_t =
         subgroup::tile_desc_t<accum_step, 1, accum_step, 1>;
+    using matQi_t = subgroup::tile_t<accum_t, matQi_tile_desc_t>;
     using matQi_payload_t = subgroup::mem_payload_t<
-        scalar_t,
+        accum_t,
         matQi_tile_desc_t,
         msg_type::block_1d,
-        mem_layout::row_major,
-        mem_space::local>;
-    using matQi_load_t = subgroup::tile_t<scalar_t, matQi_tile_desc_t>;
-    using matQi_t = subgroup::tile_t<accum_t, matQi_tile_desc_t>;
-    // TODO: how to set block_size_x/y
+        mem_desc_Qi_L_t::layout,
+        mem_desc_Qi_L_t::space>;
     using matKj_tile_desc_t =
         subgroup::tile_desc_t<accum_step, kSgBc, accum_step, kSgBc>;
     using matKj_t = subgroup::tile_t<accum_t, matKj_tile_desc_t>;
 
     // Gemm to comput Sij
     matQi_payload_t matQi_payload(ctx.desc_Qi_L);
-    matQi_load_t matQi_load;
     matQi_t matQi;
     matKj_t matKj;
 
     for (int i = 0; i < ctx.loop_count; i++) {
       // load Qi from local memory
-      subgroup::tile_load(matQi_load, matQi_payload);
-      subgroup::elemwise_cvt(matQi, matQi_load);
+      subgroup::tile_load(matQi, matQi_payload);
       matQi_payload.template update_tdesc<tdesc_update_dir::x_dir>(accum_step);
 
       // indexed load Kj
+      ctx.idesc_Kj.set_offset(i * accum_step);
       iload_tile(matKj, ctx.idesc_Kj);
-      ctx.idesc_Kj.update_offset(i * accum_step);
 
 #pragma unroll
-      for (int i = 0; i < kSgBc; i++) {
-        auto matKj_sub = matKj.reg.xetla_select<accum_step, 1>(i * accum_step);
-        matSij.reg.xetla_select<1, 1>(i) +=
+      for (int j = 0; j < kSgBc; j++) {
+        auto matKj_sub = matKj.reg.xetla_select<accum_step, 1>(j * accum_step);
+        matSij.reg.xetla_select<1, 1>(j) +=
             xetla_reduce<accum_t, accum_t, accum_step, reduce_op::sum>(
                 matQi.reg * matKj_sub);
       }
-    }
-
-    // Multiply by softmax scaling factor
-    matSij.reg *= args.sm_scale;
-
-    if constexpr (kUseBias) {
-      // TODO:
     }
   }
 
   // ======================= // gemm_Oi // ======================= //
 
+  /// @brief gemm_Oi is used to compute Oi += Pij x Vj
   using matOi_tile_desc_t = subgroup::tile_desc_t<kSgHm, 1, kSgHm, 1>;
   using matOi_t = subgroup::tile_t<accum_t, matOi_tile_desc_t>;
   using matPij_t = matSij_t;
 
   /// @brief gemm_Oi is used to compute Oi += Pij x Vj
-  inline void gemm_Oi(matPij_t& matPij, matOi_t& matOi, arguments_t& args) {
+  inline void gemm_Oi(matPij_t& matPij, matOi_t& matOi) {
     using matVj_tile_desc_t =
         subgroup::tile_desc_t<accum_step, kSgBc, accum_step, kSgBc>;
     using matVj_t = subgroup::tile_t<accum_t, matVj_tile_desc_t>;
 
     using matOt0_tile_desc_t =
         subgroup::tile_desc_t<accum_step, 1, accum_step, 1>;
+    using matOt0_t = subgroup::tile_t<accum_t, matOt0_tile_desc_t>;
     using matOt0_payload_t = subgroup::mem_payload_t<
         accum_t,
         matOt0_tile_desc_t,
         msg_type::block_1d,
-        mem_layout::row_major,
-        mem_space::local>;
-    using matOt0_t = subgroup::tile_t<accum_t, matOt0_tile_desc_t>;
+        mem_desc_Ot_L_t::layout,
+        mem_desc_Ot_L_t::space>;
 
     matVj_t matVj;
     matOt0_t matOt0;
-    matOt0_payload_t matOt0_payload(ctx.desc_Ot0_L);
+    mem_desc_Ot_L_t desc_Ot0_L(ctx.desc_Ot0_L);
 
     for (int i = 0; i < ctx.loop_count; i++) {
       // indexed load Vj
+      ctx.idesc_Vj.set_offset(i * accum_step);
       iload_tile(matVj, ctx.idesc_Vj);
-      ctx.idesc_Vj.update_offset(i * accum_step);
 
 #pragma unroll
       for (int j = 0; j < accum_step; j++) {
         auto matVj_sub = matVj.reg.xetla_select<kSgBc, accum_step>(j);
-        matOt0.reg.xetla_select<1, 1>(j) +=
+        matOt0.reg.xetla_select<1, 1>(j) =
             xetla_reduce<accum_t, accum_t, kSgBc, reduce_op::sum>(
                 matPij.reg * matVj_sub);
       }
-
+      matOt0_payload_t matOt0_payload(desc_Ot0_L);
       subgroup::tile_store(matOt0, matOt0_payload);
-      matOt0_payload.template update_tdesc<tdesc_update_dir::x_dir>(accum_step);
+      desc_Ot0_L.update_coord_x(accum_step);
     }
 
     xetla_fence<memory_kind::shared_local>();
     if constexpr (wg_size > 1)
       ctx.nbarrier.arrive_wait();
 
+    using matOt1_t = subgroup::tile_t<accum_t, matOi_tile_desc_t>;
     using matOt1_payload_t = subgroup::mem_payload_t<
         accum_t,
         matOi_tile_desc_t,
         msg_type::block_1d,
-        mem_layout::row_major,
-        mem_space::local>;
-    using matOt1_t = subgroup::tile_t<accum_t, matOi_tile_desc_t>;
-
+        mem_desc_Ot_L_t::layout,
+        mem_desc_Ot_L_t::space>;
     matOt1_t matOt1;
     matOt1_payload_t matOt1_payload(ctx.desc_Ot1_L);
 
@@ -401,18 +409,29 @@ class ifmha_forward_t {
     }
   }
 
-  // ====================== // softmax_fwd // ===================== //
+  // ====================== // pre_softmax // ===================== //
 
-  using wg_max_t = group_1d_reduce_t<matSij_t, wg_size, reduce_op::max>;
-  using wg_sum_t = group_1d_reduce_t<matSij_t, wg_size, reduce_op::sum>;
-
-  /// @brief softmax_fwd is used to do softmax.
-  inline void softmax_fwd(
+  /// @brief softmax pre_processing function
+  inline void pre_softmax(
       matSij_t& matSij,
-      matOi_t& matOi,
       arguments_t& args,
       uint32_t start_T) {
-    // padding mask the tail, if needed.
+    // Multiply by softmax scaling factor
+    matSij.reg *= args.sm_scale;
+
+    if constexpr (kUseBias) {
+      using bias_op_t = subgroup::
+          elemwise_reduce_op_t<reduce_op::sum, scalar_t, gpu_arch::Xe>;
+      using bias_args_t = typename bias_op_t::arguments_t;
+      int32_t tile_offset_x = ctx.sg_id * kSgBc;
+      ctx.desc_Bij.update_coord_x(tile_offset_x);
+
+      bias_op_t bias_op;
+      bias_args_t bias_args(ctx.desc_Bij.base, ctx.desc_Bij.shape);
+      bias_op(matSij, ctx.desc_Bij.coord, bias_args);
+    }
+
+    // padding mask to the tail, if needed.
     uint32_t sg_start_T = start_T + ctx.sg_id * kSgBc;
     uint32_t num_keep = (args.uT < sg_start_T) ? 0 : (args.uT - sg_start_T);
     if (num_keep < kSgBc) {
@@ -420,31 +439,38 @@ class ifmha_forward_t {
           xetla_vector_gen<uint32_t, kSgBc>(1, 1) > num_keep;
       matSij.reg.xetla_merge(kNegInfinity, mask);
     }
+  }
+
+  // ====================== // softmax_fwd // ===================== //
+
+  /// @brief softmax_fwd is used to do softmax.
+  inline void softmax_fwd(matSij_t& matSij, matOi_t& matOi) {
+    using wg_max_t = group_1d_reduce_t<matSij_t, wg_size, reduce_op::max>;
+    using wg_sum_t = group_1d_reduce_t<matSij_t, wg_size, reduce_op::sum>;
 
     // compute new m
     wg_max_t wg_max(ctx.sg_id, 0, softmax_slm);
-    xetla_vector<accum_t, 1> m_new = wg_max(matSij);
+    accum_t m_new = wg_max(matSij);
     if constexpr (wg_size > 1)
       ctx.nbarrier.arrive();
-    m_new = xetla_max<accum_t, 1>(m_new, ctx.softmax_m);
+    m_new = xetla_max<accum_t>(m_new, ctx.softmax_m);
 
     // correct old l
-    ctx.softmax_l *= xetla_exp<accum_t, 1>(ctx.softmax_m - m_new);
+    ctx.softmax_l *= xetla_exp<accum_t>(ctx.softmax_m - m_new);
     // compute Pij
-    subgroup::tile_broadcast_op<subgroup::tile_minus, matSij_t>(matSij, m_new);
-    matSij.reg = xetla_exp<accum_t>(matSij.reg);
+    matSij.reg = xetla_exp<accum_t, kSgBc>(matSij.reg - m_new);
 
     // compute new l
     if constexpr (wg_size > 1)
       ctx.nbarrier.wait();
     wg_sum_t wg_sum(ctx.sg_id, 0, softmax_slm);
-    xetla_vector<accum_t, 1> l_new = wg_sum(matSij);
+    accum_t l_new = wg_sum(matSij);
     l_new += ctx.softmax_l;
 
-    // rescale operands of matmuls
-    subgroup::tile_broadcast_op<subgroup::tile_div, matSij_t>(matSij, l_new);
-    xetla_vector<accum_t, 1> o_scale = l_new / ctx.softmax_l;
-    subgroup::tile_broadcast_op<subgroup::tile_div, matOi_t>(matOi, o_scale);
+    // rescale Pij and Oi
+    matSij.reg /= l_new;
+    matOi.reg *= ctx.softmax_l / l_new;
+
     // update m and l for the next step
     ctx.softmax_m = m_new;
     ctx.softmax_l = l_new;
@@ -456,49 +482,57 @@ class ifmha_forward_t {
 
   // ==================== // store_Oi // ====================== //
 
-  /// @brief store Oi to global memory. [B,N,F,H]
-  inline void store_Oi(matOi_t& matOi, arguments_t& args) {
-    using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<gpu_arch::Xe>,
-        tile_shape_Hm,
-        mem_desc_Oi_t>;
-    epilogue_t epilogue;
-    work_group_t g(ctx.sg_id);
-    epilogue(g, matOi, ctx.desc_Oi);
+  /// @brief store Oi to global memory. [B,Bm,1,N,H]
+  inline void store_Oi(matOi_t& matOi) {
+    using matOi_scalar_t = subgroup::tile_t<scalar_t, matOi_tile_desc_t>;
+    using matOi_payload_t = subgroup::mem_payload_t<
+        scalar_t,
+        matOi_tile_desc_t,
+        msg_type::block_2d,
+        mem_desc_Oi_t::layout,
+        mem_desc_Oi_t::space>;
+
+    matOi_scalar_t matOi_scalar;
+    matOi_payload_t matOi_payload(ctx.desc_Oi);
+
+    subgroup::elemwise_cvt(matOi_scalar, matOi);
+    subgroup::tile_store(matOi_scalar, matOi_payload);
   }
 
   // ====================== // preload_Qi // ====================== //
 
   /// @brief preload_Qi is used to load Qi from global to local memory.
-  inline void preload_Qi(arguments_t& args) {
-    using matQi_t = subgroup::tile_t<scalar_t, matOi_tile_desc_t>;
+  inline void preload_Qi() {
+    using matQi_scalar_t = subgroup::tile_t<scalar_t, matOi_tile_desc_t>;
     using matQi_load_t = subgroup::mem_payload_t<
         scalar_t,
         matOi_tile_desc_t,
         msg_type::block_2d,
         mem_desc_Qi_t::layout,
-        mem_desc_Qi_t::space,
-        gpu_arch::Xe>;
+        mem_desc_Qi_t::space>;
+
+    using matQi_t = subgroup::tile_t<accum_t, matOi_tile_desc_t>;
     using matQi_store_t = subgroup::mem_payload_t<
-        scalar_t,
+        accum_t,
         matOi_tile_desc_t,
-        subgroup::msg_type_v<matOi_tile_desc_t, mem_desc_Qi_L_t::space>,
+        msg_type::block_1d,
         mem_desc_Qi_L_t::layout,
-        mem_desc_Qi_L_t::space,
-        gpu_arch::Xe>;
+        mem_desc_Qi_L_t::space>;
+    // load Qi from global memory
+    matQi_scalar_t matQi_scalar;
+    matQi_load_t matQi_load(ctx.desc_Qi);
+    subgroup::tile_load(matQi_scalar, matQi_load);
 
-    mem_desc_Qi_t desc_Qi_load(ctx.desc_Qi);
-    mem_desc_Qi_L_t desc_Qi_store(ctx.desc_Qi_L);
-
-    int32_t tile_offset_x = ctx.sg_id * kSgHm;
-    desc_Qi_load.update_coord_x(tile_offset_x);
-    desc_Qi_store.update_coord_x(tile_offset_x);
-
+    // convert type
     matQi_t matQi;
-    matQi_load_t matQi_load(desc_Qi_load);
-    subgroup::tile_load(matQi, matQi_load);
+    subgroup::elemwise_cvt(matQi, matQi_scalar);
 
-    matQi_store_t matQi_store(desc_Qi_store);
+    // store Qi in local memory
+    mem_desc_Qi_L_t desc_Qi_L(ctx.desc_Qi_L);
+    int32_t tile_offset_x = ctx.sg_id * kSgHm;
+    desc_Qi_L.update_coord_x(tile_offset_x);
+
+    matQi_store_t matQi_store(desc_Qi_L);
     subgroup::tile_store(matQi, matQi_store);
 
     xetla_fence<memory_kind::shared_local>();
@@ -525,7 +559,7 @@ class ifmha_forward_t {
     return size;
   };
 
-  /// @brief Helper function to get the nd_range under the Fmha policy.
+  /// @brief Helper function to get the nd_range under the ifmha policy.
   /// @return Expected nd_range.
   static sycl::nd_range<2> get_nd_range(uint32_t total_batches) {
     // local range
@@ -536,7 +570,6 @@ class ifmha_forward_t {
   };
 
   // ================= // Entry of the functor // ================= //
-
   inline KERNEL_FUNC void operator()(
       xetla_exec_item<2>& ei,
       arguments_t& args) {
@@ -547,7 +580,7 @@ class ifmha_forward_t {
     // initialize context for ifmha loops
     ctx.init_context(ei, args);
     // preload Qi to local memory
-    preload_Qi(args);
+    preload_Qi();
     // initialize matOi for accumulate the output
     matOi_t matOi(0);
 
@@ -557,17 +590,17 @@ class ifmha_forward_t {
       ctx.update_context(ei, args, start_T);
       // compute Sij
       matSij_t matSij(0);
-      gemm_Sij(matSij, args);
+      gemm_Sij(matSij);
       // softmax
-      softmax_fwd(matSij, matOi, args, start_T);
+      pre_softmax(matSij, args, start_T);
+      softmax_fwd(matSij, matOi);
       // compute Oi
-      gemm_Oi(matSij, matOi, args);
+      gemm_Oi(matSij, matOi);
     }
 
     // Store output to global
-    store_Oi(matOi, args);
+    store_Oi(matOi);
   }
-}; // ifmha_forward_t
-
+}; // ifmha_forward_t0
 } // namespace fmha
 } // namespace gpu::xetla

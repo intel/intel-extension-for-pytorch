@@ -261,7 +261,7 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   if (attn_mask.has_value()) {
     attn_mask_padded_block_size = attn_mask.value().size(-1);
     TORCH_CHECK(
-        (alibi_padded_block_size * key.itemsize() % 8 == 0),
+        (attn_mask_padded_block_size * key.itemsize() % 8 == 0),
         "XeTLA SDP Attention mask needs 8bytes aligned on leading dimension ...");
   }
 
@@ -296,7 +296,9 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
 //              layout : [kv_in_len, bs, num_head, head_dim]
 // *value       shape  : [bs, num_head, kv_in_len, head_dim]
 //              layout : [kv_in_len, bs, num_head, head_dim]
-// *key_cache   shape  : [kv_out_len, bs * beam, num_head, head_dim]
+// *key_cache   shape  : [bs * beam, num_head, kv_out_len, head_dim]
+//              layout : [kv_out_len, bs * beam, num_head, head_dim]
+// *value_cache shape  : [bs * beam, num_head, kv_out_len, head_dim]
 //              layout : [kv_out_len, bs * beam, num_head, head_dim]
 // *index       shape  : [kv_out_len, bs * beam]
 //              layout : [kv_out_len, bs * beam]
@@ -322,12 +324,19 @@ Tensor xetla_fsdp_index_forward(
       !head_mask.has_value(),
       "Unsupported feature in fsdp kernel, head_mask ...");
 
+  // check attn_mask padded
+  uint32_t attn_mask_padding = 0;
+  if (attn_mask.has_value()) {
+    attn_mask_padding = attn_mask.value().size(-1);
+    TORCH_CHECK(
+        (attn_mask_padding * key.itemsize() % 8 == 0),
+        "XeTLA SDP Attention mask needs 8bytes aligned on leading dimension ...");
+  }
+
   uint32_t beam_width = query.size(0) / key.size(0);
   uint32_t num_keys_in = key.size(2);
-  uint32_t num_keys_out = key_cache.size(0);
-  auto output = at::empty(
-      {query.size(1), query.size(0), query.size(2), query.size(3)},
-      query.options());
+  uint32_t num_keys_out = key_cache.size(2);
+  auto output = at::empty_like(query);
   auto dpcpp_queue = dpcppGetCurrentQueue();
   RECORD_FUNCTION("xetla_fsdp_index_forward", {});
   gpu::xetla::fmha_forward_index_kernel(
@@ -346,15 +355,15 @@ Tensor xetla_fsdp_index_forward(
       alpha,
       beta,
       dropout_p,
-      query.size(0),
+      key.size(0),
       beam_width,
       query.size(1),
       query.size(3),
       query.size(2),
       num_keys_in,
       num_keys_out,
+      attn_mask_padding,
       is_causal);
-  output = output.permute({0, 2, 1, 3});
   return output;
 }
 } // namespace AtenIpexTypeXPU

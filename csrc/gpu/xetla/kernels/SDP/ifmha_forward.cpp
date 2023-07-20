@@ -26,7 +26,23 @@ void ifmha_forward_impl(
     uint32_t num_heads,
     uint32_t head_size,
     uint32_t kv_len0,
-    uint32_t kv_len1) {
+    uint32_t kv_len1,
+    uint32_t attn_mask_padding) {
+#ifdef SDP_DBG
+  printf(
+      "B, Bm, N, F, T0, T1, H: %d, %d, %d, %d, %d, %d, %d, UseBias: %d, IsTraining: %d, uPT %d, scale %f\n",
+      num_batches,
+      beam,
+      num_heads,
+      1,
+      kv_len0,
+      kv_len1,
+      head_size,
+      kUseBias,
+      kIsTraining,
+      attn_mask_padding,
+      sm_scale);
+#endif
   // ifmha forward kernel
   using ifmha_forward_op_t =
       ifmha_forward_t<ifmha_policy, T, kUseBias, kIsTraining>;
@@ -60,7 +76,8 @@ void ifmha_forward_impl(
           num_heads,
           head_size,
           kv_len0,
-          kv_len1);
+          kv_len1,
+          attn_mask_padding);
 
       // call the functor
       ifmha_fwd_op(ei, args);
@@ -101,7 +118,8 @@ void ifmha_forward_impl(
       num_heads,                                         \
       head_size,                                         \
       kv_len0,                                           \
-      kv_len1)
+      kv_len1,                                           \
+      attn_mask_padding)
 
 /// @brief Main execution function for indexed flash mha forward.
 template <typename T, bool kUseBias = false, bool kIsTraining = false>
@@ -123,7 +141,8 @@ void ifmha_forward(
     uint32_t num_heads,
     uint32_t head_size,
     uint32_t kv_len0,
-    uint32_t kv_len1) {
+    uint32_t kv_len1,
+    uint32_t attn_mask_padding) {
   if (head_size <= 64) {
     CALL_IMPL_FUNC(ifmha_policy_64x64);
   } else if (head_size <= 128) {
@@ -161,6 +180,7 @@ void fmha_forward_index_kernel(
     uint32_t num_queries,
     uint32_t num_keys_in,
     uint32_t num_keys_out,
+    uint32_t attn_mask_padding,
     bool is_causal) {
   using T = sycl::half;
   TORCH_CHECK(
@@ -192,7 +212,8 @@ void fmha_forward_index_kernel(
         num_heads,
         head_dim,
         num_keys_in,
-        num_keys_out);
+        num_keys_out,
+        attn_mask_padding);
   } else {
     ifmha_forward<T, false, false>(
         q,
@@ -212,7 +233,8 @@ void fmha_forward_index_kernel(
         num_heads,
         head_dim,
         num_keys_in,
-        num_keys_out);
+        num_keys_out,
+        attn_mask_padding);
   }
 }
 } // namespace gpu::xetla

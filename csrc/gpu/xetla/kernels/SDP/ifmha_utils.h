@@ -68,25 +68,26 @@ struct imem_desc_t<dtype_, lanes_, mem_layout::row_major, mem_space::global> {
     lanes1 = lanes1_;
   }
 
-  inline void update_offset(int32_t offset_) {
+  inline void set_offset(int32_t offset_) {
     offset = offset_;
   }
 
-  inline void get_tdesc(uint32_t lane, desc_t& desc) {
-    int32_t idx = 0;
+  inline bool init_tdesc(uint32_t lane, desc_t& desc) {
     if (lane < lanes0) {
-      idx = index0[lane];
-      desc.init(addr0, {width, uint32_t(idx + 1), width}, {offset, idx});
+      int32_t idx = index0[lane];
+      uint32_t height = idx + 1;
+      desc.init(addr0, {width, height, width}, {offset, idx});
     } else {
       lane -= lanes0;
       if (lane < lanes1) {
-        idx = index1[lane];
-        desc.init(addr1, {width, uint32_t(idx + 1), width}, {offset, idx});
+        int32_t idx = index1[lane];
+        uint32_t height = idx + 1;
+        desc.init(addr1, {width, height, width}, {offset, idx});
       } else {
-        // TODO: do nothing???
-        desc.init(addr1, {width, 1u, width}, {offset, 1});
+        return false;
       }
     }
+    return true;
   }
 };
 
@@ -126,9 +127,12 @@ iload_tile(tile_t& tile, imem_desc_t& imem_desc) {
 
 #pragma unroll
   for (int i = 0; i < lanes; i++) {
-    imem_desc.get_tdesc(i, lane_mem_desc);
-    lane_payload.init(lane_mem_desc);
-    subgroup::tile_load(lane_tile, lane_payload);
+    if (imem_desc.init_tdesc(i, lane_mem_desc)) {
+      lane_payload.init(lane_mem_desc);
+      subgroup::tile_load(lane_tile, lane_payload);
+    } else {
+      lane_tile.init(0);
+    }
 
     tile.reg.xetla_select<width, 1>(i * width) =
         xetla_cvt<dtype_acc, dtype, width>(lane_tile.reg);
@@ -146,26 +150,23 @@ struct group_1d_reduce_t {
       "the tile_size_y should be 1d");
 
   // store results of subgroup to slm
-  using store_tile_desc = subgroup::tile_desc_t<1, 1, 1, 1, reg_layout::tiled>;
+  using store_tile_desc = subgroup::tile_desc_t<1, 1, 1, 1>;
   using store_tile_t = subgroup::tile_t<T, store_tile_desc>;
   using store_payload_t = subgroup::mem_payload_t<
       T,
       store_tile_desc,
       msg_type::block_1d,
       mem_layout::row_major,
-      mem_space::local,
-      gpu_arch::Xe>;
+      mem_space::local>;
   // load all subgroup results together
-  using load_tile_desc =
-      subgroup::tile_desc_t<kNumSg, 1, kNumSg, 1, reg_layout::tiled>;
+  using load_tile_desc = subgroup::tile_desc_t<kNumSg, 1, kNumSg, 1>;
   using load_tile_t = subgroup::tile_t<T, load_tile_desc>;
   using load_payload_t = subgroup::mem_payload_t<
       T,
       load_tile_desc,
-      subgroup::msg_type_v<load_tile_desc, mem_space::local>,
+      msg_type::block_1d,
       mem_layout::row_major,
-      mem_space::local,
-      gpu_arch::Xe>;
+      mem_space::local>;
 
   xetla_nbarrier_t<kNumSg, kNumSg> nbarrier;
   uint32_t slm_base;
@@ -180,9 +181,8 @@ struct group_1d_reduce_t {
     slm_base = slm_base_;
   }
 
-  inline KERNEL_FUNC xetla_vector<T, 1> operator()(mat_t& src) {
-    xetla_vector<T, 1> ret =
-        xetla_reduce<T, T, tile_size_x, reduce_kind>(src.reg);
+  inline KERNEL_FUNC T operator()(mat_t& src) {
+    T ret = xetla_reduce<T, T, tile_size_x, reduce_kind>(src.reg);
     if constexpr (kNumSg == 1)
       return ret;
 
