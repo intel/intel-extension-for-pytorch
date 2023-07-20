@@ -341,13 +341,13 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
             self.module.self_attn.q_proj.weight.data = self.ipex_optimized_module.attn.qkv_wei[0, :, :]
             self.module.self_attn.k_proj.weight.data = self.ipex_optimized_module.attn.qkv_wei[1, :, :]
             self.module.self_attn.v_proj.weight.data = self.ipex_optimized_module.attn.qkv_wei[2, :, :]
-            self.module.self_attn.q_wei = self.module.self_attn.q_proj.weight
-            self.module.self_attn.k_wei = self.module.self_attn.k_proj.weight
-            self.module.self_attn.v_wei = self.module.self_attn.v_proj.weight
+            self.ipex_optimized_module.attn.q_wei = self.module.self_attn.q_proj.weight
+            self.ipex_optimized_module.attn.k_wei = self.module.self_attn.k_proj.weight
+            self.ipex_optimized_module.attn.v_wei = self.module.self_attn.v_proj.weight
 
-            self.ipex_optimized_module.attn.q_proj.bias = self.module.self_attn.q_proj.bias
-            self.ipex_optimized_module.attn.k_proj.bias = self.module.self_attn.k_proj.bias
-            self.ipex_optimized_module.attn.v_proj.bias = self.module.self_attn.v_proj.bias
+            self.ipex_optimized_module.attn.bias = self.module.self_attn.q_proj.bias
+            self.ipex_optimized_module.attn.bias = self.module.self_attn.k_proj.bias
+            self.ipex_optimized_module.attn.bias = self.module.self_attn.v_proj.bias
 
             self.module.self_attn.o_proj.weight.data = self.module.self_attn.o_proj.weight.t().contiguous()
             self.ipex_optimized_module.attn.out_wei = self.module.self_attn.o_proj.weight
