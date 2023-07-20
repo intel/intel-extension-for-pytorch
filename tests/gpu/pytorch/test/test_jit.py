@@ -12769,7 +12769,7 @@ dedent """
         self.assertEqual(some_func(x), x)
 
     def test_file_format_serialization(self):
-        filename = tempfile.mktemp()
+        filename = tempfile.mkstemp()
         writer = torch._C.PyTorchFileWriter(filename)
         buffers = [os.urandom(size) for size in [random.randint(1, 100) for i in range(20)]]
         offsets = []
