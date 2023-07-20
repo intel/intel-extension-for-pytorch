@@ -34,7 +34,7 @@ f = 1
 t_in = 1919
 t_out = 111
 t = t_in + t_out
-t_max = 2048 # 2176
+t_max = 2176
 beam = 4
 bs = 64
 b = bs * beam
@@ -48,7 +48,9 @@ is_causal = False
 seq_last = True
 alibi = None
 attn_mask = None
+attn_mask_padded = None
 head_mask = None
+
 
 print("alpha:", end=" ")
 print(alpha)
@@ -63,6 +65,8 @@ class TestTorchMethod(TestCase):
         v = torch.randn([t, b, n, h], dtype=dtype, device=torch.device('xpu'))
         k_cache = torch.randn([t_max, b, n, h], dtype=dtype, device=torch.device('xpu'))
         v_cache = torch.randn([t_max, b, n, h], dtype=dtype, device=torch.device('xpu'))
+        attn_mask = torch.randn([b, 1, f, t], dtype=dtype, device=torch.device('xpu'))
+        attn_mask_padded = torch.zeros([b, 1, f, t_max], dtype=dtype, device=torch.device('xpu'))
         index = torch.randint(0, beam, [t_out, bs, beam], dtype=torch.int, device=torch.device('xpu'))
         # print("index", index)
 
@@ -88,6 +92,8 @@ class TestTorchMethod(TestCase):
                 k[t_in + i][j].copy_(k_history[i][int(bs_)][beam_choice])
                 v[t_in + i][j].copy_(v_history[i][int(bs_)][beam_choice])
 
+        attn_mask_padded[:,:,:,0:t] = attn_mask
+
         # print("q", q)
         # print("k_in_proj", k_in_proj)
         # print("k_cache", k_cache[0:t_out,:,:,:])
@@ -105,9 +111,9 @@ class TestTorchMethod(TestCase):
             None,
             alpha)
 
-        ref = torch.xpu.IpexSDP(q.permute(1, 2, 0, 3), k.permute(1, 2, 0, 3), v.permute(1, 2, 0, 3), alibi, attn_mask, head_mask, alpha, beta, dropout, is_causal, seq_last)
+        ref = torch.xpu.IpexSDP(q.permute(1, 2, 0, 3), k.permute(1, 2, 0, 3), v.permute(1, 2, 0, 3), alibi, attn_mask_padded, head_mask, alpha, beta, dropout, is_causal, seq_last)
         # sdp index fusion op is on SequenceLast by default
-        res = torch.xpu.IpexSDP_Index(q.permute(1, 2, 0, 3), k_in_proj.permute(1, 2, 0, 3), v_in_proj.permute(1, 2, 0, 3), k_cache[0:t_out,:,:,:].permute(1, 2, 0, 3), v_cache[0:t_out,:,:,:].permute(1, 2, 0, 3), index, alibi, attn_mask, head_mask, t_out, alpha, beta, dropout, is_causal)
+        res = torch.xpu.IpexSDP_Index(q.permute(1, 2, 0, 3), k_in_proj.permute(1, 2, 0, 3), v_in_proj.permute(1, 2, 0, 3), k_cache[0:t_out,:,:,:].permute(1, 2, 0, 3), v_cache[0:t_out,:,:,:].permute(1, 2, 0, 3), index, alibi, attn_mask_padded, head_mask, t_out, alpha, beta, dropout, is_causal)
         # res = torch.xpu.IpexSDP_Index(q, k_in_proj, v_in_proj, k_cache[0:t_out,:,:,:], v_cache[0:t_out,:,:,:], index, alibi, attn_mask, head_mask, t_out, alpha, beta, dropout, is_causal)
         # print(ref.cpu())
         # print(res.cpu())
