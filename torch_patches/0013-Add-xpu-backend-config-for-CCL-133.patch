@@ -1,7 +1,7 @@
 From 7ca13eb324fc490f1f7e5101213f36cf9bcc3bf6 Mon Sep 17 00:00:00 2001
 From: zhuhong61 <95205772+zhuhong61@users.noreply.github.com>
 Date: Fri, 9 Jun 2023 12:53:33 +0800
-Subject: [PATCH 13/14] Add xpu backend config for CCL (#133)
+Subject: [PATCH 13/15] Add xpu backend config for CCL (#133)
 
 ---
  torch/distributed/distributed_c10d.py | 1 +

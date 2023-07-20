@@ -1,7 +1,7 @@
 From f61ea2d96b8c556ccea6cd2c40c92ef44462c2fd Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <guangye.yu@intel.com>
 Date: Mon, 22 May 2023 09:55:53 +0000
-Subject: [PATCH 02/14] remove dlpack dependency
+Subject: [PATCH 02/15] remove dlpack dependency
 
 ---
  aten/src/ATen/DLConvertor.cpp            |  2 +-

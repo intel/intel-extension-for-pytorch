@@ -1,7 +1,7 @@
 From 4f8e107bd5a90a3e8c228dd5d38c03e644ef673c Mon Sep 17 00:00:00 2001
 From: sclarkson <sc@lambdal.com>
 Date: Tue, 21 Mar 2023 21:44:49 +0000
-Subject: [PATCH 11/14] Fix kDefaultTimeout multiple definition build failure
+Subject: [PATCH 11/15] Fix kDefaultTimeout multiple definition build failure
  (#97270)
 
 Make the namespace explicit to avoid the constexpr conflict on GCC 11.
