@@ -559,9 +559,9 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
                 module_converter = transformers_converter[type(named_module)](named_module, config, dtype=dtype, device=config.device)
                 module_transformed = module_converter.get_transformed_module()
                 setattr(module, name, module_transformed)
-            elif OpConverter.valid_op_for_convert(named_module):
-                op_transformed = OpConverter.convert_op(named_module)
-                setattr(module, name, op_transformed)
+            # elif OpConverter.valid_op_for_convert(named_module):
+            #     op_transformed = OpConverter.convert_op(named_module)
+            #     setattr(module, name, op_transformed)
             else:
                 recursive_module_replace(named_module, config, dtype=dtype)
         return model
