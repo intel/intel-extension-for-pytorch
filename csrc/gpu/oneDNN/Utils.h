@@ -385,6 +385,37 @@ static inline bool is_onednn_layout(const at::Tensor& tensor) {
   return !at::AtenIpexTypeXPU::DPCPPTensorContext::is_plain(tensor);
 }
 
+template <typename T>
+static inline bool iteratable_has_onednn_layout(T container) {
+  bool has_onednn_layout_tensor =
+      std::any_of(container.begin(), container.end(), [](const Tensor& t) {
+        return xpu::oneDNN::is_onednn_layout(t);
+      });
+  return has_onednn_layout_tensor;
+}
+
+static inline bool has_onednn_layout(const Tensor& tensor) {
+  return is_onednn_layout(tensor);
+}
+
+static inline bool has_onednn_layout(const TensorList& inputs) {
+  return iteratable_has_onednn_layout(inputs);
+}
+
+static inline bool has_onednn_layout(const ITensorListRef& inputs) {
+  auto tensors = inputs.materialize();
+  return iteratable_has_onednn_layout(tensors);
+}
+
+// T would be Tensor, TensorList, ITensorListRef
+template <typename T, typename... Args>
+bool has_onednn_layout(const T& input, const Args&... rest) {
+  if (has_onednn_layout(input)) {
+    return true;
+  }
+  return false || has_onednn_layout(rest...);
+}
+
 static inline bool eltwise_forward_valid(const at::Tensor& tensor) {
   switch (tensor.scalar_type()) {
     // return false if scalar_type not supported
@@ -596,9 +627,11 @@ static inline int get_memory_layout_for_conv(
     return MEMORY_LAYOUT_FOR_CONV::ChannelsFirst;
   }
 
-  if (Settings::I().is_onednn_layout_enabled()) {
-    // suggest blocked
-    return MEMORY_LAYOUT_FOR_CONV::Blocked;
+  if (src.is_quantized() || weight.is_quantized() || (!dpcppSupportFP64())) {
+    if (Settings::I().is_onednn_layout_enabled()) {
+      // suggest blocked
+      return MEMORY_LAYOUT_FOR_CONV::Blocked;
+    }
   }
 
   auto suggest_channels_last_format =

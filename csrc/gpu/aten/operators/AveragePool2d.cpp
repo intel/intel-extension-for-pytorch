@@ -10,6 +10,7 @@
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
+#include "utils/ComputeEngine.h"
 
 using namespace dnnl;
 using namespace at::native;
@@ -277,9 +278,11 @@ void avg_pool2d_out_template(
 
   // per oneDNN definition, no dilation means dilation ratio is 0
   std::vector<int64_t> dilation_vec = {0, 0};
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
 
   // for onednn block format
-  if (is_onednn_layout(input)) {
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     if (count_include_pad) {
       ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_include_padding>(
           output,
@@ -315,57 +318,56 @@ void avg_pool2d_out_template(
           padding_vec,
           padding_vec);
     }
-    return;
+  } else {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::kHalf,
+        at::kBFloat16,
+        input.scalar_type(),
+        "avg_pool2d_out_frame",
+        [&] {
+          using accscalar_t = acc_type<scalar_t>;
+
+          if (at::MemoryFormat::ChannelsLast == memory_format) {
+            avg_pool2d_channels_last_frame<scalar_t, accscalar_t>(
+                input_,
+                nInputPlane,
+                inputHeight,
+                inputWidth,
+                outputHeight,
+                outputWidth,
+                kH,
+                kW,
+                dH,
+                dW,
+                padH,
+                padW,
+                output,
+                divisor_override_value,
+                count_include_pad,
+                use_divisor);
+          } else {
+            // use contiguous memory format as default path
+            input_ = input_.contiguous();
+            avg_pool2d_out_frame<scalar_t, accscalar_t>(
+                input_,
+                nInputPlane,
+                inputHeight,
+                inputWidth,
+                outputHeight,
+                outputWidth,
+                kH,
+                kW,
+                dH,
+                dW,
+                padH,
+                padW,
+                output,
+                divisor_override_value,
+                count_include_pad,
+                use_divisor);
+          }
+        });
   }
-
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::kHalf,
-      at::kBFloat16,
-      input.scalar_type(),
-      "avg_pool2d_out_frame",
-      [&] {
-        using accscalar_t = acc_type<scalar_t>;
-
-        if (at::MemoryFormat::ChannelsLast == memory_format) {
-          avg_pool2d_channels_last_frame<scalar_t, accscalar_t>(
-              input_,
-              nInputPlane,
-              inputHeight,
-              inputWidth,
-              outputHeight,
-              outputWidth,
-              kH,
-              kW,
-              dH,
-              dW,
-              padH,
-              padW,
-              output,
-              divisor_override_value,
-              count_include_pad,
-              use_divisor);
-        } else {
-          // use contiguous memory format as default path
-          input_ = input_.contiguous();
-          avg_pool2d_out_frame<scalar_t, accscalar_t>(
-              input_,
-              nInputPlane,
-              inputHeight,
-              inputWidth,
-              outputHeight,
-              outputWidth,
-              kH,
-              kW,
-              dH,
-              dW,
-              padH,
-              padW,
-              output,
-              divisor_override_value,
-              count_include_pad,
-              use_divisor);
-        }
-      });
 }
 
 Tensor& avg_pool2d_backward_out_template(

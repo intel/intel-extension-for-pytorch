@@ -1100,10 +1100,18 @@ Tensor& upsample_nearest3d_out(
   bool onednn_path = (output_depth % input_depth == 0) &&
       (output_height % input_height == 0) && (output_width % input_width == 0);
 
+  xpu::COMPUTE_ENG real_eng;
+  if (onednn_path) {
+    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+  } else {
+    // Always use sycl implementation due to onednn path has acc issue
+    real_eng = xpu::COMPUTE_ENG::BASIC;
+  }
+
   // temp fix: restore onednn path for integral scale cases
   // TODO: optimize perf for sycl implementation for both integral and
   // non-integral scale cases
-  if (onednn_path) {
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     xpu::oneDNN::resample(
         input,
         output,
@@ -1204,10 +1212,18 @@ Tensor& upsample_nearest3d_backward_out(
        (output_height % input_height == 0) &&
        (output_width % input_width == 0));
 
+  xpu::COMPUTE_ENG real_eng;
+  if (onednn_path) {
+    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+  } else {
+    // Always use sycl implementation due to onednn path has acc issue
+    real_eng = xpu::COMPUTE_ENG::BASIC;
+  }
+
   // temp fix: restore onednn path for integral scale cases
   // TODO: optimize perf for sycl implementation for both integral and
   // non-integral scale cases
-  if (onednn_path) {
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
@@ -1262,10 +1278,18 @@ Tensor& upsample_nearest2d_out(
   bool onednn_path =
       (output_height % input_height == 0) && (output_width % input_width == 0);
 
+  xpu::COMPUTE_ENG real_eng;
+  if (onednn_path) {
+    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+  } else {
+    // Always use sycl implementation due to onednn path has acc issue
+    real_eng = xpu::COMPUTE_ENG::BASIC;
+  }
+
   // temp fix: restore onednn path for integral scale cases
   // TODO: optimize perf for sycl implementation for both integral and
   // non-integral scale cases
-  if (onednn_path) {
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     xpu::oneDNN::resample(
         input,
         output,
@@ -1315,10 +1339,17 @@ Tensor& upsample_nearest2d_backward_out(
   bool onednn_path =
       (output_height % input_height == 0) && (output_width % input_width == 0);
 
+  xpu::COMPUTE_ENG real_eng;
+  if (onednn_path) {
+    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+  } else {
+    // Always use sycl implementation due to onednn path has acc issue
+    real_eng = xpu::COMPUTE_ENG::BASIC;
+  }
   // temp fix: restore onednn path for integral scale cases
   // TODO: optimize perf for sycl implementation for both integral and
   // non-integral scale cases
-  if (onednn_path) {
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
@@ -1374,7 +1405,16 @@ Tensor upsample_nearest1d(
   // TODO: optimize perf for sycl implementation for both integral and
   // non-integral scale cases
   bool onednn_path = (output_width % input_width == 0);
+
+  xpu::COMPUTE_ENG real_eng;
   if (onednn_path) {
+    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+  } else {
+    // Always use sycl implementation due to onednn path has acc issue
+    real_eng = xpu::COMPUTE_ENG::BASIC;
+  }
+
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     auto output = at::empty(
         {nbatch, channels, output_width},
         input.options(),
@@ -1412,10 +1452,19 @@ Tensor& upsample_nearest1d_out(
   int64_t input_width = input.size(2);
 
   bool onednn_path = (output_width % input_width == 0);
+
+  xpu::COMPUTE_ENG real_eng;
+  if (onednn_path) {
+    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+  } else {
+    // Always use sycl implementation due to onednn path has acc issue
+    real_eng = xpu::COMPUTE_ENG::BASIC;
+  }
+
   // temp fix: restore onednn path for integral scale cases
   // TODO: optimize perf for sycl implementation for both integral and
   // non-integral scale cases
-  if (onednn_path) {
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     xpu::oneDNN::resample(
         input,
         output,
@@ -1456,10 +1505,17 @@ Tensor& upsample_nearest1d_backward_out(
   int64_t input_width = input_size[2];
 
   bool onednn_path = (output_width % input_width == 0);
+  xpu::COMPUTE_ENG real_eng;
+  if (onednn_path) {
+    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+  } else {
+    // Always use sycl implementation due to onednn path has acc issue
+    real_eng = xpu::COMPUTE_ENG::BASIC;
+  }
   // temp fix: restore onednn path for integral scale cases
   // TODO: optimize perf for sycl implementation for both integral and
   // non-integral scale cases
-  if (onednn_path) {
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
@@ -1635,10 +1691,17 @@ Tensor upsample_nearest2d(
   int input_width = input.size(3);
   bool onednn_path =
       (output_height % input_height == 0) && (output_width % input_width == 0);
+  xpu::COMPUTE_ENG real_eng;
+  if (onednn_path) {
+    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+  } else {
+    // Always use sycl implementation due to onednn path has acc issue
+    real_eng = xpu::COMPUTE_ENG::BASIC;
+  }
   // temp fix: restore onednn path for integral scale cases
   // TODO: optimize perf for sycl implementation for both integral and
   // non-integral scale cases
-  if (onednn_path) {
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     Tensor output = at::_empty_affine_quantized(
         input.sizes(),
         input.options().dtype(toQIntType(input.scalar_type())),

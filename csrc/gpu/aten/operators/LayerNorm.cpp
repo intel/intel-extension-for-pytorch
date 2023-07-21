@@ -5,6 +5,7 @@
 #include <oneDNN/oneDNN.h>
 #include "Norm.h"
 #include "comm/RegistrationDeclarations.h"
+#include "utils/ComputeEngine.h"
 
 using namespace xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU::normalization;
@@ -710,9 +711,9 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
   Tensor output = at::empty(input.sizes(), input.options());
   Tensor mean, rstd;
   if (input.numel() != 0) {
-    bool apply_onednn =
-        (xpu::oneDNN::is_onednn_layout(input) && input.dim() > 1);
-    if (apply_onednn) {
+    xpu::COMPUTE_ENG real_eng =
+        choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+    if (xpu::COMPUTE_ENG::ONEDNN == real_eng && input.dim() > 1) {
       Tensor input_ = xpu::oneDNN::contiguous_if_needed(input);
       Tensor weight_ = xpu::oneDNN::contiguous_if_needed(weight);
       Tensor bias_ = xpu::oneDNN::contiguous_if_needed(bias);
@@ -767,9 +768,8 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
   }
   if (input.numel() != 0 && grad_output.numel() != 0) {
     if (M > 0 && N > 0) {
-      bool apply_onednn =
-          (xpu::oneDNN::is_onednn_layout(input) && input.dim() > 1);
-      if (apply_onednn) {
+      auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+      if (xpu::COMPUTE_ENG::ONEDNN == real_eng && input.dim() > 1) {
         Tensor grad_output_ = xpu::oneDNN::contiguous_if_needed(grad_output);
         Tensor input_ = xpu::oneDNN::contiguous_if_needed(input);
         Tensor weight_ = xpu::oneDNN::contiguous_if_needed(weight);

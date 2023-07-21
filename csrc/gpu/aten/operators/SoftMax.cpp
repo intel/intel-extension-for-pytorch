@@ -15,8 +15,8 @@
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
 #include "comm/SimpleReduce.h"
+#include "utils/ComputeEngine.h"
 #include "utils/CustomOperatorRegistration.h"
-
 /*
 softmax forward and backward follow the same optimization routine, we take
 forward as an example here. softmax = exp(x) / sum(exp(x)) to ensuare the exp(x)
@@ -1984,14 +1984,21 @@ Tensor& _softmax_out(
     Tensor& out) {
   checkBackend("_softmax", {input_}, Backend::XPU);
 
+  xpu::COMPUTE_ENG real_eng;
+  bool is_softmax_valid = xpu::oneDNN::softmax_valid(input_);
+  if (!is_softmax_valid) {
+    real_eng = xpu::COMPUTE_ENG::BASIC;
+  } else {
+    real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input_);
+  }
+
   // 1.check the tensors type are supported by oneDNN or not
   // 2.check the tensors are contiguous or not
   // 3.check the tensors are blocked format or not
   // when satify the aformentioned two conditions,
   // the oneDNN path will be selected,
   // all the other cases will go to SYCL path
-  if (xpu::oneDNN::softmax_valid(input_) &&
-      xpu::oneDNN::is_onednn_layout(input_)) {
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     xpu::oneDNN::softmax(input_, dim, half_to_float, out);
     return out;
   } else {

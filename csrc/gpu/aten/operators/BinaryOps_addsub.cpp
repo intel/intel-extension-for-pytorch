@@ -14,6 +14,8 @@
 #include "Loops.h"
 #include "LoopsTemplates.h"
 
+#include <utils/ComputeEngine.h>
+
 using namespace xpu::dpcpp;
 
 namespace at {
@@ -137,49 +139,4 @@ Tensor rsub(const Tensor& self, const Tensor& other, const Scalar& alpha) {
 
 } // namespace AtenIpexTypeXPU
 
-namespace AtenIpexTypeQuantizedXPU {
-
-Tensor add(const Tensor& _self, const Tensor& _other, const Scalar& alpha) {
-  Tensor result, self, other;
-  if (1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
-      _self.sizes() == _other.sizes() && !is_wrapped_number(_self) &&
-      !is_wrapped_number(_other) &&
-      (xpu::oneDNN::is_onednn_layout(_self) ||
-       xpu::oneDNN::is_onednn_layout(_other))) {
-    xpu::oneDNN::sum(
-        result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
-    return result;
-  } else if (
-      _self.is_quantized() && _self.defined() && _other.defined() &&
-      _self.sizes() == _other.sizes() && !is_wrapped_number(_self) &&
-      !is_wrapped_number(_other)) { // &&
-    Tensor _post = at::empty({1}, _self.options().dtype(at::kFloat));
-    _post.fill_(1 / alpha.to<float>());
-    result = at::_empty_affine_quantized(
-        _self.sizes(),
-        _self.options(),
-        alpha.to<float>(),
-        0,
-        _self.suggest_memory_format());
-    xpu::oneDNN::bin<dnnl::algorithm::binary_add, dnnl::algorithm::binary_mul>(
-        result, _self, _other, _post);
-    return result;
-  } else {
-    self = to_plain_if_needed(_self);
-    other = to_plain_if_needed(_other);
-
-    auto iter = TensorIterator::binary_op(result, self, other);
-    impl::alpha_check(iter, alpha);
-    impl::add_kernel_dpcpp(iter, alpha);
-    auto smf = _self.suggest_memory_format();
-    if (is_channels_last(smf)) {
-      if (!(iter.output().is_contiguous(smf))) {
-        iter.output().contiguous(smf);
-      }
-    }
-    return iter.output();
-  }
-}
-
-} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

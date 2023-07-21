@@ -818,6 +818,7 @@ supported:
   - _weight_norm_interface
   - _validate_compressed_sparse_indices
   - index.Tensor_out
+  - pad_sequence
 autograd:
   - cdist
   - lstm.input

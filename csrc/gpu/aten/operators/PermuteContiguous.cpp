@@ -6,6 +6,7 @@
 #include <oneapi/dnnl/dnnl.hpp>
 
 #include <oneDNN/oneDNN.h>
+#include "utils/ComputeEngine.h"
 #include "utils/CustomOperatorRegistration.h"
 
 namespace at {
@@ -16,8 +17,11 @@ at::Tensor permute_contiguous(
     at::IntArrayRef dims,
     at::MemoryFormat dim_contiguous) {
   Tensor result;
+
+  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, self);
+
   // plain format tensor will go through naitve permute contiguous pass
-  if (!xpu::oneDNN::is_onednn_layout(self)) {
+  if (real_eng != xpu::COMPUTE_ENG::ONEDNN) {
     result = at::native::permute(self, dims).contiguous(dim_contiguous);
     return result;
   }

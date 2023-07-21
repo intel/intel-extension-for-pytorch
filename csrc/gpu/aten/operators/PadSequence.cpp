@@ -298,10 +298,5 @@ Tensor pad_sequence(
   }
   return out;
 }
-
-TORCH_LIBRARY_IMPL(aten, XPU, m) {
-  m.impl("pad_sequence", TORCH_FN(pad_sequence));
-}
-
 } // namespace AtenIpexTypeXPU
 } // namespace at
