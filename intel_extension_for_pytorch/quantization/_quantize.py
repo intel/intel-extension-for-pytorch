@@ -1,6 +1,5 @@
 import copy
 import functools
-import os
 import warnings
 
 import torch
@@ -15,6 +14,7 @@ import intel_extension_for_pytorch._C as core
 from intel_extension_for_pytorch.cpu.utils.linear_bn_folding import linear_bn_fuse
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     may_import_deepspeed_modules,
+    _all_reduce_and_bias_add,
 )
 from ._quantize_utils import auto_prepare, auto_convert, copy_prepared_model
 from .. import nn
@@ -109,6 +109,20 @@ def prepare(
     return auto_prepare(prepare_model, configure, example_inputs, example_kwarg_inputs)
 
 
+def _may_insert_deepspeed_modules(
+    torch_modules, q_linear_layer_module, q_linear_all_reduce_module
+):
+    deepspeed_modules = may_import_deepspeed_modules()
+    if deepspeed_modules is not None:
+        LinearAllreduce, LinearLayer = deepspeed_modules
+        deepspeed_modules = {
+            LinearLayer: q_linear_layer_module,
+            LinearAllreduce: q_linear_all_reduce_module,
+        }
+        torch_modules.update(deepspeed_modules)
+    return torch_modules
+
+
 @functools.lru_cache(None)
 def IPEX_DYNAMIC_QUANTIZATION_MODULE_CPU():
     # TODO: have to override Linear here for GPT-J performance.
@@ -134,14 +148,20 @@ def IPEX_DYNAMIC_QUANTIZATION_MODULE_CPU():
         torch.nn.Linear: DynamicQuantizedLinearLayer,
     }
 
-    deepspeed_modules = may_import_deepspeed_modules()
-    if deepspeed_modules is not None:
-        LinearAllreduce, LinearLayer = deepspeed_modules
-        deepspeed_modules = {
-            LinearLayer: DynamicQuantizedLinearLayer,
-            LinearAllreduce: DynamicQuantizedLinearAllreduce,
-        }
-        torch_modules.update(deepspeed_modules)
+    torch_modules = _may_insert_deepspeed_modules(
+        torch_modules, DynamicQuantizedLinearLayer, DynamicQuantizedLinearAllreduce
+    )
+    return torch_modules
+
+
+@functools.lru_cache(None)
+def IPEX_WEIGHT_ONLY_QUANTIZATION_MODULE_CPU():
+    torch_modules = {}
+    torch_modules = _may_insert_deepspeed_modules(
+        torch_modules,
+        nn.modules.weight_only_quantization.IpexWoqLinear,
+        nn.modules.weight_only_quantization.IpexWoqLinearAllreduce,
+    )
     return torch_modules
 
 
@@ -253,21 +273,25 @@ class DynamicQuantizedLinearAllreduce(_IPEXDynamicQuantizedLinear):
             raise RuntimeError("Unsupported dtype on dynamic quantized linear!")
         output = Y.to(x.dtype)
 
-        if self.mp_group is not None:
-            torch.ops.deepspeed_comm.all_reduce(
-                output,
-                "sum",
-                "",
-                list(torch.arange(int(os.environ["WORLD_SIZE"]))),
-                int(os.environ["WORLD_SIZE"]),
-            )
-
-        if self.original_bias is not None:
-            output += self.original_bias
-        return output
+        return _all_reduce_and_bias_add(self.mp_group, self.original_bias, output)
 
     def __repr__(self):
         return "DynamicQuantizedLinearAllreduce()"
+
+
+def may_quantize_deepspeed_modules(
+    IPEX_QUANTIZATION_MODULE, q_config, module_mappings, qconfig_spec
+):
+    deepspeed_modules = may_import_deepspeed_modules()
+    if deepspeed_modules is not None:
+        LinearAllreduce, LinearLayer = deepspeed_modules
+        module_mappings.update(IPEX_QUANTIZATION_MODULE)
+        deepspeed_qconfig_spec = {
+            LinearLayer: q_config,
+            LinearAllreduce: q_config,
+        }
+        qconfig_spec.update(deepspeed_qconfig_spec)
+    return module_mappings, qconfig_spec
 
 
 def convert(model, inplace=False):
@@ -316,12 +340,20 @@ def convert(model, inplace=False):
         module_mappings[
             torch.nn.Linear
         ] = nn.modules.weight_only_quantization.IpexWoqLinear
+
+        module_mappings, qconfig_spec = may_quantize_deepspeed_modules(
+            IPEX_WEIGHT_ONLY_QUANTIZATION_MODULE_CPU(),
+            convert_model.q_config,
+            module_mappings,
+            qconfig_spec,
+        )
+
         converted_model = torch.quantization.quantize_dynamic(
             convert_model,
             qconfig_spec=qconfig_spec,
             dtype=torch.qint8,
             mapping=module_mappings,
-            inplace=False,
+            inplace=inplace,
         )
         return converted_model
 
@@ -338,15 +370,12 @@ def convert(model, inplace=False):
             torch.nn.GRUCell: convert_model.q_config,
         }
 
-        deepspeed_modules = may_import_deepspeed_modules()
-        if deepspeed_modules is not None:
-            LinearAllreduce, LinearLayer = deepspeed_modules
-            module_mappings.update(IPEX_DYNAMIC_QUANTIZATION_MODULE_CPU())
-            deepspeed_qconfig_spec = {
-                LinearLayer: convert_model.q_config,
-                LinearAllreduce: convert_model.q_config,
-            }
-            qconfig_spec.update(deepspeed_qconfig_spec)
+        module_mappings, qconfig_spec = may_quantize_deepspeed_modules(
+            IPEX_DYNAMIC_QUANTIZATION_MODULE_CPU(),
+            convert_model.q_config,
+            module_mappings,
+            qconfig_spec,
+        )
 
         return torch.quantization.quantize_dynamic(
             convert_model,

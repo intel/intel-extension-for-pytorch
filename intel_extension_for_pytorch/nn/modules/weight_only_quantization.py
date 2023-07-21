@@ -3,6 +3,10 @@ import torch.ao.nn.quantized as nnq
 from torch.ao.nn.quantized.modules.utils import _quantize_weight
 import torch.ao.nn.intrinsic as nni
 from ...quantization._qconfig import get_weight_only_quant_qconfig_mapping
+from intel_extension_for_pytorch.nn.utils._weight_prepack import (
+    may_import_deepspeed_modules,
+    _all_reduce_and_bias_add,
+)
 
 
 class IpexWoqLinear(nnq.Linear):
@@ -51,6 +55,9 @@ class IpexWoqLinear(nnq.Linear):
         del weight
         del qweight
 
+    def post_ipex_gemm(self, output):
+        return output
+
     def forward(self, x):
         # Note that we can handle self.bias == None case.
         if self._packed_params.dtype in [torch.qint8, torch.quint4x2]:
@@ -59,7 +66,8 @@ class IpexWoqLinear(nnq.Linear):
             )
         else:
             raise RuntimeError("Unsupported dtype of wegiht only quantized linear!")
-        return Y.to(x.dtype)
+        output = Y.to(x.dtype)
+        return self.post_ipex_gemm(output)
 
     def _get_name(self):
         return "IpexWeightOnlyQuantizedLinear"
@@ -115,6 +123,9 @@ class IpexWoqLinear(nnq.Linear):
                           utilities or provided by the user
         """
         float_modules = [torch.nn.Linear]
+        deepspeed_modules = may_import_deepspeed_modules()
+        if deepspeed_modules is not None:
+            float_modules.extend(deepspeed_modules)
 
         assert (
             type(mod) in float_modules
@@ -142,12 +153,23 @@ class IpexWoqLinear(nnq.Linear):
             raise RuntimeError(
                 "Unsupported dtype specified for dynamic quantized Linear!"
             )
+
+        if not hasattr(mod, "in_features"):
+            mod.in_features = mod.weight.size()[1]
+        if not hasattr(mod, "out_features"):
+            mod.out_features = mod.weight.size()[0]
+
+        qlinear = cls._init_cls(mod, dtype, qweight)
+        qlinear.weight_qscheme = qlinear.weight().qscheme()
+        del qweight
+        return qlinear
+
+    @classmethod
+    def _init_cls(cls, mod, dtype, qweight):
         qlinear = cls(mod.in_features, mod.out_features, dtype=dtype)
         qlinear._op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
             qweight, mod.bias, None
         )
-        qlinear.weight_qscheme = qlinear.weight().qscheme()
-        del qweight
         return qlinear
 
     @classmethod
@@ -170,3 +192,43 @@ class IpexWoqLinear(nnq.Linear):
         )
         qlinear.weight_qscheme = qlinear.weight().qscheme()
         return qlinear
+
+
+class IpexWoqLinearAllreduce(IpexWoqLinear):
+    def __init__(
+        self,
+        in_features,
+        out_features,
+        mp_group,
+        bias_value,
+        bias_=True,
+        dtype=torch.qint8,
+    ):
+        # Save the original bias here
+        # For bias handling, please refer to the comment in __init__ of _IPEXLinearAllreduce
+        super().__init__(in_features, out_features, bias_, dtype=dtype)
+        self.mp_group = mp_group
+        self.original_bias = bias_value
+
+    @classmethod
+    def _init_cls(cls, mod, dtype, qweight):
+        qlinear = cls(
+            mod.in_features,
+            mod.out_features,
+            mod.mp_group,
+            mod.bias,  # save the original bias value
+            dtype=dtype,
+        )
+        # For bias handling, please refer to the comment in __init__ of _IPEXLinearAllreduce
+        qlinear.set_weight_bias(qweight, None)
+
+        qlinear._op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
+            qweight,
+            None,  # Set bias to None when prepacking. Please refer to the comment in __init__ of _IPEXLinearAllreduce
+            None,  # batch_size
+        )
+
+        return qlinear
+
+    def post_ipex_gemm(self, output):
+        return _all_reduce_and_bias_add(self.mp_group, self.original_bias, output)

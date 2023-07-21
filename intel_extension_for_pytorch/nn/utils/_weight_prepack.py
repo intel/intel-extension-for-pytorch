@@ -36,6 +36,22 @@ if "deepspeed" in installed_pkg:
     ds_comm_lib_cpu.impl("all_reduce", _all_reduce)
 
 
+def _all_reduce_and_bias_add(mp_group, original_bias, output):
+    if mp_group is not None:
+        torch.ops.deepspeed_comm.all_reduce(
+            output,
+            "sum",
+            "",
+            list(torch.arange(int(os.environ["WORLD_SIZE"]))),
+            int(os.environ["WORLD_SIZE"]),
+        )
+
+    if original_bias is not None:
+        output += original_bias
+
+    return output
+
+
 def _ipex_module_load_from_state_dict_(self, state_dict, prefix):
     w_name = prefix + "weight"
     b_name = prefix + "bias"
@@ -194,17 +210,7 @@ class _IPEXLinearAllreduce(_IPEXLinear):
         super(_IPEXLinearAllreduce, self).__init__()
 
     def post_ipex_gemm(self, output):
-        if self.mp_group is not None:
-            torch.ops.deepspeed_comm.all_reduce(
-                output,
-                "sum",
-                "",
-                list(torch.arange(int(os.environ["WORLD_SIZE"]))),
-                int(os.environ["WORLD_SIZE"]),
-            )
-        if self.module_bias is not None:
-            output += self.module_bias
-        return output
+        return _all_reduce_and_bias_add(self.mp_group, self.original_bias, output)
 
 
 class _IPEXConvTransposeNd(_IPEXPrepackModule):
@@ -344,7 +350,7 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
             param_wrapper.prepack(m, is_training)
             new_m.__dict__ = m.__dict__
             if isinstance(new_m, _IPEXLinearAllreduce):
-                new_m.module_bias = all_reduce_bias
+                new_m.original_bias = all_reduce_bias
             new_m.ctx = param_wrapper.op_ctx
             setattr(new_m, "weight_wrapper", param_wrapper)  # noqa: B010
             setattr(new_m, "bias_wrapper", bias_wrapper)  # noqa: B010
@@ -428,4 +434,3 @@ def record_input_shape_for_prepack(module, sample_input):
     module(*sample_input)
     if module_is_train:
         module.train()
-
