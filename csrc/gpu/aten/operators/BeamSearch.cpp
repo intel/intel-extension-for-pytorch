@@ -1,5 +1,6 @@
 #include "BeamSearch.h"
 #include <ATen/ATen.h>
+#include <ATen/record_function.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
@@ -232,6 +233,19 @@ std::tuple<Tensor, Tensor, Tensor> beam_search_topk(
     Tensor& candidate_output_ids,
     Tensor& candidate_sequence_lengths,
     Tensor& candidate_score) {
+  RECORD_FUNCTION(
+      "beam_search_topk",
+      std::vector<c10::IValue>(
+          {logits_score,
+           finished,
+           output_token_ids,
+           output_beam_ids,
+           cadidate_num_beams,
+           cadidate_normed_scores,
+           candidate_min_normed_scores,
+           candidate_output_ids,
+           candidate_sequence_lengths,
+           candidate_score}));
   const int32_t num_wg_per_beam = 128;
   const int32_t tmp_output_len =
       2 * beam_size * num_wg_per_beam * beam_size * batch_size;
@@ -318,6 +332,14 @@ void update_output_indices(
     const int64_t time_step,
     const int64_t batch_size,
     const int64_t beam_size) {
+  RECORD_FUNCTION(
+      "beam_search_topk",
+      std::vector<c10::IValue>(
+          {top_beam_id,
+           top_token_id,
+           output_beam_ids,
+           output_token_ids,
+           finished}));
   update_token(
       top_beam_id.data_ptr<int64_t>(),
       top_token_id.data_ptr<int64_t>(),
@@ -382,6 +404,9 @@ Tensor update_beam_indices_for_cache(
   Tensor out_cache_indices = at::empty(
       {src_cache_indices.size(0) + 1, src_cache_indices.size(1)},
       src_cache_indices.options());
+  RECORD_FUNCTION(
+      "update_beam_indices_for_cache",
+      std::vector<c10::IValue>({src_cache_indices, beam_ids}));
   const int step = src_cache_indices.size(0);
   IPEX_DISPATCH_INTEGRAL_TYPES(
       src_cache_indices.scalar_type(), "update_beam_indices_for_cache", [&]() {
@@ -414,6 +439,18 @@ Tensor beam_search_finalize(
     const int64_t out_sentence_number,
     const int64_t cur_len,
     const int64_t pad_token_id) {
+  RECORD_FUNCTION(
+      "beam_search_finalize",
+      std::vector<c10::IValue>(
+          {candidate_num_beams,
+           candidate_sequence_lengths,
+           candidate_output_ids,
+           candidate_score,
+           candidate_normed_scores,
+           output_beam_ids,
+           output_token_ids,
+           top_score,
+           finished}));
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       kBFloat16,
       kHalf,
@@ -502,6 +539,9 @@ Tensor& update_output_sequence(
     const Tensor& input_ids,
     Tensor& output_ids,
     const int64_t batch_size) {
+  RECORD_FUNCTION(
+      "beam_search_finalize",
+      std::vector<c10::IValue>({input_ids, output_ids}));
   int32_t input_len = input_ids.size(1);
   int32_t output_len = output_ids.size(1);
   int32_t seq_num = output_ids.size(0);

@@ -10,10 +10,14 @@ from .RoPE import GPTJRotaryEmbedding, LlamaRotaryEmbedding, PositionalEmbedding
 from ._transformer_configuration import IPEXTransformerConfig
 from typing import Optional, Tuple, Union
 import torch.nn as nn
+
+from functools import partial
+from ._utils import ipex_beam_search, _ipex_prepare_model_inputs, ipex_beam_search_without_optimize
 from ._inference_ops import OpConverter
 # from transformers.models.llama.configuration_llama import 
 
 MAX_SEQ_LEN = int(os.environ.get("MAX_SEQ_LEN", "0"))
+MAX_OUT_SEQ_LEN = max(256, int(os.environ.get("MAX_OUT_SEQ_LEN", "0")))
 
 class IPEXTransformerConverter:
     tp_group = None
@@ -86,6 +90,7 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
             intermediate_size=intermediate_size,
             num_attention_heads=num_head,
             max_positions=n_positions,
+            max_out_positions=MAX_OUT_SEQ_LEN,
             rotary_embedding_class=GPTJRotaryEmbedding,
             rotary_dim=rotary_dim,
             rotate_half=False,
@@ -191,6 +196,7 @@ class IPEXOptConverter(IPEXTransformerConverter):
             intermediate_size=intermediate_size,
             num_attention_heads=num_head,
             max_positions=n_positions,
+            max_out_positions=MAX_OUT_SEQ_LEN,
             rotary_embedding_class=PositionalEmbedding,
             rotary_dim=None,
             rotate_half=False,
@@ -300,6 +306,7 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
             intermediate_size=intermediate_size,
             num_attention_heads=num_head,
             max_positions=n_positions,
+            max_out_positions=MAX_OUT_SEQ_LEN,
             rotary_embedding_class=LlamaRotaryEmbedding,
             rotary_dim=None,
             rotate_half=True,
@@ -422,6 +429,7 @@ class IPEXBloomConverter(IPEXTransformerConverter):
             intermediate_size=intermediate_size,
             num_attention_heads=num_head,
             max_positions=n_positions,
+            max_out_positions=MAX_OUT_SEQ_LEN,
             rotary_embedding_class=PositionalEmbedding,
             rotary_dim=None,
             rotate_half=False,
@@ -565,7 +573,6 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
 
     def recursive_module_replace(module, config, dtype, enable_deepspeed=False):
         not_deepspeed_engine = not enable_deepspeed or not isinstance(module, deepspeed.InferenceEngine)
-        op_converter = OpConverter()
         if config is None and hasattr(module, "config") and not_deepspeed_engine:
             config = module.config
             config.dtype = dtype
@@ -573,6 +580,14 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
 
         if hasattr(module, "_convert_to_bloom_cache"):
             setattr(module, "_convert_to_bloom_cache", _convert_to_bloom_cache_ipex)
+        
+        if hasattr(module, "_prepare_model_inputs"):
+            setattr(module, "_prepare_model_inputs", partial(_ipex_prepare_model_inputs, module))
+
+        if os.environ.get("DISABLE_KV_CACHE", "OFF") not in ["1", "Y", "YES", "TRUE", "ON"]:
+            if hasattr(module, "beam_search"):
+                setattr(module, "beam_search", partial(ipex_beam_search, module))
+
 
         for name, named_module in module.named_children():
             if type(named_module) in transformers_converter.keys():

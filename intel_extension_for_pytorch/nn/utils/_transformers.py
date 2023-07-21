@@ -70,6 +70,8 @@ class IPEXTransformerAtten(nn.Module):
     casual_attention_mask = None
     blocked_alibi = None
     blocked_attn_mask = None
+    beam_index = None
+    batch_size = 1
 
     def __init__(self, config) -> None:
         super(IPEXTransformerAtten, self).__init__()
@@ -78,6 +80,7 @@ class IPEXTransformerAtten(nn.Module):
         self.kv_cache_optimize = self.config.kv_cache_optimize
         self.layer_id = IPEXTransformerAtten.layer_id_static
         self.max_positions = self.config.max_positions
+        self.max_out_positions = self.config.max_out_positions
         self.use_casual_mask = self.config.use_casual_mask
         self.layer_id = IPEXTransformerAtten.layer_id_static
         self.embed_dim = self.config.embed_dim
@@ -124,7 +127,17 @@ class IPEXTransformerAtten(nn.Module):
             mask = torch.ones((self.max_positions, self.max_positions), dtype=torch.float)
             mask = (1 - torch.tril(mask).view(1, 1, self.max_positions, self.max_positions)) * (-66504.0)
             IPEXTransformerAtten.attention_mask = mask.to(self.config.device) 
-    
+
+        # the cached key/value for the input prompt
+        self.key_prompt = None
+        self.value_prompt = None
+        self.prev_len = 0 
+        self.cur_len = 0
+
+    @staticmethod
+    def update_beam_index(beam_index):
+        IPEXTransformerAtten.beam_index = beam_index
+
     def checking_cache(self, layer_past):
         acc_test = os.environ.get("LLM_ACC_TEST", "OFF").upper() in ["1", "ON", "Y", "YES", "TRUE"]
         if not acc_test:
@@ -176,25 +189,37 @@ class IPEXTransformerAtten(nn.Module):
 
     def qkv_cache_optimized_beam(self, hidden_states, layer_past = None):
         # beam search path
-        # hidden_states has already been converted to [seq, beam, hidden_size]
-        if layer_past is None:
+        # hidden_states has already been converted to [seq, bs*beam, hidden_size]
+        if self.key_prompt is None or self.value_prompt is None:
             # the first timestep
-            shape = [self.max_positions, hidden_states.shape[1], self.num_attn_head, self.head_dim]
-            self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-            self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            # first timestamp's shape will be [seq, bs, hidden_size]
+            shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
+            query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            self.key_prompt = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            self.value_prompt = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, self.key_prompt, self.value_prompt)
+            key = self.key_prompt
+            value = self.value_prompt
             self.prev_len = 0
+            self.cur_len = 0
+        else:
+            # the 2nd to the last timestep
+            if self.key_cached is None or self.value_cached is None:
+                # the 2nd generated token, create the key_cached and value_cached buffers
+                shape = [self.max_out_positions, hidden_states.shape[1], self.num_attn_head, self.head_dim]
+                self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+                self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+                self.prev_len = 0
 
-        self.cur_len = self.prev_len + hidden_states.size(0)
-
-        shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
-        query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-        key = self.key_cached[self.prev_len : self.cur_len, :, :, :]
-        value = self.value_cached[self.prev_len : self.cur_len, :, :, :]
-
-        key = key.view(shape)
-        value = value.view(shape)
-
-        torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
+            self.cur_len = self.prev_len + hidden_states.size(0)
+            shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
+            query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            key = self.key_cached[self.prev_len : self.cur_len, :, :, :]
+            value = self.value_cached[self.prev_len : self.cur_len, :, :, :]
+            key = key.view(shape)
+            value = value.view(shape)
+            torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
+        self.prev_len = self.cur_len
         return query, key, value
 
     def qkv_normal(self, hidden_states, layer_past = None):
@@ -218,12 +243,18 @@ class IPEXTransformerAtten(nn.Module):
                 query, key, value = self.qkv_cache_optimized_greedy(hidden_states=hidden_state, layer_past=layer_past)
             else:
                 query, key, value = self.qkv_cache_optimized_beam(hidden_states=hidden_state, layer_past=layer_past)
+            new_shape = query.size()[:-1] + (self.num_attn_head, self.head_dim)
+            if self.cur_len == 0:
+                if self.key_prompt is not None:
+                    self.key_prompt = self.key_prompt.view(new_shape)
+                if self.value_prompt is not None:
+                    self.value_prompt = self.value_prompt.view(new_shape)
         else:
             # qkv fusion now is only support on greedy search 
             query, key, value = self.qkv_normal(hidden_states=hidden_state, layer_past=layer_past)
 
         new_shape = query.size()[:-1] + (self.num_attn_head, self.head_dim)
-        # reshape the qkv size to (seq_len, bs*beam, num_head, head_dim)
+        # reshape the qkv size from (seq_len, bs*beam, num_head*head_dim) to (seq_len, bs*beam, num_head, head_dim)
         query = query.view(new_shape)
         key = key.view(new_shape)
         value = value.view(new_shape)
@@ -231,15 +262,18 @@ class IPEXTransformerAtten(nn.Module):
         return query, key, value
 
     def optimized_combine(self, query, key, value, layer_past = None):
-        # query/key/value has been converted to [seq, bs*beam, num_head, head_dim]
-        key = self.key_cached[: self.cur_len, :, :, :]  # [seq_len, bs*beam, head, head_dim]
-        value = self.value_cached[: self.cur_len, :, :, :] # [seq_len, bs*beam, head, head_dim]
+        if self.cur_len == 0:
+            key = self.key_prompt
+            value = self.value_prompt
+            self.key_prompt = self.key_prompt.permute(1, 2, 0, 3)
+            self.value_prompt = self.value_prompt.permute(1, 2, 0, 3)
+        else:
+            # query/key/value shape and layout [seq, bs*beam, num_head, head_dim]
+            key = self.key_cached[: self.cur_len, :, :, :]  # [seq_len, bs*beam, head, head_dim]
+            value = self.value_cached[: self.cur_len, :, :, :] # [seq_len, bs*beam, head, head_dim]
         query = query.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
         key = key.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
         value = value.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
-
-        # self.prev_len = self.cur_len
-
         return query, key, value
 
     def normal_combine(self, query, key, value, layer_past = None):
@@ -305,9 +339,6 @@ class IPEXTransformerAtten(nn.Module):
 
             # change view to [batch_size, num_heads, q_length, kv_length]
             attention_scores = matmul_result.view(batch_size, num_heads, q_length, kv_length)
-            #input_dtype = attention_scores.dtype 
-            #if input_dtype == torch.float16:
-            #    attention_scores = attention_scores.to(torch.float)
             attn_weights = torch.masked_fill(attention_scores, attention_mask, torch.finfo(attention_scores.dtype).min)
             attention_probs = nn.functional.softmax(attn_weights, dim=-1)
 
@@ -374,10 +405,77 @@ class IPEXTransformerAtten(nn.Module):
                 blocked_alibi = self.get_blocked_alibi(alibi)
 
 
-            attn_output = torch.xpu.IpexSDP(query, key, value, blocked_alibi, blocked_attn_mask, head_mask, alpha, beta, dropout, is_causal)
+            if self.cur_len > 0 and not self.greedy:
+                ########### 2nd token to the end
+                # query shape [bs*beam, head, q_seq, dim], layout [q_seq, bs*beam, head, dim]
+                # query shape [4, 16, 1, 256], stride [4096, 256, 16384, 1]
+                # key_prompt shape [bs, head, prompt_seq, dim], layout [prompt_seq, bs, head, dim]
+                # key_prompt shape [1, 16, 32, 256], stride [4096, 256, 4096, 1]
+                # value_prompt is the same as key_prompt
+                # key shape [bs*beam, head, kv_seq, dim], layout [kv_seq, bs*beam, head, dim]
+                # key shape [4, 16, kv_len, 256]
+                # value is the same as key
+                # attention_mask= None
+                # is_causal=False
+                # beam_idx shape [kv_len, beam], layout [kv_len, beam], dtype=int32
+                # self.cur_len = kv_len
+                attn_output = torch.xpu.IpexSDP_Index(query, self.key_prompt, self.value_prompt, key, value, IPEXTransformerAtten.beam_index, blocked_alibi, blocked_attn_mask, head_mask, self.cur_len, alpha, beta, dropout, is_causal)
+            else:
+                ########### first token
+                # query shape [bs*beam, head, q_seq, dim], layout [q_seq, bs*beam, head, dim]
+                # query shape [1, 16, 32, 256], stride [4096, 256, 4096, 1]
+                # key, value are the same as query
+                # attention_mask= None
+                # is_causal=True
+                attn_output = torch.xpu.IpexSDP(query, key, value, blocked_alibi, blocked_attn_mask, head_mask, alpha, beta, dropout, is_causal)
         else:
+            if self.cur_len > 0:
+                key, value = self.reorder_cache(key, value, IPEXTransformerAtten.beam_index)
             attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi)
         return attn_output, attn_weights
+    
+    def expand_beam_idx(self):
+        bs = IPEXTransformerAtten.batch_size
+        beam_idx = IPEXTransformerAtten.beam_index
+        beam = beam_idx.shape[1] // bs
+        expand_beam_idx = torch.empty_like(beam_idx)
+        for i in range(bs):
+            expand_beam_idx[:, i*beam:(i+1)*beam] = beam_idx[:, i*beam:(i+1)*beam]  + beam * i
+        return expand_beam_idx
+
+    def reorder_cache(self, key, value, beam_idx_cache):
+        """
+        This function is used to re-order the `past_key_values` cache if [`~PretrainedModel.beam_search`] or
+        [`~PretrainedModel.beam_sample`] is called. This is required to match `past_key_values` with the correct
+        beam_idx at every generation step.
+        """
+        # past_key_values: 28 decoder layers of [key, value]
+        # beam_idx_cache: [kv_out_len, bs*beam]
+
+        # self.key_prompt shape[bs, head, seq, dim] layout[seq, bs, head, dim]
+        # key shape[bs*beam, head, kv_len, dim] layout[kv_len, bs*beam, head, dim]
+        bs = self.key_prompt.shape[0]
+        beam = int(key.shape[0] // bs)
+        shape = [bs*beam, self.key_prompt.shape[1], self.key_prompt.shape[2], self.key_prompt.shape[3]]
+        #shape1 = [bs* beam, key.shape[1], key.shape[2], key.shape[3]]
+
+        key_list = [torch.repeat_interleave(self.key_prompt, beam, 0)]
+        value_list = [torch.repeat_interleave(self.value_prompt, beam, 0)]
+        beam_idx_cache = self.expand_beam_idx()
+        for idx in range(beam_idx_cache.shape[0]):
+            beam_idx = beam_idx_cache[idx]
+
+            current_key = key[:, :, idx, :].view(bs*beam, key.shape[1], 1, -1)
+            current_key = current_key.index_select(0, beam_idx.to(key.device))
+            key_list.append(current_key)
+            current_value = value[:, :, idx, :].view(bs*beam, value.shape[1], 1, -1)
+            current_value = current_value.index_select(0, beam_idx.to(value.device))
+            value_list.append(current_value)
+        
+
+        key = torch.cat(key_list, dim=2)
+        value = torch.cat(value_list, dim=2)
+        return key, value
 
     def get_final_output(self, attn_output: torch.Tensor, residual: Optional[torch.Tensor] = None):
         # reshape the attn_output from [bs, head_num, seq_len, head_dim] back to [seq_len, bs, embedding_size]
@@ -403,7 +501,6 @@ class IPEXTransformerAtten(nn.Module):
             self.all_reduce_if_necessary(attn_output)
             attn_output += residual
         return attn_output
-        # return self.residual_drop(attn_output)
 
     def forward(
         self,
@@ -418,12 +515,16 @@ class IPEXTransformerAtten(nn.Module):
         residual: Optional[torch.Tensor] = None,
         alibi: torch.Tensor = None
     ):
-
-
+        # the shape of query, key, value, [seq, bs*beam, head*dim]
+        # the layout of query, key, value, [seq, bs*beam, head*dim]
         query, key, value = self.compute_qkv(hidden_state=hidden_states, key_value_state=key_value_states, layer_past=layer_past)
 
+        # the shape of query, key, value, [seq, bs*beam, head, dim]
+        # the layout of query, key, value, [seq, bs*beam, head, dim]
         key, query = self.apply_rotary_embedding(key, query, position_ids=position_ids)
 
+        # the shape of query, key, value, [seq, bs*beam, head, dim]
+        # the layout of query, key, value, [seq, bs*beam, head, dim]
         query, key, value = self.combine_with_cache(query, key, value, layer_past=layer_past)
 
         if use_cache or self.is_decoder:
@@ -431,6 +532,8 @@ class IPEXTransformerAtten(nn.Module):
         else:
             present = None
 
+        # the shape of query, key, value, [bs*beam, head, seq, dim]
+        # the layout of query, key, value, [seq, bs*beam, head, dim]
         attn_output, attn_weight = self.self_attention(query, key, value, attention_mask, head_mask, alibi)
         attn_output = self.get_final_output(attn_output=attn_output, residual=residual)
 
@@ -519,6 +622,7 @@ class IPEXOptAtten(IPEXTransformerAtten):
 
 
 class IPEXTransformerMLP(nn.Module):
+    batch_size = 1
     def __init__(self,
                  config: IPEXTransformerConfig):
         super().__init__()
@@ -646,8 +750,18 @@ class IPEXGPTJBlock(nn.Module):
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False
     ) ->  Union[Tuple[torch.Tensor], Optional[Tuple[torch.Tensor, Tuple[torch.FloatTensor, ...]]]]:
+        # hidden_states:  [bs*beam, seq, hidden_size]
+        # position_ids:   [bs*beam, seq]
+        # attention_mask: [bs*beam, head, q_seq, kv_seq]
+        bs = IPEXTransformerAtten.batch_size
+        beam = hidden_states.shape[0] // bs
+        hidden_shape = [bs, beam, hidden_states.shape[1], hidden_states.shape[2]]
 
-        # convert layout form [beam, seq, hidden_size] to [seq, beam, hidden_size]
+        if hidden_states.shape[1] > 1:
+            hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :]        # [bs, seq, hidden_size]
+            position_ids = position_ids[0, :].view(1, position_ids.shape[1])
+            attention_mask = attention_mask[0, :, :, :].view(1, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
+        # convert layout form [bs, seq, hidden_size] to [seq, bs, hidden_size]
         hidden_states = hidden_states.transpose(0, 1).contiguous()
         position_ids = position_ids.transpose(0, 1).contiguous()
 
@@ -669,6 +783,9 @@ class IPEXGPTJBlock(nn.Module):
 
         # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
         hidden_states = hidden_states.transpose(0, 1)
+        if hidden_states.shape[1] > 1:
+            # hidden_states = hidden_states.expand([beam, hidden_states.shape[1], hidden_states.shape[2]])
+            hidden_states = torch.repeat_interleave(hidden_states, beam, 0)
         if use_cache:
             outputs = (hidden_states, ) + outputs
         else:
@@ -877,3 +994,4 @@ class IPEXBloomBlock(nn.Module):
         else:
             outputs = (output, ) + outputs[1:]
         return outputs
+ 
