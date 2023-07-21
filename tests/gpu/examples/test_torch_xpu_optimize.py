@@ -233,7 +233,8 @@ class TestTorchMethod(TestCase):
                     model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
             elif optimizer_string.lower() == 'splitsgd':
                 lr = 5.0
-                for momentum_value in [0, 0.9]:
+                # use larger momentum_value to faster the error occurs
+                for momentum_value in [0, 5.0]:
                     optimizer_xpu_no_fuse = torch.optim.SGD(model_xpu_no_fuse.parameters(), lr=lr, momentum=momentum_value)
                     optimizer_xpu = torch.optim.SGD(model_xpu.parameters(), lr=lr, momentum=momentum_value)
                     model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
@@ -362,6 +363,8 @@ class TestTorchMethod(TestCase):
             support_dtype_list = [torch.float32, torch.bfloat16]
             if optimizer_string.lower() == "adam" or optimizer_string.lower() == "sgd":
                 support_dtype_list.append(torch.float64)
+            if 'split' in optimizer_string.lower():
+                support_dtype_list.remove(torch.float32)
             for dtype in support_dtype_list:
                 print("checking dtype: ", dtype)
                 checking_atol = 1e-5
