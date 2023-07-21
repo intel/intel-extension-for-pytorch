@@ -15,7 +15,6 @@ void beam_search_topk_kernel(
     int64_t* tmp_idx,
     scalar_t* tmp_topk_scores,
     int64_t* tmp_topk_idx,
-    const bool* finished,
     int64_t end_id,
     int64_t vocab_size,
     int64_t beam_size,
@@ -25,7 +24,6 @@ void beam_search_topk_kernel(
       scores,
       tmp_scores,
       tmp_idx,
-      finished,
       end_id,
       vocab_size,
       beam_size,
@@ -50,7 +48,6 @@ void beam_search_topk_launch(
     int64_t* tmp_idx,
     scalar_t* tmp_topk_scores,
     int64_t* tmp_topk_idx,
-    const bool* finished,
     int64_t end_id,
     int64_t vocab_size,
     int64_t beam_size,
@@ -64,7 +61,6 @@ void beam_search_topk_launch(
         tmp_idx,                          \
         tmp_topk_scores,                  \
         tmp_topk_idx,                     \
-        finished,                         \
         end_id,                           \
         vocab_size,                       \
         beam_size,                        \
@@ -86,7 +82,8 @@ void beam_seach_procss_impl(
     const scalar_t* tmp_score, // in
     const int64_t* tmp_idx, // in
     scalar_t* topk_score, // out
-    int64_t* topk_idx, // out
+    int64_t* topk_token, // out
+    int64_t* topk_beams, // out
     const int64_t pad_token_id,
     const int64_t eos_token_id,
     bool* finished,
@@ -95,47 +92,48 @@ void beam_seach_procss_impl(
     const int64_t beam_size,
     const int64_t batch_size,
     const int64_t vocab_size,
-    int64_t time_step,
+    int64_t cur_len,
+    bool early_stopping,
     int64_t max_in_seq_len,
     int64_t max_out_seq_len,
-    int64_t* beam_hyps_num_beams, // [batch_size] number for eos candidates
-    scalar_t* beam_hyps_min_normed_scores, // [batch_size]
-    scalar_t* beam_hyps_normed_scores, // [batch_size * 2 * beam_size], store
-                                       // the norm scores for candidates
-    int64_t* beam_hyps_output_ids_tgt, // [batch_size * 2 * beam_size, max_seq],
-                                       // cadidate output sentence
-    int64_t* beam_hyps_output_ids_src, // [max_seq, batch_size * 2 * beam_size],
-                                       // the out_buffer
-    int64_t* beam_hyps_beam_ids_src, // [max_seq, batch_size, beam_size]
-    int64_t* beam_hyps_sequence_lengths_tgt, // [batch_size * 2 * beam_size]
-    int64_t* beam_hyps_sequence_lengths_src, // [batch_size * beam_size]
-    scalar_t* beam_hyps_score) { // [batch_size * 2 * beam_size]
+    int64_t* cadidate_num_beams, // [batch_size] number for eos candidates
+    scalar_t* candidate_min_normed_scores, // [batch_size]
+    scalar_t* cadidate_normed_scores, // [batch_size * 2 * beam_size], store
+                                      // the norm scores for candidates
+    int64_t* candidate_output_ids, // [batch_size * 2 * beam_size, max_seq],
+                                   // cadidate output sentence
+    int64_t* output_token_ids, // [max_seq, batch_size * 2 * beam_size],
+                               // the out_buffer
+    int64_t* output_beam_ids, // [max_seq, batch_size, beam_size]
+    int64_t* candidate_sequence_lengths, // [batch_size * 2 * beam_size]
+    scalar_t* candidate_score) { // [batch_size * 2 * beam_size]
 
   batch_topk_kernel<scalar_t, MAX_K * 2>(
       tmp_score,
       tmp_idx,
       topk_score,
-      topk_idx,
+      topk_token,
+      topk_beams,
       pad_token_id,
       eos_token_id,
       finished,
-      beam_hyps_num_beams,
-      beam_hyps_min_normed_scores,
-      beam_hyps_normed_scores,
-      beam_hyps_output_ids_tgt,
-      beam_hyps_output_ids_src,
-      beam_hyps_beam_ids_src,
-      beam_hyps_sequence_lengths_tgt,
-      beam_hyps_sequence_lengths_src,
-      beam_hyps_score,
+      cadidate_num_beams,
+      candidate_min_normed_scores,
+      cadidate_normed_scores,
+      candidate_output_ids,
+      output_token_ids,
+      output_beam_ids,
+      candidate_sequence_lengths,
+      candidate_score,
       length_penalty,
       process_length,
       beam_size,
       batch_size,
       vocab_size,
-      time_step,
+      cur_len,
       max_in_seq_len,
-      max_out_seq_len);
+      max_out_seq_len,
+      early_stopping);
 }
 
 // input: tmp_score [batch_size * beam_size * beam_size * 2]
@@ -147,7 +145,8 @@ void beam_seach_procss(
     const scalar_t* tmp_score,
     const int64_t* tmp_idx,
     scalar_t* topk_score,
-    int64_t* topk_idx,
+    int64_t* topk_token,
+    int64_t* topk_beams,
     const int64_t pad_token_id,
     const int64_t eos_token_id,
     bool* finished,
@@ -156,25 +155,26 @@ void beam_seach_procss(
     const int64_t beam_size,
     const int64_t batch_size,
     const int64_t vocab_size,
-    int64_t time_step,
+    int64_t cur_len,
+    bool early_stopping,
     int64_t max_in_seq_len,
     int64_t max_out_seq_len,
-    int64_t* beam_hyps_num_beams,
-    scalar_t* beam_hyps_min_normed_scores,
-    scalar_t* beam_hyps_normed_scores,
-    int64_t* beam_hyps_output_ids_tgt,
-    int64_t* beam_hyps_output_ids_src,
-    int64_t* beam_hyps_beam_ids_src,
-    int64_t* beam_hyps_sequence_lengths_tgt,
-    int64_t* beam_hyps_sequence_lengths_src,
-    scalar_t* beam_hyps_score) {
+    int64_t* cadidate_num_beams,
+    scalar_t* candidate_min_normed_scores,
+    scalar_t* cadidate_normed_scores,
+    int64_t* candidate_output_ids,
+    int64_t* output_token_ids,
+    int64_t* output_beam_ids,
+    int64_t* candidate_sequence_lengths,
+    scalar_t* candidate_score) {
 #define CASE_P(K)                        \
   case K:                                \
     beam_seach_procss_impl<scalar_t, K>( \
         tmp_score,                       \
         tmp_idx,                         \
         topk_score,                      \
-        topk_idx,                        \
+        topk_token,                      \
+        topk_beams,                      \
         pad_token_id,                    \
         eos_token_id,                    \
         finished,                        \
@@ -183,18 +183,18 @@ void beam_seach_procss(
         beam_size,                       \
         batch_size,                      \
         vocab_size,                      \
-        time_step,                       \
+        cur_len,                         \
+        early_stopping,                  \
         max_in_seq_len,                  \
         max_out_seq_len,                 \
-        beam_hyps_num_beams,             \
-        beam_hyps_min_normed_scores,     \
-        beam_hyps_normed_scores,         \
-        beam_hyps_output_ids_tgt,        \
-        beam_hyps_output_ids_src,        \
-        beam_hyps_beam_ids_src,          \
-        beam_hyps_sequence_lengths_tgt,  \
-        beam_hyps_sequence_lengths_src,  \
-        beam_hyps_score);                \
+        cadidate_num_beams,              \
+        candidate_min_normed_scores,     \
+        cadidate_normed_scores,          \
+        candidate_output_ids,            \
+        output_token_ids,                \
+        output_beam_ids,                 \
+        candidate_sequence_lengths,      \
+        candidate_score);                \
     break;
 
   switch (beam_size) {
@@ -209,29 +209,29 @@ void beam_seach_procss(
 // input: scores [batch_size*beam_size, vocab_size]
 // output: top result
 //        top_score [batch_size * beam_size]
+//        top_token [batch_size * beam_size]
 //        top_idx   [batch_size * beam_size]
-// values in idx is global index
-std::tuple<Tensor, Tensor> beam_search_topk(
+std::tuple<Tensor, Tensor, Tensor> beam_search_topk(
     const Tensor& logits_score,
-    const Tensor& finished,
+    Tensor& finished,
     int64_t pad_token_id,
     int64_t eos_token_id,
     double length_penalty,
     const int64_t beam_size,
     const int64_t batch_size,
     const int64_t vocab_size,
-    int64_t time_step,
+    int64_t cur_len,
+    bool early_stopping,
     const int64_t max_in_seq_len,
     const int64_t max_out_seq_len,
-    Tensor& beam_hyps_num_beams,
-    Tensor& beam_hyps_normed_scores,
-    Tensor& beam_hyps_min_normed_scores,
-    Tensor& beam_hyps_output_ids_tgt,
-    Tensor& beam_hyps_output_ids_src,
-    Tensor& beam_hyps_beam_ids_src,
-    Tensor& beam_hyps_sequence_lengths_tgt,
-    Tensor& beam_hyps_sequence_lengths_src, // sequence lengths
-    Tensor& beam_hyps_score) {
+    Tensor& output_token_ids,
+    Tensor& output_beam_ids,
+    Tensor& cadidate_num_beams,
+    Tensor& cadidate_normed_scores,
+    Tensor& candidate_min_normed_scores,
+    Tensor& candidate_output_ids,
+    Tensor& candidate_sequence_lengths,
+    Tensor& candidate_score) {
   const int32_t num_wg_per_beam = 128;
   const int32_t tmp_output_len =
       2 * beam_size * num_wg_per_beam * beam_size * batch_size;
@@ -248,6 +248,8 @@ std::tuple<Tensor, Tensor> beam_search_topk(
       at::empty(topk_len, logits_score.options().dtype(at::kLong));
 
   Tensor topk_val = at::empty(beam_size * batch_size, logits_score.options());
+  Tensor topk_token = at::empty(
+      beam_size * batch_size, logits_score.options().dtype(at::kLong));
   Tensor topk_idx = at::empty(
       beam_size * batch_size, logits_score.options().dtype(at::kLong));
 
@@ -263,7 +265,6 @@ std::tuple<Tensor, Tensor> beam_search_topk(
             tmp_log_idx.data_ptr<int64_t>(),
             tmp_topk_val.data_ptr<scalar_t>(),
             tmp_topk_idx.data_ptr<int64_t>(),
-            finished.data_ptr<bool>(),
             eos_token_id,
             vocab_size,
             beam_size,
@@ -281,6 +282,7 @@ std::tuple<Tensor, Tensor> beam_search_topk(
             tmp_topk_val.data_ptr<scalar_t>(),
             tmp_topk_idx.data_ptr<int64_t>(),
             topk_val.data_ptr<scalar_t>(),
+            topk_token.data_ptr<int64_t>(),
             topk_idx.data_ptr<int64_t>(),
             pad_token_id,
             eos_token_id,
@@ -290,54 +292,48 @@ std::tuple<Tensor, Tensor> beam_search_topk(
             beam_size,
             batch_size,
             vocab_size,
-            time_step,
+            cur_len,
+            early_stopping,
             max_in_seq_len,
             max_out_seq_len,
-            beam_hyps_num_beams.data_ptr<int64_t>(),
-            beam_hyps_min_normed_scores.data_ptr<scalar_t>(),
-            beam_hyps_normed_scores.data_ptr<scalar_t>(),
-            beam_hyps_output_ids_tgt.data_ptr<int64_t>(),
-            beam_hyps_output_ids_src.data_ptr<int64_t>(),
-            beam_hyps_beam_ids_src.data_ptr<int64_t>(),
-            beam_hyps_sequence_lengths_tgt.data_ptr<int64_t>(),
-            beam_hyps_sequence_lengths_src.data_ptr<int64_t>(),
-            beam_hyps_score.data_ptr<scalar_t>());
+            cadidate_num_beams.data_ptr<int64_t>(),
+            candidate_min_normed_scores.data_ptr<scalar_t>(),
+            cadidate_normed_scores.data_ptr<scalar_t>(),
+            candidate_output_ids.data_ptr<int64_t>(),
+            output_token_ids.data_ptr<int64_t>(),
+            output_beam_ids.data_ptr<int64_t>(),
+            candidate_sequence_lengths.data_ptr<int64_t>(),
+            candidate_score.data_ptr<scalar_t>());
       });
 
-  return std::tuple<Tensor, Tensor>(topk_val, topk_idx);
+  return std::tuple<Tensor, Tensor, Tensor>(topk_val, topk_token, topk_idx);
 }
 
 void update_output_indices(
-    const Tensor& global_ids,
-    Tensor& beam_ids,
-    Tensor& word_ids,
+    const Tensor& top_beam_id,
+    const Tensor& top_token_id,
+    Tensor& output_beam_ids,
+    Tensor& output_token_ids,
     Tensor& finished,
-    Tensor& sequence_length,
-    Tensor& beam_hyps_num_beams,
     const int64_t time_step,
     const int64_t batch_size,
-    const int64_t beam_size,
-    const int64_t vocab_size,
-    const int64_t eos_token_id) {
+    const int64_t beam_size) {
   update_token(
-      global_ids.data_ptr<int64_t>(),
-      beam_ids.data_ptr<int64_t>(),
-      word_ids.data_ptr<int64_t>(),
+      top_beam_id.data_ptr<int64_t>(),
+      top_token_id.data_ptr<int64_t>(),
+      output_beam_ids.data_ptr<int64_t>(),
+      output_token_ids.data_ptr<int64_t>(),
       finished.data_ptr<bool>(),
-      sequence_length.data_ptr<int64_t>(),
-      beam_hyps_num_beams.data_ptr<int64_t>(),
       time_step,
       batch_size,
-      beam_size,
-      vocab_size,
-      eos_token_id);
+      beam_size);
 }
 
 template <typename scalar_t>
 void update_beam_indices_kernel(
     scalar_t* src_cache_indices,
     scalar_t* out_cache_indices,
-    scalar_t* beam_ids,
+    int64_t* beam_ids,
     int32_t step,
     int32_t beam_size,
     int32_t batch_size) {
@@ -392,7 +388,7 @@ Tensor update_beam_indices_for_cache(
         update_beam_indices_kernel(
             src_cache_indices.data_ptr<scalar_t>(),
             out_cache_indices.data_ptr<scalar_t>(),
-            beam_ids.data_ptr<scalar_t>(),
+            beam_ids.data_ptr<int64_t>(),
             step,
             beam_size,
             batch_size);
@@ -401,16 +397,13 @@ Tensor update_beam_indices_for_cache(
 }
 
 Tensor beam_search_finalize(
-    Tensor& beam_hyps_num_beams,
-    //   Tensor& beam_hyps_sequence_lengths_src,
-    Tensor& beam_hyps_sequence_lengths_tgt,
-    //   Tensor& beam_hyps_output_ids_src,
-    Tensor& beam_hyps_output_ids_tgt,
-    Tensor& beam_hyps_score,
-    Tensor& beam_hyps_normed_scores,
-    Tensor& beam_ids,
-    Tensor& word_ids,
-    Tensor& sequence_length,
+    Tensor& candidate_num_beams,
+    Tensor& candidate_sequence_lengths,
+    Tensor& candidate_output_ids,
+    Tensor& candidate_score,
+    Tensor& candidate_normed_scores,
+    Tensor& output_beam_ids,
+    Tensor& output_token_ids,
     Tensor& top_score,
     Tensor& finished,
     double length_penalty,
@@ -418,48 +411,113 @@ Tensor beam_search_finalize(
     const int64_t max_out_seq_len,
     const int64_t batch_size,
     const int64_t beam_size,
-    const int64_t out_sentence_number) {
+    const int64_t out_sentence_number,
+    const int64_t cur_len,
+    const int64_t pad_token_id) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       kBFloat16,
       kHalf,
-      beam_hyps_score.scalar_type(),
+      candidate_score.scalar_type(),
       "insert_to_candidate_list",
       [&]() {
         insert_to_candidate_list<scalar_t>(
-            beam_hyps_num_beams.data_ptr<int64_t>(),
-            sequence_length.data_ptr<int64_t>(),
-            beam_hyps_sequence_lengths_tgt.data_ptr<int64_t>(),
-            word_ids.data_ptr<int64_t>(),
-            beam_hyps_output_ids_tgt.data_ptr<int64_t>(),
-            beam_ids.data_ptr<int64_t>(),
-            beam_hyps_score.data_ptr<scalar_t>(),
-            beam_hyps_normed_scores.data_ptr<scalar_t>(),
+            candidate_num_beams.data_ptr<int64_t>(),
+            candidate_sequence_lengths.data_ptr<int64_t>(),
+            output_token_ids.data_ptr<int64_t>(),
+            candidate_output_ids.data_ptr<int64_t>(),
+            output_beam_ids.data_ptr<int64_t>(),
+            candidate_score.data_ptr<scalar_t>(),
+            candidate_normed_scores.data_ptr<scalar_t>(),
             top_score.data_ptr<scalar_t>(),
             finished.data_ptr<bool>(),
             (float)length_penalty,
             max_in_seq_len,
             max_out_seq_len,
             batch_size,
-            beam_size);
+            beam_size,
+            cur_len);
       });
 
   Tensor output_ids = at::empty(
-      {batch_size * beam_size, max_in_seq_len + max_out_seq_len},
-      word_ids.options());
+      {batch_size * out_sentence_number, max_in_seq_len + max_out_seq_len},
+      candidate_output_ids.options());
+  Tensor sequence_length = at::empty(
+      {batch_size, out_sentence_number}, candidate_output_ids.options());
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      kBFloat16, kHalf, beam_hyps_score.scalar_type(), "finalize", [&]() {
+      kBFloat16,
+      kHalf,
+      candidate_normed_scores.scalar_type(),
+      "finalize",
+      [&]() {
         finalize<scalar_t>(
             output_ids.data_ptr<int64_t>(),
             sequence_length.data_ptr<int64_t>(),
-            beam_hyps_output_ids_tgt.data_ptr<int64_t>(),
-            beam_hyps_sequence_lengths_tgt.data_ptr<int64_t>(),
-            beam_hyps_normed_scores.data_ptr<scalar_t>(),
-            beam_hyps_num_beams.data_ptr<int64_t>(),
+            candidate_output_ids.data_ptr<int64_t>(),
+            candidate_sequence_lengths.data_ptr<int64_t>(),
+            candidate_normed_scores.data_ptr<scalar_t>(),
+            candidate_num_beams.data_ptr<int64_t>(),
             beam_size,
             batch_size,
+            max_in_seq_len,
             max_out_seq_len,
-            out_sentence_number);
+            out_sentence_number,
+            pad_token_id);
+      });
+  return output_ids;
+}
+
+template <typename scalar_t>
+void copy_input_to_output(
+    scalar_t* input_ids,
+    scalar_t* output_ids,
+    int32_t input_len,
+    int32_t output_len,
+    int32_t seq_num,
+    int32_t beam_size,
+    int32_t out_beams) {
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int32_t wg_size = dpcppMaxWorkGroupSize(dev_id);
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
+      int32_t wi_id = item.get_local_id(0);
+      int32_t wg_id = item.get_group(0);
+
+      for (int32_t index = wi_id; index < input_len; index += wg_size) {
+        output_ids[wg_id * output_len + index] =
+            input_ids[(wg_id / out_beams) * beam_size * input_len + index];
+      }
+    };
+    cgh.parallel_for(
+        sycl::nd_range<1>(
+            sycl::range<1>(wg_size * seq_num), sycl::range<1>(wg_size)),
+        kfn);
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+Tensor& update_output_sequence(
+    const Tensor& input_ids,
+    Tensor& output_ids,
+    const int64_t batch_size) {
+  int32_t input_len = input_ids.size(1);
+  int32_t output_len = output_ids.size(1);
+  int32_t seq_num = output_ids.size(0);
+  int32_t out_beams = seq_num / batch_size;
+  int32_t beam_size = input_ids.size(0) / batch_size;
+
+  IPEX_DISPATCH_INTEGRAL_TYPES(
+      input_ids.scalar_type(), "update_output_sequence", [&]() {
+        copy_input_to_output<scalar_t>(
+            input_ids.data_ptr<scalar_t>(),
+            output_ids.data_ptr<scalar_t>(),
+            input_len,
+            output_len,
+            seq_num,
+            beam_size,
+            out_beams);
       });
   return output_ids;
 }
@@ -479,6 +537,9 @@ IPEX_LIBRARY_FRAGMENT() {
 
   IPEX_OP_REGISTER_DISPATCH(
       "beam_search_finalize", beam_search_finalize, c10::DispatchKey::XPU);
+
+  IPEX_OP_REGISTER_DISPATCH(
+      "update_output_sequence", update_output_sequence, c10::DispatchKey::XPU);
 }
 
 } // namespace

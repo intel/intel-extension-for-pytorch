@@ -4,6 +4,7 @@
 #include "Reduce.h"
 #include "comm/Numerics.h"
 
+// struct for sorted topk seq
 template <typename T, int MAX_K>
 struct TopK {
   int p[MAX_K];
@@ -108,12 +109,12 @@ inline T group_reduce_op(
 }
 
 // reduce to 2*beam_size*num_wg_per_beam for each beam
+// i.e. 2*beam_size*beam_size*num_wg_per_beam for each batch
 template <typename scalar_t, int32_t MAX_K>
 void beam_search_topk_stage1(
     const scalar_t* scores,
     scalar_t* tmp_scores,
     int64_t* tmp_idx,
-    const bool* finished,
     int64_t end_id,
     int64_t vocab_size,
     int64_t beam_size,
@@ -136,8 +137,6 @@ void beam_search_topk_stage1(
 
       int32_t sentence_offset = sentence_id * vocab_size;
 
-      bool finish = finished[sentence_id];
-
       TopK<scalar_t, MAX_K> partial;
 
       for (int32_t i = 0; i < MAX_K; i++) {
@@ -145,19 +144,9 @@ void beam_search_topk_stage1(
         partial.u[i] = std::numeric_limits<scalar_t>::lowest();
       }
 
-      if (finish) {
-        // no need ?
-        for (int elem_id = start + wi_id; elem_id < end; elem_id += wg_size) {
-          scalar_t elem = (elem_id == end_id)
-              ? std::numeric_limits<scalar_t>::max()
-              : std::numeric_limits<scalar_t>::lowest();
-          partial.insert(elem, elem_id);
-        }
-      } else {
-        for (int elem_id = start + wi_id; elem_id < end; elem_id += wg_size) {
-          scalar_t elem = scores[sentence_offset + elem_id];
-          partial.insert(elem, elem_id); // work item reduce
-        }
+      for (int elem_id = start + wi_id; elem_id < end; elem_id += wg_size) {
+        scalar_t elem = scores[sentence_offset + elem_id];
+        partial.insert(elem, elem_id); // work item reduce
       }
 
       using arg_vec_t = at::detail::Array<TopK<scalar_t, MAX_K>, 1>;
@@ -195,7 +184,7 @@ void beam_search_topk_stage1(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-// 2*beam_size*num_wg_per_beam --> 2*beam_size
+// 2*beam_size*num_wg_per_beam --> 2*beam_size for each beam
 template <typename scalar_t, int32_t MAX_K>
 void beam_search_topk_stage2(
     scalar_t* tmp_scores,
@@ -292,18 +281,19 @@ inline TopK_2<T> reduce_topk_op_2(const TopK_2<T>& a, const TopK_2<T>& b) {
   return a.u > b.u ? a : b;
 }
 
+// 1, 2*beam_size*beam_size --> 2*beam_size for each batch
+// 2, 2*beam_size --> beam_size
 template <typename scalar_t, int32_t MAX_K>
 void batch_topk_kernel(
     const scalar_t* topk_tmp_val_buf,
     const int64_t*
         topk_tmp_id_buf, // len = batch_size x beam_size x beam_size x 2
-    scalar_t* top_score,
-    int64_t* top_idx, // out for for topk (global id)
-    // float* cum_log_probs,
-    // float* output_log_probs,
+    scalar_t* top_score, // out
+    int64_t* top_token, // out for for topk (global id)
+    int64_t* top_beams, // out
     int64_t pad_token_id,
     int64_t eos_token_id,
-    const bool* finished, // [batch_size, beam_size]
+    bool* finished, // [batch_size]
     // parameters for beam_hyps
     int64_t* beam_hyps_num_beams, // [batch_size] number for eos candidates
     scalar_t* beam_hyps_min_normed_scores, // [batch_size]
@@ -311,11 +301,10 @@ void batch_topk_kernel(
                                        // the norm scores for candidates
     int64_t* beam_hyps_output_ids_tgt, // [batch_size * 2 * beam_size, max_seq],
                                        // cadidate output sentence
-    int64_t* beam_hyps_output_ids_src, // [max_seq, batch_size * 2 * beam_size],
+    int64_t* beam_hyps_output_ids_src, // [max_seq, batch_size * beam_size],
                                        // the out_buffer
-    int64_t* beam_hyps_beam_ids_src, // [max_seq, batch_size, beam_size]
+    int64_t* beam_hyps_beam_ids_src, // [max_seq, batch_size * beam_size]
     int64_t* beam_hyps_sequence_lengths_tgt, // [batch_size * 2 * beam_size]
-    int64_t* beam_hyps_sequence_lengths_src, // [batch_size * beam_size]
     scalar_t* beam_hyps_score, // [batch_size * 2 * beam_size]
     const float length_penalty,
     const int length_per_wg, // beam_size x beam_size x 2
@@ -324,10 +313,10 @@ void batch_topk_kernel(
     const int64_t vocab_size,
     int64_t cur_len,
     int64_t max_in_seq_len,
-    int64_t max_out_seq_len) {
+    int64_t max_out_seq_len,
+    bool early_stopping) {
   // one wg handle one batch
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int32_t wg_size = 32;
   int slm_size = (sizeof(int) + sizeof(scalar_t)) * MAX_K * wg_size;
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -337,11 +326,20 @@ void batch_topk_kernel(
       const int32_t wg_id = item.get_group(0); // each work group handle a batch
       int32_t wg_offset = wg_id * length_per_wg;
 
+      // init
+      if (wi_id < beam_size) {
+        top_score[wg_id * beam_size + beam_size] = 0;
+        top_token[wg_id * beam_size + beam_size] = pad_token_id;
+        top_beams[wg_id * beam_size + beam_size] = 0;
+      }
+
+      if (finished[wg_id]) {
+        return;
+      }
+
       if (beam_hyps_num_beams[wg_id] == 0 && wi_id == 0) {
         beam_hyps_min_normed_scores[wg_id] =
             std::numeric_limits<scalar_t>::max();
-      } else if (beam_hyps_num_beams[wg_id] == beam_size) {
-        return; // can we return ?
       }
 
       TopK<scalar_t, MAX_K> partial;
@@ -448,7 +446,8 @@ void batch_topk_kernel(
               }
               const int tgt_beam_idx =
                   global_batch_idx * (beam_size * 2) + beam_idx;
-              beam_hyps_sequence_lengths_tgt[tgt_beam_idx] = cur_len;
+              beam_hyps_sequence_lengths_tgt[tgt_beam_idx] =
+                  cur_len + 1; // +1 for eos token
               beam_hyps_normed_scores[tgt_beam_idx] = normed_score;
               beam_hyps_min_normed_scores[global_batch_idx] =
                   Numerics<scalar_t>::min(
@@ -460,8 +459,10 @@ void batch_topk_kernel(
                   (float)topk_tmp_val_buf[wg_offset + total.p[i]];
             }
           } else if (i < 2 * beam_size) {
-            top_idx[wg_offset_k + selected_beams] =
-                topk_tmp_id_buf[wg_offset + total.p[i]];
+            int64_t global_index = topk_tmp_id_buf[wg_offset + total.p[i]];
+            top_token[wg_offset_k + selected_beams] = global_index % vocab_size;
+            top_beams[wg_offset_k + selected_beams] =
+                global_index / vocab_size % beam_size;
             top_score[wg_offset_k + selected_beams] =
                 (float)topk_tmp_val_buf[wg_offset + total.p[i]];
             selected_beams++;
@@ -469,6 +470,20 @@ void batch_topk_kernel(
           item.barrier(dpcpp_local_fence);
           if (selected_beams >= beam_size) {
             break;
+          }
+        }
+        if (beam_hyps_num_beams[wg_id] == beam_size) {
+          if (early_stopping) {
+            finished[wg_id] = true;
+          } else {
+            scalar_t highest_attainable_score = apply_length_penalty(
+                top_score[wg_offset_k],
+                cur_len + max_in_seq_len,
+                length_penalty);
+            if (beam_hyps_min_normed_scores[wg_id] >=
+                highest_attainable_score) {
+              finished[wg_id] = true;
+            }
           }
         }
       }
@@ -482,17 +497,14 @@ void batch_topk_kernel(
 }
 
 void update_token(
-    int64_t* global_ids, // [batch_size * beam_size]
-    int64_t* beam_ids, // [max_out_seq_len, batch_size * beam_size]
-    int64_t* word_ids, // [max_out_seq_len, batch_size * beam_size]
+    int64_t* top_beam_id, // in [batch_size * beam_size]
+    int64_t* top_word_id, // in
+    int64_t* beam_ids, // out [max_out_seq_len, batch_size * beam_size]
+    int64_t* word_ids, // out [max_out_seq_len, batch_size * beam_size]
     bool* finished,
-    int64_t* sequence_length, // [batch_size * beam_size]
-    int64_t* beam_hyps_num_beams,
     const int64_t time_step,
     const int64_t batch_size,
-    const int64_t beam_size,
-    const int64_t vocab_size,
-    const int64_t end_ids) {
+    const int64_t beam_size) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int32_t wg_size = 256;
 
@@ -502,24 +514,9 @@ void update_token(
            index += wg_size) {
         int32_t offset = time_step * batch_size * beam_size;
         int batch_idx = index / beam_size;
-        sequence_length[index] = finished[index] ? sequence_length[index]
-                                                 : sequence_length[index] + 1;
 
-        int32_t beam_id = (global_ids[index] / vocab_size) % beam_size;
-        int32_t word_id = global_ids[index] % vocab_size;
-
-        sequence_length[index] =
-            sequence_length[batch_idx * beam_size + beam_id]; // why needs this
-                                                              // convert ?
-        finished[index] = word_id == end_ids ? 1 : 0; // refresh finished table
-        beam_ids[offset + index] = beam_id;
-        word_ids[offset + index] = word_id;
-
-        if (beam_hyps_num_beams[batch_idx] == beam_size) {
-          for (int i = 0; i < beam_size; i++) {
-            finished[batch_idx * beam_size + i] = true;
-          }
-        }
+        beam_ids[offset + index] = top_beam_id[index];
+        word_ids[offset + index] = top_word_id[index];
       }
     };
 
@@ -532,11 +529,10 @@ void update_token(
 template <typename scalar_t>
 void insert_to_candidate_list(
     int64_t* beam_hyps_num_beams,
-    int64_t* beam_hyps_sequence_lengths_src,
     int64_t* beam_hyps_sequence_lengths_tgt,
-    int64_t* beam_hyps_output_ids_src,
+    int64_t* beam_hyps_output_ids_src, // [max_seq_len, batch_size, beam_size]
     int64_t* beam_hyps_output_ids_tgt,
-    int64_t* beam_hyps_beam_ids_src,
+    int64_t* beam_hyps_beam_ids_src, // [max_seq_len, batch_size, beam_size]
     scalar_t* beam_hyps_score,
     scalar_t* beam_hyps_normed_scores,
     scalar_t* top_score,
@@ -545,7 +541,8 @@ void insert_to_candidate_list(
     const int64_t max_in_seq_len,
     const int64_t max_out_seq_len,
     const int64_t batch_size,
-    const int64_t beam_size) {
+    const int64_t beam_size,
+    const int64_t cur_len) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int32_t wg_size = 256;
 
@@ -554,15 +551,16 @@ void insert_to_candidate_list(
       const int wg_id = item.get_group(0);
       const int tgt_start_idx =
           beam_hyps_num_beams[wg_id]; // start for seq to add
-      // if (beam_hyps.is_done[wg_id]) {
-      //   return;
-      // }
+      // finished batch pass
+      if (finished[wg_id]) {
+        return;
+      }
       for (int i = 0; i < beam_size; i++) {
         if (item.get_local_id(0) == 0) {
           const int src_beam_idx = wg_id * beam_size + i;
           const int tgt_beam_idx = wg_id * beam_size * 2 + i + tgt_start_idx;
 
-          const int length = beam_hyps_sequence_lengths_src[src_beam_idx];
+          const int length = cur_len - 1;
           // output_ids_src is output_ids
           beam_hyps_output_ids_tgt[(tgt_beam_idx)*max_out_seq_len + length] =
               beam_hyps_output_ids_src
@@ -580,13 +578,10 @@ void insert_to_candidate_list(
                 [j * batch_size * beam_size + wg_id * beam_size + prev_id];
           }
           beam_hyps_sequence_lengths_tgt[tgt_beam_idx] =
-              length; // update target length
+              cur_len; // update target length
 
           beam_hyps_normed_scores[tgt_beam_idx] = apply_length_penalty(
-              top_score[src_beam_idx],
-              finished[src_beam_idx] ? max_in_seq_len + length + 1
-                                     : max_in_seq_len + length,
-              length_penalty);
+              top_score[src_beam_idx], max_in_seq_len + length, length_penalty);
           beam_hyps_score[tgt_beam_idx] = top_score[src_beam_idx];
           // update score and norm score
 
@@ -603,26 +598,28 @@ void insert_to_candidate_list(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
+// sentences from cadidate list, have eos token at the end. others don't
 template <typename scalar_t>
 void finalize(
-    int64_t* output_ids, // [bs, beam_size, max_seq_len], new tensor for output
-    int64_t* sequence_lengths,
+    int64_t* output_ids, // [bs, out_sentence_num, max_seq_len], new tensor for
+                         // output
+    int64_t* sequence_lengths, // [batch_size, out_sentence_num]
     const int64_t* beam_hyps_output_ids_tgt,
     const int64_t* beam_hyps_sequence_lengths_tgt,
     const scalar_t* beam_hyps_normed_scores, // [bs, 2 * beam_size]
     const int64_t* beam_hyps_num_beams,
     const int64_t beam_size,
     const int64_t batch_size,
-    const int64_t max_seq_len,
-    const int64_t out_sentence) {
-  // output_ids need to be init with pad_id
-
+    const int64_t max_in_seq_len,
+    const int64_t max_out_seq_len,
+    const int64_t out_sentence_num,
+    const int64_t pad_token_id) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int32_t wg_size = 2 * beam_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto s_score = dpcpp_local_acc_t<scalar_t>(wg_size, cgh);
-    auto rank = dpcpp_local_acc_t<int32_t>(out_sentence, cgh);
+    auto rank = dpcpp_local_acc_t<int32_t>(out_sentence_num, cgh);
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
       const int32_t wi_id = item.get_local_id(0);
       const int32_t wg_id = item.get_group(0);
@@ -639,15 +636,15 @@ void finalize(
       auto combine = [=](scalar_t value, scalar_t other) -> scalar_t {
         return Numerics<scalar_t>::max(value, other);
       };
-      for (int i = 0; i < out_sentence; i++) {
+      for (int i = 0; i < out_sentence_num; i++) {
         scalar_t value = s_score[wi_id];
         for (int offset = 1; offset < sg_size; offset <<= 1) {
           scalar_t other = sg.shuffle_down(value, offset);
-          scalar_t value = combine(value, other);
+          value = combine(value, other);
         }
 
         if (wi_id == 0) {
-          for (int j = 0; j > beam_size * 2; j++) {
+          for (int j = 0; j < beam_size * 2; j++) {
             if (s_score[j] == value) {
               rank[i] = j;
               s_score[j] = std::numeric_limits<scalar_t>::lowest();
@@ -655,25 +652,28 @@ void finalize(
             }
           }
         }
-
         item.barrier(dpcpp_local_fence);
+      }
 
-        if (wi_id < out_sentence) {
-          sequence_lengths[wg_id * out_sentence + wi_id] =
-              beam_hyps_sequence_lengths_tgt
-                  [wg_id * 2 * beam_size + rank[wi_id]];
-        }
+      if (wi_id < out_sentence_num) {
+        sequence_lengths[wg_id * out_sentence_num + wi_id] =
+            beam_hyps_sequence_lengths_tgt[wg_id * 2 * beam_size + rank[wi_id]];
+      }
 
-        for (int32_t index = 0; index < out_sentence; index++) {
-          // all of the work items will decode one sentence
-          for (int32_t wi_id;
-               wi_id < sequence_lengths[wg_id * out_sentence + index];
-               wi_id += wg_size) {
+      auto total_len = max_in_seq_len + max_out_seq_len;
+      for (int32_t index = 0; index < out_sentence_num; index++) {
+        // all of the work items will decode one sentence
+        for (int32_t t_id = wi_id; t_id < max_out_seq_len; t_id += wg_size) {
+          if (t_id < sequence_lengths[wg_id * out_sentence_num + index]) {
             output_ids
-                [wg_id * out_sentence * max_seq_len + index * max_seq_len + i] =
-                    beam_hyps_output_ids_tgt
-                        [wg_id * (beam_size * 2) * max_seq_len +
-                         rank[index] * max_seq_len + i];
+                [wg_id * out_sentence_num * total_len + index * total_len +
+                 max_in_seq_len + t_id] = beam_hyps_output_ids_tgt
+                    [wg_id * (beam_size * 2) * max_out_seq_len +
+                     rank[index] * max_out_seq_len + t_id];
+          } else {
+            output_ids
+                [wg_id * out_sentence_num * total_len + index * total_len +
+                 max_in_seq_len + t_id] = pad_token_id;
           }
         }
       }
