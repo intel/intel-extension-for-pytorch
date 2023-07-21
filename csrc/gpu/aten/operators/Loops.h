@@ -14,6 +14,8 @@
 
 #define UNROLLED_ELEM_PER_WORK_ITEM 4
 #define LOOPS_UNROLL_WORK_SIZE 16
+#define SIMD16 16
+#define SIMD32 32
 
 using namespace xpu::dpcpp;
 

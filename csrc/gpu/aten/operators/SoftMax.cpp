@@ -96,8 +96,6 @@ using namespace xpu::dpcpp;
 using namespace xpu::oneDNN;
 
 #define MIN_WG_NUM 32768
-#define SIMD32 32
-#define SIMD16 16
 
 namespace at {
 namespace AtenIpexTypeXPU {
