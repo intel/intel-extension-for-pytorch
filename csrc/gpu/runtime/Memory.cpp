@@ -41,6 +41,12 @@ void memcpyHostToDevice(
       e = queue.memcpy(dst, src_host_alloc, n_bytes);
       CachingHostAllocator::Instance()->recordEvent(
           const_cast<void*>(src_host_alloc), e);
+
+      // obviously release the allocated unpageable memory to let its associated
+      // block can be recycled upon its recorded events are all completed
+      // because the src_host_alloc is not mantained by any unique ptr, so no
+      // one can free it unless here
+      CachingHostAllocator::Instance()->release(src_host_alloc);
     }
   }
 
