@@ -53,6 +53,17 @@ class IPEXEmptyLinear(nn.Module):
     def forward(self, input):
         return torch.nn.functional.linear(input, self.weight, bias=self.bias)
 
+class IPEXEmptyLinearWithPadding(nn.Module):
+    def __init__(self, n_dim):
+        super(IPEXEmptyLinearWithPadding, self).__init__()
+        # we set the weight and bias to None to avoid any possible memory presure
+        self.weight = None
+        self.bias = None
+        self.n_dim = n_dim
+
+    def forward(self, input):
+        return torch.nn.functional.linear(input, self.weight, bias=self.bias)[:,:,:self.n_dim]
+
 class IPEXTransformerAtten(nn.Module):
 
     layer_id_static = 0

@@ -8,7 +8,7 @@ import torch.fx.experimental.optimization as optimization
 from torch.jit._trace import TracerWarning
 import warnings
 from enum import IntFlag
-from .nn.utils._transformer_converter import transformer_frontend_replace
+from .nn.utils._transformer_converter import transformer_frontend_replace, pad_for_gptj_lm_head
 
 from .nn import utils
 from .optim._optimizer_utils import (
@@ -306,15 +306,17 @@ class GraphCapture(object):
 
 def optimize_transformers(model, dtype=None, optimizer=None):
     def model_converter(model, dtype):
-        try:
-            import transformers
-            # from  import IPEXGPTJBlock
-        except ImportError as e:
-            print("Can not find transformers in your environment, disable ipex transformer optimize")
-            return model
         transformer_frontend_replace(model, config=None, dtype=dtype)
         return model
     optimize_output = optimize(model, dtype=dtype, optimizer=optimizer, inplace=True)
+    try:
+        import transformers
+        # from  import IPEXGPTJBlock
+    except ImportError as e:
+        print("Can not find transformers in your environment, disable ipex transformer optimize")
+        return model
+    if type(model) == transformers.models.gptj.modeling_gptj.GPTJForCausalLM:
+        pad_for_gptj_lm_head(model)
     if optimizer is None:
         model = optimize_output
         return model_converter(model, dtype=dtype)

@@ -1,6 +1,6 @@
 import torch 
 import os
-from ._transformers import IPEXGPTJBlock, IPEXLlamaBlock, IPEXOptBlock, IPEXBloomBlock
+from ._transformers import IPEXGPTJBlock, IPEXLlamaBlock, IPEXOptBlock, IPEXBloomBlock, IPEXEmptyLinearWithPadding
 
 # from transformers.models.gptj.modeling_gptj import GPTJBlock
 
@@ -523,6 +523,26 @@ def _convert_to_bloom_cache_ipex(
             )
             for layer_past in past_key_value
         )
+
+def gemm_padding(weight):
+    n, k = weight.shape
+    if n % 4 != 0:
+        padded_n = (n + 4 - 1) // 4 * 4
+        padded_weight = torch.zeros(padded_n, k, dtype=weight.dtype, device=weight.device)
+        padded_weight[:n, :] = weight
+        return padded_weight
+    else:
+        return weight
+
+def pad_for_gptj_lm_head(model):
+    n = model.lm_head.weight.shape[0] #[n, k]
+
+    lm_head_new = IPEXEmptyLinearWithPadding(n)
+    lm_head_new.weight = model.lm_head.weight
+    model.lm_head = lm_head_new
+
+    model.lm_head.weight.data = gemm_padding(model.lm_head.weight)
+
 def transformer_frontend_replace(model, config = None, dtype = torch.float):
     import transformers
     enable_ds = False
