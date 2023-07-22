@@ -190,7 +190,7 @@ class IPEXTransformerAtten(nn.Module):
     def qkv_cache_optimized_beam(self, hidden_states, layer_past = None):
         # beam search path
         # hidden_states has already been converted to [seq, bs*beam, hidden_size]
-        if self.key_prompt is None or self.value_prompt is None:
+        if layer_past is None:
             # the first timestep
             # first timestamp's shape will be [seq, bs, hidden_size]
             shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
@@ -756,7 +756,6 @@ class IPEXGPTJBlock(nn.Module):
         bs = IPEXTransformerAtten.batch_size
         beam = hidden_states.shape[0] // bs
         hidden_shape = [bs, beam, hidden_states.shape[1], hidden_states.shape[2]]
-
         if hidden_states.shape[1] > 1:
             hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :]        # [bs, seq, hidden_size]
             position_ids = position_ids[0, :].view(1, position_ids.shape[1])
