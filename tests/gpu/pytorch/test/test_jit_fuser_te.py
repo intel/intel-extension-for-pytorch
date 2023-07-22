@@ -2818,4 +2818,5 @@ instantiate_device_type_tests(TestLoopnestRandomization, globals(), only_for=("c
 
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

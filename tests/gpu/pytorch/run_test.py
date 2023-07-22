@@ -10,8 +10,9 @@ from math import ceil
 
 from tool.file_utils import load_from_yaml, save_to_yaml, read_file, write_file
 from tool.collector import collect_cases_from_logfile, collect_detailed_issues
-from tool.maintainer import update_reference, check_reference
-from tool.reporter import report_configurations, report_details, report_diffs, report_summary
+from tool.skipper import add_dynamic_skipped_cases
+from tool.maintainer import update_reference, check_reference, check_ci_pass
+from tool.reporter import report_configurations, report_details, report_diffs, report_summary, report_ci_failure
 from common import xpu_test_base
 
 test_suite_root = os.path.dirname(os.path.abspath(__file__))
@@ -104,6 +105,12 @@ def parse_args():
         help="tool will run cases which match the given keyword in its case name."
     )
     parser.add_argument(
+        '-s',
+        '--autoskip',
+        action="store_true",
+        help="autoskip those fatal errored cases to make sure each test run to an end."
+    )
+    parser.add_argument(
         "test",
         nargs="*",
         type=str,
@@ -142,7 +149,7 @@ def select_tests_from(include_tests, options):
         selected_tests.remove(test)
     return selected_tests
 
-def run_test(cmd, timeout, autoskip, quiet, test, logfile):
+def run_test(cmd, timeout, quiet, test, logfile):
     global test_suite_root
     returncode = 0
     outmsg = ""
@@ -178,8 +185,6 @@ def run_test(cmd, timeout, autoskip, quiet, test, logfile):
         write_file(outmsg, sys.stdout, end_char="\n")
         write_file(errmsg, sys.stderr, end_char="\n")
         write_file(tail, sys.stdout, end_char="\n")
-    # autoskip path here but has not been implemented
-    # autoskip path end
     write_file(outmsg, logfile, mode="w", end_char="\n")
     write_file(errmsg, logfile, mode="a", end_char="\n")
     write_file(tail,   logfile, mode="a", end_char="\n")
@@ -260,16 +265,37 @@ def run_tests(selected_tests, options):
                                           cmd=" ".join(cmd), file=sys.stdout)
                 report_configurations(iter=i, log_path=full_log_path, options=options, timeout=timeout,
                                       cmd=" ".join(cmd), file=configure_log_file_path)
-                autoskip = False  # whether to automatially skip fatal errors (seg fault, core dumped, timeout)
+                autoskip = options.autoskip # whether to automatially skip fatal errors (seg fault, core dumped, timeout)
                 if options.mode[0] in ['weekly', 'maintain']:
                     autoskip = True
+                print(f"[INFO] Begin to run '{test_name}'")
                 duration, cases_result = run_test(
                     cmd,
                     timeout if timeout > 0 else None,
-                    autoskip,
                     options.quiet,
                     test_name,
                     full_log_path)
+                while autoskip and cases_result["NO_RESULT"]:
+                    add_dynamic_skipped_cases(cases_result["NO_RESULT"], "Auto skipped due to Fatal Error or Timed Out")
+                    print(f"[INFO] Re-run '{test_name}' triggered by autoskip")
+                    duration, cases_result = run_test(
+                        cmd,
+                        timeout if timeout > 0 else None,
+                        options.quiet,
+                        test_name,
+                        full_log_path)
+                print(f"[INFO] Finished '{test_name}' with time cost : {duration}s")
+
+                if options.mode[0] == 'ci':
+                    issued_cases, short_details, details = check_ci_pass(cases_result, full_log_path)
+                    if issued_cases:
+                        header = "============================= CI FAILED IN PORTED UT =============================\n"
+                        tail = f"[CI FAILED] Please check cases with COMMAND: {' '.join(cmd)}\n"
+                        report_ci_failure(issued_cases, short_details, header, tail, sys.stdout)
+                        report_ci_failure(issued_cases, details, header, tail, ci_error_log_path)
+                        warnings.warn(f"[INFO] CI failure detailed report written to {ci_error_log_path}", UserWarning)
+                        exit(1)
+
                 if test_name not in total_results:
                     total_results[test_name] = []
                 total_results[test_name].append((duration, cases_result))
@@ -278,29 +304,7 @@ def run_tests(selected_tests, options):
                         checked_cases[tag] = []
                     checked_cases[tag].extend(cases)
                 for tag, cases in cases_result.items():
-                    if tag in ["PASSED", "SKIPPED", "NO_RESULT"]:
-                        continue
                     details_msg_list.extend(collect_detailed_issues(cases, full_log_path))
-                if options.mode[0] == 'ci':
-                    print("checked_cases = ", checked_cases)
-                    issued_cases = []
-                    if "PASSED => FAILED" in checked_cases.keys():
-                        issued_cases.extend(checked_cases["PASSED => FAILED"])
-                    if "PASSED => ERROR" in checked_cases.keys():
-                        issued_cases.extend(checked_cases["PASSED => ERROR"])
-                    if "PASSED => XPASS" in checked_cases.keys():
-                        issued_cases.extend(checked_cases["PASSED => XPASS"])
-                    if "PASSED => NO_RESULT" in checked_cases.keys():
-                        issued_cases.extend(checked_cases["PASSED => NO_RESULT"])
-                    print("issued_cases = ", issued_cases)
-                    if issued_cases:    # has item means not success
-                        details = collect_detailed_issues(issued_cases, full_log_path)
-                        header = "============================= CI FAILED IN PORTED UT =============================\n"
-                        tail = f"[CI FAILED] Please check cases with COMMAND: {' '.join(cmd)}\n"
-                        report_details(details, header, tail, sys.stdout) # CI failure always print out to screen /w quiet
-                        report_details(details, header, tail, ci_error_log_path)
-                        warnings.warn(f"[INFO] CI Failue detailed report written to {ci_error_log_path}", UserWarning)
-                        return     # need return immediately once ci failed at only one case
                 if options.update_timeout is not None:
                     if timeout > 0 and duration >= timeout:
                         timeout_list[test_name] = timeout
@@ -337,8 +341,8 @@ def run_tests(selected_tests, options):
         report_diffs(checked_cases, header, tail, weekly_diffs_path)
         header = "=========================== DETAILED FAILED CASES IN WEEKLY ============================\n"
         tail =   "=================================== DETAILS FINISH =====================================\n"
-        if not options.quiet:
-            report_details(details_msg_list, header, tail, sys.stdout)
+        # if not options.quiet:
+        #     report_details(details_msg_list, header, tail, sys.stdout)
         report_details(details_msg_list, header, tail, weekly_details_path)
 
 def set_tool_env():

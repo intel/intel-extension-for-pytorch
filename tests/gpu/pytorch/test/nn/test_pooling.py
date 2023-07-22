@@ -1485,4 +1485,5 @@ instantiate_device_type_tests(TestPoolingNNDeviceType, globals())
 instantiate_parametrized_tests(TestPoolingNN)
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

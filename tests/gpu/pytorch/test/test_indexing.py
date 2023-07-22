@@ -1593,4 +1593,5 @@ instantiate_device_type_tests(TestIndexing, globals(), except_for='meta')
 instantiate_device_type_tests(NumpyTests, globals(), except_for='meta')
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

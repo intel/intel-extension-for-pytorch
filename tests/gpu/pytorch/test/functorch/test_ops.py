@@ -2179,4 +2179,5 @@ only_for = ("cpu", "cuda")
 instantiate_device_type_tests(TestOperators, globals(), only_for=only_for)
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

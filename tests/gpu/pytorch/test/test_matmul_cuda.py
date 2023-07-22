@@ -177,4 +177,5 @@ class TestMatmulCuda(TestCase):
 instantiate_device_type_tests(TestMatmulCuda, globals(), except_for="cpu")
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

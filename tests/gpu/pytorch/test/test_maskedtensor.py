@@ -916,4 +916,5 @@ instantiate_parametrized_tests(TestBinary)
 instantiate_parametrized_tests(TestReductions)
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

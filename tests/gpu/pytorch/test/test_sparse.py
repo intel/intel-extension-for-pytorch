@@ -4587,4 +4587,5 @@ instantiate_device_type_tests(TestSparse, globals(), except_for='meta')
 instantiate_device_type_tests(TestSparseAny, globals(), except_for='meta')
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

@@ -34,6 +34,7 @@ Dtype Analysis relies on symbolic shape analysis, which is still in beta
 
 
 if __name__ == "__main__":
+    common.xpu_test_base.customized_skipper()
     raise RuntimeError(
         "This test file is not meant to be run directly, use:\n\n"
         "\tpython test/test_jit.py TESTNAME\n\n"

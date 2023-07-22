@@ -143,8 +143,18 @@ def report_details(details, header, tail, file):
     for detail in details:
         outmsg += detail
     outmsg += tail
-    write_file(outmsg, file, "w", endchar="\n")
+    write_file(outmsg, file, "w", end_char="\n")
 
+def report_ci_failure(issued_cases, details, header, tail, file):
+    outmsg = header
+    outmsg += "[ISSEUD CASES] These cases failed in CI for this turn:\n"
+    for case in issued_cases:
+        outmsg += "\t" + case + "\n"
+    outmsg += "[FAILURE DETAILS]:\n"
+    for detail in details:
+        outmsg += "\t" + detail + "\n"
+    outmsg += tail
+    write_file(outmsg, file, "w", end_char="\n")
 
 def report_configurations(iter, log_path, options, timeout, cmd, file):
     outmsg = ""

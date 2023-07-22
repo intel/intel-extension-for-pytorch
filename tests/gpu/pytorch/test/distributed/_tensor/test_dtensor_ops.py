@@ -728,4 +728,5 @@ instantiate_device_type_tests(TestDTensorOps, globals(), only_for=(DEVICE_TYPE,)
 
 
 if __name__ == "__main__":
+    common.xpu_test_base.customized_skipper()
     run_tests()

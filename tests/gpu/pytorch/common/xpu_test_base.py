@@ -1,3 +1,4 @@
+import __main__
 import intel_extension_for_pytorch
 import torch
 
@@ -8,18 +9,97 @@ from torch.testing._internal.common_device_type import (
     PYTORCH_TESTING_DEVICE_EXCEPT_FOR_KEY,
     _update_param_kwargs,
     _dtype_test_suffix)
-from torch.testing._internal.common_utils import compose_parametrize_fns
+from torch.testing._internal.common_utils import compose_parametrize_fns, discover_test_cases_recursively
 
 import subprocess
 import os
 import sys
 import copy
 import inspect
+import unittest
 from functools import wraps
+from collections import OrderedDict
 
 cur_script_path = os.path.dirname(os.path.abspath(__file__))
 test_suite_root = os.path.join(cur_script_path, "../")
+# test_suite_path = os.path.join(test_suite_root, "test/")
 
+sys.path.append(test_suite_root)
+# sys.path.append(test_suite_path)
+
+from tool.file_utils import load_from_yaml, save_to_yaml
+from tool.case_utils import match_name, match_dtype
+
+
+static_skipped_cases_list = []
+static_skipped_dicts = load_from_yaml(
+    os.path.join(test_suite_root, "config/static_skipped_cases_list.yaml"))
+if static_skipped_dicts:
+    for static_skipped_dict in static_skipped_dicts:
+        static_skipped_cases_list.extend(static_skipped_dict['cases'])
+
+USE_DYNAMIC_SKIP = True
+dynamic_skipped_cases_list = []
+dynamic_skipped_dicts = load_from_yaml(
+    os.path.join(test_suite_root, "config/dynamic_skipped_cases_list.yaml"))
+if dynamic_skipped_dicts:
+    for dynamic_skipped_dict in dynamic_skipped_dicts:
+        dynamic_skipped_cases_list.extend(dynamic_skipped_dict['cases'])
+
+unsupported_dtypes = [
+    torch.complex,
+    torch.complex32,
+    torch.complex64,
+    torch.complex128,
+    torch.chalf,
+    torch.cfloat,
+    torch.cdouble,
+]
+
+def reload_dyn_skip_list():
+    global dynamic_skipped_cases_list
+    dynamic_skipped_cases_list = []
+    dynamic_skipped_dicts = load_from_yaml(
+        os.path.join(test_suite_root, "config/dynamic_skipped_cases_list.yaml"))
+    if dynamic_skipped_dicts:
+        for dynamic_skipped_dict in dynamic_skipped_dicts:
+            dynamic_skipped_cases_list.extend(dynamic_skipped_dict['cases'])
+
+def customized_skipper():
+    # load dynamic skipped cases list every time we start a run
+    reload_dyn_skip_list()
+    suite = unittest.TestLoader().loadTestsFromModule(__main__)
+    test_cases = discover_test_cases_recursively(suite)
+    for test in test_cases:
+        # static skip. Won't run these cases anytime.
+        @wraps(test)
+        def disallowed_test(self, *args, **kwargs):
+            raise unittest.SkipTest("shouldn't run on XPU")
+            return test(self, *args, **kwargs)
+
+        # dynamic skip. Should be fixed and re-checked if necessary
+        @wraps(test)
+        def unsupported_test(self, *args, **kwargs):
+            raise unittest.SkipTest("not ready on XPU")
+            return test(self, *args, **kwargs)
+
+        @wraps(test)
+        def unsupported_dtype_test(self, *args, **kwargs):
+            raise unittest.SkipTest("dtype not implement on XPU")
+            return test(self, *args, **kwargs)
+
+        test_case_full_name = test.id().split('.', 1)[1][::-1].replace('.', "::", 1)[::-1]
+        case_name = test_case_full_name.split("::", 1)[1]
+        test_class = test.__class__
+        if match_name(test_case_full_name, static_skipped_cases_list):
+            setattr(test_class, case_name, disallowed_test)
+            print(f"[INFO] trying to skip static case {test_case_full_name}")
+        elif match_name(test_case_full_name, dynamic_skipped_cases_list) and USE_DYNAMIC_SKIP:
+            setattr(test_class, case_name, unsupported_test)
+            print(f"[INFO] trying to skip dynamic case {test_case_full_name}")
+        elif match_dtype(test_case_full_name, unsupported_dtypes):
+            setattr(test_class, case_name, unsupported_dtype_test)
+            print(f"[INFO] trying to skip unsupported dtype case {test_case_full_name}")
 
 # Test Base is which used to generate each device type specific test class instances
 class XPUTestBase(CUDATestBase):

@@ -19,6 +19,7 @@ from file_utils import (
     save_to_yaml,
     read_file,
     insert_header_lines,
+    insert_main_lines,
     copy_dir_or_file,
     remove_files,
 )
@@ -124,6 +125,7 @@ sys.path.append(test_root)
 
 import common.xpu_test_base
 """, tgt_full_path)
+                insert_main_lines("common.xpu_test_base.customized_skipper()\n", tgt_full_path)
                 msg += import_msg
             else:
                 msg += "DISCARD\n"

@@ -2494,4 +2494,5 @@ instantiate_device_type_tests(TestConvolutionNNDeviceType, globals())
 instantiate_parametrized_tests(TestConvolutionNN)
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()
