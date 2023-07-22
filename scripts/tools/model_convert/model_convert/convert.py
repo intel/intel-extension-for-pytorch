@@ -6,6 +6,21 @@ from ruamel.yaml import YAML
 from .wrap_api import WrapAPI
 
 yaml = YAML(typ="safe", pure=True)
+lazy_init_list = ["_is_in_bad_fork",
+                  "_lazy_call",
+                  "_lazy_init",
+                  "is_initialized",
+                  "DeferredCudaCallError",
+                  "_LazySeedTracker"]
+not_callable_list = ["is_bf16_supported",
+                     "has_half",
+                     "_initialization_lock",
+                     "_initialized",
+                     "_lazy_seed_tracker",
+                     "_queued_calls",
+                     "_tls",
+                     "threading",
+                     "traceback"]
 
 
 def get_api_info():
@@ -67,6 +82,9 @@ def get_api_info():
     for item in dir(torch.xpu):
         tmp_list.append("torch.cuda." + item)
 
+    for item in lazy_init_list:
+        tmp_list.append("torch.cuda." + item)
+    tmp_list.append("torch.cuda._CudaBase")
     cuda_xpu_common_list = list(set(cuda_list).intersection(set(tmp_list)))
     cuda_support_xpu_not_list = list(
         set(cuda_list).difference(set(tmp_list)).difference(set(failure_list))
@@ -98,11 +116,7 @@ def get_api_info():
         if new_mod != "":
             eval_new_mod = eval(new_mod)
         api_name = item_list[-1]
-        if item in api_list_unsupported:
-            torch_api_map_list.append(
-                api_map(eval_new_mod, api_name, WrapAPI.wrap_api_skip)
-            )
-        elif item in pass_list:
+        if item in pass_list:
             torch_api_map_list.append(
                 api_map(eval_new_mod, api_name, WrapAPI.wrap_api_pass)
             )
@@ -118,6 +132,11 @@ def get_api_info():
             torch_api_map_list.append(
                 api_map(eval_new_mod, api_name, WrapAPI.wrap_api_to)
             )
+        elif item in api_list_unsupported:
+            if api_name not in not_callable_list:
+                torch_api_map_list.append(
+                    api_map(eval_new_mod, api_name, WrapAPI.wrap_api_skip)
+                )
         else:
             torch_api_map_list.append(
                 api_map(eval_new_mod, api_name, WrapAPI.wrap_api_common)
@@ -150,11 +169,13 @@ def get_attr(mod, name):
         pass
     return api
 
+
 def set_attr(mod, name, new_name):
     try:
         setattr(mod, name, new_name)
     except AttributeError:
         pass
+
 
 class WrapHelper:
     def __init__(self):
@@ -170,13 +191,29 @@ class WrapHelper:
                 api = get_attr(item.api_mod, "to")
             full_api_name = "torch.cuda." + item.api_name
             if full_api_name in cuda_xpu_common_list:
-                api = get_attr(torch.xpu, item.api_name)
+                if item.api_name in lazy_init_list:
+                    if item.api_name == "DeferredCudaCallError":
+                        api = get_attr(torch.xpu.lazy_init, "DeferredXPUCallError")
+                    else:
+                        api = get_attr(torch.xpu.lazy_init, item.api_name)
+                elif item.api_name == "_CudaBase":
+                    api = get_attr(torch.xpu, "_XPUBase")
+                else:
+                    api = get_attr(torch.xpu, item.api_name)
             if api is not None:
                 set_attr(item.api_mod, item.api_name, item.api_wrap(api))
 
     def convert_var(self):
         torch.has_cuda = True
         torch.version.cuda = "11.7"
+        torch.cuda.has_half = True
+        torch.cuda._initialization_lock = torch.xpu.lazy_init._initialization_lock
+        torch.cuda._initialized = torch.xpu.lazy_init._initialized
+        torch.cuda._lazy_seed_tracker = torch.xpu.lazy_init._lazy_seed_tracker
+        torch.cuda._queued_calls = torch.xpu.lazy_init._queued_calls
+        torch.cuda._tls = torch.xpu.lazy_init._tls
+        torch.cuda.threading = torch.xpu.lazy_init.threading
+        torch.cuda.traceback = torch.xpu.lazy_init.traceback
 
 
 def convert():

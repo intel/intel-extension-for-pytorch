@@ -19,7 +19,7 @@ def search_and_replace_via_ast(file_list):
         convert.run(input_file, execute=False, export=True)
 
 
-def search_and_replace(from_value, to_value, file_list, in_place, regex_match, verbose):
+def search_and_replace(from_value, to_value, file_list, regex_match, verbose):
     change_file_list = []
     change_happen = False
     for input_file in file_list:
@@ -83,7 +83,6 @@ def main():
         args.from_value,
         args.to_value,
         file_list,
-        args.in_place,
         args.regex_match,
         args.verbose,
     )
