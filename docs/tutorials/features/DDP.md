@@ -75,11 +75,29 @@ Installation from either repository shares the command below. Replace the place 
 python -m pip install oneccl_bind_pt -f <REPO_URL>
 ```
 
-**Note:** Make sure you have installed [basekit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit) when using Intel® oneCCL Bindings for Pytorch\* on Intel® GPUs.
+### Runtime Dynamic Linking
+
+- If torch-ccl is built with oneCCL from third party or installed from prebuilt wheel:
+Dynamic link oneCCL and Intel MPI libraries: 
+
+```bash
+source $(python -c "import oneccl_bindings_for_pytorch as torch_ccl;print(torch_ccl.cwd)")/env/setvars.sh
+```
+
+Dynamic link oneCCL only (not including Intel MPI):
+
+```bash
+source $(python -c "import oneccl_bindings_for_pytorch as torch_ccl;print(torch_ccl.cwd)")/env/vars.sh 
+```
+
+- If torch-ccl is built without oneCCL and use oneCCL in system, dynamic link oneCCl from oneAPI basekit:
 
 ```bash
 source $basekit_root/ccl/latest/env/vars.sh
 ```
+
+Note: Make sure you have installed [basekit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit) when using Intel® oneCCL Bindings for Pytorch\* on Intel® GPUs.
+
 
 ## DDP Usage
 
@@ -112,10 +130,10 @@ Note: For single-device modules, `device_ids` can contain exactly one device id,
 
 Intel® oneCCL Bindings for Pytorch\* recommends MPI as the launcher to start multiple processes. Here's an example to illustrate such usage.
 
-Use MPI from basekit:
+Dynamic link oneCCL and Intel MPI libraries:
 
 ```bash
-source $basekit_root/mpi/latest/env/vars.sh
+source $(python -c "import oneccl_bindings_for_pytorch as torch_ccl;print(torch_ccl.cwd)")/env/setvars.sh
 ```
 
 `Example_DDP.py`
