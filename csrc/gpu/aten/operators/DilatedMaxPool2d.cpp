@@ -249,7 +249,10 @@ void max_pool2d_with_indices_out_template(
   const int64_t dims = 2;
   auto kernel_size_vec =
       expand_param_if_needed(kernel_size, "kernel_size", dims);
-  auto stride_vec = expand_param_if_needed(stride, "stride", dims);
+  std::vector<int64_t> empty_stride_vec = {dH, dW};
+  auto stride_vec = stride.empty()
+      ? empty_stride_vec
+      : expand_param_if_needed(stride, "stride", dims);
   auto padding_vec = expand_param_if_needed(padding, "padding", dims);
 
   auto padding_vec_l = padding_vec;
@@ -503,7 +506,10 @@ Tensor& max_pool2d_with_indices_backward_out_template(
   const int64_t dims = 2;
   auto kernel_size_vec =
       expand_param_if_needed(kernel_size, "kernel_size", dims);
-  auto stride_vec = expand_param_if_needed(stride, "stride", dims);
+  std::vector<int64_t> empty_stride_vec = {dH, dW};
+  auto stride_vec = stride.empty()
+      ? empty_stride_vec
+      : expand_param_if_needed(stride, "stride", dims);
   auto padding_vec = expand_param_if_needed(padding, "padding", dims);
 
   auto padding_vec_l = padding_vec;
