@@ -110,7 +110,7 @@ void indexSelect(
         tensorInfoIfScalar(getTensorInfo<scalar_t, int64_t>(src.contiguous()));
     int new_indexing_dim = src_info.collapseDims(dim);
 
-    if (dst.is_contiguous())
+    if (dst.is_contiguous() && indices.is_contiguous())
       _index_select_kernel<
           decltype(src_info),
           decltype(dst_info),
