@@ -347,6 +347,7 @@ class TestThatContainsCUDAAssertFailure(TestCase):
         self.assertEqual(x1, x2)
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()
 """)
         # should capture CUDA error
@@ -388,6 +389,7 @@ instantiate_device_type_tests(
 )
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()
 """)
         # should capture CUDA error
@@ -430,6 +432,7 @@ instantiate_device_type_tests(
 )
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()
 """)
         # we are currently disabling CUDA early termination for distributed tests.
@@ -484,6 +487,7 @@ instantiate_device_type_tests(
 )
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()
 """
         test_bases_count = len(get_device_type_test_bases())
@@ -2153,4 +2157,5 @@ instantiate_parametrized_tests(TestImports)
 
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

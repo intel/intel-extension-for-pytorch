@@ -1369,6 +1369,7 @@ def print_op_str_if_not_supported(op_str):
 
 
 if __name__ == "__main__":
+    common.xpu_test_base.customized_skipper()
     COMPARE_XLA = os.getenv('PYTORCH_COMPARE_XLA', None)
     if COMPARE_XLA is not None:
         with open(COMPARE_XLA, "r") as f:

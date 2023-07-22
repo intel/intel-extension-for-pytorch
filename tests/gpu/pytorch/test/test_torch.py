@@ -8870,4 +8870,5 @@ instantiate_device_type_tests(TestTorchDeviceType, globals())
 instantiate_device_type_tests(TestDevicePrecision, globals(), except_for='cpu')
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

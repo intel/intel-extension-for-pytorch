@@ -3,6 +3,7 @@ from ruamel import yaml
 import os
 import sys
 import shutil
+import re
 
 def load_from_yaml(yaml_file):
     with open(yaml_file, "r") as load_f:
@@ -31,10 +32,15 @@ def read_file(file_name):
     f.close()
     return data
 
+def read_file_lines(file_name):
+    f = open(file_name, "r")
+    lines = f.readlines()
+    f.close()
+    return lines
 
 def write_file(data, file_name, mode="w", end_char=""):
     if not isinstance(file_name, str):
-        print(data, file=file_name)
+        print(data + end_char, file=file_name)
         return
     dirname = os.path.dirname(os.path.realpath(file_name))
     if not os.path.exists(dirname):
@@ -43,10 +49,32 @@ def write_file(data, file_name, mode="w", end_char=""):
     f.write(data + end_char)
     f.close()
 
+def write_file_lines(lines, file_name, mode="w", end_char=""):
+    if not isinstance(file_name, str):
+        for line in lines:
+            print(line + end_char, file=file_name)
+        return
+    dirname = os.path.dirname(os.path.realpath(file_name))
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    f = open(file_name, mode)
+    lines = [line + end_char for line in lines]
+    f.writelines(lines)
+    f.close()
+
 def insert_header_lines(data, file_name):
     old_data = read_file(file_name)
     new_data = data + old_data
     write_file(new_data, file_name)
+
+def insert_main_lines(data, file_name):
+    lines = read_file_lines(file_name)
+    for i, line in enumerate(lines):
+        if re.match("if __name__ == .__main__.:", line, re.S | re.I):
+            indent = len(lines[i+1]) - len(lines[i+1].lstrip())
+            new_line = " " * indent + data;
+            lines.insert(i + 1, new_line)
+    write_file_lines(lines, file_name)
 
 def copy_dir_or_file(src_path, tgt_path):
     src_full_path = os.path.realpath(src_path)

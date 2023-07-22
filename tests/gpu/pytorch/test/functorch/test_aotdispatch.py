@@ -2809,4 +2809,5 @@ instantiate_device_type_tests(TestEagerFusionModuleInfo, globals(), only_for=onl
 
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

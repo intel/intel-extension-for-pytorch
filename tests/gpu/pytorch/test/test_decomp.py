@@ -754,4 +754,5 @@ class HasDecompTest(TestCase):
         self.assertExpected("".join(sorted(op.name() + "\n" for op in ops_missing_decomp)))
 
 if __name__ == "__main__":
+    common.xpu_test_base.customized_skipper()
     run_tests()

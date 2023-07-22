@@ -1,6 +1,7 @@
 import os
 from collections import OrderedDict
 from .file_utils import load_from_yaml, save_to_yaml
+from .collector import collect_detailed_issues, collect_fatal_error
 
 tool_path = os.path.dirname(os.path.abspath(__file__))
 ref_file = os.path.join(tool_path, "../config/reference_list.yaml")
@@ -28,6 +29,33 @@ def check_reference(cosim_cases):
                     diffs_cases[diff_tag] = []
                 diffs_cases[diff_tag].append(case)
     return diffs_cases
+
+def check_ci_pass(cases_result, logfile):
+    global ref_file
+    ref_dict = load_from_yaml(ref_file)
+
+    issued_cases = []
+    short_details = []
+    details = []
+    for case in cases_result["NO_RESULT"]:
+        if case not in ref_dict["NO_RESULT"]:
+            issued_cases.append(case)
+            detail = collect_fatal_error(case, logfile)
+            if 'timed out' in detail:
+                short_details.append("Timed Out\n" + detail)
+            else:
+                short_details.append("Fatal Error\n" + detail)
+            details.append(detail)
+            return issued_cases, short_details, details
+    for tag, cases in cases_result.items():
+        if tag == "PASSED":
+            continue
+        for case in cases:
+            if case in ref_dict["PASSED"]:
+                issued_cases.append(case)
+    if issued_cases:
+        short_details, details = collect_detailed_issues(issued_cases, logfile, with_short=True)
+    return issued_cases, short_details, details
 
 def update_reference(total_results):
     global ref_file

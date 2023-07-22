@@ -3520,4 +3520,5 @@ as the input tensor excluding its innermost dimension'):
 instantiate_device_type_tests(TestReductions, globals())
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

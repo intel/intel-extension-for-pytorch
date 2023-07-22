@@ -1568,4 +1568,5 @@ class TestUnaryUfuncs(TestCase):
 instantiate_device_type_tests(TestUnaryUfuncs, globals())
 
 if __name__ == "__main__":
+    common.xpu_test_base.customized_skipper()
     run_tests()

@@ -1585,4 +1585,5 @@ instantiate_device_type_tests(TestFFT, globals())
 instantiate_device_type_tests(TestFFTDocExamples, globals(), only_for='cpu')
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

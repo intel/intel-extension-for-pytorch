@@ -5312,4 +5312,5 @@ instantiate_device_type_tests(TestCudaFuserOpInfo, globals(), only_for=("cuda"))
 
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

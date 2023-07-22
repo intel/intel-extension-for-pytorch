@@ -3292,4 +3292,5 @@ instantiate_device_type_tests(TestSparseCSR, globals())
 instantiate_device_type_tests(TestSparseCompressed, globals())
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

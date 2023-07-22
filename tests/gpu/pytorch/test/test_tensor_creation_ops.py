@@ -3969,4 +3969,5 @@ instantiate_device_type_tests(TestBufferProtocol, globals(), only_for="cpu")
 instantiate_device_type_tests(TestAsArray, globals())
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

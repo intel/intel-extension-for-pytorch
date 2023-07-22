@@ -5170,4 +5170,5 @@ instantiate_device_type_tests(TestRandomness, globals(), only_for=only_for)
 instantiate_device_type_tests(TestVmapDeviceType, globals(), only_for=only_for)
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()

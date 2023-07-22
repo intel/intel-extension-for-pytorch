@@ -7307,4 +7307,5 @@ scipy_lobpcg  | {:10.2e}  | {:10.2e}  | {:6} | N/A
 instantiate_device_type_tests(TestLinalg, globals())
 
 if __name__ == '__main__':
+    common.xpu_test_base.customized_skipper()
     run_tests()
