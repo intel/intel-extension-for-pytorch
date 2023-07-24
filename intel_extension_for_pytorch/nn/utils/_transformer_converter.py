@@ -17,7 +17,7 @@ from ._inference_ops import OpConverter
 # from transformers.models.llama.configuration_llama import 
 
 MAX_SEQ_LEN = int(os.environ.get("MAX_SEQ_LEN", "0"))
-MAX_OUT_SEQ_LEN = max(256, int(os.environ.get("MAX_OUT_SEQ_LEN", "0")))
+MAX_OUT_SEQ_LEN = max(128, int(os.environ.get("MAX_OUT_SEQ_LEN", "0")))
 
 class IPEXTransformerConverter:
     tp_group = None

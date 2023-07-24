@@ -427,7 +427,7 @@ class IPEXTransformerAtten(nn.Module):
                 # key, value are the same as query
                 # attention_mask= None
                 # is_causal=True
-                attn_output = torch.xpu.IpexSDP(query, key, value, blocked_alibi, blocked_attn_mask, head_mask, alpha, beta, dropout, is_causal)
+                attn_output = torch.xpu.IpexSDP(query, key, value, blocked_alibi, blocked_attn_mask, head_mask, alpha, beta, dropout, is_causal, True)
         else:
             if self.cur_len > 0:
                 key, value = self.reorder_cache(key, value, IPEXTransformerAtten.beam_index)
