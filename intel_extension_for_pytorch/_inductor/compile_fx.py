@@ -5,7 +5,26 @@ from unittest.mock import patch
 import torch
 from .decomposition import get_decompositions
 from .lowering import patch_lowering
+from torch._inductor.compile_fx import compile_fx_inner
+from .ipex_fusion import _ipex_fusion_passes
 
+
+def ipex_compile_fx_inner(
+    gm: torch.fx.GraphModule,
+    example_inputs: List[torch.Tensor],
+    cudagraphs=None,
+    num_fixed=0,
+    is_backward=False,
+    graph_id=None,
+    cpp_wrapper=False,
+    aot_mode=False,
+    is_inference=False,
+    boxed_forward_device_index=None,
+    user_visible_outputs=frozenset(),
+    layout_opt=None,
+):
+    _ipex_fusion_passes(gm)
+    return compile_fx_inner(gm, example_inputs, cudagraphs=cudagraphs, num_fixed=num_fixed, is_backward=is_backward, graph_id=graph_id, cpp_wrapper=cpp_wrapper, aot_mode=aot_mode, is_inference=is_inference, boxed_forward_device_index=boxed_forward_device_index, user_visible_outputs=user_visible_outputs, layout_opt=layout_opt)
 
 @contextlib.contextmanager
 def patch_codegen():
@@ -49,5 +68,5 @@ def compile_fx(
 
     with patch_functions():
         return inductor_compile(
-            model, example_inputs, decompositions=get_decompositions()
+            model, example_inputs, inner_compile=ipex_compile_fx_inner, decompositions=get_decompositions()
         )

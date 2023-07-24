@@ -387,3 +387,12 @@ def meta_ROIAlign_backward(
         if is_channels_last
         else torch.contiguous_format
     )
+
+@register_meta("bmm_add")
+def meta_bmm_add(
+    input,
+    batch1,
+    batch2,
+    alpha,
+):
+    return batch1.new_empty((*batch1.shape[:-1], batch2.shape[-1]))

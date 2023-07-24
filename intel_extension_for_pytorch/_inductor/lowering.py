@@ -1,8 +1,8 @@
 # Custom lowerings overriding those from PyTorch
-
+import torch
 import contextlib
 import functools
-from torch._inductor.lowering import ELEMENTWISE_TYPE_PROMOTION_KIND
+from torch._inductor.lowering import ELEMENTWISE_TYPE_PROMOTION_KIND, make_fallback
 
 lowering_overrides = {}
 
@@ -38,6 +38,7 @@ def register_lowering(
         convert_input_to_bool=convert_input_to_bool,
     )
 
+make_fallback(torch.ops.torch_ipex.bmm_add)
 
 @contextlib.contextmanager
 def patch_lowering():

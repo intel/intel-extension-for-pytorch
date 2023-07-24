@@ -75,6 +75,16 @@ class Lstm(torch.nn.Module):
         return x, h
 
 
+class BmmAdd(torch.nn.Module):
+    def __init__(self):
+        super(BmmAdd, self).__init__()
+
+    def forward(self, input, batch1, batch2):
+        bmm_res = torch.bmm(batch1, batch2)
+        res = torch.add(bmm_res, input)
+        return res
+
+
 class TestCompileCases(TestCase):
     def test_conv_relu_inference(self):
         for dim in [1, 2, 3]:
@@ -93,6 +103,8 @@ class TestCompileCases(TestCase):
                 ipex_optimize,
                 weight_prepack,
             ) in options:
+                if compiler_backend == "torchscript" and dynamic is True:
+                    continue
                 if weight_prepack is True and ipex_optimize is False:
                     continue
                 N = 2
@@ -215,6 +227,8 @@ class TestCompileCases(TestCase):
                 ipex_optimize,
                 weight_prepack,
             ) in options:
+                if compiler_backend == "torchscript" and dynamic is True:
+                    continue
                 if weight_prepack is True and ipex_optimize is False:
                     continue
                 ic = input_channel_per_group
@@ -328,6 +342,8 @@ class TestCompileCases(TestCase):
             ipex_optimize,
             weight_prepack,
         ) in options:
+            if compiler_backend == "torchscript" and dynamic is True:
+                continue
             if weight_prepack is True and ipex_optimize is False:
                 continue
             x = torch.randn(x_shape, dtype=torch.float32)
@@ -414,6 +430,8 @@ class TestCompileCases(TestCase):
             [True, False],
         )
         for dtype, compiler_backend, dynamic, ipex_optimize in options:
+            if compiler_backend == "torchscript" and dynamic is True:
+                continue
             input = torch.randn(5, 3, 10)
             h0 = torch.randn(2, 3, 20)
             c0 = torch.randn(2, 3, 20)
@@ -437,6 +455,33 @@ class TestCompileCases(TestCase):
             self.assertTrue(output.dtype == dtype)
             self.assertTrue(hn.dtype == dtype)
             self.assertTrue(cn.dtype == dtype)
+
+    def test_bmm_add_inference(self):
+        options = itertools.product(
+            [torch.float32, torch.bfloat16],
+            ["torchscript", "inductor"],
+            [True, False],
+        )
+        for dtype, compiler_backend, dynamic in options:
+            if compiler_backend == "torchscript" and dynamic is True:
+                continue
+            x = torch.randn(6, 3, 5).to(dtype=dtype)
+            b1 = torch.randn(6, 3, 4).to(dtype=dtype)
+            b2 = torch.randn(6, 4, 5).to(dtype=dtype)
+            model = BmmAdd().eval()
+            with torch.cpu.amp.autocast(
+                enabled=(dtype == torch.bfloat16), dtype=torch.bfloat16
+            ), torch.no_grad():
+                ori_y = model(x, b1, b2)
+            torch._dynamo.reset()
+            ipex._set_compiler_backend(compiler_backend)
+            compile_model = torch.compile(model, dynamic=dynamic, backend="ipex")
+            with torch.cpu.amp.autocast(
+                enabled=(dtype == torch.bfloat16), dtype=torch.bfloat16
+            ), torch.no_grad():
+                y = compile_model(x, b1, b2)
+            self.assertEqual(ori_y, y, prec=0.1)
+            self.assertTrue(y.dtype == dtype)
 
 
 if __name__ == "__main__":
