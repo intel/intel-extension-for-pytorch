@@ -13,7 +13,7 @@ index 6c6b0778b70..a3888f53317 160000
 +++ b/third_party/protobuf
 @@ -1 +1 @@
 -Subproject commit 6c6b0778b70f35f93c2f0dee30e5d12ad2a83eea
-+Subproject commit a3888f53317a8018e7a439bac4abeb8f3425d5e9
++Subproject commit 24b65038cfe36191268fda355aca0e43d3ecbcbe
 -- 
 2.34.1
 
