@@ -118,8 +118,13 @@ class MaskedMHATest(TestCase):
                     value_cache = value_cache.repeat_interleave(beam_size, dim=0) 
                     for i in range(batch_size):
                         self.assertEqual(key_cache.transpose(0,1)[:,i*beam_size, :, :], key_cache_iakv[0:first_seq_len, i*beam_size,:,:])
-                        self.assertEqual(value_cache.transpose(0,1)[:,i*beam_size, :, :], value_cache_iakv[0:first_seq_len, i*beam_size,:,:])         
-                    beam_idx_t = torch.zeros(beam_size*batch_size, dtype=torch.int64)
+                        self.assertEqual(value_cache.transpose(0,1)[:,i*beam_size, :, :], value_cache_iakv[0:first_seq_len, i*beam_size,:,:])                             
+                    if beam_size == 4:    
+                        beam_idx_t = torch.zeros(beam_size*batch_size, dtype=torch.int64)
+                        for i in range(1, batch_size):
+                            beam_idx_t[i*beam_size:i*beam_size+beam_size] = beam_idx_t[i*beam_size:i*beam_size+beam_size] + i*beam_size                              
+                    elif beam_size == 1:
+                        beam_idx_t = torch.arange(batch_size)
                     beam_idx[offset] = beam_idx_t
                     #reorder cache for naive impelementation
                     key_cache = torch.index_select(key_cache, 0, beam_idx_t)
@@ -170,8 +175,10 @@ class MaskedMHATest(TestCase):
                         self.assertEqual(value_cache_bf16.transpose(0,1)[offset], value_cache_iakv_bf16[offset,:,:,:])       
                         if beam_size == 4:    
                             beam_idx_t = torch.tensor([1,3,0,0]).repeat(batch_size)
+                            for i in range(1, batch_size):
+                                beam_idx_t[i*beam_size:i*beam_size+beam_size] = beam_idx_t[i*beam_size:i*beam_size+beam_size] + i*beam_size                           
                         elif beam_size == 1:
-                            beam_idx_t = torch.tensor([0]).repeat(batch_size)
+                            beam_idx_t = torch.arange(batch_size)
                         beam_idx[offset] = beam_idx_t
                         offset = offset + 1
                         #reorder cache for naive impelementation

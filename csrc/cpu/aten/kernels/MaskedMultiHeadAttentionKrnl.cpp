@@ -308,7 +308,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>  scale_do
       }
     }
   }
-
 // query Query embeeding with the of [beam_size*batch, cur_len, head_num,
 // head_size] key Key embeeding with the of [beam_size*batch, cur_len, head_num,
 // head_size] key_cache Cache past key embeeding with the of [past_len,
@@ -318,8 +317,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>  scale_do
   for (auto bi = 0; bi < bs; bi++) {
     for (auto hi = 0; hi < head_num; hi++) {
       // auto kv_hi = hi / group_size;
-      // printf("bi/bs: %d/%d group_size:%d hi:%d kv_hi:%d kv_head:%d \n", bi,
-      // bs, group_size, hi, kv_hi, kv_head); fflush(stdout);
       // e.g.,cur_len = 2, offset=3
       // query:            t4 t5
       // key:  t0 t1 t2 t3|t4 t5
@@ -331,8 +328,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>  scale_do
         float p[1][seq_len];
         auto kv_hi = hi / group_size; // maping the query head to key/value head
                                       // to support MGA/MQA
-        // printf("bi/bs: %d/%d group_size:%d hi:%d kv_hi:%d kv_head:%d \n", bi,
-        // bs, group_size, hi, kv_hi, kv_head); fflush(stdout);
+        //printf("beam_batch: %d bi/bs: %d/%d group_size:%d hi:%d kv_hi:%d kv_head:%d \n", beam_batch, bi, bs, group_size, hi, kv_hi, kv_head); fflush(stdout);
         auto mask_ptr_start = mask_ptr + bi * mask_bs_stride;
         auto q_ptr_start = q_ptr +
             (bi * cur_len + query_ti) * head_num * head_size + hi * head_size;
@@ -386,6 +382,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>  scale_do
                 kc_t_beam_start =
                     kc_t_beam_start + bi * beam_size * kv_head * head_size;
               }
+              //printf("new_beam_idx[bi][ti]:%d \n", new_beam_idx[bi][ti]);
               auto kc_head_start =
                   k_cache_ptr + kc_t_beam_start + kv_hi * head_size;
               reduce_head<QT>(
@@ -472,6 +469,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>  scale_do
                     false,
                     nullptr);
               } else {
+                //printf("new_beam_idx[bi][vi]:%d \n", new_beam_idx[bi][vi]);
                 auto vc_t_beam_start =
                     vc_token_start + new_beam_idx[bi][vi] * kv_head * head_size;
                 if (cur_len > 1) {
@@ -529,7 +527,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> first_tok
     at::Tensor query,
     at::Tensor key,
     at::Tensor value,
-    const int64_t batch_size,
+    at::Tensor& key_cache,
+    at::Tensor& value_cache,
+    at::Tensor& beam_idx,
+    const int64_t beam_batch,
     const double scale_attn,
     int64_t max_positions,
     at::Tensor attention_mask
@@ -539,7 +540,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> first_tok
     auto key_lenght = key.size(1);
     auto kv_head_num = key.size(2);
     auto head_size = key.size(3);
-    auto expand_size = batch_size / query.size(0);
     auto casual_mask = at::full({query_length, key_lenght}, -1e6, query.options());
     casual_mask = at::triu(casual_mask, 1);    
     casual_mask = casual_mask.unsqueeze(0).unsqueeze(0);
@@ -547,21 +547,15 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> first_tok
     if(max_positions < query_length){
         max_positions = query_length + max_positions;
     }
-    //allocate the kv cache buffer for the first token
-    auto key_cache = at::empty(
-        {max_positions, batch_size, kv_head_num, head_size}, key.options());
-    auto value_cache = at::empty(
-        {max_positions, batch_size, kv_head_num, head_size}, value.options());
     if(key.scalar_type() != at::kBFloat16 && key.scalar_type() != at::kFloat){
         TORCH_CHECK(false, "key and value must be float or bfloat16 to use ipex::masked_multihead_self_attention_kernel_impl");
     }
     if (key.scalar_type() == at::kFloat) {
-      copy_key_value<float>(key_cache, key, value_cache, value, batch_size);
+      copy_key_value<float>(key_cache, key, value_cache, value, beam_batch);
     } else {
       copy_key_value<at::BFloat16>(
-          key_cache, key, value_cache, value, batch_size);
-    }
-    auto beam_idx = at::zeros({max_positions, batch_size}, at::kLong);
+          key_cache, key, value_cache, value, beam_batch);
+    }    
     //surpport MGQ/MQA
     //expand the head dimensiopn of key/value to be same to the query
     if(query.size(2) != key.size(2)){
@@ -621,6 +615,16 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>  masked_m
       value_cache = at::empty(
           {max_positions, beam_batch, value.size(2), value.size(3)}, value.options());
       beam_idx = at::zeros({max_positions, beam_batch}, beam_idx.options());
+      for (auto i = 0; i < max_positions; i++){
+          for (auto j = 0; j < beam_batch; j++){
+              if(key.size(0) == beam_batch){
+                 beam_idx[i][j] = j;
+              }else{
+                 auto beam_size = beam_batch / key.size(0);
+                 beam_idx[i][j] = j / beam_size * beam_size;
+              }
+            }
+       }
     } else if (offset > 0 && offset + cur_len > cache_size) {
       auto new_cache_size = cache_size * 2;
       auto new_key_cache = at::zeros(
@@ -631,6 +635,16 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>  masked_m
       new_key_cache.slice(0, 0, cache_size).copy_(key_cache);
       new_value_cache.slice(0, 0, cache_size).copy_(value_cache);
       new_beam_idx.slice(0, 0, cache_size).copy_(beam_idx);
+      for (auto i = offset; i < new_cache_size; i++){
+          for (auto j = 0; j < beam_batch; j++){
+              if(key.size(0) == beam_batch){
+                 new_beam_idx[i][j] = j;
+              }else{
+                 auto beam_size = beam_batch / key.size(0);
+                 new_beam_idx[i][j] = j / beam_size * beam_size;
+              }
+            }
+      }
       key_cache = new_key_cache;
       value_cache = new_value_cache;
       beam_idx = new_beam_idx;
@@ -652,6 +666,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>  masked_m
           query,
           key,
           value,
+          key_cache,
+          value_cache,
+          beam_idx,
           beam_batch,
           scale_attn,
           max_positions,
