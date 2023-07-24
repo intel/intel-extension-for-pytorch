@@ -119,15 +119,18 @@ def replace_transformer_with_ipex_transformer(model):
         import transformers
         from ._transformers import IPEXGPTJBlock
     except ImportError as e:
-        print("Can not find transformers in your environment, disable ipex transformer optimize")
+        warnings.warn("Can not find transformers in your environment, disable ipex transformer optimize")
         return model
-    # supported_blocks = [transformers.models.gptj.modeling_gptj.GPTJBlock]
-    for child_name, child in model.named_children():
-        if isinstance(child, transformers.models.gptj.modeling_gptj.GPTJBlock):
-            ipex_block = IPEXGPTJBlock(child)
-            setattr(model, child_name, ipex_block)
-        else:
-            replace_transformer_with_ipex_transformer(child)
+
+    def replace_transformer_with_ipex_transformer_util(model):
+        # supported_blocks = [transformers.models.gptj.modeling_gptj.GPTJBlock]
+        for child_name, child in model.named_children():
+            if isinstance(child, transformers.models.gptj.modeling_gptj.GPTJBlock):
+                ipex_block = IPEXGPTJBlock(child)
+                setattr(model, child_name, ipex_block)
+            else:
+                replace_transformer_with_ipex_transformer_util(child)
+    replace_transformer_with_ipex_transformer_util(model)
 
 
 def replace_dropout_with_identity(model):
