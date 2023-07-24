@@ -84,7 +84,7 @@ if "deepspeed" in installed_pkg:
 
     def _all_reduce(self, reduceOp, tag, ranks, group_size):
         if DS_SHM_ALLREDUCE == "1":
-            comm.all_reduce_low_latency(self, async_op=False)
+            comm.inference_all_reduce(self, async_op=False)
         else:
             comm.all_reduce(self, async_op=False)
         return self
