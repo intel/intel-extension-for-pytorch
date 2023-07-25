@@ -1,4 +1,115 @@
-/* make the page 1000px */
+/* make the page 1200px */
 .wy-nav-content {
-   max-width: 1200px;
+  max-width: 1200px;
+}
+
+
+.menu {
+  display: flex;
+  flex-wrap: wrap;
+  width: 60%;
+  margin: auto;
+  padding: 10px 24px 24px 24px;
+}
+
+.menu-element {
+  flex: 1 1 48%;
+  background-color: #0070C0;
+  color: white;
+  text-align: center;
+  margin: 2px;
+  padding: 10px 24px;
+  cursor: pointer;
+}
+
+@media screen and (max-width: 768px) {
+  .menu-element {
+    width: 100%;
+  }
+}
+
+.menu-element:hover {
+  background-color: #1A6F9B;
+}
+
+.menu-element.selected {
+  background-color: #1A6F9B;
+}
+
+
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  margin: auto;
+  padding: 0px 2px;
+}
+
+.row-element-1 {
+  flex: 1 1 20%;
+  display: block;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.row-element-2 {
+  flex: 1 1 80%;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.mobile-headings {
+  flex: 1 1 auto;
+  color: black;
+  text-align: left;
+  margin: 2px;
+  padding: 10px 24px;
+  display: none;
+}
+
+.headings-element {
+  text-align: left;
+  margin: 2px;
+  padding: 10px 24px;
+}
+
+.values-element {
+  flex: 1 1 auto;
+  background-color: #0070C0;
+  color: white;
+  text-align: left;
+  margin: 2px;
+  padding: 10px 24px;
+  cursor: pointer;
+}
+
+@media screen and (max-width: 768px) {
+  .row-element-1 {
+    display: none;
+  }
+
+  .row-element-2 {
+    flex: 1 1 100%;
+  }
+
+  .mobile-headings {
+    display: block;
+  }
+
+  .values-element {
+    flex: 1 1 100%;
+  }
+}
+
+.values-element:hover {
+  background-color: #1A6F9B;
+}
+
+.values-element.selected {
+  background-color: #1A6F9B;
+}
+
+#install-instructions {
+  padding-top: 50px;
 }
