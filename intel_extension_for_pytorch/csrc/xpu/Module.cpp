@@ -209,6 +209,23 @@ PyObject* THPModule_getCurrentStream_wrap(
   END_HANDLE_TH_ERRORS
 }
 
+PyObject* THPModule_getCurrentRawStream(
+    PyObject* /* unused */,
+    PyObject* device_index) {
+  HANDLE_TH_ERRORS
+  THPUtils_assert(
+      THPUtils_checkLong(device_index),
+      "invalid argument to getCurrentRawStream");
+  int64_t device = THPUtils_unpackLong(device_index);
+  // NOTE: Here is a high dependency on the implementation of queue pool using
+  // smart pointer in runtime.
+  return PyCapsule_New(
+      xpu::dpcpp::getCurrentDPCPPStream(device).queue(),
+      "torch.xpu.Stream.sycl_queue",
+      nullptr);
+  END_HANDLE_TH_ERRORS
+}
+
 PyObject* THPModule_setCurrentStream_wrap(
     PyObject* self,
     PyObject* args,
@@ -487,6 +504,10 @@ static struct PyMethodDef _THPModule_methods[] = {
      nullptr},
     {"_getCurrentStream",
      (PyCFunction)THPModule_getCurrentStream_wrap,
+     METH_O,
+     nullptr},
+    {"_getCurrentRawStream",
+     (PyCFunction)THPModule_getCurrentRawStream,
      METH_O,
      nullptr},
     {"_setCurrentStream",

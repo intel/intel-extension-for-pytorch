@@ -97,6 +97,7 @@ from . import quantization
 from . import nn
 from . import jit
 from . import optim
+from . import _inductor
 
 from .frontend import optimize, enable_onednn_fusion
 from .frontend import enable_auto_channels_last, disable_auto_channels_last
