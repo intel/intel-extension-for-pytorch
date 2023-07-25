@@ -9,6 +9,7 @@
 #include "comm/AccumulateType.h"
 #include "comm/RegistrationDeclarations.h"
 #include "core/MemoryFormat.h"
+#include "utils/ComputeEngine.h"
 using namespace dnnl;
 using namespace xpu::dpcpp;
 using namespace xpu::dpcpp::detail;
@@ -1147,9 +1148,14 @@ std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> native_batch_norm_out(
     Tensor& out,
     Tensor& save_mean,
     Tensor& save_invstd) {
-  auto compute_eng = Settings::I().get_compute_eng();
-  if (xpu::oneDNN::is_onednn_layout(input) ||
-      compute_eng == xpu::COMPUTE_ENG::ONEDNN || input.is_quantized()) {
+  xpu::COMPUTE_ENG real_eng;
+  if (input.is_quantized()) {
+    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+  } else {
+    real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+  }
+
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     c10::MaybeOwned<Tensor> weight_maybe_owned =
         at::borrow_from_optional_tensor(weight_opt);
     const Tensor& weight = *weight_maybe_owned;
@@ -2781,9 +2787,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm_backward(
     bool training,
     double epsilon,
     std::array<bool, 3> grad_input_mask) {
-  auto compute_eng = Settings::I().get_compute_eng();
-  if (xpu::oneDNN::is_onednn_layout(input) ||
-      compute_eng == xpu::COMPUTE_ENG::ONEDNN) {
+  xpu::COMPUTE_ENG real_eng;
+  real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     c10::MaybeOwned<Tensor> weight_maybe_owned =
         at::borrow_from_optional_tensor(weight_opt);
     const Tensor& weight = *weight_maybe_owned;
