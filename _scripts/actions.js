@@ -478,7 +478,6 @@ $(document).ready(function() {
         console.log("error");
         console.log(textStatus);
         console.log(errorThrown);
-        alert(textStatus);
       },
       success: function(data) {
         var ret = jQuery.parseJSON(data);
