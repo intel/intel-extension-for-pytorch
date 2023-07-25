@@ -421,16 +421,20 @@ def record_input_shape_for_prepack(module, sample_input):
             torch.nn.Conv3d,
             torch.nn.ConvTranspose2d,
         ]:
-            module.register_forward_pre_hook(hook_function)
+            hook = module.register_forward_pre_hook(hook_function)
+            hooks.append(hook)
 
     def register_hook_function_rec(module):
         register_hook_function(module)
         for child in module.children():
             register_hook_function_rec(child)
 
+    hooks = []
     module_is_train = module.training
     module.eval()
     register_hook_function_rec(module)
     module(*sample_input)
     if module_is_train:
         module.train()
+    for hook in hooks:
+        hook.remove()

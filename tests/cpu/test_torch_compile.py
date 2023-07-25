@@ -95,6 +95,7 @@ class TestCompileCases(TestCase):
                 [True, False],
                 [True, False],
                 [True, False],
+                [True, False],
             )
             for (
                 dtype,
@@ -102,10 +103,13 @@ class TestCompileCases(TestCase):
                 dynamic,
                 ipex_optimize,
                 weight_prepack,
+                feed_sample_input,
             ) in options:
                 if compiler_backend == "torchscript" and dynamic is True:
                     continue
                 if weight_prepack is True and ipex_optimize is False:
+                    continue
+                if feed_sample_input is True and weight_prepack is False:
                     continue
                 N = 2
                 M = 2
@@ -124,9 +128,14 @@ class TestCompileCases(TestCase):
                         ipex.disable_auto_channels_last()
                     else:
                         ipex.enable_auto_channels_last()
-                    model = ipex.optimize(
-                        model, weights_prepack=weight_prepack, dtype=dtype
-                    )
+                    if feed_sample_input:
+                        model = ipex.optimize(
+                            model, weights_prepack=weight_prepack, dtype=dtype, sample_input=x,
+                        )
+                    else:
+                        model = ipex.optimize(
+                            model, weights_prepack=weight_prepack, dtype=dtype
+                        )
                 torch._dynamo.reset()
                 ipex._set_compiler_backend(compiler_backend)
                 compile_model = torch.compile(model, dynamic=dynamic, backend="ipex")
@@ -148,6 +157,7 @@ class TestCompileCases(TestCase):
                 [True, False],
                 [True, False],
                 [True, False],
+                [True, False],
             )
             for (
                 dtype,
@@ -155,8 +165,11 @@ class TestCompileCases(TestCase):
                 dynamic,
                 ipex_optimize,
                 weight_prepack,
+                feed_sample_input,
             ) in options:
                 if weight_prepack is True and ipex_optimize is False:
+                    continue
+                if feed_sample_input is True and weight_prepack is False:
                     continue
                 N = 2
                 M = 2
@@ -165,6 +178,7 @@ class TestCompileCases(TestCase):
                 input = torch.randn(x_shape, dtype=torch.float32)
                 ori_x = input.clone().requires_grad_()
                 x = input.clone().requires_grad_()
+                sample_x = input.clone().requires_grad_()
                 conv = ConvNd_Relu(
                     dim=dim,
                     in_channels=C,
@@ -180,18 +194,34 @@ class TestCompileCases(TestCase):
                         ipex.disable_auto_channels_last()
                     else:
                         ipex.enable_auto_channels_last()
-                    ori_model, _ = ipex.optimize(
-                        ori_model,
-                        weights_prepack=weight_prepack,
-                        dtype=dtype,
-                        optimizer=optimizer,
-                    )
-                    model, _ = ipex.optimize(
-                        model,
-                        weights_prepack=weight_prepack,
-                        dtype=dtype,
-                        optimizer=optimizer,
-                    )
+                    if feed_sample_input:
+                        ori_model, _ = ipex.optimize(
+                            ori_model,
+                            weights_prepack=weight_prepack,
+                            dtype=dtype,
+                            optimizer=optimizer,
+                            sample_input=sample_x,
+                        )
+                        model, _ = ipex.optimize(
+                            model,
+                            weights_prepack=weight_prepack,
+                            dtype=dtype,
+                            optimizer=optimizer,
+                            sample_input=sample_x,
+                        )
+                    else:
+                        ori_model, _ = ipex.optimize(
+                            ori_model,
+                            weights_prepack=weight_prepack,
+                            dtype=dtype,
+                            optimizer=optimizer,
+                        )
+                        model, _ = ipex.optimize(
+                            model,
+                            weights_prepack=weight_prepack,
+                            dtype=dtype,
+                            optimizer=optimizer,
+                        )
                 torch._dynamo.reset()
                 ipex._set_compiler_backend(compiler_backend)
                 compile_model = torch.compile(model, dynamic=dynamic, backend="ipex")
@@ -219,6 +249,7 @@ class TestCompileCases(TestCase):
                 [True, False],
                 [True, False],
                 [True, False],
+                [True, False],
             )
             for (
                 dtype,
@@ -226,10 +257,13 @@ class TestCompileCases(TestCase):
                 dynamic,
                 ipex_optimize,
                 weight_prepack,
+                feed_sample_input,
             ) in options:
                 if compiler_backend == "torchscript" and dynamic is True:
                     continue
                 if weight_prepack is True and ipex_optimize is False:
+                    continue
+                if feed_sample_input is True and weight_prepack is False:
                     continue
                 ic = input_channel_per_group
                 oc = output_channel_per_group
@@ -242,9 +276,14 @@ class TestCompileCases(TestCase):
                         ipex.disable_auto_channels_last()
                     else:
                         ipex.enable_auto_channels_last()
-                    model = ipex.optimize(
-                        model, weights_prepack=weight_prepack, dtype=dtype
-                    )
+                    if feed_sample_input:
+                        model = ipex.optimize(
+                            model, weights_prepack=weight_prepack, dtype=dtype, sample_input=x,
+                        )
+                    else:
+                        model = ipex.optimize(
+                            model, weights_prepack=weight_prepack, dtype=dtype
+                        )
                 torch._dynamo.reset()
                 ipex._set_compiler_backend(compiler_backend)
                 compile_model = torch.compile(model, dynamic=dynamic, backend="ipex")
@@ -269,6 +308,7 @@ class TestCompileCases(TestCase):
                 [True, False],
                 [True, False],
                 [True, False],
+                [True, False],
             )
             for (
                 dtype,
@@ -276,8 +316,11 @@ class TestCompileCases(TestCase):
                 dynamic,
                 ipex_optimize,
                 weight_prepack,
+                feed_sample_input,
             ) in options:
                 if weight_prepack is True and ipex_optimize is False:
+                    continue
+                if feed_sample_input is True and weight_prepack is False:
                     continue
                 ic = input_channel_per_group
                 oc = output_channel_per_group
@@ -285,6 +328,7 @@ class TestCompileCases(TestCase):
                 input = torch.randn(x_shape, dtype=torch.float32)
                 ori_x = input.clone().requires_grad_()
                 x = input.clone().requires_grad_()
+                sample_x = input.clone().requires_grad_()
                 deconv = DeconvNd_Relu(dim, ic, oc, kernel_size)
                 ori_model = copy.deepcopy(deconv).train()
                 model = copy.deepcopy(deconv).train()
@@ -295,18 +339,34 @@ class TestCompileCases(TestCase):
                         ipex.disable_auto_channels_last()
                     else:
                         ipex.enable_auto_channels_last()
-                    ori_model, _ = ipex.optimize(
-                        ori_model,
-                        weights_prepack=weight_prepack,
-                        dtype=dtype,
-                        optimizer=optimizer,
-                    )
-                    model, _ = ipex.optimize(
-                        model,
-                        weights_prepack=weight_prepack,
-                        dtype=dtype,
-                        optimizer=optimizer,
-                    )
+                    if feed_sample_input:
+                        ori_model, _ = ipex.optimize(
+                            ori_model,
+                            weights_prepack=weight_prepack,
+                            dtype=dtype,
+                            optimizer=optimizer,
+                            sample_input=sample_x,
+                        )
+                        model, _ = ipex.optimize(
+                            model,
+                            weights_prepack=weight_prepack,
+                            dtype=dtype,
+                            optimizer=optimizer,
+                            sample_input=sample_x,
+                        )
+                    else:
+                        ori_model, _ = ipex.optimize(
+                            ori_model,
+                            weights_prepack=weight_prepack,
+                            dtype=dtype,
+                            optimizer=optimizer,
+                        )
+                        model, _ = ipex.optimize(
+                            model,
+                            weights_prepack=weight_prepack,
+                            dtype=dtype,
+                            optimizer=optimizer,
+                        )
                 torch._dynamo.reset()
                 ipex._set_compiler_backend(compiler_backend)
                 compile_model = torch.compile(model, dynamic=dynamic, backend="ipex")
@@ -333,6 +393,7 @@ class TestCompileCases(TestCase):
             [True, False],
             [True, False],
             [True, False],
+            [True, False],
         )
         for (
             x_shape,
@@ -341,17 +402,25 @@ class TestCompileCases(TestCase):
             dynamic,
             ipex_optimize,
             weight_prepack,
+            feed_sample_input,
         ) in options:
             if compiler_backend == "torchscript" and dynamic is True:
                 continue
             if weight_prepack is True and ipex_optimize is False:
                 continue
+            if feed_sample_input is True and weight_prepack is False:
+                continue
             x = torch.randn(x_shape, dtype=torch.float32)
             model = Linear_Relu(in_features, out_features).eval()
             if ipex_optimize:
-                model = ipex.optimize(
-                    model, weights_prepack=weight_prepack, dtype=dtype
-                )
+                if feed_sample_input:
+                    model = ipex.optimize(
+                        model, weights_prepack=weight_prepack, dtype=dtype, sample_input=x,
+                    )
+                else:
+                    model = ipex.optimize(
+                        model, weights_prepack=weight_prepack, dtype=dtype
+                    )
             torch._dynamo.reset()
             ipex._set_compiler_backend(compiler_backend)
             compile_model = torch.compile(model, dynamic=dynamic, backend="ipex")
@@ -376,6 +445,7 @@ class TestCompileCases(TestCase):
             [True, False],
             [True, False],
             [True, False],
+            [True, False],
         )
         for (
             x_shape,
@@ -384,29 +454,49 @@ class TestCompileCases(TestCase):
             dynamic,
             ipex_optimize,
             weight_prepack,
+            feed_sample_input,
         ) in options:
             if weight_prepack is True and ipex_optimize is False:
+                continue
+            if feed_sample_input is True and weight_prepack is False:
                 continue
             input = torch.randn(x_shape, dtype=torch.float32)
             ori_x = input.clone().requires_grad_()
             x = input.clone().requires_grad_()
+            sample_x = input.clone().requires_grad_()
             linear = Linear_Relu(in_features, out_features)
             ori_model = copy.deepcopy(linear).train()
             model = copy.deepcopy(linear).train()
             optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)
             if ipex_optimize:
-                ori_model, _ = ipex.optimize(
-                    ori_model,
-                    weights_prepack=weight_prepack,
-                    dtype=dtype,
-                    optimizer=optimizer,
-                )
-                model, _ = ipex.optimize(
-                    model,
-                    weights_prepack=weight_prepack,
-                    dtype=dtype,
-                    optimizer=optimizer,
-                )
+                if feed_sample_input:
+                    ori_model, _ = ipex.optimize(
+                        ori_model,
+                        weights_prepack=weight_prepack,
+                        dtype=dtype,
+                        optimizer=optimizer,
+                        sample_input=sample_x,
+                    )
+                    model, _ = ipex.optimize(
+                        model,
+                        weights_prepack=weight_prepack,
+                        dtype=dtype,
+                        optimizer=optimizer,
+                        sample_input=sample_x,
+                    )
+                else:
+                    ori_model, _ = ipex.optimize(
+                        ori_model,
+                        weights_prepack=weight_prepack,
+                        dtype=dtype,
+                        optimizer=optimizer,
+                    )
+                    model, _ = ipex.optimize(
+                        model,
+                        weights_prepack=weight_prepack,
+                        dtype=dtype,
+                        optimizer=optimizer,
+                    )
             torch._dynamo.reset()
             ipex._set_compiler_backend(compiler_backend)
             compile_model = torch.compile(model, dynamic=dynamic, backend="ipex")
