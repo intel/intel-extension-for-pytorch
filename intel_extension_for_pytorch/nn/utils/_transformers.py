@@ -113,9 +113,6 @@ class IPEXTransformerAtten(nn.Module):
         self.key_cached = None
         self.value_cached = None
 
-        beam = os.environ.get("Beam", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
-        self.greedy = not beam
-
         seq_first = os.environ.get("SEQ_FIRST", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         disable_kv_cache = os.environ.get("DISABLE_KV_CACHE", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         self.kv_cache = not disable_kv_cache
@@ -239,9 +236,15 @@ class IPEXTransformerAtten(nn.Module):
                     key_value_state: Optional[torch.Tensor] = None,
                     layer_past: Optional[Tuple[torch.Tensor]] = None):
         if self.kv_cache_optimize and self.row_major and self.kv_cache:
-            if self.greedy:
+            if self.get_beam_width() == 1:
                 query, key, value = self.qkv_cache_optimized_greedy(hidden_states=hidden_state, layer_past=layer_past)
             else:
+                # TODO: support greedy
+                # update prompts status
+                new_prompts = True if layer_past == None else False
+                if new_prompts:
+                    self.key_prompt = None
+                    self.value_prompt = None
                 query, key, value = self.qkv_cache_optimized_beam(hidden_states=hidden_state, layer_past=layer_past)
             new_shape = query.size()[:-1] + (self.num_attn_head, self.head_dim)
             if self.cur_len == 0:
@@ -404,8 +407,7 @@ class IPEXTransformerAtten(nn.Module):
             if alibi != None:
                 blocked_alibi = self.get_blocked_alibi(alibi)
 
-
-            if self.cur_len > 0 and not self.greedy:
+            if self.cur_len > 0 and self.get_beam_width() != 1:
                 ########### 2nd token to the end
                 # query shape [bs*beam, head, q_seq, dim], layout [q_seq, bs*beam, head, dim]
                 # query shape [4, 16, 1, 256], stride [4096, 256, 16384, 1]
@@ -433,7 +435,10 @@ class IPEXTransformerAtten(nn.Module):
                 key, value = self.reorder_cache(key, value, IPEXTransformerAtten.beam_index)
             attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi)
         return attn_output, attn_weights
-    
+
+    def get_beam_width(self):
+        return IPEXTransformerAtten.beam_index.shape[1] // IPEXTransformerAtten.batch_size if IPEXTransformerAtten.beam_index != None else 1
+
     def expand_beam_idx(self):
         bs = IPEXTransformerAtten.batch_size
         beam_idx = IPEXTransformerAtten.beam_index
