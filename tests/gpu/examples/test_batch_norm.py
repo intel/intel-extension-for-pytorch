@@ -379,3 +379,17 @@ class TestNNMethod(TestCase):
         )
         self.assertEqual(mean, torch.ones(3, device="xpu"))
         self.assertEqual(invstd, torch.ones(3, device="xpu"))
+
+
+    def test_sync_batchnorm_accuracy(self):
+
+        def _batch_norm_stats(data, memory_format, mean_axes):
+            mean1, _ = torch.batch_norm_stats(data, 1e-5)
+            mean2, _ = torch.batch_norm_stats(data.to(memory_format=memory_format), 1e-5)
+            mean_ref = torch.mean(data, mean_axes, keepdim=False)
+
+            self.assertEqual(mean_ref, mean1)
+            self.assertEqual(mean_ref, mean2)
+
+        _batch_norm_stats(torch.randn(1, 96, 112, 112, dtype=torch.float, device='xpu'), torch.channels_last, (0, 2, 3))
+        _batch_norm_stats(torch.randn(1, 96, 112, 112, 112, dtype=torch.float, device='xpu'), torch.channels_last_3d, (0, 2, 3, 4))

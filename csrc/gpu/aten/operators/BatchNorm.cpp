@@ -24,6 +24,17 @@ struct Var {
   }
 };
 
+struct InvStd {
+  template <typename T>
+  inline T operator()(T var, double epsilon) const {
+    T invstd = 0;
+    if (var != static_cast<T>(0.0f) || epsilon != static_cast<T>(0.0f)) {
+      invstd = static_cast<T>(1.0f) / Numerics<T>::sqrt(var + epsilon);
+    }
+    return invstd;
+  }
+};
+
 // returns 2**floor(log2(n))
 static int lastPow2(unsigned int n) {
   n |= (n >> 1);
@@ -3202,6 +3213,44 @@ std::tuple<Tensor, Tensor> batch_norm_gather_stats_with_counts(
       momentum,
       epsilon,
       counts);
+}
+
+std::tuple<Tensor, Tensor> batch_norm_stats(
+    const Tensor& self,
+    double epsilon) {
+  auto options = self.options().dtype(toAccumulateType(self.scalar_type()));
+  auto n_channels = self.size(1);
+  auto save_mean = at::empty({n_channels}, options);
+  auto save_invstd = at::empty({n_channels}, options);
+
+  batch_norm_stats_out(self, epsilon, save_mean, save_invstd);
+  return std::tuple<Tensor, Tensor>(save_mean, save_invstd);
+}
+
+std::tuple<Tensor&, Tensor&> batch_norm_stats_out(
+    const Tensor& self,
+    double epsilon,
+    Tensor& save_mean,
+    Tensor& save_invstd) {
+  bool use_channels_last_kernel = batch_norm_use_channels_last_kernels(self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "batch_norm_stats",
+      [&] {
+        if (use_channels_last_kernel) {
+          batch_norm_stats_channels_last_template<scalar_t, InvStd>(
+              save_mean, save_invstd, self, epsilon);
+        } else if (canUse32BitIndexMath(self)) {
+          batch_norm_stats_channels_first_template<scalar_t, int32_t, InvStd>(
+              save_mean, save_invstd, self, epsilon);
+        } else {
+          batch_norm_stats_channels_first_template<scalar_t, int64_t, InvStd>(
+              save_mean, save_invstd, self, epsilon);
+        }
+      });
+  return std::tuple<Tensor&, Tensor&>(save_mean, save_invstd);
 }
 
 } // namespace AtenIpexTypeXPU
