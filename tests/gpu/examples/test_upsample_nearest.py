@@ -96,11 +96,10 @@ class TestNNMethod(TestCase):
         grad_dpcpp = input_dpcpp.grad
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
 
-    @pytest.mark.skipif(not torch.xpu.has_fp64_dtype(), reason="[oneDNN rls-v3.3-pc] hang on ATS-M, will be fixed soon.")
     def test_upsample_nearest_with_non_integral_scales(self, dtype=torch.float):
         # 2D, CF
-        x = torch.rand(1, 3, 180, 320)
-        shape = (360, 480)
+        x = torch.rand(1, 3, 18, 32)
+        shape = (36, 48)
         dummy_img = (x - x.min()) / (x.max() - x.min()) * 255.
         dummy_img_xpu = dummy_img.to("xpu")
         dummy_img.requires_grad = True
@@ -109,7 +108,7 @@ class TestNNMethod(TestCase):
         y_xpu = torch.functional.F.interpolate(dummy_img_xpu, shape)
         self.assertEqual(y_cpu, y_xpu.cpu())
         grad_out_cpu = torch.randn(
-            (1, 3, 360, 480), dtype=torch.float32, device=cpu_device
+            (1, 3, 36, 48), dtype=torch.float32, device=cpu_device
         )
         grad_out_dpcpp = grad_out_cpu.to("xpu")
         grad_out_cpu = Variable(grad_out_cpu, requires_grad=True)
@@ -122,8 +121,8 @@ class TestNNMethod(TestCase):
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
 
         # 2D, CL
-        x = torch.rand(1, 3, 180, 320).to(memory_format=torch.channels_last)
-        shape = (360, 480)
+        x = torch.rand(1, 3, 18, 32).to(memory_format=torch.channels_last)
+        shape = (36, 48)
         dummy_img = (x - x.min()) / (x.max() - x.min()) * 255.
         dummy_img_xpu = dummy_img.to("xpu")
         dummy_img.requires_grad = True
@@ -132,7 +131,7 @@ class TestNNMethod(TestCase):
         y_xpu = torch.functional.F.interpolate(dummy_img_xpu, shape)
         self.assertEqual(y_cpu, y_xpu.cpu())
         grad_out_cpu = torch.randn(
-            (1, 3, 360, 480), dtype=torch.float32, device=cpu_device
+            (1, 3, 36, 48), dtype=torch.float32, device=cpu_device
         ).to(memory_format=torch.channels_last)
         grad_out_dpcpp = grad_out_cpu.to("xpu")
         grad_out_cpu = Variable(grad_out_cpu, requires_grad=True)
@@ -145,8 +144,8 @@ class TestNNMethod(TestCase):
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
 
         # 1D, CF
-        x = torch.rand(3, 180, 320)
-        shape = (480)
+        x = torch.rand(3, 18, 32)
+        shape = (48)
         dummy_img = (x - x.min()) / (x.max() - x.min()) * 255.
         dummy_img_xpu = dummy_img.to("xpu")
         dummy_img.requires_grad = True
@@ -155,7 +154,7 @@ class TestNNMethod(TestCase):
         y_xpu = torch.functional.F.interpolate(dummy_img_xpu, shape)
         self.assertEqual(y_cpu, y_xpu.cpu())
         grad_out_cpu = torch.randn(
-            (3, 180, 480), dtype=torch.float32, device=cpu_device
+            (3, 18, 48), dtype=torch.float32, device=cpu_device
         )
         grad_out_dpcpp = grad_out_cpu.to("xpu")
         grad_out_cpu = Variable(grad_out_cpu, requires_grad=True)
@@ -168,8 +167,8 @@ class TestNNMethod(TestCase):
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
 
         # 3D, CF
-        x = torch.rand(1, 3, 180, 320, 320)
-        shape = (360, 480, 480)
+        x = torch.rand(1, 3, 18, 32, 32)
+        shape = (36, 48, 48)
         dummy_img = (x - x.min()) / (x.max() - x.min()) * 255.
         dummy_img_xpu = dummy_img.to("xpu")
         dummy_img.requires_grad = True
@@ -178,7 +177,7 @@ class TestNNMethod(TestCase):
         y_xpu = torch.functional.F.interpolate(dummy_img_xpu, shape)
         self.assertEqual(y_cpu, y_xpu.cpu())
         grad_out_cpu = torch.randn(
-            (1, 3, 360, 480, 480), dtype=torch.float32, device=cpu_device
+            (1, 3, 36, 48, 48), dtype=torch.float32, device=cpu_device
         )
         grad_out_dpcpp = grad_out_cpu.to("xpu")
         grad_out_cpu = Variable(grad_out_cpu, requires_grad=True)
@@ -191,8 +190,8 @@ class TestNNMethod(TestCase):
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
 
         # 3D, CL
-        x = torch.rand(1, 3, 180, 320, 320).to(memory_format=torch.channels_last_3d)
-        shape = (360, 480, 480)
+        x = torch.rand(1, 3, 18, 32, 32).to(memory_format=torch.channels_last_3d)
+        shape = (36, 48, 48)
         dummy_img = (x - x.min()) / (x.max() - x.min()) * 255.
         dummy_img_xpu = dummy_img.to("xpu")
         dummy_img.requires_grad = True
@@ -201,7 +200,7 @@ class TestNNMethod(TestCase):
         y_xpu = torch.functional.F.interpolate(dummy_img_xpu, shape)
         self.assertEqual(y_cpu, y_xpu.cpu())
         grad_out_cpu = torch.randn(
-            (1, 3, 360, 480, 480), dtype=torch.float32, device=cpu_device
+            (1, 3, 36, 48, 48), dtype=torch.float32, device=cpu_device
         ).to(memory_format=torch.channels_last_3d)
         grad_out_dpcpp = grad_out_cpu.to("xpu")
         grad_out_cpu = Variable(grad_out_cpu, requires_grad=True)
