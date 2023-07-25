@@ -8,7 +8,7 @@ class PositionalEmbedding(nn.Module):
         super().__init__()
         self.config = config
 
-    def forward(self, query, key, position_ids):
+    def forward(self, query, key, position_ids, layer_ids):
         return query, key
 
 
@@ -53,15 +53,16 @@ class GPTJRotaryEmbedding(PositionalEmbedding):
     def apply_rotary_pos_emb(self, query, key, sin, cos) -> torch.Tensor:
         torch.ops.torch_ipex.apply_rotary_embedding_two(query, key, sin, cos, query, key)
 
-    def get_sin_cos(self, position_ids):
-        if GPTJRotaryEmbedding.position_ids is None or GPTJRotaryEmbedding.position_ids is not position_ids:
+    def get_sin_cos(self, position_ids, layer_id):
+        if GPTJRotaryEmbedding.position_ids is None or layer_id == 0:
+            position_ids = position_ids.transpose(0, 1)
             GPTJRotaryEmbedding.sin = self.sin_cached[position_ids].unsqueeze(2)
             GPTJRotaryEmbedding.cos = self.cos_cached[position_ids].unsqueeze(2)
             GPTJRotaryEmbedding.position_ids = position_ids
         return GPTJRotaryEmbedding.sin, GPTJRotaryEmbedding.cos
 
-    def forward(self, query, key, position_ids):
-        sin, cos = self.get_sin_cos(position_ids)
+    def forward(self, query, key, position_ids, layer_id):
+        sin, cos = self.get_sin_cos(position_ids, layer_id)
         if self.rotary_dim is not None:
             self.apply_rotary_pos_emb(query[:, :, :, : self.rotary_dim], key[:, :, :, : self.rotary_dim], sin, cos)
         else:
@@ -93,14 +94,14 @@ class LlamaRotaryEmbedding(torch.nn.Module):
     def apply_rotary_pos_emb(self, query: torch.Tensor, key: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor):
         torch.ops.torch_ipex.apply_rotary_embedding_half(query, key, sin, cos, query, key)
 
-    def get_sin_cos(self, position_ids):
-        if LlamaRotaryEmbedding.position_ids is None or LlamaRotaryEmbedding.position_ids is not position_ids:
+    def get_sin_cos(self, position_ids, layer_id):
+        if LlamaRotaryEmbedding.position_ids is None or layer_id == 0:
             LlamaRotaryEmbedding.sin = self.sin_cached[position_ids].unsqueeze(2)
             LlamaRotaryEmbedding.cos = self.cos_cached[position_ids].unsqueeze(2)
             LlamaRotaryEmbedding.position_ids = position_ids
         return LlamaRotaryEmbedding.sin, LlamaRotaryEmbedding.cos
 
-    def forward(self, query, key, position_ids):
-        sin, cos = self.get_sin_cos(position_ids)
+    def forward(self, query, key, position_ids, layer_id):
+        sin, cos = self.get_sin_cos(position_ids, layer_id)
         self.apply_rotary_pos_emb(query, key, sin, cos)
         return query, key

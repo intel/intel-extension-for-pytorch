@@ -299,7 +299,7 @@ class IPEXTransformerAtten(nn.Module):
         return query, key, value
 
     def apply_rotary_embedding(self, key, query, position_ids):
-        return self.position_emb(key, query, position_ids)
+        return self.position_emb(key, query, position_ids, self.layer_id)
 
     def all_reduce_if_necessary(self, reduce_target):
         if self.tp_group is not None:
@@ -461,11 +461,13 @@ class IPEXTransformerAtten(nn.Module):
         # key shape[bs*beam, head, kv_len, dim] layout[kv_len, bs*beam, head, dim]
         bs = self.key_prompt.shape[0]
         beam = int(key.shape[0] // bs)
+        expand_shape = [bs, beam, self.key_prompt.shape[1]*self.key_prompt.shape[2]*self.key_prompt.shape[3]]
         shape = [bs*beam, self.key_prompt.shape[1], self.key_prompt.shape[2], self.key_prompt.shape[3]]
         #shape1 = [bs* beam, key.shape[1], key.shape[2], key.shape[3]]
-
-        key_list = [torch.repeat_interleave(self.key_prompt, beam, 0)]
-        value_list = [torch.repeat_interleave(self.value_prompt, beam, 0)]
+        key_prompt = self.key_prompt.view(bs, 1, -1).expand(expand_shape).view(shape)
+        value_prompt = self.value_prompt.view(bs, 1, -1).expand(expand_shape).view(shape)
+        key_list = [key_prompt]
+        value_list = [value_prompt]
         beam_idx_cache = self.expand_beam_idx()
         for idx in range(beam_idx_cache.shape[0]):
             beam_idx = beam_idx_cache[idx]
@@ -767,7 +769,7 @@ class IPEXGPTJBlock(nn.Module):
             attention_mask = attention_mask[0, :, :, :].view(1, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
         # convert layout form [bs, seq, hidden_size] to [seq, bs, hidden_size]
         hidden_states = hidden_states.transpose(0, 1).contiguous()
-        position_ids = position_ids.transpose(0, 1).contiguous()
+        # position_ids = position_ids.transpose(0, 1).contiguous()
 
         residual = hidden_states
         hidden_states, mean, var = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.ln.normalized_shape, self.ln.weight, self.ln.bias, self.ln.eps)
@@ -789,7 +791,9 @@ class IPEXGPTJBlock(nn.Module):
         hidden_states = hidden_states.transpose(0, 1)
         if hidden_states.shape[1] > 1:
             # hidden_states = hidden_states.expand([beam, hidden_states.shape[1], hidden_states.shape[2]])
-            hidden_states = torch.repeat_interleave(hidden_states, beam, 0)
+            # hidden_states = torch.repeat_interleave(hidden_states, beam, 0)
+            hidden_states = hidden_states.view(bs, 1, hidden_states.shape[1], hidden_states.shape[2]).expand([bs, beam, hidden_states.shape[1], hidden_states.shape[2]])
+            hidden_states = hidden_states.view(bs*beam, hidden_states.shape[2], hidden_states.shape[3])
         if use_cache:
             outputs = (hidden_states, ) + outputs
         else:
