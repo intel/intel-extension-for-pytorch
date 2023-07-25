@@ -22,6 +22,11 @@ $(document).ready(function() {
       $("#div-installation").show();
       if(window.location.hash != "#installation")
         window.location.hash = "#installation";
+      if($("#col-headings").children().length == 0) {
+        var query = {};
+        query.request = "platform";
+        $.ajax_query(JSON.stringify(query));
+      }
     } else if($(this).attr("id") == "menu-introduction") {
       $("#div-introduction").show();
       $("#div-installation").hide();
@@ -502,9 +507,6 @@ $(document).ready(function() {
     });
   }
 
-  var query = {};
-  query.request = "platform";
-  $.ajax_query(JSON.stringify(query));
   $("#col-values").on("click", ".values-element", function() {
     fields = $(this).attr("id").split("-");
     if(fields[1] == "options")
