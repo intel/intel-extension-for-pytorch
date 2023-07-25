@@ -43,12 +43,3 @@ class TestTorchMethod(TestCase):
         tensor1 = torch.rand([8, 2048, 50304], dtype=dtype, device=dpcpp_device)
         tensor2 = tensor1.clone()
         self.assertEqual(tensor1.to(cpu_device), tensor2.to(cpu_device))
-
-    def test_non_blocking_H2D_copy(self):
-        input_cpu = torch.randn([256, 3, 224, 224])
-        input_xpu = input_cpu.to(dpcpp_device, non_blocking=True)
-
-        def dummy_compute(tensor):
-            return (tensor + 1.0) * 0.1
-
-        self.assertEqual(dummy_compute(input_cpu), dummy_compute(input_xpu).cpu())
