@@ -38,6 +38,18 @@ def register_lowering(
         convert_input_to_bool=convert_input_to_bool,
     )
 
+make_fallback(torch.ops.torch_ipex.convolution_forward)
+make_fallback(torch.ops.torch_ipex.convolution_backward)
+make_fallback(torch.ops.torch_ipex.conv_transpose)
+make_fallback(torch.ops.torch_ipex.conv_transpose_backward)
+make_fallback(torch.ops.torch_ipex.ipex_linear)
+make_fallback(torch.ops.torch_ipex.linear_backward)
+make_fallback(torch.ops.torch_ipex.ipex_MKLSGEMM)
+make_fallback(torch.ops.torch_ipex.embedding_bag)
+make_fallback(torch.ops.torch_ipex.ipex_lstm)
+make_fallback(torch.ops.torch_ipex.ROIAlign_forward)
+make_fallback(torch.ops.torch_ipex.ROIAlign_backward)
+
 make_fallback(torch.ops.torch_ipex.bmm_add)
 
 @contextlib.contextmanager
