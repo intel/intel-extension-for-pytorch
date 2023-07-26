@@ -17,7 +17,7 @@ from .utils.channels_last_1d import to_channels_last_1d
 from .cpu.utils.linear_bn_folding import linear_bn_fuse
 from .cpu.graph_capture import GraphCapture
 from .nn.utils._lstm_convert import _LSTM, replace_lstm_with_ipex_lstm
-from .nn.utils._weight_prepack import _IPEXConv2d, _IPEXConvTranspose2d, _IPEXLinear
+from .nn.utils._weight_prepack import _IPEXConv2d, _IPEXConv3d, _IPEXConvTranspose2d, _IPEXConvTranspose3d, _IPEXLinear
 from .nn.utils._weight_prepack import weight_prepack_with_ipex, record_input_shape_for_prepack
 from .cpu._auto_kernel_selection import (
     _enable_dnnl,
@@ -473,6 +473,8 @@ def optimize(
 
     if opt_properties.optimize_lstm:
         replace_lstm_with_ipex_lstm(optimized_model, optimized_optimizer)
+        torch._dynamo.allow_in_graph(_LSTM)
+
     if (
         model.training
         and opt_properties.split_master_weight_for_bf16
@@ -551,10 +553,13 @@ def optimize(
         ) = weight_prepack_with_ipex(
             optimized_model, optimized_optimizer, params_attr, "cpu"
         )
+        # TODO: support _IPEXConv1d in Inductor
+        # torch._dynamo.allow_in_graph(_IPEXConv1d)
         torch._dynamo.allow_in_graph(_IPEXConv2d)
+        torch._dynamo.allow_in_graph(_IPEXConv3d)
         torch._dynamo.allow_in_graph(_IPEXConvTranspose2d)
+        torch._dynamo.allow_in_graph(_IPEXConvTranspose3d)
         torch._dynamo.allow_in_graph(_IPEXLinear)
-        torch._dynamo.allow_in_graph(_LSTM)
 
 
     if opt_properties.graph_mode:
