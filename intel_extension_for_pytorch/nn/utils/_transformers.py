@@ -793,7 +793,7 @@ class IPEXGPTJBlock(nn.Module):
             # hidden_states = hidden_states.expand([beam, hidden_states.shape[1], hidden_states.shape[2]])
             # hidden_states = torch.repeat_interleave(hidden_states, beam, 0)
             hidden_states = hidden_states.view(bs, 1, hidden_states.shape[1], hidden_states.shape[2]).expand([bs, beam, hidden_states.shape[1], hidden_states.shape[2]])
-            hidden_states = hidden_states.view(bs*beam, hidden_states.shape[2], hidden_states.shape[3])
+            hidden_states = hidden_states.reshape(bs*beam, hidden_states.shape[2], hidden_states.shape[3])
         if use_cache:
             outputs = (hidden_states, ) + outputs
         else:

@@ -8,6 +8,7 @@ from collections import OrderedDict
 from ._transformers import IPEXTransformerAtten, IPEXTransformerMLP
 import os
 import inspect
+import time
 
 
 def _ipex_prepare_model_inputs(
@@ -205,6 +206,7 @@ def ipex_beam_search(
     from transformers.generation.stopping_criteria import StoppingCriteriaList, validate_stopping_criteria
     print("into ipex beam search")
     # init values
+    latency_list = []
     logits_processor = logits_processor if logits_processor is not None else LogitsProcessorList()
     stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
     if max_length is not None:
@@ -288,6 +290,7 @@ def ipex_beam_search(
     candidate_sequence_lengths = torch.zeros((batch_size * 2 * num_beams), dtype=torch.long, device=input_ids.device)
     origin_input_ids = input_ids
     while True:
+        tic = time.time()
         if synced_gpus:
             # Under synced_gpus the `forward` call must continue until all gpus complete their sequence.
             # The following logic allows an early break if all peers finished generating their sequence
@@ -346,7 +349,9 @@ def ipex_beam_search(
 
         # increase cur_len
         cur_len = cur_len + 1
-
+        if hasattr(self, "token_latency") and self.token_latency:
+            torch.xpu.synchronize()
+            latency_list.append(time.time() - tic)
         if finished.all() or cur_len >= stopping_criteria.max_length:
             if not synced_gpus:
                 break
@@ -359,6 +364,8 @@ def ipex_beam_search(
 
     # origin_input_ids size is [batch_size * beam_size, seq_len]
     out = torch.ops.torch_ipex.update_output_sequence(origin_input_ids, out, batch_size)
+    if hasattr(self, "token_latency") and self.token_latency:
+        return out, latency_list
     return out
 
 
