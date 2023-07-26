@@ -490,6 +490,38 @@ class TestOp(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, "aten::abs", 1)
 
     @llga_fp32_bf16_test_env
+    def test_type_as(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                x = x.type_as(y)
+                return x
+
+        x = torch.rand(10, 10, dtype=torch.float32)
+        y = torch.rand(10, 10, dtype=torch.bfloat16)
+        m = M()
+        graph, traced = self.checkTrace(m, [x, y])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+
+    @llga_fp32_bf16_test_env
+    def test_do_not_map_type_as(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                x = x.type_as(y)
+                return x
+
+        x = torch.rand(10, 10, dtype=torch.float32)
+        y = torch.rand(10, 10, dtype=torch.float32)
+        m = M()
+        graph, traced = self.checkTrace(m, [x, y])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+    
+    @llga_fp32_bf16_test_env
     # Currently graph with sub-block is unsupported
     # %z : Tensor = prim::If(%8)
     #     block0():

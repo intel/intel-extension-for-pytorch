@@ -440,6 +440,8 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
         .setAttr(dnnl::graph::op::attr::transpose_b, true);
   } else if (nodeKind == Symbol::aten("to")) {
     return Operator(node, opkind::TypeCast).setInput(0).setOutput(0);
+  } else if (nodeKind == Symbol::aten("type_as")) {
+    return Operator(node, opkind::TypeCast).setInput(0).setOutput(0);
   } else if (nodeKind == Symbol::aten("quantize_per_tensor")) {
     // TODO: how to handle this case
     REQ(node->input(1)->node()->kind() != Symbol::aten("q_scale"));
