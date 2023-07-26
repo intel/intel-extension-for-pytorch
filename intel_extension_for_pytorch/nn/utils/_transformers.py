@@ -506,7 +506,8 @@ class IPEXTransformerAtten(nn.Module):
         else:
             attn_output = torch.matmul(attn_output, self.out_proj.weight.t())
             self.all_reduce_if_necessary(attn_output)
-            attn_output += residual
+            if residual is not None:
+                attn_output += residual
         return attn_output
 
     def forward(
@@ -769,7 +770,6 @@ class IPEXGPTJBlock(nn.Module):
             attention_mask = attention_mask[0, :, :, :].view(1, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
         # convert layout form [bs, seq, hidden_size] to [seq, bs, hidden_size]
         hidden_states = hidden_states.transpose(0, 1).contiguous()
-        # position_ids = position_ids.transpose(0, 1).contiguous()
 
         residual = hidden_states
         hidden_states = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.ln.normalized_shape, self.ln.weight, self.ln.bias, self.ln.eps)

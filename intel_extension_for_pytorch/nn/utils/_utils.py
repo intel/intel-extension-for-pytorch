@@ -204,7 +204,6 @@ def ipex_beam_search(
     from transformers.generation.beam_search import BeamScorer, BeamSearchScorer, ConstrainedBeamSearchScorer
     from transformers.generation.logits_process import LogitsProcessorList
     from transformers.generation.stopping_criteria import StoppingCriteriaList, validate_stopping_criteria
-    print("into ipex beam search")
     # init values
     latency_list = []
     logits_processor = logits_processor if logits_processor is not None else LogitsProcessorList()
@@ -495,7 +494,6 @@ def ipex_beam_search_without_optimize(
     from transformers.generation.beam_search import BeamScorer, BeamSearchScorer, ConstrainedBeamSearchScorer
     from transformers.generation.logits_process import LogitsProcessorList
     from transformers.generation.stopping_criteria import StoppingCriteriaList, validate_stopping_criteria
-    print("into ipex beam search")
     # init values
     logits_processor = logits_processor if logits_processor is not None else LogitsProcessorList()
     stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()

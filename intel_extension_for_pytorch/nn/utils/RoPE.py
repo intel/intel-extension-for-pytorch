@@ -11,12 +11,67 @@ class PositionalEmbedding(nn.Module):
     def forward(self, query, key, position_ids, layer_ids):
         return query, key
 
+class GPTJRotaryEmbeddingRef(PositionalEmbedding):
+    def __init__(self,
+                 config: IPEXTransformerConfig):
+        super().__init__(config=config)
+        self.rotary_dim = config.rotary_dim
+        self.base = config.positional_embedding_base
+        self.device = config.device
+        self.dtype = config.dtype
+        pos_embd_dim = self.rotary_dim or self.embed_dim
+        self.embed_positions = self.create_sinusoidal_positions(config.max_positions, pos_embd_dim)
 
-def rotate_half(x):
-    """Rotates half the hidden dims of the input."""
-    x1 = x[..., : x.shape[-1] // 2]
-    x2 = x[..., x.shape[-1] // 2 :]
-    return torch.cat((-x2, x1), dim=-1)
+    def create_sinusoidal_positions(self, num_pos: int, dim: int) -> torch.Tensor:
+        inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2, dtype=self.dtype) / dim))
+        sinusoid_inp = torch.einsum("i , j -> i j", torch.arange(num_pos, dtype=torch.float), inv_freq).float()
+        res = torch.cat((torch.sin(sinusoid_inp), torch.cos(sinusoid_inp)), dim=1)
+        return res
+
+    def _get_embed_positions(self, position_ids):
+        embed_positions = self.embed_positions
+        if embed_positions.device != position_ids.device:
+            embed_positions = embed_positions.to(position_ids.device)
+            self.embed_positions = embed_positions
+        return embed_positions.repeat(position_ids.shape[0], 1, 1)
+
+    def rotate_every_two(self, x: torch.Tensor) -> torch.Tensor:
+        x1 = x[:, :, :, ::2] 
+        x2 = x[:, :, :, 1::2]
+        x = torch.stack((-x2, x1), dim=-1)
+        return x.flatten(-2)  # in einsum notation: rearrange(x, '... d j -> ... (d j)')
+
+    def apply_rotary_pos_emb(self, tensor: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor) -> torch.Tensor:
+        sin = torch.repeat_interleave(sin[:, :, None, :], 2, 3)
+        cos = torch.repeat_interleave(cos[:, :, None, :], 2, 3)
+        return (tensor * cos) + (self.rotate_every_two(tensor) * sin)
+
+    def forward(self, query, key, position_ids, layer_id):
+        query = query.transpose(0,1).contiguous()
+        key = key.transpose(0,1).contiguous()
+        position_ids = position_ids.transpose(0, 1).contiguous()
+        embed_positions = self._get_embed_positions(position_ids)
+        repeated_position_ids = position_ids.unsqueeze(-1).repeat(1, 1, embed_positions.shape[-1])
+        sincos = torch.gather(embed_positions, 1, repeated_position_ids)
+        sin, cos = torch.split(sincos, sincos.shape[-1] // 2, dim=-1)
+
+        if self.rotary_dim is not None:
+            k_rot = key[:, :, :, : self.rotary_dim]
+            k_pass = key[:, :, :, self.rotary_dim :]
+            q_rot = query[:, :, :, : self.rotary_dim]
+            q_pass = query[:, :, :, self.rotary_dim :]
+            k_rot = self.apply_rotary_pos_emb(k_rot, sin, cos)
+            q_rot = self.apply_rotary_pos_emb(q_rot, sin, cos)
+            key = torch.cat([k_rot, k_pass], dim=-1)
+            query = torch.cat([q_rot, q_pass], dim=-1)
+        else:
+            key = apply_rotary_pos_emb(key, sin, cos)
+            query = apply_rotary_pos_emb(query, sin, cos)
+
+        query = query.transpose(0,1).contiguous()
+        key = key.transpose(0,1).contiguous()
+        return query, key
+
 
 class GPTJRotaryEmbedding(PositionalEmbedding):
     sin = None
