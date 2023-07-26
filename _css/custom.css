@@ -5,7 +5,8 @@
 
 
 .menu {
-  display: flex;
+  /* display: flex; */
+  display: none;
   flex-wrap: wrap;
   width: 60%;
   margin: auto;

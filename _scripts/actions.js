@@ -308,7 +308,29 @@ $(document).ready(function() {
               ret += "<h3>" + $.secid_gen([indexa], indexb) + repo + "</h3>";
             }
             ret += "<p>Prebuilt wheel files are available for Python " + value.python.join(", ") + ".";
-            ret += $.code_gen(value.commands);
+            if(value.commands.length == 1) {
+              ret += $.code_gen(value.commands);
+            } else {
+              ret += $.notes_gen(["Should you experience low downloading speed issue, try choose another storage below."]);
+              ret += "<div class=\"row\" id=\"row-storage\" style=\"width: 50%\">";
+              var flex_ratio = 96 / value.commands.length;
+              $.each(value.commands, function(index, value) {
+                var selected = "";
+                if(index == 0)
+                  selected = " selected";
+                ret += "<div class=\"values-element elem-instruction" + selected + "\" style=\"flex: 1 1 " + flex_ratio + "%\">Storage " + index + "</div>";
+              });
+              ret += "</div>";
+              ret += "<p></p>";
+              ret += "<div id=\"code-storage\">";
+              $.each(value.commands, function(index, value) {
+                if(index == 0)
+                  ret += $.code_gen(value).replace("notranslate\"", "notranslate\" style=\"display: block\"");
+                else
+                  ret += $.code_gen(value).replace("notranslate\"", "notranslate\" style=\"display: none\"");
+              });
+              ret += "</div>";
+            }
             if(value.notes != null)
               ret += $.notes_gen(value.notes);
             ret += "</div>";
@@ -370,13 +392,44 @@ $(document).ready(function() {
         }
       } else if(data.package == "cppsdk") {
         if(data.installation.files != null) {
-          var headers = [];
-          var values = [];
-          $.each(data.installation.files, function(index, value) {
-            headers.push(value.abi);
-            values.push("<a href=\"" + value.url + "\">" + value.filename + "</a>");
-          });
-          ret += $.table_1d_gen(headers, values);
+          if(data.installation.files.length == 1) {
+            var headers = [];
+            var values = [];
+            $.each(data.installation.files, function(index, value) {
+              headers.push(value.abi);
+              values.push("<a href=\"" + value.url + "\">" + value.filename + "</a>");
+            });
+            ret += $.table_1d_gen(headers, values);
+          } else {
+            ret += $.notes_gen(["Should you experience low downloading speed issue, try choose another storage below."]);
+            ret += "<div class=\"row\" id=\"row-cppsdk\" style=\"width: 50%\">";
+            var flex_ratio = 96 / data.installation.files.length;
+            $.each(data.installation.files, function(index, value) {
+              var selected = "";
+              if(index == 0)
+                selected = " selected";
+              ret += "<div class=\"values-element elem-instruction" + selected + "\" style=\"flex: 1 1 " + flex_ratio + "%\">Storage " + index + "</div>";
+            });
+            ret += "</div>";
+            ret += "<p></p>";
+            ret += "<div id=\"code-cppsdk\">";
+            $.each(data.installation.files, function(index, value) {
+              var table_cppsdk = "";
+              var headers = [];
+              var values = [];
+              $.each(value, function(index, v) {
+                headers.push(v.abi);
+                values.push("<a href=\"" + v.url + "\">" + v.filename + "</a>");
+              });
+              table_cppsdk = $.table_1d_gen(headers, values);
+              if(index == 0)
+                ret += table_cppsdk.replace("docutils\"", "docutils\" style=\"display: block\"");
+              else
+                ret += table_cppsdk.replace("docutils\"", "docutils\" style=\"display: none\"");
+            });
+            ret += "</div>";
+          }
+
         }
         if(data.installation.commands != null) {
           $.each(data.installation.commands, function(index, value) {
@@ -469,13 +522,29 @@ $(document).ready(function() {
     }
   }
 
+  $.query_gen = function(elem) {
+    var query = {};
+    elem.parent().parent().children().each(function() {
+      var elem = $(this).find(".selected");
+      var id = elem.attr("id").split("-");
+      var category = id[0];
+      var value = id[1];
+      if(value == "options")
+        value = elem.val();
+      else
+        value = elem.html();
+      query[category] = value;
+    });
+    return query;
+  }
+
   $.ajax_query = function(query) {
     var formdata = new FormData();
     formdata.append("query", query);
     $.ajax({
       cache: false,
       type: "POST",
-      url: "http://ec2-52-27-27-201.us-west-2.compute.amazonaws.com/ipex-installation-guide",
+      url: "https://developer.intel.com/ipex-installation-guide",
       data: formdata,
       processData: false,
       contentType: false,
@@ -486,24 +555,28 @@ $(document).ready(function() {
       },
       success: function(data) {
         var ret = jQuery.parseJSON(data);
-        if(ret.stage == "platform") {
-          $.row_append($.merge(["Platform"], ret["data"]));
-        } else if(ret.stage == "version") {
-          var num_elem = 3;
-          if(ret["data"].indexOf("Master") == -1) {
-            num_elem -= 1;
-          }
-          $.row_append($.merge(["Version"], ret["data"]), num_elem);
-        } else if(ret.stage == "os") {
-          $.row_append($.merge(["OS"], ret["data"]));
-        } else if(ret.stage == "package") {
-          $.row_append($.merge(["Package"], ret["data"]));
-        } else if(ret.stage == "instruction") {
+        if(ret.stage == "Instruction") {
           $("#install-instructions").html($.instruction_gen(ret["data"]));
         } else {
-          // Do nothing
+          var num_elem = 0;
+          if(ret.stage == "Version") {
+            num_elem = 3;
+            if(ret["data"][0].indexOf("Master") == -1)
+              num_elem -= 1;
+          }
+          $.row_append($.merge([ret.stage], ret.data), num_elem);
         }
       }
+    });
+  }
+
+  $.reset_selection = function(elem) {
+    elem.parent().nextAll().remove();
+    $("#col-headings").children().eq(elem.parent().index()).nextAll().remove();
+    $("#install-instructions").html("");
+
+    elem.parent().children().each(function() {
+      $(this).removeClass("selected");
     });
   }
 
@@ -511,73 +584,38 @@ $(document).ready(function() {
     fields = $(this).attr("id").split("-");
     if(fields[1] == "options")
       return;
-    $(this).parent().nextAll().remove();
-    $("#col-headings").children().eq($(this).parent().index()).nextAll().remove();
-    $("#install-instructions").html("");
+    $.reset_selection($(this));
+    $(this).addClass("selected");
 
+    var query = $.query_gen($(this))
+    $.ajax_query(JSON.stringify(query));
+  });
+
+  $("#col-values").on("change", "select", function() {
+    $.reset_selection($(this));
+    if($(this).val() != "na") {
+      $(this).addClass("selected");
+
+      var query = $.query_gen($(this))
+      $.ajax_query(JSON.stringify(query));
+    }
+  });
+
+  $("#install-instructions").on("click", ".elem-instruction", function() {
     $(this).parent().children().each(function() {
       $(this).removeClass("selected");
     });
     $(this).addClass("selected");
 
-    if(fields[0] == "platform") {
-      var query = {};
-      query.request = "version";
-      query.platform = $(this).html();
-      $.ajax_query(JSON.stringify(query));
-    } else if(fields[0] == "version") {
-      var query = {};
-      query.request = "os";
-      query.platform = $(".install-platform.selected").html();
-      query.version = $(this).html();
-      $.ajax_query(JSON.stringify(query));
-    } else if(fields[0] == "os") {
-      var query = {};
-      query.request = "package";
-      query.platform = $(".install-platform.selected").html();
-      query.version = $(".install-version.selected").attr("id").split("-")[1];
-      if(query.version == "options") {
-        query.version = $("#version-options").val();
-      } else {
-        query.version = $(".install-version.selected").html();
-      }
-      query.os = $(this).html();
-      $.ajax_query(JSON.stringify(query));
-    } else if(fields[0] == "package") {
-      var query = {};
-      query.request = "instruction";
-      query.platform = $(".install-platform.selected").html();
-      query.version = $(".install-version.selected").attr("id").split("-")[1];
-      if(query.version == "options") {
-        query.version = $("#version-options").val();
-      } else {
-        query.version = $(".install-version.selected").html();
-      }
-      query.os = $(".install-os.selected").html();
-      query.package = $(this).html();
-      $.ajax_query(JSON.stringify(query));
-    } else {
-      // Do nothing
-    }
-  });
-
-  $("#col-values").on("change", "select", function() {
-    $(this).parent().nextAll().remove();
-    $("#col-headings").children().eq($(this).parent().index()).nextAll().remove();
-    $("#install-instructions").html("");
-
-    $(this).parent().children().each(function() {
-      $(this).removeClass("selected");
+    var index = $(this).index();
+    var category = $(this).parent().attr("id").split("-")[1];
+    var i = 0;
+    $("#code-" + category).children().each(function () {
+      if(i == index)
+        $(this).css("display", "block");
+      else
+        $(this).css("display", "none");
+      i += 1;
     });
-
-    if($(this).val() != "na") {
-      $(this).addClass("selected");
-
-      var query = {};
-      query.request = "os";
-      query.platform = $(".install-platform.selected").html();
-      query.version = $(this).val();
-      $.ajax_query(JSON.stringify(query));
-    }
   });
 });
