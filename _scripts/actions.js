@@ -312,7 +312,7 @@ $(document).ready(function() {
               ret += $.code_gen(value.commands);
             } else {
               ret += $.notes_gen(["Should you experience low downloading speed issue, try choose another storage below."]);
-              ret += "<div class=\"row\" id=\"row-storage\" style=\"width: 50%\">";
+              ret += "<div class=\"row\" id=\"row-storage" + index + "\" style=\"width: 50%\">";
               var flex_ratio = 96 / value.commands.length;
               $.each(value.commands, function(index, value) {
                 var selected = "";
@@ -322,7 +322,7 @@ $(document).ready(function() {
               });
               ret += "</div>";
               ret += "<p></p>";
-              ret += "<div id=\"code-storage\">";
+              ret += "<div id=\"code-storage" + index + "\">";
               $.each(value.commands, function(index, value) {
                 if(index == 0)
                   ret += $.code_gen(value).replace("notranslate\"", "notranslate\" style=\"display: block\"");
