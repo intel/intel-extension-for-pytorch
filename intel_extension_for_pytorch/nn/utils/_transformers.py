@@ -464,8 +464,8 @@ class IPEXTransformerAtten(nn.Module):
         expand_shape = [bs, beam, self.key_prompt.shape[1]*self.key_prompt.shape[2]*self.key_prompt.shape[3]]
         shape = [bs*beam, self.key_prompt.shape[1], self.key_prompt.shape[2], self.key_prompt.shape[3]]
         #shape1 = [bs* beam, key.shape[1], key.shape[2], key.shape[3]]
-        key_prompt = self.key_prompt.view(bs, 1, -1).expand(expand_shape).view(shape)
-        value_prompt = self.value_prompt.view(bs, 1, -1).expand(expand_shape).view(shape)
+        key_prompt = self.key_prompt.reshape(bs, 1, -1).expand(expand_shape).view(shape)
+        value_prompt = self.value_prompt.reshape(bs, 1, -1).expand(expand_shape).view(shape)
         key_list = [key_prompt]
         value_list = [value_prompt]
         beam_idx_cache = self.expand_beam_idx()
