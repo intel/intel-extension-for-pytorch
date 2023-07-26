@@ -271,17 +271,28 @@ def _beam_search(
 
             if hasattr(self, "trace_graph"):
                 if first_token:
-                    model_inputs["attention_mask"] = model_inputs["attention_mask"][
-                        :1, :
-                    ]
-                    model_inputs["input_ids"] = model_inputs["input_ids"][:1, :]
-                    model_inputs["position_ids"] = model_inputs["position_ids"][:1, :]
+                    new_attention_mask = model_inputs["attention_mask"][
+                        :batch_size
+                    ].clone()
+                    new_input_ids = model_inputs["input_ids"][:batch_size].clone()
+                    new_position_ids = model_inputs["position_ids"][:batch_size].clone()
+                    for i in range(batch_size):
+                        new_attention_mask[i] = model_inputs["attention_mask"][
+                            i * num_beams
+                        ]
+                        new_input_ids[i] = model_inputs["input_ids"][i * num_beams]
+                        new_position_ids[i] = model_inputs["position_ids"][
+                            i * num_beams
+                        ]
+                    model_inputs["attention_mask"] = new_attention_mask
+                    model_inputs["input_ids"] = new_input_ids
+                    model_inputs["position_ids"] = new_position_ids
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
                 outputs = self.trace_graph(**model_inputs)
                 if first_token and len(model_inputs["past_key_values"][0]) == 4:
                     outputs = list(outputs)
-                    outputs[0] = outputs[0].repeat_interleave(input_bs, dim=0)
+                    outputs[0] = outputs[0].repeat_interleave(num_beams, dim=0)
                     outputs = tuple(outputs)
                 if synced_gpus and this_peer_finished:
                     cur_len = cur_len + 1
