@@ -320,8 +320,8 @@ def ipex_beam_search(
         next_token_scores = nn.functional.log_softmax(
             next_token_logits, dim=-1
         )  # (batch_size * num_beams, vocab_size)
-
-        next_token_scores_processed = logits_processor(input_ids, next_token_scores)
+        dummy_input_ids = torch.empty((batch_size * num_beams, cur_len), dtype=torch.long, device="meta")
+        next_token_scores_processed = logits_processor(dummy_input_ids, next_token_scores)
         next_token_scores = next_token_scores_processed + beam_scores[:, None].expand_as(next_token_scores)
 
         beam_scores, beam_next_tokens, beam_idx = torch.ops.torch_ipex.beam_search_topk(next_token_scores, finished, pad_token_id, eos_token_id, length_penalty, num_beams,
