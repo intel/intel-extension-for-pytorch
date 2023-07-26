@@ -26,8 +26,6 @@ void fused_norm_kernel1(
     scalar_t* add1_data,
     scalar_t* add2_data,
     scalar_t* X_data,
-    mean_t* mean_data,
-    mean_t* var_data,
     weight_t* gamma_data,
     weight_t* beta_data,
     scalar_t* Y_data,
@@ -35,7 +33,7 @@ void fused_norm_kernel1(
     int BS,
     int Plane) {
   constexpr int max_vec_size = float4_size / sizeof(scalar_t);
-  constexpr int reg_num_per_item = max_vec_size * 2;
+  constexpr int reg_num_per_item = max_vec_size << 1;
   constexpr int Num = std::max(reg_num_per_item / vec_size, 1);
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
@@ -195,8 +193,6 @@ void launch_vectorized_fused_norm_kernel1(
     scalar_t* add1_data,
     scalar_t* add2_data,
     scalar_t* X_data,
-    mean_t* mean_data,
-    mean_t* var_data,
     weight_t* gamma_data,
     weight_t* beta_data,
     scalar_t* Y_data,
@@ -223,8 +219,6 @@ void launch_vectorized_fused_norm_kernel1(
             add1_data,                                                         \
             add2_data,                                                         \
             X_data,                                                            \
-            mean_data,                                                         \
-            var_data,                                                          \
             gamma_data,                                                        \
             beta_data,                                                         \
             Y_data,                                                            \
@@ -242,8 +236,6 @@ void launch_vectorized_fused_norm_kernel1(
             add1_data,                                                         \
             add2_data,                                                         \
             X_data,                                                            \
-            mean_data,                                                         \
-            var_data,                                                          \
             gamma_data,                                                        \
             beta_data,                                                         \
             Y_data,                                                            \
@@ -285,9 +277,7 @@ bool LayerNormKernelImplInternal(
     int64_t M,
     int64_t N,
     acc_type<scalar_t> eps,
-    Tensor& Y,
-    Tensor& mean,
-    Tensor& rstd) {
+    Tensor& Y) {
   constexpr int max_vec_size = float4_size / sizeof(scalar_t);
   constexpr int reg_num_per_item = max_vec_size * 2;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
@@ -302,22 +292,16 @@ bool LayerNormKernelImplInternal(
   while ((vec_size >> 1) * workgroup_size >= N) {
     vec_size = vec_size >> 1;
   }
-  scalar_t* add1_data = add1.defined() ? add1.data_ptr<scalar_t>() : nullptr;
-  scalar_t* add2_data = add2.defined() ? add2.data_ptr<scalar_t>() : nullptr;
   scalar_t* X_data = X.data_ptr<scalar_t>();
   scalar_t* Y_data = Y.data_ptr<scalar_t>();
-  mean_t* mean_data = mean.data_ptr<mean_t>();
-  mean_t* var_data = rstd.data_ptr<mean_t>();
   weight_t* gamma_data = gamma.defined() ? gamma.data_ptr<weight_t>() : nullptr;
   weight_t* beta_data = beta.defined() ? beta.data_ptr<weight_t>() : nullptr;
 
   bool can_use_32bit_index = canUse32BitIndexMath(X);
   launch_vectorized_fused_norm_kernel1<scalar_t, mean_t, weight_t, one_moment>(
-      add1_data,
-      add2_data,
+      nullptr,
+      nullptr,
       X_data,
-      mean_data,
-      var_data,
       gamma_data,
       beta_data,
       Y_data,
@@ -339,9 +323,7 @@ bool LayerNormKernelImpl(
     int64_t M,
     int64_t N,
     double eps,
-    Tensor& Y,
-    Tensor& mean,
-    Tensor& rstd) {
+    Tensor& Y) {
   bool success = false;
   AT_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
@@ -349,47 +331,25 @@ bool LayerNormKernelImpl(
       X.scalar_type(),
       "LayerNormKernelImpl",
       [&]() {
-        if (gamma.scalar_type() == kFloat) {
-          mean = at::empty({M}, X.options().dtype(kFloat));
-          rstd = at::empty({M}, X.options().dtype(kFloat));
-          success =
-              LayerNormKernelImplInternal<scalar_t, float, float, one_moment>(
-                  add1,
-                  add2,
-                  X,
-                  gamma,
-                  beta,
-                  M,
-                  N,
-                  static_cast<acc_type<scalar_t>>(eps),
-                  Y,
-                  mean,
-                  rstd);
-        } else {
-          mean = at::empty({M}, X.options());
-          rstd = at::empty({M}, X.options());
-          success = LayerNormKernelImplInternal<
-              scalar_t,
-              scalar_t,
-              scalar_t,
-              one_moment>(
-              add1,
-              add2,
-              X,
-              gamma,
-              beta,
-              M,
-              N,
-              static_cast<acc_type<scalar_t>>(eps),
-              Y,
-              mean,
-              rstd);
-        }
+        success = LayerNormKernelImplInternal<
+            scalar_t,
+            scalar_t,
+            scalar_t,
+            one_moment>(
+            Tensor(),
+            Tensor(),
+            X,
+            gamma,
+            beta,
+            M,
+            N,
+            static_cast<acc_type<scalar_t>>(eps),
+            Y);
       });
   return success;
 }
 
-std::tuple<Tensor, Tensor, Tensor> add_add_layer_norm(
+Tensor add_add_layer_norm(
     const Tensor& add1,
     const Tensor& add2,
     const Tensor& input,
@@ -409,59 +369,46 @@ std::tuple<Tensor, Tensor, Tensor> add_add_layer_norm(
 
   int numel = input.numel();
   Tensor output = at::empty(input.sizes(), input.options());
-  Tensor mean, rstd;
   if (input.numel() != 0) {
-    Tensor input_ = (input.dim() == 1) ? input.reshape({M, N}) : input;
-    Tensor output_ = (output.dim() == 1) ? output.reshape({M, N}) : output;
+    // Tensor add1_ =
+    //    add1.defined() ? to_plain_if_needed(add1).contiguous() : add1;
+    // Tensor add2_ =
+    //    add2.defined() ? to_plain_if_needed(add2).contiguous() : add2;
+    Tensor input_ = to_plain_if_needed(input).contiguous();
     Tensor weight_ =
-        (weight.defined() && weight.dim() == 1) ? weight.reshape({N}) : weight;
+        weight.defined() ? to_plain_if_needed(weight).contiguous() : weight;
     Tensor bias_ =
-        (bias.defined() && bias.dim() == 1) ? bias.reshape({N}) : bias;
-
-    Tensor add1_ =
-        add1.defined() ? to_plain_if_needed(add1).contiguous() : add1;
-    Tensor add2_ =
-        add2.defined() ? to_plain_if_needed(add2).contiguous() : add2;
-    input_ = to_plain_if_needed(input_).contiguous();
-    weight_ =
-        weight_.defined() ? to_plain_if_needed(weight_).contiguous() : weight_;
-    bias_ = bias_.defined() ? to_plain_if_needed(bias_).contiguous() : bias_;
+        bias.defined() ? to_plain_if_needed(bias).contiguous() : bias;
     bool can_be_fused = true;
-    if (add1.defined() &&
-        (input_.sizes() != add1_.sizes() || input_.dtype() != add1_.dtype())) {
-      can_be_fused = false;
-    }
-    if (add2.defined() &&
-        (input_.sizes() != add2_.sizes() || input_.dtype() != add2_.dtype())) {
-      can_be_fused = false;
-    }
+    // if (add1.defined() &&
+    //    (input_.sizes() != add1_.sizes() || input_.dtype() != add1_.dtype()))
+    //    {
+    //  can_be_fused = false;
+    //}
+    // if (add2.defined() &&
+    //    (input_.sizes() != add2_.sizes() || input_.dtype() != add2_.dtype()))
+    //    {
+    //  can_be_fused = false;
+    //}
 
     bool fast_path_success = false;
     if (can_be_fused) {
       fast_path_success = LayerNormKernelImpl(
-          add1_,
-          add2_,
-          input_,
-          weight_,
-          bias_,
-          M,
-          N,
-          epsilon,
-          output,
-          mean,
-          rstd);
+          Tensor(), Tensor(), input_, weight_, bias_, M, N, epsilon, output);
     }
     if (!(can_be_fused && fast_path_success)) {
-      input_ = add1_.defined() ? input_ + add1_ : input_;
-      input_ = add2_.defined() ? input_ + add2_ : input_;
-      return at::AtenIpexTypeXPU::native_layer_norm(
-          input_, normalized_shape, weight_opt, bias_opt, epsilon);
+      // input_ = add1.defined() ? input_ + add1 : input_;
+      // input_ = add2.defined() ? input_ + add2 : input_;
+      Tensor mean, rstd;
+      std::tuple<Tensor, Tensor, Tensor>(output, mean, rstd) =
+          at::AtenIpexTypeXPU::native_layer_norm(
+              input_, normalized_shape, weight_opt, bias_opt, epsilon);
     }
   }
-  return std::make_tuple(output.reshape(input.sizes()), mean, rstd);
+  return output.reshape(input.sizes());
 }
 
-std::tuple<Tensor, Tensor, Tensor> add_layer_norm(
+Tensor add_layer_norm(
     const Tensor& add1,
     const Tensor& add2,
     const Tensor& input,
@@ -474,7 +421,7 @@ std::tuple<Tensor, Tensor, Tensor> add_layer_norm(
       add1, Tensor(), input, normalized_shape, weight_opt, bias_opt, epsilon);
 }
 
-std::tuple<Tensor, Tensor, Tensor> fast_layer_norm(
+Tensor fast_layer_norm(
     const Tensor& input,
     at::IntArrayRef normalized_shape,
     const c10::optional<at::Tensor>& weight_opt,
@@ -491,7 +438,7 @@ std::tuple<Tensor, Tensor, Tensor> fast_layer_norm(
       epsilon);
 }
 
-std::tuple<Tensor, Tensor, Tensor> add_add_rms_norm(
+Tensor add_add_rms_norm(
     const Tensor& add1,
     const Tensor& add2,
     const Tensor& input,
@@ -512,61 +459,30 @@ std::tuple<Tensor, Tensor, Tensor> add_add_rms_norm(
 
   int numel = input.numel();
   Tensor output = at::empty(input.sizes(), input.options());
-  Tensor mean, rstd;
   if (input.numel()) {
-    Tensor input_ = (input.dim() == 1) ? input.reshape({M, N}) : input;
-    Tensor output_ = (output.dim() == 1) ? output.reshape({M, N}) : output;
+    Tensor input_ = to_plain_if_needed(input).contiguous();
     Tensor weight_ =
-        (weight.defined() && weight.dim() == 1) ? weight.reshape({N}) : weight;
+        weight.defined() ? to_plain_if_needed(weight).contiguous() : weight;
     Tensor bias_ =
-        (bias.defined() && bias.dim() == 1) ? bias.reshape({N}) : bias;
-
-    Tensor add1_ =
-        add1.defined() ? to_plain_if_needed(add1).contiguous() : add1;
-    Tensor add2_ =
-        add2.defined() ? to_plain_if_needed(add2).contiguous() : add2;
-    input_ = to_plain_if_needed(input_).contiguous();
-    weight_ =
-        weight_.defined() ? to_plain_if_needed(weight_).contiguous() : weight_;
-    bias_ = bias_.defined() ? to_plain_if_needed(bias_).contiguous() : bias_;
+        bias.defined() ? to_plain_if_needed(bias).contiguous() : bias;
     bool can_be_fused = true;
-    if (add1.defined() &&
-        (input_.sizes() != add1_.sizes() || input_.dtype() != add1_.dtype())) {
-      can_be_fused = false;
-    }
-    if (add2.defined() &&
-        (input_.sizes() != add2_.sizes() || input_.dtype() != add2_.dtype())) {
-      can_be_fused = false;
-    }
-
     bool fast_path_success = false;
     if (can_be_fused) {
       fast_path_success = LayerNormKernelImpl<true>(
-          add1_,
-          add2_,
-          input_,
-          weight_,
-          bias_,
-          M,
-          N,
-          epsilon,
-          output,
-          mean,
-          rstd);
+          Tensor(), Tensor(), input_, weight_, bias_, M, N, epsilon, output);
     }
 
     if (!(can_be_fused && fast_path_success)) {
-      input_ = add1_.defined() ? input_ + add1_ : input_;
-      input_ = add2_.defined() ? input_ + add2_ : input_;
+      Tensor mean, rstd;
       std::tuple<Tensor, Tensor, Tensor>(output, mean, rstd) =
           at::AtenIpexTypeXPU::native_layer_norm(
               input_, normalized_shape, weight_opt, bias_opt, epsilon);
     }
   }
-  return std::make_tuple(output.reshape(input.sizes()), mean, rstd);
+  return output.reshape(input.sizes());
 }
 
-std::tuple<Tensor, Tensor, Tensor> add_rms_norm(
+Tensor add_rms_norm(
     const Tensor& add1,
     const Tensor& add2,
     const Tensor& input,
@@ -579,7 +495,7 @@ std::tuple<Tensor, Tensor, Tensor> add_rms_norm(
       add1, Tensor(), input, normalized_shape, weight_opt, bias_opt, epsilon);
 }
 
-std::tuple<Tensor, Tensor, Tensor> fast_rms_norm(
+Tensor fast_rms_norm(
     const Tensor& input,
     at::IntArrayRef normalized_shape,
     const c10::optional<at::Tensor>& weight_opt,

@@ -772,7 +772,7 @@ class IPEXGPTJBlock(nn.Module):
         # position_ids = position_ids.transpose(0, 1).contiguous()
 
         residual = hidden_states
-        hidden_states, mean, var = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.ln.normalized_shape, self.ln.weight, self.ln.bias, self.ln.eps)
+        hidden_states = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.ln.normalized_shape, self.ln.weight, self.ln.bias, self.ln.eps)
         attn_outputs = self.attn(
             hidden_states=hidden_states,
             layer_past=layer_past,
@@ -813,7 +813,7 @@ class LlamaRMSNorm(nn.Module):
 
     def forward(self, hidden_states: torch.Tensor):
         hsz = hidden_states.shape[-1]
-        hidden_states, mean, var = torch.ops.torch_ipex.fast_rms_norm(hidden_states, [hsz], self.weight, None, self.variance_epsilon)
+        hidden_states = torch.ops.torch_ipex.fast_rms_norm(hidden_states, [hsz], self.weight, None, self.variance_epsilon)
         #output = torch.ops.torch_ipex.rms_norm(hidden_states, [hsz], self.weight)
         #return output[0]
         return hidden_states
@@ -968,7 +968,7 @@ class IPEXBloomBlock(nn.Module):
         hidden_states = hidden_states.transpose(0, 1).contiguous()
 
         #layernorm_output = self.input_layernorm(hidden_states)
-        layernorm_output, _, _ = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.input_layernorm.normalized_shape, self.input_layernorm.weight, self.input_layernorm.bias, self.input_layernorm.eps)
+        layernorm_output = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.input_layernorm.normalized_shape, self.input_layernorm.weight, self.input_layernorm.bias, self.input_layernorm.eps)
         if self.config.do_norm_before:
             residual = layernorm_output
         else:
@@ -988,7 +988,7 @@ class IPEXBloomBlock(nn.Module):
 
         outputs = attn_outputs[1:]
         #layernorm_output = self.post_attention_layernorm(attention_output)
-        layernorm_output, _, _ = torch.ops.torch_ipex.fast_layer_norm(attention_output, self.post_attention_layernorm.normalized_shape, self.post_attention_layernorm.weight, self.post_attention_layernorm.bias, self.post_attention_layernorm.eps)
+        layernorm_output = torch.ops.torch_ipex.fast_layer_norm(attention_output, self.post_attention_layernorm.normalized_shape, self.post_attention_layernorm.weight, self.post_attention_layernorm.bias, self.post_attention_layernorm.eps)
         if self.config.do_norm_before:
             redisual = layernorm_output
         else:

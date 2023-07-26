@@ -14,7 +14,7 @@ C10_ALWAYS_INLINE std::pair<int64_t, int64_t> _check_layer_norm_inputs(
     const Tensor& weight /* optional */,
     const Tensor& bias /* optional */) {
   const int normalized_ndim = normalized_shape.size();
-  TORCH_CHECK(
+  /*TORCH_CHECK(
       normalized_ndim >= 1,
       "Expected normalized_shape to be at least 1-dimensional, i.e., ",
       "containing at least one element, but got normalized_shape = ",
@@ -33,10 +33,10 @@ C10_ALWAYS_INLINE std::pair<int64_t, int64_t> _check_layer_norm_inputs(
       bias.sizes(),
       " and normalized_shape = ",
       normalized_shape);
-
+  */
   const auto input_shape = input.sizes();
   const auto input_ndim = input.dim();
-
+  /*
   if (input_ndim < normalized_ndim ||
       !input_shape.slice(input_ndim - normalized_ndim)
            .equals(normalized_shape)) {
@@ -48,7 +48,7 @@ C10_ALWAYS_INLINE std::pair<int64_t, int64_t> _check_layer_norm_inputs(
     }
     ss << "], but got input of size" << input_shape;
     AT_ERROR(ss.str());
-  }
+  }*/
 
   const int axis = input_ndim - normalized_ndim;
   const int64_t M =
