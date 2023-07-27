@@ -51,10 +51,16 @@ def TPPLinear_weight_prepack(m, bk=None, bc=None, layer_dtype=torch.float32):
 
 
 def Apply_TPPLinear_weight_prepack(m, dtype, device="cpu"):
-    if m.weight.size()[0] == 50400 or m.weight.size()[0] == 32000:
+    if (m.weight.size()[0] == 50400 or m.weight.size()[0] == 32000) and m.weight.size()[
+        1
+    ] % 64 == 0:
         m = TPPLinear_weight_prepack(m, 100, 64, dtype)
-    else:
+    elif m.weight.size()[0] % 16 == 0 and m.weight.size()[1] % 64 == 0:
         m = TPPLinear_weight_prepack(m, 16, 64, dtype)
+    else:
+        setattr(m, "tpp_fallback", True)
+        return
+    setattr(m, "tpp_fallback", False)
 
     block(m)
 
@@ -241,11 +247,16 @@ class _IPEXLinear(_IPEXPrepackModule):
                 self.out_features,
             )
         elif self.use_tpp:
-            x = x.to(self.weight.dtype).contiguous()
-            if self.bias is not None:
-                output = torch.ops.torch_ipex.tpp_linear_bias(x, self.weight, self.bias)
+            if self.tpp_fallback:
+                output = torch.nn.functional.linear(x, self.weight, self.bias)
             else:
-                output = torch.ops.torch_ipex.tpp_linear(x, self.weight)
+                x = x.to(self.weight.dtype).contiguous()
+                if self.bias is not None:
+                    output = torch.ops.torch_ipex.tpp_linear_bias(
+                        x, self.weight, self.bias
+                    )
+                else:
+                    output = torch.ops.torch_ipex.tpp_linear(x, self.weight)
         else:
             output = torch.ops.torch_ipex.ipex_MKLSGEMM(
                 x,
@@ -450,12 +461,16 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
             if _using_tpp():
                 weight_key = m.weight
                 param_wrapper.prepack(m, is_training)
+                if m.tpp_fallback:
+                    setattr(new_m, "tpp_fallback", True)
                 params_attr[m.weight] = params_attr.pop(weight_key)
                 del weight_key
+
             else:
                 param_wrapper.prepack(m, is_training)
 
             new_m.__dict__ = m.__dict__
+
             if isinstance(new_m, _IPEXLinearAllreduce):
                 new_m.original_bias = all_reduce_bias
             new_m.ctx = param_wrapper.op_ctx
