@@ -3,9 +3,11 @@
 #include <core/detail/OffsetCalculator.h>
 
 #include "Loops.h"
+#include "comm/ATDispatch.h"
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
 
+using namespace at::native;
 using namespace xpu::dpcpp;
 
 namespace at {
@@ -159,6 +161,43 @@ Tensor cross(
     const c10::optional<int64_t> dimension) {
   Tensor out = at::empty_like(input);
   at::AtenIpexTypeXPU::cross_out(input, other, dimension, out);
+  return out;
+}
+
+Tensor& linalg_cross_out(
+    const Tensor& input,
+    const Tensor& other,
+    int64_t dim,
+    Tensor& out) {
+  auto x_d = input.dim();
+  auto y_d = other.dim();
+
+  // This is to avoid things like
+  // linalg.cross(torch.randn(2, 3), torch.randn(5, 2, 3), dim=2)
+  TORCH_CHECK(
+      x_d == y_d,
+      "linalg.cross: inputs must have the same number of dimensions.");
+  TORCH_CHECK(
+      input.size(dim) == 3 && other.size(dim) == 3,
+      "linalg.cross: inputs dimension ",
+      dim,
+      " must have length 3. Got ",
+      input.size(dim),
+      " and ",
+      other.size(dim));
+
+  // Broadcast the batch dimension of input and other.
+  // Since the non-batch dimensions agree, this is the same as broadcast all
+  // the inputs
+  auto out_size = infer_size(input.sizes(), other.sizes());
+
+  dim = maybe_wrap_dim(dim, input.dim());
+  Tensor input_broadcasted = input.expand(out_size);
+  Tensor other_broadcasted = other.expand(out_size);
+  out = at::empty_like(input_broadcasted);
+
+  impl::cross(out, input_broadcasted, other_broadcasted, dim);
+
   return out;
 }
 

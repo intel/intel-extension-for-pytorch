@@ -21,3 +21,17 @@ class TestTorchMethod(TestCase):
         self.assertEqual(a, a_dpcpp.to(cpu_device))
         self.assertEqual(b, b_dpcpp.to(cpu_device))
         self.assertEqual(a.cross(b), a_dpcpp.cross(b_dpcpp).to(cpu_device))
+
+
+    def test_linalg_cross(self, dtype=torch.float32):
+        x = torch.rand(100, 3, 100, dtype=dtype, device=cpu_device)
+        y = torch.rand(100, 3, 100, dtype=dtype, device=cpu_device)
+        x_xpu = x.to(dpcpp_device)
+        y_xpu = y.to(dpcpp_device)
+
+        res = torch.tensor((), dtype=dtype, device=cpu_device)
+        res_xpu = torch.tensor((), dtype=dtype, device=dpcpp_device)
+        res = torch.linalg.cross(x, y, dim=1, out=res)
+        res_xpu = torch.linalg.cross(x_xpu, y_xpu, dim=1, out=res_xpu)
+
+        self.assertEqual(res, res_xpu)
