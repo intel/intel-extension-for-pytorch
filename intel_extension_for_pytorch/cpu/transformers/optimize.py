@@ -56,6 +56,17 @@ def is_distributed(m):
         is_distributed(sub_m)
 
 
+def _set_optimized_model_for_generation(
+    model,
+    optimized_model,
+    first_token_optimized_model=None,
+):
+    if first_token_optimized_model is not None:
+        setattr(model, "trace_graph_first", first_token_optimized_model)
+
+    setattr(model, "trace_graph", optimized_model)
+
+
 def _optimize_transformers(
     model,
     dtype=torch.float,

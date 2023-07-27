@@ -289,7 +289,10 @@ def _beam_search(
                     model_inputs["position_ids"] = new_position_ids
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
-                outputs = self.trace_graph(**model_inputs)
+                if first_token and hasattr(self, "trace_graph_first"):
+                    outputs = self.trace_graph_first(**model_inputs)
+                else:
+                    outputs = self.trace_graph(**model_inputs)
                 if first_token and len(model_inputs["past_key_values"][0]) == 4:
                     outputs = list(outputs)
                     outputs[0] = outputs[0].repeat_interleave(num_beams, dim=0)

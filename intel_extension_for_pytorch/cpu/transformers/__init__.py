@@ -1,1 +1,2 @@
 from .optimize import _optimize_transformers
+from .optimize import _set_optimized_model_for_generation
