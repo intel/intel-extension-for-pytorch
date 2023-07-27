@@ -541,24 +541,33 @@ def _convert_to_bloom_cache_ipex(
             for layer_past in past_key_value
         )
 
-def gemm_padding(weight):
+def gemm_padding(weight, bias=None):
     n, k = weight.shape
     if n % 4 != 0:
         padded_n = (n + 4 - 1) // 4 * 4
         padded_weight = torch.zeros(padded_n, k, dtype=weight.dtype, device=weight.device)
         padded_weight[:n, :] = weight
-        return padded_weight
+        if bias is not None:
+            padded_bias = torch.zeros(padded_n, dtype=bias.dtype, device=bias.device)
+            padded_bias[:n] = bias
+        else:
+            padded_bias = None
+        return padded_weight, padded_bias
     else:
-        return weight
+        return weight, bias
 
 def pad_for_gptj_lm_head(model):
     n = model.lm_head.weight.shape[0] #[n, k]
 
     lm_head_new = IPEXEmptyLinearWithPadding(n)
     lm_head_new.weight = model.lm_head.weight
+    lm_head_new.bias = model.lm_head.bias
     model.lm_head = lm_head_new
 
-    model.lm_head.weight.data = gemm_padding(model.lm_head.weight)
+    if model.lm_head.bias is not None:
+        model.lm_head.weight.data, model.lm_head.bias.data = gemm_padding(model.lm_head.weight, model.lm_head.bias)
+    else:
+        model.lm_head.weight.data, _ = gemm_padding(model.lm_head.weight)
 
 def transformer_frontend_replace(model, config = None, dtype = torch.float):
     import transformers
