@@ -4,7 +4,6 @@
 - torch.sparse_bsr_tensor
 - torch.sparse_csc_tensor
 - torch.cuda._tls
-- torch.cuda.max_memory_cached
 - torch.cuda._nvml_based_avail
 - torch.cuda.can_device_access_peer
 - torch.cuda._transform_uuid_to_ordinals
@@ -12,7 +11,6 @@
 - torch.cuda._utils
 - torch.cuda.threading
 - torch.cuda._dummy_type
-- torch.cuda.memory_cached
 - torch.cuda.contextlib
 - torch.cuda.CUDAGraph
 - torch.cuda.graph
@@ -69,7 +67,6 @@
 - torch.cuda.CudaError
 - torch.cuda.get_arch_list
 - torch.cuda._parse_visible_devices
-- torch.cuda.reset_max_memory_allocated
 - torch.cuda.lru_cache
 - torch.cuda._lazy_seed_tracker
 - torch.cuda._check_cubins
