@@ -21,8 +21,9 @@ using data_type = dnnl::graph::logical_tensor::data_type;
 
 thread_local std::list<LlgaKernel::key_value_pair_t>
     LlgaKernel::cache_items_list_;
-thread_local std::unordered_map<size_t, LlgaKernel::list_iterator_t>
-    LlgaKernel::cache_items_map_;
+thread_local std::
+    unordered_map<std::vector<int64_t>, LlgaKernel::list_iterator_t>
+        LlgaKernel::cache_items_map_;
 thread_local int LlgaKernel::capacity_ = 7500;
 
 LlgaKernel::LlgaKernel(const Node* fusionNode)
@@ -471,8 +472,7 @@ LlgaKernel::cp_entry& LlgaKernel::compileAndCache(
     auto shape_vec = in.sizes().vec();
     key.insert(key.end(), shape_vec.begin(), shape_vec.end());
   }
-  auto hashed_key = c10::get_hash(key);
-  auto iter = cache_items_map_.find(hashed_key);
+  auto iter = cache_items_map_.find(key);
   if (iter == cache_items_map_.end()) {
     GRAPH_DEBUG("Compiling partition");
     cp_entry compiledPartitionEntry;
@@ -489,8 +489,8 @@ LlgaKernel::cp_entry& LlgaKernel::compileAndCache(
         inputSpecs,
         compiledPartitionEntry.outputSpecs_);
     cache_items_list_.push_front(
-        key_value_pair_t(hashed_key, std::move(compiledPartitionEntry)));
-    cache_items_map_[hashed_key] = cache_items_list_.begin();
+        key_value_pair_t(key, std::move(compiledPartitionEntry)));
+    cache_items_map_[key] = cache_items_list_.begin();
     if (cache_items_map_.size() > capacity_) {
       auto last = cache_items_list_.end();
       last--;
@@ -499,7 +499,7 @@ LlgaKernel::cp_entry& LlgaKernel::compileAndCache(
     }
     // If hash computation cost is higher than copying this struct,
     // then remove std::move above & return compiledPartitionEntry instead
-    return cache_items_map_[hashed_key]->second;
+    return cache_items_map_[key]->second;
   } else {
 #ifdef GRAPH_DEBUG_ENABLED
     GRAPH_DEBUG("Cached compiled partition is available");

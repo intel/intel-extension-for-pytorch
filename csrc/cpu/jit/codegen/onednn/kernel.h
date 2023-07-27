@@ -11,6 +11,34 @@
 #include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/runtime/interpreter.h>
 
+namespace std {
+template <>
+struct hash<std::vector<int64_t>> {
+  size_t operator()(const std::vector<int64_t>& key) const {
+    size_t total = key.size();
+    size_t sum = 0;
+    if (total < 64) {
+      for (size_t i = 0; i < total; i++) {
+        sum += key[i] << i;
+      }
+    } else {
+      size_t batch = total / 64;
+      size_t remain = total % 64;
+      for (size_t bs = 0; bs < batch; bs++) {
+        for (size_t i = 0; i < 64; i++) {
+          sum += key[bs * 64 + i] << i;
+        }
+      }
+      for (size_t i = 0; i < remain; i++) {
+        sum += key[batch * 64 + i] << i;
+      }
+    }
+    return sum;
+  }
+};
+
+} // namespace std
+
 namespace torch_ipex {
 namespace jit {
 namespace fuser {
@@ -140,10 +168,10 @@ class LlgaKernel {
   // https://github.com/lamerman/cpp-lru-cache/blob/master/include/lrucache.hpp
   // LRU cache is per-thread, so as to enable weight sharing among groups of
   // threads.
-  using key_value_pair_t = std::pair<size_t, cp_entry>;
+  using key_value_pair_t = std::pair<std::vector<int64_t>, cp_entry>;
   using list_iterator_t = std::list<key_value_pair_t>::iterator;
   static thread_local std::list<key_value_pair_t> cache_items_list_;
-  static thread_local std::unordered_map<size_t, list_iterator_t>
+  static thread_local std::unordered_map<std::vector<int64_t>, list_iterator_t>
       cache_items_map_;
   static thread_local int capacity_;
   std::vector<std::vector<int64_t>> tracedInputShapes_;
