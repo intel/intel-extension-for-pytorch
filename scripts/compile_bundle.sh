@@ -171,13 +171,14 @@ cd ../vision
 python setup.py clean
 python setup.py bdist_wheel 2>&1 | tee build.log
 python -m pip install --force-reinstall --no-deps dist/*.whl
+cd ..
 # don't fail on external scripts
 set +uex
 source ${DPCPP_ENV}
 source ${ONEMKL_ENV}
 set -uex
 #  TorchAudio
-cd ../audio
+cd audio
 python -m pip install -r requirements.txt
 python setup.py clean
 python setup.py bdist_wheel 2>&1 | tee build.log
