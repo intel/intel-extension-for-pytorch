@@ -393,6 +393,46 @@ def meta_ROIAlign_backward(
         else torch.contiguous_format
     )
 
+@register_meta("batch_norm_forward")
+def meta_batch_norm_forward(
+    input,
+    weight,
+    bias,
+    running_mean,
+    running_var,
+    train,
+    momentum,
+    eps,
+):
+    memory_format = torch._prims_common.suggest_memory_format(input)
+    output = input.new_empty(input.shape).to(memory_format=memory_format)
+    out_running_mean = input.new_empty(input.shape[1])
+    out_running_var = input.new_empty(input.shape[1])
+    return (output, out_running_mean, out_running_var)
+
+@register_meta("batch_norm_backward")
+def meta_batch_norm_backward(
+    grad_output,
+    input,
+    weight,
+    save_mean,
+    save_var,
+    train,
+    eps,
+    grad_input_mask,
+):
+    backend_grad_input = None
+    backend_grad_weight = None
+    backend_grad_bias = None
+    if grad_input_mask[0]:
+        memory_format = torch._prims_common.suggest_memory_format(input)
+        backend_grad_input = input.new_empty(input.shape).to(memory_format=memory_format)
+    if grad_input_mask[1]:
+        backend_grad_weight = weight.new_empty(weight.shape)
+    if grad_input_mask[2]:
+        backend_grad_bias = weight.new_empty(weight.shape[0])
+    return (backend_grad_input, backend_grad_weight, backend_grad_bias)
+
 @register_meta("bmm_add")
 def meta_bmm_add(
     input,
@@ -401,3 +441,10 @@ def meta_bmm_add(
     alpha,
 ):
     return batch1.new_empty((*batch1.shape[:-1], batch2.shape[-1]))
+
+@register_meta("add_softmax_")
+def meta_add_softmax_(
+    input1,
+    input2,
+):
+    return input1.new_empty(input1.shape)

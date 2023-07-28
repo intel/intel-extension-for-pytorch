@@ -49,7 +49,10 @@ make_fallback(torch.ops.torch_ipex.embedding_bag)
 make_fallback(torch.ops.torch_ipex.ipex_lstm)
 make_fallback(torch.ops.torch_ipex.ROIAlign_forward)
 make_fallback(torch.ops.torch_ipex.ROIAlign_backward)
+make_fallback(torch.ops.torch_ipex.batch_norm_forward)
+make_fallback(torch.ops.torch_ipex.batch_norm_backward)
 
+make_fallback(torch.ops.torch_ipex.add_softmax_)
 make_fallback(torch.ops.torch_ipex.bmm_add)
 
 @contextlib.contextmanager

@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch.optim import SGD
 import intel_extension_for_pytorch as ipex
+from intel_extension_for_pytorch.nn import FrozenBatchNorm2d
 
 from common_utils import TestCase
 
@@ -83,6 +84,13 @@ class BmmAdd(torch.nn.Module):
         bmm_res = torch.bmm(batch1, batch2)
         res = torch.add(bmm_res, input)
         return res
+
+class AddSoftmax(torch.nn.Module):
+    def __init__(self):
+        super(AddSoftmax, self).__init__()
+
+    def forward(self, x1, x2):
+        return torch.ops.torch_ipex.add_softmax_(x1, x2)
 
 
 class TestCompileCases(TestCase):
@@ -573,6 +581,73 @@ class TestCompileCases(TestCase):
             self.assertEqual(ori_y, y, prec=0.1)
             self.assertTrue(y.dtype == dtype)
 
+    def test_add_softmax_inference(self):
+        a = torch.randn(2, 3)
+        b = torch.randn(2, 3)
+        model = AddSoftmax()
+        ori_y = model(a, b)
+        for compiler_backend in ["torchscript", "inductor"]:
+            torch._dynamo.reset()
+            ipex._set_compiler_backend(compiler_backend)
+            compile_model = torch.compile(model, backend="ipex")
+
+            y = compile_model(a, b)
+            self.assertEqual(ori_y, y)
+
+    def test_frozen_batch_norm_inference(self):
+        torch._dynamo.allow_in_graph(FrozenBatchNorm2d)
+        options = itertools.product(
+            [torch.float32, torch.bfloat16],
+            ["torchscript", "inductor"],
+            [True, False],
+        )
+        for dtype, compiler_backend, dynamic in options:
+            if compiler_backend == "torchscript" and dynamic is True:
+                continue
+            x = torch.randn(20, 100, 35, 45).to(dtype=dtype).to(memory_format=torch.channels_last)
+            model = FrozenBatchNorm2d(100).eval()
+            with torch.cpu.amp.autocast(
+                enabled=(dtype == torch.bfloat16), dtype=torch.bfloat16
+            ), torch.no_grad():
+                ori_y = model(x)
+            torch._dynamo.reset()
+            ipex._set_compiler_backend(compiler_backend)
+            compile_model = torch.compile(model, dynamic=dynamic, backend="ipex")
+            with torch.cpu.amp.autocast(
+                enabled=(dtype == torch.bfloat16), dtype=torch.bfloat16
+            ), torch.no_grad():
+                y = compile_model(x)
+            self.assertEqual(ori_y, y)
+            self.assertTrue(y.dtype == dtype)
+
+    def test_frozen_batch_norm_train(self):
+        torch._dynamo.allow_in_graph(FrozenBatchNorm2d)
+        options = itertools.product(
+            [torch.float32, torch.bfloat16],
+            ["inductor",],
+            [True, False],
+        )
+        for dtype, compiler_backend, dynamic in options:
+            input = torch.randn(20, 100, 35, 45).to(dtype=dtype).to(memory_format=torch.channels_last)
+            ori_x = input.clone().requires_grad_()
+            x = input.clone().requires_grad_()
+            FrozenBatchNorm = FrozenBatchNorm2d(100)
+            ori_model = copy.deepcopy(FrozenBatchNorm).train()
+            model = copy.deepcopy(FrozenBatchNorm).train()
+            torch._dynamo.reset()
+            ipex._set_compiler_backend(compiler_backend)
+            compile_model = torch.compile(model, dynamic=dynamic, backend="ipex")
+            with torch.cpu.amp.autocast(
+                enabled=(dtype == torch.bfloat16), dtype=torch.bfloat16
+            ):
+                ori_y = ori_model(ori_x)
+                y = compile_model(x)
+                ori_y.mean().backward()
+                y.mean().backward()
+            self.assertEqual(ori_y, y)
+            self.assertEqual(ori_x.grad, x.grad)
+            self.assertTrue(y.dtype == dtype)
+            self.assertTrue(x.grad.dtype == dtype)
 
 if __name__ == "__main__":
     torch.manual_seed(2020)
