@@ -19,7 +19,7 @@ To utilize optimizations of Intel® Extension for PyTorch\* for optimum performa
 
 ```
 import torch
-impot intel_extension_for_pytorch as ipex # clause added
+import intel_extension_for_pytorch as ipex # clause added
 model = Model().eval()
 model = ipex.optimization(model)          # clause added
 with torch.no_grad():
