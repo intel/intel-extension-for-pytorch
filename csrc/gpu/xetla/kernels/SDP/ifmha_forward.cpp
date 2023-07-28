@@ -50,7 +50,7 @@ void ifmha_forward_impl(
   sycl::nd_range<2> NdRange =
       ifmha_forward_op_t::get_nd_range(num_batches * beam * num_heads);
 
-  auto event = q.submit([&](sycl::handler& cgh) {
+  auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for<
         class IfmhaForwardKernel<ifmha_policy, T, kUseBias, kIsTraining>>(
         NdRange, [=](sycl::nd_item<2> item) SYCL_ESIMD_KERNEL {
@@ -82,19 +82,21 @@ void ifmha_forward_impl(
       // call the functor
       ifmha_fwd_op(ei, args);
         });
-  });
-  // event.wait();
-  // double time = (event.template get_profiling_info<
-  //                    sycl::info::event_profiling::command_end>() -
-  //                event.template get_profiling_info<
-  //                    sycl::info::event_profiling::command_start>());
-  // uint64_t ops = num_batches * num_heads *
-  //                uint64_t(head_size * num_queries * num_keys) * 2L * 2L;
-  // double tflops = (ops / 1024.0f / 1024.0f / 1024.0f / 1024.0f) / (time /
-  // 1e9); printf("B, N, F, T, H: %d, %d, %d, %d, %d, time: %f us, tflops:
-  // %f\n",
-  //        num_batches, num_heads, num_queries, num_keys, head_size, time /
-  //        1e3, tflops);
+        // event.wait();
+        // double time = (event.template get_profiling_info<
+        //                    sycl::info::event_profiling::command_end>() -
+        //                event.template get_profiling_info<
+        //                    sycl::info::event_profiling::command_start>());
+        // uint64_t ops = num_batches * num_heads *
+        //                uint64_t(head_size * num_queries * num_keys) * 2L *
+        //                2L;
+        // double tflops = (ops / 1024.0f / 1024.0f / 1024.0f / 1024.0f) / (time
+        // / 1e9); printf("B, N, F, T, H: %d, %d, %d, %d, %d, time: %f us,
+        // tflops: %f\n",
+        //        num_batches, num_heads, num_queries, num_keys, head_size, time
+        //        / 1e3, tflops);
+  };
+  DPCPP_Q_SUBMIT(q, cgf);
 }
 
 } // namespace fmha
