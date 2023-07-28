@@ -1,6 +1,6 @@
 import torch 
 import os
-from ._transformers import IPEXGPTJBlock, IPEXLlamaBlock, IPEXOptBlock, IPEXBloomBlock, IPEXEmptyLinearWithPadding
+from ._transformers import IPEXGPTJBlock, IPEXLlamaBlock, IPEXOptBlock, IPEXBloomBlock, IPEXEmptyLinearWithPadding, IPEXEmptyINT4LinearWithPadding
 
 # from transformers.models.gptj.modeling_gptj import GPTJBlock
 
@@ -65,9 +65,11 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
                  module,
                  config = None,
                  device = "cpu",
-                 dtype = torch.float):
+                 dtype = torch.float,
+                 is_int4 = False):
         from transformers.models.gptj.configuration_gptj import GPTJConfig
         super().__init__(module, config, device=device, dtype=dtype)
+        self.is_int4 = is_int4
         self.config = config if config is not None else GPTJConfig()
         self.ipex_transformers_config = self.construct_transformer_config()
         # print(self.ipex_transformers_config.__dict__)
@@ -115,53 +117,141 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
             tp_size=IPEXTransformerConverter.tp_size,
             tp_group=IPEXTransformerConverter.tp_group
         )
-
+    
     def construct_ipex_optimized_module(self):
-        return IPEXGPTJBlock(self.ipex_transformers_config)
+        return IPEXGPTJBlock(self.ipex_transformers_config, self.is_int4)
 
     def port_attn_parameters(self):
-        if self.row_major:
-            self.module.attn.q_proj.weight.data = self.module.attn.q_proj.weight.transpose(0, 1).contiguous()
-            self.ipex_optimized_module.attn.q_wei = self.module.attn.q_proj.weight
-            self.ipex_optimized_module.attn.q_proj.bias = self.module.attn.q_proj.bias
-            self.module.attn.k_proj.weight.data = self.module.attn.k_proj.weight.transpose(0, 1).contiguous()
-            self.ipex_optimized_module.attn.k_wei = self.module.attn.k_proj.weight
-            self.ipex_optimized_module.attn.k_proj.bias = self.module.attn.k_proj.bias
-            self.module.attn.v_proj.weight.data = self.module.attn.v_proj.weight.transpose(0, 1).contiguous()
-            self.ipex_optimized_module.attn.v_wei = self.module.attn.v_proj.weight
-            self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
-            self.module.attn.out_proj.weight.data = self.module.attn.out_proj.weight.transpose(0, 1).contiguous()
-            self.ipex_optimized_module.attn.out_wei = self.module.attn.out_proj.weight
-            self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
-            shape = [3, -1, self.module.attn.q_proj.weight.shape[-1]]
-            self.ipex_optimized_module.attn.qkv_wei = torch.stack([self.ipex_optimized_module.attn.q_wei, self.ipex_optimized_module.attn.k_wei, self.ipex_optimized_module.attn.v_wei]).contiguous().view(shape)
-            self.ipex_optimized_module.attn.q_wei.data = self.ipex_optimized_module.attn.qkv_wei[0, :, :]
-            self.ipex_optimized_module.attn.k_wei.data = self.ipex_optimized_module.attn.qkv_wei[1, :, :]
-            self.ipex_optimized_module.attn.v_wei.data = self.ipex_optimized_module.attn.qkv_wei[2, :, :]
-            self.ipex_optimized_module.attn.qkv_bias = None
-        else:
-            self.ipex_optimized_module.attn.k_proj.weight = self.module.attn.k_proj.weight
-            self.ipex_optimized_module.attn.k_proj.bias = self.module.attn.k_proj.bias
-            self.ipex_optimized_module.attn.q_proj.weight = self.module.attn.q_proj.weight
-            self.ipex_optimized_module.attn.q_proj.bias = self.module.attn.q_proj.bias
-            self.ipex_optimized_module.attn.v_proj.weight = self.module.attn.v_proj.weight
-            self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
-            self.ipex_optimized_module.attn.out_proj.weight = self.module.attn.out_proj.weight
-            self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
+        if self.is_int4:
+            if self.row_major:
+                self.ipex_optimized_module.attn.q_wei = self.module.attn.q_proj.qweight
+                self.ipex_optimized_module.attn.q_scl = self.module.attn.q_proj.scales
+                self.ipex_optimized_module.attn.q_zp = self.module.attn.q_proj.qzeros
+                self.ipex_optimized_module.attn.q_gs = self.module.attn.q_proj.group_size
+                self.ipex_optimized_module.attn.q_proj.bias = self.module.attn.q_proj.bias
+                self.ipex_optimized_module.attn.k_wei = self.module.attn.k_proj.qweight
+                self.ipex_optimized_module.attn.k_scl = self.module.attn.k_proj.scales
+                self.ipex_optimized_module.attn.k_zp = self.module.attn.k_proj.qzeros
+                self.ipex_optimized_module.attn.k_gs = self.module.attn.k_proj.group_size
+                self.ipex_optimized_module.attn.k_proj.bias = self.module.attn.k_proj.bias
+                self.ipex_optimized_module.attn.v_wei = self.module.attn.v_proj.qweight
+                self.ipex_optimized_module.attn.v_scl = self.module.attn.v_proj.scales
+                self.ipex_optimized_module.attn.v_zp = self.module.attn.v_proj.qzeros
+                self.ipex_optimized_module.attn.v_gs = self.module.attn.v_proj.group_size
+                self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
+                self.ipex_optimized_module.attn.out_wei = self.module.attn.out_proj.qweight
+                self.ipex_optimized_module.attn.out_scl = self.module.attn.out_proj.scales
+                self.ipex_optimized_module.attn.out_zp = self.module.attn.out_proj.qzeros
+                self.ipex_optimized_module.attn.out_gs = self.module.attn.out_proj.group_size
+                self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
+
+                shape = [3, -1, self.module.attn.q_proj.qweight.shape[-1]]
+                self.ipex_optimized_module.attn.qkv_wei = torch.stack([self.ipex_optimized_module.attn.q_wei, self.ipex_optimized_module.attn.k_wei, self.ipex_optimized_module.attn.v_wei]).contiguous().view(shape)
+                self.ipex_optimized_module.attn.qkv_scl = torch.stack([self.ipex_optimized_module.attn.q_scl, self.ipex_optimized_module.attn.k_scl, self.ipex_optimized_module.attn.v_scl]).contiguous().view(shape)
+                self.ipex_optimized_module.attn.qkv_zp = torch.stack([self.ipex_optimized_module.attn.q_zp, self.ipex_optimized_module.attn.k_zp, self.ipex_optimized_module.attn.v_zp]).contiguous().view(shape)
+                self.ipex_optimized_module.attn.qkv_gs = self.ipex_optimized_module.attn.q_gs
+
+                self.ipex_optimized_module.attn.q_wei.data = self.ipex_optimized_module.attn.qkv_wei[0, :, :]
+                self.ipex_optimized_module.attn.q_scl.data = self.ipex_optimized_module.attn.qkv_scl[0, :, :]
+                self.ipex_optimized_module.attn.q_zp.data = self.ipex_optimized_module.attn.qkv_zp[0, :, :]
+                self.ipex_optimized_module.attn.k_wei.data = self.ipex_optimized_module.attn.qkv_wei[1, :, :]
+                self.ipex_optimized_module.attn.k_scl.data = self.ipex_optimized_module.attn.qkv_scl[1, :, :]
+                self.ipex_optimized_module.attn.k_zp.data = self.ipex_optimized_module.attn.qkv_zp[1, :, :]
+                self.ipex_optimized_module.attn.v_wei.data = self.ipex_optimized_module.attn.qkv_wei[2, :, :]
+                self.ipex_optimized_module.attn.v_scl.data = self.ipex_optimized_module.attn.qkv_scl[2, :, :]
+                self.ipex_optimized_module.attn.v_zp.data = self.ipex_optimized_module.attn.qkv_zp[2, :, :]
+                self.ipex_optimized_module.attn.qkv_bias = None
+            else:
+                self.ipex_optimized_module.attn.k_proj.qweight = self.module.attn.k_proj.qweight
+                self.ipex_optimized_module.attn.k_proj.scales = self.module.attn.k_proj.scales
+                self.ipex_optimized_module.attn.k_proj.qzeros = self.module.attn.k_proj.qzeros
+                self.ipex_optimized_module.attn.k_proj.group_size = self.module.attn.k_proj.group_size
+                self.ipex_optimized_module.attn.k_proj.bias = self.module.attn.k_proj.bias
+                self.ipex_optimized_module.attn.q_proj.qweight = self.module.attn.q_proj.qweight
+                self.ipex_optimized_module.attn.q_proj.scales = self.module.attn.q_proj.scales
+                self.ipex_optimized_module.attn.q_proj.qzeros = self.module.attn.q_proj.qzeros
+                self.ipex_optimized_module.attn.q_proj.group_size = self.module.attn.q_proj.group_size
+                self.ipex_optimized_module.attn.q_proj.bias = self.module.attn.q_proj.bias
+                self.ipex_optimized_module.attn.v_proj.qweight = self.module.attn.v_proj.qweight
+                self.ipex_optimized_module.attn.v_proj.scales = self.module.attn.v_proj.scales
+                self.ipex_optimized_module.attn.v_proj.qzeros = self.module.attn.v_proj.qzeros
+                self.ipex_optimized_module.attn.v_proj.group_size = self.module.attn.v_proj.group_size
+                self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
+                self.ipex_optimized_module.attn.out_proj.qweight = self.module.attn.out_proj.qweight
+                self.ipex_optimized_module.attn.out_proj.scales = self.module.attn.out_proj.scales
+                self.ipex_optimized_module.attn.out_proj.qzeros = self.module.attn.out_proj.qzeros
+                self.ipex_optimized_module.attn.out_proj.group_size = self.module.attn.out_proj.group_size
+                self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
+
+
+        else: 
+            if self.row_major:
+                self.module.attn.q_proj.weight.data = self.module.attn.q_proj.weight.transpose(0, 1).contiguous()
+                self.ipex_optimized_module.attn.q_wei = self.module.attn.q_proj.weight
+                self.ipex_optimized_module.attn.q_proj.bias = self.module.attn.q_proj.bias
+                self.module.attn.k_proj.weight.data = self.module.attn.k_proj.weight.transpose(0, 1).contiguous()
+                self.ipex_optimized_module.attn.k_wei = self.module.attn.k_proj.weight
+                self.ipex_optimized_module.attn.k_proj.bias = self.module.attn.k_proj.bias
+                self.module.attn.v_proj.weight.data = self.module.attn.v_proj.weight.transpose(0, 1).contiguous()
+                self.ipex_optimized_module.attn.v_wei = self.module.attn.v_proj.weight
+                self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
+                self.module.attn.out_proj.weight.data = self.module.attn.out_proj.weight.transpose(0, 1).contiguous()
+                self.ipex_optimized_module.attn.out_wei = self.module.attn.out_proj.weight
+                self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
+                shape = [3, -1, self.module.attn.q_proj.weight.shape[-1]]
+                self.ipex_optimized_module.attn.qkv_wei = torch.stack([self.ipex_optimized_module.attn.q_wei, self.ipex_optimized_module.attn.k_wei, self.ipex_optimized_module.attn.v_wei]).contiguous().view(shape)
+                self.ipex_optimized_module.attn.q_wei.data = self.ipex_optimized_module.attn.qkv_wei[0, :, :]
+                self.ipex_optimized_module.attn.k_wei.data = self.ipex_optimized_module.attn.qkv_wei[1, :, :]
+                self.ipex_optimized_module.attn.v_wei.data = self.ipex_optimized_module.attn.qkv_wei[2, :, :]
+                self.ipex_optimized_module.attn.qkv_bias = None
+            else:
+                self.ipex_optimized_module.attn.k_proj.weight = self.module.attn.k_proj.weight
+                self.ipex_optimized_module.attn.k_proj.bias = self.module.attn.k_proj.bias
+                self.ipex_optimized_module.attn.q_proj.weight = self.module.attn.q_proj.weight
+                self.ipex_optimized_module.attn.q_proj.bias = self.module.attn.q_proj.bias
+                self.ipex_optimized_module.attn.v_proj.weight = self.module.attn.v_proj.weight
+                self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
+                self.ipex_optimized_module.attn.out_proj.weight = self.module.attn.out_proj.weight
+                self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
 
     def port_mlp_parameters(self):
-        if self.row_major:
-            self.module.mlp.fc_in.weight.data = self.module.mlp.fc_in.weight.transpose(0, 1).contiguous()
-            self.ipex_optimized_module.mlp.fc_in_wei = self.module.mlp.fc_in.weight
-            self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
-            self.module.mlp.fc_out.weight.data = self.module.mlp.fc_out.weight.transpose(0, 1).contiguous()
-            self.ipex_optimized_module.mlp.fc_out_wei = self.module.mlp.fc_out.weight
-            self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
+        if self.is_int4:
+            if self.row_major:
+                self.ipex_optimized_module.mlp.fc_in_wei = self.module.mlp.fc_in.qweight
+                self.ipex_optimized_module.mlp.fc_in_scl = self.module.mlp.fc_in.scales
+                self.ipex_optimized_module.mlp.fc_in_zp = self.module.mlp.fc_in.qzeros
+                self.ipex_optimized_module.mlp.fc_in_gs = self.module.mlp.fc_in.group_size
+                self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
+                self.ipex_optimized_module.mlp.fc_out_wei = self.module.mlp.fc_out.qweight
+                self.ipex_optimized_module.mlp.fc_out_scl = self.module.mlp.fc_out.scales
+                self.ipex_optimized_module.mlp.fc_out_zp = self.module.mlp.fc_out.qzeros
+                self.ipex_optimized_module.mlp.fc_out_gs = self.module.mlp.fc_out.group_size
+                self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
+            else:
+                self.ipex_optimized_module.mlp.fc_in.qweight = self.module.mlp.fc_in.qweight
+                self.ipex_optimized_module.mlp.fc_in.scales = self.module.mlp.fc_in.scales
+                self.ipex_optimized_module.mlp.fc_in.qzeros = self.module.mlp.fc_in.qzeros
+                self.ipex_optimized_module.mlp.fc_in.group_size = self.module.mlp.fc_in.group_size
+                self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
+                self.ipex_optimized_module.mlp.fc_out.qweight = self.module.mlp.fc_out.qweight
+                self.ipex_optimized_module.mlp.fc_out.scales = self.module.mlp.fc_out.scales
+                self.ipex_optimized_module.mlp.fc_out.qzeros = self.module.mlp.fc_out.qzeros
+                self.ipex_optimized_module.mlp.fc_out.group_size = self.module.mlp.fc_out.group_size
+                self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
+
         else:
-            self.ipex_optimized_module.mlp.fc_in.weight = self.module.mlp.fc_in.weight
-            self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
-            self.ipex_optimized_module.mlp.fc_out.weight = self.module.mlp.fc_out.weight
-            self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
+            if self.row_major:
+                self.module.mlp.fc_in.weight.data = self.module.mlp.fc_in.weight.transpose(0, 1).contiguous()
+                self.ipex_optimized_module.mlp.fc_in_wei = self.module.mlp.fc_in.weight
+                self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
+                self.module.mlp.fc_out.weight.data = self.module.mlp.fc_out.weight.transpose(0, 1).contiguous()
+                self.ipex_optimized_module.mlp.fc_out_wei = self.module.mlp.fc_out.weight
+                self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
+            else:
+                self.ipex_optimized_module.mlp.fc_in.weight = self.module.mlp.fc_in.weight
+                self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
+                self.ipex_optimized_module.mlp.fc_out.weight = self.module.mlp.fc_out.weight
+                self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
 
     def port_layer_norm_parameters(self):
         self.ipex_optimized_module.ln.weight = self.module.ln_1.weight
@@ -541,6 +631,36 @@ def _convert_to_bloom_cache_ipex(
             for layer_past in past_key_value
         )
 
+def int4_gemm_padding(qdata):
+    k, n = qdata.shape
+    if n % 8 != 0:
+        padded_n = (n + 8 - 1) // 8 * 8
+        padded_qdata = torch.empty(k, padded_n, dtype=qdata.dtype, device=qdata.device)
+        padded_qdata[:, :n] = qdata
+        return padded_qdata
+    else:
+        return qdata
+		
+def int4_gemm_bias_padding(qdata):
+    n = qdata.shape[0]
+    if n % 4 != 0:
+        padded_n = (n + 4 - 1) // 4 * 4
+        padded_qdata = torch.empty(padded_n, dtype=qdata.dtype, device=qdata.device)
+        padded_qdata[:n] = qdata
+        return padded_qdata
+    else:
+        return qdata
+
+def int4_gemm_scale_padding(scale):
+    k, n = scale.shape
+    if n % 4 != 0:
+        padded_n = (n + 4 - 1) // 4 * 4
+        padded_scale = torch.empty(k, padded_n, dtype=scale.dtype, device=scale.device)
+        padded_scale[:, :n] = scale
+        return padded_scale
+    else:
+        return scale
+
 def gemm_padding(weight, bias=None):
     n, k = weight.shape
     if n % 4 != 0:
@@ -556,20 +676,39 @@ def gemm_padding(weight, bias=None):
     else:
         return weight, bias
 
-def pad_for_gptj_lm_head(model):
-    n = model.lm_head.weight.shape[0] #[n, k]
+def pad_for_gptj_lm_head(model, is_int4):
+    if is_int4:
+        n = model.lm_head.qweight.shape[1] * 2 - 1 #specific for 50401(25201) int4 weight
 
-    lm_head_new = IPEXEmptyLinearWithPadding(n)
-    lm_head_new.weight = model.lm_head.weight
-    lm_head_new.bias = model.lm_head.bias
-    model.lm_head = lm_head_new
+        lm_head_new = IPEXEmptyINT4LinearWithPadding(n)
+        lm_head_new.qweight = model.lm_head.qweight
+        lm_head_new.bias = model.lm_head.bias if model.lm_head.bias is not None else None
+        lm_head_new.scales = model.lm_head.scales
+        lm_head_new.qzeros = model.lm_head.qzeros
+        lm_head_new.group_size = model.lm_head.group_size
+        model.lm_head = lm_head_new 
 
-    if model.lm_head.bias is not None:
-        model.lm_head.weight.data, model.lm_head.bias.data = gemm_padding(model.lm_head.weight, model.lm_head.bias)
+        model.lm_head.qweight.data = int4_gemm_padding(model.lm_head.qweight)
+        model.lm_head.scales.data = int4_gemm_scale_padding(model.lm_head.scales)
+        model.lm_head.qzeros.data = int4_gemm_padding(model.lm_head.qzeros)
+
+        if model.lm_head.bias is not None:
+            model.lm_head.bias.data = int4_gemm_bias_padding(model.lm_head.bias)
+
     else:
-        model.lm_head.weight.data, _ = gemm_padding(model.lm_head.weight)
+        n = model.lm_head.weight.shape[0] #[n, k]
 
-def transformer_frontend_replace(model, config = None, dtype = torch.float):
+        lm_head_new = IPEXEmptyLinearWithPadding(n)
+        lm_head_new.weight = model.lm_head.weight
+        lm_head_new.bias = model.lm_head.bias
+        model.lm_head = lm_head_new
+
+        if model.lm_head.bias is not None:
+            model.lm_head.weight.data, model.lm_head.bias.data = gemm_padding(model.lm_head.weight, model.lm_head.bias)
+        else:
+            model.lm_head.weight.data, _ = gemm_padding(model.lm_head.weight)
+
+def transformer_frontend_replace(model, config = None, dtype = torch.float, is_int4=False):
     import transformers
     enable_ds = False
     try:
@@ -589,7 +728,7 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
         transformers.models.bloom.modeling_bloom.BloomBlock: IPEXBloomConverter
     }
 
-    def recursive_module_replace(module, config, dtype, enable_deepspeed=False):
+    def recursive_module_replace(module, config, dtype, enable_deepspeed=False, is_int4=is_int4):
         not_deepspeed_engine = not enable_deepspeed or not isinstance(module, deepspeed.InferenceEngine)
         if config is None and hasattr(module, "config") and not_deepspeed_engine:
             config = module.config
@@ -609,16 +748,16 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
 
         for name, named_module in module.named_children():
             if type(named_module) in transformers_converter.keys():
-                module_converter = transformers_converter[type(named_module)](named_module, config, dtype=dtype, device=config.device)
+                module_converter = transformers_converter[type(named_module)](named_module, config, dtype=dtype, device=config.device, is_int4=is_int4)
                 module_transformed = module_converter.get_transformed_module()
                 setattr(module, name, module_transformed)
             # elif OpConverter.valid_op_for_convert(named_module):
             #     op_transformed = OpConverter.convert_op(named_module)
             #     setattr(module, name, op_transformed)
             else:
-                recursive_module_replace(named_module, config, dtype=dtype)
+                recursive_module_replace(named_module, config, dtype=dtype, is_int4=is_int4)
         return model
 
-    replaced_model = recursive_module_replace(model, None, dtype=dtype, enable_deepspeed=enable_ds)
+    replaced_model = recursive_module_replace(model, None, dtype=dtype, enable_deepspeed=enable_ds, is_int4=is_int4)
 
     return replaced_model

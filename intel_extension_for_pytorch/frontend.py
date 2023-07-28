@@ -304,9 +304,9 @@ class GraphCapture(object):
         return forward
 
 
-def optimize_transformers(model, dtype=None, optimizer=None):
+def optimize_transformers(model, dtype=None, optimizer=None, is_int4=False):
     def model_converter(model, dtype):
-        transformer_frontend_replace(model, config=None, dtype=dtype)
+        transformer_frontend_replace(model, config=None, dtype=dtype, is_int4=is_int4)
         return model
     optimize_output = optimize(model, dtype=dtype, optimizer=optimizer, inplace=True)
     try:
@@ -316,7 +316,7 @@ def optimize_transformers(model, dtype=None, optimizer=None):
         print("Can not find transformers in your environment, disable ipex transformer optimize")
         return model
     if type(model) == transformers.models.gptj.modeling_gptj.GPTJForCausalLM:
-        pad_for_gptj_lm_head(model)
+        pad_for_gptj_lm_head(model, is_int4)
     if optimizer is None:
         model = optimize_output
         return model_converter(model, dtype=dtype)
