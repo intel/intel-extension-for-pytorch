@@ -21,7 +21,7 @@ from transformers import (
 MODEL_CLASSES = {
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
-    "llama": (LlamaForCausalLM, LlamaTokenizer),
+    "llama": (AutoModelForCausalLM, LlamaTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
