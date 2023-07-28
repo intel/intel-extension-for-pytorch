@@ -1,4 +1,5 @@
 #include <ATen/Tensor.h>
+#include <aten/FlashAttention.h>
 #include <aten/MaskedMultiHeadAttention.h>
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
@@ -536,6 +537,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> first_tok
     at::Tensor attention_mask
 ) {
     
+    auto bs = query.size(0);
     auto query_length = query.size(1);
     auto key_lenght = key.size(1);
     auto kv_head_num = key.size(2);
@@ -555,24 +557,30 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> first_tok
     } else {
       copy_key_value<at::BFloat16>(
           key_cache, key, value_cache, value, beam_batch);
-    }    
+    }
     //surpport MGQ/MQA
     //expand the head dimensiopn of key/value to be same to the query
     if(query.size(2) != key.size(2)){
         auto n_req = query.size(2) / key.size(2);
         key = key.repeat_interleave(n_req, 2);
         value = value.repeat_interleave(n_req, 2);
-    }    
-    key = key.permute({0, 2, 1, 3});
-    query = query.permute({0, 2, 1, 3});
-    value = value.permute({0, 2, 1, 3});
-    auto attn_weights = query.matmul(key.transpose(-1, -2));
-    attn_weights = attn_weights.div(scale_attn);
-    attn_weights = attn_weights + attention_mask;
-    attn_weights = attn_weights.softmax(-1);
-    attn_weights = attn_weights.to(value.dtype());
-    auto attn_outputs = attn_weights.matmul(value);
-    return std::make_tuple(attn_outputs, attn_weights, key_cache, value_cache, beam_idx);
+    }
+    auto attn_weights = at::Tensor();
+    if (key.scalar_type() == at::kBFloat16) {
+        auto attn_outputs = torch_ipex::cpu::flash_attention_kernel_stub(kCPU, query, key, value, scale_attn, attention_mask);
+        return std::make_tuple(attn_outputs, attn_weights, key_cache, value_cache, beam_idx);
+    } else {
+        key = key.permute({0, 2, 1, 3});
+        query = query.permute({0, 2, 1, 3});
+        value = value.permute({0, 2, 1, 3});
+        auto attn_weights = query.matmul(key.transpose(-1, -2));
+        attn_weights = attn_weights.div(scale_attn);
+        attn_weights = attn_weights + attention_mask;
+        attn_weights = attn_weights.softmax(-1);
+        attn_weights = attn_weights.to(value.dtype());
+        auto attn_outputs = attn_weights.matmul(value);
+        return std::make_tuple(attn_outputs, attn_weights, key_cache, value_cache, beam_idx);
+    }
 }
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>  masked_multihead_self_attention_kernel_impl(
     at::Tensor query,
@@ -615,13 +623,14 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>  masked_m
       value_cache = at::empty(
           {max_positions, beam_batch, value.size(2), value.size(3)}, value.options());
       beam_idx = at::zeros({max_positions, beam_batch}, beam_idx.options());
+      auto beam_idx_access = beam_idx.accessor<long, 2>();
       for (auto i = 0; i < max_positions; i++){
           for (auto j = 0; j < beam_batch; j++){
               if(key.size(0) == beam_batch){
-                 beam_idx[i][j] = j;
+                 beam_idx_access[i][j] = j;
               }else{
                  auto beam_size = beam_batch / key.size(0);
-                 beam_idx[i][j] = j / beam_size * beam_size;
+                 beam_idx_access[i][j] = j / beam_size * beam_size;
               }
             }
        }
