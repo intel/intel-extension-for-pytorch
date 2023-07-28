@@ -487,8 +487,8 @@ class _LlamaAttention_GQA(nn.Module):
         self.hidden_size = module.hidden_size
         self.num_heads = module.num_heads
         self.num_kv_heads = (
-            self.config.num_attention_kv_heads
-            if hasattr(self.config, "num_attention_kv_heads")
+            self.config.num_key_value_heads
+            if hasattr(self.config, "num_key_value_heads")
             else module.num_attention_heads
         )
         self.head_dim = self.hidden_size // self.num_heads
@@ -518,16 +518,18 @@ class _LlamaAttention_GQA(nn.Module):
             else 2048
         )
 
-    def repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
-        """torch.repeat_interleave(x, dim=2, repeats=n_rep)"""
-        bs, slen, n_kv_heads, head_dim = x.shape
+    def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
+        """
+        This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,
+        num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
+        """
+        batch, num_key_value_heads, slen, head_dim = hidden_states.shape
         if n_rep == 1:
-            return x
-        return (
-            x[:, :, :, None, :]
-            .expand(bs, slen, n_kv_heads, n_rep, head_dim)
-            .reshape(bs, slen, n_kv_heads * n_rep, head_dim)
+            return hidden_states
+        hidden_states = hidden_states[:, :, None, :, :].expand(
+            batch, num_key_value_heads, n_rep, slen, head_dim
         )
+        return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
 
     def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int):
         return (
@@ -618,20 +620,15 @@ class _LlamaAttention_GQA(nn.Module):
                 torch.tensor(past_key_value[3] + query.shape[1], dtype=torch.long),
             )
         else:
-            # repeat k/v heads if n_kv_heads < n_heads
-            key = self.repeat_kv(
-                key, self.n_rep
-            )  # (bs, seqlen, n_local_heads, head_dim)
-            value = self.repeat_kv(
-                value, self.n_rep
-            )  # (bs, seqlen, n_local_heads, head_dim)
             value_states = value.transpose(1, 2)
             query_states = query.transpose(1, 2)
             key_states = key.transpose(1, 2)
             kv_seq_len = key_states.shape[-2]
 
             past_key_value = None
-
+            # repeat k/v heads if n_kv_heads < n_heads
+            key_states = self.repeat_kv(key_states, self.n_rep)
+            value_states = self.repeat_kv(value_states, self.n_rep)
             attn_weights = torch.matmul(
                 query_states, key_states.transpose(2, 3)
             ) / math.sqrt(self.head_dim)

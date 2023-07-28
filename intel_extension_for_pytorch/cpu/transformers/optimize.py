@@ -112,11 +112,10 @@ def _optimize_transformers(
             # tpp rope optimization has transformers version requirements
             installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
             min_version = "4.28.0"
-            max_version = "4.30.0"
             if "transformers" not in installed_pkg:
                 raise RuntimeError(
-                    "optimize_transformers optimization requires transformers package and its version between {} and {}, fallback due to not meet".format(
-                        min_version, max_version
+                    "optimize_transformers optimization requires transformers package and its version at least {} , fallback due to not meet".format(
+                        min_version
                     )
                 )
 
@@ -124,12 +123,10 @@ def _optimize_transformers(
             from packaging import version
 
             trans_version = transformers.__version__
-            if version.parse(trans_version) < version.parse(
-                min_version
-            ) or version.parse(trans_version) > version.parse(max_version):
+            if version.parse(trans_version) < version.parse(min_version):
                 raise RuntimeError(
-                    "optimize_transformers optimization requires the transformers with version: between {} and {} while now transformers== {}, fallback due to not meet".format(
-                        min_version, max_version, trans_version
+                    "optimize_transformers optimization requires the transformers with version: at least {} while now transformers== {}, fallback due to not meet".format(
+                        min_version, trans_version
                     )
                 )
 
@@ -232,7 +229,7 @@ def _optimize_transformers(
                     _GPTNeoXAttention,
                     _model.config,
                 )
-                if hasattr(_model.config, "num_attention_kv_heads"):
+                if hasattr(_model.config, "num_key_value_heads"):
                     convert_class(
                         _model,
                         transformers.models.llama.modeling_llama.LlamaAttention,
