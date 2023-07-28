@@ -266,31 +266,23 @@ void batch_norm_transform_input_kernel(
 
 template <typename scalar_t, typename accscalar_t, typename layerscalar_t>
 void batch_norm_transform_input_channels_last_kernel(
-    const Tensor& input,
-    const optional<Tensor>& z,
-    const Tensor& mean,
-    const Tensor& inv_std,
-    const Tensor& weight,
-    const Tensor& shift,
-    Tensor& output,
+    const scalar_t* input_ptr,
+    const scalar_t* z_ptr,
+    const accscalar_t* mean_ptr,
+    const accscalar_t* inv_std_ptr,
+    const layerscalar_t* weight_ptr,
+    const layerscalar_t* shift_ptr,
+    scalar_t* output_ptr,
+    const int reduction_size,
+    const int stride,
     const bool fuse_relu) {
   // tensor dimension (m,c)
   // loop along m dimension
-  const auto stride = input.sizes()[1];
-  const auto reduction_size = input.numel() / stride;
 
   auto& queue = dpcppGetCurrentQueue();
   sycl::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
       flexible_launch_configs(reduction_size, stride);
-
-  auto input_ptr = input.data_ptr<scalar_t>();
-  auto z_ptr = z.has_value() ? z.value().data_ptr<scalar_t>() : nullptr;
-  auto mean_ptr = mean.data_ptr<accscalar_t>();
-  auto inv_std_ptr = inv_std.data_ptr<accscalar_t>();
-  auto weight_ptr = weight.defined() ? weight.data_ptr<accscalar_t>() : nullptr;
-  auto shift_ptr = shift.defined() ? shift.data_ptr<accscalar_t>() : nullptr;
-  auto output_ptr = output.data_ptr<scalar_t>();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
@@ -383,6 +375,8 @@ void batch_norm_elemt_channels_last_template(
   const auto second_dtype = weight.defined()
       ? weight.scalar_type()
       : (shift.defined() ? shift.scalar_type() : input.scalar_type());
+  const auto stride = input.sizes()[1];
+  const auto reduction_size = input.numel() / stride;
 
   if (input.scalar_type() != second_dtype) {
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -392,7 +386,16 @@ void batch_norm_elemt_channels_last_template(
               scalar_t,
               accscalar_t,
               accscalar_t>(
-              input, z, mean, inv_std, weight, shift, output, fuse_relu);
+              input.data_ptr<scalar_t>(),
+              z.has_value() ? z.value().data_ptr<scalar_t>() : nullptr,
+              mean.data_ptr<accscalar_t>(),
+              inv_std.data_ptr<accscalar_t>(),
+              weight.defined() ? weight.data_ptr<accscalar_t>() : nullptr,
+              shift.defined() ? shift.data_ptr<accscalar_t>() : nullptr,
+              output.data_ptr<scalar_t>(),
+              reduction_size,
+              stride,
+              fuse_relu);
         });
   } else {
     if (weight.defined()) {
@@ -410,7 +413,16 @@ void batch_norm_elemt_channels_last_template(
               scalar_t,
               accscalar_t,
               scalar_t>(
-              input, z, mean, inv_std, weight, shift, output, fuse_relu);
+              input.data_ptr<scalar_t>(),
+              z.has_value() ? z.value().data_ptr<scalar_t>() : nullptr,
+              mean.data_ptr<accscalar_t>(),
+              inv_std.data_ptr<accscalar_t>(),
+              weight.defined() ? weight.data_ptr<scalar_t>() : nullptr,
+              shift.defined() ? shift.data_ptr<scalar_t>() : nullptr,
+              output.data_ptr<scalar_t>(),
+              reduction_size,
+              stride,
+              fuse_relu);
         });
   }
 }
