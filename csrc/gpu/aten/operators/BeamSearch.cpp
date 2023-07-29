@@ -377,6 +377,9 @@ void update_beam_indices_kernel(
 
       if (sentence_id < batch_size * beam_size && time_step < num_step) {
         const scalar_t src_beam = beam_ids[sentence_id];
+        // const scalar_t src_beam =
+        //     (scalar_t)beam_ids[sentence_id] - batch_id * beam_size;
+        // fix for reference beam search
         const int32_t src_offset = batch_size * beam_size * time_step +
             batch_id * beam_size + src_beam;
         const int32_t out_offset =

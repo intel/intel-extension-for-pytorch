@@ -285,7 +285,7 @@ def ipex_beam_search(
     candidate_score = torch.empty((batch_size * 2 * num_beams), dtype=torch.float, device=input_ids.device)
     candidate_normed_scores = torch.empty((batch_size * 2 * num_beams), dtype=torch.float, device=input_ids.device)
     candidate_min_normed_scores = torch.empty((batch_size), dtype=torch.float, device=input_ids.device)
-    candidate_output_ids = torch.empty((batch_size * num_beams, max_out_seq_length), dtype=torch.long, device=input_ids.device)
+    candidate_output_ids = torch.empty((batch_size * 2 * num_beams, max_out_seq_length), dtype=torch.long, device=input_ids.device)
     candidate_sequence_lengths = torch.zeros((batch_size * 2 * num_beams), dtype=torch.long, device=input_ids.device)
     origin_input_ids = input_ids
     while True:
