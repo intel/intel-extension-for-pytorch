@@ -152,7 +152,7 @@ class IPEXTransformerAtten(nn.Module):
     def qkv_cache_optimized_greedy(self, hidden_states, layer_past = None):
         # greedy search path
         # hidden_states has already been converted to [seq, beam, hidden_size]
-        if layer_past is None:
+        if hidden_states.shape[0] != 1:
             # the first timestep
             shape = [self.max_positions, hidden_states.shape[1], self.num_attn_head, self.head_dim]
             self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
@@ -187,7 +187,7 @@ class IPEXTransformerAtten(nn.Module):
     def qkv_cache_optimized_beam(self, hidden_states, layer_past = None):
         # beam search path
         # hidden_states has already been converted to [seq, bs*beam, hidden_size]
-        if layer_past is None:
+        if hidden_states.shape[0] != 1:
             # the first timestep
             # first timestamp's shape will be [seq, bs, hidden_size]
             shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
