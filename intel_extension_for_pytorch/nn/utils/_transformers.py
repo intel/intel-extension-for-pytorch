@@ -63,7 +63,7 @@ class IPEXEmptyINT4Linear(nn.Module):
         self.group_size = None
 
     def forward(self, input):
-        if self.bias is not None:
+        if self.bias is None:
             return torch.ops.torch_ipex.mm_int4(input, self.qweight, self.scales, self.qzeros, self.group_size)
         else:
             return torch.ops.torch_ipex.mm_bias_int4(input, self.qweight, self.bias, self.scales, self.qzeros, self.group_size)
@@ -90,7 +90,7 @@ class IPEXEmptyINT4LinearWithPadding(nn.Module):
         self.n_dim = n_dim
 
     def forward(self, input):
-        if self.bias is not None:
+        if self.bias is None:
             return torch.ops.torch_ipex.mm_int4(input, self.qweight, self.scales, self.qzeros, self.group_size)[:,:,:self.n_dim]
         else:
             return torch.ops.torch_ipex.mm_bias_int4(input, self.qweight, self.bias, self.scales, self.qzeros, self.group_size)[:,:,:self.n_dim]

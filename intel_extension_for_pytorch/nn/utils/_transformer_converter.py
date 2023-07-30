@@ -643,8 +643,8 @@ def int4_gemm_padding(qdata):
 		
 def int4_gemm_bias_padding(qdata):
     n = qdata.shape[0]
-    if n % 4 != 0:
-        padded_n = (n + 4 - 1) // 4 * 4
+    if n % 16 != 0:
+        padded_n = (n + 16 - 1) // 16 * 16
         padded_qdata = torch.empty(padded_n, dtype=qdata.dtype, device=qdata.device)
         padded_qdata[:n] = qdata
         return padded_qdata
