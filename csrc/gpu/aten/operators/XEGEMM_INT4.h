@@ -115,6 +115,94 @@ using namespace xpu::xetla;
           HGEMM_INT4_RES_DISPATCH, hgemm_res_wint4##F)                     \
   }
 
+#define HGEMM_INT4_8M_16384N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##8x256_8x16x32##_##gz##_2_)
+#define HGEMM_INT4_8M_4096N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##8x64_8x16x64##_##gz##_8_)
+#define HGEMM_INT4_8M_4096N_16384K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##8x64_8x16x64##_##gz##_8_)
+#define HGEMM_INT4_8M_50416N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##8x512_8x16x32##_##gz##_1_)
+
+#define HGEMM_INT4_16M_16384N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##16x256_16x16x32##_##gz##_2_)
+#define HGEMM_INT4_16M_4096N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##16x64_16x16x32##_##gz##_8_)
+#define HGEMM_INT4_16M_4096N_16384K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##16x64_16x16x32##_##gz##_8_)
+#define HGEMM_INT4_16M_50416N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##16x512_16x16x32##_##gz##_1_)
+
+#define HGEMM_INT4_32M_16384N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##32x256_32x16x32##_##gz##_2_)
+#define HGEMM_INT4_32M_4096N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##32x64_32x16x32##_##gz##_8_)
+#define HGEMM_INT4_32M_4096N_16384K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##32x64_32x16x32##_##gz##_8_)
+#define HGEMM_INT4_32M_50416N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##32x512_32x16x32##_##gz##_1_)
+
+#define HGEMM_INT4_64M_16384N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##64x256_64x16x32##_##gz##_2_)
+#define HGEMM_INT4_64M_4096N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##32x128_32x16x32##_##gz##_4_)
+#define HGEMM_INT4_64M_4096N_16384K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##32x128_32x16x32##_##gz##_4_)
+#define HGEMM_INT4_64M_50416N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##64x512_64x16x32##_##gz##_1_)
+
+#define HGEMM_INT4_384M_16384N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
+#define HGEMM_INT4_384M_4096N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
+#define HGEMM_INT4_384M_4096N_16384K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
+#define HGEMM_INT4_384M_50416N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
+
+#define HGEMM_INT4_1024M_16384N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##128x256_64x16x32##_##gz##_1_)
+#define HGEMM_INT4_1024M_4096N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##128x256_64x16x32##_##gz##_1_)
+#define HGEMM_INT4_1024M_4096N_16384K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##128x256_64x16x32##_##gz##_1_)
+#define HGEMM_INT4_1024M_50416N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##128x512_64x32x32##_##gz##_1_)
+
+#define HGEMM_INT4_INFM_16384N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
+#define HGEMM_INT4_INFM_4096N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
+#define HGEMM_INT4_INFM_4096N_16384K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
+#define HGEMM_INT4_INFM_50416N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
+
+#define HGEMM_INT4_M_N_K_DISPATCH(m, n, k, gz) \
+  HGEMM_INT4_##m##M_##n##N_##k##K_IMPL(gz)
+
+#define HGEMM_INT4_N_K_DISPATCH(m, gz)             \
+  if (n_ == 16384 && k_ == 4096) {                 \
+    HGEMM_INT4_M_N_K_DISPATCH(m, 16384, 4096, gz); \
+  } else if (n_ == 4096 && k_ == 4096) {           \
+    HGEMM_INT4_M_N_K_DISPATCH(m, 4096, 4096, gz);  \
+  } else if (n_ == 4096 && k_ == 16384) {          \
+    HGEMM_INT4_M_N_K_DISPATCH(m, 4096, 16384, gz); \
+  } else if (n_ == 50416 && k_ == 4096) {          \
+    HGEMM_INT4_M_N_K_DISPATCH(m, 50416, 4096, gz); \
+  } else {                                         \
+    TORCH_CHECK(false);                            \
+  }
+
+#define HGEMM_INT4_M_DISPATCH(m)            \
+  if (calib_gz_ == k_ || calib_gz_ == -1) { \
+    HGEMM_INT4_N_K_DISPATCH(m, 0);          \
+  } else if (calib_gz_ == 128) {            \
+    HGEMM_INT4_N_K_DISPATCH(m, 128);        \
+  } else {                                  \
+    TORCH_CHECK(false);                     \
+  }
+
 inline Tensor resize_as_mat1(const Tensor& mat1, const Tensor& output) {
   auto output_ = output.flatten(0, -2);
   int n = output_.sizes()[1];
@@ -249,32 +337,20 @@ class HGEMMXetla_INT4 final {
     using scalar_t =
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
     auto& q = dpcppGetCurrentQueue();
-    if (calib_gz_ == k_ || calib_gz_ == -1) {
-      if (n_ == 4096 && k_ == 16384) {
-        HGEMM_INT4_COMMON_DISPATCH(_8x64_8x16x64_0_8_);
-      } else if (n_ == 16384 && k_ == 4096) {
-        HGEMM_INT4_COMMON_DISPATCH(_8x256_8x16x32_0_2_);
-      } else if (n_ == 4096 && k_ == 4096) {
-        HGEMM_INT4_COMMON_DISPATCH(_8x64_8x16x64_0_8_);
-      } else if (n_ == 50416 && k_ == 4096) {
-        HGEMM_INT4_COMMON_DISPATCH(_8x512_8x16x32_0_1_);
-      } else {
-        std::cout << "n = " << n_ << " k = " << k_ << std::endl;
-        TORCH_CHECK(false, "This shape is not supported by INT4 GEMM!\n");
-      }
+    if (m_ <= 8) {
+      HGEMM_INT4_M_DISPATCH(8);
+    } else if (m_ <= 16) {
+      HGEMM_INT4_M_DISPATCH(16);
+    } else if (m_ <= 32) {
+      HGEMM_INT4_M_DISPATCH(32);
+    } else if (m_ <= 64) {
+      HGEMM_INT4_M_DISPATCH(64);
+    } else if (m_ <= 384 && n_ == 4096 && (k_ == 4096 || k_ == 16384)) {
+      HGEMM_INT4_M_DISPATCH(384);
+    } else if (m_ <= 1024) {
+      HGEMM_INT4_M_DISPATCH(1024);
     } else {
-      if (n_ == 4096 && k_ == 16384) {
-        HGEMM_INT4_COMMON_DISPATCH(_8x64_8x16x64_128_8_);
-      } else if (n_ == 16384 && k_ == 4096) {
-        HGEMM_INT4_COMMON_DISPATCH(_8x256_8x16x32_128_2_);
-      } else if (n_ == 4096 && k_ == 4096) {
-        HGEMM_INT4_COMMON_DISPATCH(_8x64_8x16x64_128_8_);
-      } else if (n_ == 50416 && k_ == 4096) {
-        HGEMM_INT4_COMMON_DISPATCH(_8x512_8x16x32_128_1_);
-      } else {
-        std::cout << "n = " << n_ << " k = " << k_ << std::endl;
-        TORCH_CHECK(false, "This shape is not supported by INT4 GEMM!\n");
-      }
+      HGEMM_INT4_M_DISPATCH(INF);
     }
   }
 };
