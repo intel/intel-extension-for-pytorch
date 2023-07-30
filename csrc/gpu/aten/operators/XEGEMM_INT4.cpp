@@ -96,7 +96,11 @@ static void mm_qkv_out_wint4(
   auto& q = dpcppGetCurrentQueue();
 
   if (calib_gz == k || calib_gz == -1) {
-    GEMM_QKV_WINT4_XETLA_DISPATCH(_8x512_8x16x32_0_1_);
+    if (m <= 8) {
+      GEMM_QKV_WINT4_XETLA_DISPATCH(_8x256_8x16x32_0_2_);
+    } else {
+      GEMM_QKV_WINT4_XETLA_DISPATCH(_128x256_64x16x32_0_1_);
+    }
     return;
   } else {
     GEMM_QKV_WINT4_XETLA_DISPATCH(_8x256_8x16x32_128_2_);
