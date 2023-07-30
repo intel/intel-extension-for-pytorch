@@ -11,9 +11,14 @@
 
 using namespace xpu::xetla;
 
+#define RECORD_FUNCTION_IMPL(F)                        \
+  char str__[100];                                     \
+  sprintf(str__, "%s(%d, %d, %d)", "" #F, m_, n_, k_); \
+  RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+
 #define HGEMM_INT4_DISPATCH(F)                                          \
   {                                                                     \
-    RECORD_FUNCTION("torch_ipex::" #F, c10::ArrayRef<c10::IValue>({})); \
+    RECORD_FUNCTION_IMPL(F)                                             \
     F(q,                                                                \
       reinterpret_cast<sycl::half*>(output_->data_ptr<scalar_t>()),     \
       reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),      \
@@ -27,7 +32,7 @@ using namespace xpu::xetla;
 
 #define HGEMM_INT4_BIAS_DISPATCH(F)                                       \
   {                                                                       \
-    RECORD_FUNCTION("torch_ipex::" #F, c10::ArrayRef<c10::IValue>({}));   \
+    RECORD_FUNCTION_IMPL(F)                                               \
     F(q,                                                                  \
       reinterpret_cast<sycl::half*>(output_->data_ptr<scalar_t>()),       \
       reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
@@ -42,7 +47,7 @@ using namespace xpu::xetla;
 
 #define HGEMM_INT4_BIAS_RES_RES_DISPATCH(F)                               \
   {                                                                       \
-    RECORD_FUNCTION("torch_ipex::" #F, c10::ArrayRef<c10::IValue>({}));   \
+    RECORD_FUNCTION_IMPL(F)                                               \
     F(q,                                                                  \
       reinterpret_cast<sycl::half*>(output_->data_ptr<scalar_t>()),       \
       reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
@@ -59,7 +64,7 @@ using namespace xpu::xetla;
 
 #define HGEMM_INT4_BIAS_GELU_DISPATCH(F)                                  \
   {                                                                       \
-    RECORD_FUNCTION("torch_ipex::" #F, c10::ArrayRef<c10::IValue>({}));   \
+    RECORD_FUNCTION_IMPL(F)                                               \
     F(q,                                                                  \
       reinterpret_cast<sycl::half*>(output_->data_ptr<scalar_t>()),       \
       reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
@@ -74,7 +79,7 @@ using namespace xpu::xetla;
 
 #define HGEMM_INT4_RES_DISPATCH(F)                                        \
   {                                                                       \
-    RECORD_FUNCTION("torch_ipex::" #F, c10::ArrayRef<c10::IValue>({}));   \
+    RECORD_FUNCTION_IMPL(F)                                               \
     F(q,                                                                  \
       reinterpret_cast<sycl::half*>(output_->data_ptr<scalar_t>()),       \
       reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
