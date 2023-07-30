@@ -5,8 +5,11 @@
 namespace gpu::xetla {
 /*
 Note:
-  kHm / kSgHm == kBc / kSgBc
-  kSgHm and kSgBc should be a multiple of 16
+  1. accum_step is the number of elements loaded for the key (K) and value (V)
+matrices for each thread during each iteration.
+  2. kHm / kSgHm == kBc / kSgBc
+  3. kHm should be a multiple of accum_step
+  4. kSgBc must be less than 32, due to limitation for 2d load of index
 */
 
 struct ifmha_policy_64x64 {

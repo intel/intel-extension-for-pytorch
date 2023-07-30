@@ -93,7 +93,7 @@ struct imem_desc_t<dtype_, lanes_, mem_layout::row_major, mem_space::global> {
 
 // --------------------- // iload_tile // ---------------------- //
 
-template <typename tile_t, typename imem_desc_t>
+template <typename imem_desc_t>
 struct load_type {
   static constexpr bool is_global_row =
       ((imem_desc_t::space == mem_space::global) &&
@@ -101,7 +101,7 @@ struct load_type {
 };
 
 template <typename tile_t, typename imem_desc_t>
-inline typename std::enable_if_t<load_type<tile_t, imem_desc_t>::is_global_row>
+inline typename std::enable_if_t<load_type<imem_desc_t>::is_global_row>
 iload_tile(tile_t& tile, imem_desc_t& imem_desc) {
   using dtype = typename imem_desc_t::dtype;
   static constexpr uint32_t lanes = imem_desc_t::lanes;
@@ -114,11 +114,11 @@ iload_tile(tile_t& tile, imem_desc_t& imem_desc) {
   static constexpr uint32_t height = tile_desc::tile_size_y;
 
   static_assert(lanes == height, "the tile height and lanes don't match");
-
-  using lane_tile_desc_t = subgroup::tile_desc_t<width, 1, width, 1>;
+  static_assert(width >= 16, "width is expected to be larger than 16");
+  using lane_tile_desc_t = subgroup::tile_desc_t<width, 1, 16, 1>;
   using lane_tile_t = subgroup::tile_t<dtype, lane_tile_desc_t>;
   using lane_payload_t = subgroup::
-      mem_payload_t<dtype, lane_tile_desc_t, msg_type::block_2d, layout, space>;
+      mem_payload_t<dtype, lane_tile_desc_t, msg_type::block_1d, layout, space>;
   using lane_mem_desc_t = mem_desc_t<dtype, layout, space>;
 
   lane_tile_t lane_tile;
@@ -136,6 +136,76 @@ iload_tile(tile_t& tile, imem_desc_t& imem_desc) {
 
     tile.reg.xetla_select<width, 1>(i * width) =
         xetla_cvt<dtype_acc, dtype, width>(lane_tile.reg);
+  }
+}
+
+template <typename tile_t, typename imem_desc_t>
+inline typename std::enable_if_t<load_type<imem_desc_t>::is_global_row>
+iload_tile(tile_t& tile, imem_desc_t& imem_desc, int lane_idx) {
+  using dtype = typename imem_desc_t::dtype;
+  static constexpr uint32_t lanes = imem_desc_t::lanes;
+  static constexpr mem_layout layout = imem_desc_t::layout;
+  static constexpr mem_space space = imem_desc_t::space;
+
+  using dtype_acc = typename tile_t::dtype;
+  using tile_desc = typename tile_t::tile_desc;
+  static constexpr uint32_t width = tile_desc::tile_size_x;
+
+  static_assert(width >= 16, "width is expected to be larger than 16");
+  using lane_tile_desc_t = subgroup::tile_desc_t<width, 1, 16, 1>;
+  using lane_tile_t = subgroup::tile_t<dtype, lane_tile_desc_t>;
+  using lane_payload_t = subgroup::
+      mem_payload_t<dtype, lane_tile_desc_t, msg_type::block_1d, layout, space>;
+  using lane_mem_desc_t = mem_desc_t<dtype, layout, space>;
+
+  lane_tile_t lane_tile;
+  lane_mem_desc_t lane_mem_desc;
+  lane_payload_t lane_payload;
+
+  if (imem_desc.init_tdesc(lane_idx, lane_mem_desc)) {
+    lane_payload.init(lane_mem_desc);
+    subgroup::tile_load(lane_tile, lane_payload);
+  } else {
+    lane_tile.init(0);
+  }
+
+  tile.reg = xetla_cvt<dtype_acc, dtype, width>(lane_tile.reg);
+}
+
+template <typename tile_t, typename imem_desc_t>
+inline typename std::enable_if_t<load_type<imem_desc_t>::is_global_row>
+iprefetch_tile(imem_desc_t& imem_desc) {
+  using dtype = typename imem_desc_t::dtype;
+  static constexpr uint32_t lanes = imem_desc_t::lanes;
+  static constexpr mem_layout layout = imem_desc_t::layout;
+  static constexpr mem_space space = imem_desc_t::space;
+
+  using dtype_acc = typename tile_t::dtype;
+  using tile_desc = typename tile_t::tile_desc;
+  static constexpr uint32_t width = tile_desc::tile_size_x;
+  static constexpr uint32_t height = tile_desc::tile_size_y;
+
+  static_assert(lanes == height, "the tile height and lanes don't match");
+
+  using lane_tile_desc_t = subgroup::tile_desc_t<width, 1, width, 1>;
+  using lane_tile_t = subgroup::tile_t<dtype, lane_tile_desc_t>;
+  using prefetch_payload_t = subgroup::prefetch_payload_t<
+      dtype,
+      lane_tile_desc_t,
+      layout,
+      space,
+      1,
+      gpu_arch::Xe>;
+  using lane_mem_desc_t = mem_desc_t<dtype, layout, space>;
+
+  lane_mem_desc_t lane_mem_desc;
+#pragma unroll
+  for (int i = 0; i < lanes; i++) {
+    if (imem_desc.init_tdesc(i, lane_mem_desc)) {
+      prefetch_payload_t prefetch_payload(lane_mem_desc);
+      subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+          prefetch_payload);
+    }
   }
 }
 

@@ -274,12 +274,13 @@ class ifmha_forward_t {
       xetla_vector<int32_t, kSgBc> index1;
 
       if (lanes1 > 0) {
-        // TODO: change to vector usage
-        load_index(ei, args, index1, start_T1);
-        for (int i = 0; i < kSgBc; ++i) {
-          index1[i] = (start_T1 + i) * args.uB * args.uBm * args.uN +
-              bid * args.uBm * args.uN + index1[i] * args.uN + nid;
-        }
+        xetla_vector<int32_t, kSgBc> beam_id;
+        load_index(ei, args, beam_id, start_T1);
+        int inital = start_T1 * args.uB * args.uBm * args.uN +
+            bid * args.uBm * args.uN + nid;
+        int step = args.uB * args.uBm * args.uN;
+        index1 = xetla_vector_gen<int32_t, kSgBc>(inital, step);
+        index1 += beam_id * args.uN;
       }
 
       idesc_Kj.update_index(index0, index1, lanes0, lanes1);
@@ -316,29 +317,30 @@ class ifmha_forward_t {
         mem_desc_Qi_L_t::layout,
         mem_desc_Qi_L_t::space>;
     using matKj_tile_desc_t =
-        subgroup::tile_desc_t<accum_step, kSgBc, accum_step, kSgBc>;
+        subgroup::tile_desc_t<accum_step, 1, accum_step, 1>;
     using matKj_t = subgroup::tile_t<accum_t, matKj_tile_desc_t>;
 
     // Gemm to comput Sij
-    matQi_payload_t matQi_payload(ctx.desc_Qi_L);
     matQi_t matQi;
     matKj_t matKj;
 
-    for (int i = 0; i < ctx.loop_count; i++) {
-      // load Qi from local memory
-      subgroup::tile_load(matQi, matQi_payload);
-      matQi_payload.template update_tdesc<tdesc_update_dir::x_dir>(accum_step);
-
-      // indexed load Kj
-      ctx.idesc_Kj.set_offset(i * accum_step);
-      iload_tile(matKj, ctx.idesc_Kj);
-
 #pragma unroll
-      for (int j = 0; j < kSgBc; j++) {
-        auto matKj_sub = matKj.reg.xetla_select<accum_step, 1>(j * accum_step);
+    for (int j = 0; j < kSgBc; j++) {
+      matQi_payload_t matQi_payload(ctx.desc_Qi_L);
+
+      for (int i = 0; i < ctx.loop_count; i++) {
+        // load Qi from local memory
+        subgroup::tile_load(matQi, matQi_payload);
+        matQi_payload.template update_tdesc<tdesc_update_dir::x_dir>(
+            accum_step);
+
+        // indexed load Kj
+        ctx.idesc_Kj.set_offset(i * accum_step);
+        iload_tile(matKj, ctx.idesc_Kj, j);
+
         matSij.reg.xetla_select<1, 1>(j) +=
             xetla_reduce<accum_t, accum_t, accum_step, reduce_op::sum>(
-                matQi.reg * matKj_sub);
+                matQi.reg * matKj.reg);
       }
     }
   }
@@ -353,7 +355,7 @@ class ifmha_forward_t {
   /// @brief gemm_Oi is used to compute Oi += Pij x Vj
   inline void gemm_Oi(matPij_t& matPij, matOi_t& matOi) {
     using matVj_tile_desc_t =
-        subgroup::tile_desc_t<accum_step, kSgBc, accum_step, kSgBc>;
+        subgroup::tile_desc_t<accum_step, 1, accum_step, 1>;
     using matVj_t = subgroup::tile_t<accum_t, matVj_tile_desc_t>;
 
     using matOt0_tile_desc_t =
@@ -368,23 +370,26 @@ class ifmha_forward_t {
 
     matVj_t matVj;
     matOt0_t matOt0;
-    mem_desc_Ot_L_t desc_Ot0_L(ctx.desc_Ot0_L);
-
-    for (int i = 0; i < ctx.loop_count; i++) {
-      // indexed load Vj
-      ctx.idesc_Vj.set_offset(i * accum_step);
-      iload_tile(matVj, ctx.idesc_Vj);
 
 #pragma unroll
-      for (int j = 0; j < accum_step; j++) {
-        auto matVj_sub = matVj.reg.xetla_select<kSgBc, accum_step>(j);
-        matOt0.reg.xetla_select<1, 1>(j) =
-            xetla_reduce<accum_t, accum_t, kSgBc, reduce_op::sum>(
-                matPij.reg * matVj_sub);
+    for (int j = 0; j < kSgBc; ++j) {
+      mem_desc_Ot_L_t desc_Ot0_L(ctx.desc_Ot0_L);
+      for (int i = 0; i < ctx.loop_count; ++i) {
+        matOt0_payload_t matOt0_payload(desc_Ot0_L);
+        if (j == 0)
+          matOt0.init(0);
+        else
+          subgroup::tile_load(matOt0, matOt0_payload);
+
+        // indexed load Vj
+        ctx.idesc_Vj.set_offset(i * accum_step);
+        iload_tile(matVj, ctx.idesc_Vj, j);
+
+        accum_t acc = matPij.reg[j];
+        matOt0.reg += matVj.reg * acc;
+        subgroup::tile_store(matOt0, matOt0_payload);
+        desc_Ot0_L.update_coord_x(accum_step);
       }
-      matOt0_payload_t matOt0_payload(desc_Ot0_L);
-      subgroup::tile_store(matOt0, matOt0_payload);
-      desc_Ot0_L.update_coord_x(accum_step);
     }
 
     xetla_fence<memory_kind::shared_local>();

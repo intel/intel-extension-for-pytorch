@@ -10,6 +10,10 @@ import os
 import inspect
 import time
 
+import transformers
+import transformers.modeling_outputs
+from transformers.modeling_outputs import CausalLMOutputWithPast
+
 
 def _ipex_prepare_model_inputs(
     self,
@@ -77,6 +81,81 @@ def _ipex_prepare_model_inputs(
     # 4. if `inputs` is still None, try to create `input_ids` from BOS token
     inputs = self._maybe_initialize_input_ids_for_generation(inputs, bos_token_id, model_kwargs)
     return inputs, input_name, model_kwargs
+
+def ipex_GPTJForCausalLM_forward(
+        self,
+        input_ids: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        token_type_ids: Optional[torch.LongTensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        head_mask: Optional[torch.FloatTensor] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple, CausalLMOutputWithPast]:
+        r"""
+        labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
+            Labels for language modeling. Note that the labels **are shifted** inside the model, i.e. you can set
+            `labels = input_ids` Indices are selected in `[-100, 0, ..., config.vocab_size]` All labels set to `-100`
+            are ignored (masked), the loss is only computed for labels in `[0, ..., config.vocab_size]`
+        """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        transformer_outputs = self.transformer(
+            input_ids,
+            past_key_values=past_key_values,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        hidden_states = transformer_outputs[0]
+
+        # Set device for model parallelism
+        if self.model_parallel:
+            torch.cuda.set_device(self.transformer.first_device)
+            hidden_states = hidden_states.to(self.lm_head.weight.device)
+
+        # make sure sampling in fp16 works correctly and
+        # compute loss in fp32 to match with mesh-tf version
+        # https://github.com/EleutherAI/gpt-neo/blob/89ce74164da2fb16179106f54e2269b5da8db333/models/gpt2/gpt2.py#L179
+        # lm_logits = self.lm_head(hidden_states).to(torch.float32)
+        lm_logits = self.lm_head(hidden_states)
+
+        loss = None
+        if labels is not None:
+            # move labels to correct device to enable model parallelism
+            labels = labels.to(lm_logits.device)
+            # Shift so that tokens < n predict n
+            shift_logits = lm_logits[..., :-1, :].contiguous()
+            shift_labels = labels[..., 1:].contiguous()
+            # Flatten the tokens
+            loss_fct = CrossEntropyLoss()
+            loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+
+            loss = loss.to(hidden_states.dtype)
+
+        if not return_dict:
+            output = (lm_logits,) + transformer_outputs[1:]
+            return ((loss,) + output) if loss is not None else output
+
+        return CausalLMOutputWithPast(
+            loss=loss,
+            logits=lm_logits,
+            past_key_values=transformer_outputs.past_key_values,
+            hidden_states=transformer_outputs.hidden_states,
+            attentions=transformer_outputs.attentions,
+        )
+
 
 def ipex_beam_search(
     self,
@@ -285,7 +364,7 @@ def ipex_beam_search(
     candidate_score = torch.empty((batch_size * 2 * num_beams), dtype=torch.float, device=input_ids.device)
     candidate_normed_scores = torch.empty((batch_size * 2 * num_beams), dtype=torch.float, device=input_ids.device)
     candidate_min_normed_scores = torch.empty((batch_size), dtype=torch.float, device=input_ids.device)
-    candidate_output_ids = torch.empty((batch_size * num_beams, max_out_seq_length), dtype=torch.long, device=input_ids.device)
+    candidate_output_ids = torch.empty((batch_size * 2 * num_beams, max_out_seq_length), dtype=torch.long, device=input_ids.device)
     candidate_sequence_lengths = torch.zeros((batch_size * 2 * num_beams), dtype=torch.long, device=input_ids.device)
     origin_input_ids = input_ids
     while True:

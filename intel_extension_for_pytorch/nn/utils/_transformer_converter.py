@@ -12,7 +12,7 @@ from typing import Optional, Tuple, Union
 import torch.nn as nn
 
 from functools import partial
-from ._utils import ipex_beam_search, _ipex_prepare_model_inputs, ipex_beam_search_without_optimize
+from ._utils import ipex_beam_search, _ipex_prepare_model_inputs, ipex_beam_search_without_optimize, ipex_GPTJForCausalLM_forward
 from ._inference_ops import OpConverter
 # from transformers.models.llama.configuration_llama import 
 
@@ -740,6 +740,10 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float, is_i
         
         if hasattr(module, "_prepare_model_inputs"):
             setattr(module, "_prepare_model_inputs", partial(_ipex_prepare_model_inputs, module))
+
+        if type(module) == transformers.models.gptj.modeling_gptj.GPTJForCausalLM:
+            if hasattr(module, "forward"):
+                setattr(module, "forward", partial(ipex_GPTJForCausalLM_forward, module))
 
         if os.environ.get("DISABLE_KV_CACHE", "OFF") not in ["1", "Y", "YES", "TRUE", "ON"]:
             if hasattr(module, "beam_search"):
