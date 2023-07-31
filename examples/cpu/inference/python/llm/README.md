@@ -122,15 +122,13 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python ru
 ```
 ## Single Instance Accuracy
 ```bash
-Accuracy test {TASK_NAME}, choice in this [link](https://github.com/EleutherAI/lm-evaluation-harness/blob/master/docs/task_table.md), by default we use "lambada_openai"
-
 # bfloat16
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run_accuracy.py --accuracy-only -m <MODEL_ID> --dtype bfloat16 --ipex --jit --tasks {TASK_NAME}
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run_generation.py --accuracy-only -m <MODEL_ID> --dtype bfloat16 --ipex --jit --lambada
 
 # Quantization as a performance part
 # (1) Do quantization to get the quantized model as mentioned above
-# (2) Run int8 accuracy test (note that GPT-NEOX please remove --int8-bf16-mixed)
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run_accuracy.py -m <MODEL ID> --quantized-model-path "./saved_results/best_model.pt" --dtype int8 --accuracy-only --jit --int8-bf16-mixed --tasks {TASK_NAME}
+# (2) Run int8 accuracy test (note that GPT-NEOX uses --int8 instead of --int8-bf16-mixed)
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run_<MODEL>_int8.py -m <MODEL ID> --quantized-model-path "./saved_results/best_model.pt" --accuracy-only --jit --int8-bf16-mixed --lambada
 ```
 
 ## Distributed Performance with DeepSpeed (autoTP)
