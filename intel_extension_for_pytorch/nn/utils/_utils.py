@@ -401,6 +401,7 @@ def ipex_beam_search(
         next_token_scores = nn.functional.log_softmax(
             next_token_logits, dim=-1
         )  # (batch_size * num_beams, vocab_size)
+        next_token_logits = None
         dummy_input_ids = torch.empty((batch_size * num_beams, cur_len), dtype=torch.long, device="meta")
         next_token_scores_processed = logits_processor(dummy_input_ids, next_token_scores)
         next_token_scores = next_token_scores_processed + beam_scores[:, None].expand_as(next_token_scores)
@@ -419,6 +420,7 @@ def ipex_beam_search(
         model_kwargs = self._update_model_kwargs_for_generation(
             outputs, model_kwargs, is_encoder_decoder=self.config.is_encoder_decoder
         )
+        outputs = None
         # if model_kwargs["past_key_values"] is not None:
         #     model_kwargs["past_key_values"] = self._reorder_cache(model_kwargs["past_key_values"], beam_idx)
 
