@@ -389,7 +389,8 @@ class IPEXTransformerAtten(nn.Module):
 
     def get_blocked_attn_mask(self, attn_mask):
         if self.layer_id == 0:
-            IPEXTransformerAtten.blocked_attn_mask = torch.zeros((attn_mask.shape[0], attn_mask.shape[1], attn_mask.shape[2], self.max_positions), device=attn_mask.device, dtype=attn_mask.dtype)
+            IPEXTransformerAtten.blocked_attn_mask = torch.empty((attn_mask.shape[0], attn_mask.shape[1], attn_mask.shape[2], self.max_positions), device=attn_mask.device, dtype=attn_mask.dtype)
+            IPEXTransformerAtten.blocked_attn_mask.fill_(-65504.);
             IPEXTransformerAtten.blocked_attn_mask[:, :, :, 0 : attn_mask.shape[3]] = attn_mask
         return IPEXTransformerAtten.blocked_attn_mask
 
@@ -468,7 +469,6 @@ class IPEXTransformerAtten(nn.Module):
                 else:
                     blocked_attn_mask = self.get_blocked_attn_mask(attention_mask)
 
-
             blocked_alibi = None
             if alibi != None:
                 blocked_alibi = self.get_blocked_alibi(alibi)
@@ -530,21 +530,19 @@ class IPEXTransformerAtten(nn.Module):
         expand_shape = [bs, beam, self.key_prompt.shape[1]*self.key_prompt.shape[2]*self.key_prompt.shape[3]]
         shape = [bs*beam, self.key_prompt.shape[1], self.key_prompt.shape[2], self.key_prompt.shape[3]]
         #shape1 = [bs* beam, key.shape[1], key.shape[2], key.shape[3]]
-        key_prompt = self.key_prompt.reshape(bs, 1, -1).expand(expand_shape).view(shape)
-        value_prompt = self.value_prompt.reshape(bs, 1, -1).expand(expand_shape).view(shape)
+        key_prompt = self.key_prompt.reshape(bs, 1, -1).expand(expand_shape).reshape(shape)
+        value_prompt = self.value_prompt.reshape(bs, 1, -1).expand(expand_shape).reshape(shape)
         key_list = [key_prompt]
         value_list = [value_prompt]
         beam_idx_cache = self.expand_beam_idx()
         for idx in range(beam_idx_cache.shape[0]):
             beam_idx = beam_idx_cache[idx]
-
             current_key = key[:, :, idx, :].view(bs*beam, key.shape[1], 1, -1)
             current_key = current_key.index_select(0, beam_idx.to(key.device))
             key_list.append(current_key)
             current_value = value[:, :, idx, :].view(bs*beam, value.shape[1], 1, -1)
             current_value = current_value.index_select(0, beam_idx.to(value.device))
             value_list.append(current_value)
-        
 
         key = torch.cat(key_list, dim=2)
         value = torch.cat(value_list, dim=2)
@@ -857,8 +855,8 @@ class IPEXGPTJBlock(nn.Module):
         hidden_shape = [bs, beam, hidden_states.shape[1], hidden_states.shape[2]]
         if hidden_states.shape[1] > 1:
             hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :]        # [bs, seq, hidden_size]
-            position_ids = position_ids[0, :].view(1, position_ids.shape[1])
-            attention_mask = attention_mask[0, :, :, :].view(1, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
+            position_ids = position_ids.view(bs, beam, position_ids.shape[1])[:,0,:].view(bs, position_ids.shape[1])
+            attention_mask = attention_mask.view(bs, beam, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])[:,0,:,:,:].view(bs, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
         # convert layout form [bs, seq, hidden_size] to [seq, bs, hidden_size]
         hidden_states = hidden_states.transpose(0, 1).contiguous()
 
