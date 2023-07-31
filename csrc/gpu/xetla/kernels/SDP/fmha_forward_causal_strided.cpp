@@ -310,7 +310,7 @@ class fmha_forward_causal_strided_t {
             args.A_ptr, {end_x, 1, args.uAT * args.uN * args.uB}, {start_x, 0});
       }
 
-      if constexpr (kUseBias) {
+      if constexpr (kUseBias && !kIsCausal) {
         int32_t start_x = startT;
         uint32_t end_x = start_x + kBc;
         uint32_t boundary_x = args.uMT;
@@ -323,6 +323,20 @@ class fmha_forward_causal_strided_t {
 
         mem_desc_Bij.init(
             args.B_ptr, {end_x, end_y, args.uMT}, {start_x, start_y});
+      }
+
+      // B, 1, 1, T
+      // batch_id * T + startT
+      if constexpr (kUseBias && kIsCausal) {
+        int32_t batch_start = batch_id * args.uMT;
+        int32_t start_x = batch_start + startT;
+        uint32_t end_x = startT + kBc;
+        uint32_t boundary_x = args.uT;
+        end_x = end_x > boundary_x ? boundary_x : end_x;
+        end_x += batch_start;
+
+        mem_desc_Bij.init(
+            args.B_ptr, {end_x, 1, args.uMT * args.uB}, {start_x, 0});
       }
     }
   };
@@ -368,13 +382,27 @@ class fmha_forward_causal_strided_t {
     }
 
     // Add attn_mask if needed
-    if constexpr (kUseBias) {
+    if constexpr (kUseBias && !kIsCausal) {
       using bias_op_t = subgroup::
           elemwise_reduce_op_t<reduce_op::sum, scalar_t, gpu_arch::Xe>;
       using bias_args_t = typename bias_op_t::arguments_t;
 
       int32_t tile_offset_x = ctx.sg_idx * kSgBc;
       int32_t tile_offset_y = ctx.sg_idy * kSgBr;
+      ctx.mem_desc_Bij.update_coord(tile_offset_x, tile_offset_y);
+
+      bias_op_t bias_op;
+      bias_args_t bias_args(ctx.mem_desc_Bij.base, ctx.mem_desc_Bij.shape);
+      bias_op(matAccSij, ctx.mem_desc_Bij.coord, bias_args);
+    }
+
+    // Add attn_mask if needed
+    if constexpr (kUseBias && kIsCausal) {
+      using bias_op_t = subgroup::bias_add_op_t<scalar_t, gpu_arch::Xe>;
+      using bias_args_t = typename bias_op_t::arguments_t;
+
+      int32_t tile_offset_x = ctx.sg_idx * kSgBc;
+      int32_t tile_offset_y = 0;
       ctx.mem_desc_Bij.update_coord(tile_offset_x, tile_offset_y);
 
       bias_op_t bias_op;
@@ -899,46 +927,90 @@ void fmha_forward_kernel(
   using T = sycl::half;
   if (seq_last) {
     if (is_causal) {
-      if (alibi) {
-        fmha_forward_causal_strided<T, true, false, true, true, false>(
-            q,
-            (T*)query,
-            (T*)key,
-            (T*)value,
-            (T*)alibi,
-            (T*)attn_mask,
-            dropout,
-            (T*)out,
-            alpha,
-            beta,
-            dropout_prob,
-            num_batches,
-            num_heads,
-            head_size,
-            num_queries,
-            num_keys,
-            alibi_padded_block_size,
-            attn_mask_padded_block_size);
+      if (attn_mask) {
+        if (alibi) {
+          fmha_forward_causal_strided<T, true, true, true, true, false>(
+              q,
+              (T*)query,
+              (T*)key,
+              (T*)value,
+              (T*)alibi,
+              (T*)attn_mask,
+              dropout,
+              (T*)out,
+              alpha,
+              beta,
+              dropout_prob,
+              num_batches,
+              num_heads,
+              head_size,
+              num_queries,
+              num_keys,
+              alibi_padded_block_size,
+              attn_mask_padded_block_size);
+        } else {
+          fmha_forward_causal_strided<T, false, true, true, true, false>(
+              q,
+              (T*)query,
+              (T*)key,
+              (T*)value,
+              (T*)alibi,
+              (T*)attn_mask,
+              dropout,
+              (T*)out,
+              alpha,
+              beta,
+              dropout_prob,
+              num_batches,
+              num_heads,
+              head_size,
+              num_queries,
+              num_keys,
+              alibi_padded_block_size,
+              attn_mask_padded_block_size);
+        }
       } else {
-        fmha_forward_causal_strided<T, false, false, true, true, false>(
-            q,
-            (T*)query,
-            (T*)key,
-            (T*)value,
-            (T*)alibi,
-            (T*)attn_mask,
-            dropout,
-            (T*)out,
-            alpha,
-            beta,
-            dropout_prob,
-            num_batches,
-            num_heads,
-            head_size,
-            num_queries,
-            num_keys,
-            alibi_padded_block_size,
-            attn_mask_padded_block_size);
+        if (alibi) {
+          fmha_forward_causal_strided<T, true, false, true, true, false>(
+              q,
+              (T*)query,
+              (T*)key,
+              (T*)value,
+              (T*)alibi,
+              (T*)attn_mask,
+              dropout,
+              (T*)out,
+              alpha,
+              beta,
+              dropout_prob,
+              num_batches,
+              num_heads,
+              head_size,
+              num_queries,
+              num_keys,
+              alibi_padded_block_size,
+              attn_mask_padded_block_size);
+        } else {
+          fmha_forward_causal_strided<T, false, false, true, true, false>(
+              q,
+              (T*)query,
+              (T*)key,
+              (T*)value,
+              (T*)alibi,
+              (T*)attn_mask,
+              dropout,
+              (T*)out,
+              alpha,
+              beta,
+              dropout_prob,
+              num_batches,
+              num_heads,
+              head_size,
+              num_queries,
+              num_keys,
+              alibi_padded_block_size,
+              attn_mask_padded_block_size);
+        }
       }
     } else {
       if (attn_mask) {
