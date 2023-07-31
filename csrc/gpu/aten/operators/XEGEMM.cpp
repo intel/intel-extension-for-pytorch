@@ -229,6 +229,33 @@ static std::tuple<Tensor, Tensor, Tensor> mm_qkv(
       out2.view_symint(sizes));
 }
 
+Tensor matmul_gelu(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    c10::string_view approximate) {
+  auto input_flat = input.flatten(0, -2);
+  if (bias.has_value() && approximate == "tanh") {
+    int m = input_flat.sizes()[0];
+    int n = weight.sizes()[1];
+    int k = input_flat.sizes()[1];
+    auto bias_ = bias.value();
+    auto output = at::empty({m, n}, input.options());
+    auto policy = HGEMMXetla()
+                      .add_matrix_c(output)
+                      .add_matrix_a(input_flat)
+                      .add_matrix_b(weight)
+                      .add_epilogue(bias_, HGEMMXetla::EpilogueType::BIAS)
+                      .add_epilogue(Tensor(), HGEMMXetla::EpilogueType::GELU)
+                      .build();
+    if (policy.fallback() == false) {
+      policy.run();
+      return resize_as_mat1(input, output);
+    }
+  }
+  TORCH_CHECK(false);
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
@@ -241,6 +268,7 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("mm_silu.xpu", at::AtenIpexTypeXPU::mm_silu);
   IPEX_OP_REGISTER("mm_qkv_out.xpu", at::AtenIpexTypeXPU::mm_qkv_out);
   IPEX_OP_REGISTER("mm_qkv.xpu", at::AtenIpexTypeXPU::mm_qkv);
+  IPEX_OP_REGISTER("matmul_gelu.xpu", at::AtenIpexTypeXPU::matmul_gelu);
 }
 } // namespace
 

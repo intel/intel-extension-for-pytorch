@@ -659,7 +659,7 @@ class IPEXTransformerMLP(nn.Module):
     def forward(self, hidden_states: Optional[torch.Tensor]):
         if self.row_major:
             if isinstance(self.act, nn.GELU):
-                hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in_wei.t(), self.fc_in.bias, self.act.approximate)
+                hidden_states = torch.ops.torch_ipex.matmul_gelu(hidden_states, self.fc_in_wei, self.fc_in.bias, self.act.approximate)
             else:
                 hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                 hidden_states = self.act(hidden_states)
@@ -677,7 +677,7 @@ class IPEXGPTJMLP(IPEXTransformerMLP):
     def forward(self, hidden_states: Optional[torch.Tensor], attn_output, residual):
         if self.row_major:
             if isinstance(self.act, nn.GELU):
-                hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in_wei.transpose(0, 1), self.fc_in.bias, self.act.approximate)
+                hidden_states = torch.ops.torch_ipex.matmul_gelu(hidden_states, self.fc_in_wei, self.fc_in.bias, self.act.approximate)
             else:
                 hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                 hidden_states = self.act(hidden_states)
@@ -722,7 +722,7 @@ class IPEXBloomMLP(IPEXTransformerMLP):
     def forward(self, hidden_states, residual: torch.Tensor):
         if self.row_major:
             if isinstance(self.act, nn.GELU):
-                hidden_states = torch.ops.torch_ipex.linear_gelu(hidden_states, self.fc_in_wei.t(), self.fc_in.bias, self.act.approximate)
+                hidden_states = torch.ops.torch_ipex.matmul_gelu(hidden_states, self.fc_in_wei, self.fc_in.bias, self.act.approximate)
             else:
                 hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                 hidden_states = self.act(hidden_states)
