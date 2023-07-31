@@ -29,11 +29,11 @@ struct ifmha_policy_128x64 {
 };
 
 struct ifmha_policy_256x64 {
-  static constexpr uint32_t accum_step = 32;
-  static constexpr uint32_t kBc = 128;
-  static constexpr uint32_t kSgBc = 16;
+  static constexpr uint32_t accum_step = 256;
+  static constexpr uint32_t kBc = 512;
+  static constexpr uint32_t kSgBc = 32;
   static constexpr uint32_t kHm = 256;
-  static constexpr uint32_t kSgHm = 32;
+  static constexpr uint32_t kSgHm = 16;
 };
 
 } // namespace gpu::xetla
