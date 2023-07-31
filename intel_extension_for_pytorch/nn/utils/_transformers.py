@@ -49,6 +49,7 @@ class IPEXTransformerAtten(nn.Module):
     blocked_attn_mask = None
     beam_index = None
     batch_size = 1
+    runtime_bs = 0
 
     def __init__(self, config) -> None:
         super(IPEXTransformerAtten, self).__init__()
@@ -89,6 +90,7 @@ class IPEXTransformerAtten(nn.Module):
         self.row_major = not col_major
         self.key_cached = None
         self.value_cached = None
+        self.kv_cache_invalid = True
 
         seq_first = os.environ.get("SEQ_FIRST", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         disable_kv_cache = os.environ.get("DISABLE_KV_CACHE", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
@@ -176,14 +178,19 @@ class IPEXTransformerAtten(nn.Module):
             value = self.value_prompt
             self.prev_len = 0
             self.cur_len = 0
+            if hidden_states.shape[1] != IPEXTransformerAtten.runtime_bs:
+                self.kv_cache_invalid = True
         else:
             # the 2nd to the last timestep
-            if self.key_cached is None or self.value_cached is None:
+            if self.key_cached is None or self.value_cached is None or self.kv_cache_invalid:
                 # the 2nd generated token, create the key_cached and value_cached buffers
                 shape = [self.max_out_positions, hidden_states.shape[1], self.num_attn_head, self.head_dim]
                 self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
                 self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
                 self.prev_len = 0
+                self.kv_cache_invalid = False
+                if self.layer_id == IPEXTransformerAtten.layer_id_static - 1:
+                    IPEXTransformerAtten.runtime_bs = hidden_states.shape[1]
 
             self.cur_len = self.prev_len + hidden_states.size(0)
             shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
