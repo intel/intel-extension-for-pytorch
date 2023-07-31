@@ -115,7 +115,7 @@ def _may_insert_deepspeed_modules(
 ):
     deepspeed_modules = may_import_deepspeed_modules()
     if deepspeed_modules is not None:
-        LinearAllreduce, LinearLayer = deepspeed_modules
+        LinearAllreduce, LinearLayer = deepspeed_modules[:2]
         deepspeed_modules = {
             LinearLayer: q_linear_layer_module,
             LinearAllreduce: q_linear_all_reduce_module,
@@ -207,7 +207,7 @@ class DynamicQuantizedLinearLayer(_IPEXDynamicQuantizedLinear):
         _FLOAT_MODULE = [torch.nn.Linear]
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
-            _, LinearLayer = deepspeed_modules
+            LinearLayer = deepspeed_modules[1]
             _FLOAT_MODULE.extend([LinearLayer])
         return _FLOAT_MODULE
 
@@ -236,7 +236,7 @@ class DynamicQuantizedLinearAllreduce(_IPEXDynamicQuantizedLinear):
         assert (
             deepspeed_modules is not None
         ), "DynamicQuantizedLinearAllreduce requires deepspeed to be installed"
-        LinearAllreduce, _ = deepspeed_modules
+        LinearAllreduce = deepspeed_modules[0]
         _FLOAT_MODULE = [LinearAllreduce]
         return _FLOAT_MODULE
 
@@ -284,7 +284,7 @@ def may_quantize_deepspeed_modules(
 ):
     deepspeed_modules = may_import_deepspeed_modules()
     if deepspeed_modules is not None:
-        LinearAllreduce, LinearLayer = deepspeed_modules
+        LinearAllreduce, LinearLayer = deepspeed_modules[:2]
         module_mappings.update(IPEX_QUANTIZATION_MODULE)
         deepspeed_qconfig_spec = {
             LinearLayer: q_config,

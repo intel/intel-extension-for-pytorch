@@ -77,7 +77,16 @@ def may_import_deepspeed_modules():
         # intel-extension-for-deepspeed imports both IPEX and deepspeed
         from deepspeed.module_inject.layers import LinearAllreduce, LinearLayer
 
-        return LinearAllreduce, LinearLayer
+        ds_layers = [LinearAllreduce, LinearLayer]
+
+        # TODO: remove this logic once deepspeed LmHeadLinearAllreduce change has been upstream-ed.
+        try:
+            from deepspeed.module_inject.layers import LmHeadLinearAllreduce
+
+            ds_layers.append(LmHeadLinearAllreduce)
+            return ds_layers
+        except ImportError:
+            return ds_layers
     except ImportError:
         return None
 
@@ -234,10 +243,15 @@ class _IPEXLinear(_IPEXPrepackModule):
         if self.bias is not None:
             self.bias.block()
 
+    def pre_ipex_gemm(self, input):
+        return input
+
     def post_ipex_gemm(self, output):
         return output
 
     def forward(self, x):
+        x = self.pre_ipex_gemm(x)
+
         if self.use_dnnl:
             output = torch.ops.torch_ipex.ipex_linear(
                 x,
@@ -319,6 +333,21 @@ class _IPEXLinear(_IPEXPrepackModule):
 class _IPEXLinearAllreduce(_IPEXLinear):
     def __init__(self):
         super(_IPEXLinearAllreduce, self).__init__()
+
+    def post_ipex_gemm(self, output):
+        return _all_reduce_and_bias_add(self.mp_group, self.original_bias, output)
+
+
+class _IPEXLmHeadLinearAllreduce(_IPEXLinear):
+    def __init__(self):
+        super(_IPEXLmHeadLinearAllreduce, self).__init__()
+
+    def pre_ipex_gemm(self, input):
+        assert (
+            input.shape[-1] % self.world_size == 0
+        ), "please ensure input.shape[-1] % self.world_size == 0"
+        input_shard = input.shape[-1] // self.world_size
+        return input[:, :, self.rank * input_shard : (self.rank + 1) * input_shard]
 
     def post_ipex_gemm(self, output):
         return _all_reduce_and_bias_add(self.mp_group, self.original_bias, output)
@@ -456,7 +485,7 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
         if param_wrapper.can_prepack(m, is_training):
             new_m = IPEX_WEIGHT_PREPACK_MODULE_CPU()[m.__class__]()
             all_reduce_bias = m.bias
-            if isinstance(new_m, _IPEXLinearAllreduce):
+            if isinstance(new_m, (_IPEXLinearAllreduce, _IPEXLmHeadLinearAllreduce)):
                 m.bias = None
             if _using_tpp():
                 weight_key = m.weight
@@ -470,8 +499,7 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
                 param_wrapper.prepack(m, is_training)
 
             new_m.__dict__ = m.__dict__
-
-            if isinstance(new_m, _IPEXLinearAllreduce):
+            if isinstance(new_m, (_IPEXLinearAllreduce, _IPEXLmHeadLinearAllreduce)):
                 new_m.original_bias = all_reduce_bias
             new_m.ctx = param_wrapper.op_ctx
             setattr(new_m, "weight_wrapper", param_wrapper)  # noqa: B010

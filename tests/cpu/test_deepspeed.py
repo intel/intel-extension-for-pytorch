@@ -12,6 +12,7 @@ from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     may_import_deepspeed_modules,
     _IPEXLinear,
     _IPEXLinearAllreduce,
+    _IPEXLmHeadLinearAllreduce,
 )
 from intel_extension_for_pytorch.quantization import prepare, convert
 from intel_extension_for_pytorch.quantization._quantize import (
@@ -45,7 +46,6 @@ class MyBlock(nn.Module):
         return z
 
 
-# For deepspeed support, please do not change the name of the class.
 class MyModel(nn.Module):
     def __init__(self):
         super().__init__()
@@ -58,12 +58,27 @@ class MyModel(nn.Module):
         return x
 
 
+# For deepspeed support, please do not change the name of the class.
+class MyLmHeadModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # For deepspeed support, please do not change the ModuleList structure of the class.
+        self.linears = nn.ModuleList([MyBlock()])
+        self.lm_head = nn.Linear(2, 2)
+
+    def forward(self, x):
+        for l in self.linears:
+            x = l(x)
+        x = self.lm_head(x)
+        return x
+
+
 # The class DeepSpeedTestM is written for deepspeed to recognize the modules and to be functional.
 # Please do not change it.
 class DeepSpeedTestM(nn.Module):
-    def __init__(self):
+    def __init__(self, module_type):
         super().__init__()
-        self.linear = MyModel()
+        self.linear = module_type()
 
     def forward(self, x):
         z = self.linear(x)
@@ -81,6 +96,7 @@ class GPTJAttention(nn.Module):
         z = self.out_proj(x)
         return z
 
+
 class GPTJMLP(nn.Module):
     def __init__(self, krnl="tpp"):
         super().__init__()
@@ -92,12 +108,15 @@ class GPTJMLP(nn.Module):
     def forward(self, x):
         if self.krnl is "onednn":
             x = self.fc_in(x)
-            x = nn.functional.gelu(x, approximate='tanh')
+            x = nn.functional.gelu(x, approximate="tanh")
         else:
-            x = torch.ops.torch_ipex.tpp_linear_gelu(x, self.fc_in.weight, self.fc_in.bias)
+            x = torch.ops.torch_ipex.tpp_linear_gelu(
+                x, self.fc_in.weight, self.fc_in.bias
+            )
         x = self.fc_out(x)
         x = self.dropout(x)
         return x
+
 
 class GPTJBlock(nn.Module):
     def __init__(self, krnl):
@@ -113,6 +132,7 @@ class GPTJBlock(nn.Module):
         x = y + z + x
         return x
 
+
 class GPTJModel(nn.Module):
     def __init__(self, krnl):
         super().__init__()
@@ -123,6 +143,7 @@ class GPTJModel(nn.Module):
             x = l(x)
         return x
 
+
 class GPTJTestM(nn.Module):
     def __init__(self, krnl):
         super().__init__()
@@ -131,6 +152,7 @@ class GPTJTestM(nn.Module):
     def forward(self, x):
         z = self.linear(x)
         return z
+
 
 class DeepspeedTester(JitTestCase):
     def _get_ds_model(self, m_linear):
@@ -153,32 +175,49 @@ class DeepspeedTester(JitTestCase):
     def test_ipex_optimize(self):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
-            LinearAllreduce, LinearLayer = deepspeed_modules
-            x = torch.randn(2, 4)
-            m_linear = DeepSpeedTestM().eval()
+            LinearAllreduce, LinearLayer = deepspeed_modules[:2]
+            # TODO: remove check_lm_head logic once deepspeed LmHeadLinearAllreduce change has been upstream-ed.
+            check_lm_head = False
+            if len(deepspeed_modules) == 3:
+                check_lm_head = True
+                LmHeadLinearAllreduce = deepspeed_modules[2]
+
+            x = torch.randn(2, 3, 4)
+            m_linear = DeepSpeedTestM(MyLmHeadModel).eval()
             y = m_linear(x)
 
             ds_model = self._get_ds_model(m_linear)
             self.assertTrue(module_found(ds_model, LinearLayer))
             self.assertTrue(module_found(ds_model, LinearAllreduce))
+            if check_lm_head:
+                self.assertTrue(module_found(ds_model, LmHeadLinearAllreduce))
 
             optimized = ipex.optimize(ds_model.eval(), inplace=True)
-            jit_optimized = torch.jit.trace(optimized, x)
-            jit_optimized = torch.jit.freeze(jit_optimized)
-            self.assertTrue(module_found(optimized, _IPEXLinear))
-            self.assertTrue(module_found(optimized, _IPEXLinearAllreduce))
 
-            optimized = optimized(x)
-            jit_res = jit_optimized(x)
-            self.assertEqual(y, jit_res)
-            self.assertEqual(y, optimized)
+            with torch.no_grad():
+
+                y_optimized = optimized(x)
+                self.assertEqual(y, y_optimized)
+
+                jit_optimized = torch.jit.trace(optimized, x)
+                jit_optimized = torch.jit.freeze(jit_optimized)
+                self.assertTrue(module_found(optimized, _IPEXLinear))
+                self.assertTrue(module_found(optimized, _IPEXLinearAllreduce))
+
+                if check_lm_head:
+                    self.assertTrue(module_found(optimized, _IPEXLmHeadLinearAllreduce))
+
+                jit_optimized(x)
+                graph = jit_optimized.graph_for(x)
+                jit_res = jit_optimized(x)
+                self.assertEqual(y, jit_res)
 
     def _test_quantization(self, dynamic_qconfig, qmodules, graph_strings):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
-            LinearAllreduce, LinearLayer = deepspeed_modules
+            LinearAllreduce, LinearLayer = deepspeed_modules[:2]
             x = torch.randn(2, 4)
-            m_linear = DeepSpeedTestM().eval()
+            m_linear = DeepSpeedTestM(MyModel).eval()
             y = m_linear(x)
 
             ds_model = self._get_ds_model(m_linear)
@@ -247,16 +286,24 @@ class DeepspeedTester(JitTestCase):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
             ds_pattern = "deepspeed_comm::all_reduce"
-            x=torch.rand(4, 32, 4096)
+            x = torch.rand(4, 32, 4096)
             for krnl in ["onednn", "tpp"]:
                 m = GPTJTestM(krnl).eval()
                 ds_model = self._get_ds_model(m)
                 if krnl is "tpp":
-                    ipex.tpp.Apply_TPP_optimization(ds_model, dtype=torch.bfloat16, distributed=True)
-                optimized = ipex.optimize(ds_model.eval(), inplace=True, auto_kernel_selection=True if krnl is "onednn" else False)
+                    ipex.tpp.Apply_TPP_optimization(
+                        ds_model, dtype=torch.bfloat16, distributed=True
+                    )
+                optimized = ipex.optimize(
+                    ds_model.eval(),
+                    inplace=True,
+                    auto_kernel_selection=True if krnl is "onednn" else False,
+                )
                 with torch.no_grad():
                     y = optimized(x)
-                    jit_optimized = torch.jit.trace(optimized, x, strict=False, check_trace=False)
+                    jit_optimized = torch.jit.trace(
+                        optimized, x, strict=False, check_trace=False
+                    )
                     jit_optimized = torch.jit.freeze(jit_optimized)
                     graph = jit_optimized.graph_for(x)
                     self.assertGraphContainsExactly(graph, ds_pattern, 2)
