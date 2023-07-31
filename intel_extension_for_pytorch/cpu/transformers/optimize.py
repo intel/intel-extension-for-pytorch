@@ -141,6 +141,7 @@ def _optimize_transformers(
                 _LlamaAttention_GQA,
                 _GPTJAttention,
                 _GPTNeoXAttention,
+                OPTAttention_forward,
                 _reorder_cache,
             )
             from intel_extension_for_pytorch.cpu.tpp.fused_llm import (
@@ -157,19 +158,22 @@ def _optimize_transformers(
                 GPTJModel_forward,
                 LlamaModel_forward,
                 GPTNeoXModel_forward,
+                OPTDecoder_forward,
                 GPTJForCausalLM_forward,
                 LlamaForCausalLM_forward,
                 GPTNeoXForCausalLM_forward,
+                OPTForCausalLM_forward,
             )
 
             well_supported_model = (
                 re.search("GPTJ", model.config.architectures[0], re.IGNORECASE)
                 or re.search("llama", model.config.architectures[0], re.IGNORECASE)
                 or re.search("gptneox", model.config.architectures[0], re.IGNORECASE)
+                or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
             )
             if not well_supported_model:
                 warnings.warn(
-                    "optimize_transformers currently well supports Llama, GPT-J, GPT-Neox"
+                    "optimize_transformers currently well supports Llama, GPT-J, GPT-Neox, OPT"
                 )
 
             if not inplace:
@@ -207,6 +211,12 @@ def _optimize_transformers(
                         "forward",
                         GPTNeoXForCausalLM_forward,
                     )
+                elif re.search("OPT", model.config.architectures[0], re.IGNORECASE):
+                    convert_function(
+                        _model,
+                        "forward",
+                        OPTForCausalLM_forward,
+                    )
 
                 convert_forward(
                     _model,
@@ -222,6 +232,16 @@ def _optimize_transformers(
                     _model,
                     transformers.models.gpt_neox.modeling_gpt_neox.GPTNeoXModel,
                     GPTNeoXModel_forward,
+                )
+                convert_forward(
+                    _model,
+                    transformers.models.opt.modeling_opt.OPTDecoder,
+                    OPTDecoder_forward,
+                )
+                convert_forward(
+                    _model,
+                    transformers.models.opt.modeling_opt.OPTAttention,
+                    OPTAttention_forward,
                 )
                 convert_class(
                     _model,
@@ -258,45 +278,48 @@ def _optimize_transformers(
                         _prepare_decoder_attention_mask,
                     )
                 else:
-                    # linear-wise optimizations
-                    _enable_tpp()
-                    _model = optimize(_model.eval(), dtype=dtype, inplace=True)
+                    if not re.search("OPT", model.config.architectures[0], re.IGNORECASE):
+                        # linear-wise optimizations
+                        _enable_tpp()
+                        _model = optimize(_model.eval(), dtype=dtype, inplace=True)
 
-                    # linear-postop-wise optimizations
-                    is_distributed(_model)
-                    if not distributed:
-                        convert_forward(
-                            _model,
-                            transformers.models.gptj.modeling_gptj.GPTJBlock,
-                            GPTJBlock_forward,
-                        )
-                        convert_forward(
-                            _model,
-                            transformers.models.gptj.modeling_gptj.GPTJMLP,
-                            GPTJMLP_forward,
-                        )
-                        convert_forward(
-                            _model,
-                            transformers.models.llama.modeling_llama.LlamaDecoderLayer,
-                            LlamaDecoderLayer_forward,
-                        )
-                        convert_forward(
-                            _model,
-                            transformers.models.llama.modeling_llama.LlamaMLP,
-                            LlamaMLP_forward,
-                        )
+                        # linear-postop-wise optimizations
+                        is_distributed(_model)
+                        if not distributed:
+                            convert_forward(
+                                _model,
+                                transformers.models.gptj.modeling_gptj.GPTJBlock,
+                                GPTJBlock_forward,
+                            )
+                            convert_forward(
+                                _model,
+                                transformers.models.gptj.modeling_gptj.GPTJMLP,
+                                GPTJMLP_forward,
+                            )
+                            convert_forward(
+                                _model,
+                                transformers.models.llama.modeling_llama.LlamaDecoderLayer,
+                                LlamaDecoderLayer_forward,
+                            )
+                            convert_forward(
+                                _model,
+                                transformers.models.llama.modeling_llama.LlamaMLP,
+                                LlamaMLP_forward,
+                            )
 
+                        else:
+                            convert_forward(
+                                _model,
+                                transformers.models.llama.modeling_llama.LlamaMLP,
+                                LlamaMLP_forward_distributed,
+                            )
+                            convert_forward(
+                                _model,
+                                transformers.models.gptj.modeling_gptj.GPTJMLP,
+                                GPTJMLP_forward_distributed,
+                            )
                     else:
-                        convert_forward(
-                            _model,
-                            transformers.models.llama.modeling_llama.LlamaMLP,
-                            LlamaMLP_forward_distributed,
-                        )
-                        convert_forward(
-                            _model,
-                            transformers.models.gptj.modeling_gptj.GPTJMLP,
-                            GPTJMLP_forward_distributed,
-                        )
+                        _model = optimize(_model.eval(), dtype=dtype, inplace=True)
             else:
                 raise RuntimeError(
                     "optimize_transformers optimization currently supports dtype: torch.float, torch.bfloat16, torch.int8, will cover more soon."

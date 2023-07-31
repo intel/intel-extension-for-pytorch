@@ -217,9 +217,11 @@ def _beam_search(
             re.search("GPTJ", self.config.architectures[0])
             or re.search("llama", self.config.architectures[0], re.IGNORECASE)
             or re.search("gptneox", self.config.architectures[0], re.IGNORECASE)
+            or re.search("OPT", self.config.architectures[0], re.IGNORECASE)
         ):
             first_token = False
             input_bs = input_ids.size()[0]
+            has_position_id = True
             if model_inputs["past_key_values"] is None:
                 first_token = True
             if first_token:
@@ -268,6 +270,22 @@ def _beam_search(
                             for i in range(self.config.num_hidden_layers)
                         ]
                     )
+                elif re.search("OPT", self.config.architectures[0], re.IGNORECASE):
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(batch_size * num_beams)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, dtype=torch.long).contiguous(),
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
+                    has_position_id = False
 
             if hasattr(self, "trace_graph"):
                 if first_token:
@@ -275,18 +293,21 @@ def _beam_search(
                         :batch_size
                     ].clone()
                     new_input_ids = model_inputs["input_ids"][:batch_size].clone()
-                    new_position_ids = model_inputs["position_ids"][:batch_size].clone()
+                    if has_position_id:
+                        new_position_ids = model_inputs["position_ids"][:batch_size].clone()
                     for i in range(batch_size):
                         new_attention_mask[i] = model_inputs["attention_mask"][
                             i * num_beams
                         ]
                         new_input_ids[i] = model_inputs["input_ids"][i * num_beams]
-                        new_position_ids[i] = model_inputs["position_ids"][
-                            i * num_beams
-                        ]
+                        if has_position_id:
+                            new_position_ids[i] = model_inputs["position_ids"][
+                                i * num_beams
+                            ]
                     model_inputs["attention_mask"] = new_attention_mask
                     model_inputs["input_ids"] = new_input_ids
-                    model_inputs["position_ids"] = new_position_ids
+                    if has_position_id:
+                        model_inputs["position_ids"] = new_position_ids
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
                 if first_token and hasattr(self, "trace_graph_first"):
@@ -579,6 +600,7 @@ def _greedy_search(
             re.search("GPTJ", self.config.architectures[0])
             or re.search("llama", self.config.architectures[0], re.IGNORECASE)
             or re.search("gptneox", self.config.architectures[0], re.IGNORECASE)
+            or re.search("OPT", self.config.architectures[0], re.IGNORECASE)
         ):
             first_token = False
             input_bs = input_ids.size()[0]
@@ -616,6 +638,21 @@ def _greedy_search(
                         ]
                     )
                 elif re.search("gptneox", self.config.architectures[0], re.IGNORECASE):
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(input_bs)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, dtype=torch.long).contiguous(),
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
+                elif re.search("OPT", self.config.architectures[0], re.IGNORECASE):
                     beam_idx_tmp = torch.zeros(
                         (2048, int(input_bs)), dtype=torch.long
                     ).contiguous()

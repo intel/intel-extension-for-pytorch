@@ -933,6 +933,62 @@ class _GPTNeoXAttention(nn.Module):
         return outputs
 
 
+def OPTAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    key_value_states: Optional[torch.Tensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    layer_head_mask: Optional[torch.Tensor] = None,
+    output_attentions: bool = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    """Input shape: Batch x Time x Channel"""
+
+    # if key_value_states are provided this layer is used as a cross-attention layer
+    # for the decoder
+    is_cross_attention = key_value_states is not None
+
+    bsz, tgt_len, _ = hidden_states.size()
+
+    if is_cross_attention and past_key_value is not None:
+        key = past_key_value[0].view(bsz, tgt_len, self.num_heads, self.head_dim).contiguous()
+        value = past_key_value[1].view(bsz, tgt_len, self.num_heads, self.head_dim).contiguous()
+    elif is_cross_attention:
+        key = self.k_proj(key_value_states).view(bsz, tgt_len, self.num_heads, self.head_dim).contiguous()
+        value = self.v_proj(key_value_states).view(bsz, tgt_len, self.num_heads, self.head_dim).contiguous()
+    else:
+        key = self.k_proj(hidden_states).view(bsz, tgt_len, self.num_heads, self.head_dim).contiguous()
+        value = self.v_proj(hidden_states).view(bsz, tgt_len, self.num_heads, self.head_dim).contiguous()
+    if past_key_value is None:
+        past_key_value = (torch.randn(0), torch.randn(0), torch.zeros(2048, 4, dtype=torch.long), torch.zeros(1, dtype=torch.long))
+    query = self.q_proj(hidden_states).view(bsz, tgt_len, self.num_heads, self.head_dim).contiguous()
+    key_cache = past_key_value[0].contiguous()
+    value_cache = past_key_value[1].contiguous()
+    beam_idx = past_key_value[2].contiguous()
+    decoded_tokens = past_key_value[3].contiguous()[0]
+    attn_output, attn_weights, key_cache, value_cache, beam_idx = torch.ops.torch_ipex.masked_multihead_self_attention(query, key, value, key_cache, value_cache, beam_idx, decoded_tokens, 1/self.scaling, 2048, layer_head_mask, attention_mask)
+
+    if self.is_decoder:
+        past_key_value=(key_cache, value_cache, beam_idx, torch.tensor(past_key_value[3]+query.shape[1], dtype=torch.long))
+
+    if not output_attentions:
+        attn_weights_reshaped = None
+    attn_output = attn_output.view(bsz, self.num_heads, tgt_len, self.head_dim)
+    if attn_output.size() != (bsz, self.num_heads, tgt_len, self.head_dim):
+        raise ValueError(
+            f"`attn_output` should be of size {(bsz, self.num_heads, tgt_len, self.head_dim)}, but is"
+            f" {attn_output.size()}"
+        )
+    attn_output = attn_output.transpose(1, 2)
+
+    # Use the `embed_dim` from the config (stored in the class) rather than `hidden_state` because `attn_output` can be
+    # partitioned aross GPUs when using tensor-parallelism.
+    attn_output = attn_output.reshape(bsz, tgt_len, self.embed_dim)
+
+    attn_output = self.out_proj(attn_output)
+
+    return attn_output, attn_weights_reshaped, past_key_value
+
 def _reorder_cache(
     self, past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor
 ) -> Tuple[Tuple[torch.Tensor]]:
