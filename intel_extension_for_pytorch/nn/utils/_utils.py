@@ -26,9 +26,6 @@ def _ipex_prepare_model_inputs(
     """
     # 1. retrieve all kwargs that are non-None or non-model input related.
     # some encoder-decoder models have different names for model and encoder
-    bs = inputs.shape[0]
-    IPEXTransformerAtten.batch_size = bs
-    IPEXTransformerMLP.batch_size = bs
     if (
         self.config.is_encoder_decoder
         and hasattr(self, "encoder")
@@ -80,6 +77,10 @@ def _ipex_prepare_model_inputs(
 
     # 4. if `inputs` is still None, try to create `input_ids` from BOS token
     inputs = self._maybe_initialize_input_ids_for_generation(inputs, bos_token_id, model_kwargs)
+
+    bs = inputs.shape[0]
+    IPEXTransformerAtten.batch_size = bs
+    IPEXTransformerMLP.batch_size = bs
     return inputs, input_name, model_kwargs
 
 def ipex_GPTJForCausalLM_forward(
