@@ -43,6 +43,10 @@ class IPEXGPTJBlock(nn.Module):
         self.attn = IPEXGPTJAttn(config)
         self.ln = nn.LayerNorm(self.config.embed_dim, eps=self.config.norm_eps)
         self.mlp = IPEXGPTJMLP(config)
+    
+    def release_resources(self):
+        self.attn.release_resources()
+        self.mlp.release_resources()
 
     def forward(
         self,

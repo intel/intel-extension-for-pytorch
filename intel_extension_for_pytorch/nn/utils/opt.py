@@ -68,6 +68,10 @@ class IPEXOptBlock(nn.Module):
         self.final_layer_norm = nn.LayerNorm(config.embed_dim, elementwise_affine=config.ln_elementwise_affine)
         self.dropout_p = config.residual_pdrop
 
+    def release_resources(self):
+        self.attn.release_resources()
+        self.mlp.release_resources()
+
     def forward(
         self,
         hidden_states: torch.Tensor,

@@ -113,6 +113,19 @@ class IPEXTransformerAtten(nn.Module):
     @staticmethod
     def update_beam_index(beam_index):
         IPEXTransformerAtten.beam_index = beam_index
+    
+    @staticmethod
+    def release_all_static_cached_resources():
+        IPEXTransformerAtten.casual_attention_mask = None
+        IPEXTransformerAtten.blocked_alibi = None
+        IPEXTransformerAtten.blocked_attn_mask = None
+        IPEXTransformerAtten.beam_index = None
+    
+    def release_resources(self):
+        self.key_cached = None
+        self.value_cached = None
+        self.key_prompt = None
+        self.value_prompt = None
 
     def checking_cache(self, layer_past):
         acc_test = os.environ.get("LLM_ACC_TEST", "OFF").upper() in ["1", "ON", "Y", "YES", "TRUE"]
@@ -554,7 +567,11 @@ class IPEXTransformerMLP(nn.Module):
         self.fc_out_wei = None
         self.fc_in_bias = None
         self.fc_out_bias = None
-    
+
+    @staticmethod
+    def release_resources():
+        pass
+
     def all_reduce_if_necessary(self, target):
         if self.tp_group is not None:
             try:

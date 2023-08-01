@@ -47,6 +47,10 @@ class IPEXLlamaBlock(nn.Module):
         self.mlp = IPEXLlamaMLP(config=config)
         self.input_layernorm = LlamaRMSNorm(config)
         self.post_attn_layernorm = LlamaRMSNorm(config)
+    
+    def release_resources(self):
+        self.attn.release_resources()
+        self.mlp.release_resources()
 
     def forward(
         self,

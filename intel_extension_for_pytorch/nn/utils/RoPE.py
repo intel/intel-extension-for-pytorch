@@ -65,8 +65,8 @@ class GPTJRotaryEmbeddingRef(PositionalEmbedding):
             key = torch.cat([k_rot, k_pass], dim=-1)
             query = torch.cat([q_rot, q_pass], dim=-1)
         else:
-            key = apply_rotary_pos_emb(key, sin, cos)
-            query = apply_rotary_pos_emb(query, sin, cos)
+            key = self.apply_rotary_pos_emb(key, sin, cos)
+            query = self.apply_rotary_pos_emb(query, sin, cos)
 
         query = query.transpose(0,1).contiguous()
         key = key.transpose(0,1).contiguous()

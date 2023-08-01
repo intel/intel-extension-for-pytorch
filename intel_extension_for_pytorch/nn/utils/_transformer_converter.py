@@ -3,7 +3,7 @@ import os
 from ._transformers import IPEXEmptyLinearWithPadding
 
 from functools import partial
-from ._utils import ipex_beam_search, _ipex_prepare_model_inputs, ipex_beam_search_without_optimize, ipex_GPTJForCausalLM_forward
+from ._utils import ipex_beam_search, _ipex_prepare_model_inputs, ipex_beam_search_without_optimize, ipex_GPTJForCausalLM_forward, IPEXLLMResourceContrainer
 from ._inference_ops import OpConverter
 # from transformers.models.llama.configuration_llama import 
 
@@ -103,7 +103,6 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
         transformers.models.opt.modeling_opt.OPTDecoderLayer: IPEXOptConverter,
         transformers.models.bloom.modeling_bloom.BloomBlock: IPEXBloomConverter
     }
-
     def recursive_module_replace(module, config, dtype, enable_deepspeed=False):
         not_deepspeed_engine = not enable_deepspeed or not isinstance(module, deepspeed.InferenceEngine)
         if config is None and hasattr(module, "config") and not_deepspeed_engine:
@@ -131,6 +130,7 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
                 module_converter = transformers_converter[type(named_module)](named_module, config, dtype=dtype, device=config.device)
                 module_transformed = module_converter.get_transformed_module()
                 setattr(module, name, module_transformed)
+                IPEXLLMResourceContrainer.push(module_transformed)
             # elif OpConverter.valid_op_for_convert(named_module):
             #     op_transformed = OpConverter.convert_op(named_module)
             #     setattr(module, name, op_transformed)
