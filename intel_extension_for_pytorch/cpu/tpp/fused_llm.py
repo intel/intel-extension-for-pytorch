@@ -121,6 +121,141 @@ def LlamaDecoderLayer_forward(
     return outputs
 
 
+def OPTDecoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    layer_head_mask: Optional[torch.Tensor] = None,
+    output_attentions: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    residual = hidden_states
+
+    # 125m, 1.7B, ..., 175B applies layer norm BEFORE attention
+    if self.do_layer_norm_before:
+        hidden_states = self.self_attn_layer_norm(hidden_states)
+
+    # Self Attention
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        past_key_value=past_key_value,
+        attention_mask=attention_mask,
+        layer_head_mask=layer_head_mask,
+        output_attentions=output_attentions,
+    )
+    hidden_states = torch.ops.torch_ipex.tpp_linear_add(
+        hidden_states,
+        residual,
+        self.self_attn.out_proj.weight,
+        self.self_attn.out_proj.bias,
+        1.0,
+    )
+
+    # 350m applies layer norm AFTER attention
+    if not self.do_layer_norm_before:
+        hidden_states = self.self_attn_layer_norm(hidden_states)
+
+    # Fully Connected
+    hidden_states_shape = hidden_states.shape
+    # TPP only supports 3d inputs for now
+    # hidden_states = hidden_states.reshape(-1, hidden_states.size(-1))
+    residual = hidden_states
+
+    # 125m, 1.7B, ..., 175B applies layer norm BEFORE attention
+    if self.do_layer_norm_before:
+        hidden_states = self.final_layer_norm(hidden_states)
+
+    hidden_states = torch.ops.torch_ipex.tpp_linear_relu(
+        hidden_states, self.fc1.weight, self.fc1.bias
+    )
+
+    hidden_states = torch.ops.torch_ipex.tpp_linear_add(
+        hidden_states,
+        residual,
+        self.fc2.weight,
+        self.fc2.bias,
+        1.0,
+    ).view(hidden_states_shape)
+
+    # 350m applies layer norm AFTER attention
+    if not self.do_layer_norm_before:
+        hidden_states = self.final_layer_norm(hidden_states)
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (self_attn_weights,)
+
+    if use_cache:
+        outputs += (present_key_value,)
+
+    return outputs
+
+
+def OPTDecoderLayer_forward_distributed(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    layer_head_mask: Optional[torch.Tensor] = None,
+    output_attentions: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    residual = hidden_states
+
+    # 125m, 1.7B, ..., 175B applies layer norm BEFORE attention
+    if self.do_layer_norm_before:
+        hidden_states = self.self_attn_layer_norm(hidden_states)
+
+    # Self Attention
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        past_key_value=past_key_value,
+        attention_mask=attention_mask,
+        layer_head_mask=layer_head_mask,
+        output_attentions=output_attentions,
+    )
+    hidden_states = self.self_attn.out_proj(hidden_states)
+    hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
+    hidden_states = residual + hidden_states
+
+    # 350m applies layer norm AFTER attention
+    if not self.do_layer_norm_before:
+        hidden_states = self.self_attn_layer_norm(hidden_states)
+
+    # Fully Connected
+    hidden_states_shape = hidden_states.shape
+    # TPP only supports 3d inputs for now
+    # hidden_states = hidden_states.reshape(-1, hidden_states.size(-1))
+    residual = hidden_states
+
+    # 125m, 1.7B, ..., 175B applies layer norm BEFORE attention
+    if self.do_layer_norm_before:
+        hidden_states = self.final_layer_norm(hidden_states)
+
+    hidden_states = torch.ops.torch_ipex.tpp_linear_relu(
+        hidden_states, self.fc1.weight, self.fc1.bias
+    )
+
+    hidden_states = self.fc2(hidden_states)
+    hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
+    hidden_states = (residual + hidden_states).view(hidden_states_shape)
+
+    # 350m applies layer norm AFTER attention
+    if not self.do_layer_norm_before:
+        hidden_states = self.final_layer_norm(hidden_states)
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (self_attn_weights,)
+
+    if use_cache:
+        outputs += (present_key_value,)
+
+    return outputs
+
 def GPTJMLP_forward(
     self, hidden_states: Optional[torch.FloatTensor]
 ) -> torch.FloatTensor:
