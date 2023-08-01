@@ -311,7 +311,6 @@ def optimize_transformers(model, dtype=None, optimizer=None, is_int4=False):
     optimize_output = optimize(model, dtype=dtype, optimizer=optimizer, inplace=True)
     try:
         import transformers
-        # from  import IPEXGPTJBlock
     except ImportError as e:
         print("Can not find transformers in your environment, disable ipex transformer optimize")
         return model

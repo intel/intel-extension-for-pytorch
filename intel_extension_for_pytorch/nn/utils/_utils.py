@@ -15,6 +15,19 @@ import transformers.modeling_outputs
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 
+class IPEXLLMResourceContrainer:
+    container = []
+    
+    @staticmethod
+    def push(resource_block):
+        IPEXLLMResourceContrainer.container.append(resource_block)
+    
+    @staticmethod
+    def release_resources():
+        print("release resources")
+        for resource_block in IPEXLLMResourceContrainer.container:
+            resource_block.release_resources()
+
 def _ipex_prepare_model_inputs(
     self,
     inputs: Optional[torch.Tensor] = None,
@@ -26,9 +39,6 @@ def _ipex_prepare_model_inputs(
     """
     # 1. retrieve all kwargs that are non-None or non-model input related.
     # some encoder-decoder models have different names for model and encoder
-    bs = inputs.shape[0]
-    IPEXTransformerAtten.batch_size = bs
-    IPEXTransformerMLP.batch_size = bs
     if (
         self.config.is_encoder_decoder
         and hasattr(self, "encoder")
@@ -80,6 +90,10 @@ def _ipex_prepare_model_inputs(
 
     # 4. if `inputs` is still None, try to create `input_ids` from BOS token
     inputs = self._maybe_initialize_input_ids_for_generation(inputs, bos_token_id, model_kwargs)
+
+    bs = inputs.shape[0]
+    IPEXTransformerAtten.batch_size = bs
+    IPEXTransformerMLP.batch_size = bs
     return inputs, input_name, model_kwargs
 
 def ipex_GPTJForCausalLM_forward(
@@ -401,6 +415,7 @@ def ipex_beam_search(
         next_token_scores = nn.functional.log_softmax(
             next_token_logits, dim=-1
         )  # (batch_size * num_beams, vocab_size)
+        next_token_logits = None
         dummy_input_ids = torch.empty((batch_size * num_beams, cur_len), dtype=torch.long, device="meta")
         next_token_scores_processed = logits_processor(dummy_input_ids, next_token_scores)
         next_token_scores = next_token_scores_processed + beam_scores[:, None].expand_as(next_token_scores)
@@ -419,6 +434,7 @@ def ipex_beam_search(
         model_kwargs = self._update_model_kwargs_for_generation(
             outputs, model_kwargs, is_encoder_decoder=self.config.is_encoder_decoder
         )
+        outputs = None
         # if model_kwargs["past_key_values"] is not None:
         #     model_kwargs["past_key_values"] = self._reorder_cache(model_kwargs["past_key_values"], beam_idx)
 
@@ -436,12 +452,14 @@ def ipex_beam_search(
             else:
                 this_peer_finished = True
 
+    IPEXLLMResourceContrainer.release_resources()
     out = torch.ops.torch_ipex.beam_search_finalize(candidate_num_beams, candidate_sequence_lengths, candidate_output_ids, candidate_score,
                                                     candidate_normed_scores, output_beam_ids, output_token_ids, beam_scores, finished, length_penalty, max_in_seq_length,
                                                     max_out_seq_length, batch_size, num_beams, beam_scorer.num_beam_hyps_to_keep, cur_len - max_in_seq_length, pad_token_id)
 
     # origin_input_ids size is [batch_size * beam_size, seq_len]
     out = torch.ops.torch_ipex.update_output_sequence(origin_input_ids, out, batch_size)
+    IPEXTransformerAtten.release_all_static_cached_resources()
     if hasattr(self, "token_latency") and self.token_latency:
         return out, latency_list
     return out
@@ -740,7 +758,8 @@ def ipex_beam_search_without_optimize(
                 break
             else:
                 this_peer_finished = True
-
+    
+    self.release_resources()
     sequence_outputs = beam_scorer.finalize(
         input_ids,
         beam_scores,

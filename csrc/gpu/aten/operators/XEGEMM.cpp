@@ -123,38 +123,6 @@ static Tensor mm_silu(const Tensor& a_, const Tensor& b_) {
   return resize_as_mat1(a_, output);
 }
 
-#undef GEMM_XETLA_DISPATCH
-
-#define GEMM_QKV_XETLA_DISPATCH(F)                                         \
-  if (!has_bias) {                                                         \
-    RECORD_FUNCTION(                                                       \
-        "torch_ipex::hgemm_qkv" #F, c10::ArrayRef<c10::IValue>({}));       \
-    hgemm_qkv##F(                                                          \
-        q,                                                                 \
-        reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),         \
-        reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),        \
-        m,                                                                 \
-        n,                                                                 \
-        k);                                                                \
-  } else {                                                                 \
-    RECORD_FUNCTION(                                                       \
-        "torch_ipex::hgemm_qkv_bias" #F, c10::ArrayRef<c10::IValue>({}));  \
-    hgemm_qkv_bias##F(                                                     \
-        q,                                                                 \
-        reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),         \
-        reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),        \
-        reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()), \
-        m,                                                                 \
-        n,                                                                 \
-        k);                                                                \
-  }
-
 static void mm_qkv_out(
     const Tensor& input_,
     const Tensor& weight,
@@ -196,18 +164,39 @@ static void mm_qkv_out(
   using scalar_t =
       decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
   auto& q = dpcppGetCurrentQueue();
-  if (m <= 32) {
-    if (n >= 2048) {
-      GEMM_QKV_XETLA_DISPATCH(_16x256_8x16x16_1_true_);
-    } else {
-      GEMM_QKV_XETLA_DISPATCH(_8x128_8x16x32_4_true_);
-    }
+
+  int selected_policy = select_gemm_config(m, n, k, is_b_row_major, 64);
+
+  char str__[80];
+  if (!has_bias) {
+    sprintf(str__, "hgemm_qkv_%d(%d, %d, %d)", selected_policy, m, n, k);
+    RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+    hgemm_qkv_policies[selected_policy](
+        q,
+        reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
+        reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
+        reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
+        reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
+        reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
+        m,
+        n,
+        k);
   } else {
-    GEMM_QKV_XETLA_DISPATCH(_256x256_32x64x32_1_true_);
+    sprintf(str__, "hgemm_qkv_bias_%d(%d, %d, %d)", selected_policy, m, n, k);
+    RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+    hgemm_qkv_bias_policies[selected_policy](
+        q,
+        reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
+        reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
+        reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
+        reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
+        reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
+        reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()),
+        m,
+        n,
+        k);
   }
 }
-
-#undef GEMM_QKV_XETLA_DISPATCH
 
 static std::tuple<Tensor, Tensor, Tensor> mm_qkv(
     const Tensor& input,
@@ -229,6 +218,33 @@ static std::tuple<Tensor, Tensor, Tensor> mm_qkv(
       out2.view_symint(sizes));
 }
 
+Tensor matmul_gelu(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    c10::string_view approximate) {
+  auto input_flat = input.flatten(0, -2);
+  if (bias.has_value() && approximate == "tanh") {
+    int m = input_flat.sizes()[0];
+    int n = weight.sizes()[1];
+    int k = input_flat.sizes()[1];
+    auto bias_ = bias.value();
+    auto output = at::empty({m, n}, input.options());
+    auto policy = HGEMMXetla()
+                      .add_matrix_c(output)
+                      .add_matrix_a(input_flat)
+                      .add_matrix_b(weight)
+                      .add_epilogue(bias_, HGEMMXetla::EpilogueType::BIAS)
+                      .add_epilogue(Tensor(), HGEMMXetla::EpilogueType::GELU)
+                      .build();
+    if (policy.fallback() == false) {
+      policy.run();
+      return resize_as_mat1(input, output);
+    }
+  }
+  TORCH_CHECK(false);
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
@@ -241,6 +257,7 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("mm_silu.xpu", at::AtenIpexTypeXPU::mm_silu);
   IPEX_OP_REGISTER("mm_qkv_out.xpu", at::AtenIpexTypeXPU::mm_qkv_out);
   IPEX_OP_REGISTER("mm_qkv.xpu", at::AtenIpexTypeXPU::mm_qkv);
+  IPEX_OP_REGISTER("matmul_gelu.xpu", at::AtenIpexTypeXPU::matmul_gelu);
 }
 } // namespace
 

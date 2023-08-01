@@ -8,7 +8,7 @@ set(IPEX_INCLUDE_DIRS
         ${BUILD_IPEX_GPU_ATEN_GENERATED})
 
 # link openblas
-set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -fsycl -lblas)
+set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -fsycl)
 set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -fsycl-targets=spir64_gen)
 
 # disable loop invariance optimization, this is for performance
