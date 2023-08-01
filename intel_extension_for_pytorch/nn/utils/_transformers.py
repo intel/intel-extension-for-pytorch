@@ -30,6 +30,21 @@ class IPEXEmptyLinear(nn.Module):
     def forward(self, input):
         return torch.nn.functional.linear(input, self.weight, bias=self.bias)
 
+class IPEXEmptyINT4Linear(nn.Module):
+    def __init__(self):
+        super(IPEXEmptyINT4Linear, self).__init__()
+        self.qweight = None
+        self.bias = None
+        self.scales = None
+        self.qzeros = None
+        self.group_size = None
+
+    def forward(self, input):
+        if self.bias is None:
+            return torch.ops.torch_ipex.mm_int4(input, self.qweight, self.scales, self.qzeros, self.group_size)
+        else:
+            return torch.ops.torch_ipex.mm_bias_int4(input, self.qweight, self.bias, self.scales, self.qzeros, self.group_size)
+
 class IPEXEmptyLinearWithPadding(nn.Module):
     def __init__(self, n_dim):
         super(IPEXEmptyLinearWithPadding, self).__init__()
@@ -41,6 +56,22 @@ class IPEXEmptyLinearWithPadding(nn.Module):
     def forward(self, input):
         return torch.nn.functional.linear(input, self.weight, bias=self.bias)[:,:,:self.n_dim]
 
+class IPEXEmptyINT4LinearWithPadding(nn.Module):
+    def __init__(self, n_dim):
+        super(IPEXEmptyINT4LinearWithPadding, self).__init__()
+        self.qweight = None
+        self.scales = None
+        self.qzeros = None
+        self.group_size = None
+        self.bias = None
+        self.n_dim = n_dim
+
+    def forward(self, input):
+        if self.bias is None:
+            return torch.ops.torch_ipex.mm_int4(input, self.qweight, self.scales, self.qzeros, self.group_size)[:,:,:self.n_dim]
+        else:
+            return torch.ops.torch_ipex.mm_bias_int4(input, self.qweight, self.bias, self.scales, self.qzeros, self.group_size)[:,:,:self.n_dim]
+
 class IPEXTransformerAtten(nn.Module):
 
     layer_id_static = 0
@@ -51,7 +82,7 @@ class IPEXTransformerAtten(nn.Module):
     batch_size = 1
     runtime_bs = 0
 
-    def __init__(self, config) -> None:
+    def __init__(self, config, is_int4=False) -> None:
         super(IPEXTransformerAtten, self).__init__()
         self.config:IPEXTransformerConfig = config
         self.seq_first = self.config.seq_first
@@ -68,15 +99,16 @@ class IPEXTransformerAtten(nn.Module):
         self.num_attn_head = self.num_attn_head // self.tp_size
         IPEXTransformerAtten.layer_id_static += 1
         self.head_dim = self.config.embed_dim // self.config.num_attention_heads
+        self.is_int4 = is_int4
         self.position_emb = self.config.rotary_embedding_class(config=self.config)
         if self.config.scale_attention:
             self.scale_attn = torch.sqrt(torch.tensor(self.head_dim, device=self.config.device))
         else:
             self.scale_attn = None
-        self.k_proj = IPEXEmptyLinear()
-        self.v_proj = IPEXEmptyLinear()
-        self.q_proj = IPEXEmptyLinear()
-        self.out_proj = IPEXEmptyLinear()
+        self.k_proj = IPEXEmptyLinear() if not is_int4 else IPEXEmptyINT4Linear()
+        self.v_proj = IPEXEmptyLinear() if not is_int4 else IPEXEmptyINT4Linear()
+        self.q_proj = IPEXEmptyLinear() if not is_int4 else IPEXEmptyINT4Linear()
+        self.out_proj = IPEXEmptyLinear() if not is_int4 else IPEXEmptyINT4Linear()
 
         self.qkv_fused = True 
         self.q_wei = None
@@ -86,6 +118,24 @@ class IPEXTransformerAtten(nn.Module):
         self.qkv_wei = None 
         self.qkv_bias = None
         self.out_bias = None
+
+        if is_int4:
+            self.q_scl = None
+            self.q_zp = None
+            self.k_scl = None
+            self.k_zp = None
+            self.v_scl = None
+            self.v_zp = None
+            self.out_scl = None
+            self.out_zp = None
+            self.qkv_scl = None
+            self.qkv_zp = None
+            self.qkv_gs = None
+            self.q_gs = None
+            self.k_gs = None
+            self.v_gs = None
+            self.out_gs = None
+
         col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         self.row_major = not col_major
         self.key_cached = None
@@ -98,16 +148,16 @@ class IPEXTransformerAtten(nn.Module):
 
         self.is_decoder = self.config.is_decoder
         self.residual_drop = nn.Dropout(self.config.residual_dropout) if self.config.residual_dropout is not None else nn.Identity()
-        self.attn_drop = nn.Dropout(self.config.attn_dropout) if self.config.attn_dropout is not None else nn.Identity() 
+        self.attn_drop = nn.Dropout(self.config.attn_dropout) if self.config.attn_dropout is not None else nn.Identity()
         if self.use_casual_mask:
             mask = torch.ones((self.max_positions, self.max_positions), dtype=torch.float)
             mask = (1 - torch.tril(mask).view(1, 1, self.max_positions, self.max_positions)) * (-66504.0)
-            IPEXTransformerAtten.attention_mask = mask.to(self.config.device) 
+            IPEXTransformerAtten.attention_mask = mask.to(self.config.device)
 
         # the cached key/value for the input prompt
         self.key_prompt = None
         self.value_prompt = None
-        self.prev_len = 0 
+        self.prev_len = 0
         self.cur_len = 0
 
     @staticmethod
@@ -172,8 +222,11 @@ class IPEXTransformerAtten(nn.Module):
         value = self.value_cached[self.prev_len : self.cur_len, :, :, :]
         key = key.view(shape)
         value = value.view(shape)
-
-        torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
+      
+        if self.is_int4:
+            torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_wei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, key, value, self.qkv_gs)
+        else:
+            torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
         return query, key, value
 
     def qkv_cache_optimized_beam(self, hidden_states, layer_past = None):
@@ -186,7 +239,10 @@ class IPEXTransformerAtten(nn.Module):
             query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.key_prompt = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.value_prompt = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-            torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, self.key_prompt, self.value_prompt)
+            if self.is_int4:
+                torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_wei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, self.key_prompt, self.value_prompt, self.qkv_gs)
+            else:
+                torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, self.key_prompt, self.value_prompt)
             key = self.key_prompt
             value = self.value_prompt
             self.prev_len = 0
@@ -212,15 +268,23 @@ class IPEXTransformerAtten(nn.Module):
             value = self.value_cached[self.prev_len : self.cur_len, :, :, :]
             key = key.view(shape)
             value = value.view(shape)
-            torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
+            if self.is_int4:
+                torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_wei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, key, value, self.qkv_gs)
+            else:
+                torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
         self.prev_len = self.cur_len
         return query, key, value
 
     def qkv_normal(self, hidden_states, layer_past = None):
         if self.row_major:
-            query = torch.matmul(hidden_states, self.q_wei)
-            key = torch.matmul(hidden_states, self.k_wei)
-            value = torch.matmul(hidden_states, self.v_wei)
+            if self.is_int4:
+                query = torch.ops.torch_ipex.mm_int4(hidden_states, self.q_wei, self.q_scl, self.q_zp, self.q_gs)
+                key = torch.ops.torch_ipex.mm_int4(hidden_states, self.k_wei, self.k_scl, self.k_zp, self.k_gs)
+                value = torch.ops.torch_ipex.mm_int4(hidden_states, self.v_wei, self.v_scl, self.v_zp, self.v_gs)
+            else:
+                query = torch.matmul(hidden_states, self.q_wei)
+                key = torch.matmul(hidden_states, self.k_wei)
+                value = torch.matmul(hidden_states, self.v_wei)
         else:
             query = self.q_proj(hidden_states)
             key = self.k_proj(hidden_states)
@@ -486,14 +550,20 @@ class IPEXTransformerAtten(nn.Module):
 
         if self.row_major:
             if residual is None:
-                attn_output = torch.matmul(attn_output, self.out_wei)
+                if self.is_int4:
+                    attn_output = torch.ops.torch_ipex.mm_int4(attn_output, self.out_wei, self.out_scl, self.out_zp, self.out_gs)
+                else:
+                    attn_output = torch.matmul(attn_output, self.out_wei)
                 self.all_reduce_if_necessary(attn_output)
                 if self.out_bias is not None:
                     attn_output += self.out_bias
             else:
                 shape = [attn_output.shape[0], attn_output.shape[1], self.embed_dim]
                 if self.out_bias is not None:
-                    attn_output = torch.ops.torch_ipex.mm_bias_resadd(attn_output, self.out_wei, self.out_bias, residual, 1.0/self.tp_size)
+                    if self.is_int4:
+                        attn_output = torch.ops.torch_ipex.mm_bias_resadd_int4(attn_output, self.out_wei, self.out_bias, residual, 1.0/self.tp_size)
+                    else:
+                        attn_output = torch.ops.torch_ipex.mm_bias_resadd(attn_output, self.out_wei, self.out_bias, residual, 1.0/self.tp_size)
                 else:
                     attn_output = torch.addmm(residual.flatten(0, -2), attn_output.flatten(0, -2), self.out_wei, beta=1.0/self.tp_size)
                 attn_output = attn_output.view(shape)
@@ -552,10 +622,11 @@ class IPEXTransformerAtten(nn.Module):
 class IPEXTransformerMLP(nn.Module):
     batch_size = 1
     def __init__(self,
-                 config: IPEXTransformerConfig):
+                 config: IPEXTransformerConfig,
+                 is_int4: False):
         super().__init__()
-        self.fc_in = IPEXEmptyLinear()
-        self.fc_out = IPEXEmptyLinear()
+        self.fc_in = IPEXEmptyLinear() if not is_int4 else IPEXEmptyINT4Linear()
+        self.fc_out = IPEXEmptyLinear() if not is_int4 else IPEXEmptyINT4Linear()
         self.act = ACT2FN[config.activation_function]
         self.drop_out = nn.Dropout(config.residual_pdrop) if config.residual_pdrop is not None else nn.Identity()
 
@@ -567,6 +638,13 @@ class IPEXTransformerMLP(nn.Module):
         self.fc_out_wei = None
         self.fc_in_bias = None
         self.fc_out_bias = None
+        self.is_int4 = is_int4
+
+        if is_int4:
+            self.fc_in_scl = None
+            self.fc_in_zp = None
+            self.fc_out_scl = None
+            self.fc_out_zp = None
 
     @staticmethod
     def release_resources():
@@ -578,7 +656,7 @@ class IPEXTransformerMLP(nn.Module):
                 from deepspeed import comm as dist
             except ImportError as e:
                 print("Can not find deepspeed. If you are using multi-tile feature, please make sure the deepspeed is correctly installed in your environment")
-                return 
+                return
             dist.all_reduce(target, group=self.tp_group)
         return target
 
