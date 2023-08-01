@@ -22,6 +22,7 @@ MODEL_CLASSES = {
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
     "llama": (AutoModelForCausalLM, LlamaTokenizer),
+    "opt": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -63,6 +64,7 @@ parser.add_argument(
 parser.add_argument("--greedy", action="store_true")
 parser.add_argument("--ipex", action="store_true")
 parser.add_argument("--jit", action="store_true")
+parser.add_argument("--profile", action="store_true")
 parser.add_argument("--benchmark", action="store_true")
 parser.add_argument("--lambada", action="store_true")
 parser.add_argument("--dataset", default="lambada", type=str)
@@ -172,6 +174,21 @@ elif re.search("gptneox", model.config.architectures[0], re.IGNORECASE):
             for i in range(model.config.num_hidden_layers)
         ]
     )
+elif re.search("opt", model.config.architectures[0], re.IGNORECASE):
+    beam_idx_tmp = torch.zeros(
+        (2048, int(args.batch_size * num_beams)), dtype=torch.long
+    ).contiguous()
+    past_key_values = tuple(
+        [
+            (
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                beam_idx_tmp,
+                torch.zeros(1, dtype=torch.long).contiguous(),
+            )
+            for i in range(model.config.num_hidden_layers)
+        ]
+    )
 else:
     print(
         "Currently we only support jit path on GPTJ, llama, and gpt_neox models for IPEX new API ipex._optimize_transformers(), please re-run without jit "
@@ -183,12 +200,19 @@ if not hasattr(model, "trace_graph") and args.jit and args.benchmark and args.ip
     input_ids = torch.ones(32).to(torch.long)
     attention_mask = torch.ones(len(input_ids))
     position_ids = torch.arange(len(input_ids))
-    example_inputs = {
-        "input_ids": input_ids.unsqueeze(0),
-        "attention_mask": attention_mask.unsqueeze(0),
-        "position_ids": position_ids.unsqueeze(0),
-        "past_key_values": past_key_values,
-    }
+    if re.search("opt", model.config.architectures[0], re.IGNORECASE):
+        example_inputs = {
+            "input_ids": input_ids.unsqueeze(0),
+            "attention_mask": attention_mask.unsqueeze(0),
+            "past_key_values": past_key_values,
+        }
+    else:
+        example_inputs = {
+            "input_ids": input_ids.unsqueeze(0),
+            "attention_mask": attention_mask.unsqueeze(0),
+            "position_ids": position_ids.unsqueeze(0),
+            "past_key_values": past_key_values,
+        }
 
     with torch.inference_mode(), torch.no_grad(), torch.autocast(
         device_type=args.device,
@@ -347,6 +371,10 @@ if args.accuracy_only:
         eval_func(model)
 
 
+def trace_handler(prof):
+    print(prof.key_averages().table(
+        sort_by="self_cpu_time_total", row_limit=-1))
+
 if args.benchmark:
     if args.token_latency:
         if not hasattr(model.config, "token_latency"):
@@ -383,6 +411,21 @@ if args.benchmark:
         enabled=amp_enabled,
         dtype=amp_dtype if amp_enabled else None,
     ):
+        if args.profile:
+            with torch.profiler.profile(
+                activities=[torch.profiler.ProfilerActivity.CPU],
+                schedule=torch.profiler.schedule(
+                    wait=1,
+                    warmup=3,
+                    active=1),
+                on_trace_ready=trace_handler
+            ) as prof:
+                for i in range(5):
+                    input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+                    output = model.generate(
+                        input_ids, max_new_tokens=args.max_new_tokens, **generate_kwargs
+                    )
+                    prof.step()
         for i in range(num_iter):
             tic = time.time()
             input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)

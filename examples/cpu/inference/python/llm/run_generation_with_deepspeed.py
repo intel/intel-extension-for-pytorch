@@ -28,6 +28,7 @@ MODEL_CLASSES = {
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
     "llama": (AutoModelForCausalLM, LlamaTokenizer),
+    "opt": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -74,6 +75,7 @@ parser.add_argument(
     "--benchmark", action="store_true", help="additionally run benchmark"
 )
 parser.add_argument("--greedy", action="store_true")
+parser.add_argument("--profile", action="store_true")
 parser.add_argument("--ki", action="store_true")
 parser.add_argument(
     "--max-new-tokens", default=32, type=int, help="output max new tokens"
@@ -385,6 +387,21 @@ if args.jit:
                 for i in range(model.config.num_hidden_layers)
             ]
         )
+    elif re.search("opt", model.config.architectures[0], re.IGNORECASE):
+        beam_idx_tmp = torch.zeros(
+            (2048, int(args.batch_size * num_beams)), dtype=torch.long
+        ).contiguous()
+        past_key_values = tuple(
+            [
+                (
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    beam_idx_tmp,
+                    torch.zeros(1, dtype=torch.long).contiguous(),
+                )
+                for i in range(model.config.num_hidden_layers)
+            ]
+        )
     else:
         print("does not support jit yet on your model, please re-run without jit")
         exit(0)
@@ -392,12 +409,19 @@ if args.jit:
     input_ids = torch.ones(32).to(torch.long)
     attention_mask = torch.ones(len(input_ids))
     position_ids = torch.arange(len(input_ids))
-    example_inputs = {
-        "input_ids": input_ids.unsqueeze(0),
-        "attention_mask": attention_mask.unsqueeze(0),
-        "position_ids": position_ids.unsqueeze(0),
-        "past_key_values": past_key_values,
-    }
+    if re.search("opt", model.config.architectures[0], re.IGNORECASE):
+        example_inputs = {
+            "input_ids": input_ids.unsqueeze(0),
+            "attention_mask": attention_mask.unsqueeze(0),
+            "past_key_values": past_key_values,
+        }
+    else:
+        example_inputs = {
+            "input_ids": input_ids.unsqueeze(0),
+            "attention_mask": attention_mask.unsqueeze(0),
+            "position_ids": position_ids.unsqueeze(0),
+            "past_key_values": past_key_values,
+        }
 
     with torch.inference_mode(), torch.no_grad(), torch.autocast(
         device_type=args.device,
@@ -444,6 +468,10 @@ def generate():
     return zip(inputs, gen_text, total_new_tokens), outputs
 
 
+def trace_handler(prof):
+    print(prof.key_averages().table(
+        sort_by="self_cpu_time_total", row_limit=-1))
+
 # warmup is a must if measuring speed as it's when all the optimizations are performed
 # e.g. on 8x80 a100 the first pass of 100 tokens takes 23sec, and the next one is 4secs
 if not args.benchmark:
@@ -469,6 +497,18 @@ else:
     cycles = args.num_iter
     warmup = args.num_warmup
     total_list = []
+    if args.profile:
+        with torch.profiler.profile(
+            activities=[torch.profiler.ProfilerActivity.CPU],
+            schedule=torch.profiler.schedule(
+                wait=1,
+                warmup=3,
+                active=1),
+            on_trace_ready=trace_handler
+        ) as prof:
+            for i in range(5):
+                gen_ids, outputs = generate()
+                prof.step()
     # latency
     for i in range(cycles):
         t0 = time.time()
