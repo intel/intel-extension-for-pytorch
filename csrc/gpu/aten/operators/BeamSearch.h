@@ -130,7 +130,8 @@ void beam_search_topk_stage1(
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
       const int32_t sentence_id = item.get_group(0);
       const int32_t wi_id = item.get_local_id(0);
-      const int32_t chunk = (vocab_size + wg_size - 1) / wg_size;
+      const int32_t chunk =
+          (vocab_size + num_wg_per_beam - 1) / num_wg_per_beam;
       const int32_t start = chunk * item.get_group(1);
       int32_t end = start + chunk;
       end = (end > vocab_size) ? vocab_size : end;
