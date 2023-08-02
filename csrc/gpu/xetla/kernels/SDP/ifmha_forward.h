@@ -41,8 +41,11 @@ class ifmha_forward_t {
   using accum_t = float;
   using index_t = int32_t;
   static constexpr uint32_t accum_step = ifmha_policy::accum_step;
+  static constexpr uint32_t prefetch_distance = ifmha_policy::prefetch_distance;
   static constexpr accum_t kNegInfinity = INFINITY * -1;
 
+  // q: (1, h) k(t, h)
+  // reduce(h*h)
   struct arguments_t {
     // Input and output tensors
     scalar_t* Q_ptr; // [1,B,Bm,N,H] - query
@@ -263,7 +266,9 @@ class ifmha_forward_t {
       if (lanes0 > 0) {
         int32_t offset = start_T0 * args.uB * args.uN + bid * args.uN + nid;
         int32_t step = args.uB * args.uN;
-        index0 = xetla_vector_gen<int32_t, kSgBc>(offset, step);
+        index0 = xetla_vector_gen<int32_t, kSgBc>(0, 1);
+        index0 *= step;
+        index0 += offset;
       }
 
       // compute index for buffer1
@@ -279,7 +284,9 @@ class ifmha_forward_t {
         int inital = start_T1 * args.uB * args.uBm * args.uN +
             bid * args.uBm * args.uN + nid;
         int step = args.uB * args.uBm * args.uN;
-        index1 = xetla_vector_gen<int32_t, kSgBc>(inital, step);
+        index1 = xetla_vector_gen<int32_t, kSgBc>(0, 1);
+        index1 *= step;
+        index1 += inital;
         index1 += beam_id * args.uN;
       }
 
@@ -324,6 +331,13 @@ class ifmha_forward_t {
     matQi_t matQi;
     matKj_t matKj;
 
+    int prefetch_id = 0;
+    ctx.idesc_Kj.set_offset(0);
+#pragma unroll
+    for (; prefetch_id < prefetch_distance; ++prefetch_id)
+      iprefetch_tile<matKj_t, imem_desc_Kj_t>(ctx.idesc_Kj, prefetch_id);
+    SW_BARRIER();
+
 #pragma unroll
     for (int j = 0; j < kSgBc; j++) {
       matQi_payload_t matQi_payload(ctx.desc_Qi_L);
@@ -342,6 +356,8 @@ class ifmha_forward_t {
             xetla_reduce<accum_t, accum_t, accum_step, reduce_op::sum>(
                 matQi.reg * matKj.reg);
       }
+      ctx.idesc_Kj.set_offset(0);
+      iprefetch_tile<matKj_t, imem_desc_Kj_t>(ctx.idesc_Kj, prefetch_id++);
     }
   }
 
@@ -370,6 +386,12 @@ class ifmha_forward_t {
 
     matVj_t matVj;
     matOt0_t matOt0;
+    int prefetch_id = 0;
+    ctx.idesc_Vj.set_offset(0);
+#pragma unroll
+    for (; prefetch_id < prefetch_distance; ++prefetch_id)
+      iprefetch_tile<matVj_t, imem_desc_Vj_t>(ctx.idesc_Vj, prefetch_id);
+    SW_BARRIER();
 
 #pragma unroll
     for (int j = 0; j < kSgBc; ++j) {
@@ -390,6 +412,8 @@ class ifmha_forward_t {
         subgroup::tile_store(matOt0, matOt0_payload);
         desc_Ot0_L.update_coord_x(accum_step);
       }
+      ctx.idesc_Vj.set_offset(0);
+      iprefetch_tile<matVj_t, imem_desc_Vj_t>(ctx.idesc_Vj, prefetch_id++);
     }
 
     xetla_fence<memory_kind::shared_local>();

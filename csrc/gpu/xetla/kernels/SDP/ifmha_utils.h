@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "prefetch_xe.h"
 #include "xetla.hpp"
 
 namespace gpu::xetla::fmha {
@@ -39,8 +40,8 @@ struct imem_desc_t<dtype_, lanes_, mem_layout::row_major, mem_space::global> {
 
   using desc_t = mem_desc_t<dtype, layout, space>;
 
-  dtype* addr0;
-  dtype* addr1;
+  uint64_t addr0;
+  uint64_t addr1;
   uint32_t width;
   int32_t offset;
 
@@ -52,8 +53,8 @@ struct imem_desc_t<dtype_, lanes_, mem_layout::row_major, mem_space::global> {
   inline imem_desc_t() = default;
 
   inline void init(dtype* address0, dtype* address1, uint32_t surface_width) {
-    addr0 = address0;
-    addr1 = address1;
+    addr0 = (uint64_t)address0;
+    addr1 = (uint64_t)address1;
     width = surface_width;
   }
 
@@ -73,21 +74,31 @@ struct imem_desc_t<dtype_, lanes_, mem_layout::row_major, mem_space::global> {
   }
 
   inline bool init_tdesc(uint32_t lane, desc_t& desc) {
-    if (lane < lanes0) {
-      int32_t idx = index0[lane];
-      uint32_t height = idx + 1;
-      desc.init(addr0, {width, height, width}, {offset, idx});
-    } else {
-      lane -= lanes0;
-      if (lane < lanes1) {
-        int32_t idx = index1[lane];
-        uint32_t height = idx + 1;
-        desc.init(addr1, {width, height, width}, {offset, idx});
-      } else {
-        return false;
-      }
-    }
+    if (lane >= lanes0 && (lane - lanes0 >= lanes1))
+      return false;
+
+    uint32_t lane_id = (lane < lanes0) ? lane : lane - lanes0;
+    int32_t idx = (lane < lanes0) ? index0[lane_id] : index1[lane_id];
+    uint32_t height = idx + 1;
+    uint64_t addr = (lane < lanes0) ? addr0 : addr1;
+    desc.init((dtype*)addr, {width, height, width}, {offset, idx});
     return true;
+
+    // if (lane < lanes0) {
+    //   int32_t idx = index0[lane];
+    //   uint32_t height = idx + 1;
+    //   desc.init(addr0, {width, height, width}, {offset, idx});
+    // } else {
+    //   lane -= lanes0;
+    //   if (lane < lanes1) {
+    //     int32_t idx = index1[lane];
+    //     uint32_t height = idx + 1;
+    //     desc.init(addr1, {width, height, width}, {offset, idx});
+    //   } else {
+    //     return false;
+    //   }
+    // }
+    // return true;
   }
 };
 
@@ -174,7 +185,7 @@ iload_tile(tile_t& tile, imem_desc_t& imem_desc, int lane_idx) {
 
 template <typename tile_t, typename imem_desc_t>
 inline typename std::enable_if_t<load_type<imem_desc_t>::is_global_row>
-iprefetch_tile(imem_desc_t& imem_desc) {
+iprefetch_tile(imem_desc_t& imem_desc, int lane_idx) {
   using dtype = typename imem_desc_t::dtype;
   static constexpr uint32_t lanes = imem_desc_t::lanes;
   static constexpr mem_layout layout = imem_desc_t::layout;
@@ -183,13 +194,11 @@ iprefetch_tile(imem_desc_t& imem_desc) {
   using dtype_acc = typename tile_t::dtype;
   using tile_desc = typename tile_t::tile_desc;
   static constexpr uint32_t width = tile_desc::tile_size_x;
-  static constexpr uint32_t height = tile_desc::tile_size_y;
 
-  static_assert(lanes == height, "the tile height and lanes don't match");
-
-  using lane_tile_desc_t = subgroup::tile_desc_t<width, 1, width, 1>;
+  static_assert(width >= 16, "width is expected to be larger than 16");
+  using lane_tile_desc_t = subgroup::tile_desc_t<width, 1, 16, 1>;
   using lane_tile_t = subgroup::tile_t<dtype, lane_tile_desc_t>;
-  using prefetch_payload_t = subgroup::prefetch_payload_t<
+  using prefetch_payload_t = subgroup::ext::prefetch_payload_t<
       dtype,
       lane_tile_desc_t,
       layout,
@@ -199,13 +208,11 @@ iprefetch_tile(imem_desc_t& imem_desc) {
   using lane_mem_desc_t = mem_desc_t<dtype, layout, space>;
 
   lane_mem_desc_t lane_mem_desc;
-#pragma unroll
-  for (int i = 0; i < lanes; i++) {
-    if (imem_desc.init_tdesc(i, lane_mem_desc)) {
-      prefetch_payload_t prefetch_payload(lane_mem_desc);
-      subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
-          prefetch_payload);
-    }
+
+  if (imem_desc.init_tdesc(lane_idx, lane_mem_desc)) {
+    prefetch_payload_t prefetch_payload(lane_mem_desc);
+    subgroup::ext::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+        prefetch_payload);
   }
 }
 
