@@ -142,8 +142,10 @@ def ipex_GPTJForCausalLM_forward(
         # make sure sampling in fp16 works correctly and
         # compute loss in fp32 to match with mesh-tf version
         # https://github.com/EleutherAI/gpt-neo/blob/89ce74164da2fb16179106f54e2269b5da8db333/models/gpt2/gpt2.py#L179
-        # lm_logits = self.lm_head(hidden_states).to(torch.float32)
-        lm_logits = self.lm_head(hidden_states)
+        shape = list(hidden_states.size())
+        shape[1] = 1
+        hidden_states = hidden_states[:, -1, :].view(shape)
+        lm_logits = self.lm_head(hidden_states).to(torch.float32)
 
         loss = None
         if labels is not None:
@@ -460,6 +462,10 @@ def ipex_beam_search(
     # origin_input_ids size is [batch_size * beam_size, seq_len]
     out = torch.ops.torch_ipex.update_output_sequence(origin_input_ids, out, batch_size)
     IPEXTransformerAtten.release_all_static_cached_resources()
+    reserved_mem = round(torch.xpu.memory_reserved() / 1024**3, 3)
+    if reserved_mem  > 50:
+        torch.xpu.synchronize()
+        torch.xpu.empty_cache()
     if hasattr(self, "token_latency") and self.token_latency:
         return out, latency_list
     return out

@@ -145,15 +145,30 @@ void ifmha_forward(
     uint32_t kv_len0,
     uint32_t kv_len1,
     uint32_t attn_mask_padding) {
-  if (head_size <= 64) {
-    CALL_IMPL_FUNC(ifmha_policy_64x64);
-  } else if (head_size <= 128) {
-    CALL_IMPL_FUNC(ifmha_policy_128x64);
-  } else if (head_size <= 256) {
-    CALL_IMPL_FUNC(ifmha_policy_256x64);
+  // occupancy first
+  constexpr int hardware_concurrent_wg = 64;
+  if (num_batches * beam <= hardware_concurrent_wg) {
+    if (head_size <= 64) {
+      CALL_IMPL_FUNC(ifmha_policy_64x64);
+    } else if (head_size <= 128) {
+      CALL_IMPL_FUNC(ifmha_policy_128x64);
+    } else if (head_size <= 256) {
+      CALL_IMPL_FUNC(ifmha_policy_s_256x64);
+    } else {
+      TORCH_CHECK(0, "SDP Index fusion kernel requires head_dim <= 256 ...");
+      return;
+    }
   } else {
-    TORCH_CHECK(0, "SDP Index fusion kernel requires head_dim <= 256 ...");
-    return;
+    if (head_size <= 64) {
+      CALL_IMPL_FUNC(ifmha_policy_64x64);
+    } else if (head_size <= 128) {
+      CALL_IMPL_FUNC(ifmha_policy_128x64);
+    } else if (head_size <= 256) {
+      CALL_IMPL_FUNC(ifmha_policy_l_256x64);
+    } else {
+      TORCH_CHECK(0, "SDP Index fusion kernel requires head_dim <= 256 ...");
+      return;
+    }
   }
 }
 
