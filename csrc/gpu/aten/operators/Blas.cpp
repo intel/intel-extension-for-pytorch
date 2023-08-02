@@ -75,6 +75,7 @@ Tensor& addmm_out(
   if (alpha.to<float>() == 1.f && beta.to<float>() == 1.f) {
     if (self.dim() == 1) {
       auto policy = HGEMMXetla()
+                        .allow_fallback()
                         .add_matrix_c(result)
                         .add_matrix_a(mat1)
                         .add_matrix_b(mat2)
@@ -86,6 +87,7 @@ Tensor& addmm_out(
       }
     } else if (self.dim() == 2) {
       auto policy = HGEMMXetla()
+                        .allow_fallback()
                         .add_matrix_c(result)
                         .add_matrix_a(mat1)
                         .add_matrix_b(mat2)
@@ -182,6 +184,7 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
 
 #if defined(USE_XETLA)
   auto policy = HGEMMXetla()
+                    .allow_fallback()
                     .add_matrix_c(result)
                     .add_matrix_a(self)
                     .add_matrix_b(mat2)

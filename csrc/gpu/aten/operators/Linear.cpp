@@ -265,6 +265,7 @@ Tensor linear_gelu(
     auto output = at::empty({m, n}, input.options());
     auto w = weight.transpose(0, 1);
     auto policy = HGEMMXetla()
+                      .allow_fallback()
                       .add_matrix_c(output)
                       .add_matrix_a(input_flat)
                       .add_matrix_b(w)

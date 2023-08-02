@@ -49,6 +49,7 @@ class HGEMMXetla final {
   bool is_b_row_major_;
   bool is_b_col_major_;
   bool fallback_;
+  bool allow_fallback_ = false;
   int selected_policy_;
   int m_, n_, k_;
 
@@ -56,6 +57,10 @@ class HGEMMXetla final {
   HGEMMXetla() = default;
   bool fallback() const {
     return fallback_;
+  }
+  HGEMMXetla& allow_fallback() {
+    allow_fallback_ = true;
+    return *this;
   }
   HGEMMXetla& add_matrix_c(const Tensor& c) {
     c_ = const_cast<Tensor*>(&c);
@@ -105,6 +110,8 @@ class HGEMMXetla final {
     bool ck1 = c_sizes[0] == m_ && c_sizes[1] == n_;
     bool ck2 = is_a_row_major_;
     if (!(ck0 && ck1 && ck2))
+      return *this;
+    if (allow_fallback_ && m_ > 1024)
       return *this;
     for (int i = 0; i < num_epilogues_; i++) {
       switch (epilogue_type_[i]) {
