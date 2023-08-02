@@ -123,6 +123,38 @@ static Tensor mm_silu(const Tensor& a_, const Tensor& b_) {
   return resize_as_mat1(a_, output);
 }
 
+#undef GEMM_XETLA_DISPATCH
+
+#define GEMM_QKV_XETLA_DISPATCH(F)                                         \
+  if (!has_bias) {                                                         \
+    RECORD_FUNCTION(                                                       \
+        "torch_ipex::hgemm_qkv" #F, c10::ArrayRef<c10::IValue>({}));       \
+    hgemm_qkv##F(                                                          \
+        q,                                                                 \
+        reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),          \
+        reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),          \
+        reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),          \
+        reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),         \
+        reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),        \
+        m,                                                                 \
+        n,                                                                 \
+        k);                                                                \
+  } else {                                                                 \
+    RECORD_FUNCTION(                                                       \
+        "torch_ipex::hgemm_qkv_bias" #F, c10::ArrayRef<c10::IValue>({}));  \
+    hgemm_qkv_bias##F(                                                     \
+        q,                                                                 \
+        reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),          \
+        reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),          \
+        reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),          \
+        reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),         \
+        reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),        \
+        reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()), \
+        m,                                                                 \
+        n,                                                                 \
+        k);                                                                \
+  }
+
 static void mm_qkv_out(
     const Tensor& input_,
     const Tensor& weight,
@@ -164,39 +196,18 @@ static void mm_qkv_out(
   using scalar_t =
       decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
   auto& q = dpcppGetCurrentQueue();
-
-  int selected_policy = select_gemm_config(m, n, k, is_b_row_major, 64);
-
-  char str__[80];
-  if (!has_bias) {
-    sprintf(str__, "hgemm_qkv_%d(%d, %d, %d)", selected_policy, m, n, k);
-    RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
-    hgemm_qkv_policies[selected_policy](
-        q,
-        reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
-        reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
-        reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
-        reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
-        reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
-        m,
-        n,
-        k);
+  if (m <= 32) {
+    if (n >= 2048) {
+      GEMM_QKV_XETLA_DISPATCH(_16x256_8x16x16_1_true_);
+    } else {
+      GEMM_QKV_XETLA_DISPATCH(_8x128_8x16x32_4_true_);
+    }
   } else {
-    sprintf(str__, "hgemm_qkv_bias_%d(%d, %d, %d)", selected_policy, m, n, k);
-    RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
-    hgemm_qkv_bias_policies[selected_policy](
-        q,
-        reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
-        reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
-        reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
-        reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
-        reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
-        reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()),
-        m,
-        n,
-        k);
+    GEMM_QKV_XETLA_DISPATCH(_256x256_32x64x32_1_true_);
   }
 }
+
+#undef GEMM_QKV_XETLA_DISPATCH
 
 static std::tuple<Tensor, Tensor, Tensor> mm_qkv(
     const Tensor& input,
