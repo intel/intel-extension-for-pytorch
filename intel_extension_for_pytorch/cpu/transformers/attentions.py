@@ -486,14 +486,19 @@ class _LlamaAttention_GQA(nn.Module):
         self.config = config
         self.hidden_size = module.hidden_size
         self.num_heads = module.num_heads
-        self.num_kv_heads = (
-            self.config.num_key_value_heads
-            if hasattr(self.config, "num_key_value_heads")
-            else module.num_attention_heads
-        )
+        if self.config.num_key_value_heads == self.config.num_attention_heads:
+            self.num_key_value_heads = self.num_heads
+        else:
+            if hasattr(module, "num_key_value_heads"):
+                self.num_key_value_heads = module.num_key_value_heads
+            else:
+                assert (
+                    False
+                ), "Your transformers version does not support LLaMA2 GQA feature, plese upgrade"
+
         self.head_dim = self.hidden_size // self.num_heads
         self.max_position_embeddings = self.config.max_position_embeddings
-        self.n_rep = self.num_heads // self.num_kv_heads
+        self.num_key_value_groups = self.num_heads // self.num_key_value_heads
         if (self.head_dim * self.num_heads) != self.hidden_size:
             raise ValueError(
                 f"hidden_size must be divisible by num_heads (got `hidden_size`: {self.hidden_size}"
@@ -501,11 +506,11 @@ class _LlamaAttention_GQA(nn.Module):
             )
         self.q_proj = module.q_proj
         self.k_proj = nn.Linear(
-            self.hidden_size, self.num_kv_heads * self.head_dim, bias=False
+            self.hidden_size, self.num_key_value_heads * self.head_dim, bias=False
         )
         self.k_proj.weight = module.k_proj.weight
         self.v_proj = nn.Linear(
-            self.hidden_size, self.num_kv_heads * self.head_dim, bias=False
+            self.hidden_size, self.num_key_value_heads * self.head_dim, bias=False
         )
         self.v_proj.weight = module.v_proj.weight
         self.o_proj = module.o_proj
@@ -552,10 +557,10 @@ class _LlamaAttention_GQA(nn.Module):
             bsz, q_len, self.num_heads, self.head_dim
         )
         key = self.k_proj(hidden_states).view(
-            bsz, q_len, self.num_kv_heads, self.head_dim
+            bsz, q_len, self.num_key_value_heads, self.head_dim
         )
         value = self.v_proj(hidden_states).view(
-            bsz, q_len, self.num_kv_heads, self.head_dim
+            bsz, q_len, self.num_key_value_heads, self.head_dim
         )
         position_ids = position_ids.contiguous()
         key = key.contiguous()
@@ -564,7 +569,7 @@ class _LlamaAttention_GQA(nn.Module):
             key,
             self.rotary_emb,
             position_ids,
-            self.num_kv_heads,
+            self.num_key_value_heads,
             self.head_dim,
             self.head_dim // 2,
             self.head_dim,
@@ -627,8 +632,8 @@ class _LlamaAttention_GQA(nn.Module):
 
             past_key_value = None
             # repeat k/v heads if n_kv_heads < n_heads
-            key_states = self.repeat_kv(key_states, self.n_rep)
-            value_states = self.repeat_kv(value_states, self.n_rep)
+            key_states = self.repeat_kv(key_states, self.num_key_value_groups)
+            value_states = self.repeat_kv(value_states, self.num_key_value_groups)
             attn_weights = torch.matmul(
                 query_states, key_states.transpose(2, 3)
             ) / math.sqrt(self.head_dim)
@@ -932,6 +937,7 @@ class _GPTNeoXAttention(nn.Module):
 
         return outputs
 
+
 class _OPTAttention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
@@ -959,7 +965,11 @@ class _OPTAttention(nn.Module):
         )
 
     def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int):
-        return tensor.view(bsz, seq_len, self.num_heads, self.head_dim).transpose(1, 2).contiguous()
+        return (
+            tensor.view(bsz, seq_len, self.num_heads, self.head_dim)
+            .transpose(1, 2)
+            .contiguous()
+        )
 
     def forward(
         self,
@@ -979,25 +989,81 @@ class _OPTAttention(nn.Module):
         bsz, tgt_len, _ = hidden_states.size()
 
         if is_cross_attention and past_key_value is not None:
-            key = past_key_value[0].view(bsz, tgt_len, self.num_heads, self.head_dim).contiguous()
-            value = past_key_value[1].view(bsz, tgt_len, self.num_heads, self.head_dim).contiguous()
+            key = (
+                past_key_value[0]
+                .view(bsz, tgt_len, self.num_heads, self.head_dim)
+                .contiguous()
+            )
+            value = (
+                past_key_value[1]
+                .view(bsz, tgt_len, self.num_heads, self.head_dim)
+                .contiguous()
+            )
         elif is_cross_attention:
-            key = self.k_proj(key_value_states).view(bsz, tgt_len, self.num_heads, self.head_dim).contiguous()
-            value = self.v_proj(key_value_states).view(bsz, tgt_len, self.num_heads, self.head_dim).contiguous()
+            key = (
+                self.k_proj(key_value_states)
+                .view(bsz, tgt_len, self.num_heads, self.head_dim)
+                .contiguous()
+            )
+            value = (
+                self.v_proj(key_value_states)
+                .view(bsz, tgt_len, self.num_heads, self.head_dim)
+                .contiguous()
+            )
         else:
-            key = self.k_proj(hidden_states).view(bsz, tgt_len, self.num_heads, self.head_dim).contiguous()
-            value = self.v_proj(hidden_states).view(bsz, tgt_len, self.num_heads, self.head_dim).contiguous()
+            key = (
+                self.k_proj(hidden_states)
+                .view(bsz, tgt_len, self.num_heads, self.head_dim)
+                .contiguous()
+            )
+            value = (
+                self.v_proj(hidden_states)
+                .view(bsz, tgt_len, self.num_heads, self.head_dim)
+                .contiguous()
+            )
         if past_key_value is None:
-            past_key_value = (torch.randn(0), torch.randn(0), torch.zeros(2048, 4, dtype=torch.long), torch.zeros(1, dtype=torch.long))
-        query = self.q_proj(hidden_states).view(bsz, tgt_len, self.num_heads, self.head_dim).contiguous()
+            past_key_value = (
+                torch.randn(0),
+                torch.randn(0),
+                torch.zeros(2048, 4, dtype=torch.long),
+                torch.zeros(1, dtype=torch.long),
+            )
+        query = (
+            self.q_proj(hidden_states)
+            .view(bsz, tgt_len, self.num_heads, self.head_dim)
+            .contiguous()
+        )
         key_cache = past_key_value[0].contiguous()
         value_cache = past_key_value[1].contiguous()
         beam_idx = past_key_value[2].contiguous()
         decoded_tokens = past_key_value[3].contiguous()[0]
-        attn_output, attn_weights, key_cache, value_cache, beam_idx = torch.ops.torch_ipex.masked_multihead_self_attention(query, key, value, key_cache, value_cache, beam_idx, decoded_tokens, 1/self.scaling, self.text_max_length, layer_head_mask, attention_mask)
+        (
+            attn_output,
+            attn_weights,
+            key_cache,
+            value_cache,
+            beam_idx,
+        ) = torch.ops.torch_ipex.masked_multihead_self_attention(
+            query,
+            key,
+            value,
+            key_cache,
+            value_cache,
+            beam_idx,
+            decoded_tokens,
+            1 / self.scaling,
+            self.text_max_length,
+            layer_head_mask,
+            attention_mask,
+        )
 
         if self.is_decoder:
-            past_key_value=(key_cache, value_cache, beam_idx, torch.tensor(past_key_value[3]+query.shape[1], dtype=torch.long))
+            past_key_value = (
+                key_cache,
+                value_cache,
+                beam_idx,
+                torch.tensor(past_key_value[3] + query.shape[1], dtype=torch.long),
+            )
 
         if not output_attentions:
             attn_weights_reshaped = None
@@ -1013,6 +1079,7 @@ class _OPTAttention(nn.Module):
         # partitioned aross GPUs when using tensor-parallelism.
         attn_output = attn_output.reshape(bsz, tgt_len, self.embed_dim)
         return attn_output, attn_weights_reshaped, past_key_value
+
 
 def _reorder_cache(
     self, past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor
