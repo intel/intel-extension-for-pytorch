@@ -16,14 +16,9 @@ ARG UBUNTU_VERSION
 
 FROM ubuntu:${UBUNTU_VERSION}
 
-RUN useradd -s /bin/bash user
-
 ENV LANG=C.UTF-8
 
 ARG DEBIAN_FRONTEND=noninteractive
-
-HEALTHCHECK NONE
-RUN useradd -d /home/ipex -m -s /bin/bash ipex
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends --fix-missing \
@@ -116,17 +111,17 @@ RUN python -m pip install numpy
 RUN python -m pip install torch==${TORCH_VERSION} -f ${TORCH_WHL_URL} && \
     python -m pip install intel_extension_for_pytorch==${IPEX_VERSION} -f ${IPEX_WHL_URL} && \
     python -m pip install torchvision==${TORCHVISION_VERSION} -f ${TORCHVISION_WHL_URL}
+
 RUN if [ ${ONECCL_BIND_PT_VERSION} != "N/A" ] && [ ${ONECCL_BIND_PT_WHL_URL} != "N/A" ]; then \
         python -m pip install oneccl_bind_pt==${ONECCL_BIND_PT_VERSION} -f ${ONECCL_BIND_PT_WHL_URL}; \
     fi
-
 
 ENV LD_LIBRARY_PATH=/opt/intel/oneapi/lib:/opt/intel/oneapi/lib/intel64:$LD_LIBRARY_PATH
 
 RUN apt update && \
     apt install -y sudo 
-RUN adduser --disabled-password --gecos "" nonroot
-RUN echo 'nonroot ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+RUN adduser --disabled-password --gecos "" user
+RUN echo 'user ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
 # Set the non-root user as the default user
 USER user
