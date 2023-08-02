@@ -212,10 +212,12 @@ void batch_norm_transform_input_kernel(
   int tb = std::max<int>(wg_size / tf, 1);
   sycl::range<2> local_range(tb, tf);
   sycl::range<2> global_range((bs + tb - 1) / tb * tb, numPlane * tf);
+
   auto input_ptr = input.data_ptr<input_scalar_t>();
   auto output_ptr = output.data_ptr<input_scalar_t>();
-  auto weight_ptr = weight.data_ptr<stat_scalar_t>();
-  auto bias_ptr = bias.data_ptr<stat_scalar_t>();
+  auto weight_ptr =
+      weight.defined() ? weight.data_ptr<stat_scalar_t>() : nullptr;
+  auto bias_ptr = bias.defined() ? bias.data_ptr<stat_scalar_t>() : nullptr;
   auto mean_ptr = mean_.data_ptr<stat_accscalar_t>();
   auto var_or_invstd_ptr = var_or_invstd.data_ptr<stat_accscalar_t>();
 
@@ -230,10 +232,10 @@ void batch_norm_transform_input_kernel(
         return;
       }
 
-      stat_accscalar_t gamma = weight_size > 0
+      stat_accscalar_t gamma = weight_ptr != nullptr
           ? static_cast<stat_accscalar_t>(weight_ptr[plane])
           : static_cast<stat_accscalar_t>(1);
-      stat_accscalar_t beta = bias_size > 0
+      stat_accscalar_t beta = bias_ptr != nullptr
           ? static_cast<stat_accscalar_t>(bias_ptr[plane])
           : static_cast<stat_accscalar_t>(0);
 
@@ -636,10 +638,10 @@ void batch_norm_collect_statistics_kernel(
 
       // Save the mean, variance, and moving averages
       if (tid == 0) {
-        if (save_mean != NULL) {
+        if (save_mean != nullptr) {
           save_mean[plane] = avg;
         }
-        if (save_transformed_var != NULL) {
+        if (save_transformed_var != nullptr) {
           save_transformed_var[plane] =
               VarTransform{}(var_n / (N * Hw), epsilon);
         }
@@ -1239,7 +1241,6 @@ std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> native_batch_norm_out(
     const bool has_running_var =
         (running_var_opt.has_value() && running_var_opt->defined());
     TORCH_CHECK(has_running_mean == has_running_var);
-
     if (training) {
       batch_norm_mean_var(input, save_mean, save_invstd);
       if (has_running_mean) {
@@ -1585,7 +1586,7 @@ void batch_norm_backward_channels_first_kernel(
       stat_accscalar_t proj_scale = dot_p * norm * invstd * invstd;
       stat_accscalar_t grad_scale = invstd * weight_val;
 
-      if (grad_input_ptr != NULL) {
+      if (grad_input_ptr != nullptr) {
         for (int batch = liy; batch < N; batch += local_range_y) {
           for (int x = lix; x < Hw; x += local_range_x) {
             input_scalar_t go = grad_output_ptr
@@ -1607,13 +1608,13 @@ void batch_norm_backward_channels_first_kernel(
         }
       }
 
-      if (grad_weight_ptr != NULL) {
+      if (grad_weight_ptr != nullptr) {
         if (lix == 0) {
           grad_weight_ptr[plane] = static_cast<stat_scalar_t>(dot_p * invstd);
         }
       }
 
-      if (grad_bias_ptr != NULL) {
+      if (grad_bias_ptr != nullptr) {
         if (lix == 0) {
           grad_bias_ptr[plane] = static_cast<stat_scalar_t>(grad_output_sum);
         }
@@ -1739,13 +1740,14 @@ void batch_norm_backward_reduce_kernel(
   auto mean_ptr = mean.data_ptr<stat_accscalar_t>();
   auto invstd_ptr = invstd.data_ptr<stat_accscalar_t>();
   stat_scalar_t* grad_weight_ptr =
-      grad_weight.size(0) > 0 ? grad_weight.data_ptr<stat_scalar_t>() : NULL;
+      grad_weight.size(0) > 0 ? grad_weight.data_ptr<stat_scalar_t>() : nullptr;
   stat_scalar_t* grad_bias_ptr =
-      grad_bias.size(0) > 0 ? grad_bias.data_ptr<stat_scalar_t>() : NULL;
+      grad_bias.size(0) > 0 ? grad_bias.data_ptr<stat_scalar_t>() : nullptr;
   stat_accscalar_t* sum_dy_ptr =
-      sum_dy.size(0) > 0 ? sum_dy.data_ptr<stat_accscalar_t>() : NULL;
-  stat_accscalar_t* sum_dy_xmu_ptr =
-      sum_dy_xmu.size(0) > 0 ? sum_dy_xmu.data_ptr<stat_accscalar_t>() : NULL;
+      sum_dy.size(0) > 0 ? sum_dy.data_ptr<stat_accscalar_t>() : nullptr;
+  stat_accscalar_t* sum_dy_xmu_ptr = sum_dy_xmu.size(0) > 0
+      ? sum_dy_xmu.data_ptr<stat_accscalar_t>()
+      : nullptr;
 
   index_t go_batch_stride = grad_output.stride(0);
   index_t go_plane_stride = grad_output.stride(1);
@@ -1789,16 +1791,16 @@ void batch_norm_backward_reduce_kernel(
           item, g, o_batch_size, o_feature_size, plane, sg_num, local_sum);
 
       if (lidx == 0) {
-        if (grad_weight_ptr != NULL) {
+        if (grad_weight_ptr != nullptr) {
           grad_weight_ptr[plane] = static_cast<stat_scalar_t>(res.v2 * factor);
         }
-        if (grad_bias_ptr != NULL) {
+        if (grad_bias_ptr != nullptr) {
           grad_bias_ptr[plane] = static_cast<stat_scalar_t>(res.v1);
         }
-        if (sum_dy_ptr != NULL) {
+        if (sum_dy_ptr != nullptr) {
           sum_dy_ptr[plane] = static_cast<stat_accscalar_t>(res.v1);
         }
-        if (sum_dy_xmu_ptr != NULL) {
+        if (sum_dy_xmu_ptr != nullptr) {
           sum_dy_xmu_ptr[plane] = static_cast<stat_accscalar_t>(res.v2);
         }
       }
@@ -2170,7 +2172,7 @@ void batch_norm_backward_elemt_channels_first_kernel_impl(
   auto mean_ptr = mean.data_ptr<stat_accscalar_t>();
   auto invstd_ptr = invstd.data_ptr<stat_accscalar_t>();
   auto weight_ptr =
-      weight.size(0) > 0 ? weight.data_ptr<stat_scalar_t>() : NULL;
+      weight.defined() ? weight.data_ptr<stat_scalar_t>() : nullptr;
   auto sum_dy_ptr = sum_dy.data_ptr<stat_accscalar_t>();
   auto sum_dy_xmu_ptr = sum_dy_xmu.data_ptr<stat_accscalar_t>();
 
@@ -2185,7 +2187,7 @@ void batch_norm_backward_elemt_channels_first_kernel_impl(
       stat_accscalar_t m_c = mean_ptr[plane];
       stat_accscalar_t m_dy_c = sum_dy_ptr[plane] * norm_fct;
       stat_accscalar_t factor_1_c = invstd_ptr[plane];
-      stat_accscalar_t factor_2_c = weight_ptr != NULL
+      stat_accscalar_t factor_2_c = weight_ptr != nullptr
           ? static_cast<stat_accscalar_t>(weight_ptr[plane])
           : stat_accscalar_t(1);
       factor_2_c *= factor_1_c;

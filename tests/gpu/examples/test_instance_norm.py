@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch  # noqa
+import intel_extension_for_pytorch as ipex
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -131,3 +131,35 @@ class TestNNMethod(TestCase):
             ch_xpu_result = ch_xpu_conv(ch_xpu_input)
             ch_xpu_result = ch_xpu_module(ch_xpu_result)
             self.assertEqual(ch_cpu_result, ch_xpu_result.to("cpu"))
+
+    def test_instance_norm_with_none_weight_inputs(self):
+        i = torch.randn(2, 512, 64, 64)
+
+        weight = None
+        bias = None
+        running_mean = None
+        running_var = None
+        use_input_stats = True
+        momentum = 0.1
+        eps = 1e-5
+
+        y_cpu = torch.instance_norm(i, weight, bias, running_mean, running_var, use_input_stats,
+                                    momentum, eps, torch.backends.cudnn.enabled)
+        y_xpu = torch.instance_norm(i.xpu(), weight, bias, running_mean, running_var, use_input_stats,
+                                    momentum, eps, torch.backends.cudnn.enabled)
+        self.assertEqual(y_cpu, y_xpu.cpu())
+
+    def test_instance_norm_with_optimize(self):
+        in3 = torch.nn.InstanceNorm3d(32)
+
+        input_tensor = torch.rand(1, 32, 96, 48, 48)
+        out_cpu = in3(input_tensor)
+
+        in3 = in3.to("xpu")
+        input_tensor = input_tensor.to("xpu")
+
+        in3.eval()
+        in3 = ipex.optimize(in3)
+
+        out_xpu = in3(input_tensor)
+        self.assertEqual(out_cpu, out_xpu.cpu())
