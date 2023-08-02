@@ -1,6 +1,8 @@
 Blogs & Publications
 ====================
 
+* [Accelerate Llama 2 with Intel AI Hardware and Software Optimizations, Jul 2023](https://www.intel.com/content/www/us/en/developer/articles/news/llama2.html)
+* [Accelerate PyTorch\* Training and Inference Performance using Intel® AMX, Jul 2023](https://www.intel.com/content/www/us/en/developer/articles/technical/accelerate-pytorch-training-inference-on-amx.html)
 * [Intel® Deep Learning Boost (Intel® DL Boost) - Improve Inference Performance of Hugging Face BERT Base Model in Google Cloud Platform (GCP) Technology Guide, Apr 2023](https://networkbuilders.intel.com/solutionslibrary/intel-deep-learning-boost-intel-dl-boost-improve-inference-performance-of-hugging-face-bert-base-model-in-google-cloud-platform-gcp-technology-guide)
 * [Get Started with Intel® Extension for PyTorch\* on GPU | Intel Software, Mar 2023](https://www.youtube.com/watch?v=Id-rE2Q7xZ0&t=1s)
 * [Accelerate PyTorch\* INT8 Inference with New “X86” Quantization Backend on X86 CPUs, Mar 2023](https://www.intel.com/content/www/us/en/developer/articles/technical/accelerate-pytorch-int8-inf-with-new-x86-backend.html)

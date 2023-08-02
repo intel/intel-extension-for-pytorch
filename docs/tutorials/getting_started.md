@@ -2,20 +2,7 @@
 
 ## Installation
 
-Prebuilt wheel files are released for multiple Python versions. You can install them simply with the following pip command.
-
-```bash
-python -m pip install torch==1.13.0a0+git6c9b55e torchvision==0.14.1a0 intel_extension_for_pytorch==1.13.120+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
-```
-
-You can run a simple sanity test to double confirm if the correct version is installed, and if the software stack can get correct hardware information onboard your system.
-
-```bash
-python -c "import torch; import intel_extension_for_pytorch as ipex; print(torch.__version__); print(ipex.__version__); [print(f'[{i}]: {torch.xpu.get_device_properties(i)}') for i in range(torch.xpu.device_count())];"
-```
-
-More detailed instructions can be found at [Installation Guide](./installation.md).
-
+Follow instructions at [Installation Guide](./installation.rst).
 
 ## Coding
 
@@ -28,7 +15,7 @@ In general, APIs invocation should follow orders below.
 3. Invoke `optimize()` function to apply optimizations.
 4. For Torchscript, invoke `torch.jit.trace()` and `torch.jit.freeze()`.
 
-**Note:** It is highly recommended to `import intel_extension_for_pytorch` right after `import torch`, prior to importing other packages.
+**Note:** Please `import intel_extension_for_pytorch` right after `import torch`, prior to importing other packages.
 
 ```python
 import torch

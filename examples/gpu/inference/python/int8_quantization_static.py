@@ -66,3 +66,5 @@ modelJit = convert_jit(modelJit, True)
 data = torch.rand(1, 3, 224, 224)
 data = data.to("xpu")
 modelJit(data)
+
+print("Execution finished")

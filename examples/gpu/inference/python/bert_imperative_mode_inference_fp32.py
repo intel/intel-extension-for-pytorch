@@ -22,3 +22,5 @@ model = ipex.optimize(model)
 
 with torch.no_grad():
     model(data)
+
+print("Execution finished")

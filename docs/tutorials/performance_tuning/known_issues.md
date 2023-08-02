@@ -8,10 +8,6 @@ Known Issues
 - FP64 data type is unsupported on current platform
 
   FP64 is not natively supported by the [Intel® Data Center GPU Flex Series](https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html) platform. If you run any AI workload on that platform and receive this error message, it means a kernel requiring FP64 instructions but not supported and the execution is stopped.
-
-- MaxPool2d operator only supports 4D input for ceil mode
-
-  If 3D input is detected, MaxPool2d will throw unsupported error message and stop execution.
   
 - Runtime error `invalid device pointer` if `import horovod.torch as hvd` before `import intel_extension_for_pytorch`
 

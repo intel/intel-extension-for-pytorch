@@ -31,6 +31,7 @@ Intel® Extension for PyTorch* has been released as an open–source project at 
    :maxdepth: 1
 
    tutorials/getting_started
+   tutorials/cheat_sheet
    tutorials/features
    tutorials/releases
    tutorials/installation

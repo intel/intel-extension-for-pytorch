@@ -34,6 +34,7 @@ int main(int argc, const char* argv[]) {
   torch::Tensor output_tensor;
   output_tensor = output.toTensor();
   std::cout << output_tensor.slice(/*dim=*/1, /*start=*/0, /*end=*/5) << std::endl;
+  std::cout << "Execution finished" << std::endl;
 
   return 0;
 }
