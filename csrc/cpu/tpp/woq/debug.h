@@ -35,6 +35,7 @@ class SafePrint {
 
 template <typename T>
 inline void print_matrix(T* mat, int m, int n, int ldm, const char* name=nullptr, int ldn=1) {
+  if (omp_get_thread_num() != 0) return;
   std::cout << "\"" << (name ? name : (const char*)("noname")) << "\"" << "\n";
   for (int i = 0; i < m; i++) {
     std::cout << "[";

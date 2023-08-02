@@ -156,6 +156,10 @@ def _optimize_transformers(
                 OPTDecoderLayer_forward,
                 OPTDecoderLayer_forward_distributed,
             )
+            from intel_extension_for_pytorch.cpu.woq.fused_llm import (
+                GPTJMLP_woq_forward,
+                GPTJBlock_woq_forward,
+            )
             from .models import (
                 GPTJModel_forward,
                 LlamaModel_forward,
@@ -280,6 +284,17 @@ def _optimize_transformers(
                         "_prepare_decoder_attention_mask",
                         _prepare_decoder_attention_mask,
                     )
+                    if _model.config.weight_only_quantization:
+                        convert_forward(
+                            _model,
+                            transformers.models.gptj.modeling_gptj.GPTJBlock,
+                            GPTJBlock_woq_forward,
+                        )
+                        convert_forward(
+                            _model,
+                            transformers.models.gptj.modeling_gptj.GPTJMLP,
+                            GPTJMLP_woq_forward,
+                        )
                 else:
                     # linear-wise optimizations
                     _enable_tpp()

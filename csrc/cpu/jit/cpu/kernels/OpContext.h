@@ -356,14 +356,14 @@ using SerializationTypeWoqLinearPrePack =
 class WoqLinearOpContext : public torch::jit::CustomClassHolder {
  protected:
   c10::optional<int64_t> batch_size_;
-  int64_t lowp_mode_;
-  int64_t num_concats_;
 
  public:
   SerializationTypeWoqLinearPrePack unpack() {
     auto orig_weight_ = this->to_public(this->get_at_packed_weight());
     auto orig_bias_ = this->get_context().at_bias_;
-    return std::make_tuple(orig_weight_, orig_bias_, batch_size_, lowp_mode_, num_concats_);
+    return std::make_tuple(
+        orig_weight_, orig_bias_, batch_size_, this->get_context().lowp_mode_, this->get_context().num_concats_
+    );
   }
 
   virtual at::Tensor get_data_handle() = 0;
@@ -386,6 +386,14 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
       at::Tensor& accumu,
       const c10::optional<at::Scalar>& alpha) = 0;
 
+  virtual at::Tensor run_add(
+      const at::Tensor& input,
+      const std::vector<at::Tensor>& others) = 0;
+
+  virtual at::Tensor run_add_add(
+      const at::Tensor& input,
+      const std::vector<at::Tensor>& others) = 0;
+
   virtual at::Tensor to_public(const at::Tensor& tensor) = 0;
 
   virtual at::Tensor get_at_packed_weight() = 0;
@@ -407,30 +415,13 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
 class IpexWoqLinearOpContext final : public WoqLinearOpContext {
  private:
   detail::ContextLinearWoq op_context_;
-  // the list contains three dtype versions of scale and zp
-  // i.e., fp32, fp16, bf16
-  std::vector<at::Tensor> scales_list_;
-  std::vector<at::Tensor> zero_points_list_;
 
  public:
   IpexWoqLinearOpContext(
       c10::optional<int64_t> batch_size,
-      detail::ContextLinearWoq&& op_context,
-      at::Tensor&& scales_float,
-      at::Tensor&& zero_point_float,
-      int64_t lowp_mode,
-      int64_t num_concats = 1)
+      detail::ContextLinearWoq&& op_context)
       : op_context_(std::move(op_context)) {
     batch_size_ = batch_size;
-    lowp_mode_ = lowp_mode;
-    num_concats_ = num_concats;
-    // Make three dtype versions of scale, zp and bias
-    auto scales_fp16 = scales_float.to(c10::kHalf);
-    auto scales_bf16 = scales_float.to(c10::kBFloat16);
-    scales_list_ = {scales_float, scales_fp16, scales_bf16};
-    auto zp_fp16 = zero_point_float.to(c10::kHalf);
-    auto zp_bf16 = zero_point_float.to(c10::kBFloat16);
-    zero_points_list_ = {zero_point_float, zp_fp16, zp_bf16};
   }
 
   virtual at::Tensor get_data_handle() override;
@@ -452,6 +443,14 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
       const at::Tensor& input,
       at::Tensor& accumu,
       const c10::optional<at::Scalar>& alpha) override;
+
+  virtual at::Tensor run_add(
+      const at::Tensor& input,
+      const std::vector<at::Tensor>& others) override;
+
+  virtual at::Tensor run_add_add(
+      const at::Tensor& input,
+      const std::vector<at::Tensor>& others) override;
 
   virtual at::Tensor to_public(const at::Tensor& tensor) override;
 

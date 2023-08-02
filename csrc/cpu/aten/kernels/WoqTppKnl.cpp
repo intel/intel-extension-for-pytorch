@@ -3,6 +3,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Tensor.h>
 #include <aten/Linear.h>
+#include <ATen/cpu/vec/vec.h>
 #include "csrc/cpu/tpp/woq/tla.h"
 
 namespace torch_ipex {
@@ -29,6 +30,84 @@ inline VAT load_dequant_zp_only_int8(uint8_t *p, VAT vzps) {
 
 // TODO(jgong5): further simplify the dequant intrinsics below with VecOps
 #ifdef __AVX512F__
+template <>
+inline std::array<__m512, 4> load_dequant_zp_only_int4<64>(
+  uint8_t *p, std::array<__m512, 4> vzps, __m512 lut
+) {
+  using T = float;
+  using VA = VecArray<64, T>;
+  using VAT = typename VA::type;
+  constexpr long COLS = VA::num_vec;
+  auto packed = _mm256_loadu_si256((__m256i*)p);
+  __m512i int32[COLS];
+  {
+    auto low_4bit = _mm512_cvtepu8_epi32(_mm256_castsi256_si128(packed));
+    auto high_4bit = _mm512_srli_epi32(low_4bit, 4);
+    int32[0] = low_4bit;
+    int32[2] = high_4bit;
+  }
+  {
+    auto low_4bit =
+        _mm512_cvtepu8_epi32(_mm256_extracti128_si256(packed, 1));
+    auto high_4bit = _mm512_srli_epi32(low_4bit, 4);
+    int32[1] = low_4bit;
+    int32[3] = high_4bit;
+  }
+  VAT vbs;
+  compile_time_for<COLS>::op(
+    [&](auto idx) {
+      vbs[idx] = _mm512_permutexvar_ps(int32[idx], lut);
+      vbs[idx] = _mm512_sub_ps(vbs[idx], vzps[idx]);
+    }
+  );
+  return vbs;
+}
+
+template <>
+inline std::array<__m512, 2> load_dequant_zp_only_int4<32>(
+  uint8_t *p, std::array<__m512, 2> vzps, __m512 lut
+) {
+  using T = float;
+  using VA = VecArray<32, T>;
+  using VAT = typename VA::type;
+  constexpr long COLS = VA::num_vec;
+  auto packed = _mm_loadu_si128((__m128i*)p);
+  __m512i int32[COLS];
+  {
+    auto low_4bit = _mm512_cvtepu8_epi32(packed);
+    auto high_4bit = _mm512_srli_epi32(low_4bit, 4);
+    int32[0] = low_4bit;
+    int32[1] = high_4bit;
+  }
+  VAT vbs;
+  compile_time_for<COLS>::op(
+    [&](auto idx) {
+      vbs[idx] = _mm512_permutexvar_ps(int32[idx], lut);
+      vbs[idx] = _mm512_sub_ps(vbs[idx], vzps[idx]);
+    }
+  );
+  return vbs;
+}
+
+template <>
+inline std::array<__m512, 1> load_dequant_zp_only_int4<16>(
+  uint8_t *p, std::array<__m512, 1> vzps, __m512 lut
+) {
+  using T = float;
+  using VA = VecArray<16, T>;
+  using VAT = typename VA::type;
+  constexpr long COLS = VA::num_vec;
+  static_assert(COLS == 1, "COLS must be 1");
+  uint64_t packed = reinterpret_cast<uint64_t*>(p)[0];
+  uint64_t high = packed >> 4;
+  __m128i packed_128 = _mm_set_epi64x(high, packed);
+  __m512i int32 = _mm512_cvtepu8_epi32(packed_128);
+  VAT vbs;
+  vbs[0] = _mm512_permutexvar_ps(int32, lut);
+  vbs[0] = _mm512_sub_ps(vbs[0], vzps[0]);
+  return vbs;
+}
+
 template <>
 inline std::array<__m512, 4> load_dequant_zp_only_int8<64>(
   uint8_t *p, std::array<__m512, 4> vzps
@@ -86,9 +165,115 @@ inline std::array<__m512, 1> load_dequant_zp_only_int8<16>(
   vbs[0] = _mm512_sub_ps(vbs[0], vzps[0]);
   return vbs;
 }
+
+inline __m512i combine_m256i(__m256i a, __m256i b) {
+  __m512i c = _mm512_castsi256_si512(a);
+  return _mm512_inserti64x4(c, b, 1);
+}
+
+inline __m512i combine_m256i(std::array<__m256i, 2> two_256) {
+  return combine_m256i(two_256[0], two_256[1]);
+}
+
+inline std::array<__m256i, 2> load_zps_4vnni(int8_t* zps) {
+  // broadcast 01234567 to
+  // 01234567012345670123456701234567
+  __m256i vzps_low = _mm256_set1_epi64x(*reinterpret_cast<long*>(zps));
+  __m256i vzps_high = _mm256_set1_epi64x(*reinterpret_cast<long*>(zps+8));
+  // shuffle from
+  // 01234567012345670123456701234567
+  // to
+  // 00001111222233334444555566667777
+  __m256i shuffle_mask = _mm256_set_epi8(
+    7, 7, 7, 7,
+    6, 6, 6, 6,
+    5, 5, 5, 5,
+    4, 4, 4, 4,
+    3, 3, 3, 3,
+    2, 2, 2, 2,
+    1, 1, 1, 1,
+    0, 0, 0, 0
+  );
+  vzps_low = _mm256_shuffle_epi8(vzps_low, shuffle_mask);
+  vzps_high = _mm256_shuffle_epi8(vzps_high, shuffle_mask);
+  return {vzps_low, vzps_high};
+}
+
+inline std::array<__m256i, 2> load_int4_as_int8(uint8_t* qB) {
+  __m256i packed = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qB));
+  const __m256i low_mask = _mm256_set1_epi8(0x0f);
+  __m256i high = _mm256_srli_epi16(packed, 4);
+  high = _mm256_and_si256(high, low_mask);
+  __m256i low = _mm256_and_si256(packed, low_mask);
+  return {low, high};
+}
+
+#else
+inline std::array<__m256i, 2> load_zps_4vnni(int8_t* zps) {
+  TLA_ASSERT(false, "not implemented");
+  return std::array<__m256i, 2>();
+}
+
+inline std::array<__m256i, 2> load_int4_as_int8(uint8_t* qB) {
+  TLA_ASSERT(false, "not implemented");
+  return std::array<__m256i, 2>();
+}
+
 #endif
 
 #ifdef __AVX512FP16__
+template<>
+inline std::array<__m512h, 2> load_dequant_zp_only_int4<64>(
+  uint8_t* p, std::array<__m512h, 2> vzps, __m512h lut
+) {
+  using T = tpp::half;
+  using VA = VecArray<64, T>;
+  using VAT = typename VA::type;
+  constexpr long COLS = VA::num_vec;
+  auto packed = _mm256_loadu_si256((__m256i*)p);
+  __m512i int32[COLS];
+  {
+    auto low_4bit = _mm512_cvtepu8_epi16(packed);
+    auto high_4bit = _mm512_srli_epi16(low_4bit, 4);
+    int32[0] = low_4bit;
+    int32[1] = high_4bit;
+  }
+  VAT vbs;
+  compile_time_for<COLS>::op(
+    [&](auto idx) {
+      vbs[idx] = _mm512_permutexvar_ph(int32[idx], lut);
+      vbs[idx] = _mm512_sub_ph(vbs[idx], vzps[idx]);
+    }
+  );
+  return vbs;
+}
+
+template<>
+inline std::array<__m512h, 1> load_dequant_zp_only_int4<32>(
+  uint8_t* p, std::array<__m512h, 1> vzps, __m512h lut
+) {
+  using T = tpp::half;
+  using VA = VecArray<32, T>;
+  using VAT = typename VA::type;
+  constexpr long COLS = VA::num_vec;
+  auto packed = _mm_loadu_si128((__m128i*)p);
+  __m512i int32[COLS];
+  {
+    auto low_4bit = _mm256_cvtepu8_epi16(packed);
+    auto high_4bit = _mm256_srli_epi16(low_4bit, 4);
+    // combine low_4bit and high_4bit into __m512i
+    int32[0] = _mm512_inserti64x4(_mm512_castsi256_si512(low_4bit), high_4bit, 1);
+  }
+  VAT vbs;
+  compile_time_for<COLS>::op(
+    [&](auto idx) {
+      vbs[idx] = _mm512_permutexvar_ph(int32[idx], lut);
+      vbs[idx] = _mm512_sub_ph(vbs[idx], vzps[idx]);
+    }
+  );
+  return vbs;
+}
+
 template<>
 inline std::array<__m512h, 2> load_dequant_zp_only_int8<64>(uint8_t* p, std::array<__m512h, 2> vzps) {
   using T = tpp::half;
@@ -174,25 +359,26 @@ constexpr int get_n_group_size(int N) {
 // TODO(jgong5): move to tpp.h
 // TODO(jgong5): add pre/post op fusion
 template <
-  typename T, long M, long N, bool transA=false, bool ACC=false, long PREFETCH_K_DIST=0, typename Enabled=void
+  typename T, typename Tout, typename TScale, typename TZero, long M, long N, long ldb,
+  bool transA=false, bool ACC=false, long PREFETCH_K_DIST=0, typename Enabled=void
 >
 struct GemmMicroKernel {
   template <bool is_int4>
-  static inline void call(long K, T* A, long lda, uint8_t* B, long ldb, T* C, long ldc, T* scales, T* zps) {
+  static inline void call(long K, T* A, long lda, uint8_t* B, Tout* C, long ldc, TScale* scales, TZero* zps) {
     TLA_ASSERT(false, "Not implemented");
   }
 };
 
 template <
-  typename T, long M, long N, bool transA, bool ACC, long PREFETCH_K_DIST
+  typename T, long M, long N, long ldb, bool transA, bool ACC, long PREFETCH_K_DIST
 >
 struct GemmMicroKernel<
-  T, M, N, transA, ACC, PREFETCH_K_DIST,
+  T, T, T, T, M, N, ldb, transA, ACC, PREFETCH_K_DIST,
   typename std::enable_if_t<std::is_same<T, float>::value || std::is_same<T, half>::value>
 > {
   // TODO(jgong5): generalize this with pre/post op handlers
   template <bool is_int4>
-  static inline void call(long K, T* A, long lda, uint8_t* B, long ldb, T* C, long ldc, T* scales, T* zps) {
+  static inline void call(long K, T* A, long lda, uint8_t* B, T* C, long ldc, T* scales, T* zps) {
     #define INDEX(x, y, ld) ((x) * (ld) + (y))
     #define ADDRESS(p, x, y, ld) ((p) + (x) * (ld) + (y))
 
@@ -208,11 +394,13 @@ struct GemmMicroKernel<
     constexpr const int COLS = N / V::VLEN;
     constexpr const int CBLOCK = N_GROUP_SIZE / V::VLEN;
     constexpr const int CNBLOCKS = N / N_GROUP_SIZE;
-    VT va;
+    VT va[M];
     VArrayT vb[CNBLOCKS];
     VT vc[M * COLS];
     VArrayT vscales[CNBLOCKS];
     VArrayT vzps[CNBLOCKS];
+
+    VT lut = V::set_0_to_15();
 
     // Load scales and zps
     compile_time_for<CNBLOCKS>::op(
@@ -238,9 +426,9 @@ struct GemmMicroKernel<
 
       if constexpr (cbidx == 0) {
         if constexpr (transA) {
-          va = V::set1(*(ST*)ADDRESS(A, k, row, lda));
+          va[row] = V::set1(*(ST*)ADDRESS(A, k, row, lda));
         } else {
-          va = V::set1(*(ST*)ADDRESS(A, row, k, lda));
+          va[row] = V::set1(*(ST*)ADDRESS(A, row, k, lda));
         }
       }
 
@@ -248,20 +436,20 @@ struct GemmMicroKernel<
         constexpr const int col = cbidx * CBLOCK;
         if constexpr (scale_as_post_op) {
           if constexpr (is_int4) {
-            TLA_ASSERT(false, "Not implemented");
+            vb[cbidx] = load_dequant_zp_only_int4<N_GROUP_SIZE>(ADDRESS(B, k, col * V::VLEN / 2, ldb / 2), vzps[cbidx], lut);
           } else {
             vb[cbidx] = load_dequant_zp_only_int8<N_GROUP_SIZE>(ADDRESS(B, k, col * V::VLEN, ldb), vzps[cbidx]);
           }
         } else {
           if constexpr (is_int4) {
-            TLA_ASSERT(false, "Not implemented");
+            vb[cbidx] = load_dequant_int4<N_GROUP_SIZE, T>::call(ADDRESS(B, k, col * V::VLEN / 2, ldb / 2), vscales[cbidx], vzps[cbidx], lut);
           } else {
             vb[cbidx] = load_dequant_int8<N_GROUP_SIZE, T>::call(ADDRESS(B, k, col * V::VLEN, ldb), vscales[cbidx], vzps[cbidx]);
           }
         }
         if constexpr (PREFETCH_K_DIST > 0) {
           if constexpr (is_int4) {
-            TLA_ASSERT(false, "Not implemented");
+            _mm_prefetch(ADDRESS(B, k + PREFETCH_K_DIST, col * V::VLEN / 2, ldb / 2), _MM_HINT_T0);
           } else {
             _mm_prefetch(ADDRESS(B, k + PREFETCH_K_DIST, col * V::VLEN, ldb), _MM_HINT_T0);
           }
@@ -271,15 +459,14 @@ struct GemmMicroKernel<
       compile_time_for<CBLOCK>::op(
         [&](auto col) {
           constexpr const int idx = INDEX(row, INDEX(cbidx, col, CBLOCK), COLS);
-          vc[idx] = V::fmadd(va, vb[cbidx][col], vc[idx]);
+          vc[idx] = V::fmadd(va[row], vb[cbidx][col], vc[idx]);
         }
       );
 
     };
 
     // Accumulate along k
-    // Do not unroll for half since no performance benefit is observed
-    constexpr const int unroll = std::is_same<T, half>::value ? 1 : LOOP_K_UNROLL;
+    constexpr const int unroll = LOOP_K_UNROLL;
     int k = 0;
     for (; k < K / unroll; k++) {
       compile_time_for<unroll>::op(
@@ -314,14 +501,115 @@ struct GemmMicroKernel<
   }
 };
 
+#ifdef __AVX512VNNI__
+template <
+  long M, long N, long ldb, bool transA, bool ACC, long PREFETCH_K_DIST
+>
+struct GemmMicroKernel<
+  /*Tin*/uint8_t, /*Tout*/float, /*TScale*/float, /*TZero*/int8_t, M, N, ldb, transA, ACC, PREFETCH_K_DIST
+> {
+  template <bool is_int4>
+  static inline void call(
+    long K, uint8_t* A, long lda, uint8_t* B, float* C, long ldc,
+    float* scales, int8_t* zps, float scale_a, int32_t zp_a
+  ) {
+    auto pqB = GetVLAPtr<uint8_t>(B, {ldb, 2}); // [K/4,N,4] packed in 4-bit
+
+    static_assert(N % 16 == 0, "N must be a multiple of 16");
+    constexpr const int COLS = N / 16;
+
+    __m512i ones = _mm512_set1_epi8(1); // used for computing compensation
+    __m512i va;
+    __m512i vb[COLS];
+    __m512i vc[M * COLS];
+    __m512 vscales[COLS];
+    __m512i vzps[COLS];
+    __m512i vcompensate[COLS];
+
+    // Load scales and zps
+    compile_time_for<COLS>::op(
+      [&](auto i) {
+        vscales[i] = _mm512_loadu_ps(scales + i * 16);
+        // TODO(jgong5): should we use 512 or two 256 here?
+        vzps[i] = combine_m256i(load_zps_4vnni(zps + i * 16));
+        vcompensate[i] = _mm512_setzero_epi32();
+      }
+    );
+
+    compile_time_for<M * COLS>::op(
+      [&](auto i) { vc[i] = _mm512_setzero_epi32(); }
+    );
+
+    auto compute = [&](auto i, int k) {
+      constexpr const int row = i / COLS;
+      constexpr const int col = i % COLS;
+
+      if constexpr (col == 0) {
+        if constexpr (transA) {
+          va = _mm512_set1_epi32(*(int32_t*)ADDRESS(A, k, row, lda));
+        } else {
+          va = _mm512_set1_epi32(*(int32_t*)ADDRESS(A, row, k, lda));
+        }
+      }
+
+      if constexpr (row == 0) {
+        vb[col] = combine_m256i(load_int4_as_int8(pqB[k/4][col*16]));
+        vb[col] = _mm512_sub_epi8(vb[col], vzps[col]);
+        vcompensate[col] = _mm512_dpbusd_epi32(vcompensate[col], ones, vb[col]);
+        if constexpr (PREFETCH_K_DIST > 0) {
+          _mm_prefetch(pqB[(k + PREFETCH_K_DIST)/4][col*16], _MM_HINT_T0);
+        }
+      }
+
+      vc[i] = _mm512_dpbusd_epi32(vc[i], va, vb[col]);
+    };
+
+    // Accumulate along k
+    constexpr const int unroll = LOOP_K_UNROLL;
+    int k = 0;
+    for (; k < K / 4 / unroll; k++) {
+      compile_time_for<unroll>::op(
+        [&](auto i) {
+          compile_time_for<M * COLS>::op(compute, 4 * (k*unroll + i));
+        }
+      );
+    }
+    k *= 4 * unroll;
+    for (; k < K; k+=4) {
+      compile_time_for<M * COLS>::op(compute, k);
+    }
+
+    // Store to C
+    auto store = [&](auto i) {
+      constexpr const int row = i / COLS;
+      constexpr const int col = i % COLS;
+      // compute (qC - compensate * zp_a) * scale_a * scale_b
+      // where compensate = sum(qB)
+      vc[i] = _mm512_sub_epi32(
+        vc[i], _mm512_mullo_epi32(vcompensate[col], _mm512_set1_epi32(zp_a))
+      );
+      __m512 vc_float = _mm512_cvtepi32_ps(vc[i]);
+      vc_float = _mm512_mul_ps(vc_float, _mm512_set1_ps(scale_a));
+      vc_float = _mm512_mul_ps(vc_float, vscales[col]);
+      if constexpr (ACC) {
+        auto vc_old = _mm512_loadu_ps(C + row * ldc + col * 16);
+        vc_float = _mm512_add_ps(vc_float, vc_old);
+      }
+      _mm512_storeu_ps(C + row * ldc + col * 16, vc_float);
+    };
+    compile_time_for<M * COLS>::op(store);
+  }
+};
+#endif
+
 // a dequant function the requires N to be a multiple of N_GROUP_SIZE
 template <
-  typename Tin, long N_GROUP_SIZE, bool is_int4
+  typename Tin, long ldb, long N_GROUP_SIZE, bool is_int4
 >
 struct dequant_n_grouped {
   template <typename Lambda1, typename Lambda2, typename Lambda3>
   static inline void call(
-    uint8_t* qB, long K, long N, long ldb, Tin* scales, Tin* zps, Tin* B,
+    uint8_t* qB, long K, long N, Tin* scales, Tin* zps, Tin* B,
     const Lambda1& load_qparam,
     const Lambda2& load_qint_as_fp,
     const Lambda3& store
@@ -342,12 +630,12 @@ struct dequant_n_grouped {
 
 #ifdef __AVX512F__
 template <
-  long N_GROUP_SIZE, bool is_int4
+  long ldb, long N_GROUP_SIZE, bool is_int4
 >
-struct dequant_n_grouped<bfloat16, N_GROUP_SIZE, is_int4> {
+struct dequant_n_grouped<bfloat16, ldb, N_GROUP_SIZE, is_int4> {
   template <typename Lambda1, typename Lambda2, typename Lambda3>
   static inline void call(
-    uint8_t* qB, long K, long N, long ldb, bfloat16* scales, bfloat16* zps, bfloat16* B,
+    uint8_t* qB, long K, long N, bfloat16* scales, bfloat16* zps, bfloat16* B,
     const Lambda1& load_qparam,
     const Lambda2& load_qint_as_fp,
     const Lambda3& store
@@ -400,30 +688,31 @@ struct dequant_n_grouped<bfloat16, N_GROUP_SIZE, is_int4> {
 };
 #endif
 
-template<typename Tin, long N_GROUP_SIZE, bool is_int4>
+template<typename Tin, long ldb, long N_GROUP_SIZE, bool is_int4>
 struct Dequantize {
-  static void call(uint8_t* qB, long K, long N, long ldb, Tin* scales, Tin* zps, Tin* B);
+  static void call(uint8_t* qB, long K, long N, Tin* scales, Tin* zps, Tin* B);
 };
 
-template<long N_GROUP_SIZE, bool is_int4>
-struct Dequantize<float, N_GROUP_SIZE, is_int4> {
-  static inline void call(uint8_t* qB, long K, long N, long ldb, float* scales, float* zps, float* B) {
+template<long ldb, long N_GROUP_SIZE, bool is_int4>
+struct Dequantize<float, ldb, N_GROUP_SIZE, is_int4> {
+  static inline void call(uint8_t* qB, long K, long N, float* scales, float* zps, float* B) {
 #if defined(__AVX512F__)
     using T = float;
     using VA = VecArray<N_GROUP_SIZE, T>;
     constexpr int VLEN = VA::vec_ops::VLEN;
     constexpr long COLS = VA::num_vec;
 
-    dequant_n_grouped<float, N_GROUP_SIZE, is_int4>::call(
-      qB, K, N, ldb, scales, zps, B,
+    __m512 lut = _mm512_set_ps(
+      15.0f, 14.0f, 13.0f, 12.0f, 11.0f, 10.0f, 9.0f, 8.0f, 7.0f, 6.0f, 5.0f, 4.0f, 3.0f, 2.0f, 1.0f, 0.0f
+    );
+    dequant_n_grouped<float, ldb, N_GROUP_SIZE, is_int4>::call(
+      qB, K, N, scales, zps, B,
       [&](float* p) {
         return VA::load1d(p);
       },
       [&](uint8_t* p, auto vscales, auto vzps) {
         if constexpr (is_int4) {
-          TLA_ASSERT(false, "Not implemented");
-          // For type induction
-          return load_dequant_int8<N_GROUP_SIZE, T>::call(p, vscales, vzps);
+          return load_dequant_int4<N_GROUP_SIZE, T>::call(p, vscales, vzps, lut);
         } else {
           return load_dequant_int8<N_GROUP_SIZE, T>::call(p, vscales, vzps);
         }
@@ -442,24 +731,28 @@ struct Dequantize<float, N_GROUP_SIZE, is_int4> {
   }
 };
 
-template<long N_GROUP_SIZE, bool is_int4>
-struct Dequantize<bfloat16, N_GROUP_SIZE, is_int4> {
-  static inline void call(uint8_t* qB, long K, long N, long ldb, bfloat16* scales, bfloat16* zps, bfloat16* B) {
+template<long ldb, long N_GROUP_SIZE, bool is_int4>
+struct Dequantize<bfloat16, ldb, N_GROUP_SIZE, is_int4> {
+  static inline void call(uint8_t* qB, long K, long N, bfloat16* scales, bfloat16* zps, bfloat16* B) {
 #ifdef __AVX512F__
     using T = bfloat16;
     using VA = VecArray<N_GROUP_SIZE, T>;
     constexpr long COLS = VA::num_vec;
 
-    dequant_n_grouped<bfloat16, N_GROUP_SIZE, is_int4>::call(
-      qB, K, N, ldb, scales, zps, B,
+    // lookup table converting uint8 to float, 15.0f - 0.0f
+    // _mm512_permutexvar_ph needs 5 bits while we only need 4 bits, init the table
+    // to honor the lower 4 bits regardless of the the highest bit, thus saving an "and" op
+     __m512 lut = _mm512_set_ps(
+      15.0f, 14.0f, 13.0f, 12.0f, 11.0f, 10.0f, 9.0f, 8.0f, 7.0f, 6.0f, 5.0f, 4.0f, 3.0f, 2.0f, 1.0f, 0.0f
+    );
+    dequant_n_grouped<bfloat16, ldb, N_GROUP_SIZE, is_int4>::call(
+      qB, K, N, scales, zps, B,
       [&](bfloat16* p) {
         return VA::load1d(p);
       },
       [&](uint8_t* p, auto vscales, auto vzps) {
         if constexpr (is_int4) {
-          TLA_ASSERT(false, "Not implemented");
-          // For type induction
-          return load_dequant_int8<N_GROUP_SIZE, float>::call(p, vscales, vzps);
+          return load_dequant_int4<N_GROUP_SIZE, float>::call(p, vscales, vzps, lut);
         } else {
           return load_dequant_int8<N_GROUP_SIZE, float>::call(p, vscales, vzps);
         }
@@ -478,25 +771,30 @@ struct Dequantize<bfloat16, N_GROUP_SIZE, is_int4> {
   }
 };
 
-template<long N_GROUP_SIZE, bool is_int4>
-struct Dequantize<half, N_GROUP_SIZE, is_int4> {
-  static inline void call(uint8_t* qB, long K, long N, long ldb, half* scales, half* zps, half* B) {
+template<long ldb, long N_GROUP_SIZE, bool is_int4>
+struct Dequantize<half, ldb, N_GROUP_SIZE, is_int4> {
+  static inline void call(uint8_t* qB, long K, long N, half* scales, half* zps, half* B) {
 #ifdef __AVX512FP16__
     using T = half;
     using VA = VecArray<N_GROUP_SIZE, T>;
     constexpr int VLEN = VA::vec_ops::VLEN;
     constexpr long COLS = VA::num_vec;
 
-    dequant_n_grouped<half, N_GROUP_SIZE, is_int4>::call(
-      qB, K, N, ldb, scales, zps, B,
+    // lookup table converting uint8 to float, 15.0f - 0.0f
+    // _mm512_permutexvar_ph needs 5 bits while we only need 4 bits, init the table
+    // to honor the lower 4 bits regardless of the the highest bit, thus saving an "and" op
+    __m512h lut = _mm512_set_ph(
+      15.0, 14.0, 13.0, 12.0, 11.0, 10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0, 0.0,
+      15.0, 14.0, 13.0, 12.0, 11.0, 10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0, 0.0
+    );
+    dequant_n_grouped<half, ldb, N_GROUP_SIZE, is_int4>::call(
+      qB, K, N, scales, zps, B,
       [&](half* p) {
         return VA::load1d(p);
       },
       [&](uint8_t* p, auto vscales, auto vzps) {
         if constexpr (is_int4) {
-          TLA_ASSERT(false, "Not implemented");
-          // For type induction
-          return load_dequant_int8<N_GROUP_SIZE, T>::call(p, vscales, vzps);
+          return load_dequant_int4<N_GROUP_SIZE, T>::call(p, vscales, vzps, lut);
         } else {
           return load_dequant_int8<N_GROUP_SIZE, T>::call(p, vscales, vzps);
         }
@@ -515,24 +813,86 @@ struct Dequantize<half, N_GROUP_SIZE, is_int4> {
   }
 };
 
+template<long ldb>
+struct Dequantize<int8_t, ldb, /*N_GROUP_SIZE*/16, /*is_int4*/true> {
+  static inline void call(uint8_t* qB, long K, long N, int8_t* zps, int8_t* B, int32_t* compensation) {
+#ifdef __AVX512VNNI__
+    auto pqB = GetVLAPtr<uint8_t>(qB, {ldb, 2}); // [K/4,N,4] packed in 4-bit
+    auto pB = GetVLAPtr<int8_t>(B, {ldb, 4}); // [K/4,N,4]
+    __m256i ones = _mm256_set1_epi8(1);
+    for (int n = 0; n < N; n+=16) {
+      auto [vzps_low, vzps_high] = load_zps_4vnni(&zps[n]);
+      __m256i vcompensate[2];
+      vcompensate[0] = _mm256_setzero_si256();
+      vcompensate[1] = _mm256_setzero_si256();
+      // TODO(jgong5): unroll k?
+      for (int k = 0; k < K/4; k++) {
+        // TODO(jgong5): consider optimize the instruction sequence below, e.g, use avx512?
+        // load 64 (N:16, K:4) int4 values from qB
+        auto [low, high] = load_int4_as_int8(pqB[k][n]);
+        high = _mm256_sub_epi8(high, vzps_high);
+        low = _mm256_sub_epi8(low, vzps_low);
+        vcompensate[0] = _mm256_dpbusd_epi32(vcompensate[0], ones, low);
+        vcompensate[1] = _mm256_dpbusd_epi32(vcompensate[1], ones, high);
+        // store vb to B
+        _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(pB[k][n]), low);
+        _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(pB[k][n+8]), high);
+      }
+      _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(&compensation[n]), vcompensate[0]);
+      _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(&compensation[n+8]), vcompensate[1]);
+    }
+#else
+    TLA_ASSERT(false, "not implemented");
+#endif
+  }
+};
+
 // TODO(jgong5): move to tpp.h
 template <
-  typename Tin, typename Tout,
-  long BLOCK_M, long N, bool transA, bool ACC, bool is_int4, long PREFETCH_K_DIST=0>
+  typename Tin, typename Tout, typename TScale, typename TZero,
+  long BLOCK_M, long N, long ldb, bool transA, bool ACC, bool is_int4, long PREFETCH_K_DIST=0>
 class DequantGemmTPP {
 public:
   DequantGemmTPP(
       long M,
       long K,
       long lda,
-      long ldb,
+      long ldc
+  ) {
+    TLA_ASSERT(false, "not implemented");
+  }
+
+  void operator()(Tin* A, uint8_t* qB, TScale* scales, TZero* zps, Tout* C, bool no_tile_cfg = true, float scale_a = 1.0, int32_t zp_a = 0) {
+    TLA_ASSERT(false, "not implemented");
+  }
+
+  void config() {
+    TLA_ASSERT(false, "not implemented");
+  }
+
+  void release() {
+    TLA_ASSERT(false, "not implemented");
+  }
+};
+
+template <
+  typename Tin, typename Tout,
+  long BLOCK_M, long N, long ldb, bool transA, bool ACC, bool is_int4, long PREFETCH_K_DIST>
+class DequantGemmTPP<
+  Tin, Tout, Tin, Tin,
+  BLOCK_M, N, ldb, transA, ACC, is_int4, PREFETCH_K_DIST
+> {
+public:
+  DequantGemmTPP(
+      long M,
+      long K,
+      long lda,
       long ldc
   )
   :
   M(M),
   K(K),
   lda(lda),
-  ldb(ldb),
   ldc(ldc) {
     static_assert(
       N % 16 == 0,
@@ -544,7 +904,7 @@ public:
     );
   }
 
-  void operator()(Tin* A, uint8_t* qB, Tin* scales, Tin* zps, Tout* C) {
+  inline void operator()(Tin* A, uint8_t* qB, Tin* scales, Tin* zps, Tout* C, bool no_tile_cfg = true, float scale_a = 1.0, int32_t zp_a = 0) {
     if (
       M < SMALL_BATCH_THRESHOLD &&
       (
@@ -554,14 +914,23 @@ public:
     ) {
       for (long m = 0; m < M; m += BLOCK_M) {
         long block_m = std::min(M - m, BLOCK_M);
-        range_dispatcher<long, 1, BLOCK_M>::call(block_m,
+        enumerate_dispatcher<long, 4, BLOCK_M>::call(block_m,
           [&](auto i) {
-            GemmMicroKernel<Tin, i, N, transA, ACC, PREFETCH_K_DIST>::template call<is_int4>(
-              K, transA ? (Tin*)A + m : (Tin*)A + m*lda, lda, qB, ldb, (Tin*)C + m*ldc, ldc, scales, zps
+            GemmMicroKernel<Tin, Tin, Tin, Tin, i, N, ldb, transA, ACC, PREFETCH_K_DIST>::template call<is_int4>(
+              K, transA ? (Tin*)A + m : (Tin*)A + m*lda, lda, qB, (Tin*)C + m*ldc, ldc, scales, zps
             );
           },
           [&](auto i) {
-            failing_fallback();
+            range_dispatcher<long, 1, BLOCK_M-1>::call(i,
+              [&](auto j) {
+                GemmMicroKernel<Tin, Tin, Tin, Tin, j, N, ldb, transA, ACC, PREFETCH_K_DIST>::template call<is_int4>(
+                  K, transA ? (Tin*)A + m : (Tin*)A + m*lda, lda, qB, (Tin*)C + m*ldc, ldc, scales, zps
+                );
+              },
+              [&](auto j) {
+                failing_fallback();
+              }
+            );
           }
         );
       }
@@ -569,8 +938,8 @@ public:
       constexpr const int N_GROUP_SIZE = get_n_group_size(N);
       Tin B[K][N];
       // TODO(jgong5): add prefetch
-      Dequantize<Tin, N_GROUP_SIZE, is_int4>::call(qB, K, N, ldb, scales, zps, B[0]);
-      (*pgemm)(A, B[0], C, 1);
+      Dequantize<Tin, ldb, N_GROUP_SIZE, is_int4>::call(qB, K, N, scales, zps, B[0]);
+      (*pgemm)(A, B[0], C, 1, no_tile_cfg);
     }
   }
 
@@ -586,39 +955,152 @@ public:
     }
   }
 
- private:
+private:
   std::shared_ptr<BrgemmTPP<Tin, Tout>> pgemm;
   long M;
   long K;
   long lda;
-  long ldb;
   long ldc;
 };
 
+template <
+  long BLOCK_M, long N, long ldb, bool transA, bool ACC, long PREFETCH_K_DIST>
+class DequantGemmTPP<
+  /*Tin*/uint8_t, /*Tout*/float, /*TScale*/float, /*TZero*/int8_t,
+  BLOCK_M, N, ldb, transA, ACC, /*is_int4*/true, PREFETCH_K_DIST
+> {
+using TBrgemmTPP = BrgemmTPP<int8_t, int32_t>;
+
+public:
+  DequantGemmTPP(
+      long M,
+      long K,
+      long lda,
+      long ldc
+  )
+  :
+  M(M),
+  K(K),
+  lda(lda),
+  ldc(ldc) {
+    static_assert(
+      N % 16 == 0,
+      "N must be a multiple of 16"
+    );
+    TLA_ASSERT(K % 4 == 0, "Kb must be a multiple of 4 for int8 VNNI");
+    // TODO(jgong5): output fp32 directly
+    pgemm = std::make_shared<TBrgemmTPP>(
+      M, N, K, 1, 1, lda, N, N, /*ACC*/0, /*transA*/false, 1, /*b_vnni*/true
+    );
+  }
+
+  inline void operator()(uint8_t* A, uint8_t* qB, float* scales, int8_t* zps, float* C, bool no_tile_cfg = true, float scale_a = 1.0, int32_t zp_a = 0) {
+    auto qA = GetVLAPtr<uint8_t>(A, {lda});
+#ifdef __AVX512VNNI__
+    if (M < SMALL_BATCH_THRESHOLD) {
+      constexpr long PREFERRED_BLOCK_M = BLOCK_M * N / 16 >= 16 ? BLOCK_M / 2: BLOCK_M;
+      for (long m = 0; m < M; m += PREFERRED_BLOCK_M) {
+        long block_m = std::min(M - m, PREFERRED_BLOCK_M);
+        enumerate_dispatcher<long, 4, PREFERRED_BLOCK_M>::call(block_m,
+          [&](auto i) {
+            GemmMicroKernel<
+              /*Tin*/uint8_t, /*Tout*/float, /*TScale*/float, /*TZero*/int8_t, /*M*/i, N, ldb,
+              /*transA*/false, ACC, PREFETCH_K_DIST
+            >::template call<true>(
+              K, qA[m], lda, qB, C + m*ldc, ldc, scales, zps, scale_a, zp_a
+            );
+          },
+          [&](auto i) {
+            range_dispatcher<long, 1, PREFERRED_BLOCK_M-1>::call(i,
+              [&](auto j) {
+                GemmMicroKernel<
+                  /*Tin*/uint8_t, /*Tout*/float, /*TScale*/float, /*TZero*/int8_t, /*M*/j, N, ldb,
+                  /*transA*/false, ACC, PREFETCH_K_DIST
+                >::template call<true>(
+                  K, qA[m], lda, qB, C + m*ldc, ldc, scales, zps, scale_a, zp_a
+                );
+              },
+              [&](auto j) {
+                failing_fallback();
+              }
+            );
+          }
+        );
+      }
+    } else
+#endif
+    {
+      constexpr const int N_GROUP_SIZE = 16;
+      int8_t B[K/4][N][4];
+      int32_t qC[M][N];
+      int32_t compensation[N];
+      // TODO(jgong5): add prefetch
+      Dequantize<int8_t, ldb, N_GROUP_SIZE, /*is_int4*/true>::call(qB, K, N, zps, B[0][0], compensation);
+      (*pgemm)((int8_t*)qA[0], B[0][0], qC[0], 1, no_tile_cfg);
+      // post-op and convert back to C
+      for (long m = 0; m < M; ++m) {
+        #pragma omp simd
+        for (long n = 0; n < N; ++n) {
+          float c = (qC[m][n] - compensation[n] * zp_a) * scale_a * scales[n];
+          if constexpr (ACC) {
+            C[m*ldc + n] += c;
+          } else {
+            C[m*ldc + n] = c;
+          }
+        }
+      }
+    }
+  }
+
+  void config() {
+    if (pgemm) {
+      pgemm->config();
+    }
+  }
+
+  void release() {
+    if (pgemm) {
+      pgemm->release();
+    }
+  }
+
+private:
+  std::shared_ptr<TBrgemmTPP> pgemm;
+  long M;
+  long K;
+  long lda;
+  long ldc;
+};
+
+#define FUSE_GELU 1
+#define FUSE_ADD 2
+#define FUSE_ADD_ADD 3
+
 // If T != TComp
-//   T -> TComp -> GEMM -> TComp -> bias/PostOp -> T
+//   T -> TComp -> GEMM -> TComp -> bias/PostOp -> Tout
 // If T == TComp (we can save intermediate output buffer and schedule M/N/K loops together)
-//   T -> GEMM -> T -> bias/PostOp -> T
-template <typename T, typename TComp, typename TGemmOut>
+//   T -> GEMM -> T -> bias/PostOp -> Tout
+template <typename T, typename TComp, typename TGemmOut, typename Tout, typename TScale, typename TZero>
 void qlinear_woq_affine_impl(
-    const at::Tensor& x,
-    const at::Tensor& qw_packed,
-    const at::Tensor& scales, // dtype is TComp
-    const at::Tensor& zps, // dtype is TComp
-    const at::Tensor& b, // dtype is TComp
-    at::Tensor y,
-    int k_splits,
-    int num_concats) {
-  TLA_ASSERT(
-    qw_packed.scalar_type() == at::kQUInt4x2 || qw_packed.scalar_type() == at::kQInt8,
-    "qlinear_woq_affine only supports qint8 and quint4x2 quantized weight"
-  );
-  auto is_int4 = qw_packed.scalar_type() == at::kQUInt4x2;
+  const at::Tensor& x,
+  const at::Tensor& qw_packed,
+  const at::Tensor& scales, // dtype is TComp
+  const at::Tensor& zps, // dtype is TComp
+  const at::Tensor& b, // dtype is TComp
+  at::Tensor y,
+  bool is_int4,
+  int k_splits,
+  int num_concats,
+  int fusion_type,
+  const TensorList& others_list,
+  float scale_a = 1.0f,
+  int32_t zp_a = 0
+) {
   auto x_sizes = x.sizes();
   auto w_sizes = qw_packed.sizes();
   auto M = x_sizes[0];
   auto Nc = w_sizes[0];
-  auto Nb = w_sizes[3];
+  auto Nb = is_int4 ? w_sizes[3] * 2 : w_sizes[3];
   auto Kc = w_sizes[1];
   auto Kb = w_sizes[2];
   auto N = Nc * Nb;
@@ -646,21 +1128,28 @@ void qlinear_woq_affine_impl(
     k_splits = 1;
   }
   TLA_ASSERT(Kc % k_splits == 0, "Kc must be a multiple of k_splits");
+  TLA_ASSERT(!(std::is_same<T, uint8_t>()) || (std::is_same<T, TComp>()), "T must be TComp if T is uint8_t");
 
-  auto compute_type = c10::CppTypeToScalarType<TComp>::value;
+  bool no_x_buf = std::is_same<T, TComp>();
+  bool no_y_buf = std::is_same<T, TComp>() && std::is_same<Tout, TGemmOut>() && k_splits == 1;
 
-  bool no_y_buf = std::is_same<T, TComp>() && std::is_same<T, TGemmOut>() && k_splits == 1;
-
+  auto lda = no_x_buf ? K : Kb;
   auto ldy = num_concats <= 1 ? N : Nc/num_concats * Nb;
   auto ldc = (no_y_buf || k_splits > 1) ? ldy : Nb;
 
   auto px = GetVLAPtr<T>(x, {Kc,Kb});
   auto pw = GetVLAPtr<uint8_t>((uint8_t*)qw_packed.data_ptr(), {Kc, Kb * (is_int4 ? Nb/2 : Nb)});
-  auto py = GetVLAPtr<T>(y, {Nc,Nb}); /*[M, Nc, Nb]*/
-  auto py_concat = GetVLAPtr<T>(y, {M,Nc/num_concats,Nb}); /*[num_concats, M, Nc/num_concats, Nb]*/
-  auto pscales = GetVLAPtr<TComp>(scales, {Nb});
-  auto pzps = GetVLAPtr<TComp>(zps, {Nb});
+  auto py = GetVLAPtr<Tout>(y, {Nc,Nb}); /*[M, Nc, Nb]*/
+  auto py_concat = GetVLAPtr<Tout>(y, {M,Nc/num_concats,Nb}); /*[num_concats, M, Nc/num_concats, Nb]*/
+  auto pscales = GetVLAPtr<TScale>(scales, {Nb});
+  auto pzps = GetVLAPtr<TZero>(zps, {Nb});
   auto pb = GetVLAPtr<TGemmOut>(b, {Nb});
+  auto tin0 = others_list.size() > 0 ? others_list[0] : at::Tensor{};
+  auto pin0 = GetVLAPtr<Tout>(tin0, {Nc,Nb}); /*[M, Nc, Nb]*/
+  auto pin0_concat = GetVLAPtr<Tout>(tin0, {M,Nc/num_concats,Nb}); /*[num_concats, M, Nc/num_concats, Nb]*/
+  auto tin1 = others_list.size() > 1 ? others_list[1] : at::Tensor{};
+  auto pin1 = GetVLAPtr<Tout>(tin1, {Nc,Nb}); /*[M, Nc, Nb]*/
+  auto pin1_concat = GetVLAPtr<Tout>(tin1, {M,Nc/num_concats,Nb}); /*[num_concats, M, Nc/num_concats, Nb]*/
 
   auto copy_bias_out_tpp = CpyBiasTPP<TGemmOut>(BLOCK_M, Nb, ldy);
   auto copy_bias_buf_tpp = CpyBiasTPP<TGemmOut>(BLOCK_M, Nb, Nb);
@@ -670,12 +1159,42 @@ void qlinear_woq_affine_impl(
   auto zero_buf_tpp = SetZeroTPP<TGemmOut>(BLOCK_M, Nb, Nb);
   auto zero_out_rem_tpp = SetZeroTPP<TGemmOut>(BLOCK_M_rem, Nb, ldy);
   auto zero_buf_rem_tpp = SetZeroTPP<TGemmOut>(BLOCK_M_rem, Nb, Nb);
+  auto gelu_fwd_tpp = GeluFwdTPP<Tout>(BLOCK_M, Nb, ldy, ldy);
+  auto gelu_fwd_rem_tpp = GeluFwdTPP<Tout>(BLOCK_M_rem, Nb, ldy, ldy);
+  auto add_tpp = AddTPP<Tout>(BLOCK_M, Nb, ldy, ldy);
+  auto add_rem_tpp = AddTPP<Tout>(BLOCK_M_rem, Nb, ldy, ldy);
+  auto post_ops_fn = [&](int m, int nc){
+    Tout* y_ptr = num_concats <= 1 ? (Tout*)py[m][nc] : (Tout*)py_concat[nc/(Nc/num_concats)][m][nc%(Nc/num_concats)];
+    Tout* tin0_ptr = fusion_type > 1 ? num_concats <= 1 ? (Tout*)pin0[m][nc] : (Tout*)pin0_concat[nc/(Nc/num_concats)][m][nc%(Nc/num_concats)] : nullptr;
+    Tout* tin1_ptr = fusion_type > 2 ? num_concats <= 1 ? (Tout*)pin1[m][nc] : (Tout*)pin1_concat[nc/(Nc/num_concats)][m][nc%(Nc/num_concats)] : nullptr;
+    if (fusion_type == FUSE_GELU) {
+      gelu_fwd_tpp(y_ptr, y_ptr);
+    } else if (fusion_type == FUSE_ADD) {
+      add_tpp(y_ptr, tin0_ptr, y_ptr);
+    } else if (fusion_type == FUSE_ADD_ADD) {
+      add_tpp(y_ptr, tin0_ptr, y_ptr);
+      add_tpp(y_ptr, tin1_ptr, y_ptr);
+    }
+  };
+  auto post_ops_rem_fn = [&](int m, int nc){
+    Tout* y_ptr = num_concats <= 1 ? (Tout*)py[m][nc] : (Tout*)py_concat[nc/(Nc/num_concats)][m][nc%(Nc/num_concats)];
+    Tout* tin0_ptr = fusion_type > 1 ? num_concats <= 1 ? (Tout*)pin0[m][nc] : (Tout*)pin0_concat[nc/(Nc/num_concats)][m][nc%(Nc/num_concats)] : nullptr;
+    Tout* tin1_ptr = fusion_type > 2 ? num_concats <= 1 ? (Tout*)pin1[m][nc] : (Tout*)pin1_concat[nc/(Nc/num_concats)][m][nc%(Nc/num_concats)] : nullptr;
+    if (fusion_type == FUSE_GELU) {
+      gelu_fwd_rem_tpp(y_ptr, y_ptr);
+    } else if (fusion_type == FUSE_ADD) {
+      add_rem_tpp(y_ptr, tin0_ptr, y_ptr);
+    } else if (fusion_type == FUSE_ADD_ADD) {
+      add_rem_tpp(y_ptr, tin0_ptr, y_ptr);
+      add_rem_tpp(y_ptr, tin1_ptr, y_ptr);
+    }
+  };
 
-  constexpr long MICRO_BLOCK_M = 4;
+  constexpr long MICRO_BLOCK_M = 8;
   product_dispatcher<
     std::tuple</*BLOCK_N*/long, /*is_int4*/bool>,
     std::tuple<
-      enumerate_dispatcher<long, 16, 32, 64, 128, 256>,
+      enumerate_dispatcher<long, 16, 32, 64, 128>,
       boolean_dispatcher
     >
   >::call(
@@ -685,39 +1204,35 @@ void qlinear_woq_affine_impl(
       auto is_int4 = std::get<1>(tuple);
       // TODO(jgong5): design API to avoid duplicate code of defining similar kernel object
       auto dequant_gemm_tpp = DequantGemmTPP<
-        TComp, TGemmOut, MICRO_BLOCK_M, BLOCK_N, /*transA*/false, /*ACC*/true, is_int4, PREFETCH_K_DIST>(
+        TComp, TGemmOut, TScale, TZero, MICRO_BLOCK_M, BLOCK_N, /*ldb*/BLOCK_N, /*transA*/false, /*ACC*/true, is_int4, PREFETCH_K_DIST>(
         /*M*/BLOCK_M, /*K*/Kb,
-        /*lda*/no_y_buf ? K : Kb,
-        /*ldb*/Nb,
+        /*lda*/lda,
         /*ldc*/ldc
       );
       auto dequant_gemm_no_prefetch_tpp = DequantGemmTPP<
-        TComp, TGemmOut, MICRO_BLOCK_M, BLOCK_N, /*transA*/false, /*ACC*/true, is_int4, 0>(
+        TComp, TGemmOut, TScale, TZero, MICRO_BLOCK_M, BLOCK_N, /*ldb*/BLOCK_N, /*transA*/false, /*ACC*/true, is_int4, 0>(
         /*M*/BLOCK_M, /*K*/Kb,
-        /*lda*/no_y_buf ? K : Kb,
-        /*ldb*/Nb,
+        /*lda*/lda,
         /*ldc*/ldc
       );
       auto dequant_gemm_rem_tpp = DequantGemmTPP<
-        TComp, TGemmOut, MICRO_BLOCK_M, BLOCK_N, /*transA*/false, /*ACC*/true, is_int4, PREFETCH_K_DIST>(
+        TComp, TGemmOut, TScale, TZero, MICRO_BLOCK_M, BLOCK_N, /*ldb*/BLOCK_N, /*transA*/false, /*ACC*/true, is_int4, PREFETCH_K_DIST>(
         /*M*/BLOCK_M_rem, /*K*/Kb,
-        /*lda*/no_y_buf ? K : Kb,
-        /*ldb*/Nb,
+        /*lda*/lda,
         /*ldc*/ldc
       );
       auto dequant_gemm_no_prefetch_rem_tpp = DequantGemmTPP<
-        TComp, TGemmOut, MICRO_BLOCK_M, BLOCK_N, /*transA*/false, /*ACC*/true, is_int4, 0>(
+        TComp, TGemmOut, TScale, TZero, MICRO_BLOCK_M, BLOCK_N, /*ldb*/BLOCK_N, /*transA*/false, /*ACC*/true, is_int4, 0>(
         /*M*/BLOCK_M_rem, /*K*/Kb,
-        /*lda*/no_y_buf ? K : Kb,
-        /*ldb*/Nb,
+        /*lda*/lda,
         /*ldc*/ldc
       );
 
-      auto cvt_x_tpp = ConvertTPP<T, TComp>(BLOCK_M, Kb, K, Kb);
-      auto cvt_x_rem_tpp = ConvertTPP<T, TComp>(BLOCK_M_rem, Kb, K, Kb);
-      auto cvt_y_tpp = ConvertTPP<TGemmOut, T>(BLOCK_M, Nb, Nb, ldy);
-      auto cvt_y_rem_tpp = ConvertTPP<TGemmOut, T>(BLOCK_M_rem, Nb, Nb, ldy);
-      auto cvt_y_private_tpp = ConvertTPP<TGemmOut, T>(BLOCK_M, Nb, N, N);
+      auto pcvt_x_tpp = std::is_same<T, uint8_t>() ? nullptr : std::make_shared<ConvertTPP<T, TComp>>(BLOCK_M, Kb, K, Kb);
+      auto pcvt_x_rem_tpp = std::is_same<T, uint8_t>() ? nullptr : std::make_shared<ConvertTPP<T, TComp>>(BLOCK_M_rem, Kb, K, Kb);
+      auto cvt_y_tpp = ConvertTPP<TGemmOut, Tout>(BLOCK_M, Nb, Nb, ldy);
+      auto cvt_y_rem_tpp = ConvertTPP<TGemmOut, Tout>(BLOCK_M_rem, Nb, Nb, ldy);
+      auto cvt_y_private_tpp = ConvertTPP<TGemmOut, Tout>(BLOCK_M, Nb, N, N);
       auto add_y_tpp = BinaryTPP(
         BLOCK_M, /*row*/
         Nb, /*col*/
@@ -725,8 +1240,8 @@ void qlinear_woq_affine_impl(
         N, /*ldi1*/
         N, /*ldo*/
         XsmmDtype<TGemmOut>(), /*dt_in0*/
-        XsmmDtype<T>(), /*dt_in1*/
-        XsmmDtype<T>(), /*dt_out*/
+        XsmmDtype<Tout>(), /*dt_in1*/
+        XsmmDtype<Tout>(), /*dt_out*/
         XsmmDtype<float>(), /*dt_compute*/
         LIBXSMM_MELTW_FLAG_BINARY_NONE,
         LIBXSMM_MELTW_TYPE_BINARY_ADD
@@ -753,9 +1268,12 @@ void qlinear_woq_affine_impl(
               }
               TComp* x_ptr = (TComp*)px[m][kc];
               if (kc < Kc - 1) {
-                dequant_gemm_tpp(x_ptr, pw[nc][kc], pscales[nc], pzps[nc], y_ptr);
+                dequant_gemm_tpp(x_ptr, pw[nc][kc], pscales[nc], pzps[nc], y_ptr, true, scale_a, zp_a);
               } else {
-                dequant_gemm_no_prefetch_tpp(x_ptr, pw[nc][kc], pscales[nc], pzps[nc], y_ptr);
+                dequant_gemm_no_prefetch_tpp(x_ptr, pw[nc][kc], pscales[nc], pzps[nc], y_ptr, true, scale_a, zp_a);
+                if (fusion_type > 0) {
+                  post_ops_fn(m, nc);
+                }
               }
             } else {
               if (kc == 0) {
@@ -767,9 +1285,14 @@ void qlinear_woq_affine_impl(
               }
               TComp* x_ptr = (TComp*)px[m][kc];
               if (kc < Kc - 1) {
-                dequant_gemm_rem_tpp(x_ptr, pw[nc][kc], pscales[nc], pzps[nc], y_ptr);
+                dequant_gemm_rem_tpp(x_ptr, pw[nc][kc], pscales[nc], pzps[nc], y_ptr, false, scale_a, zp_a);
+                dequant_gemm_tpp.config();                
               } else {
-                dequant_gemm_no_prefetch_rem_tpp(x_ptr, pw[nc][kc], pscales[nc], pzps[nc], y_ptr);
+                dequant_gemm_no_prefetch_rem_tpp(x_ptr, pw[nc][kc], pscales[nc], pzps[nc], y_ptr, false, scale_a, zp_a);
+                dequant_gemm_no_prefetch_tpp.config();              
+                if (fusion_type > 0) {
+                  post_ops_rem_fn(m, nc);
+                }
               }
             }
             // TODO(jgong5): post-op fusion
@@ -828,30 +1351,45 @@ void qlinear_woq_affine_impl(
               }
             }
             for (int kc = kc_start; kc < kc_end; kc++) {
+              TComp* x_ptr = (TComp*)px[m][kc];
               if (!is_rem) {
                 alignas(64) TComp x_buf[BLOCK_M][Kb];
-                cvt_x_tpp(px[m][kc], x_buf[0]);
+                if (!no_x_buf) {
+                  (*pcvt_x_tpp)(px[m][kc], x_buf[0]);
+                  x_ptr = x_buf[0];
+                }
                 if (kc < Kc - 1) {
-                  dequant_gemm_tpp(x_buf[0], pw[nc][kc], pscales[nc], pzps[nc], y_ptr);
+                  dequant_gemm_tpp(x_ptr, pw[nc][kc], pscales[nc], pzps[nc], y_ptr, true, scale_a, zp_a);
                 } else {
-                  dequant_gemm_no_prefetch_tpp(x_buf[0], pw[nc][kc], pscales[nc], pzps[nc], y_ptr);
+                  dequant_gemm_no_prefetch_tpp(x_ptr, pw[nc][kc], pscales[nc], pzps[nc], y_ptr, true, scale_a, zp_a);
                 }
               } else {
                 alignas(64) TComp x_buf[BLOCK_M][Kb];
-                cvt_x_rem_tpp(px[m][kc], x_buf[0]);
+                if (!no_x_buf) {
+                  (*pcvt_x_rem_tpp)(px[m][kc], x_buf[0]);
+                  x_ptr = x_buf[0];
+                }
                 if (kc < Kc - 1) {
-                  dequant_gemm_rem_tpp(x_buf[0], pw[nc][kc], pscales[nc], pzps[nc], y_ptr);
+                  dequant_gemm_rem_tpp(x_ptr, pw[nc][kc], pscales[nc], pzps[nc], y_ptr, false, scale_a, zp_a);
+                  dequant_gemm_tpp.config();                  
                 } else {
-                  dequant_gemm_no_prefetch_rem_tpp(x_buf[0], pw[nc][kc], pscales[nc], pzps[nc], y_ptr);
+                  dequant_gemm_no_prefetch_rem_tpp(x_ptr, pw[nc][kc], pscales[nc], pzps[nc], y_ptr, false, scale_a, zp_a);
+                  dequant_gemm_no_prefetch_tpp.config();                
                 }
               }
             }
             // TODO(jgong5): post-op fusion
             if (k_splits <= 1) {
-              if(!is_rem){
+              if (!is_rem) {
                 cvt_y_tpp(y_buf[0], y_out_ptr);
-              }else{
+                if (fusion_type > 0) {
+                  post_ops_fn(m, nc);               
+                }
+              }else {
                 cvt_y_rem_tpp(y_buf[0], y_out_ptr);
+                if (fusion_type > 0) {
+                  post_ops_rem_fn(m, nc);                
+                }
               }
             }
           },
@@ -876,6 +1414,9 @@ void qlinear_woq_affine_impl(
                   }
                 }
               }
+              if (fusion_type > 0) {
+                post_ops_fn(m, nc); 
+              }
             }
           );
           std::free(y_private);
@@ -889,6 +1430,11 @@ void qlinear_woq_affine_impl(
   );
 }
 
+#define LOWP_MODE_NONE 0
+#define LOWP_MODE_FP16 1
+#define LOWP_MODE_BF16 2
+#define LOWP_MODE_INT8 3
+
 /**
  * @brief pack the weight in quantized format.
  * @param qw quantized weight with shape [N, K]
@@ -896,30 +1442,62 @@ void qlinear_woq_affine_impl(
  * @param block_k block size along K, K % block_k == 0. block_k % 2 == 0 for bf16 compute_dtype.
  * false if activation is expected to be float32.
  */
-at::Tensor qlinear_woq_pack(const at::Tensor& qw, size_t block_n, size_t block_k) {
+at::Tensor qlinear_woq_pack(const at::Tensor& qw, bool is_int4, size_t block_n, size_t block_k, int64_t lowp_mode) {
   TLA_ASSERT(qw.is_contiguous(), "qw must be contiguous");
-  TLA_ASSERT(
-    qw.qscheme() == at::kPerChannelAffine || qw.qscheme() == at::kPerChannelAffineFloatQParams,
-    "qw must be per channel affine quantized");
   auto sizes = qw.sizes();
   auto N = sizes[0];
-  auto K = sizes[1];
+  auto K = is_int4 ? sizes[1] * 2 : sizes[1];
   TLA_ASSERT(N % block_n == 0, "N must be multiple of block_n");
   TLA_ASSERT(K % block_k == 0, "K must be multiple of block_k");
   TLA_ASSERT(block_n % 16 == 0, "block_n must be multiple of 16 for int4");
-  const int N_GROUP_SIZE = get_n_group_size(block_n);
+  if (lowp_mode == LOWP_MODE_INT8) {
+    TLA_ASSERT(block_k % 4 == 0, "block_k must be multiple of 4 for int8 for LOWP_MODE_INT8");
+  }
+  const int N_GROUP_SIZE = lowp_mode != LOWP_MODE_INT8 ? get_n_group_size(block_n) : 16;
   const int Nc = N / block_n;
   const int Kc = K / block_k;
-  if (qw.scalar_type() == at::kQUInt4x2) {
-    TLA_ASSERT(false, "Not implemented");
-  } else if (qw.scalar_type() == at::kQInt8) {
-    auto result = at::_empty_per_channel_affine_quantized(
-      {Nc, Kc, block_k, block_n},
-      qw.q_per_channel_scales().clone(at::MemoryFormat::Preserve),
-      qw.q_per_channel_zero_points().clone(at::MemoryFormat::Preserve),
-      qw.q_per_channel_axis(),
-      qw.options()
+  if (is_int4) {
+    // TODO(jgong5): support lowp_mode == LOWP_MODE_INT8
+    auto result = at::empty({Nc, Kc, block_k, block_n/2}, qw.options());
+    // Pack weight in [N,K] to [N/block_n, K/block_k, block_k, block_n]
+    // And then, pre-shuffle per 32 or 64 4-bit values to save shuffle at runtime
+    // Take 32 4-bit values as an example below:
+    // x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 y0 y1 y2 y3 y4 y5 y6 y7 y8 y9 y10 y11 y12 y13 y14 y15
+    // becomes
+    // x0 y0 x1 y1 x2 y2 x3 y3 x4 y4 x5 y5 x6 y6 x7 y7 x8 y8 x9 y9 x10 y10 x11 y11 x12 y12 x13 y13 x14 y14 x15 y15
+    // Here, xi and yj are 4-bit values.
+    uint8_t* src_data = (uint8_t*)qw.data_ptr();
+    uint8_t* dst_data = (uint8_t*)result.data_ptr();
+    auto psrc = GetVLAPtr<uint8_t>(src_data, {block_n, Kc, block_k/2});
+    auto pdst = GetVLAPtr<uint8_t>(dst_data, {Kc, block_k, block_n/2});
+    auto pdst_4vnni = GetVLAPtr<uint8_t>(dst_data, {Kc, block_k/4, block_n/2, 4});
+    auto pack_loop = ThreadedLoop<3>({{Nc}, {Kc}, {0, block_n, N_GROUP_SIZE, false}}, "ABc");
+    pack_loop(
+      [&](int *idx) {
+        int nc = idx[0];
+        int kc = idx[1];
+        int nb = idx[2];
+        for (int i = 0; i < N_GROUP_SIZE/2; i++) {
+          for (int kb = 0; kb < block_k; kb+=2) {
+            auto src0 = psrc[nc][nb+i][kc][kb/2];
+            auto src1 = psrc[nc][nb+i+N_GROUP_SIZE/2][kc][kb/2];
+            auto dst0 = (src0 & 0xf) | ((src1 & 0xf) << 4);
+            auto dst1 = (src0 >> 4) | ((src1 >> 4) << 4);
+            if (lowp_mode != LOWP_MODE_INT8) {
+              pdst[nc][kc][kb][nb/2+i] = dst0;
+              pdst[nc][kc][kb+1][nb/2+i] = dst1;
+            } else {
+              pdst_4vnni[nc][kc][kb/4][nb/2+i][kb%4] = dst0;
+              pdst_4vnni[nc][kc][(kb+1)/4][nb/2+i][(kb+1)%4] = dst1;
+            }
+          }
+        }
+      }
     );
+    return result;
+  } else {
+    TLA_ASSERT(lowp_mode != LOWP_MODE_INT8, "lowp mode int8 is not supported yet with int8 weight");
+    auto result = at::empty({Nc, Kc, block_k, block_n}, qw.options());
     // Pack weight in [N,K] to [N/block_n, K/block_k, block_k, block_n]
     int8_t* src_data = (int8_t*)qw.data_ptr();
     int8_t* dst_data = (int8_t*)result.data_ptr();
@@ -940,29 +1518,52 @@ at::Tensor qlinear_woq_pack(const at::Tensor& qw, size_t block_n, size_t block_k
     );
     return result;
   }
-  return qw;
 }
 
-at::Tensor qlinear_woq_unpack(const at::Tensor& qw_packed) {
+at::Tensor qlinear_woq_unpack(const at::Tensor& qw_packed, bool is_int4, int64_t lowp_mode) {
   if (qw_packed.dim() == 4) {
     auto w_sizes = qw_packed.sizes();
     auto Nc = w_sizes[0];
-    auto Nb = w_sizes[3];
+    auto Nb = is_int4 ? w_sizes[3] * 2 : w_sizes[3];
     auto Kc = w_sizes[1];
     auto Kb = w_sizes[2];
     auto N = Nc * Nb;
     auto K = Kc * Kb;
-    const int N_GROUP_SIZE = get_n_group_size(Nb);
-    if (qw_packed.scalar_type() == at::kQUInt4x2) {
-      TLA_ASSERT(false, "Not implemented");
-    } else if (qw_packed.scalar_type() == at::kQInt8) {
-      auto result = at::_empty_per_channel_affine_quantized(
-        {N, K},
-        qw_packed.q_per_channel_scales().clone(at::MemoryFormat::Preserve),
-        qw_packed.q_per_channel_zero_points().clone(at::MemoryFormat::Preserve),
-        qw_packed.q_per_channel_axis(),
-        qw_packed.options()
+    const int N_GROUP_SIZE = lowp_mode != LOWP_MODE_INT8 ? get_n_group_size(Nb) : 16;
+    if (is_int4) {
+      // TODO: support lowp_mode == 3
+      auto result = at::empty({N, K/2}, qw_packed.options());
+      uint8_t* src_data = (uint8_t*)qw_packed.data_ptr();
+      uint8_t* dst_data = (uint8_t*)result.data_ptr();
+      auto psrc = GetVLAPtr<uint8_t>(src_data, {Kc, Kb, Nb/2});
+      auto psrc_4vnni = GetVLAPtr<uint8_t>(src_data, {Kc, Kb/4, Nb/2, 4});
+      auto pdst = GetVLAPtr<uint8_t>(dst_data, {Nb, Kc, Kb/2});
+      auto unpack_loop = ThreadedLoop<3>({{Nc}, {Kc}, {0, Nb, N_GROUP_SIZE, false}}, "ABc");
+      unpack_loop(
+        [&](int *idx) {
+          int nc = idx[0];
+          int kc = idx[1];
+          int nb = idx[2];
+          for (int kb = 0; kb < Kb; kb+=2) {
+            for (int i = 0; i < N_GROUP_SIZE/2; i++) {
+              uint8_t src0, src1;
+              if (lowp_mode != LOWP_MODE_INT8) {
+                src0 = psrc[nc][kc][kb][nb/2+i];
+                src1 = psrc[nc][kc][kb+1][nb/2+i];
+              } else {
+                src0 = psrc_4vnni[nc][kc][kb/4][nb/2+i][kb%4];
+                src1 = psrc_4vnni[nc][kc][(kb+1)/4][nb/2+i][(kb+1)%4];
+              }
+              pdst[nc][nb+i][kc][kb/2] = (src0 & 0xf) | ((src1 & 0xf) << 4);
+              pdst[nc][nb+i+N_GROUP_SIZE/2][kc][kb/2] = (src0 >> 4) | ((src1 >> 4) << 4);
+            }
+          }
+        }
       );
+      return result;
+    } else {
+      TLA_ASSERT(lowp_mode != LOWP_MODE_INT8, "lowp mode int8 is not supported yet with int8 weight");
+      auto result = at::empty({N, K}, qw_packed.options());
       int8_t* src_data = (int8_t*)qw_packed.data_ptr();
       int8_t* dst_data = (int8_t*)result.data_ptr();
       auto psrc = GetVLAPtr<int8_t>(src_data, {Kc, Kb, Nb});
@@ -981,8 +1582,6 @@ at::Tensor qlinear_woq_unpack(const at::Tensor& qw_packed) {
         }
       );
       return result;
-    } else {
-      TLA_ASSERT(false, "not implemented");
     }
   } else {
     TLA_ASSERT(qw_packed.dim() == 2, "qw_packed must be 2D or 4D");
@@ -990,9 +1589,110 @@ at::Tensor qlinear_woq_unpack(const at::Tensor& qw_packed) {
   }
 }
 
-#define LOWP_MODE_NONE 0
-#define LOWP_MODE_FP16 1
-#define LOWP_MODE_BF16 2
+void compute_int8_qparams_per_tensor(const at::Tensor& t, float* scale, int32_t* zp) {
+  auto [t_min, t_max] = at::aminmax(t);
+  auto min = t_min.item<float>();
+  auto max = t_max.item<float>();
+  min = std::min(min, 0.0f);
+  max = std::max(max, 0.0f);
+  *scale = (max - min) / 255.0f;
+  *zp = (int32_t)(-std::nearbyint(min / *scale));
+}
+
+template <typename T>
+at::Tensor quantize_per_tensor(const at::Tensor& t, float scale, int32_t zp) {
+  // TODO(jgong5): optimize me
+  auto t_q = t / scale + zp;
+  t_q = at::clamp(at::round(t_q), 0, 255);
+  return t_q.to(at::kByte);
+}
+
+template <>
+at::Tensor quantize_per_tensor<bfloat16>(const at::Tensor& t, float scale, int32_t zp) {
+#ifdef __AVX512F__
+  // modified based on inductor codegen...
+  auto convert_float_to_uint8 = [](at::vec::Vectorized<float> src) -> at::vec::Vectorized<uint8_t> {
+    // Convert from float32 to int32
+    __m512i x_values_int32 = _mm512_cvtps_epi32(src);
+
+    // Convert from int32 to int16 using signed saturation
+    __m512i xy_packed_v = _mm512_packs_epi32(x_values_int32, x_values_int32);
+
+    constexpr auto min_val = std::numeric_limits<uint8_t>::min();
+    constexpr auto max_val = std::numeric_limits<uint8_t>::max();
+
+    // Convert from int16 to uint8 using unsigned saturation
+    __m512i packed_and_sat = _mm512_packus_epi16(xy_packed_v, xy_packed_v);
+    __m512i xyzw_clamped_v = _mm512_max_epu8(
+      _mm512_set1_epi8(min_val),
+      _mm512_min_epu8(packed_and_sat, _mm512_set1_epi8(max_val)));
+    __m512i permute_mask_v =
+        _mm512_set_epi32(0x0f, 0x0b, 0x07, 0x03, 0x0e, 0x0a, 0x06, 0x02,
+                        0x0d, 0x09, 0x05, 0x01, 0x0c, 0x08, 0x04, 0x00);
+    return _mm512_permutexvar_epi32(permute_mask_v, xyzw_clamped_v);
+  };
+  at::Tensor out = at::empty_like(t, at::kByte);
+  auto in_ptr0 = t.data_ptr<at::BFloat16>();
+  auto out_ptr0 = out.data_ptr<uint8_t>();
+  auto n = t.numel();
+  auto vecsize = at::vec::Vectorized<float>::size();
+  auto vec_end = 0;
+  #pragma omp parallel for
+  for(long i0 = 0; i0 < static_cast<long>(n)/vecsize*vecsize; i0+=static_cast<long>(vecsize))
+  {
+      auto tmp0 = at::vec::Vectorized<at::BFloat16>::loadu(in_ptr0 + static_cast<long>(i0), vecsize);
+      at::vec::Vectorized<float> res_vec1(0);
+      at::vec::Vectorized<float> res_vec2(0);
+      std::tie(res_vec1, res_vec2) = at::vec::convert_bfloat16_float(tmp0);
+      auto tmp1 = res_vec1;
+      // auto tmp1 = cvt_bf16_to_fp32(tmp0);
+      auto tmp2 = at::vec::Vectorized<float>(static_cast<float>(scale));
+      auto tmp3 = tmp1 / tmp2;
+      auto tmp4 = at::vec::Vectorized<float>(static_cast<float>(zp));
+      auto tmp5 = tmp3 + tmp4;
+      auto tmp6 = tmp5.round();
+      auto tmp7 = (tmp6);
+      auto tmp8 = at::vec::Vectorized<float>(static_cast<float>(0.0));
+      auto tmp9 = at::vec::maximum(tmp7, tmp8);
+      auto tmp10 = at::vec::Vectorized<float>(static_cast<float>(255.0));
+      auto tmp11 = at::vec::minimum(tmp9, tmp10);
+      auto tmp12 = (tmp11);
+      auto tmp13 = convert_float_to_uint8(tmp12);
+      tmp13.store(out_ptr0 + static_cast<long>(i0), vecsize);
+  }
+  for(long i0 = static_cast<long>(n)/vecsize*vecsize; i0<static_cast<long>(n); i0+=static_cast<long>(1))
+  {
+      auto tmp0 = in_ptr0[static_cast<long>(i0)];
+      auto tmp1 = static_cast<float>(tmp0);
+      auto tmp2 = static_cast<float>(0.05);
+      auto tmp3 = tmp1 / tmp2;
+      auto tmp4 = static_cast<float>(1.0);
+      auto tmp5 = tmp3 + tmp4;
+      auto tmp6 = std::nearbyint(tmp5);
+      auto tmp7 = static_cast<float>(tmp6);
+      auto tmp8 = static_cast<float>(0.0);
+      // auto tmp9 = max_propagate_nan(tmp7, tmp8);
+      auto tmp9 = 0;
+      if (at::_isnan(tmp7)) {
+          tmp9 = tmp7;
+      }
+      tmp9 = tmp7 > tmp8 ? tmp7 : tmp8;
+      auto tmp10 = static_cast<float>(255.0);
+      auto tmp11 = 0;
+      if (at::_isnan(tmp9)) {
+          tmp11 = tmp9;
+      }
+      tmp11 =  tmp9 < tmp10 ? tmp9 : tmp10;
+      // auto tmp11 = min_propagate_nan(tmp9, tmp10);
+      auto tmp12 = static_cast<float>(tmp11);
+      auto tmp13 = static_cast<unsigned char>(tmp12);
+      out_ptr0[static_cast<long>(i0)] = tmp13;
+  }
+  return out;
+#else
+  return at::quantize_per_tensor(t.to(c10::kFloat), scale, zp, c10::kQUInt8);
+#endif
+}
 
 /**
  * @brief quantized linear with weight in affine quantized format (scale + zero-point) but
@@ -1003,7 +1703,7 @@ at::Tensor qlinear_woq_unpack(const at::Tensor& qw_packed) {
  * @param qw weight in affine quantized format, could be 4-bit or 8-bit quantized in
  * 4D blocked format [Nc,Kc,Kb,Nb] or 2D plain format [N,K].
  * @param scales_list a list of fp32/fp16/bf16 scales tensors
- * @param zp_list a list of fp32/fp16/bf16 zero points tensors
+ * @param zp_list a list of fp32/fp16/bf16/int8 zero points tensors
  * @param bias_list a list of fp32/fp16/bf16 bias tensors
  * @param lowp_mode decide the compute dtype to use.
  *        LOWP_MODE_NONE: keep activation dtype
@@ -1017,17 +1717,23 @@ at::Tensor qlinear_woq_affine(
     const TensorList& scales_list,
     const TensorList& zp_list,
     const TensorList& bias_list,
+    bool is_int4,
     int64_t lowp_mode,
-    // int64_t k_splits,
-    int64_t num_concats) {
+    int64_t num_concats,
+    int64_t fusion_type,
+    const TensorList& others_list) {
   const int64_t k_splits = 0;
-  constexpr size_t fp32_idx = 0, fp16_idx = 1, bf16_idx = 2;
+  // int8_idx is only valid with zp_list when lowp_mode == LOWP_MODE_INT8
+  constexpr size_t fp32_idx = 0, fp16_idx = 1, bf16_idx = 2, int8_idx = 3;
   auto biases = bias_list.empty() ? TensorList({at::Tensor(), at::Tensor(), at::Tensor()}) : bias_list;
   if (qw.dim() == 4) {
     auto w_sizes = qw.sizes();
     auto K = x.size(-1);
     auto M = x.numel() / K;
     auto N = w_sizes[0] * w_sizes[3];
+    if (is_int4) {
+      N *= 2;
+    }
     auto out_sizes = x.sizes().vec();
     out_sizes.back() = N;
     auto y = at::empty(out_sizes, x.options());
@@ -1037,38 +1743,45 @@ at::Tensor qlinear_woq_affine(
         using act_type = typename c10::impl::ScalarTypeToCPPType<act_dtype>::type;
         auto try_compute_in_half = [&]() {
 #ifdef __AVX512FP16__
-          qlinear_woq_affine_impl<act_type, half, /*TGemmOut*/half>(
-              x_reshape, qw, scales_list[fp16_idx], zp_list[fp16_idx], biases[fp16_idx], y, k_splits, num_concats);
+          qlinear_woq_affine_impl<act_type, half, /*TGemmOut*/half, act_type, half, half>(
+              x_reshape, qw, scales_list[fp16_idx], zp_list[fp16_idx], biases[fp16_idx], y, is_int4, k_splits, num_concats, fusion_type, others_list);
 #else
-          qlinear_woq_affine_impl<act_type, float, /*TGemmOut*/float>(
-              x_reshape, qw, scales_list[fp32_idx], zp_list[fp32_idx], biases[fp32_idx], y, k_splits, num_concats);
+          qlinear_woq_affine_impl<act_type, float, /*TGemmOut*/float, act_type, float, float>(
+              x_reshape, qw, scales_list[fp32_idx], zp_list[fp32_idx], biases[fp32_idx], y, is_int4, k_splits, num_concats, fusion_type, others_list);
 #endif
         };
         if (lowp_mode == LOWP_MODE_NONE) {
           if (std::is_same<act_type, half>()) {
             try_compute_in_half();
           } else if (std::is_same<act_type, bfloat16>()) {
-            qlinear_woq_affine_impl<bfloat16, bfloat16, /*TGemmOut*/float>(
-              x_reshape, qw, scales_list[bf16_idx], zp_list[bf16_idx], biases[fp32_idx], y, k_splits, num_concats
+            qlinear_woq_affine_impl<bfloat16, bfloat16, /*TGemmOut*/float, bfloat16, bfloat16, bfloat16>(
+              x_reshape, qw, scales_list[bf16_idx], zp_list[bf16_idx], biases[fp32_idx], y, is_int4, k_splits, num_concats, fusion_type, others_list
             );
           } else {
-            qlinear_woq_affine_impl<float, float, /*TGemmOut*/float>(
-              x_reshape, qw, scales_list[fp32_idx], zp_list[fp32_idx], biases[fp32_idx], y, k_splits, num_concats
+            qlinear_woq_affine_impl<float, float, /*TGemmOut*/float, float, float, float>(
+              x_reshape, qw, scales_list[fp32_idx], zp_list[fp32_idx], biases[fp32_idx], y, is_int4, k_splits, num_concats, fusion_type, others_list
             );
+          }
+        } else if (lowp_mode == LOWP_MODE_FP16) {
+          try_compute_in_half();
+        } else if (lowp_mode == LOWP_MODE_BF16) {
+          if (M >= SMALL_BATCH_THRESHOLD) {
+            // compute in bfloat16 for large bs
+            qlinear_woq_affine_impl<act_type, bfloat16, /*TGemmOut*/float, act_type, bfloat16, bfloat16>(
+                x_reshape, qw, scales_list[bf16_idx], zp_list[bf16_idx], biases[fp32_idx], y, is_int4, k_splits, num_concats, fusion_type, others_list);
+          } else {
+            try_compute_in_half();
           }
         } else {
-          if (lowp_mode == LOWP_MODE_FP16) {
-            try_compute_in_half();
-          } else {
-            TLA_ASSERT(lowp_mode == LOWP_MODE_BF16, "invalid lowp_mode");
-            if (M >= SMALL_BATCH_THRESHOLD) {
-              // compute in bfloat16 for large bs
-              qlinear_woq_affine_impl<act_type, bfloat16, /*TGemmOut*/float>(
-                  x_reshape, qw, scales_list[bf16_idx], zp_list[bf16_idx], biases[fp32_idx], y, k_splits, num_concats);
-            } else {
-              try_compute_in_half();
-            }
-          }
+          TLA_ASSERT(lowp_mode == LOWP_MODE_INT8, "invalid lowp_mode");
+          TLA_ASSERT(is_int4, "LOWP_MODE_INT8 only support is_int4=true");
+          float scale_a;
+          int32_t zp_a;
+          auto x_reshape_contig = x_reshape.contiguous();
+          compute_int8_qparams_per_tensor(x_reshape_contig, &scale_a, &zp_a);
+          auto x_quantized = quantize_per_tensor<act_type>(x_reshape_contig, scale_a, zp_a);
+          qlinear_woq_affine_impl<uint8_t, uint8_t, /*TGemmOut*/float, act_type, float, int8_t>(
+              x_quantized, qw, scales_list[fp32_idx], zp_list[int8_idx], biases[fp32_idx], y, is_int4, k_splits, num_concats, fusion_type, others_list, scale_a, zp_a);
         }
       },
       failing_fallback<at::ScalarType>
@@ -1082,7 +1795,17 @@ at::Tensor qlinear_woq_affine(
     } else if (lowp_mode == LOWP_MODE_BF16) {
       compute_dtype = at::kBFloat16;
     }
-    auto w = qw.dequantize().to(compute_dtype);
+    auto w = [&]() {
+      if (is_int4) {
+        using namespace at::indexing;
+        auto w_int8 = at::empty({qw.size(0), qw.size(1) * 2}, qw.options().dtype(at::kByte));
+        w_int8.index({Slice(), Slice(None, None, 2)}).copy_(qw.bitwise_and(0xf));
+        w_int8.index({Slice(), Slice(1, None, 2)}).copy_(qw.bitwise_right_shift(4));
+        return (w_int8.to(at::kFloat) - zp_list[fp32_idx]) * scales_list[fp32_idx];
+      } else {
+        return (qw.to(at::kFloat) - zp_list[fp32_idx]) * scales_list[fp32_idx];
+      }
+    }().to(compute_dtype);
     auto x_fp = x.to(compute_dtype);
     auto y = at::linear(x_fp, w);
     if (biases[0].defined()) {
@@ -1090,12 +1813,22 @@ at::Tensor qlinear_woq_affine(
                      compute_dtype == at::kHalf ? fp16_idx : bf16_idx;
       y = at::add(y, biases[b_index]);
     }
+    if (fusion_type == FUSE_GELU) {
+      y = at::gelu(y);
+    } else if (fusion_type == FUSE_ADD || fusion_type == FUSE_ADD_ADD) {
+      for (auto& tin:others_list)
+        y = at::add(y, tin);
+    }
     if (num_concats > 1) {
       y = y.view({-1, num_concats, y.size(-1)/num_concats}).transpose(0, 1).contiguous().view({-1, y.size(-1)});
     }
     return y.to(x.scalar_type());
   }
 }
+
+// TODO(jgong5): int4 quantized linear with lut
+// at::Tensor qlinear_woq_lut(at::Tensor x, at::Tensor qw_packed, at::Tensor lut, at::Tensor b, at::ScalarType compute_dtype) {
+// }
 
 } // namespace
 

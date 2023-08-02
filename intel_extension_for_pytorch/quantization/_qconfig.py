@@ -81,6 +81,7 @@ class WoqLowpMode(IntEnum):
     NONE = 0
     FP16 = 1
     BF16 = 2
+    INT8 = 3
 
 QConfigWoq = namedtuple('QConfigWoq', [*QConfig._fields, 'lowp_mode'])
 def get_weight_only_quant_qconfig_mapping(
@@ -89,6 +90,7 @@ def get_weight_only_quant_qconfig_mapping(
         lowp_mode: int = WoqLowpMode.NONE):
     dtype_to_qscheme = {
         torch.qint8: torch.per_channel_affine,
+        torch.quint8: torch.per_channel_affine,
         # It is required to use per_channel_affine_float_qparams for quint4x2 by PyTorch
         torch.quint4x2: torch.per_channel_affine_float_qparams,
     }

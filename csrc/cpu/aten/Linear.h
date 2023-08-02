@@ -83,7 +83,7 @@ at::Tensor woq_linear_pack_weight(
     const at::Tensor& zero_points,
     int64_t lowp_mode);
 
-at::Tensor woq_linear_unpack_weight(const at::Tensor& weight);
+at::Tensor woq_linear_unpack_weight(const at::Tensor& weight, bool is_int4, int64_t lowp_mode);
 
 void woq_linear_kernel_output(
     const at::Tensor& self,
@@ -100,6 +100,7 @@ at::Tensor woq_linear_kernel(
     const std::vector<at::Tensor>& scales_list,
     const std::vector<at::Tensor>& zps_list,
     const std::vector<at::Tensor>& bias_list,
+    bool is_int4,
     int64_t lowp_mode,
     int64_t num_concats);
 
@@ -118,13 +119,49 @@ void woq_linear_eltwise_kernel_output(
 at::Tensor woq_linear_eltwise_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
-    const at::Tensor& scales_float,
-    const at::Tensor& zero_points_float,
-    const at::Tensor& bias,
+    const std::vector<at::Tensor>& scales_list,
+    const std::vector<at::Tensor>& zps_list,
+    const std::vector<at::Tensor>& bias_list,
     const c10::string_view& post_op,
     const torch::List<c10::optional<at::Scalar>>& scalars,
     const c10::optional<c10::string_view>& algorithm,
-    int64_t lowp_mode);
+    bool is_int4,
+    int64_t lowp_mode,
+    int64_t num_concats);
+
+at::Tensor woq_linear_add_kernel(
+    const at::Tensor& self,
+    const at::Tensor& weight,
+    const std::vector<at::Tensor>& scales_list,
+    const std::vector<at::Tensor>& zps_list,
+    const std::vector<at::Tensor>& bias_list,
+    bool is_int4,
+    int64_t lowp_mode,
+    int64_t num_concats,
+    at::Tensor& accumu,
+    const c10::optional<at::Scalar>& alpha);
+
+at::Tensor woq_linear_add_kernel(
+    const at::Tensor& self,
+    const at::Tensor& weight,
+    const std::vector<at::Tensor>& scales_list,
+    const std::vector<at::Tensor>& zps_list,
+    const std::vector<at::Tensor>& bias_list,
+    bool is_int4,
+    int64_t lowp_mode,
+    int64_t num_concats,
+    const std::vector<at::Tensor>& others);
+
+at::Tensor woq_linear_add_add_kernel(
+    const at::Tensor& self,
+    const at::Tensor& weight,
+    const std::vector<at::Tensor>& scales_list,
+    const std::vector<at::Tensor>& zps_list,
+    const std::vector<at::Tensor>& bias_list,
+    bool is_int4,
+    int64_t lowp_mode,
+    int64_t num_concats,
+    const std::vector<at::Tensor>& others);
 
 namespace {
 void woq_gemm_kernel_impl(
@@ -194,13 +231,16 @@ using woq_tpp_gemm_kernel_fn = at::Tensor (*)(
     const std::vector<at::Tensor>&,
     const std::vector<at::Tensor>&,
     const std::vector<at::Tensor>&,
+    bool,
     int64_t,
-    int64_t);
+    int64_t,
+    int64_t,
+    const std::vector<at::Tensor>&);
 
 using woq_tpp_gemm_packB_fn =
-    at::Tensor (*)(const at::Tensor&, size_t, size_t);
+    at::Tensor (*)(const at::Tensor&, bool, size_t, size_t, int64_t);
 
-using woq_tpp_gemm_unpackB_fn = at::Tensor (*)(const at::Tensor&);
+using woq_tpp_gemm_unpackB_fn = at::Tensor (*)(const at::Tensor&, bool, int64_t);
 
 DECLARE_DISPATCH(woq_tpp_gemm_kernel_fn, woq_tpp_gemm_kernel_stub);
 DECLARE_DISPATCH(woq_tpp_gemm_packB_fn, woq_tpp_gemm_packB_stub);
@@ -210,6 +250,10 @@ DECLARE_DISPATCH(woq_tpp_gemm_unpackB_fn, woq_tpp_gemm_unpackB_stub);
 #  include <features.h>
 #  if __GNUC_PREREQ(12,3)
 #  define WOQ_TPP_KERNEL
+#  define FUSE_NONE 0
+#  define FUSE_GELU 1
+#  define FUSE_ADD 2
+#  define FUSE_ADD_ADD 3
 #  endif
 #endif
 

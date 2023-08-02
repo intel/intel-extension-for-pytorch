@@ -419,14 +419,10 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
         zero_points_float.data_ptr<float>());
 
     auto op_context = torch_ipex::cpu::detail::woq_linear::create(
-        weight, scales, zero_points_int32, bias, batch_size, lowp_mode);
+        weight, scales, zero_points_int32, bias, batch_size, lowp_mode, num_concats);
     return c10::make_intrusive<IpexWoqLinearOpContext>(
         batch_size,
-        std::move(op_context),
-        std::move(scales),
-        std::move(zero_points_float),
-        lowp_mode,
-        num_concats);
+        std::move(op_context));
   } else {
     // extract scales from weight
     std::vector<float> weight_scales_float(1, 0.0);
@@ -462,14 +458,20 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
         weight_zero_points_float.end(),
         zero_points_float.data_ptr<float>());
     auto op_context = torch_ipex::cpu::detail::woq_linear::create(
-        weight, scales, zero_points_float, bias, batch_size, lowp_mode);
+        weight, scales, zero_points_float, bias, batch_size, lowp_mode, num_concats);
+    if (op_context.orig_wei_shape_.has_value()) {
+      int64_t padded_N = op_context.at_weight_.sizes().size() == 4
+          ? op_context.at_weight_.size(0) * op_context.at_weight_.size(3)
+          : op_context.at_weight_.size(0);
+      auto scales_padded = at::pad(scales, {0, padded_N - N}, "constant", 0.f);
+      auto zero_points_padded = at::pad(zero_points_float, {0, padded_N - N}, "constant", 0.f);
+      return c10::make_intrusive<IpexWoqLinearOpContext>(
+          batch_size,
+          std::move(op_context));
+    }
     return c10::make_intrusive<IpexWoqLinearOpContext>(
         batch_size,
-        std::move(op_context),
-        std::move(scales),
-        std::move(zero_points_float),
-        lowp_mode,
-        num_concats);
+        std::move(op_context));
   }
 }
 
@@ -480,8 +482,7 @@ at::Tensor IpexWoqLinearOpContext::get_data_handle() {
 }
 
 at::Tensor IpexWoqLinearOpContext::run(const at::Tensor& input) {
-  return torch_ipex::cpu::detail::woq_linear::run(
-      op_context_, scales_list_, zero_points_list_, input, lowp_mode_, num_concats_);
+  return torch_ipex::cpu::detail::woq_linear::run(op_context_, input);
 }
 
 at::Tensor IpexWoqLinearOpContext::run_eltwise(
@@ -490,8 +491,7 @@ at::Tensor IpexWoqLinearOpContext::run_eltwise(
     const torch::List<c10::optional<at::Scalar>>& scalars,
     const c10::optional<c10::string_view>& algorithm) {
   return torch_ipex::cpu::detail::woq_linear::run_eltwise(
-      op_context_, scales_list_[0], zero_points_list_[0], input,
-      post_op, scalars, algorithm, lowp_mode_);
+      op_context_, input, post_op, scalars, algorithm);
 }
 
 at::Tensor IpexWoqLinearOpContext::run_add(
@@ -499,8 +499,7 @@ at::Tensor IpexWoqLinearOpContext::run_add(
     at::Tensor& accumu,
     const c10::optional<at::Scalar>& alpha) {
   return torch_ipex::cpu::detail::woq_linear::run_add(
-    op_context_, scales_list_, zero_points_list_, input,
-    accumu, alpha, lowp_mode_, num_concats_);
+      op_context_, input, accumu, alpha);
 }
 
 at::Tensor IpexWoqLinearOpContext::run_add_relu(
@@ -508,8 +507,21 @@ at::Tensor IpexWoqLinearOpContext::run_add_relu(
     at::Tensor& accumu,
     const c10::optional<at::Scalar>& alpha) {
   return torch_ipex::cpu::detail::woq_linear::run_add_relu(
-    op_context_, scales_list_, zero_points_list_, input,
-    accumu, alpha, lowp_mode_, num_concats_);
+      op_context_, input, accumu, alpha);
+}
+
+at::Tensor IpexWoqLinearOpContext::run_add(
+    const at::Tensor& input,
+    const std::vector<at::Tensor>& others) {
+  return torch_ipex::cpu::detail::woq_linear::run_add(
+      op_context_, input, others);
+}
+
+at::Tensor IpexWoqLinearOpContext::run_add_add(
+    const at::Tensor& input,
+    const std::vector<at::Tensor>& others) {
+  return torch_ipex::cpu::detail::woq_linear::run_add_add(
+      op_context_, input, others);
 }
 
 at::Tensor IpexWoqLinearOpContext::to_public(const at::Tensor& tensor) {

@@ -404,7 +404,136 @@ void small_gemm_smallm(
     float* scale,
     float* zero_point,
     float* bias = NULL,
-    int rowOff = 0) {}
+    int rowOff = 0) {
+  constexpr int COLS = N / 16;
+  __m512 va;
+  __m512 vb[COLS];
+  __m512 vc[LINES * COLS];
+  __m512 float_scale[COLS];
+  __m512 float_zero_point[COLS];
+  // lookup table converting uint8 to float, 15.0f - 0.0f
+  __m512 lut = _mm512_set_ps(
+      15.0f,
+      14.0f,
+      13.0f,
+      12.0f,
+      11.0f,
+      10.0f,
+      9.0f,
+      8.0f,
+      7.0f,
+      6.0f,
+      5.0f,
+      4.0f,
+      3.0f,
+      2.0f,
+      1.0f,
+      0.0f);
+
+  // Load scale
+  auto load_scale = [&](auto i) {
+    float_scale[i] = _mm512_loadu_ps(scale + 16 * i);
+  };
+  compile_time_for<COLS>::op(load_scale);
+
+  // Load zero point
+  auto load_zp = [&](auto i) {
+    float_zero_point[i] = _mm512_loadu_ps(zero_point + 16 * i);
+  };
+  compile_time_for<COLS>::op(load_zp);
+
+  // Load from C or set to 0
+  if constexpr (ACC) {
+    auto loadc = [&](auto i) {
+      constexpr const int row = i / COLS;
+      constexpr const int col = i % COLS;
+      vc[i] = _mm512_loadu_ps(ADDRESS(C, row, col * 16, ldc));
+    };
+    compile_time_for<LINES * COLS>::op(loadc);
+  } else {
+    auto set0 = [&](auto i) { vc[i] = _mm512_setzero_ps(); };
+    compile_time_for<LINES * COLS>::op(set0);
+  }
+
+  auto compute = [&](auto i, int k) {
+    constexpr const int row = i / COLS;
+    constexpr const int col = i % COLS;
+
+    if constexpr (col == 0) {
+      va = _mm512_set1_ps(*ADDRESS(A, row, k, lda));
+    }
+
+#define ALGORITHM 1
+
+#if ALGORITHM == 0
+    if constexpr (row == 0) {
+      __m128i b_ =
+          bytesFromNibbles(ADDRESS(B, k, col * 8, ldb / 2)); // int4 -> int8
+      _mm_prefetch(
+          ADDRESS(B, k + PREFETCH_K_DIST, col * 8, ldb / 2), _MM_HINT_T0);
+      vb[col] = _mm512_cvtepi32_ps(_mm512_cvtepu8_epi32(b_));
+      vb[col] = _mm512_sub_ps(vb[col], float_zero_point[col]);
+      vb[col] = _mm512_mul_ps(vb[col], float_scale[col]);
+    }
+#else
+    // GCC < 11.3 internal compiler error with constexpr
+    if (col == 0 && row == 0) {
+      static_assert(COLS == 4, "expect register block size 4 for weights");
+      _mm_prefetch(ADDRESS(B, k + PREFETCH_K_DIST, 0, ldb / 2), _MM_HINT_T0);
+      // load 64 elements from ADDRESS(B, k, 0 ldb / 2) with 4-bit each
+      // and then, unpack them and convert them into 64 fp32 numbers held in
+      // four avx512 registers: vb[0] - vb[3]
+      // Load the buffer into a 256-bit register
+      __m256i packed = _mm256_load_si256((__m256i*)ADDRESS(B, k, 0, ldb / 2));
+      __m512i int32[4];
+      {
+        auto low_4bit = _mm512_cvtepu8_epi32(_mm256_castsi256_si128(packed));
+        auto high_4bit = _mm512_srli_epi32(low_4bit, 4);
+        int32[0] = low_4bit;
+        int32[2] = high_4bit;
+      }
+      {
+        auto low_4bit =
+            _mm512_cvtepu8_epi32(_mm256_extracti128_si256(packed, 1));
+        auto high_4bit = _mm512_srli_epi32(low_4bit, 4);
+        int32[1] = low_4bit;
+        int32[3] = high_4bit;
+      }
+
+      auto dequant_int32 = [&](auto idx) {
+        vb[idx] = _mm512_permutexvar_ps(int32[idx], lut);
+        vb[idx] = _mm512_sub_ps(vb[idx], float_zero_point[idx]);
+        vb[idx] = _mm512_mul_ps(vb[idx], float_scale[idx]);
+      };
+      compile_time_for<COLS>::op(dequant_int32);
+    }
+#endif
+
+    constexpr const int idx = INDEX(row, col, COLS);
+    vc[idx] = _mm512_fmadd_ps(va, vb[col], vc[idx]);
+  };
+
+// Accumulate along k
+#pragma unroll(4)
+  for (int k = 0; k < K; ++k) {
+    compile_time_for<LINES * COLS>::op(compute, k);
+  }
+
+  // Store to C
+  auto store = [&](auto i) {
+    constexpr const int line = i / COLS;
+    constexpr const int col = i % COLS;
+    if constexpr (bias_add) {
+      __m512 bias_ = _mm512_loadu_ps(bias + col * 16);
+      vc[i] = _mm512_add_ps(vc[i], bias_);
+      _mm512_storeu_ps(ADDRESS(C, line, col * 16, ldc), vc[i]);
+    } else {
+      _mm512_storeu_ps(ADDRESS(C, line, col * 16, ldc), vc[i]);
+    }
+  };
+
+  compile_time_for<LINES * COLS>::op(store);
+}
 
 // bf16 * int4 -> fp32
 template <
@@ -425,7 +554,137 @@ void small_gemm_smallm(
     float* scale,
     float* zero_point,
     float* bias = NULL,
-    int rowOff = 0) {}
+    int rowOff = 0) {
+  constexpr int COLS = N / 16;
+  __m512 va;
+  __m512 vb[COLS];
+  __m512 vc[LINES * COLS];
+  __m512 float_scale[COLS];
+  __m512 float_zero_point[COLS];
+  // lookup table converting uint8 to float, 15.0f - 0.0f
+  __m512 lut = _mm512_set_ps(
+      15.0f,
+      14.0f,
+      13.0f,
+      12.0f,
+      11.0f,
+      10.0f,
+      9.0f,
+      8.0f,
+      7.0f,
+      6.0f,
+      5.0f,
+      4.0f,
+      3.0f,
+      2.0f,
+      1.0f,
+      0.0f);
+
+  // Load scale
+  auto load_scale = [&](auto i) {
+    float_scale[i] = _mm512_loadu_ps(scale + 16 * i);
+  };
+  compile_time_for<COLS>::op(load_scale);
+
+  // Load zero point
+  auto load_zp = [&](auto i) {
+    float_zero_point[i] = _mm512_loadu_ps(zero_point + 16 * i);
+  };
+  compile_time_for<COLS>::op(load_zp);
+
+  // Load from C or set to 0
+  if constexpr (ACC) {
+    auto loadc = [&](auto i) {
+      constexpr const int row = i / COLS;
+      constexpr const int col = i % COLS;
+      vc[i] = _mm512_loadu_ps(ADDRESS(C, row, col * 16, ldc));
+    };
+    compile_time_for<LINES * COLS>::op(loadc);
+  } else {
+    auto set0 = [&](auto i) { vc[i] = _mm512_setzero_ps(); };
+    compile_time_for<LINES * COLS>::op(set0);
+  }
+
+  auto compute = [&](auto i, int k) {
+    constexpr const int row = i / COLS;
+    constexpr const int col = i % COLS;
+
+    if constexpr (col == 0) {
+      float aa = *ADDRESS(A, row, k, lda); // convert from bf16 to fp32
+      va = _mm512_set1_ps(aa);
+    }
+
+#define ALGORITHM 1
+
+#if ALGORITHM == 0
+    if constexpr (row == 0) {
+      __m128i b_ =
+          bytesFromNibbles(ADDRESS(B, k, col * 8, ldb / 2)); // int4 -> int8
+      _mm_prefetch(
+          ADDRESS(B, k + PREFETCH_K_DIST, col * 8, ldb / 2), _MM_HINT_T0);
+      vb[col] = _mm512_cvtepi32_ps(_mm512_cvtepu8_epi32(b_));
+      vb[col] = _mm512_sub_ps(vb[col], float_zero_point[col]);
+      vb[col] = _mm512_mul_ps(vb[col], float_scale[col]);
+    }
+#else
+    // GCC < 11.3 internal compiler error with constexpr
+    if (col == 0 && row == 0) {
+      static_assert(COLS == 4, "expect register block size 4 for weights");
+      _mm_prefetch(ADDRESS(B, k + PREFETCH_K_DIST, 0, ldb / 2), _MM_HINT_T0);
+      // load 64 elements from ADDRESS(B, k, 0 ldb / 2) with 4-bit each
+      // and then, unpack them and convert them into 64 fp32 numbers held in
+      // four avx512 registers: vb[0] - vb[3]
+      // Load the buffer into a 256-bit register
+      __m256i packed = _mm256_load_si256((__m256i*)ADDRESS(B, k, 0, ldb / 2));
+      __m512i int32[4];
+      {
+        auto low_4bit = _mm512_cvtepu8_epi32(_mm256_castsi256_si128(packed));
+        auto high_4bit = _mm512_srli_epi32(low_4bit, 4);
+        int32[0] = low_4bit;
+        int32[2] = high_4bit;
+      }
+      {
+        auto low_4bit =
+            _mm512_cvtepu8_epi32(_mm256_extracti128_si256(packed, 1));
+        auto high_4bit = _mm512_srli_epi32(low_4bit, 4);
+        int32[1] = low_4bit;
+        int32[3] = high_4bit;
+      }
+
+      auto dequant_int32 = [&](auto idx) {
+        vb[idx] = _mm512_permutexvar_ps(int32[idx], lut);
+        vb[idx] = _mm512_sub_ps(vb[idx], float_zero_point[idx]);
+        vb[idx] = _mm512_mul_ps(vb[idx], float_scale[idx]);
+      };
+      compile_time_for<COLS>::op(dequant_int32);
+    }
+#endif
+
+    constexpr const int idx = INDEX(row, col, COLS);
+    vc[idx] = _mm512_fmadd_ps(va, vb[col], vc[idx]);
+  };
+
+// Accumulate along k
+#pragma unroll(4)
+  for (int k = 0; k < K; ++k) {
+    compile_time_for<LINES * COLS>::op(compute, k);
+  }
+
+  // Store to C
+  auto store = [&](auto i) {
+    constexpr const int line = i / COLS;
+    constexpr const int col = i % COLS;
+    if constexpr (bias_add) {
+      __m512 bias_ = _mm512_loadu_ps(bias + col * 16);
+      vc[i] = _mm512_add_ps(vc[i], bias_);
+      _mm512_storeu_ps(ADDRESS(C, line, col * 16, ldc), vc[i]);
+    } else {
+      _mm512_storeu_ps(ADDRESS(C, line, col * 16, ldc), vc[i]);
+    }
+  };
+
+  compile_time_for<LINES * COLS>::op(store);
+}
 
 inline void dequant_(
     int8_t* B,
@@ -662,7 +921,94 @@ void dequant(int8_t* B, float* b, int K, int N, float scale, float zero_point) {
 // per channel dequantize for int4
 // B is packed and not transposed, shape:[BLOCK_K x BLOCK_N]
 template <int BLOCK_K, int BLOCK_N>
-void dequant(uint8_t* B, float* b, float* scale, float* zero_point) {}
+void dequant(uint8_t* B, float* b, float* scale, float* zero_point) {
+  if constexpr (BLOCK_N == 64) {
+    const int COLS = 4;
+    // lookup table converting uint8 to float, 15.0f - 0.0f
+    __m512 lut = _mm512_set_ps(
+        15.0f,
+        14.0f,
+        13.0f,
+        12.0f,
+        11.0f,
+        10.0f,
+        9.0f,
+        8.0f,
+        7.0f,
+        6.0f,
+        5.0f,
+        4.0f,
+        3.0f,
+        2.0f,
+        1.0f,
+        0.0f);
+    __m512 float_scale[4] = {
+        _mm512_loadu_ps(scale),
+        _mm512_loadu_ps(scale + 16),
+        _mm512_loadu_ps(scale + 32),
+        _mm512_loadu_ps(scale + 48)};
+    __m512 float_zero_point[4] = {
+        _mm512_loadu_ps(zero_point),
+        _mm512_loadu_ps(zero_point + 16),
+        _mm512_loadu_ps(zero_point + 32),
+        _mm512_loadu_ps(zero_point + 48)};
+    for (int k = 0; k < BLOCK_K; k++) {
+      uint8_t* src = B;
+      float* dst = b;
+      __m256i packed = _mm256_load_si256((__m256i*)src);
+      __m512i int32[4];
+      {
+        auto low_4bit = _mm512_cvtepu8_epi32(_mm256_castsi256_si128(packed));
+        auto high_4bit = _mm512_srli_epi32(low_4bit, 4);
+        int32[0] = low_4bit;
+        int32[2] = high_4bit;
+      }
+      {
+        auto low_4bit =
+            _mm512_cvtepu8_epi32(_mm256_extracti128_si256(packed, 1));
+        auto high_4bit = _mm512_srli_epi32(low_4bit, 4);
+        int32[1] = low_4bit;
+        int32[3] = high_4bit;
+      }
+      for (int idx = 0; idx < 4; idx++) {
+        __m512 vb = _mm512_permutexvar_ps(int32[idx], lut);
+        vb = _mm512_sub_ps(vb, float_zero_point[idx]);
+        vb = _mm512_mul_ps(vb, float_scale[idx]);
+        _mm512_storeu_ps(b + idx * 16, vb);
+      }
+      B += BLOCK_N / 2;
+      b += BLOCK_N;
+    }
+  } else {
+    const int COLS = BLOCK_N / 16;
+    for (int k = 0; k < BLOCK_K; k++) {
+      uint8_t* src = B;
+      float* dst = b;
+      int j, idx;
+      for (idx = 0, j = 0; j < COLS * 16; j += 16) {
+        __m512 float_scale = _mm512_loadu_ps(scale + j);
+        __m512 float_zero_point = _mm512_loadu_ps(zero_point + j);
+        dequant_(src, dst, float_scale, float_zero_point);
+        src += 8;
+        dst += 16;
+      }
+      if (j < BLOCK_N) {
+        const int res = BLOCK_N - j;
+        for (int l = 0; l < res; l += 2) {
+          const uint8_t vi = src[l / 2];
+          const int8_t vi0 = vi & 0xf;
+          const int8_t vi1 = vi >> 4;
+          const float v0 = (vi0 - zero_point[j + l]) * scale[j + l];
+          const float v1 = (vi1 - zero_point[j + l + 1]) * scale[j + l + 1];
+          dst[l + 0] = v0;
+          dst[l + 1] = v1;
+        }
+      }
+      B += BLOCK_N / 2;
+      b += BLOCK_N;
+    }
+  }
+}
 
 // per channel dequantize for int4
 // handle edge cases
@@ -672,7 +1018,121 @@ void dequant(
     int K,
     int N,
     float* scale,
-    float* zero_point) {}
+    float* zero_point) {
+  if (N % 2 == 0) {
+    if (N == 64) {
+      const int COLS = 4;
+      // lookup table converting uint8 to float, 15.0f - 0.0f
+      __m512 lut = _mm512_set_ps(
+          15.0f,
+          14.0f,
+          13.0f,
+          12.0f,
+          11.0f,
+          10.0f,
+          9.0f,
+          8.0f,
+          7.0f,
+          6.0f,
+          5.0f,
+          4.0f,
+          3.0f,
+          2.0f,
+          1.0f,
+          0.0f);
+      __m512 float_scale[4] = {
+          _mm512_loadu_ps(scale),
+          _mm512_loadu_ps(scale + 16),
+          _mm512_loadu_ps(scale + 32),
+          _mm512_loadu_ps(scale + 48)};
+      __m512 float_zero_point[4] = {
+          _mm512_loadu_ps(zero_point),
+          _mm512_loadu_ps(zero_point + 16),
+          _mm512_loadu_ps(zero_point + 32),
+          _mm512_loadu_ps(zero_point + 48)};
+      for (int k = 0; k < K; k++) {
+        uint8_t* src = B;
+        float* dst = b;
+        __m256i packed = _mm256_load_si256((__m256i*)src);
+        __m512i int32[4];
+        {
+          auto low_4bit = _mm512_cvtepu8_epi32(_mm256_castsi256_si128(packed));
+          auto high_4bit = _mm512_srli_epi32(low_4bit, 4);
+          int32[0] = low_4bit;
+          int32[2] = high_4bit;
+        }
+        {
+          auto low_4bit =
+              _mm512_cvtepu8_epi32(_mm256_extracti128_si256(packed, 1));
+          auto high_4bit = _mm512_srli_epi32(low_4bit, 4);
+          int32[1] = low_4bit;
+          int32[3] = high_4bit;
+        }
+        for (int idx = 0; idx < 4; idx++) {
+          __m512 vb = _mm512_permutexvar_ps(int32[idx], lut);
+          vb = _mm512_sub_ps(vb, float_zero_point[idx]);
+          vb = _mm512_mul_ps(vb, float_scale[idx]);
+          _mm512_storeu_ps(b + idx * 16, vb);
+        }
+        B += N / 2;
+        b += N;
+      }
+    } else {
+      const int COLS = N / 16;
+      for (int k = 0; k < K; k++) {
+        uint8_t* src = B;
+        float* dst = b;
+        int j, idx;
+        for (idx = 0, j = 0; j < COLS * 16; j += 16) {
+          __m512 float_scale = _mm512_loadu_ps(scale + j);
+          __m512 float_zero_point = _mm512_loadu_ps(zero_point + j);
+          dequant_(src, dst, float_scale, float_zero_point);
+          src += 8;
+          dst += 16;
+        }
+        if (j < N) {
+          const int res = N - j;
+          int rr = res / 2;
+          int l = 0;
+          for (; l < rr * 2; l += 2) {
+            const uint8_t vi = src[l / 2];
+            const int8_t vi0 = vi & 0xf;
+            const int8_t vi1 = vi >> 4;
+            const float v0 = (vi0 - zero_point[j + l]) * scale[j + l];
+            const float v1 = (vi1 - zero_point[j + l + 1]) * scale[j + l + 1];
+            dst[l + 0] = v0;
+            dst[l + 1] = v1;
+          }
+          if (l < res) {
+            const uint8_t vi = src[l / 2];
+            const int8_t vi0 = vi & 0xf;
+            const float v0 = (vi0 - zero_point[j + l]) * scale[j + l];
+            dst[l + 0] = v0;
+          }
+        }
+        B += N / 2;
+        b += N;
+      }
+    }
+  } else {
+    int i = 0;
+    for (; i < K * N / 2 * 2; i += 2) {
+      const uint8_t vi = B[i / 2];
+      const int8_t vi0 = vi & 0xf;
+      const int8_t vi1 = vi >> 4;
+      const float v0 = (vi0 - zero_point[i % N]) * scale[i % N];
+      const float v1 = (vi1 - zero_point[(i + 1) % N]) * scale[(i + 1) % N];
+      b[i + 0] = v0;
+      b[i + 1] = v1;
+    }
+    if (i < K * N) {
+      const uint8_t vi = B[i / 2];
+      const int8_t vi0 = vi & 0xf;
+      const float v0 = (vi0 - zero_point[i % N]) * scale[i % N];
+      b[i + 0] = v0;
+    }
+  }
+}
 
 // dequant uint4 weight to bf16
 void dequant(
@@ -681,7 +1141,121 @@ void dequant(
     int K,
     int N,
     float* scale,
-    float* zero_point) {}
+    float* zero_point) {
+  if (N % 2 == 0) {
+    if (N == 64) {
+      const int COLS = 4;
+      // lookup table converting uint8 to float, 15.0f - 0.0f
+      __m512 lut = _mm512_set_ps(
+          15.0f,
+          14.0f,
+          13.0f,
+          12.0f,
+          11.0f,
+          10.0f,
+          9.0f,
+          8.0f,
+          7.0f,
+          6.0f,
+          5.0f,
+          4.0f,
+          3.0f,
+          2.0f,
+          1.0f,
+          0.0f);
+      __m512 float_scale[4] = {
+          _mm512_loadu_ps(scale),
+          _mm512_loadu_ps(scale + 16),
+          _mm512_loadu_ps(scale + 32),
+          _mm512_loadu_ps(scale + 48)};
+      __m512 float_zero_point[4] = {
+          _mm512_loadu_ps(zero_point),
+          _mm512_loadu_ps(zero_point + 16),
+          _mm512_loadu_ps(zero_point + 32),
+          _mm512_loadu_ps(zero_point + 48)};
+      for (int k = 0; k < K; k++) {
+        uint8_t* src = B;
+        BFloat16* dst = b;
+        __m256i packed = _mm256_load_si256((__m256i*)src);
+        __m512i int32[4];
+        {
+          auto low_4bit = _mm512_cvtepu8_epi32(_mm256_castsi256_si128(packed));
+          auto high_4bit = _mm512_srli_epi32(low_4bit, 4);
+          int32[0] = low_4bit;
+          int32[2] = high_4bit;
+        }
+        {
+          auto low_4bit =
+              _mm512_cvtepu8_epi32(_mm256_extracti128_si256(packed, 1));
+          auto high_4bit = _mm512_srli_epi32(low_4bit, 4);
+          int32[1] = low_4bit;
+          int32[3] = high_4bit;
+        }
+        for (int idx = 0; idx < 4; idx++) {
+          __m512 vb = _mm512_permutexvar_ps(int32[idx], lut);
+          vb = _mm512_sub_ps(vb, float_zero_point[idx]);
+          vb = _mm512_mul_ps(vb, float_scale[idx]);
+          _mm256_storeu_si256((__m256i*)(b + idx * 16), cvt_fp32_to_bf16(vb));
+        }
+        B += N / 2;
+        b += N;
+      }
+    } else {
+      const int COLS = N / 16;
+      for (int k = 0; k < K; k++) {
+        uint8_t* src = B;
+        BFloat16* dst = b;
+        int j, idx;
+        for (idx = 0, j = 0; j < COLS * 16; j += 16) {
+          __m512 float_scale = _mm512_loadu_ps(scale + j);
+          __m512 float_zero_point = _mm512_loadu_ps(zero_point + j);
+          dequant_to_bf16_(src, dst, float_scale, float_zero_point);
+          src += 8;
+          dst += 16;
+        }
+        if (j < N) {
+          const int res = N - j;
+          int rr = res / 2;
+          int l = 0;
+          for (; l < rr * 2; l += 2) {
+            const uint8_t vi = src[l / 2];
+            const int8_t vi0 = vi & 0xf;
+            const int8_t vi1 = vi >> 4;
+            const float v0 = (vi0 - zero_point[j + l]) * scale[j + l];
+            const float v1 = (vi1 - zero_point[j + l + 1]) * scale[j + l + 1];
+            dst[l + 0] = v0;
+            dst[l + 1] = v1;
+          }
+          if (l < res) {
+            const uint8_t vi = src[l / 2];
+            const int8_t vi0 = vi & 0xf;
+            const float v0 = (vi0 - zero_point[j + l]) * scale[j + l];
+            dst[l + 0] = v0;
+          }
+        }
+        B += N / 2;
+        b += N;
+      }
+    }
+  } else {
+    int i = 0;
+    for (; i < K * N / 2 * 2; i += 2) {
+      const uint8_t vi = B[i / 2];
+      const int8_t vi0 = vi & 0xf;
+      const int8_t vi1 = vi >> 4;
+      const float v0 = (vi0 - zero_point[i % N]) * scale[i % N];
+      const float v1 = (vi1 - zero_point[(i + 1) % N]) * scale[(i + 1) % N];
+      b[i + 0] = v0;
+      b[i + 1] = v1;
+    }
+    if (i < K * N) {
+      const uint8_t vi = B[i / 2];
+      const int8_t vi0 = vi & 0xf;
+      const float v0 = (vi0 - zero_point[i % N]) * scale[i % N];
+      b[i + 0] = v0;
+    }
+  }
+}
 
 void add_bias(float* C, float* bias, int M, int N, int ldc) {
   int COLS = N / 16;
@@ -1001,7 +1575,36 @@ void pack(
     int K,
     int N,
     int ldb,
-    bool trans_B) {}
+    bool trans_B) {
+  AT_ASSERTM(
+      trans_B, "B must be transposed!"); // B must be transposed, shape:[N x K]
+  static_assert(BLOCK_N == 64, "BLOCK_N must be 64");
+  const int blks = (N + BLOCK_N - 1) / BLOCK_N;
+#pragma omp parallel for
+  for (int i = 0; i < blks; i++) {
+    int rows = BLOCK_N;
+    if (i == blks - 1) {
+      rows = N - i * BLOCK_N;
+    }
+    const uint8_t* psrc = B + i * BLOCK_N * K / 2;
+    uint8_t* pdst = packed_B + i * K * BLOCK_N / 2;
+    for (int c = 0; c < K; c++) {
+      if (rows != BLOCK_N) {
+        for (int r = 0; r < rows; r++) {
+          uint8_t tmp = extract_element(psrc, c, r, K);
+          insert_element(pdst, c, r, rows, tmp);
+        }
+      } else {
+        for (int r = 0; r < BLOCK_N / 2; r++) {
+          uint8_t tmp = extract_element(psrc, c, r, K);
+          insert_element(pdst, c, r * 2, rows, tmp);
+          tmp = extract_element(psrc, c, r + BLOCK_N / 2, K);
+          insert_element(pdst, c, r * 2 + 1, rows, tmp);
+        }
+      }
+    }
+  }
+}
 
 // TODO: optimize with vectorized transposition
 void unpack(
@@ -1042,7 +1645,36 @@ void unpack(
     int K,
     int N,
     int ldb,
-    bool trans_B) {}
+    bool trans_B) {
+  AT_ASSERTM(
+      trans_B, "B must be transposed!"); // B must be transposed, shape:[N x K]
+  static_assert(BLOCK_N == 64, "BLOCK_N must be 64");
+  const int blks = (N + BLOCK_N - 1) / BLOCK_N;
+#pragma omp parallel for
+  for (int i = 0; i < blks; i++) {
+    int rows = BLOCK_N;
+    if (i == blks - 1) {
+      rows = N - i * BLOCK_N;
+    }
+    uint8_t* pdst = unpacked_B + i * BLOCK_N * K / 2;
+    const uint8_t* psrc = packed_B + i * K * BLOCK_N / 2;
+    for (int c = 0; c < K; c++) {
+      if (rows != BLOCK_N) {
+        for (int r = 0; r < rows; r++) {
+          uint8_t tmp = extract_element(psrc, r, c, rows);
+          insert_element(pdst, r, c, K, tmp);
+        }
+      } else {
+        for (int r = 0; r < BLOCK_N / 2; r++) {
+          uint8_t tmp = extract_element(psrc, r * 2, c, rows);
+          insert_element(pdst, r, c, K, tmp);
+          tmp = extract_element(psrc, r * 2 + 1, c, rows);
+          insert_element(pdst, r + BLOCK_N / 2, c, K, tmp);
+        }
+      }
+    }
+  }
+}
 
 // dequant per channel
 template <bool has_bias, int BLOCK_M>

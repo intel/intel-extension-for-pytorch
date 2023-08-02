@@ -60,6 +60,14 @@ inline libxsmm_datatype XsmmDtype<int32_t>() {
   return LIBXSMM_DATATYPE_I32;
 }
 template <>
+inline libxsmm_datatype XsmmDtype<int8_t>() {
+  return LIBXSMM_DATATYPE_I8;
+}
+template <>
+inline libxsmm_datatype XsmmDtype<uint8_t>() {
+  return LIBXSMM_DATATYPE_U8;
+}
+template <>
 inline libxsmm_datatype XsmmDtype<float>() {
   return LIBXSMM_DATATYPE_F32;
 }
@@ -2120,8 +2128,7 @@ class BrgemmTPP {
       if (p->a_trans == 1)
         l_flags |= LIBXSMM_GEMM_FLAG_TRANS_B;
       if (brgemm_type != 0) {
-        if (p->b_vnni)
-          l_flags |= LIBXSMM_GEMM_FLAG_VNNI_A;
+        if (p->b_vnni) l_flags |= LIBXSMM_GEMM_FLAG_VNNI_A;
         if (p->a_trans == 1) {
           l_flags |= LIBXSMM_GEMM_FLAG_VNNI_B;
         }
@@ -2152,8 +2159,13 @@ class BrgemmTPP {
       l_shape.ldc = p->ldc;
       l_shape.a_in_type = XsmmDtype<Tin>();
       l_shape.b_in_type = XsmmDtype<Tin>();
-      l_shape.out_type = XsmmDtype<Tout>();
       l_shape.comp_type = LIBXSMM_DATATYPE_F32;
+      // TODO(jgong5): we should not always assume u8*i8 for int8 gemm
+      if (std::is_same<Tin, int8_t>()) {
+        l_flags |= LIBXSMM_GEMM_FLAG_B_UNSIGNED;
+        l_shape.comp_type = LIBXSMM_DATATYPE_I32;
+      }
+      l_shape.out_type = XsmmDtype<Tout>();
 
       l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
       l_brconfig.br_stride_a_hint = p->str_b * sizeof(Tin);

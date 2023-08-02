@@ -2,7 +2,7 @@
 set -x
 set -e
 
-VER_IPEX="v2.1.0.dev+cpu.llm"
+VER_IPEX="llm_feature_branch"
 
 # Check existance of required Linux commands
 for CMD in python git nproc conda; do
