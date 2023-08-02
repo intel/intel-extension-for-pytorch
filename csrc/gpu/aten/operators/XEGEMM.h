@@ -11,10 +11,149 @@
 
 using namespace xpu::xetla;
 
-#define RECORD_FUNCTION_IMPL(F)                                             \
-  char str__[100];                                                          \
-  sprintf(str__, "%s_%d(%d, %d, %d)", "" #F, selected_policy_, m_, n_, k_); \
+#define RECORD_FUNCTION_IMPL(F)                        \
+  char str__[100];                                     \
+  sprintf(str__, "%s(%d, %d, %d)", "" #F, m_, n_, k_); \
   RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+
+#define HGEMM_DISPATCH(F)                                      \
+  {                                                            \
+    RECORD_FUNCTION_IMPL(F)                                    \
+    F(q,                                                       \
+      reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()), \
+      reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()), \
+      reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()), \
+      m_,                                                      \
+      n_,                                                      \
+      k_);                                                     \
+  }
+
+#define HGEMM_BIAS_DISPATCH(F)                                            \
+  {                                                                       \
+    RECORD_FUNCTION_IMPL(F)                                               \
+    F(q,                                                                  \
+      reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+      m_,                                                                 \
+      n_,                                                                 \
+      k_);                                                                \
+  }
+
+#define HGEMM_BIAS_RES_RES_DISPATCH(F)                                    \
+  {                                                                       \
+    RECORD_FUNCTION_IMPL(F)                                               \
+    F(q,                                                                  \
+      reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+      reinterpret_cast<sycl::half*>(epilogues_[1]->data_ptr<scalar_t>()), \
+      reinterpret_cast<sycl::half*>(epilogues_[2]->data_ptr<scalar_t>()), \
+      m_,                                                                 \
+      n_,                                                                 \
+      k_);                                                                \
+  }
+
+#define HGEMM_BIAS_GELU_DISPATCH(F)                                       \
+  {                                                                       \
+    RECORD_FUNCTION_IMPL(F)                                               \
+    F(q,                                                                  \
+      reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+      m_,                                                                 \
+      n_,                                                                 \
+      k_);                                                                \
+  }
+
+#define HGEMM_RESMUL_DISPATCH(F)                                          \
+  {                                                                       \
+    RECORD_FUNCTION_IMPL(F)                                               \
+    F(q,                                                                  \
+      reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+      m_,                                                                 \
+      n_,                                                                 \
+      k_);                                                                \
+  }
+
+#define HGEMM_SILU_DISPATCH(F)                                 \
+  {                                                            \
+    RECORD_FUNCTION_IMPL(F)                                    \
+    F(q,                                                       \
+      reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()), \
+      reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()), \
+      reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()), \
+      m_,                                                      \
+      n_,                                                      \
+      k_);                                                     \
+  }
+
+#define HGEMM_RES_DISPATCH(F)                                             \
+  {                                                                       \
+    RECORD_FUNCTION_IMPL(F)                                               \
+    F(q,                                                                  \
+      reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+      m_,                                                                 \
+      n_,                                                                 \
+      k_);                                                                \
+  }
+
+#define HGEMM_BIAS_XRES_DISPATCH(F)                                       \
+  {                                                                       \
+    RECORD_FUNCTION_IMPL(F)                                               \
+    F(q,                                                                  \
+      reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),            \
+      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+      reinterpret_cast<sycl::half*>(epilogues_[1]->data_ptr<scalar_t>()), \
+      (scalar_t)pf32[1],                                                  \
+      m_,                                                                 \
+      n_,                                                                 \
+      k_);                                                                \
+  }
+
+#define HGEMM_COMMON_DISPATCH_IMPL(DISPATCHER, F) \
+  if (is_b_row_major_)                            \
+    DISPATCHER(F##true_)                          \
+  else                                            \
+    DISPATCHER(F##false_)
+
+#define HGEMM_COMMON_DISPATCH(F)                                               \
+  {                                                                            \
+    if (num_epilogues_ == 0)                                                   \
+      HGEMM_COMMON_DISPATCH_IMPL(HGEMM_DISPATCH, hgemm##F)                     \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS)                 \
+      HGEMM_COMMON_DISPATCH_IMPL(HGEMM_BIAS_DISPATCH, hgemm_bias##F)           \
+    else if (                                                                  \
+        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                    \
+        epilogue_type_[1] == RES_ADD && epilogue_type_[2] == RES_ADD)          \
+      HGEMM_COMMON_DISPATCH_IMPL(                                              \
+          HGEMM_BIAS_RES_RES_DISPATCH, hgemm_bias_res_res##F)                  \
+    else if (                                                                  \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                    \
+        epilogue_type_[1] == GELU)                                             \
+      HGEMM_COMMON_DISPATCH_IMPL(HGEMM_BIAS_GELU_DISPATCH, hgemm_bias_gelu##F) \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL)              \
+      HGEMM_COMMON_DISPATCH_IMPL(HGEMM_RESMUL_DISPATCH, hgemm_resmul##F)       \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == SILU)                 \
+      HGEMM_COMMON_DISPATCH_IMPL(HGEMM_SILU_DISPATCH, hgemm_silu##F)           \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD)              \
+      HGEMM_COMMON_DISPATCH_IMPL(HGEMM_RES_DISPATCH, hgemm_res##F)             \
+    else if (                                                                  \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                    \
+        epilogue_type_[1] == SCALED_RES_ADD)                                   \
+      HGEMM_COMMON_DISPATCH_IMPL(HGEMM_BIAS_XRES_DISPATCH, hgemm_bias_res##F)  \
+  }
 
 inline Tensor resize_as_mat1(const Tensor& mat1, const Tensor& output) {
   auto output_ = output.flatten(0, -2);
@@ -50,7 +189,6 @@ class HGEMMXetla final {
   bool is_b_col_major_;
   bool fallback_;
   bool allow_fallback_ = false;
-  int selected_policy_;
   int m_, n_, k_;
 
  public:
@@ -111,6 +249,9 @@ class HGEMMXetla final {
     bool ck2 = is_a_row_major_;
     if (!(ck0 && ck1 && ck2))
       return *this;
+    // if (!(m_ <= 32 && n_ >= 4096 && k_ >= 4096)) // TODO:
+    if (!(n_ >= 4096 && k_ >= 1024))
+      return *this;
     if (allow_fallback_ && m_ > 1024)
       return *this;
     for (int i = 0; i < num_epilogues_; i++) {
@@ -138,8 +279,6 @@ class HGEMMXetla final {
       }
     }
     fallback_ = false;
-    selected_policy_ = select_gemm_config(
-        m_, n_, k_, is_b_row_major_, 64); // 64 is subslice count per tile
     return *this;
   }
 
@@ -147,103 +286,33 @@ class HGEMMXetla final {
     using scalar_t =
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
     auto& q = dpcppGetCurrentQueue();
-
-    if (num_epilogues_ == 0) {
-      RECORD_FUNCTION_IMPL(hgemm)
-      hgemm_policies[selected_policy_](
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          m_,
-          n_,
-          k_);
-    } else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS) {
-      RECORD_FUNCTION_IMPL(hgemm_bias)
-      hgemm_bias_policies[selected_policy_](
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()),
-          m_,
-          n_,
-          k_);
-    } else if (
-        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&
-        epilogue_type_[1] == RES_ADD && epilogue_type_[2] == RES_ADD) {
-      RECORD_FUNCTION_IMPL(hgemm_bias_res_res)
-      hgemm_bias_res_res_policies[selected_policy_](
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(epilogues_[1]->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(epilogues_[2]->data_ptr<scalar_t>()),
-          m_,
-          n_,
-          k_);
-    } else if (
-        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&
-        epilogue_type_[1] == GELU) {
-      RECORD_FUNCTION_IMPL(hgemm_bias_gelu)
-      hgemm_bias_gelu_policies[selected_policy_](
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()),
-          m_,
-          n_,
-          k_);
-    } else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL) {
-      RECORD_FUNCTION_IMPL(hgemm_resmul)
-      hgemm_resmul_policies[selected_policy_](
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()),
-          m_,
-          n_,
-          k_);
-    } else if (num_epilogues_ == 1 && epilogue_type_[0] == SILU) {
-      RECORD_FUNCTION_IMPL(hgemm_silu)
-      hgemm_silu_policies[selected_policy_](
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          m_,
-          n_,
-          k_);
-    } else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD) {
-      RECORD_FUNCTION_IMPL(hgemm_res)
-      hgemm_res_policies[selected_policy_](
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()),
-          m_,
-          n_,
-          k_);
-    } else if (
-        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&
-        epilogue_type_[1] == SCALED_RES_ADD) {
-      RECORD_FUNCTION_IMPL(hgemm_bias_res)
-      hgemm_bias_res_policies[selected_policy_](
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(epilogues_[1]->data_ptr<scalar_t>()),
-          (scalar_t)pf32[1],
-          m_,
-          n_,
-          k_);
+    if (m_ == 60 && n_ == 4096 && k_ == 4096) {
+      HGEMM_COMMON_DISPATCH(_32x64_8x16x32_2_);
+    } else if (m_ == 60 && (n_ >= 16384) && k_ == 4096) {
+      HGEMM_COMMON_DISPATCH(_256x256_32x64x16_1_);
+    } else if (m_ >= 1024) {
+      HGEMM_COMMON_DISPATCH(_256x256_32x64x32_1_);
+    } else if (m_ >= 32) {
+      HGEMM_COMMON_DISPATCH(_32x256_8x32x16_1_);
+    } else if (n_ == 13824 && (k_ == 4096 || k_ == 5120)) {
+      HGEMM_COMMON_DISPATCH(
+          _8x512_8x32x16_2_); // HGEMM_IMPL_FUNC(8, 256, 8, 32, 16, 2, false)
+      return;
+    } else if ((n_ == 4096 || n_ == 5120) && k_ == 13824) {
+      HGEMM_COMMON_DISPATCH(_8x128_8x16x16_4_);
+      return;
+    } else if (n_ >= 4096 && n_ < 5120) {
+      HGEMM_COMMON_DISPATCH(_32x64_8x16x16_2_);
+      return;
+    } else if (n_ >= 5120 && n_ < 11008) {
+      HGEMM_COMMON_DISPATCH(_8x128_8x16x16_4_); // 8, 128, 8, 16, 16, 4
+      return;
+    } else if (n_ >= 11008 && n_ < 13824) {
+      HGEMM_COMMON_DISPATCH(_16x256_8x16x16_1_); // 16, 256, 8, 16, 16, 1
+      return;
+    } else {
+      HGEMM_COMMON_DISPATCH(_8x512_8x16x16_1_); // 8, 512, 8, 16, 16, 1
+      return;
     }
   }
 };
