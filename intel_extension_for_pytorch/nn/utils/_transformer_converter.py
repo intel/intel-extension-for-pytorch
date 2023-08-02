@@ -97,7 +97,7 @@ def gemm_padding(weight, bias=None):
         return weight, bias
 
 def pad_for_gptj_lm_head(model, is_int4):
-    if is_int4:
+    if 0: # is_int4:
         n = model.lm_head.qweight.shape[1] * 2 - 1 #specific for 50401(25201) int4 weight
 
         lm_head_new = IPEXEmptyINT4LinearWithPadding(n)
