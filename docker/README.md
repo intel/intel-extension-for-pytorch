@@ -12,14 +12,24 @@ Assumptions:
 
 ## Docker
 
-### Build the container:
+### Build or Pull Container:
 
 `./build.sh` script has docker build command, update all the relevant build arguments and execute the script.
 
 ```bash
 ./build.sh [xpu-flex/xpu-max]
 ```
+To pull docker images use the following commands:
 
+For Flex GPU:
+```bash
+docker pull intel/intel-extension-for-pytorch:xpu-flex
+```
+
+For Max GPU:
+```bash
+docker pull intel/intel-extension-for-pytorch:xpu-max
+```
 ### Running container:
 
 Run the following commands to start Intel® Extension for PyTorch\* GPU container. You can use `-v` option to mount your
@@ -29,11 +39,11 @@ docker container so that the GPU is accessible.
 
 For Flex GPU:
 ```
-IMAGE_NAME=intel-extension-for-pytorch:xpu-flex
+IMAGE_NAME=intel/intel-extension-for-pytorch:xpu-flex
 ```
 For Max GPU:
 ```
-IMAGE_NAME=intel-extension-for-pytorch:xpu-max
+IMAGE_NAME=intel/intel-extension-for-pytorch:xpu-max
 ```
 ```bash
 
