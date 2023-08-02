@@ -462,6 +462,8 @@ def ipex_beam_search(
     # origin_input_ids size is [batch_size * beam_size, seq_len]
     out = torch.ops.torch_ipex.update_output_sequence(origin_input_ids, out, batch_size)
     IPEXTransformerAtten.release_all_static_cached_resources()
+    torch.xpu.synchronize()
+    torch.xpu.empty_cache()
     if hasattr(self, "token_latency") and self.token_latency:
         return out, latency_list
     return out
