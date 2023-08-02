@@ -27,7 +27,7 @@ MODEL_CLASSES = {
 }
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", nargs="?", default="EleutherAI/gpt-j-6b")
+parser.add_argument("-m", "--model", nargs="?", default="EleutherAI/gpt-j-6b")
 parser.add_argument("--output_dir", nargs="?", default="./saved_results")
 parser.add_argument("--device", default="cpu", type=str, help="cpu")
 parser.add_argument(
@@ -307,6 +307,49 @@ if args.accuracy_only:
                             for i in range(self.base_model.config.n_layer)
                         ]
                     )
+                elif re.search(
+                    "OPT", self.base_model.config.architectures[0], re.IGNORECASE
+                ):
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(input_bs)), dtype=torch.long
+                    ).contiguous()
+                    past_key_values = tuple(
+                        [
+                            (
+                                torch.zeros(
+                                    [
+                                        1,
+                                        int(
+                                            self.base_model.config.num_attention_heads
+                                            / self.tp_number
+                                        ),
+                                        1,
+                                        int(
+                                            self.base_model.config.hidden_size
+                                            / self.base_model.config.num_attention_heads
+                                        ),
+                                    ]
+                                ).contiguous(),
+                                torch.zeros(
+                                    [
+                                        1,
+                                        int(
+                                            self.base_model.config.num_attention_heads
+                                            / self.tp_number
+                                        ),
+                                        1,
+                                        int(
+                                            self.base_model.config.hidden_size
+                                            / self.base_model.config.num_attention_heads
+                                        ),
+                                    ]
+                                ).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, dtype=torch.long).contiguous(),
+                            )
+                            for i in range(self.base_model.config.num_hidden_layers)
+                        ]
+                    )
 
                 position_ids = torch.arange(len(input_ids))
                 attention_mask = torch.ones(len(input_ids))
@@ -327,6 +370,10 @@ if args.accuracy_only:
                     if self._dtype != "int8":
                         if re.search(
                             "bloom",
+                            self.base_model.config.architectures[0],
+                            re.IGNORECASE,
+                        ) or re.search(
+                            "OPT",
                             self.base_model.config.architectures[0],
                             re.IGNORECASE,
                         ):
@@ -356,6 +403,8 @@ if args.accuracy_only:
 
                     if re.search(
                         "bloom", self.base_model.config.architectures[0], re.IGNORECASE
+                    ) or re.search(
+                        "OPT", self.base_model.config.architectures[0], re.IGNORECASE
                     ):
                         self.model(
                             inputs,
@@ -385,6 +434,8 @@ if args.accuracy_only:
 
             if re.search(
                 "bloom", self.base_model.config.architectures[0], re.IGNORECASE
+            ) or re.search(
+                "OPT", self.base_model.config.architectures[0], re.IGNORECASE
             ):
                 with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
                     enabled=True

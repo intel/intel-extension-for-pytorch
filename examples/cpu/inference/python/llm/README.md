@@ -1,6 +1,6 @@
 # Text Generation
 We provide the inference benchmarking script `run_generation.py` for large language models text generation.<br/>
-Support large language models, such as GPT-J, LLaMA, GPT-Neox.<br/>
+Support large language models, such as GPT-J, LLaMA, GPT-Neox, OPT.<br/>
 And script `run_generation_with_deepspeed.py` for distributed with DeepSpeed.<br/>
 And script `run_model_int8.py` for int8.<br/>
 
@@ -93,7 +93,8 @@ wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prom
 (1) "EleutherAI/gpt-j-6b" (model id from transformers Hub)
 (2) "EleutherAI/gpt-neox-20b" (model id from transformers Hub)
 (3) Llama 2 Model directory path
-Note: Above models are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM models (like OPT, Bloom...), we could still run with this BKC, and may get parts of optimizations like prepacked TPP Linear (fp32/bf16), and we are working in progress to cover all optimizations to these other LLM models, which will expand the model list above.
+(4) "facebook/opt-30b" (model id from transformers Hub)
+Note: Above models are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM models (like Bloom...), we could still run with this BKC, and may get parts of optimizations like prepacked TPP Linear (fp32/bf16), and we are working in progress to cover all optimizations to these other LLM models, which will expand the model list above.
 ```
 * Llama 2 model conversion steps:
     1) [transformers conversion tool](https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/convert_llama_weights_to_hf.py) (Verified [meta-llama/Llama-2-7b-chat](https://huggingface.co/meta-llama/Llama-2-7b-chat) and [meta-llama/Llama-2-13b-chat](https://huggingface.co/meta-llama/Llama-2-13b-chat)).
@@ -146,7 +147,7 @@ unset KMP_AFFINITY
 # Get prompt file to the path of scripts
 mv PATH/TO/prompt.json WORK_DIR
 
-# Run GPTJ/LLAMA with bfloat16  DeepSpeed
+# Run GPTJ/LLAMA/OPT with bfloat16  DeepSpeed
 deepspeed --bind_cores_to_rank run_generation_with_deepspeed.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --jit
 
 # Run GPT-NeoX with ipex weight only quantization

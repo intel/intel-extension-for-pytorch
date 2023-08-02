@@ -76,7 +76,7 @@ def _optimize_transformers(
     r"""
     Apply optimizations at Python frontend to the given transformers model (nn.Module) for inference only.
     This API focus on transformers models, especially for generation tasks inference.
-    Well supported model list: Llama, GPT-J, GPT-Neox.
+    Well supported model list: Llama, GPT-J, GPT-Neox, OPT.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations on.
@@ -141,7 +141,7 @@ def _optimize_transformers(
                 _LlamaAttention_GQA,
                 _GPTJAttention,
                 _GPTNeoXAttention,
-                OPTAttention_forward,
+                _OPTAttention,
                 _reorder_cache,
             )
             from intel_extension_for_pytorch.cpu.tpp.fused_llm import (
@@ -240,11 +240,6 @@ def _optimize_transformers(
                     transformers.models.opt.modeling_opt.OPTDecoder,
                     OPTDecoder_forward,
                 )
-                convert_forward(
-                    _model,
-                    transformers.models.opt.modeling_opt.OPTAttention,
-                    OPTAttention_forward,
-                )
                 convert_class(
                     _model,
                     transformers.models.gpt_neox.modeling_gpt_neox.GPTNeoXAttention,
@@ -269,6 +264,12 @@ def _optimize_transformers(
                     _model,
                     transformers.models.gptj.modeling_gptj.GPTJAttention,
                     _GPTJAttention,
+                    _model.config,
+                )
+                convert_class(
+                    _model,
+                    transformers.models.opt.modeling_opt.OPTAttention,
+                    _OPTAttention,
                     _model.config,
                 )
 
