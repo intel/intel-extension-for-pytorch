@@ -43,7 +43,7 @@ git clone https://github.com/EleutherAI/lm-evaluation-harness
 cd lm-evaluation-harness
 pip install -e .
 
-# Install transformers
+# Install transformers (version 4.31.0 is required for testing LLaMA2 70B model)
 pip install transformers==4.28.1
 # Install others deps
 pip install cpuid accelerate datasets sentencepiece protobuf==3.20.3
