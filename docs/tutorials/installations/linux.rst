@@ -300,17 +300,3 @@ You can get full usage help message by running the run file alone, as the follow
 .. code:: shell
 
   bash <libintel-ext-pt-name>.run
-
-Solutions to potential issues on WSL2
--------------------------------------
-
-.. list-table::
-   :widths: auto
-   :header-rows: 1
-
-   * - Issue
-     - Explanation
-   * - Building from source for Intel® Arc™ A-Series GPUs failed on WSL2 without any error thrown
-     - Your system probably does not have enough RAM, so Linux kernel's Out-of-memory killer got invoked. You can verify it by running `dmesg` on bash (WSL2 terminal). If the OOM killer had indeed killed the build process, then you can try increasing the swap-size of WSL2, and/or decreasing the number of parallel build jobs with the environment variable `MAX_JOBS` (by default, it's equal to the number of logical CPU cores. So, setting `MAX_JOBS` to 1 is a very conservative approach, which would slow things down a lot).
-   * - On WSL2, some workloads terminate with an error `CL_DEVICE_NOT_FOUND` after some time 
-     - This is due to the `TDR feature <https://learn.microsoft.com/en-us/windows-hardware/drivers/display/tdr-registry-keys#tdrdelay>`_ in Windows. You can try increasing TDRDelay in your Windows Registry to a large value, such as 20 (it is 2 seconds, by default), and reboot.
