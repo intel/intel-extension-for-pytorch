@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Technical Details &mdash; intel_extension_for_pytorch 2.0.110+xpu documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = “intel-extension-for-pytorch”; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="ISA Dynamic Dispatching" href="technical_details/isa_dynamic_dispatch.html" />
+    <link rel="prev" title="Known Issues" href="performance_tuning/known_issues.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../">2.0.110+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cheat_sheet.html">Cheat Sheet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Technical Details</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#isa-dynamic-dispatching-cpu">ISA Dynamic Dispatching [CPU]</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="technical_details/isa_dynamic_dispatch.html">ISA Dynamic Dispatching</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#graph-optimization-cpu">Graph Optimization [CPU]</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="technical_details/graph_optimization.html">Graph Optimization</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#optimizer-optimization-cpu-gpu">Optimizer Optimization [CPU, GPU]</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="technical_details/optimizer_fusion_cpu.html">Optimizer Fusion on CPU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="technical_details/optimizer_fusion_gpu.html">Optimizer Fusion on GPU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="technical_details/split_sgd.html">Split SGD</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#ahead-of-time-compilation-aot-gpu">Ahead of Time Compilation (AOT) [GPU]</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="technical_details/AOT.html">Ahead of Time (AOT) Compilation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#memory-management-gpu">Memory Management [GPU]</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="technical_details/memory_management.html">Memory Management</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Technical Details</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/technical_details.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="technical-details">
+<h1>Technical Details<a class="headerlink" href="#technical-details" title="Permalink to this heading"></a></h1>
+<section id="isa-dynamic-dispatching-cpu">
+<h2>ISA Dynamic Dispatching [CPU]<a class="headerlink" href="#isa-dynamic-dispatching-cpu" title="Permalink to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* features dynamic dispatching functionality to automatically adapt execution binaries to the most advanced instruction set available on your machine.</p>
+<p>For more detailed information, check <a class="reference external" href="technical_details/isa_dynamic_dispatch.html">ISA Dynamic Dispatching</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="graph-optimization-cpu">
+<h2>Graph Optimization [CPU]<a class="headerlink" href="#graph-optimization-cpu" title="Permalink to this heading"></a></h2>
+<p>To further optimize TorchScript performance, Intel® Extension for PyTorch* supports transparent fusion of frequently used operator patterns such as Conv2D+ReLU and Linear+ReLU.
+For more detailed information, check <a class="reference external" href="technical_details/graph_optimization.html">Graph Optimization</a>.</p>
+<p>Compared to eager mode, graph mode in PyTorch normally yields better performance from optimization methodologies such as operator fusion. Intel® Extension for PyTorch* provides further optimizations in graph mode. We recommend you take advantage of Intel® Extension for PyTorch* with <a class="reference external" href="https://pytorch.org/docs/stable/jit.html">TorchScript</a>. You may wish to run with the <cite>torch.jit.trace()</cite> function first, since it generally works better with Intel® Extension for PyTorch* than using the <cite>torch.jit.script()</cite> function. More detailed information can be found at the <a class="reference external" href="https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html#tracing-modules">pytorch.org website</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="optimizer-optimization-cpu-gpu">
+<h2>Optimizer Optimization [CPU, GPU]<a class="headerlink" href="#optimizer-optimization-cpu-gpu" title="Permalink to this heading"></a></h2>
+<p>Optimizers are a key part of the training workloads. Intel® Extension for PyTorch* brings two types of optimizations to optimizers:</p>
+<ol class="arabic simple">
+<li><p>Operator fusion for the computation in the optimizers. <strong>[CPU, GPU]</strong></p></li>
+<li><p>SplitSGD for BF16 training, which reduces the memory footprint of the master weights by half. <strong>[CPU]</strong></p></li>
+</ol>
+<div class="toctree-wrapper compound">
+</div>
+<p>For more detailed information, check <a class="reference external" href="technical_details/optimizer_fusion_cpu.html">Optimizer Fusion on CPU</a>, <a class="reference external" href="technical_details/optimizer_fusion_gpu.html">Optimizer Fusion on GPU</a> and <a class="reference external" href="technical_details/split_sgd.html">Split SGD</a>.</p>
+</section>
+<section id="ahead-of-time-compilation-aot-gpu">
+<h2>Ahead of Time Compilation (AOT) [GPU]<a class="headerlink" href="#ahead-of-time-compilation-aot-gpu" title="Permalink to this heading"></a></h2>
+<p><a class="reference external" href="https://www.intel.com/content/www/us/en/develop/documentation/oneapi-dpcpp-cpp-compiler-dev-guide-and-reference/top/compilation/ahead-of-time-compilation.html">AOT Compilation</a> is a helpful feature for development lifecycle or distribution time, when you know beforehand what your target device is going to be at application execution time. When AOT compilation is enabled, no additional compilation time is needed when running application. It also benifits the product quality since no just-in-time (JIT) bugs encountered as JIT is skipped and final code executing on the target device can be tested as-is before delivery to end-users. The disadvantage of this feature is that the final distributed binary size will be increased a lot (e.g. from 500MB to 2.5GB for Intel® Extension for PyTorch*).</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="memory-management-gpu">
+<span id="xpu-memory-management"></span><h2>Memory Management [GPU]<a class="headerlink" href="#memory-management-gpu" title="Permalink to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* uses a caching memory allocator to speed up memory allocations. This allows fast memory deallocation without any overhead.
+Allocations are associated with a sycl device. The allocator attempts to find the smallest cached block that will fit the requested size from the reserved block pool.
+If it unable to find a appropriate memory block inside of already allocated ares, the allocator will delegate to allocate a new block memory.</p>
+<p>For more detailed information, check <a class="reference external" href="technical_details/memory_management.html">Memory Management</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="performance_tuning/known_issues.html" class="btn btn-neutral float-left" title="Known Issues" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="technical_details/isa_dynamic_dispatch.html" class="btn btn-neutral float-right" title="ISA Dynamic Dispatching" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7fbb62531a30> 
+  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a></div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

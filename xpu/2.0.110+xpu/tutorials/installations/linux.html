@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Installation Guide (Linux/WSL2) &mdash; intel_extension_for_pytorch 2.0.110+xpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = “intel-extension-for-pytorch”; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Ahead of Time (AOT) Compilation" href="../technical_details/AOT.html" />
+    <link rel="prev" title="Installation" href="../installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../../">2.0.110+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cheat_sheet.html">Cheat Sheet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../installation.html">Installation</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Installation Guide (Linux/WSL2)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#system-requirements">System Requirements</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#hardware-requirement">Hardware Requirement</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#software-requirements">Software Requirements</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#preparations">Preparations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#install-intel-gpu-driver">Install Intel GPU Driver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#install-oneapi-base-toolkit">Install oneAPI Base Toolkit</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#pytorch-intel-extension-for-pytorch-version-mapping">PyTorch-Intel® Extension for PyTorch* Version Mapping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#install-via-prebuilt-wheel-files">Install via prebuilt wheel files</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#via-pip-command">via pip command</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#generic-python">Generic Python</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#id7">Intel® Distribution for Python*</a></li>
+</ul>
+</li>
+<!--<li class="toctree-l4"><a class="reference internal" href="#via-conda-command">via conda command</a></li>-->
+<li class="toctree-l4"><a class="reference internal" href="#important-notes">Important Notes</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#install-via-compiling-from-source">Install via compiling from source</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#configure-the-aot-optional">Configure the AOT (Optional)</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../technical_details/AOT.html">Ahead of Time (AOT) Compilation</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#compile-the-bundle-pytorch-torchvision-torchaudio-intel-extension-for-pytorch-with-script">Compile the bundle (PyTorch*, torchvision, torchaudio, Intel® Extension for PyTorch*) with script</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#sanity-test">Sanity Test</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#install-c-sdk">Install C++ SDK</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="windows.html">Installation Guide (Windows)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../installation.html">Installation</a> &raquo;</li>
+      <li>Installation Guide (Linux/WSL2)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/installations/linux.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="installation-guide-linux-wsl2">
+<h1>Installation Guide (Linux/WSL2)<a class="headerlink" href="#installation-guide-linux-wsl2" title="Permalink to this heading"></a></h1>
+<section id="system-requirements">
+<h2>System Requirements<a class="headerlink" href="#system-requirements" title="Permalink to this heading"></a></h2>
+<section id="hardware-requirement">
+<h3>Hardware Requirement<a class="headerlink" href="#hardware-requirement" title="Permalink to this heading"></a></h3>
+<dl class="simple">
+<dt>Verified Hardware Platforms:</dt><dd><ul class="simple">
+<li><p>Intel® Data Center GPU Flex Series 170</p></li>
+<li><p>Intel® Data Center GPU Max Series</p></li>
+<li><p>Intel® Arc™ A-Series GPUs (Experimental support)</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+<section id="software-requirements">
+<h3>Software Requirements<a class="headerlink" href="#software-requirements" title="Permalink to this heading"></a></h3>
+<ul class="simple">
+<li><p>OS &amp; Intel GPU Drivers</p></li>
+</ul>
+<table class="colwidths-auto docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Hardware</p></th>
+<th class="head"><p>OS</p></th>
+<th class="head"><p>Driver</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Intel® Data Center GPU Flex Series</p></td>
+<td><p>Ubuntu 22.04 (Validated), Red Hat 8.6</p></td>
+<td><p><a class="reference external" href="https://dgpu-docs.intel.com/releases/stable_647_21_20230714.html">Stable 647.21</a></p></td>
+</tr>
+<tr class="row-odd"><td><p>Intel® Data Center GPU Max Series</p></td>
+<td><p>Ubuntu 22.04, Red Hat 8.6, Sles 15sp3/sp4 (Validated)</p></td>
+<td><p><a class="reference external" href="https://dgpu-docs.intel.com/releases/stable_647_21_20230714.html">Stable 647.21</a></p></td>
+</tr>
+<tr class="row-even"><td><p>Intel® Arc™ A-Series Graphics</p></td>
+<td><p>Ubuntu 22.04</p></td>
+<td><p><a class="reference external" href="https://dgpu-docs.intel.com/releases/stable_647_21_20230714.html">Stable 647.21</a></p></td>
+</tr>
+<tr class="row-odd"><td><p>Intel® Arc™ A-Series Graphics</p></td>
+<td><p>Windows 10, Windows 11 (21H2, 22H2) (via WSL2) (Validated)</p></td>
+<td><p><a class="reference external" href="https://www.intel.com/content/www/us/en/download/726609/intel-arc-iris-xe-graphics-whql-windows.html">Intel® Arc™ &amp; Iris® Xe Graphics - WHQL - Windows*</a></p></td>
+</tr>
+<tr class="row-even"><td><p>CPU (3<sup>rd</sup> and 4<sup>th</sup>  Gen of Intel® Xeon® Scalable Processors)</p></td>
+<td><p>Linux* distributions with glibc&gt;=2.17. Validated on CentOS 8.</p></td>
+<td><p>N/A</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><a class="reference external" href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html">Intel® oneAPI Base Toolkit 2023.2.0</a></p></li>
+<li><p>Python 3.8-3.11</p></li>
+<li><p>Verified with GNU GCC 11</p></li>
+</ul>
+</section>
+</section>
+<section id="preparations">
+<h2>Preparations<a class="headerlink" href="#preparations" title="Permalink to this heading"></a></h2>
+<section id="install-intel-gpu-driver">
+<h3>Install Intel GPU Driver<a class="headerlink" href="#install-intel-gpu-driver" title="Permalink to this heading"></a></h3>
+<table class="colwidths-auto docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>OS</p></th>
+<th class="head"><p>Instructions for installing Intel GPU Driver</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Linux*</p></td>
+<td><p>Refer to the <a class="reference external" href="https://dgpu-docs.intel.com/installation-guides/index.html">Installation Guides</a> for the driver installation on individual Linux* distributions. When installing the verified driver mentioned in the table above, use the specific version of each component packages mentioned in the installation guide page, such as <cite>sudo apt-get install intel-opencl-icd=&lt;version&gt;</cite></p></td>
+</tr>
+<tr class="row-odd"><td><p>Windows 10, Windows 11 (21H2, 22H2) (via WSL2) (Validated)</p></td>
+<td><p>Install the driver for Windows mentioned in the table above first on Windows. Then, follow Steps 4 &amp; 5 of the <a class="reference external" href="https://dgpu-docs.intel.com/installation-guides/ubuntu/ubuntu-jammy-arc.html#step-4-install-run-time-packages">Installation Guides</a> on WSL2 to install drivers for Linux.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="install-oneapi-base-toolkit">
+<h3>Install oneAPI Base Toolkit<a class="headerlink" href="#install-oneapi-base-toolkit" title="Permalink to this heading"></a></h3>
+<dl class="simple">
+<dt>The following components of Intel® oneAPI Base Toolkit are required:</dt><dd><ul class="simple">
+<li><p>Intel® oneAPI DPC++ Compiler (Placeholder <cite>DPCPPROOT</cite> as its installation path)</p></li>
+<li><p>Intel® oneAPI Math Kernel Library (oneMKL) (Placeholder <cite>MKLROOT</cite> as its installation path)</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+</section>
+<section id="pytorch-intel-extension-for-pytorch-version-mapping">
+<h2>PyTorch-Intel® Extension for PyTorch* Version Mapping<a class="headerlink" href="#pytorch-intel-extension-for-pytorch-version-mapping" title="Permalink to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* has to work with a corresponding version of PyTorch. Here are the PyTorch versions that we support and the mapping relationship:</p>
+<table class="colwidths-auto docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>PyTorch Version</p></th>
+<th class="head"><p>Extension Version</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><a class="reference external" href="https://github.com/pytorch/pytorch/tree/v2.0.1">v2.0.*</a> (patches needed)</p></td>
+<td><p><a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/v2.0.110+xpu">v2.0.*</a></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference external" href="https://github.com/pytorch/pytorch/tree/v1.13.1">v1.13.*</a> (patches needed)</p></td>
+<td><p><a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/v1.13.120+xpu">v1.13.*</a></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference external" href="https://github.com/pytorch/pytorch/tree/v1.10.0">v1.10.*</a> (patches needed)</p></td>
+<td><p><a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/v1.10.200+gpu">v1.10.*</a></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="install-via-prebuilt-wheel-files">
+<h2>Install via prebuilt wheel files<a class="headerlink" href="#install-via-prebuilt-wheel-files" title="Permalink to this heading"></a></h2>
+<section id="via-pip-command">
+<h3>via pip command<a class="headerlink" href="#via-pip-command" title="Permalink to this heading"></a></h3>
+<section id="generic-python">
+<h4>Generic Python<a class="headerlink" href="#generic-python" title="Permalink to this heading"></a></h4>
+<p>Prebuilt wheel files availability matrix for Python versions:</p>
+<table class="colwidths-auto docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Extension Version</p></th>
+<th class="head"><p>Python 3.6</p></th>
+<th class="head"><p>Python 3.7</p></th>
+<th class="head"><p>Python 3.8</p></th>
+<th class="head"><p>Python 3.9</p></th>
+<th class="head"><p>Python 3.10</p></th>
+<th class="head"><p>Python 3.11</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>2.0.110+xpu</p></td>
+<td></td>
+<td></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+</tr>
+<tr class="row-odd"><td><p>1.13.120+xpu</p></td>
+<td></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>1.13.10+xpu</p></td>
+<td></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>1.10.200+gpu</p></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>python -m pip install <span class="nv">torch</span><span class="o">==</span><span class="m">2</span>.0.1a0 <span class="nv">torchvision</span><span class="o">==</span><span class="m">0</span>.15.2a0 <span class="nv">intel_extension_for_pytorch</span><span class="o">==</span><span class="m">2</span>.0.110+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Under generic Python environments, do NOT install numpy from Intel conda channel.</p>
+</div>
+</section>
+<section id="id7">
+<h4><a class="reference external" href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/distribution-for-python.html">Intel® Distribution for Python*</a><a class="headerlink" href="#id7" title="Permalink to this heading"></a></h4>
+<p>Prebuit wheel files only support Python 3.9 for Intel® Distribution for Python* environment. Supported version starts from 1.13.10+xpu.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>python -m pip install <span class="nv">torch</span><span class="o">==</span><span class="m">2</span>.0.1a0 <span class="nv">torchvision</span><span class="o">==</span><span class="m">0</span>.15.2a0 <span class="nv">intel_extension_for_pytorch</span><span class="o">==</span><span class="m">2</span>.0.110+xpu -f https://developer.intel.com/ipex-whl-stable-xpu-idp
+</pre></div>
+</div>
+</section>
+</section>
+<!--<section id="via-conda-command">
+<h3>via conda command<a class="headerlink" href="#via-conda-command" title="Permalink to this heading"></a></h3>
+<p>Prebuilt conda packages availability matrix for Python versions:</p>
+<table class="colwidths-auto docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Extension Version</p></th>
+<th class="head"><p>Python 3.6</p></th>
+<th class="head"><p>Python 3.7</p></th>
+<th class="head"><p>Python 3.8</p></th>
+<th class="head"><p>Python 3.9</p></th>
+<th class="head"><p>Python 3.10</p></th>
+<th class="head"><p>Python 3.11</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>2.0.110+xpu</p></td>
+<td></td>
+<td></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+</tr>
+<tr class="row-odd"><td><p>1.13.120+xpu</p></td>
+<td></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td><p>✔️</p></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Prebuilt conda packages are stored in Intel channel on Anaconda: <a class="reference external" href="https://anaconda.org/intel/intel-extension-for-pytorch/files">intel-extension-for-pytorch</a> and <a class="reference external" href="https://anaconda.org/intel/pytorch/files">pytorch</a>.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>conda install intel-extension-for-pytorch<span class="o">=</span><span class="m">2</span>.0.110 <span class="nv">pytorch</span><span class="o">=</span><span class="m">2</span>.0.1 -c intel -c conda-forge
+</pre></div>
+</div>
+</section>-->
+<section id="important-notes">
+<h3>Important Notes<a class="headerlink" href="#important-notes" title="Permalink to this heading"></a></h3>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>Installation of TorchVision is optional.</p></li>
+<li><p>You may need to have gomp package in your system (<cite>apt install libgomp1</cite> or <cite>yum/dnf install libgomp</cite>).</p></li>
+<li><p>Since DPC++ compiler doesn’t support old <a class="reference external" href="https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html">C++ ABI</a> (<cite>_GLIBCXX_USE_CXX11_ABI=0</cite>), ecosystem packages, including PyTorch and TorchVision, need to be compiled with the new C++ ABI (<cite>_GLIBCXX_USE_CXX11_ABI=1</cite>).</p></li>
+<li><p>If you need TorchAudio, please follow the <a class="reference external" href="https://pytorch.org/audio/main/build.html">instructions</a> to compile it from source. According to torchaudio-pytorch dependency table, torchaudio 2.0.2 is recommended.</p></li>
+</ul>
+</div>
+</section>
+</section>
+<section id="install-via-compiling-from-source">
+<h2>Install via compiling from source<a class="headerlink" href="#install-via-compiling-from-source" title="Permalink to this heading"></a></h2>
+<section id="configure-the-aot-optional">
+<h3>Configure the AOT (Optional)<a class="headerlink" href="#configure-the-aot-optional" title="Permalink to this heading"></a></h3>
+<p>Please refer to <a class="reference external" href="../technical_details/AOT.html">AOT documentation</a> for how to configure <cite>USE_AOT_DEVLIST</cite>. Without configuring AOT, the start-up time for processes using Intel® Extension for PyTorch* will be long, so this step is important.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="compile-the-bundle-pytorch-torchvision-torchaudio-intel-extension-for-pytorch-with-script">
+<h3>Compile the bundle (PyTorch*, torchvision, torchaudio, Intel® Extension for PyTorch*) with script<a class="headerlink" href="#compile-the-bundle-pytorch-torchvision-torchaudio-intel-extension-for-pytorch-with-script" title="Permalink to this heading"></a></h3>
+<p>To ensure a smooth compilation of the bundle, including PyTorch*, torchvision, torchaudio, Intel® Extension for PyTorch*, a script is provided in the Github repo. If you would like to compile the binaries from source, it is highly recommended to utilize this script.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$ wget https://raw.githubusercontent.com/intel/intel-extension-for-pytorch/v2.0.110+xpu/scripts/compile_bundle.sh
+$ bash compile_bundle.sh &lt;DPCPPROOT&gt; &lt;MKLROOT&gt; <span class="o">[</span>AOT<span class="o">]</span>
+  DPCPPROOT and MKLROOT are mandatory, should be absolute or relative path to the root directory of DPC++ compiler and oneMKL respectively.
+  AOT is optional, should be the text string <span class="k">for</span> environment variable USE_AOT_DEVLIST.
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>Recommend to use the <cite>compile_bundle.sh</cite> script in a clean docker container with Intel GPU driver packages installed.</p></li>
+<li><p>Use the <cite>compile_bundle.sh</cite> script under a <cite>conda</cite> environment.</p></li>
+<li><p>Depends on what applications are available on your OS, you probably need to install some Linux commands, like <cite>patch</cite>, <cite>git</cite>, etc. Installation of these Linux commands are not included in this script.</p></li>
+<li><p>The <cite>compile_bundle.sh</cite> script downloads source code of PyTorch*, torchvision, torchaudio, Intel® Extension for PyTorch* into individual folders in its directory. You can consider to create a specific folder to use this script. Wheel files will be generated under <cite>dist</cite> folder of each source code directory. Besides, compilation progress is dumped into a log file <cite>build.log</cite> in each source code directory. The log file is helpful to identify errors occurred during compilation. Should any failure happened, after addressing the issue, you can simply run the <cite>compile_bundle.sh</cite> script again with the same command.</p></li>
+</ul>
+</div>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$ mkdir ipex_bundle
+$ <span class="nb">cd</span> ipex_bundle
+$ wget .../compile_bundle.sh
+$ bash compile_bundle.sh ...
+$ ls
+audio  compile_bundle.sh  intel_extension_for_pytorch  torch  vision
+$ tree -L <span class="m">3</span> .
+.
+├── audio
+│   ├── dist
+│   │   └── torchaudio-....whl
+│   ├ build.log
+│   └ ...
+├── compile_bundle.sh
+├── intel_extension_for_pytorch
+│   ├── dist
+│   │   └── intel_extension_for_pytorch-....whl
+│   ├ build.log
+│   └ ...
+├── torch
+│   ├── dist
+│   │   └── torch-....whl
+│   ├ build.log
+│   └ ...
+└── vision
+    ├── dist
+    │   └── torchvision-....whl
+    ├ build.log
+    └ ...
+</pre></div>
+</div>
+</section>
+</section>
+<section id="sanity-test">
+<h2>Sanity Test<a class="headerlink" href="#sanity-test" title="Permalink to this heading"></a></h2>
+<p>You can run a simple sanity test to double confirm if the correct version is installed, and if the software stack can get correct hardware information onboard your system. Replace the placeholders <em>{DPCPPROOT}</em> and <em>{MKLROOT}</em> with the installation path on your system in the commands below.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span> <span class="o">{</span>DPCPPROOT<span class="o">}</span>/env/vars.sh
+<span class="nb">source</span> <span class="o">{</span>MKLROOT<span class="o">}</span>/env/vars.sh
+python -c <span class="s2">&quot;import torch; import intel_extension_for_pytorch as ipex; print(torch.__version__); print(ipex.__version__); [print(f&#39;[{i}]: {torch.xpu.get_device_properties(i)}&#39;) for i in range(torch.xpu.device_count())];&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="install-c-sdk">
+<h2>Install C++ SDK<a class="headerlink" href="#install-c-sdk" title="Permalink to this heading"></a></h2>
+<table class="colwidths-auto docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Version</p></th>
+<th class="head"><p>cxx11 ABI</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>2.0.110+xpu</p></td>
+<td><p><a class="reference external" href="https://intel-extension-for-pytorch.s3.amazonaws.com/libipex/xpu/libintel-ext-pt-cxx11-abi-2.0.110%2Bxpu.run">libintel-ext-pt-cxx11-abi-2.0.110+xpu.run</a></p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Usage:</strong> Download one run file above according to your scenario, run the following command to install it and follow the <a class="reference external" href="./examples.md#c">C++ example</a>.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bash &lt;libintel-ext-pt-name&gt;.run install &lt;libtorch_path&gt;
+</pre></div>
+</div>
+<p>You can get full usage help message by running the run file alone, as the following command.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bash &lt;libintel-ext-pt-name&gt;.run
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../technical_details/AOT.html" class="btn btn-neutral float-right" title="Ahead of Time (AOT) Compilation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7fbb64c6a3a0> 
+  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a></div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

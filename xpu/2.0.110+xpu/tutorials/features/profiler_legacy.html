@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Legacy Profiler Tool (Experimental) &mdash; intel_extension_for_pytorch 2.0.110+xpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = “intel-extension-for-pytorch”; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Simple Trace Tool (Experimental)" href="simple_trace.html" />
+    <link rel="prev" title="Advanced Configuration" href="advanced_configuration.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../../">2.0.110+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cheat_sheet.html">Cheat Sheet</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#device-agnostics">Device-Agnostics</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#gpu-specific">GPU-Specific</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../features.html#dlpack-solution">DLPack Solution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../features.html#legacy-profiler-tool-experimental">Legacy Profiler Tool (Experimental)</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Legacy Profiler Tool (Experimental)</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#use-case">Use Case</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#build-tool">Build Tool</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#use-tool">Use Tool</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#disable-tool-in-model-script">Disable Tool in Model Script</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#results">Results</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#export-to-chrome-trace">Export to Chrome Trace</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#simple-trace-tool-experimental">Simple Trace Tool (Experimental)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#cpu-specific">CPU-Specific</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../features.html">Features</a> &raquo;</li>
+      <li>Legacy Profiler Tool (Experimental)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/profiler_legacy.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="legacy-profiler-tool-experimental">
+<h1>Legacy Profiler Tool (Experimental)<a class="headerlink" href="#legacy-profiler-tool-experimental" title="Permalink to this heading"></a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading"></a></h2>
+<p>The legacy profiler tool is an extension of PyTorch* legacy profiler for profiling operators’ overhead on XPU devices. With this tool, users can get the information in many fields of the run models or code scripts. User should build Intel® Extension for PyTorch* with profiler support as default and enable this tool by a <code class="docutils literal notranslate"><span class="pre">with</span></code> statement before the code segment.</p>
+</section>
+<section id="use-case">
+<h2>Use Case<a class="headerlink" href="#use-case" title="Permalink to this heading"></a></h2>
+<p>To use the legacy profiler tool, you need to build Intel® Extension for PyTorch* from source or install it via prebuilt wheel. You also have various methods to disable this tool.</p>
+<section id="build-tool">
+<h3>Build Tool<a class="headerlink" href="#build-tool" title="Permalink to this heading"></a></h3>
+<p>The build option <code class="docutils literal notranslate"><span class="pre">BUILD_PROFILER</span></code> is switched on as default but you can switch it off via setting <code class="docutils literal notranslate"><span class="pre">BUILD_PROFILER=OFF</span></code> while building Intel® Extension for PyTorch* from source. With <code class="docutils literal notranslate"><span class="pre">BUILD_PROFILER=OFF</span></code>, no profiler code will be compiled and all python scripts using profiler with XPU support will raise a runtime error to user.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="o">[</span><span class="nv">BUILD_PROFILER</span><span class="o">=</span>ON<span class="o">]</span> python setup.py install     <span class="c1"># build from source with profiler tool</span>
+<span class="nv">BUILD_PROFILER</span><span class="o">=</span>OFF python setup.py install      <span class="c1"># build from source without profiler tool</span>
+</pre></div>
+</div>
+</section>
+<section id="use-tool">
+<h3>Use Tool<a class="headerlink" href="#use-tool" title="Permalink to this heading"></a></h3>
+<p>In your model script, write <code class="docutils literal notranslate"><span class="pre">with</span></code> statement to enable the legacy profiler tool ahead of your code snippets, as shown in the following example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># import all necessary libraries</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+
+<span class="c1"># these lines won&#39;t be profiled before enabling profiler tool</span>
+<span class="n">input_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;xpu:0&#39;</span><span class="p">)</span>
+
+<span class="c1"># enable legacy profiler tool with a `with` statement</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler_legacy</span><span class="o">.</span><span class="n">profile</span><span class="p">(</span><span class="n">use_xpu</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">as</span> <span class="n">prof</span><span class="p">:</span>
+    <span class="c1"># do what you want to profile here after the `with` statement with proper indent</span>
+    <span class="n">output_tensor_1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">)</span>
+    <span class="n">output_tensor_2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">)</span>
+
+<span class="c1"># print the result table formatted by the legacy profiler tool as your wish</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">prof</span><span class="o">.</span><span class="n">key_averages</span><span class="p">()</span><span class="o">.</span><span class="n">table</span><span class="p">())</span>
+</pre></div>
+</div>
+<p>There are a number of useful parameters defined in <code class="docutils literal notranslate"><span class="pre">torch.autograd.profiler_legacy.profile()</span></code>. Many of them are aligned with usages defined in PyTorch*’s official profiler, such as <code class="docutils literal notranslate"><span class="pre">record_shapes</span></code>, a very useful parameter to control whether to record the shape of input tensors for each operator. To enable legacy profiler on XPU devices, pass <code class="docutils literal notranslate"><span class="pre">use_xpu=True</span></code>. For the usage of more parameters, please refer to <a class="reference external" href="https://pytorch.org/tutorials/recipes/recipes/profiler_recipe.html">PyTorch*’s tutorial page</a>.</p>
+</section>
+<section id="disable-tool-in-model-script">
+<h3>Disable Tool in Model Script<a class="headerlink" href="#disable-tool-in-model-script" title="Permalink to this heading"></a></h3>
+<p>To disable the legacy profiler tool temporarily in your model script, pass <code class="docutils literal notranslate"><span class="pre">enabled=False</span></code> to <code class="docutils literal notranslate"><span class="pre">torch.autograd.profiler_legacy.profile()</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler_legacy</span><span class="o">.</span><span class="n">profile</span><span class="p">(</span><span class="n">enabled</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_xpu</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">as</span> <span class="n">prof</span><span class="p">:</span>
+    <span class="c1"># as `enabled` is set to false, the profiler won&#39;t work on these lines of code</span>
+    <span class="n">output_tensor_1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">)</span>
+    <span class="n">output_tensor_2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">)</span>
+
+<span class="c1"># This print will raise an error to user as the profiler was disabled</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">prof</span><span class="o">.</span><span class="n">key_averages</span><span class="p">()</span><span class="o">.</span><span class="n">table</span><span class="p">())</span>
+</pre></div>
+</div>
+</section>
+<section id="results">
+<h3>Results<a class="headerlink" href="#results" title="Permalink to this heading"></a></h3>
+<p>Using the script shown above in <strong>Use Tool</strong> part, you’ll see the result table printed out to the console as below:</p>
+<p><img alt="Legacy_profiler_result_1" src="../../_images/Legacy_profiler_result_1.png" /></p>
+<p>In this result, you can find several fields like:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Name</span></code>: the name of run operators</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Self</span> <span class="pre">CPU</span> <span class="pre">%</span></code>, <code class="docutils literal notranslate"><span class="pre">Self</span> <span class="pre">CPU</span></code>: the time consumed by the operator itself at host excluded its children operator call. The column marked with percentage sign shows the propotion of time to total self cpu time. While an operator calls more than once in a run, the self cpu time may increase in this field.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CPU</span> <span class="pre">total</span> <span class="pre">%</span></code>, <code class="docutils literal notranslate"><span class="pre">CPU</span> <span class="pre">total</span></code>: the time consumed by the operator at host included its children operator call. The column marked with percentasge sign shows the propotion of time to total cpu time. While an operator calls more than once in a run, the cpu time may increase in this field.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CPU</span> <span class="pre">time</span> <span class="pre">avg</span></code>: the average time consumed by each once call of the operator at host. This average is calculated on the cpu total time.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Self</span> <span class="pre">XPU</span></code>, <code class="docutils literal notranslate"><span class="pre">Self</span> <span class="pre">XPU</span> <span class="pre">%</span></code>: similar to <code class="docutils literal notranslate"><span class="pre">Self</span> <span class="pre">CPU</span> <span class="pre">(%)</span></code> but shows the time consumption on XPU devices.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">XPU</span> <span class="pre">total</span></code>: similar to <code class="docutils literal notranslate"><span class="pre">CPU</span> <span class="pre">total</span></code> but shows the time consumption on XPU devices.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">XPU</span> <span class="pre">time</span> <span class="pre">avg</span></code>: similar to <code class="docutils literal notranslate"><span class="pre">CPU</span> <span class="pre">time</span> <span class="pre">avg</span></code> but shows average time sonsumption on XPU devices. This average is calculated on the XPU total time.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">of</span> <span class="pre">Calls</span></code>: number of call for each operators in a run.</p></li>
+</ul>
+<p>You can print result table in different styles, such as sort all called operators in reverse order via <code class="docutils literal notranslate"><span class="pre">print(prof.table(sort_by='id'))</span></code> like:</p>
+<p><img alt="Legacy_profiler_result_2" src="../../_images/Legacy_profiler_result_2.png" /></p>
+</section>
+<section id="export-to-chrome-trace">
+<h3>Export to Chrome Trace<a class="headerlink" href="#export-to-chrome-trace" title="Permalink to this heading"></a></h3>
+<p>You can export the result to a json file and then load it in the Chrome trace viewer (<code class="docutils literal notranslate"><span class="pre">chrome://tracing</span></code>) by add this line in your model script:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">prof</span><span class="o">.</span><span class="n">export_chrome_trace</span><span class="p">(</span><span class="s2">&quot;trace_file.json&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In Chrome trace viewer, you may find the result shows like:</p>
+<p><img alt="Legacy_profiler_result_3" src="../../_images/Legacy_profiler_result_3.png" /></p>
+<p>For more example results, please refer to <a class="reference external" href="https://pytorch.org/tutorials/recipes/recipes/profiler_recipe.html">PyTorch*’s tutorial page</a>.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="advanced_configuration.html" class="btn btn-neutral float-left" title="Advanced Configuration" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="simple_trace.html" class="btn btn-neutral float-right" title="Simple Trace Tool (Experimental)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7fbb629695b0> 
+  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a></div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Memory Management &mdash; intel_extension_for_pytorch 2.0.110+xpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = “intel-extension-for-pytorch”; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Blogs &amp; Publications" href="../blogs_publications.html" />
+    <link rel="prev" title="Split SGD" href="split_sgd.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../../../">2.0.110+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cheat_sheet.html">Cheat Sheet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../technical_details.html">Technical Details</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../technical_details.html#isa-dynamic-dispatching-cpu">ISA Dynamic Dispatching [CPU]</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../technical_details.html#graph-optimization-cpu">Graph Optimization [CPU]</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../technical_details.html#optimizer-optimization-cpu-gpu">Optimizer Optimization [CPU, GPU]</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../technical_details.html#ahead-of-time-compilation-aot-gpu">Ahead of Time Compilation (AOT) [GPU]</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../technical_details.html#memory-management-gpu">Memory Management [GPU]</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Memory Management</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../technical_details.html">Technical Details</a> &raquo;</li>
+      <li>Memory Management</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/technical_details/memory_management.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="memory-management">
+<h1>Memory Management<a class="headerlink" href="#memory-management" title="Permalink to this heading"></a></h1>
+<p>You can use <code class="xref py py-meth docutils literal notranslate"><span class="pre">memory_allocated()</span></code> and
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">max_memory_allocated()</span></code> to monitor memory occupied by
+tensors, and use <code class="xref py py-meth docutils literal notranslate"><span class="pre">memory_reserved()</span></code> and
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">max_memory_reserved()</span></code> to monitor the total amount of memory
+managed by the caching allocator. Calling <code class="xref py py-meth docutils literal notranslate"><span class="pre">empty_cache()</span></code>
+releases all <strong>unused</strong> cached memory from PyTorch so that those can be used
+by other GPU applications. However, the occupied GPU memory by tensors will not
+be freed so it can not increase the amount of GPU memory available for PyTorch.</p>
+<p>For more advanced users, we offer more comprehensive memory benchmarking via
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">memory_stats()</span></code>. We also offer the capability to capture a
+complete snapshot of the memory allocator state via
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">memory_snapshot()</span></code>, which can help you understand the
+underlying allocation patterns produced by your code.</p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="split_sgd.html" class="btn btn-neutral float-left" title="Split SGD" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../blogs_publications.html" class="btn btn-neutral float-right" title="Blogs &amp; Publications" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7fbb60086d60> 
+  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a></div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
