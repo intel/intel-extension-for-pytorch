@@ -4,7 +4,7 @@
 import torch
 import torchvision
 
-model =  torchvision.models.resnet50(pretrained=True)
+model = torchvision.models.resnet50(pretrained=True)
 model.eval()
 
 input = torch.rand(1, 3, 224, 224)
