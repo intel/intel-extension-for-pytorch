@@ -284,7 +284,7 @@ def _optimize_transformers(
                         "_prepare_decoder_attention_mask",
                         _prepare_decoder_attention_mask,
                     )
-                    if _model.config.weight_only_quantization:
+                    if getattr(_model.config, 'weight_only_quantization', False):
                         convert_forward(
                             _model,
                             transformers.models.gptj.modeling_gptj.GPTJBlock,

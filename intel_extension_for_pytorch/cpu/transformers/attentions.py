@@ -120,7 +120,7 @@ class _GPTJAttention(nn.Module):
             torch.tensor(self.head_dim, dtype=torch.float32)
         ).to(torch.get_default_dtype())
 
-        self.enable_concat_linear = config.weight_only_quantization
+        self.enable_concat_linear = getattr(config, 'weight_only_quantization', False)
         self.k_proj = module.k_proj
         self.v_proj = module.v_proj
         self.q_proj = module.q_proj
