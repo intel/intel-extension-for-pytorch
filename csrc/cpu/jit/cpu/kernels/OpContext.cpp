@@ -459,16 +459,6 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
         zero_points_float.data_ptr<float>());
     auto op_context = torch_ipex::cpu::detail::woq_linear::create(
         weight, scales, zero_points_float, bias, batch_size, lowp_mode, num_concats);
-    if (op_context.orig_wei_shape_.has_value()) {
-      int64_t padded_N = op_context.at_weight_.sizes().size() == 4
-          ? op_context.at_weight_.size(0) * op_context.at_weight_.size(3)
-          : op_context.at_weight_.size(0);
-      auto scales_padded = at::pad(scales, {0, padded_N - N}, "constant", 0.f);
-      auto zero_points_padded = at::pad(zero_points_float, {0, padded_N - N}, "constant", 0.f);
-      return c10::make_intrusive<IpexWoqLinearOpContext>(
-          batch_size,
-          std::move(op_context));
-    }
     return c10::make_intrusive<IpexWoqLinearOpContext>(
         batch_size,
         std::move(op_context));

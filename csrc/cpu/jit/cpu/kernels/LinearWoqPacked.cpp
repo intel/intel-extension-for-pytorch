@@ -58,6 +58,7 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
   // 2. int4 weight after calibration, quantized and compressed, as int32
   at::Tensor weight_int4;
   if (weight.scalar_type() == c10::kInt) {
+    // Weight created by GPTQ and transposed
     // Create empty weight with desired options then copy data
     int64_t N = weight.size(1);
     int64_t K_int32 = weight.size(0);
@@ -110,26 +111,42 @@ ContextLinearWoq create(
       (packed_shape.size() == 4 && is_int4 && packed_shape[0] * packed_shape[3] * 2 != N) ||
       (packed_shape.size() == 4 && !is_int4 && packed_shape[0] * packed_shape[3] != N) ||
       (packed_shape.size() == 2 && packed_shape[0] != N);
-  if (weight_is_padded && bias.has_value()) {
+  auto zero_points_float = zero_points.to(c10::kFloat);
+  if (weight_is_padded) {
     int64_t padded_N = packed_shape.size() == 4
           ? (is_int4 ? packed_shape[0] * packed_shape[3] * 2 : packed_shape[0] * packed_shape[3])
           : packed_shape[0];
-    auto bias_padded = at::pad(bias.value(), {0, padded_N - N}, "constant", 0.f);
-    return ContextLinearWoq(
-        std::move(packed_weight),
-        std::move(scales),
-        std::move(zero_points.to(c10::kFloat)),
-        c10::make_optional(bias_padded),
-        is_int4,
-        lowp_mode,
-        num_concats,
-        c10::make_optional(weight.sizes().vec())
-    );
+    auto scales_padded = at::pad(scales, {0, padded_N - N}, "constant", 1.f);
+    auto zero_points_padded = at::pad(zero_points_float, {0, padded_N - N}, "constant", 0.f);
+    if (bias.has_value()) {
+      auto bias_padded = at::pad(bias.value(), {0, padded_N - N}, "constant", 0.f);
+      return ContextLinearWoq(
+          std::move(packed_weight),
+          std::move(scales_padded),
+          std::move(zero_points_padded),
+          c10::make_optional(bias_padded),
+          is_int4,
+          lowp_mode,
+          num_concats,
+          c10::make_optional(weight.sizes().vec())
+      );
+    } else {
+      return ContextLinearWoq(
+          std::move(packed_weight),
+          std::move(scales_padded),
+          std::move(zero_points_padded),
+          c10::nullopt,
+          is_int4,
+          lowp_mode,
+          num_concats,
+          c10::make_optional(weight.sizes().vec())
+      );
+    }
   }
   return ContextLinearWoq(
       std::move(packed_weight),
-        std::move(scales),
-        std::move(zero_points.to(c10::kFloat)),
+      std::move(scales),
+      std::move(zero_points_float),
       bias.has_value() ? c10::make_optional(*bias) : c10::nullopt,
       is_int4,
       lowp_mode,
@@ -322,7 +339,8 @@ at::Tensor unpack(ContextLinearWoq& context, const at::Tensor& tensor) {
           0,
           device(c10::kCPU).dtype(c10::kQUInt4x2)
       );
-      std::memcpy(qweight.data_ptr(), unpacked_weight.data_ptr(), unpacked_weight.numel());
+      assert(qweight.numel() % 2 == 0);
+      std::memcpy(qweight.data_ptr(), unpacked_weight.data_ptr(), qweight.numel() / 2);
       return qweight;
     } else { // int8
       return at::_make_per_channel_quantized_tensor(

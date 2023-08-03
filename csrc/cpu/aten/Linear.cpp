@@ -315,7 +315,7 @@ at::Tensor woq_linear_pack_weight(
     bool is_int4 = weight.scalar_type() == c10::kQUInt4x2;
     // int num_threads = at::get_num_threads();
     size_t block_n = 32;
-    if (lowp_mode == 0 || lowp_mode == 3) {
+    if (lowp_mode == 0) {
       block_n = 16;
     }
     size_t block_k = 64;
