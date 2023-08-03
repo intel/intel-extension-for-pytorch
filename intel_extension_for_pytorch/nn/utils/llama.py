@@ -47,7 +47,7 @@ class IPEXLlamaBlock(nn.Module):
         self.mlp = IPEXLlamaMLP(config=config)
         self.input_layernorm = LlamaRMSNorm(config)
         self.post_attn_layernorm = LlamaRMSNorm(config)
-    
+
     def release_resources(self):
         self.attn.release_resources()
         self.mlp.release_resources()
@@ -61,9 +61,20 @@ class IPEXLlamaBlock(nn.Module):
         output_attentions: Optional[bool] = False,
         use_cache: Optional[bool] = False,
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
-        # convert layout form [beam, seq, hidden_size] to [seq, beam, hidden_size]
+        # hidden_states:  [bs*beam, seq, hidden_size]
+        # position_ids:   [bs*beam, seq]
+        # attention_mask: [bs*beam, head, q_seq, kv_seq]
+        bs = IPEXTransformerAtten.batch_size
+        beam = hidden_states.shape[0] // bs
+        hidden_shape = [bs, beam, hidden_states.shape[1], hidden_states.shape[2]]
+        if hidden_states.shape[1] > 1:
+            hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :]        # [bs, seq, hidden_size]
+            if position_ids is not None:
+                position_ids = position_ids.view(bs, beam, position_ids.shape[1])[:,0,:].view(bs, position_ids.shape[1])
+            if attention_mask is not None:
+                attention_mask = attention_mask.view(bs, beam, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])[:,0,:,:,:].view(bs, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
+        # convert layout form [bs, seq, hidden_size] to [seq, bs, hidden_size]
         hidden_states = hidden_states.transpose(0, 1).contiguous()
-        position_ids = position_ids.transpose(0, 1).contiguous()
 
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
@@ -81,7 +92,12 @@ class IPEXLlamaBlock(nn.Module):
         residual = hidden_states
         hidden_states = self.post_attn_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states, residual)
+
+        # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
         hidden_states = hidden_states.transpose(0, 1)
+        if hidden_states.shape[1] > 1:
+            hidden_states = hidden_states.view(bs, 1, hidden_states.shape[1], hidden_states.shape[2]).expand([bs, beam, hidden_states.shape[1], hidden_states.shape[2]])
+            hidden_states = hidden_states.reshape(bs*beam, hidden_states.shape[2], hidden_states.shape[3])
 
         outputs = (hidden_states, )
         if output_attentions:

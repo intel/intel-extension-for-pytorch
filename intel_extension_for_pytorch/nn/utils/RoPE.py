@@ -151,6 +151,7 @@ class LlamaRotaryEmbedding(torch.nn.Module):
 
     def get_sin_cos(self, position_ids, layer_id):
         if LlamaRotaryEmbedding.position_ids is None or layer_id == 0:
+            position_ids = position_ids.transpose(0, 1)
             LlamaRotaryEmbedding.sin = self.sin_cached[position_ids].unsqueeze(2)
             LlamaRotaryEmbedding.cos = self.cos_cached[position_ids].unsqueeze(2)
             LlamaRotaryEmbedding.position_ids = position_ids

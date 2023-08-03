@@ -66,8 +66,10 @@ class IPEXGPTJBlock(nn.Module):
         hidden_shape = [bs, beam, hidden_states.shape[1], hidden_states.shape[2]]
         if hidden_states.shape[1] > 1:
             hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :]        # [bs, seq, hidden_size]
-            position_ids = position_ids.view(bs, beam, position_ids.shape[1])[:,0,:].view(bs, position_ids.shape[1])
-            attention_mask = attention_mask.view(bs, beam, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])[:,0,:,:,:].view(bs, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
+            if position_ids is not None:
+                position_ids = position_ids.view(bs, beam, position_ids.shape[1])[:,0,:].view(bs, position_ids.shape[1])
+            if attention_mask is not None:
+                attention_mask = attention_mask.view(bs, beam, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])[:,0,:,:,:].view(bs, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
         # convert layout form [bs, seq, hidden_size] to [seq, bs, hidden_size]
         hidden_states = hidden_states.transpose(0, 1).contiguous()
 
@@ -90,8 +92,6 @@ class IPEXGPTJBlock(nn.Module):
         # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
         hidden_states = hidden_states.transpose(0, 1)
         if hidden_states.shape[1] > 1:
-            # hidden_states = hidden_states.expand([beam, hidden_states.shape[1], hidden_states.shape[2]])
-            # hidden_states = torch.repeat_interleave(hidden_states, beam, 0)
             hidden_states = hidden_states.view(bs, 1, hidden_states.shape[1], hidden_states.shape[2]).expand([bs, beam, hidden_states.shape[1], hidden_states.shape[2]])
             hidden_states = hidden_states.reshape(bs*beam, hidden_states.shape[2], hidden_states.shape[3])
         if use_cache:

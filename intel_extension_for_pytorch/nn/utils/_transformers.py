@@ -229,12 +229,12 @@ class IPEXTransformerAtten(nn.Module):
 
 
     def compute_qkv(self,
-                    hidden_state: torch.Tensor,
+                    hidden_states: torch.Tensor,
                     key_value_state: Optional[torch.Tensor] = None,
                     layer_past: Optional[Tuple[torch.Tensor]] = None):
         if self.kv_cache_optimize and self.row_major and self.kv_cache:
             if self.get_beam_width() == 1:
-                query, key, value = self.qkv_cache_optimized_greedy(hidden_states=hidden_state, layer_past=layer_past)
+                query, key, value = self.qkv_cache_optimized_greedy(hidden_states=hidden_states, layer_past=layer_past)
             else:
                 # TODO: support greedy
                 # update prompts status
@@ -242,7 +242,7 @@ class IPEXTransformerAtten(nn.Module):
                 if new_prompts:
                     self.key_prompt = None
                     self.value_prompt = None
-                query, key, value = self.qkv_cache_optimized_beam(hidden_states=hidden_state, layer_past=layer_past)
+                query, key, value = self.qkv_cache_optimized_beam(hidden_states=hidden_states, layer_past=layer_past)
             new_shape = query.size()[:-1] + (self.num_attn_head, self.head_dim)
             if self.cur_len == 0:
                 if self.key_prompt is not None:
@@ -251,7 +251,7 @@ class IPEXTransformerAtten(nn.Module):
                     self.value_prompt = self.value_prompt.view(new_shape)
         else:
             # qkv fusion now is only support on greedy search 
-            query, key, value = self.qkv_normal(hidden_states=hidden_state, layer_past=layer_past)
+            query, key, value = self.qkv_normal(hidden_states=hidden_states, layer_past=layer_past)
 
         new_shape = query.size()[:-1] + (self.num_attn_head, self.head_dim)
         # reshape the qkv size from (seq_len, bs*beam, num_head*head_dim) to (seq_len, bs*beam, num_head, head_dim)
@@ -520,7 +520,7 @@ class IPEXTransformerAtten(nn.Module):
     ):
         # the shape of query, key, value, [seq, bs*beam, head*dim]
         # the layout of query, key, value, [seq, bs*beam, head*dim]
-        query, key, value = self.compute_qkv(hidden_state=hidden_states, key_value_state=key_value_states, layer_past=layer_past)
+        query, key, value = self.compute_qkv(hidden_states=hidden_states, key_value_state=key_value_states, layer_past=layer_past)
 
         # the shape of query, key, value, [seq, bs*beam, head, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]

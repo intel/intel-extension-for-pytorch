@@ -74,9 +74,16 @@ class IPEXBloomBlock(nn.Module):
         use_cache: bool = False,
         output_attentions: bool = False,
     ):
-        # convert layout form [beam, seq, hidden_size] to [seq, beam, hidden_size]
-        hidden_states = hidden_states.transpose(0, 1).contiguous()
+        bs = IPEXTransformerAtten.batch_size
+        beam = hidden_states.shape[0] // bs
+        hidden_shape = [bs, beam, hidden_states.shape[1], hidden_states.shape[2]]
+        if hidden_states.shape[1] > 1:
+            hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :]        # [bs, seq, hidden_size]
+            if attention_mask is not None:
+                attention_mask = attention_mask.view(bs, beam, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])[:,0,:,:,:].view(bs, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
+        # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
 
+        hidden_states = hidden_states.transpose(0, 1).contiguous()
         #layernorm_output = self.input_layernorm(hidden_states)
         layernorm_output = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.input_layernorm.normalized_shape, self.input_layernorm.weight, self.input_layernorm.bias, self.input_layernorm.eps)
         if self.config.do_norm_before:
@@ -95,22 +102,27 @@ class IPEXBloomBlock(nn.Module):
         )
 
         attention_output = attn_outputs[0]
-
         outputs = attn_outputs[1:]
         #layernorm_output = self.post_attention_layernorm(attention_output)
+
         layernorm_output = torch.ops.torch_ipex.fast_layer_norm(attention_output, self.post_attention_layernorm.normalized_shape, self.post_attention_layernorm.weight, self.post_attention_layernorm.bias, self.post_attention_layernorm.eps)
         if self.config.do_norm_before:
             redisual = layernorm_output
         else:
             residual = attention_output
 
-        output = self.mlp(layernorm_output, residual)
-        output = output.transpose(0, 1)
+        hidden_states = self.mlp(layernorm_output, residual)
+
+        # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
+        hidden_states = hidden_states.transpose(0, 1)
+        if hidden_states.shape[1] > 1:
+            hidden_states = hidden_states.view(bs, 1, hidden_states.shape[1], hidden_states.shape[2]).expand([bs, beam, hidden_states.shape[1], hidden_states.shape[2]])
+            hidden_states = hidden_states.reshape(bs*beam, hidden_states.shape[2], hidden_states.shape[3])
 
         if use_cache:
-            outputs = (output, ) + outputs
+            outputs = (hidden_states, ) + outputs
         else:
-            outputs = (output, ) + outputs[1:]
+            outputs = (hidden_states, ) + outputs[1:]
         return outputs
 
 
