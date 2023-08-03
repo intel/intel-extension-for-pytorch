@@ -512,7 +512,17 @@ class _LlamaAttention_GQA(nn.Module):
             self.num_key_value_heads = self.num_heads
         else:
             if hasattr(module, "num_key_value_heads"):
-                self.num_key_value_heads = module.num_key_value_heads
+                if module.num_key_value_heads != self.config.num_key_value_heads:
+                    self.num_key_value_heads = module.num_key_value_heads
+                else:  # workaround here as deepspeed does not support llama2 GQA autoTP, will remove once it supports
+                    self.num_key_value_heads = self.config.num_key_value_heads // (
+                        self.config.num_attention_heads // module.num_heads
+                    )
+                    if self.num_key_value_heads < 1:
+                        assert (
+                            False
+                        ), "Does not support Tensor parallel in this num_key_value_heads < 1 case, please reach out deepspeed's support"
+
             else:
                 assert (
                     False
