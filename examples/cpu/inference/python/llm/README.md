@@ -138,7 +138,12 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list
 # (2) Run int8 accuracy test (note that GPT-NEOX please remove --int8-bf16-mixed)
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run_accuracy.py --model <MODEL ID> --quantized-model-path "./saved_results/best_model.pt" --dtype int8 --accuracy-only --jit --int8-bf16-mixed --tasks {TASK_NAME}
 ```
-
+## Shard model for Distributed Performance
+```
+# We need to make sure the model is well shard before we test Distributed Performance with DeepSpeed (saving memory usage purpose)
+python create_shard_model.py -m <MODEL ID>  --save-path <SHARD MODEL NEW PATH>
+# After sharding the model, using -m <SHARD MODEL NEW PATH> in later tests.
+```
 ## Distributed Performance with DeepSpeed (autoTP)
 ```bash
 export DS_SHM_ALLREDUCE=1
