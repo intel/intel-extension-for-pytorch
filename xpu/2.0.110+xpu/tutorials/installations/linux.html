@@ -432,12 +432,13 @@ python -c <span class="s2">&quot;import torch; import intel_extension_for_pytorc
 </thead>
 <tbody>
 <tr class="row-even"><td><p>2.0.110+xpu</p></td>
-<td><p><a class="reference external" href="https://intel-extension-for-pytorch.s3.amazonaws.com/libipex/xpu/libintel-ext-pt-cxx11-abi-2.0.110%2Bxpu.run">libintel-ext-pt-cxx11-abi-2.0.110+xpu.run</a></p></td>
+<td><p><a class="reference external" href="https://intel-extension-for-pytorch.s3.amazonaws.com/libipex/xpu/libtorch-cxx11-abi-shared-with-deps-2.0.0a0.zip">libtorch-cxx11-abi-shared-with-deps-2.0.0a0.zip</a>,&nbsp;<a class="reference external" href="https://intel-extension-for-pytorch.s3.amazonaws.com/libipex/xpu/libintel-ext-pt-cxx11-abi-2.0.110%2Bxpu.run">libintel-ext-pt-cxx11-abi-2.0.110+xpu.run</a></p></td>
 </tr>
 </tbody>
 </table>
 <p><strong>Usage:</strong> Download one run file above according to your scenario, run the following command to install it and follow the <a class="reference external" href="./examples.md#c">C++ example</a>.</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bash &lt;libintel-ext-pt-name&gt;.run install &lt;libtorch_path&gt;
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>unzip libtorch-cxx11-abi-shared-with-deps-2.0.0a0.zip
+bash &lt;libintel-ext-pt-name&gt;.run install &lt;libtorch_path&gt;
 </pre></div>
 </div>
 <p>You can get full usage help message by running the run file alone, as the following command.</p>
