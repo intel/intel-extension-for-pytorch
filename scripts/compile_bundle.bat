@@ -94,6 +94,8 @@ cd ..\pytorch
 git stash
 git clean -f
 for %%f in ("..\intel-extension-for-pytorch\torch_patches\*.patch") do git apply "%%f"
+python -m pip install -r requirements.txt
+call conda install -q --yes -c conda-forge libuv=1.39
 rem Ensure cmake can find python packages when using conda or virtualenv
 if defined CONDA_PREFIX (
     set "CMAKE_PREFIX_PATH=%CONDA_PREFIX:~1,-1%"
