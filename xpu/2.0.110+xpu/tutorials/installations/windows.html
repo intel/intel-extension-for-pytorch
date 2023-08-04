@@ -263,7 +263,7 @@ python -m pip install <span class="nv">torch</span><span class="o">==</span><spa
 <section id="compile-the-bundle-pytorch-torchvision-intel-extension-for-pytorch-with-script">
 <h3>Compile the bundle (PyTorch*, torchvision, Intel® Extension for PyTorch*) with script<a class="headerlink" href="#compile-the-bundle-pytorch-torchvision-intel-extension-for-pytorch-with-script" title="Permalink to this heading"></a></h3>
 <p>To ensure a smooth compilation of the bundle, including PyTorch*, torchvision, Intel® Extension for PyTorch*, a script is provided in the Github repo. If you would like to compile the binaries from source, it is highly recommended to utilize this script.</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$ wget https://raw.githubusercontent.com/intel/intel-extension-for-pytorch/v2.0.110+xpu/scripts/compile_bundle.bat
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>Download https://github.com/intel/intel-extension-for-pytorch/blob/v2.0.110%2Bxpu/scripts/compile_bundle.bat
 $ compile_bundle.bat &lt;DPCPPROOT&gt; &lt;MKLROOT&gt;
   DPCPPROOT and MKLROOT are mandatory, should be absolute or relative path to the root directory of DPC++ compiler and oneMKL respectively.
 </pre></div>
@@ -277,10 +277,10 @@ $ compile_bundle.bat &lt;DPCPPROOT&gt; &lt;MKLROOT&gt;
 </div>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$ mkdir ipex_bundle
 $ <span class="nb">cd</span> ipex_bundle
-$ wget .../compile_bundle.bat
+Download .../compile_bundle.bat
 $ compile_bundle.bat ...
-$ ls
-compile_bundle.sh  intel_extension_for_pytorch  torch  vision
+$ dir
+compile_bundle.bat  intel_extension_for_pytorch  torch  vision
 </pre></div>
 </div>
 </section>
