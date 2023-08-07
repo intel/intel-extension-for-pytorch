@@ -7,6 +7,11 @@ import torch
 from pathlib import Path
 import intel_extension_for_pytorch as ipex
 
+import deepspeed
+from deepspeed.accelerator import get_accelerator
+import deepspeed.comm as dist
+from huggingface_hub import snapshot_download
+from transformers.utils import is_offline_mode
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -27,7 +32,7 @@ MODEL_CLASSES = {
 }
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-m", "--model", nargs="?", default="EleutherAI/gpt-j-6b")
+parser.add_argument("--model", nargs="?", default="EleutherAI/gpt-j-6b")
 parser.add_argument("--output_dir", nargs="?", default="./saved_results")
 parser.add_argument("--device", default="cpu", type=str, help="cpu")
 parser.add_argument(
@@ -57,10 +62,28 @@ parser.add_argument(
     type=str,
     help="tasks list for accuracy validation, only enabled lambada_openai and lambada_standard at present",
 )
-
+parser.add_argument(
+    "--local_rank", required=False, type=int, help="used by dist launchers"
+)
 
 args = parser.parse_args()
 
+def get_int_from_env(env_keys, default):
+    """Returns the first positive env value found in the `env_keys` list or the default."""
+    for e in env_keys:
+        val = int(os.environ.get(e, -1))
+        if val >= 0:
+            return val
+    return default
+
+
+
+local_rank = get_int_from_env(["LOCAL_RANK", "MPI_LOCALRANKID"], "0")
+world_size = get_int_from_env(["WORLD_SIZE", "PMI_SIZE"], "1")
+
+deepspeed.init_distributed(get_accelerator().communication_backend_name())
+
+print("init_distributed done")
 
 if args.accuracy_only:
     import lm_eval
@@ -84,9 +107,10 @@ if args.accuracy_only:
             batch_size=1,
             max_length=None,
             dtype: Optional[Union[str, torch.dtype]] = "auto",
+            tp_number = 1,
         ):
             super().__init__()
-
+            
             self._device = device
             self._batch_size = batch_size
             self._with_jit = with_jit
@@ -94,6 +118,7 @@ if args.accuracy_only:
             self._with_greedy = with_greedy
             self._max_length = max_length
             self._dtype = dtype
+            self._tp_number = tp_number
 
             if dtype == "float16":
                 load_dtype = torch.half
@@ -115,18 +140,86 @@ if args.accuracy_only:
                 (x for x in MODEL_CLASSES.keys() if x in model_id.lower()), "auto"
             )
             model_class = MODEL_CLASSES[model_type]
+
             self.tokenizer = model_class[1].from_pretrained(model_id)
 
             self.config = AutoConfig.from_pretrained(model_id, torchscript=with_jit)
 
-            self.model = model_class[0].from_pretrained(
-                model_id,
-                low_cpu_mem_usage=True,
-                config=self.config,
-                torch_dtype=load_dtype,
-            )
+            with deepspeed.OnDevice(dtype=load_dtype, device="meta"):
+                if model_class[0] == AutoModelForCausalLM:
+                    self.model = model_class[0].from_config(self.config).to(load_dtype)
+                else: 
+                    self.model = model_class[0].from_pretrained(
+                        model_id,
+                        low_cpu_mem_usage=True,
+                        config=self.config,
+                        torch_dtype=load_dtype,
+                    )
 
             self.model = self.model.eval()
+          
+            checkpoints_json = "checkpoints.json"
+            def get_repo_root(model_name_or_path):
+                local_prefix = ("/", "./", "../")
+                if model_name_or_path.startswith(local_prefix):
+                    return model_name_or_path
+                # checks if online or not
+                if is_offline_mode():
+                    print_rank0("Offline mode: forcing local_files_only=True")
+                # download only on first process
+                allow_patterns = ["*.bin", "*.model", "*.json", "*.txt", "*.py", "*LICENSE"]
+                if local_rank == 0:
+                    snapshot_download(
+                        model_name_or_path,
+                        local_files_only=is_offline_mode(),
+                        cache_dir=os.getenv("TRANSFORMERS_CACHE", None),
+                        allow_patterns=allow_patterns,
+                        # ignore_patterns=["*.safetensors"],
+                    )
+            
+                dist.barrier()
+            
+                return snapshot_download(
+                    model_name_or_path,
+                    local_files_only=is_offline_mode(),
+                    cache_dir=os.getenv("TRANSFORMERS_CACHE", None),
+                    allow_patterns=allow_patterns,
+                    # ignore_patterns=["*.safetensors"],
+                )
+            
+            
+            def get_checkpoint_files(model_name_or_path):
+                cached_repo_dir = get_repo_root(model_name_or_path)
+            
+                # extensions: .bin | .pt
+                # creates a list of paths from all downloaded files in cache dir
+                file_list = [
+                    str(entry)
+                    for entry in Path(cached_repo_dir).rglob("*.[bp][it][n]")
+                    if entry.is_file()
+                ]
+                return file_list
+            
+
+            def write_checkpoints_json():
+                checkpoint_files = get_checkpoint_files(model_id)
+                if local_rank == 0:
+                    # model.config.model_type.upper()
+                    data = {"type": "BLOOM", "checkpoints": checkpoint_files, "version": 1.0}
+                    json.dump(data, open(checkpoints_json, "w"))
+
+            repo_root = get_repo_root(model_id)
+            write_checkpoints_json()
+
+            self.model = deepspeed.init_inference(
+                self.model,
+                mp_size=tp_number,
+                base_dir=repo_root,
+                dtype=infer_dtype,
+                checkpoint=checkpoints_json,
+            )
+
+            self.model = self.model.module
 
             if with_ipex:
                 self.model = ipex._optimize_transformers(
@@ -135,16 +228,14 @@ if args.accuracy_only:
 
             self.base_model = self.model
 
-            self.iter = 0
             self.num_beams = 1 if with_greedy else 4
-            self.tp_number = 1
+            self.iter = 0
 
         def _model_call(
             self, inputs: TokenSequence, labels: Optional[TokenSequence] = None
         ) -> TokenSequence:
             _attention_mask = []
             _position_ids = []
-
 
             if self._with_jit:
                 for text in inputs:
@@ -162,7 +253,7 @@ if args.accuracy_only:
                                             1,
                                             int(
                                                 self.base_model.config.n_head
-                                                / self.tp_number
+                                                / self._tp_number
                                             ),
                                             1,
                                             int(
@@ -176,7 +267,7 @@ if args.accuracy_only:
                                             1,
                                             int(
                                                 self.base_model.config.n_head
-                                                / self.tp_number
+                                                / self._tp_number
                                             ),
                                             1,
                                             int(
@@ -205,7 +296,7 @@ if args.accuracy_only:
                                             1,
                                             int(
                                                 self.base_model.config.num_attention_heads
-                                                / self.tp_number
+                                                / self._tp_number
                                             ),
                                             1,
                                             int(
@@ -219,7 +310,7 @@ if args.accuracy_only:
                                             1,
                                             int(
                                                 self.base_model.config.num_attention_heads
-                                                / self.tp_number
+                                                / self._tp_number
                                             ),
                                             1,
                                             int(
@@ -248,7 +339,7 @@ if args.accuracy_only:
                                             1,
                                             int(
                                                 self.base_model.config.num_attention_heads
-                                                / self.tp_number
+                                                / self._tp_number
                                             ),
                                             1,
                                             int(
@@ -262,7 +353,7 @@ if args.accuracy_only:
                                             1,
                                             int(
                                                 self.base_model.config.num_attention_heads
-                                                / self.tp_number
+                                                / self._tp_number
                                             ),
                                             1,
                                             int(
@@ -331,10 +422,6 @@ if args.accuracy_only:
                             "bloom",
                             self.base_model.config.architectures[0],
                             re.IGNORECASE,
-                        ) or re.search(
-                            "OPT",
-                            self.base_model.config.architectures[0],
-                            re.IGNORECASE,
                         ):
                             example_dict = {
                                 "input_ids": inputs,
@@ -362,8 +449,6 @@ if args.accuracy_only:
 
                     if re.search(
                         "bloom", self.base_model.config.architectures[0], re.IGNORECASE
-                    ) or re.search(
-                        "OPT", self.base_model.config.architectures[0], re.IGNORECASE
                     ):
                         self.model(
                             inputs,
@@ -393,8 +478,6 @@ if args.accuracy_only:
 
             if re.search(
                 "bloom", self.base_model.config.architectures[0], re.IGNORECASE
-            ) or re.search(
-                "OPT", self.base_model.config.architectures[0], re.IGNORECASE
             ):
                 with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
                     enabled=True
@@ -430,7 +513,7 @@ if args.accuracy_only:
                         output = self.base_model(
                             inputs,
                         )
-
+ 
             if isinstance(output, tuple):
                 return output[0]
 
@@ -494,6 +577,7 @@ if args.accuracy_only:
         with_ipex=args.ipex,
         with_jit=args.jit,
         dtype=args.dtype,
+        tp_number=world_size,
     )
 
     results = evaluator.evaluate(

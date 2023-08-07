@@ -158,3 +158,16 @@ deepspeed --bind_cores_to_rank run_generation_with_deepspeed.py --benchmark -m <
 # Run GPT-NeoX with ipex weight only quantization
 deepspeed --bind_cores_to_rank run_generation_with_deepspeed.py --benchmark -m EleutherAI/gpt-neox-20b --dtype float32 --ipex --jit --ipex-weight-only-quantization
 ```
+
+## Distributed Accuracy with DeepSpeed (autoTP)
+```bash
+# Run distributed accuracy with 2 ranks of one node for bfloat16 with ipex and jit 
+source ${ONECCL_DIR}/build/_install/env/setvars.sh
+
+export LD_PRELOAD=${CONDA_PREFIX}/lib/libiomp5.so:${CONDA_PREFIX}/lib/libtcmalloc.so
+export LD_LIBRARY_PATH=${ONECCL_DIR}/lib:$LD_LIBRARY_PATH
+unset KMP_AFFINITY
+
+deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --device cpu --model <MODEL_ID> --dtype bfloat16 --ipex --jit --tasks <TASK_NAME> --accuracy-only
+
+```
