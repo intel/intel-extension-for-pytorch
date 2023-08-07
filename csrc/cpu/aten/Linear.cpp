@@ -421,6 +421,14 @@ at::Tensor woq_linear_kernel(
       bias_list[0],
       lowp_mode,
       output);
+  if (num_concats > 1) {
+    // View as [..., num_concats, N/num_concats], transpose then make contiguous
+    // Finally view back as output shape
+    auto out_shape = output.sizes().vec();
+    out_shape.insert(out_shape.end() - 1, num_concats);
+    out_shape.back() /= num_concats;
+    return output.view(out_shape).transpose(0, -2).contiguous().view(output.sizes().vec());
+  }
   return output;
 }
 
@@ -516,7 +524,7 @@ at::Tensor woq_linear_gelu_forward(
       "torch_ipex::woq_linear_gelu", c10::ArrayRef<c10::IValue>({}));
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
-      ->run_eltwise(input, "gelu", torch::List<c10::optional<at::Scalar>>(), c10::nullopt);
+      ->run_eltwise(input, "gelu", torch::List<c10::optional<at::Scalar>>(), "none");
 }
 
 at::Tensor woq_linear_add_kernel(
