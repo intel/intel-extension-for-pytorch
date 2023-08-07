@@ -1,14 +1,16 @@
 import torch
 import torch.nn as nn
-from typing import Optional, Tuple
+import torch.nn.functional as F
+from torch.nn import CrossEntropyLoss
+from typing import Optional, Tuple, Union, List
 
 from intel_extension_for_pytorch.nn.utils._transformer_configuration import IPEXTransformerConfig
-from ._transformers import IPEXTransformerAtten, IPEXTransformerMLP, IPEXEmptyLinear
+from ._transformers import IPEXTransformerAtten, IPEXTransformerMLP, IPEXEmptyLinear, IPEXTransformerConverter, MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
 from ._transformer_configuration import IPEXTransformerConfig
-from ._transformer_converter import IPEXTransformerConverter, MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
 from .RoPE import LlamaRotaryEmbedding
 from .Norm import LlamaRMSNorm
-import math
+from transformers.modeling_outputs import CausalLMOutputWithPast
+
 
 class IPEXLlamaAttn(IPEXTransformerAtten):
     def __init__(self, config) -> None:
@@ -65,9 +67,18 @@ class IPEXLlamaBlock(nn.Module):
         # position_ids:   [bs*beam, seq]
         # attention_mask: [bs*beam, head, q_seq, kv_seq]
         bs = IPEXTransformerAtten.batch_size
-        beam = hidden_states.shape[0] // bs
-        hidden_shape = [bs, beam, hidden_states.shape[1], hidden_states.shape[2]]
-        if hidden_states.shape[1] > 1:
+        dim = hidden_states.dim()
+        if dim == 3:
+            beam = hidden_states.shape[0] // bs
+        elif dim == 4:
+            beam = hidden_states.shape[1]
+        else:
+            print("Unsupported input shape")
+            return
+        seq = hidden_states.shape[-2]
+        hidden_size = hidden_states.shape[-1]
+        hidden_shape = [bs, beam, seq, hidden_size]
+        if seq > 1:
             hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :]        # [bs, seq, hidden_size]
             if position_ids is not None:
                 position_ids = position_ids.view(bs, beam, position_ids.shape[1])[:,0,:].view(bs, position_ids.shape[1])
@@ -95,9 +106,8 @@ class IPEXLlamaBlock(nn.Module):
 
         # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
         hidden_states = hidden_states.transpose(0, 1)
-        if hidden_states.shape[1] > 1:
-            hidden_states = hidden_states.view(bs, 1, hidden_states.shape[1], hidden_states.shape[2]).expand([bs, beam, hidden_states.shape[1], hidden_states.shape[2]])
-            hidden_states = hidden_states.reshape(bs*beam, hidden_states.shape[2], hidden_states.shape[3])
+        if seq > 1:
+            hidden_states = hidden_states.view(bs, 1, seq, hidden_size).expand([bs, beam, seq, hidden_size])
 
         outputs = (hidden_states, )
         if output_attentions:
@@ -107,6 +117,99 @@ class IPEXLlamaBlock(nn.Module):
             outputs += (present_key_value, )
 
         return outputs
+
+
+def IPEXLlamaForCausalLMForward(
+        self,
+        input_ids: torch.LongTensor = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[List[torch.FloatTensor]] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple, CausalLMOutputWithPast]:
+        r"""
+        Args:
+            labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
+                Labels for computing the masked language modeling loss. Indices should either be in `[0, ...,
+                config.vocab_size]` or -100 (see `input_ids` docstring). Tokens with indices set to `-100` are ignored
+                (masked), the loss is only computed for the tokens with labels in `[0, ..., config.vocab_size]`.
+
+        Returns:
+
+        Example:
+
+        ```python
+        >>> from transformers import AutoTokenizer, LlamaForCausalLM
+
+        >>> model = LlamaForCausalLM.from_pretrained(PATH_TO_CONVERTED_WEIGHTS)
+        >>> tokenizer = AutoTokenizer.from_pretrained(PATH_TO_CONVERTED_TOKENIZER)
+
+        >>> prompt = "Hey, are you conscious? Can you talk to me?"
+        >>> inputs = tokenizer(prompt, return_tensors="pt")
+
+        >>> # Generate
+        >>> generate_ids = model.generate(inputs.input_ids, max_length=30)
+        >>> tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+        "Hey, are you conscious? Can you talk to me?\nI'm not conscious, but I can talk to you."
+        ```"""
+
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
+        outputs = self.model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+        hidden_states = outputs[0]
+        if hidden_states.dim() > 3:
+            hidden_states = hidden_states.reshape([-1, hidden_states.shape[-2], hidden_states.shape[-1]])
+        shape = list(hidden_states.size())
+        shape[1] = 1
+        hidden_states = hidden_states[:, -1, :].view(shape)
+        logits = self.lm_head(hidden_states)
+        logits = logits.float()
+
+        loss = None
+        if labels is not None:
+            # Shift so that tokens < n predict n
+            shift_logits = logits[..., :-1, :].contiguous()
+            shift_labels = labels[..., 1:].contiguous()
+            # Flatten the tokens
+            loss_fct = CrossEntropyLoss()
+            shift_logits = shift_logits.view(-1, self.config.vocab_size)
+            shift_labels = shift_labels.view(-1)
+            # Enable model parallelism
+            shift_labels = shift_labels.to(shift_logits.device)
+            loss = loss_fct(shift_logits, shift_labels)
+
+        if not return_dict:
+            output = (logits,) + outputs[1:]
+            return (loss,) + output if loss is not None else output
+
+        return CausalLMOutputWithPast(
+            loss=loss,
+            logits=logits,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class IPEXLlamaConverter(IPEXTransformerConverter):

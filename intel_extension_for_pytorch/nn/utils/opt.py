@@ -3,9 +3,8 @@ import torch.nn as nn
 from typing import Optional, Tuple
 
 from intel_extension_for_pytorch.nn.utils._transformer_configuration import IPEXTransformerConfig
-from ._transformers import IPEXTransformerAtten, IPEXTransformerMLP
+from ._transformers import IPEXTransformerAtten, IPEXTransformerMLP, IPEXTransformerConverter, MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
 from ._transformer_configuration import IPEXTransformerConfig
-from ._transformer_converter import IPEXTransformerConverter, MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
 from .RoPE import PositionalEmbedding
 
 class IPEXOptAtten(IPEXTransformerAtten):

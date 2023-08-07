@@ -314,8 +314,6 @@ def optimize_transformers(model, dtype=None, optimizer=None):
     except ImportError as e:
         print("Can not find transformers in your environment, disable ipex transformer optimize")
         return model
-    if type(model) == transformers.models.gptj.modeling_gptj.GPTJForCausalLM:
-        pad_for_gptj_lm_head(model)
     if optimizer is None:
         model = optimize_output
         return model_converter(model, dtype=dtype)

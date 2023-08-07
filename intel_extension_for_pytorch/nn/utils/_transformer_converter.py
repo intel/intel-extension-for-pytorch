@@ -1,56 +1,14 @@
 import torch 
 import os
-from ._transformers import IPEXEmptyLinearWithPadding
+from ._transformers import IPEXEmptyLinearWithPadding, IPEXTransformerConverter
 
 from functools import partial
-from ._utils import ipex_beam_search, _ipex_prepare_model_inputs, ipex_beam_search_without_optimize, ipex_GPTJForCausalLM_forward, IPEXLLMResourceContrainer
+from ._utils import ipex_beam_search, _ipex_prepare_model_inputs, ipex_beam_search_without_optimize, IPEXLLMResourceContrainer
+from .gptj import IPEXGPTJForCausalLMForward
+from .llama import IPEXLlamaForCausalLMForward
+from .bloom import IPEXBloomForCausalLMForward
 from ._inference_ops import OpConverter
 # from transformers.models.llama.configuration_llama import 
-
-MAX_SEQ_LEN = int(os.environ.get("MAX_SEQ_LEN", "0"))
-MAX_OUT_SEQ_LEN = max(128, int(os.environ.get("MAX_OUT_SEQ_LEN", "0")))
-
-class IPEXTransformerConverter:
-    tp_group = None
-    tp_size = 1
-
-    def __init__(self, module, config, device = "cpu", dtype = torch.float) -> None:
-        self.module = module
-        self.config = config
-        self.dtype = dtype
-        self.device = device
-        col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
-        self.row_major = not col_major
-
-    def construct_transformer_config(self):
-        pass
-
-    def construct_ipex_optimized_module(self):
-        pass
-
-    def port_attn_parameters(self):
-        pass
-
-    def port_mlp_parameters(self):
-        pass
-
-    def port_layer_norm_parameters(self):
-        pass
-
-    def port_block_parameters(self):
-        pass
-
-    def port_all_parameters_to_new_module(self):
-        pass
-
-    def get_transformed_model_to_run(self):
-        pass
-    @staticmethod
-    def update_tp_data(tp_size, tp_group):
-        IPEXTransformerConverter.tp_size = tp_size
-        IPEXTransformerConverter.tp_group = tp_group
-
-
 
 def gemm_padding(weight, bias=None):
     n, k = weight.shape
@@ -117,13 +75,22 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
             setattr(module, "_prepare_model_inputs", partial(_ipex_prepare_model_inputs, module))
 
         if type(module) == transformers.models.gptj.modeling_gptj.GPTJForCausalLM:
+            pad_for_gptj_lm_head(model)
             if hasattr(module, "forward"):
-                setattr(module, "forward", partial(ipex_GPTJForCausalLM_forward, module))
+                setattr(module, "forward", partial(IPEXGPTJForCausalLMForward, module))
+        elif type(module) == transformers.models.llama.modeling_llama.LlamaForCausalLM:
+            pad_for_gptj_lm_head(model)
+            if hasattr(module, "forward"):
+                setattr(module, "forward", partial(IPEXLlamaForCausalLMForward, module))
+        elif type(module) == transformers.models.bloom.modeling_bloom.BloomForCausalLM:
+            pad_for_gptj_lm_head(model)
+            if hasattr(module, "forward"):
+                setattr(module, "forward", partial(IPEXBloomForCausalLMForward, module))
+
 
         if os.environ.get("DISABLE_KV_CACHE", "OFF") not in ["1", "Y", "YES", "TRUE", "ON"]:
             if hasattr(module, "beam_search"):
                 setattr(module, "beam_search", partial(ipex_beam_search, module))
-
 
         for name, named_module in module.named_children():
             if type(named_module) in transformers_converter.keys():

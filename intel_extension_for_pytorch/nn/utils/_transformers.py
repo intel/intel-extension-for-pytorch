@@ -8,6 +8,9 @@ from ._transformer_configuration import IPEXTransformerConfig
 import os
 import math
 
+MAX_SEQ_LEN = int(os.environ.get("MAX_SEQ_LEN", "0"))
+MAX_OUT_SEQ_LEN = max(128, int(os.environ.get("MAX_OUT_SEQ_LEN", "0")))
+
 def activation_replace(module):
     from transformers.activations import NewGELUActivation
 
@@ -595,3 +598,44 @@ class IPEXTransformerMLP(nn.Module):
             hidden_states = self.act(hidden_states)
             hidden_states = self.fc_out(hidden_states)
         return self.drop_out(hidden_states)
+
+
+class IPEXTransformerConverter:
+    tp_group = None
+    tp_size = 1
+
+    def __init__(self, module, config, device = "cpu", dtype = torch.float) -> None:
+        self.module = module
+        self.config = config
+        self.dtype = dtype
+        self.device = device
+        col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
+        self.row_major = not col_major
+
+    def construct_transformer_config(self):
+        pass
+
+    def construct_ipex_optimized_module(self):
+        pass
+
+    def port_attn_parameters(self):
+        pass
+
+    def port_mlp_parameters(self):
+        pass
+
+    def port_layer_norm_parameters(self):
+        pass
+
+    def port_block_parameters(self):
+        pass
+
+    def port_all_parameters_to_new_module(self):
+        pass
+
+    def get_transformed_model_to_run(self):
+        pass
+    @staticmethod
+    def update_tp_data(tp_size, tp_group):
+        IPEXTransformerConverter.tp_size = tp_size
+        IPEXTransformerConverter.tp_group = tp_group

@@ -1,13 +1,17 @@
+import math
+import warnings
 import torch
 import torch.nn as nn
-from typing import Optional, Tuple
+from torch.nn import CrossEntropyLoss
+from typing import Optional, Tuple, Union
 
 from intel_extension_for_pytorch.nn.utils._transformer_configuration import IPEXTransformerConfig
-from ._transformers import IPEXTransformerAtten, IPEXTransformerMLP, IPEXEmptyLinear
+from ._transformers import IPEXTransformerAtten, IPEXTransformerMLP, IPEXEmptyLinear, IPEXTransformerConverter, MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
 from ._transformer_configuration import IPEXTransformerConfig
-from ._transformer_converter import IPEXTransformerConverter, MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
 from .RoPE import PositionalEmbedding
-import math
+from transformers.modeling_outputs import CausalLMOutputWithCrossAttentions
+
+
 
 class IPEXBloomAttn(IPEXTransformerAtten):
     def __init__(self, config) -> None:
@@ -75,9 +79,18 @@ class IPEXBloomBlock(nn.Module):
         output_attentions: bool = False,
     ):
         bs = IPEXTransformerAtten.batch_size
-        beam = hidden_states.shape[0] // bs
-        hidden_shape = [bs, beam, hidden_states.shape[1], hidden_states.shape[2]]
-        if hidden_states.shape[1] > 1:
+        dim = hidden_states.dim()
+        if dim == 3:
+            beam = hidden_states.shape[0] // bs
+        elif dim == 4:
+            beam = hidden_states.shape[1]
+        else:
+            print("Unsupported input shape")
+            return
+        seq = hidden_states.shape[-2]
+        hidden_size = hidden_states.shape[-1]
+        hidden_shape = [bs, beam, seq, hidden_size]
+        if seq > 1:
             hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :]        # [bs, seq, hidden_size]
             if attention_mask is not None:
                 attention_mask = attention_mask.view(bs, beam, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])[:,0,:,:,:].view(bs, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
@@ -115,9 +128,8 @@ class IPEXBloomBlock(nn.Module):
 
         # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
         hidden_states = hidden_states.transpose(0, 1)
-        if hidden_states.shape[1] > 1:
-            hidden_states = hidden_states.view(bs, 1, hidden_states.shape[1], hidden_states.shape[2]).expand([bs, beam, hidden_states.shape[1], hidden_states.shape[2]])
-            hidden_states = hidden_states.reshape(bs*beam, hidden_states.shape[2], hidden_states.shape[3])
+        if seq > 1:
+            hidden_states = hidden_states.view(bs, 1, seq, hidden_size).expand([bs, beam, seq, hidden_size])
 
         if use_cache:
             outputs = (hidden_states, ) + outputs
@@ -140,6 +152,84 @@ def _convert_to_bloom_cache_ipex(
                 layer_past[1].view(batch_size, num_heads, seq_length, head_dim),
             )
             for layer_past in past_key_value
+        )
+
+def IPEXBloomForCausalLMForward(
+        self,
+        input_ids: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[Tuple[Tuple[torch.Tensor, torch.Tensor], ...]] = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        head_mask: Optional[torch.Tensor] = None,
+        inputs_embeds: Optional[torch.Tensor] = None,
+        labels: Optional[torch.Tensor] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+        **deprecated_arguments,
+    ) -> Union[Tuple[torch.Tensor], CausalLMOutputWithCrossAttentions]:
+        r"""
+        labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
+            Labels for language modeling. Note that the labels **are shifted** inside the model, i.e. you can set
+            `labels = input_ids` Indices are selected in `[-100, 0, ..., config.vocab_size]` All labels set to `-100`
+            are ignored (masked), the loss is only computed for labels in `[0, ..., config.vocab_size]`
+        """
+        if deprecated_arguments.pop("position_ids", False) is not False:
+            # `position_ids` could have been `torch.Tensor` or `None` so defaulting pop to `False` allows to detect if users were passing explicitly `None`
+            warnings.warn(
+                "`position_ids` have no functionality in BLOOM and will be removed in v5.0.0. You can safely ignore"
+                " passing `position_ids`.",
+                FutureWarning,
+            )
+        if len(deprecated_arguments) > 0:
+            raise ValueError(f"Got unexpected arguments: {deprecated_arguments}")
+
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        transformer_outputs = self.transformer(
+            input_ids,
+            past_key_values=past_key_values,
+            attention_mask=attention_mask,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        hidden_states = transformer_outputs[0]
+
+        if hidden_states.dim() > 3:
+            hidden_states = hidden_states.reshape([-1, hidden_states.shape[-2], hidden_states.shape[-1]])
+        shape = list(hidden_states.size())
+        shape[1] = 1
+        hidden_states = hidden_states[:, -1, :].view(shape)
+        lm_logits = self.lm_head(hidden_states)
+
+        loss = None
+        if labels is not None:
+            # move labels to correct device to enable model parallelism
+            labels = labels.to(lm_logits.device)
+            # Shift so that tokens < n predict n
+            shift_logits = lm_logits[..., :-1, :].contiguous()
+            shift_labels = labels[..., 1:].contiguous()
+            batch_size, seq_length, vocab_size = shift_logits.shape
+            # Flatten the tokens
+            loss_fct = CrossEntropyLoss()
+            loss = loss_fct(
+                shift_logits.view(batch_size * seq_length, vocab_size), shift_labels.view(batch_size * seq_length)
+            )
+
+        if not return_dict:
+            output = (lm_logits,) + transformer_outputs[1:]
+            return ((loss,) + output) if loss is not None else output
+
+        return CausalLMOutputWithCrossAttentions(
+            loss=loss,
+            logits=lm_logits,
+            past_key_values=transformer_outputs.past_key_values,
+            hidden_states=transformer_outputs.hidden_states,
+            attentions=transformer_outputs.attentions,
         )
 
 class IPEXBloomConverter(IPEXTransformerConverter):
