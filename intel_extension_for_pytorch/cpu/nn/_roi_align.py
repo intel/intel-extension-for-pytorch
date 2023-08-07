@@ -2,7 +2,7 @@ import torch  # noqa F401
 from torch import nn, Tensor
 from torch.jit.annotations import BroadcastingList2
 
-from .. import functional as F
+from ...nn import functional as F
 
 
 class RoIAlign(nn.Module):
@@ -24,7 +24,7 @@ class RoIAlign(nn.Module):
         self.aligned = aligned
 
     def forward(self, input: Tensor, rois: Tensor) -> Tensor:
-        return F._roi_align.roi_align(
+        return F._roi_align_helper.roi_align(
             input,
             rois,
             self.output_size,

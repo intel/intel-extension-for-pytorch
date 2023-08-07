@@ -3,9 +3,9 @@ import torch.nn.functional
 from torch import nn as nn
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
+from intel_extension_for_pytorch.optim._lamb import Lamb
 import pytest  # noqa
 import os
-from intel_extension_for_pytorch.optim._lamb import Lamb
 import itertools
 
 device = "xpu"
@@ -182,19 +182,22 @@ class TestTorchMethod(TestCase):
         lr = 10.0
         weight_decay = 0.01
 
-        def create_model_optimizer(optimizer_string, mem_format, dtype):
+        def create_model_optimizer(optimizer_string, dtype):
             model_optimizer_list = []
-            # create model
-            model_xpu_no_fuse = TrainingModel()
-            model_xpu = TrainingModel()
 
-            model_xpu_no_fuse = (
-                model_xpu_no_fuse.to(memory_format=mem_format).to(device=device).train()
-            )
-            model_xpu = model_xpu.to(memory_format=mem_format).to(device=device).train()
+            def create_model():
+                # create model
+                model_xpu_no_fuse = TrainingModel()
+                model_xpu = TrainingModel()
 
-            # align the weight
-            align_all(model_xpu, model_xpu_no_fuse)
+                model_xpu_no_fuse = (
+                    model_xpu_no_fuse.to(device=device).train()
+                )
+                model_xpu = model_xpu.to(device=device).train()
+
+                # align the weight
+                align_all(model_xpu, model_xpu_no_fuse)
+                return model_xpu_no_fuse, model_xpu
 
             # optimizer
             if optimizer_string.lower() == "adamw":
@@ -204,6 +207,7 @@ class TestTorchMethod(TestCase):
                 amsgrad = True
                 weight_decay = 0.01
                 lr = 0.05
+                model_xpu_no_fuse, model_xpu = create_model()
                 optimizer_xpu_no_fuse = torch.optim.AdamW(model_xpu_no_fuse.parameters(),
                                                           lr=lr,
                                                           betas=(beta1, beta2),
@@ -216,28 +220,23 @@ class TestTorchMethod(TestCase):
                                                   eps=adam_epsilon,
                                                   weight_decay=weight_decay,
                                                   amsgrad=amsgrad)
-                model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
+                model_optimizer_list.append([model_xpu_no_fuse, model_xpu, optimizer_xpu_no_fuse, optimizer_xpu])
             elif optimizer_string.lower() == 'lamb':
                 beta1 = 0.9
                 beta2 = 0.999
                 lamb_epsilon = 1e-6
                 lr = 0.05
+                model_xpu_no_fuse, model_xpu = create_model()
                 optimizer_xpu_no_fuse = Lamb(model_xpu_no_fuse.parameters(), lr=lr, betas=(beta1, beta2), eps=lamb_epsilon)
                 optimizer_xpu = Lamb(model_xpu.parameters(), lr=lr, betas=(beta1, beta2), eps=lamb_epsilon)
-                model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
-            elif optimizer_string.lower() == 'sgd':
+                model_optimizer_list.append([model_xpu_no_fuse, model_xpu, optimizer_xpu_no_fuse, optimizer_xpu])
+            elif optimizer_string.lower() == 'sgd' or optimizer_string.lower() == 'splitsgd':
                 lr = 5.0
-                for momentum_value in [0, 0.9]:
+                for momentum_value in [0.0, 0.9]:
+                    model_xpu_no_fuse, model_xpu = create_model()
                     optimizer_xpu_no_fuse = torch.optim.SGD(model_xpu_no_fuse.parameters(), lr=lr, momentum=momentum_value)
                     optimizer_xpu = torch.optim.SGD(model_xpu.parameters(), lr=lr, momentum=momentum_value)
-                    model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
-            elif optimizer_string.lower() == 'splitsgd':
-                lr = 5.0
-                # use larger momentum_value to faster the error occurs
-                for momentum_value in [0, 5.0]:
-                    optimizer_xpu_no_fuse = torch.optim.SGD(model_xpu_no_fuse.parameters(), lr=lr, momentum=momentum_value)
-                    optimizer_xpu = torch.optim.SGD(model_xpu.parameters(), lr=lr, momentum=momentum_value)
-                    model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
+                    model_optimizer_list.append([model_xpu_no_fuse, model_xpu, optimizer_xpu_no_fuse, optimizer_xpu])
             elif optimizer_string.lower() == 'adam':
                 beta1 = 0.9
                 beta2 = 0.999
@@ -245,6 +244,7 @@ class TestTorchMethod(TestCase):
                 amsgrad = True
                 weight_decay = 0.01
                 lr = 0.05
+                model_xpu_no_fuse, model_xpu = create_model()
                 optimizer_xpu_no_fuse = torch.optim.Adam(model_xpu_no_fuse.parameters(),
                                                          lr=lr,
                                                          betas=(beta1, beta2),
@@ -257,12 +257,13 @@ class TestTorchMethod(TestCase):
                                                  eps=adam_epsilon,
                                                  weight_decay=weight_decay,
                                                  amsgrad=amsgrad)
-                model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
+                model_optimizer_list.append([model_xpu_no_fuse, model_xpu, optimizer_xpu_no_fuse, optimizer_xpu])
             elif optimizer_string.lower() == 'lars':
                 momentum = 0.9
                 epsilon = 0.001
                 lr = 5.0
                 weight_decay = 0.01
+                model_xpu_no_fuse, model_xpu = create_model()
                 optimizer_xpu_no_fuse = torch.xpu.optim.Lars(model_xpu_no_fuse.parameters(),
                                                              lr=lr, weight_decay=weight_decay,
                                                              momentum=momentum,
@@ -271,26 +272,28 @@ class TestTorchMethod(TestCase):
                                                      lr=lr, weight_decay=weight_decay,
                                                      momentum=momentum,
                                                      epsilon=epsilon)
-                model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
+                model_optimizer_list.append([model_xpu_no_fuse, model_xpu, optimizer_xpu_no_fuse, optimizer_xpu])
             else:
                 raise RuntimeError(
                     "found unknown optimizer {}".format(optimizer_string)
                 )
 
+            # optimize with torch.xpu.optimize
             model_and_optimzier_list = []
             for model_optimzier_item in model_optimizer_list:
-                # index 0 is non fuse optimizer, index 1 fuse optimizer
-                # non-fusion
-                model_xpu_no_fuse, optimizer_xpu_no_fuse = torch.xpu.optimize(model=model_xpu_no_fuse,
-                                                                              dtype=dtype, 
-                                                                              optimizer=model_optimzier_item[0],
+                # create non-fusion model and optimizer
+                # [watch out] for split sgd, the fused optimizer is required in torch.xpu.optimize,
+                # here model_xpu_no_fuse, as accuracy reference, it uses master weight training
+                model_xpu_no_fuse, optimizer_xpu_no_fuse = torch.xpu.optimize(model=model_optimzier_item[0],
+                                                                              dtype=dtype,
+                                                                              optimizer=model_optimzier_item[2],
                                                                               fuse_update_step=False)
 
-                # fusion
+                # create fusion model and optimizer
                 use_split_master_weight = True if 'split' in optimizer_string.lower() else False
-                model_xpu, optimizer_xpu = torch.xpu.optimize(model=model_xpu, 
-                                                              dtype=dtype, 
-                                                              optimizer=model_optimzier_item[1],
+                model_xpu, optimizer_xpu = torch.xpu.optimize(model=model_optimzier_item[1],
+                                                              dtype=dtype,
+                                                              optimizer=model_optimzier_item[3],
                                                               fuse_update_step=True,
                                                               split_master_weight_for_bf16=use_split_master_weight)
                 model_and_optimzier_list.append([model_xpu_no_fuse, model_xpu, optimizer_xpu_no_fuse, optimizer_xpu])
@@ -313,10 +316,19 @@ class TestTorchMethod(TestCase):
                         layer1.weight.data = layer2.weight.clone().data
                         if layer1.weight.grad is not None:
                             layer1.weight.grad.data = layer2.weight.grad.clone().data
-                        if hasattr(layer1, "master_weight"):
-                            layer1.master_weight.data = (
-                                layer2.master_weight.clone().data
-                            )
+                        if hasattr(layer1, "weight" + "_wrapper"):
+                            if layer1.weight_wrapper.master_parameter is not None:
+                                layer1.weight_wrapper.master_parameter.data = (
+                                    layer2.weight_wrapper.master_parameter.clone().data
+                                )
+                            elif layer1.weight_wrapper.parameter_trail is not None:
+                                # split the master weight from layer2 to align the layer1 weight trail
+                                _, layer2_weight_trail = torch.ops.torch_ipex.split_float_bfloat16(
+                                    layer2.weight_wrapper.master_parameter.clone().data
+                                )
+                                layer1.weight_wrapper.parameter_trail.data = layer2_weight_trail.data
+                            else:
+                                pass
 
                     if isinstance(layer1, nn.Linear) and isinstance(layer2, nn.Linear):
                         layer1.weight.data = layer2.weight.clone().data
@@ -325,20 +337,40 @@ class TestTorchMethod(TestCase):
                             layer1.weight.grad.data = layer2.weight.grad.clone().data
                         if layer1.bias.grad is not None:
                             layer1.bias.grad.data = layer2.bias.grad.clone().data
-                        if hasattr(layer1, "master_weight"):
-                            layer1.master_weight.data = (
-                                layer2.master_weight.clone().data
-                            )
-                        if hasattr(layer1, "master_bias"):
-                            layer1.master_bias.data = layer2.master_bias.clone().data
+                        if hasattr(layer1, "weight" + "_wrapper"):
+                            if layer1.weight_wrapper.master_parameter is not None:
+                                layer1.weight_wrapper.master_parameter.data = (
+                                    layer2.weight_wrapper.master_parameter.clone().data
+                                )
+                            elif layer1.weight_wrapper.parameter_trail is not None:
+                                # split the master weight from layer2 to align the layer1 weight trail
+                                _, layer2_weight_trail = torch.ops.torch_ipex.split_float_bfloat16(
+                                    layer2.weight_wrapper.master_parameter.clone().data
+                                )
+                                layer1.weight_wrapper.parameter_trail.data = layer2_weight_trail.data
+                            else:
+                                pass
+
+                        if hasattr(layer1, "bias" + "_wrapper"):
+                            if layer1.bias_wrapper.master_parameter is not None:
+                                layer1.bias_wrapper.master_parameter.data = (
+                                    layer2.bias_wrapper.master_parameter.clone().data
+                                )
+                            elif layer1.bias_wrapper.parameter_trail is not None:
+                                # split the master bias from layer2 to align the layer1 bias trail
+                                _, layer2_bias_trail = torch.ops.torch_ipex.split_float_bfloat16(
+                                    layer2.bias_wrapper.master_parameter.clone().data
+                                )
+                                layer1.bias_wrapper.parameter_trail.data = layer2_bias_trail.data
+                            else:
+                                pass
+
             torch.xpu.synchronize()
 
-        def training(input, target, mode, dtype, optimizer, mem_format):
+        def training(input, target, mode, dtype, optimizer):
             input_xpu = torch.empty_like(input)
             input_xpu.data = input.data
-            input_xpu.data = input_xpu.contiguous(
-                memory_format=mem_format
-            ).requires_grad_()
+            input_xpu = input_xpu.requires_grad_(True)
             target_xpu = torch.empty_like(target)
             target_xpu.data = target.data
 
@@ -363,6 +395,8 @@ class TestTorchMethod(TestCase):
             support_dtype_list = [torch.float32, torch.bfloat16]
             if optimizer_string.lower() == "adam" or optimizer_string.lower() == "sgd":
                 support_dtype_list.append(torch.float64)
+
+            # for split master weight training, the test for fp32 is ignored
             if 'split' in optimizer_string.lower():
                 support_dtype_list.remove(torch.float32)
             for dtype in support_dtype_list:
@@ -372,51 +406,49 @@ class TestTorchMethod(TestCase):
                 if dtype == torch.bfloat16:
                     checking_atol = 1e-3
                     checking_rtol = 1.6e-2
-                for mem_format in [torch.contiguous_format, torch.channels_last]:
-                    print('checking memory format: ', mem_format)
-                    model_optimizer_list = create_model_optimizer(optimizer_string, mem_format, dtype=dtype)
-                    for model_optimizer_item in model_optimizer_list:
-                        model_xpu_no_fuse = model_optimizer_item[0]
-                        model_xpu = model_optimizer_item[1]
-                        optimizer_xpu_no_fuse = model_optimizer_item[2]
-                        optimizer_xpu = model_optimizer_item[3]
-                        for i in range(num_iter):
-                            print('checking iter: ', i, '. optimizer: ', optimizer_string, end='')
-                            print('. memory format: ', mem_format, ' dtype: ', dtype)
-                            input = torch.randn(batch_size, input_channel, 7, 7).to(device=device)
-                            target = torch.empty(batch_size, dtype=torch.long).random_(class_num).to(device=device)
+                model_optimizer_list = create_model_optimizer(optimizer_string, dtype=dtype)
+                for model_optimizer_item in model_optimizer_list:
+                    model_xpu_no_fuse = model_optimizer_item[0]
+                    model_xpu = model_optimizer_item[1]
+                    optimizer_xpu_no_fuse = model_optimizer_item[2]
+                    optimizer_xpu = model_optimizer_item[3]
+                    for i in range(num_iter):
+                        print('checking iter: ', i, '. optimizer: ', optimizer_string, end='')
+                        print(' dtype: ', dtype)
+                        input = torch.randn(batch_size, input_channel, 7, 7).to(device=device)
+                        target = torch.empty(batch_size, dtype=torch.long).random_(class_num).to(device=device)
 
-                            align_all(model_xpu, model_xpu_no_fuse)
+                        align_all(model_xpu, model_xpu_no_fuse)
 
-                            training(input, target, model_xpu_no_fuse, dtype, optimizer_xpu_no_fuse, mem_format)
-                            training(input, target, model_xpu, dtype, optimizer_xpu, mem_format)
+                        training(input, target, model_xpu_no_fuse, dtype, optimizer_xpu_no_fuse)
+                        training(input, target, model_xpu, dtype, optimizer_xpu)
 
-                            # checking updated weight
-                            for layer1 in model_xpu.modules():
-                                for layer2 in model_xpu_no_fuse.modules():
-                                    if (isinstance(layer1, nn.BatchNorm2d) and isinstance(layer2, nn.BatchNorm2d)):
-                                        self.assertEqual(layer1.weight.cpu(),
-                                                         layer2.weight.cpu(),
-                                                         atol=checking_atol,
-                                                         rtol=checking_rtol)
-                                        self.assertEqual(layer1.bias.cpu(),
-                                                         layer2.bias.cpu(),
-                                                         atol=checking_atol,
-                                                         rtol=checking_rtol)
-                                    if (isinstance(layer1, nn.Conv2d) and isinstance(layer2, nn.Conv2d)):
-                                        self.assertEqual(layer1.weight.cpu(),
-                                                         layer2.weight.cpu(),
-                                                         atol=checking_atol,
-                                                         rtol=checking_rtol)
-                                    if (isinstance(layer1, nn.Linear) and isinstance(layer2, nn.Linear)):
-                                        self.assertEqual(layer1.weight.cpu(),
-                                                         layer2.weight.cpu(),
-                                                         atol=checking_atol,
-                                                         rtol=checking_rtol)
-                                        self.assertEqual(layer1.bias.cpu(),
-                                                         layer2.bias.cpu(),
-                                                         atol=checking_atol,
-                                                         rtol=checking_rtol)
+                        # checking updated weight
+                        for layer1 in model_xpu.modules():
+                            for layer2 in model_xpu_no_fuse.modules():
+                                if (isinstance(layer1, nn.BatchNorm2d) and isinstance(layer2, nn.BatchNorm2d)):
+                                    self.assertEqual(layer1.weight.cpu(),
+                                                     layer2.weight.cpu(),
+                                                     atol=checking_atol,
+                                                     rtol=checking_rtol)
+                                    self.assertEqual(layer1.bias.cpu(),
+                                                     layer2.bias.cpu(),
+                                                     atol=checking_atol,
+                                                     rtol=checking_rtol)
+                                if (isinstance(layer1, nn.Conv2d) and isinstance(layer2, nn.Conv2d)):
+                                    self.assertEqual(layer1.weight.cpu(),
+                                                     layer2.weight.cpu(),
+                                                     atol=checking_atol,
+                                                     rtol=checking_rtol)
+                                if (isinstance(layer1, nn.Linear) and isinstance(layer2, nn.Linear)):
+                                    self.assertEqual(layer1.weight.cpu(),
+                                                     layer2.weight.cpu(),
+                                                     atol=checking_atol,
+                                                     rtol=checking_rtol)
+                                    self.assertEqual(layer1.bias.cpu(),
+                                                     layer2.bias.cpu(),
+                                                     atol=checking_atol,
+                                                     rtol=checking_rtol)
 
     def test_xpu_auto_channels_last(self):
         def check_layout_for_module(module):
@@ -568,11 +600,10 @@ class TestTorchMethod(TestCase):
                 y.backward()
                 optimizer.step()
 
-        # TODO: when support split master weight, will set split_master_weight_for_bf16: [True, False]
         params_dict = {
             "dtype": [torch.float32, torch.bfloat16],
             "level": ["O0", "O1"],
-            "split_master_weight_for_bf16": [False],
+            "split_master_weight_for_bf16": [True, False],
             "fuse_update_step": [True, False],
         }
 

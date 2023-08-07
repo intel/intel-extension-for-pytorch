@@ -122,16 +122,31 @@ class TestOptimizeCases(TestCase):
                         traced_model = torch.jit.trace(opt_M, x)
                         trace_graph = traced_model.graph_for(x)
                     self.assertEqual(len([n for n in trace_graph.nodes() if n.kind() == "ipex::batch_norm"]), max_num_folding-(conv_bn_folding+linear_bn_folding))
-    
+
     def test_optimize_bf16_model(self):
         model = ConvBatchNorm()
         optimized_model = ipex.optimize(model.eval(), dtype=torch.bfloat16)
         # model should not has master weight attr for infernence model.
-        self.assertTrue(not hasattr(optimized_model.conv, 'master_weight'))
+        self.assertTrue(not hasattr(optimized_model.conv, "master_weight"))
         # model should has master weight attr for infernence model.
         sgd = torch.optim.SGD(model.parameters(), lr=0.1)
-        optimized_model, optimized_sgd = ipex.optimize(model.train(), optimizer=sgd, dtype=torch.bfloat16, split_master_weight_for_bf16=False)
-        self.assertTrue(hasattr(optimized_model.conv, 'master_weight'))
+        optimized_model, optimized_sgd = ipex.optimize(
+            model.train(),
+            optimizer=sgd,
+            dtype=torch.bfloat16,
+            split_master_weight_for_bf16=False,
+        )
+        self.assertEqual(optimized_model.conv.weight.dtype, torch.bfloat16)
+
+        def found_wrapper(parameter, params_attr):
+            for _, v in params_attr.items():
+                if parameter is v.parameter:
+                    return v
+            return None
+
+        wrapper = found_wrapper(optimized_model.conv.weight, optimized_sgd.params_attr)
+        self.assertTrue(wrapper is not None)
+        self.assertEqual(wrapper.master_parameter.dtype, torch.float)
 
     def test_optimize_pretrain_model(self):
         optimizer_options = [Lamb, Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD]

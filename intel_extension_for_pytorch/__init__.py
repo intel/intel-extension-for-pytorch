@@ -1,6 +1,7 @@
 # coding: utf-8
 import re
 import torch
+import warnings
 
 try:
     import torchvision
@@ -99,11 +100,20 @@ from . import jit
 from . import optim
 from . import _inductor
 
-from .frontend import optimize, enable_onednn_fusion
+try:
+    from .cpu import tpp
+except BaseException:
+    warnings.warn(
+        "Please install transformers repo when you want to use fast_bert API."
+    )
+
+from .frontend import optimize
 from .frontend import enable_auto_channels_last, disable_auto_channels_last
 from .frontend import set_fp32_math_mode, get_fp32_math_mode, FP32MathMode
 from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl
 from .cpu.utils.verbose import verbose
+from .cpu.tpp.fused_bert import fast_bert
+from .cpu.onednn_fusion import enable_onednn_fusion
 
 from . import _C
 from ._version import (__version__, __ipex_gitrev__, __torch_gitrev__,

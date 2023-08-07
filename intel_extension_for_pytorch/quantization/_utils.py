@@ -319,11 +319,9 @@ class Node:
         self.post_nodes = []
 
 
-class ParentNode:
-    __slots__ = ["output_info"]
+from collections import namedtuple
 
-    def __init__(self, output_info):
-        self.output_info = output_info
+ParentNode = namedtuple(typename="ParentNode", field_names=["output_info"])
 
 
 def convert_quant_state_map_to_nodes(quant_state_map):
