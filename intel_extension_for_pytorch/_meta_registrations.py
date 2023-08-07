@@ -447,4 +447,4 @@ def meta_add_softmax_(
     input1,
     input2,
 ):
-    return input1.new_empty(input1.shape)
+    return input1
