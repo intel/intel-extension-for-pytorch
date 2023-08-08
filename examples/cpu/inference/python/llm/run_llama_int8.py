@@ -62,7 +62,7 @@ parser.add_argument("--greedy", action="store_true")
 parser.add_argument("--profile", action="store_true")
 parser.add_argument(
     "--lowp-mode",
-    choice=["BF16","FP32","INT8","FP16"], 
+    choices=["BF16","FP32","INT8","FP16"], 
     default="BF16",
     type=str,
     help="low precision mode for weight only quantization"
