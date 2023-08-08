@@ -58,6 +58,7 @@ void insertPrePackedLinearOp(
     const bool& use_mkl_sgemm);
 void fuseLinearWithEltwise(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseLinearAddRelu(std::shared_ptr<torch::jit::Graph>& graph);
+void fuseLinearMulAdd(std::shared_ptr<torch::jit::Graph>& graph);
 
 void FuseRMSNorm(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseAddLayerNorm(std::shared_ptr<torch::jit::Graph>& graph);

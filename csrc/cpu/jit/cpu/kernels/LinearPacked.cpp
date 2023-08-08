@@ -169,6 +169,61 @@ at::Tensor linear_add_relu_run(
       ideep::attr_t::residual(scale).set_fpmath_mode(torch_ipex::fpmath_mode));
 }
 
+at::Tensor linear_mul_run(
+    const at::Tensor& input,
+    const at::Tensor& to_mul,
+    const c10::intrusive_ptr<LinearOpContext>& op_context) {
+  RECORD_FUNCTION(
+      "ipex_prepack::linear_mul_run", c10::ArrayRef<c10::IValue>({}));
+  // align dtype
+  auto dtype = input.scalar_type();
+  auto to_mul_ = to_mul.contiguous().to(dtype);
+  // We better make post ops tensor have same format with inner product output
+  // See [Note: onednn inner product with Pytorch Linear]
+  auto to_mul_reshaped = to_mul_.dim() == 2
+      ? to_mul_
+      : to_mul_.reshape({-1, to_mul_.size(to_mul_.dim() - 1)});
+  ideep::tensor onednn_to_mul = itensor_view_from_dense(to_mul_reshaped);
+  auto op_attr = ideep::attr_t::fuse_binary(
+      dnnl::algorithm::binary_mul, onednn_to_mul.get_desc());
+  std::vector<ideep::tensor> post_op_tensors = {onednn_to_mul};
+  return op_context->run_with_binary_post_op(
+      input, post_op_tensors, op_attr.set_fpmath_mode(torch_ipex::fpmath_mode));
+}
+
+at::Tensor linear_mul_add_run(
+    const at::Tensor& input,
+    const at::Tensor& to_mul,
+    const at::Tensor& to_add,
+    const c10::intrusive_ptr<LinearOpContext>& op_context) {
+  RECORD_FUNCTION(
+      "ipex_prepack::linear_mul_add_run", c10::ArrayRef<c10::IValue>({}));
+  // align dtype
+  auto dtype = input.scalar_type();
+  auto to_mul_ = to_mul.contiguous().to(dtype);
+  auto to_add_ = to_add.contiguous().to(dtype);
+  // We better make post ops tensor have same format with inner product output
+  // See [Note: onednn inner product with Pytorch Linear]
+  auto to_mul_reshaped = to_mul_.dim() == 2
+      ? to_mul_
+      : to_mul_.reshape({-1, to_mul_.size(to_mul_.dim() - 1)});
+  ideep::tensor onednn_to_mul = itensor_view_from_dense(to_mul_reshaped);
+  auto to_add_reshaped = to_add_.dim() == 2
+      ? to_add_
+      : to_add_.reshape({-1, to_add_.size(to_add_.dim() - 1)});
+  ideep::tensor onednn_to_add = itensor_view_from_dense(to_add_reshaped);
+
+  ideep::attr_t op_attr;
+  ideep::post_ops po;
+  po.append_binary(dnnl::algorithm::binary_mul, onednn_to_mul.get_desc());
+  po.append_binary(dnnl::algorithm::binary_add, onednn_to_add.get_desc());
+  op_attr.set_post_ops(po);
+
+  std::vector<ideep::tensor> post_op_tensors = {onednn_to_mul, onednn_to_add};
+  return op_context->run_with_binary_post_op(
+      input, post_op_tensors, op_attr.set_fpmath_mode(torch_ipex::fpmath_mode));
+}
+
 ContextLinear create(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
@@ -237,6 +292,22 @@ at::Tensor& run(
   const at::Tensor& bias = *bias_maybe_owned;
   linear_kernel_output(input_, context.weight_packed_, bias, accumu, attr);
   return accumu;
+}
+
+at::Tensor run(
+    const ContextLinear& context,
+    const at::Tensor& input,
+    const std::vector<ideep::tensor>& post_op_src,
+    const ideep::attr_t& attr) {
+  TORCH_CHECK(
+      input.size(input.dim() - 1) == context.weight_packed_.get_dims()[1],
+      "Check the shapes of mat1 and mat2, they cannot be multiplied!");
+  auto input_ = input.contiguous();
+  c10::MaybeOwned<at::Tensor> bias_maybe_owned =
+      at::borrow_from_optional_tensor(context.at_bias_);
+  const at::Tensor& bias = *bias_maybe_owned;
+
+  return linear_kernel(input_, context.weight_packed_, bias, attr, post_op_src);
 }
 
 void run_core(

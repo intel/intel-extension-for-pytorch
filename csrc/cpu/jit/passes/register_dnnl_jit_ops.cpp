@@ -647,6 +647,41 @@ torch::jit::RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
+        "ipex_prepack::linear_mul_run(Tensor input, Tensor to_mul, "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) "
+        "-> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = linear_mul_run(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toTensor(),
+                (std::move(peek(stack, 2, 3)))
+                    .toCustomClass<LinearOpContext>());
+            drop(stack, 3);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::linear_mul_add_run(Tensor input, Tensor to_mul, Tensor to_add, "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) "
+        "-> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = linear_mul_add_run(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                (std::move(peek(stack, 1, 4))).toTensor(),
+                (std::move(peek(stack, 2, 4))).toTensor(),
+                (std::move(peek(stack, 3, 4)))
+                    .toCustomClass<LinearOpContext>());
+            drop(stack, 4);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
         "ipex_prepack::mkl_sgemm_run(Tensor input, "
         "__torch__.torch.classes.ipex_prepack.MKLOpContext "
         "W_prepack) -> Tensor",

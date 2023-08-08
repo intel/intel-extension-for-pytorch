@@ -28,9 +28,17 @@ void linear_kernel_output(
     const ideep::tensor& mkldnn_weight,
     const at::Tensor& bias,
     at::Tensor& output,
-    const ideep::attr_t& attr) {
+    const ideep::attr_t& attr,
+    const std::vector<ideep::tensor>& post_op_src) {
   auto self_ = self.is_contiguous() ? self : self.contiguous();
   const int64_t dim = self.dim();
+  // [Note: onednn inner product with Pytorc Linear]
+  // We use onednn inner_product primitive to support Pytorch linear
+  // Since the semantic of onednn inner_product is different with
+  // Pytorch linear while input's dimension > 2
+  // https://oneapi-src.github.io/oneDNN/dev_guide_inner_product.html#forward
+  // https://pytorch.org/docs/stable/generated/torch.nn.functional.linear.html?highlight=linear#torch.nn.functional.linear
+  // We need to reshape input to 2d to make them semantic aligned
   auto self_reshaped =
       dim == 2 ? self_ : self_.reshape({-1, self.size(self.dim() - 1)});
   const ideep::tensor mkldnn_input = itensor_view_from_dense(self_reshaped);
@@ -51,13 +59,30 @@ void linear_kernel_output(
   if (bias.defined()) {
     auto bias_ = self.is_contiguous() ? bias : bias.contiguous();
     const ideep::tensor mkldnn_bias = itensor_view_from_dense(bias_);
-    ideep::inner_product_forward::
-        compute</*reorder_src=*/false, /*reorder_weight=*/false>(
-            mkldnn_input, mkldnn_weight, mkldnn_bias, mkldnn_output, attr);
+    if (post_op_src.empty()) {
+      ideep::inner_product_forward::
+          compute</*reorder_src=*/false, /*reorder_weight=*/false>(
+              mkldnn_input, mkldnn_weight, mkldnn_bias, mkldnn_output, attr);
+    } else {
+      ideep::inner_product_forward::
+          compute_binary</*reorder_src=*/false, /*reorder_weight=*/false>(
+              mkldnn_input,
+              post_op_src,
+              mkldnn_weight,
+              mkldnn_bias,
+              mkldnn_output,
+              attr);
+    }
   } else {
-    ideep::inner_product_forward::
-        compute</*reorder_src=*/false, /*reorder_weight=*/false>(
-            mkldnn_input, mkldnn_weight, mkldnn_output, attr);
+    if (post_op_src.empty()) {
+      ideep::inner_product_forward::
+          compute</*reorder_src=*/false, /*reorder_weight=*/false>(
+              mkldnn_input, mkldnn_weight, mkldnn_output, attr);
+    } else {
+      ideep::inner_product_forward::
+          compute_binary</*reorder_src=*/false, /*reorder_weight=*/false>(
+              mkldnn_input, post_op_src, mkldnn_weight, mkldnn_output, attr);
+    }
   }
   if (self.dim() != 2) {
     output_ = output_.reshape(output_size);
@@ -71,12 +96,13 @@ at::Tensor linear_kernel(
     const at::Tensor& self,
     const ideep::tensor& mkldnn_weight,
     const at::Tensor& bias,
-    const ideep::attr_t& attr) {
+    const ideep::attr_t& attr,
+    const std::vector<ideep::tensor>& post_op_src) {
   auto input_size = self.sizes();
   std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
   output_size.push_back(mkldnn_weight.get_dim(0));
   auto output = at::empty(output_size, self.options());
-  linear_kernel_output(self, mkldnn_weight, bias, output, attr);
+  linear_kernel_output(self, mkldnn_weight, bias, output, attr, post_op_src);
   return output;
 }
 

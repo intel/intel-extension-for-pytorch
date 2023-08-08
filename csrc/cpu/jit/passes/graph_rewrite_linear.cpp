@@ -414,6 +414,92 @@ void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {
   rewriter_add_relu.runOnGraph(graph);
 }
 
+void fuseLinearMulAdd(std::shared_ptr<Graph>& graph) {
+  SubgraphRewriter rewriter_add_operand_on_the_right,
+      rewriter_add_operand_on_the_left, rewriter_mul_operand_on_the_right,
+      rewriter_mul_operand_on_the_left;
+  std::array<std::string, 2> add_operators = {"add", "add_"};
+  std::array<std::string, 2> mul_operators = {"mul", "mul_"};
+
+  // linear + mul
+  // linear   Y
+  //   \   /
+  //    mul
+  // output = linear_output * Y
+  auto linear_mul_operand_on_the_right_rstring = CodeTemplate(R"(
+    graph(%input, %operand, %packed_weight):
+        %x = ipex_prepack::linear_run(%input, %packed_weight)
+        %res = aten::${mul}(%x, %operand)
+        return (%res))");
+
+  //  Y     linear
+  //   \   /
+  //    mul
+  // output = Y * linear_output
+  auto linear_mul_operand_on_the_left_rstring = CodeTemplate(R"(
+    graph(%input, %operand, %packed_weight):
+        %x = ipex_prepack::linear_run(%input, %packed_weight)
+        %res = aten::${mul}(%operand, %x)
+        return (%res))");
+
+  std::string linear_mul_fused = R"(
+    graph(%input, %operand, %packed_weight):
+        %res = ipex_prepack::linear_mul_run(%input, %operand, %packed_weight)
+        return (%res))";
+
+  for (const auto& mul : mul_operators) {
+    TemplateEnv env;
+    env.s("mul", mul);
+    rewriter_mul_operand_on_the_right.RegisterRewritePattern(
+        linear_mul_operand_on_the_right_rstring.format(env), linear_mul_fused);
+    rewriter_mul_operand_on_the_left.RegisterRewritePattern(
+        linear_mul_operand_on_the_left_rstring.format(env), linear_mul_fused);
+  }
+
+  rewriter_mul_operand_on_the_right.runOnGraph(graph);
+  rewriter_mul_operand_on_the_left.runOnGraph(graph);
+
+  // linear + mul + add
+  // linear_mul   Y
+  //   \         /
+  //       add
+  // output = linear_mul + alpha * Y
+  auto linear_add_operand_on_the_right_rstring = CodeTemplate(R"(
+    graph(%input, %operand, %packed_weight, %add_operand, %alpha):
+        %x = ipex_prepack::linear_mul_run(%input, %operand, %packed_weight)
+        %res = aten::${add}(%x, %add_operand, %alpha)
+        return (%res))");
+
+  //  Y     linear_mul
+  //   \   /
+  //    add
+  // output = alpha * linear_mul + Y
+  auto linear_add_operand_on_the_left_rstring = CodeTemplate(R"(
+    graph(%input, %operand, %packed_weight, %add_operand, %alpha):
+        %x = ipex_prepack::linear_mul_run(%input, %operand, %packed_weight)
+        %res = aten::${add}(%add_operand, %x, %alpha)
+        return (%res))");
+
+  std::string linear_mul_add_fused = R"(
+    graph(%input, %operand, %packed_weight, %add_operand, %alpha):
+        %res = ipex_prepack::linear_mul_add_run(%input, %operand, %add_operand, %packed_weight)
+        return (%res))";
+
+  for (const auto& add : add_operators) {
+    TemplateEnv env;
+    env.s("add", add);
+    rewriter_add_operand_on_the_right.RegisterRewritePattern(
+        linear_add_operand_on_the_right_rstring.format(env),
+        linear_mul_add_fused);
+    rewriter_add_operand_on_the_left.RegisterRewritePattern(
+        linear_add_operand_on_the_left_rstring.format(env),
+        linear_mul_add_fused);
+  }
+
+  rewriter_add_operand_on_the_right.runOnGraph(graph, fuse_binary_add_filter);
+  rewriter_add_operand_on_the_left.runOnGraph(graph, fuse_binary_add_filter);
+}
+
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch_ipex
