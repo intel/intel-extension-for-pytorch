@@ -11,43 +11,53 @@ class IPEXOptAtten(IPEXTransformerAtten):
     def __init__(self, 
                  config: IPEXTransformerConfig) -> None:
         super().__init__(config)
-        self.scaling = self.head_dim**-0.5
 
     def compute_qkv(self,
                     hidden_states: torch.Tensor,
                     key_value_state: Optional[torch.Tensor] = None,
                     layer_past: Optional[Tuple[torch.Tensor]] = None):
         is_cross_attention = key_value_state is not None
-
         seq_len, bs, _ = hidden_states.size()
-        if self.row_major:
-            query_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.q_wei, self.q_proj.bias)
-        else:
-            query_states = self.q_proj(hidden_states) 
-        query_states = query_states * self.scaling
-
         if is_cross_attention and layer_past is not None:
-            key_states = layer_past[0]
-            value_state = layer_past[1]
+            if self.row_major:
+                query = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.q_wei, self.q_proj.bias)
+            else:
+                query = self.q_proj(hidden_states)
+            key = layer_past[0]
+            value = layer_past[1]
         elif is_cross_attention:
             if self.row_major:
-                key_states = torch.ops.torch_ipex.matmul_bias_out(key_value_state, self.k_wei, self.k_proj.bias)
-                value_state = torch.ops.torch_ipex.matmul_bias_out(key_value_state, self.v_wei, self.v_proj.bias)
+                query = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.q_wei, self.q_proj.bias)
+                key = torch.ops.torch_ipex.matmul_bias_out(key_value_state, self.k_wei, self.k_proj.bias)
+                value = torch.ops.torch_ipex.matmul_bias_out(key_value_state, self.v_wei, self.v_proj.bias)
             else:
-                key_states = self.k_proj(key_value_state)
-                value_state = self.v_proj(key_value_state)
+                query = self.q_proj(hidden_states)
+                key = self.k_proj(key_value_state)
+                value = self.v_proj(key_value_state)
         else:
-            if self.row_major:
-                key_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.k_wei, self.k_proj.bias)
-                value_state = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.v_wei, self.v_proj.bias)
+            if self.kv_cache_optimize and self.row_major and self.kv_cache:
+                if self.get_beam_width() == 1:
+                    query, key, value = self.qkv_cache_optimized_greedy(hidden_states=hidden_states, layer_past=layer_past)
+                else:
+                    new_prompts = True if layer_past == None else False
+                    if new_prompts:
+                        self.key_prompt = None
+                        self.value_prompt = None
+                    query, key, value = self.qkv_cache_optimized_beam(hidden_states=hidden_states, layer_past=layer_past)
+                    if self.cur_len == 0:
+                        new_shape = [seq_len, bs, self.num_attn_head, self.head_dim]
+                        if self.key_prompt is not None:
+                            self.key_prompt = self.key_prompt.view(new_shape)
+                        if self.value_prompt is not None:
+                            self.value_prompt = self.value_prompt.view(new_shape)
             else:
-                key_states = self.k_proj(hidden_states)
-                value_state = self.v_proj(hidden_states)
+                query, key, value = self.qkv_normal(hidden_states=hidden_states, layer_past=layer_past)
 
-        query_states = query_states.view(seq_len, bs, self.num_attn_head, self.head_dim)
-        key_states = key_states.view(seq_len, bs, self.num_attn_head, self.head_dim)
-        value_state = value_state.view(seq_len, bs, self.num_attn_head, self.head_dim)
-        return query_states, key_states, value_state
+        new_shape = [seq_len, bs, self.num_attn_head, self.head_dim]
+        query = query.view(new_shape)
+        key = key.view(new_shape)
+        value = value.view(new_shape)
+        return query, key, value
 
 
 class IPEXOptMLP(IPEXTransformerMLP):
@@ -92,6 +102,26 @@ class IPEXOptBlock(nn.Module):
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
 
         # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
+
+        bs = IPEXTransformerAtten.batch_size
+        dim = hidden_states.dim()
+        if dim == 3:
+            beam = hidden_states.shape[0] // bs
+        elif dim == 4:
+            beam = hidden_states.shape[1]
+        else:
+            print("Unsupported input shape")
+            return
+        seq = hidden_states.shape[-2] 
+        hidden_size = hidden_states.shape[-1]
+        hidden_shape = [bs, beam, seq, hidden_size]
+        if seq > 1:
+            hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :]        # [bs, seq, hidden_size]
+            if attention_mask is not None:
+                shape = attention_mask.shape
+                attention_mask = attention_mask.view(bs, beam, shape[1], shape[2], shape[3])[:,0,:,:,:].view(bs, shape[1], shape[2], shape[3])
+
+        # convert layout form [bs, seq, hidden_size] to [seq, bs, hidden_size]
         hidden_states = hidden_states.transpose(0, 1).contiguous()
         residual = hidden_states
         if self.do_layer_norm_before:
@@ -104,7 +134,6 @@ class IPEXOptBlock(nn.Module):
             head_mask=layer_head_mask,
             output_attentions=output_attentions,
             residual=residual)
-
         if not self.do_layer_norm_before:
             hidden_states = self.self_attn_layer_norm(hidden_states)
 
@@ -115,7 +144,12 @@ class IPEXOptBlock(nn.Module):
 
         if not self.do_layer_norm_before:
             hidden_states = self.final_layer_norm(hidden_states)
+        # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
         hidden_states = hidden_states.transpose(0, 1)
+        if seq > 1:
+            hidden_states = hidden_states.view(bs, 1, seq, hidden_size).expand([bs, beam, seq, hidden_size])
+            hidden_states = hidden_states.reshape([bs*beam, seq, hidden_size])
+
 
         outputs = (hidden_states,)
         if output_attentions:
@@ -167,12 +201,12 @@ class IPEXOptConverter(IPEXTransformerConverter):
             attn_dropout=None,
             enable_bias=enable_bias,
             residual_pdrop=resid_pdrop,
-            scale_attention=False,
+            scale_attention=True,
             is_decoder=True,
             do_norm_before=do_layer_norm_before,
             ln_elementwise_affine=layer_norm_eltwise_affine,
             seq_first=True,
-            kv_cache_optimize=False,
+            kv_cache_optimize=True,
             positional_embedding_base=10000,
             sdp_fusion_enable=True,
             device=self.device,
@@ -201,6 +235,23 @@ class IPEXOptConverter(IPEXTransformerConverter):
             self.module.self_attn.out_proj.weight.data = self.module.self_attn.out_proj.weight.transpose(0, 1).contiguous()
             self.ipex_optimized_module.attn.out_wei = self.module.self_attn.out_proj.weight
             self.ipex_optimized_module.attn.out_bias = self.module.self_attn.out_proj.bias
+
+            shape = [3, -1, self.module.self_attn.q_proj.weight.shape[-1]]
+            self.ipex_optimized_module.attn.qkv_wei = torch.stack([
+                self.ipex_optimized_module.attn.q_wei, 
+                self.ipex_optimized_module.attn.k_wei, 
+                self.ipex_optimized_module.attn.v_wei]).contiguous().view(shape)
+            self.ipex_optimized_module.attn.q_wei.data = self.ipex_optimized_module.attn.qkv_wei[0,:, :]
+            self.ipex_optimized_module.attn.k_wei.data = self.ipex_optimized_module.attn.qkv_wei[1,:, :]
+            self.ipex_optimized_module.attn.v_wei.data = self.ipex_optimized_module.attn.qkv_wei[2,:, :]
+
+            self.ipex_optimized_module.attn.qkv_bias = torch.stack([
+                self.ipex_optimized_module.attn.q_proj.bias, 
+                self.ipex_optimized_module.attn.k_proj.bias, 
+                self.ipex_optimized_module.attn.v_proj.bias]).contiguous().view([3, -1])
+            self.ipex_optimized_module.attn.q_proj.bias.data = self.ipex_optimized_module.attn.qkv_bias[0, :]
+            self.ipex_optimized_module.attn.k_proj.bias.data = self.ipex_optimized_module.attn.qkv_bias[1, :]
+            self.ipex_optimized_module.attn.v_proj.bias.data = self.ipex_optimized_module.attn.qkv_bias[2, :]
         else:
             self.ipex_optimized_module.attn.k_proj.weight = self.module.self_attn.k_proj.weight
             self.ipex_optimized_module.attn.k_proj.bias = self.module.self_attn.k_proj.bias

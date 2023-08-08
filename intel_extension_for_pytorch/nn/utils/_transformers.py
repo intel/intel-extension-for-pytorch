@@ -209,6 +209,7 @@ class IPEXTransformerAtten(nn.Module):
                     IPEXTransformerAtten.runtime_bs = hidden_states.shape[1]
 
             self.cur_len = self.prev_len + hidden_states.size(0)
+
             shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
             query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             key = self.key_cached[self.prev_len : self.cur_len, :, :, :]
@@ -221,9 +222,9 @@ class IPEXTransformerAtten(nn.Module):
 
     def qkv_normal(self, hidden_states, layer_past = None):
         if self.row_major:
-            query = torch.matmul(hidden_states, self.q_wei)
-            key = torch.matmul(hidden_states, self.k_wei)
-            value = torch.matmul(hidden_states, self.v_wei)
+            query = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.q_wei, self.q_proj.bias)
+            key = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.k_wei, self.k_proj.bias)
+            value = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.v_wei, self.v_proj.bias)
         else:
             query = self.q_proj(hidden_states)
             key = self.k_proj(hidden_states)
@@ -253,7 +254,6 @@ class IPEXTransformerAtten(nn.Module):
                 if self.value_prompt is not None:
                     self.value_prompt = self.value_prompt.view(new_shape)
         else:
-            # qkv fusion now is only support on greedy search 
             query, key, value = self.qkv_normal(hidden_states=hidden_states, layer_past=layer_past)
 
         new_shape = query.size()[:-1] + (self.num_attn_head, self.head_dim)
@@ -289,6 +289,7 @@ class IPEXTransformerAtten(nn.Module):
             past_value = layer_past[1]
             key = torch.cat((past_key, key), dim=-2)
             value = torch.cat((past_value, value), dim=-2)
+        self.cur_len = key.shape[-2]
         return query, key, value
 
     def combine_with_cache(self, query, key, value, layer_past = None):
@@ -431,7 +432,7 @@ class IPEXTransformerAtten(nn.Module):
                 # is_causal=True
                 attn_output = torch.xpu.IpexSDP(query, key, value, blocked_alibi, blocked_attn_mask, head_mask, alpha, beta, dropout, is_causal, True)
         else:
-            if self.cur_len > 0:
+            if self.cur_len > 0 and self.get_beam_width() != 1:
                 key, value = self.reorder_cache(key, value, IPEXTransformerAtten.beam_index)
             attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi)
         return attn_output, attn_weights
@@ -534,7 +535,15 @@ class IPEXTransformerAtten(nn.Module):
         query, key, value = self.combine_with_cache(query, key, value, layer_past=layer_past)
 
         if use_cache or self.is_decoder:
-            present = (key, value)
+            if self.get_beam_width() == 1:
+                present = (key, value)
+            else:
+                # key, value shape [bs*beam=1, head, seq, dim]
+                seq_len = self.cur_len if self.key_prompt is None else self.cur_len + self.key_prompt.shape[2]
+                cache_shape = (1, key.shape[1], seq_len, key.shape[3])
+                key_cache = torch.empty(cache_shape, device=key.device, dtype=key.dtype)
+                value_cache = key_cache
+                present = (key_cache, value_cache)
         else:
             present = None
 
