@@ -321,7 +321,7 @@ elif model_type == "auto":
         + args.model_id
     )
 elif int(args.input_tokens) > 8192:
-    prompt = prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
+    input_sentences.append(prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192))
 elif args.input_tokens in prompt_pool[model_type]:
     input_sentences.append(prompt_pool[model_type][args.input_tokens])
 else:
