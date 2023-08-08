@@ -3061,8 +3061,8 @@ std::tuple<Tensor, Tensor> batch_norm_gather_stats_xpu_template(
   save_mean_ = at::empty({features}, input_options);
   save_invstd_ = at::empty({features}, input_options);
 
-  auto mean = mean_.accessor<accscalar_t, 2>();
-  auto invstd = invstd_.accessor<accscalar_t, 2>();
+  auto mean = mean_.data_ptr<accscalar_t>();
+  auto invstd = invstd_.data_ptr<accscalar_t>();
   auto running_mean =
       running_mean_.defined() ? running_mean_.data_ptr<scalar_t>() : nullptr;
   auto running_var =
@@ -3085,7 +3085,7 @@ std::tuple<Tensor, Tensor> batch_norm_gather_stats_xpu_template(
     cgh.parallel_for(
         sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size),
         [=](sycl::nd_item<1> itemId) {
-          auto tid = itemId.get_global_linear_id();
+          auto tid = itemId.get_global_id(0);
 
           // first the reductions each thread does separately
           if (tid < features) {
@@ -3094,8 +3094,8 @@ std::tuple<Tensor, Tensor> batch_norm_gather_stats_xpu_template(
             index_t n = 0;
             for (int j = 0; j < world_size; j++) {
               scalar_t count = counts[j];
-              accscalar_t m = mean[j][tid];
-              accscalar_t v = accscalar_t(1.0f) / (invstd[j][tid]);
+              accscalar_t m = mean[j * features + tid];
+              accscalar_t v = accscalar_t(1.0f) / (invstd[j * features + tid]);
               v = (v * v - epsilon_) * count;
               accscalar_t factor = 1.0f / (n + count);
               var_n += v + (avg - m) * (avg - m) * n * count * factor;
