@@ -36,6 +36,11 @@ parser.add_argument("--dataset", nargs="?", default="lambada", const="lambada")
 parser.add_argument("--split", nargs="?", default="validation", const="validation")
 parser.add_argument("--output-dir", nargs="?", default="./saved_results")
 parser.add_argument("--ipex-smooth-quant", action="store_true")
+parser.add_argument(
+    "--ipex-weight-only-quantization",
+    action="store_true",
+    help="use ipex weight-only quantization",
+)
 parser.add_argument("--jit", action="store_true")
 parser.add_argument("--int8", action="store_true")
 parser.add_argument(
@@ -43,7 +48,7 @@ parser.add_argument(
     action="store_true",
     help="by default it is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
 )
-parser.add_argument("--quantized-model-path", default="./saved_result/best_model.pt")
+parser.add_argument("--quantized-model-path", default="./saved_results/best_model.pt")
 parser.add_argument("--lambada", action="store_true")
 parser.add_argument("--accuracy-only", action="store_true")
 parser.add_argument("--benchmark", action="store_true")
@@ -54,6 +59,14 @@ parser.add_argument("--num-warmup", default=10, type=int, help="num warmup")
 parser.add_argument("--batch-size", default=1, type=int, help="batch size")
 parser.add_argument("--token-latency", action="store_true")
 parser.add_argument("--greedy", action="store_true")
+parser.add_argument("--profile", action="store_true")
+parser.add_argument(
+    "--lowp-mode",
+    choice=["BF16","FP32","INT8","FP16"], 
+    default="BF16",
+    type=str,
+    help="low precision mode for weight only quantization"
+)
 args = parser.parse_args()
 
 
@@ -84,7 +97,7 @@ config = AutoConfig.from_pretrained(args.model_id, torchscript=args.jit)
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 
-if args.benchmark and args.jit:
+if args.benchmark and args.jit and not args.ipex_weight_only_quantization:
     try:
         with ipex._IPEXOnDevice(dtype=torch.float, device="meta"):
             user_model = LlamaForCausalLM._from_config(config)
@@ -200,33 +213,28 @@ class Evaluator:
             shuffle=False,
             collate_fn=self.collate_batch,
         )
-
         for i, (
-            (input_ids, attention_mask, position_ids, past_key_values),
-            last_ind,
-        ) in enumerate(test_dataloader):
-            label = input_ids[torch.arange(len(last_ind)), last_ind]
-            input_ids[torch.arange(len(last_ind)), last_ind] = self.pad_val
-            pad_len = self.pad_max - last_ind - 1
-            start = time.time()
-
-            outputs = model(
-                input_ids,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                past_key_values=past_key_values,
-            )
-
-            latency += time.time() - start
-
-            last_token_logits = outputs[0][torch.arange(len(last_ind)), -2 - pad_len, :]
-
-            pred = last_token_logits.argmax(dim=-1)
-            total += label.size(0)
-            hit += (pred == label).sum().item()
-            if i % 50 == 0:
-                print(hit / total)
-                print("Processed minibatch:", i)
+                (input_ids, attention_mask, position_ids, past_key_values),
+                last_ind,
+            ) in enumerate(test_dataloader):
+                label = input_ids[torch.arange(len(last_ind)), last_ind]
+                input_ids[torch.arange(len(last_ind)), last_ind] = self.pad_val
+                pad_len = self.pad_max - last_ind - 1
+                start = time.time()
+                outputs = model(
+                    input_ids,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids,
+                    past_key_values=past_key_values,
+                )
+                latency += time.time() - start
+                last_token_logits = outputs[0][torch.arange(len(last_ind)), -2 - pad_len, :]
+                pred = last_token_logits.argmax(dim=-1)
+                total += label.size(0)
+                hit += (pred == label).sum().item()
+                if i % 50 == 0:
+                    print(hit / total, flush=True)
+                    print("Processed minibatch:", i, flush=True)
 
         acc = hit / total
         print(acc)
@@ -325,6 +333,63 @@ if args.ipex_smooth_quant:
         self_jit = torch.jit.freeze(self_jit.eval())
         self_jit.save(args.output_dir + "/best_model.pt")
 
+
+if args.ipex_weight_only_quantization:
+
+    def convert_woq(m, qconfig, inplace=True):
+        import copy
+
+        def _convert(m):
+            from intel_extension_for_pytorch.nn.modules import IpexWoqLinear
+
+            if isinstance(m, torch.nn.Linear):
+                m.qconfig = qconfig.global_qconfig
+                m_new = IpexWoqLinear.from_float(m)
+                return m_new
+            m_new = m
+
+            for name, child in m.named_children():
+                setattr(m_new, name, _convert(child))
+            return m_new
+
+        if not inplace:
+            m_new = copy.deepcopy(m)
+        else:
+            m_new = m
+        return _convert(m_new)
+
+    example_inputs = None
+    input_ids = torch.ones(32).to(torch.long)
+    attention_mask = torch.ones(len(input_ids))
+    position_ids = torch.arange(len(input_ids))
+    example_inputs = (
+        input_ids.unsqueeze(0),
+        attention_mask.unsqueeze(0),
+        position_ids.unsqueeze(0),
+        tuple(global_past_key_value),
+    )
+
+    from intel_extension_for_pytorch.quantization import prepare, convert
+    
+    if args.lowp_mode == "INT8":
+        lowp_mode = ipex.quantization.WoqLowpMode.INT8
+    elif args.lowp_mode == "FP32":
+        lowp_mode = ipex.quantization.WoqLowpMode.NONE
+    elif args.lowp_mode == "FP16":
+        lowp_mode = ipex.quantization.WoqLowpMode.FP16
+    else:
+        lowp_mode = ipex.quantization.WoqLowpMode.BF16
+
+    qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+        lowp_mode=lowp_mode
+    )
+    with torch.no_grad():
+        convert_model = convert_woq(user_model.eval(), qconfig)
+        self_jit = torch.jit.trace(convert_model.eval(), example_inputs, strict=False)
+        self_jit = torch.jit.freeze(self_jit.eval())
+        self_jit.save(args.output_dir + "/best_model.pt")
+
+
 if args.accuracy_only:
     if args.int8 or args.int8_bf16_mixed:
         user_model = torch.jit.load(args.quantized_model_path)
@@ -336,6 +401,7 @@ if args.accuracy_only:
         dtype=torch.bfloat16 if amp_enabled else None,
     ):
         eval_func(user_model)
+        
 
 if args.benchmark:
     # input prompt
@@ -388,6 +454,27 @@ if args.benchmark:
                 total_time += toc - tic
                 if args.token_latency:
                     total_list.append(output[1])
+
+    if args.profile:
+        def trace_handler(prof):
+            print(prof.key_averages().table(
+                sort_by="self_cpu_time_total", row_limit=-1))
+        with torch.profiler.profile(
+            activities=[torch.profiler.ProfilerActivity.CPU],
+            schedule=torch.profiler.schedule(
+                wait=1,
+                warmup=3,
+                active=1),
+            on_trace_ready=trace_handler
+        ) as prof:
+            for i in range(5):
+                input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+                output = user_model.generate(
+                    input_ids, max_new_tokens=args.max_new_tokens, **generate_kwargs
+                )
+                gen_ids = output[0] if args.token_latency else output
+                gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
+                prof.step()
 
     print("\n", "-" * 10, "Summary:", "-" * 10)
     latency = total_time / (num_iter - num_warmup)

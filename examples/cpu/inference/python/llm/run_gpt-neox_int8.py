@@ -44,7 +44,7 @@ parser.add_argument("--output-dir", nargs="?", default="./saved_results")
 parser.add_argument(
     "--ipex-weight-only-quantization",
     action="store_true",
-    help="no use and enabled always",
+    help="use ipex weight-only quantization",
 )
 parser.add_argument("--jit", action="store_true")
 parser.add_argument("--int8", action="store_true")
@@ -53,7 +53,8 @@ parser.add_argument(
     action="store_true",
     help="by default it is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
 )
-parser.add_argument("--quantized-model-path", default="./saved_result/best_model.pt")
+parser.add_argument("--quantized-model-path", default="./saved_results/best_model.pt")
+parser.add_argument("--ipex-smooth-quant", action="store_true")
 parser.add_argument("--lambada", action="store_true")
 parser.add_argument("--accuracy-only", action="store_true")
 parser.add_argument("--benchmark", action="store_true")
@@ -64,6 +65,14 @@ parser.add_argument("--num-warmup", default=10, type=int, help="num warmup")
 parser.add_argument("--batch-size", default=1, type=int, help="batch size")
 parser.add_argument("--token-latency", action="store_true")
 parser.add_argument("--greedy", action="store_true")
+parser.add_argument("--profile", action="store_true")
+parser.add_argument(
+    "--lowp-mode",
+    choice=["BF16","FP32","INT8","FP16"], 
+    default="BF16",
+    type=str,
+    help="low precision mode for weight only quantization"
+)
 args = parser.parse_args()
 
 
@@ -230,8 +239,8 @@ class Evaluator:
             total += label.size(0)
             hit += (pred == label).sum().item()
             if i % 50 == 0:
-                print(hit / total)
-                print("Processed minibatch:", i)
+                print(hit / total, flush=True)
+                print("Processed minibatch:", i, flush=True)
 
         acc = hit / total
         print(acc)
@@ -294,6 +303,48 @@ if args.jit and args.benchmark:
             self_jit = torch.jit.freeze(self_jit.eval())
             setattr(user_model, "trace_graph", self_jit)
 
+if args.ipex_smooth_quant:
+    from neural_compressor import PostTrainingQuantConfig, quantization
+
+    op_type_dict = {
+        "add": {"weight": {"dtype": ["fp32"]}, "activation": {"dtype": ["fp32"]}},
+        "linear": {
+            "weight": {
+                "dtype": ["int8"],
+                "scheme": ["sym"],
+                "granularity": ["per_channel"],
+                "algorithm": ["minmax"],
+            },
+            "activation": {
+                "dtype": ["uint8"],
+                "scheme": ["asym"],
+                "granularity": ["per_tensor"],
+                "algorithm": ["kl"],
+            },
+        },
+    }
+
+    excluded_precisions = [] if args.int8_bf16_mixed else ["bf16"]
+    recipes = {"smooth_quant": True, "smooth_quant_args": {"alpha": "auto"}}
+
+    recipes["smooth_quant_args"]["folding"] = True
+
+    print("smooth_quant_args:", recipes)
+    conf = PostTrainingQuantConfig(
+        backend="ipex",
+        excluded_precisions=excluded_precisions,
+        op_type_dict=op_type_dict,
+        recipes=recipes,
+    )
+
+    q_model = quantization.fit(
+        user_model,
+        conf,
+        calib_dataloader=calib_dataloader,
+        calib_func=calib_func,
+    )
+
+    q_model.save(args.output_dir)
 
 if args.ipex_weight_only_quantization:
 
@@ -332,7 +383,15 @@ if args.ipex_weight_only_quantization:
 
     from intel_extension_for_pytorch.quantization import prepare, convert
 
-    lowp_mode = ipex.quantization.WoqLowpMode.BF16
+    if args.lowp_mode == "INT8":
+        lowp_mode = ipex.quantization.WoqLowpMode.INT8
+    elif args.lowp_mode == "FP32":
+        lowp_mode = ipex.quantization.WoqLowpMode.NONE
+    elif args.lowp_mode == "FP16":
+        lowp_mode = ipex.quantization.WoqLowpMode.FP16
+    else:
+        lowp_mode = ipex.quantization.WoqLowpMode.BF16  
+      
     qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
         lowp_mode=lowp_mode
     )
@@ -347,6 +406,7 @@ if args.accuracy_only:
     if args.int8 or args.int8_bf16_mixed:
         user_model = torch.jit.load(args.quantized_model_path)
         user_model = torch.jit.freeze(user_model.eval())
+
     with torch.autocast(
         device_type=args.device,
         enabled=amp_enabled,
@@ -406,6 +466,27 @@ if args.benchmark:
                 if args.token_latency:
                     total_list.append(output[1])
 
+    if args.profile:
+        def trace_handler(prof):
+            print(prof.key_averages().table(
+                sort_by="self_cpu_time_total", row_limit=-1))
+        with torch.profiler.profile(
+            activities=[torch.profiler.ProfilerActivity.CPU],
+            schedule=torch.profiler.schedule(
+                wait=1,
+                warmup=3,
+                active=1),
+            on_trace_ready=trace_handler
+        ) as prof:
+            for i in range(5):
+                input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+                output = user_model.generate(
+                    input_ids, max_new_tokens=args.max_new_tokens, **generate_kwargs
+                )
+                gen_ids = output[0] if args.token_latency else output
+                gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
+                prof.step()
+
     print("\n", "-" * 10, "Summary:", "-" * 10)
     latency = total_time / (num_iter - num_warmup)
     print("Inference latency: %.3f sec." % latency)
@@ -423,3 +504,4 @@ if args.benchmark:
         print("Average 2... latency: %.3f sec." % average_2n_latency)
         print("P90 2... latency: %.3f sec." % p90_latency)
         print("P99 2... latency: %.3f sec." % p99_latency)
+
