@@ -50,7 +50,7 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
         OpConverter.update_deepspeed_supported_ops()
         if isinstance(model, deepspeed.InferenceEngine):
             IPEXTransformerConverter.update_tp_data(model._config.tensor_parallel.tp_size, model._config.tensor_parallel.tp_group)
-    
+
     from .gptj import IPEXGPTJConverter
     from .llama import IPEXLlamaConverter
     from .opt import IPEXOptConverter
@@ -70,20 +70,20 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
 
         if hasattr(module, "_convert_to_bloom_cache"):
             setattr(module, "_convert_to_bloom_cache", _convert_to_bloom_cache_ipex)
-        
+
         if hasattr(module, "_prepare_model_inputs"):
             setattr(module, "_prepare_model_inputs", partial(_ipex_prepare_model_inputs, module))
 
         if type(module) == transformers.models.gptj.modeling_gptj.GPTJForCausalLM:
-            pad_for_gptj_lm_head(model)
+            pad_for_gptj_lm_head(module)
             if hasattr(module, "forward"):
                 setattr(module, "forward", partial(IPEXGPTJForCausalLMForward, module))
         elif type(module) == transformers.models.llama.modeling_llama.LlamaForCausalLM:
-            pad_for_gptj_lm_head(model)
+            pad_for_gptj_lm_head(module)
             if hasattr(module, "forward"):
                 setattr(module, "forward", partial(IPEXLlamaForCausalLMForward, module))
         elif type(module) == transformers.models.bloom.modeling_bloom.BloomForCausalLM:
-            pad_for_gptj_lm_head(model)
+            pad_for_gptj_lm_head(module)
             if hasattr(module, "forward"):
                 setattr(module, "forward", partial(IPEXBloomForCausalLMForward, module))
 
@@ -103,7 +103,7 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
             #     setattr(module, name, op_transformed)
             else:
                 recursive_module_replace(named_module, config, dtype=dtype)
-        return model
+        return module
 
     replaced_model = recursive_module_replace(model, None, dtype=dtype, enable_deepspeed=enable_ds)
 
