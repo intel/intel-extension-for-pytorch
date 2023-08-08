@@ -31,7 +31,7 @@ set(ONEMKL_GPU_LIBS)
 set(ONEMKL_CPU_LIBS)
 
 set(mkl_root_hint)
-if(BUILD_WITH_XPU)
+if(BUILD_WITH_XPU AND USE_ONEMKL)
   if(DEFINED ENV{MKLROOT})
     set(mkl_root_hint $ENV{MKLROOT})
   elseif(DEFINED ENV{MKL_ROOT})
@@ -108,7 +108,7 @@ if(NOT MKL_CORE)
   message(FATAL_ERROR "oneMKL library ${MKL_CORE} not found")
 endif()
 
-if(BUILD_WITH_XPU)
+if(BUILD_WITH_XPU AND USE_ONEMKL)
   set(MKL_SYCL "${LIB_PREFIX}mkl_sycl${LIB_SUFFIX}")
   find_library(MKL_LIB_SYCL ${MKL_SYCL} HINTS ${mkl_root_hint}
       PATH_SUFFIXES lib lib/intel64 NO_DEFAULT_PATH)
@@ -126,7 +126,7 @@ endif()
 
 set(ONEMKL_CPU_LIBS ${START_GROUP} ${MKL_LIB_LP64} ${MKL_LIB_CORE} ${MKL_LIB_THREAD} ${END_GROUP})
 
-if(BUILD_WITH_XPU)
+if(BUILD_WITH_XPU AND USE_ONEMKL)
   set(ONEMKL_GPU_LIBS ${START_GROUP} ${MKL_LIB_LP64} ${MKL_LIB_CORE} ${MKL_LIB_THREAD} ${MKL_LIB_SYCL} ${END_GROUP})
 endif()
 

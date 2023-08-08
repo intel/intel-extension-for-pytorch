@@ -178,6 +178,8 @@ if (USE_ONEMKL)
         message(WARNING "WARNING: Cannot find oneMKL! Continue to build without oneMKL!")
         set_target_properties(intel-ext-pt-gpu PROPERTIES USE_ONEMKL OFF)
     endif()
+else()
+    set_target_properties(intel-ext-pt-gpu PROPERTIES USE_ONEMKL OFF)
 endif()
 
 # XXX: Please make sure to find oneMKL before oneDNN
