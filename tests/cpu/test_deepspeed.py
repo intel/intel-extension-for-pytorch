@@ -5,13 +5,14 @@ import unittest
 
 import torch
 import torch.nn as nn
-from torch.testing._internal.common_utils import TestCase
+from torch.testing._internal.jit_utils import JitTestCase
 from torch.testing import FileCheck
 import intel_extension_for_pytorch as ipex
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     may_import_deepspeed_modules,
     _IPEXLinear,
     _IPEXLinearAllreduce,
+    _IPEXLmHeadLinearAllreduce,
 )
 from intel_extension_for_pytorch.quantization import prepare, convert
 from intel_extension_for_pytorch.quantization._quantize import (
@@ -45,7 +46,6 @@ class MyBlock(nn.Module):
         return z
 
 
-# For deepspeed support, please do not change the name of the class.
 class MyModel(nn.Module):
     def __init__(self):
         super().__init__()
@@ -58,19 +58,34 @@ class MyModel(nn.Module):
         return x
 
 
+# For deepspeed support, please do not change the name of the class.
+class MyLmHeadModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # For deepspeed support, please do not change the ModuleList structure of the class.
+        self.linears = nn.ModuleList([MyBlock()])
+        self.lm_head = nn.Linear(2, 2)
+
+    def forward(self, x):
+        for l in self.linears:
+            x = l(x)
+        x = self.lm_head(x)
+        return x
+
+
 # The class DeepSpeedTestM is written for deepspeed to recognize the modules and to be functional.
 # Please do not change it.
 class DeepSpeedTestM(nn.Module):
-    def __init__(self):
+    def __init__(self, module_type):
         super().__init__()
-        self.linear = MyModel()
+        self.linear = module_type()
 
     def forward(self, x):
         z = self.linear(x)
         return z
 
 
-class DeepspeedTester(TestCase):
+class DeepspeedTester(JitTestCase):
     def _get_ds_model(self, m_linear):
         import deepspeed
 
@@ -91,33 +106,49 @@ class DeepspeedTester(TestCase):
     def test_ipex_optimize(self):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
+            LinearAllreduce, LinearLayer = deepspeed_modules[:2]
+            # TODO: remove check_lm_head logic once deepspeed LmHeadLinearAllreduce change has been upstream-ed.
+            check_lm_head = False
+            if len(deepspeed_modules) == 3:
+                check_lm_head = True
+                LmHeadLinearAllreduce = deepspeed_modules[2]
+
+            x = torch.randn(2, 3, 4)
+            m_linear = DeepSpeedTestM(MyLmHeadModel).eval()
+            y = m_linear(x)
+
+            ds_model = self._get_ds_model(m_linear)
+            self.assertTrue(module_found(ds_model, LinearLayer))
+            self.assertTrue(module_found(ds_model, LinearAllreduce))
+            if check_lm_head:
+                self.assertTrue(module_found(ds_model, LmHeadLinearAllreduce))
+
+            optimized = ipex.optimize(ds_model.eval(), inplace=True)
+
             with torch.no_grad():
-                LinearAllreduce, LinearLayer = deepspeed_modules
-                x = torch.randn(2, 4)
-                m_linear = DeepSpeedTestM().eval()
-                y = m_linear(x)
 
-                ds_model = self._get_ds_model(m_linear)
-                self.assertTrue(module_found(ds_model, LinearLayer))
-                self.assertTrue(module_found(ds_model, LinearAllreduce))
+                y_optimized = optimized(x)
+                self.assertEqual(y, y_optimized)
 
-                optimized = ipex.optimize(ds_model.eval(), inplace=True)
                 jit_optimized = torch.jit.trace(optimized, x)
                 jit_optimized = torch.jit.freeze(jit_optimized)
                 self.assertTrue(module_found(optimized, _IPEXLinear))
                 self.assertTrue(module_found(optimized, _IPEXLinearAllreduce))
 
-                optimized = optimized(x)
+                if check_lm_head:
+                    self.assertTrue(module_found(optimized, _IPEXLmHeadLinearAllreduce))
+
+                jit_optimized(x)
+                graph = jit_optimized.graph_for(x)
                 jit_res = jit_optimized(x)
                 self.assertEqual(y, jit_res)
-                self.assertEqual(y, optimized)
 
     def _test_quantization(self, dynamic_qconfig, qmodules, graph_strings):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
-            LinearAllreduce, LinearLayer = deepspeed_modules
+            LinearAllreduce, LinearLayer = deepspeed_modules[:2]
             x = torch.randn(2, 4)
-            m_linear = DeepSpeedTestM().eval()
+            m_linear = DeepSpeedTestM(MyModel).eval()
             y = m_linear(x)
 
             ds_model = self._get_ds_model(m_linear)

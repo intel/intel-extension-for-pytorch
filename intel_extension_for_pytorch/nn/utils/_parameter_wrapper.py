@@ -14,6 +14,7 @@ from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     _IPEXConvTranspose2d,
     _IPEXConvTranspose3d,
     _IPEXLinearAllreduce,
+    _IPEXLmHeadLinearAllreduce,
     may_import_deepspeed_modules,
 )
 
@@ -31,12 +32,17 @@ def IPEX_WEIGHT_PREPACK_MODULE_CPU():
 
     deepspeed_modules = may_import_deepspeed_modules()
     if deepspeed_modules is not None:
-        LinearAllreduce, LinearLayer = deepspeed_modules
-        deepspeed_modules = {
+        LinearAllreduce, LinearLayer = deepspeed_modules[:2]
+        deepspeed_modules_mapping = {
             LinearLayer: _IPEXLinear,
             LinearAllreduce: _IPEXLinearAllreduce,
         }
-        torch_modules.update(deepspeed_modules)
+        if len(deepspeed_modules) > 2:
+            LmHeadLinearAllreduce = deepspeed_modules[2]
+            deepspeed_modules_mapping.update(
+                {LmHeadLinearAllreduce: _IPEXLmHeadLinearAllreduce}
+            )
+        torch_modules.update(deepspeed_modules_mapping)
 
     return torch_modules
 
@@ -432,6 +438,7 @@ class ParameterWrapper(object):
             assert target_module in (
                 _IPEXLinear,
                 _IPEXLinearAllreduce,
+                _IPEXLmHeadLinearAllreduce,
             )
             self.linear_prepack(module, is_training)
 
