@@ -86,11 +86,18 @@ parser.add_argument("--ipex", action="store_true", help="ipex is not enabled now
 parser.add_argument(
     "--ipex-weight-only-quantization",
     action="store_true",
-    help="enable ipex WOQ optimization (int8 mix fp32)",
+    help="use ipex weight-only quantization",
 )
 parser.add_argument("--jit", action="store_true")
 parser.add_argument("--print-memory", action="store_true")
 parser.add_argument("--token-latency", action="store_true")
+parser.add_argument(
+    "--lowp-mode",
+    choices=["BF16","FP32","INT8","FP16"], 
+    default="BF16",
+    type=str,
+    help="low precision mode for weight only quantization"
+)
 args = parser.parse_args()
 
 
@@ -295,7 +302,15 @@ if args.ipex:
     if ipex_woq_enabled:
         from intel_extension_for_pytorch.quantization import convert, prepare
 
-        lowp_mode = ipex.quantization.WoqLowpMode.BF16
+        if args.lowp_mode == "INT8":
+            lowp_mode = ipex.quantization.WoqLowpMode.INT8
+        elif args.lowp_mode == "FP32":
+            lowp_mode = ipex.quantization.WoqLowpMode.NONE
+        elif args.lowp_mode == "FP16":
+            lowp_mode = ipex.quantization.WoqLowpMode.FP16
+        else:
+            lowp_mode = ipex.quantization.WoqLowpMode.BF16
+    
         qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
             lowp_mode=lowp_mode
         )
