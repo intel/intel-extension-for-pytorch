@@ -344,8 +344,8 @@ if args.benchmark:
     total_list = []
     with torch.inference_mode(), torch.no_grad(), torch.autocast(
         device_type=args.device,
-        enabled=amp_enabled or args.int8_bf16_mixed,
-        dtype=torch.bfloat16 if args.int8_bf16_mixed else None,
+        enabled=amp_enabled,
+        dtype=torch.bfloat16 if amp_enabled else None,
     ):
         for i in range(num_iter):
             tic = time.time()

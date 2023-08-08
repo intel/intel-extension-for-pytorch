@@ -317,8 +317,8 @@ if args.ipex_smooth_quant:
             )
     with torch.no_grad(), torch.autocast(
         device_type=args.device,
-        enabled=amp_enabled or args.int8_bf16_mixed,
-        dtype=amp_dtype,
+        enabled=amp_enabled,
+        dtype=torch.bfloat16 if amp_enabled else None,
     ):
         convert_model = convert(prepared_model.eval()).eval()
         self_jit = torch.jit.trace(convert_model.eval(), example_inputs, strict=False)
@@ -332,8 +332,8 @@ if args.accuracy_only:
 
     with torch.autocast(
         device_type=args.device,
-        enabled=amp_enabled or args.int8_bf16_mixed,
-        dtype=amp_dtype,
+        enabled=amp_enabled,
+        dtype=torch.bfloat16 if amp_enabled else None,
     ):
         eval_func(user_model)
 
@@ -364,8 +364,8 @@ if args.benchmark:
     total_list = []
     with torch.inference_mode(), torch.no_grad(), torch.autocast(
         device_type=args.device,
-        enabled=amp_enabled or args.int8_bf16_mixed,
-        dtype=torch.bfloat16 if args.int8_bf16_mixed else None,
+        enabled=amp_enabled,
+        dtype=torch.bfloat16 if amp_enabled else None,
     ):
         for i in range(num_iter):
             tic = time.time()
