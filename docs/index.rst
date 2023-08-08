@@ -145,7 +145,7 @@ Single Instance Accuracy
 
 .. code:: shell
 
-   cd examples/gpu/inference/python/llm/casual-language-modeling/
+   cd examples/gpu/inference/python/llm/causal-language-modeling/
 
    LLM_ACC_TEST=1 python -u run_llama.py --device xpu --dtype float16 --accuracy_only --lambada --model "/path/to/output/7B-path" --greedy
    
