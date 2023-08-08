@@ -4,7 +4,10 @@ import functools
 import contextlib
 import types
 import warnings
-from intel_extension_for_pytorch.cpu._auto_kernel_selection import _using_dnnl
+from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
+    _using_dnnl,
+    _using_tpp,
+)
 from intel_extension_for_pytorch import frontend
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     _IPEXLinear,
@@ -529,26 +532,36 @@ class ParameterWrapper(object):
                     torch.float32,
                     torch.bfloat16,
                 ], "Only float, bf16 and fp16 are supported"
-                use_dnnl = True
+                use_dnnl = True if not _using_tpp() else False
+        module.use_tpp = _using_tpp()
         module.use_dnnl = use_dnnl
-        if not hasattr(module, "out_features"):
-            setattr(module, "out_features", module.weight.shape[0])  # noqa: B010
-        # prepare batch size
-        module.batch_size_collapsed = None
-        if hasattr(module, "input_shape"):
-            module.batch_size_collapsed = 1
-            for i in range(len(module.input_shape) - 1):
-                module.batch_size_collapsed *= module.input_shape[i]
-        # create linear op context
-        if module.use_dnnl:
-            self.op_ctx = torch.ops.ipex_prepack.linear_prepack(
-                module.weight, module.bias, module.batch_size_collapsed
-            )
+        if not module.use_tpp:
+            if not hasattr(module, "out_features"):
+                setattr(module, "out_features", module.weight.shape[0])  # noqa: B010
+            # prepare batch size
+            module.batch_size_collapsed = None
+            if hasattr(module, "input_shape"):
+                module.batch_size_collapsed = 1
+                for i in range(len(module.input_shape) - 1):
+                    module.batch_size_collapsed *= module.input_shape[i]
+            # create linear op context
+            if module.use_dnnl:
+                self.op_ctx = torch.ops.ipex_prepack.linear_prepack(
+                    module.weight, module.bias, module.batch_size_collapsed
+                )
+            else:
+                self.op_ctx = torch.ops.ipex_prepack.mkl_sgemm_prepack(
+                    module.weight, module.bias, module.batch_size_collapsed
+                )
+            self.pack_weight(use_dnnl)
         else:
-            self.op_ctx = torch.ops.ipex_prepack.mkl_sgemm_prepack(
-                module.weight, module.bias, module.batch_size_collapsed
+            from intel_extension_for_pytorch.nn.utils import (
+                Apply_TPPLinear_weight_prepack,
             )
-        self.pack_weight(use_dnnl)
+
+            Apply_TPPLinear_weight_prepack(module, dtype=module.weight.dtype)
+            self.parameter.data = module.weight.data
+            self.parameter = module.weight
 
     def load_cast_and_prepack(self, module, param):
         # load from state dict

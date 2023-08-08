@@ -5,8 +5,69 @@ import logging
 import os
 import pkg_resources
 from intel_extension_for_pytorch import optim
+from intel_extension_for_pytorch.cpu.tpp.utils.blocked_layout import (
+    BlockedParameter,
+    get_vnni_blocking,
+)
+
+from intel_extension_for_pytorch.cpu._auto_kernel_selection import _using_tpp
 
 logger = logging.getLogger(__name__)
+
+USE_LOW_PREC_PARAMS = True
+
+
+def TPPLinear_weight_prepack(m, bk=None, bc=None, layer_dtype=torch.float32):
+    m.__class__ = _IPEXLinear
+    m.weight = BlockedParameter(m.weight.data)
+    m.weight.set_blocking_param(
+        (
+            [bk, bc],
+            [0, 2, 3, 1],
+        )
+    )
+    layer_use_low_prec = layer_dtype != torch.float32
+    if layer_use_low_prec is True and USE_LOW_PREC_PARAMS:
+        low_prec_vnni_blocking = get_vnni_blocking(layer_dtype)
+        m.weight.set_blocking_param(
+            (
+                [
+                    bk,
+                    [
+                        bc // low_prec_vnni_blocking,
+                        low_prec_vnni_blocking,
+                    ],
+                ],
+                [0, 2, 3, 1, 4],
+                layer_dtype,
+            )
+        )
+
+    if m.bias is not None:
+        m.bias = BlockedParameter(m.bias.data)
+        m.bias.set_blocking_param((None, None, layer_dtype))
+    return m
+
+
+def Apply_TPPLinear_weight_prepack(m, dtype, device="cpu"):
+    if (m.weight.size()[0] == 50400 or m.weight.size()[0] == 32000) and m.weight.size()[
+        1
+    ] % 64 == 0:
+        m = TPPLinear_weight_prepack(m, 100, 64, dtype)
+    elif m.weight.size()[0] % 16 == 0 and m.weight.size()[1] % 64 == 0:
+        m = TPPLinear_weight_prepack(m, 16, 64, dtype)
+    else:
+        m.tpp_fallback = True
+        return
+    m.tpp_fallback = False
+
+    block(m)
+
+
+def block(model):
+    for m in model.modules():
+        if hasattr(m, "maybe_block_params"):
+            m.maybe_block_params()
 
 
 def may_import_deepspeed_modules():
@@ -171,6 +232,11 @@ class _IPEXLinear(_IPEXPrepackModule):
     def __init__(self):
         super(_IPEXLinear, self).__init__()
 
+    def maybe_block_params(self):
+        self.weight.block()
+        if self.bias is not None:
+            self.bias.block()
+
     def pre_ipex_gemm(self, input):
         return input
 
@@ -188,6 +254,17 @@ class _IPEXLinear(_IPEXPrepackModule):
                 self.ctx.get_data_handle(),
                 self.out_features,
             )
+        elif self.use_tpp:
+            if self.tpp_fallback:
+                output = torch.nn.functional.linear(x, self.weight, self.bias)
+            else:
+                x = x.to(self.weight.dtype).contiguous()
+                if self.bias is not None:
+                    output = torch.ops.torch_ipex.tpp_linear_bias(
+                        x, self.weight, self.bias
+                    )
+                else:
+                    output = torch.ops.torch_ipex.tpp_linear(x, self.weight)
         else:
             output = torch.ops.torch_ipex.ipex_MKLSGEMM(
                 x,
@@ -200,10 +277,20 @@ class _IPEXLinear(_IPEXPrepackModule):
         return self.post_ipex_gemm(output)
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
-        assert (
-            not keep_vars
-        ), "can not using keep_vars true when to save _IPEXLinear's parameters"
-        super(_IPEXLinear, self)._save_to_state_dict(destination, prefix, keep_vars)
+        if self.use_tpp:
+            blocked_params = []
+            for p in self.parameters(recurse=False):
+                if isinstance(p, BlockedParameter) and p.is_blocked():
+                    p.unblock()
+                    blocked_params.append(p)
+            super(_IPEXLinear, self)._save_to_state_dict(destination, prefix, keep_vars)
+            for p in blocked_params:
+                p.block()
+        else:
+            assert (
+                not keep_vars
+            ), "can not using keep_vars true when to save _IPEXLinear's parameters"
+            super(_IPEXLinear, self)._save_to_state_dict(destination, prefix, keep_vars)
 
     def _load_from_state_dict(
         self,
@@ -215,8 +302,26 @@ class _IPEXLinear(_IPEXPrepackModule):
         unexpected_keys,
         error_msgs,
     ):
-        with torch.no_grad():
-            _ipex_module_load_from_state_dict_(self, state_dict, prefix)
+        if self.use_tpp:
+            blocked_params = []
+            for p in self.parameters(recurse=False):
+                if isinstance(p, BlockedParameter) and p.is_blocked():
+                    p.unblock()
+                    blocked_params.append(p)
+            super(_IPEXLinear, self)._load_from_state_dict(
+                state_dict,
+                prefix,
+                local_metadata,
+                strict,
+                missing_keys,
+                unexpected_keys,
+                error_msgs,
+            )
+            for p in blocked_params:
+                p.block()
+        else:
+            with torch.no_grad():
+                _ipex_module_load_from_state_dict_(self, state_dict, prefix)
 
 
 class _IPEXLinearAllreduce(_IPEXLinear):
@@ -376,8 +481,21 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
             all_reduce_bias = m.bias
             if isinstance(new_m, (_IPEXLinearAllreduce, _IPEXLmHeadLinearAllreduce)):
                 m.bias = None
-            param_wrapper.prepack(m, is_training)
+            if _using_tpp():
+                weight_key = m.weight
+                param_wrapper.prepack(m, is_training)
+                if m.tpp_fallback:
+                    new_m.tpp_fallback = True
+                else:
+                    new_m.tpp_fallback = False
+                params_attr[m.weight] = params_attr.pop(weight_key)
+                del weight_key
+
+            else:
+                param_wrapper.prepack(m, is_training)
+
             new_m.__dict__ = m.__dict__
+
             if isinstance(new_m, (_IPEXLinearAllreduce, _IPEXLmHeadLinearAllreduce)):
                 new_m.original_bias = all_reduce_bias
             new_m.ctx = param_wrapper.op_ctx
