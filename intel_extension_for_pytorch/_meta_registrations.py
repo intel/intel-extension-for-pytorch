@@ -328,6 +328,43 @@ def meta_ipex_MKLSGEMM(
     return input.new_empty((*input.shape[:-1], out_features))
 
 
+@register_meta("ipex_linear_eltwise")
+def meta_ipex_linear_eltwise(
+    input,
+    weight,
+    bias,
+    eltwise,
+    W_prepack,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("linear_eltwise_backward")
+def meta_linear_eltwise_backward(
+    input,
+    weight,
+    bias,
+    output,
+    eltwise,
+    grad_output,
+    out_mask,
+    W_prepack,
+):
+    backend_grad_input = None
+    backend_grad_weight = None
+    backend_grad_bias = None
+
+    if out_mask[0]:
+        backend_grad_input = grad_output.new_empty(input.size())
+    if out_mask[1]:
+        backend_grad_weight = grad_output.new_empty(weight.size())
+    if out_mask[2]:
+        backend_grad_bias = grad_output.new_empty(bias.size())
+
+    return (backend_grad_input, backend_grad_weight, backend_grad_bias)
+
+
 @register_meta("embedding_bag")
 def meta_embedding_bag(
     weight,
@@ -448,3 +485,11 @@ def meta_add_softmax_(
     input2,
 ):
     return input1
+
+@register_meta("cumsum")
+def meta_cumsum(
+    input,
+    dim,
+    dtype=None,
+):
+    return input.new_empty(input.shape)

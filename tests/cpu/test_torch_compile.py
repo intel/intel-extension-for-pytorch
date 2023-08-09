@@ -85,12 +85,24 @@ class BmmAdd(torch.nn.Module):
         res = torch.add(bmm_res, input)
         return res
 
+
 class AddSoftmax(torch.nn.Module):
     def __init__(self):
         super(AddSoftmax, self).__init__()
 
     def forward(self, x1, x2):
         return torch.ops.torch_ipex.add_softmax_(x1, x2)
+
+
+class MLP(torch.nn.Module):
+    def __init__(self):
+        super(MLP, self).__init__()
+        self.mlp = torch.nn.ModuleList()
+        self.mlp.append(torch.nn.Linear(10, 10))
+        self.mlp.append(torch.nn.ReLU())
+
+    def forward(self, x):
+        return self.mlp[1](self.mlp[0](x))
 
 
 class TestCompileCases(TestCase):
@@ -649,6 +661,67 @@ class TestCompileCases(TestCase):
             self.assertEqual(ori_x.grad, x.grad)
             self.assertTrue(y.dtype == dtype)
             self.assertTrue(x.grad.dtype == dtype)
+
+    def test_cumsum(self):
+        def func(x):
+            return torch.ops.torch_ipex.cumsum(x, 1)
+        options = itertools.product(
+            ["torchscript", "inductor"],
+            [True, False],
+        )
+        x = torch.randn(17, 47)
+        for compiler_backend, dynamic in options:
+            if compiler_backend == "torchscript" and dynamic is True:
+                continue
+            torch._dynamo.reset()
+            ipex._set_compiler_backend(compiler_backend)
+            compile_fn = torch.compile(func, dynamic=dynamic, backend="ipex")
+            with torch.no_grad():
+                ori_y = func(x)
+                y = compile_fn(x)
+                self.assertEqual(ori_y, y)
+
+    def test_linear_eltwise(self):
+        torch._dynamo.allow_in_graph(ipex.nn.modules.IPEXLinearEltwise)
+        input = torch.rand(5, 10).requires_grad_()
+
+        options = itertools.product(
+            [torch.float32, torch.bfloat16],
+            ["inductor",],
+            [True, False],
+        )
+        for dtype, compiler_backend, dynamic in options:
+            fused_model = MLP()
+            opt = torch.optim.SGD(fused_model.parameters(), lr=0.01)
+            fused_model, opt = ipex.optimize(
+                fused_model, dtype=dtype, optimizer=opt, auto_kernel_selection=True
+            )
+            fused_model.mlp[0] = ipex.nn.modules.IPEXLinearEltwise(
+                fused_model.mlp[0], "relu"
+            )
+            fused_model.mlp[1] = torch.nn.Identity()
+
+            ori_x = input.to(dtype=dtype).clone().detach().requires_grad_()
+            x = input.to(dtype=dtype).clone().detach().requires_grad_()
+
+            ori_model = copy.deepcopy(fused_model).train()
+            model = copy.deepcopy(fused_model).train()
+
+            torch._dynamo.reset()
+            ipex._set_compiler_backend(compiler_backend)
+            compile_model = torch.compile(model, dynamic=dynamic, backend="ipex")
+
+            with torch.cpu.amp.autocast(enabled=(dtype == torch.bfloat16)):
+                ori_y = ori_model(ori_x)
+                ori_y.sum().backward()
+                y = compile_model(x)
+                y.sum().backward()
+
+            self.assertEqual(ori_y, y)
+            self.assertTrue(y.dtype == dtype)
+            self.assertEqual(ori_x.grad, x.grad)
+            self.assertTrue(x.grad.dtype == dtype)
+
 
 if __name__ == "__main__":
     torch.manual_seed(2020)

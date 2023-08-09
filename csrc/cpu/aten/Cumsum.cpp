@@ -50,17 +50,16 @@ at::Tensor& cumsum_out(
 namespace {
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def(
-      "cumsum(Tensor self, int dim, *, ScalarType? dtype=None) -> Tensor",
-      torch_ipex::cpu::cumsum);
+  m.def("cumsum(Tensor self, int dim, *, ScalarType? dtype=None) -> Tensor");
+  m.impl("cumsum", c10::DispatchKey::CPU, torch_ipex::cpu::cumsum);
   m.def(
       "cumsum_(Tensor(a!) self, int dim, *, ScalarType? dtype=None) -> "
-      "Tensor(a!)",
-      torch_ipex::cpu::cumsum_);
+      "Tensor(a!)");
+  m.impl("cumsum_", c10::DispatchKey::CPU, torch_ipex::cpu::cumsum_);
   m.def(
       "cumsum.out(Tensor self, int dim, *, ScalarType? dtype=None, "
-      "Tensor(a!) out) -> Tensor(a!)",
-      torch_ipex::cpu::cumsum_out);
+      "Tensor(a!) out) -> Tensor(a!)");
+  m.impl("cumsum.out", c10::DispatchKey::CPU, torch_ipex::cpu::cumsum_out);
 }
 
 } // namespace
