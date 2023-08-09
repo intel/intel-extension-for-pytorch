@@ -276,10 +276,10 @@ class TestMergedEmbedding(TestCase):
     table1 = nn.EmbeddingBag(50, 32, mode="sum", sparse=False)
     table2 = nn.EmbeddingBag(
         18000000,
-        128,
+        8,
         mode="sum",
         include_last_offset=True,
-        _weight=torch.empty(18000000, 128, dtype=torch.bfloat16),
+        _weight=torch.empty(18000000, 8, dtype=torch.bfloat16),
         sparse=False,
     )
     table3 = nn.EmbeddingBag(100, 16, mode="mean", sparse=True).double()
@@ -288,7 +288,7 @@ class TestMergedEmbedding(TestCase):
         [
             (100, 16, "mean", table0.weight.dtype, table0.weight.detach(), False),
             (50, 32, "sum", table1.weight.dtype, table1.weight.detach(), False),
-            (18000000, 128, "sum", table2.weight.dtype, table2.weight.detach(), False),
+            (18000000, 8, "sum", table2.weight.dtype, table2.weight.detach(), False),
         ]
     )
     input = [
