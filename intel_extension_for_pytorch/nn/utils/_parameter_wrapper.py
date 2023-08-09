@@ -151,6 +151,20 @@ def _should_prepack(module, is_training, is_xpu=False):
 
 def get_shared_parameter_status(module, shared_p):
     visited_wrapper = []
+
+    # TODO: weight and bias of deepspeed modules are no longer
+    # nn.Parameter starting from deepspeed commit 94c7233.
+    # Add a workaround here to convert them to Parameter.
+    # Need to check if we can upstream this fix to deepspeed
+    # and remove this workaround in IPEX later.
+    deepspeed_modules = may_import_deepspeed_modules()
+    if deepspeed_modules is not None:
+        LinearAllreduce, LinearLayer = deepspeed_modules
+
+        if isinstance(module, (LinearLayer, LinearAllreduce)):
+            module.weight = torch.nn.Parameter(module.weight, requires_grad=False)
+            module.bias = torch.nn.Parameter(module.bias, requires_grad=False)
+
     for _, param in module._parameters.items():
         if param is None:
             continue
