@@ -44,7 +44,7 @@ struct imem_desc_t<dtype_, lanes_, mem_layout::row_major, mem_space::global> {
   uint64_t addr1;
   uint32_t width;
   int32_t offset;
-
+  // 1919, 128
   xetla_vector<int32_t, lanes> index0;
   xetla_vector<int32_t, lanes> index1;
   uint32_t lanes0;
