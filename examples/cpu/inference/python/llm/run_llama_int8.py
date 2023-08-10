@@ -385,6 +385,12 @@ if args.ipex_weight_only_quantization:
     )
     with torch.no_grad():
         convert_model = convert_woq(user_model.eval(), qconfig)
+    with torch.no_grad(), torch.autocast(
+        device_type=args.device,
+        enabled=amp_enabled,
+        dtype=amp_dtype if amp_enabled else None,
+    ):
+        convert_model = convert_woq(user_model.eval(), qconfig)
         self_jit = torch.jit.trace(convert_model.eval(), example_inputs, strict=False)
         self_jit = torch.jit.freeze(self_jit.eval())
         self_jit.save(args.output_dir + "/best_model.pt")

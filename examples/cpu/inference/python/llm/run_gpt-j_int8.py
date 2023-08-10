@@ -97,6 +97,8 @@ print("Data type of the model:", user_model.dtype)
 user_model = user_model.to(memory_format=torch.channels_last)
 user_model.eval()
 # calling _optimize_transformers for int8 path
+if args.ipex_weight_only_quantization:
+    user_model.config.weight_only_quantization = True
 user_model = ipex._optimize_transformers(
     user_model.eval(), dtype=torch.int8, inplace=True
 )
@@ -367,6 +369,13 @@ if args.ipex_weight_only_quantization:
     )
     with torch.no_grad():
         convert_model = convert_woq(user_model.eval(), qconfig)
+    with torch.no_grad(), torch.autocast(
+        device_type=args.device,
+        enabled=amp_enabled,
+        dtype=amp_dtype if amp_enabled else None,
+    ):
+        if amp_enabled:
+            convert_model = ipex.optimize(convert_model, dtype=torch.bfloat16, inplace=True, concat_linear=False)
         self_jit = torch.jit.trace(convert_model.eval(), example_inputs, strict=False)
         self_jit = torch.jit.freeze(self_jit.eval())
         self_jit.save(args.output_dir + "/best_model.pt")
