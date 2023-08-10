@@ -71,7 +71,7 @@
 <li class="toctree-l5"><a class="reference internal" href="#id7">Intel® Distribution for Python*</a></li>
 </ul>
 </li>
-<!--<li class="toctree-l4"><a class="reference internal" href="#via-conda-command">via conda command</a></li>-->
+<li class="toctree-l4"><a class="reference internal" href="#via-conda-command">via conda command</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#important-notes">Important Notes</a></li>
 </ul>
 </li>
@@ -81,6 +81,12 @@
 </ul>
 </li>
 <li class="toctree-l4"><a class="reference internal" href="#compile-the-bundle-pytorch-torchvision-torchaudio-intel-extension-for-pytorch-with-script">Compile the bundle (PyTorch*, torchvision, torchaudio, Intel® Extension for PyTorch*) with script</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#install-via-docker">Install via docker</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#build-from-dockerfile">Build from a Dockerfile</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pull-from-dockerhub">Pull from Docker Hub</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#run-docker-image">Run a Docker Image</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#sanity-test">Sanity Test</a></li>
@@ -303,13 +309,12 @@
 </div>
 </section>
 </section>
-<!--<section id="via-conda-command">
+<section id="via-conda-command">
 <h3>via conda command<a class="headerlink" href="#via-conda-command" title="Permalink to this heading"></a></h3>
 <p>Prebuilt conda packages availability matrix for Python versions:</p>
 <table class="colwidths-auto docutils align-default">
 <thead>
 <tr class="row-odd"><th class="head"><p>Extension Version</p></th>
-<th class="head"><p>Python 3.6</p></th>
 <th class="head"><p>Python 3.7</p></th>
 <th class="head"><p>Python 3.8</p></th>
 <th class="head"><p>Python 3.9</p></th>
@@ -320,14 +325,12 @@
 <tbody>
 <tr class="row-even"><td><p>2.0.110+xpu</p></td>
 <td></td>
-<td></td>
 <td><p>✔️</p></td>
 <td><p>✔️</p></td>
 <td><p>✔️</p></td>
 <td><p>✔️</p></td>
 </tr>
 <tr class="row-odd"><td><p>1.13.120+xpu</p></td>
-<td></td>
 <td><p>✔️</p></td>
 <td><p>✔️</p></td>
 <td><p>✔️</p></td>
@@ -336,11 +339,15 @@
 </tr>
 </tbody>
 </table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Installation of Intel® Extension for PyTorch* 2.0.110+xpu via conda for Python 3.8, 3.9 and 3.10 will automatically install Data Parallel Extension for NumPy (dpnp).</p>
+</div>
 <p>Prebuilt conda packages are stored in Intel channel on Anaconda: <a class="reference external" href="https://anaconda.org/intel/intel-extension-for-pytorch/files">intel-extension-for-pytorch</a> and <a class="reference external" href="https://anaconda.org/intel/pytorch/files">pytorch</a>.</p>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>conda install intel-extension-for-pytorch<span class="o">=</span><span class="m">2</span>.0.110 <span class="nv">pytorch</span><span class="o">=</span><span class="m">2</span>.0.1 -c intel -c conda-forge
 </pre></div>
 </div>
-</section>-->
+</section>
 <section id="important-notes">
 <h3>Important Notes<a class="headerlink" href="#important-notes" title="Permalink to this heading"></a></h3>
 <div class="admonition note">
@@ -409,6 +416,36 @@ $ tree -L <span class="m">3</span> .
     │   └── torchvision-....whl
     ├ build.log
     └ ...
+</pre></div>
+</div>
+</section>
+</section>
+<section id="install-via-docker">
+<h2>Install via docker<a class="headerlink" href="#install-via-docker" title="Permalink to this heading"></a></h2>
+<p>You can also run your workloads inside docker containers, either from an image compiled from a dockerfile locally, or from an image pulled from Docker Hub.</p>
+<section id="build-from-dockerfile">
+<h3>Build from a Dockerfile<a class="headerlink" href="#build-from-dockerfile" title="Permalink to this heading"></a></h3>
+<p>Use commands below to build docker images. Comparing to <cite>xpu-flex</cite>, <cite>xpu-max</cite> enables distributed training.</p>
+<div class="highlight-shell notranslate">
+<div class="highlight"><pre>wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.0.110%2Bxpu/docker/Dockerfile.xpu
+wget https://github.com/intel/intel-extension-for-pytorch/raw/v2.0.110%2Bxpu/docker/build.sh
+./build.sh [xpu-flex/xpu-max]
+</pre></div>
+</div>
+</section>
+<section id="pull-from-dockerhub">
+<h3>Pull from Docker Hub<a class="headerlink" href="#pull-from-dockerhub" title="Permalink to this heading"></a></h3>
+<p>Use either of the commands below to download a prebuilt docker image. Comparing to <cite>xpu-flex</cite>, <cite>xpu-max</cite> enables distributed training.</p>
+<div class="highlight-shell notranslate">
+<div class="highlight"><pre>docker pull intel/intel-extension-for-pytorch:xpu-flex-2.0.110-xpu
+docker pull intel/intel-extension-for-pytorch:xpu-max-2.0.110-xpu
+</pre></div>
+</div>
+</section>
+<section id="run-docker-image">
+<h3>Run a Docker Image<a class="headerlink" href="#run-docker-image" title="Permalink to this heading"></a></h3>
+<div class="highlight-shell notranslate">
+<div class="highlight"><pre>docker run --rm -it --privileged --device=/dev/dri --ipc=host &lt;image_name&gt;:&lt;tag&gt; bash
 </pre></div>
 </div>
 </section>
