@@ -7,12 +7,13 @@ This document explains the dynamic kernel dispatch mechanism for Intel® Extensi
 IPEX dyndisp is forked from **PyTorch:** `ATen/native/DispatchStub.h` and `ATen/native/DispatchStub.cpp`. IPEX adds additional CPU ISA level support, such as `AVX512_VNNI`, `AVX512_BF16` and `AMX`.
 
 PyTorch & IPEX CPU ISA support statement:
- | | DEFAULT | AVX2 | AVX2_VNNI | AVX512 | AVX512_VNNI | AVX512_BF16 | AMX |
- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
- | PyTorch | ✔ | ✔ | ✘ | ✔ | ✘ | ✘ | ✘ |
- | IPEX-1.11 | ✘ | ✔ | ✘ | ✔ | ✘ | ✘ | ✘ |
- | IPEX-1.12 | ✘ | ✔ | ✘ | ✔ | ✔ | ✔ | ✔ |
- | IPEX-1.13 | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
+ | | DEFAULT | AVX2 | AVX2_VNNI | AVX512 | AVX512_VNNI | AVX512_BF16 | AMX | AVX512_FP16
+ | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
+ | PyTorch | ✔ | ✔ | ✘ | ✔ | ✘ | ✘ | ✘ | ✘ |
+ | IPEX-1.11 | ✘ | ✔ | ✘ | ✔ | ✘ | ✘ | ✘ | ✘ |
+ | IPEX-1.12 | ✘ | ✔ | ✘ | ✔ | ✔ | ✔ | ✔ | ✘ |
+ | IPEX-1.13 | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✘ |
+ | IPEX-2.1 | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 
 \* Current IPEX DEFAULT level implemented as same as AVX2 level.
 
@@ -25,6 +26,7 @@ PyTorch & IPEX CPU ISA support statement:
  | AVX512_BF16 | GCC 10.3+ |
  | AVX2_VNNI | GCC 11.2+ |
  | AMX | GCC 11.2+ |
+ | AVX512_FP16 | GCC 12.1+ |
 
 \* Check with `cmake/Modules/FindAVX.cmake` for detailed compiler checks.
 
@@ -69,7 +71,8 @@ The CodeGen will copy each cpp files from **Kernel implementation**, and then ad
 > AVX512_BF16: `build/Release/csrc/isa_codegen/cpu/aten/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX512_BF16.cpp -O3 -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -DCPU_CAPABILITY_AVX512_VNNI -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mfma -DCPU_CAPABILITY=AVX512_BF16 -DCPU_CAPABILITY_AVX512_BF16`
 >
 > AMX: `build/Release/csrc/isa_codegen/cpu/aten/kernels/AdaptiveAveragePoolingKrnl.cpp.AMX.cpp -O3  -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -DCPU_CAPABILITY_AVX512_VNNI -DCPU_CAPABILITY_AVX512_BF16 -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mfma -mamx-tile -mamx-int8 -mamx-bf16 -DCPU_CAPABILITY=AMX -DCPU_CAPABILITY_AMX`
-
+>
+> AVX512_FP16: `build/Release/csrc/isa_codegen/cpu/aten/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX512_FP16.cpp -O3  -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -DCPU_CAPABILITY_AVX512_VNNI -DCPU_CAPABILITY_AVX512_BF16 -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mfma -mamx-tile -mamx-int8 -mamx-bf16 -mavx512fp16 -DCPU_CAPABILITY_AMX -DCPU_CAPABILITY=AVX512_FP16 -DCPU_CAPABILITY_AVX512_FP16`
 ---
 
 >**Note:**
@@ -390,7 +393,7 @@ Type "help", "copyright", "credits" or "license" for more information.
 
 ## Select ISA level manually.
 
-By default, IPEX dispatches to the kernels with the maximum ISA level supported by the underlying CPU hardware. This ISA level can be overridden by the environment variable `ATEN_CPU_CAPABILITY` (same environment variable as PyTorch). The available values are {`avx2`, `avx512`, `avx512_vnni`, `avx512_bf16`, `amx`}. The effective ISA level would be the minimal level between `ATEN_CPU_CAPABILITY` and the maximum level supported by the hardware.
+By default, IPEX dispatches to the kernels with the maximum ISA level supported by the underlying CPU hardware. This ISA level can be overridden by the environment variable `ATEN_CPU_CAPABILITY` (same environment variable as PyTorch). The available values are {`avx2`, `avx512`, `avx512_vnni`, `avx512_bf16`, `amx`, `avx512_fp16`}. The effective ISA level would be the minimal level between `ATEN_CPU_CAPABILITY` and the maximum level supported by the hardware.
 ### Example:
 ```bash
 $ python -c 'import intel_extension_for_pytorch._C as core;print(core._get_current_isa_level())'
