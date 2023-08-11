@@ -139,6 +139,7 @@ def _optimize_transformers(
                 _prepare_decoder_attention_mask,
                 _LlamaAttention,
                 _LlamaAttention_GQA,
+                _LlamaRMSNorm_forward,
                 _GPTJAttention,
                 _GPTNeoXAttention,
                 _OPTAttention,
@@ -284,7 +285,12 @@ def _optimize_transformers(
                         "_prepare_decoder_attention_mask",
                         _prepare_decoder_attention_mask,
                     )
-                    if getattr(_model.config, 'weight_only_quantization', False):
+                    convert_forward(
+                        _model,
+                        transformers.models.llama.modeling_llama.LlamaRMSNorm,
+                        _LlamaRMSNorm_forward,
+                    )
+                    if getattr(_model.config, "weight_only_quantization", False):
                         convert_forward(
                             _model,
                             transformers.models.gptj.modeling_gptj.GPTJBlock,

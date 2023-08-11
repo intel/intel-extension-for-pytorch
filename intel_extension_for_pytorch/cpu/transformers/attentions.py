@@ -120,22 +120,30 @@ class _GPTJAttention(nn.Module):
             torch.tensor(self.head_dim, dtype=torch.float32)
         ).to(torch.get_default_dtype())
 
-        self.enable_concat_linear = getattr(config, 'weight_only_quantization', False)
+        self.enable_concat_linear = getattr(config, "weight_only_quantization", False)
         self.k_proj = module.k_proj
         self.v_proj = module.v_proj
         self.q_proj = module.q_proj
-        
+
         if self.enable_concat_linear:
-            weights = torch.cat([self.q_proj.weight, self.k_proj.weight, self.v_proj.weight], dim=0)
+            weights = torch.cat(
+                [self.q_proj.weight, self.k_proj.weight, self.v_proj.weight], dim=0
+            )
             if self.q_proj.bias is not None:
-                biases = torch.cat([self.q_proj.bias, self.k_proj.bias, self.v_proj.bias], dim=0)
-                self.concat_qkv = torch.nn.Linear(weights.shape[0], weights.shape[1], bias=True)
+                biases = torch.cat(
+                    [self.q_proj.bias, self.k_proj.bias, self.v_proj.bias], dim=0
+                )
+                self.concat_qkv = torch.nn.Linear(
+                    weights.shape[0], weights.shape[1], bias=True
+                )
                 self.concat_qkv.bias = torch.nn.Parameter(biases)
             else:
-                self.concat_qkv = torch.nn.Linear(weights.shape[0], weights.shape[1], bias=False)
+                self.concat_qkv = torch.nn.Linear(
+                    weights.shape[0], weights.shape[1], bias=False
+                )
             self.concat_qkv.weight = torch.nn.Parameter(weights)
             setattr(self.concat_qkv, "_num_concats", 3)
-            
+
         self.out_proj = module.out_proj
         self.rotary_dim = module.rotary_dim
         pos_embd_dim = self.rotary_dim or self.embed_dim
@@ -244,12 +252,16 @@ class _GPTJAttention(nn.Module):
     ]:
         if self.enable_concat_linear:
             num_concats = getattr(self.concat_qkv, "_num_concats")
-            assert(num_concats == 3)
+            assert num_concats == 3
             qkv_output = self.concat_qkv(hidden_states)
             hidden_size = qkv_output.shape[-1] // num_concats
             qkv = qkv_output.view(num_concats, -1, hidden_size)
             expected_shape = list(hidden_states.shape)[:-1] + [hidden_size]
-            query, key, value = qkv[0].view(expected_shape), qkv[1].view(expected_shape), qkv[2].view(expected_shape)
+            query, key, value = (
+                qkv[0].view(expected_shape),
+                qkv[1].view(expected_shape),
+                qkv[2].view(expected_shape),
+            )
         else:
             query = self.q_proj(hidden_states)
             key = self.k_proj(hidden_states)
@@ -334,6 +346,17 @@ class _GPTJAttention(nn.Module):
         return outputs  # a, present, (attentions)
 
 
+def _LlamaRMSNorm_forward(self, hidden_states):
+    variance = hidden_states.to(torch.float32).pow(2).mean(-1, keepdim=True)
+    hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+
+    # convert into half-precision if necessary
+    if self.weight.dtype in [torch.float16, torch.bfloat16]:
+        hidden_states = hidden_states.to(self.weight.dtype)
+
+    return self.weight * hidden_states
+
+
 class _LlamaAttention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
@@ -411,7 +434,9 @@ class _LlamaAttention(nn.Module):
 
         if use_cache:
             if past_key_value is None:
-                beam_idx_tmp = torch.zeros((2048, int(4)), dtype=torch.int).contiguous()
+                beam_idx_tmp = torch.zeros(
+                    (2048, int(4)), dtype=torch.long
+                ).contiguous()
                 past_key_value = tuple(
                     [
                         torch.zeros([1, 32, 1, 128]).contiguous(),
@@ -618,7 +643,9 @@ class _LlamaAttention_GQA(nn.Module):
 
         if use_cache:
             if past_key_value is None:
-                beam_idx_tmp = torch.zeros((2048, int(4)), dtype=torch.int).contiguous()
+                beam_idx_tmp = torch.zeros(
+                    (2048, int(4)), dtype=torch.long
+                ).contiguous()
                 past_key_value = tuple(
                     [
                         torch.zeros([1, 32, 1, 128]).contiguous(),
@@ -924,8 +951,8 @@ class _GPTNeoXAttention(nn.Module):
         else:
             if layer_past is None:
                 layer_past = (
-                    torch.randn(0),
-                    torch.randn(0),
+                    torch.randn(1),
+                    torch.randn(1),
                     torch.zeros(2048, 4, dtype=torch.long),
                     torch.zeros(1, dtype=torch.long),
                 )
