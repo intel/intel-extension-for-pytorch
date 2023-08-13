@@ -4,6 +4,7 @@
 #include <ATen/record_function.h>
 #include <runtime/Utils.h>
 #include <xetla/GEMM.h>
+#include "Linear.h"
 #include "comm/ATDispatch.h"
 #include "utils/CustomOperatorRegistration.h"
 
@@ -12,156 +13,205 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-static Tensor mm_bias_resadd_resadd(
-    const Tensor& a_,
-    const Tensor& b_,
-    const Tensor& bias_,
-    const Tensor& res0_,
-    const Tensor& res1_) {
-  auto a = a_.flatten(0, -2);
-  auto b = b_.flatten(0, -2);
-  auto bias = bias_.flatten();
-  auto res0 = res0_.flatten(0, -2);
-  auto res1 = res1_.flatten(0, -2);
-  // a: m x k, b: k x n, bias: n, res0/1: m x n
-  TORCH_CHECK(
-      a.dim() == 2 && b.dim() == 2 && bias.dim() == 1 && res0.dim() == 2 &&
-      res1.dim() == 2);
-  int m = a.sizes()[0];
-  int n = b.sizes()[1];
-  int k = a.sizes()[1];
-  auto output = at::empty({m, n}, a.options());
+#define RECORD_ONEDNN_FUNCTION_IMPL(F)                     \
+  char str__[100];                                         \
+  sprintf(str__, "onednn_%s(%d, %d, %d)", "" #F, m, n, k); \
+  RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
 
-  auto policy = HGEMMXetla()
+static Tensor mm_(const Tensor& a, const Tensor& b) {
+  auto af = a.flatten(0, -2);
+  int m = af.sizes()[0];
+  int n = b.sizes()[1];
+  int k = b.sizes()[0];
+  auto output = at::empty({m, n}, a.options());
+  auto policy = HGEMM_XETLA()
                     .add_matrix_c(output)
                     .add_matrix_a(a)
                     .add_matrix_b(b)
-                    .add_epilogue(bias, HGEMMXetla::EpilogueType::BIAS)
-                    .add_epilogue(res0, HGEMMXetla::EpilogueType::RES_ADD)
-                    .add_epilogue(res1, HGEMMXetla::EpilogueType::RES_ADD)
                     .build();
-  TORCH_CHECK(policy.fallback() == false);
-  policy.run();
-  return resize_as_mat1(a_, output);
+  if (policy.valid()) {
+    policy.run();
+  } else {
+    RECORD_ONEDNN_FUNCTION_IMPL(mm_)
+    xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, Attr());
+  }
+  return matmul_resize(a, output);
 }
 
-static Tensor mm_bias_resadd(
-    const Tensor& a_,
-    const Tensor& b_,
-    const Tensor& bias_,
-    const Tensor& res_,
-    const double res_scale) {
-  auto a = a_.flatten(0, -2);
-  auto b = b_.flatten(0, -2);
-  auto bias = bias_.flatten();
-  auto res = res_.flatten(0, -2);
-  // a: m x k, b: k x n, bias: n, res: m x n
-  TORCH_CHECK(
-      a.dim() == 2 && b.dim() == 2 && bias.dim() == 1 && res.dim() == 2);
-  int m = a.sizes()[0];
+static Tensor mm_bias(const Tensor& a, const Tensor& b, const Tensor& bias) {
+  auto af = a.flatten(0, -2);
+  int m = af.sizes()[0];
   int n = b.sizes()[1];
-  int k = a.sizes()[1];
+  int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
+  auto policy = HGEMM_XETLA()
+                    .add_matrix_c(output)
+                    .add_matrix_a(a)
+                    .add_matrix_b(b)
+                    .add_epilogue(bias, HGEMM_XETLA::EpilogueType::BIAS)
+                    .build();
+  if (policy.valid()) {
+    policy.run();
+  } else {
+    RECORD_ONEDNN_FUNCTION_IMPL(mm_bias)
+    xpu::oneDNN::matmul(output, af, b, bias, true, Attr());
+  }
+  return matmul_resize(a, output);
+}
 
+static Tensor mm_bias_scaled_resadd(
+    const Tensor& a,
+    const Tensor& b,
+    const Tensor& bias,
+    const Tensor& res,
+    const double res_scale) {
+  auto af = a.flatten(0, -2);
+  int m = af.sizes()[0];
+  int n = b.sizes()[1];
+  int k = b.sizes()[0];
+  auto output = at::empty({m, n}, a.options());
   auto policy =
-      HGEMMXetla()
+      HGEMM_XETLA()
           .add_matrix_c(output)
           .add_matrix_a(a)
           .add_matrix_b(b)
-          .add_epilogue(bias, HGEMMXetla::EpilogueType::BIAS)
+          .add_epilogue(bias, HGEMM_XETLA::EpilogueType::BIAS)
           .add_epilogue(
-              res, HGEMMXetla::EpilogueType::SCALED_RES_ADD, res_scale)
+              res, HGEMM_XETLA::EpilogueType::SCALED_RES_ADD, res_scale)
           .build();
-  TORCH_CHECK(policy.fallback() == false);
-  policy.run();
-  return resize_as_mat1(a_, output);
-}
-
-static Tensor mm_resmul(
-    const Tensor& a_,
-    const Tensor& b_,
-    const Tensor& res_) {
-  auto a = a_.flatten(0, -2);
-  auto b = b_.flatten(0, -2);
-  auto res = res_.flatten(0, -2);
-  // a: m x k, b: k x n, res: m, n
-  TORCH_CHECK(a.dim() == 2 && b.dim() == 2 && res.dim() == 2);
-  int m = a.sizes()[0];
-  int n = b.sizes()[1];
-  int k = a.sizes()[1];
-  auto output = at::empty({m, n}, a.options());
-
-  auto policy = HGEMMXetla()
-                    .add_matrix_c(output)
-                    .add_matrix_a(a)
-                    .add_matrix_b(b)
-                    .add_epilogue(res, HGEMMXetla::EpilogueType::RES_MUL)
-                    .build();
-  TORCH_CHECK(policy.fallback() == false);
-  policy.run();
-  return resize_as_mat1(a_, output);
-}
-
-static Tensor mm_silu(const Tensor& a_, const Tensor& b_) {
-  auto a = a_.flatten(0, -2);
-  auto b = b_.flatten(0, -2);
-  // a: m x k, b: k x n
-  TORCH_CHECK(a.dim() == 2 && b.dim() == 2);
-  int m = a.sizes()[0];
-  int n = b.sizes()[1];
-  int k = a.sizes()[1];
-  auto output = at::empty({m, n}, a.options());
-
-  auto policy = HGEMMXetla()
-                    .add_matrix_c(output)
-                    .add_matrix_a(a)
-                    .add_matrix_b(b)
-                    .add_epilogue(Tensor(), HGEMMXetla::EpilogueType::SILU)
-                    .build();
-  TORCH_CHECK(policy.fallback() == false);
-  policy.run();
-  return resize_as_mat1(a_, output);
-}
-
-#undef GEMM_XETLA_DISPATCH
-
-#define GEMM_QKV_XETLA_DISPATCH(F)                                         \
-  if (!has_bias) {                                                         \
-    RECORD_FUNCTION(                                                       \
-        "torch_ipex::hgemm_qkv" #F, c10::ArrayRef<c10::IValue>({}));       \
-    hgemm_qkv##F(                                                          \
-        q,                                                                 \
-        reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),         \
-        reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),        \
-        m,                                                                 \
-        n,                                                                 \
-        k);                                                                \
-  } else {                                                                 \
-    RECORD_FUNCTION(                                                       \
-        "torch_ipex::hgemm_qkv_bias" #F, c10::ArrayRef<c10::IValue>({}));  \
-    hgemm_qkv_bias##F(                                                     \
-        q,                                                                 \
-        reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),         \
-        reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),        \
-        reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()), \
-        m,                                                                 \
-        n,                                                                 \
-        k);                                                                \
+  if (policy.valid()) {
+    policy.run();
+  } else {
+    RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_scaled_resadd)
+    xpu::oneDNN::matmul(output, af, b, bias, true, Attr());
+    output = output + Scalar(res_scale) * res.flatten(0, -2);
   }
+  return matmul_resize(a, output);
+}
+
+static Tensor mm_bias_resadd_resadd(
+    const Tensor& a,
+    const Tensor& b,
+    const Tensor& bias,
+    const Tensor& res0,
+    const Tensor& res1) {
+  auto af = a.flatten(0, -2);
+  int m = af.sizes()[0];
+  int n = b.sizes()[1];
+  int k = b.sizes()[0];
+  auto output = at::empty({m, n}, a.options());
+  auto policy = HGEMM_XETLA()
+                    .add_matrix_c(output)
+                    .add_matrix_a(a)
+                    .add_matrix_b(b)
+                    .add_epilogue(bias, HGEMM_XETLA::EpilogueType::BIAS)
+                    .add_epilogue(res0, HGEMM_XETLA::EpilogueType::RES_ADD)
+                    .add_epilogue(res1, HGEMM_XETLA::EpilogueType::RES_ADD)
+                    .build();
+  if (policy.valid()) {
+    policy.run();
+  } else {
+    RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_resadd_resadd)
+    xpu::oneDNN::matmul(output, af, b, bias, true, Attr());
+    output = output + res0.flatten(0, -2) + res1.flatten(0, -2);
+  }
+  return matmul_resize(a, output);
+}
+
+static Tensor mm_resmul(const Tensor& a, const Tensor& b, const Tensor& res) {
+  auto af = a.flatten(0, -2);
+  int m = af.sizes()[0];
+  int n = b.sizes()[1];
+  int k = b.sizes()[0];
+  auto output = at::empty({m, n}, a.options());
+  auto policy = HGEMM_XETLA()
+                    .add_matrix_c(output)
+                    .add_matrix_a(a)
+                    .add_matrix_b(b)
+                    .add_epilogue(res, HGEMM_XETLA::EpilogueType::RES_MUL)
+                    .build();
+  if (policy.valid()) {
+    policy.run();
+  } else {
+    RECORD_ONEDNN_FUNCTION_IMPL(mm_resmul)
+    xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, Attr());
+    output = output * res.flatten(0, -2);
+  }
+  return matmul_resize(a, output);
+}
+
+static Tensor mm_silu(const Tensor& a, const Tensor& b) {
+  auto af = a.flatten(0, -2);
+  int m = af.sizes()[0];
+  int n = b.sizes()[1];
+  int k = b.sizes()[0];
+  auto output = at::empty({m, n}, a.options());
+  auto policy = HGEMM_XETLA()
+                    .add_matrix_c(output)
+                    .add_matrix_a(a)
+                    .add_matrix_b(b)
+                    .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::SILU)
+                    .build();
+  if (policy.valid()) {
+    policy.run();
+  } else {
+    RECORD_ONEDNN_FUNCTION_IMPL(mm_silu)
+    xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, Attr());
+    at::AtenIpexTypeXPU::silu_out(output, output);
+  }
+  return matmul_resize(a, output);
+}
+
+Tensor matmul_gelu(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    c10::string_view approximate) {
+  int m = input.flatten(0, -2).sizes()[0];
+  int n = weight.sizes()[1];
+  int k = weight.sizes()[0];
+  if (bias.has_value() && approximate == "tanh") {
+    auto output = at::empty({m, n}, input.options());
+    auto policy =
+        HGEMM_XETLA()
+            .add_matrix_c(output)
+            .add_matrix_a(input)
+            .add_matrix_b(weight)
+            .add_epilogue(bias.value(), HGEMM_XETLA::EpilogueType::BIAS)
+            .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::GELU)
+            .build();
+    if (policy.valid()) {
+      policy.run();
+      return matmul_resize(input, output);
+    }
+  }
+  RECORD_ONEDNN_FUNCTION_IMPL(matmul_gelu)
+  auto weight_ = weight.transpose(0, 1);
+  auto linear_wrapper = LinearConverter();
+  auto post_op = [=]() {
+    Attr attr;
+    algorithm algo;
+    if (approximate == "none") {
+      algo = attr.kind_with_gelu_erf;
+    } else if (approximate == "tanh") {
+      algo = attr.kind_with_gelu_tanh;
+    } else {
+      TORCH_INTERNAL_ASSERT(false, "Unsupported gelu algorithm: ", approximate);
+    }
+    attr.append_post_eltwise(1.0f, 0.0f, 0.0f, algo);
+    return attr;
+  };
+  Tensor result;
+  return linear_wrapper.call(result, input, weight_, bias, post_op);
+}
 
 static void mm_qkv_out(
     const Tensor& input_,
     const Tensor& weight,
     const optional<Tensor>& bias_,
-    const Tensor& out0_,
-    const Tensor& out1_,
-    const Tensor& out2_) {
+    Tensor& out0_,
+    Tensor& out1_,
+    Tensor& out2_) {
   auto input = input_.flatten(0, -2);
   auto out0 = out0_.flatten(0, -2);
   auto out1 = out1_.flatten(0, -2);
@@ -196,18 +246,70 @@ static void mm_qkv_out(
   using scalar_t =
       decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
   auto& q = dpcppGetCurrentQueue();
-  if (m <= 32) {
-    if (n >= 2048) {
-      GEMM_QKV_XETLA_DISPATCH(_16x256_8x16x16_1_true_);
+
+  bool is_server = is_server_mode();
+  if (is_server) {
+    auto wq = weight[0];
+    auto wk = weight[1];
+    auto wv = weight[2];
+    if (!has_bias) {
+      at::AtenIpexTypeXPU::mm_out(input, wq, out0);
+      at::AtenIpexTypeXPU::mm_out(input, wk, out1);
+      at::AtenIpexTypeXPU::mm_out(input, wv, out2);
     } else {
-      GEMM_QKV_XETLA_DISPATCH(_8x128_8x16x32_4_true_);
+      at::AtenIpexTypeXPU::addmm_out(
+          bias_.value()[0], input, wq, at::Scalar(1), at::Scalar(1), out0_);
+      at::AtenIpexTypeXPU::addmm_out(
+          bias_.value()[1], input, wk, at::Scalar(1), at::Scalar(1), out1_);
+      at::AtenIpexTypeXPU::addmm_out(
+          bias_.value()[2], input, wv, at::Scalar(1), at::Scalar(1), out2_);
     }
   } else {
-    GEMM_QKV_XETLA_DISPATCH(_256x256_32x64x32_1_true_);
+    int m_real = (3 * (m + 127) / 128 * 128);
+    int selected_policy = select_gemm_config(m_real, n, k, is_b_row_major, 64);
+    char str__[100];
+    if (!has_bias) {
+      sprintf(
+          str__,
+          "hgemm_qkv%s(%d, %d, %d)",
+          hgemm_policy_names[selected_policy],
+          m,
+          n,
+          k);
+      RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+      hgemm_qkv_policies[selected_policy](
+          q,
+          reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
+          m,
+          n,
+          k);
+    } else {
+      sprintf(
+          str__,
+          "hgemm_qkv_bias%s(%d, %d, %d)",
+          hgemm_policy_names[selected_policy],
+          m,
+          n,
+          k);
+      RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+      hgemm_qkv_bias_policies[selected_policy](
+          q,
+          reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()),
+          m,
+          n,
+          k);
+    }
   }
 }
-
-#undef GEMM_QKV_XETLA_DISPATCH
 
 static std::tuple<Tensor, Tensor, Tensor> mm_qkv(
     const Tensor& input,
@@ -229,46 +331,27 @@ static std::tuple<Tensor, Tensor, Tensor> mm_qkv(
       out2.view_symint(sizes));
 }
 
-Tensor matmul_gelu(
-    const Tensor& input,
-    const Tensor& weight,
-    const c10::optional<Tensor>& bias,
-    c10::string_view approximate) {
-  auto input_flat = input.flatten(0, -2);
-  if (bias.has_value() && approximate == "tanh") {
-    int m = input_flat.sizes()[0];
-    int n = weight.sizes()[1];
-    int k = input_flat.sizes()[1];
-    auto bias_ = bias.value();
-    auto output = at::empty({m, n}, input.options());
-    auto policy = HGEMMXetla()
-                      .add_matrix_c(output)
-                      .add_matrix_a(input_flat)
-                      .add_matrix_b(weight)
-                      .add_epilogue(bias_, HGEMMXetla::EpilogueType::BIAS)
-                      .add_epilogue(Tensor(), HGEMMXetla::EpilogueType::GELU)
-                      .build();
-    if (policy.fallback() == false) {
-      policy.run();
-      return resize_as_mat1(input, output);
-    }
-  }
-  TORCH_CHECK(false);
-}
+#undef RECORD_ONEDNN_FUNCTION_IMPL
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER("mm_.xpu", at::AtenIpexTypeXPU::mm_);
+  IPEX_OP_REGISTER("mm_bias.xpu", at::AtenIpexTypeXPU::mm_bias);
+  IPEX_OP_REGISTER(
+      "mm_bias_scaled_resadd.xpu", at::AtenIpexTypeXPU::mm_bias_scaled_resadd);
   IPEX_OP_REGISTER(
       "mm_bias_resadd_resadd.xpu", at::AtenIpexTypeXPU::mm_bias_resadd_resadd);
-  IPEX_OP_REGISTER("mm_bias_resadd.xpu", at::AtenIpexTypeXPU::mm_bias_resadd);
+
   IPEX_OP_REGISTER("mm_resmul.xpu", at::AtenIpexTypeXPU::mm_resmul);
   IPEX_OP_REGISTER("mm_silu.xpu", at::AtenIpexTypeXPU::mm_silu);
+
+  IPEX_OP_REGISTER("matmul_gelu.xpu", at::AtenIpexTypeXPU::matmul_gelu);
+
   IPEX_OP_REGISTER("mm_qkv_out.xpu", at::AtenIpexTypeXPU::mm_qkv_out);
   IPEX_OP_REGISTER("mm_qkv.xpu", at::AtenIpexTypeXPU::mm_qkv);
-  IPEX_OP_REGISTER("matmul_gelu.xpu", at::AtenIpexTypeXPU::matmul_gelu);
 }
 } // namespace
 
