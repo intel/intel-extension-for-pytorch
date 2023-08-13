@@ -48,7 +48,7 @@ void ifmha_forward_impl(
       ifmha_forward_t<ifmha_policy, T, kUseBias, kIsTraining>;
 
   sycl::nd_range<2> NdRange =
-      ifmha_forward_op_t::get_nd_range(num_batches * beam * num_heads);
+      ifmha_forward_op_t::get_nd_range(num_batches, beam, num_heads);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for<
@@ -82,19 +82,6 @@ void ifmha_forward_impl(
       // call the functor
       ifmha_fwd_op(ei, args);
         });
-        // event.wait();
-        // double time = (event.template get_profiling_info<
-        //                    sycl::info::event_profiling::command_end>() -
-        //                event.template get_profiling_info<
-        //                    sycl::info::event_profiling::command_start>());
-        // uint64_t ops = num_batches * num_heads *
-        //                uint64_t(head_size * num_queries * num_keys) * 2L *
-        //                2L;
-        // double tflops = (ops / 1024.0f / 1024.0f / 1024.0f / 1024.0f) / (time
-        // / 1e9); printf("B, N, F, T, H: %d, %d, %d, %d, %d, time: %f us,
-        // tflops: %f\n",
-        //        num_batches, num_heads, num_queries, num_keys, head_size, time
-        //        / 1e3, tflops);
   };
   DPCPP_Q_SUBMIT(q, cgf);
 }
@@ -147,28 +134,15 @@ void ifmha_forward(
     uint32_t attn_mask_padding) {
   // occupancy first
   constexpr int hardware_concurrent_wg = 64;
-  if (num_batches * beam <= hardware_concurrent_wg) {
-    if (head_size <= 64) {
-      CALL_IMPL_FUNC(ifmha_policy_64x64);
-    } else if (head_size <= 128) {
-      CALL_IMPL_FUNC(ifmha_policy_128x64);
-    } else if (head_size <= 256) {
-      CALL_IMPL_FUNC(ifmha_policy_s_256x64);
-    } else {
-      TORCH_CHECK(0, "SDP Index fusion kernel requires head_dim <= 256 ...");
-      return;
-    }
+  if (head_size <= 64) {
+    CALL_IMPL_FUNC(ifmha_policy_64x64);
+  } else if (head_size <= 128) {
+    CALL_IMPL_FUNC(ifmha_policy_128x64);
+  } else if (head_size <= 256) {
+    CALL_IMPL_FUNC(ifmha_policy_256x64);
   } else {
-    if (head_size <= 64) {
-      CALL_IMPL_FUNC(ifmha_policy_64x64);
-    } else if (head_size <= 128) {
-      CALL_IMPL_FUNC(ifmha_policy_128x64);
-    } else if (head_size <= 256) {
-      CALL_IMPL_FUNC(ifmha_policy_l_256x64);
-    } else {
-      TORCH_CHECK(0, "SDP Index fusion kernel requires head_dim <= 256 ...");
-      return;
-    }
+    TORCH_CHECK(0, "SDP Index fusion kernel requires head_dim <= 256 ...");
+    return;
   }
 }
 

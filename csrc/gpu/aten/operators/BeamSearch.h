@@ -329,9 +329,9 @@ void batch_topk_kernel(
 
       // init
       if (wi_id < beam_size) {
-        top_score[wg_id * beam_size + beam_size] = 0;
-        top_token[wg_id * beam_size + beam_size] = pad_token_id;
-        top_beams[wg_id * beam_size + beam_size] = 0;
+        top_score[wg_id * beam_size + wi_id] = 0;
+        top_token[wg_id * beam_size + wi_id] = pad_token_id;
+        top_beams[wg_id * beam_size + wi_id] = 0;
       }
 
       if (finished[wg_id]) {

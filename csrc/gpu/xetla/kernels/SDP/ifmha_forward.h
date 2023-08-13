@@ -41,11 +41,13 @@ class ifmha_forward_t {
   using accum_t = float;
   using index_t = int32_t;
   static constexpr uint32_t accum_step = ifmha_policy::accum_step;
+  static constexpr uint32_t reduce_step = ifmha_policy::reduce_step;
   static constexpr uint32_t prefetch_distance = ifmha_policy::prefetch_distance;
   static constexpr accum_t kNegInfinity = INFINITY * -1;
+  static constexpr uint32_t uH = ifmha_policy::kHm;
+  // loop_count is used in gemm_Sij and gemm_Oi
+  static constexpr uint32_t loop_count = (uH + accum_step - 1) / accum_step;
 
-  // q: (1, h) k(t, h)
-  // reduce(h*h)
   struct arguments_t {
     // Input and output tensors
     scalar_t* Q_ptr; // [1,B,Bm,N,H] - query
@@ -66,7 +68,6 @@ class ifmha_forward_t {
     uint32_t uB;
     uint32_t uBm;
     uint32_t uN;
-    uint32_t uH;
     uint32_t uT0;
     uint32_t uT1;
     uint32_t uPT;
@@ -106,7 +107,6 @@ class ifmha_forward_t {
           uB(num_batches),
           uBm(beam),
           uN(num_heads),
-          uH(head_size),
           uT0(kv_len0),
           uT1(kv_len1),
           uPT(padded_kvlen),
@@ -128,14 +128,12 @@ class ifmha_forward_t {
   static_assert(
       kHm / kSgHm == wg_size,
       "wg_size must be the same between Hm and Bc");
-  static_assert(wg_size <= 32, "The number of threads should be less than 32!");
+  static_assert(wg_size <= 8, "The number of threads should be less than 8!");
 
   // --------------------- // Memory desc // ---------------------- //
   // suffix: L -> local;
   using mem_desc_Qi_t =
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
-  using mem_desc_Qi_L_t =
-      mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>;
   using mem_desc_Bij_t =
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Ot_L_t =
@@ -149,17 +147,21 @@ class ifmha_forward_t {
   using imem_desc_Vj_t =
       imem_desc_t<scalar_t, kSgBc, mem_layout::row_major, mem_space::global>;
 
+  using matQi_tile_desc_t = subgroup::tile_desc_t<kHm, 1, 16, 1>;
+  using matQi_t = subgroup::tile_t<accum_t, matQi_tile_desc_t>;
   // ------------------- // Slm and nbarrier // ------------------- //
-  static constexpr uint32_t slm_size_Qi = kHm * sizeof(accum_t);
-  static constexpr uint32_t slm_size_Ot = kHm * wg_size * sizeof(accum_t);
+  static constexpr uint32_t beams = 4;
+  static constexpr uint32_t slm_size_Qi = 0;
+  static constexpr uint32_t slm_size_Ot =
+      beams * kHm * wg_size * sizeof(accum_t);
   static constexpr uint32_t slm_size_softmax =
-      (wg_size > 1) ? wg_size * sizeof(accum_t) : 0;
+      (wg_size > 1) ? beams * wg_size * sizeof(accum_t) : 0;
   // Slm addr to store inermediate results
   static constexpr uint32_t Qi_slm = 0;
   static constexpr uint32_t Ot_slm = Qi_slm + slm_size_Qi;
   static constexpr uint32_t softmax_slm = Ot_slm + slm_size_Ot;
 
-  static constexpr uint32_t nbarrier_cnt = (wg_size > 1) ? 1 : 0;
+  static constexpr uint32_t nbarrier_cnt = (wg_size > 1) ? beams : 0;
 
   // ======================== // Context // ======================= //
 
@@ -167,7 +169,9 @@ class ifmha_forward_t {
   struct context_t {
     // thread id
     uint32_t sg_id;
-    uint32_t loop_count;
+    uint32_t batch_id;
+    uint32_t beam_id;
+    uint32_t head_id;
     // nbarrier
     xetla_nbarrier_t<wg_size, wg_size> nbarrier;
     // softmax statistics
@@ -175,7 +179,6 @@ class ifmha_forward_t {
     accum_t softmax_l;
     // mem desc variables
     mem_desc_Qi_t desc_Qi;
-    mem_desc_Qi_L_t desc_Qi_L;
     mem_desc_Bij_t desc_Bij;
     mem_desc_Ot_L_t desc_Ot0_L;
     mem_desc_Ot_L_t desc_Ot1_L;
@@ -189,31 +192,37 @@ class ifmha_forward_t {
     /// @brief Initialize invariant variables in the ifmha loop
     inline void init_context(xetla_exec_item<2>& ei, arguments_t& args) {
       // thread id
-      sg_id = ei.get_local_linear_id();
-      // loop_count is used in gemm_Sij and gemm_Oi
-      loop_count = (args.uH + accum_step - 1) / accum_step;
+      beam_id = ei.get_local_id(0);
+      sg_id = ei.get_local_id(1);
+
       // nbarrier
-      nbarrier.init_nbarrier(0, nbarrier_role::producer_consumer);
+      nbarrier.init_nbarrier(beam_id, nbarrier_role::producer_consumer);
       // softmax statistics
       softmax_m = kNegInfinity;
       softmax_l = 0.f;
 
       // mem desc variables
-      uint32_t gid = ei.get_group(0);
+      batch_id = ei.get_group(0);
+      head_id = ei.get_group(1);
+      uint32_t b_id =
+          batch_id * args.uBm * args.uN + beam_id * args.uN + head_id;
+
+      int32_t start_y = b_id;
+      uint32_t end_y = b_id + 1;
+      desc_Qi.init(args.Q_ptr, {uH, end_y, uH}, {0, start_y});
 
       int32_t start_x = sg_id * kSgHm;
-      int32_t start_y = gid;
-      uint32_t end_y = gid + 1;
-      desc_Qi.init(args.Q_ptr, {args.uH, end_y, args.uH}, {start_x, start_y});
-      desc_Oi.init(args.O_ptr, {args.uH, end_y, args.uH}, {start_x, start_y});
-      desc_Qi_L.init(Qi_slm, {kHm, 1, kHm}, {0, 0});
+      desc_Oi.init(args.O_ptr, {uH, end_y, uH}, {start_x, start_y});
 
       start_y = sg_id;
-      desc_Ot0_L.init(Ot_slm, {kHm, wg_size, kHm}, {0, start_y});
-      desc_Ot1_L.init(Ot_slm, {kHm, wg_size, kHm}, {start_x, 0});
+      uint32_t ot_slm_offset = beam_id * kHm * wg_size * sizeof(accum_t);
+      desc_Ot0_L.init(
+          Ot_slm + ot_slm_offset, {kHm, wg_size, kHm}, {0, start_y});
+      desc_Ot1_L.init(
+          Ot_slm + ot_slm_offset, {kHm, wg_size, kHm}, {start_x, 0});
 
-      idesc_Kj.init(args.K0_ptr, args.K1_ptr, args.uH);
-      idesc_Vj.init(args.V0_ptr, args.V1_ptr, args.uH);
+      idesc_Kj.init(args.K0_ptr, args.K1_ptr, uH);
+      idesc_Vj.init(args.V0_ptr, args.V1_ptr, uH);
     }
 
     inline void load_index(
@@ -221,7 +230,7 @@ class ifmha_forward_t {
         arguments_t& args,
         xetla_vector<int32_t, kSgBc>& index,
         int32_t start_y) {
-      using index_tile_desc_t = subgroup::tile_desc_t<1, kSgBc, 1, kSgBc>;
+      using index_tile_desc_t = subgroup::tile_desc_t<1, kSgBc, 1, 16>;
       using index_tile_t = subgroup::tile_t<index_t, index_tile_desc_t>;
       using index_payload_t = subgroup::mem_payload_t<
           index_t,
@@ -232,8 +241,7 @@ class ifmha_forward_t {
       index_tile_t index_tile;
       index_payload_t index_payload;
 
-      auto gid = ei.get_group(0);
-      auto b_bm_id = gid / args.uN;
+      auto b_bm_id = batch_id * args.uBm + beam_id;
       int32_t start_x = b_bm_id;
       uint32_t end_x = start_x + 1;
       uint32_t end_y = std::min(start_y + kSgBc, args.uT1);
@@ -252,9 +260,8 @@ class ifmha_forward_t {
       uint32_t sg_start_T = start_T + sg_id * kSgBc;
       uint32_t sg_end_T = std::min(sg_start_T + kSgBc, args.uT);
 
-      auto gid = ei.get_group(0);
-      auto nid = gid % args.uN;
-      auto bid = gid / (args.uBm * args.uN);
+      auto nid = head_id;
+      auto bid = batch_id;
 
       // compute index for buffer0
       uint32_t start_T0 = std::min(sg_start_T, args.uT0);
@@ -279,15 +286,15 @@ class ifmha_forward_t {
       xetla_vector<int32_t, kSgBc> index1;
 
       if (lanes1 > 0) {
-        xetla_vector<int32_t, kSgBc> beam_id;
-        load_index(ei, args, beam_id, start_T1);
+        xetla_vector<int32_t, kSgBc> sel_beam_id;
+        load_index(ei, args, sel_beam_id, start_T1);
         int inital = start_T1 * args.uB * args.uBm * args.uN +
             bid * args.uBm * args.uN + nid;
         int step = args.uB * args.uBm * args.uN;
         index1 = xetla_vector_gen<int32_t, kSgBc>(0, 1);
         index1 *= step;
         index1 += inital;
-        index1 += beam_id * args.uN;
+        index1 += sel_beam_id * args.uN;
       }
 
       idesc_Kj.update_index(index0, index1, lanes0, lanes1);
@@ -298,7 +305,7 @@ class ifmha_forward_t {
         uint32_t end_x = start_x + kBc;
         uint32_t boundary_x = args.uPT;
         end_x = end_x > boundary_x ? boundary_x : end_x;
-        int32_t start_y = gid / args.uN;
+        int32_t start_y = batch_id * args.uBm + beam_id;
         uint32_t end_y = start_y + 1;
         desc_Bij.init(args.B_ptr, {end_x, end_y, args.uPT}, {start_x, start_y});
       }
@@ -313,22 +320,16 @@ class ifmha_forward_t {
   using matSij_t = subgroup::tile_t<accum_t, matSij_tile_desc_t>;
 
   /// @brief gemm_Sij is used to compute Sij = Qi x Kj.T
-  inline void gemm_Sij(matSij_t& matSij) {
-    using matQi_tile_desc_t =
-        subgroup::tile_desc_t<accum_step, 1, accum_step, 1>;
-    using matQi_t = subgroup::tile_t<accum_t, matQi_tile_desc_t>;
-    using matQi_payload_t = subgroup::mem_payload_t<
-        accum_t,
-        matQi_tile_desc_t,
-        msg_type::block_1d,
-        mem_desc_Qi_L_t::layout,
-        mem_desc_Qi_L_t::space>;
+  inline void gemm_Sij(matQi_t& matQi, matSij_t& matSij) {
     using matKj_tile_desc_t =
         subgroup::tile_desc_t<accum_step, 1, accum_step, 1>;
     using matKj_t = subgroup::tile_t<accum_t, matKj_tile_desc_t>;
 
+    using matKj_acc_tile_desc_t =
+        subgroup::tile_desc_t<accum_step, reduce_step, accum_step, reduce_step>;
+    using matKj_acc_t = subgroup::tile_t<accum_t, matKj_acc_tile_desc_t>;
+
     // Gemm to comput Sij
-    matQi_t matQi;
     matKj_t matKj;
 
     int prefetch_id = 0;
@@ -338,26 +339,28 @@ class ifmha_forward_t {
       iprefetch_tile<matKj_t, imem_desc_Kj_t>(ctx.idesc_Kj, prefetch_id);
     SW_BARRIER();
 
+    matKj_acc_t matKj_acc;
 #pragma unroll
-    for (int j = 0; j < kSgBc; j++) {
-      matQi_payload_t matQi_payload(ctx.desc_Qi_L);
-
-      for (int i = 0; i < ctx.loop_count; i++) {
-        // load Qi from local memory
-        subgroup::tile_load(matQi, matQi_payload);
-        matQi_payload.template update_tdesc<tdesc_update_dir::x_dir>(
-            accum_step);
+    for (int j = 0; j < kSgBc / reduce_step; j++) {
+#pragma unroll
+      for (int i = 0; i < loop_count; i++) {
+        // load Qi from register
+        xetla_vector<accum_t, accum_step> matQi_i =
+            matQi.reg.xetla_select<accum_step, 1>(i * accum_step);
 
         // indexed load Kj
-        ctx.idesc_Kj.set_offset(i * accum_step);
-        iload_tile(matKj, ctx.idesc_Kj, j);
-
-        matSij.reg.xetla_select<1, 1>(j) +=
-            xetla_reduce<accum_t, accum_t, accum_step, reduce_op::sum>(
-                matQi.reg * matKj.reg);
+        for (int i_step = 0; i_step < reduce_step; ++i_step) {
+          ctx.idesc_Kj.set_offset(i * accum_step);
+          iload_tile(matKj, ctx.idesc_Kj, j * reduce_step + i_step);
+          matKj_acc.reg.xetla_select<accum_step, 1>(i_step * accum_step) =
+              matKj.reg;
+          iprefetch_tile<matKj_t, imem_desc_Kj_t>(ctx.idesc_Kj, prefetch_id++);
+        }
+        matKj_acc.reg =
+            matKj_acc.reg * (matQi_i.template replicate<reduce_step>());
+        matSij.reg.xetla_select<reduce_step, 1>(j * reduce_step) +=
+            tile_reduce<reduce_op::sum, matKj_acc_t, accum_t, 1>(matKj_acc);
       }
-      ctx.idesc_Kj.set_offset(0);
-      iprefetch_tile<matKj_t, imem_desc_Kj_t>(ctx.idesc_Kj, prefetch_id++);
     }
   }
 
@@ -374,6 +377,10 @@ class ifmha_forward_t {
         subgroup::tile_desc_t<accum_step, 1, accum_step, 1>;
     using matVj_t = subgroup::tile_t<accum_t, matVj_tile_desc_t>;
 
+    using matVj_acc_tile_desc_t =
+        subgroup::tile_desc_t<accum_step, reduce_step, accum_step, reduce_step>;
+    using matVj_acc_t = subgroup::tile_t<accum_t, matVj_acc_tile_desc_t>;
+
     using matOt0_tile_desc_t =
         subgroup::tile_desc_t<accum_step, 1, accum_step, 1>;
     using matOt0_t = subgroup::tile_t<accum_t, matOt0_tile_desc_t>;
@@ -389,14 +396,16 @@ class ifmha_forward_t {
     int prefetch_id = 0;
     ctx.idesc_Vj.set_offset(0);
 #pragma unroll
-    for (; prefetch_id < prefetch_distance; ++prefetch_id)
-      iprefetch_tile<matVj_t, imem_desc_Vj_t>(ctx.idesc_Vj, prefetch_id);
+    for (; prefetch_id < prefetch_distance;)
+      iprefetch_tile<matVj_t, imem_desc_Vj_t>(ctx.idesc_Vj, prefetch_id++);
     SW_BARRIER();
 
+    matVj_acc_t matVj_acc;
 #pragma unroll
-    for (int j = 0; j < kSgBc; ++j) {
+    for (int j = 0; j < kSgBc / reduce_step; ++j) {
       mem_desc_Ot_L_t desc_Ot0_L(ctx.desc_Ot0_L);
-      for (int i = 0; i < ctx.loop_count; ++i) {
+#pragma unroll
+      for (int i = 0; i < loop_count; ++i) {
         matOt0_payload_t matOt0_payload(desc_Ot0_L);
         if (j == 0)
           matOt0.init(0);
@@ -404,16 +413,21 @@ class ifmha_forward_t {
           subgroup::tile_load(matOt0, matOt0_payload);
 
         // indexed load Vj
-        ctx.idesc_Vj.set_offset(i * accum_step);
-        iload_tile(matVj, ctx.idesc_Vj, j);
-
-        accum_t acc = matPij.reg[j];
-        matOt0.reg += matVj.reg * acc;
+        auto matP = matPij.reg.xetla_select<reduce_step, 1>(j * reduce_step);
+#pragma unroll
+        for (int i_step = 0; i_step < reduce_step; ++i_step) {
+          ctx.idesc_Vj.set_offset(i * accum_step);
+          iload_tile(matVj, ctx.idesc_Vj, j * reduce_step + i_step);
+          accum_t acc = matP[i_step];
+          matVj_acc.reg.xetla_select<accum_step, 1>(i_step * accum_step) =
+              matVj.reg * acc;
+          iprefetch_tile<matVj_t, imem_desc_Vj_t>(ctx.idesc_Vj, prefetch_id++);
+        }
+        tile_row_reduce<matOt0_t, matVj_acc_t, true, float, 1>(
+            matOt0, matVj_acc);
         subgroup::tile_store(matOt0, matOt0_payload);
         desc_Ot0_L.update_coord_x(accum_step);
       }
-      ctx.idesc_Vj.set_offset(0);
-      iprefetch_tile<matVj_t, imem_desc_Vj_t>(ctx.idesc_Vj, prefetch_id++);
     }
 
     xetla_fence<memory_kind::shared_local>();
@@ -476,9 +490,10 @@ class ifmha_forward_t {
   inline void softmax_fwd(matSij_t& matSij, matOi_t& matOi) {
     using wg_max_t = group_1d_reduce_t<matSij_t, wg_size, reduce_op::max>;
     using wg_sum_t = group_1d_reduce_t<matSij_t, wg_size, reduce_op::sum>;
-
+    uint32_t softmax_slm_start =
+        softmax_slm + ctx.beam_id * wg_size * sizeof(accum_t);
     // compute new m
-    wg_max_t wg_max(ctx.sg_id, 0, softmax_slm);
+    wg_max_t wg_max(ctx.sg_id, ctx.beam_id, softmax_slm_start);
     accum_t m_new = wg_max(matSij);
     if constexpr (wg_size > 1)
       ctx.nbarrier.arrive();
@@ -492,7 +507,7 @@ class ifmha_forward_t {
     // compute new l
     if constexpr (wg_size > 1)
       ctx.nbarrier.wait();
-    wg_sum_t wg_sum(ctx.sg_id, 0, softmax_slm);
+    wg_sum_t wg_sum(ctx.sg_id, ctx.beam_id, softmax_slm_start);
     accum_t l_new = wg_sum(matSij);
     l_new += ctx.softmax_l;
 
@@ -531,42 +546,22 @@ class ifmha_forward_t {
   // ====================== // preload_Qi // ====================== //
 
   /// @brief preload_Qi is used to load Qi from global to local memory.
-  inline void preload_Qi() {
-    using matQi_scalar_t = subgroup::tile_t<scalar_t, matOi_tile_desc_t>;
+  inline void preload_Qi(matQi_t& matQi) {
+    using matQi_scalar_t = subgroup::tile_t<scalar_t, matQi_tile_desc_t>;
     using matQi_load_t = subgroup::mem_payload_t<
         scalar_t,
-        matOi_tile_desc_t,
-        msg_type::block_2d,
+        matQi_tile_desc_t,
+        msg_type::block_1d,
         mem_desc_Qi_t::layout,
         mem_desc_Qi_t::space>;
 
-    using matQi_t = subgroup::tile_t<accum_t, matOi_tile_desc_t>;
-    using matQi_store_t = subgroup::mem_payload_t<
-        accum_t,
-        matOi_tile_desc_t,
-        msg_type::block_1d,
-        mem_desc_Qi_L_t::layout,
-        mem_desc_Qi_L_t::space>;
     // load Qi from global memory
     matQi_scalar_t matQi_scalar;
     matQi_load_t matQi_load(ctx.desc_Qi);
     subgroup::tile_load(matQi_scalar, matQi_load);
 
     // convert type
-    matQi_t matQi;
     subgroup::elemwise_cvt(matQi, matQi_scalar);
-
-    // store Qi in local memory
-    mem_desc_Qi_L_t desc_Qi_L(ctx.desc_Qi_L);
-    int32_t tile_offset_x = ctx.sg_id * kSgHm;
-    desc_Qi_L.update_coord_x(tile_offset_x);
-
-    matQi_store_t matQi_store(desc_Qi_L);
-    subgroup::tile_store(matQi, matQi_store);
-
-    xetla_fence<memory_kind::shared_local>();
-    if constexpr (wg_size > 1)
-      ctx.nbarrier.arrive_wait();
   }
 
  public:
@@ -590,11 +585,14 @@ class ifmha_forward_t {
 
   /// @brief Helper function to get the nd_range under the ifmha policy.
   /// @return Expected nd_range.
-  static sycl::nd_range<2> get_nd_range(uint32_t total_batches) {
+  static sycl::nd_range<2> get_nd_range(
+      uint32_t num_batches,
+      uint32_t beam,
+      uint32_t num_heads) {
     // local range
-    sycl::range<2> local_range = sycl::range<2>{1, wg_size};
+    sycl::range<2> local_range = sycl::range<2>{beam, wg_size};
     // group range
-    sycl::range<2> group_range = sycl::range<2>{total_batches, 1};
+    sycl::range<2> group_range = sycl::range<2>{num_batches, num_heads};
     return sycl::nd_range<2>{group_range * local_range, local_range};
   };
 
@@ -609,7 +607,8 @@ class ifmha_forward_t {
     // initialize context for ifmha loops
     ctx.init_context(ei, args);
     // preload Qi to local memory
-    preload_Qi();
+    matQi_t matQi;
+    preload_Qi(matQi);
     // initialize matOi for accumulate the output
     matOi_t matOi(0);
 
@@ -619,7 +618,7 @@ class ifmha_forward_t {
       ctx.update_context(ei, args, start_T);
       // compute Sij
       matSij_t matSij(0);
-      gemm_Sij(matSij);
+      gemm_Sij(matQi, matSij);
       // softmax
       pre_softmax(matSij, args, start_T);
       softmax_fwd(matSij, matOi);
