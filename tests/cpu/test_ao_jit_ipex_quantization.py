@@ -888,11 +888,11 @@ class TestDictInput(JitLlgaTestCase):
                 [
                     "aten::dequantize",
                     "aten::linear",
-                    "aten::add",
                 ],
                 [
                     "aten::dequantize",
                     "aten::linear",
+                    "aten::add",
                     "aten::add",
                 ],
             ]
@@ -916,11 +916,11 @@ class TestDictInput(JitLlgaTestCase):
                 [
                     "aten::dequantize",
                     "aten::linear",
-                    "aten::add",
                 ],
                 [
                     "aten::dequantize",
                     "aten::linear",
+                    "aten::add",
                     "aten::add",
                 ],
             ]

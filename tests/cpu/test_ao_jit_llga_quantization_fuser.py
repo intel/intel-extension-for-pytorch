@@ -1318,6 +1318,42 @@ class TestFusionPattern(JitLlgaTestCase):
             )
             self.checkPatterns(graph, patterns)
 
+    def test_linear_with_multiple_add(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear1 = nn.Linear(15, 20)
+                self.linear2 = nn.Linear(15, 20)
+
+            def forward(self, x1, y1, x2, y2):
+                x1 = self.linear1(x1)
+                x1 += y1.clone()
+                x2 = self.linear2(x2)
+                x2 += y2.clone()
+                return x1 + x2
+
+        x1 = torch.randn(2, 15)
+        y1 = torch.randn(2, 20)
+        x2 = torch.randn(2, 15)
+        y2 = torch.randn(2, 20)
+
+        m = M()
+        patterns = [
+            ["aten::dequantize", "aten::linear", "aten::add"],
+            ["aten::dequantize", "aten::linear", "aten::add", "aten::add"],
+        ]
+        for qconfig in static_qconfig[:2]:
+            graph = self.checkQuantizeTrace(
+                m, [x1, y1, x2, y2], atol=2e-1, qconfig=qconfig
+            )
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+            # There shouldn't have single add node which doesn't fused into subgraph.
+            self.assertFused(
+                graph,
+                ["aten::linear", "aten::add"],
+            )
+            self.checkPatterns(graph, patterns)
+
     def test_linear_dropout_sum_bf16(self):
         class M(nn.Module):
             def __init__(self):
@@ -1340,8 +1376,6 @@ class TestFusionPattern(JitLlgaTestCase):
                 "aten::dequantize",
                 "aten::to",
                 "aten::linear",
-                "aten::to",
-                "aten::quantize_per_tensor",
             ],
             ["aten::dequantize", "aten::to", "aten::linear", "aten::add"],
         ]
