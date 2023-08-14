@@ -29,6 +29,7 @@ IPEX_FUSED_OPTIMIZER_LIST_XPU = [
     torch.optim.AdamW,
     torch.optim.Adam,
     Lamb,
+    torch.optim.Adagrad
 ]
 
 OPTIMIZER_FUSED_STEP_MAPPING_CPU = {
@@ -41,8 +42,9 @@ OPTIMIZER_FUSED_STEP_MAPPING_CPU = {
 OPTIMIZER_FUSED_STEP_MAPPING_XPU = {
     torch.optim.SGD: sgd_step,
     torch.optim.AdamW: adamw_step,
-    torch.optim.Adam: adam_step,
+    torch.optim.Adagrad: adagrad_step,
     Lamb: lamb_step,
+    torch.optim.Adam: adam_step,
     Lars: lars_step,
 }
 

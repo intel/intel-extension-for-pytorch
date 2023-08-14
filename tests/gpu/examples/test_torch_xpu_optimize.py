@@ -20,7 +20,7 @@ TEST_MODULE_CONVERT_LIST = [
     torch.nn.LSTM,
 ]
 
-SUPPORTED_FUSION_OPTIMIZER = ['Adam', 'SGD', 'AdamW', 'Lars', 'Lamb', 'splitSGD']
+SUPPORTED_FUSION_OPTIMIZER = ['Adam', 'SGD', 'AdamW', 'Lars', 'Lamb', 'splitSGD', 'Adagrad']
 
 class InferenceModel(nn.Module):
     def __init__(self):
@@ -237,6 +237,21 @@ class TestTorchMethod(TestCase):
                     optimizer_xpu_no_fuse = torch.optim.SGD(model_xpu_no_fuse.parameters(), lr=lr, momentum=momentum_value)
                     optimizer_xpu = torch.optim.SGD(model_xpu.parameters(), lr=lr, momentum=momentum_value)
                     model_optimizer_list.append([model_xpu_no_fuse, model_xpu, optimizer_xpu_no_fuse, optimizer_xpu])
+            elif optimizer_string.lower() == 'adagrad':
+                lr = 5.0
+                lr_decay = 0.01
+                weight_decay = 0.05
+                model_xpu_no_fuse, model_xpu = create_model()
+                optimizer_xpu_no_fuse = torch.optim.Adagrad(model_xpu_no_fuse.parameters(),
+                                                            lr=lr,
+                                                            eps=0,
+                                                            weight_decay=weight_decay,
+                                                            lr_decay=lr_decay)
+                optimizer_xpu = torch.optim.Adagrad(model_xpu.parameters(),
+                                                    lr=lr,
+                                                    eps=0,
+                                                    weight_decay=weight_decay,
+                                                    lr_decay=lr_decay)
             elif optimizer_string.lower() == 'adam':
                 beta1 = 0.9
                 beta2 = 0.999
@@ -367,7 +382,7 @@ class TestTorchMethod(TestCase):
 
             torch.xpu.synchronize()
 
-        def training(input, target, mode, dtype, optimizer):
+        def training_without_step(input, target, mode, dtype, optimizer):
             input_xpu = torch.empty_like(input)
             input_xpu.data = input.data
             input_xpu = input_xpu.requires_grad_(True)
@@ -387,7 +402,6 @@ class TestTorchMethod(TestCase):
             loss_xpu.backward()
 
             # fusion optimizer and no-fused optimizer update
-            optimizer.step()
             torch.xpu.synchronize()
 
         for optimizer_string in SUPPORTED_FUSION_OPTIMIZER:
@@ -418,10 +432,11 @@ class TestTorchMethod(TestCase):
                         input = torch.randn(batch_size, input_channel, 7, 7).to(device=device)
                         target = torch.empty(batch_size, dtype=torch.long).random_(class_num).to(device=device)
 
+                        training_without_step(input, target, model_xpu_no_fuse, dtype, optimizer_xpu_no_fuse)
+                        training_without_step(input, target, model_xpu, dtype, optimizer_xpu)
                         align_all(model_xpu, model_xpu_no_fuse)
-
-                        training(input, target, model_xpu_no_fuse, dtype, optimizer_xpu_no_fuse)
-                        training(input, target, model_xpu, dtype, optimizer_xpu)
+                        optimizer_xpu_no_fuse.step()
+                        optimizer_xpu.step()
 
                         # checking updated weight
                         for layer1 in model_xpu.modules():

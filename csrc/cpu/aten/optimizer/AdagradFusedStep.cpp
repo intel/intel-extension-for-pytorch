@@ -2,6 +2,7 @@
 
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
+#include "csrc/utils/CustomOperatorRegistration.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -76,13 +77,10 @@ std::tuple<at::Tensor, at::Tensor> adagrad_fused_step(
 } // namespace torch_ipex
 
 namespace {
-
-TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def(
-      "adagrad_fused_step(Tensor(a!) param, Tensor grad, Tensor(b!) "
-      "state_sum, Tensor trail, float step, float lr, float weight_decay, "
-      "float lr_decay, float eps) -> (Tensor(a!), Tensor(b!))",
-      torch_ipex::cpu::adagrad_fused_step);
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
+      "adagrad_fused_step",
+      torch_ipex::cpu::adagrad_fused_step,
+      at::DispatchKey::CPU);
 }
-
 } // namespace
