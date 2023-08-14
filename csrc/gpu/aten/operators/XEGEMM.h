@@ -278,4 +278,19 @@ inline Tensor matmul_resize(const Tensor& a, const Tensor& output) {
   return output.view_symint(sizes);
 }
 
+inline std::vector<std::tuple<int, int>> hgemm_split_m(const int m, const int n) {
+  std::vector<std::tuple<int, int>> res;
+  constexpr int slice_n = 4096;
+  if (m > 4096 && n >= 4096) {
+  for (int start_idx = 0; start_idx < m; start_idx += slice_n) {
+        int remaining = m - start_idx;
+        int len = slice_n < remaining ? slice_n : remaining;
+        res.push_back(std::make_tuple(start_idx, len));
+      }
+  } else {
+    res.push_back(std::make_tuple(0, m));
+  }
+  return res;
+}
+
 #undef RECORD_FUNCTION_IMPL
