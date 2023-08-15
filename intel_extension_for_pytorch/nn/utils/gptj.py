@@ -206,22 +206,22 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
                 self.ipex_optimized_module.attn.q_qwei = self.module.attn.q_proj.qweight
                 self.ipex_optimized_module.attn.q_scl = self.module.attn.q_proj.scales
                 self.ipex_optimized_module.attn.q_zp = self.module.attn.q_proj.qzeros
-                self.ipex_optimized_module.attn.q_gs = self.module.attn.q_proj.group_size
+                self.ipex_optimized_module.attn.q_gs = self.module.attn.q_proj.group_size.data.item()
                 self.ipex_optimized_module.attn.q_proj.bias = self.module.attn.q_proj.bias
                 self.ipex_optimized_module.attn.k_qwei = self.module.attn.k_proj.qweight
                 self.ipex_optimized_module.attn.k_scl = self.module.attn.k_proj.scales
                 self.ipex_optimized_module.attn.k_zp = self.module.attn.k_proj.qzeros
-                self.ipex_optimized_module.attn.k_gs = self.module.attn.k_proj.group_size
+                self.ipex_optimized_module.attn.k_gs = self.module.attn.k_proj.group_size.data.item()
                 self.ipex_optimized_module.attn.k_proj.bias = self.module.attn.k_proj.bias
                 self.ipex_optimized_module.attn.v_qwei = self.module.attn.v_proj.qweight
                 self.ipex_optimized_module.attn.v_scl = self.module.attn.v_proj.scales
                 self.ipex_optimized_module.attn.v_zp = self.module.attn.v_proj.qzeros
-                self.ipex_optimized_module.attn.v_gs = self.module.attn.v_proj.group_size
+                self.ipex_optimized_module.attn.v_gs = self.module.attn.v_proj.group_size.data.item()
                 self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
                 self.ipex_optimized_module.attn.out_qwei = self.module.attn.out_proj.qweight
                 self.ipex_optimized_module.attn.out_scl = self.module.attn.out_proj.scales
                 self.ipex_optimized_module.attn.out_zp = self.module.attn.out_proj.qzeros
-                self.ipex_optimized_module.attn.out_gs = self.module.attn.out_proj.group_size
+                self.ipex_optimized_module.attn.out_gs = self.module.attn.out_proj.group_size.data.item()
                 self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
 
                 shape = [3, -1, self.module.attn.q_proj.qweight.shape[-1]]
@@ -244,22 +244,22 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
                 self.ipex_optimized_module.attn.k_proj.qweight = self.module.attn.k_proj.qweight
                 self.ipex_optimized_module.attn.k_proj.scales = self.module.attn.k_proj.scales
                 self.ipex_optimized_module.attn.k_proj.qzeros = self.module.attn.k_proj.qzeros
-                self.ipex_optimized_module.attn.k_proj.group_size = self.module.attn.k_proj.group_size
+                self.ipex_optimized_module.attn.k_proj.group_size = self.module.attn.k_proj.group_size.data.item()
                 self.ipex_optimized_module.attn.k_proj.bias = self.module.attn.k_proj.bias
                 self.ipex_optimized_module.attn.q_proj.qweight = self.module.attn.q_proj.qweight
                 self.ipex_optimized_module.attn.q_proj.scales = self.module.attn.q_proj.scales
                 self.ipex_optimized_module.attn.q_proj.qzeros = self.module.attn.q_proj.qzeros
-                self.ipex_optimized_module.attn.q_proj.group_size = self.module.attn.q_proj.group_size
+                self.ipex_optimized_module.attn.q_proj.group_size = self.module.attn.q_proj.group_size.data.item()
                 self.ipex_optimized_module.attn.q_proj.bias = self.module.attn.q_proj.bias
                 self.ipex_optimized_module.attn.v_proj.qweight = self.module.attn.v_proj.qweight
                 self.ipex_optimized_module.attn.v_proj.scales = self.module.attn.v_proj.scales
                 self.ipex_optimized_module.attn.v_proj.qzeros = self.module.attn.v_proj.qzeros
-                self.ipex_optimized_module.attn.v_proj.group_size = self.module.attn.v_proj.group_size
+                self.ipex_optimized_module.attn.v_proj.group_size = self.module.attn.v_proj.group_size.data.item()
                 self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
                 self.ipex_optimized_module.attn.out_proj.qweight = self.module.attn.out_proj.qweight
                 self.ipex_optimized_module.attn.out_proj.scales = self.module.attn.out_proj.scales
                 self.ipex_optimized_module.attn.out_proj.qzeros = self.module.attn.out_proj.qzeros
-                self.ipex_optimized_module.attn.out_proj.group_size = self.module.attn.out_proj.group_size
+                self.ipex_optimized_module.attn.out_proj.group_size = self.module.attn.out_proj.group_size.data.item()
                 self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
 
     def port_mlp_parameters(self):
@@ -281,23 +281,23 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
                 self.ipex_optimized_module.mlp.fc_in_qwei = self.module.mlp.fc_in.qweight
                 self.ipex_optimized_module.mlp.fc_in_scl = self.module.mlp.fc_in.scales
                 self.ipex_optimized_module.mlp.fc_in_zp = self.module.mlp.fc_in.qzeros
-                self.ipex_optimized_module.mlp.fc_in_gs = self.module.mlp.fc_in.group_size
+                self.ipex_optimized_module.mlp.fc_in_gs = self.module.mlp.fc_in.group_size.data.item()
                 self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
                 self.ipex_optimized_module.mlp.fc_out_qwei = self.module.mlp.fc_out.qweight
                 self.ipex_optimized_module.mlp.fc_out_scl = self.module.mlp.fc_out.scales
                 self.ipex_optimized_module.mlp.fc_out_zp = self.module.mlp.fc_out.qzeros
-                self.ipex_optimized_module.mlp.fc_out_gs = self.module.mlp.fc_out.group_size
+                self.ipex_optimized_module.mlp.fc_out_gs = self.module.mlp.fc_out.group_size.data.item()
                 self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
             else:
                 self.ipex_optimized_module.mlp.fc_in.qweight = self.module.mlp.fc_in.qweight
                 self.ipex_optimized_module.mlp.fc_in.scales = self.module.mlp.fc_in.scales
                 self.ipex_optimized_module.mlp.fc_in.qzeros = self.module.mlp.fc_in.qzeros
-                self.ipex_optimized_module.mlp.fc_in.group_size = self.module.mlp.fc_in.group_size
+                self.ipex_optimized_module.mlp.fc_in.group_size = self.module.mlp.fc_in.group_size.data.item()
                 self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
                 self.ipex_optimized_module.mlp.fc_out.qweight = self.module.mlp.fc_out.qweight
                 self.ipex_optimized_module.mlp.fc_out.scales = self.module.mlp.fc_out.scales
                 self.ipex_optimized_module.mlp.fc_out.qzeros = self.module.mlp.fc_out.qzeros
-                self.ipex_optimized_module.mlp.fc_out.group_size = self.module.mlp.fc_out.group_size
+                self.ipex_optimized_module.mlp.fc_out.group_size = self.module.mlp.fc_out.group_size.data.item()
                 self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
 
     def port_layer_norm_parameters(self):

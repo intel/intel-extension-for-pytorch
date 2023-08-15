@@ -24,9 +24,11 @@ using namespace xpu::xetla;
   RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
 
 inline bool is_server_mode() {
-  auto raw =  std::getenv("SCENARIO");
-  if (raw == nullptr) return false;
-  else return std::string(raw) == std::string("Server");
+  auto raw = std::getenv("SCENARIO");
+  if (raw == nullptr)
+    return false;
+  else
+    return std::string(raw) == std::string("Server");
 }
 
 class HGEMM_XETLA final {

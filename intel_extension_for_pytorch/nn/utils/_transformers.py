@@ -38,7 +38,7 @@ class IPEXEmptyINT4Linear(nn.Module):
         self.bias = None
         self.scales = None
         self.qzeros = None
-        self.group_size = None
+        self.group_size = 1
 
     def forward(self, input):
         if input.shape[0] == 1:
@@ -67,7 +67,7 @@ class IPEXEmptyINT4LinearWithPadding(nn.Module):
         self.weight = None
         self.scales = None
         self.qzeros = None
-        self.group_size = None
+        self.group_size = 1
         self.bias = None
         self.n_dim = n_dim
 
@@ -140,11 +140,11 @@ class IPEXTransformerAtten(nn.Module):
             self.out_zp = None
             self.qkv_scl = None
             self.qkv_zp = None
-            self.qkv_gs = None
-            self.q_gs = None
-            self.k_gs = None
-            self.v_gs = None
-            self.out_gs = None
+            self.qkv_gs = 1
+            self.q_gs = 1
+            self.k_gs = 1
+            self.v_gs = 1
+            self.out_gs = 1
 
         col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         self.row_major = not col_major
