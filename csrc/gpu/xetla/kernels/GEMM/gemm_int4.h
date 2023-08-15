@@ -681,212 +681,212 @@ inline void hgemm_bias_res_res_wint4(
   DPCPP_Q_SUBMIT(queue, cgf);
 }
 
-template <
-    typename scalar_t,
-    int WG_M = 8,
-    int WG_N = 32,
-    int SG_M = 8,
-    int SG_N = 16,
-    int SG_K = 64,
-    int DQUANT_S = 1,
-    int SLM_KS = 8,
-    int L3_KS = 1,
-    int SYNC_FREQ = 1,
-    int STAGES = 3>
-inline void hgemm_qkv_wint4(
-    sycl::queue& queue,
-    scalar_t* out0,
-    scalar_t* out1,
-    scalar_t* out2,
-    const scalar_t* a,
-    const uint8_t* b,
-    const uint8_t* b_zp,
-    const scalar_t* b_scale,
-    const uint32_t m,
-    const uint32_t n,
-    const uint32_t k) {
-  static_assert(L3_KS == 1, "for qkv fusion, L3_KS should be 1");
-  uint32_t group_range_m = (m + WG_M - 1) / WG_M;
-  uint32_t group_range_n = (n + WG_N - 1) / WG_N;
-  uint32_t thread_range_m = WG_M / SG_M;
-  uint32_t thread_range_n = WG_N / SG_N;
-  uint32_t lda = k;
-  uint32_t ldb = n / 2;
-  uint32_t ldc = n;
-  cl::sycl::range<3> GroupRange{3, group_range_m, group_range_n};
-  cl::sycl::range<3> LocalRange{SLM_KS, thread_range_m, thread_range_n};
-  cl::sycl::nd_range<3> NDRange(GroupRange * LocalRange, LocalRange);
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(NDRange, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-      xetla_exec_item<3> ei(item);
-      using data_type_a = scalar_t;
-      using data_type_b = bit4x2;
-      using data_type_c = scalar_t;
-      using data_type_zp = bit4x2;
-      using data_type_scale = scalar_t;
-      using data_type_acc = float;
-      using post_op = subgroup::chained_tile_op_t<>;
-      using hgemm_wint4_functor = hgemm_wint4_func<
-          data_type_a,
-          data_type_b,
-          data_type_c,
-          data_type_zp,
-          data_type_scale,
-          data_type_acc,
-          WG_M,
-          WG_N,
-          SG_M,
-          SG_N,
-          SG_K,
-          L3_KS,
-          SLM_KS,
-          DQUANT_S,
-          post_op>;
-      constexpr uint32_t barrier_count = hgemm_wint4_functor::barrier_count;
-      constexpr uint32_t slm_size = hgemm_wint4_functor::slm_size;
-
-      xetla_nbarrier_init<barrier_count>();
-      xetla_local_init<slm_size>();
-
-      uint32_t batch_id = ei.get_group(0);
-      scalar_t* c = (batch_id == 0) ? out0 : ((batch_id == 1) ? out1 : out2);
-      uint32_t weight_offset = batch_id * k * n / 2;
-
-      uint32_t group_num = 1;
-      if constexpr (DQUANT_S != 0) {
-        group_num = k / DQUANT_S;
-      }
-      uint32_t zp_offset = batch_id * group_num * n / 2;
-      uint32_t scale_offset = batch_id * group_num * n;
-
-      const data_type_b* b_alias = reinterpret_cast<const bit4x2*>(b);
-      const data_type_b* b_zp_alias = reinterpret_cast<const bit4x2*>(b_zp);
-
-      hgemm_wint4_functor::run(
-          ei,
-          const_cast<scalar_t*>(a),
-          const_cast<bit4x2*>(b_alias + weight_offset),
-          c,
-          m,
-          n,
-          k,
-          lda,
-          ldb,
-          ldc,
-          const_cast<bit4x2*>(b_zp_alias + zp_offset),
-          const_cast<scalar_t*>(b_scale + scale_offset),
-          group_num);
-    });
-  };
-  DPCPP_Q_SUBMIT(queue, cgf);
-}
-
-template <
-    typename scalar_t,
-    int WG_M = 8,
-    int WG_N = 32,
-    int SG_M = 8,
-    int SG_N = 16,
-    int SG_K = 64,
-    int DQUANT_S = 1,
-    int SLM_KS = 8,
-    int L3_KS = 1,
-    int SYNC_FREQ = 1,
-    int STAGES = 3>
-inline void hgemm_qkv_bias_wint4(
-    sycl::queue& queue,
-    scalar_t* out0,
-    scalar_t* out1,
-    scalar_t* out2,
-    const scalar_t* a,
-    const uint8_t* b,
-    const uint8_t* b_zp,
-    const scalar_t* b_scale,
-    const scalar_t* bias,
-    const uint32_t m,
-    const uint32_t n,
-    const uint32_t k) {
-  static_assert(L3_KS == 1, "for qkv fusion, L3_KS should be 1");
-  uint32_t group_range_m = (m + WG_M - 1) / WG_M;
-  uint32_t group_range_n = (n + WG_N - 1) / WG_N;
-  uint32_t thread_range_m = WG_M / SG_M;
-  uint32_t thread_range_n = WG_N / SG_N;
-  uint32_t lda = k;
-  uint32_t ldb = n / 2;
-  uint32_t ldc = n;
-  cl::sycl::range<3> GroupRange{3, group_range_m, group_range_n};
-  cl::sycl::range<3> LocalRange{SLM_KS, thread_range_m, thread_range_n};
-  cl::sycl::nd_range<3> NDRange(GroupRange * LocalRange, LocalRange);
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(NDRange, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-      xetla_exec_item<3> ei(item);
-      using data_type_a = scalar_t;
-      using data_type_b = bit4x2;
-      using data_type_c = scalar_t;
-      using data_type_zp = bit4x2;
-      using data_type_scale = scalar_t;
-      using data_type_acc = float;
-      using data_type_bias = scalar_t;
-      using post_op = subgroup::chained_tile_op_t<
-          subgroup::bias_add_op_t<data_type_bias, gpu_arch::Xe>>;
-      using hgemm_wint4_functor = hgemm_wint4_func<
-          data_type_a,
-          data_type_b,
-          data_type_c,
-          data_type_zp,
-          data_type_scale,
-          data_type_acc,
-          WG_M,
-          WG_N,
-          SG_M,
-          SG_N,
-          SG_K,
-          L3_KS,
-          SLM_KS,
-          DQUANT_S,
-          post_op>;
-      constexpr uint32_t barrier_count = hgemm_wint4_functor::barrier_count;
-      constexpr uint32_t slm_size = hgemm_wint4_functor::slm_size;
-
-      xetla_nbarrier_init<barrier_count>();
-      xetla_local_init<slm_size>();
-
-      uint32_t batch_id = ei.get_group(0);
-      scalar_t* c = (batch_id == 0) ? out0 : ((batch_id == 1) ? out1 : out2);
-      uint32_t bias_offset = batch_id * n;
-      uint32_t weight_offset = batch_id * k * n / 2;
-
-      uint32_t group_num = 1;
-      if constexpr (DQUANT_S != 0) {
-        group_num = k / DQUANT_S;
-      }
-      uint32_t zp_offset = batch_id * group_num * n / 2;
-      uint32_t scale_offset = batch_id * group_num * n;
-
-      const data_type_b* b_alias = reinterpret_cast<const bit4x2*>(b);
-      const data_type_b* b_zp_alias = reinterpret_cast<const bit4x2*>(b_zp);
-
-      hgemm_wint4_functor::run(
-          ei,
-          const_cast<scalar_t*>(a),
-          const_cast<bit4x2*>(b_alias + weight_offset),
-          c,
-          m,
-          n,
-          k,
-          lda,
-          ldb,
-          ldc,
-          const_cast<bit4x2*>(b_zp_alias + zp_offset),
-          const_cast<scalar_t*>(b_scale + scale_offset),
-          group_num,
-          {{{const_cast<scalar_t*>(bias + bias_offset), {n, 1, n}}}});
-    });
-  };
-  DPCPP_Q_SUBMIT(queue, cgf);
-}
+//template <
+//    typename scalar_t,
+//    int WG_M = 8,
+//    int WG_N = 32,
+//    int SG_M = 8,
+//    int SG_N = 16,
+//    int SG_K = 64,
+//    int DQUANT_S = 1,
+//    int SLM_KS = 8,
+//    int L3_KS = 1,
+//    int SYNC_FREQ = 1,
+//    int STAGES = 3>
+//inline void hgemm_qkv_wint4(
+//    sycl::queue& queue,
+//    scalar_t* out0,
+//    scalar_t* out1,
+//    scalar_t* out2,
+//    const scalar_t* a,
+//    const uint8_t* b,
+//    const uint8_t* b_zp,
+//    const scalar_t* b_scale,
+//    const uint32_t m,
+//    const uint32_t n,
+//    const uint32_t k) {
+//  static_assert(L3_KS == 1, "for qkv fusion, L3_KS should be 1");
+//  uint32_t group_range_m = (m + WG_M - 1) / WG_M;
+//  uint32_t group_range_n = (n + WG_N - 1) / WG_N;
+//  uint32_t thread_range_m = WG_M / SG_M;
+//  uint32_t thread_range_n = WG_N / SG_N;
+//  uint32_t lda = k;
+//  uint32_t ldb = n / 2;
+//  uint32_t ldc = n;
+//  cl::sycl::range<3> GroupRange{3, group_range_m, group_range_n};
+//  cl::sycl::range<3> LocalRange{SLM_KS, thread_range_m, thread_range_n};
+//  cl::sycl::nd_range<3> NDRange(GroupRange * LocalRange, LocalRange);
+//
+//  auto cgf = DPCPP_Q_CGF(cgh) {
+//    cgh.parallel_for(NDRange, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
+//      xetla_exec_item<3> ei(item);
+//      using data_type_a = scalar_t;
+//      using data_type_b = bit4x2;
+//      using data_type_c = scalar_t;
+//      using data_type_zp = bit4x2;
+//      using data_type_scale = scalar_t;
+//      using data_type_acc = float;
+//      using post_op = subgroup::chained_tile_op_t<>;
+//      using hgemm_wint4_functor = hgemm_wint4_func<
+//          data_type_a,
+//          data_type_b,
+//          data_type_c,
+//          data_type_zp,
+//          data_type_scale,
+//          data_type_acc,
+//          WG_M,
+//          WG_N,
+//          SG_M,
+//          SG_N,
+//          SG_K,
+//          L3_KS,
+//          SLM_KS,
+//          DQUANT_S,
+//          post_op>;
+//      constexpr uint32_t barrier_count = hgemm_wint4_functor::barrier_count;
+//      constexpr uint32_t slm_size = hgemm_wint4_functor::slm_size;
+//
+//      xetla_nbarrier_init<barrier_count>();
+//      xetla_local_init<slm_size>();
+//
+//      uint32_t batch_id = ei.get_group(0);
+//      scalar_t* c = (batch_id == 0) ? out0 : ((batch_id == 1) ? out1 : out2);
+//      uint32_t weight_offset = batch_id * k * n / 2;
+//
+//      uint32_t group_num = 1;
+//      if constexpr (DQUANT_S != 0) {
+//        group_num = k / DQUANT_S;
+//      }
+//      uint32_t zp_offset = batch_id * group_num * n / 2;
+//      uint32_t scale_offset = batch_id * group_num * n;
+//
+//      const data_type_b* b_alias = reinterpret_cast<const bit4x2*>(b);
+//      const data_type_b* b_zp_alias = reinterpret_cast<const bit4x2*>(b_zp);
+//
+//      hgemm_wint4_functor::run(
+//          ei,
+//          const_cast<scalar_t*>(a),
+//          const_cast<bit4x2*>(b_alias + weight_offset),
+//          c,
+//          m,
+//          n,
+//          k,
+//          lda,
+//          ldb,
+//          ldc,
+//          const_cast<bit4x2*>(b_zp_alias + zp_offset),
+//          const_cast<scalar_t*>(b_scale + scale_offset),
+//          group_num);
+//    });
+//  };
+//  DPCPP_Q_SUBMIT(queue, cgf);
+//}
+//
+//template <
+//    typename scalar_t,
+//    int WG_M = 8,
+//    int WG_N = 32,
+//    int SG_M = 8,
+//    int SG_N = 16,
+//    int SG_K = 64,
+//    int DQUANT_S = 1,
+//    int SLM_KS = 8,
+//    int L3_KS = 1,
+//    int SYNC_FREQ = 1,
+//    int STAGES = 3>
+//inline void hgemm_qkv_bias_wint4(
+//    sycl::queue& queue,
+//    scalar_t* out0,
+//    scalar_t* out1,
+//    scalar_t* out2,
+//    const scalar_t* a,
+//    const uint8_t* b,
+//    const uint8_t* b_zp,
+//    const scalar_t* b_scale,
+//    const scalar_t* bias,
+//    const uint32_t m,
+//    const uint32_t n,
+//    const uint32_t k) {
+//  static_assert(L3_KS == 1, "for qkv fusion, L3_KS should be 1");
+//  uint32_t group_range_m = (m + WG_M - 1) / WG_M;
+//  uint32_t group_range_n = (n + WG_N - 1) / WG_N;
+//  uint32_t thread_range_m = WG_M / SG_M;
+//  uint32_t thread_range_n = WG_N / SG_N;
+//  uint32_t lda = k;
+//  uint32_t ldb = n / 2;
+//  uint32_t ldc = n;
+//  cl::sycl::range<3> GroupRange{3, group_range_m, group_range_n};
+//  cl::sycl::range<3> LocalRange{SLM_KS, thread_range_m, thread_range_n};
+//  cl::sycl::nd_range<3> NDRange(GroupRange * LocalRange, LocalRange);
+//
+//  auto cgf = DPCPP_Q_CGF(cgh) {
+//    cgh.parallel_for(NDRange, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
+//      xetla_exec_item<3> ei(item);
+//      using data_type_a = scalar_t;
+//      using data_type_b = bit4x2;
+//      using data_type_c = scalar_t;
+//      using data_type_zp = bit4x2;
+//      using data_type_scale = scalar_t;
+//      using data_type_acc = float;
+//      using data_type_bias = scalar_t;
+//      using post_op = subgroup::chained_tile_op_t<
+//          subgroup::bias_add_op_t<data_type_bias, gpu_arch::Xe>>;
+//      using hgemm_wint4_functor = hgemm_wint4_func<
+//          data_type_a,
+//          data_type_b,
+//          data_type_c,
+//          data_type_zp,
+//          data_type_scale,
+//          data_type_acc,
+//          WG_M,
+//          WG_N,
+//          SG_M,
+//          SG_N,
+//          SG_K,
+//          L3_KS,
+//          SLM_KS,
+//          DQUANT_S,
+//          post_op>;
+//      constexpr uint32_t barrier_count = hgemm_wint4_functor::barrier_count;
+//      constexpr uint32_t slm_size = hgemm_wint4_functor::slm_size;
+//
+//      xetla_nbarrier_init<barrier_count>();
+//      xetla_local_init<slm_size>();
+//
+//      uint32_t batch_id = ei.get_group(0);
+//      scalar_t* c = (batch_id == 0) ? out0 : ((batch_id == 1) ? out1 : out2);
+//      uint32_t bias_offset = batch_id * n;
+//      uint32_t weight_offset = batch_id * k * n / 2;
+//
+//      uint32_t group_num = 1;
+//      if constexpr (DQUANT_S != 0) {
+//        group_num = k / DQUANT_S;
+//      }
+//      uint32_t zp_offset = batch_id * group_num * n / 2;
+//      uint32_t scale_offset = batch_id * group_num * n;
+//
+//      const data_type_b* b_alias = reinterpret_cast<const bit4x2*>(b);
+//      const data_type_b* b_zp_alias = reinterpret_cast<const bit4x2*>(b_zp);
+//
+//      hgemm_wint4_functor::run(
+//          ei,
+//          const_cast<scalar_t*>(a),
+//          const_cast<bit4x2*>(b_alias + weight_offset),
+//          c,
+//          m,
+//          n,
+//          k,
+//          lda,
+//          ldb,
+//          ldc,
+//          const_cast<bit4x2*>(b_zp_alias + zp_offset),
+//          const_cast<scalar_t*>(b_scale + scale_offset),
+//          group_num,
+//          {{{const_cast<scalar_t*>(bias + bias_offset), {n, 1, n}}}});
+//    });
+//  };
+//  DPCPP_Q_SUBMIT(queue, cgf);
+//}
 
 } // namespace xetla
 } // namespace xpu

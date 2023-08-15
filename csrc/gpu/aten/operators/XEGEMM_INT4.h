@@ -197,11 +197,14 @@ using namespace xpu::xetla;
 #define HGEMM_INT4_M_DISPATCH(m)            \
   if (calib_gz_ == k_ || calib_gz_ == -1) { \
     HGEMM_INT4_N_K_DISPATCH(m, 0);          \
-  } else if (calib_gz_ == 128) {            \
-    HGEMM_INT4_N_K_DISPATCH(m, 128);        \
   } else {                                  \
     TORCH_CHECK(false);                     \
   }
+//  } else if (calib_gz_ == 128) {            \
+//    HGEMM_INT4_N_K_DISPATCH(m, 128);        \
+//  } else {                                  \
+//    TORCH_CHECK(false);                     \
+//  }
 
 inline Tensor resize_as_mat1(const Tensor& mat1, const Tensor& output) {
   auto output_ = output.flatten(0, -2);

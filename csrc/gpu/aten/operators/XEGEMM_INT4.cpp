@@ -12,128 +12,128 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-#define GEMM_QKV_WINT4_XETLA_DISPATCH(F)                                   \
-  if (!has_bias) {                                                         \
-    RECORD_FUNCTION(                                                       \
-        "torch_ipex::hgemm_qkv_wint4" #F, c10::ArrayRef<c10::IValue>({})); \
-    hgemm_qkv_wint4##F(                                                    \
-        q,                                                                 \
-        reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),         \
-        weight.data_ptr<uint8_t>(),                                        \
-        weight_zp.data_ptr<uint8_t>(),                                     \
-        reinterpret_cast<sycl::half*>(weight_scl.data_ptr<scalar_t>()),    \
-        m,                                                                 \
-        n,                                                                 \
-        k);                                                                \
-  } else {                                                                 \
-    RECORD_FUNCTION(                                                       \
-        "torch_ipex::hgemm_qkv_bias_wint4" #F,                             \
-        c10::ArrayRef<c10::IValue>({}));                                   \
-    hgemm_qkv_bias_wint4##F(                                               \
-        q,                                                                 \
-        reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),          \
-        reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),         \
-        weight.data_ptr<uint8_t>(),                                        \
-        weight_zp.data_ptr<uint8_t>(),                                     \
-        reinterpret_cast<sycl::half*>(weight_scl.data_ptr<scalar_t>()),    \
-        reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()), \
-        m,                                                                 \
-        n,                                                                 \
-        k);                                                                \
-  }
-
-#define GEMM_QKV_WINT4_8M_16384N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##8x256_8x16x32##_##gz##_2_)
-#define GEMM_QKV_WINT4_8M_4096N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##8x64_8x16x64##_##gz##_8_)
-#define GEMM_QKV_WINT4_8M_4096N_16384K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##8x64_8x16x64##_##gz##_8_)
-#define GEMM_QKV_WINT4_8M_50416N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##8x512_8x16x32##_##gz##_1_)
-
-#define GEMM_QKV_WINT4_16M_16384N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##16x256_16x16x32##_##gz##_2_)
-#define GEMM_QKV_WINT4_16M_4096N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##16x64_16x16x32##_##gz##_8_)
-#define GEMM_QKV_WINT4_16M_4096N_16384K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##16x64_16x16x32##_##gz##_8_)
-#define GEMM_QKV_WINT4_16M_50416N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##16x512_16x16x32##_##gz##_1_)
-
-#define GEMM_QKV_WINT4_32M_16384N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##32x256_32x16x32##_##gz##_2_)
-#define GEMM_QKV_WINT4_32M_4096N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##32x64_32x16x32##_##gz##_8_)
-#define GEMM_QKV_WINT4_32M_4096N_16384K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##32x64_32x16x32##_##gz##_8_)
-#define GEMM_QKV_WINT4_32M_50416N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##32x512_32x16x32##_##gz##_1_)
-
-#define GEMM_QKV_WINT4_64M_16384N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##64x256_64x16x32##_##gz##_2_)
-#define GEMM_QKV_WINT4_64M_4096N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##32x128_32x16x32##_##gz##_4_)
-#define GEMM_QKV_WINT4_64M_4096N_16384K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##32x128_32x16x32##_##gz##_4_)
-#define GEMM_QKV_WINT4_64M_50416N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##64x512_64x16x32##_##gz##_1_)
-
-#define GEMM_QKV_WINT4_384M_16384N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
-#define GEMM_QKV_WINT4_384M_4096N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
-#define GEMM_QKV_WINT4_384M_4096N_16384K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
-#define GEMM_QKV_WINT4_384M_50416N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
-
-#define GEMM_QKV_WINT4_1024M_16384N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##128x256_64x16x32##_##gz##_1_)
-#define GEMM_QKV_WINT4_1024M_4096N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##128x256_64x16x32##_##gz##_1_)
-#define GEMM_QKV_WINT4_1024M_4096N_16384K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##128x256_64x16x32##_##gz##_1_)
-#define GEMM_QKV_WINT4_1024M_50416N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##128x512_64x32x32##_##gz##_1_)
-
-#define GEMM_QKV_WINT4_INFM_16384N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
-#define GEMM_QKV_WINT4_INFM_4096N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
-#define GEMM_QKV_WINT4_INFM_4096N_16384K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
-#define GEMM_QKV_WINT4_INFM_50416N_4096K_IMPL(gz) \
-  GEMM_QKV_WINT4_XETLA_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
-
-#define GEMM_QKV_WINT4_M_N_K_DISPATCH(m, n, k, gz) \
-  GEMM_QKV_WINT4_##m##M_##n##N_##k##K_IMPL(gz)
-
-#define GEMM_QKV_WINT4_N_K_DISPATCH(m, gz)             \
-  if (n == 16384 && k == 4096) {                       \
-    GEMM_QKV_WINT4_M_N_K_DISPATCH(m, 16384, 4096, gz); \
-  } else if (n == 4096 && k == 4096) {                 \
-    GEMM_QKV_WINT4_M_N_K_DISPATCH(m, 4096, 4096, gz);  \
-  } else if (n == 4096 && k == 16384) {                \
-    GEMM_QKV_WINT4_M_N_K_DISPATCH(m, 4096, 16384, gz); \
-  } else if (n == 50416 && k == 4096) {                \
-    GEMM_QKV_WINT4_M_N_K_DISPATCH(m, 50416, 4096, gz); \
-  } else {                                             \
-    TORCH_CHECK(false);                                \
-  }
-
-#define GEMM_QKV_WINT4_M_DISPATCH(m)     \
-  if (calib_gz == k || calib_gz == -1) { \
-    GEMM_QKV_WINT4_N_K_DISPATCH(m, 0);   \
-  } else if (calib_gz == 128) {          \
-    GEMM_QKV_WINT4_N_K_DISPATCH(m, 128); \
-  } else {                               \
-    TORCH_CHECK(false);                  \
-  }
+//#define GEMM_QKV_WINT4_XETLA_DISPATCH(F)                                   \
+//  if (!has_bias) {                                                         \
+//    RECORD_FUNCTION(                                                       \
+//        "torch_ipex::hgemm_qkv_wint4" #F, c10::ArrayRef<c10::IValue>({})); \
+//    hgemm_qkv_wint4##F(                                                    \
+//        q,                                                                 \
+//        reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),          \
+//        reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),          \
+//        reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),          \
+//        reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),         \
+//        weight.data_ptr<uint8_t>(),                                        \
+//        weight_zp.data_ptr<uint8_t>(),                                     \
+//        reinterpret_cast<sycl::half*>(weight_scl.data_ptr<scalar_t>()),    \
+//        m,                                                                 \
+//        n,                                                                 \
+//        k);                                                                \
+//  } else {                                                                 \
+//    RECORD_FUNCTION(                                                       \
+//        "torch_ipex::hgemm_qkv_bias_wint4" #F,                             \
+//        c10::ArrayRef<c10::IValue>({}));                                   \
+//    hgemm_qkv_bias_wint4##F(                                               \
+//        q,                                                                 \
+//        reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),          \
+//        reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),          \
+//        reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),          \
+//        reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),         \
+//        weight.data_ptr<uint8_t>(),                                        \
+//        weight_zp.data_ptr<uint8_t>(),                                     \
+//        reinterpret_cast<sycl::half*>(weight_scl.data_ptr<scalar_t>()),    \
+//        reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()), \
+//        m,                                                                 \
+//        n,                                                                 \
+//        k);                                                                \
+//  }
+//
+//#define GEMM_QKV_WINT4_8M_16384N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##8x256_8x16x32##_##gz##_2_)
+//#define GEMM_QKV_WINT4_8M_4096N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##8x64_8x16x64##_##gz##_8_)
+//#define GEMM_QKV_WINT4_8M_4096N_16384K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##8x64_8x16x64##_##gz##_8_)
+//#define GEMM_QKV_WINT4_8M_50416N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##8x512_8x16x32##_##gz##_1_)
+//
+//#define GEMM_QKV_WINT4_16M_16384N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##16x256_16x16x32##_##gz##_2_)
+//#define GEMM_QKV_WINT4_16M_4096N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##16x64_16x16x32##_##gz##_8_)
+//#define GEMM_QKV_WINT4_16M_4096N_16384K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##16x64_16x16x32##_##gz##_8_)
+//#define GEMM_QKV_WINT4_16M_50416N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##16x512_16x16x32##_##gz##_1_)
+//
+//#define GEMM_QKV_WINT4_32M_16384N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##32x256_32x16x32##_##gz##_2_)
+//#define GEMM_QKV_WINT4_32M_4096N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##32x64_32x16x32##_##gz##_8_)
+//#define GEMM_QKV_WINT4_32M_4096N_16384K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##32x64_32x16x32##_##gz##_8_)
+//#define GEMM_QKV_WINT4_32M_50416N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##32x512_32x16x32##_##gz##_1_)
+//
+//#define GEMM_QKV_WINT4_64M_16384N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##64x256_64x16x32##_##gz##_2_)
+//#define GEMM_QKV_WINT4_64M_4096N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##32x128_32x16x32##_##gz##_4_)
+//#define GEMM_QKV_WINT4_64M_4096N_16384K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##32x128_32x16x32##_##gz##_4_)
+//#define GEMM_QKV_WINT4_64M_50416N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##64x512_64x16x32##_##gz##_1_)
+//
+//#define GEMM_QKV_WINT4_384M_16384N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
+//#define GEMM_QKV_WINT4_384M_4096N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
+//#define GEMM_QKV_WINT4_384M_4096N_16384K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
+//#define GEMM_QKV_WINT4_384M_50416N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
+//
+//#define GEMM_QKV_WINT4_1024M_16384N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##128x256_64x16x32##_##gz##_1_)
+//#define GEMM_QKV_WINT4_1024M_4096N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##128x256_64x16x32##_##gz##_1_)
+//#define GEMM_QKV_WINT4_1024M_4096N_16384K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##128x256_64x16x32##_##gz##_1_)
+//#define GEMM_QKV_WINT4_1024M_50416N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##128x512_64x32x32##_##gz##_1_)
+//
+//#define GEMM_QKV_WINT4_INFM_16384N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
+//#define GEMM_QKV_WINT4_INFM_4096N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
+//#define GEMM_QKV_WINT4_INFM_4096N_16384K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
+//#define GEMM_QKV_WINT4_INFM_50416N_4096K_IMPL(gz) \
+//  GEMM_QKV_WINT4_XETLA_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
+//
+//#define GEMM_QKV_WINT4_M_N_K_DISPATCH(m, n, k, gz) \
+//  GEMM_QKV_WINT4_##m##M_##n##N_##k##K_IMPL(gz)
+//
+//#define GEMM_QKV_WINT4_N_K_DISPATCH(m, gz)             \
+//  if (n == 16384 && k == 4096) {                       \
+//    GEMM_QKV_WINT4_M_N_K_DISPATCH(m, 16384, 4096, gz); \
+//  } else if (n == 4096 && k == 4096) {                 \
+//    GEMM_QKV_WINT4_M_N_K_DISPATCH(m, 4096, 4096, gz);  \
+//  } else if (n == 4096 && k == 16384) {                \
+//    GEMM_QKV_WINT4_M_N_K_DISPATCH(m, 4096, 16384, gz); \
+//  } else if (n == 50416 && k == 4096) {                \
+//    GEMM_QKV_WINT4_M_N_K_DISPATCH(m, 50416, 4096, gz); \
+//  } else {                                             \
+//    TORCH_CHECK(false);                                \
+//  }
+//
+//#define GEMM_QKV_WINT4_M_DISPATCH(m)     \
+//  if (calib_gz == k || calib_gz == -1) { \
+//    GEMM_QKV_WINT4_N_K_DISPATCH(m, 0);   \
+//  } else if (calib_gz == 128) {          \
+//    GEMM_QKV_WINT4_N_K_DISPATCH(m, 128); \
+//  } else {                               \
+//    TORCH_CHECK(false);                  \
+//  }
 
 static void mm_qkv_out_wint4(
     const Tensor& input_,
@@ -183,24 +183,24 @@ static void mm_qkv_out_wint4(
       decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
   auto& q = dpcppGetCurrentQueue();
 
-  if (m <= 8) {
-    GEMM_QKV_WINT4_M_DISPATCH(8);
-  } else if (m <= 16) {
-    GEMM_QKV_WINT4_M_DISPATCH(16);
-  } else if (m <= 32) {
-    GEMM_QKV_WINT4_M_DISPATCH(32);
-  } else if (m <= 64) {
-    GEMM_QKV_WINT4_M_DISPATCH(64);
-  } else if (m <= 384) {
-    GEMM_QKV_WINT4_M_DISPATCH(384);
-  } else if (m <= 1024) {
-    GEMM_QKV_WINT4_M_DISPATCH(1024);
-  } else {
-    GEMM_QKV_WINT4_M_DISPATCH(INF);
-  }
+  //if (m <= 8) {
+  //  GEMM_QKV_WINT4_M_DISPATCH(8);
+  //} else if (m <= 16) {
+  //  GEMM_QKV_WINT4_M_DISPATCH(16);
+  //} else if (m <= 32) {
+  //  GEMM_QKV_WINT4_M_DISPATCH(32);
+  //} else if (m <= 64) {
+  //  GEMM_QKV_WINT4_M_DISPATCH(64);
+  //} else if (m <= 384) {
+  //  GEMM_QKV_WINT4_M_DISPATCH(384);
+  //} else if (m <= 1024) {
+  //  GEMM_QKV_WINT4_M_DISPATCH(1024);
+  //} else {
+  //  GEMM_QKV_WINT4_M_DISPATCH(INF);
+  //}
 }
 
-#undef GEMM_QKV_WINT4_XETLA_DISPATCH
+//#undef GEMM_QKV_WINT4_XETLA_DISPATCH
 
 static std::tuple<Tensor, Tensor, Tensor> mm_qkv_wint4(
     const Tensor& input,
