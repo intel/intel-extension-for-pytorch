@@ -563,7 +563,7 @@ class IPEXTransformerAtten(nn.Module):
                     if self.is_int4:
                         attn_output = torch.ops.torch_ipex.mm_bias_resadd_int4(attn_output, self.out_wei, self.out_bias, residual, 1.0/self.tp_size)
                     else:
-                        attn_output = torch.ops.torch_ipex.mm_bias_resadd(attn_output, self.out_wei, self.out_bias, residual, 1.0/self.tp_size)
+                        attn_output = torch.ops.torch_ipex.mm_bias_scaled_resadd(attn_output, self.out_wei, self.out_bias, residual, 1.0/self.tp_size)
                 else:
                     attn_output = torch.addmm(residual.flatten(0, -2), attn_output.flatten(0, -2), self.out_wei, beta=1.0/self.tp_size)
                 attn_output = attn_output.view(shape)

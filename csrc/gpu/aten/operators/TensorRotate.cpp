@@ -127,8 +127,8 @@ template <
 void apply_rotary_embedding_two_kernel(
     scalar_t* query,
     scalar_t* key,
-    scalar_t* sin,
-    scalar_t* cos,
+    float* sin,
+    float* cos,
     scalar_t* query_out,
     scalar_t* key_out,
     OffsetCalculator<N, index_type, unsigned_index> offset_calc,
@@ -155,9 +155,10 @@ void apply_rotary_embedding_two_kernel(
           scalar_t query_val = *(query + offset[2]);
           scalar_t scale = i % 2 == 0 ? -1 : 1;
           scalar_t shift_val = sg.shuffle_xor(query_val, 1) * scale;
-          scalar_t sin_val = *(sin + offset[4]);
-          scalar_t cos_val = *(cos + offset[5]);
-          *(query_out + offset[0]) = shift_val * sin_val + query_val * cos_val;
+          float sin_val = *(sin + offset[4]);
+          float cos_val = *(cos + offset[5]);
+          *(query_out + offset[0]) =
+              (scalar_t)((float)shift_val * sin_val + (float)query_val * cos_val);
         }
       } else {
         for (int i = item_idx; i < problem_size; i += item_range) {
@@ -166,9 +167,10 @@ void apply_rotary_embedding_two_kernel(
           scalar_t key_val = *(key + offset[3]);
           scalar_t scale = i % 2 == 0 ? -1 : 1;
           scalar_t shift_val = sg.shuffle_xor(key_val, 1) * scale;
-          scalar_t sin_val = *(sin + offset[4]);
-          scalar_t cos_val = *(cos + offset[5]);
-          *(key_out + offset[1]) = shift_val * sin_val + key_val * cos_val;
+          float sin_val = *(sin + offset[4]);
+          float cos_val = *(cos + offset[5]);
+          *(key_out + offset[1]) =
+              (scalar_t)((float)shift_val * sin_val + (float)key_val * cos_val);
         }
       }
     };
@@ -304,6 +306,7 @@ void apply_rotary_embedding_qk(
                   .add_input(key)
                   .add_input(sin)
                   .add_input(cos)
+                  .check_all_same_dtype(false)
                   .build();
   auto offset_calc = make_element_offset_calculator<6>(iter);
 
@@ -328,8 +331,8 @@ void apply_rotary_embedding_qk(
           apply_rotary_embedding_two_kernel(
               static_cast<scalar_t*>(query.data_ptr()),
               static_cast<scalar_t*>(key.data_ptr()),
-              static_cast<scalar_t*>(sin.data_ptr()),
-              static_cast<scalar_t*>(cos.data_ptr()),
+              static_cast<float*>(sin.data_ptr()),
+              static_cast<float*>(cos.data_ptr()),
               static_cast<scalar_t*>(query_out.data_ptr()),
               static_cast<scalar_t*>(key_out.data_ptr()),
               offset_calc,
