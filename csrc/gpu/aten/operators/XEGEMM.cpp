@@ -108,11 +108,17 @@ static Tensor mm_bias_resadd_resadd(
                     .add_epilogue(res0, HGEMM_XETLA::EpilogueType::RES_ADD)
                     .add_epilogue(res1, HGEMM_XETLA::EpilogueType::RES_ADD)
                     .build();
-  if (policy.valid()) {
+  // if (policy.valid()) {
+  if (0) { // acc consider
     policy.run();
   } else {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_resadd_resadd)
-    xpu::oneDNN::matmul(output, af, b, bias, true, Attr());
+    auto split_ms = hgemm_split_m(m, n);
+    for (auto data : split_ms) {
+       auto newo = output.narrow(0, std::get<0>(data), std::get<1>(data));
+       auto newa = af.narrow(0, std::get<0>(data), std::get<1>(data));
+       xpu::oneDNN::matmul(newo, newa, b, bias, true, Attr());
+    }
     output = output + res0.flatten(0, -2) + res1.flatten(0, -2);
   }
   return matmul_resize(a, output);
