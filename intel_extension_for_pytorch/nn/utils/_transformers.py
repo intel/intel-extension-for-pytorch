@@ -34,16 +34,20 @@ class IPEXEmptyINT4Linear(nn.Module):
     def __init__(self):
         super(IPEXEmptyINT4Linear, self).__init__()
         self.qweight = None
+        self.weight = None
         self.bias = None
         self.scales = None
         self.qzeros = None
         self.group_size = None
 
     def forward(self, input):
-        if self.bias is None:
-            return torch.ops.torch_ipex.mm_int4(input, self.qweight, self.scales, self.qzeros, self.group_size)
+        if input.shape[0] == 1:
+            if self.bias is None:
+                return torch.ops.torch_ipex.mm_int4(input, self.qweight, self.scales, self.qzeros, self.group_size)
+            else:
+                return torch.ops.torch_ipex.mm_bias_int4(input, self.qweight, self.bias, self.scales, self.qzeros, self.group_size)
         else:
-            return torch.ops.torch_ipex.mm_bias_int4(input, self.qweight, self.bias, self.scales, self.qzeros, self.group_size)
+            return torch.nn.functional.linear(input, self.weight, bias=self.bias)
 
 class IPEXEmptyLinearWithPadding(nn.Module):
     def __init__(self, n_dim):
@@ -60,6 +64,7 @@ class IPEXEmptyINT4LinearWithPadding(nn.Module):
     def __init__(self, n_dim):
         super(IPEXEmptyINT4LinearWithPadding, self).__init__()
         self.qweight = None
+        self.weight = None
         self.scales = None
         self.qzeros = None
         self.group_size = None
@@ -120,6 +125,11 @@ class IPEXTransformerAtten(nn.Module):
         self.out_bias = None
 
         if is_int4:
+            self.q_qwei = None
+            self.k_qwei = None
+            self.v_qwei = None
+            self.qkv_qwei = None 
+            self.out_qwei = None
             self.q_scl = None
             self.q_zp = None
             self.k_scl = None
@@ -223,8 +233,8 @@ class IPEXTransformerAtten(nn.Module):
         key = key.view(shape)
         value = value.view(shape)
       
-        if self.is_int4:
-            torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_wei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, key, value, self.qkv_gs)
+        if self.is_int4 and hidden_states.shape[0] == 1:
+            torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_qwei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, key, value, self.qkv_gs)
         else:
             torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
         return query, key, value
@@ -239,8 +249,8 @@ class IPEXTransformerAtten(nn.Module):
             query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.key_prompt = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.value_prompt = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-            if self.is_int4:
-                torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_wei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, self.key_prompt, self.value_prompt, self.qkv_gs)
+            if 0: #self.is_int4 and hidden_states.shape[0] == 1:
+                torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_qwei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, self.key_prompt, self.value_prompt, self.qkv_gs)
             else:
                 torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, self.key_prompt, self.value_prompt)
             key = self.key_prompt
@@ -268,8 +278,8 @@ class IPEXTransformerAtten(nn.Module):
             value = self.value_cached[self.prev_len : self.cur_len, :, :, :]
             key = key.view(shape)
             value = value.view(shape)
-            if self.is_int4:
-                torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_wei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, key, value, self.qkv_gs)
+            if 0: #self.is_int4 and hidden_states.shape[0] == 1:
+                torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_qwei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, key, value, self.qkv_gs)
             else:
                 torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
         self.prev_len = self.cur_len
@@ -277,10 +287,10 @@ class IPEXTransformerAtten(nn.Module):
 
     def qkv_normal(self, hidden_states, layer_past = None):
         if self.row_major:
-            if self.is_int4:
-                query = torch.ops.torch_ipex.mm_int4(hidden_states, self.q_wei, self.q_scl, self.q_zp, self.q_gs)
-                key = torch.ops.torch_ipex.mm_int4(hidden_states, self.k_wei, self.k_scl, self.k_zp, self.k_gs)
-                value = torch.ops.torch_ipex.mm_int4(hidden_states, self.v_wei, self.v_scl, self.v_zp, self.v_gs)
+            if self.is_int4 and hidden_states.shape[0] == 1:
+                query = torch.ops.torch_ipex.mm_int4(hidden_states, self.q_qwei, self.q_scl, self.q_zp, self.q_gs)
+                key = torch.ops.torch_ipex.mm_int4(hidden_states, self.k_qwei, self.k_scl, self.k_zp, self.k_gs)
+                value = torch.ops.torch_ipex.mm_int4(hidden_states, self.v_qwei, self.v_scl, self.v_zp, self.v_gs)
             else:
                 query = torch.matmul(hidden_states, self.q_wei)
                 key = torch.matmul(hidden_states, self.k_wei)
@@ -550,8 +560,8 @@ class IPEXTransformerAtten(nn.Module):
 
         if self.row_major:
             if residual is None:
-                if self.is_int4:
-                    attn_output = torch.ops.torch_ipex.mm_int4(attn_output, self.out_wei, self.out_scl, self.out_zp, self.out_gs)
+                if self.is_int4 and attn_output.shape[0] == 1:
+                    attn_output = torch.ops.torch_ipex.mm_int4(attn_output, self.out_qwei, self.out_scl, self.out_zp, self.out_gs)
                 else:
                     attn_output = torch.matmul(attn_output, self.out_wei)
                 self.all_reduce_if_necessary(attn_output)
@@ -560,7 +570,7 @@ class IPEXTransformerAtten(nn.Module):
             else:
                 shape = [attn_output.shape[0], attn_output.shape[1], self.embed_dim]
                 if self.out_bias is not None:
-                    if self.is_int4:
+                    if self.is_int4 and attn_output.shape[0] == 1:
                         attn_output = torch.ops.torch_ipex.mm_bias_resadd_int4(attn_output, self.out_wei, self.out_bias, residual, 1.0/self.tp_size)
                     else:
                         attn_output = torch.ops.torch_ipex.mm_bias_scaled_resadd(attn_output, self.out_wei, self.out_bias, residual, 1.0/self.tp_size)
@@ -641,6 +651,8 @@ class IPEXTransformerMLP(nn.Module):
         self.is_int4 = is_int4
 
         if is_int4:
+            self.fc_in_qwei = None
+            self.fc_out_qwei = None
             self.fc_in_scl = None
             self.fc_in_zp = None
             self.fc_out_scl = None
