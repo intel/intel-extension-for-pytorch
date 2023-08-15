@@ -108,17 +108,11 @@ static Tensor mm_bias_resadd_resadd(
                     .add_epilogue(res0, HGEMM_XETLA::EpilogueType::RES_ADD)
                     .add_epilogue(res1, HGEMM_XETLA::EpilogueType::RES_ADD)
                     .build();
-  // if (policy.valid()) {
-  if (0) { // acc consider
+  if (policy.valid()) {
     policy.run();
   } else {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_resadd_resadd)
-    auto split_ms = hgemm_split_m(m, n);
-    for (auto data : split_ms) {
-       auto newo = output.narrow(0, std::get<0>(data), std::get<1>(data));
-       auto newa = af.narrow(0, std::get<0>(data), std::get<1>(data));
-       xpu::oneDNN::matmul(newo, newa, b, bias, true, Attr());
-    }
+    xpu::oneDNN::matmul(output, af, b, bias, true, Attr());
     output = output + res0.flatten(0, -2) + res1.flatten(0, -2);
   }
   return matmul_resize(a, output);
@@ -176,8 +170,8 @@ Tensor matmul_gelu(
   int m = input.flatten(0, -2).sizes()[0];
   int n = weight.sizes()[1];
   int k = weight.sizes()[0];
-  auto output = at::empty({m, n}, input.options());
   if (bias.has_value() && approximate == "tanh") {
+    auto output = at::empty({m, n}, input.options());
     auto policy =
         HGEMM_XETLA()
             .add_matrix_c(output)
@@ -186,8 +180,7 @@ Tensor matmul_gelu(
             .add_epilogue(bias.value(), HGEMM_XETLA::EpilogueType::BIAS)
             .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::GELU)
             .build();
-    // if (policy.valid()) {
-    if (false) {
+    if (policy.valid()) {
       policy.run();
       return matmul_resize(input, output);
     }
@@ -208,15 +201,8 @@ Tensor matmul_gelu(
     attr.append_post_eltwise(1.0f, 0.0f, 0.0f, algo);
     return attr;
   };
-
-  auto input_flatten = input.flatten(0, -2);
-  auto split_ms = hgemm_split_m(m, n);
-  for (auto data : split_ms) {
-     auto newo = output.narrow(0, std::get<0>(data), std::get<1>(data));
-     auto newa = input_flatten.narrow(0, std::get<0>(data), std::get<1>(data));
-     linear_wrapper.call(newo, newa, weight_, bias, post_op);
-  }
-  return matmul_resize(input, output);
+  Tensor result;
+  return linear_wrapper.call(result, input, weight_, bias, post_op);
 }
 
 static void mm_qkv_out(
