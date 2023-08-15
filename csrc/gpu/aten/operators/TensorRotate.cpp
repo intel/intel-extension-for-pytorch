@@ -157,8 +157,7 @@ void apply_rotary_embedding_two_kernel(
           scalar_t shift_val = sg.shuffle_xor(query_val, 1) * scale;
           float sin_val = *(sin + offset[4]);
           float cos_val = *(cos + offset[5]);
-          *(query_out + offset[0]) =
-              (scalar_t)((float)shift_val * sin_val + (float)query_val * cos_val);
+          *(query_out + offset[0]) = (scalar_t)((float)shift_val * sin_val + (float)query_val * cos_val);
         }
       } else {
         for (int i = item_idx; i < problem_size; i += item_range) {
@@ -169,8 +168,7 @@ void apply_rotary_embedding_two_kernel(
           scalar_t shift_val = sg.shuffle_xor(key_val, 1) * scale;
           float sin_val = *(sin + offset[4]);
           float cos_val = *(cos + offset[5]);
-          *(key_out + offset[1]) =
-              (scalar_t)((float)shift_val * sin_val + (float)key_val * cos_val);
+          *(key_out + offset[1]) = (scalar_t)((float)shift_val * sin_val + (float)key_val * cos_val);
         }
       }
     };

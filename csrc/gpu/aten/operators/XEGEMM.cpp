@@ -115,9 +115,9 @@ static Tensor mm_bias_resadd_resadd(
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_resadd_resadd)
     auto split_ms = hgemm_split_m(m, n);
     for (auto data : split_ms) {
-      auto newo = output.narrow(0, std::get<0>(data), std::get<1>(data));
-      auto newa = af.narrow(0, std::get<0>(data), std::get<1>(data));
-      xpu::oneDNN::matmul(newo, newa, b, bias, true, Attr());
+       auto newo = output.narrow(0, std::get<0>(data), std::get<1>(data));
+       auto newa = af.narrow(0, std::get<0>(data), std::get<1>(data));
+       xpu::oneDNN::matmul(newo, newa, b, bias, true, Attr());
     }
     output = output + res0.flatten(0, -2) + res1.flatten(0, -2);
   }
@@ -212,9 +212,9 @@ Tensor matmul_gelu(
   auto input_flatten = input.flatten(0, -2);
   auto split_ms = hgemm_split_m(m, n);
   for (auto data : split_ms) {
-    auto newo = output.narrow(0, std::get<0>(data), std::get<1>(data));
-    auto newa = input_flatten.narrow(0, std::get<0>(data), std::get<1>(data));
-    linear_wrapper.call(newo, newa, weight_, bias, post_op);
+     auto newo = output.narrow(0, std::get<0>(data), std::get<1>(data));
+     auto newa = input_flatten.narrow(0, std::get<0>(data), std::get<1>(data));
+     linear_wrapper.call(newo, newa, weight_, bias, post_op);
   }
   return matmul_resize(input, output);
 }
