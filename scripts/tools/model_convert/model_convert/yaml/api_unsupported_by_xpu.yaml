@@ -29,7 +29,6 @@
 - torch.cuda._CudaBase
 - torch.cuda.caching_allocator_alloc
 - torch.cuda.check_error
-- torch.cuda.reset_max_memory_cached
 - torch.cuda.CUDAPluggableAllocator
 - torch.cuda.has_half
 - torch.cuda.get_gencode_flags
