@@ -203,43 +203,43 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
 
         if self.is_int4:
             if self.row_major:
-                self.ipex_optimized_module.attn.q_qwei = self.module.attn.q_proj.qweight
-                self.ipex_optimized_module.attn.q_scl = self.module.attn.q_proj.scales
-                self.ipex_optimized_module.attn.q_zp = self.module.attn.q_proj.qzeros
-                self.ipex_optimized_module.attn.q_gs = self.module.attn.q_proj.group_size.data.item()
-                self.ipex_optimized_module.attn.q_proj.bias = self.module.attn.q_proj.bias
-                self.ipex_optimized_module.attn.k_qwei = self.module.attn.k_proj.qweight
-                self.ipex_optimized_module.attn.k_scl = self.module.attn.k_proj.scales
-                self.ipex_optimized_module.attn.k_zp = self.module.attn.k_proj.qzeros
-                self.ipex_optimized_module.attn.k_gs = self.module.attn.k_proj.group_size.data.item()
-                self.ipex_optimized_module.attn.k_proj.bias = self.module.attn.k_proj.bias
-                self.ipex_optimized_module.attn.v_qwei = self.module.attn.v_proj.qweight
-                self.ipex_optimized_module.attn.v_scl = self.module.attn.v_proj.scales
-                self.ipex_optimized_module.attn.v_zp = self.module.attn.v_proj.qzeros
-                self.ipex_optimized_module.attn.v_gs = self.module.attn.v_proj.group_size.data.item()
-                self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
+                #self.ipex_optimized_module.attn.q_qwei = self.module.attn.q_proj.qweight
+                #self.ipex_optimized_module.attn.q_scl = self.module.attn.q_proj.scales
+                #self.ipex_optimized_module.attn.q_zp = self.module.attn.q_proj.qzeros
+                #self.ipex_optimized_module.attn.q_gs = self.module.attn.q_proj.group_size.data.item()
+                #self.ipex_optimized_module.attn.q_proj.bias = self.module.attn.q_proj.bias
+                #self.ipex_optimized_module.attn.k_qwei = self.module.attn.k_proj.qweight
+                #self.ipex_optimized_module.attn.k_scl = self.module.attn.k_proj.scales
+                #self.ipex_optimized_module.attn.k_zp = self.module.attn.k_proj.qzeros
+                #self.ipex_optimized_module.attn.k_gs = self.module.attn.k_proj.group_size.data.item()
+                #self.ipex_optimized_module.attn.k_proj.bias = self.module.attn.k_proj.bias
+                #self.ipex_optimized_module.attn.v_qwei = self.module.attn.v_proj.qweight
+                #self.ipex_optimized_module.attn.v_scl = self.module.attn.v_proj.scales
+                #self.ipex_optimized_module.attn.v_zp = self.module.attn.v_proj.qzeros
+                #self.ipex_optimized_module.attn.v_gs = self.module.attn.v_proj.group_size.data.item()
+                #self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
                 self.ipex_optimized_module.attn.out_qwei = self.module.attn.out_proj.qweight
                 self.ipex_optimized_module.attn.out_scl = self.module.attn.out_proj.scales
                 self.ipex_optimized_module.attn.out_zp = self.module.attn.out_proj.qzeros
                 self.ipex_optimized_module.attn.out_gs = self.module.attn.out_proj.group_size.data.item()
                 self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
 
-                shape = [3, -1, self.module.attn.q_proj.qweight.shape[-1]]
-                self.ipex_optimized_module.attn.qkv_qwei = torch.stack([self.ipex_optimized_module.attn.q_qwei, self.ipex_optimized_module.attn.k_qwei, self.ipex_optimized_module.attn.v_qwei]).contiguous().view(shape)
-                self.ipex_optimized_module.attn.qkv_scl = torch.stack([self.ipex_optimized_module.attn.q_scl, self.ipex_optimized_module.attn.k_scl, self.ipex_optimized_module.attn.v_scl]).contiguous().view(shape)
-                self.ipex_optimized_module.attn.qkv_zp = torch.stack([self.ipex_optimized_module.attn.q_zp, self.ipex_optimized_module.attn.k_zp, self.ipex_optimized_module.attn.v_zp]).contiguous().view(shape)
-                self.ipex_optimized_module.attn.qkv_gs = self.ipex_optimized_module.attn.q_gs
+                #shape = [3, -1, self.module.attn.q_proj.qweight.shape[-1]]
+                #self.ipex_optimized_module.attn.qkv_qwei = torch.stack([self.ipex_optimized_module.attn.q_qwei, self.ipex_optimized_module.attn.k_qwei, self.ipex_optimized_module.attn.v_qwei]).contiguous().view(shape)
+                #self.ipex_optimized_module.attn.qkv_scl = torch.stack([self.ipex_optimized_module.attn.q_scl, self.ipex_optimized_module.attn.k_scl, self.ipex_optimized_module.attn.v_scl]).contiguous().view(shape)
+                #self.ipex_optimized_module.attn.qkv_zp = torch.stack([self.ipex_optimized_module.attn.q_zp, self.ipex_optimized_module.attn.k_zp, self.ipex_optimized_module.attn.v_zp]).contiguous().view(shape)
+                #self.ipex_optimized_module.attn.qkv_gs = self.ipex_optimized_module.attn.q_gs
 
-                self.ipex_optimized_module.attn.q_qwei.data = self.ipex_optimized_module.attn.qkv_qwei[0, :, :]
-                self.ipex_optimized_module.attn.q_scl.data = self.ipex_optimized_module.attn.qkv_scl[0, :, :]
-                self.ipex_optimized_module.attn.q_zp.data = self.ipex_optimized_module.attn.qkv_zp[0, :, :]
-                self.ipex_optimized_module.attn.k_qwei.data = self.ipex_optimized_module.attn.qkv_qwei[1, :, :]
-                self.ipex_optimized_module.attn.k_scl.data = self.ipex_optimized_module.attn.qkv_scl[1, :, :]
-                self.ipex_optimized_module.attn.k_zp.data = self.ipex_optimized_module.attn.qkv_zp[1, :, :]
-                self.ipex_optimized_module.attn.v_qwei.data = self.ipex_optimized_module.attn.qkv_qwei[2, :, :]
-                self.ipex_optimized_module.attn.v_scl.data = self.ipex_optimized_module.attn.qkv_scl[2, :, :]
-                self.ipex_optimized_module.attn.v_zp.data = self.ipex_optimized_module.attn.qkv_zp[2, :, :]
-                self.ipex_optimized_module.attn.qkv_bias = None
+                #self.ipex_optimized_module.attn.q_qwei.data = self.ipex_optimized_module.attn.qkv_qwei[0, :, :]
+                #self.ipex_optimized_module.attn.q_scl.data = self.ipex_optimized_module.attn.qkv_scl[0, :, :]
+                #self.ipex_optimized_module.attn.q_zp.data = self.ipex_optimized_module.attn.qkv_zp[0, :, :]
+                #self.ipex_optimized_module.attn.k_qwei.data = self.ipex_optimized_module.attn.qkv_qwei[1, :, :]
+                #self.ipex_optimized_module.attn.k_scl.data = self.ipex_optimized_module.attn.qkv_scl[1, :, :]
+                #self.ipex_optimized_module.attn.k_zp.data = self.ipex_optimized_module.attn.qkv_zp[1, :, :]
+                #self.ipex_optimized_module.attn.v_qwei.data = self.ipex_optimized_module.attn.qkv_qwei[2, :, :]
+                #self.ipex_optimized_module.attn.v_scl.data = self.ipex_optimized_module.attn.qkv_scl[2, :, :]
+                #self.ipex_optimized_module.attn.v_zp.data = self.ipex_optimized_module.attn.qkv_zp[2, :, :]
+                #self.ipex_optimized_module.attn.qkv_bias = None
             else:
                 self.ipex_optimized_module.attn.k_proj.qweight = self.module.attn.k_proj.qweight
                 self.ipex_optimized_module.attn.k_proj.scales = self.module.attn.k_proj.scales
