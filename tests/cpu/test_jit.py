@@ -774,6 +774,7 @@ class LinearAddRelu(nn.Module):
         b = self.linear2(x)
         return F.relu(a.add_(b), inplace=self.inplace)
 
+
 class LinearMulAdd(nn.Module):
     def __init__(self, in_features, num_layers, low_rank):
         super(LinearMulAdd, self).__init__()
@@ -782,8 +783,12 @@ class LinearMulAdd(nn.Module):
         self.linears_v = nn.ModuleList()
         self.linears_w = nn.ModuleList()
         for i in range(self._num_layers):
-            self.linears_v.append(torch.nn.Linear(in_features, self._low_rank, bias=False))
-            self.linears_w.append(torch.nn.Linear(self._low_rank, in_features, bias=True))
+            self.linears_v.append(
+                torch.nn.Linear(in_features, self._low_rank, bias=False)
+            )
+            self.linears_w.append(
+                torch.nn.Linear(self._low_rank, in_features, bias=True)
+            )
 
     def forward(self, input):
         x_0 = input
@@ -795,6 +800,7 @@ class LinearMulAdd(nn.Module):
             x_l = x_0 * x_l_w + x_l
         return x_l
 
+
 class LinearMul(nn.Module):
     def __init__(self, in_features, num_layers, low_rank):
         super(LinearMul, self).__init__()
@@ -803,8 +809,12 @@ class LinearMul(nn.Module):
         self.linears_v = nn.ModuleList()
         self.linears_w = nn.ModuleList()
         for i in range(self._num_layers):
-            self.linears_v.append(torch.nn.Linear(in_features, self._low_rank, bias=False))
-            self.linears_w.append(torch.nn.Linear(self._low_rank, in_features, bias=True))
+            self.linears_v.append(
+                torch.nn.Linear(in_features, self._low_rank, bias=False)
+            )
+            self.linears_w.append(
+                torch.nn.Linear(self._low_rank, in_features, bias=True)
+            )
 
     def forward(self, input):
         x_0 = input
@@ -815,6 +825,7 @@ class LinearMul(nn.Module):
             x_l_w = self.linears_w[layer](x_l_v)
             x_l = x_0 * x_l_w
         return x_l
+
 
 class Linear_Reshape_Relu(nn.Module):
     def __init__(self, in_channels, out_channels, dest_shape, **kwargs):
@@ -4460,9 +4471,7 @@ class Tester(TestCase):
         x = torch.ones(2, 4)
         self._test_output(m, x, kind_in_graph="aten::linear")
         self._test_mkl_fp32(m, x, kind_in_graph="ipex_prepack::mkl_sgemm_run")
-        self._test_dnnl_fp32(
-            m, x, kind_in_graph="ipex_prepack::linear_mul_add_run"
-        )
+        self._test_dnnl_fp32(m, x, kind_in_graph="ipex_prepack::linear_mul_add_run")
         self._test_output_bf16(
             m,
             x,
@@ -4476,9 +4485,7 @@ class Tester(TestCase):
         x = torch.ones(2, 4)
         self._test_output(m, x, kind_in_graph="aten::linear")
         self._test_mkl_fp32(m, x, kind_in_graph="ipex_prepack::mkl_sgemm_run")
-        self._test_dnnl_fp32(
-            m, x, kind_in_graph="ipex_prepack::linear_mul_run"
-        )
+        self._test_dnnl_fp32(m, x, kind_in_graph="ipex_prepack::linear_mul_run")
         self._test_output_bf16(
             m,
             x,

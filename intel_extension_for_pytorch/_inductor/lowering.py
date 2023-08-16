@@ -38,6 +38,7 @@ def register_lowering(
         convert_input_to_bool=convert_input_to_bool,
     )
 
+
 make_fallback(torch.ops.torch_ipex.convolution_forward)
 make_fallback(torch.ops.torch_ipex.convolution_backward)
 make_fallback(torch.ops.torch_ipex.conv_transpose)
@@ -57,6 +58,7 @@ make_fallback(torch.ops.torch_ipex.cumsum)
 
 make_fallback(torch.ops.torch_ipex.add_softmax_)
 make_fallback(torch.ops.torch_ipex.bmm_add)
+
 
 @contextlib.contextmanager
 def patch_lowering():

@@ -5,11 +5,11 @@ from torch._inductor.lowering import lowerings as L
 
 patterns = PatternMatcherPass()
 
+
 @register_lowering_pattern(
     CallFunction(
-        torch.ops.aten.add,
-        CallFunction(torch.ops.aten.bmm, Arg(), Arg()),
-        Arg()),
+        torch.ops.aten.add, CallFunction(torch.ops.aten.bmm, Arg(), Arg()), Arg()
+    ),
 )
 def bmm_add(match: Match, mat1, mat2, mat3):
     return L[torch.ops.torch_ipex.bmm_add](mat3, mat1, mat2, 1.0)

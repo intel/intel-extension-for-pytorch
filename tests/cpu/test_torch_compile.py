@@ -150,7 +150,10 @@ class TestCompileCases(TestCase):
                         ipex.enable_auto_channels_last()
                     if feed_sample_input:
                         model = ipex.optimize(
-                            model, weights_prepack=weight_prepack, dtype=dtype, sample_input=x,
+                            model,
+                            weights_prepack=weight_prepack,
+                            dtype=dtype,
+                            sample_input=x,
                         )
                     else:
                         model = ipex.optimize(
@@ -298,7 +301,10 @@ class TestCompileCases(TestCase):
                         ipex.enable_auto_channels_last()
                     if feed_sample_input:
                         model = ipex.optimize(
-                            model, weights_prepack=weight_prepack, dtype=dtype, sample_input=x,
+                            model,
+                            weights_prepack=weight_prepack,
+                            dtype=dtype,
+                            sample_input=x,
                         )
                     else:
                         model = ipex.optimize(
@@ -435,7 +441,10 @@ class TestCompileCases(TestCase):
             if ipex_optimize:
                 if feed_sample_input:
                     model = ipex.optimize(
-                        model, weights_prepack=weight_prepack, dtype=dtype, sample_input=x,
+                        model,
+                        weights_prepack=weight_prepack,
+                        dtype=dtype,
+                        sample_input=x,
                     )
                 else:
                     model = ipex.optimize(
@@ -599,7 +608,9 @@ class TestCompileCases(TestCase):
         model = AddSoftmax()
         ori_y = model(a, b)
         # TODO: support custom inplace operators in inductor path.
-        for compiler_backend in ["torchscript",]:
+        for compiler_backend in [
+            "torchscript",
+        ]:
             torch._dynamo.reset()
             ipex._set_compiler_backend(compiler_backend)
             compile_model = torch.compile(model, backend="ipex")
@@ -617,7 +628,11 @@ class TestCompileCases(TestCase):
         for dtype, compiler_backend, dynamic in options:
             if compiler_backend == "torchscript" and dynamic is True:
                 continue
-            x = torch.randn(20, 100, 35, 45).to(dtype=dtype).to(memory_format=torch.channels_last)
+            x = (
+                torch.randn(20, 100, 35, 45)
+                .to(dtype=dtype)
+                .to(memory_format=torch.channels_last)
+            )
             model = FrozenBatchNorm2d(100).eval()
             with torch.cpu.amp.autocast(
                 enabled=(dtype == torch.bfloat16), dtype=torch.bfloat16
@@ -637,11 +652,17 @@ class TestCompileCases(TestCase):
         torch._dynamo.allow_in_graph(FrozenBatchNorm2d)
         options = itertools.product(
             [torch.float32, torch.bfloat16],
-            ["inductor",],
+            [
+                "inductor",
+            ],
             [True, False],
         )
         for dtype, compiler_backend, dynamic in options:
-            input = torch.randn(20, 100, 35, 45).to(dtype=dtype).to(memory_format=torch.channels_last)
+            input = (
+                torch.randn(20, 100, 35, 45)
+                .to(dtype=dtype)
+                .to(memory_format=torch.channels_last)
+            )
             ori_x = input.clone().requires_grad_()
             x = input.clone().requires_grad_()
             FrozenBatchNorm = FrozenBatchNorm2d(100)
@@ -665,6 +686,7 @@ class TestCompileCases(TestCase):
     def test_cumsum(self):
         def func(x):
             return torch.ops.torch_ipex.cumsum(x, 1)
+
         options = itertools.product(
             ["torchscript", "inductor"],
             [True, False],
@@ -687,7 +709,9 @@ class TestCompileCases(TestCase):
 
         options = itertools.product(
             [torch.float32, torch.bfloat16],
-            ["inductor",],
+            [
+                "inductor",
+            ],
             [True, False],
         )
         for dtype, compiler_backend, dynamic in options:

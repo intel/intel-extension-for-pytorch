@@ -520,7 +520,7 @@ class TestOp(JitLlgaTestCase):
         m = M()
         graph, traced = self.checkTrace(m, [x, y])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
-    
+
     @llga_fp32_bf16_test_env
     # Currently graph with sub-block is unsupported
     # %z : Tensor = prim::If(%8)
@@ -1031,7 +1031,7 @@ class TestDebugLog(JitLlgaTestCase):
             stderr=subprocess.STDOUT,
         ) as p:
             for line in p.stdout.readlines():
-                line = str(line, 'utf-8').strip()
+                line = str(line, "utf-8").strip()
                 if line.__contains__("LLGA_bridge::prepareKernel"):
                     num += 1
                 if line.__contains__("Executing partition"):

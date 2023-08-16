@@ -126,7 +126,6 @@ class DeepspeedTester(JitTestCase):
             optimized = ipex.optimize(ds_model.eval(), inplace=True)
 
             with torch.no_grad():
-
                 y_optimized = optimized(x)
                 self.assertEqual(y, y_optimized)
 

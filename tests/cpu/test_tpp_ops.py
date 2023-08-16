@@ -178,37 +178,50 @@ class TPPOPsTester(TestCase):
         self._test_backward(
             hf_res, tpp_res, hf_intermediate, tpp_intermediate, prec=0.01
         )
+
     def test_tpp_gptj_attention_rope(self):
         def create_sinusoidal_positions(num_pos: int, dim: int) -> torch.Tensor:
             inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2) / dim))
-            sinusoid_inp = torch.einsum("i , j -> i j", torch.arange(num_pos, dtype=torch.float), inv_freq).float()
+            sinusoid_inp = torch.einsum(
+                "i , j -> i j", torch.arange(num_pos, dtype=torch.float), inv_freq
+            ).float()
             return torch.cat((torch.sin(sinusoid_inp), torch.cos(sinusoid_inp)), dim=1)
+
         def _get_embed_positions(embed_positions, position_ids):
             if embed_positions.device != position_ids.device:
                 embed_positions = embed_positions.to(position_ids.device)
                 self.embed_positions = embed_positions
             return embed_positions.repeat(position_ids.shape[0], 1, 1)
+
         def rotate_every_two(x: torch.Tensor) -> torch.Tensor:
             x1 = x[:, :, :, ::2]
             x2 = x[:, :, :, 1::2]
             x = torch.stack((-x2, x1), dim=-1)
-            return x.flatten(-2)  # in einsum notation: rearrange(x, '... d j -> ... (d j)')
-        def apply_rotary_pos_emb(tensor: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor) -> torch.Tensor:
+            return x.flatten(
+                -2
+            )  # in einsum notation: rearrange(x, '... d j -> ... (d j)')
+
+        def apply_rotary_pos_emb(
+            tensor: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor
+        ) -> torch.Tensor:
             sin = torch.repeat_interleave(sin[:, :, None, :], 2, 3)
             cos = torch.repeat_interleave(cos[:, :, None, :], 2, 3)
             return (tensor * cos) + (rotate_every_two(tensor) * sin)
+
         def hf_forward(query, key, position_ids, embed_positions, rotary_dim=None):
             embed_positions = _get_embed_positions(embed_positions, position_ids)
-            repeated_position_ids = position_ids.unsqueeze(-1).repeat(1, 1, embed_positions.shape[-1])
+            repeated_position_ids = position_ids.unsqueeze(-1).repeat(
+                1, 1, embed_positions.shape[-1]
+            )
             sincos = torch.gather(embed_positions, 1, repeated_position_ids)
             sin, cos = torch.split(sincos, sincos.shape[-1] // 2, dim=-1)
 
             if rotary_dim is not None:
-                k_rot = key[:, :, :, : rotary_dim]
-                k_pass = key[:, :, :, rotary_dim :]
+                k_rot = key[:, :, :, :rotary_dim]
+                k_pass = key[:, :, :, rotary_dim:]
 
-                q_rot = query[:, :, :, : rotary_dim]
-                q_pass = query[:, :, :, rotary_dim :]
+                q_rot = query[:, :, :, :rotary_dim]
+                q_pass = query[:, :, :, rotary_dim:]
 
                 k_rot = apply_rotary_pos_emb(k_rot, sin, cos)
                 q_rot = apply_rotary_pos_emb(q_rot, sin, cos)
@@ -219,8 +232,11 @@ class TPPOPsTester(TestCase):
                 key = apply_rotary_pos_emb(key, sin, cos)
                 query = apply_rotary_pos_emb(query, sin, cos)
             return query, key
+
         for rotary_dim in [64, None]:
-            query = torch.rand(1, 32, 16, 256) #(batch, head, seq_length, head_features)
+            query = torch.rand(
+                1, 32, 16, 256
+            )  # (batch, head, seq_length, head_features)
             key = torch.rand(1, 32, 16, 256)
             query_tpp = copy.deepcopy(query)
             key_tpp = copy.deepcopy(key)
@@ -228,24 +244,14 @@ class TPPOPsTester(TestCase):
 
             pos_embd_dim = rotary_dim or 256
             embed_positions = create_sinusoidal_positions(2048, pos_embd_dim)
-            query_hf, key_hf = hf_forward(query, key, position_ids, embed_positions, rotary_dim)
-            torch.ops.torch_ipex.rotary_position_embedding(
-                key_tpp,
-                embed_positions,
-                position_ids,
-                16,
-                256,
-                1,
-                64
+            query_hf, key_hf = hf_forward(
+                query, key, position_ids, embed_positions, rotary_dim
             )
             torch.ops.torch_ipex.rotary_position_embedding(
-                query_tpp,
-                embed_positions,
-                position_ids,
-                16,
-                256,
-                1,
-                64
+                key_tpp, embed_positions, position_ids, 16, 256, 1, 64
+            )
+            torch.ops.torch_ipex.rotary_position_embedding(
+                query_tpp, embed_positions, position_ids, 16, 256, 1, 64
             )
 
             self.assertEqual(query_hf, query_tpp)

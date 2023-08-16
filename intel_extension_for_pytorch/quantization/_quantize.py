@@ -106,7 +106,9 @@ def prepare(
         assert isinstance(
             example_kwarg_inputs, Dict
         ), "IPEX quantization.prepare: example_kwarg_inputs must be type of Dict."
-    prepared_model = auto_prepare(prepare_model, configure, example_inputs, example_kwarg_inputs)
+    prepared_model = auto_prepare(
+        prepare_model, configure, example_inputs, example_kwarg_inputs
+    )
     if inplace and hasattr(prepared_model, "save_qconf_summary"):
         model.save_qconf_summary = prepared_model.save_qconf_summary
     return prepared_model
