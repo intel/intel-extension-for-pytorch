@@ -59,6 +59,16 @@ static inline std::pair<memory, memory> q_get_sc_zp_gpu_mem(
   return {qx_sc_m, qx_zp_m};
 }
 
+static inline memory q_get_wgh_sc_gpu_mem(
+    const Tensor& qw,
+    dnnl::engine& engine) {
+  float dnn_scale = qw.q_scale();
+  auto quant_base = xpu::dpcpp::fetch_cached_quantizer_base(dnn_scale, 0);
+  auto sc_ptr = quant_base.scale_ptr();
+  memory sc_m = dpcpp_onednn_memory(Q_PER_TENSOR_SC_MD, engine, sc_ptr);
+  return sc_m;
+}
+
 static inline memory::format_tag get_dnnl_default_format(
     int ndims,
     bool is_channels_last = false,
@@ -375,6 +385,37 @@ static inline bool is_onednn_layout(const at::Tensor& tensor) {
   return !at::AtenIpexTypeXPU::DPCPPTensorContext::is_plain(tensor);
 }
 
+template <typename T>
+static inline bool iteratable_has_onednn_layout(T container) {
+  bool has_onednn_layout_tensor =
+      std::any_of(container.begin(), container.end(), [](const Tensor& t) {
+        return xpu::oneDNN::is_onednn_layout(t);
+      });
+  return has_onednn_layout_tensor;
+}
+
+static inline bool has_onednn_layout(const Tensor& tensor) {
+  return is_onednn_layout(tensor);
+}
+
+static inline bool has_onednn_layout(const TensorList& inputs) {
+  return iteratable_has_onednn_layout(inputs);
+}
+
+static inline bool has_onednn_layout(const ITensorListRef& inputs) {
+  auto tensors = inputs.materialize();
+  return iteratable_has_onednn_layout(tensors);
+}
+
+// T would be Tensor, TensorList, ITensorListRef
+template <typename T, typename... Args>
+bool has_onednn_layout(const T& input, const Args&... rest) {
+  if (has_onednn_layout(input)) {
+    return true;
+  }
+  return false || has_onednn_layout(rest...);
+}
+
 static inline bool eltwise_forward_valid(const at::Tensor& tensor) {
   switch (tensor.scalar_type()) {
     // return false if scalar_type not supported
@@ -586,9 +627,11 @@ static inline int get_memory_layout_for_conv(
     return MEMORY_LAYOUT_FOR_CONV::ChannelsFirst;
   }
 
-  if (Settings::I().is_onednn_layout_enabled()) {
-    // suggest blocked
-    return MEMORY_LAYOUT_FOR_CONV::Blocked;
+  if (src.is_quantized() || weight.is_quantized() || (!dpcppSupportFP64())) {
+    if (Settings::I().is_onednn_layout_enabled()) {
+      // suggest blocked
+      return MEMORY_LAYOUT_FOR_CONV::Blocked;
+    }
   }
 
   auto suggest_channels_last_format =

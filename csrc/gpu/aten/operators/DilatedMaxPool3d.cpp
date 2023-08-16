@@ -7,6 +7,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/Atomics.h"
 #include "comm/RegistrationDeclarations.h"
+#include "utils/ComputeEngine.h"
 
 #include <vector>
 
@@ -327,9 +328,8 @@ void max_pool3d_with_indices_out_template(
       "max_pool3d_with_indices_out_template()",
       /*check_input_size=*/true);
 
-  auto compute_eng = Settings::I().get_compute_eng();
-  if (xpu::oneDNN::is_onednn_layout(input) ||
-      compute_eng == xpu::COMPUTE_ENG::ONEDNN ||
+  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng ||
       input.is_quantized()) { // oneDNN path
     Tensor input_;
     if (input.ndimension() == 4) {
@@ -376,7 +376,6 @@ void max_pool3d_with_indices_out_template(
         padding_vec);
 
   } else { // SYCL implementation
-
     bool channels_last = input.ndimension() == 5 &&
         input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d;
     Tensor _input = input;

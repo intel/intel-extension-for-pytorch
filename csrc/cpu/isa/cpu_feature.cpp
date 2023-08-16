@@ -1,6 +1,6 @@
 #include "cpu_feature.hpp"
+#include <c10/util/Exception.h>
 #include <stdio.h>
-#include <exception>
 #include "embedded_function.h"
 
 #ifdef __linux__
@@ -175,7 +175,6 @@ bool CPUFeature::os_avx2() {
   read_cpuid(0, &eax, &ebx, &ecx, &edx);
   uint32_t max_basic_id = eax;
   if (max_basic_id >= 0x00000007) {
-    uint32_t max_sub_leaf = 0;
     read_cpuidex(0x00000007, 0, &eax, &ebx, &ecx, &edx);
 
     support_avx2 = check_reg_bit(ebx, 5);
@@ -324,7 +323,7 @@ bool CPUFeature::init_amx() {
 }
 #else
 bool CPUFeature::init_amx() {
-  throw std::exception("DispatchStub: only support init amx on Linux now");
+  AT_ERROR("DispatchStub: only support init amx on Linux now");
   return false;
 }
 #endif

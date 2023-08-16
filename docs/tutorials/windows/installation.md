@@ -1,7 +1,7 @@
 # Building Intel® Extension for PyTorch* on Native Windows
 
-## 1. Install Microsoft Visual Studio 2022
-Follow this [link](https://visualstudio.microsoft.com/vs/) to download and install Microsoft Visual Studio 2022. In order to link oneAPI to VS environment in the next step, select **Desktop development with C++** workload.
+## 1. Install MSVC and Windows SDK fom Visual Studio Build Tools
+Follow this [link](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) to download and install MSVC and Windows SDK. Select **Desktop development with C++** workload, and under optional components select **MSVC** and **Windows SDK**.
 
 ## 2. Install Intel oneAPI Base Toolkit
 Follow this [link](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html?operatingsystem=window&distributions=offline) to download and install the latest Windows distribution of oneAPI toolkit.
@@ -11,7 +11,7 @@ Follow this [link](https://www.intel.com/content/www/us/en/developer/tools/oneap
 - **DO NOT** select **Intel® oneAPI Deep Neural Network Library**.
 - Make sure to select **Intel® oneAPI DPC++ Compiler** and **Intel® oneAPI Math Kernel Library**. 
 
-**Integrate Microsoft Visual Studio 2022** when the option pops up.
+Integrate **Miscrosoft C++ Build Tools 2022** when the option pops up.
 
 The following instruction assumes the oneAPI base toolkit is installed under folder `C:\oneAPI`.
 
@@ -26,7 +26,7 @@ Inside an Anaconda Prompt, activate oneAPI environment first:
 ## 4. Install PyTorch
 Get the PyTorch repo:
 ```
-git clone https://github.com/pytorch/pytorch -b v1.13.1
+git clone https://github.com/pytorch/pytorch -b v2.0.1
 ```
 Get the Intel® Extension for PyTorch* repo to apply PyTorch patch needed:
 ```
@@ -57,9 +57,6 @@ Install the required packages:
 pip install -r requirements.txt
 ```
 Install Intel® Extension for PyTorch*:
-
-**Note**: Windows compiler check needs to be **comment out** at **third_party/oneDNN/cmake/dpcpp_driver_check.cmake#L36**
-    
 ```
 set BUILD_WITH_CPU=0
 set USE_MULTI_CONTEXT=1

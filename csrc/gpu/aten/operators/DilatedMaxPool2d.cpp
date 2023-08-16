@@ -8,6 +8,7 @@
 #include "comm/Atomics.h"
 #include "comm/ParamUtils.h"
 #include "comm/RegistrationDeclarations.h"
+#include "utils/ComputeEngine.h"
 
 #include <tuple>
 
@@ -248,7 +249,10 @@ void max_pool2d_with_indices_out_template(
   const int64_t dims = 2;
   auto kernel_size_vec =
       expand_param_if_needed(kernel_size, "kernel_size", dims);
-  auto stride_vec = expand_param_if_needed(stride, "stride", dims);
+  std::vector<int64_t> empty_stride_vec = {dH, dW};
+  auto stride_vec = stride.empty()
+      ? empty_stride_vec
+      : expand_param_if_needed(stride, "stride", dims);
   auto padding_vec = expand_param_if_needed(padding, "padding", dims);
 
   auto padding_vec_l = padding_vec;
@@ -348,9 +352,9 @@ void max_pool2d_with_indices_out_template(
     indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
   }
 
-  auto compute_eng = Settings::I().get_compute_eng();
-  if (xpu::oneDNN::is_onednn_layout(input) ||
-      compute_eng == xpu::COMPUTE_ENG::ONEDNN || input.is_quantized()) {
+  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng || input.is_quantized()) {
     // per oneDNN definition, no dilation means dilation ratio is 0.
     // Since dilation is already designed in the output size, no dilation
     // is used in ::xpu::oneDNN::pooling
@@ -502,7 +506,10 @@ Tensor& max_pool2d_with_indices_backward_out_template(
   const int64_t dims = 2;
   auto kernel_size_vec =
       expand_param_if_needed(kernel_size, "kernel_size", dims);
-  auto stride_vec = expand_param_if_needed(stride, "stride", dims);
+  std::vector<int64_t> empty_stride_vec = {dH, dW};
+  auto stride_vec = stride.empty()
+      ? empty_stride_vec
+      : expand_param_if_needed(stride, "stride", dims);
   auto padding_vec = expand_param_if_needed(padding, "padding", dims);
 
   auto padding_vec_l = padding_vec;
@@ -516,9 +523,10 @@ Tensor& max_pool2d_with_indices_backward_out_template(
   auto input_4d = (input.ndimension() == 3) ? (input.unsqueeze(0)) : (input);
   /*
     For the pooling output shap with ceil_mode, oneDNN computes as (src -
-    ker_range + pad_l + pad_r) / str + 1 and PyTorch ceil_mode comptues as (src
-    - ker_range + pl + pr + stride -1) /stride +1. The code following here is to
-    adjust right padding of pooling to satisfy oneDNN fromula according to
+    ker_range + pad_l + pad_r) / str + 1 and PyTorch ceil_mode comptues as
+    (src
+    - ker_range + pl + pr + stride -1) /stride +1. The code following here is
+    to adjust right padding of pooling to satisfy oneDNN fromula according to
     https://jira.devtools.intel.com/browse/MFDNN-6759. The code is based on
     https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/mkldnn/Pooling.cpp#L222.
   */
@@ -580,9 +588,8 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       outputWidth,
       memory_format);
 
-  auto compute_eng = Settings::I().get_compute_eng();
-  if (xpu::oneDNN::is_onednn_layout(input) ||
-      compute_eng == xpu::COMPUTE_ENG::ONEDNN || input.is_quantized()) {
+  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+  if ((input.is_quantized()) || real_eng == xpu::COMPUTE_ENG::ONEDNN) {
     // per oneDNN definition, no dilation means dilation ratio is 0.
     // Since dilation is already designed in the output size, no dilation
     // is used in ::xpu::oneDNN::pooling

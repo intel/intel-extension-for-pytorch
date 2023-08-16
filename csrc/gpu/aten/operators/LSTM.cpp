@@ -10,6 +10,7 @@
 #include <utils/SimpleTrace.h>
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
+#include "utils/ComputeEngine.h"
 
 using namespace dnnl;
 using namespace xpu::dpcpp;
@@ -145,8 +146,11 @@ std::tuple<Tensor, Tensor, Tensor> lstm(
     bool train,
     bool bidirectional,
     bool batch_first) {
-  auto compute_eng = Settings::I().get_compute_eng();
-  if (compute_eng == xpu::COMPUTE_ENG::ONEDNN) {
+  // Use oneDNN as recommend engine after big memory issues fixed.
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     Variable input_v = input;
     if (batch_first) {
       input_v = input_v.transpose(0, 1).contiguous();

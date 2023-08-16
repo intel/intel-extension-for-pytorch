@@ -4,7 +4,6 @@ import unittest
 import copy
 from common_utils import TestCase
 
-
 class TestTesorMethod(TestCase):
     def test_numpy(self):
         # float tensor, numpy array will share memory with torch tensor.
@@ -19,5 +18,5 @@ class TestTesorMethod(TestCase):
         self.assertNotEqual(x.data_ptr(), y.data_ptr())
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     test = unittest.main()

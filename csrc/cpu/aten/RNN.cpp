@@ -217,25 +217,22 @@ at::ScalarType get_bias_dtype(
 std::vector<float> get_mkldnn_weight_scales_of_lstm(
     const at::Tensor& weight_ih,
     const at::Tensor& weight_hh) {
-  std::vector<float> weight_scales;
-
   at::Tensor weight_ih_scales_tensor =
       int8::utils::get_weight_scale_tensor(weight_ih);
   at::Tensor weight_hh_scales_tensor =
       int8::utils::get_weight_scale_tensor(weight_hh);
   TORCH_CHECK(
-      weight_ih_scales_tensor.sizes() == weight_hh_scales_tensor.sizes(),
-      "scales of weight_ih and weight_hh should be of same size");
+      weight_ih_scales_tensor.sizes() == weight_hh_scales_tensor.sizes() == 1,
+      "Expect scales of LSTM weight_ih and weight_hh to be of size 1");
 
   // PyTorch scale: (max - min) / (qmax - qmin)
   // oneDNN scale: (qmax - qmin) / (max - min)
-  for (size_t i = 0; i < weight_ih_scales_tensor.sizes()[0]; i++) {
-    weight_scales.push_back(
-        1. /
-        std::max(
-            weight_ih_scales_tensor[i].item().toFloat(),
-            weight_hh_scales_tensor[i].item().toFloat()));
-  }
+  auto scale_tensor = 1. /
+      torch::maximum(weight_ih_scales_tensor, weight_hh_scales_tensor)
+          .to(c10::kFloat);
+  scale_tensor = scale_tensor.contiguous();
+  auto s_ptr = scale_tensor.data_ptr<float>();
+  std::vector<float> weight_scales{s_ptr, s_ptr + scale_tensor.size(0)};
   return weight_scales;
 }
 
@@ -1068,9 +1065,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> quantized_lstm(
     double scale,
     int64_t zp,
     int64_t dtype) {
-#if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("ipex::quantized_lstm", c10::ArrayRef<c10::IValue>({}));
-#endif
 
   auto hx_ = hx.vec();
   auto weights_ = weights.vec();
@@ -1131,47 +1126,27 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> ipex_lstm(
   auto cy = std::get<1>(result.second);
   return std::make_tuple(output, hy, cy);
 }
-} // namespace torch_ipex
 
-namespace {
-TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def(
-      "ipex_lstm(Tensor input, Tensor[] hx, Tensor[] params, bool "
-      "has_biases, int num_layers, float dropout_p, bool train, bool "
-      "bidirectional, bool batch_first) -> (Tensor, Tensor, Tensor)",
-      torch_ipex::ipex_lstm);
-  m.impl("ipex_lstm", c10::DispatchKey::CPU, torch_ipex::ipex_lstm);
-  m.def(
-      "ipex_lstm_layer(Tensor input, Tensor weight0, Tensor weight1, Tensor "
-      "weight2, Tensor weight3, Tensor hx_, Tensor cx_, bool reverse, int[] "
-      "batch_sizes, int mode, int hidden_size, int num_layers, bool "
-      "has_biases, bool bidirectional, bool batch_first, bool train, float scale, int zp, int dtype) -> "
-      "Tensor[]");
-  m.impl(
-      "ipex_lstm_layer",
-      c10::DispatchKey::Autograd,
-      torch_ipex::cpu::ipex_lstm_layer);
-  m.impl(
-      "ipex_lstm_layer",
-      c10::DispatchKey::CPU,
-      torch_ipex::cpu::ipex_lstm_layer_forward);
-  m.impl(
-      "ipex_lstm_layer",
-      c10::DispatchKey::QuantizedCPU,
-      torch_ipex::cpu::ipex_lstm_layer_forward);
-  m.def(
-      "ipex_lstm_layer_backward(Tensor input, Tensor weight1, Tensor "
-      "weight2, Tensor weight3, Tensor weight4, Tensor hx_, Tensor cx_tmp, "
-      "Tensor output, Tensor hy_, Tensor cy_, Tensor grad_output, Tensor "
-      "grad_hy, Tensor grad_cy, bool reverse, int mode, int hidden_size, int "
-      "num_layers, bool has_biases, bool train, bool bidirectional, int[] "
-      "batch_sizes, bool batch_first, Tensor workspace) -> Tensor[]");
-  m.impl(
-      "ipex_lstm_layer_backward",
-      c10::DispatchKey::CPU,
-      torch_ipex::cpu::ipex_lstm_layer_backward);
+std::tuple<at::Tensor, at::Tensor, at::Tensor> ipex_lstm_meta(
+    const at::Tensor& input,
+    std::vector<at::Tensor> hx,
+    std::vector<at::Tensor> params,
+    bool has_biases,
+    int64_t num_layers,
+    double dropout_p,
+    bool train,
+    bool bidirectional,
+    bool batch_first) {
+  auto input_size = input.sym_sizes();
+  c10::SymDimVector output_size(input_size.begin(), input_size.end() - 1);
+  output_size.push_back(
+      bidirectional ? hx[0].sym_size(2) * 2 : hx[0].sym_size(2));
+  auto output = at::empty_symint(output_size, input.options());
+  auto hy = at::empty_symint(hx[0].sym_sizes(), hx[0].options());
+  auto cy = at::empty_symint(hx[1].sym_sizes(), hx[1].options());
+  return std::make_tuple(output, hy, cy);
 }
-} // namespace
+} // namespace torch_ipex
 
 namespace torch_ipex {
 namespace autocast {
@@ -1242,9 +1217,97 @@ std::vector<at::Tensor> ipex_lstm_layer(
       dtype);
 }
 
-TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m) {
-  m.impl("ipex_lstm_layer", torch_ipex::autocast::ipex_lstm_layer);
+std::tuple<at::Tensor, at::Tensor, at::Tensor> ipex_lstm(
+    const at::Tensor& input,
+    std::vector<at::Tensor> hx,
+    std::vector<at::Tensor> params,
+    bool has_biases,
+    int64_t num_layers,
+    double dropout_p,
+    bool train,
+    bool bidirectional,
+    bool batch_first) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::ipex_lstm", "")
+                       .typed<decltype(ipex_lstm)>();
+#if defined(IPEX_DISP_OP)
+  printf("torch_ipex::autocast::ipex_lstm\n");
+#endif
+  auto target_type = get_autocast_dtype();
+  // only have bf16 support now, keep fp32 for other target_type
+  bool cast_to_bfloat16 = at::kBFloat16 == target_type;
+  auto casted_input =
+      cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, input) : input;
+  std::vector<at::Tensor> casted_hx, casted_params;
+  for (const auto i : c10::irange(hx.size())) {
+    casted_hx.emplace_back(
+        cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, hx[i]) : hx[i]);
+  }
+  for (const auto i : c10::irange(params.size())) {
+    casted_params.emplace_back(
+        cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, params[i])
+                         : params[i]);
+  }
+  return op.call(
+      casted_input,
+      casted_hx,
+      casted_params,
+      has_biases,
+      num_layers,
+      dropout_p,
+      train,
+      bidirectional,
+      batch_first);
 }
 
 } // namespace autocast
 } // namespace torch_ipex
+
+namespace {
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "ipex_lstm(Tensor input, Tensor[] hx, Tensor[] params, bool "
+      "has_biases, int num_layers, float dropout_p, bool train, bool "
+      "bidirectional, bool batch_first) -> (Tensor, Tensor, Tensor)");
+  m.impl(
+      "ipex_lstm",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::ipex_lstm);
+  m.impl("ipex_lstm", c10::DispatchKey::CPU, torch_ipex::ipex_lstm);
+  m.impl("ipex_lstm", c10::DispatchKey::Meta, torch_ipex::ipex_lstm_meta);
+  m.def(
+      "ipex_lstm_layer(Tensor input, Tensor weight0, Tensor weight1, Tensor "
+      "weight2, Tensor weight3, Tensor hx_, Tensor cx_, bool reverse, int[] "
+      "batch_sizes, int mode, int hidden_size, int num_layers, bool "
+      "has_biases, bool bidirectional, bool batch_first, bool train, float scale, int zp, int dtype) -> "
+      "Tensor[]");
+  m.impl(
+      "ipex_lstm_layer",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::ipex_lstm_layer);
+  m.impl(
+      "ipex_lstm_layer",
+      c10::DispatchKey::Autograd,
+      torch_ipex::cpu::ipex_lstm_layer);
+  m.impl(
+      "ipex_lstm_layer",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::ipex_lstm_layer_forward);
+  m.impl(
+      "ipex_lstm_layer",
+      c10::DispatchKey::QuantizedCPU,
+      torch_ipex::cpu::ipex_lstm_layer_forward);
+  m.def(
+      "ipex_lstm_layer_backward(Tensor input, Tensor weight1, Tensor "
+      "weight2, Tensor weight3, Tensor weight4, Tensor hx_, Tensor cx_tmp, "
+      "Tensor output, Tensor hy_, Tensor cy_, Tensor grad_output, Tensor "
+      "grad_hy, Tensor grad_cy, bool reverse, int mode, int hidden_size, int "
+      "num_layers, bool has_biases, bool train, bool bidirectional, int[] "
+      "batch_sizes, bool batch_first, Tensor workspace) -> Tensor[]");
+  m.impl(
+      "ipex_lstm_layer_backward",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::ipex_lstm_layer_backward);
+}
+} // namespace

@@ -4,7 +4,8 @@ import intel_extension_for_pytorch
 from search_and_replace import read_file, search_and_replace, search_and_replace_via_ast
 import argparse
 import subprocess
-import ruamel.yaml as yaml
+from ruamel.yaml import YAML
+yaml = YAML(typ="safe", pure=True)
 
 
 def walkdir(path=".", aggressive=False):
@@ -51,23 +52,47 @@ def model_script_convert(file_list, in_place, aggressive, verbose):
         print(api_list_unsupported)
         print("###########################################")
     search_and_replace_via_ast(file_list)
+    corner_cases_dic = {"torch.has_cuda": "True",
+                        "torch.version.cuda": "11.7",
+                        "torch.cuda.has_half": "True",
+                        "torch.cuda._CudaBase": "torch.xpu._XPUBase",
+                        "torch.cuda._initialization_lock": "torch.xpu.lazy_init._initialization_lock",
+                        "torch.cuda._initialized": "torch.xpu.lazy_init._initialized",
+                        "torch.cuda._lazy_seed_tracker": "torch.xpu.lazy_init._lazy_seed_tracker",
+                        "torch.cuda._queued_calls": "torch.xpu.lazy_init._queued_calls",
+                        "torch.cuda._tls": "torch.xpu.lazy_init._tls",
+                        "torch.cuda.threading": "torch.xpu.lazy_init.threading",
+                        "torch.cuda.traceback": "torch.xpu.lazy_init.traceback",
+                        "torch.cuda._is_in_bad_fork": "torch.xpu.lazy_init._is_in_bad_fork",
+                        "torch.cuda._lazy_call": "torch.xpu.lazy_init._lazy_call",
+                        "torch.cuda._lazy_init": "torch.xpu.lazy_init._lazy_init",
+                        "torch.cuda.is_initialized": "torch.xpu.lazy_init.is_initialized",
+                        "torch.cuda.DeferredCudaCallError": "torch.xpu.lazy_init.DeferredXPUCallError",
+                        "torch.cuda._LazySeedTracker": "torch.xpu.lazy_init._LazySeedTracker"}
     if not aggressive:
         # roll back the definately unsupported xpu api
         for api_name in cuda_support_xpu_not_list:
-            xpu_api_name = api_name.replace("cuda", "xpu")
-            cuda_api_name = api_name
+            old_api_name = api_name.replace("cuda", "xpu")
+            new_api_name = api_name
+            is_corner_case = False
+            if new_api_name in corner_cases_dic.keys():
+                is_corner_case = True
+                new_api_name = corner_cases_dic[new_api_name]
             # TODO: use regrex match
             regrex_match = False
             revert, revert_file_list = search_and_replace(
-                xpu_api_name, cuda_api_name, file_list, in_place, regrex_match, verbose
+                old_api_name, new_api_name, file_list, regrex_match, verbose
             )
             if revert:
                 print("###########################################")
-                print(
-                    "Warning: {0} is not supported by torch.xpu, will not change it in following files".format(
-                        api_name
+                if is_corner_case:
+                    print("Warning: {0} will be mapped to {1}".format(api_name, new_api_name))
+                else:
+                    print(
+                        "Warning: {0} is not supported by torch.xpu, will not change it in following files".format(
+                            api_name
+                        )
                     )
-                )
                 for revert_file in revert_file_list:
                     print(revert_file)
                 print("###########################################")

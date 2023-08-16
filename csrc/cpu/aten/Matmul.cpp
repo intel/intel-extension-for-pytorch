@@ -200,9 +200,6 @@ at::Tensor matmul_onednn(const at::Tensor& self, const at::Tensor& mat2) {
       mkldnn_output,
       1.0f,
       1.0f,
-      ideep::scale_t(),
-      ideep::scale_t(),
-      ideep::scale_t(),
       ideep::attr_t(torch_ipex::fpmath_mode));
 
   handle_grad(self, mat2, output);
@@ -245,9 +242,6 @@ at::Tensor& matmul_onednn(
       mkldnn_output,
       1.0f,
       1.0f,
-      ideep::scale_t(),
-      ideep::scale_t(),
-      ideep::scale_t(),
       ideep::attr_t(torch_ipex::fpmath_mode));
   return out;
 }

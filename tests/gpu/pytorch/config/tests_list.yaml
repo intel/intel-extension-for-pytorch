@@ -1,0 +1,150 @@
+
+# This yaml file is for collecting tests (of files) into different lists
+# As a transition, we will keep both ported lists and pytorch-self lists (name starts with 'PYTORCH_')
+# But only ported lists will be queried, those pytorch-self lists are just a reminder
+# For current experimental CI, we only collect those ported CORE tests into CI to ensure stability
+# For weekly, we still want to run all ported tests.
+!!omap
+- TESTS:
+  - distributed/test_data_parallel
+  - nn/test_dropout
+  - nn/test_embedding
+  - nn/test_pooling
+  - test_autograd
+  - test_binary_ufuncs
+  - test_complex
+  - test_decomp
+  - test_dlpack
+  - test_expanded_weights
+  - test_foreach
+  - test_fx
+  - test_fx_experimental
+  - test_indexing
+  - test_linalg
+  - test_masked
+  - test_meta
+  - test_module_init
+  - test_modules
+  - test_nestedtensor
+  - test_nn
+  - test_numpy_interop
+  - test_ops
+  - test_ops_gradients
+  - test_ops_jit
+  - test_prims
+  - test_reductions
+  - test_scatter_gather_ops
+  - test_segment_reductions
+  - test_serialization
+  - test_shape_ops
+  - test_sort_and_select
+  - test_sparse
+  - test_sparse_csr
+  - test_spectral_ops
+  - test_tensor_creation_ops
+  - test_testing
+  - test_torch
+  - test_type_promotion
+  - test_unary_ufuncs
+  - test_view_ops
+  - test_vmap
+- CI_TESTS:
+  - test_autograd
+  - test_modules
+  - test_nn
+  - test_ops
+  - test_ops_gradients
+  - test_ops_jit
+  - test_torch
+- CORE_TESTS:
+  - test_autograd
+  - test_modules
+  - test_nn
+  - test_ops
+  - test_ops_gradients
+  - test_ops_jit
+  - test_torch
+- USE_PYTEST_LIST:
+  - distributed/elastic/agent/server/test/api_test
+  - distributed/elastic/events/lib_test
+  - distributed/pipeline/sync/skip/test_api
+  - distributed/pipeline/sync/skip/test_gpipe
+  - distributed/pipeline/sync/skip/test_inspect_skip_layout
+  - distributed/pipeline/sync/skip/test_leak
+  - distributed/pipeline/sync/skip/test_portal
+  - distributed/pipeline/sync/skip/test_stash_pop
+  - distributed/pipeline/sync/skip/test_tracker
+  - distributed/pipeline/sync/skip/test_verify_skippables
+  - distributed/pipeline/sync/test_balance
+  - distributed/pipeline/sync/test_bugs
+  - distributed/pipeline/sync/test_checkpoint
+  - distributed/pipeline/sync/test_copy
+  - distributed/pipeline/sync/test_deferred_batch_norm
+  - distributed/pipeline/sync/test_dependency
+  - distributed/pipeline/sync/test_inplace
+  - distributed/pipeline/sync/test_microbatch
+  - distributed/pipeline/sync/test_phony
+  - distributed/pipeline/sync/test_pipe
+  - distributed/pipeline/sync/test_pipeline
+  - distributed/pipeline/sync/test_stream
+  - distributed/pipeline/sync/test_transparency
+  - distributed/pipeline/sync/test_worker
+  - distributed/test_c10d_error_logger.py
+  - distributions/test_constraints
+  - distributions/test_transforms
+  - distributions/test_utils
+  - test_deploy
+  - test_typing
+- RUN_PARALLEL_BLOCKLIST:
+  - test_cpp_extensions_jit
+  - test_cpp_extensions_open_device_registration
+  - test_cuda_nvml_based_avail
+  - test_cuda_primary_ctx
+  - test_cuda_trace
+  - test_jit_disabled
+  - test_mobile_optimizer
+  - test_multiprocessing
+  - test_multiprocessing_spawn
+  - test_numedtuple_return_api
+  - test_overrides
+  - test_show_pickle
+  - test_tensorexpr
+- PYTORCH_TESTS:
+  - 'Not used for ported 1.13, wait for completing for ported 2.0, AR: Xunsong, Huang'
+- PYTORCH_FSDP_TEST:
+  - 'Not used for ported 1.13, wait for completing for ported 2.0, AR: Xunsong, Huang'
+- PYTORCH_CI_SERIAL_LIST:
+  - distributions/test_distributions
+  - functorch/test_vmap
+  - nn/test_convolution
+  - nn/test_pooling
+  - test_autograd
+  - test_cpp_api_parity
+  - test_cpp_extensions_jit
+  - test_cuda
+  - test_dataloader
+  - test_dispatch
+  - test_fake_tensor
+  - test_fx
+  - test_fx_backends
+  - test_indexing
+  - test_jit_cuda_fuser
+  - test_linalg
+  - test_modules
+  - test_nn
+  - test_prims
+  - test_reductions
+  - test_serialization
+  - test_sparse_csr
+  - test_spectral_ops
+  - test_tensor_creation_ops
+  - test_torch
+- PYTORCH_CORE_TEST_LIST:
+  - test_autograd
+  - test_modules
+  - test_nn
+  - test_ops
+  - test_ops_fwd_gradients
+  - test_ops_gradients
+  - test_ops_jit
+  - test_torch

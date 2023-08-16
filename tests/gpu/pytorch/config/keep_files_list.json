@@ -1,0 +1,9 @@
+[
+  "run_test.py",
+  "run_tests.py",
+  "config/*.json",
+  "config/*.yaml",
+  "common/*.py",
+  "test/xpu_test_base.py",
+  "tool/*.py"
+]

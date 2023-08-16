@@ -10,17 +10,17 @@ namespace cpu {
 DEFINE_DISPATCH(lamb_fused_step_kernel_stub);
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step(
-    at::Tensor& param_,
-    at::Tensor& exp_avg_,
-    at::Tensor& exp_avg_sq_,
-    at::Tensor& grad_,
-    at::Tensor& param2_,
-    const int64_t step,
-    const double beta1,
-    const double beta2,
-    const double learning_rate,
-    const double weight_decay,
-    const double eps) {
+    const at::Tensor& param_,
+    const at::Tensor& exp_avg_,
+    const at::Tensor& exp_avg_sq_,
+    const at::Tensor& grad_,
+    const at::Tensor& param2_,
+    int64_t step,
+    double beta1,
+    double beta2,
+    double learning_rate,
+    double weight_decay,
+    double eps) {
   RECORD_FUNCTION(
       "torch_ipex::lamb_fused_step", c10::ArrayRef<c10::IValue>({}));
 
@@ -90,10 +90,12 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step(
 } // namespace torch_ipex
 
 namespace {
+
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
       "lamb_fused_step",
       torch_ipex::cpu::lamb_fused_step,
       at::DispatchKey::CPU);
 }
+
 } // namespace

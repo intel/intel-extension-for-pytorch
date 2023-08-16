@@ -343,11 +343,11 @@ Tensor q_deconv3d(
 }
 
 TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
-  m.impl("quantized::conv2d.new", q_conv2d);
-  m.impl("quantized::conv2d_relu.new", q_conv2d_relu);
-  m.impl("quantized::conv3d.new", q_conv3d);
-  m.impl("quantized::conv3d_relu.new", q_conv3d_relu);
-  m.impl("quantized::conv_transpose3d", q_deconv3d);
+  IPEX_QOP_REGISTER("quantized::conv2d.new", q_conv2d);
+  IPEX_QOP_REGISTER("quantized::conv2d_relu.new", q_conv2d_relu)
+  IPEX_QOP_REGISTER("quantized::conv3d.new", q_conv3d);
+  IPEX_QOP_REGISTER("quantized::conv3d_relu.new", q_conv3d_relu);
+  IPEX_QOP_REGISTER("quantized::conv_transpose3d", q_deconv3d);
 }
 
 } // namespace AtenIpexTypeQuantizedXPU

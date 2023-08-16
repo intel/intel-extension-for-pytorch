@@ -95,6 +95,26 @@ static inline accscalar_t compute_scales_value(
 }
 
 template <typename accscalar_t>
+static accscalar_t nearest_compute_scales_value(
+    const c10::optional<double> scale,
+    int64_t src_size,
+    int64_t dst_size) {
+  return (scale.has_value() && scale.value() > 0.)
+      ? (accscalar_t)(1.0 / scale.value())
+      : (accscalar_t)src_size / dst_size;
+}
+
+template <typename accscalar_t>
+static accscalar_t compute_scales_value_backwards(
+    const c10::optional<double> scale,
+    int64_t src_size,
+    int64_t dst_size) {
+  return (scale.has_value() && scale.value() > 0.)
+      ? (accscalar_t)scale.value()
+      : (accscalar_t)src_size / dst_size;
+}
+
+template <typename accscalar_t>
 static inline accscalar_t area_pixel_compute_scale(
     int input_size,
     int output_size,

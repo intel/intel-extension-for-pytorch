@@ -2,7 +2,6 @@ import argparse
 import torch
 import intel_extension_for_pytorch as ipex
 
-
 class Module(torch.nn.Module):
     def __init__(self):
         super(Module, self).__init__()
@@ -12,7 +11,6 @@ class Module(torch.nn.Module):
         y = self.conv(x)
         return y
 
-
 def run_model(level):
     m = Module().eval()
     m = ipex.optimize(m, dtype=torch.float32, level="O1")
@@ -20,8 +18,7 @@ def run_model(level):
     with ipex.verbose(level):
         m(d)
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose-level", default=0, type=int)
     args = parser.parse_args()

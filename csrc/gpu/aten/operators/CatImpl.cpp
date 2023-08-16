@@ -17,6 +17,7 @@
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 #include "comm/zmath.h"
+#include "utils/ComputeEngine.h"
 
 using namespace dnnl;
 using namespace xpu::dpcpp;
@@ -516,11 +517,6 @@ void cat_(const ITensorListRef& container, int64_t dim, Tensor& out) {
         return t.scalar_type() == firstType;
       });
 
-  bool isBlockfmt =
-      std::any_of(tensors.begin(), tensors.end(), [](const Tensor& t) {
-        return xpu::oneDNN::is_onednn_layout(t);
-      });
-
   bool isQuant =
       std::any_of(tensors.begin(), tensors.end(), [](const Tensor& t) {
         return t.is_quantized();
@@ -528,7 +524,13 @@ void cat_(const ITensorListRef& container, int64_t dim, Tensor& out) {
 
   // when satify none of the input tensors is block fmt
   // cat will go to DPCPP path, all the other cases will go to oneDNN path
-  if (isQuant || !isBlockfmt) {
+
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::BASIC, container);
+
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng && (!isQuant)) {
+    xpu::oneDNN::concat(out, tensors, dim);
+  } else {
     auto atens = at::AtenIpexTypeXPU::to_plain_if_needed(tensors);
     impl::cat(
         out,
@@ -536,8 +538,6 @@ void cat_(const ITensorListRef& container, int64_t dim, Tensor& out) {
         atens.size(),
         dim,
         allSameType);
-  } else {
-    xpu::oneDNN::concat(out, tensors, dim);
   }
 }
 

@@ -69,16 +69,39 @@ void store_args(
 } // namespace
 
 namespace foreach_internal {
+// Implement std::isnan<IntegralType> for MSVC.
+// taken from
+// https://github.com/pytorch/pytorch/blob/a67691e50803b31e98043d22ae29da4c0135ab3c/aten/src/ATen/native/ReduceOps.cpp#L239-L256
+namespace {
+#ifdef _MSC_VER
+template <typename T>
+inline typename std::enable_if<std::is_integral<T>::value, bool>::type isnan_(
+    T x) {
+  return false;
+}
+template <typename T>
+inline typename std::enable_if<!std::is_integral<T>::value, bool>::type isnan_(
+    T x) {
+  return std::isnan(x);
+}
+#else
+template <typename T>
+inline bool isnan_(T x) {
+  return std::isnan(x);
+}
+#endif
+} // namespace
+
 template <typename T>
 struct minimum {
   T operator()(const T& a, const T& b) {
-    return (std::isnan(a) || a < b) ? a : b;
+    return (isnan_(a) || a < b) ? a : b;
   }
 };
 template <typename T>
 struct maximum {
   T operator()(const T& a, const T& b) {
-    return (std::isnan(a) || a > b) ? a : b;
+    return (isnan_(a) || a > b) ? a : b;
   }
 };
 } // namespace foreach_internal

@@ -1,7 +1,6 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
-import pytest
 
 xpu_device = torch.device("xpu")
 cpu_device = torch.device("cpu")
@@ -10,7 +9,6 @@ checking_rtol = 3e-2
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skip("Skip this case due to random NaN in CPU reference.")
     def test_baddbmm_scale(self, dtype=torch.float):
         m1_cpu = torch.ones([6, 3, 4], dtype=dtype) * 0.25
         m2_cpu = torch.ones([6, 4, 2], dtype=dtype) * 1.5
@@ -26,8 +24,10 @@ class TestTorchMethod(TestCase):
                 print("alpha", alpha)
                 print("beta", beta)
                 res_cpu = torch.baddbmm(x_cpu, m1_cpu, m2_cpu, beta=beta, alpha=alpha)
-                res_xpu = torch.baddbmm(x_xpu, m1_xpu, m2_xpu, beta=beta, alpha=alpha)
                 print("cpu addmm_ result", res_cpu)
+                if res_cpu.isnan().any():
+                    continue  # skip if NaN in CPU result
+                res_xpu = torch.baddbmm(x_xpu, m1_xpu, m2_xpu, beta=beta, alpha=alpha)
                 print("xpu addmm_ result", res_xpu.cpu())
                 self.assertEqual(res_cpu, res_xpu.cpu())
 

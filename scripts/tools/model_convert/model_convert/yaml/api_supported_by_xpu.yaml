@@ -73,6 +73,8 @@
 - torch.cuda.seed
 - torch.cuda.IntTensor
 - torch.cuda.max_memory_allocated
+- torch.cuda.max_memory_cached
+- torch.cuda.memory_cached
 - torch.cuda.device_count
 - torch.cuda.ByteStorage
 - torch.cuda.set_stream
@@ -123,6 +125,8 @@
 - torch.cuda.BoolTensor
 - torch.cuda.max_memory_reserved
 - torch.cuda.memory_allocated
+- torch.cuda.reset_max_memory_allocated
+- torch.cuda.reset_max_memory_cached
 - torch.cuda.CharStorage
 - torch.cuda.__file__
 - torch.cuda.get_rng_state_all

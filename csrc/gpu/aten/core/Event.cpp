@@ -143,7 +143,7 @@ float DPCPPEvent::elapsed_time(const DPCPPEvent& other) const {
 }
 
 void DPCPPEvent::ipc_handle(void* handle) {
-  AT_ERROR("ipc_handle with DPCPP is not supported");
+  AT_ERROR("ipc_handle with XPU is not supported");
 }
 
 void DPCPPEvent::moveHelper(DPCPPEvent&& other) {

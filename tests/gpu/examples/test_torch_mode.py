@@ -1,17 +1,12 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch # noqa
-import pytest
 
 cpu_device = torch.device("cpu")
 xpu_device = torch.device("xpu")
 value_range = 30
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(
-        not torch.xpu.has_2d_block_array(),
-        reason="Failed on ATSM only, will be fixed soon.",
-    )
     def test_mode(self):
         def mode_test_helper(input_list):
             for input_cpu in input_list:

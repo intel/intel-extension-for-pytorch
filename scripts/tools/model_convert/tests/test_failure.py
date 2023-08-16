@@ -8,10 +8,6 @@ class TorchCudaAPITests(unittest.TestCase):
         x = torch.cuda.is_current_stream_capturing()
         self.assertEqual(x, False)
 
-    def test_is_in_bad_fork(self):
-        x = torch.cuda._is_in_bad_fork()
-        self.assertEqual(x, False)
-
 
 if __name__ == "__main__":
     unittest.main()

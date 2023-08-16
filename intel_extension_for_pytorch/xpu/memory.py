@@ -142,6 +142,59 @@ def reset_peak_memory_stats(device: Union[Device, int] = None) -> None:
     return intel_extension_for_pytorch._C._resetPeakMemoryStats(device)
 
 
+def reset_max_memory_allocated(device: Union[Device, int] = None) -> None:
+    r"""Resets the starting point in tracking maximum GPU memory occupied by
+    tensors for a given device.
+
+    See :func:`~torch.xpu.max_memory_allocated` for details.
+
+    Args:
+        device (torch.device or int, optional): selected device. Returns
+            statistic for the current device, given by :func:`~torch.xpu.current_device`,
+            if :attr:`device` is ``None`` (default).
+
+    .. warning::
+        This function now calls :func:`~torch.xpu.reset_peak_memory_stats`, which resets
+        /all/ peak memory stats.
+
+    .. note::
+        See :ref:`xpu-memory-management` for more details about GPU memory
+        management.
+    """
+    warnings.warn(
+        "torch.xpu.reset_max_memory_allocated now calls torch.xpu.reset_peak_memory_stats, "
+        "which resets /all/ peak memory stats.",
+        FutureWarning)
+    return reset_peak_memory_stats(device=device)
+
+
+
+def reset_max_memory_cached(device: Union[Device, int] = None) -> None:
+    r"""Resets the starting point in tracking maximum GPU memory managed by the
+    caching allocator for a given device.
+
+    See :func:`~torch.xpu.max_memory_cached` for details.
+
+    Args:
+        device (torch.device or int, optional): selected device. Returns
+            statistic for the current device, given by :func:`~torch.xpu.current_device`,
+            if :attr:`device` is ``None`` (default).
+
+    .. warning::
+        This function now calls :func:`~torch.xpu.reset_peak_memory_stats`, which resets
+        /all/ peak memory stats.
+
+    .. note::
+        See :ref:`xpu-memory-management` for more details about GPU memory
+        management.
+    """
+    warnings.warn(
+        "torch.xpu.reset_max_memory_cached now calls torch.xpu.reset_peak_memory_stats, "
+        "which resets /all/ peak memory stats.",
+        FutureWarning)
+    return reset_peak_memory_stats(device=device)
+
+
 def memory_allocated(device: Union[Device, int] = None) -> int:
     r"""Returns the current GPU memory occupied by tensors in bytes for a given
     device.
@@ -218,6 +271,22 @@ def max_memory_reserved(device: Union[Device, int] = None) -> int:
         management.
     """
     return memory_stats(device=device)["reserved_bytes.all.peak"]
+
+
+def memory_cached(device: Union[Device, int] = None) -> int:
+    r"""Deprecated; see :func:`~torch.xpu.memory_reserved`."""
+    warnings.warn(
+        "torch.xpu.memory_cached has been renamed to torch.xpu.memory_reserved",
+        FutureWarning)
+    return memory_reserved(device=device)
+
+
+def max_memory_cached(device: Union[Device, int] = None) -> int:
+    r"""Deprecated; see :func:`~torch.xpu.max_memory_reserved`."""
+    warnings.warn(
+        "torch.xpu.max_memory_cached has been renamed to torch.xpu.max_memory_reserved",
+        FutureWarning)
+    return max_memory_reserved(device=device)
 
 
 def memory_snapshot():

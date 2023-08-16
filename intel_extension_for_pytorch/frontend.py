@@ -553,45 +553,52 @@ def optimize(
     if opt_properties.auto_kernel_selection:
         _enable_dnnl()
 
-    # when on xpu, some features are not supported
+    if device_type == "cpu":
+        if opt_properties.optimize_transformers:
+            warnings.warn("Transformer opitmization is only support on XPU now.")
+            opt_properties.optimize_transformers = False
+
     if device_type == "xpu":
-        if opt_properties.auto_kernel_selection:
-            warnings.warn(
-                "Auto Kernel Selection feature is not supported on XPU, disabled."
-            )
-            opt_properties.auto_kernel_selection = False
         if opt_properties.split_master_weight_for_bf16:
             # currently split master weight for xpu only support sgd
             if type(optimizer) is torch.optim.SGD:
                 opt_properties.split_master_weight_for_bf16 = True
             else:
                 opt_properties.split_master_weight_for_bf16 = False
-        if opt_properties.graph_mode:
-            warnings.warn(
-                "Out-of-Box (OOB) solution for inference supposes to trace a model outside "
-                + "the torch.xpu.optimize on XPU, disabled the graph mode."
-            )
-            # TODO: for xpu now, the oob solution for inference is to trace model outside of the torch.xpu.optimize.
-            opt_properties.graph_mode = False
-        if not inplace:
-            warnings.warn(
-                "To reduce device memory usage on XPU, optimization are done inplace,"
-                + " setting the inplace argument to True."
-            )
-            # TODO: for xpu, inplace is true will add device memory pressure, so set inplace to be true
-            inplace = True
-        if opt_properties.weights_prepack or sample_input is not None:
-            warnings.warn(
-                "Weight Prepack and Sample Input are both disabled on XPU. The Onednn Layout"
-                + " is automatically applied."
-            )
-            opt_properties.weights_prepack = False
-            sample_input = None
-        if opt_properties.optimize_lstm is not None:
-            warnings.warn(
-                "For XPU, the optimize_lstm(replace lstm with ipex_lstm) is unsupported, so disable it"
-            )
-            opt_properties.optimize_lstm = False
+
+        # throw warnings when users manually choose the unsupported optimization
+        if opt_properties.opt_level == "O0":
+            if opt_properties.auto_kernel_selection:
+                warnings.warn(
+                    "Auto Kernel Selection feature is not supported on XPU, disabled."
+                )
+            if opt_properties.graph_mode:
+                warnings.warn(
+                    "Out-of-Box (OOB) solution for inference supposes to trace a model outside "
+                    + "the torch.xpu.optimize on XPU, disabled the graph mode."
+                )
+            if not inplace:
+                warnings.warn(
+                    "To reduce device memory usage on XPU, optimization are done inplace,"
+                    + " setting the inplace argument to True."
+                )
+            if opt_properties.weights_prepack or sample_input is not None:
+                warnings.warn(
+                    "Weight Prepack and Sample Input are both disabled on XPU. The Onednn Layout"
+                    + " is automatically applied."
+                )
+            if opt_properties.optimize_lstm is not None:
+                warnings.warn(
+                    "For XPU, the optimize_lstm(replace lstm with ipex_lstm) is unsupported,"
+                    + " so disable it"
+                )
+
+        opt_properties.graph_mode = False
+        inplace = True
+        opt_properties.weights_prepack = False
+        sample_input = None         
+        opt_properties.optimize_lstm = False
+        opt_properties.auto_kernel_selection = False
 
     if inplace:
         optimized_model = model

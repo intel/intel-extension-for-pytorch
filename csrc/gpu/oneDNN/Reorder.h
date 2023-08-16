@@ -144,8 +144,8 @@ static inline void quantized_reorder(
     int32_t* src_zero_point,
     float* dst_scale,
     int32_t* dst_zero_point,
-    std::vector<long> scale_zp_sz,
-    std::vector<long> scale_zp_st,
+    memory::dims scale_zp_sz,
+    memory::dims scale_zp_st,
     const ReorderAttr& rattr) {
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});

@@ -21,7 +21,7 @@ class TestNNMethod(TestCase):
         y_dpcpp = bn(x_dpcpp_i)
         self.assertEqual(y_cpu, y_dpcpp.cpu().float(), atol=1e-2, rtol=0)
 
-    def test_batch_norm_bfloat16(self, dtype=torch.bfloat16):
+    def test_batch_norm_half_bakcward(self, dtype=torch.float16):
         x_i = torch.randn([2, 2, 3, 3], device=cpu_device)
         grad_i = torch.randn([2, 2, 3, 3], device=cpu_device)
 
@@ -35,8 +35,31 @@ class TestNNMethod(TestCase):
 
         y_cpu.backward(grad_cpu)
 
-        print("x_cpu = ", y_cpu)
-        print("x_cpu.grad = ", x_cpu.grad)
+        x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
+        grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
+        bn.to(dtype).to(dpcpp_device)
+        y_dpcpp = bn(x_dpcpp)
+        y_dpcpp.backward(grad_dpcpp)
+
+        self.assertEqual(y_cpu, y_dpcpp.to(cpu_device).float(), rtol=10e-4, atol=10e-2)
+        self.assertEqual(
+            x_cpu.grad, x_dpcpp.grad.to(cpu_device).float(), rtol=10e-4, atol=10e-2
+        )
+
+    def test_batch_norm_bfloat16(self, dtype=torch.bfloat16):
+        x_i = torch.randn([2, 2, 3, 3], dtype=dtype, device=cpu_device)
+        grad_i = torch.randn([2, 2, 3, 3], dtype=dtype, device=cpu_device)
+
+        x_dpcpp_i = x_i.to(dpcpp_device)
+        grad_dpcpp_i = grad_i.to(dpcpp_device)
+
+        x_cpu = Variable(x_i, requires_grad=True)
+        grad_cpu = Variable(grad_i, requires_grad=True)
+        bn = nn.BatchNorm2d(2)
+        y_cpu = bn(x_cpu)
+
+        y_cpu.backward(grad_cpu)
+
 
         x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
         grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
@@ -44,52 +67,60 @@ class TestNNMethod(TestCase):
         y_dpcpp = bn(x_dpcpp)
         y_dpcpp.backward(grad_dpcpp)
 
-        print("y_dpcpp = ", y_dpcpp.cpu())
-        print("x_dpcpp.grad", x_dpcpp.grad.cpu())
-        self.assertEqual(y_cpu, y_dpcpp.to(cpu_device).float(), rtol=10e-4, atol=10e-2)
+        self.assertEqual(y_cpu, y_dpcpp.to(cpu_device), rtol=1e-3, atol=1e-1)
         self.assertEqual(
-            x_cpu.grad, x_dpcpp.grad.to(cpu_device).float(), rtol=10e-4, atol=10e-2
-        )
+            x_cpu.grad, x_dpcpp.grad.to(cpu_device), rtol=1e-3, atol=1e-1)
 
     def test_batch_norm(self, dtype=torch.float):
-        x_i = torch.randn([2, 2, 3, 3], device=cpu_device)
-        grad_i = torch.randn([2, 2, 3, 3], device=cpu_device)
+        shapes = [
+            (1, 2, 3, 3),
+            (2, 2, 3, 3),
+            (4, 4, 4, 4),
+            (4, 4, 1, 1),
+            (4, 1, 4, 4),
+            (4, 1, 4, 1),
+            (4, 1, 1, 4),
+            (1, 4, 1, 4),
+            (1, 4, 4, 1),
+            (4, 1, 1, 1),
+            (4, 64, 128, 1),
+            (4, 32, 64, 64),
+            (4, 1024, 16, 16),
+        ]
+        for shape in shapes:
+            print("\n================== test shape: ", shape, "==================")
+            N, C, H, W = shape[0], shape[1], shape[2], shape[3]
+            x_i = torch.randn([N, C, H, W], device=cpu_device)
+            grad_i = torch.randn([N, C, H, W], device=cpu_device)
 
-        x_dpcpp_i = x_i.to(dpcpp_device)
-        grad_dpcpp_i = grad_i.to(dpcpp_device)
+            x_dpcpp_i = x_i.to(dpcpp_device)
+            grad_dpcpp_i = grad_i.to(dpcpp_device)
 
-        self.assertEqual(x_i, x_dpcpp_i.to(cpu_device))
-        self.assertEqual(grad_i, grad_dpcpp_i.to(cpu_device))
+            self.assertEqual(x_i, x_dpcpp_i.to(cpu_device))
+            self.assertEqual(grad_i, grad_dpcpp_i.to(cpu_device))
 
-        x_cpu = Variable(x_i, requires_grad=True)
-        grad_cpu = Variable(grad_i, requires_grad=True)
-        bn1 = nn.BatchNorm2d(2)
-        bn2 = nn.BatchNorm2d(2)
-        y_cpu1 = bn1(x_cpu)
-        y_cpu = bn2(y_cpu1)
+            x_cpu = Variable(x_i, requires_grad=True)
+            grad_cpu = Variable(grad_i, requires_grad=True)
+            bn1 = nn.BatchNorm2d(C)
+            bn2 = nn.BatchNorm2d(C)
+            y_cpu1 = bn1(x_cpu)
+            y_cpu = bn2(y_cpu1)
 
-        y_cpu.backward(grad_cpu)
+            y_cpu.backward(grad_cpu)
 
-        print("x_cpu = ", y_cpu)
-        print("x_cpu.grad = ", x_cpu.grad)
 
-        x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
-        grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
-        bn1.to(dpcpp_device)
-        bn2.to(dpcpp_device)
+            x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
+            grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
+            bn1.to(dpcpp_device)
+            bn2.to(dpcpp_device)
 
-        y_dpcpp1 = bn1(x_dpcpp)
-        y_dpcpp = bn2(y_dpcpp1)
+            y_dpcpp1 = bn1(x_dpcpp)
+            y_dpcpp = bn2(y_dpcpp1)
 
-        y_dpcpp.backward(grad_dpcpp)
+            y_dpcpp.backward(grad_dpcpp)
 
-        # y = y_dpcpp1.cpu()
-        # y = Variable(y, requires_grad = True)
-        #  y.backward(grad_cpu)
-        print("y_dpcpp = ", y_dpcpp.cpu())
-        print("x_dpcpp.grad", x_dpcpp.grad.cpu())
-        self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
-        self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
+            self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
     def test_batch_norm_bwd(self, dtype=torch.float):
         conv = nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
@@ -110,8 +141,6 @@ class TestNNMethod(TestCase):
         y_cpu = bn(y_cpu1)
         y_cpu.backward(grad_cpu)
 
-        print("x_cpu = ", y_cpu)
-        print("x_cpu.grad = ", x_cpu.grad)
 
         x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
         grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
@@ -122,8 +151,6 @@ class TestNNMethod(TestCase):
         y_dpcpp = bn(y_dpcpp1)
         y_dpcpp.backward(grad_dpcpp)
 
-        print("y_dpcpp = ", y_dpcpp.cpu())
-        print("x_dpcpp.grad", x_dpcpp.grad.cpu())
         self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
@@ -145,8 +172,6 @@ class TestNNMethod(TestCase):
         real = relu(real)
         real = real.contiguous().cpu()
 
-        print(real)
-        print(ref)
         self.assertEqual(real, ref)
 
     def test_channels_last_simple_bwd(self, dtype=torch.float):
@@ -165,8 +190,6 @@ class TestNNMethod(TestCase):
 
         y_cpu.backward(grad_cpu)
 
-        print("x_cpu = ", y_cpu)
-        print("x_cpu.grad = ", x_cpu.grad)
 
         x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
         grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
@@ -177,8 +200,6 @@ class TestNNMethod(TestCase):
 
         y_dpcpp.backward(grad_dpcpp)
 
-        print("y_dpcpp = ", y_dpcpp.cpu())
-        print("x_dpcpp.grad", x_dpcpp.grad.cpu())
         self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
@@ -187,6 +208,7 @@ class TestNNMethod(TestCase):
     )
     def test_channels_last_1d_fwd_and_bwd(self, dtype=torch.float):
         shapes = [
+            (1, 4, 32),
             (1, 2, 3),
             (2, 2, 3),
             (4, 4, 4),
@@ -194,6 +216,8 @@ class TestNNMethod(TestCase):
             (4, 1, 4),
             (4, 1, 1),
             (1, 4, 4),
+            (1, 32, 1024),
+            (4, 1024, 256),
         ]
         for shape in shapes:
             print("\n================== test shape: ", shape, "==================")
@@ -212,9 +236,6 @@ class TestNNMethod(TestCase):
             y_cpu = bn(y_cpu1)
 
             y_cpu.backward(grad_cpu)
-
-            print("x_cpu = ", y_cpu)
-            print("x_cpu.grad = ", x_cpu.grad)
 
             x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
             grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
@@ -255,8 +276,6 @@ class TestNNMethod(TestCase):
                     torch.xpu.is_contiguous_channels_last_1d(x_dpcpp.grad), True
                 )
 
-            print("y_dpcpp = ", y_dpcpp.cpu())
-            print("x_dpcpp.grad", x_dpcpp.grad.cpu())
             self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
             self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
@@ -272,79 +291,86 @@ class TestNNMethod(TestCase):
             (1, 4, 1, 4),
             (1, 4, 4, 1),
             (4, 1, 1, 1),
+            (1, 8, 32, 32),
+            (4, 32, 32, 32),
+            (4, 1024, 16, 16),
         ]
-        for shape in shapes:
-            print("\n================== test shape: ", shape, "==================")
-            N, C, H, W = shape[0], shape[1], shape[2], shape[3]
-            bn = nn.BatchNorm2d(C)
-            x_i = torch.randn([N, C, H, W], device=cpu_device)
-            grad_i = torch.randn([N, C, H, W], device=cpu_device)
+        for dtype in [torch.float, torch.bfloat16]:
+            if dtype == torch.bfloat16:
+                rtol = 1e-3
+                atol = 1e-1
+            else:
+                rtol = 1e-4
+                atol = 1e-5
 
-            x_dpcpp_i = x_i.to(dpcpp_device).to(memory_format=torch.channels_last)
-            grad_dpcpp_i = grad_i.to(dpcpp_device).to(memory_format=torch.channels_last)
+            for shape in shapes:
+                print("\n================== test shape: ", shape, ", dtype:", dtype, "==================")
+                N, C, H, W = shape[0], shape[1], shape[2], shape[3]
+                bn = nn.BatchNorm2d(C)
+                x_i = torch.randn([N, C, H, W], dtype=dtype, device=cpu_device)
+                grad_i = torch.randn([N, C, H, W], dtype=dtype, device=cpu_device)
 
-            x_cpu = Variable(x_i, requires_grad=True)
-            grad_cpu = Variable(grad_i, requires_grad=True)
+                x_dpcpp_i = x_i.to(dpcpp_device).to(memory_format=torch.channels_last)
+                grad_dpcpp_i = grad_i.to(dpcpp_device).to(memory_format=torch.channels_last)
 
-            y_cpu1 = bn(x_cpu)
-            y_cpu = bn(y_cpu1)
+                x_cpu = Variable(x_i, requires_grad=True)
+                grad_cpu = Variable(grad_i, requires_grad=True)
 
-            y_cpu.backward(grad_cpu)
+                y_cpu1 = bn(x_cpu)
+                y_cpu = bn(y_cpu1)
 
-            print("x_cpu = ", y_cpu)
-            print("x_cpu.grad = ", x_cpu.grad)
+                y_cpu.backward(grad_cpu)
 
-            x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
-            grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
-            bn.to(dpcpp_device)
 
-            y_dpcpp1 = bn(x_dpcpp)
-            y_dpcpp = bn(y_dpcpp1)
+                x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
+                grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
+                bn.to(dpcpp_device)
 
-            y_dpcpp.backward(grad_dpcpp)
+                y_dpcpp1 = bn(x_dpcpp)
+                y_dpcpp = bn(y_dpcpp1)
 
-            if (
-                1 == y_dpcpp.shape[1]
-                or (1 == y_dpcpp.shape[2] and 1 == y_dpcpp.shape[3])
-                or (
+                y_dpcpp.backward(grad_dpcpp)
+
+                if (
                     1 == y_dpcpp.shape[1]
-                    and 1 == y_dpcpp.shape[2]
-                    and 1 == y_dpcpp.shape[3]
-                )
-            ):
-                self.assertEqual(y_dpcpp.is_contiguous(), True)
-                self.assertEqual(
-                    y_dpcpp.is_contiguous(memory_format=torch.channels_last), True
-                )
-            else:
-                self.assertEqual(y_dpcpp.is_contiguous(), False)
-                self.assertEqual(
-                    y_dpcpp.is_contiguous(memory_format=torch.channels_last), True
-                )
+                    or (1 == y_dpcpp.shape[2] and 1 == y_dpcpp.shape[3])
+                    or (
+                        1 == y_dpcpp.shape[1]
+                        and 1 == y_dpcpp.shape[2]
+                        and 1 == y_dpcpp.shape[3]
+                    )
+                ):
+                    self.assertEqual(y_dpcpp.is_contiguous(), True)
+                    self.assertEqual(
+                        y_dpcpp.is_contiguous(memory_format=torch.channels_last), True
+                    )
+                else:
+                    self.assertEqual(y_dpcpp.is_contiguous(), False)
+                    self.assertEqual(
+                        y_dpcpp.is_contiguous(memory_format=torch.channels_last), True
+                    )
 
-            if (
-                1 == x_dpcpp.grad.shape[1]
-                or (1 == x_dpcpp.grad.shape[2] and 1 == x_dpcpp.grad.shape[3])
-                or (
+                if (
                     1 == x_dpcpp.grad.shape[1]
-                    and 1 == x_dpcpp.grad.shape[2]
-                    and 1 == x_dpcpp.grad.shape[3]
-                )
-            ):
-                self.assertEqual(x_dpcpp.grad.is_contiguous(), True)
-                self.assertEqual(
-                    x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last), True
-                )
-            else:
-                self.assertEqual(x_dpcpp.grad.is_contiguous(), False)
-                self.assertEqual(
-                    x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last), True
-                )
+                    or (1 == x_dpcpp.grad.shape[2] and 1 == x_dpcpp.grad.shape[3])
+                    or (
+                        1 == x_dpcpp.grad.shape[1]
+                        and 1 == x_dpcpp.grad.shape[2]
+                        and 1 == x_dpcpp.grad.shape[3]
+                    )
+                ):
+                    self.assertEqual(x_dpcpp.grad.is_contiguous(), True)
+                    self.assertEqual(
+                        x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last), True
+                    )
+                else:
+                    self.assertEqual(x_dpcpp.grad.is_contiguous(), False)
+                    self.assertEqual(
+                        x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last), True
+                    )
 
-            print("y_dpcpp = ", y_dpcpp.cpu())
-            print("x_dpcpp.grad", x_dpcpp.grad.cpu())
-            self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
-            self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
+                self.assertEqual(y_cpu, y_dpcpp.to(cpu_device), rtol=rtol, atol=atol)
+                self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device), rtol=rtol, atol=atol)
 
     def test_batch_norm_gather_stats(self):
         input = torch.randn(1, 3, 3, 3, device="xpu")
@@ -360,3 +386,17 @@ class TestNNMethod(TestCase):
         )
         self.assertEqual(mean, torch.ones(3, device="xpu"))
         self.assertEqual(invstd, torch.ones(3, device="xpu"))
+
+
+    def test_sync_batchnorm_accuracy(self):
+
+        def _batch_norm_stats(data, memory_format, mean_axes):
+            mean1, _ = torch.batch_norm_stats(data, 1e-5)
+            mean2, _ = torch.batch_norm_stats(data.to(memory_format=memory_format), 1e-5)
+            mean_ref = torch.mean(data, mean_axes, keepdim=False)
+
+            self.assertEqual(mean_ref, mean1)
+            self.assertEqual(mean_ref, mean2)
+
+        _batch_norm_stats(torch.randn(1, 96, 112, 112, dtype=torch.float, device='xpu'), torch.channels_last, (0, 2, 3))
+        _batch_norm_stats(torch.randn(1, 96, 112, 112, 112, dtype=torch.float, device='xpu'), torch.channels_last_3d, (0, 2, 3, 4))

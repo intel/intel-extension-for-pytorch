@@ -16,7 +16,8 @@
 #include "comm/AccumulateType.h"
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
-#include "jit/dpcpp_ops.h"
+
+#include "utils/ComputeEngine.h"
 #include "utils/CustomOperatorRegistration.h"
 
 using namespace xpu::dpcpp;
@@ -129,7 +130,8 @@ Tensor mul_scalar_add_scalar(
     Scalar accumu,
     Scalar alpha) {
   Tensor result;
-  if (check_opaque({self})) {
+  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, self);
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     result = AtenIpexTypeXPU::mul(self, other);
     result = AtenIpexTypeXPU::add(result, accumu, alpha);
   } else {
@@ -171,10 +173,12 @@ Tensor mul_add_scalar(
     Scalar accumu,
     Scalar alpha) {
   Tensor result;
-  if (check_opaque({self, other})) {
+  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, self, other);
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     result = AtenIpexTypeXPU::mul(self, other);
     return AtenIpexTypeXPU::add(result, accumu, alpha);
   }
+
   auto iter = TensorIteratorConfig()
                   .set_check_mem_overlap(true)
                   .promote_inputs_to_common_dtype(true)
@@ -226,7 +230,9 @@ Tensor mul_scalar_add(
     const Tensor& accumu,
     Scalar alpha) {
   Tensor result;
-  if (check_opaque({self, accumu})) {
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::BASIC, self, accumu);
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     result = AtenIpexTypeXPU::mul(self, other);
     result = AtenIpexTypeXPU::add(result, accumu, alpha);
   } else {
@@ -283,7 +289,9 @@ Tensor mul_add(
     const Tensor& accumu,
     Scalar alpha) {
   Tensor result;
-  if (check_opaque({self, other, accumu})) {
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::BASIC, self, other, accumu);
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     result = AtenIpexTypeXPU::mul(self, other);
     result = AtenIpexTypeXPU::add(result, accumu, alpha);
   } else {

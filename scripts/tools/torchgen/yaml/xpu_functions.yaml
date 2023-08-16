@@ -58,6 +58,8 @@ supported:
   - _lu_with_info
   - _make_per_channel_quantized_tensor
   - _make_per_tensor_quantized_tensor
+  - _masked_softmax
+  - _masked_softmax_backward
   - _pdist_backward
   - _pdist_forward
   - _pin_memory
@@ -73,6 +75,7 @@ supported:
   - linalg_lu_solve.out
   - linalg_lu.out
   - linalg_matrix_exp
+  - linalg_cross.out
   - _unique
   - _unique2
   - abs.out
@@ -137,6 +140,8 @@ supported:
   - batch_norm_elemt.out
   - batch_norm_gather_stats
   - batch_norm_gather_stats_with_counts
+  - batch_norm_stats
+  - batch_norm_stats.out
   - bernoulli_.Tensor
   - bernoulli_.float
   - bernoulli.out
@@ -636,6 +641,7 @@ supported:
   - upsample_bilinear2d_backward.grad_input
   - upsample_linear1d.out
   - upsample_linear1d_backward.grad_input
+  - upsample_nearest1d
   - upsample_nearest1d.out
   - upsample_nearest1d_backward.grad_input
   - upsample_nearest2d.out
@@ -821,6 +827,7 @@ supported:
   - _weight_norm_interface
   - _validate_compressed_sparse_indices
   - index.Tensor_out
+  - pad_sequence
 autograd:
   - cdist
   - lstm.input

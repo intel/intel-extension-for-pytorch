@@ -28,7 +28,8 @@ at::Tensor convolution_kernel(
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
     int64_t groups,
-    const ideep::attr_t& attr);
+    const ideep::attr_t& attr,
+    at::MemoryFormat memory_format);
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward_kernel(
     const at::Tensor& input,
@@ -50,6 +51,13 @@ std::vector<int64_t> calc_conv_output_size(
     at::IntArrayRef stride,
     at::IntArrayRef dilation);
 
+c10::SymDimVector calc_conv_output_size(
+    c10::SymIntArrayRef input_size,
+    at::IntArrayRef kernel_size,
+    at::IntArrayRef padding,
+    at::IntArrayRef stride,
+    at::IntArrayRef dilation);
+
 // IPEX customized convolution OP with n-D packed weight
 class IPEXConvolutionOp : public torch::autograd::Function<IPEXConvolutionOp> {
  public:
@@ -59,19 +67,51 @@ class IPEXConvolutionOp : public torch::autograd::Function<IPEXConvolutionOp> {
       const at::Tensor& input,
       const at::Tensor& weight,
       const c10::optional<at::Tensor>& bias_opt,
-      const at::Tensor& op_context);
+      const at::Tensor& op_context,
+      c10::optional<at::IntArrayRef> kernel_size,
+      c10::optional<at::IntArrayRef> padding,
+      c10::optional<at::IntArrayRef> stride,
+      c10::optional<at::IntArrayRef> dilation,
+      c10::optional<bool> weight_channels_last);
 
   static at::Tensor forward(
       torch::autograd::AutogradContext* ctx,
       const at::Tensor& input,
       const at::Tensor& weight,
       const c10::optional<at::Tensor>& bias_opt,
-      const at::Tensor& op_context);
+      const at::Tensor& op_context,
+      c10::optional<at::IntArrayRef> kernel_size,
+      c10::optional<at::IntArrayRef> padding,
+      c10::optional<at::IntArrayRef> stride,
+      c10::optional<at::IntArrayRef> dilation,
+      c10::optional<bool> weight_channels_last);
 
   static torch::autograd::variable_list backward(
       torch::autograd::AutogradContext* ctx,
       torch::autograd::variable_list grad_outputs);
 };
+
+at::Tensor convolution_forward(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias_opt,
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> kernel_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<bool> weight_channels_last);
+
+at::Tensor convolution_forward_meta(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias_opt,
+    const at::Tensor& op_context,
+    c10::optional<at::IntArrayRef> kernel_size,
+    c10::optional<at::IntArrayRef> padding,
+    c10::optional<at::IntArrayRef> stride,
+    c10::optional<at::IntArrayRef> dilation,
+    c10::optional<bool> weight_channels_last);
 
 } // namespace cpu
 } // namespace torch_ipex

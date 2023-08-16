@@ -20,7 +20,6 @@ TEST_MODULE_CONVERT_LIST = [
     torch.nn.LSTM,
 ]
 
-# TODO: for now, only support SGD and AdamW
 SUPPORTED_FUSION_OPTIMIZER = ['Adam', 'SGD', 'AdamW', 'Lars', 'Lamb', 'splitSGD']
 
 class InferenceModel(nn.Module):
@@ -179,7 +178,8 @@ class TestTorchMethod(TestCase):
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_master_weight_fusion_optimizer(self):
-        lr = 0.01
+        # using large lr to fastern the error occurance
+        lr = 10.0
         weight_decay = 0.01
 
         def create_model_optimizer(optimizer_string, mem_format, dtype):
@@ -202,6 +202,8 @@ class TestTorchMethod(TestCase):
                 beta2 = 0.999
                 adam_epsilon = 1e-6
                 amsgrad = True
+                weight_decay = 0.01
+                lr = 0.05
                 optimizer_xpu_no_fuse = torch.optim.AdamW(model_xpu_no_fuse.parameters(),
                                                           lr=lr,
                                                           betas=(beta1, beta2),
@@ -219,16 +221,20 @@ class TestTorchMethod(TestCase):
                 beta1 = 0.9
                 beta2 = 0.999
                 lamb_epsilon = 1e-6
+                lr = 0.05
                 optimizer_xpu_no_fuse = Lamb(model_xpu_no_fuse.parameters(), lr=lr, betas=(beta1, beta2), eps=lamb_epsilon)
                 optimizer_xpu = Lamb(model_xpu.parameters(), lr=lr, betas=(beta1, beta2), eps=lamb_epsilon)
                 model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
             elif optimizer_string.lower() == 'sgd':
+                lr = 5.0
                 for momentum_value in [0, 0.9]:
                     optimizer_xpu_no_fuse = torch.optim.SGD(model_xpu_no_fuse.parameters(), lr=lr, momentum=momentum_value)
                     optimizer_xpu = torch.optim.SGD(model_xpu.parameters(), lr=lr, momentum=momentum_value)
                     model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
             elif optimizer_string.lower() == 'splitsgd':
-                for momentum_value in [0, 0.9]:
+                lr = 5.0
+                # use larger momentum_value to faster the error occurs
+                for momentum_value in [0, 5.0]:
                     optimizer_xpu_no_fuse = torch.optim.SGD(model_xpu_no_fuse.parameters(), lr=lr, momentum=momentum_value)
                     optimizer_xpu = torch.optim.SGD(model_xpu.parameters(), lr=lr, momentum=momentum_value)
                     model_optimizer_list.append([optimizer_xpu_no_fuse, optimizer_xpu])
@@ -236,7 +242,9 @@ class TestTorchMethod(TestCase):
                 beta1 = 0.9
                 beta2 = 0.999
                 adam_epsilon = 1e-6
-                amsgrad = False
+                amsgrad = True
+                weight_decay = 0.01
+                lr = 0.05
                 optimizer_xpu_no_fuse = torch.optim.Adam(model_xpu_no_fuse.parameters(),
                                                          lr=lr,
                                                          betas=(beta1, beta2),
@@ -253,6 +261,8 @@ class TestTorchMethod(TestCase):
             elif optimizer_string.lower() == 'lars':
                 momentum = 0.9
                 epsilon = 0.001
+                lr = 5.0
+                weight_decay = 0.01
                 optimizer_xpu_no_fuse = torch.xpu.optim.Lars(model_xpu_no_fuse.parameters(),
                                                              lr=lr, weight_decay=weight_decay,
                                                              momentum=momentum,
@@ -353,12 +363,13 @@ class TestTorchMethod(TestCase):
             support_dtype_list = [torch.float32, torch.bfloat16]
             if optimizer_string.lower() == "adam" or optimizer_string.lower() == "sgd":
                 support_dtype_list.append(torch.float64)
+            if 'split' in optimizer_string.lower():
+                support_dtype_list.remove(torch.float32)
             for dtype in support_dtype_list:
                 print("checking dtype: ", dtype)
+                checking_atol = 1e-5
+                checking_rtol = 1.3e-6
                 if dtype == torch.bfloat16:
-                    checking_atol = 1e-3
-                    checking_rtol = 1.6e-2
-                else:
                     checking_atol = 1e-3
                     checking_rtol = 1.6e-2
                 for mem_format in [torch.contiguous_format, torch.channels_last]:

@@ -62,8 +62,6 @@ set(IPEX_GPU_CORE_SRC
         ${IPEX_GPU_GEN_FILES}
         ${IPEX_UTILS_SRCS})
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${IPEX_SYCL_KERNEL_FLAGS}")
-
 if(BUILD_SEPARATE_OPS)
   set(IPEX_GPU_OP_LIBRARIES)
   foreach(op_src ${IPEX_ATEN_OPS_SRCS})
@@ -71,8 +69,10 @@ if(BUILD_SEPARATE_OPS)
       set(op_lib intel-ext-pt-gpu-op-${obj})
       add_library(${op_lib} SHARED ${op_src})
       target_include_directories(${op_lib} PUBLIC ${IPEX_INCLUDE_DIRS})
+      target_compile_options(${op_lib} PRIVATE ${IPEX_SYCL_KERNEL_FLAGS})
       target_link_directories(${op_lib} PUBLIC ${SYCL_LIBRARY_DIR})
       target_link_libraries(${op_lib} PUBLIC ${GPU_TORCH_LIBS})
+      target_link_options(${op_lib} PRIVATE ${IPEX_SYCL_LINK_FLAGS})
       list(APPEND IPEX_GPU_OP_LIBRARIES ${op_lib})
   endforeach()
 
@@ -81,8 +81,12 @@ else()
 endif()
 
 add_library(intel-ext-pt-gpu SHARED ${IPEX_GPU_CORE_SRC})
+
 target_include_directories(intel-ext-pt-gpu PUBLIC ${IPEX_INCLUDE_DIRS})
+target_compile_options(intel-ext-pt-gpu PRIVATE ${IPEX_SYCL_KERNEL_FLAGS})
+
 target_link_directories(intel-ext-pt-gpu PUBLIC ${SYCL_LIBRARY_DIR})
+target_link_options(intel-ext-pt-gpu PRIVATE ${IPEX_SYCL_LINK_FLAGS})
 
 add_dependencies(intel-ext-pt-gpu IPEX_GPU_GEN_TARGET)
 include(${PROJECT_SOURCE_DIR}/cmake/ClangFormat.cmake)
@@ -152,10 +156,6 @@ endif()
 
 if (USE_SPLIT_FP64_LOOPS)
   list(APPEND IPEX_COMPILE_DEFINITIONS "USE_SPLIT_FP64_LOOPS")
-endif()
-
-if (USE_FP64_EXCE_HINT)
-  list(APPEND IPEX_COMPILE_DEFINITIONS "USE_FP64_EXCE_HINT")
 endif()
 
 list(APPEND IPEX_COMPILE_DEFINITIONS "BUILD_IPEX_MAIN_LIB")

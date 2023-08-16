@@ -285,4 +285,14 @@ extern int FLAGS_caffe2_log_level;
 #define IPEX_LIBRARY_FRAGMENT() TORCH_LIBRARY_FRAGMENT(torch_ipex, m)
 
 } // namespace AtenIpexTypeXPU
+
+namespace AtenIpexTypeQuantizedXPU {
+#define IPEX_QOP_REGISTER(NAME, Func)                                     \
+  m.impl(                                                                 \
+      NAME,                                                               \
+      &AtenIpexTypeXPU::                                                  \
+          IpexFunctionWarpper<decltype(Func), &Func, false, true>::type:: \
+              call);
+} // namespace AtenIpexTypeQuantizedXPU
+
 } // namespace at

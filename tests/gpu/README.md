@@ -2,9 +2,9 @@
 
 ## Notice
 
-* These tests are powered by [Pytest](https://docspytest.org/en/stable/).
+* These tests are powered by [Pytest](https://docs.pytest.org/en/7.3.x/).
 
-* Please refer to [Pytest Documents](https://docspytest.org/en/stable/) for more helps.
+* Please refer to [Pytest Documents](https://docs.pytest.org/en/7.3.x/) for more helps.
 
 ## Pre-requirements
 
@@ -22,7 +22,7 @@ python3 -m pip install pytest
 * Or download from the repo with below command.
 
 ```bash
-git clone https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu.git
+git clone https://github.com/intel/intel-extension-for-pytorch.git
 ```
 
 * Please use pytest to run one test, or all of them if ${Test_Name} is empty.

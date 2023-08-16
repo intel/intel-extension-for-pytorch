@@ -1,1 +1,2 @@
 - torch.distributed.is_nccl_available
+- torch.cuda.is_bf16_supported

@@ -9,6 +9,7 @@
 #include "InnerProduct.h"
 #include "Linear.h"
 #include "comm/ParamUtils.h"
+#include "utils/CustomOperatorRegistration.h"
 
 using namespace dnnl;
 using namespace at::native;
@@ -48,7 +49,7 @@ at::Tensor dpcppLinear(
 }
 
 TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
-  m.impl("quantized::linear", dpcppLinear);
+  IPEX_QOP_REGISTER("quantized::linear", dpcppLinear);
 }
 
 } // namespace AtenIpexTypeQuantizedXPU

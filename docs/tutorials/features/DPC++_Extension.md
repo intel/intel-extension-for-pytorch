@@ -146,13 +146,12 @@ c10::impl::VirtualGuardImpl impl(device_type);
 c10::Stream c10_stream = impl.getStream(c10::Device(device_type));
 auto& queue = xpu::get_queue_from_stream(c10_stream);
 ```
-In python code, you can use the below codes to get a `sycl::queue` pointer, which
-is stored by `PyLong_FromVoidPtr`.
+In python code, you can use the below codes to get a `sycl::queue` pointer, which is encapsuled by a ``PyCapsule``.
 ```python
 import torch
 import intel_extension_for_pytorch
 stream = torch.xpu.current_stream()
-queue = stream.sycl_queue # queue is a sycl::queue pointer
+queue = stream.sycl_queue # queue is a ``PyCapsule`` which encapsuled a sycl::queue pointer
 ```
 Subsequently, you can submit a customized kernel via `sycl::queue` by yourself. Refer to [Writing the DPC++ Op](#writing-the-dpc-op) for more details.
 
@@ -257,7 +256,7 @@ Let’s go through the DPC++ code step by step:
 
 template <typename scalar_t>
 scalar_t sigmoid(scalar_t z) {
-  return 1.0 / (1.0 + exp(-z));
+  return 1.0f / (1.0f + exp(-z));
 }
 ```
 
@@ -267,25 +266,25 @@ At the beginning of the code, we include `<torch/extension.h>` that will introdu
 template <typename scalar_t>
 scalar_t d_sigmoid(scalar_t z) {
   const auto s = sigmoid(z);
-  return (1.0 - s) * s;
+  return (1.0f - s) * s;
 }
 
 template <typename scalar_t>
 scalar_t d_tanh(scalar_t z) {
   const auto t = tanh(z);
-  return 1 - (t * t);
+  return 1.0f - (t * t);
 }
 
 template <typename scalar_t>
-scalar_t elu(scalar_t z, scalar_t alpha = 1.0) {
-  return fmax(0.0, z) + fmin(0.0, alpha * (exp(z) - 1.0));
+scalar_t elu(scalar_t z, scalar_t alpha = 1.0f) {
+  return fmax(0.0f, z) + fmin(0.0f, alpha * (exp(z) - 1.0f));
 }
 
 template <typename scalar_t>
-scalar_t d_elu(scalar_t z, scalar_t alpha = 1.0) {
+scalar_t d_elu(scalar_t z, scalar_t alpha = 1.0f) {
   const auto e = exp(z);
-  const auto d_relu = z < 0.0 ? 0.0 : 1.0;
-  return d_relu + (((alpha * (e - 1.0)) < 0.0) ? (alpha * e) : 0.0);
+  const auto d_relu = z < 0.0f ? 0.0f : 1.0f;
+  return d_relu + (((alpha * (e - 1.0f)) < 0.0f) ? (alpha * e) : 0.0f);
 }
 ```
 

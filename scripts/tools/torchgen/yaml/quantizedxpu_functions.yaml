@@ -7,7 +7,6 @@ supported:
   - _adaptive_avg_pool2d
   - _empty_affine_quantized
   - _to_copy
-  - add.Tensor
   - addmm
   - as_strided
   - avg_pool2d
@@ -44,3 +43,7 @@ supported:
   - sigmoid_
   - sigmoid.out
   - _empty_per_channel_affine_quantized
+  - hardtanh
+  - hardtanh.out
+  - hardtanh_
+  - relu

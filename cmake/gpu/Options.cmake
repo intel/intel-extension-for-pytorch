@@ -19,7 +19,6 @@ option(USE_PROFILER "USE XPU Profiler in build." ON)
 option(USE_SYCL_ASSERT "Enables assert in sycl kernel" OFF)
 option(USE_ITT_ANNOTATION "Enables ITT annotation in sycl kernel" OFF)
 option(USE_SPLIT_FP64_LOOPS "Split FP64 loops into separate kernel for element-wise kernels" ON)
-option(USE_FP64_EXCE_HINT "Catch and hint all FP64 exceptions" ON)
 option(USE_XETLA "Use XeTLA based customer kernels" OFF)
 
 option(BUILD_BY_PER_KERNEL "Build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)" OFF)
@@ -32,10 +31,10 @@ option(BUILD_JIT_QUANTIZATION_SAVE "Support jit quantization model save and load
 function (print_xpu_config_summary)
   # Fetch configurations of intel-ext-pt-gpu
   get_target_property(GPU_NATIVE_DEFINITIONS intel-ext-pt-gpu COMPILE_DEFINITIONS)
+  get_target_property(GPU_LINK_LIBRARIES intel-ext-pt-gpu LINK_LIBRARIES)
   get_target_property(ONEDNN_INCLUDE_DIR intel-ext-pt-gpu ONEDNN_INCLUDE_DIR)
   get_target_property(USE_ONEMKL intel-ext-pt-gpu USE_ONEMKL)
   get_target_property(ONEMKL_INCLUDE_DIR intel-ext-pt-gpu ONEMKL_INCLUDE_DIR)
-  get_target_property(GPU_LINK_LIBRARIES intel-ext-pt-gpu LINK_LIBRARIES)
 
     print_config_summary()
     message(STATUS "******** Summary on XPU ********")
@@ -48,13 +47,14 @@ function (print_xpu_config_summary)
     message(STATUS "  C++ compiler version  : ${CMAKE_CXX_COMPILER_VERSION}")
 
     message(STATUS "  CXX flags             : ${CMAKE_CXX_FLAGS}")
-    message(STATUS "  CXX Linker options    : ${CMAKE_SHARED_LINKER_FLAGS}")
     message(STATUS "  Compile definitions   : ${GPU_NATIVE_DEFINITIONS}")
+    message(STATUS "  CXX Linker options    : ${CMAKE_SHARED_LINKER_FLAGS}")
     message(STATUS "  Link libraries        : ${GPU_LINK_LIBRARIES}")
 
     message(STATUS "  SYCL Language version : ${SYCL_LANGUAGE_VERSION}")
     message(STATUS "  SYCL Compiler version : ${SYCL_COMPILER_VERSION}")
     message(STATUS "  SYCL Kernel flags     : ${IPEX_SYCL_KERNEL_FLAGS}")
+    message(STATUS "  SYCL Link flags       : ${IPEX_SYCL_LINK_FLAGS}")
 
     message(STATUS "  Intel SYCL instance ID: ${SYCL_IMPLEMENTATION_ID}")
     message(STATUS "  Intel SYCL include    : ${SYCL_INCLUDE_DIR}")
@@ -90,7 +90,6 @@ function (print_xpu_config_summary)
     message(STATUS "  USE_SYCL_ASSERT       : ${USE_SYCL_ASSERT}")
     message(STATUS "  USE_ITT_ANNOTATION    : ${USE_ITT_ANNOTATION}")
     message(STATUS "  USE_SPLIT_FP64_LOOPS  : ${USE_SPLIT_FP64_LOOPS}")
-    message(STATUS "  USE_FP64_EXCE_HINT    : ${USE_FP64_EXCE_HINT}")
 
   if(NOT BUILD_BY_PER_KERNEL AND USE_AOT_DEVLIST)
     message(STATUS "  USE_AOT_DEVLIST       : ${USE_AOT_DEVLIST}")

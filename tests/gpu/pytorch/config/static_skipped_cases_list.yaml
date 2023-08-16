@@ -1,0 +1,8 @@
+
+# This yaml file is for collecting cases should be skipped statically
+# Those cases skipped here must have a strong reason that we won't or have very low will to fix
+# This file is converted from old json file and those temporary skipped cases are also mixed in
+# Once rebasing 2.0 is finished, those cases we should fix will be moved into dynamic_skipped_cases_list.yaml
+- !!omap
+  - reason: ""
+  - cases: []

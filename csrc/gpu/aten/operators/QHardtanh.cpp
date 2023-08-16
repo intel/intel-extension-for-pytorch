@@ -8,6 +8,7 @@
 #include <quantized/QUtils.h>
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
+#include "utils/CustomOperatorRegistration.h"
 
 #include "Loops.h"
 
@@ -96,6 +97,7 @@ Tensor quantized_clamp_impl_dpcpp(
     const Tensor& qx,
     const optional<Scalar>& min,
     const optional<Scalar>& max) {
+  const OptionalDeviceGuard device_guard(device_of(qx));
   Tensor qy;
   if (min && max) {
     impl::qclamp_kernel(qx, *min, *max, qy);
@@ -111,16 +113,13 @@ Tensor quantized_clamp_impl_dpcpp(
   return qy;
 }
 
-Tensor hardtanh_quantized_xpu(
-    const Tensor& qx,
-    const Scalar& min,
-    const Scalar& max) {
+Tensor hardtanh(const Tensor& qx, const Scalar& min, const Scalar& max) {
   Tensor qy;
   qy = quantized_clamp_impl_dpcpp(qx, min, max);
   return qy;
 }
 
-Tensor& hardtanh_out_quantized_xpu(
+Tensor& hardtanh_out(
     const Tensor& qx,
     const Scalar& min,
     const Scalar& max,
@@ -129,10 +128,7 @@ Tensor& hardtanh_out_quantized_xpu(
   return result;
 }
 
-Tensor& hardtanh_quantized_xpu_(
-    Tensor& self,
-    const Scalar& min,
-    const Scalar& max) {
+Tensor& hardtanh_(Tensor& self, const Scalar& min, const Scalar& max) {
   Tensor qy;
   qy = quantized_clamp_impl_dpcpp(self, min, max);
   self.copy_(qy);
@@ -140,15 +136,8 @@ Tensor& hardtanh_quantized_xpu_(
 }
 
 TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
-  m.impl(
-      TORCH_SELECTIVE_NAME("quantized::clamp"),
-      TORCH_FN(quantized_clamp_impl_dpcpp));
-}
-
-TORCH_LIBRARY_IMPL(aten, QuantizedXPU, m) {
-  m.impl("hardtanh", hardtanh_quantized_xpu);
-  m.impl("hardtanh.out", hardtanh_out_quantized_xpu);
-  m.impl("hardtanh_", hardtanh_quantized_xpu_);
+  IPEX_QOP_REGISTER(
+      TORCH_SELECTIVE_NAME("quantized::clamp"), quantized_clamp_impl_dpcpp);
 }
 
 } // namespace AtenIpexTypeQuantizedXPU

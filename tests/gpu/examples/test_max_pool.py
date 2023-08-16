@@ -43,26 +43,30 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu[1], y_dpcpp[1].cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
-    def test_channels_last_global_max_pool(self, dtype=torch.float):
-        x_cpu = torch.randn([16, 1024, 1, 1500], device='cpu', dtype=dtype)
-        grad_cpu = torch.randn([16, 1024, 1, 1], device='cpu', dtype=dtype)
-        x_dpcpp = x_cpu.to("xpu").to(memory_format=torch.channels_last)
+    def test_max_pool_empty_stride(self, dtype=torch.float):
+        x_cpu = torch.randn([16, 2, 32, 32], device='cpu', dtype=dtype)
+        grad_cpu = torch.randn([16, 2, 17, 10], device='cpu', dtype=dtype)
+        x_dpcpp = x_cpu.to("xpu")
         grad_dpcpp = grad_cpu.to("xpu")
 
-        max_pool = nn.MaxPool2d(kernel_size=(1, 1500), stride=(1, 1500),
-                                padding=0, return_indices=True)
+        conv1 = nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=True)
+        max_pool = nn.MaxPool2d(kernel_size=(2, 3), stride=[],
+                                padding=1, dilation=(1, 2), return_indices=True)
 
         x_cpu.requires_grad_(True)
-        y_cpu = max_pool(x_cpu)
+        y_cpu1 = conv1(x_cpu)
+        y_cpu = max_pool(y_cpu1)
         print("y_cpu", y_cpu[0])
         print("y_cpu_idx", y_cpu[1])
         output_cpu = y_cpu[0].backward(grad_cpu)
         print("x_cpu.grad", x_cpu.grad)
 
+        conv1.to("xpu")
         max_pool.to("xpu")
 
         x_dpcpp.requires_grad_(True)
-        y_dpcpp = max_pool(x_dpcpp)
+        y_dpcpp1 = conv1(x_dpcpp)
+        y_dpcpp = max_pool(y_dpcpp1)
         print("y_dpcpp", y_dpcpp[0].to("cpu"))
         print("y_dpcpp_idx", y_dpcpp[1].to("cpu"))
         output_dpcpp = y_dpcpp[0].backward(grad_dpcpp)
@@ -70,6 +74,35 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu[0], y_dpcpp[0].cpu())
         self.assertEqual(y_cpu[1], y_dpcpp[1].cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+
+    def test_channels_last_global_max_pool(self, dtype=torch.float):
+        x_cpu = torch.randn([16, 1024, 1, 1500], device='cpu', dtype=dtype)
+        grad_cpu = torch.randn([16, 1024, 1, 1], device='cpu', dtype=dtype)
+        x_dpcpp = x_cpu.to("xpu").to(memory_format=torch.channels_last)
+        grad_dpcpp = grad_cpu.to("xpu")
+
+        for stride in [(1, 1500), []]:
+            max_pool = nn.MaxPool2d(kernel_size=(1, 1500), stride=stride,
+                                    padding=0, return_indices=True)
+
+            x_cpu.requires_grad_(True)
+            y_cpu = max_pool(x_cpu)
+            print("y_cpu", y_cpu[0])
+            print("y_cpu_idx", y_cpu[1])
+            output_cpu = y_cpu[0].backward(grad_cpu)
+            print("x_cpu.grad", x_cpu.grad)
+
+            max_pool.to("xpu")
+
+            x_dpcpp.requires_grad_(True)
+            y_dpcpp = max_pool(x_dpcpp)
+            print("y_dpcpp", y_dpcpp[0].to("cpu"))
+            print("y_dpcpp_idx", y_dpcpp[1].to("cpu"))
+            output_dpcpp = y_dpcpp[0].backward(grad_dpcpp)
+            print("x_dpcpp.grad", x_dpcpp.grad.to("cpu"))
+            self.assertEqual(y_cpu[0], y_dpcpp[0].cpu())
+            self.assertEqual(y_cpu[1], y_dpcpp[1].cpu())
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     @pytest.mark.skipif(
         not torch.xpu.has_channels_last_1d(), reason="doesn't enable channels last 1d"

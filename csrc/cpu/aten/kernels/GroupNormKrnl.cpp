@@ -38,7 +38,7 @@ void GroupNormKernelImplInternal(
     int64_t C,
     int64_t HxW,
     int64_t group,
-    T eps,
+    double eps,
     at::Tensor& Y,
     at::Tensor& mean,
     at::Tensor& rstd) {
@@ -57,7 +57,7 @@ void GroupNormKernelImplInternal(
   const bool beta_null = beta_data == nullptr;
   const int64_t inner_size = D * HxW;
 
-  using T_ACC = at::vec::vec_scalar_t<T>;
+  using T_ACC = at::opmath_type<T>;
 
   at::parallel_for(0, N * G, 1, [&](int64_t start, int64_t end) {
     for (const auto i : c10::irange(start, end)) {
@@ -65,7 +65,7 @@ void GroupNormKernelImplInternal(
       T_ACC mean_val;
       T_ACC rstd_val;
       std::tie(mean_val, rstd_val) =
-          at::native::utils::RowwiseMoments(X_ptr, inner_size);
+          at::native::RowwiseMoments(X_ptr, inner_size);
       rstd_val = T_ACC(1) / std::sqrt(std::max(rstd_val, T_ACC(0)) + eps);
       if (gamma_null && beta_null) {
         T* Y_ptr = Y_data + i * inner_size;
@@ -76,9 +76,10 @@ void GroupNormKernelImplInternal(
         const int64_t g = i % G;
         for (const auto j : c10::irange(D)) {
           const int64_t c = g * D + j;
-          const T_ACC scale = rstd_val * (gamma_null ? PT(1) : gamma_data[c]);
+          const T_ACC scale =
+              rstd_val * (gamma_null ? T_ACC(1) : T_ACC(gamma_data[c]));
           const T_ACC bias =
-              -scale * mean_val + (beta_null ? PT(0) : beta_data[c]);
+              -scale * mean_val + (beta_null ? T_ACC(0) : T_ACC(beta_data[c]));
           X_ptr = X_data + (i * D + j) * HxW;
           T* Y_ptr = Y_data + (i * D + j) * HxW;
           for (const auto k : c10::irange(HxW)) {
@@ -167,12 +168,12 @@ std::tuple<float, float> ColumnwiseMoments(
 }
 
 template <typename scalar_t, typename param_t>
-inline void calc_mean_var(
+inline void CalcMeanVar(
     const scalar_t* X_ptr,
     param_t* mean_ptr,
     param_t* rstd_ptr,
     int64_t C) {
-  using Vec = at::vec::Vectorized<at::vec::vec_scalar_t<param_t>>;
+  using Vec = at::vec::Vectorized<scalar_t>;
   at::vec::map2<scalar_t>(
       [](Vec x, Vec y) { return x + y; }, mean_ptr, X_ptr, mean_ptr, C);
   at::vec::map2<scalar_t>(
@@ -180,7 +181,7 @@ inline void calc_mean_var(
 }
 
 template <>
-inline void calc_mean_var(
+inline void CalcMeanVar(
     const BFloat16* X_ptr,
     float* mean_ptr,
     float* rstd_ptr,
@@ -237,13 +238,13 @@ inline void calc_mean_var(
 }
 
 template <typename scalar_t, typename param_t>
-inline void apply_scale_bias(
+inline void ApplyScaleBias(
     scalar_t* Y_ptr,
     const scalar_t* X_ptr,
     const param_t* scale_ptr,
     const param_t* bias_ptr,
     int64_t C) {
-  using Vec = at::vec::Vectorized<at::vec::vec_scalar_t<param_t>>;
+  using Vec = at::vec::Vectorized<scalar_t>;
   at::vec::map3<scalar_t>(
       [](Vec x, Vec scale, Vec bias) { return x * scale + bias; },
       Y_ptr,
@@ -254,7 +255,7 @@ inline void apply_scale_bias(
 }
 
 template <>
-inline void apply_scale_bias(
+inline void ApplyScaleBias(
     BFloat16* Y_ptr,
     const BFloat16* X_ptr,
     const float* scale_ptr,
@@ -304,7 +305,7 @@ void GroupNormKernelImplChannelsLastInternal(
     int64_t C,
     int64_t HxW,
     int64_t group,
-    T eps,
+    double eps,
     at::Tensor& Y,
     at::Tensor& mean,
     at::Tensor& rstd) {
@@ -320,7 +321,7 @@ void GroupNormKernelImplChannelsLastInternal(
   PT* mean_data = mean.data_ptr<PT>();
   PT* rstd_data = rstd.data_ptr<PT>();
 
-  using T_ACC = at::vec::vec_scalar_t<T>;
+  using T_ACC = at::opmath_type<T>;
 
   const T_ACC s = T_ACC(1) / static_cast<T_ACC>(D * HxW);
   const bool gamma_null = (gamma_data == nullptr);
@@ -342,14 +343,16 @@ void GroupNormKernelImplChannelsLastInternal(
   //   data per thread {NHWC / T} is much larger then temp buffer per thread
   //   {2NC}
   //
+
   constexpr int64_t feature_map_threshold = 1024;
   if (HxW < feature_map_threshold) {
     // impl-1: parallel on N * G.
     //
     // for each plain of HxW, scale and bias is calculated only once
     at::Tensor buffer = at::empty(
-        {N * G, 2 * D}, X.options().dtype(c10::CppTypeToScalarType<PT>::value));
-    PT* buffer_data = buffer.data_ptr<PT>();
+        {N * G, 2 * D},
+        X.options().dtype(c10::CppTypeToScalarType<T_ACC>::value));
+    T_ACC* buffer_data = buffer.data_ptr<T_ACC>();
 
     at::parallel_for(0, N * G, 1, [&](int64_t begin, int64_t end) {
       int64_t n{0}, g{0};
@@ -365,7 +368,6 @@ void GroupNormKernelImplChannelsLastInternal(
         T_ACC mean_val, rstd_val;
         std::tie(mean_val, rstd_val) =
             ColumnwiseMoments(X_data + n * HxW * C + g * D, HxW, C, D);
-
         mean_val *= s;
         rstd_val = std::max(rstd_val * s - mean_val * mean_val, T_ACC(0));
         rstd_val = T_ACC(1) / std::sqrt(rstd_val + eps);
@@ -373,22 +375,22 @@ void GroupNormKernelImplChannelsLastInternal(
         rstd_data[i] = rstd_val;
 
         // step-2: calculate scale and bias
-        PT* scale_ptr = buffer_data + i * 2 * D;
-        PT* bias_ptr = scale_ptr + D;
+        T_ACC* scale_ptr = buffer_data + i * 2 * D;
+        T_ACC* bias_ptr = scale_ptr + D;
         for (const auto d : c10::irange(D)) {
           const int64_t c = g * D + d;
-          scale_ptr[d] = rstd_val * (gamma_null ? PT(1) : gamma_data[c]);
-          bias_ptr[d] =
-              -scale_ptr[d] * mean_val + (beta_null ? PT(0) : beta_data[c]);
+          scale_ptr[d] =
+              rstd_val * (gamma_null ? T_ACC(1) : T_ACC(gamma_data[c]));
+          bias_ptr[d] = -scale_ptr[d] * mean_val +
+              (beta_null ? T_ACC(0) : T_ACC(beta_data[c]));
         }
 
         // step-3: apply scale and bias
         for (const auto m : c10::irange(HxW)) {
           const T* X_ptr = X_data + n * HxW * C + m * C + g * D;
           T* Y_ptr = Y_data + n * HxW * C + m * C + g * D;
-          apply_scale_bias<T, PT>(Y_ptr, X_ptr, scale_ptr, bias_ptr, D);
+          ApplyScaleBias<T, T_ACC>(Y_ptr, X_ptr, scale_ptr, bias_ptr, D);
         }
-
         at::native::data_index_step(n, N, g, G);
       }
     });
@@ -429,7 +431,7 @@ void GroupNormKernelImplChannelsLastInternal(
         T_ACC* mean_ptr = buffer_ptr + n * 2 * C;
         T_ACC* rstd_ptr = mean_ptr + C;
         const T* X_ptr = X_data + i * C;
-        calc_mean_var<T, T_ACC>(X_ptr, mean_ptr, rstd_ptr, C);
+        CalcMeanVar<T, T_ACC>(X_ptr, mean_ptr, rstd_ptr, C);
         at::native::data_index_step(n, N, m, HxW);
       }
     });
@@ -470,8 +472,8 @@ void GroupNormKernelImplChannelsLastInternal(
         T_ACC* bias_ptr = scale_ptr + C;
         T_ACC mean_val = tmp_buffer_data[n * 2 * G + 2 * g];
         T_ACC rstd_val = tmp_buffer_data[n * 2 * G + 2 * g + 1];
-        mean_data[n * G + g] = PT(mean_val);
-        rstd_data[n * G + g] = PT(rstd_val);
+        mean_data[n * G + g] = mean_val;
+        rstd_data[n * G + g] = rstd_val;
 
         for (const auto d : c10::irange(D)) {
           const int64_t c = g * D + d;
@@ -496,7 +498,7 @@ void GroupNormKernelImplChannelsLastInternal(
         T* Y_ptr = Y_data + i * C;
         T_ACC* scale_ptr = buffer_data + n * 2 * C;
         T_ACC* bias_ptr = scale_ptr + C;
-        apply_scale_bias<T, T_ACC>(Y_ptr, X_ptr, scale_ptr, bias_ptr, C);
+        ApplyScaleBias<T, T_ACC>(Y_ptr, X_ptr, scale_ptr, bias_ptr, C);
         at::native::data_index_step(n, N, m, HxW);
       }
     });
@@ -526,58 +528,18 @@ void GroupNormKernelImpl(
             if (!is_channels_last_1d(X)) {
               if (mixed_type) {
                 GroupNormKernelImplInternal<BFloat16, float>(
-                    X,
-                    gamma,
-                    beta,
-                    N,
-                    C,
-                    HxW,
-                    group,
-                    static_cast<scalar_t>(eps),
-                    Y,
-                    mean,
-                    rstd);
+                    X, gamma, beta, N, C, HxW, group, eps, Y, mean, rstd);
               } else {
                 GroupNormKernelImplInternal<scalar_t, scalar_t>(
-                    X,
-                    gamma,
-                    beta,
-                    N,
-                    C,
-                    HxW,
-                    group,
-                    static_cast<scalar_t>(eps),
-                    Y,
-                    mean,
-                    rstd);
+                    X, gamma, beta, N, C, HxW, group, eps, Y, mean, rstd);
               }
             } else {
               if (mixed_type) {
                 GroupNormKernelImplChannelsLastInternal<BFloat16, float>(
-                    X,
-                    gamma,
-                    beta,
-                    N,
-                    C,
-                    HxW,
-                    group,
-                    static_cast<scalar_t>(eps),
-                    Y,
-                    mean,
-                    rstd);
+                    X, gamma, beta, N, C, HxW, group, eps, Y, mean, rstd);
               } else {
                 GroupNormKernelImplChannelsLastInternal<scalar_t, scalar_t>(
-                    X,
-                    gamma,
-                    beta,
-                    N,
-                    C,
-                    HxW,
-                    group,
-                    static_cast<scalar_t>(eps),
-                    Y,
-                    mean,
-                    rstd);
+                    X, gamma, beta, N, C, HxW, group, eps, Y, mean, rstd);
               }
             }
           });
@@ -592,30 +554,10 @@ void GroupNormKernelImpl(
           [&]() {
             if (mixed_type) {
               GroupNormKernelImplChannelsLastInternal<BFloat16, float>(
-                  X,
-                  gamma,
-                  beta,
-                  N,
-                  C,
-                  HxW,
-                  group,
-                  static_cast<scalar_t>(eps),
-                  Y,
-                  mean,
-                  rstd);
+                  X, gamma, beta, N, C, HxW, group, eps, Y, mean, rstd);
             } else {
               GroupNormKernelImplChannelsLastInternal<scalar_t, scalar_t>(
-                  X,
-                  gamma,
-                  beta,
-                  N,
-                  C,
-                  HxW,
-                  group,
-                  static_cast<scalar_t>(eps),
-                  Y,
-                  mean,
-                  rstd);
+                  X, gamma, beta, N, C, HxW, group, eps, Y, mean, rstd);
             }
           });
       break;
@@ -627,45 +569,28 @@ void GroupNormKernelImpl(
   }
 }
 
-template <typename T, typename PT>
+template <typename T, typename T_ACC>
 void ComputeInternalGradients(
     int64_t N,
     int64_t C,
     int64_t HxW,
     const T* dY,
     const T* X,
-    PT* ds,
-    PT* db) {
+    T_ACC* ds,
+    T_ACC* db) {
+  using Vec = at::vec::Vectorized<T_ACC>;
   at::parallel_for(0, N * C, 1, [=](int64_t start, int64_t end) {
-    constexpr int64_t K = at::vec::Vectorized<T>::size();
-    const int64_t inner_size = HxW / K * K;
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    std::array<PT, K> ds_arr;
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    std::array<PT, K> db_arr;
     for (const auto i : c10::irange(start, end)) {
       const T* dY_ptr = dY + i * HxW;
       const T* X_ptr = X + i * HxW;
-      at::vec::Vectorized<PT> ds_vec(0);
-      at::vec::Vectorized<PT> db_vec(0);
-      for (int64_t j = 0; j < inner_size; j += K) {
-        const at::vec::Vectorized<T> dy_vec =
-            at::vec::Vectorized<T>::loadu(dY_ptr + j);
-        const at::vec::Vectorized<T> x_vec =
-            at::vec::Vectorized<T>::loadu(X_ptr + j);
-        ds_vec = ds_vec + dy_vec * x_vec;
-        db_vec = db_vec + dy_vec;
-      }
-      ds_vec.store(ds_arr.data());
-      db_vec.store(db_arr.data());
-      PT ds_val = std::accumulate(ds_arr.cbegin(), ds_arr.cend(), T(0));
-      PT db_val = std::accumulate(db_arr.cbegin(), db_arr.cend(), T(0));
-      for (const auto j : c10::irange(inner_size, HxW)) {
-        ds_val += dY_ptr[j] * X_ptr[j];
-        db_val += dY_ptr[j];
-      }
-      ds[i] = ds_val;
-      db[i] = db_val;
+      ds[i] = at::vec::map2_reduce_all<T>(
+          [](Vec x, Vec y) { return x * y; },
+          [](Vec x, Vec y) { return x + y; },
+          dY_ptr,
+          X_ptr,
+          HxW);
+      db[i] = at::vec::reduce_all<T>(
+          [](Vec& x, Vec& y) { return x + y; }, dY_ptr, HxW);
     }
   });
 }
@@ -717,7 +642,57 @@ void ComputeInternalGradients(
   });
 }
 
-template <typename T, typename PT>
+template <typename PT, typename T_ACC>
+inline void CalcDsDb(
+    const T_ACC* ds_ptr,
+    const T_ACC* db_ptr,
+    bool gamma_null,
+    const PT* gamma_ptr,
+    const int64_t d,
+    const int64_t K,
+    void* ds_arr,
+    void* db_arr) {
+  at::vec::Vectorized<T_ACC> ds_vec(0);
+  at::vec::Vectorized<T_ACC> db_vec(0);
+  for (int64_t j = 0; j < d; j += K) {
+    const at::vec::Vectorized<PT> gamma_vec = gamma_null
+        ? at::vec::Vectorized<PT>(1)
+        : at::vec::Vectorized<PT>::loadu(gamma_ptr + j);
+    ds_vec = ds_vec + at::vec::Vectorized<PT>::loadu(ds_ptr + j) * gamma_vec;
+    db_vec = db_vec + at::vec::Vectorized<PT>::loadu(db_ptr + j) * gamma_vec;
+  }
+  ds_vec.store(ds_arr);
+  db_vec.store(db_arr);
+}
+
+template <>
+inline void CalcDsDb(
+    const float* ds_ptr,
+    const float* db_ptr,
+    bool gamma_null,
+    const BFloat16* gamma_ptr,
+    const int64_t d,
+    const int64_t K,
+    void* ds_arr,
+    void* db_arr) {
+  using fVec = at::vec::Vectorized<float>;
+  using bVec = at::vec::Vectorized<BFloat16>;
+  fVec ds_acc(0);
+  fVec db_acc(0);
+  for (int64_t j = 0; j < d; j += K) {
+    const bVec gamma_vec = gamma_null ? bVec(1) : bVec::loadu(gamma_ptr + j);
+    fVec gamma_vec0, gamma_vec1;
+    std::tie(gamma_vec0, gamma_vec1) = convert_bfloat16_float(gamma_vec);
+    ds_acc += fVec::loadu(ds_ptr + j) * gamma_vec0;
+    ds_acc += fVec::loadu(ds_ptr + j + fVec::size()) * gamma_vec1;
+    db_acc += fVec::loadu(db_ptr + j) * gamma_vec0;
+    db_acc += fVec::loadu(db_ptr + j + fVec::size()) * gamma_vec1;
+  }
+  ds_acc.store(ds_arr);
+  db_acc.store(db_arr);
+}
+
+template <typename T, typename PT, typename T_ACC>
 void GroupNormInputBackward(
     int64_t N,
     int64_t C,
@@ -728,174 +703,225 @@ void GroupNormInputBackward(
     const PT* mean,
     const PT* rstd,
     const PT* gamma,
-    const PT* ds,
-    const PT* db,
+    const T_ACC* ds,
+    const T_ACC* db,
     T* dX) {
   const int64_t G = group;
   const int64_t D = C / G;
-  const T s = T(1) / static_cast<T>(D * HxW);
+  const T_ACC s = T_ACC(1) / static_cast<T_ACC>(D * HxW);
   const bool gamma_null = (gamma == nullptr);
   at::parallel_for(0, N * G, 1, [=](int64_t start, int64_t end) {
-    constexpr int64_t K = at::vec::Vectorized<T>::size();
+    constexpr int64_t K = at::vec::Vectorized<PT>::size();
     const int64_t d = D / K * K;
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    std::array<T, K> ds_arr;
+    std::array<T_ACC, at::vec::Vectorized<T_ACC>::size()> ds_arr;
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    std::array<T, K> db_arr;
+    std::array<T_ACC, at::vec::Vectorized<T_ACC>::size()> db_arr;
     for (const auto i : c10::irange(start, end)) {
       const int64_t g = i % G;
-      const T* ds_ptr = ds + i * D;
-      const T* db_ptr = db + i * D;
-      at::vec::Vectorized<T> ds_vec(0);
-      at::vec::Vectorized<T> db_vec(0);
-      for (int64_t j = 0; j < d; j += K) {
-        const at::vec::Vectorized<T> gamma_vec = gamma_null
-            ? at::vec::Vectorized<T>(1)
-            : at::vec::Vectorized<T>::loadu(gamma + g * D + j);
-        ds_vec = ds_vec + at::vec::Vectorized<T>::loadu(ds_ptr + j) * gamma_vec;
-        db_vec = db_vec + at::vec::Vectorized<T>::loadu(db_ptr + j) * gamma_vec;
-      }
-      ds_vec.store(ds_arr.data());
-      db_vec.store(db_arr.data());
-      T ds_val = std::accumulate(ds_arr.cbegin(), ds_arr.cend(), T(0));
-      T db_val = std::accumulate(db_arr.cbegin(), db_arr.cend(), T(0));
+      const T_ACC* ds_ptr = ds + i * D;
+      const T_ACC* db_ptr = db + i * D;
+      const PT* gamma_ptr = gamma + g * D;
+      CalcDsDb(
+          ds_ptr,
+          db_ptr,
+          gamma_null,
+          gamma_ptr,
+          d,
+          K,
+          ds_arr.data(),
+          db_arr.data());
+      T_ACC ds_val = std::accumulate(ds_arr.cbegin(), ds_arr.cend(), T_ACC(0));
+      T_ACC db_val = std::accumulate(db_arr.cbegin(), db_arr.cend(), T_ACC(0));
       for (const auto j : c10::irange(d, D)) {
-        const T gamma_v = gamma_null ? T(1) : gamma[g * D + j];
+        const T_ACC gamma_v = gamma_null ? T_ACC(1) : T_ACC(gamma[g * D + j]);
         ds_val += ds_ptr[j] * gamma_v;
         db_val += db_ptr[j] * gamma_v;
       }
-      const T c2 =
-          (db_val * mean[i] - ds_val) * rstd[i] * rstd[i] * rstd[i] * s;
-      const T c3 = -c2 * mean[i] - db_val * rstd[i] * s;
+      const T_ACC c2 = (db_val * T_ACC(mean[i]) - ds_val) * T_ACC(rstd[i]) *
+          T_ACC(rstd[i]) * T_ACC(rstd[i]) * s;
+      const T_ACC c3 = -c2 * T_ACC(mean[i]) - db_val * T_ACC(rstd[i]) * s;
       for (const auto j : c10::irange(D)) {
         const int64_t c = g * D + j;
         const T* dY_ptr = dY + (i * D + j) * HxW;
         const T* X_ptr = X + (i * D + j) * HxW;
         T* dX_ptr = dX + (i * D + j) * HxW;
-        const T c1 = rstd[i] * (gamma_null ? T(1) : gamma[c]);
+        const T_ACC c1 =
+            T_ACC(rstd[i]) * (gamma_null ? T_ACC(1) : T_ACC(gamma[c]));
         for (const auto k : c10::irange(HxW)) {
-          dX_ptr[k] = c1 * dY_ptr[k] + c2 * X_ptr[k] + c3;
+          dX_ptr[k] = c1 * T_ACC(dY_ptr[k]) + c2 * T_ACC(X_ptr[k]) + c3;
         }
       }
     }
   });
 }
 
-template <>
-void GroupNormInputBackward(
-    int64_t N,
-    int64_t C,
-    int64_t HxW,
-    int64_t group,
-    const BFloat16* dY,
-    const BFloat16* X,
-    const float* mean,
-    const float* rstd,
-    const float* gamma,
-    const float* ds,
-    const float* db,
-    BFloat16* dX) {
-  using bVec = at::vec::Vectorized<BFloat16>;
-  using fVec = at::vec::Vectorized<float>;
-  const int64_t G = group;
-  const int64_t D = C / G;
-  const float s = float(1) / static_cast<float>(D * HxW);
-  const bool gamma_null = (gamma == nullptr);
-  at::parallel_for(0, N * G, 1, [=](int64_t start, int64_t end) {
-    constexpr int64_t K = bVec::size();
-    const int64_t d = D / K * K;
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    std::array<float, K / 2> ds_arr;
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    std::array<float, K / 2> db_arr;
-    for (const auto i : c10::irange(start, end)) {
-      const int64_t g = i % G;
-      const float* ds_ptr = ds + i * D;
-      const float* db_ptr = db + i * D;
-      at::vec::Vectorized<float> ds_vec(0);
-      at::vec::Vectorized<float> db_vec(0);
-      for (int64_t j = 0; j < d; j += K) {
-        const fVec gamma_vec0 =
-            gamma_null ? fVec(1) : fVec::loadu(gamma + g * D + j);
-        const fVec gamma_vec1 =
-            gamma_null ? fVec(1) : fVec::loadu(gamma + g * D + j + K / 2);
-
-        fVec ds_fvec0 = fVec::loadu(ds_ptr + j);
-        fVec ds_fvec1 = fVec::loadu(ds_ptr + j + K / 2);
-        fVec db_fvec0 = fVec::loadu(db_ptr + j);
-        fVec db_fvec1 = fVec::loadu(db_ptr + j + K / 2);
-        ds_vec = ds_vec + ds_fvec0 * gamma_vec0;
-        ds_vec = ds_vec + ds_fvec1 * gamma_vec1;
-        db_vec = db_vec + db_fvec0 * gamma_vec0;
-        db_vec = db_vec + db_fvec1 * gamma_vec1;
-      }
-      ds_vec.store(ds_arr.data());
-      db_vec.store(db_arr.data());
-      float ds_val = std::accumulate(ds_arr.cbegin(), ds_arr.cend(), float(0));
-      float db_val = std::accumulate(db_arr.cbegin(), db_arr.cend(), float(0));
-      for (const auto j : c10::irange(d, D)) {
-        const float gamma_v = gamma_null ? float(1) : gamma[g * D + j];
-        ds_val += ds_ptr[j] * gamma_v;
-        db_val += db_ptr[j] * gamma_v;
-      }
-      const float c2 =
-          (db_val * mean[i] - ds_val) * rstd[i] * rstd[i] * rstd[i] * s;
-      const float c3 = -c2 * mean[i] - db_val * rstd[i] * s;
-      for (const auto j : c10::irange(D)) {
-        const int64_t c = g * D + j;
-        const BFloat16* dY_ptr = dY + (i * D + j) * HxW;
-        const BFloat16* X_ptr = X + (i * D + j) * HxW;
-        BFloat16* dX_ptr = dX + (i * D + j) * HxW;
-        const float c1 = rstd[i] * (gamma_null ? float(1) : gamma[c]);
-        for (const auto k : c10::irange(HxW)) {
-          dX_ptr[k] = c1 * float(dY_ptr[k]) + c2 * float(X_ptr[k]) + c3;
-        }
-      }
-    }
-  });
-}
-
-template <typename T>
+template <typename PT, typename T_ACC>
 void GammaBackward(
     int64_t N,
     int64_t C,
     int64_t group,
-    const T* mean,
-    const T* rstd,
-    const T* ds,
-    const T* db,
-    T* dgamma) {
+    const PT* mean,
+    const PT* rstd,
+    const T_ACC* ds,
+    const T_ACC* db,
+    PT* dgamma) {
   const int64_t G = group;
   const int64_t D = C / G;
-  constexpr int64_t K = at::vec::Vectorized<T>::size();
-  at::parallel_for(0, D, K, [=](int64_t start, int64_t end) {
-    for (const auto i : c10::irange(G)) {
-      std::memset(dgamma + i * D + start, 0, (end - start) * sizeof(T));
-    }
-    for (int64_t i = 0; i < N * G; ++i) {
-      const T* ds_ptr = ds + i * D;
-      const T* db_ptr = db + i * D;
-      const int64_t g = i % G;
-      for (const auto j : c10::irange(start, end)) {
-        const int64_t c = g * D + j;
-        dgamma[c] += (ds_ptr[j] - db_ptr[j] * mean[i]) * rstd[i];
+  constexpr int64_t K = at::vec::Vectorized<PT>::size();
+  using Vec = at::vec::Vectorized<PT>;
+  const int64_t inner_size = D / K * K;
+  for (const auto g : c10::irange(G)) {
+    int64_t i = 0;
+    for (; i < inner_size; i += K) {
+      Vec acc_vec{0};
+      for (const auto n : c10::irange(N)) {
+        const PT* ds_ptr = ds + n * C + g * D + i;
+        const PT* db_ptr = db + n * C + g * D + i;
+        auto ds_vec = Vec::loadu(ds_ptr);
+        auto db_vec = Vec::loadu(db_ptr);
+        auto mean_vec = Vec(mean[n * G + g]);
+        auto rstd_vec = Vec(rstd[n * G + g]);
+        acc_vec += (ds_vec - db_vec * mean_vec) * rstd_vec;
       }
+      acc_vec.store(dgamma + g * D + i);
     }
-  });
+    if (D - i > 0) {
+      Vec acc_vec{0};
+      for (const auto n : c10::irange(N)) {
+        const PT* ds_ptr = ds + n * C + g * D + i;
+        const PT* db_ptr = db + n * C + g * D + i;
+        auto ds_vec = Vec::loadu(ds_ptr, D - i);
+        auto db_vec = Vec::loadu(db_ptr, D - i);
+        auto mean_vec = Vec(mean[n * G + g]);
+        auto rstd_vec = Vec(rstd[n * G + g]);
+        acc_vec += (ds_vec - db_vec * mean_vec) * rstd_vec;
+      }
+      acc_vec.store(dgamma + g * D + i, D - i);
+    }
+  }
 }
 
-template <typename T>
-void BetaBackward(int64_t N, int64_t C, const T* db, T* dbeta) {
-  constexpr int64_t K = at::vec::Vectorized<T>::size();
-  at::parallel_for(0, C, K, [=](int64_t start, int64_t end) {
-    std::memset(dbeta + start, 0, (end - start) * sizeof(T));
-    for (const auto i : c10::irange(N)) {
-      const T* db_ptr = db + i * C;
-      for (const auto j : c10::irange(start, end)) {
-        dbeta[j] += db_ptr[j];
+template <>
+void GammaBackward(
+    int64_t N,
+    int64_t C,
+    int64_t group,
+    const BFloat16* mean,
+    const BFloat16* rstd,
+    const float* ds,
+    const float* db,
+    BFloat16* dgamma) {
+  const int64_t G = group;
+  const int64_t D = C / G;
+  using Vec = at::vec::Vectorized<BFloat16>;
+  using fVec = at::vec::Vectorized<float>;
+  constexpr int64_t K = Vec::size();
+  const int64_t inner_size = D / K * K;
+  for (const auto g : c10::irange(G)) {
+    int64_t i = 0;
+    for (; i < inner_size; i += K) {
+      fVec acc0_vec{0}, acc1_vec{0};
+      for (const auto n : c10::irange(N)) {
+        const float* ds_ptr = ds + n * C + g * D + i;
+        const float* db_ptr = db + n * C + g * D + i;
+        fVec ds_vec0, ds_vec1, db_vec0, db_vec1;
+        ds_vec0 = fVec::loadu(ds_ptr);
+        ds_vec1 = fVec::loadu(ds_ptr + fVec::size());
+        db_vec0 = fVec::loadu(db_ptr);
+        db_vec1 = fVec::loadu(db_ptr + fVec::size());
+        fVec mean_vec = fVec(float(mean[n * G + g]));
+        fVec rstd_vec = fVec(float(rstd[n * G + g]));
+        acc0_vec += (ds_vec0 - db_vec0 * mean_vec) * rstd_vec;
+        acc1_vec += (ds_vec1 - db_vec1 * mean_vec) * rstd_vec;
       }
+      convert_float_bfloat16(acc0_vec, acc1_vec).store(dgamma + g * D + i);
     }
-  });
+    if (D - i > 0) {
+      fVec acc0_vec{0}, acc1_vec{0};
+      for (const auto n : c10::irange(N)) {
+        const float* ds_ptr = ds + n * C + g * D + i;
+        const float* db_ptr = db + n * C + g * D + i;
+        fVec ds_vec0, ds_vec1, db_vec0, db_vec1;
+        ds_vec0 = fVec::loadu(
+            ds_ptr, (D - i) > fVec::size() ? fVec::size() : (D - i));
+        ds_vec1 = fVec::loadu(
+            ds_ptr + fVec::size(),
+            (D - i) > fVec::size() ? (D - i - fVec::size()) : 0);
+        db_vec0 = fVec::loadu(
+            db_ptr, (D - i) > fVec::size() ? fVec::size() : (D - i));
+        db_vec1 = fVec::loadu(
+            db_ptr + fVec::size(),
+            (D - i) > fVec::size() ? (D - i - fVec::size()) : 0);
+        fVec mean_vec = fVec(float(mean[n * G + g]));
+        fVec rstd_vec = fVec(float(rstd[n * G + g]));
+        acc0_vec += (ds_vec0 - db_vec0 * mean_vec) * rstd_vec;
+        acc1_vec += (ds_vec1 - db_vec1 * mean_vec) * rstd_vec;
+      }
+      convert_float_bfloat16(acc0_vec, acc1_vec)
+          .store(dgamma + g * D + i, D - i);
+    }
+  }
+}
+
+template <typename PT, typename T_ACC>
+void BetaBackward(int64_t N, int64_t C, const T_ACC* db, PT* dbeta) {
+  using Vec = at::vec::Vectorized<PT>;
+  constexpr int64_t K = Vec::size();
+  Vec acc_vec{0}, zero{0};
+  const int64_t inner_size = C / K * K;
+  int64_t i = 0;
+  for (; i < inner_size; i += K) {
+    for (const auto n : c10::irange(N)) {
+      acc_vec += Vec::loadu(db + n * C + i);
+    }
+    acc_vec.store(dbeta + i);
+    acc_vec = Vec::set(acc_vec, zero);
+  }
+  if (C - i > 0) {
+    for (const auto n : c10::irange(N)) {
+      acc_vec += Vec::loadu(db + n * C + i, C - i);
+    }
+    acc_vec.store(dbeta + i, C - i);
+    acc_vec = Vec::set(acc_vec, zero, C - i);
+  }
+}
+
+template <>
+void BetaBackward(int64_t N, int64_t C, const float* db, BFloat16* dbeta) {
+  using Vec = at::vec::Vectorized<BFloat16>;
+  using fVec = at::vec::Vectorized<float>;
+  constexpr int64_t K = Vec::size();
+  fVec acc0_vec{0}, acc1_vec{0}, zero{0};
+  const int64_t inner_size = C / K * K;
+  int64_t i = 0;
+  for (; i < inner_size; i += K) {
+    for (const auto n : c10::irange(N)) {
+      fVec db_vec0, db_vec1;
+      db_vec0 = fVec::loadu(db + n * C + i);
+      db_vec1 = fVec::loadu(db + n * C + i + fVec::size());
+      acc0_vec += db_vec0;
+      acc1_vec += db_vec1;
+    }
+    convert_float_bfloat16(acc0_vec, acc1_vec).store(dbeta + i);
+    acc0_vec = fVec::set(acc0_vec, zero);
+    acc1_vec = fVec::set(acc1_vec, zero);
+  }
+  if (C - i > 0) {
+    for (const auto n : c10::irange(N)) {
+      fVec db_vec0, db_vec1;
+      db_vec0 = fVec::loadu(
+          db + n * C + i, (C - i) > fVec::size() ? fVec::size() : (C - i));
+      db_vec1 = fVec::loadu(
+          db + n * C + i + fVec::size(),
+          (C - i) > fVec::size() ? (C - i - fVec::size()) : 0);
+      acc0_vec += db_vec0;
+      acc1_vec += db_vec1;
+    }
+    convert_float_bfloat16(acc0_vec, acc1_vec).store(dbeta + i, C - i);
+    acc0_vec = fVec::set(acc0_vec, zero, C - i);
+    acc1_vec = fVec::set(acc1_vec, zero, C - i);
+  }
 }
 
 template <typename T, typename PT>
@@ -917,7 +943,6 @@ void GroupNormBackwardKernelImplInternal(
   TORCH_CHECK(mean.numel() == N * group);
   TORCH_CHECK(rstd.numel() == N * group);
   TORCH_CHECK(!gamma.defined() || gamma.numel() == C);
-
   const T* dY_data = dY.data_ptr<T>();
   const T* X_data = X.data_ptr<T>();
   const PT* mean_data = mean.data_ptr<PT>();
@@ -926,15 +951,18 @@ void GroupNormBackwardKernelImplInternal(
   T* dX_data = dX.defined() ? dX.data_ptr<T>() : nullptr;
   PT* dgamma_data = dgamma.defined() ? dgamma.data_ptr<PT>() : nullptr;
   PT* dbeta_data = dbeta.defined() ? dbeta.data_ptr<PT>() : nullptr;
-  at::Tensor ds =
-      at::empty({N, C}, X.options().dtype(c10::CppTypeToScalarType<PT>::value));
-  at::Tensor db =
-      at::empty({N, C}, X.options().dtype(c10::CppTypeToScalarType<PT>::value));
-  PT* ds_data = ds.data_ptr<PT>();
-  PT* db_data = db.data_ptr<PT>();
-  ComputeInternalGradients<T, PT>(N, C, HxW, dY_data, X_data, ds_data, db_data);
+  using T_ACC = at::opmath_type<T>;
+  at::Tensor ds = at::empty(
+      {N, C}, X.options().dtype(c10::CppTypeToScalarType<T_ACC>::value));
+  at::Tensor db = at::empty(
+      {N, C}, X.options().dtype(c10::CppTypeToScalarType<T_ACC>::value));
+  T_ACC* ds_data = ds.data_ptr<T_ACC>();
+  T_ACC* db_data = db.data_ptr<T_ACC>();
+  ComputeInternalGradients<T, T_ACC>(
+      N, C, HxW, dY_data, X_data, ds_data, db_data);
+
   if (dX_data != nullptr) {
-    GroupNormInputBackward<T, PT>(
+    GroupNormInputBackward<T, PT, T_ACC>(
         N,
         C,
         HxW,
@@ -949,11 +977,631 @@ void GroupNormBackwardKernelImplInternal(
         dX_data);
   }
   if (dgamma_data != nullptr) {
-    GammaBackward<PT>(
+    GammaBackward(
         N, C, group, mean_data, rstd_data, ds_data, db_data, dgamma_data);
   }
   if (dbeta_data != nullptr) {
-    BetaBackward<PT>(N, C, db_data, dbeta_data);
+    BetaBackward(N, C, db_data, dbeta_data);
+  }
+}
+
+template <typename T, typename T_ACC>
+inline void DsDbRowwiseMomentsChannelsLast(
+    const T* dY_ptr,
+    const T* X_ptr,
+    T_ACC* ds_ptr,
+    T_ACC* db_ptr,
+    int64_t C) {
+  using Vec = at::vec::Vectorized<T>;
+  constexpr int64_t K = at::vec::Vectorized<T>::size();
+  const int64_t inner_size = C / K * K;
+  int64_t d = 0;
+  for (; d < inner_size; d += K) {
+    Vec ds_dev = Vec::loadu(ds_ptr + d);
+    Vec db_vec = Vec::loadu(db_ptr + d);
+    Vec x_vec = Vec::loadu(X_ptr + d);
+    Vec dy_vec = Vec::loadu(dY_ptr + d);
+
+    ds_dev += x_vec * dy_vec;
+    db_vec += dy_vec;
+    ds_dev.store(ds_ptr + d);
+    db_vec.store(db_ptr + d);
+  }
+  if (C - d > 0) {
+    Vec ds_dev = Vec::loadu(ds_ptr + d, C - d);
+    Vec db_vec = Vec::loadu(db_ptr + d, C - d);
+    Vec x_vec = Vec::loadu(X_ptr + d, C - d);
+    Vec dy_vec = Vec::loadu(dY_ptr + d, C - d);
+    ds_dev += x_vec * dy_vec;
+    db_vec += dy_vec;
+    ds_dev.store(ds_ptr + d, C - d);
+    db_vec.store(db_ptr + d, C - d);
+  }
+}
+
+template <>
+inline void DsDbRowwiseMomentsChannelsLast(
+    const BFloat16* dY_ptr,
+    const BFloat16* X_ptr,
+    float* ds_ptr,
+    float* db_ptr,
+    int64_t C) {
+  using fVec = at::vec::Vectorized<float>;
+  using bVec = at::vec::Vectorized<BFloat16>;
+  int64_t d = 0;
+  for (; d < C - (C % bVec::size()); d += bVec::size()) {
+    fVec ds_dev0 = fVec::loadu(ds_ptr + d);
+    fVec ds_dev1 = fVec::loadu(ds_ptr + d + fVec::size());
+    fVec db_vec0 = fVec::loadu(db_ptr + d);
+    fVec db_vec1 = fVec::loadu(db_ptr + d + fVec::size());
+    bVec x_vec = bVec::loadu(X_ptr + d);
+    bVec dy_vec = bVec::loadu(dY_ptr + d);
+    fVec x_vec0, x_vec1, dy_vec0, dy_vec1;
+    std::tie(x_vec0, x_vec1) = convert_bfloat16_float(x_vec);
+    std::tie(dy_vec0, dy_vec1) = convert_bfloat16_float(dy_vec);
+    ds_dev0 += x_vec0 * dy_vec0;
+    ds_dev1 += x_vec1 * dy_vec1;
+    db_vec0 += dy_vec0;
+    db_vec1 += dy_vec1;
+
+    ds_dev0.store(ds_ptr + d);
+    ds_dev1.store(ds_ptr + d + fVec::size());
+    db_vec0.store(db_ptr + d);
+    db_vec1.store(db_ptr + d + fVec::size());
+  }
+  if (C - d > 0) {
+    fVec ds_dev0 = fVec::loadu(
+        ds_ptr + d, (C - d) > fVec::size() ? fVec::size() : (C - d));
+    fVec ds_dev1 = fVec::loadu(
+        ds_ptr + d + fVec::size(),
+        (C - d) > fVec::size() ? (C - d - fVec::size()) : 0);
+    fVec db_vec0 = fVec::loadu(
+        db_ptr + d, (C - d) > fVec::size() ? fVec::size() : (C - d));
+    fVec db_vec1 = fVec::loadu(
+        db_ptr + d + fVec::size(),
+        (C - d) > fVec::size() ? (C - d - fVec::size()) : 0);
+    bVec x_vec = bVec::loadu(X_ptr + d, C - d);
+    bVec dy_vec = bVec::loadu(dY_ptr + d, C - d);
+    fVec x_vec0, x_vec1, dy_vec0, dy_vec1;
+    std::tie(x_vec0, x_vec1) = convert_bfloat16_float(x_vec);
+    std::tie(dy_vec0, dy_vec1) = convert_bfloat16_float(dy_vec);
+    ds_dev0 += x_vec0 * dy_vec0;
+    ds_dev1 += x_vec1 * dy_vec1;
+    db_vec0 += dy_vec0;
+    db_vec1 += dy_vec1;
+
+    ds_dev0.store(ds_ptr + d, (C - d) > fVec::size() ? fVec::size() : (C - d));
+    ds_dev1.store(
+        ds_ptr + d + fVec::size(),
+        (C - d) > fVec::size() ? (C - d - fVec::size()) : 0);
+    db_vec0.store(db_ptr + d, (C - d) > fVec::size() ? fVec::size() : (C - d));
+    db_vec1.store(
+        db_ptr + d + fVec::size(),
+        (C - d) > fVec::size() ? (C - d - fVec::size()) : 0);
+  }
+}
+
+template <typename T>
+inline std::tuple<
+    at::vec::Vectorized<at::opmath_type<T>>,
+    at::vec::Vectorized<at::opmath_type<T>>>
+load_util(const T* data_ptr, int64_t n) {
+  using Vec = at::vec::Vectorized<T>;
+  auto vec0 = Vec::loadu(data_ptr, n > Vec::size() ? Vec::size() : n);
+  auto vec1 = Vec::loadu(
+      data_ptr + Vec::size(), n > Vec::size() ? (n - Vec::size()) : 0);
+  return std::tuple<Vec, Vec>(vec0, vec1);
+}
+
+template <>
+inline std::tuple<at::vec::Vectorized<float>, at::vec::Vectorized<float>>
+load_util(const BFloat16* data_ptr, int64_t n) {
+  using bVec = at::vec::Vectorized<BFloat16>;
+  auto vec = bVec::loadu(data_ptr, n);
+  return convert_bfloat16_float(vec);
+}
+
+template <typename T, typename PT, typename T_ACC>
+inline typename std::enable_if<std::is_same<T, T_ACC>::value, void>::type
+ApplyInputGradientsChannelsLastColMov(
+    const T* dY_data,
+    const T* X_data,
+    T* dX_data,
+    const PT* rstd,
+    const PT* gamma,
+    T_ACC c2,
+    T_ACC c3,
+    int64_t HxW,
+    int64_t C,
+    int64_t D) {
+  const bool gamma_null = (gamma == nullptr);
+  int64_t d = 0;
+  auto K = at::vec::Vectorized<T>::size();
+  for (; d < D / K * K; d += K) {
+    auto c1 = at::vec::Vectorized<T>(*rstd) *
+        (gamma_null ? at::vec::Vectorized<T>(1)
+                    : at::vec::Vectorized<T>::loadu(gamma + d));
+    for (const auto m : c10::irange(HxW)) {
+      const T* X_ptr = X_data + m * C;
+      const T* dY_ptr = dY_data + m * C;
+      T* dX_ptr = dX_data + m * C;
+      auto dy_vec = at::vec::Vectorized<T>::loadu(dY_ptr + d);
+      auto x_vec = at::vec::Vectorized<T>::loadu(X_ptr + d);
+      auto dx_vec = c1 * dy_vec + at::vec::Vectorized<T>(c2) * x_vec +
+          at::vec::Vectorized<T>(c3);
+      dx_vec.store(dX_ptr + d);
+    }
+  }
+  if (D - d > 0) {
+    auto c1 = at::vec::Vectorized<T>(*rstd) *
+        (gamma_null ? at::vec::Vectorized<T>(1)
+                    : at::vec::Vectorized<T>::loadu(gamma + d, D - d));
+    for (const auto m : c10::irange(HxW)) {
+      const T* X_ptr = X_data + m * C;
+      const T* dY_ptr = dY_data + m * C;
+      T* dX_ptr = dX_data + m * C;
+      auto dy_vec = at::vec::Vectorized<T>::loadu(dY_ptr + d, D - d);
+      auto x_vec = at::vec::Vectorized<T>::loadu(X_ptr + d, D - d);
+      auto dx_vec = c1 * dy_vec + at::vec::Vectorized<T>(c2) * x_vec +
+          at::vec::Vectorized<T>(c3);
+      dx_vec.store(dX_ptr + d, D - d);
+    }
+  }
+}
+
+template <typename T, typename PT, typename T_ACC>
+inline typename std::enable_if<!std::is_same<T, T_ACC>::value, void>::type
+ApplyInputGradientsChannelsLastColMov(
+    const T* dY_data,
+    const T* X_data,
+    T* dX_data,
+    const PT* rstd,
+    const PT* gamma,
+    T_ACC c2,
+    T_ACC c3,
+    int64_t HxW,
+    int64_t C,
+    int64_t D) {
+  using bVec = at::vec::Vectorized<T>;
+  using fVec = at::vec::Vectorized<T_ACC>;
+  const bool gamma_null = (gamma == nullptr);
+  auto K = bVec::size();
+  int64_t d = 0;
+  for (; d < D / K * K; d += K) {
+    fVec c1_0, c1_1;
+    std::tie(c1_0, c1_1) = gamma_null ? std::tuple<fVec, fVec>(fVec(1), fVec(1))
+                                      : load_util(gamma + d, K);
+    c1_0 = c1_0 * fVec(T_ACC(*rstd));
+    c1_1 = c1_1 * fVec(T_ACC(*rstd));
+    for (const auto m : c10::irange(HxW)) {
+      const T* X_ptr = X_data + m * C;
+      const T* dY_ptr = dY_data + m * C;
+      T* dX_ptr = dX_data + m * C;
+
+      bVec dy_vec = bVec::loadu(dY_ptr + d);
+      bVec x_vec = bVec::loadu(X_ptr + d);
+      fVec dy_vec0, dy_vec1, x_vec0, x_vec1;
+      std::tie(x_vec0, x_vec1) = convert_bfloat16_float(x_vec);
+      std::tie(dy_vec0, dy_vec1) = convert_bfloat16_float(dy_vec);
+      fVec dx_vec0 = c1_0 * dy_vec0 + fVec(c2) * x_vec0 + fVec(c3);
+      fVec dx_vec1 = c1_1 * dy_vec1 + fVec(c2) * x_vec1 + fVec(c3);
+      convert_float_bfloat16(dx_vec0, dx_vec1).store(dX_ptr + d);
+    }
+  }
+  if (D - d > 0) {
+    fVec c1_0, c1_1;
+    std::tie(c1_0, c1_1) = gamma_null ? std::tuple<fVec, fVec>(fVec(1), fVec(1))
+                                      : load_util(gamma + d, D - d);
+    c1_0 = c1_0 * fVec(T_ACC(*rstd));
+    c1_1 = c1_1 * fVec(T_ACC(*rstd));
+    for (const auto m : c10::irange(HxW)) {
+      const T* X_ptr = X_data + m * C;
+      const T* dY_ptr = dY_data + m * C;
+      T* dX_ptr = dX_data + m * C;
+      bVec dy_vec = bVec::loadu(dY_ptr + d, D - d);
+      bVec x_vec = bVec::loadu(X_ptr + d, D - d);
+      fVec dy_vec0, dy_vec1, x_vec0, x_vec1;
+      std::tie(x_vec0, x_vec1) = convert_bfloat16_float(x_vec);
+      std::tie(dy_vec0, dy_vec1) = convert_bfloat16_float(dy_vec);
+      fVec dx_vec0 = c1_0 * dy_vec0 + fVec(c2) * x_vec0 + fVec(c3);
+      fVec dx_vec1 = c1_1 * dy_vec1 + fVec(c2) * x_vec1 + fVec(c3);
+      convert_float_bfloat16(dx_vec0, dx_vec1).store(dX_ptr + d, D - d);
+    }
+  }
+}
+
+template <typename T, typename PT, typename T_ACC>
+inline typename std::enable_if<std::is_same<T, T_ACC>::value, void>::type
+ApplyInputGradientsChannelsLastRowMov(
+    const T* dY_data,
+    const T* X_data,
+    T* dX_data,
+    const PT* rstd,
+    const PT* gamma,
+    T_ACC c2,
+    T_ACC c3,
+    int64_t HxW,
+    int64_t C,
+    int64_t D) {
+  const bool gamma_null = (gamma == nullptr);
+  int64_t d = 0;
+  auto K = at::vec::Vectorized<T>::size();
+  for (; d < D / K * K; d += K) {
+    auto c1 = at::vec::Vectorized<T>(*rstd) *
+        (gamma_null ? at::vec::Vectorized<T>(1)
+                    : at::vec::Vectorized<T>::loadu(gamma + d));
+    auto dy_vec = at::vec::Vectorized<T>::loadu(dY_data + d);
+    auto x_vec = at::vec::Vectorized<T>::loadu(X_data + d);
+    auto dx_vec = c1 * dy_vec + at::vec::Vectorized<T>(c2) * x_vec +
+        at::vec::Vectorized<T>(c3);
+    dx_vec.store(dX_data + d);
+  }
+  if (D - d > 0) {
+    auto c1 = at::vec::Vectorized<T>(*rstd) *
+        (gamma_null ? at::vec::Vectorized<T>(1)
+                    : at::vec::Vectorized<T>::loadu(gamma + d, D - d));
+    auto dy_vec = at::vec::Vectorized<T>::loadu(dY_data + d, D - d);
+    auto x_vec = at::vec::Vectorized<T>::loadu(X_data + d, D - d);
+    auto dx_vec = c1 * dy_vec + at::vec::Vectorized<T>(c2) * x_vec +
+        at::vec::Vectorized<T>(c3);
+    dx_vec.store(dX_data + d, D - d);
+  }
+}
+
+template <typename T, typename PT, typename T_ACC>
+inline typename std::enable_if<!std::is_same<T, T_ACC>::value, void>::type
+ApplyInputGradientsChannelsLastRowMov(
+    const T* dY_data,
+    const T* X_data,
+    T* dX_data,
+    const PT* rstd,
+    const PT* gamma,
+    T_ACC c2,
+    T_ACC c3,
+    int64_t HxW,
+    int64_t C,
+    int64_t D) {
+  using bVec = at::vec::Vectorized<T>;
+  using fVec = at::vec::Vectorized<T_ACC>;
+  const bool gamma_null = (gamma == nullptr);
+  auto K = bVec::size();
+  int64_t d = 0;
+  for (; d < D / K * K; d += K) {
+    fVec c1_0, c1_1;
+    std::tie(c1_0, c1_1) = gamma_null ? std::tuple<fVec, fVec>(fVec(1), fVec(1))
+                                      : load_util(gamma + d, K);
+    c1_0 = c1_0 * fVec(T_ACC(*rstd));
+    c1_1 = c1_1 * fVec(T_ACC(*rstd));
+    bVec dy_vec = bVec::loadu(dY_data + d);
+    bVec x_vec = bVec::loadu(X_data + d);
+    fVec dy_vec0, dy_vec1, x_vec0, x_vec1;
+    std::tie(x_vec0, x_vec1) = convert_bfloat16_float(x_vec);
+    std::tie(dy_vec0, dy_vec1) = convert_bfloat16_float(dy_vec);
+    fVec dx_vec0 = c1_0 * dy_vec0 + fVec(c2) * x_vec0 + fVec(c3);
+    fVec dx_vec1 = c1_1 * dy_vec1 + fVec(c2) * x_vec1 + fVec(c3);
+    convert_float_bfloat16(dx_vec0, dx_vec1).store(dX_data + d);
+  }
+  if (D - d > 0) {
+    fVec c1_0, c1_1;
+    std::tie(c1_0, c1_1) = gamma_null ? std::tuple<fVec, fVec>(fVec(1), fVec(1))
+                                      : load_util(gamma + d, D - d);
+    c1_0 = c1_0 * fVec(T_ACC(*rstd));
+    c1_1 = c1_1 * fVec(T_ACC(*rstd));
+    bVec dy_vec = bVec::loadu(dY_data + d, D - d);
+    bVec x_vec = bVec::loadu(X_data + d, D - d);
+    fVec dy_vec0, dy_vec1, x_vec0, x_vec1;
+    std::tie(x_vec0, x_vec1) = convert_bfloat16_float(x_vec);
+    std::tie(dy_vec0, dy_vec1) = convert_bfloat16_float(dy_vec);
+    fVec dx_vec0 = c1_0 * dy_vec0 + fVec(c2) * x_vec0 + fVec(c3);
+    fVec dx_vec1 = c1_1 * dy_vec1 + fVec(c2) * x_vec1 + fVec(c3);
+    convert_float_bfloat16(dx_vec0, dx_vec1).store(dX_data + d, D - d);
+  }
+}
+
+template <typename T, typename PT, typename T_ACC>
+inline typename std::
+    enable_if<std::is_same<T, T_ACC>::value, std::tuple<T_ACC, T_ACC>>::type
+    CalcInternalGradientsChannelsLast(
+        const T* X_data,
+        const T* dY_data,
+        const PT* gamma_ptr,
+        T_ACC* ds_ptr,
+        T_ACC* db_ptr,
+        int64_t HxW,
+        int64_t C,
+        int64_t D) {
+  using Vec = at::vec::Vectorized<T>;
+  const bool gamma_null = (gamma_ptr == nullptr);
+  constexpr int64_t K = Vec::size();
+  const int64_t inner_size = D / K * K;
+  int64_t d = 0;
+  PT ds_gamma{0}, db_gamma{0};
+  for (; d < inner_size; d += K) {
+    Vec acc0_vec{0}, acc1_vec{0};
+    for (const auto m : c10::irange(HxW)) {
+      const T* X_ptr = X_data + m * C;
+      const T* dY_ptr = dY_data + m * C;
+      Vec x_vec = Vec::loadu(X_ptr + d);
+      Vec dy_vec = Vec::loadu(dY_ptr + d);
+      acc0_vec += x_vec * dy_vec;
+      acc1_vec += dy_vec;
+    }
+    acc0_vec.store(ds_ptr + d);
+    acc1_vec.store(db_ptr + d);
+    ds_gamma += at::vec::vec_reduce_all(
+        [](Vec& x, Vec& y) { return x + y; },
+        acc0_vec * (gamma_null ? Vec(1) : Vec::loadu(gamma_ptr + d)));
+    db_gamma += at::vec::vec_reduce_all(
+        [](Vec& x, Vec& y) { return x + y; },
+        acc1_vec * (gamma_null ? Vec(1) : Vec::loadu(gamma_ptr + d)));
+  }
+  if (D - d > 0) {
+    Vec acc0_vec{0}, acc1_vec{0};
+    for (const auto m : c10::irange(HxW)) {
+      const T* X_ptr = X_data + m * C;
+      const T* dY_ptr = dY_data + m * C;
+      Vec x_vec = Vec::loadu(X_ptr + d, D - d);
+      Vec dy_vec = Vec::loadu(dY_ptr + d, D - d);
+      acc0_vec += x_vec * dy_vec;
+      acc1_vec += dy_vec;
+    }
+    acc0_vec.store(ds_ptr + d, D - d);
+    acc1_vec.store(db_ptr + d, D - d);
+    ds_gamma += at::vec::vec_reduce_all(
+        [](Vec& x, Vec& y) { return x + y; },
+        acc0_vec * (gamma_null ? Vec(1) : Vec::loadu(gamma_ptr + d, D - d)));
+    db_gamma += at::vec::vec_reduce_all(
+        [](Vec& x, Vec& y) { return x + y; },
+        acc1_vec * (gamma_null ? Vec(1) : Vec::loadu(gamma_ptr + d, D - d)));
+  }
+  return std::tuple<PT, PT>(ds_gamma, db_gamma);
+}
+
+template <typename T, typename PT, typename T_ACC>
+inline typename std::
+    enable_if<!std::is_same<T, T_ACC>::value, std::tuple<T_ACC, T_ACC>>::type
+    CalcInternalGradientsChannelsLast(
+        const T* X_data,
+        const T* dY_data,
+        const PT* gamma_ptr,
+        T_ACC* ds_ptr,
+        T_ACC* db_ptr,
+        int64_t HxW,
+        int64_t C,
+        int64_t D) {
+  using bVec = at::vec::Vectorized<T>;
+  using fVec = at::vec::Vectorized<T_ACC>;
+  constexpr int64_t K = bVec::size();
+  const int64_t inner_size = D / K * K;
+  float ds_gamma{0}, db_gamma{0};
+  int64_t d = 0;
+  for (; d < inner_size; d += K) {
+    fVec acc0_vec0{0}, acc0_vec1{0}, acc1_vec0{0}, acc1_vec1{0};
+    for (const auto m : c10::irange(HxW)) {
+      const T* X_ptr = X_data + m * C;
+      const T* dY_ptr = dY_data + m * C;
+      bVec x_vec = bVec::loadu(X_ptr + d);
+      bVec dy_vec = bVec::loadu(dY_ptr + d);
+      fVec x_vec0, x_vec1, dy_vec0, dy_vec1;
+      std::tie(x_vec0, x_vec1) = convert_bfloat16_float(x_vec);
+      std::tie(dy_vec0, dy_vec1) = convert_bfloat16_float(dy_vec);
+      acc0_vec0 += x_vec0 * dy_vec0;
+      acc0_vec1 += x_vec1 * dy_vec1;
+      acc1_vec0 += dy_vec0;
+      acc1_vec1 += dy_vec1;
+    }
+    acc0_vec0.store(ds_ptr + d);
+    acc0_vec1.store(ds_ptr + d + fVec::size());
+    acc1_vec0.store(db_ptr + d);
+    acc1_vec1.store(db_ptr + d + fVec::size());
+    fVec gamma_vec0, gamma_vec1;
+    std::tie(gamma_vec0, gamma_vec1) = (gamma_ptr == nullptr)
+        ? std::tuple<fVec, fVec>(fVec(1), fVec(1))
+        : load_util(gamma_ptr + d, K);
+    ds_gamma += at::vec::vec_reduce_all(
+        [](fVec& x, fVec& y) { return x + y; }, acc0_vec0 * gamma_vec0);
+    ds_gamma += at::vec::vec_reduce_all(
+        [](fVec& x, fVec& y) { return x + y; }, acc0_vec1 * gamma_vec1);
+    db_gamma += at::vec::vec_reduce_all(
+        [](fVec& x, fVec& y) { return x + y; }, acc1_vec0 * gamma_vec0);
+    db_gamma += at::vec::vec_reduce_all(
+        [](fVec& x, fVec& y) { return x + y; }, acc1_vec1 * gamma_vec1);
+  }
+  for (; d < D; d++) {
+    T_ACC acc0{0}, acc1{0};
+    for (const auto m : c10::irange(HxW)) {
+      const BFloat16* X_ptr = X_data + m * C;
+      const BFloat16* dY_ptr = dY_data + m * C;
+      acc0 += T_ACC(X_ptr[d]) * T_ACC(dY_ptr[d]);
+      acc1 += T_ACC(dY_ptr[d]);
+    }
+    ds_ptr[d] = acc0;
+    db_ptr[d] = acc1;
+    T_ACC gamma_val = (gamma_ptr == nullptr) ? T_ACC(1) : T_ACC(gamma_ptr[d]);
+    ds_gamma += acc0 * gamma_val;
+    db_gamma += acc1 * gamma_val;
+  }
+
+  return std::tuple<float, float>(ds_gamma, db_gamma);
+}
+
+template <typename T, typename PT>
+void GroupNormBackwardKernelImplChannelsLastInternal(
+    const at::Tensor& dY,
+    const at::Tensor& X,
+    const at::Tensor& mean,
+    const at::Tensor& rstd,
+    const at::Tensor& gamma,
+    int64_t N,
+    int64_t C,
+    int64_t HxW,
+    int64_t group,
+    at::Tensor& dX,
+    at::Tensor& dgamma,
+    at::Tensor& dbeta) {
+  TORCH_CHECK(dY.numel() == N * C * HxW);
+  TORCH_CHECK(X.numel() == N * C * HxW);
+  TORCH_CHECK(mean.numel() == N * group);
+  TORCH_CHECK(rstd.numel() == N * group);
+  TORCH_CHECK(!gamma.defined() || gamma.numel() == C);
+  int64_t D = C / group;
+  int64_t G = group;
+  const T* dY_data = dY.data_ptr<T>();
+  const T* X_data = X.data_ptr<T>();
+  const PT* mean_data = mean.data_ptr<PT>();
+  const PT* rstd_data = rstd.data_ptr<PT>();
+  const PT* gamma_data = gamma.defined() ? gamma.data_ptr<PT>() : nullptr;
+  T* dX_data = dX.defined() ? dX.data_ptr<T>() : nullptr;
+  PT* dgamma_data = dgamma.defined() ? dgamma.data_ptr<PT>() : nullptr;
+  PT* dbeta_data = dbeta.defined() ? dbeta.data_ptr<PT>() : nullptr;
+  const bool gamma_null = (gamma_data == nullptr);
+  using T_ACC = at::opmath_type<T>;
+  at::Tensor ds = at::empty(
+      {N, C}, X.options().dtype(c10::CppTypeToScalarType<T_ACC>::value));
+  at::Tensor db = at::empty(
+      {N, C}, X.options().dtype(c10::CppTypeToScalarType<T_ACC>::value));
+  T_ACC* ds_data = ds.data_ptr<T_ACC>();
+  T_ACC* db_data = db.data_ptr<T_ACC>();
+  const T_ACC s = T_ACC(1) / static_cast<T_ACC>(D * HxW);
+
+  // Similar to channels last forward, channels last backward has also 2 impls.
+  // impl-1: parallel on N * G. Only need one omp session for input gradients
+  //   but memory access per thread is non-contiguous.
+  //
+  // impl-2: parallel on N * HxW. Memory access per thread is contiguous,
+  //   but requires help of extra temp buffer of size {T, N, 2C}.
+
+  // Generally impl-2 has better performance when HxW is large enough, so that
+  //   data per thread {NHWC / T} is much larger then temp buffer per thread
+  //   {2NC}
+  constexpr int64_t feature_map_threshold = 2048;
+  if (HxW < feature_map_threshold) {
+    // impl-1: parallel on N * G.
+    at::parallel_for(0, N * G, 1, [=](int64_t begin, int64_t end) {
+      int64_t n{0}, g{0};
+      at::native::data_index_init(begin, n, N, g, G);
+      for (const auto i : c10::irange(begin, end)) {
+        // Step 1. Compute internal gradients.
+        T_ACC* ds_ptr = ds_data + i * D;
+        T_ACC* db_ptr = db_data + i * D;
+        T_ACC ds_gamma, db_gamma;
+        const T* X_ptr = X_data + n * HxW * C + g * D;
+        const T* dY_ptr = dY_data + n * HxW * C + g * D;
+        const PT* gamma_ptr = gamma_null ? gamma_data : (gamma_data + g * D);
+        std::tie(ds_gamma, db_gamma) =
+            CalcInternalGradientsChannelsLast<T, PT, T_ACC>(
+                X_ptr, dY_ptr, gamma_ptr, ds_ptr, db_ptr, HxW, C, D);
+
+        // Step 2. Compute dX.
+        T* dX_ptr = dX_data + n * HxW * C + g * D;
+        const PT* rstd_ptr = rstd_data + i;
+        const T_ACC c2 = (db_gamma * T_ACC(mean_data[i]) - ds_gamma) *
+            T_ACC(rstd_data[i]) * T_ACC(rstd_data[i]) * T_ACC(rstd_data[i]) * s;
+        const T_ACC c3 =
+            -c2 * T_ACC(mean_data[i]) - db_gamma * T_ACC(rstd_data[i]) * s;
+        ApplyInputGradientsChannelsLastColMov<T, PT, T_ACC>(
+            dY_ptr, X_ptr, dX_ptr, rstd_ptr, gamma_ptr, c2, c3, HxW, C, D);
+        at::native::data_index_step(n, N, g, G);
+      }
+    });
+
+  } else {
+    // impl-2: parallel on N * HxW.
+    int num_threads = at::get_num_threads();
+    at::Tensor buffer =
+        at::empty(
+            {num_threads, N, 2 * C},
+            X.options().dtype(c10::CppTypeToScalarType<T_ACC>::value))
+            .zero_();
+    T_ACC* buffer_data = buffer.data_ptr<T_ACC>();
+
+    at::Tensor tmp_buffer = at::empty(
+        {N, 2 * G}, X.options().dtype(c10::CppTypeToScalarType<T_ACC>::value));
+    T_ACC* tmp_buffer_data = tmp_buffer.data_ptr<T_ACC>();
+
+    // Step 1. Each thread compute their own internal gradients to the buffer.
+    at::parallel_for(0, N * HxW, 1, [&](int64_t begin, int64_t end) {
+      int tid = at::get_thread_num();
+      T_ACC* buffer_ptr = buffer_data + tid * N * 2 * C;
+      int64_t n{0}, m{0};
+      at::native::data_index_init(begin, n, N, m, HxW);
+      for (const auto i : c10::irange(begin, end)) {
+        T_ACC* ds_ptr = buffer_ptr + n * 2 * C;
+        T_ACC* db_ptr = ds_ptr + C;
+        const T* X_ptr = X_data + i * C;
+        const T* dY_ptr = dY_data + i * C;
+
+        DsDbRowwiseMomentsChannelsLast<T, T_ACC>(
+            dY_ptr, X_ptr, ds_ptr, db_ptr, C);
+        at::native::data_index_step(n, N, m, HxW);
+      }
+    });
+
+    // Step 2. Collect internal gradients from each thread and
+    // get the final internal gradients to ds, db, and tmp_buffer.
+    for (const auto n : c10::irange(N)) {
+      for (const auto g : c10::irange(G)) {
+        T_ACC ds_gamma{0}, db_gamma{0};
+        for (const auto d : c10::irange(D)) {
+          T_ACC ds_val{0}, db_val{0};
+          for (const auto t : c10::irange(num_threads)) {
+            T_ACC* buffer_ptr = buffer_data + t * N * 2 * C + n * 2 * C;
+            if (gamma_null) {
+              ds_gamma += buffer_ptr[g * D + d];
+              db_gamma += buffer_ptr[g * D + d + C];
+            } else {
+              ds_gamma += buffer_ptr[g * D + d] * gamma_data[g * D + d];
+              db_gamma += buffer_ptr[g * D + d + C] * gamma_data[g * D + d];
+            }
+            ds_val += buffer_ptr[g * D + d];
+            db_val += buffer_ptr[g * D + d + C];
+          }
+          ds_data[n * C + g * D + d] = ds_val;
+          db_data[n * C + g * D + d] = db_val;
+        }
+        tmp_buffer_data[n * 2 * G + 2 * g] = ds_gamma;
+        tmp_buffer_data[n * 2 * G + 2 * g + 1] = db_gamma;
+      }
+    }
+
+    // Step 3. Compute dx.
+    if (dX_data != nullptr) {
+      at::parallel_for(0, N * HxW, 1, [&](int64_t begin, int64_t end) {
+        int64_t n{0}, m{0};
+        at::native::data_index_init(begin, n, N, m, HxW);
+        for (const auto i : c10::irange(begin, end)) {
+          for (const auto g : c10::irange(G)) {
+            const T* X_ptr = X_data + i * C + g * D;
+            const T* dY_ptr = dY_data + i * C + g * D;
+            T* dX_ptr = dX_data + i * C + g * D;
+            const PT* mean_ptr = mean_data + n * G + g;
+            const PT* rstd_ptr = rstd_data + n * G + g;
+            const PT* gamma_ptr =
+                gamma_null ? gamma_data : (gamma_data + g * D);
+            T_ACC ds_val = tmp_buffer_data[n * 2 * G + 2 * g];
+            T_ACC db_val = tmp_buffer_data[n * 2 * G + 2 * g + 1];
+
+            const T_ACC c2 = (db_val * T_ACC(*mean_ptr) - ds_val) *
+                T_ACC(*rstd_ptr) * T_ACC(*rstd_ptr) * T_ACC(*rstd_ptr) * s;
+            const T_ACC c3 =
+                -c2 * T_ACC(*mean_ptr) - db_val * T_ACC(*rstd_ptr) * s;
+            ApplyInputGradientsChannelsLastRowMov<T, PT, T_ACC>(
+                dY_ptr, X_ptr, dX_ptr, rstd_ptr, gamma_ptr, c2, c3, HxW, C, D);
+          }
+
+          at::native::data_index_step(n, N, m, HxW);
+        }
+      });
+    }
+  }
+
+  // Finally compute dgamma and dbeta.
+  if (dgamma_data != nullptr) {
+    GammaBackward(
+        N, C, group, mean_data, rstd_data, ds_data, db_data, dgamma_data);
+  }
+  if (dbeta_data != nullptr) {
+    BetaBackward(N, C, db_data, dbeta_data);
   }
 }
 
@@ -970,20 +1618,100 @@ void GroupNormBackwardKernelImpl(
     at::Tensor& dX,
     at::Tensor& dgamma,
     at::Tensor& dbeta) {
-  const bool mixed_type = at::native::is_mixed_type(dY, gamma);
-  AT_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16,
-      X.scalar_type(),
-      "GroupNormBackwardKernelImpl",
-      [&]() {
-        if (mixed_type) {
-          GroupNormBackwardKernelImplInternal<BFloat16, float>(
-              dY, X, mean, rstd, gamma, N, C, HxW, group, dX, dgamma, dbeta);
-        } else {
-          GroupNormBackwardKernelImplInternal<scalar_t, scalar_t>(
-              dY, X, mean, rstd, gamma, N, C, HxW, group, dX, dgamma, dbeta);
-        }
-      });
+  // In training, using Amp to enable BFloat16 is recommended.
+  // It will keep module parameters in acc dtype i.e. float
+  // while input/output will be in BFloat16.
+  // Using parameters in BFloat16 will cause high precision loss.
+  const bool mixed_type = at::native::is_mixed_type(dY, mean);
+  switch (X.suggest_memory_format()) {
+    case at::MemoryFormat::Contiguous: {
+      AT_DISPATCH_FLOATING_TYPES_AND(
+          ScalarType::BFloat16,
+          X.scalar_type(),
+          "GroupNormBackwardKernelImpl",
+          [&]() {
+            using param_t = at::opmath_type<scalar_t>;
+            if (mixed_type) {
+              GroupNormBackwardKernelImplInternal<scalar_t, param_t>(
+                  dY,
+                  X,
+                  mean,
+                  rstd,
+                  gamma,
+                  N,
+                  C,
+                  HxW,
+                  group,
+                  dX,
+                  dgamma,
+                  dbeta);
+            } else {
+              GroupNormBackwardKernelImplInternal<scalar_t, scalar_t>(
+                  dY,
+                  X,
+                  mean,
+                  rstd,
+                  gamma,
+                  N,
+                  C,
+                  HxW,
+                  group,
+                  dX,
+                  dgamma,
+                  dbeta);
+            }
+          });
+      break;
+    }
+    case at::MemoryFormat::ChannelsLast:
+    case at::MemoryFormat::ChannelsLast3d: {
+      AT_DISPATCH_FLOATING_TYPES_AND(
+          ScalarType::BFloat16,
+          X.scalar_type(),
+          "GroupNormBackwardKernelImpl",
+          [&]() {
+            using param_t = at::opmath_type<scalar_t>;
+            if (mixed_type) {
+              GroupNormBackwardKernelImplChannelsLastInternal<
+                  scalar_t,
+                  param_t>(
+                  dY,
+                  X,
+                  mean,
+                  rstd,
+                  gamma,
+                  N,
+                  C,
+                  HxW,
+                  group,
+                  dX,
+                  dgamma,
+                  dbeta);
+            } else {
+              GroupNormBackwardKernelImplChannelsLastInternal<
+                  scalar_t,
+                  scalar_t>(
+                  dY,
+                  X,
+                  mean,
+                  rstd,
+                  gamma,
+                  N,
+                  C,
+                  HxW,
+                  group,
+                  dX,
+                  dgamma,
+                  dbeta);
+            }
+          });
+      break;
+    }
+    default:
+      TORCH_CHECK(
+          false,
+          "Unsupported memory format. Supports only ChannelsLast, ChannelsLast3d, Contiguous");
+  }
 }
 
 } // namespace
