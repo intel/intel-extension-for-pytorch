@@ -64,7 +64,10 @@ def IPEX_GEMM_MODULE_CPU():
 @functools.lru_cache(None)
 def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
     from ._lstm_convert import _LSTM
-    from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBag
+    from intel_extension_for_pytorch.nn.modules import (
+        MergedEmbeddingBag,
+        MergedEmbeddingBagWithCat,
+    )
 
     module_convert_list_bf16_inference = [
         torch.nn.Conv2d,
@@ -74,6 +77,8 @@ def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
         torch.nn.Linear,
         torch.nn.Embedding,
         torch.nn.LSTM,
+        MergedEmbeddingBagWithCat,
+        torch.nn.ParameterList,
     ]
 
     module_convert_list_bf16_training = [
@@ -97,6 +102,8 @@ def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
         torch.nn.Conv2d,
         torch.nn.Conv3d,
         torch.nn.Linear,
+        MergedEmbeddingBagWithCat,
+        torch.nn.ParameterList,
     ]
 
     if dtype == torch.float16:

@@ -40,6 +40,30 @@ class EmbeddingBagList(torch.nn.Module):
         return ly
 
 
+class EmbCatDense(torch.nn.Module):
+    def __init__(self, NUM_TABLE, NUM_DIM, dtype):
+        super(EmbCatDense, self).__init__()
+        self.emblist = torch.nn.ModuleList()
+        for _ in range(NUM_TABLE):
+            self.emblist.append(
+                torch.nn.EmbeddingBag(1000, NUM_DIM, mode="sum", dtype=dtype)
+            )
+        self.merged_emb = (
+            ipex.nn.modules.MergedEmbeddingBagWithCat.from_embeddingbag_list(
+                self.emblist
+            )
+        )
+
+    def ref_forward(self, indices, offsets, to_cat):
+        sparse_out = []
+        for i, emb in enumerate(self.emblist):
+            sparse_out.append(emb(indices[i], offsets[i]))
+        return torch.cat([to_cat] + sparse_out, dim=1)
+
+    def forward(self, indices, offsets, to_cat):
+        return self.merged_emb(indices, offsets, to_cat)
+
+
 def run_bench(bench_name, module, input_data, optimizer=None, training=False):
     iters = 100 if training else 1000
     for i in range(iters):
@@ -97,6 +121,64 @@ def training_bench(dataset, emb_list, merged_emb, optimizer):
     )
 
 
+def merged_emb_cat_bench(args):
+    assert args.inference
+    NUM_TABLE = 26
+    index_type = torch.int64
+    multi_hot = [
+        3,
+        2,
+        1,
+        2,
+        6,
+        1,
+        1,
+        1,
+        1,
+        7,
+        3,
+        8,
+        1,
+        6,
+        9,
+        5,
+        1,
+        1,
+        1,
+        12,
+        100,
+        27,
+        10,
+        3,
+        1,
+        1,
+    ]
+    for index_type in [torch.int32, torch.int64]:
+        indices = [
+            torch.randint(1000, (args.batch_size * multi_hot[i],)).to(index_type)
+            for i in range(NUM_TABLE)
+        ]
+        offsets = [
+            torch.arange(0, args.batch_size * multi_hot[i], multi_hot[i]).to(index_type)
+            for i in range(NUM_TABLE)
+        ]
+        for dtype in [torch.float32, torch.bfloat16, torch.float16]:
+            m = EmbCatDense(NUM_TABLE, args.vector_size, dtype)
+            dense = torch.randn(args.batch_size, args.vector_size, dtype=dtype)
+            with torch.no_grad():
+                run_bench(
+                    f"MergedEmbeddingBagWithCat: value_dtype:{dtype}, index_dtype:{index_type}",
+                    m,
+                    (indices, offsets, dense),
+                )
+                m.forward = m.ref_forward
+                run_bench(
+                    f"EmbeddingBagList+Cat: value_dtype:{dtype}, index_dtype:{index_type}",
+                    m,
+                    (indices, offsets, dense),
+                )
+
+
 def get_data(distribution, merged_emb, max_rows, batch_size):
     indices = []
     offsets = []
@@ -133,8 +215,12 @@ def run():
     parser.add_argument("--inference", action="store_true", default=False)
     parser.add_argument("--batch-size", type=int, default=7168)
     parser.add_argument("--vector-size", type=int, default=128)
+    parser.add_argument("--with-cat", action="store_true", default=False)
 
     args = parser.parse_args()
+    if args.with_cat:
+        merged_emb_cat_bench(args)
+        exit()
 
     max_rows = [args.batch_size for i in range(26)]
     emb_list = EmbeddingBagList(max_rows, args.vector_size)

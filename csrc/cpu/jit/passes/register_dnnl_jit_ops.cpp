@@ -5,6 +5,7 @@
 
 #include "aten/AddLayerNorm.h"
 #include "aten/ConcatBnRelu.h"
+#include "aten/MergedEmbCat.h"
 #include "aten/RMSNorm.h"
 #include "cpu/kernels/ConvPacked.h"
 #include "cpu/kernels/ConvTransposePacked.h"
@@ -1371,6 +1372,27 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 2, 4))).toInt(),
                 (std::move(peek(stack, 3, 4))).toScalarType());
             drop(stack, 4);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::qmerged_embeddingbag_cat(Tensor[] weights, Tensor[] index, "
+        "Tensor[] offsets, Tensor qdense, float o_scale, "
+        "int o_zp, ScalarType o_dtype) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = dil_qmerged_embeddingbag_cat(
+                (std::move(peek(stack, 0, 7))).toTensorVector(),
+                (std::move(peek(stack, 1, 7))).toTensorVector(),
+                (std::move(peek(stack, 2, 7))).toTensorVector(),
+                (std::move(peek(stack, 3, 7))).toTensor(),
+                (std::move(peek(stack, 4, 7))).toDouble(),
+                (std::move(peek(stack, 5, 7))).toInt(),
+                (std::move(peek(stack, 6, 7))).toScalarType());
+            drop(stack, 7);
             torch::jit::pack(stack, std::move(result));
             return 0;
           };

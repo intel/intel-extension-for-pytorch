@@ -14,7 +14,7 @@ from intel_extension_for_pytorch.nn.functional import interaction
 
 from ._quantization_state_utils import QTensorInfo
 from ._smooth_quant import SmoothQuantActivationObserver, SmoothQuantWeightObserver
-
+from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
 
 add_and_mul_ops = set(
     [
@@ -30,6 +30,7 @@ quantized_modules_has_weights = set(
         torch.nn.Conv3d,
         torch.nn.Linear,
         torch.nn.EmbeddingBag,
+        MergedEmbeddingBagWithCat,
         torch.nn.ConvTranspose2d,
         torch.nn.ConvTranspose3d,
         torch.nn.LSTM,
@@ -68,9 +69,11 @@ int8_int8_ops = set(
         # ipex customer op
         str(interaction),
         str(torch.ops.torch_ipex.interaction_forward),
+        str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
         str(torch.embedding_bag),
         str(F.embedding_bag),
         str(torch.nn.EmbeddingBag),
+        str(MergedEmbeddingBagWithCat),
         str(torch.nn.LSTM),
     ]
 )
@@ -467,14 +470,17 @@ def _check_after_nodes_all_quantized_give_node(node):
                 int8_int8_symmetric_ops = [
                     str(interaction),
                     str(torch.ops.torch_ipex.interaction_forward),
+                    str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
                     str(torch.embedding_bag),
                     str(F.embedding_bag),
                     str(torch.nn.EmbeddingBag),
+                    str(MergedEmbeddingBagWithCat),
                 ]
                 if next.type in int8_int8_symmetric_ops:
                     if next.type in [
                         str(interaction),
                         str(torch.ops.torch_ipex.interaction_forward),
+                        str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
                     ]:
                         # node.input_tensor_infos may be set, we can use force_inf_dtype to check whether this op is quantizabled.
                         for force_inf_dtype in next.input_tensor_force_inf_dtype:
@@ -494,7 +500,8 @@ def _check_after_nodes_all_quantized_give_node(node):
 
 def set_node_output_quantized(nodes):
     r"""
-    # For interation EmbeddingBag, pooling and elt_wise, we only support INT8->INT*, if those ops have quantized their inputs,
+    # For interation, EmbeddingBag, MergedEmbWithCat, pooling and elt_wise,
+    # we only support INT8->INT*, if those ops have quantized their inputs,
     # we need make sure their output also have falk quant to make them call in INT8 kernel.
     # this function will check whether the output inf dtype is int8 dtype if its' input is set to quantized, if the
     # output's infe dtype is not int8, set it and also set insert_fake_quant_after_output to True.
@@ -518,7 +525,10 @@ def set_node_output_quantized(nodes):
             continue
         if node.qconfig is not None and node.type in int8_int8_ops:
             post_node_are_quantized = _check_after_nodes_all_quantized_give_node(node)
-            if node.type in str(torch.nn.EmbeddingBag):
+            if node.type in (
+                str(torch.nn.EmbeddingBag),
+                str(MergedEmbeddingBagWithCat),
+            ):
                 if (
                     node.weight_tensor_infos[0].inf_dtype == torch.qint8
                     and not post_node_are_quantized
@@ -537,6 +547,7 @@ def set_node_output_quantized(nodes):
             elif node.type in [
                 str(interaction),
                 str(torch.ops.torch_ipex.interaction_forward),
+                str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
             ]:
                 if (
                     node.input_tensor_force_inf_dtype[0] == torch.qint8
@@ -1131,6 +1142,10 @@ def module_call_to_function_call(module, args, weights):
             args[2] if len(args) == 3 else None,
             module.include_last_offset,
             module.padding_idx,
+        )
+    elif isinstance(module, MergedEmbeddingBagWithCat):
+        output = torch.ops.torch_ipex.merged_embeddingbag_cat_forward(
+            weights, args[0], args[1], args[2]
         )
     elif isinstance(module, torch.nn.ConvTranspose2d) or isinstance(
         module, torch.nn.ConvTranspose3d

@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from intel_extension_for_pytorch.nn.functional import interaction
+from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
 
 from ._utils import ParentNode, set_node_output_quantized
 
@@ -69,6 +70,7 @@ rnn_ops = [str(torch.nn.LSTM)]
 s8_s8_symmetric_ops = [
     str(interaction),
     str(torch.ops.torch_ipex.interaction_forward),
+    str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
     str(torch.embedding_bag),
     str(F.embedding_bag),
     str(torch.nn.EmbeddingBag),
@@ -340,9 +342,10 @@ def _check_has_quantizable_node_before_node(node):
                 if node.type in [
                     str(interaction),
                     str(torch.ops.torch_ipex.interaction_forward),
+                    str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
                 ]:
                     for force_inf_dtype in node.input_tensor_force_inf_dtype:
-                        if force_inf_dtype.inf_dtype == torch.qint8:
+                        if force_inf_dtype == torch.qint8:
                             return True
                     return False
                 else:
@@ -529,6 +532,8 @@ def get_default_recipe(nodes):
         str(torch.embedding_bag),
         str(F.embedding_bag),
         str(torch.nn.EmbeddingBag),
+        str(MergedEmbeddingBagWithCat),
+        str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
     ]
     for node in nodes:
         if isinstance(node, ParentNode):

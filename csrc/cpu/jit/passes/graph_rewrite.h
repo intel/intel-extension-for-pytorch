@@ -35,6 +35,8 @@ void replaceEmbeddingBagWithQEmbeddingBag(
     std::shared_ptr<torch::jit::Graph>& graph);
 void replaceInteractionWithQInteraction(
     std::shared_ptr<torch::jit::Graph>& graph);
+void replaceMergedEmbCatWithQmergedEmbCat(
+    std::shared_ptr<torch::jit::Graph>& graph);
 void preprocessSizeForQLstm(std::shared_ptr<torch::jit::Graph>& graph);
 void replaceLstmWithQLstm(std::shared_ptr<torch::jit::Graph>& graph);
 void replaceAddWithQAdd(std::shared_ptr<torch::jit::Graph>& graph);

@@ -7,6 +7,7 @@ from intel_extension_for_pytorch.nn.modules import (
     MergedEmbeddingBagWithSGD as MergedEmbeddingBagWithSGD,
 )
 from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBag
+import bench.custom_op_bench.merged_embeddingbag
 
 
 class TestMergedEmbeddingBagWithSGD(TestCase):
@@ -401,6 +402,60 @@ class TestMergedEmbedding(TestCase):
         self.assertEqual(self.table0.weight.grad, model.weights[0].grad)
         self.assertEqual(self.table1.weight.grad, model.weights[1].grad)
         self.assertEqual(self.table2.weight.grad, model.weights[2].grad)
+
+
+class TestMergedEmbeddingCat(TestCase):
+    def test_inference_cat(self):
+        multi_hot = [
+            3,
+            2,
+            1,
+            2,
+            6,
+            1,
+            1,
+            1,
+            1,
+            7,
+            3,
+            8,
+            1,
+            6,
+            9,
+            5,
+            1,
+            300,
+            1,
+            12,
+            100,
+            27,
+            10,
+            3,
+            1,
+            1,
+        ]
+        B = 1029
+        NUM_TABLE = 26
+        for index_type in [torch.int32, torch.int64]:
+            indices = [
+                torch.randint(10, (B * multi_hot[i],)).to(index_type)
+                for i in range(NUM_TABLE)
+            ]
+            offsets = [
+                torch.arange(0, B * multi_hot[i], multi_hot[i]).to(index_type)
+                for i in range(NUM_TABLE)
+            ]
+            for dtype in [torch.float64, torch.float32, torch.bfloat16, torch.float16]:
+                for NUM_DIM in [128, 129]:
+                    # 128 for fast path, 129 for general path
+                    m = bench.custom_op_bench.merged_embeddingbag.EmbCatDense(
+                        NUM_TABLE, NUM_DIM, dtype
+                    )
+                    dense = torch.zeros(B, NUM_DIM, dtype=dtype)
+                    with torch.no_grad():
+                        out = m.forward(indices, offsets, dense)
+                        ref_out = m.ref_forward(indices, offsets, dense)
+                    self.assertEqual(out, ref_out)
 
 
 if __name__ == "__main__":

@@ -127,7 +127,11 @@ void IpexQuantFusion(std::shared_ptr<torch::jit::Graph>& graph) {
       graph);
   graph_rewrite::replaceInteractionWithQInteraction(graph);
   GRAPH_DUMP(
-      "After replaceInteractionWithQInteraction. Before preprocessSizeForQLstm",
+      "After replaceInteractionWithQInteraction. Before replaceMergedEmbCatWithQmergedEmbCat",
+      graph);
+  graph_rewrite::replaceMergedEmbCatWithQmergedEmbCat(graph);
+  GRAPH_DUMP(
+      "After replaceMergedEmbCatWithQmergedEmbCat. Before preprocessSizeForQLstm",
       graph);
   graph_rewrite::preprocessSizeForQLstm(graph);
   GRAPH_DUMP(

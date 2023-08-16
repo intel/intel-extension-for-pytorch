@@ -748,6 +748,78 @@ void replaceInteractionWithQInteraction(std::shared_ptr<Graph>& graph) {
   }
 }
 
+void replaceMergedEmbCatWithQmergedEmbCat(std::shared_ptr<Graph>& graph) {
+  // graph->print(std::cout);
+  std::vector<std::string> patterns;
+  std::vector<std::string> replacements;
+  std::string graph_common_head = R"(graph()";
+  std::string graph_common_tail =
+      R"(, %indices, %offsets, %qdense, %o_scale, %o_zp, %o_dtype):
+  )";
+  std::string list_construct_common_head =
+      R"(%weights : Tensor[] = prim::ListConstruct()";
+  std::string list_construct_common_tail = R"() )";
+  std::string replacement_common_tail =
+      R"(%out = ipex::qmerged_embeddingbag_cat(%weights, %indices,  %offsets, %qdense, %o_scale, %o_zp, %o_dtype) return (%out) )";
+  std::string pattern_common_tail =
+      R"(%dense=aten::dequantize(%qdense)  %out = torch_ipex::merged_embeddingbag_cat_forward(%weights, %indices, %offsets, %dense)  %qout = aten::quantize_per_tensor(%out, %o_scale, %o_zp, %o_dtype) return (%qout) )";
+
+  for (auto* n : graph->block()->nodes()) {
+    if (n->kind() ==
+        Symbol::fromQualString("torch_ipex::merged_embeddingbag_cat_forward")) {
+      size_t id = 0;
+      auto weightslist = n->input(0)->node();
+
+      bool is_quantized = std::any_of(
+          weightslist->inputs().begin(),
+          weightslist->inputs().end(),
+          [](auto& v) {
+            return v->node()->kind() == Symbol::aten("dequantize");
+          });
+
+      if (!is_quantized)
+        return;
+
+      std::string pattern = R"()";
+      std::string replacement = R"()";
+      std::string dequantizes = R"()";
+      std::vector<std::string> qinputs;
+      std::vector<std::string> dqinputs;
+      for (auto input : weightslist->inputs()) {
+        if (input->node()->kind() == Symbol::aten("dequantize")) {
+          qinputs.push_back("%q" + std::to_string(id));
+          dqinputs.push_back("%dq" + std::to_string(id));
+          std::string dequantize = "%dq" + std::to_string(id) +
+              " : Tensor = aten::dequantize(" + "%q" + std::to_string(id) + ")";
+          dequantizes.append(dequantize);
+          ++id;
+        }
+      }
+
+      std::string header =
+          graph_common_head + c10::Join(", ", qinputs) + graph_common_tail;
+      pattern += header;
+      pattern += dequantizes;
+      pattern += list_construct_common_head + c10::Join(", ", dqinputs) +
+          list_construct_common_tail;
+      pattern += pattern_common_tail;
+      patterns.push_back(pattern);
+
+      replacement = header;
+      replacement += list_construct_common_head + c10::Join(", ", qinputs) +
+          list_construct_common_tail;
+      replacement += replacement_common_tail;
+      replacements.push_back(replacement);
+    }
+  }
+
+  SubgraphRewriter rewriter;
+  for (size_t i = 0; i < patterns.size(); i++) {
+    rewriter.RegisterRewritePattern(patterns[i], replacements[i]);
+    rewriter.runOnGraph(graph);
+  }
+}
+
 // When converting LSTM to int8 LSTM, IPEX will pre-hook the LSTM forward
 // function to insert quant and dequant node. After converting the model, when
 // entering the forward function, if the hidden state and cell state are empty,
