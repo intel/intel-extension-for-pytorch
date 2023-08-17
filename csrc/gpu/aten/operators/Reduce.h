@@ -177,12 +177,12 @@ using namespace xpu::dpcpp::detail;
 using namespace at::native::Memory::detail;
 using at::detail::Array;
 
-static inline int64_t div_up(int64_t a, int64_t b) {
+inline int64_t div_up(int64_t a, int64_t b) {
   return (a + b - 1) / b;
 }
 
 // returns floor(log2(n))
-static inline int last_pow2(int n) {
+inline int last_pow2(int n) {
   n |= (n >> 1);
   n |= (n >> 2);
   n |= (n >> 4);

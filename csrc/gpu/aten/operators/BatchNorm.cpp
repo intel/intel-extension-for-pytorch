@@ -4,12 +4,14 @@
 #include <core/detail/IndexUtils.h>
 #include <oneDNN/oneDNN.h>
 #include "Loops.h"
+#include "Reduce.h"
 #include "ReduceOpStdVar.h"
 #include "Resize.h"
 #include "comm/AccumulateType.h"
 #include "comm/RegistrationDeclarations.h"
 #include "core/MemoryFormat.h"
 #include "utils/ComputeEngine.h"
+#include "utils/DPCPP.h"
 using namespace dnnl;
 using namespace xpu::dpcpp;
 using namespace xpu::dpcpp::detail;
@@ -34,16 +36,6 @@ struct InvStd {
     return invstd;
   }
 };
-
-// returns 2**floor(log2(n))
-static int lastPow2(unsigned int n) {
-  n |= (n >> 1);
-  n |= (n >> 2);
-  n |= (n >> 4);
-  n |= (n >> 8);
-  n |= (n >> 16);
-  return std::max<int>(1, n - (n >> 1));
-}
 
 static int getNumThreads(int nElem, int max_size) {
   int threadSizes[6] = {16, 32, 64, 128, 256, max_size};
@@ -93,6 +85,51 @@ int get_prefer_wg_size(unsigned int nHw, int simd) {
   auto size_problem = getNumThreads(nHw, simd * simd);
   auto wg_size = dpcppMaxWorkGroupSize(dev_id);
   return std::min(int64_t(size_problem), wg_size);
+}
+
+inline int rnd_up(const int a, const int b) {
+  return (div_up(a, b) * b);
+}
+
+int get_nhwc_sp_block_size(int sp, int ic_dim, int simd = 16) {
+  int eu_count = dpcppGpuEuCount();
+  int threads_per_eu = dpcppGpuHWThreadsPerEU();
+
+  float efficiency_thr = 0.0f;
+  float efficiency_peak_eu_thr = 0.0f;
+  int block_size_thr = 1;
+  int block_size_peak_eu_thr = 1;
+  int curr_block_size = sp;
+  int nthr_mul = 1;
+  const int ic_nsg = ic_dim / simd; // number of subgroups by ic dim
+
+  // The search is based on threads wave efficiency.
+  // Higher priority for cases with peak EUs utilization.
+  while (nthr_mul <= 32) {
+    const int nthr = nthr_mul * eu_count;
+    curr_block_size = div_up(sp * ic_nsg, nthr);
+    const int nblock = div_up(sp, curr_block_size);
+    const int nthr_gen = nblock * ic_nsg;
+
+    const float curr_efficiency_eus =
+        (float)nthr_gen / rnd_up(nthr_gen, eu_count);
+    const float curr_efficiency_thr =
+        (float)nthr_gen / rnd_up(nthr_gen, eu_count * threads_per_eu);
+
+    if (curr_efficiency_thr > efficiency_thr) {
+      efficiency_thr = curr_efficiency_thr;
+      block_size_thr = curr_block_size;
+    }
+    if (curr_efficiency_eus == 1 &&
+        curr_efficiency_thr > efficiency_peak_eu_thr) {
+      efficiency_peak_eu_thr = curr_efficiency_thr;
+      block_size_peak_eu_thr = curr_block_size;
+    }
+    nthr_mul++;
+  }
+  if (efficiency_peak_eu_thr > 0.0f)
+    return block_size_peak_eu_thr;
+  return block_size_thr;
 }
 
 ScalarType first_type() {
@@ -159,15 +196,15 @@ std::tuple<sycl::range<2>, sycl::range<2>> flexible_launch_configs(
     const int loops_per_item = 1,
     const bool coop_flag = false) {
   int wg_size = dpcppMaxWorkItemsPerEU();
-  int group_x = std::min(lastPow2(stride), 32);
-  int group_y =
-      std::min(lastPow2(CeilDiv(reduction, loops_per_item)), wg_size / group_x);
+  int group_x = std::min(last_pow2(stride), 32);
+  int group_y = std::min(
+      last_pow2(CeilDiv(reduction, loops_per_item)), wg_size / group_x);
   if (group_x * group_y != wg_size) {
-    group_x = std::min(lastPow2(stride), wg_size / group_y);
+    group_x = std::min(last_pow2(stride), wg_size / group_y);
   }
 
   int grid_x = CeilDiv(stride, group_x);
-  int grid_y = std::min(CeilDiv(reduction, group_y * loops_per_item), 128);
+  int grid_y = std::min(CeilDiv(reduction, group_y * loops_per_item), 1024);
   if (coop_flag) {
     // it's not worth having a grid reduction if the reduction dimension is not
     // big enough
@@ -687,7 +724,6 @@ void inline welford_merge_group_vertical(
   auto liy = item.get_local_id(0);
   auto lix = item.get_local_id(1);
 
-  //#pragma unroll
   for (int offset = local_range_y / 2; offset > 0; offset >>= 1) {
     if (liy < offset * 2) {
       shmem_mean[address_base] = mean;
@@ -1174,7 +1210,25 @@ std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> native_batch_norm_out(
     Tensor& save_mean,
     Tensor& save_invstd) {
   xpu::COMPUTE_ENG real_eng;
-  if (input.is_quantized()) {
+  int sp = input.numel() / input.size(1);
+  int ic = input.size(1);
+
+  // oneDNN makes vectorized load/store for nhwc when channels is multiples of
+  // 16
+  bool onednn_nhwc_optimized =
+      batch_norm_choose_impl(input) == Impl::ChannelsLast && ic % 16 == 0;
+
+  // In oneDNN, for shapes with nhwc_optimized, spatial dim(NHW) will be divided
+  // into blocks, each thread handles one block
+  int onednn_block_size = 0;
+  if (onednn_nhwc_optimized)
+    onednn_block_size = get_nhwc_sp_block_size(sp, ic);
+
+  // For shapes with channels vectorized and spatial optimized, we adopt oneDNN
+  // implementation
+  bool adopt_onednn_path = onednn_nhwc_optimized && onednn_block_size > 1;
+
+  if (input.is_quantized() || adopt_onednn_path) {
     real_eng = xpu::COMPUTE_ENG::ONEDNN;
   } else {
     real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
@@ -1731,7 +1785,7 @@ void batch_norm_backward_reduce_kernel(
       i_batch_size * i_feature_size, SIMD); // for higher occupancy
 
   int tx = getNumThreads(i_feature_size, wg_size);
-  int ty = std::min(int64_t(lastPow2(i_batch_size)), wg_size / tx);
+  int ty = std::min(int64_t(last_pow2(i_batch_size)), wg_size / tx);
   ty = std::max(1, ty);
   sycl::range<2> local_range(ty, tx);
   sycl::range<2> global_range(numPlane * ty, tx);
@@ -2812,8 +2866,30 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm_backward(
     bool training,
     double epsilon,
     std::array<bool, 3> grad_input_mask) {
+  int sp = input.numel() / input.size(1);
+  int ic = input.size(1);
+
+  // oneDNN makes vectorized load/store for nhwc when channels is multiples of
+  // 16
+  bool onednn_nhwc_optimized =
+      batch_norm_choose_impl(input) == Impl::ChannelsLast && ic % 16 == 0;
+
+  // In oneDNN, for shapes with nhwc_optimized, spatial dim(NHW) will be divided
+  // into blocks, each thread handles one block
+  int onednn_block_size = 0;
+  if (onednn_nhwc_optimized)
+    onednn_block_size = get_nhwc_sp_block_size(sp, ic);
+
+  // For shapes with channels vectorized and spatial optimized, we adopt oneDNN
+  // implementation
+  bool adopt_onednn_path = onednn_nhwc_optimized && onednn_block_size > 1;
+
   xpu::COMPUTE_ENG real_eng;
-  real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+  if (adopt_onednn_path) {
+    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+  } else {
+    real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+  }
 
   if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     c10::MaybeOwned<Tensor> weight_maybe_owned =
