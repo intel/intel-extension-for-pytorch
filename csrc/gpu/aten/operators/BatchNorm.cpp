@@ -4,12 +4,14 @@
 #include <core/detail/IndexUtils.h>
 #include <oneDNN/oneDNN.h>
 #include "Loops.h"
+#include "Reduce.h"
 #include "ReduceOpStdVar.h"
 #include "Resize.h"
 #include "comm/AccumulateType.h"
 #include "comm/RegistrationDeclarations.h"
 #include "core/MemoryFormat.h"
 #include "utils/ComputeEngine.h"
+#include "utils/DPCPP.h"
 using namespace dnnl;
 using namespace xpu::dpcpp;
 using namespace xpu::dpcpp::detail;
@@ -34,16 +36,6 @@ struct InvStd {
     return invstd;
   }
 };
-
-// returns 2**floor(log2(n))
-static int lastPow2(unsigned int n) {
-  n |= (n >> 1);
-  n |= (n >> 2);
-  n |= (n >> 4);
-  n |= (n >> 8);
-  n |= (n >> 16);
-  return std::max<int>(1, n - (n >> 1));
-}
 
 static int getNumThreads(int nElem, int max_size) {
   int threadSizes[6] = {16, 32, 64, 128, 256, max_size};
@@ -93,6 +85,51 @@ int get_prefer_wg_size(unsigned int nHw, int simd) {
   auto size_problem = getNumThreads(nHw, simd * simd);
   auto wg_size = dpcppMaxWorkGroupSize(dev_id);
   return std::min(int64_t(size_problem), wg_size);
+}
+
+inline int rnd_up(const int a, const int b) {
+  return (div_up(a, b) * b);
+}
+
+int get_nhwc_sp_block_size(int sp, int ic_dim, int simd = 16) {
+  int eu_count = dpcppGpuEuCount();
+  int threads_per_eu = dpcppGpuHWThreadsPerEU();
+
+  float efficiency_thr = 0.0f;
+  float efficiency_peak_eu_thr = 0.0f;
+  int block_size_thr = 1;
+  int block_size_peak_eu_thr = 1;
+  int curr_block_size = sp;
+  int nthr_mul = 1;
+  const int ic_nsg = ic_dim / simd; // number of subgroups by ic dim
+
+  // The search is based on threads wave efficiency.
+  // Higher priority for cases with peak EUs utilization.
+  while (nthr_mul <= 32) {
+    const int nthr = nthr_mul * eu_count;
+    curr_block_size = div_up(sp * ic_nsg, nthr);
+    const int nblock = div_up(sp, curr_block_size);
+    const int nthr_gen = nblock * ic_nsg;
+
+    const float curr_efficiency_eus =
+        (float)nthr_gen / rnd_up(nthr_gen, eu_count);
+    const float curr_efficiency_thr =
+        (float)nthr_gen / rnd_up(nthr_gen, eu_count * threads_per_eu);
+
+    if (curr_efficiency_thr > efficiency_thr) {
+      efficiency_thr = curr_efficiency_thr;
+      block_size_thr = curr_block_size;
+    }
+    if (curr_efficiency_eus == 1 &&
+        curr_efficiency_thr > efficiency_peak_eu_thr) {
+      efficiency_peak_eu_thr = curr_efficiency_thr;
+      block_size_peak_eu_thr = curr_block_size;
+    }
+    nthr_mul++;
+  }
+  if (efficiency_peak_eu_thr > 0.0f)
+    return block_size_peak_eu_thr;
+  return block_size_thr;
 }
 
 ScalarType first_type() {
@@ -159,15 +196,15 @@ std::tuple<sycl::range<2>, sycl::range<2>> flexible_launch_configs(
     const int loops_per_item = 1,
     const bool coop_flag = false) {
   int wg_size = dpcppMaxWorkItemsPerEU();
-  int group_x = std::min(lastPow2(stride), 32);
-  int group_y =
-      std::min(lastPow2(CeilDiv(reduction, loops_per_item)), wg_size / group_x);
+  int group_x = std::min(last_pow2(stride), 32);
+  int group_y = std::min(
+      last_pow2(CeilDiv(reduction, loops_per_item)), wg_size / group_x);
   if (group_x * group_y != wg_size) {
-    group_x = std::min(lastPow2(stride), wg_size / group_y);
+    group_x = std::min(last_pow2(stride), wg_size / group_y);
   }
 
   int grid_x = CeilDiv(stride, group_x);
-  int grid_y = std::min(CeilDiv(reduction, group_y * loops_per_item), 128);
+  int grid_y = std::min(CeilDiv(reduction, group_y * loops_per_item), 1024);
   if (coop_flag) {
     // it's not worth having a grid reduction if the reduction dimension is not
     // big enough
@@ -212,10 +249,12 @@ void batch_norm_transform_input_kernel(
   int tb = std::max<int>(wg_size / tf, 1);
   sycl::range<2> local_range(tb, tf);
   sycl::range<2> global_range((bs + tb - 1) / tb * tb, numPlane * tf);
+
   auto input_ptr = input.data_ptr<input_scalar_t>();
   auto output_ptr = output.data_ptr<input_scalar_t>();
-  auto weight_ptr = weight.data_ptr<stat_scalar_t>();
-  auto bias_ptr = bias.data_ptr<stat_scalar_t>();
+  auto weight_ptr =
+      weight.defined() ? weight.data_ptr<stat_scalar_t>() : nullptr;
+  auto bias_ptr = bias.defined() ? bias.data_ptr<stat_scalar_t>() : nullptr;
   auto mean_ptr = mean_.data_ptr<stat_accscalar_t>();
   auto var_or_invstd_ptr = var_or_invstd.data_ptr<stat_accscalar_t>();
 
@@ -230,10 +269,10 @@ void batch_norm_transform_input_kernel(
         return;
       }
 
-      stat_accscalar_t gamma = weight_size > 0
+      stat_accscalar_t gamma = weight_ptr != nullptr
           ? static_cast<stat_accscalar_t>(weight_ptr[plane])
           : static_cast<stat_accscalar_t>(1);
-      stat_accscalar_t beta = bias_size > 0
+      stat_accscalar_t beta = bias_ptr != nullptr
           ? static_cast<stat_accscalar_t>(bias_ptr[plane])
           : static_cast<stat_accscalar_t>(0);
 
@@ -636,10 +675,10 @@ void batch_norm_collect_statistics_kernel(
 
       // Save the mean, variance, and moving averages
       if (tid == 0) {
-        if (save_mean != NULL) {
+        if (save_mean != nullptr) {
           save_mean[plane] = avg;
         }
-        if (save_transformed_var != NULL) {
+        if (save_transformed_var != nullptr) {
           save_transformed_var[plane] =
               VarTransform{}(var_n / (N * Hw), epsilon);
         }
@@ -685,7 +724,6 @@ void inline welford_merge_group_vertical(
   auto liy = item.get_local_id(0);
   auto lix = item.get_local_id(1);
 
-  //#pragma unroll
   for (int offset = local_range_y / 2; offset > 0; offset >>= 1) {
     if (liy < offset * 2) {
       shmem_mean[address_base] = mean;
@@ -1172,7 +1210,25 @@ std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> native_batch_norm_out(
     Tensor& save_mean,
     Tensor& save_invstd) {
   xpu::COMPUTE_ENG real_eng;
-  if (input.is_quantized()) {
+  int sp = input.numel() / input.size(1);
+  int ic = input.size(1);
+
+  // oneDNN makes vectorized load/store for nhwc when channels is multiples of
+  // 16
+  bool onednn_nhwc_optimized =
+      batch_norm_choose_impl(input) == Impl::ChannelsLast && ic % 16 == 0;
+
+  // In oneDNN, for shapes with nhwc_optimized, spatial dim(NHW) will be divided
+  // into blocks, each thread handles one block
+  int onednn_block_size = 0;
+  if (onednn_nhwc_optimized)
+    onednn_block_size = get_nhwc_sp_block_size(sp, ic);
+
+  // For shapes with channels vectorized and spatial optimized, we adopt oneDNN
+  // implementation
+  bool adopt_onednn_path = onednn_nhwc_optimized && onednn_block_size > 1;
+
+  if (input.is_quantized() || adopt_onednn_path) {
     real_eng = xpu::COMPUTE_ENG::ONEDNN;
   } else {
     real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
@@ -1239,7 +1295,6 @@ std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> native_batch_norm_out(
     const bool has_running_var =
         (running_var_opt.has_value() && running_var_opt->defined());
     TORCH_CHECK(has_running_mean == has_running_var);
-
     if (training) {
       batch_norm_mean_var(input, save_mean, save_invstd);
       if (has_running_mean) {
@@ -1585,7 +1640,7 @@ void batch_norm_backward_channels_first_kernel(
       stat_accscalar_t proj_scale = dot_p * norm * invstd * invstd;
       stat_accscalar_t grad_scale = invstd * weight_val;
 
-      if (grad_input_ptr != NULL) {
+      if (grad_input_ptr != nullptr) {
         for (int batch = liy; batch < N; batch += local_range_y) {
           for (int x = lix; x < Hw; x += local_range_x) {
             input_scalar_t go = grad_output_ptr
@@ -1607,13 +1662,13 @@ void batch_norm_backward_channels_first_kernel(
         }
       }
 
-      if (grad_weight_ptr != NULL) {
+      if (grad_weight_ptr != nullptr) {
         if (lix == 0) {
           grad_weight_ptr[plane] = static_cast<stat_scalar_t>(dot_p * invstd);
         }
       }
 
-      if (grad_bias_ptr != NULL) {
+      if (grad_bias_ptr != nullptr) {
         if (lix == 0) {
           grad_bias_ptr[plane] = static_cast<stat_scalar_t>(grad_output_sum);
         }
@@ -1730,7 +1785,7 @@ void batch_norm_backward_reduce_kernel(
       i_batch_size * i_feature_size, SIMD); // for higher occupancy
 
   int tx = getNumThreads(i_feature_size, wg_size);
-  int ty = std::min(int64_t(lastPow2(i_batch_size)), wg_size / tx);
+  int ty = std::min(int64_t(last_pow2(i_batch_size)), wg_size / tx);
   ty = std::max(1, ty);
   sycl::range<2> local_range(ty, tx);
   sycl::range<2> global_range(numPlane * ty, tx);
@@ -1739,13 +1794,14 @@ void batch_norm_backward_reduce_kernel(
   auto mean_ptr = mean.data_ptr<stat_accscalar_t>();
   auto invstd_ptr = invstd.data_ptr<stat_accscalar_t>();
   stat_scalar_t* grad_weight_ptr =
-      grad_weight.size(0) > 0 ? grad_weight.data_ptr<stat_scalar_t>() : NULL;
+      grad_weight.size(0) > 0 ? grad_weight.data_ptr<stat_scalar_t>() : nullptr;
   stat_scalar_t* grad_bias_ptr =
-      grad_bias.size(0) > 0 ? grad_bias.data_ptr<stat_scalar_t>() : NULL;
+      grad_bias.size(0) > 0 ? grad_bias.data_ptr<stat_scalar_t>() : nullptr;
   stat_accscalar_t* sum_dy_ptr =
-      sum_dy.size(0) > 0 ? sum_dy.data_ptr<stat_accscalar_t>() : NULL;
-  stat_accscalar_t* sum_dy_xmu_ptr =
-      sum_dy_xmu.size(0) > 0 ? sum_dy_xmu.data_ptr<stat_accscalar_t>() : NULL;
+      sum_dy.size(0) > 0 ? sum_dy.data_ptr<stat_accscalar_t>() : nullptr;
+  stat_accscalar_t* sum_dy_xmu_ptr = sum_dy_xmu.size(0) > 0
+      ? sum_dy_xmu.data_ptr<stat_accscalar_t>()
+      : nullptr;
 
   index_t go_batch_stride = grad_output.stride(0);
   index_t go_plane_stride = grad_output.stride(1);
@@ -1789,16 +1845,16 @@ void batch_norm_backward_reduce_kernel(
           item, g, o_batch_size, o_feature_size, plane, sg_num, local_sum);
 
       if (lidx == 0) {
-        if (grad_weight_ptr != NULL) {
+        if (grad_weight_ptr != nullptr) {
           grad_weight_ptr[plane] = static_cast<stat_scalar_t>(res.v2 * factor);
         }
-        if (grad_bias_ptr != NULL) {
+        if (grad_bias_ptr != nullptr) {
           grad_bias_ptr[plane] = static_cast<stat_scalar_t>(res.v1);
         }
-        if (sum_dy_ptr != NULL) {
+        if (sum_dy_ptr != nullptr) {
           sum_dy_ptr[plane] = static_cast<stat_accscalar_t>(res.v1);
         }
-        if (sum_dy_xmu_ptr != NULL) {
+        if (sum_dy_xmu_ptr != nullptr) {
           sum_dy_xmu_ptr[plane] = static_cast<stat_accscalar_t>(res.v2);
         }
       }
@@ -2170,7 +2226,7 @@ void batch_norm_backward_elemt_channels_first_kernel_impl(
   auto mean_ptr = mean.data_ptr<stat_accscalar_t>();
   auto invstd_ptr = invstd.data_ptr<stat_accscalar_t>();
   auto weight_ptr =
-      weight.size(0) > 0 ? weight.data_ptr<stat_scalar_t>() : NULL;
+      weight.defined() ? weight.data_ptr<stat_scalar_t>() : nullptr;
   auto sum_dy_ptr = sum_dy.data_ptr<stat_accscalar_t>();
   auto sum_dy_xmu_ptr = sum_dy_xmu.data_ptr<stat_accscalar_t>();
 
@@ -2185,7 +2241,7 @@ void batch_norm_backward_elemt_channels_first_kernel_impl(
       stat_accscalar_t m_c = mean_ptr[plane];
       stat_accscalar_t m_dy_c = sum_dy_ptr[plane] * norm_fct;
       stat_accscalar_t factor_1_c = invstd_ptr[plane];
-      stat_accscalar_t factor_2_c = weight_ptr != NULL
+      stat_accscalar_t factor_2_c = weight_ptr != nullptr
           ? static_cast<stat_accscalar_t>(weight_ptr[plane])
           : stat_accscalar_t(1);
       factor_2_c *= factor_1_c;
@@ -2810,8 +2866,30 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm_backward(
     bool training,
     double epsilon,
     std::array<bool, 3> grad_input_mask) {
+  int sp = input.numel() / input.size(1);
+  int ic = input.size(1);
+
+  // oneDNN makes vectorized load/store for nhwc when channels is multiples of
+  // 16
+  bool onednn_nhwc_optimized =
+      batch_norm_choose_impl(input) == Impl::ChannelsLast && ic % 16 == 0;
+
+  // In oneDNN, for shapes with nhwc_optimized, spatial dim(NHW) will be divided
+  // into blocks, each thread handles one block
+  int onednn_block_size = 0;
+  if (onednn_nhwc_optimized)
+    onednn_block_size = get_nhwc_sp_block_size(sp, ic);
+
+  // For shapes with channels vectorized and spatial optimized, we adopt oneDNN
+  // implementation
+  bool adopt_onednn_path = onednn_nhwc_optimized && onednn_block_size > 1;
+
   xpu::COMPUTE_ENG real_eng;
-  real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+  if (adopt_onednn_path) {
+    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+  } else {
+    real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+  }
 
   if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     c10::MaybeOwned<Tensor> weight_maybe_owned =
@@ -3059,8 +3137,8 @@ std::tuple<Tensor, Tensor> batch_norm_gather_stats_xpu_template(
   save_mean_ = at::empty({features}, input_options);
   save_invstd_ = at::empty({features}, input_options);
 
-  auto mean = mean_.accessor<accscalar_t, 2>();
-  auto invstd = invstd_.accessor<accscalar_t, 2>();
+  auto mean = mean_.data_ptr<accscalar_t>();
+  auto invstd = invstd_.data_ptr<accscalar_t>();
   auto running_mean =
       running_mean_.defined() ? running_mean_.data_ptr<scalar_t>() : nullptr;
   auto running_var =
@@ -3083,7 +3161,7 @@ std::tuple<Tensor, Tensor> batch_norm_gather_stats_xpu_template(
     cgh.parallel_for(
         sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size),
         [=](sycl::nd_item<1> itemId) {
-          auto tid = itemId.get_global_linear_id();
+          auto tid = itemId.get_global_id(0);
 
           // first the reductions each thread does separately
           if (tid < features) {
@@ -3092,8 +3170,8 @@ std::tuple<Tensor, Tensor> batch_norm_gather_stats_xpu_template(
             index_t n = 0;
             for (int j = 0; j < world_size; j++) {
               scalar_t count = counts[j];
-              accscalar_t m = mean[j][tid];
-              accscalar_t v = accscalar_t(1.0f) / (invstd[j][tid]);
+              accscalar_t m = mean[j * features + tid];
+              accscalar_t v = accscalar_t(1.0f) / (invstd[j * features + tid]);
               v = (v * v - epsilon_) * count;
               accscalar_t factor = 1.0f / (n + count);
               var_n += v + (avg - m) * (avg - m) * n * count * factor;
