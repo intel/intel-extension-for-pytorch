@@ -126,6 +126,8 @@ model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[device])
 
 Note: For single-device modules, `device_ids` can contain exactly one device id, which represents the only GPU device where the input module corresponding to this process resides. Alternatively, device_ids can be `None`.
 
+Note: When using `torch.xpu.optimize` for distributed training with low precision, the `torch.xpu.manual_seed(seed_number)` is needed to make sure the master weight is the same on all ranks.
+
 ## Example Usage (MPI launch for single node):
 
 Intel® oneCCL Bindings for Pytorch\* recommends MPI as the launcher to start multiple processes. Here's an example to illustrate such usage.
@@ -162,6 +164,7 @@ class Model(nn.Module):
 
 if __name__ == "__main__":
 
+    torch.xpu.manual_seed(123)  # set a seed number
     mpi_world_size = int(os.environ.get('PMI_SIZE', -1))
     mpi_rank = int(os.environ.get('PMI_RANK', -1))
     if mpi_world_size > 0:
