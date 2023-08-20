@@ -9,15 +9,15 @@ Simple Trace is a built-in debugging tool that lets you control printing out the
 
 To use the simple trace tool, you need to build Intel® Extension for PyTorch\* from source and add explicit calls to enable and disable tracing in your model script. When enabled, the trace messages will be printed to the console screen by default, along with verbose log messages.
 
-### Build Tool
+### Enable and Disable Tool
 
-Add the Simple Trace tool by turning on the build option `BUILD_SIMPLE_TRACE=ON` and then build Intel® Extension for PyTorch\* from source.
+IPEX_SIMPLE_TRACE can be used to turn ON/OFF simple trace. It is set as 0 by default. You can set 1 to enable simple trace for all operators:
 
-```bash
-BUILD_SIMPLE_TRACE=ON python setup.py install
+```python
+export IPEX_SIMPLE_TRACE=1 
 ```
 
-### Enable and Disable Tool
+### Use Simple Trace in Model
 
 In your model script, bracket code in your model script with calls to `torch.xpu.enable_simple_trace()` and `torch.xpu.disable_simple_trace()`, as shown in the following example:
 
