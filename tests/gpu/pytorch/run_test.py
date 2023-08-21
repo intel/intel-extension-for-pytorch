@@ -314,7 +314,9 @@ def run_tests(selected_tests, options):
         header = "=============================== CI SUCCEED IN PORTED UT ===========-====================\n"
         write_file(header, sys.stdout)
     if options.mode[0] == 'maintain':
-        update_reference(total_results)
+        update_reference(total_results, "maintain")
+    if options.mode[0] == 'weekly':
+        update_reference(total_results, "weekly")
     if options.update_timeout is not None or options.mode[0] == 'maintain':
         save_to_yaml(timeout_list, os.path.join(test_suite_root, "config/timeout_config.yaml"))
     if options.mode[0] == 'maintain':

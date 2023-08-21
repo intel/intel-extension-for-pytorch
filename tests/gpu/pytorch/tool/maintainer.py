@@ -5,6 +5,7 @@ from .collector import collect_detailed_issues, collect_fatal_error
 
 tool_path = os.path.dirname(os.path.abspath(__file__))
 ref_file = os.path.join(tool_path, "../config/reference_list.yaml")
+weekly_ref_file = os.path.join(tool_path, "../config/weekly_reference_list.yaml")
 
 def check_reference(cosim_cases):
     def _lookup_reference_list(cur_case):
@@ -57,8 +58,9 @@ def check_ci_pass(cases_result, logfile):
         short_details, details = collect_detailed_issues(issued_cases, logfile, with_short=True)
     return issued_cases, short_details, details
 
-def update_reference(total_results):
+def update_reference(total_results, mode):
     global ref_file
+    global weekly_ref_file
     collected_cases = OrderedDict({"PASSED": [], "FAILED": [], "ERROR": [], "SKIPPED": [], "XFAIL": [], "XPASS": [], "NO_RESULT": []})
     for test_name, records in total_results.items():
         for dur, cases_result in records:
@@ -82,4 +84,7 @@ def update_reference(total_results):
     collected_cases["XFAIL"]     = sorted(list(sets_list[4]))
     collected_cases["XPASS"]     = sorted(list(sets_list[5]))
     collected_cases["NO_RESULT"] = sorted(list(sets_list[6]))
-    save_to_yaml(collected_cases, ref_file)
+    if mode == "weekly":
+        save_to_yaml(collected_cases, weekly_ref_file)
+    elif mode == "maintain":
+        save_to_yaml(collected_cases, ref_file)
