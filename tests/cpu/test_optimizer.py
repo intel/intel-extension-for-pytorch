@@ -524,7 +524,7 @@ class TestPatchedMethod(TestCase):
             for param in ipex_optimizer.param_groups[0]['params']:
                 if param.data_ptr() not in uncast_weight:
                     self.assertTrue(param.grad == None)
-                    self.assertTrue(ipex_optimizer.params_attr[param]['bf16_param'].grad != None)
+                    self.assertTrue(ipex_optimizer.params_attr[param].parameter.grad is not None)
                 else:
                     self.assertTrue(param.grad != None)
 
@@ -538,7 +538,7 @@ class TestPatchedMethod(TestCase):
             for param in ipex_optimizer.param_groups[0]['params']:
                 if param.data_ptr() not in uncast_weight:
                     expected_grad = None if set_to_none else torch.zeros_like(param).bfloat16()
-                    self.assertEqual(expected_grad, ipex_optimizer.params_attr[param]['bf16_param'].grad)
+                    self.assertEqual(expected_grad, ipex_optimizer.params_attr[param].parameter.grad)
                 else:
                     expected_grad = None if set_to_none else torch.zeros_like(param)
                     self.assertEqual(expected_grad, param.grad)
