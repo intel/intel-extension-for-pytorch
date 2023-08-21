@@ -95,74 +95,78 @@ class TestTorchMethod(TestCase):
             torch.save(state, filename)
 
         for dtype in [torch.float32, torch.bfloat16]:
-            print("dtype = ", dtype)
-            # create model
-            model_xpu = (
-                models.__dict__["resnet18"](pretrained=True).to(device=device).train()
-            )
-            optimizer_xpu = torch.optim.SGD(model_xpu.parameters(), lr=lr)
-            criterion = nn.CrossEntropyLoss()
-
-            if os.path.exists(checkpoint_path_str):
-                os.remove(checkpoint_path_str)
-
-            # process torch.xpu.optimize
-            model_xpu, optimizer_xpu = torch.xpu.optimize(
-                model=model_xpu, dtype=dtype, optimizer=optimizer_xpu
-            )
-
-            # mimic model train, then eval
-            for _ in range(train_num_iter):
-                training_step(model_xpu, optimizer_xpu, criterion, dtype)
-            model_xpu.eval()
-            for _ in range(eval_num_iter):
-                eval_step(model_xpu, dtype)
-            torch.xpu.synchronize()
-
-            save_checkpoint(
-                {
-                    "model_state_dict": model_xpu.state_dict(),
-                    "optimizer_state_dict": optimizer_xpu.state_dict(),
-                }
-            )
-            if os.path.isfile(checkpoint_path_str):
-                # load checkpoint
-                checkpoint = torch.load(checkpoint_path_str, map_location=device)
-                print("load checkpoint")
+            for split_master_weight_for_bf16 in [True, False]:
+                print("dtype = ", dtype)
+                print("split master weight = ", dtype)
 
                 # create model
-                new_model = (
-                    models.__dict__["resnet18"](pretrained=False)
-                    .to(device=device)
-                    .train()
+                model_xpu = (
+                    models.__dict__["resnet18"](pretrained=True).to(device=device).train()
                 )
-                print("create model")
+                optimizer_xpu = torch.optim.SGD(model_xpu.parameters(), lr=lr)
+                criterion = nn.CrossEntropyLoss()
 
-                # create optimizer
-                new_optimizer = torch.optim.SGD(new_model.parameters(), lr=lr)
-                print("create model")
+                if os.path.exists(checkpoint_path_str):
+                    os.remove(checkpoint_path_str)
 
-                # optimize
-                new_model, new_optimizer = torch.xpu.optimize(
-                    model=new_model, dtype=dtype, optimizer=new_optimizer
+                # process torch.xpu.optimize
+                model_xpu, optimizer_xpu = torch.xpu.optimize(
+                    model=model_xpu, dtype=dtype, optimizer=optimizer_xpu,
+                    split_master_weight_for_bf16=split_master_weight_for_bf16
                 )
 
-                # load state dict
-                new_model.load_state_dict(checkpoint["model_state_dict"])
-                new_optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-                print("load state dict")
+                # mimic model train, then eval
+                for _ in range(train_num_iter):
+                    training_step(model_xpu, optimizer_xpu, criterion, dtype)
+                model_xpu.eval()
+                for _ in range(eval_num_iter):
+                    eval_step(model_xpu, dtype)
+                torch.xpu.synchronize()
 
-                # check
-                print("checking...")
-                self.assertEqual(
-                    model_xpu.state_dict(), new_model.state_dict(), atol=1e-6, rtol=1e-6
+                save_checkpoint(
+                    {
+                        "model_state_dict": model_xpu.state_dict(),
+                        "optimizer_state_dict": optimizer_xpu.state_dict(),
+                    }
                 )
-                self.assertEqual(
-                    optimizer_xpu.state_dict(),
-                    new_optimizer.state_dict(),
-                    atol=1e-6,
-                    rtol=1e-6,
-                )
-                os.remove(checkpoint_path_str)
-            else:
-                assert False, "save checkpoint failed for xpu model"  # noqa B011
+                if os.path.isfile(checkpoint_path_str):
+                    # load checkpoint
+                    checkpoint = torch.load(checkpoint_path_str, map_location=device)
+                    print("load checkpoint")
+
+                    # create model
+                    new_model = (
+                        models.__dict__["resnet18"](pretrained=False)
+                        .to(device=device)
+                        .train()
+                    )
+                    print("create model")
+
+                    # create optimizer
+                    new_optimizer = torch.optim.SGD(new_model.parameters(), lr=lr)
+                    print("create model")
+
+                    # optimize
+                    new_model, new_optimizer = torch.xpu.optimize(
+                        model=new_model, dtype=dtype, optimizer=new_optimizer
+                    )
+
+                    # load state dict
+                    new_model.load_state_dict(checkpoint["model_state_dict"])
+                    new_optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+                    print("load state dict")
+
+                    # check
+                    print("checking...")
+                    self.assertEqual(
+                        model_xpu.state_dict(), new_model.state_dict(), atol=1e-6, rtol=1e-6
+                    )
+                    self.assertEqual(
+                        optimizer_xpu.state_dict(),
+                        new_optimizer.state_dict(),
+                        atol=1e-6,
+                        rtol=1e-6,
+                    )
+                    os.remove(checkpoint_path_str)
+                else:
+                    assert False, "save checkpoint failed for xpu model"  # noqa B011
