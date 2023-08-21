@@ -166,11 +166,12 @@ def get_shared_parameter_status(module, shared_p):
     # and remove this workaround in IPEX later.
     deepspeed_modules = may_import_deepspeed_modules()
     if deepspeed_modules is not None:
-        LinearAllreduce, LinearLayer = deepspeed_modules
+        LinearAllreduce, LinearLayer = deepspeed_modules[:2]
 
         if isinstance(module, (LinearLayer, LinearAllreduce)):
             module.weight = torch.nn.Parameter(module.weight, requires_grad=False)
-            module.bias = torch.nn.Parameter(module.bias, requires_grad=False)
+            if module.bias is not None:
+                module.bias = torch.nn.Parameter(module.bias, requires_grad=False)
 
     for _, param in module._parameters.items():
         if param is None:
