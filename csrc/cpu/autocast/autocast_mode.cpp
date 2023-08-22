@@ -170,6 +170,7 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
   MAKE_REGISTER_FUNC_TWO_POLICIES(mm, user_defined_dtype, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(baddbmm, user_defined_dtype, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(addmm, user_defined_dtype, fp32)
+  MAKE_REGISTER_FUNC_TWO_POLICIES(_addmm_activation, user_defined_dtype, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(addbmm, user_defined_dtype, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(linear, user_defined_dtype, fp32)
   MAKE_REGISTER_FUNC2_TWO_POLICIES(

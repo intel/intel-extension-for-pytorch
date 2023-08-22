@@ -167,6 +167,7 @@ class AutocastCPUTestLists(object):
                 ),
             ),
             ("addmm", mat1_fp32 + mat2_fp32 + mat3_fp32),
+            ("_addmm_activation", mat1_fp32 + mat2_fp32 + mat3_fp32),
             (
                 "addbmm",
                 mat0_fp32
