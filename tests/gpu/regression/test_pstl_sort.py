@@ -2,7 +2,7 @@ import torch
 import intel_extension_for_pytorch  # noqa F401
 import copy
 from torch.testing._internal.common_utils import TestCase
-from intel_extension_for_pytorch.nn.functional._embeddingbag import torch_embedding_bag
+from intel_extension_for_pytorch.cpu.nn._embeddingbag import torch_embedding_bag
 
 
 class TestTorchMethod(TestCase):

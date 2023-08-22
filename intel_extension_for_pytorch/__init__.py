@@ -92,6 +92,7 @@ if sys.platform == "win32":
     kernel32.SetErrorMode(prev_error_mode)
 
 from .utils._proxy_module import *
+from .utils.utils import has_cpu, has_xpu
 from . import cpu
 from . import xpu
 from . import quantization

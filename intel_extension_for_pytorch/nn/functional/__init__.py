@@ -1,2 +1,4 @@
-from .interaction import interaction, InteractionFunc
-from . import _embeddingbag, _tensor_method, _roi_align
+from ...cpu.nn import _embeddingbag
+from . import _tensor_method
+from ...cpu.nn.interaction import interaction, InteractionFunc
+from ...cpu.nn import _roi_align_helper
