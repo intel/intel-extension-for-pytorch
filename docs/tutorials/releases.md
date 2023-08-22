@@ -1,6 +1,31 @@
 Releases
 =============
 
+## 2.0.110+xpu
+
+Intel® Extension for PyTorch\* v2.0.110+xpu is the new Intel® Extension for PyTorch\* release supports both CPU platforms and GPU platforms (Intel® Data Center GPU Flex Series and Intel® Data Center GPU Max Series) based on PyTorch\* 2.0.1. It extends PyTorch\* 2.0.1 with up-to-date features and optimizations on `xpu` for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel Xe Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch* `xpu` device, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs with PyTorch*.
+
+### Highlights
+
+This release introduces specific XPU solution optimizations on Intel discrete GPUs which include Intel® Data Center GPU Flex Series and Intel® Data Center GPU Max Series. Optimized operators and kernels are implemented and registered through PyTorch\* dispatching mechanism for the `xpu` device. These operators and kernels are accelerated on Intel GPU hardware from the corresponding native vectorization and matrix calculation features. In graph mode, additional operator fusions are supported to reduce operator/kernel invocation overheads, and thus increase performance.
+
+This release provides the following features:
+- oneDNN 3.3 API integration and adoption
+- Libtorch support
+- ARC support on Windows, WSL2 and Ubuntu (Experimental)
+- OOB models improvement
+  - More fusion patterns enabled for optimizing OOB models
+- CPU support is merged in this release:
+  - CPU features and optimizations are equivalent to what has been released in Intel® Extension for PyTorch* v2.0.100+cpu release that was made publicly available in May 2023. For customers who would like to evaluate workloads on both GPU and CPU, they can use this package. For customers who are focusing on CPU only, we still recommend them to use Intel® Extension for PyTorch* v2.0.100+cpu release for smaller footprint, less dependencies and broader OS support.
+
+This release adds the following fusion patterns in PyTorch\* JIT mode for Intel GPU:
+- `add` + `softmax`
+- `add` + `view` + `softmax`
+
+### Known Issues
+
+Please refer to [Known Issues webpage](./performance_tuning/known_issues.md).
+
 ## 1.13.120+xpu
 
 Intel® Extension for PyTorch\* v1.13.120+xpu is the updated Intel® Extension for PyTorch\* release supports both CPU platforms and GPU platforms (Intel® Data Center GPU Flex Series and Intel® Data Center GPU Max Series) based on PyTorch\* 1.13.1. It extends PyTorch\* 1.13.1 with up-to-date features and optimizations on `xpu` for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel Xe Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch* `xpu` device, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs with PyTorch*.
@@ -28,7 +53,6 @@ This release adds the following fusion patterns in PyTorch\* JIT mode for Intel 
 ### Known Issues
 
 Please refer to [Known Issues webpage](./performance_tuning/known_issues.md).
-
 
 ## 1.13.10+xpu
 

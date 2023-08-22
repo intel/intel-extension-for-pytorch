@@ -40,7 +40,7 @@ fi
 
 # Check existance of required Linux commands
 for APP in python git patch pkg-config nproc bzip2 gcc g++; do
-    command -v $APP || (echo "Error: Command \"${APP}\" not found." ; exit 4)
+    command -v $APP > /dev/null || (echo "Error: Command \"${APP}\" not found." ; exit 4)
 done
 
 # Check existance of required libs
@@ -136,6 +136,12 @@ fi
 cmake -DCMAKE_INSTALL_PREFIX=${LLVM_ROOT}/../release/ -P cmake_install.cmake
 ln -s ${LLVM_ROOT}/bin/llvm-config ${LLVM_ROOT}/bin/llvm-config-13
 export PATH=${LLVM_ROOT}/bin:$PATH
+set +uex
+env | grep LD_LIBRARY_PATH > /dev/null
+if [ $? -ne 0 ]; then
+    export LD_LIBRARY_PATH=
+fi
+set -uex
 export LD_LIBRARY_PATH=${LLVM_ROOT}/lib:$LD_LIBRARY_PATH
 cd ..
 #  PyTorch
@@ -143,6 +149,8 @@ cd ../pytorch
 git stash
 git clean -f
 git apply ../intel-extension-for-pytorch/torch_patches/*.patch
+mv version.txt version.txt.bk
+echo "2.0.1a0" > version.txt
 export USE_LLVM=${LLVM_ROOT}
 export LLVM_DIR=${USE_LLVM}/lib/cmake/llvm
 # Ensure cmake can find python packages when using conda or virtualenv
@@ -164,6 +172,7 @@ unset USE_STATIC_MKL
 unset CMAKE_PREFIX_PATH
 unset LLVM_DIR
 unset USE_LLVM
+mv version.txt.bk version.txt
 python -m pip uninstall -y mkl-static mkl-include
 python -m pip install --force-reinstall dist/*.whl
 #  TorchVision

@@ -21,3 +21,5 @@ with torch.no_grad():
     with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
     ############################ code changes ######################
         model(data)
+
+print("Execution finished")

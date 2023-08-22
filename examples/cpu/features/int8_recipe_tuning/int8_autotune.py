@@ -140,3 +140,5 @@ with torch.no_grad():
 
 # save tuned qconfig file
 tuned_model.save_qconf_summary(qconf_summary="tuned_conf.json")
+
+print("Execution finished")

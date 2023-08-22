@@ -15,7 +15,7 @@ Here we show how to use TorchServe with Intel® Extension for PyTorch\*.
 
 
 ## Install Intel® Extension for PyTorch\*
-Refer to the documentation [here](../installation.md).
+Refer to the documentation [here](../../../../index.html#installation).
 
 ## Serving model with Intel® Extension for PyTorch\*
 After installation, all it needs to use TorchServe with Intel® Extension for PyTorch\* is to enable it in `config.properties`.
