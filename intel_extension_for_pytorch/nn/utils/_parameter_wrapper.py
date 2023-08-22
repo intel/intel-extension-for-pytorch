@@ -76,7 +76,6 @@ def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
         torch.nn.Linear,
         torch.nn.Embedding,
         torch.nn.LSTM,
-        # TODO: why different with inference
         MergedEmbeddingBag,
         torch.nn.EmbeddingBag,
         _LSTM,
@@ -100,20 +99,34 @@ def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
 
 @functools.lru_cache(None)
 def IPEX_WEIGHT_CONVERT_MODULE_XPU(inference: bool, dtype: torch.bfloat16):
-    # For XPU, the cast list is independent on inference/train mode or dtype
-    module_convert_list = [
+    module_convert_list_inference = [
+        torch.nn.Conv2d,
+        torch.nn.Conv3d,
+        torch.nn.ConvTranspose2d,
+        torch.nn.ConvTranspose3d,
         torch.nn.Linear,
+        torch.nn.Embedding,
+        torch.nn.LSTM,
+    ]
+
+    # For XPU, the cast list is independent on inference/train mode or dtype
+    module_convert_list_training = [
         torch.nn.Conv1d,
         torch.nn.Conv2d,
         torch.nn.Conv3d,
         torch.nn.ConvTranspose1d,
         torch.nn.ConvTranspose2d,
         torch.nn.ConvTranspose3d,
-        torch.nn.EmbeddingBag,
+        torch.nn.Linear,
         torch.nn.Embedding,
+        torch.nn.EmbeddingBag,
+        torch.nn.ParameterList,
     ]
 
-    return module_convert_list
+    if inference:
+        return module_convert_list_inference
+    else:
+        return module_convert_list_training
 
 def _should_prepack(module, is_training, is_xpu=False):
     if is_xpu:
@@ -157,6 +170,8 @@ def _should_prepack(module, is_training, is_xpu=False):
 
 
 def get_shared_parameter_status(module, shared_p):
+    if module is None:
+        return
     visited_wrapper = []
     for _, param in module._parameters.items():
         if param is None:

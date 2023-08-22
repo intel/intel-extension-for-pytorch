@@ -460,11 +460,10 @@ def optimize(
             model, optimizer
         )
 
-    if sample_input is not None:
+    if sample_input is not None and device_type == "cpu":
         if isinstance(sample_input, torch.Tensor):
             sample_input = (sample_input,)
-            record_input_shape_for_prepack(optimized_model, sample_input)
-
+        record_input_shape_for_prepack(optimized_model, sample_input)
     params_attr = {}
     if not model.training:
         if opt_properties.conv_bn_folding:

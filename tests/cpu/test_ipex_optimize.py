@@ -241,8 +241,11 @@ class TestOptimizeCases(TestCase):
             # share parameters. But the changes on Graph Module cannot be reflected on original module. So
             # only the un-opitimized weight will use same mem buffer with original module.
             if level == "O1":
-                self.assertTrue(M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr())
-                self.assertFalse(hasattr(M.linear, 'weight'))
+                self.assertTrue(
+                    M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr()
+                )                # linear is optimized and used same parameter with original model
+                self.assertTrue(M.linear.weight is opt_M.linear.weight)
+                self.assertTrue(isinstance(opt_M.linear, _IPEXLinear))
             # un-optimized part should be inplaced
             self.assertTrue(M.embeddingbag.weight.data_ptr() == opt_M.embeddingbag.weight.data_ptr())
 

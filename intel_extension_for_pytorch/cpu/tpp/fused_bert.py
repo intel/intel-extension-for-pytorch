@@ -10,6 +10,7 @@ import pkg_resources
 import warnings
 from .optim import AdamW, SGD
 import intel_extension_for_pytorch._C as torch_ipex_cpp
+import copy
 try:
     from transformers.modeling_utils import apply_chunking_to_forward
     from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions
@@ -1273,6 +1274,7 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     # replace the original transfomers module object with tpp module which has the same functionality but with more
     # operator fusion optimization
     new_model = copy.deepcopy(model)
+    global layer_use_bf16
     layer_use_bf16 = True if dtype == torch.bfloat16 else False
     if unpad:
         unpad = True
