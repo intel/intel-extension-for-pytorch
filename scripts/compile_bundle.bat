@@ -20,17 +20,17 @@ if not "%~3"=="" (
 rem Check existance of DPCPP and ONEMKL environments
 set "DPCPP_ENV=%DPCPP_ROOT%\env\vars.bat"
 if NOT EXIST "%DPCPP_ENV%" (
-    echo DPC++ compiler environment %DPCPP_ENV% doesn't seem to exist.
+    echo DPC++ compiler environment "%DPCPP_ENV%" doesn't seem to exist.
     exit /b 2
 )
-call %DPCPP_ENV%
+call "%DPCPP_ENV%"
 
 set "ONEMKL_ENV=%ONEMKL_ROOT%\env\vars.bat"
 if NOT EXIST "%ONEMKL_ENV%" (
-    echo oneMKL environment %ONEMKL_ENV% doesn't seem to exist.
+    echo oneMKL environment "%ONEMKL_ENV%" doesn't seem to exist.
     exit /b 3
 )
-call %ONEMKL_ENV%
+call "%ONEMKL_ENV%"
 
 rem Check existence of required Windows commands
 for %%A in (python git cl) do (
