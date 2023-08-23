@@ -1,6 +1,6 @@
-import torch 
+import torch
 import os
-from ._transformers import IPEXEmptyLinearWithPadding, IPEXTransformerConverter
+from ._transformers import IPEXEmptyLinearWithPadding, IPEXEmptyINT4LinearWithPadding, IPEXTransformerConverter
 
 from functools import partial
 from ._utils import ipex_beam_search, _ipex_prepare_model_inputs, ipex_beam_search_without_optimize, IPEXLLMResourceContrainer
@@ -8,7 +8,36 @@ from .gptj import IPEXGPTJForCausalLMForward
 from .llama import IPEXLlamaForCausalLMForward
 from .bloom import IPEXBloomForCausalLMForward
 from ._inference_ops import OpConverter
-# from transformers.models.llama.configuration_llama import 
+
+def int4_gemm_padding(qdata):
+    k, n = qdata.shape
+    if n % 8 != 0:
+        padded_n = (n + 8 - 1) // 8 * 8
+        padded_qdata = torch.empty(k, padded_n, dtype=qdata.dtype, device=qdata.device)
+        padded_qdata[:, :n] = qdata
+        return padded_qdata
+    else:
+        return qdata
+
+def int4_gemm_bias_padding(qdata):
+    n = qdata.shape[0]
+    if n % 16 != 0:
+        padded_n = (n + 16 - 1) // 16 * 16
+        padded_qdata = torch.empty(padded_n, dtype=qdata.dtype, device=qdata.device)
+        padded_qdata[:n] = qdata
+        return padded_qdata
+    else:
+        return qdata
+
+def int4_gemm_scale_padding(scale):
+    k, n = scale.shape
+    if n % 4 != 0:
+        padded_n = (n + 4 - 1) // 4 * 4
+        padded_scale = torch.empty(k, padded_n, dtype=scale.dtype, device=scale.device)
+        padded_scale[:, :n] = scale
+        return padded_scale
+    else:
+        return scale
 
 def gemm_padding(weight, bias=None):
     n, k = weight.shape
@@ -25,20 +54,40 @@ def gemm_padding(weight, bias=None):
     else:
         return weight, bias
 
-def pad_for_gptj_lm_head(model):
-    n = model.lm_head.weight.shape[0] #[n, k]
+def pad_for_gptj_lm_head(model, is_int4=False):
+    if is_int4:
+        n = model.lm_head.qweight.shape[1] * 2 - 1 #specific for 50401(25201) int4 weight
 
-    lm_head_new = IPEXEmptyLinearWithPadding(n)
-    lm_head_new.weight = model.lm_head.weight
-    lm_head_new.bias = model.lm_head.bias
-    model.lm_head = lm_head_new
+        lm_head_new = IPEXEmptyINT4LinearWithPadding(n)
+        lm_head_new.qweight = model.lm_head.qweight
+        lm_head_new.weight = model.lm_head.weight
+        lm_head_new.bias = model.lm_head.bias if model.lm_head.bias is not None else None
+        lm_head_new.scales = model.lm_head.scales
+        lm_head_new.qzeros = model.lm_head.qzeros
+        lm_head_new.group_size = model.lm_head.group_size.data.item()
+        model.lm_head = lm_head_new
 
-    if model.lm_head.bias is not None:
-        model.lm_head.weight.data, model.lm_head.bias.data = gemm_padding(model.lm_head.weight, model.lm_head.bias)
+        model.lm_head.qweight.data = int4_gemm_padding(model.lm_head.qweight)
+        model.lm_head.scales.data = int4_gemm_scale_padding(model.lm_head.scales)
+        model.lm_head.qzeros.data = int4_gemm_padding(model.lm_head.qzeros)
+
+        if model.lm_head.bias is not None:
+            model.lm_head.bias.data = int4_gemm_bias_padding(model.lm_head.bias)
+
     else:
-        model.lm_head.weight.data, _ = gemm_padding(model.lm_head.weight)
+        n = model.lm_head.weight.shape[0] #[n, k]
 
-def transformer_frontend_replace(model, config = None, dtype = torch.float):
+        lm_head_new = IPEXEmptyLinearWithPadding(n)
+        lm_head_new.weight = model.lm_head.weight
+        lm_head_new.bias = model.lm_head.bias
+        model.lm_head = lm_head_new
+
+        if model.lm_head.bias is not None:
+            model.lm_head.weight.data, model.lm_head.bias.data = gemm_padding(model.lm_head.weight, model.lm_head.bias)
+        else:
+            model.lm_head.weight.data, _ = gemm_padding(model.lm_head.weight)
+
+def transformer_frontend_replace(model, config = None, dtype = torch.float, is_int4=False):
     import transformers
     enable_ds = False
     try:
@@ -61,7 +110,12 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
         transformers.models.opt.modeling_opt.OPTDecoderLayer: IPEXOptConverter,
         transformers.models.bloom.modeling_bloom.BloomBlock: IPEXBloomConverter
     }
-    def recursive_module_replace(module, config, dtype, enable_deepspeed=False):
+
+    transformers_int4 = {
+        transformers.models.gptj.modeling_gptj.GPTJBlock,
+    }    
+
+    def recursive_module_replace(module, config, dtype, enable_deepspeed=False, is_int4=is_int4):
         not_deepspeed_engine = not enable_deepspeed or not isinstance(module, deepspeed.InferenceEngine)
         if config is None and hasattr(module, "config") and not_deepspeed_engine:
             config = module.config
@@ -75,7 +129,7 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
             setattr(module, "_prepare_model_inputs", partial(_ipex_prepare_model_inputs, module))
 
         if type(module) == transformers.models.gptj.modeling_gptj.GPTJForCausalLM:
-            pad_for_gptj_lm_head(module)
+            pad_for_gptj_lm_head(module, is_int4)
             if hasattr(module, "forward"):
                 setattr(module, "forward", partial(IPEXGPTJForCausalLMForward, module))
         elif type(module) == transformers.models.llama.modeling_llama.LlamaForCausalLM:
@@ -94,7 +148,10 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
 
         for name, named_module in module.named_children():
             if type(named_module) in transformers_converter.keys():
-                module_converter = transformers_converter[type(named_module)](named_module, config, dtype=dtype, device=config.device)
+                if type(named_module) in transformers_int4:
+                    module_converter = transformers_converter[type(named_module)](named_module, config, dtype=dtype, device=config.device, is_int4=is_int4)
+                else:
+                    module_converter = transformers_converter[type(named_module)](named_module, config, dtype=dtype, device=config.device)
                 module_transformed = module_converter.get_transformed_module()
                 setattr(module, name, module_transformed)
                 IPEXLLMResourceContrainer.push(module_transformed)
@@ -102,9 +159,9 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float):
             #     op_transformed = OpConverter.convert_op(named_module)
             #     setattr(module, name, op_transformed)
             else:
-                recursive_module_replace(named_module, config, dtype=dtype)
+                recursive_module_replace(named_module, config, dtype=dtype, is_int4=is_int4)
         return module
 
-    replaced_model = recursive_module_replace(model, None, dtype=dtype, enable_deepspeed=enable_ds)
+    replaced_model = recursive_module_replace(model, None, dtype=dtype, enable_deepspeed=enable_ds, is_int4=is_int4)
 
     return replaced_model

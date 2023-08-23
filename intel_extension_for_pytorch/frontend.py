@@ -154,9 +154,9 @@ class _O1:
 
 opt_levels = {"O0": _O0(), "O1": _O1()}
 
-def optimize_transformers(model, dtype=None, optimizer=None):
+def optimize_transformers(model, dtype=None, optimizer=None, is_int4=False):
     def model_converter(model, dtype):
-        transformer_frontend_replace(model, config=None, dtype=dtype)
+        transformer_frontend_replace(model, config=None, dtype=dtype, is_int4=is_int4)
         return model
     optimize_output = optimize(model, dtype=dtype, optimizer=optimizer, inplace=True)
     try:

@@ -11,21 +11,29 @@ from ._transformer_configuration import IPEXTransformerConfig
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 class IPEXGPTJAttn(IPEXTransformerAtten):
-    def __init__(self, config) -> None:
-        super().__init__(config)
+    def __init__(self, config, is_int4=False) -> None:
+        super().__init__(config, is_int4)
 
 class IPEXGPTJMLP(IPEXTransformerMLP):
-    def __init__(self, config: IPEXTransformerConfig):
-        super().__init__(config)
+    def __init__(self, config: IPEXTransformerConfig, is_int4=False):
+        super().__init__(config, is_int4)
 
     def forward(self, hidden_states: Optional[torch.Tensor], attn_output, residual):
         if self.row_major:
-            if isinstance(self.act, nn.GELU):
-                hidden_states = torch.ops.torch_ipex.matmul_gelu(hidden_states, self.fc_in_wei, self.fc_in.bias, self.act.approximate)
+            if self.is_int4 and hidden_states.shape[0]==1:
+                if isinstance(self.act, nn.GELU):
+                    hidden_states = torch.ops.torch_ipex.mm_bias_gelu_int4(hidden_states, self.fc_in_qwei, self.fc_in_scl, self.fc_in_zp,  self.fc_in.bias, self.fc_in_gs, self.act.approximate)
+                else:
+                    hidden_states = torch.ops.torch_ipex.mm_bias_int4(hidden_states, self.fc_in_qwei, self.fc_in_scl, self.fc_in_zp, self.fc_in.bias)
+                    hidden_states = self.act(hidden_states)
+                hidden_states = torch.ops.torch_ipex.mm_bias_resadd_resadd_int4(hidden_states, self.fc_out_qwei, self.fc_out.bias, attn_output, residual, self.fc_out_scl, self.fc_out_zp, self.fc_out_gs)
             else:
-                hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
-                hidden_states = self.act(hidden_states)
-            hidden_states = torch.ops.torch_ipex.mm_bias_resadd_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output, residual)
+                if isinstance(self.act, nn.GELU):
+                    hidden_states = torch.ops.torch_ipex.matmul_gelu(hidden_states, self.fc_in_wei, self.fc_in.bias, self.act.approximate)
+                else:
+                    hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
+                    hidden_states = self.act(hidden_states)
+                hidden_states = torch.ops.torch_ipex.mm_bias_resadd_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output, residual)
         else:
             hidden_states = self.fc_in(hidden_states)
             hidden_states = self.act(hidden_states)
@@ -33,15 +41,17 @@ class IPEXGPTJMLP(IPEXTransformerMLP):
         return hidden_states
 
 class IPEXGPTJBlock(nn.Module):
-    def __init__(self, 
-                 config:IPEXTransformerConfig):
+    def __init__(self,
+                 config:IPEXTransformerConfig,
+                 is_int4=False):
         super().__init__()
+        self.is_int4 = is_int4
         self.config = config
         self.config.intermediate_size = 4 * self.config.embed_dim if self.config.intermediate_size is None else self.config.intermediate_size
-        self.attn = IPEXGPTJAttn(config)
+        self.attn = IPEXGPTJAttn(config, is_int4)
         self.ln = nn.LayerNorm(self.config.embed_dim, eps=self.config.norm_eps)
-        self.mlp = IPEXGPTJMLP(config)
-    
+        self.mlp = IPEXGPTJMLP(config, is_int4)
+
     def release_resources(self):
         self.attn.release_resources()
         self.mlp.release_resources()
@@ -106,7 +116,7 @@ class IPEXGPTJBlock(nn.Module):
         else:
             outputs = (hidden_states, ) + outputs[1:]
 
-        return outputs   
+        return outputs
 
 
 def IPEXGPTJForCausalLMForward(
@@ -193,9 +203,11 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
                  module,
                  config = None,
                  device = "cpu",
-                 dtype = torch.float):
+                 dtype = torch.float,
+                 is_int4 = False):
         from transformers.models.gptj.configuration_gptj import GPTJConfig
         super().__init__(module, config, device=device, dtype=dtype)
+        self.is_int4 = is_int4
         self.config = config if config is not None else GPTJConfig()
         self.ipex_transformers_config = self.construct_transformer_config()
         # print(self.ipex_transformers_config.__dict__)
@@ -245,7 +257,7 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
         )
 
     def construct_ipex_optimized_module(self):
-        return IPEXGPTJBlock(self.ipex_transformers_config)
+        return IPEXGPTJBlock(self.ipex_transformers_config, self.is_int4)
 
     def port_attn_parameters(self):
         if self.row_major:
@@ -277,6 +289,67 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
             self.ipex_optimized_module.attn.out_proj.weight = self.module.attn.out_proj.weight
             self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
 
+        if self.is_int4:
+            if self.row_major:
+                self.ipex_optimized_module.attn.q_qwei = self.module.attn.q_proj.qweight
+                self.ipex_optimized_module.attn.q_scl = self.module.attn.q_proj.scales
+                self.ipex_optimized_module.attn.q_zp = self.module.attn.q_proj.qzeros
+                self.ipex_optimized_module.attn.q_gs = self.module.attn.q_proj.group_size.data.item()
+                self.ipex_optimized_module.attn.q_proj.bias = self.module.attn.q_proj.bias
+                self.ipex_optimized_module.attn.k_qwei = self.module.attn.k_proj.qweight
+                self.ipex_optimized_module.attn.k_scl = self.module.attn.k_proj.scales
+                self.ipex_optimized_module.attn.k_zp = self.module.attn.k_proj.qzeros
+                self.ipex_optimized_module.attn.k_gs = self.module.attn.k_proj.group_size.data.item()
+                self.ipex_optimized_module.attn.k_proj.bias = self.module.attn.k_proj.bias
+                self.ipex_optimized_module.attn.v_qwei = self.module.attn.v_proj.qweight
+                self.ipex_optimized_module.attn.v_scl = self.module.attn.v_proj.scales
+                self.ipex_optimized_module.attn.v_zp = self.module.attn.v_proj.qzeros
+                self.ipex_optimized_module.attn.v_gs = self.module.attn.v_proj.group_size.data.item()
+                self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
+                self.ipex_optimized_module.attn.out_qwei = self.module.attn.out_proj.qweight
+                self.ipex_optimized_module.attn.out_scl = self.module.attn.out_proj.scales
+                self.ipex_optimized_module.attn.out_zp = self.module.attn.out_proj.qzeros
+                self.ipex_optimized_module.attn.out_gs = self.module.attn.out_proj.group_size.data.item()
+                self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
+
+                shape = [3, -1, self.module.attn.q_proj.qweight.shape[-1]]
+                self.ipex_optimized_module.attn.qkv_qwei = torch.stack([self.ipex_optimized_module.attn.q_qwei, self.ipex_optimized_module.attn.k_qwei, self.ipex_optimized_module.attn.v_qwei]).contiguous().view(shape)
+                self.ipex_optimized_module.attn.qkv_scl = torch.stack([self.ipex_optimized_module.attn.q_scl, self.ipex_optimized_module.attn.k_scl, self.ipex_optimized_module.attn.v_scl]).contiguous().view(shape)
+                self.ipex_optimized_module.attn.qkv_zp = torch.stack([self.ipex_optimized_module.attn.q_zp, self.ipex_optimized_module.attn.k_zp, self.ipex_optimized_module.attn.v_zp]).contiguous().view(shape)
+                self.ipex_optimized_module.attn.qkv_gs = self.ipex_optimized_module.attn.q_gs
+
+                self.ipex_optimized_module.attn.q_qwei.data = self.ipex_optimized_module.attn.qkv_qwei[0, :, :]
+                self.ipex_optimized_module.attn.q_scl.data = self.ipex_optimized_module.attn.qkv_scl[0, :, :]
+                self.ipex_optimized_module.attn.q_zp.data = self.ipex_optimized_module.attn.qkv_zp[0, :, :]
+                self.ipex_optimized_module.attn.k_qwei.data = self.ipex_optimized_module.attn.qkv_qwei[1, :, :]
+                self.ipex_optimized_module.attn.k_scl.data = self.ipex_optimized_module.attn.qkv_scl[1, :, :]
+                self.ipex_optimized_module.attn.k_zp.data = self.ipex_optimized_module.attn.qkv_zp[1, :, :]
+                self.ipex_optimized_module.attn.v_qwei.data = self.ipex_optimized_module.attn.qkv_qwei[2, :, :]
+                self.ipex_optimized_module.attn.v_scl.data = self.ipex_optimized_module.attn.qkv_scl[2, :, :]
+                self.ipex_optimized_module.attn.v_zp.data = self.ipex_optimized_module.attn.qkv_zp[2, :, :]
+                self.ipex_optimized_module.attn.qkv_bias = None
+            else:
+                self.ipex_optimized_module.attn.k_proj.qweight = self.module.attn.k_proj.qweight
+                self.ipex_optimized_module.attn.k_proj.scales = self.module.attn.k_proj.scales
+                self.ipex_optimized_module.attn.k_proj.qzeros = self.module.attn.k_proj.qzeros
+                self.ipex_optimized_module.attn.k_proj.group_size = self.module.attn.k_proj.group_size.data.item()
+                self.ipex_optimized_module.attn.k_proj.bias = self.module.attn.k_proj.bias
+                self.ipex_optimized_module.attn.q_proj.qweight = self.module.attn.q_proj.qweight
+                self.ipex_optimized_module.attn.q_proj.scales = self.module.attn.q_proj.scales
+                self.ipex_optimized_module.attn.q_proj.qzeros = self.module.attn.q_proj.qzeros
+                self.ipex_optimized_module.attn.q_proj.group_size = self.module.attn.q_proj.group_size.data.item()
+                self.ipex_optimized_module.attn.q_proj.bias = self.module.attn.q_proj.bias
+                self.ipex_optimized_module.attn.v_proj.qweight = self.module.attn.v_proj.qweight
+                self.ipex_optimized_module.attn.v_proj.scales = self.module.attn.v_proj.scales
+                self.ipex_optimized_module.attn.v_proj.qzeros = self.module.attn.v_proj.qzeros
+                self.ipex_optimized_module.attn.v_proj.group_size = self.module.attn.v_proj.group_size.data.item()
+                self.ipex_optimized_module.attn.v_proj.bias = self.module.attn.v_proj.bias
+                self.ipex_optimized_module.attn.out_proj.qweight = self.module.attn.out_proj.qweight
+                self.ipex_optimized_module.attn.out_proj.scales = self.module.attn.out_proj.scales
+                self.ipex_optimized_module.attn.out_proj.qzeros = self.module.attn.out_proj.qzeros
+                self.ipex_optimized_module.attn.out_proj.group_size = self.module.attn.out_proj.group_size.data.item()
+                self.ipex_optimized_module.attn.out_proj.bias = self.module.attn.out_proj.bias
+
     def port_mlp_parameters(self):
         if self.row_major:
             self.module.mlp.fc_in.weight.data = self.module.mlp.fc_in.weight.transpose(0, 1).contiguous()
@@ -291,6 +364,30 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
             self.ipex_optimized_module.mlp.fc_out.weight = self.module.mlp.fc_out.weight
             self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
 
+        if self.is_int4:
+            if self.row_major:
+                self.ipex_optimized_module.mlp.fc_in_qwei = self.module.mlp.fc_in.qweight
+                self.ipex_optimized_module.mlp.fc_in_scl = self.module.mlp.fc_in.scales
+                self.ipex_optimized_module.mlp.fc_in_zp = self.module.mlp.fc_in.qzeros
+                self.ipex_optimized_module.mlp.fc_in_gs = self.module.mlp.fc_in.group_size.data.item()
+                self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
+                self.ipex_optimized_module.mlp.fc_out_qwei = self.module.mlp.fc_out.qweight
+                self.ipex_optimized_module.mlp.fc_out_scl = self.module.mlp.fc_out.scales
+                self.ipex_optimized_module.mlp.fc_out_zp = self.module.mlp.fc_out.qzeros
+                self.ipex_optimized_module.mlp.fc_out_gs = self.module.mlp.fc_out.group_size.data.item()
+                self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
+            else:
+                self.ipex_optimized_module.mlp.fc_in.qweight = self.module.mlp.fc_in.qweight
+                self.ipex_optimized_module.mlp.fc_in.scales = self.module.mlp.fc_in.scales
+                self.ipex_optimized_module.mlp.fc_in.qzeros = self.module.mlp.fc_in.qzeros
+                self.ipex_optimized_module.mlp.fc_in.group_size = self.module.mlp.fc_in.group_size.data.item()
+                self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
+                self.ipex_optimized_module.mlp.fc_out.qweight = self.module.mlp.fc_out.qweight
+                self.ipex_optimized_module.mlp.fc_out.scales = self.module.mlp.fc_out.scales
+                self.ipex_optimized_module.mlp.fc_out.qzeros = self.module.mlp.fc_out.qzeros
+                self.ipex_optimized_module.mlp.fc_out.group_size = self.module.mlp.fc_out.group_size.data.item()
+                self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
+
     def port_layer_norm_parameters(self):
         self.ipex_optimized_module.ln.weight = self.module.ln_1.weight
         self.ipex_optimized_module.ln.bias = self.module.ln_1.bias
@@ -301,4 +398,4 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
         self.port_layer_norm_parameters()
 
     def get_transformed_module(self):
-        return self.ipex_optimized_module      
+        return self.ipex_optimized_module
