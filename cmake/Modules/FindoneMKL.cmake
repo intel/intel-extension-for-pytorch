@@ -50,9 +50,14 @@ function (install_mkl_packages)
   set(mkl_h_rel ${CMAKE_MATCH_1})
   get_filename_component(mkl_inc "${mkl_prefix}/${mkl_h_rel}/" DIRECTORY)
   get_filename_component(mkl_root_hint "${mkl_inc}/../" ABSOLUTE)
+  set(mkl_root_hint ${mkl_root_hint} PARENT_SCOPE)
 endfunction()
 
+# IPEX XPU lib always use the dynamic linker for oneMKL lib if USE_ONEMKL is ON and oneMKL is available.
+# IPEX CPU lib will use the same oneMKL lib as XPU if and only if USE_ONEMKL is ON and oneMKL is available,
+# in other situation CPU lib will download and install mkl-static lib and use static linker for mkl-static lib.
 if(BUILD_WITH_XPU)
+  set(BUILD_STATIC_ONEMKL OFF)
   if(DEFINED ENV{MKLROOT})
     set(mkl_root_hint $ENV{MKLROOT})
   elseif(DEFINED ENV{MKL_ROOT})
@@ -61,14 +66,18 @@ if(BUILD_WITH_XPU)
     set(mkl_root_hint ${MKL_ROOT})
   else()
     if(BUILD_MODULE_TYPE STREQUAL "GPU")
-      message(FATAL_ERROR "Please set oneMKL root path by MKLROOT, or MKL_ROOT.")
+      # For IPEX XPU build, if we CAN NOT find the specified oneMKL, we should return earily. ONEMKL_FOUND is OFF in this situation.
+      message(WARNING "Please set oneMKL root path by MKLROOT, or MKL_ROOT for IPEX XPU build.")
+      return()
     else()
       # For IPEX CPU build, if we CAN NOT find the specified oneMKL, we should download and install the MKL via pip.
       message(WARNING "No found oneMKL root path by MKLROOT, or MKL_ROOT. Will download and install mkl-include and mkl-static for IPEX CPU build.")
       install_mkl_packages()
+      set(BUILD_STATIC_ONEMKL ON)
     endif()
   endif()
 else()
+  set(BUILD_STATIC_ONEMKL ON)
   # If only build IPEX CPU libraries, we should use the downloaded MKL via pip.
   message(STATUS "Download and install mkl-include and mkl-static for IPEX CPU build automatically.")
   install_mkl_packages()
@@ -124,7 +133,7 @@ if(NOT MKL_CORE)
   message(FATAL_ERROR "oneMKL library ${MKL_CORE} not found")
 endif()
 
-if(BUILD_WITH_XPU)
+if(BUILD_MODULE_TYPE STREQUAL "GPU")
   set(MKL_SYCL "${LIB_PREFIX}mkl_sycl${LIB_SUFFIX}")
   find_library(MKL_LIB_SYCL ${MKL_SYCL} HINTS ${mkl_root_hint}
       PATH_SUFFIXES lib lib/intel64 NO_DEFAULT_PATH)
@@ -142,7 +151,7 @@ endif()
 
 set(ONEMKL_CPU_LIBS ${START_GROUP} ${MKL_LIB_LP64} ${MKL_LIB_CORE} ${MKL_LIB_THREAD} ${END_GROUP})
 
-if(BUILD_WITH_XPU)
+if(BUILD_MODULE_TYPE STREQUAL "GPU")
   set(ONEMKL_GPU_LIBS ${START_GROUP} ${MKL_LIB_LP64} ${MKL_LIB_CORE} ${MKL_LIB_THREAD} ${MKL_LIB_SYCL} ${END_GROUP})
 endif()
 

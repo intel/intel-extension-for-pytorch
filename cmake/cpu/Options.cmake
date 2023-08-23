@@ -7,7 +7,6 @@ set(Options_CPU_cmake_included true)
 # The options to build cpu
 include(CMakeDependentOption)
 option(IPEX_DISP_OP "output the extension operators name for debug purpose" OFF)
-cmake_dependent_option(BUILD_STATIC_ONEMKL "Static link with oneMKL" OFF "BUILD_WITH_XPU" ON)
 
 function (print_cpu_config_summary)
   # Fetch configurations of intel-ext-pt-cpu
@@ -38,7 +37,6 @@ function (print_cpu_config_summary)
     message(STATUS "  oneMKL include        : ${ONEMKL_INCLUDE_DIR}")
 
     message(STATUS "Options:")
-    message(STATUS "  BUILD_STATIC_ONEMKL   : ${BUILD_STATIC_ONEMKL}")
     message(STATUS "  IPEX_DISP_OP          : ${IPEX_DISP_OP}")
 
     message(STATUS "")
