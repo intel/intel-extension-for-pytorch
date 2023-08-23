@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.distributed as dist
 from typing import Optional, Tuple, Union
 
 from intel_extension_for_pytorch.nn.utils._transformer_configuration import IPEXTransformerConfig
@@ -304,11 +305,6 @@ class IPEXTransformerAtten(nn.Module):
 
     def all_reduce_if_necessary(self, reduce_target):
         if self.tp_group is not None:
-            try:
-                from deepspeed import comm as dist
-            except ImportError as e:
-                print("Can not find deepspeed. If you are using multi-tile feature, please make sure the deepspeed is correctly installed in your environment")
-                return 
             dist.all_reduce(reduce_target, group=self.tp_group)
             return reduce_target
         else:
@@ -586,11 +582,6 @@ class IPEXTransformerMLP(nn.Module):
 
     def all_reduce_if_necessary(self, target):
         if self.tp_group is not None:
-            try:
-                from deepspeed import comm as dist
-            except ImportError as e:
-                print("Can not find deepspeed. If you are using multi-tile feature, please make sure the deepspeed is correctly installed in your environment")
-                return 
             dist.all_reduce(target, group=self.tp_group)
         return target
 
