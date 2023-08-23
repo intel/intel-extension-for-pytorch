@@ -108,7 +108,8 @@ except BaseException:
         "Please install transformers repo when you want to use fast_bert API."
     )
 
-from .frontend import optimize, optimize_transformers
+from .frontend import optimize
+from .frontend import optimize_transformers
 from .frontend import enable_auto_channels_last, disable_auto_channels_last
 from .frontend import set_fp32_math_mode, get_fp32_math_mode, FP32MathMode
 from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl

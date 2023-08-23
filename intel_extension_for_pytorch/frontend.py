@@ -154,7 +154,6 @@ class _O1:
 
 opt_levels = {"O0": _O0(), "O1": _O1()}
 
-
 def optimize_transformers(model, dtype=None, optimizer=None):
     def model_converter(model, dtype):
         transformer_frontend_replace(model, config=None, dtype=dtype)
@@ -549,8 +548,8 @@ def optimize(
                 opt_properties.split_master_weight_for_bf16,
                 dtype,
                 device_type
-            )
 
+            )
     # Since TorchDynamo cannot handle custom operations yet, for the case of inference graph mode,
     # the weights prepacking here is temporarily cancelled, and it will be completed on the graph.
     if opt_properties.weights_prepack and device_type == "cpu":
