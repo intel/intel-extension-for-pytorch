@@ -489,7 +489,15 @@ class fmha_forward_causal_strided_t {
     // compute Pij
     subgroup::tile_broadcast_op<subgroup::tile_minus, matAccSij_t>(
         matAccSij, m_new);
-    matAccSij.reg = xetla_exp<accum_t>(matAccSij.reg);
+    // matAccSij.reg = xetla_exp<accum_t>(matAccSij.reg);
+
+    matAccSij_t mat_zeros(0);
+    constexpr int elems = matAccSij_t::tile_desc::tile_elems;
+    // xetla_mask<elems> mask = matAccSij->reg < (INFINITY * -1) ||
+    // matAccSij->reg > INFINITY;
+    xetla_mask<elems> mask = matAccSij.reg < -65400.f;
+    (matAccSij.reg)
+        .xetla_merge(mat_zeros.reg, xetla_exp<accum_t>(matAccSij.reg), mask);
 
     if constexpr (wg_size_x > 1)
       ctx.nbarrier.wait();

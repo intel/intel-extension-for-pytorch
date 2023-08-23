@@ -502,7 +502,15 @@ class ifmha_forward_t {
     // correct old l
     ctx.softmax_l *= xetla_exp<accum_t>(ctx.softmax_m - m_new);
     // compute Pij
-    matSij.reg = xetla_exp<accum_t, kSgBc>(matSij.reg - m_new);
+    auto delta = matSij.reg - m_new;
+    // matSij.reg = xetla_exp<accum_t, kSgBc>(matSij.reg - m_new);
+
+    matSij_t mat_zeros(0);
+    constexpr int elems = matSij_t::tile_desc::tile_elems;
+    // xetla_mask<elems> mask = matAccSij->reg < (INFINITY * -1) ||
+    // matAccSij->reg > INFINITY;
+    xetla_mask<elems> mask = delta < -65400.f;
+    (matSij.reg).xetla_merge(mat_zeros.reg, xetla_exp<accum_t>(delta), mask);
 
     // compute new l
     if constexpr (wg_size > 1)
