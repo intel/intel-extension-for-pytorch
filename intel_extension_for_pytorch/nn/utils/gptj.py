@@ -71,25 +71,42 @@ class IPEXGPTJBlock(nn.Module):
         # attention_mask: [bs*beam, head, q_seq, kv_seq]
         bs = IPEXTransformerAtten.batch_size
         dim = hidden_states.dim()
+        #print("----hidden_states1={}".format(hidden_states.shape))
         if dim == 3:
             beam = hidden_states.shape[0] // bs
+            seq = hidden_states.shape[1]
         elif dim == 4:
             beam = hidden_states.shape[1]
+            seq = hidden_states.shape[2]
         else:
             print("Unsupported input shape")
             return
-        seq = hidden_states.shape[-2] 
+        IPEXTransformerAtten.beam_size = beam
+        first_token = True if seq > 1 else False
         hidden_size = hidden_states.shape[-1]
         hidden_shape = [bs, beam, seq, hidden_size]
-        if seq > 1:
-            hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :]        # [bs, seq, hidden_size]
+        #print("-----bs={}".format(bs))
+        #print("-----beam={}".format(beam))
+        #print("-----seq={}".format(seq))
+        #print("-----hidden_size={}".format(hidden_size))
+        if first_token and beam > 1:
+            # for 1st token, keep the original layout
+            # reduce the duplicated info in beam dim
+            # shape -> [bs*beam, seq, hidden_size]
+            # layout -> [bs*beam, seq, hidden_size]
+            hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :].contiguous()
             if position_ids is not None:
                 position_ids = position_ids.view(bs, beam, position_ids.shape[1])[:,0,:].view(bs, position_ids.shape[1])
             if attention_mask is not None:
                 attention_mask = attention_mask.view(bs, beam, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])[:,0,:,:,:].view(bs, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
-        # convert layout form [bs, seq, hidden_size] to [seq, bs, hidden_size]
-        hidden_states = hidden_states.transpose(0, 1).contiguous()
+        else:
+            # for 2nd to last token, we convert the layout
+            # shape -> [bs*beam, seq, hidden_size]
+            # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
+            hidden_states = hidden_states.transpose(0, 1).contiguous()
 
+        #print("----hidden_states2={}".format(hidden_states.shape))
+        #print("----hidden_states2={}".format(hidden_states.stride()))
         residual = hidden_states
         hidden_states = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.ln.normalized_shape, self.ln.weight, self.ln.bias, self.ln.eps)
         attn_outputs = self.attn(
@@ -99,23 +116,28 @@ class IPEXGPTJBlock(nn.Module):
             position_ids=position_ids,
             head_mask=head_mask,
             use_cache=use_cache,
-            output_attentions=output_attentions
+            output_attentions=output_attentions,
+            first_token = first_token
         )
         attn_output = attn_outputs[0]
         outputs = attn_outputs[1: ]
 
         hidden_states = self.mlp(hidden_states, attn_output, residual)
 
-        # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
-        hidden_states = hidden_states.transpose(0, 1)
-        if seq > 1:
-            hidden_states = hidden_states.view(bs, 1, seq, hidden_size).expand([bs, beam, seq, hidden_size])
+        if first_token and beam > 1:
+            # for 1st token, expand the result with beam
+            hidden_states = hidden_states.view(bs, 1, seq, hidden_size)
+            hidden_states = hidden_states.expand([bs, beam, seq, hidden_size])
+        else:
+            # for 2nd to last token, we convert the layout back
+            # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
+            hidden_states = hidden_states.transpose(0, 1)
+
 
         if use_cache:
             outputs = (hidden_states, ) + outputs
         else:
             outputs = (hidden_states, ) + outputs[1:]
-
         return outputs
 
 

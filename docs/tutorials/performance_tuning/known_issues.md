@@ -8,20 +8,14 @@ Known Issues
 - FP64 data type is unsupported on current platform
 
   FP64 is not natively supported by the [Intel® Data Center GPU Flex Series](https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html) platform. If you run any AI workload on that platform and receive this error message, it means a kernel requiring FP64 instructions but not supported and the execution is stopped.
-
-- MaxPool2d operator only supports 4D input for ceil mode
-
-  If 3D input is detected, MaxPool2d will throw unsupported error message and stop execution.
   
 - Runtime error `invalid device pointer` if `import horovod.torch as hvd` before `import intel_extension_for_pytorch`
 
   Intel® Optimization for Horovod\* need use utilities provided by Intel® Extension for PyTorch\*. The improper import order will cause Intel® Extension for PyTorch\* be unloaded before Intel® Optimization for Horovod\* at the end of the execution and trigger this error. The recommended usage is to `import intel_extension_for_pytorch` before `import horovod.torch as hvd`.
 
 - RuntimeError: Number of dpcpp devices should be greater than zero!
-
-  - Scenario 1: Running some AI models (e.g. 3D-Unet inference) on Ubuntu22.04 may trigger this runtime error, as oneAPI Base Toolkit 2023.1 fails to return available GPU device on ubuntu22.04 in such scenario. The workaround solution is to update the model script to make sure `import torch` and `import intel_extension_for_pytorch` happen before importing other libraries.
-
-  - Scenario 2: If you use Intel® Extension for PyTorch\*  in a conda environment, this error might occur. Conda also ships with a libstdc++.so dynamic library file. It may conflict with the one shipped in the OS. Exporting the libstdc++.so file path in OS to an environment variable `LD_PRELOAD` could workaround this issue.
+  
+  If you use Intel® Extension for PyTorch* in a conda environment, you might encounter this error. Conda also ships with a libstdc++.so dynamic library file that may conflict with the one shipped in the OS. Exporting the libstdc++.so file path in the OS to an environment variable `LD_PRELOAD` could work around this issue.
 
 - symbol undefined caused by `_GLIBCXX_USE_CXX11_ABI`
 
@@ -31,6 +25,22 @@ Known Issues
 
   DPC++ does not support `_GLIBCXX_USE_CXX11_ABI=0`, Intel® Extension for PyTorch\* is always compiled with `_GLIBCXX_USE_CXX11_ABI=1`. This symbol undefined issue appears when PyTorch\* is compiled with `_GLIBCXX_USE_CXX11_ABI=0`. Pass `export GLIBCXX_USE_CXX11_ABI=1` and compile PyTorch\* with particular compiler which supports `_GLIBCXX_USE_CXX11_ABI=1`. We recommend using prebuilt wheels in [download server](https://developer.intel.com/ipex-whl-stable-xpu) to avoid this issue.
 
+- Bad termination after AI model execution finishes when using Intel MPI
+
+  This is a random issue when the AI model (e.g. RN50 training) execution finishes in an Intel MPI environment. It is not user-friendly as the model execution ends ungracefully. The workaround solution is to add `dist.destroy_process_group()` during the cleanup stage in the model script, as described in [Getting Started with Distributed Data Parallel](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html).
+
+- `-997 runtime error` when running some AI models on Intel® Arc™ A-Series GPUs
+
+  Some of the `-997 runtime error` are actually out-of-memory errors. As Intel® Arc™ A-Series GPUs have less device memory than Intel® Data Center GPU Flex Series 170 and Intel® Data Center GPU Max Series, running some AI models on them may trigger out-of-memory errors and cause them to report failure such as `-997 runtime error` most likely. This is expected. Memory usage optimization is a work in progress to allow Intel® Arc™ A-Series GPUs to support more AI models.
+
+- Building from source for Intel® Arc™ A-Series GPUs fails on WSL2 without any error thrown
+
+  Your system probably does not have enough RAM, so Linux kernel's Out-of-memory killer was invoked. You can verify this by running `dmesg` on bash (WSL2 terminal). If the OOM killer had indeed killed the build process, then you can try increasing the swap-size of WSL2, and/or decreasing the number of parallel build jobs with the environment variable `MAX_JOBS` (by default, it's equal to the number of logical CPU cores. So, setting `MAX_JOBS` to 1 is a very conservative approach that would slow things down a lot).
+
+- Some workloads terminate with an error `CL_DEVICE_NOT_FOUND` after some time on WSL2
+
+  This issue is due to the [TDR feature](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/tdr-registry-keys#tdrdelay) in Windows. You can try increasing TDRDelay in your Windows Registry to a large value, such as 20 (it is 2 seconds, by default), and reboot.
+  
 ### Dependency Libraries
 
 - Can't find oneMKL library when build Intel® Extension for PyTorch\* without oneMKL
@@ -73,40 +83,32 @@ Known Issues
 
   If you continue seeing similar issues for other shared object files, add the corresponding files under `${MKL_DPCPP_ROOT}/lib/intel64/` by `LD_PRELOAD`. Note that the suffix of the libraries may change (e.g. from .1 to .2), if more than one oneMKL library is installed on the system.
 
-- OpenMP library could not be found
-
-  Build Intel® Extension for PyTorch\* on SLES15 SP3 using default GCC 7.5 and CentOS8 using default GCC 8.5 may trigger this build error.
-
-  ```bash
-  Make Error at third_party/ideep/mkl-dnn/third_party/oneDNN/cmake/OpenMP.cmake:118 (message):
-    OpenMP library could not be found.  Proceeding might lead to highly
-    sub-optimal performance.
-  Call Stack (most recent call first):
-    third_party/ideep/mkl-dnn/third_party/oneDNN/CMakeLists.txt:117 (include)
-  ```
-
-  The root cause is GCC 7.5 or 8.5 does not support `-Wno-error=redundant-move` option. Uplift to GCC version >=9 can solve this issue.
-
-### UnitTest
+### Unit Test
 
 - Unit test failures on Intel® Data Center GPU Flex Series 170
 
-  The following unit tests fail on Intel® Data Center GPU Flex Series 170.
-    - test_linalg.py::TestTorchMethod::test_tensorinv_empty
-    - test_distributions.py::TestDistributions::test_dirichlet_mean_var
-    - test_adaptive_avg_pool2d.py::TestNNMethod::test_adaptive_avg_pool2d
+  The following unit tests fail on Intel® Data Center GPU Flex Series 170 but the same test cases pass on Intel® Data Center GPU Max Series. The root cause of the failures is under investigation.
     - test_multilabel_margin_loss.py::TestNNMethod::test_multiabel_margin_loss
-
-  The same test cases pass on Intel® Data Center GPU Max Series. The root cause of the failures is under investigation.
-
+    - test_weight_norm.py::TestNNMethod::test_weight_norm_differnt_type
+      
 - Unit test failures on Intel® Data Center GPU Max Series
 
-  The following unit tests randomly fail on Intel® Data Center GPU Flex Max Series.
+  The following unit tests randomly fail on Intel® Data Center GPU Max Series if running with other test cases together using `pytest -v`. These cases pass if run individually on the same environment. The root cause of the failures is under investigation.
+  
      - test_nn.py::TestNNDeviceTypeXPU::test_activations_bfloat16_xpu
-     - test_lstm.py::TestNNMethod::test_lstm_rnnt_onednn
      - test_eigh.py::TestTorchMethod::test_linalg_eigh
-     
-  The test cases rarely fail if running with other test cases together using `pytest -v`. These cases pass if run individually on the same environment. The root cause of the failures is under investigation.
+     - test_baddbmm.py::TestTorchMethod::test_baddbmm_scale
+
+  The following unit tests fail on Intel® Data Center GPU Max Series. The root cause of the failures is under investigation with oneDNN as the operators under test use oneDNN primitives.
+  
+     - test_lstm.py::TestNNMethod::test_lstm_rnnt_onednn
+     - test_conv_transposed.py::TestTorchMethod::test_deconv3d_bias
+
+- Unit test failures on CPU (ICX, CPX, SPR).
+
+  The following unit test fails on CPU if using latest transformers versoin (4.31.0). The workaround solution is to use old version transformers by pip `install transformers==4.30.0` instead.
+  
+     - test_tpp_ops.py::TPPOPsTester::test_tpp_bert_embeddings
 
 ## Known Issues Specific to CPU
 

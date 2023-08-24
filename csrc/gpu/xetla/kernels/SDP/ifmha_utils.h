@@ -21,235 +21,238 @@
 
 namespace gpu::xetla::fmha {
 
-// --------------------- // imem_desc_t // ---------------------- //
-
-/// @brief Memory struct for tile load and store
-/// @tparam dtype Is the data type
-/// @tparam lanes Is the number of indexes for one tile
-/// @tparam memory_space Is the data location
-/// @tparam memory_layout Is the memory layout
-template <typename dtype, uint32_t lanes, mem_layout layout, mem_space space>
-struct imem_desc_t {};
-
-template <typename dtype_, uint32_t lanes_>
-struct imem_desc_t<dtype_, lanes_, mem_layout::row_major, mem_space::global> {
+/// @brief Memory struct for indexed tile load
+template <typename dtype_, uint32_t N_, uint32_t Beams_, uint32_t LoadSize_>
+struct imem_desc_t {
   using dtype = dtype_;
-  static constexpr uint32_t lanes = lanes_;
+  static constexpr uint32_t N = N_;
+  static constexpr uint32_t Beams = Beams_;
+  static constexpr uint32_t LoadSize = LoadSize_;
+  static constexpr uint32_t SZ = N * Beams;
+
   static constexpr mem_layout layout = mem_layout::row_major;
   static constexpr mem_space space = mem_space::global;
 
-  using desc_t = mem_desc_t<dtype, layout, space>;
+  dtype* addr_;
+  uint32_t width_;
+  uint32_t pitch_;
 
-  uint64_t addr0;
-  uint64_t addr1;
-  uint32_t width;
-  int32_t offset;
-  // 1919, 128
-  xetla_vector<int32_t, lanes> index0;
-  xetla_vector<int32_t, lanes> index1;
-  uint32_t lanes0;
-  uint32_t lanes1;
+  xetla_vector<int32_t, SZ> index_;
+  uint32_t total_;
+
+  int32_t offset_;
+  uint32_t lane_;
+  uint32_t beam_;
+  int32_t offset_pre_;
+  uint32_t lane_pre_;
+  uint32_t beam_pre_;
 
   inline imem_desc_t() = default;
-
-  inline void init(dtype* address0, dtype* address1, uint32_t surface_width) {
-    addr0 = (uint64_t)address0;
-    addr1 = (uint64_t)address1;
-    width = surface_width;
+  inline imem_desc_t(dtype* address, uint32_t width, uint32_t pitch) {
+    addr_ = address;
+    width_ = width;
+    pitch_ = pitch;
   }
 
-  inline void update_index(
-      xetla_vector<int32_t, lanes> index0_,
-      xetla_vector<int32_t, lanes> index1_,
-      uint32_t lanes0_,
-      uint32_t lanes1_) {
-    index0 = index0_;
-    index1 = index1_;
-    lanes0 = lanes0_;
-    lanes1 = lanes1_;
+  inline void init(dtype* address, uint32_t width, uint32_t pitch) {
+    addr_ = address;
+    width_ = width;
+    pitch_ = pitch;
   }
 
-  inline void set_offset(int32_t offset_) {
-    offset = offset_;
+  inline void init_index(xetla_vector<int32_t, SZ> index, uint32_t total) {
+    index_ = index;
+    total_ = total;
+    offset_ = 0;
+    lane_ = 0;
+    beam_ = 0;
+    offset_pre_ = 0;
+    lane_pre_ = 0;
+    beam_pre_ = 0;
   }
 
-  inline bool init_tdesc(uint32_t lane, desc_t& desc) {
-    if (lane >= lanes0 && (lane - lanes0 >= lanes1))
-      return false;
-
-    uint32_t lane_id = (lane < lanes0) ? lane : lane - lanes0;
-    int32_t idx = (lane < lanes0) ? index0[lane_id] : index1[lane_id];
-    uint32_t height = idx + 1;
-    uint64_t addr = (lane < lanes0) ? addr0 : addr1;
-    desc.init((dtype*)addr, {width, height, width}, {offset, idx});
-    return true;
-
-    // if (lane < lanes0) {
-    //   int32_t idx = index0[lane];
-    //   uint32_t height = idx + 1;
-    //   desc.init(addr0, {width, height, width}, {offset, idx});
-    // } else {
-    //   lane -= lanes0;
-    //   if (lane < lanes1) {
-    //     int32_t idx = index1[lane];
-    //     uint32_t height = idx + 1;
-    //     desc.init(addr1, {width, height, width}, {offset, idx});
-    //   } else {
-    //     return false;
-    //   }
-    // }
-    // return true;
+  inline void update_tdesc() {
+    if (++lane_ >= N_) {
+      lane_ = 0;
+      if (++beam_ >= Beams) {
+        beam_ = 0;
+        offset_ += LoadSize;
+      }
+    }
   }
-};
 
-// --------------------- // iload_tile // ---------------------- //
+  inline void update_prefetch_tdesc() {
+    if (++lane_pre_ >= N_) {
+      lane_pre_ = 0;
+      if (++beam_pre_ >= Beams) {
+        beam_pre_ = 0;
+        offset_pre_ += LoadSize;
+      }
+    }
+  }
 
-template <typename imem_desc_t>
-struct load_type {
-  static constexpr bool is_global_row =
-      ((imem_desc_t::space == mem_space::global) &&
-       (imem_desc_t::layout == mem_layout::row_major));
-};
+  template <typename tile_t>
+  inline void iload_tile(tile_t& tile) {
+    using dtype_acc = typename tile_t::dtype;
+    using tile_desc = typename tile_t::tile_desc;
+    static_assert(
+        tile_desc::tile_size_x == LoadSize,
+        "tile_size_x should equal LoadSize");
+    static_assert(tile_desc::tile_size_y == 1, "the tile should be 1d");
 
-template <typename tile_t, typename imem_desc_t>
-inline typename std::enable_if_t<load_type<imem_desc_t>::is_global_row>
-iload_tile(tile_t& tile, imem_desc_t& imem_desc) {
-  using dtype = typename imem_desc_t::dtype;
-  static constexpr uint32_t lanes = imem_desc_t::lanes;
-  static constexpr mem_layout layout = imem_desc_t::layout;
-  static constexpr mem_space space = imem_desc_t::space;
+    using lane_tile_desc_t = subgroup::tile_desc_t<LoadSize, 1, 16, 1>;
+    using lane_tile_t = subgroup::tile_t<dtype, lane_tile_desc_t>;
+    using lane_payload_t = subgroup::mem_payload_t<
+        dtype,
+        lane_tile_desc_t,
+        msg_type::block_1d,
+        layout,
+        space>;
 
-  using dtype_acc = typename tile_t::dtype;
-  using tile_desc = typename tile_t::tile_desc;
-  static constexpr uint32_t width = tile_desc::tile_size_x;
-  static constexpr uint32_t height = tile_desc::tile_size_y;
+    lane_tile_t lane_tile;
 
-  static_assert(lanes == height, "the tile height and lanes don't match");
-  static_assert(width >= 16, "width is expected to be larger than 16");
-  using lane_tile_desc_t = subgroup::tile_desc_t<width, 1, 16, 1>;
-  using lane_tile_t = subgroup::tile_t<dtype, lane_tile_desc_t>;
-  using lane_payload_t = subgroup::
-      mem_payload_t<dtype, lane_tile_desc_t, msg_type::block_1d, layout, space>;
-  using lane_mem_desc_t = mem_desc_t<dtype, layout, space>;
-
-  lane_tile_t lane_tile;
-  lane_mem_desc_t lane_mem_desc;
-  lane_payload_t lane_payload;
-
-#pragma unroll
-  for (int i = 0; i < lanes; i++) {
-    if (imem_desc.init_tdesc(i, lane_mem_desc)) {
-      lane_payload.init(lane_mem_desc);
+    if (offset_ < width_ && lane_ < total_) {
+      int32_t idx = index_[lane_ * Beams + beam_];
+      lane_payload_t lane_payload(addr_, width_, idx + 1, pitch_, offset_, idx);
       subgroup::tile_load(lane_tile, lane_payload);
     } else {
       lane_tile.init(0);
     }
 
-    tile.reg.xetla_select<width, 1>(i * width) =
-        xetla_cvt<dtype_acc, dtype, width>(lane_tile.reg);
-  }
-}
-
-template <typename tile_t, typename imem_desc_t>
-inline typename std::enable_if_t<load_type<imem_desc_t>::is_global_row>
-iload_tile(tile_t& tile, imem_desc_t& imem_desc, int lane_idx) {
-  using dtype = typename imem_desc_t::dtype;
-  static constexpr uint32_t lanes = imem_desc_t::lanes;
-  static constexpr mem_layout layout = imem_desc_t::layout;
-  static constexpr mem_space space = imem_desc_t::space;
-
-  using dtype_acc = typename tile_t::dtype;
-  using tile_desc = typename tile_t::tile_desc;
-  static constexpr uint32_t width = tile_desc::tile_size_x;
-
-  static_assert(width >= 16, "width is expected to be larger than 16");
-  using lane_tile_desc_t = subgroup::tile_desc_t<width, 1, 16, 1>;
-  using lane_tile_t = subgroup::tile_t<dtype, lane_tile_desc_t>;
-  using lane_payload_t = subgroup::
-      mem_payload_t<dtype, lane_tile_desc_t, msg_type::block_1d, layout, space>;
-  using lane_mem_desc_t = mem_desc_t<dtype, layout, space>;
-
-  lane_tile_t lane_tile;
-  lane_mem_desc_t lane_mem_desc;
-  lane_payload_t lane_payload;
-
-  if (imem_desc.init_tdesc(lane_idx, lane_mem_desc)) {
-    lane_payload.init(lane_mem_desc);
-    subgroup::tile_load(lane_tile, lane_payload);
-  } else {
-    lane_tile.init(0);
+    tile.reg = xetla_cvt<dtype_acc, dtype, LoadSize>(lane_tile.reg);
   }
 
-  tile.reg = xetla_cvt<dtype_acc, dtype, width>(lane_tile.reg);
-}
+  inline void iprefetch_tile() {
+    using lane_tile_desc_t = subgroup::tile_desc_t<LoadSize, 1, 16, 1>;
+    using lane_payload_t = subgroup::ext::
+        prefetch_payload_t<dtype, lane_tile_desc_t, layout, space, 1>;
 
-template <typename tile_t, typename imem_desc_t>
-inline typename std::enable_if_t<load_type<imem_desc_t>::is_global_row>
-iprefetch_tile(imem_desc_t& imem_desc, int lane_idx) {
-  using dtype = typename imem_desc_t::dtype;
-  static constexpr uint32_t lanes = imem_desc_t::lanes;
-  static constexpr mem_layout layout = imem_desc_t::layout;
-  static constexpr mem_space space = imem_desc_t::space;
-
-  using dtype_acc = typename tile_t::dtype;
-  using tile_desc = typename tile_t::tile_desc;
-  static constexpr uint32_t width = tile_desc::tile_size_x;
-
-  static_assert(width >= 16, "width is expected to be larger than 16");
-  using lane_tile_desc_t = subgroup::tile_desc_t<width, 1, 16, 1>;
-  using lane_tile_t = subgroup::tile_t<dtype, lane_tile_desc_t>;
-  using prefetch_payload_t = subgroup::ext::prefetch_payload_t<
-      dtype,
-      lane_tile_desc_t,
-      layout,
-      space,
-      1,
-      gpu_arch::Xe>;
-  using lane_mem_desc_t = mem_desc_t<dtype, layout, space>;
-
-  lane_mem_desc_t lane_mem_desc;
-
-  if (imem_desc.init_tdesc(lane_idx, lane_mem_desc)) {
-    prefetch_payload_t prefetch_payload(lane_mem_desc);
-    subgroup::ext::tile_prefetch<cache_hint::cached, cache_hint::cached>(
-        prefetch_payload);
+    if (offset_pre_ < width_ && lane_pre_ < total_) {
+      int32_t idx = index_[lane_pre_ * Beams + beam_pre_];
+      lane_payload_t lane_payload(
+          addr_, width_, idx + 1, pitch_, offset_pre_, idx);
+      subgroup::ext::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+          lane_payload);
+    }
   }
+};
+
+template <typename T, uint32_t size, uint32_t reduce_size>
+inline xetla_vector<T, reduce_size> partial_reduce(xetla_vector<T, size> src) {
+  static_assert(
+      size % reduce_size == 0, "size should be a multiple of reduce_size");
+  xetla_vector<T, reduce_size> ret(0);
+
+#pragma unroll
+  for (int i = 0; i < size / reduce_size; i++) {
+    auto src_sub = src.xetla_select<reduce_size, 1>(i * reduce_size);
+    ret += src_sub;
+  }
+
+  return ret;
 }
 
-// --------------------- // group_1d_reduce_t // ---------------------- //
+// ==================== // tile_mask_t // ================== //
+
+template <typename mat_t>
+struct tile_mask_t {
+  using accum_t = typename mat_t::dtype;
+  static constexpr accum_t kNegInfinity = INFINITY * -1;
+  static constexpr uint32_t tile_size_x = mat_t::tile_size_x;
+  static constexpr uint32_t tile_size_y = mat_t::tile_size_y;
+  static constexpr uint32_t block_size_x = mat_t::block_size_x;
+  static constexpr uint32_t block_size_y = mat_t::block_size_y;
+  static constexpr int32_t num_block_x = mat_t::num_block_x;
+  static constexpr uint32_t block_elems = mat_t::block_elems;
+
+  inline static void padding_mask(mat_t& src, uint32_t num_keep) {
+#pragma unroll
+    for (int i = 0; i < tile_size_y / block_size_y; i++) {
+#pragma unroll
+      for (int j = 0; j < num_block_x; j++) {
+        uint32_t start_x = j * block_size_x;
+        uint32_t num_keep_blk = (start_x > num_keep) ? 0 : (num_keep - start_x);
+
+        if (num_keep_blk < block_size_x) {
+          xetla_mask<block_size_x> mask =
+              xetla_vector_gen<uint32_t, block_size_x>(1, 1) > num_keep_blk;
+          auto src_sub =
+              src.reg
+                  .xetla_select<block_elems, 1>(
+                      (i * num_block_x + j) * block_elems)
+                  .xetla_format<accum_t, block_size_y, block_size_x>();
+#pragma unroll
+          for (int k = 0; k < block_size_y; k++) {
+            src_sub.row(k).xetla_merge(kNegInfinity, mask);
+          }
+        }
+      }
+    }
+
+    if constexpr ((tile_size_y % block_size_y) != 0) {
+      constexpr uint32_t tail_start_y =
+          tile_size_y / block_size_y * block_size_y;
+      constexpr uint32_t tail_size_y = tile_size_y % block_size_y;
+      constexpr uint32_t tail_block_elems = tail_size_y * block_size_x;
+#pragma unroll
+      for (int j = 0; j < num_block_x; j++) {
+        uint32_t start_x = j * block_size_x;
+        uint32_t num_keep_blk = (start_x > num_keep) ? 0 : (num_keep - start_x);
+
+        if (num_keep_blk < block_size_x) {
+          xetla_mask<block_size_x> mask =
+              xetla_vector_gen<uint32_t, block_size_x>(1, 1) > num_keep_blk;
+          auto src_sub =
+              src.reg
+                  .xetla_select<tail_block_elems, 1>(
+                      tail_start_y * tile_size_x + j * tail_block_elems)
+                  .xetla_format<accum_t, tail_size_y, block_size_x>();
+#pragma unroll
+          for (int k = 0; k < tail_size_y; k++) {
+            src_sub.row(k).xetla_merge(kNegInfinity, mask);
+          }
+        }
+      }
+    }
+  }
+};
+
+// ==================== // group_row_reduce_t // ================== //
 
 template <typename mat_t, uint32_t kNumSg, reduce_op reduce_kind>
-struct group_1d_reduce_t {
+struct group_row_reduce_t {
   using T = typename mat_t::dtype;
-  static constexpr uint32_t tile_size_x = mat_t::tile_desc::tile_size_x;
-  static_assert(
-      mat_t::tile_desc::tile_size_y == 1,
-      "the tile_size_y should be 1d");
+  static constexpr uint32_t kNum = mat_t::tile_desc::tile_size_y;
+  static constexpr uint32_t kTotal = kNum * kNumSg;
 
   // store results of subgroup to slm
-  using store_tile_desc = subgroup::tile_desc_t<1, 1, 1, 1>;
+  using store_tile_desc =
+      subgroup::tile_desc_t<kNum, 1, kNum, 1, reg_layout::tiled>;
   using store_tile_t = subgroup::tile_t<T, store_tile_desc>;
   using store_payload_t = subgroup::mem_payload_t<
       T,
       store_tile_desc,
       msg_type::block_1d,
       mem_layout::row_major,
-      mem_space::local>;
+      mem_space::local,
+      gpu_arch::Xe>;
   // load all subgroup results together
-  using load_tile_desc = subgroup::tile_desc_t<kNumSg, 1, kNumSg, 1>;
+  using load_tile_desc =
+      subgroup::tile_desc_t<kTotal, 1, kTotal, 1, reg_layout::tiled>;
   using load_tile_t = subgroup::tile_t<T, load_tile_desc>;
   using load_payload_t = subgroup::mem_payload_t<
       T,
       load_tile_desc,
-      msg_type::block_1d,
+      subgroup::msg_type_v<load_tile_desc, mem_space::local>,
       mem_layout::row_major,
-      mem_space::local>;
+      mem_space::local,
+      gpu_arch::Xe>;
 
   xetla_nbarrier_t<kNumSg, kNumSg> nbarrier;
   uint32_t slm_base;
   uint32_t sg_id;
-  inline group_1d_reduce_t() = default;
-  inline group_1d_reduce_t(
+  inline group_row_reduce_t() = default;
+  inline group_row_reduce_t(
       uint32_t sg_id_,
       uint32_t nbarrier_id,
       uint32_t slm_base_) {
@@ -258,13 +261,15 @@ struct group_1d_reduce_t {
     slm_base = slm_base_;
   }
 
-  inline KERNEL_FUNC T operator()(mat_t& src) {
-    T ret = xetla_reduce<T, T, tile_size_x, reduce_kind>(src.reg);
+  inline KERNEL_FUNC xetla_vector<T, kNum> operator()(mat_t& src) {
+    xetla_vector<T, kNum> ret =
+        subgroup::tile_reduce<reduce_kind, mat_t, T, 1>(src);
     if constexpr (kNumSg == 1)
       return ret;
 
     store_tile_t sg_store;
-    store_payload_t sg_store_payload(slm_base, kNumSg, 1, kNumSg, sg_id, 0);
+    store_payload_t sg_store_payload(
+        slm_base, kTotal, 1, kTotal, sg_id * kNum, 0);
     sg_store.reg = ret;
     subgroup::tile_store(sg_store, sg_store_payload);
 
@@ -272,10 +277,16 @@ struct group_1d_reduce_t {
     nbarrier.arrive_wait();
 
     load_tile_t sg_load;
-    load_payload_t sg_load_payload(slm_base, kNumSg, 1, kNumSg, 0, 0);
+    load_payload_t sg_load_payload(slm_base, kTotal, 1, kTotal, 0, 0);
     subgroup::tile_load(sg_load, sg_load_payload);
 
-    ret = xetla_reduce<T, T, kNumSg, reduce_kind>(sg_load.reg);
+    ret = recur_row_reduce<reduce_kind, T, kNum, kNumSg>(sg_load.reg);
+    // auto data_2d = sg_load.reg.xetla_format<T, kNumSg, kNum>();
+    //     ret = data_2d.row(0);
+    // #pragma unroll
+    //     for (int i = 1; i < kNumSg; i++) {
+    //       ret = reduce_helper<reduce_kind, T, kNum>(data_2d.row(i), ret);
+    //     }
     return ret;
   }
 };

@@ -54,3 +54,5 @@ torch.save(
     },
     "checkpoint.pth",
 )
+
+print("Execution finished")

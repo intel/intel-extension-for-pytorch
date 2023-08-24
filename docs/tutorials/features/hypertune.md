@@ -1,7 +1,7 @@
 HyperTune (Experimental)
 ========================
 
-![HyperTune](../../../images/hypertune/hypertune.png)
+![HyperTune](../../images/hypertune/hypertune.png)
 
 HyperTune is an experimental feature to perform hyperparameter/execution configuration searching. The searching is used in various areas such as optimization of hyperparameters of deep learning models. The searching is extremely useful in real situations when the number of hyperparameters, including configuration of script execution, and their search spaces are huge that manually tuning these hyperparameters/configuration is impractical and time consuming. Hypertune automates this process of execution configuration searching for the [launcher](../performance_tuning/launch_script.md) and Intel® Extension for PyTorch\*.
 

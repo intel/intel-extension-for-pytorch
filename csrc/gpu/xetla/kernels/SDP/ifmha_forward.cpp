@@ -3,11 +3,21 @@
 namespace gpu::xetla {
 namespace fmha {
 
-template <typename ifmha_policy, typename T, bool kUseBias, bool kIsTraining>
+template <
+    typename ifmha_policy,
+    typename T,
+    bool kUseAlibi,
+    bool kUseBias,
+    bool kIsTraining>
 class IfmhaForwardKernel;
 
 // The launcher of indexed flash mha forward kernel
-template <typename ifmha_policy, typename T, bool kUseBias, bool kIsTraining>
+template <
+    typename ifmha_policy,
+    typename T,
+    bool kUseAlibi,
+    bool kUseBias,
+    bool kIsTraining>
 void ifmha_forward_impl(
     sycl::queue& q,
     T* query,
@@ -16,6 +26,7 @@ void ifmha_forward_impl(
     T* value0,
     T* value1,
     int32_t* index,
+    T* alibi,
     T* bias,
     uint8_t* dropout,
     float dropout_prob,
@@ -27,10 +38,11 @@ void ifmha_forward_impl(
     uint32_t head_size,
     uint32_t kv_len0,
     uint32_t kv_len1,
+    uint32_t alibi_padding,
     uint32_t attn_mask_padding) {
 #ifdef SDP_DBG
   printf(
-      "B, Bm, N, F, T0, T1, H: %d, %d, %d, %d, %d, %d, %d, UseBias: %d, IsTraining: %d, uPT %d, scale %f\n",
+      "B, Bm, N, F, T0, T1, H: %d, %d, %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d, IsTraining: %d, uAT %d, uPT %d, scale %f alibi @ 0x%llx\n",
       num_batches,
       beam,
       num_heads,
@@ -38,21 +50,24 @@ void ifmha_forward_impl(
       kv_len0,
       kv_len1,
       head_size,
+      kUseAlibi,
       kUseBias,
       kIsTraining,
+      alibi_padding,
       attn_mask_padding,
-      sm_scale);
+      sm_scale,
+      (unsigned long long)alibi);
 #endif
   // ifmha forward kernel
   using ifmha_forward_op_t =
-      ifmha_forward_t<ifmha_policy, T, kUseBias, kIsTraining>;
+      ifmha_forward_t<ifmha_policy, T, kUseAlibi, kUseBias, kIsTraining>;
 
   sycl::nd_range<2> NdRange =
       ifmha_forward_op_t::get_nd_range(num_batches, beam, num_heads);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for<
-        class IfmhaForwardKernel<ifmha_policy, T, kUseBias, kIsTraining>>(
+        class IfmhaForwardKernel<ifmha_policy, T, kUseAlibi, kUseBias, kIsTraining>>(
         NdRange, [=](sycl::nd_item<2> item) SYCL_ESIMD_KERNEL {
       // exec item
       xetla_exec_item<2> ei(item);
@@ -66,6 +81,7 @@ void ifmha_forward_impl(
           value0,
           value1,
           index,
+          alibi,
           bias,
           dropout,
           dropout_prob,
@@ -77,6 +93,7 @@ void ifmha_forward_impl(
           head_size,
           kv_len0,
           kv_len1,
+          alibi_padding,
           attn_mask_padding);
 
       // call the functor
@@ -88,30 +105,32 @@ void ifmha_forward_impl(
 
 } // namespace fmha
 
-#define CALL_IMPL_FUNC(P)                                \
-  fmha::ifmha_forward_impl<P, T, kUseBias, kIsTraining>( \
-      q,                                                 \
-      query,                                             \
-      key0,                                              \
-      key1,                                              \
-      value0,                                            \
-      value1,                                            \
-      index,                                             \
-      bias,                                              \
-      dropout,                                           \
-      dropout_prob,                                      \
-      sm_scale,                                          \
-      out,                                               \
-      num_batches,                                       \
-      beam,                                              \
-      num_heads,                                         \
-      head_size,                                         \
-      kv_len0,                                           \
-      kv_len1,                                           \
+#define CALL_IMPL_FUNC(P)                                           \
+  fmha::ifmha_forward_impl<P, T, kUseAlibi, kUseBias, kIsTraining>( \
+      q,                                                            \
+      query,                                                        \
+      key0,                                                         \
+      key1,                                                         \
+      value0,                                                       \
+      value1,                                                       \
+      index,                                                        \
+      alibi,                                                        \
+      bias,                                                         \
+      dropout,                                                      \
+      dropout_prob,                                                 \
+      sm_scale,                                                     \
+      out,                                                          \
+      num_batches,                                                  \
+      beam,                                                         \
+      num_heads,                                                    \
+      head_size,                                                    \
+      kv_len0,                                                      \
+      kv_len1,                                                      \
+      alibi_padding,                                                \
       attn_mask_padding)
 
 /// @brief Main execution function for indexed flash mha forward.
-template <typename T, bool kUseBias = false, bool kIsTraining = false>
+template <typename T, bool kUseAlibi, bool kUseBias, bool kIsTraining>
 void ifmha_forward(
     sycl::queue& q,
     T* query,
@@ -120,6 +139,7 @@ void ifmha_forward(
     T* value0,
     T* value1,
     int32_t* index,
+    T* alibi,
     T* bias,
     uint8_t* dropout,
     float dropout_prob,
@@ -131,6 +151,7 @@ void ifmha_forward(
     uint32_t head_size,
     uint32_t kv_len0,
     uint32_t kv_len1,
+    uint32_t alibi_padding,
     uint32_t attn_mask_padding) {
   // occupancy first
   constexpr int hardware_concurrent_wg = 64;
@@ -171,6 +192,7 @@ void fmha_forward_index_kernel(
     uint32_t num_queries,
     uint32_t num_keys_in,
     uint32_t num_keys_out,
+    uint32_t alibi_padding,
     uint32_t attn_mask_padding,
     bool is_causal) {
   using T = sycl::half;
@@ -180,52 +202,43 @@ void fmha_forward_index_kernel(
   TORCH_CHECK(
       is_causal == false,
       "SDP Index fusion kernel doesn't support causal so far ...");
-  TORCH_CHECK(
-      alibi == nullptr,
-      "SDP Index fusion kernel doesn't support alibi so far ...");
 
-  if (attn_mask) {
-    ifmha_forward<T, true, false>(
-        q,
-        (T*)query,
-        (T*)key,
-        (T*)key_cache,
-        (T*)value,
-        (T*)value_cache,
-        index,
-        (T*)attn_mask,
-        dropout,
-        dropout_p,
-        alpha,
-        (T*)out,
-        num_batches,
-        beam_width,
-        num_heads,
-        head_dim,
-        num_keys_in,
-        num_keys_out,
-        attn_mask_padding);
+#define DISPATCH_TEMPLATE(T, USE_ALIBI, USE_BIAS, IS_TRAINING) \
+  ifmha_forward<T, USE_ALIBI, USE_BIAS, IS_TRAINING>(          \
+      q,                                                       \
+      (T*)query,                                               \
+      (T*)key,                                                 \
+      (T*)key_cache,                                           \
+      (T*)value,                                               \
+      (T*)value_cache,                                         \
+      index,                                                   \
+      (T*)alibi,                                               \
+      (T*)attn_mask,                                           \
+      dropout,                                                 \
+      dropout_p,                                               \
+      alpha,                                                   \
+      (T*)out,                                                 \
+      num_batches,                                             \
+      beam_width,                                              \
+      num_heads,                                               \
+      head_dim,                                                \
+      num_keys_in,                                             \
+      num_keys_out,                                            \
+      alibi_padding,                                           \
+      attn_mask_padding);
+
+  if (alibi) {
+    if (attn_mask) {
+      DISPATCH_TEMPLATE(T, true, true, false)
+    } else {
+      DISPATCH_TEMPLATE(T, true, false, false)
+    }
   } else {
-    ifmha_forward<T, false, false>(
-        q,
-        (T*)query,
-        (T*)key,
-        (T*)key_cache,
-        (T*)value,
-        (T*)value_cache,
-        index,
-        (T*)attn_mask,
-        dropout,
-        dropout_p,
-        alpha,
-        (T*)out,
-        num_batches,
-        beam_width,
-        num_heads,
-        head_dim,
-        num_keys_in,
-        num_keys_out,
-        attn_mask_padding);
+    if (attn_mask) {
+      DISPATCH_TEMPLATE(T, false, true, false)
+    } else {
+      DISPATCH_TEMPLATE(T, false, false, false)
+    }
   }
 }
 } // namespace gpu::xetla

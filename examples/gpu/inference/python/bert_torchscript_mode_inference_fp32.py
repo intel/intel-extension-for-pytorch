@@ -29,3 +29,5 @@ with torch.no_grad():
     model = torch.jit.freeze(model)
 
     model(data)
+
+print("Execution finished")

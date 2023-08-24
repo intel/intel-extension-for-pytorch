@@ -8,7 +8,7 @@ class PositionalEmbedding(nn.Module):
         super().__init__()
         self.config = config
 
-    def forward(self, query, key, position_ids, layer_ids):
+    def forward(self, query, key, position_ids, layer_id, beam_size):
         return query, key
 
 class GPTJRotaryEmbeddingRef(PositionalEmbedding):
@@ -74,8 +74,6 @@ class GPTJRotaryEmbeddingRef(PositionalEmbedding):
 
 
 class GPTJRotaryEmbedding(PositionalEmbedding):
-    sin = None
-    cos = None
     position_ids = None
 
     def __init__(self,
@@ -108,16 +106,28 @@ class GPTJRotaryEmbedding(PositionalEmbedding):
     def apply_rotary_pos_emb(self, query, key, sin, cos) -> torch.Tensor:
         torch.ops.torch_ipex.apply_rotary_embedding_two(query, key, sin, cos, query, key)
 
-    def get_sin_cos(self, position_ids, layer_id):
-        if GPTJRotaryEmbedding.position_ids is None or layer_id == 0:
-            position_ids = position_ids.transpose(0, 1)
-            GPTJRotaryEmbedding.sin = self.sin_cached[position_ids].unsqueeze(2)
-            GPTJRotaryEmbedding.cos = self.cos_cached[position_ids].unsqueeze(2)
-            GPTJRotaryEmbedding.position_ids = position_ids
+    def get_sin_cos(self, position_ids, layer_id, beam_size):
+        # position_ids [bs*beam, seq_len]
+        first_token = position_ids.shape[-1] > 1
+        if layer_id == 0:
+            GPTJRotaryEmbedding.position_ids = position_ids.transpose(0, 1).contiguous()
+        GPTJRotaryEmbedding.sin = self.sin_cached[GPTJRotaryEmbedding.position_ids].unsqueeze(2)
+        GPTJRotaryEmbedding.cos = self.cos_cached[GPTJRotaryEmbedding.position_ids].unsqueeze(2)
+        if first_token and beam_size > 1:
+            # 1st token
+            # convert sin/cos from shape [seq, bs*beam, num_head, head_dim]
+            # to shape [bs*beam, seq, num_head, head_dim]
+            GPTJRotaryEmbedding.sin = GPTJRotaryEmbedding.sin.transpose(0, 1)
+            GPTJRotaryEmbedding.cos = GPTJRotaryEmbedding.cos.transpose(0, 1)
+
+        # 1st token
+        # GPTJRotaryEmbedding.sin is in shape of [bs*beam, seq, num_head, head_dim]
+        # 2nd to last token or greedy
+        # GPTJRotaryEmbedding.sin is in shape of [seq, bs*beam, num_head, head_dim]
         return GPTJRotaryEmbedding.sin, GPTJRotaryEmbedding.cos
 
-    def forward(self, query, key, position_ids, layer_id):
-        sin, cos = self.get_sin_cos(position_ids, layer_id)
+    def forward(self, query, key, position_ids, layer_id, beam_size):
+        sin, cos = self.get_sin_cos(position_ids, layer_id, beam_size)
         if self.rotary_dim is not None:
             self.apply_rotary_pos_emb(query[:, :, :, : self.rotary_dim], key[:, :, :, : self.rotary_dim], sin, cos)
         else:
@@ -125,8 +135,6 @@ class GPTJRotaryEmbedding(PositionalEmbedding):
         return query, key
 
 class LlamaRotaryEmbedding(torch.nn.Module):
-    sin = None
-    cos = None
     position_ids = None
     def __init__(self,
                  config: IPEXTransformerConfig):
@@ -149,15 +157,26 @@ class LlamaRotaryEmbedding(torch.nn.Module):
     def apply_rotary_pos_emb(self, query: torch.Tensor, key: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor):
         torch.ops.torch_ipex.apply_rotary_embedding_half(query, key, sin, cos, query, key)
 
-    def get_sin_cos(self, position_ids, layer_id):
-        if LlamaRotaryEmbedding.position_ids is None or layer_id == 0:
-            position_ids = position_ids.transpose(0, 1)
-            LlamaRotaryEmbedding.sin = self.sin_cached[position_ids].unsqueeze(2)
-            LlamaRotaryEmbedding.cos = self.cos_cached[position_ids].unsqueeze(2)
-            LlamaRotaryEmbedding.position_ids = position_ids
+    def get_sin_cos(self, position_ids, layer_id, beam_size):
+        # position_ids [bs*beam, seq_len]
+        first_token = position_ids.shape[-1] > 1
+        if layer_id == 0:
+            LlamaRotaryEmbedding.position_ids = position_ids.transpose(0, 1).contiguous()
+        LlamaRotaryEmbedding.sin = self.sin_cached[LlamaRotaryEmbedding.position_ids].unsqueeze(2)
+        LlamaRotaryEmbedding.cos = self.cos_cached[LlamaRotaryEmbedding.position_ids].unsqueeze(2)
+        if first_token and beam_size > 1:
+            # 1st token
+            # convert sin/cos from shape [seq, bs*beam, num_head, head_dim]
+            # to shape [bs*beam, seq, num_head, head_dim]
+            LlamaRotaryEmbedding.sin = LlamaRotaryEmbedding.sin.transpose(0, 1)
+            LlamaRotaryEmbedding.cos = LlamaRotaryEmbedding.cos.transpose(0, 1)
+        # 1st token
+        # LlamaRotaryEmbedding.sin is in shape of [bs*beam, seq, num_head, head_dim]
+        # 2nd to last token or greedy
+        # GPTJRotaryEmbedding.sin is in shape of [seq, bs*beam, num_head, head_dim]
         return LlamaRotaryEmbedding.sin, LlamaRotaryEmbedding.cos
 
-    def forward(self, query, key, position_ids, layer_id):
-        sin, cos = self.get_sin_cos(position_ids, layer_id)
+    def forward(self, query, key, position_ids, layer_id, beam_size):
+        sin, cos = self.get_sin_cos(position_ids, layer_id, beam_size)
         self.apply_rotary_pos_emb(query, key, sin, cos)
         return query, key

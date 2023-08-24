@@ -14,7 +14,7 @@ To use PyTorch DDP on GPU, install Intel® oneCCL Bindings for Pytorch\* as desc
 ### Install PyTorch and Intel® Extension for PyTorch\*
 
 Make sure you have installed PyTorch and Intel® Extension for PyTorch\* successfully.
-For more detailed information, check [installation guide](../installation.md).  
+For more detailed information, check [installation guide](../../../../index.html#installation).
 
 ### Install Intel® oneCCL Bindings for Pytorch\*
 

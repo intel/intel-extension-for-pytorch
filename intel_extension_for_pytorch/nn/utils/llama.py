@@ -70,22 +70,32 @@ class IPEXLlamaBlock(nn.Module):
         dim = hidden_states.dim()
         if dim == 3:
             beam = hidden_states.shape[0] // bs
+            seq = hidden_states.shape[1]
         elif dim == 4:
             beam = hidden_states.shape[1]
+            seq = hidden_states.shape[2]
         else:
             print("Unsupported input shape")
             return
-        seq = hidden_states.shape[-2]
+        IPEXTransformerAtten.beam_size = beam
+        first_token = True if seq > 1 else False
         hidden_size = hidden_states.shape[-1]
         hidden_shape = [bs, beam, seq, hidden_size]
-        if seq > 1:
-            hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :]        # [bs, seq, hidden_size]
+        if first_token and beam > 1:
+            # for 1st token, keep the original layout
+            # reduce the duplicated info in beam dim
+            # shape -> [bs*beam, seq, hidden_size]
+            # layout -> [bs*beam, seq, hidden_size]
+            hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :].contiguous()
             if position_ids is not None:
                 position_ids = position_ids.view(bs, beam, position_ids.shape[1])[:,0,:].view(bs, position_ids.shape[1])
             if attention_mask is not None:
                 attention_mask = attention_mask.view(bs, beam, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])[:,0,:,:,:].view(bs, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
-        # convert layout form [bs, seq, hidden_size] to [seq, bs, hidden_size]
-        hidden_states = hidden_states.transpose(0, 1).contiguous()
+        else:
+            # for 2nd to last token, we convert the layout
+            # shape -> [bs*beam, seq, hidden_size]
+            # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
+            hidden_states = hidden_states.transpose(0, 1).contiguous()
 
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
@@ -97,17 +107,21 @@ class IPEXLlamaBlock(nn.Module):
             layer_past=past_key_value,
             output_attentions=output_attentions,
             use_cache=use_cache,
-            residual=residual
+            residual=residual,
+            first_token = first_token
         )
 
         residual = hidden_states
         hidden_states = self.post_attn_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states, residual)
 
-        # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
-        hidden_states = hidden_states.transpose(0, 1)
-        if seq > 1:
+        if first_token and beam > 1:
+            # for 1st token, expand the result with beam
             hidden_states = hidden_states.view(bs, 1, seq, hidden_size).expand([bs, beam, seq, hidden_size])
+        else:
+            # for 2nd to last token, we convert the layout back
+            # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
+            hidden_states = hidden_states.transpose(0, 1)
 
         outputs = (hidden_states, )
         if output_attentions:

@@ -25,3 +25,5 @@ with torch.no_grad():
         model = torch.jit.trace(model, d)
         model = torch.jit.freeze(model)
         model(data)
+
+print("Execution finished")

@@ -124,7 +124,7 @@ ipexrun --log-dir ./logs resnet50.py
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched physical core number of threads on all physical cores.
 
-![Single instance all physical cores](../../../images/launch_script/1ins_phy.gif)
+![Single instance all physical cores](../../images/launch_script/1ins_phy.gif)
 
 If you check your log directory, you will find directory structure as below.
 
@@ -158,7 +158,7 @@ ipexrun --use-logical-core --log-dir ./logs resnet50.py
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on all cores, including logical cores.
 
-![Single instance logical cores](../../../images/launch_script/1ins_log.gif)
+![Single instance logical cores](../../images/launch_script/1ins_log.gif)
 
 If you check your log directory, you will find directory structure as below.
 
@@ -192,7 +192,7 @@ ipexrun --nodes-list 1 --log-dir ./logs resnet50.py
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on all other cores on the same numa node.
 
-![Single instance all physical cores](../../../images/launch_script/1ins_soc.gif)
+![Single instance all physical cores](../../images/launch_script/1ins_soc.gif)
 
 If you check your log directory, you will find directory structure as below.
 
@@ -226,7 +226,7 @@ ipexrun --ninstances 1 --ncores-per-instance 10 --log-dir ./logs resnet50.py
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on other 9 physical cores.
 
-![Single instance designated number of cores](../../../images/launch_script/1ins_cus.gif)
+![Single instance designated number of cores](../../images/launch_script/1ins_cus.gif)
 
 If you check your log directory, you will find directory structure as below.
 
@@ -291,7 +291,7 @@ ipexrun --throughput-mode --log-dir ./logs resnet50.py
 
 CPU usage is shown as below. 2 main worker threads were launched on 2 numa nodes respectively, then they launched threads on other physical cores.
 
-![Multiple instance throughput mode](../../../images/launch_script/nins_thr.gif)
+![Multiple instance throughput mode](../../images/launch_script/nins_thr.gif)
 
 If you check your log directory, you will find directory structure as below.
 
@@ -326,7 +326,7 @@ ipexrun --latency-mode --log-dir ./logs resnet50.py
 
 CPU usage is shown as below. 4 cores are used for each instance.
 
-![Multiple instances latency mode](../../../images/launch_script/nins_lat.gif)
+![Multiple instances latency mode](../../images/launch_script/nins_lat.gif)
 
 If you check your log directory, you will find directory structure as below.
 
@@ -380,7 +380,7 @@ ipexrun --ninstances 4 --log-dir ./logs resnet50.py
 
 CPU usage is shown as below. 4 main worker thread were launched, then they launched threads on all other physical cores.
 
-![Multiple instances designated number of instances](../../../images/launch_script/nins_cus.gif)
+![Multiple instances designated number of instances](../../images/launch_script/nins_cus.gif)
 
 If you check your log directory, you will find directory structure as below.
 

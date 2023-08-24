@@ -89,6 +89,7 @@ class IPEXTransformerAtten(nn.Module):
     blocked_attn_mask = None
     beam_index = None
     batch_size = 1
+    beam_size = 0
     runtime_bs = 0
 
     def __init__(self, config, is_int4=False) -> None:
@@ -110,6 +111,7 @@ class IPEXTransformerAtten(nn.Module):
         self.head_dim = self.config.embed_dim // self.config.num_attention_heads
         self.is_int4 = is_int4
         self.position_emb = self.config.rotary_embedding_class(config=self.config)
+        self.device = self.config.device
         if self.config.scale_attention:
             self.scale_attn = torch.sqrt(torch.tensor(self.head_dim, device=self.config.device))
         else:
@@ -204,7 +206,7 @@ class IPEXTransformerAtten(nn.Module):
         if not torch.equal(self.value_cached[:prev_key_len, :, :, :], prev_value):
             return False
         return True
-
+ 
     def qkv_cache_optimized_greedy(self, hidden_states, layer_past = None):
         # greedy search path
         # hidden_states has already been converted to [seq, beam, hidden_size]
@@ -243,13 +245,15 @@ class IPEXTransformerAtten(nn.Module):
             torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
         return query, key, value
 
-    def qkv_cache_optimized_beam(self, hidden_states, layer_past = None):
+    def qkv_cache_optimized_beam(self, hidden_states, first_token = False, layer_past = None):
         # beam search path
-        # hidden_states has already been converted to [seq, bs*beam, hidden_size]
-        if hidden_states.shape[0] != 1:
-            # the first timestep
-            # first timestamp's shape will be [seq, bs, hidden_size]
-            shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
+        # hidden_states keep the original shape [bs*beam, seq, hidden_size]
+        if first_token:
+            # the first token, shape will be [bs, seq, hidden_size]
+            bs_beam = hidden_states.shape[0]
+            seq = hidden_states.shape[1]
+            hidden_size = self.num_attn_head * self.head_dim
+            shape = [bs_beam, seq, hidden_size]
             query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.key_prompt = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.value_prompt = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
@@ -261,23 +265,27 @@ class IPEXTransformerAtten(nn.Module):
             value = self.value_prompt
             self.prev_len = 0
             self.cur_len = 0
-            if hidden_states.shape[1] != IPEXTransformerAtten.runtime_bs:
+            if bs_beam != IPEXTransformerAtten.runtime_bs:
                 self.kv_cache_invalid = True
         else:
             # the 2nd to the last timestep
+            # hidden_states has already been converted to [seq, bs*beam, hidden_size]
+            seq = hidden_states.shape[0]
+            bs_beam = hidden_states.shape[1]
+            hidden_size = self.num_attn_head * self.head_dim
             if self.key_cached is None or self.value_cached is None or self.kv_cache_invalid:
                 # the 2nd generated token, create the key_cached and value_cached buffers
-                shape = [self.max_out_positions, hidden_states.shape[1], self.num_attn_head, self.head_dim]
+                # kv_cahce shape/layout [max_seq, bs*beam, hidden_size]
+                shape = [self.max_out_positions, bs_beam, self.num_attn_head, self.head_dim]
                 self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
                 self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
                 self.prev_len = 0
                 self.kv_cache_invalid = False
                 if self.layer_id == IPEXTransformerAtten.layer_id_static - 1:
-                    IPEXTransformerAtten.runtime_bs = hidden_states.shape[1]
+                    IPEXTransformerAtten.runtime_bs = bs_beam
 
-            self.cur_len = self.prev_len + hidden_states.size(0)
-
-            shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
+            self.cur_len = self.prev_len + seq
+            shape = [seq, bs_beam, hidden_size]
             query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
             key = self.key_cached[self.prev_len : self.cur_len, :, :, :]
             value = self.value_cached[self.prev_len : self.cur_len, :, :, :]
@@ -310,9 +318,11 @@ class IPEXTransformerAtten(nn.Module):
     def compute_qkv(self,
                     hidden_states: torch.Tensor,
                     key_value_state: Optional[torch.Tensor] = None,
-                    layer_past: Optional[Tuple[torch.Tensor]] = None):
-        if self.kv_cache_optimize and self.row_major and self.kv_cache:
-            if self.get_beam_width() == 1:
+                    layer_past: Optional[Tuple[torch.Tensor]] = None,
+                    first_token = False,):
+        new_shape = hidden_states.size()[:-1] + (self.num_attn_head, self.head_dim)
+        if self.kv_cache_optimize and self.kv_cache:
+            if IPEXTransformerAtten.beam_size == 1:
                 query, key, value = self.qkv_cache_optimized_greedy(hidden_states=hidden_states, layer_past=layer_past)
             else:
                 # TODO: support greedy
@@ -321,44 +331,68 @@ class IPEXTransformerAtten(nn.Module):
                 if new_prompts:
                     self.key_prompt = None
                     self.value_prompt = None
-                query, key, value = self.qkv_cache_optimized_beam(hidden_states=hidden_states, layer_past=layer_past)
-            new_shape = query.size()[:-1] + (self.num_attn_head, self.head_dim)
-            if self.cur_len == 0:
-                if self.key_prompt is not None:
-                    self.key_prompt = self.key_prompt.view(new_shape)
-                if self.value_prompt is not None:
-                    self.value_prompt = self.value_prompt.view(new_shape)
+                query, key, value = self.qkv_cache_optimized_beam(hidden_states=hidden_states, first_token=first_token, layer_past=layer_past)
+                if first_token:
+                    if self.key_prompt is not None:
+                        self.key_prompt = self.key_prompt.view(new_shape)
+                    if self.value_prompt is not None:
+                        self.value_prompt = self.value_prompt.view(new_shape)
         else:
             query, key, value = self.qkv_normal(hidden_states=hidden_states, layer_past=layer_past)
 
-        new_shape = query.size()[:-1] + (self.num_attn_head, self.head_dim)
-        # reshape the qkv size from (seq_len, bs*beam, num_head*head_dim) to (seq_len, bs*beam, num_head, head_dim)
+        # greedy_search: reshape the qkv size
+        # all the tokens: from (seq_len, bs*beam, num_head*head_dim) to (seq_len, bs*beam, num_head, head_dim)
+        # beam_search: reshape the qkv size
+        # 1st token: from (bs*beam, seq_len, num_head*head_dim) to (bs*beam, seq_len, num_head, head_dim)
+        # 2nd to last token: from (seq_len, bs*beam, num_head*head_dim) to (seq_len, bs*beam, num_head, head_dim)
         query = query.view(new_shape)
         key = key.view(new_shape)
         value = value.view(new_shape)
 
         return query, key, value
 
-    def optimized_combine(self, query, key, value, layer_past = None):
-        if self.cur_len == 0:
+    def optimized_combine(self, query, key, value, first_token = False, layer_past = None):
+        #print("=========================== optimized_combine ==================")
+        #print("----first_token={}".format(first_token))
+        #print("----IPEXTransformerAtten.beam_size={}".format(IPEXTransformerAtten.beam_size))
+        if first_token and IPEXTransformerAtten.beam_size > 1:
+            #print("-----flag1-----")
+            # 1st token
+            # input: shape and layout [bs*beam, seq, num_head, head_dim]
+            # output: shape [bs*beam, num_head, seq, head_dim], layout [bs*beam, seq, num_head, head_dim]
+            self.key_prompt = self.key_prompt.permute(0, 2, 1, 3)
+            self.value_prompt = self.value_prompt.permute(0, 2, 1, 3)
             key = self.key_prompt
             value = self.value_prompt
-            self.key_prompt = self.key_prompt.permute(1, 2, 0, 3)
-            self.value_prompt = self.value_prompt.permute(1, 2, 0, 3)
+            query = query.permute(0, 2, 1, 3)
         else:
-            # query/key/value shape and layout [seq, bs*beam, num_head, head_dim]
-            key = self.key_cached[: self.cur_len, :, :, :]  # [seq_len, bs*beam, head, head_dim]
-            value = self.value_cached[: self.cur_len, :, :, :] # [seq_len, bs*beam, head, head_dim]
-        query = query.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
-        key = key.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
-        value = value.permute(1, 2, 0, 3)  # [bs*beam, head, seq_len, head_dim]
+            #print("-----flag2-----")
+            # 2nd to last token
+            # input: shape and layout [seq, bs*beam, num_head, head_dim]
+            # output: shape [bs*beam, num_head, seq, head_dim], layout [seq, bs*beam, num_head, head_dim]
+            key = self.key_cached[: self.cur_len, :, :, :]
+            value = self.value_cached[: self.cur_len, :, :, :]
+            key = key.permute(1, 2, 0, 3)
+            value = value.permute(1, 2, 0, 3)
+            query = query.permute(1, 2, 0, 3)
         return query, key, value
 
-    def normal_combine(self, query, key, value, layer_past = None):
-        # query/key/value has been converted to [seq, bs*beam, num_head, head_dim]
-        query = query.permute(1, 2, 0, 3)
-        key = key.permute(1, 2, 0, 3)
-        value = value.permute(1, 2, 0, 3)
+    def normal_combine(self, query, key, value, first_token = False, layer_past = None):
+        if first_token:
+            # 1st token
+            # input: shape and layout [bs*beam, seq, num_head, head_dim]
+            # output: shape [bs*beam, num_head, seq, head_dim], layout [bs*beam, seq, num_head, head_dim]
+            query = query.permute(0, 2, 1, 3)
+            key = key.permute(0, 2, 1, 3)
+            value = value.permute(0, 2, 1, 3)
+        else:
+            # 2nd to last token
+            # input shape/layout [seq, bs*beam, num_head, head_dim]
+            # output: shape [bs*beam, num_head, seq, head_dim], layout [seq, bs*beam, num_head, head_dim]
+            query = query.permute(1, 2, 0, 3)
+            key = key.permute(1, 2, 0, 3)
+            value = value.permute(1, 2, 0, 3)
+
         if layer_past is not None:
             past_key = layer_past[0]
             past_value = layer_past[1]
@@ -367,15 +401,15 @@ class IPEXTransformerAtten(nn.Module):
         self.cur_len = key.shape[-2]
         return query, key, value
 
-    def combine_with_cache(self, query, key, value, layer_past = None):
-        if self.kv_cache_optimize and self.row_major and self.kv_cache:
-            query, key, value = self.optimized_combine(query, key, value, layer_past=layer_past)
+    def combine_with_cache(self, query, key, value, first_token = False, layer_past = None):
+        if self.kv_cache_optimize and self.kv_cache:
+            query, key, value = self.optimized_combine(query, key, value, first_token, layer_past)
         else:
-            query, key, value = self.normal_combine(query, key, value, layer_past=layer_past)
+            query, key, value = self.normal_combine(query, key, value, first_token, layer_past)
         return query, key, value
 
     def apply_rotary_embedding(self, key, query, position_ids):
-        return self.position_emb(key, query, position_ids, self.layer_id)
+        return self.position_emb(key, query, position_ids, self.layer_id, IPEXTransformerAtten.beam_size)
 
     def all_reduce_if_necessary(self, reduce_target):
         if self.tp_group is not None:
@@ -451,7 +485,11 @@ class IPEXTransformerAtten(nn.Module):
 
         return attn_output, attn_weights
 
-    def self_attention(self, query, key, value, attention_mask=None, head_mask=None, alibi=None):
+    def self_attention(self, query, key, value, attention_mask=None, head_mask=None, alibi=None, first_token=False):
+        # create the beam_idx for greedy search
+        if self.layer_id == 0 and IPEXTransformerAtten.beam_size == 1: 
+            IPEXTransformerAtten.beam_index = torch.zeros([self.cur_len, IPEXTransformerAtten.beam_size], dtype=torch.int, device=self.device)
+        
         do_sdp_fusion = os.environ.get("ENABLE_SDP_FUSION", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         if self.config.sdp_fusion_enable and do_sdp_fusion:
             attn_weights = None
@@ -477,39 +515,70 @@ class IPEXTransformerAtten(nn.Module):
             blocked_alibi = None
             if alibi != None:
                 blocked_alibi = self.get_blocked_alibi(alibi)
-
-            if self.cur_len > 0 and self.get_beam_width() != 1:
-                ########### 2nd token to the end
+            if first_token or IPEXTransformerAtten.beam_size == 1:
+                ########### 1st token
+                # query/key/value shape [bs*beam, head, q_seq, dim], layout [bs*beam, q_seq, head, dim]
+                # attn_output shape [bs*beam, head, q_seq, dim], layout [bs*beam, q_seq, head, dim]
+                # attention_mask= None
+                # is_causal=True
+                seq_first = False 
+                if IPEXTransformerAtten.beam_size == 1:
+                    seq_first = True
+                attn_output = torch.xpu.IpexSDP(query, key, value, blocked_alibi, blocked_attn_mask, head_mask, alpha, beta, dropout, is_causal, seq_first)
+            else:
+                ########### 2nd to the last token
+                # key_prompt shape [bs, head, prompt_seq, dim], layout [bs, prompt_seq, head, dim]
+                # value_prompt shape [bs, head, prompt_seq, dim], layout [bs, prompt_seq, head, dim] 
                 # query shape [bs*beam, head, q_seq, dim], layout [q_seq, bs*beam, head, dim]
-                # query shape [4, 16, 1, 256], stride [4096, 256, 16384, 1]
-                # key_prompt shape [bs, head, prompt_seq, dim], layout [prompt_seq, bs, head, dim]
-                # key_prompt shape [1, 16, 32, 256], stride [4096, 256, 4096, 1]
-                # value_prompt is the same as key_prompt
                 # key shape [bs*beam, head, kv_seq, dim], layout [kv_seq, bs*beam, head, dim]
-                # key shape [4, 16, kv_len, 256]
-                # value is the same as key
+                # value shape [bs*beam, head, kv_seq, dim], layout [kv_seq, bs*beam, head, dim]
+                # attn_output shape [bs*beam, head, seq, dim], layout [seq, bs*beam, head, dim]
                 # attention_mask= None
                 # is_causal=False
                 # beam_idx shape [kv_len, beam], layout [kv_len, beam], dtype=int32
                 # self.cur_len = kv_len
+                '''
+                print("========================self.cur_len={}".format(self.cur_len))
+                print("----beam_shape={}".format(IPEXTransformerAtten.beam_index.shape))
+                print("----beam_shape={}".format(IPEXTransformerAtten.beam_index.stride()))
+                print("----beam_shape={}".format(IPEXTransformerAtten.beam_index.dtype))
+                
+                print("===========2nd_token")
+                print("---key_prompt={}".format(self.key_prompt.shape))
+                print("---key_prompt={}".format(self.key_prompt.stride()))
+                print("---value_prompt={}".format(self.value_prompt.shape))
+                print("---value_prompt={}".format(self.value_prompt.stride()))
+                print("---query={}".format(query.shape))
+                print("---query={}".format(query.stride()))
+                print("---key={}".format(key.shape))
+                print("---key={}".format(key.stride()))
+                print("---value={}".format(value.shape))
+                print("---value={}".format(value.stride()))
+                '''
                 attn_output = torch.xpu.IpexSDP_Index(query, self.key_prompt, self.value_prompt, key, value, IPEXTransformerAtten.beam_index, blocked_alibi, blocked_attn_mask, head_mask, self.cur_len, alpha, beta, dropout, is_causal)
-            else:
-                ########### first token
-                # query shape [bs*beam, head, q_seq, dim], layout [q_seq, bs*beam, head, dim]
-                # query shape [1, 16, 32, 256], stride [4096, 256, 4096, 1]
-                # key, value are the same as query
-                # attention_mask= None
-                # is_causal=True
-                attn_output = torch.xpu.IpexSDP(query, key, value, blocked_alibi, blocked_attn_mask, head_mask, alpha, beta, dropout, is_causal, True)
+                #print("---attn_output={}".format(attn_output.shape))
+                #print("---attn_output={}".format(attn_output.stride()))
         else:
-            if self.cur_len > 0 and self.get_beam_width() != 1:
+            if not first_token and IPEXTransformerAtten.beam_size > 1:
                 key, value = self.reorder_cache(key, value, IPEXTransformerAtten.beam_index)
             attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi)
-        return attn_output, attn_weights
 
+        if first_token and IPEXTransformerAtten.beam_size > 1:
+            # 1st token
+            # reshape the attn_output shape/layour from shape [bs*beam, num_head, seq_len, head_dim], layout [bs*beam, seq_len, num_head, head_dim]
+            # to shape [bs*beam, seq_len, hidden_size], layout [bs*beam, seq_len, hidden_size]
+            attn_output = attn_output.permute(0, 2, 1, 3)
+        else:
+            # 2nd to last token
+            # reshape the attn_output shape/layour from shape [bs*beam, num_head, seq_len, head_dim], layout [seq_len, bs*beam, num_head, head_dim]
+            # to shape [seq_len, bs*beam, hidden_size], layout [seq_len, bs*beam, hidden_size]
+            attn_output = attn_output.permute(2, 0, 1, 3)
+        attn_output = attn_output.reshape(attn_output.size()[:-2] + (self.embed_dim // self.tp_size,))
+        return attn_output, attn_weights
+    '''
     def get_beam_width(self):
         return IPEXTransformerAtten.beam_index.shape[1] // IPEXTransformerAtten.batch_size if IPEXTransformerAtten.beam_index != None else 1
-
+    '''
     def expand_beam_idx(self):
         bs = IPEXTransformerAtten.batch_size
         beam_idx = IPEXTransformerAtten.beam_index
@@ -528,24 +597,28 @@ class IPEXTransformerAtten(nn.Module):
         # past_key_values: 28 decoder layers of [key, value]
         # beam_idx_cache: [kv_out_len, bs*beam]
 
-        # self.key_prompt shape[bs, head, seq, dim] layout[seq, bs, head, dim]
-        # key shape[bs*beam, head, kv_len, dim] layout[kv_len, bs*beam, head, dim]
+        # self.key_prompt shape[bs, head, seq, dim] layout[bs, seq, head, dim]
+        # key shape[bs*beam, head, kv_seq, dim] layout[kv_len, bs*beam, head, dim]
         bs = self.key_prompt.shape[0]
         beam = int(key.shape[0] // bs)
-        expand_shape = [bs, beam, self.key_prompt.shape[1]*self.key_prompt.shape[2]*self.key_prompt.shape[3]]
-        shape = [bs*beam, self.key_prompt.shape[1], self.key_prompt.shape[2], self.key_prompt.shape[3]]
-        #shape1 = [bs* beam, key.shape[1], key.shape[2], key.shape[3]]
-        key_prompt = self.key_prompt.reshape(bs, 1, -1).expand(expand_shape).reshape(shape)
-        value_prompt = self.value_prompt.reshape(bs, 1, -1).expand(expand_shape).reshape(shape)
+        num_head, seq_prompt, head_dim = self.key_prompt.shape[1], self.key_prompt.shape[2], self.key_prompt.shape[3]
+        prompt_shape = [bs, 1, num_head, seq_prompt, head_dim]
+        expand_shape = [bs, beam, num_head, seq_prompt, head_dim]
+        shape = [bs*beam, num_head, seq_prompt, head_dim]
+        # expand the key_prompt/value_prompt from shape [bs, num_head, seq_prompt, head_dim]
+        # to shape [bs*beam, num_head, seq_prompt, head_dim]
+        key_prompt = self.key_prompt.reshape(prompt_shape).expand(expand_shape).reshape(shape)
+        value_prompt = self.value_prompt.reshape(prompt_shape).expand(expand_shape).reshape(shape)
         key_list = [key_prompt]
         value_list = [value_prompt]
+
         beam_idx_cache = self.expand_beam_idx()
         for idx in range(beam_idx_cache.shape[0]):
             beam_idx = beam_idx_cache[idx]
-            current_key = key[:, :, idx, :].view(bs*beam, key.shape[1], 1, -1)
+            current_key = key[:, :, idx, :].view(bs*beam, num_head, 1, head_dim)
             current_key = current_key.index_select(0, beam_idx.to(key.device))
             key_list.append(current_key)
-            current_value = value[:, :, idx, :].view(bs*beam, value.shape[1], 1, -1)
+            current_value = value[:, :, idx, :].view(bs*beam, num_head, 1, head_dim)
             current_value = current_value.index_select(0, beam_idx.to(value.device))
             value_list.append(current_value)
 
@@ -554,10 +627,6 @@ class IPEXTransformerAtten(nn.Module):
         return key, value
 
     def get_final_output(self, attn_output: torch.Tensor, residual: Optional[torch.Tensor] = None):
-        # reshape the attn_output from [bs, head_num, seq_len, head_dim] back to [seq_len, bs, embedding_size]
-        attn_output = attn_output.permute(2, 0, 1, 3)
-        attn_output = attn_output.reshape(attn_output.size()[:-2] + (self.embed_dim // self.tp_size,))
-
         if self.row_major:
             if residual is None:
                 if self.is_int4 and attn_output.shape[0] == 1:
@@ -596,22 +665,89 @@ class IPEXTransformerAtten(nn.Module):
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
         residual: Optional[torch.Tensor] = None,
-        alibi: torch.Tensor = None
+        alibi: torch.Tensor = None,
+        first_token = False
     ):
+        '''
+        print("================== self_cur_len={}".format(self.cur_len))
+        print("------IPEXTransformerAtten_batch_size={}".format(IPEXTransformerAtten.batch_size))
+        print("------IPEXTransformerAtten_beam_size={}".format(IPEXTransformerAtten.beam_size))
+        print("------attention_mask={}".format(attention_mask.shape))
+        '''
+        # greedy_search
         # the shape of query, key, value, [seq, bs*beam, head*dim]
         # the layout of query, key, value, [seq, bs*beam, head*dim]
-        query, key, value = self.compute_qkv(hidden_states=hidden_states, key_value_state=key_value_states, layer_past=layer_past)
-
+        # beam_search
+        # 1st token:
+        # the shape of query, key, value, [bs*beam, seq, head*dim]
+        # the layout of query, key, value, [bs*beam, seq, head*dim]
+        # 2nd to last:
+        # the shape of query, key, value, [seq, bs*beam, head*dim]
+        # the layout of query, key, value, [seq, bs*beam, head*dim]
+        query, key, value = self.compute_qkv(hidden_states=hidden_states, key_value_state=key_value_states, layer_past=layer_past, first_token=first_token)
+        '''
+        print("---query1={}".format(query.shape))
+        print("---query1={}".format(query.stride()))
+        print("---key1={}".format(key.shape))
+        print("---key1={}".format(key.stride()))
+        print("---value1={}".format(value.shape))
+        print("---value1={}".format(value.stride()))
+        '''
+        #print("---key_prompt1={}".format(self.key_prompt.shape))
+        #print("---key_prompt1={}".format(self.key_prompt.stride()))
+        #print("---value_prompt1={}".format(self.value_prompt.shape))
+        #print("---value_prompt1={}".format(self.value_prompt.stride()))
+        # print("-----------------------------")
+        # greedy_search
+        # the shape of query, key, value, [seq, bs*beam, head, dim]
+        # the layout of query, key, value, [seq, bs*beam, head, dim]
+        # beam_search
+        # 1st token
+        # the shape of query, key, value, [bs*beam, seq, head, dim]
+        # the layout of query, key, value, [bs*beam, seq, head, dim]
+        # 2nd to last:
         # the shape of query, key, value, [seq, bs*beam, head, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]
         key, query = self.apply_rotary_embedding(key, query, position_ids=position_ids)
-
+        '''
+        print("---query2={}".format(query.shape))
+        print("---query2={}".format(query.stride()))
+        print("---key2={}".format(key.shape))
+        print("---key2={}".format(key.stride()))
+        print("---value2={}".format(value.shape))
+        print("---value2={}".format(value.stride()))
+        print("---key_prompt2={}".format(self.key_prompt.shape))
+        print("---key_prompt2={}".format(self.key_prompt.stride()))
+        print("---value_prompt2={}".format(self.value_prompt.shape))
+        print("---value_prompt2={}".format(self.value_prompt.stride()))
+        print("-----------------------------")
+        '''
+        # greedy search
         # the shape of query, key, value, [seq, bs*beam, head, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]
-        query, key, value = self.combine_with_cache(query, key, value, layer_past=layer_past)
-
+        # 1st token
+        # the shape of query, key, value, [bs*beam, seq, head, dim]
+        # the layout of query, key, value, [bs*beam, seq, head, dim]
+        # 2nd to last:
+        # the shape of query, key, value, [seq, bs*beam, head, dim]
+        # the layout of query, key, value, [seq, bs*beam, head, dim]
+        query, key, value = self.combine_with_cache(query, key, value, first_token, layer_past)
+        '''
+        print("---query3={}".format(query.shape))
+        print("---query3={}".format(query.stride()))
+        print("---key3={}".format(key.shape))
+        print("---key3={}".format(key.stride()))
+        print("---value3={}".format(value.shape))
+        print("---value3={}".format(value.stride()))
+        print("---key_prompt3={}".format(self.key_prompt.shape))
+        print("---key_prompt3={}".format(self.key_prompt.stride()))
+        print("---value_prompt3={}".format(self.value_prompt.shape))
+        print("---value_prompt3={}".format(self.value_prompt.stride()))
+        print("-----------------------------")
+        '''
+        #print("----use_cahce={}".format(use_cache))
         if use_cache or self.is_decoder:
-            if self.get_beam_width() == 1:
+            if IPEXTransformerAtten.beam_size == 1:
                 present = (key, value)
             else:
                 # key, value shape [bs*beam=1, head, seq, dim]
@@ -623,10 +759,33 @@ class IPEXTransformerAtten(nn.Module):
         else:
             present = None
 
+        # greedy search
         # the shape of query, key, value, [bs*beam, head, seq, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]
-        attn_output, attn_weight = self.self_attention(query, key, value, attention_mask, head_mask, alibi)
+        # beam search
+        # 1st token
+        # the shape of query, key, value, [bs*beam, head, seq, dim]
+        # the layout of query, key, value, [bs*beam, seq, head, dim]
+        # 2nd to last:
+        # the shape of query, key, value, [bs*beam, head, seq, dim]
+        # the layout of query, key, value, [seq, bs*beam, head, dim]
+        attn_output, attn_weight = self.self_attention(query, key, value, attention_mask, head_mask, alibi, first_token)
+        #print("---attn_output1={}".format(attn_output.shape))
+        #print("---attn_output1={}".format(attn_output.stride()))
+
+        # greedy search
+        # the shape of attn_output [seq, bs*beam, hidden_size]
+        # the layout of attn_output [seq, bs*beam, hidden_size]
+        # beam search
+        # 1st token
+        # the shape of attn_output [bs*beam, seq, hidden_size]
+        # the layout of attn_output [bs*beam, seq, hidden_size]
+        # 2nd to last:
+        # the shape of attn_output [seq, bs*beam, hidden_size]
+        # the layout of attn_output [seq, bs*beam, hidden_size]
         attn_output = self.get_final_output(attn_output=attn_output, residual=residual)
+        #print("---attn_output2={}".format(attn_output.shape))
+        #print("---attn_output2={}".format(attn_output.stride()))
 
         outputs = (attn_output, present)
         if output_attentions:

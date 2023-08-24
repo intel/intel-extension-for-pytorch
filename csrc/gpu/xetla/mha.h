@@ -91,6 +91,7 @@ void fmha_forward_index_kernel(
     uint32_t num_queries,
     uint32_t num_keys_in,
     uint32_t num_keys_out,
+    uint32_t alibi_padding,
     uint32_t attn_mask_padding,
     bool is_causal);
 

@@ -324,6 +324,15 @@ Tensor xetla_fsdp_index_forward(
       !head_mask.has_value(),
       "Unsupported feature in fsdp kernel, head_mask ...");
 
+  // check alibi padded
+  uint32_t alibi_padding = 0;
+  if (alibi.has_value()) {
+    alibi_padding = alibi.value().size(-1);
+    TORCH_CHECK(
+        (alibi_padding * key.itemsize() % 8 == 0),
+        "XeTLA SDP Alibi needs 8bytes aligned on leading dimension ...");
+  }
+
   // check attn_mask padded
   uint32_t attn_mask_padding = 0;
   if (attn_mask.has_value()) {
@@ -362,6 +371,7 @@ Tensor xetla_fsdp_index_forward(
       query.size(2),
       num_keys_in,
       num_keys_out,
+      alibi_padding,
       attn_mask_padding,
       is_causal);
   return output;

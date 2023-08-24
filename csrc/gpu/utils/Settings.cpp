@@ -11,12 +11,13 @@
 namespace xpu {
 namespace dpcpp {
 
+// clang-format off
 /*
  * [Keep the format for automatic doc generation.]
  * All available launch options for IPEX
  * ==========ALL==========
  *   IPEX_FP32_MATH_MODE:
- *      Default = 0 | Set values for FP32 math mode (0: FP32, 1: TF32, 2: BF32)
+ *      Default = FP32 | Set values for FP32 math mode (valid values: FP32, TF32, BF32). Refer to <a class="reference internal" href="../api_doc.html#_CPPv4N3xpu18set_fp32_math_modeE14FP32_MATH_MODE">API Documentation</a> for details.
  * ==========ALL==========
  *
  * XPU ONLY optionos:
@@ -49,6 +50,7 @@ namespace dpcpp {
  *      operators: RECOMMEND, BASIC, ONEDNN, ONEMKL, XETLA
  * ==========INT==========
  */
+// clang-format on
 
 static std::mutex s_mutex;
 

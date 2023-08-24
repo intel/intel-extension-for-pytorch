@@ -7,6 +7,7 @@ from ._utils import ipex_beam_search, _ipex_prepare_model_inputs, ipex_beam_sear
 from .gptj import IPEXGPTJForCausalLMForward
 from .llama import IPEXLlamaForCausalLMForward
 from .bloom import IPEXBloomForCausalLMForward
+from .opt import IPEXOPTForCausalLMForward
 from ._inference_ops import OpConverter
 
 def int4_gemm_padding(qdata):
@@ -140,6 +141,10 @@ def transformer_frontend_replace(model, config = None, dtype = torch.float, is_i
             pad_for_gptj_lm_head(module)
             if hasattr(module, "forward"):
                 setattr(module, "forward", partial(IPEXBloomForCausalLMForward, module))
+        elif type(module) == transformers.models.opt.modeling_opt.OPTForCausalLM:
+            pad_for_gptj_lm_head(module)
+            if hasattr(module, "forward"):
+                setattr(module, "forward", partial(IPEXOPTForCausalLMForward, module))
 
 
         if os.environ.get("DISABLE_KV_CACHE", "OFF") not in ["1", "Y", "YES", "TRUE", "ON"]:

@@ -35,11 +35,16 @@ static const char* FP32_MATH_MODE_STR[]{"FP32", "TF32", "BF32"};
 /// Get Math Mode Setting Status.
 FP32_MATH_MODE get_fp32_math_mode();
 
-/// Enable or disable implicit data type conversion.
-/// If mode is FP32MathMode.FP32 which means to disable the oneDNN fpmath mode.
-/// If mode is FP32MathMode.TF32 which means to enable the oneDNN fpmath mode by
-/// down converting to tf32 implicitly If mode is FP32MathMode.BF32 which means
-/// to enable the oneDNN fpmath mode by down converting to bfloat16 implicitly.
+/// Enable or disable implicit floating-point type conversion during computation
+/// for oneDNN kernels. Set ``FP32MathMode.FP32`` will disable floating-point
+/// type conversion. Set ``FP32MathMode.TF32`` will enable implicit
+/// down-conversion from ``fp32`` to ``tf32``. Set ``FP32MathMode.BF32`` will
+/// enable implicit down-conversion from ``fp32`` to ``bf16``.
+///
+/// refer to <a class="reference external" href="https://oneapi-src.github.io/
+/// oneDNN/dev_guide_attributes_fpmath_mode.html">Primitive Attributes: floating
+/// -point math mode</a> for detail description about the definition and
+/// numerical behavior of floating-point math modes.
 /// @param mode (FP32MathMode): Only works for ``FP32MathMode.FP32``,
 /// ``FP32MathMode.TF32`` and ``FP32MathMode.BF32``.
 ///     oneDNN fpmath mode will be disabled by default if dtype is set to
