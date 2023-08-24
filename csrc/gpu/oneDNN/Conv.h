@@ -311,7 +311,8 @@ static at::Tensor convolution(
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  auto memory_layout_for_conv = get_memory_layout_for_conv(src, wgh);
+  auto memory_layout_for_conv =
+      get_memory_layout_for_conv(src, wgh, /*is_transposed*/ false);
   bool is_onednn_layout_suggested =
       memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked;
 
@@ -436,7 +437,8 @@ static void convolution_backward_weights(
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  auto memory_layout_for_conv = get_memory_layout_for_conv(src, diff_dst);
+  auto memory_layout_for_conv =
+      get_memory_layout_for_conv(src, diff_dst, /*is_transposed=*/false);
 
   // create memory desc
   memory::desc src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md;
@@ -577,7 +579,8 @@ static void convolution_backward_data(
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  auto memory_layout_for_conv = get_memory_layout_for_conv(diff_dst, weight);
+  auto memory_layout_for_conv =
+      get_memory_layout_for_conv(diff_dst, weight, /*is_transposed=*/false);
 
   // create memory desc
   memory::desc src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md;

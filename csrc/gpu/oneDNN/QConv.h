@@ -241,7 +241,8 @@ static at::Tensor quantized_convolution(
 
   // create usr_md for tensors, and md for conv primitive
   memory::desc src_usr_md, wgh_usr_md, dst_usr_md, src_md, wgh_md, dst_md;
-  auto memory_layout_for_conv = get_memory_layout_for_conv(src, wgh);
+  auto memory_layout_for_conv =
+      get_memory_layout_for_conv(src, wgh, /*is_transposed=*/false);
   bool is_onednn_layout_suggested =
       memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked;
   bool is_channels_last_suggested =

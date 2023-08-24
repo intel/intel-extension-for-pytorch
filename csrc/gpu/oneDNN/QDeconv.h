@@ -231,7 +231,8 @@ static Tensor quantized_deconvolution(
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  auto memory_layout_for_conv = get_memory_layout_for_conv(src, wgh);
+  auto memory_layout_for_conv =
+      get_memory_layout_for_conv(src, wgh, /*is_transposed=*/true);
 
   bool is_onednn_layout_suggested =
       (memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked);

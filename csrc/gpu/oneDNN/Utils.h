@@ -621,13 +621,15 @@ enum MEMORY_LAYOUT_FOR_CONV {
 
 static inline int get_memory_layout_for_conv(
     const at::Tensor& src,
-    const at::Tensor& weight) {
+    const at::Tensor& weight,
+    bool is_transpose) {
   if (!src.defined() || src.is_sparse()) {
     // suggest channels_first
     return MEMORY_LAYOUT_FOR_CONV::ChannelsFirst;
   }
 
-  if (src.is_quantized() || weight.is_quantized() || (!dpcppSupportFP64())) {
+  if (is_transpose || src.is_quantized() || weight.is_quantized() ||
+      (!dpcppSupportFP64())) {
     if (Settings::I().is_onednn_layout_enabled()) {
       // suggest blocked
       return MEMORY_LAYOUT_FOR_CONV::Blocked;
@@ -657,9 +659,10 @@ static inline int get_memory_layout_for_conv(
 
 static inline at::MemoryFormat get_tensor_format_for_conv(
     const at::Tensor& src,
-    const at::Tensor& weight) {
+    const at::Tensor& weight,
+    bool is_transposed) {
   at::MemoryFormat mfmt;
-  if (get_memory_layout_for_conv(src, weight) ==
+  if (get_memory_layout_for_conv(src, weight, is_transposed) ==
       MEMORY_LAYOUT_FOR_CONV::ChannelsLast) {
     mfmt = get_cl_tag_by_ndim(src.ndimension());
   } else {

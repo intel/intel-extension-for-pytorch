@@ -75,7 +75,8 @@ struct QuantizeConvConverter {
   template <typename Func>
   at::Tensor call(const at::Tensor& input, Func func) {
     // make sure input/weight/output are contiguous or ChannelsLast congituous
-    at::MemoryFormat mfmt = get_tensor_format_for_conv(input, weight_);
+    at::MemoryFormat mfmt =
+        get_tensor_format_for_conv(input, weight_, /*is_transposed=*/false);
     Tensor input_ = is_onednn_layout(input) ? input.contiguous(mfmt) : input;
     weight_ = is_onednn_layout(weight_) ? weight_.contiguous(mfmt) : weight_;
     at::Tensor output_ = quantizedEmptyTensorFromInput(input_);
@@ -110,7 +111,8 @@ struct QuantizeConvConverter {
   template <typename Func>
   at::Tensor call(const at::Tensor& input, at::Tensor& output, Func func) {
     // make sure input/weight are contiguous or ChannelsLast congituous
-    at::MemoryFormat mfmt = get_tensor_format_for_conv(input, weight_);
+    at::MemoryFormat mfmt =
+        get_tensor_format_for_conv(input, weight_, /*is_transposed=*/false);
     Tensor input_ = is_onednn_layout(input) ? input.contiguous(mfmt) : input;
     weight_ = is_onednn_layout(weight_) ? weight_.contiguous(mfmt) : weight_;
     Tensor output_ = output.is_contiguous(mfmt)
