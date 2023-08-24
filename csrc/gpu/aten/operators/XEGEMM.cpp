@@ -108,8 +108,7 @@ static Tensor mm_bias_resadd_resadd(
                     .add_epilogue(res0, HGEMM_XETLA::EpilogueType::RES_ADD)
                     .add_epilogue(res1, HGEMM_XETLA::EpilogueType::RES_ADD)
                     .build();
-  // if (policy.valid()) {
-  if (0) { // acc consider
+  if (policy.valid()) {
     policy.run();
   } else {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_resadd_resadd)
@@ -186,8 +185,7 @@ Tensor matmul_gelu(
             .add_epilogue(bias.value(), HGEMM_XETLA::EpilogueType::BIAS)
             .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::GELU)
             .build();
-    // if (policy.valid()) {
-    if (false) {
+    if (policy.valid()) {
       policy.run();
       return matmul_resize(input, output);
     }

@@ -139,7 +139,7 @@ namespace xetla {
 
 // clang-format off
 #define HGEMM_COMMA ,
-#define HGEMM_NUM_POLICIES 22
+#define HGEMM_NUM_POLICIES 23
 #define HGEMM_ENUMERATE_POLICIES(_, T) \
     _(8, 64, 8, 16, 32, 8, true)T      \
     _(8, 256, 8, 16, 16, 2, true)T     \
@@ -148,6 +148,7 @@ namespace xetla {
     _(16, 256, 16, 16, 16, 2, true)T   \
     _(16, 512, 16, 16, 16, 1, true)T   \
     _(32, 64, 32, 16, 16, 8, true)T    \
+    _(32, 64, 8, 16, 16, 2, true)T    \
     _(32, 128, 32, 16, 16, 4, true)T   \
     _(32, 256, 32, 16, 16, 2, true)T   \
     _(32, 512, 32, 16, 16, 1, true)T   \
@@ -170,6 +171,7 @@ namespace xetla {
     _(16, 256, 16, 16, 16, 2, false)T  \
     _(16, 512, 16, 16, 16, 1, false)T  \
     _(32, 64, 32, 16, 16, 8, false)T   \
+    _(32, 64, 8, 16, 16, 2, false)T    \
     _(32, 128, 32, 16, 16, 4, false)T  \
     _(32, 256, 32, 16, 16, 2, false)T  \
     _(32, 512, 32, 16, 16, 1, false)T  \
@@ -319,16 +321,20 @@ inline int select_gemm_special_config(
     const int n,
     const int k,
     const bool is_b_row_major) {
-  if (m <= 256 && n >= 16384) {
-    return is_b_row_major ? 17 : 17 + HGEMM_NUM_POLICIES;
-  } else if (((m + 255) / 256) * ((n + 255) / 256) >= 64) {
+  if (m <= 8 && n <= 4096) {
+    return is_b_row_major ? 7 : 7 + HGEMM_NUM_POLICIES;
+  } else if (m <= 16) {
+    return -1;
+  } else if (m <= 256 && n >= 16384) {
     return is_b_row_major ? 18 : 18 + HGEMM_NUM_POLICIES;
-  } else if (m <= 128 && n == 4096) {
+  } else if (((m + 255) / 256) * ((n + 255) / 256) >= 64) {
     return is_b_row_major ? 19 : 19 + HGEMM_NUM_POLICIES;
-  } else if (m <= 256 && n == 4096) {
+  } else if (m <= 128 && n == 4096) {
     return is_b_row_major ? 20 : 20 + HGEMM_NUM_POLICIES;
-  } else if (m <= 512 && n == 4096) {
+  } else if (m <= 256 && n == 4096) {
     return is_b_row_major ? 21 : 21 + HGEMM_NUM_POLICIES;
+  } else if (m <= 512 && n == 4096) {
+    return is_b_row_major ? 22 : 22 + HGEMM_NUM_POLICIES;
   }
   return -1;
 }
@@ -358,18 +364,14 @@ inline int select_gemm_config(
     metas.push_back(meta);
   }
   std::sort(metas.begin(), metas.end(), [](const auto& lhs, const auto& rhs) {
-    if (lhs.num_ss != rhs.num_ss)
-      return lhs.num_ss < rhs.num_ss;
-    else if (lhs.wg_eff != rhs.wg_eff)
+    if (lhs.wg_eff != rhs.wg_eff)
       return lhs.wg_eff > rhs.wg_eff;
+    else if (lhs.num_ss != rhs.num_ss)
+      return lhs.num_ss < rhs.num_ss;
     else
       return lhs.aspect_r < rhs.aspect_r;
   });
-  for (int i = 0; i < metas.size(); i++) {
-    idx = metas[i].idx;
-    if (metas[i].num_ss >= TOTAL_SS)
-      break;
-  }
+  idx = metas[0].idx;
   return is_b_row_major ? idx : idx + HGEMM_NUM_POLICIES;
 }
 
