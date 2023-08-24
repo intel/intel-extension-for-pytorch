@@ -1,5 +1,5 @@
-#include "../../GEMM.h"
-#include "hgemm_splitk.h"
+#include "../../hgemm.h"
+#include "hgemm_impl.h"
 
 namespace xpu {
 namespace xetla {
@@ -234,7 +234,7 @@ namespace xetla {
         B_ROW_MAJOR>(queue, out, a, b, bias, res, res_scale, m, n, k);         \
   }
 
-HGEMM_ENUMERATE_POLICIES(HGEMM_ENUMERATE_FUNC_IMPLS, )
+HGEMM_ENUMERATE_POLICIES(HGEMM_ENUMERATE_FUNC_IMPLS)
 
 } // namespace xetla
 } // namespace xpu

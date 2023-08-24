@@ -5,7 +5,7 @@
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
 #include <utils/oneMKLUtils.h>
-#include <xetla/GEMM.h>
+#include <xetla/hgemm.h>
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
 

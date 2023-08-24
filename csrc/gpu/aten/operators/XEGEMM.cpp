@@ -3,7 +3,7 @@
 #include <ATen/CPUApplyUtils.h>
 #include <ATen/record_function.h>
 #include <runtime/Utils.h>
-#include <xetla/GEMM.h>
+#include <xetla/hgemm.h>
 #include "Linear.h"
 #include "comm/ATDispatch.h"
 #include "utils/CustomOperatorRegistration.h"

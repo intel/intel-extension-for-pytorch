@@ -6,7 +6,6 @@
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
 #include <utils/oneMKLUtils.h>
-#include <xetla/GEMM.h>
 #include <vector>
 
 #include "comm/ATDispatch.h"
