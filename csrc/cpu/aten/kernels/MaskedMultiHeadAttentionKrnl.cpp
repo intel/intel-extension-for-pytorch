@@ -1,4 +1,5 @@
 #include <ATen/Tensor.h>
+#include <aten/FlashAttention.h>
 #include <aten/MaskedMultiHeadAttention.h>
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
@@ -692,18 +693,25 @@ first_token_masked_mha(
     key = key.repeat_interleave(n_req, 2);
     value = value.repeat_interleave(n_req, 2);
   }
-
-  key = key.permute({0, 2, 1, 3});
-  query = query.permute({0, 2, 1, 3});
-  value = value.permute({0, 2, 1, 3});
-  auto attn_weights = query.matmul(key.transpose(-1, -2));
-  attn_weights = attn_weights.div(scale_attn);
-  attn_weights = attn_weights + attention_mask;
-  attn_weights = attn_weights.softmax(-1);
-  attn_weights = attn_weights.to(value.dtype());
-  auto attn_outputs = attn_weights.matmul(value);
-  return std::make_tuple(
-      attn_outputs, attn_weights, key_cache, value_cache, beam_idx);
+  auto attn_weights = at::Tensor();
+  if (key.scalar_type() == at::kBFloat16) {
+    auto attn_outputs = torch_ipex::cpu::flash_attention_kernel_stub(
+        kCPU, query, key, value, scale_attn, attention_mask);
+    return std::make_tuple(
+        attn_outputs, attn_weights, key_cache, value_cache, beam_idx);
+  } else {
+    key = key.permute({0, 2, 1, 3});
+    query = query.permute({0, 2, 1, 3});
+    value = value.permute({0, 2, 1, 3});
+    auto attn_weights = query.matmul(key.transpose(-1, -2));
+    attn_weights = attn_weights.div(scale_attn);
+    attn_weights = attn_weights + attention_mask;
+    attn_weights = attn_weights.softmax(-1);
+    attn_weights = attn_weights.to(value.dtype());
+    auto attn_outputs = attn_weights.matmul(value);
+    return std::make_tuple(
+        attn_outputs, attn_weights, key_cache, value_cache, beam_idx);
+  }
 }
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 masked_multihead_self_attention_kernel_impl(
