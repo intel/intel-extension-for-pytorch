@@ -255,7 +255,10 @@ def get_input_observed_arg_idxs(
     op_type: str,
     op_type_is_module: bool,
 ) -> Optional[List[int]]:
-    if op_type_is_module and op_type not in (str(torch.nn.EmbeddingBag), str(MergedEmbeddingBagWithCat)):
+    if op_type_is_module and op_type not in (
+        str(torch.nn.EmbeddingBag),
+        str(MergedEmbeddingBagWithCat),
+    ):
         # TODO(future PR): handle RNNs
         return [0]
     elif op_type in conv_linear_ops:

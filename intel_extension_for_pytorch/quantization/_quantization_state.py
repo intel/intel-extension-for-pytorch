@@ -997,7 +997,10 @@ class AutoQuantizationState(torch.nn.Module):
             else:
                 # always add observer if the op can be quantized.
                 tensor_id = tensor_info.id  # type: ignore[attr-defined]
-                if seen_q_op_info.type in (str(torch.nn.EmbeddingBag), str(MergedEmbeddingBagWithCat)):
+                if seen_q_op_info.type in (
+                    str(torch.nn.EmbeddingBag),
+                    str(MergedEmbeddingBagWithCat),
+                ):
                     obs = qconfig.activation()
                     self.weight_tensor_id_to_observer[
                         str(seen_q_op_info.idx) + "_" + str(tensor_id)
