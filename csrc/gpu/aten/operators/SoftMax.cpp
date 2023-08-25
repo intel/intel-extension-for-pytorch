@@ -2160,7 +2160,7 @@ Tensor _masked_softmax_backward(
       mask.scalar_type() == ScalarType::Bool,
       "Mask should be a boolean tensor");
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       ScalarType::Half,
       ScalarType::BFloat16,
       grad_input.scalar_type(),

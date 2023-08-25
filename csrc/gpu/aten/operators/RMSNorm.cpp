@@ -381,7 +381,7 @@ void RMSNormKernelImpl(
     double eps,
     Tensor& Y,
     Tensor& rstd) {
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       X.scalar_type(),
