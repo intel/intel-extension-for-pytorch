@@ -4,6 +4,8 @@
 
 C++ extension is a mechanism developed by PyTorch that lets you to create customized and highly efficient PyTorch operators defined out-of-source, i.e. separate from the PyTorch backend. (For more details, see https://pytorch.org/tutorials/advanced/cpp_extension.html). Based on the PyTorch C++ extension mechanism, Intel® Extension for PyTorch\* lets you to create PyTorch operators with custom DPC++ kernels to run on the XPU device.
 
+**Note:** The current implementation of the DPC++ extension only supports Linux.
+
 ## Motivation and Example
 
 This tutorial walks through a practical example of writing and using a DPC++ extension on the XPU device with Intel® Extension for PyTorch\*.
