@@ -55,10 +55,15 @@ class IpexWoqLinear(nnq.Linear):
         del weight
         del qweight
 
+    def pre_ipex_gemm(self, input):
+        return input
+
     def post_ipex_gemm(self, output):
         return output
 
     def forward(self, x):
+        x = self.pre_ipex_gemm(x)
+        
         # Note that we can handle self.bias == None case.
         if self._packed_params.dtype in [torch.qint8, torch.quint4x2]:
             Y = torch.ops.torch_ipex.ipex_woq_linear(
@@ -211,14 +216,18 @@ class IpexWoqLinearAllreduce(IpexWoqLinear):
         self.original_bias = bias_value
 
     @classmethod
-    def _init_cls(cls, mod, dtype, qweight):
-        qlinear = cls(
+    def _init_from_mod(cls, mod, dtype):
+        return cls(
             mod.in_features,
             mod.out_features,
             mod.mp_group,
             mod.bias,  # save the original bias value
             dtype=dtype,
         )
+
+    @classmethod
+    def _init_cls(cls, mod, dtype, qweight):
+        qlinear = cls._init_from_mod(mod, dtype)
         # For bias handling, please refer to the comment in __init__ of _IPEXLinearAllreduce
         qlinear.set_weight_bias(qweight, None)
 
@@ -232,3 +241,41 @@ class IpexWoqLinearAllreduce(IpexWoqLinear):
 
     def post_ipex_gemm(self, output):
         return _all_reduce_and_bias_add(self.mp_group, self.original_bias, output)
+
+
+class IpexWoqLmHeadLinearAllreduce(IpexWoqLinearAllreduce):
+    def __init__(
+        self,
+        in_features,
+        out_features,
+        mp_group,
+        rank,
+        world_size,
+        bias_value,
+        bias_=True,
+        dtype=torch.qint8,
+    ):
+        # Save the original bias here
+        # For bias handling, please refer to the comment in __init__ of _IPEXLinearAllreduce
+        super().__init__(in_features, out_features, mp_group, bias_value, bias_, dtype)
+        self.rank = rank
+        self.world_size = world_size
+
+    @classmethod
+    def _init_from_mod(cls, mod, dtype):
+        return cls(
+            mod.in_features,
+            mod.out_features,
+            mod.mp_group,
+            mod.rank,
+            mod.world_size,
+            mod.bias,  # save the original bias value
+            dtype=dtype,
+        )
+
+    def pre_ipex_gemm(self, input):
+        assert (
+            input.shape[-1] % self.world_size == 0
+        ), "please ensure input.shape[-1] % self.world_size == 0"
+        input_shard = input.shape[-1] // self.world_size
+        return input[:, :, self.rank * input_shard : (self.rank + 1) * input_shard]

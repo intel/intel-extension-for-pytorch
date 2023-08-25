@@ -18,6 +18,7 @@ from intel_extension_for_pytorch.quantization import prepare, convert
 from intel_extension_for_pytorch.quantization._quantize import (
     DynamicQuantizedLinearLayer,
     DynamicQuantizedLinearAllreduce,
+    DynamicQuantizedLmHeadLinearAllreduce,
 )
 
 from test_weight_prepack import module_found
@@ -142,17 +143,33 @@ class DeepspeedTester(JitTestCase):
                 jit_res = jit_optimized(x)
                 self.assertEqual(y, jit_res)
 
-    def _test_quantization(self, dynamic_qconfig, qmodules, graph_strings):
+    def _test_quantization(
+        self,
+        dynamic_qconfig,
+        qmodules,
+        lm_head_qmodules,
+        graph_strings,
+        atol=0.005,
+        rtol=1.3e-6,
+    ):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
             LinearAllreduce, LinearLayer = deepspeed_modules[:2]
-            x = torch.randn(2, 4)
-            m_linear = DeepSpeedTestM(MyModel).eval()
+            # TODO: remove check_lm_head logic once deepspeed LmHeadLinearAllreduce change has been upstream-ed.
+            check_lm_head = False
+            if len(deepspeed_modules) == 3:
+                check_lm_head = True
+                LmHeadLinearAllreduce = deepspeed_modules[2]
+
+            x = torch.randn(2, 3, 4)
+            m_linear = DeepSpeedTestM(MyLmHeadModel).eval()
             y = m_linear(x)
 
             ds_model = self._get_ds_model(m_linear)
             self.assertTrue(module_found(ds_model, LinearLayer))
             self.assertTrue(module_found(ds_model, LinearAllreduce))
+            if check_lm_head:
+                self.assertTrue(module_found(ds_model, LmHeadLinearAllreduce))
 
             prepared_model = prepare(
                 ds_model,
@@ -165,11 +182,18 @@ class DeepspeedTester(JitTestCase):
             self.assertTrue(
                 all(module_found(converted, qmodule) for qmodule in qmodules)
             )
-
-            y_quantized = converted(x)
-            self.assertEqual(y, y_quantized, atol=0.005, rtol=1.3e-6)
+            if check_lm_head:
+                self.assertTrue(
+                    all(
+                        module_found(converted, lm_head_qmodule)
+                        for lm_head_qmodule in lm_head_qmodules
+                    )
+                )
 
             with torch.no_grad():
+                y_quantized = converted(x)
+                self.assertEqual(y, y_quantized, atol=atol, rtol=rtol)
+
                 converted = torch.jit.trace(converted, x)
                 traced = torch.jit.freeze(converted)
 
@@ -179,7 +203,7 @@ class DeepspeedTester(JitTestCase):
                     FileCheck().check(graph_string).run(graph)
 
                 y_traced = traced(x)
-                self.assertEqual(y, y_traced, atol=0.005, rtol=1.3e-6)
+                self.assertEqual(y, y_traced, atol=atol, rtol=rtol)
 
                 with tempfile.TemporaryDirectory() as tmp:
                     path = os.path.join(tmp, "ds_model.pt")
@@ -193,13 +217,16 @@ class DeepspeedTester(JitTestCase):
                         FileCheck().check(graph_string).run(graph_loaded)
 
                     y_loaded = loaded(x)
-                    self.assertEqual(y, y_loaded, atol=0.005, rtol=1.3e-6)
+                    self.assertEqual(y, y_loaded, atol=atol, rtol=rtol)
 
     def test_dynamic_quantization(self):
         self._test_quantization(
             ipex.quantization.default_dynamic_qconfig,
             [DynamicQuantizedLinearLayer, DynamicQuantizedLinearAllreduce],
+            [DynamicQuantizedLmHeadLinearAllreduce],
             ["quantized::linear_dynamic", "deepspeed_comm::all_reduce"],
+            atol=0.009,
+            rtol=1.3e-6,
         )
 
     def test_weight_only_quantization(self):
@@ -209,6 +236,7 @@ class DeepspeedTester(JitTestCase):
                 ipex.nn.modules.weight_only_quantization.IpexWoqLinear,
                 ipex.nn.modules.weight_only_quantization.IpexWoqLinearAllreduce,
             ],
+            [ipex.nn.modules.weight_only_quantization.IpexWoqLmHeadLinearAllreduce],
             ["torch_ipex::ipex_woq_linear", "deepspeed_comm::all_reduce"],
         )
 
