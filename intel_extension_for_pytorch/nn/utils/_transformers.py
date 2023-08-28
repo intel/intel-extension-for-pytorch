@@ -352,11 +352,7 @@ class IPEXTransformerAtten(nn.Module):
         return query, key, value
 
     def optimized_combine(self, query, key, value, first_token = False, layer_past = None):
-        #print("=========================== optimized_combine ==================")
-        #print("----first_token={}".format(first_token))
-        #print("----IPEXTransformerAtten.beam_size={}".format(IPEXTransformerAtten.beam_size))
         if first_token and IPEXTransformerAtten.beam_size > 1:
-            #print("-----flag1-----")
             # 1st token
             # input: shape and layout [bs*beam, seq, num_head, head_dim]
             # output: shape [bs*beam, num_head, seq, head_dim], layout [bs*beam, seq, num_head, head_dim]
@@ -366,7 +362,6 @@ class IPEXTransformerAtten(nn.Module):
             value = self.value_prompt
             query = query.permute(0, 2, 1, 3)
         else:
-            #print("-----flag2-----")
             # 2nd to last token
             # input: shape and layout [seq, bs*beam, num_head, head_dim]
             # output: shape [bs*beam, num_head, seq, head_dim], layout [seq, bs*beam, num_head, head_dim]
@@ -433,10 +428,15 @@ class IPEXTransformerAtten(nn.Module):
             IPEXTransformerAtten.blocked_attn_mask[:, :, :, 0 : attn_mask.shape[3]] = attn_mask
         return IPEXTransformerAtten.blocked_attn_mask
 
-    def naive_self_attention(self, query, key, value, attention_mask=None, head_mask=None, alibi : torch.Tensor=None):
+    def naive_self_attention(self, query, key, value, attention_mask=None, head_mask=None, alibi : torch.Tensor=None, first_token=False):
         if alibi is not None:
-            batch_size, num_heads, q_length, dim = query.shape
+            bs_beam, num_heads, q_length, dim = query.shape
             _, _, kv_length, _ = key.shape
+            # query, key result [bs*beam, num_head, q_len, kv_len]
+            # alibi: [bs_beam*num_head, q_len, kv_len]
+            if first_token and IPEXTransformerAtten.beam_size > 1:
+                shape = [IPEXTransformerAtten.batch_size, IPEXTransformerAtten.beam_size, num_heads, -1, kv_length]
+                alibi = alibi.view(shape)[:, 0, :, :, :].reshape([IPEXTransformerAtten.batch_size*num_heads, -1, kv_length])
             batch1 = query.view(-1, q_length, dim)
             batch2 = key.view(-1, kv_length, dim).transpose(1, 2)
             matmul_result = alibi.baddbmm(
@@ -446,18 +446,18 @@ class IPEXTransformerAtten(nn.Module):
                 alpha=self.inv_norm_factor,
             )
 
-            # change view to [batch_size, num_heads, q_length, kv_length]
-            attention_scores = matmul_result.view(batch_size, num_heads, q_length, kv_length)
+            # change view to [bs_beam, num_heads, q_length, kv_length]
+            attention_scores = matmul_result.view(bs_beam, num_heads, q_length, kv_length)
             attn_weights = torch.masked_fill(attention_scores, attention_mask, torch.finfo(attention_scores.dtype).min)
             attention_probs = nn.functional.softmax(attn_weights, dim=-1)
 
-            # [batch_size, num_heads, q_length, kv_length]
+            # [bs_beam, num_heads, q_length, kv_length]
             attention_probs = self.attn_drop(attention_probs)
 
             if head_mask is not None:
                 attention_probs = attention_probs * head_mask
 
-            # matmul: [batch_size * num_heads, q_length, head_dim]
+            # matmul: [bs_beam * num_heads, q_length, head_dim]
             attn_output = torch.matmul(attention_probs, value)
         else:
             attn_weights = torch.matmul(query, key.transpose(-1, -2))
@@ -537,31 +537,11 @@ class IPEXTransformerAtten(nn.Module):
                 # is_causal=False
                 # beam_idx shape [kv_len, beam], layout [kv_len, beam], dtype=int32
                 # self.cur_len = kv_len
-                '''
-                print("========================self.cur_len={}".format(self.cur_len))
-                print("----beam_shape={}".format(IPEXTransformerAtten.beam_index.shape))
-                print("----beam_shape={}".format(IPEXTransformerAtten.beam_index.stride()))
-                print("----beam_shape={}".format(IPEXTransformerAtten.beam_index.dtype))
-                
-                print("===========2nd_token")
-                print("---key_prompt={}".format(self.key_prompt.shape))
-                print("---key_prompt={}".format(self.key_prompt.stride()))
-                print("---value_prompt={}".format(self.value_prompt.shape))
-                print("---value_prompt={}".format(self.value_prompt.stride()))
-                print("---query={}".format(query.shape))
-                print("---query={}".format(query.stride()))
-                print("---key={}".format(key.shape))
-                print("---key={}".format(key.stride()))
-                print("---value={}".format(value.shape))
-                print("---value={}".format(value.stride()))
-                '''
                 attn_output = torch.xpu.IpexSDP_Index(query, self.key_prompt, self.value_prompt, key, value, IPEXTransformerAtten.beam_index, blocked_alibi, blocked_attn_mask, head_mask, self.cur_len, alpha, beta, dropout, is_causal)
-                #print("---attn_output={}".format(attn_output.shape))
-                #print("---attn_output={}".format(attn_output.stride()))
         else:
             if not first_token and IPEXTransformerAtten.beam_size > 1:
                 key, value = self.reorder_cache(key, value, IPEXTransformerAtten.beam_index)
-            attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi)
+            attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi, first_token=first_token)
 
         if first_token and IPEXTransformerAtten.beam_size > 1:
             # 1st token
@@ -668,12 +648,6 @@ class IPEXTransformerAtten(nn.Module):
         alibi: torch.Tensor = None,
         first_token = False
     ):
-        '''
-        print("================== self_cur_len={}".format(self.cur_len))
-        print("------IPEXTransformerAtten_batch_size={}".format(IPEXTransformerAtten.batch_size))
-        print("------IPEXTransformerAtten_beam_size={}".format(IPEXTransformerAtten.beam_size))
-        print("------attention_mask={}".format(attention_mask.shape))
-        '''
         # greedy_search
         # the shape of query, key, value, [seq, bs*beam, head*dim]
         # the layout of query, key, value, [seq, bs*beam, head*dim]
@@ -685,19 +659,7 @@ class IPEXTransformerAtten(nn.Module):
         # the shape of query, key, value, [seq, bs*beam, head*dim]
         # the layout of query, key, value, [seq, bs*beam, head*dim]
         query, key, value = self.compute_qkv(hidden_states=hidden_states, key_value_state=key_value_states, layer_past=layer_past, first_token=first_token)
-        '''
-        print("---query1={}".format(query.shape))
-        print("---query1={}".format(query.stride()))
-        print("---key1={}".format(key.shape))
-        print("---key1={}".format(key.stride()))
-        print("---value1={}".format(value.shape))
-        print("---value1={}".format(value.stride()))
-        '''
-        #print("---key_prompt1={}".format(self.key_prompt.shape))
-        #print("---key_prompt1={}".format(self.key_prompt.stride()))
-        #print("---value_prompt1={}".format(self.value_prompt.shape))
-        #print("---value_prompt1={}".format(self.value_prompt.stride()))
-        # print("-----------------------------")
+
         # greedy_search
         # the shape of query, key, value, [seq, bs*beam, head, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]
@@ -709,19 +671,7 @@ class IPEXTransformerAtten(nn.Module):
         # the shape of query, key, value, [seq, bs*beam, head, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]
         key, query = self.apply_rotary_embedding(key, query, position_ids=position_ids)
-        '''
-        print("---query2={}".format(query.shape))
-        print("---query2={}".format(query.stride()))
-        print("---key2={}".format(key.shape))
-        print("---key2={}".format(key.stride()))
-        print("---value2={}".format(value.shape))
-        print("---value2={}".format(value.stride()))
-        print("---key_prompt2={}".format(self.key_prompt.shape))
-        print("---key_prompt2={}".format(self.key_prompt.stride()))
-        print("---value_prompt2={}".format(self.value_prompt.shape))
-        print("---value_prompt2={}".format(self.value_prompt.stride()))
-        print("-----------------------------")
-        '''
+
         # greedy search
         # the shape of query, key, value, [seq, bs*beam, head, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]
@@ -732,20 +682,7 @@ class IPEXTransformerAtten(nn.Module):
         # the shape of query, key, value, [seq, bs*beam, head, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]
         query, key, value = self.combine_with_cache(query, key, value, first_token, layer_past)
-        '''
-        print("---query3={}".format(query.shape))
-        print("---query3={}".format(query.stride()))
-        print("---key3={}".format(key.shape))
-        print("---key3={}".format(key.stride()))
-        print("---value3={}".format(value.shape))
-        print("---value3={}".format(value.stride()))
-        print("---key_prompt3={}".format(self.key_prompt.shape))
-        print("---key_prompt3={}".format(self.key_prompt.stride()))
-        print("---value_prompt3={}".format(self.value_prompt.shape))
-        print("---value_prompt3={}".format(self.value_prompt.stride()))
-        print("-----------------------------")
-        '''
-        #print("----use_cahce={}".format(use_cache))
+
         if use_cache or self.is_decoder:
             if IPEXTransformerAtten.beam_size == 1:
                 present = (key, value)
@@ -770,8 +707,6 @@ class IPEXTransformerAtten(nn.Module):
         # the shape of query, key, value, [bs*beam, head, seq, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]
         attn_output, attn_weight = self.self_attention(query, key, value, attention_mask, head_mask, alibi, first_token)
-        #print("---attn_output1={}".format(attn_output.shape))
-        #print("---attn_output1={}".format(attn_output.stride()))
 
         # greedy search
         # the shape of attn_output [seq, bs*beam, hidden_size]
@@ -784,8 +719,6 @@ class IPEXTransformerAtten(nn.Module):
         # the shape of attn_output [seq, bs*beam, hidden_size]
         # the layout of attn_output [seq, bs*beam, hidden_size]
         attn_output = self.get_final_output(attn_output=attn_output, residual=residual)
-        #print("---attn_output2={}".format(attn_output.shape))
-        #print("---attn_output2={}".format(attn_output.stride()))
 
         outputs = (attn_output, present)
         if output_attentions:

@@ -110,8 +110,7 @@ class IPEXBloomBlock(nn.Module):
             # shape -> [bs*beam, seq, hidden_size]
             # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
             hidden_states = hidden_states.transpose(0, 1).contiguous()
-        
-        #layernorm_output = self.input_layernorm(hidden_states)
+
         layernorm_output = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.input_layernorm.normalized_shape, self.input_layernorm.weight, self.input_layernorm.bias, self.input_layernorm.eps)
         if self.config.do_norm_before:
             residual = layernorm_output

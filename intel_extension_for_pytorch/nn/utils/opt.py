@@ -60,9 +60,6 @@ class IPEXOptAtten(IPEXTransformerAtten):
         query = query.view(new_shape)
         key = key.view(new_shape)
         value = value.view(new_shape)
-        #print("---query.shape2={}".format(query.shape))
-        #print("---key.shape2={}".format(key.shape))
-        #print("---value.shape2={}".format(value.shape))
         return query, key, value
 
 
@@ -110,7 +107,6 @@ class IPEXOptBlock(nn.Module):
         # position_ids:   [bs*beam, seq]
         # attention_mask: [bs*beam, head, q_seq, kv_seq]
         bs = IPEXTransformerAtten.batch_size
-        #print("---hidden_states1={}".format(hidden_states.shape))
         dim = hidden_states.dim()
         if dim == 3:
             beam = hidden_states.shape[0] // bs
@@ -122,7 +118,6 @@ class IPEXOptBlock(nn.Module):
             print("Unsupported input shape")
             return
         IPEXTransformerAtten.beam_size = beam
-        #print("---IPEXTransformerAtten.beam_size={}".format(IPEXTransformerAtten.beam_size))
         first_token = True if seq > 1 else False
         hidden_size = hidden_states.shape[-1]
         hidden_shape = [bs, beam, seq, hidden_size]
@@ -142,11 +137,9 @@ class IPEXOptBlock(nn.Module):
             # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
             hidden_states = hidden_states.transpose(0, 1).contiguous()
 
-        #print("---hidden_states2={}".format(hidden_states.shape))
         residual = hidden_states
         if self.do_layer_norm_before:
             hidden_states = self.self_attn_layer_norm(hidden_states)
-        #print("---hidden_states3={}".format(hidden_states.shape))
 
         hidden_states, present_key_value, self_attn_weights = self.attn(
             hidden_states=hidden_states,
@@ -156,7 +149,7 @@ class IPEXOptBlock(nn.Module):
             output_attentions=output_attentions,
             residual=residual,
             first_token=first_token)
-        #print("---hidden_states4={}".format(hidden_states.shape))
+
         if not self.do_layer_norm_before:
             hidden_states = self.self_attn_layer_norm(hidden_states)
 
@@ -164,12 +157,10 @@ class IPEXOptBlock(nn.Module):
         if self.do_layer_norm_before:
             hidden_states = self.final_layer_norm(hidden_states)
         hidden_states = self.mlp(hidden_states, residual)
-        #print("---hidden_states5={}".format(hidden_states.shape))
 
         if not self.do_layer_norm_before:
             hidden_states = self.final_layer_norm(hidden_states)
 
-        #print("---hidden_states6={}".format(hidden_states.shape))
         if first_token and beam > 1:
             # for 1st token, expand the result with beam
             hidden_states = hidden_states.view(bs, 1, seq, hidden_size)
@@ -178,7 +169,7 @@ class IPEXOptBlock(nn.Module):
             # for 2nd to last token, we convert the layout back
             # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
             hidden_states = hidden_states.transpose(0, 1)
-        #print("---hidden_states7={}".format(hidden_states.shape))
+
         outputs = (hidden_states,)
         if output_attentions:
             outputs += (self_attn_weights,)

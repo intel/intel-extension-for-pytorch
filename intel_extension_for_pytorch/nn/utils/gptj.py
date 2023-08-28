@@ -71,7 +71,6 @@ class IPEXGPTJBlock(nn.Module):
         # attention_mask: [bs*beam, head, q_seq, kv_seq]
         bs = IPEXTransformerAtten.batch_size
         dim = hidden_states.dim()
-        #print("----hidden_states1={}".format(hidden_states.shape))
         if dim == 3:
             beam = hidden_states.shape[0] // bs
             seq = hidden_states.shape[1]
@@ -85,10 +84,6 @@ class IPEXGPTJBlock(nn.Module):
         first_token = True if seq > 1 else False
         hidden_size = hidden_states.shape[-1]
         hidden_shape = [bs, beam, seq, hidden_size]
-        #print("-----bs={}".format(bs))
-        #print("-----beam={}".format(beam))
-        #print("-----seq={}".format(seq))
-        #print("-----hidden_size={}".format(hidden_size))
         if first_token and beam > 1:
             # for 1st token, keep the original layout
             # reduce the duplicated info in beam dim
@@ -105,8 +100,6 @@ class IPEXGPTJBlock(nn.Module):
             # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
             hidden_states = hidden_states.transpose(0, 1).contiguous()
 
-        #print("----hidden_states2={}".format(hidden_states.shape))
-        #print("----hidden_states2={}".format(hidden_states.stride()))
         residual = hidden_states
         hidden_states = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.ln.normalized_shape, self.ln.weight, self.ln.bias, self.ln.eps)
         attn_outputs = self.attn(
@@ -232,7 +225,6 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
         self.is_int4 = is_int4
         self.config = config if config is not None else GPTJConfig()
         self.ipex_transformers_config = self.construct_transformer_config()
-        # print(self.ipex_transformers_config.__dict__)
         self.ipex_optimized_module = self.construct_ipex_optimized_module()
         self.port_all_parameters_to_new_module()
 

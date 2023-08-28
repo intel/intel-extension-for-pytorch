@@ -46,10 +46,17 @@ class GPTJRotaryEmbeddingRef(PositionalEmbedding):
         cos = torch.repeat_interleave(cos[:, :, None, :], 2, 3)
         return (tensor * cos) + (self.rotate_every_two(tensor) * sin)
 
-    def forward(self, query, key, position_ids, layer_id):
-        query = query.transpose(0,1).contiguous()
-        key = key.transpose(0,1).contiguous()
-        position_ids = position_ids.transpose(0, 1).contiguous()
+    def forward(self, query, key, position_ids, layer_id, beam_size):
+        # position_ids [bs*beam, seq_len]
+        first_token = position_ids.shape[-1] > 1
+        # beam search first_token
+        # query, key shape [bs*beam, seq, hidden_size], layout [bs*beam, seq, hidden_size]
+        # greedy search/ beam search 2nd token
+        # query, key shape [seq, bs*beam, hidden_size], layout [seq, bs*beam, hidden_size]
+        if beam_size == 1 or not first_token:
+            query = query.transpose(0,1).contiguous()
+            key = key.transpose(0,1).contiguous()
+            position_ids = position_ids.transpose(0, 1).contiguous()
         embed_positions = self._get_embed_positions(position_ids)
         repeated_position_ids = position_ids.unsqueeze(-1).repeat(1, 1, embed_positions.shape[-1])
         sincos = torch.gather(embed_positions, 1, repeated_position_ids)
@@ -68,8 +75,9 @@ class GPTJRotaryEmbeddingRef(PositionalEmbedding):
             key = self.apply_rotary_pos_emb(key, sin, cos)
             query = self.apply_rotary_pos_emb(query, sin, cos)
 
-        query = query.transpose(0,1).contiguous()
-        key = key.transpose(0,1).contiguous()
+        if beam_size == 1 or not first_token:
+            query = query.transpose(0,1).contiguous()
+            key = key.transpose(0,1).contiguous()
         return query, key
 
 
