@@ -1105,23 +1105,24 @@ static inline std::tuple<Tensor, Tensor, Tensor> _create_U_S_VT(
     bool compute_uv) {
   auto sizes = input.sizes().vec();
   int64_t m = input.size(-2), n = input.size(-1);
+  auto k = std::min(m, n);
 
-  sizes[input.dim() - 1] = (compute_uv && some) ? std::min(m, n) : m;
-  auto strides = at::detail::defaultStrides(sizes);
+  sizes[input.dim() - 1] = (compute_uv && some) ? k : m;
+  auto U_strides =
+      at::native::batched_matrix_contiguous_strides(sizes, /*f-contig*=*/true);
   // U should be a column-major or a batch of column-major matrices
   // ... x m x ucol will have strides: ...., ucol, 1
   // We require: ...., 1, m
-  strides[input.dim() - 1] = m;
-  strides[input.dim() - 2] = 1;
 
   Tensor U_empty;
-  U_empty = at::empty_strided(sizes, strides, input.options());
+  U_empty = at::empty_strided(sizes, U_strides, input.options());
 
-  sizes[input.dim() - 2] = n;
+  sizes[input.dim() - 2] = some ? k : n;
   sizes[input.dim() - 1] = n;
-  // VT should be a row-major or a batch of row-major matrices
+  auto Vh_strides =
+      at::native::batched_matrix_contiguous_strides(sizes, /*f-contig*=*/true);
   Tensor VT_empty;
-  VT_empty = at::empty(sizes, input.options());
+  VT_empty = at::empty_strided(sizes, Vh_strides, input.options());
 
   sizes.pop_back();
   sizes[input.dim() - 2] = std::min(m, n);
@@ -2778,16 +2779,16 @@ std::tuple<Tensor, Tensor, Tensor> _svd_helper(
     auto self_working_copy = native::cloneBatchedColumnMajor(self);
     auto& dpcpp_queue = dpcppGetCurrentQueue();
     auto self_stride = at::native::matrixStride(self_working_copy);
-    auto U_stride = at::native::matrixStride(U_working_copy);
+    auto U_stride = compute_uv ? at::native::matrixStride(U_working_copy) : 1;
     auto S_stride = S_working_copy.size(-1);
-    auto VT_stride = at::native::matrixStride(VT_working_copy);
+    auto VT_stride = compute_uv ? at::native::matrixStride(VT_working_copy) : 1;
     auto batchsize = at::native::batchCount(self_working_copy);
 
     auto m = self_working_copy.size(-2);
     auto n = self_working_copy.size(-1);
-    std::int64_t lda = m;
-    std::int64_t ldu = m;
-    std::int64_t ldvt = n;
+    int64_t lda = self_working_copy.stride(-1);
+    int64_t ldu = compute_uv ? U_working_copy.stride(-1) : 1;
+    int64_t ldvt = compute_uv ? VT_working_copy.stride(-1) : 1;
     IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
         self.scalar_type(), "svd_xpu", [&] {
           using value_t = typename c10::scalar_value_type<scalar_t>::type;
@@ -2800,12 +2801,12 @@ std::tuple<Tensor, Tensor, Tensor> _svd_helper(
               m,
               n,
               self.options(),
-              U_working_copy.data_ptr<scalar_t>(),
+              compute_uv ? U_working_copy.data_ptr<scalar_t>() : nullptr,
               ldu,
               U_stride,
               S_working_copy.data_ptr<value_t>(),
               S_stride,
-              VT_working_copy.data_ptr<scalar_t>(),
+              compute_uv ? VT_working_copy.data_ptr<scalar_t>() : nullptr,
               ldvt,
               VT_stride,
               jobz);
@@ -2823,11 +2824,7 @@ std::tuple<Tensor, Tensor, Tensor> _svd_helper(
     U_working_copy.zero_();
     VT_working_copy.zero_();
   }
-  if (compute_uv) {
-    if (some) {
-      VT_working_copy = VT_working_copy.narrow(-1, 0, k);
-    }
-  }
+
   return std::make_tuple(U_working_copy, S_working_copy, VT_working_copy);
 }
 
@@ -2860,10 +2857,9 @@ std::tuple<Tensor&, Tensor&, Tensor&> _linalg_svd_out(
   Tensor U_tmp, S_tmp, Vh_tmp;
   bool some = !full_matrices;
   std::tie(U_tmp, S_tmp, Vh_tmp) = _svd_helper(A, some, /*compute_uv=*/true);
-  Tensor Vh_c = Vh_tmp.conj().transpose(-2, -1);
   svd_resize_and_copy("U", U_tmp, U);
   svd_resize_and_copy("S", S_tmp, S);
-  svd_resize_and_copy("V", Vh_c, Vh);
+  svd_resize_and_copy("V", Vh_tmp, Vh);
   return std::tuple<Tensor&, Tensor&, Tensor&>(U, S, Vh);
 }
 
