@@ -128,7 +128,6 @@ ExternalProject_Add(libxsmm
   CONFIGURE_COMMAND ""
   BUILD_COMMAND
     make
-    "AVX=3"
     "-j"
     ${args}
   INSTALL_COMMAND ""
