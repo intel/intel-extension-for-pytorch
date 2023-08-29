@@ -259,6 +259,32 @@ PyObject* THPModule_setCurrentStream_wrap(
   END_HANDLE_TH_ERRORS
 }
 
+PyObject* THPModule_xpu_CachingAllocator_raw_alloc(
+    PyObject* self,
+    PyObject* args) {
+  HANDLE_TH_ERRORS
+  PyObject* size_o = nullptr;
+  if (!PyArg_ParseTuple(args, "O", &size_o)) {
+    THPUtils_invalidArguments(
+        args, nullptr, "caching_allocator_alloc", 1, "(ssize_t size)");
+    return nullptr;
+  }
+  auto size = PyLong_AsSsize_t(size_o);
+  void* mem = c10::GetAllocator(c10::DeviceType::XPU)->raw_allocate(size);
+  return PyLong_FromVoidPtr(mem);
+  END_HANDLE_TH_ERRORS
+}
+
+PyObject* THPModule_xpu_CachingAllocator_delete(
+    PyObject* _unused,
+    PyObject* obj) {
+  HANDLE_TH_ERRORS
+  void* mem_ptr = PyLong_AsVoidPtr(obj);
+  c10::GetAllocator(c10::DeviceType::XPU)->raw_deallocate(mem_ptr);
+  Py_RETURN_NONE;
+  END_HANDLE_TH_ERRORS
+}
+
 PyObject* THPModule_resetPeakMemoryStats(PyObject* _unused, PyObject* arg) {
   HANDLE_TH_ERRORS
   THPUtils_assert(
