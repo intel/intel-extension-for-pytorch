@@ -1572,17 +1572,21 @@ void batch_norm_backward_channels_first_kernel(
   auto input_ptr = input.data_ptr<input_scalar_t>();
   auto grad_output_ptr = grad_output.data_ptr<input_scalar_t>();
   input_scalar_t* grad_input_ptr =
-      grad_input.size(0) > 0 ? grad_input.data_ptr<input_scalar_t>() : nullptr;
+      grad_input.numel() > 0 ? grad_input.data_ptr<input_scalar_t>() : nullptr;
   stat_scalar_t* weight_ptr =
-      weight.size(0) > 0 ? weight.data_ptr<stat_scalar_t>() : nullptr;
+      weight.numel() > 0 ? weight.data_ptr<stat_scalar_t>() : nullptr;
   stat_scalar_t* grad_weight_ptr =
-      grad_weight.size(0) > 0 ? grad_weight.data_ptr<stat_scalar_t>() : nullptr;
+      grad_weight.numel() > 0 ? grad_weight.data_ptr<stat_scalar_t>() : nullptr;
   stat_scalar_t* grad_bias_ptr =
-      grad_bias.size(0) > 0 ? grad_bias.data_ptr<stat_scalar_t>() : nullptr;
-  stat_scalar_t* running_mean_ptr = running_mean.data_ptr<stat_scalar_t>();
-  stat_scalar_t* running_var_ptr = running_var.data_ptr<stat_scalar_t>();
-  auto save_mean_ptr = save_mean.data_ptr<accscalar_t>();
-  auto save_invstd_ptr = save_invstd.data_ptr<accscalar_t>();
+      grad_bias.numel() > 0 ? grad_bias.data_ptr<stat_scalar_t>() : nullptr;
+  stat_scalar_t* running_mean_ptr =
+      running_mean.defined() ? running_mean.data_ptr<stat_scalar_t>() : nullptr;
+  stat_scalar_t* running_var_ptr =
+      running_var.defined() ? running_var.data_ptr<stat_scalar_t>() : nullptr;
+  accscalar_t* save_mean_ptr =
+      save_mean.defined() ? save_mean.data_ptr<accscalar_t>() : nullptr;
+  accscalar_t* save_invstd_ptr =
+      save_invstd.defined() ? save_invstd.data_ptr<accscalar_t>() : nullptr;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto local_sum =
