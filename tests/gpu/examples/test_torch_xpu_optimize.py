@@ -22,6 +22,8 @@ TEST_MODULE_CONVERT_LIST = [
 
 SUPPORTED_FUSION_OPTIMIZER = ['Adam', 'SGD', 'AdamW', 'Lars', 'Lamb', 'splitSGD', 'Adagrad']
 
+SUPPORTED_SPARSE_OPTIMIZER = ['Adagrad']
+
 class InferenceModel(nn.Module):
     def __init__(self):
         super(InferenceModel, self).__init__()
@@ -74,6 +76,21 @@ class TrainingModel(nn.Module):
     def forward(self, x):
         x = self.m(x)
         x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
+
+
+class TrainingSparseModel(nn.Module):
+    def __init__(self):
+        super(TrainingSparseModel, self).__init__()
+        self.emb = nn.EmbeddingBag(hidden_channel, 128, mode="sum", sparse=True)
+        self.fc = nn.Linear(
+            in_features=128, out_features=class_num, bias=True
+        )
+
+    def forward(self, x):
+        offset = torch.tensor(list(range(batch_size)), dtype=torch.long).to(x.device)
+        x = self.emb(x, offset)
         x = self.fc(x)
         return x
 
@@ -173,6 +190,181 @@ class TestTorchMethod(TestCase):
         )
         check_pos = 0
         check_no_dropout_but_identity(optimized_module, check_pos)
+
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
+    def test_sparse_weight_optimizer(self):
+        lr = 0.01
+        weight_decay = 0.01
+
+        def create_model_optimizer(optimizer_string, mem_format, dtype):
+            model_optimizer_list = []
+            # create model
+            model_cpu = TrainingSparseModel()
+            model_xpu = TrainingSparseModel()
+
+            # align the weight
+            align_all(model_cpu, model_xpu)
+
+            model_cpu = model_cpu.train()
+            model_xpu = model_xpu.to(device=device).train()
+
+
+            # optimizer
+            if optimizer_string.lower() == "adagrad":
+                lr_decay = 0.01
+                optimizer_cpu = torch.optim.Adagrad(model_cpu.parameters(), lr=lr, lr_decay=lr_decay, weight_decay=0)
+                optimizer_xpu = torch.optim.Adagrad(model_xpu.parameters(), lr=lr, lr_decay=lr_decay, weight_decay=0)
+                model_optimizer_list.append([optimizer_cpu, optimizer_xpu])
+            else:
+                raise RuntimeError(
+                    "found unknown optimizer {}".format(optimizer_string)
+                )
+
+            model_and_optimzier_list = []
+            model_xpu, optimizer_xpu = torch.xpu.optimize(model=model_xpu,
+                                                          dtype=torch.float32, optimizer=model_optimizer_list[0][1])
+
+            model_and_optimzier_list.append([model_cpu, model_xpu, optimizer_cpu, optimizer_xpu])
+            return model_and_optimzier_list
+
+        def align_all(model_cpu, model_xpu):
+            for layer1 in model_xpu.modules():
+                for layer2 in model_cpu.modules():
+                    if isinstance(layer1, nn.BatchNorm2d) and isinstance(
+                        layer2, nn.BatchNorm2d
+                    ):
+                        layer1.weight.data = layer2.weight.clone().data
+                        layer1.bias.data = layer2.bias.clone().data
+                        if layer1.weight.grad is not None:
+                            layer1.weight.grad.data = layer2.weight.grad.clone().data
+                        if layer1.bias.grad is not None:
+                            layer1.bias.grad.data = layer2.bias.grad.clone().data
+
+                    if isinstance(layer1, nn.EmbeddingBag) and isinstance(
+                        layer2, nn.EmbeddingBag
+                    ):
+                        layer1.weight.data = layer2.weight.clone().data
+                        if layer1.weight.grad is not None:
+                            layer1.weight.grad.data = layer2.weight.grad.clone().data
+
+                    if isinstance(layer1, nn.Conv2d) and isinstance(layer2, nn.Conv2d):
+                        layer1.weight.data = layer2.weight.clone().data
+                        if layer1.weight.grad is not None:
+                            layer1.weight.grad.data = layer2.weight.grad.clone().data
+                        if hasattr(layer1, "master_weight"):
+                            layer1.master_weight.data = (
+                                layer2.master_weight.clone().data
+                            )
+
+                    if isinstance(layer1, nn.Linear) and isinstance(layer2, nn.Linear):
+                        layer1.weight.data = layer2.weight.clone().data
+                        layer1.bias.data = layer2.bias.clone().data
+                        if layer1.weight.grad is not None:
+                            layer1.weight.grad.data = layer2.weight.grad.clone().data
+                        if layer1.bias.grad is not None:
+                            layer1.bias.grad.data = layer2.bias.grad.clone().data
+                        if hasattr(layer1, "master_weight"):
+                            layer1.master_weight.data = (
+                                layer2.master_weight.clone().data
+                            )
+                        if hasattr(layer1, "master_bias"):
+                            layer1.master_bias.data = layer2.master_bias.clone().data
+            torch.xpu.synchronize()
+
+        def training(input, target, mode, dtype, optimizer, mem_format):
+            criterion = nn.CrossEntropyLoss()
+
+            # forward
+            loss = None
+            if input.device == "xpu":
+                with torch.xpu.amp.autocast(enabled=True, dtype=dtype):
+                    output = mode(input)
+                    loss = criterion(output, target)
+            else:
+                if dtype == torch.float32:
+                    output = mode(input)
+                    loss = criterion(output, target)
+                else:
+                    with torch.autocast(device_type="cpu", enabled=True, dtype=dtype):
+                        output = mode(input)
+                        loss = criterion(output, target)
+
+
+            # optimizer
+            optimizer.zero_grad(set_to_none=True)
+
+            loss.backward()
+
+            # fusion optimizer and no-fused optimizer update
+            optimizer.step()
+            if input.device == "xpu":
+                torch.xpu.synchronize()
+
+        for optimizer_string in SUPPORTED_SPARSE_OPTIMIZER:
+            print("checking optimizer: ", optimizer_string)
+            support_dtype_list = [torch.float32]
+            for dtype in support_dtype_list:
+                print("checking dtype: ", dtype)
+                if dtype == torch.bfloat16:
+                    checking_atol = 1e-3
+                    checking_rtol = 1.6e-2
+                else:
+                    checking_atol = 1e-3
+                    checking_rtol = 1.6e-2
+                for mem_format in [torch.contiguous_format, torch.channels_last]:
+                    print('checking memory format: ', mem_format)
+                    model_optimizer_list = create_model_optimizer(optimizer_string, mem_format, dtype=dtype)
+                    for model_optimizer_item in model_optimizer_list:
+                        model_cpu = model_optimizer_item[0]
+                        model_xpu = model_optimizer_item[1]
+                        optimizer_cpu = model_optimizer_item[2]
+                        optimizer_xpu = model_optimizer_item[3]
+                        for i in range(num_iter):
+                            print('checking iter: ', i, '. optimizer: ', optimizer_string, end='')
+                            print('. memory format: ', mem_format, ' dtype: ', dtype)
+                            input = torch.randint(0, hidden_channel, (batch_size,))
+                            target = torch.empty(batch_size, dtype=torch.long).random_(class_num)
+
+                            align_all(model_cpu.to(device=device), model_xpu)
+                            model_cpu.to("cpu")
+
+                            training(input, target, model_cpu, dtype, optimizer_cpu, mem_format)
+                            training(input.to(device), target.to(device), model_xpu, dtype, optimizer_xpu, mem_format)
+
+                            # checking updated weight
+                            for layer1 in model_xpu.modules():
+                                for layer2 in model_cpu.modules():
+                                    if (isinstance(layer1, nn.BatchNorm2d) and isinstance(layer2, nn.BatchNorm2d)):
+                                        self.assertEqual(layer1.weight.cpu(),
+                                                         layer2.weight.cpu(),
+                                                         atol=checking_atol,
+                                                         rtol=checking_rtol)
+                                        self.assertEqual(layer1.bias.cpu(),
+                                                         layer2.bias.cpu(),
+                                                         atol=checking_atol,
+                                                         rtol=checking_rtol)
+                                    if (isinstance(layer1, nn.Conv2d) and isinstance(layer2, nn.Conv2d)):
+                                        self.assertEqual(layer1.weight.cpu(),
+                                                         layer2.weight.cpu(),
+                                                         atol=checking_atol,
+                                                         rtol=checking_rtol)
+                                    if (isinstance(layer1, nn.Linear) and isinstance(layer2, nn.Linear)):
+                                        self.assertEqual(layer1.weight.cpu(),
+                                                         layer2.weight.cpu(),
+                                                         atol=checking_atol,
+                                                         rtol=checking_rtol)
+                                        self.assertEqual(layer1.bias.cpu(),
+                                                         layer2.bias.cpu(),
+                                                         atol=checking_atol,
+                                                         rtol=checking_rtol)
+                                    if (isinstance(layer1, nn.EmbeddingBag) and isinstance(layer2, nn.EmbeddingBag)):
+                                        self.assertEqual(layer1.weight.cpu(),
+                                                         layer2.weight.cpu(),
+                                                         atol=checking_atol,
+                                                         rtol=checking_rtol)
+
 
     @pytest.mark.skipif(
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
