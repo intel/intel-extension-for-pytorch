@@ -140,7 +140,8 @@ void renorm_kernel(
         }
       }
 
-      v = GroupReduceSum(item, v, IPEXGetLocalAccPointer(smem));
+      v = GroupReduceSum(
+          item, v, static_cast<accscalar_t*>(smem.get_pointer().get()));
 
       if (tid == 0) {
         smem[0] = std::pow(v, static_cast<accscalar_t>(1.0 / norm_type));

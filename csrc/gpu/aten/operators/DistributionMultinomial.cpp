@@ -84,7 +84,7 @@ inline void renormRows(Tensor& t) {
                 t_ptr,
                 rows,
                 cols,
-                (unsigned char*)(IPEXGetLocalAccPointer(slm)));
+                (unsigned char*)(slm.get_pointer().get()));
           };
           cgh.parallel_for(
               sycl::nd_range<1>(num_groups * group_size, group_size), kfn);

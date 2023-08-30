@@ -65,11 +65,10 @@ inline void fast_group_radix_select_impl_(
       PrivateValueT values[SelectMethod::REG_LEN];
 
       KeyT* keys_temp = reinterpret_cast<KeyT*>(
-          IPEXGetLocalAccPointer(slm) +
-          SelectMethod::GetSharedLocalMemorySize());
+          slm.get_pointer().get() + SelectMethod::GetSharedLocalMemorySize());
       PrivateValueT* values_temp = reinterpret_cast<PrivateValueT*>(
-          IPEXGetLocalAccPointer(slm) +
-          SelectMethod::GetSharedLocalMemorySize() + ntopk * sizeof(KeyT));
+          slm.get_pointer().get() + SelectMethod::GetSharedLocalMemorySize() +
+          ntopk * sizeof(KeyT));
 
 #pragma unroll
       for (int ITEM = 0; ITEM < KEYS_PER_ITEM; ++ITEM) {
