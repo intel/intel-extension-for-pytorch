@@ -100,7 +100,6 @@ function (print_xpu_config_summary)
     message(STATUS "  BUILD_SEPARATE_OPS    : ${BUILD_SEPARATE_OPS}")
     message(STATUS "  BUILD_SIMPLE_TRACE    : ${BUILD_SIMPLE_TRACE}")
     message(STATUS "  BUILD_JIT_QUANTIZATION_SAVE : ${BUILD_JIT_QUANTIZATION_SAVE}")
-
     message(STATUS "")
     message(STATUS "********************************")
 endfunction()

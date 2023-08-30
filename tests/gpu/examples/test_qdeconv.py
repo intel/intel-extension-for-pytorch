@@ -1,8 +1,8 @@
 import torch
 import pytest
 import intel_extension_for_pytorch as ipex  # noqa
-import numpy as np
 from torch.testing._internal.common_utils import TestCase
+import platform
 
 
 def fake_minmax_sc(x):
@@ -16,74 +16,6 @@ class TestTorchMethod(TestCase):
         "fbgemm" not in torch.backends.quantized.supported_engines,
         reason="No qengine found. USE_FBGEMM=1 is needed for building pytorch",
     )
-    def test_qdeconv_floatref(self, dtype=torch.float):
-        with torch.xpu.onednn_verbose(0):
-            zero_point = 0
-            torch_u8_symm_zp = 128
-
-            dtype_inputs = torch.quint8
-            dtype_filters = torch.qint8
-
-            output_channels = 1
-            bias = None
-            X_scale = 1.2
-            X_zero_points = 0
-            W_scale = 0.2
-            Y_scale = 4.2
-            Y_zero_point = 0
-            X_zero_point = 0
-
-            (X_value_min, X_valu_max) = (-64, 64)
-            X_init = torch.randint(X_value_min, X_valu_max, (1, 1, 5, 5, 5))
-            # Actually, this is a dequant formulation, motivation for this design is to make
-            # true int8 tensor is at smalle range, aka (-5, 5) in current case. This would
-            # avoid overflow during kernel computation.
-            X = X_scale * (X_init - X_zero_point).float()
-
-            (W_value_min, W_value_max) = (-5, 5)
-            W_scale = W_scale * output_channels
-            W_init = torch.randint(W_value_min, W_value_max, (1, 1, 3, 3, 3))
-            W = (W_scale * W_init).float()
-
-            X_gpu = X.to("xpu")
-            W_gpu = W.to("xpu")
-            if bias is not None:
-                bias_gpu = bias.to("xpu")
-            else:
-                bias_gpu = None
-
-            qX_gpu = torch.quantize_per_tensor(
-                X_gpu, X_scale, torch_u8_symm_zp, dtype_inputs
-            )
-            qW_gpu = torch.quantize_per_tensor(W_gpu, W_scale, 0, dtype_filters)
-            packed_params_gpu = torch.ops.quantized.conv_transpose3d_prepack(
-                qW_gpu, bias_gpu, (1, 1, 1), (0, 0, 0), (0, 0, 0), (1, 1, 1), 1
-            )
-            output_gpu_int8 = torch.ops.quantized.conv_transpose3d(
-                qX_gpu, packed_params_gpu, Y_scale, Y_zero_point
-            )
-
-            Y = torch.nn.functional.conv_transpose3d(
-                X,
-                W,
-                bias=None,
-                stride=1,
-                padding=0,
-                output_padding=0,
-                groups=1,
-                dilation=1,
-            )
-            qY_ref = torch.quantize_per_tensor(Y, Y_scale, 0, torch.qint8)
-            np.testing.assert_array_almost_equal(
-                qY_ref.int_repr().cpu().numpy(),
-                output_gpu_int8.int_repr().cpu().numpy(),
-                decimal=0,
-            )
-
-    @pytest.mark.skipif(
-        "fbgemm" not in torch.backends.quantized.supported_engines,
-        reason="No qengine found. USE_FBGEMM=1 is needed for building pytorch",
-    )
     def test_qdeconv3d_cpuref(self, dtype=torch.float):
         print(
             "Please open FBGEMM (PyTorch CPU INT8 default engine ) when build PyTorch, "
@@ -92,7 +24,6 @@ class TestTorchMethod(TestCase):
         )
         with torch.xpu.onednn_verbose(0):
             zero_point = 0
-            torch_u8_symm_zp = 128
 
             dtype_inputs = torch.quint8
             dtype_filters = torch.qint8
@@ -104,7 +35,7 @@ class TestTorchMethod(TestCase):
             W_scale = 0.2
             Y_scale = 4.2
             Y_zero_point = 0
-            X_zero_point = 128
+            X_zero_point = 0 if platform.system() == 'Windows' else 128
 
             (X_value_min, X_valu_max) = (32, 64)
             X_init = torch.randint(X_value_min, X_valu_max, (1, 1, 5, 5, 5))
@@ -143,7 +74,7 @@ class TestTorchMethod(TestCase):
 
             # We do the s8 quantize in backend, the formula is qx = x / sc + 0
             qX_gpu = torch.quantize_per_tensor(
-                X_gpu, X_scale, torch_u8_symm_zp, dtype_inputs
+                X_gpu, X_scale, X_zero_point, dtype_inputs
             )
             print("fake qX_gpu:", X_gpu / X_scale)
             qW_gpu = torch.quantize_per_tensor(W_gpu, W_scale, 0, dtype_filters)

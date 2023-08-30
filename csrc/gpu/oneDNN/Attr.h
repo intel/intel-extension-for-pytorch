@@ -24,6 +24,13 @@ namespace oneDNN {
    Int8 Convolution: dst_fp32 = (src_int8 * wei_int8) * (scale_src * scale_wei)
    Int8 Convolution: dst_int8 = 1 / scale_dst * dst_fp32;
 
+   Considering zero-point (asymmetric):
+   dst_fp32 = (src_int8 - src_zp) * src_sc * wei_int8 * wei_sc
+   dst_sc * (dst_int8 - dst_zp) = (src_int8 - src_zp) * wei_int8  * src_sc *
+                                 wei_sc
+   dst_int8 = (src_int8 - src_zp) * wei_int8 * src_sc * wei_sc / dst_sc +
+              dst_zp
+
    considering bias:
    fp32 Convolution: dst_fp32 = src_fp32 * wei_fp32 + bias
    Int8 Convolution: dst_fp32 = (src_int8 * wei_int8) * (scale_src * scale_wei)
@@ -258,19 +265,6 @@ class Attr {
     return *this;
   }
 
-  // This function only work for int8
-  ScalarType get_dst_dtype() {
-    // this function is used to check whether the last post op is relu or not
-    // if with relu and alpha<=0 in leakyrelu, the dst should U8 type
-    // otherwise, the output should in S8 type
-    auto dtype = at::kQInt8;
-    auto last_op = ops_params_[-1];
-    if (last_op.algo_ == kind_with_relu && last_op.alpha_ <= 0.0) {
-      dtype = at::kQUInt8;
-    }
-    return dtype;
-  }
-
   void extract_post_ops(post_ops& dnnl_post_ops, const Tensor& dst) {
     // this function is used to extract post ops params from the ops_params_
     // and put them into onednn post ops
@@ -286,6 +280,8 @@ class Attr {
         }
         case kind_t::sum: {
           float scale = ops_params_[i].scale_;
+          // TODO [Asymmetric]:
+          // Post-sum zp for gpu is not supported currently
           dnnl_post_ops.append_sum(scale);
           break;
         }
@@ -320,11 +316,6 @@ class Attr {
       // On the other hand, for u8 in oneDNN, the scale for quantization is
       // defined as max_v/(qmax-qmin). Hence, we need to divide by 2 here.
       // (https://oneapi-src.github.io/oneDNN/dev_guide_inference_int8.html)
-      q_scale_ =
-          (get_onednn_dtype_include_double(dst) == memory::data_type::u8 &&
-           dst.q_zero_point() == 128)
-          ? q_scale_ / 2
-          : q_scale_;
       dnnl_post_ops.append_eltwise(
           kind_with_linear, 1.f / q_scale_, q_zero_point_);
     }

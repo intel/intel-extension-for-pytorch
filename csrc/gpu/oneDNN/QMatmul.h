@@ -1,11 +1,9 @@
 #pragma once
 
 #include <ATen/ATen.h>
-
 #include <ATen/record_function.h>
 
 #include <oneDNN/Runtime.h>
-#include <quantized/QUtils.h>
 #include <runtime/Utils.h>
 #include <tensor/Tensor.h>
 #include <utils/LRUCache.h>
@@ -20,7 +18,7 @@ using namespace at::AtenIpexTypeXPU;
 
 namespace xpu {
 namespace oneDNN {
-static inline void matmul(
+static inline void quantized_matmul(
     Tensor& result,
     const Tensor& mat1,
     const Tensor& mat2,
@@ -41,13 +39,15 @@ static inline void matmul(
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  Tensor m1 =
-      xpu::oneDNN::is_onednn_matmul_strides(mat1) ? mat1 : mat1.contiguous();
-  Tensor m2 =
-      xpu::oneDNN::is_onednn_matmul_strides(mat2) ? mat2 : mat2.contiguous();
+  Tensor m1 = xpu::oneDNN::is_onednn_matmul_strides(mat1)
+      ? mat1
+      : contiguous_if_needed(mat1);
+  Tensor m2 = xpu::oneDNN::is_onednn_matmul_strides(mat2)
+      ? mat2
+      : contiguous_if_needed(mat2);
   Tensor dst = xpu::oneDNN::is_onednn_matmul_strides(result, true)
       ? result
-      : result.contiguous();
+      : contiguous_if_needed(result);
 
   int64_t m = dst.size(-2);
   int64_t n = dst.size(-1);
@@ -113,10 +113,10 @@ static inline void matmul(
   }
 
   // bias is fused in post-op for quantized path
-  with_bias &= (!m1.is_quantized()) && (!m2.is_quantized());
   b = b.contiguous(); // avoid reorder 2 times
 
   // ipex matmul support both ab/ba shape for m2 tensor, we don't check any more
+
   auto m1_usr_dt = get_onednn_dtype(m1);
   auto m2_usr_dt = get_onednn_dtype(m2);
   auto dst_usr_dt = get_onednn_dtype(dst);
@@ -129,18 +129,9 @@ static inline void matmul(
   memory::desc m1_md, m1_usr_md, m1_any_md;
   memory::desc m2_md, m2_usr_md, m2_any_md;
   memory::desc dst_md, dst_usr_md, dst_any_md;
-  memory::desc bias_md;
+  memory::desc b_md;
 
-  // Naive Master weight
-  if (m1_dt == memory::data_type::bf16 && m2_dt == memory::data_type::f32) {
-    m2_dt = memory::data_type::bf16;
-    dst_dt = memory::data_type::bf16;
-  } else if (
-      m1_dt == memory::data_type::f32 && m2_dt == memory::data_type::bf16) {
-    m1_dt = memory::data_type::bf16;
-    dst_dt = memory::data_type::bf16;
-  }
-
+  // STEP1: create memory desc
   memory::dims m1_dims, m2_dims, dst_dims, bias_dims;
   memory::dims m1_strides, m2_strides, dst_strides, bias_strides;
   if (dims == 2) {
@@ -175,10 +166,12 @@ static inline void matmul(
     bias_strides = get_onednn_strides(b);
   }
 
-  auto is_onednn_layout_suggested = using_onednn_layout_for_matmul(m1);
+  std::unordered_map<int, memory> args;
 
   post_ops po;
   attr.extract_post_ops(po, dst);
+  auto is_onednn_layout_suggested = using_onednn_layout_for_matmul(m1);
+  bool m1_need_zp = (m1.q_zero_point() != 0);
 
   lru_key_t key_primitive;
 #ifdef USE_PRIMITIVE_CACHE
@@ -198,25 +191,20 @@ static inline void matmul(
       bias_strides,
       dims,
       is_onednn_layout_suggested,
+      m1_need_zp,
       attr);
 #endif
 
-  // Only setting zp mask when zp is not zero
-  // See: [Note: Use symmetric quant implementation when zp is 0]
-  bool src_need_zp = m1.is_quantized() && requires_runtime_zp(m1);
-  bool dst_need_zp = dst.is_quantized() && requires_runtime_zp(dst);
-  bool wgh_need_zp = m2.is_quantized() && requires_runtime_zp(m2);
-
-  std::unordered_map<int, memory> args;
-
-  dnnl::matmul matmul_p;
-  dnnl::matmul::primitive_desc matmul_pd;
-
+  // STEP3: create primitive
 #ifdef USE_PRIMITIVE_CACHE
   bool load_from_cache = find_key<dnnl::matmul>(key_primitive);
 #else
   bool load_from_cache = false;
 #endif
+
+  dnnl::matmul matmul_p;
+  dnnl::matmul::primitive_desc matmul_pd;
+
   if (load_from_cache) {
     // load primitive from cache
     matmul_p = fetch_m<dnnl::matmul>(key_primitive);
@@ -224,8 +212,7 @@ static inline void matmul(
     matmul_pd = dnnl::matmul::primitive_desc(
         const_cast<dnnl_primitive_desc_t>(matmul_pd_t));
   } else {
-    // STEP1: create memory desc
-    if (dims == 2 && is_onednn_layout_suggested) {
+    if (is_onednn_layout_suggested && dims == 2) {
       m1_md = memory::desc(m1_dims, m1_dt, memory::format_tag::any);
       m2_md = memory::desc(m2_dims, m2_dt, memory::format_tag::any);
       dst_md = memory::desc(dst_dims, dst_dt, memory::format_tag::any);
@@ -234,7 +221,6 @@ static inline void matmul(
       m2_md = memory::desc(m2_dims, m2_dt, m2_strides);
       dst_md = memory::desc(dst_dims, dst_dt, dst_strides);
     }
-
     // STEP2: creat attribute
     primitive_attr pattr;
     pattr.set_post_ops(po);
@@ -243,38 +229,37 @@ static inline void matmul(
     pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
 
+    Tensor m2_sc;
+    memory::desc m2_sc_md =
+        memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+    memory m2_sc_m, m2_zp_m;
+    if (m2.is_quantized()) {
+      bool wgh_need_zp = (m2.q_zero_point() != 0);
+      if (m2.qscheme() == kPerTensorAffine) {
+        pattr.set_scales_mask(DNNL_ARG_WEIGHTS, 0);
+        if (wgh_need_zp)
+          pattr.set_zero_points_mask(DNNL_ARG_WEIGHTS, 0);
+      } else {
+        pattr.set_scales_mask(DNNL_ARG_WEIGHTS, 1 << 1);
+      }
+    }
+
+    Tensor m1_sc;
+    memory::desc m1_sc_md =
+        memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+    memory m1_sc_m, m1_zp_m;
     if (m1.is_quantized()) {
-      auto in_scale = m1.q_scale();
       int mask_ac = 0;
-      // See [Note: Per-channel quantization mask setting]
-      // 1<<1 = 2^1, quantize on second channel of weight aka n in [k, n]
-      int mask_wgh = (m2.qscheme() == kPerChannelAffine) ? 1 << 1 : 0;
-      if (dst.is_quantized())
-        pattr.set_scales_mask(DNNL_ARG_DST, mask_ac);
       pattr.set_scales_mask(DNNL_ARG_SRC, mask_ac);
-      pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_wgh);
-
-#ifdef BUILD_PRIOR_SYMM_QUANT
-      // Only setting zp mask when zp is not zero
-      // See: [Note: Use symmetric quant implementation when zp is 0]
-      if (src_need_zp)
-        pattr.set_zero_points_mask(DNNL_ARG_DST, mask_ac);
-      if (dst_need_zp)
+      if (m1_need_zp) {
         pattr.set_zero_points_mask(DNNL_ARG_SRC, mask_ac);
-      if (wgh_need_zp)
-        pattr.set_zero_points_mask(DNNL_ARG_WEIGHTS, mask_wgh);
-#endif
+      }
     }
 
-    if (m1_dt == memory::data_type::f32) {
-      pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
-    }
-
-    // STEP3: create primitive
     if (with_bias) {
-      bias_md = memory::desc(bias_dims, bias_dt, bias_strides);
+      b_md = memory::desc(bias_dims, bias_dt, bias_strides);
       matmul_pd =
-          matmul::primitive_desc(engine, m1_md, m2_md, bias_md, dst_md, pattr);
+          matmul::primitive_desc(engine, m1_md, m2_md, b_md, dst_md, pattr);
     } else {
       matmul_pd = matmul::primitive_desc(engine, m1_md, m2_md, dst_md, pattr);
     }
@@ -289,7 +274,6 @@ static inline void matmul(
   m1_usr_md = memory::desc(m1_dims, m1_usr_dt, m1_strides);
   m2_usr_md = memory::desc(m2_dims, m2_usr_dt, m2_strides);
   dst_usr_md = memory::desc(dst_dims, dst_usr_dt, dst_strides);
-
   // STEP4: create memory
   auto m1_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(m1);
   auto m1_usr_m = m1_ctx.is_plain()
@@ -319,6 +303,15 @@ static inline void matmul(
     onoff &= c10::InferenceMode::is_enabled();
     return onoff;
   }();
+
+#ifdef USE_SCRATCHPAD_MODE
+  int scratchpad_size = matmul_pd.scratchpad_desc().get_size();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
+      {scratchpad_size}, m1.options().dtype(at::kByte), c10::nullopt);
+  auto scratchpad_memory = dpcpp_onednn_memory(
+      matmul_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+  args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_memory});
+#endif
 
   // reorder cases
   // case1: master weight support to reorder data type
@@ -357,74 +350,44 @@ static inline void matmul(
   if (attr.with_binary())
     attr.construct_post_binary(matmul_pd, po, args);
 
-#ifdef USE_SCRATCHPAD_MODE
-  size_t scratchpad_size = matmul_pd.scratchpad_desc().get_size();
-  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
-      {scratchpad_size}, m1.options().dtype(at::kByte), c10::nullopt);
-  auto scratchpad_memory = dpcpp_onednn_memory(
-      matmul_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
-  args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_memory});
-#endif
-
   args.insert({DNNL_ARG_SRC, m1_m});
   args.insert({DNNL_ARG_WEIGHTS, m2_m});
   args.insert({DNNL_ARG_DST, dst_m});
-  if (with_bias) {
-    auto bias_m = dpcpp_onednn_memory(bias_md, engine, b.data_ptr());
-    args.insert({DNNL_ARG_BIAS, bias_m});
+  if (b.defined()) {
+    auto b_m = dpcpp_onednn_memory(b_md, engine, b.data_ptr());
+    args.insert({DNNL_ARG_BIAS, b_m});
   }
 
-  // TODO: Separate quantized path from fp32 path
-  if ((!m1.is_quantized()) && (!m2.is_quantized())) {
-    // Path1: normal path for non quantized input
-    DPCPP_ONEDNN_EXEC(matmul_p, strm, args);
-  } else {
-    // Path2: quantized path, set runtime sale and zp here
-    bool is_per_tensor_quantized = (m2.qscheme() == kPerTensorAffine);
-
-    memory m1_sc_m, m1_zp_m;
-    memory::desc m1_sc_md =
-        memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
-    std::tie(m1_sc_m, m1_zp_m) = q_get_sc_zp_gpu_mem(m1, engine);
-    args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, m1_sc_m});
-
-    memory dst_sc_m, dst_zp_m;
-    if (dst.is_quantized()) {
-      std::tie(dst_sc_m, dst_zp_m) = q_get_sc_zp_gpu_mem(dst, engine);
-      args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_DST, dst_sc_m});
+  // Add scale/zp md
+  Tensor m2_sc;
+  memory m2_sc_m, m2_zp_m;
+  memory::desc m2_sc_md =
+      memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+  if (m2.is_quantized()) {
+    if (m2.qscheme() == kPerTensorAffine) {
+      std::tie(m2_sc_m, m2_zp_m) = xpu::oneDNN::q_get_sc_zp_gpu_mem(m2, engine);
+    } else {
+      m2_sc = m2.q_per_channel_scales().to(at::kFloat);
+      m2_sc_m = dpcpp_onednn_memory(m2_sc_md, engine, m2_sc.data_ptr());
+      // See [Note: Per-channel quantization mask setting]
     }
+    args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, m2_sc_m});
+  }
 
-    // Only setting zp when zp is not zero
-    // See: [Note: Use symmetric quant implementation when zp is 0]
-    if (src_need_zp) {
+  Tensor m1_sc;
+  memory::desc m1_sc_md =
+      memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
+  memory m1_sc_m, m1_zp_m;
+  if (m1.is_quantized()) {
+    int mask_ac = 0;
+    std::tie(m1_sc_m, m1_zp_m) = xpu::oneDNN::q_get_sc_zp_gpu_mem(m1, engine);
+    args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, m1_sc_m});
+    if (m1_need_zp) {
       args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, m1_zp_m});
     }
-
-    // Only setting zp when zp is not zero
-    // See: [Note: Use symmetric quant implementation when zp is 0]
-    if (dst.is_quantized() && dst_need_zp) {
-      args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zp_m});
-    }
-
-    if (is_per_tensor_quantized) {
-      memory m2_sc_m;
-      m2_sc_m = q_get_wgh_sc_gpu_mem(m2, engine);
-      args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, m2_sc_m});
-
-      DPCPP_ONEDNN_EXEC(matmul_p, strm, args);
-    } else {
-      // Per-channel quantized
-      Tensor wgh_sc = m2.q_per_channel_scales();
-      memory::desc wgh_sc_md = memory::desc(
-          get_onednn_dims(wgh_sc),
-          memory::data_type::f32,
-          memory::format_tag::x);
-      memory wgh_sc_m =
-          dpcpp_onednn_memory(wgh_sc_md, engine, wgh_sc.data_ptr());
-      args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});
-      DPCPP_ONEDNN_EXEC(matmul_p, strm, args);
-    }
   }
+
+  DPCPP_ONEDNN_EXEC(matmul_p, strm, args);
   if (is_onednn_layout_suggested && dst_m != dst_usr_m && dims == 2) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));

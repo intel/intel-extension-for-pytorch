@@ -235,10 +235,11 @@ Tensor q_conv2d(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, output_scale, 0, kQInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto post_op = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -256,10 +257,11 @@ at::Tensor q_conv2d_relu(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, output_scale, 128, kQUInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -281,10 +283,11 @@ Tensor q_conv3d(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<3>(packed_weight, output_scale, 0, kQInt8);
+  auto qconv_wrapper = QuantizeConvConverter<3>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto post_op = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<3>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -302,10 +305,11 @@ Tensor q_conv3d_relu(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<3>(packed_weight, output_scale, 128, kQUInt8);
+  auto qconv_wrapper = QuantizeConvConverter<3>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto post_op = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<3>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -327,8 +331,8 @@ Tensor q_deconv3d(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<3>(packed_weight, output_scale, 0, kQInt8);
+  auto qconv_wrapper = QuantizeConvConverter<3>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
 
   // TODO: no post op for q_deconv3d
   auto post_op = [=]() {
@@ -356,6 +360,12 @@ TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
 
 namespace AtenIpexTypeXPU {
 
+//[Note]: Post-op for fusion with accumulation
+// Y = (x_int8 - x_zp) * x_sc * w_int8 * w_sc + (acc - acc_zp) * acc_sc
+// Y = conv(X, W) + (acc - acc_zp) * acc_sc
+// Y = acc_sc * [1/acc_sc * conv(X, W) + acc - acc_zp] #post linear
+// Let conv(X, W) + acc = temp, then                   #post sum
+// Y = acc_sc * temp - acc_zp * acc_sc                 #post linear
 at::Tensor q_conv2d_sum(
     const Tensor& input,
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
@@ -365,23 +375,28 @@ at::Tensor q_conv2d_sum(
     double sum_scale,
     int64_t sum_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto output_zp = accumu.scalar_type() == kQUInt8 ? 128 : 0;
   auto qconv_wrapper = QuantizeConvConverter<2>(
-      packed_weight, sum_scale, output_zp, accumu.scalar_type());
+      packed_weight, sum_scale, sum_zero_point, accumu.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(sum_scale));
+    Attr attr(/* q_scale */ static_cast<float>(sum_scale), sum_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
       Tensor bias = pack_ptr->bias.value();
       attr.append_bias<2>(bias);
     }
-    return attr.append_post_sum(
-        1.f,
-        accumu.scalar_type() == kQUInt8
-            ? accumu.q_scale() / 2
-            : accumu.q_scale()); // See [Note: Gap of u8 qtensor scale between
-                                 // oneDNN and PyTorch]
+    return attr
+        .append_post_eltwise(
+            1,
+            /*alpha*/ 1.0 / accumu.q_scale(),
+            /*beta*/ 0.f,
+            attr.kind_with_linear)
+        .append_post_sum(1.f, 1.f)
+        .append_post_eltwise(
+            1,
+            /*alpha*/ accumu.q_scale(),
+            -accumu.q_zero_point() * accumu.q_scale(),
+            attr.kind_with_linear);
   };
   return qconv_wrapper.call(input, accumu, att);
 }
@@ -395,11 +410,10 @@ at::Tensor q_conv2d_sum_relu(
     double sum_scale,
     int64_t sum_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto output_zp = accumu.scalar_type() == kQUInt8 ? 128 : 0;
   auto qconv_wrapper = QuantizeConvConverter<2>(
-      packed_weight, sum_scale, output_zp, accumu.scalar_type());
+      packed_weight, sum_scale, sum_zero_point, accumu.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(sum_scale));
+    Attr attr(/* q_scale */ static_cast<float>(sum_scale), sum_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -407,12 +421,17 @@ at::Tensor q_conv2d_sum_relu(
       attr.append_bias<2>(bias);
     }
     return attr
-        .append_post_sum(
-            1.f,
-            accumu.scalar_type() == kQUInt8
-                ? accumu.q_scale() / 2
-                : accumu.q_scale()) // See [Note: Gap of u8 qtensor scale
-                                    // between oneDNN and PyTorch]
+        .append_post_eltwise(
+            1,
+            /*alpha*/ 1.0 / accumu.q_scale(),
+            /*beta*/ 0.f,
+            attr.kind_with_linear)
+        .append_post_sum(1.f, 1.f)
+        .append_post_eltwise(
+            1,
+            /*alpha*/ accumu.q_scale(),
+            -accumu.q_zero_point() * accumu.q_scale(),
+            attr.kind_with_linear)
         .append_post_eltwise(1.f, 0.f, 0.f, attr.kind_with_relu);
   };
   return qconv_wrapper.call(input, accumu, att);
@@ -423,17 +442,12 @@ at::Tensor q_conv2d_sigmoid(
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
     double output_scale,
     int64_t output_zero_point) {
-  // [Note: Scale caching for qsigmoid]
-  // PyTorch qsigmoid uses 1.0 / 256.0 as qscale for qsigmoid rather than
-  // get scale from observer. scale&zp caching in IPEX caches torch_scale / 2
-  // for dnn symmetric qunt diff with PyTorch. To cache right value for qsimoid
-  // here, we let scale = 1.0 / 255.0 * 2.0 The output tensor would has
-  // observed-like scale, while it caches right scale inside.
-  auto scale = 1.0 / 255.0 * 2.0;
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, scale, 128, kQUInt8);
+  int64_t output_zp = (input.scalar_type() == at::kQInt8) ? -128 : 0;
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, 1.0 / 256.0, output_zp, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(1.0 / 256.0), output_zp);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -456,9 +470,10 @@ at::Tensor q_conv2d_relu(
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
   auto qconv_wrapper = QuantizeConvConverter<2>(
-      packed_weight, output_scale, 128, ScalarType::QUInt8);
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -482,12 +497,11 @@ at::Tensor q_conv2d_leaky_relu(
     Scalar negative_slope) {
   // See [Note: Method to set fusion output dtype]
   float alpha = negative_slope.to<float>();
-  auto dtype = alpha <= 0.0 ? ScalarType::QUInt8 : ScalarType::QInt8;
-  auto output_zp = (dtype == kQUInt8) ? 128 : 0;
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, output_scale, output_zp, dtype);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -514,10 +528,10 @@ at::Tensor q_conv2d_mish_compound(
     int64_t q_zpoint,
     at::ScalarType dtype) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, q_scale, 0, kQInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, q_scale, q_zpoint, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(q_scale));
+    Attr attr(/* q_scale */ static_cast<float>(q_scale), q_zpoint);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -547,11 +561,10 @@ at::Tensor q_conv2d_mish_compound_add(
     double add_scale,
     int64_t add_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto output_zp = accumu.scalar_type() == kQUInt8 ? 128 : 0;
   auto qconv_wrapper = QuantizeConvConverter<2>(
-      packed_weight, add_scale, output_zp, accumu.scalar_type());
+      packed_weight, add_scale, add_zero_point, accumu.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(add_scale));
+    Attr attr(/* q_scale */ static_cast<float>(add_scale), add_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -564,9 +577,21 @@ at::Tensor q_conv2d_mish_compound_add(
             /* alpha */ 0.f,
             /* beta */ 0.f,
             attr.kind_with_mish)
+        .append_post_eltwise(
+            1,
+            /*alpha*/ 1.0 / accumu.q_scale(),
+            /*beta*/ 0.f,
+            attr.kind_with_linear)
         .append_post_sum(
             /* sum_scale */ 1.f,
-            /* sum_q_scale */ accumu.q_scale());
+            /* sum_q_scale */ 1.f)
+        .append_post_eltwise(
+            1,
+            /*alpha*/ 1.0,
+            /*beta*/ -accumu.q_zero_point(),
+            attr.kind_with_linear)
+        .append_post_eltwise(
+            1, /*alpha*/ accumu.q_scale(), /*beta*/ 0.f, attr.kind_with_linear);
   };
   return qconv_wrapper.call(input, accumu, att);
 }
@@ -632,9 +657,9 @@ Tensor q_conv2d_dequantize_silu_quantize(
     at::ScalarType dtype) {
   // See [Note: Method to set fusion output dtype]
   auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, q_scale, 0, kQInt8);
+      QuantizeConvConverter<2>(packed_weight, q_scale, q_zpoint, dtype);
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(q_scale));
+    Attr attr(/* q_scale */ static_cast<float>(q_scale), q_zpoint);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -656,10 +681,12 @@ at::Tensor q_conv2d_sqrt(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, 0.00392157, 128, kQUInt8);
+  // TODO: Why sqrt use 0.00392157 as scale here?
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -681,10 +708,11 @@ at::Tensor q_conv2d_abs(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, 0.00392157, 128, kQUInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -706,10 +734,11 @@ at::Tensor q_conv2d_tanh(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, output_scale, 128, kQUInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -731,10 +760,11 @@ at::Tensor q_conv2d_square(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, 0.00392157, 128, kQUInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -756,10 +786,11 @@ at::Tensor q_conv2d_exp(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, 0.00392157, 128, kQUInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -781,10 +812,11 @@ at::Tensor q_conv2d_log(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, output_scale, 0, kQInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -806,10 +838,11 @@ at::Tensor q_conv2d_round(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, output_scale, 0, kQInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -831,10 +864,11 @@ at::Tensor q_conv2d_log_sigmoid(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, output_scale, 0, kQInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -858,10 +892,11 @@ at::Tensor q_conv2d_hardswish(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, output_scale, 0, kQInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -883,10 +918,11 @@ at::Tensor q_conv2d_mish(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, output_scale, 0, kQInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -908,10 +944,11 @@ at::Tensor q_conv2d_silu(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, output_scale, 0, kQInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -934,10 +971,11 @@ at::Tensor q_conv2d_gelu(
     int64_t output_zero_point,
     c10::string_view approximate) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, output_scale, 0, kQInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -967,10 +1005,11 @@ at::Tensor q_conv2d_hardsigmoid(
     double output_scale,
     int64_t output_zero_point) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, 0.00392157, 128, kQUInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -993,10 +1032,11 @@ at::Tensor q_conv2d_pow(
     int64_t output_zero_point,
     Scalar exponent) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, output_scale, 0, kQInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -1021,14 +1061,15 @@ at::Tensor q_conv2d_hardtanh(
     Scalar minval,
     Scalar maxval) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, output_scale, 0, kQInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
     int32_t min_q = quantize_value<int32_t>(
         output_scale, output_zero_point, minval.toFloat());
     int32_t max_q = quantize_value<int32_t>(
         output_scale, output_zero_point, maxval.toFloat());
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {
@@ -1054,10 +1095,11 @@ at::Tensor q_conv2d_elu(
     Scalar scale,
     Scalar input_scale) {
   // See [Note: Method to set fusion output dtype]
-  auto qconv_wrapper =
-      QuantizeConvConverter<2>(packed_weight, output_scale, 0, kQInt8);
+  auto qconv_wrapper = QuantizeConvConverter<2>(
+      packed_weight, output_scale, output_zero_point, input.scalar_type());
   auto att = [=]() {
-    Attr attr(/* q_scale */ static_cast<float>(output_scale));
+    Attr attr(
+        /* q_scale */ static_cast<float>(output_scale), output_zero_point);
     auto pack_ptr =
         dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
     if (pack_ptr->bias.has_value()) {

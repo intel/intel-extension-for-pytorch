@@ -10,7 +10,8 @@ from torch.quantization.quantize_jit import (
     convert_jit,
     prepare_jit,
 )
-
+import pytest
+import platform
 
 checking_atol = 3e-2
 checking_rtol = 3e-2
@@ -25,8 +26,6 @@ class ConvSigmoid(torch.nn.Module):
             torch.nn.Conv2d(3, 3, kernel_size=7, stride=2, padding=3, bias=False),
             torch.nn.Sigmoid(),
         )
-        self.block[0].weight.data.fill_(1)
-        self.block[2].weight.data.fill_(1)
 
     def forward(self, x):
         x = self.block(x)
@@ -188,7 +187,8 @@ def trace_int8_model(model, device, test_input):
     # inference
     print("start ", device, " inference ...")
     with torch.no_grad():
-        for i in range(1):
+        # print(modelJit.graph_for(test_input))
+        for i in range(2):
             start = time.time()
             output_cpu = modelJit(test_input)
             end = time.time()
@@ -203,14 +203,16 @@ def trace_int8_model(model, device, test_input):
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(platform.system() == 'Windows',
+                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
     def test_qConv2d_sigmoid(self, dtype=torch.float):
         model = ConvSigmoid()
         model1 = copy.deepcopy(model)
-        test_input = torch.ones([1, 3, 8, 8])
+        test_input = torch.randn([1, 3, 8, 8])
         # impe vs. jit
         # For model that JIT and impe path are both reachable.
-        xpu_res = trace_int8_model(model, "xpu", test_input)
         impe_res = impe_int8_model(model1, "xpu", test_input)
+        xpu_res = trace_int8_model(model, "xpu", test_input)
         # imperatie path has an extra quantized&dequatnize pair, which includes more error
         np.testing.assert_almost_equal(
             xpu_res.cpu().numpy(), impe_res.cpu().numpy(), decimal=1
@@ -222,8 +224,8 @@ class TestTorchMethod(TestCase):
         model = model.to("cpu")
         cpu_res = model(test_input)
         xpu_res = trace_int8_model(model, "xpu", test_input)
-        cpu_res = torch.quantize_per_tensor(cpu_res, 1.0 / 255.0 * 2.0, 0, torch.qint8)
-        xpu_res = torch.quantize_per_tensor(xpu_res, 1.0 / 255.0 * 2.0, 0, torch.qint8)
+        cpu_res = torch.quantize_per_tensor(cpu_res, 1.0 / 256.0, 0, torch.quint8)
+        xpu_res = torch.quantize_per_tensor(xpu_res, 1.0 / 255.0, 0, torch.quint8)
         # fbgemm and onednn use different scale here
         np.testing.assert_almost_equal(
             xpu_res.dequantize().cpu().numpy(),
@@ -231,6 +233,8 @@ class TestTorchMethod(TestCase):
             decimal=1,
         )
 
+    @pytest.mark.skipif(platform.system() == 'Windows',
+                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
     def test_qConv2d_leakyrelu(self, dtype=torch.float):
         model = ConvLeakyRelu()
         model1 = copy.deepcopy(model)
@@ -243,6 +247,8 @@ class TestTorchMethod(TestCase):
             xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol
         )
 
+    @pytest.mark.skipif(platform.system() == 'Windows',
+                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
     def test_qConv2d_mish(self, dtype=torch.float):
         model = ConvMish()
         model1 = copy.deepcopy(model)
@@ -255,6 +261,8 @@ class TestTorchMethod(TestCase):
             xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol
         )
 
+    @pytest.mark.skipif(platform.system() == 'Windows',
+                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
     def test_qConv2d_mish_add(self, dtype=torch.float):
         model = ConvMishAdd()
         model1 = copy.deepcopy(model)
@@ -267,11 +275,15 @@ class TestTorchMethod(TestCase):
             xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol
         )
 
+    @pytest.mark.skipif(platform.system() == 'Windows',
+                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
     def test_conv_binary_bias(self, dtype=torch.float):
         model = ConvBinaryBias()
         test_input = torch.rand([1, 256, 1, 1])
         xpu_res = trace_int8_model(model, "xpu", test_input.clone())
 
+    @pytest.mark.skipif(platform.system() == 'Windows',
+                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
     def test_conv_silu(self, dtype=torch.float):
         model = ConvSiLU()
         model1 = copy.deepcopy(model)

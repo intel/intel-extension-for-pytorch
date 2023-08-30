@@ -41,9 +41,7 @@ static std::tuple<memory::desc, memory::desc, memory::desc> qconv_get_usr_md(
 
   if (src_ctx.is_plain()) {
     auto src_tz = src.sizes().vec();
-    auto src_data_t = (src.scalar_type() == at::kQInt8 || is_opaque_u8(src))
-        ? memory::data_type::s8
-        : memory::data_type::u8;
+    auto src_data_t = get_onednn_dtype(src);
     src_usr_md = memory::desc(src_tz, src_data_t, fmt_src);
   } else {
     src_usr_md = src_ctx.meta();
@@ -166,8 +164,8 @@ static memory qconv_get_expected_wgh_memory(
       reshaped_wgh = share_storage_and_set_strided_as(
           wgh,
           wgh_blocked.sizes(),
-          /*compatible with different strides of weight (including contiguous,
-             channels_last and non-contiguous) */
+          /*compatible with different strides of weight (including
+             contiguous, channels_last and non-contiguous) */
           compatible_groups_conv_strides(wgh, wgh_blocked.sizes().vec()),
           c10::nullopt);
     }
@@ -196,11 +194,8 @@ static memory qconv_get_blocked_dst_memory(
   memory dst_m;
   if (dst_usr_md != expected_dst_md) {
     auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
-        (get_onednn_dtype(dst) == memory::data_type::u8 &&
-         dst.q_zero_point() == 128)
-            ? dst.q_scale() / 2
-            : dst.q_scale(),
-        0,
+        dst.q_scale(),
+        dst.q_zero_point(),
         typeMetaToScalarType(dst.options().dtype()));
     dst_blocked =
         empty_opaque_qtensor(expected_dst_md, c10::nullopt, quantizer);
@@ -250,9 +245,7 @@ static at::Tensor quantized_convolution(
   // input tensors config
   memory::dims src_dims = src.sizes().vec();
   memory::dims wgh_dims = wgh.sizes().vec();
-  auto src_data_t = (src.scalar_type() == at::kQInt8 || is_opaque_u8(src))
-      ? memory::data_type::s8
-      : memory::data_type::u8;
+  auto src_data_t = get_onednn_dtype_include_double(src);
   auto dst_data_t = get_onednn_dtype_include_double(dst);
   // conv config
   memory::dims _stride = stride.vec();
@@ -267,12 +260,13 @@ static at::Tensor quantized_convolution(
   std::vector<float> wgh_scales, conv_scale = {1};
   int mask_ac = 0, mask_wgh;
   // [Note: Per-channel quantization mask setting]
-  // Per-channel quantization is on weight output channel mostly, mask_wgh= 1
-  // here means 2^0. 0 means the 0th dimension of wgh tensor, aka output
-  // channel. DNN requires mask = 2^k for the kth axis to be quantized. Only one
-  // axis quantization is supported in IPEX. Multi channel quantization is not
-  // supported. In addition, src, dst should still be per-tensor quant, aka
-  // mask=0. Per-channel quantization on activation is not supported in conv.
+  // Per-channel quantization is on weight output channel mostly, mask_wgh=
+  // 1 here means 2^0. 0 means the 0th dimension of wgh tensor, aka output
+  // channel. DNN requires mask = 2^k for the kth axis to be quantized. Only
+  // one axis quantization is supported in IPEX. Multi channel quantization
+  // is not supported. In addition, src, dst should still be per-tensor
+  // quant, aka mask=0. Per-channel quantization on activation is not
+  // supported in conv.
   mask_wgh = (wgh.qscheme() == kPerTensorAffine) ? 0 : 1;
   primitive_attr pattr;
 
@@ -302,24 +296,21 @@ static at::Tensor quantized_convolution(
   bool load_from_cache = false;
 #endif
 
-// [Note: Use symmetric quant implementation when zp is 0]
-// (JIRA: https://jira.devtools.intel.com/browse/MFDNN-9633)
-// Due to asymmetric quant has perf gap compared to symm quant, we need to avoid
-// dnn kernel goes into asymm path if tensor zp is 0. We expect following
-// behaviour:
-// 1. IF IPEX is Symmetric only: Alwasy refuse to use runtime zp. Use symmetric
-// kernel.
-// 2. IF IPEX is Asymmetric supported:
-//      a. Check src&dzp&wgh zp, if all are zero, we go into symmetric path for
-//      perf. With this WA, operate like conv_relu fusion would maintin high
-//      perf even the overall config is asymm.
-//      b. If zp is not zero, using asymmetric kernel. Perf regression should
-//      then happen.
-#ifdef BUILD_PRIOR_SYMM_QUANT
+  // [Note: Use symmetric quant implementation when zp is 0]
+  // (JIRA: https://jira.devtools.intel.com/browse/MFDNN-9633)
+  // Due to asymmetric quant has perf gap compared to symm quant, we need to
+  // avoid dnn kernel goes into asymm path if tensor zp is 0. We expect
+  // following behaviour:
+  // 1. IF IPEX is Symmetric only: Alwasy refuse to use runtime zp. Use
+  // symmetric kernel.
+  // 2. IF IPEX is Asymmetric supported:
+  //      a. Check src&dzp&wgh zp, if all are zero, we go into symmetric path
+  //      for perf. With this WA, operate like conv_relu fusion would maintin
+  //      high perf even the overall config is asymm.
+  //      b. If zp is not zero, using asymmetric kernel. Perf regression
+  //      should then happen.
   bool src_need_zp = requires_runtime_zp(src);
   bool dst_need_zp = requires_runtime_zp(dst);
-  bool wgh_need_zp = requires_runtime_zp(wgh);
-#endif
 
   std::tie(src_usr_md, wgh_usr_md, dst_usr_md) =
       qconv_get_usr_md(src, wgh, dst, groups, memory_layout_for_conv);
@@ -350,16 +341,10 @@ static at::Tensor quantized_convolution(
     pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_wgh);
     pattr.set_post_ops(po);
 
-#ifdef BUILD_PRIOR_SYMM_QUANT
     // Only setting zp mask when zp is not zero
     // See: [Note: Use symmetric quant implementation when zp is 0]
     if (src_need_zp)
-      pattr.set_zero_points_mask(DNNL_ARG_DST, mask_ac);
-    if (dst_need_zp)
       pattr.set_zero_points_mask(DNNL_ARG_SRC, mask_ac);
-    if (wgh_need_zp)
-      pattr.set_zero_points_mask(DNNL_ARG_WEIGHTS, mask_wgh);
-#endif
 #ifdef USE_SCRATCHPAD_MODE
     pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
@@ -441,7 +426,6 @@ static at::Tensor quantized_convolution(
   std::tie(src_sc_m, src_zp_m) = q_get_sc_zp_gpu_mem(src, engine);
   args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, src_sc_m});
 
-#ifdef BUILD_PRIOR_SYMM_QUANT
   // Only setting zp when zp is not zero
   // See: [Note: Use symmetric quant implementation when zp is 0]
   Tensor srz_zp;
@@ -449,18 +433,8 @@ static at::Tensor quantized_convolution(
   if (src_need_zp) {
     args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, src_zp_m});
   }
-#endif
 
   // dst scale is no need for setting, since it is fused in postop via linear
-
-#ifdef BUILD_PRIOR_SYMM_QUANT
-  // Only setting zp when zp is not zero
-  // See: [Note: Use symmetric quant implementation when zp is 0]
-  memory dst_zp_m;
-  if (dst_need_zp) {
-    args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zp_m});
-  }
-#endif
 
 #ifdef USE_SCRATCHPAD_MODE
   size_t scratchpad_size = conv_fwd_pd.scratchpad_desc().get_size();

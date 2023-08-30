@@ -24,9 +24,7 @@ qdeconv_get_blocked_md(
   auto fmt_src = deconv_src_fmt(ndim);
   if (src_ctx.is_plain()) {
     auto src_tz = src.sizes().vec();
-    auto src_data_t = (src.scalar_type() == at::kQInt8 || is_opaque_u8(src))
-        ? memory::data_type::s8
-        : memory::data_type::u8;
+    auto src_data_t = get_onednn_dtype_include_double(src);
     src_usr_md = memory::desc(src_tz, src_data_t, fmt_src);
   } else {
     src_usr_md = src_ctx.meta();
@@ -82,9 +80,7 @@ qdeconv_get_plain_md(
     int64_t groups,
     bool is_channels_last_suggested) {
   auto ndim = src.ndimension();
-  auto src_data_t = (src.scalar_type() == at::kQInt8 || is_opaque_u8(src))
-      ? memory::data_type::s8
-      : memory::data_type::u8;
+  auto src_data_t = get_onednn_dtype_include_double(src);
 
   // TODO: support channels last
   auto fmt_src = deconv_src_fmt(ndim, is_channels_last_suggested);
@@ -192,11 +188,8 @@ static memory qdeconv_get_block_dst_memory(
   memory dst_m;
   if (dst_usr_md != expected_dst_md) {
     auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
-        (get_onednn_dtype_include_double(dst) == memory::data_type::u8 &&
-         dst.q_zero_point() == 128)
-            ? dst.q_scale() / 2
-            : dst.q_scale(),
-        0,
+        dst.q_scale(),
+        dst.q_zero_point(),
         typeMetaToScalarType(dst.options().dtype()));
     dst_blocked =
         empty_opaque_qtensor(expected_dst_md, c10::nullopt, quantizer);
@@ -282,7 +275,6 @@ static Tensor quantized_deconvolution(
   pattr.set_scales_mask(DNNL_ARG_SRC, mask_ac);
   pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_wgh);
 
-#ifdef BUILD_PRIOR_SYMM_QUANT
   // Only setting zp mask when zp is not zero
   // See: [Note: Use symmetric quant implementation when zp is 0]
   bool src_need_zp = requires_runtime_zp(src);
@@ -294,7 +286,6 @@ static Tensor quantized_deconvolution(
     pattr.set_zero_points_mask(DNNL_ARG_DST, mask_ac);
   if (wgh_need_zp)
     pattr.set_zero_points_mask(DNNL_ARG_WEIGHTS, mask_wgh);
-#endif
 
   auto deconv_fwd_pd = deconvolution_forward::primitive_desc(
       engine,
@@ -366,27 +357,22 @@ static Tensor quantized_deconvolution(
   std::tie(src_sc_m, src_zp_m) = q_get_sc_zp_gpu_mem(src, engine);
   args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, src_sc_m});
 
-#ifdef BUILD_PRIOR_SYMM_QUANT
   // Only setting zp when zp is not zero
   // See: [Note: Use symmetric quant implementation when zp is 0]
-  memory src_zp_m;
   if (src_need_zp) {
     args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, src_zp_m});
   }
-#endif
 
   memory dst_sc_m, dst_zp_m;
   std::tie(dst_sc_m, dst_zp_m) = q_get_sc_zp_gpu_mem(dst, engine);
   args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_DST, dst_sc_m});
 
-#ifdef BUILD_PRIOR_SYMM_QUANT
   // Only setting zp when zp is not zero
   // See: [Note: Use symmetric quant implementation when zp is 0]
   Tensor dst_zp;
   if (dst_need_zp) {
     args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zp_m});
   }
-#endif
 
   if (wgh.qscheme() == kPerTensorAffine) {
     memory wgh_sc_m, wgh_zp_m;

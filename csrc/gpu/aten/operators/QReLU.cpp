@@ -8,10 +8,13 @@
 #include <c10/util/Optional.h>
 #include <torch/library.h>
 
+#include <oneDNN/oneDNN.h>
 #include "comm/Numerics.h"
 
 #include <core/detail/ListUtils.h>
+#include <quantized/QUtils.h>
 #include <runtime/Utils.h>
+#include <tensor/OpaqueTensorFactories.h>
 #include <functional>
 #include "Loops.h"
 #include "comm/ATDispatch.h"
@@ -24,17 +27,15 @@ namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 namespace impl {
 
-template <typename scalar_t_in, typename scalar_t_out>
+template <typename scalar_t>
 void q_relu_xpu_kernel(
-    scalar_t_in* in_ptr,
-    scalar_t_out* out_ptr,
+    scalar_t* in_ptr,
+    scalar_t* out_ptr,
     int64_t num_ele,
-    int64_t zero_point,
-    bool s8tou8) {
+    int64_t zero_point) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t group_size = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
   int64_t num_groups = CeilDiv(num_ele, group_size);
-  float dnn_factor = s8tou8 ? 2.f : 1.f;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(
@@ -44,37 +45,63 @@ void q_relu_xpu_kernel(
         [=](sycl::nd_item<1> item) {
           auto id = item.get_global_linear_id();
           if (id < num_ele) {
-            out_ptr[id] = in_ptr[id] > zero_point
-                ? static_cast<scalar_t_out>(
-                      static_cast<float>(in_ptr[id]) * dnn_factor)
-                : static_cast<scalar_t_out>(zero_point);
+            out_ptr[id] = in_ptr[id] > zero_point ? in_ptr[id] : zero_point;
           }
         });
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
+
+template <typename scalar_t>
+void q_leaky_relu_xpu_kernel(
+    scalar_t* in_ptr,
+    scalar_t* out_ptr,
+    int64_t num_ele,
+    float in_sc,
+    int32_t in_zp,
+    float out_sc,
+    int32_t out_zp,
+    float neg_val) {
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  int64_t group_size = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
+  int64_t num_groups = CeilDiv(num_ele, group_size);
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    cgh.parallel_for(
+        sycl::nd_range<1>(
+            sycl::range<1>(num_groups * group_size),
+            sycl::range<1>(group_size)),
+        [=](sycl::nd_item<1> item) {
+          auto id = item.get_global_linear_id();
+          if (id < num_ele) {
+            float dequant_val = (in_ptr[id] - in_zp) * in_sc;
+            dequant_val =
+                dequant_val > 0.f ? dequant_val : dequant_val * neg_val;
+            out_ptr[id] = quantize_val<scalar_t>(out_sc, out_zp, dequant_val);
+          }
+        });
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
 } // namespace impl
 
 void q_relu_xpu(const Tensor& qx, Tensor& qy) {
   IPEX_DISPATCH_QINT_TYPES(qx.scalar_type(), "qrelu", [&]() {
-    int64_t torch_zp = 128;
     qy = at::_empty_affine_quantized(
         qx.sizes(),
-        qx.options().device(kXPU).dtype(kQUInt8),
+        qx.options().dtype(toQIntType(qx.scalar_type())),
         qx.q_scale(),
-        128);
-    bool s8tou8 = (qx.scalar_type() == kQInt8) ? true : false;
+        qx.q_zero_point());
+    auto qx_plain = AtenIpexTypeXPU::to_plain_if_needed(qx);
     int64_t num_ele = xpu::dpcpp::detail::prod_intlist(qx.sizes());
-    int64_t dnn_zp = static_cast<int64_t>(0);
-    // This is a workaroud for oneDNN symmetric INT8, will remove it after
-    // oneDNN Asymmetric INT8 is ready.
+    int64_t zp = static_cast<int64_t>(qx.q_zero_point());
 
     impl::q_relu_xpu_kernel(
-        reinterpret_cast<underlying_t*>(qx.data_ptr<scalar_t>()),
-        reinterpret_cast<uint8_t*>(qy.data_ptr<c10::quint8>()),
+        reinterpret_cast<underlying_t*>(qx_plain.data_ptr()),
+        reinterpret_cast<underlying_t*>(qy.data_ptr()),
         num_ele,
-        dnn_zp,
-        s8tou8);
+        zp);
   });
 }
 
@@ -84,5 +111,40 @@ Tensor relu(const Tensor& qx) {
   return qy;
 }
 
+Tensor& q_leaky_relu(Tensor& out, const Tensor& self, Scalar negative_slope) {
+  if (self.q_zero_point() == 0) {
+    float alpha = negative_slope.to<float>();
+    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(out, self, alpha, 0.0f);
+    return out;
+  } else {
+    IPEX_DISPATCH_QINT_TYPES(self.scalar_type(), "q_leakyrelu", [&]() {
+      int64_t num_ele = xpu::dpcpp::detail::prod_intlist(self.sizes());
+      impl::q_leaky_relu_xpu_kernel<underlying_t>(
+          reinterpret_cast<underlying_t*>(self.data_ptr()),
+          reinterpret_cast<underlying_t*>(out.data_ptr()),
+          num_ele,
+          self.q_scale(),
+          self.q_zero_point(),
+          out.q_scale(),
+          out.q_zero_point(),
+          negative_slope.to<float>());
+    });
+  }
+  return out;
+}
+
+Tensor& leaky_relu_(Tensor& self, const Scalar& negative_slope) {
+  return q_leaky_relu(self, self, negative_slope);
+}
+
+Tensor leaky_relu(const Tensor& self, const Scalar& negative_slope) {
+  Tensor out = at::_empty_affine_quantized(
+      self.sizes(),
+      self.options().dtype(toQIntType(self.scalar_type())),
+      self.q_scale(),
+      self.q_zero_point());
+  auto result = q_leaky_relu(out, self, negative_slope);
+  return result;
+}
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

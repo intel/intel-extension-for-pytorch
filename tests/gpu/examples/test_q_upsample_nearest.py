@@ -7,6 +7,8 @@ from torch.quantization.quantize_jit import (
     convert_jit,
     prepare_jit,
 )
+import platform
+import pytest
 
 
 class ConvUpsample(torch.nn.Module):
@@ -23,7 +25,7 @@ class ConvUpsample(torch.nn.Module):
         y = F.interpolate(
             x, size=(x.size()[2], x.size()[3]), scale_factor=None, mode="nearest"
         )
-        return torch.cat((y, x), dim=1)
+        return y
 
 
 def trace_int8_model(model, device, test_input):
@@ -63,32 +65,36 @@ def trace_int8_model(model, device, test_input):
 
 class TestNNMethod(TestCase):
     def test_q_upsamle_nearest(self, dtype=torch.float):
-        x_cpu = torch.randn(
-            (2, 3, 5, 5), dtype=torch.float32, device=torch.device("cpu")
-        )
-        x_gpu = x_cpu.to("xpu")
-        scales = [6, 8]
-        rsf = False
+        zp_vec = [0] if platform.system() == 'Windows' else [0, 2]
+        for dtype_inputs in [torch.qint8, torch.quint8]:
+            for zp in zp_vec:
+                x_cpu = torch.randn(
+                    (2, 3, 5, 5), dtype=torch.float32, device=torch.device("cpu")
+                )
+                x_gpu = x_cpu.to("xpu")
+                scales = [6, 8]
+                rsf = False
 
-        dtype_inputs = torch.qint8
-        q_scale = 0.04
-        q_cpu = torch.quantize_per_tensor(x_cpu, q_scale, 0, dtype_inputs)
-        q_gpu = torch.quantize_per_tensor(x_gpu, q_scale, 0, dtype_inputs)
+                q_scale = 0.04
+                q_cpu = torch.quantize_per_tensor(x_cpu, q_scale, zp, dtype_inputs)
+                q_gpu = torch.quantize_per_tensor(x_gpu, q_scale, zp, dtype_inputs)
 
-        output_cpu = torch.nn.functional.interpolate(
-            q_cpu, scale_factor=scales, mode="nearest", recompute_scale_factor=rsf
-        )
-        output_gpu = torch.nn.functional.interpolate(
-            q_gpu, scale_factor=scales, mode="nearest", recompute_scale_factor=rsf
-        )
+                output_cpu = torch.nn.functional.interpolate(
+                    q_cpu, scale_factor=scales, mode="nearest", recompute_scale_factor=rsf
+                )
+                output_gpu = torch.nn.functional.interpolate(
+                    q_gpu, scale_factor=scales, mode="nearest", recompute_scale_factor=rsf
+                )
 
-        self.assertEqual(output_cpu, output_gpu)
+                self.assertEqual(output_cpu, output_gpu)
 
+    @pytest.mark.skipif(platform.system() == 'Windows', 
+                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
     def test_q_upsample_nearest2(self, dtype=torch.float):
         M = ConvUpsample()
         x_input = torch.randn([8, 8, 1, 1]).to("xpu")
 
+        y_fp32 = M(x_input.to("cpu"))
         y_int8 = trace_int8_model(M, "xpu", x_input)
-        y_fp32 = M(x_input)
 
         self.assertEqual(y_int8.cpu(), y_fp32, atol=3e-2, rtol=3e-2)

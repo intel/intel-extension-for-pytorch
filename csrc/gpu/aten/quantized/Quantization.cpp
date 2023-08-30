@@ -74,6 +74,7 @@ Tensor quantize_tensor_per_channel_affine(
   memory::dims scale_zp_sz = scales.sizes().vec();
   memory::dims scale_zp_st = scales.strides().vec();
   rattr.set_dst_sc_mask(mask);
+  rattr.set_dst_zp_mask(mask);
   xpu::oneDNN::quantized_reorder(
       rtensor,
       qtensor,
@@ -94,78 +95,26 @@ Tensor quantize_tensor_per_tensor_affine(
     double scale,
     int64_t zero_point) {
   auto r_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(rtensor);
-  if (Settings::I().is_onednn_layout_enabled()) {
-    // this is a temporary implementation for forcing linear to fp32 path
-    // and get better performance,due to oneDNN int8 kernel slower than fp32
-    // kernel by currently.
-    if (rtensor.dim() == 2) {
-      return rtensor;
-    }
-    // for int8 weight cache
-    if (!r_ctx.is_plain() &&
-        (r_ctx.meta().get_data_type() != memory::data_type::f32)) {
-      return rtensor;
-    }
-  }
 
   xpu::oneDNN::ReorderAttr rattr = xpu::oneDNN::ReorderAttr();
   int mask = 0;
   rattr.set_dst_sc_mask(mask);
-  bool asymmetric = false;
-  if (asymmetric && zero_point != 0)
+  if (zero_point != 0)
     rattr.set_dst_zp_mask(mask);
   const memory::dim scale_zp_sz = 1;
   const memory::dim scale_zp_st = 1;
   float dnn_scale = scale;
-  // TODO: Remove workaround for dnnl symmetric quantization
-  int dnn_zero_point = 0;
-  auto quant_base = fetch_cached_quantizer_base(dnn_scale, dnn_zero_point);
-  // See [Note: Scale setting for reorder]
-  // rattr.set_dst_sc_and_zp_mask(mask);
-  if (qtensor.scalar_type() == kQUInt8 && zero_point == 128) {
-    Tensor qtensor_opt = qtensor;
-    memory::dims q_dims = xpu::oneDNN::get_onednn_dims(rtensor);
-    memory::format_tag q_fmt = xpu::oneDNN::get_dnnl_default_format(
-        rtensor.dim(), is_smf_channels_last(rtensor));
-
-    // We will force to specify s8 as quantization data type to meet the
-    // requirement of pytorch calibration with unified data type. Dueing to
-    // PyTorch use zp=128 for u8 symmetric quantization, while oneDNN use 0. We
-    // need forcely quant input to a s8 tensor.
-    memory::data_type q_dt = memory::data_type::s8;
-    memory::desc q_md = memory::desc(q_dims, q_dt, q_fmt);
-    auto quantizer = dpcpp_make_per_tensor_affine_quantizer(scale, 0, kQInt8);
-
-    qtensor_opt =
-        AtenIpexTypeXPU::empty_opaque_qtensor(q_md, c10::nullopt, quantizer);
-    xpu::oneDNN::quantized_reorder(
-        rtensor,
-        qtensor_opt,
-        /*src_scale*/ nullptr,
-        /*src_zero_point*/ nullptr,
-        quant_base.scale_ptr(),
-        quant_base.zero_point_ptr(),
-        {scale_zp_sz},
-        {scale_zp_st},
-        rattr);
-    auto q_opt_ctx =
-        at::AtenIpexTypeXPU::DPCPPTensorContext::release_tensor_ctx(
-            qtensor_opt);
-    at::AtenIpexTypeXPU::DPCPPTensorContext::set_tensor_ctx(
-        qtensor, std::move(q_opt_ctx));
-  } else {
-    xpu::oneDNN::quantized_reorder(
-        rtensor,
-        qtensor,
-        /*src_scale=*/nullptr,
-        /*srd_zero_point=*/nullptr,
-        quant_base.scale_ptr(),
-        quant_base.zero_point_ptr(),
-        {scale_zp_sz},
-        {scale_zp_st},
-        rattr);
-  }
-
+  auto quant_base = fetch_cached_quantizer_base(dnn_scale, zero_point);
+  xpu::oneDNN::quantized_reorder(
+      rtensor,
+      qtensor,
+      /*src_scale=*/nullptr,
+      /*srd_zero_point=*/nullptr,
+      quant_base.scale_ptr(),
+      quant_base.zero_point_ptr(),
+      {scale_zp_sz},
+      {scale_zp_st},
+      rattr);
   return qtensor;
 }
 
@@ -232,7 +181,7 @@ Tensor _empty_affine_quantized(
       size,
       options,
       dpcpp_make_per_tensor_affine_quantizer(
-          scale, 0, typeMetaToScalarType(options.dtype())));
+          scale, zero_point, typeMetaToScalarType(options.dtype())));
 }
 
 Tensor _empty_per_channel_affine_quantized(

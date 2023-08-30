@@ -10,10 +10,6 @@ from torch.quantization.quantize_jit import (
     prepare_jit,
 )
 
-torch._C._jit_set_profiling_mode(False)
-torch._C._jit_set_profiling_executor(False)
-
-
 class Net(torch.nn.Module):
     def __init__(self):
         super(Net, self).__init__()

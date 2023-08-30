@@ -314,7 +314,7 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
         ? at::MemoryFormat::ChannelsLast
         : at::MemoryFormat::Contiguous;
     self = _empty_affine_quantized(
-        self.sizes(), self.options(), 1.f, static_cast<int>(0), mfmt);
+        self.sizes(), self.options(), src.q_scale(), src.q_zero_point(), mfmt);
     set_quantizer_(self, src.quantizer());
   }
 

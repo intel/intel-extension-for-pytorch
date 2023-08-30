@@ -24,22 +24,28 @@ Tensor requantize(
 
   auto reorder_attr = xpu::oneDNN::ReorderAttr();
   int mask = 0;
-  auto scale_in = src.is_quantized() ? static_cast<float>(src.q_scale()) : 1.f;
-  float requant_scale = static_cast<float>((scale_out / scale_in));
-  // TODO:Remove this WA after asymmetric quantization
-  int32_t requant_zp = 0;
-  auto quant_base = fetch_cached_quantizer_base(requant_scale, requant_zp);
+  auto sc_in = src.q_scale();
+  int32_t zp_in = src.q_zero_point();
+  auto quant_base_src = fetch_cached_quantizer_base(sc_in, zp_in);
+  auto src_zp_ptr = (zp_in == 0) ? nullptr : quant_base_src.zero_point_ptr();
 
-  reorder_attr.set_dst_sc_mask(mask);
-  if (requant_zp != 0)
+  auto quant_base_dst = fetch_cached_quantizer_base(scale_out, zero_point_out);
+  auto dst_zp_ptr =
+      (zero_point_out == 0) ? nullptr : quant_base_dst.zero_point_ptr();
+
+  if (zp_in != 0)
+    reorder_attr.set_src_zp_mask(mask);
+  if (zero_point_out != 0)
     reorder_attr.set_dst_zp_mask(mask);
+  reorder_attr.set_dst_sc_mask(mask);
+  reorder_attr.set_src_sc_mask(mask);
   xpu::oneDNN::quantized_reorder(
       src,
       dst_,
-      /*src_scale=*/nullptr,
-      /*src_zero_point=*/nullptr,
-      quant_base.scale_ptr(),
-      /*dst_zero_point=*/nullptr,
+      quant_base_src.scale_ptr(),
+      src_zp_ptr,
+      quant_base_dst.scale_ptr(),
+      dst_zp_ptr,
       {1},
       {1},
       reorder_attr);

@@ -145,15 +145,11 @@ static inline XPUQuantizerBase<float, int32_t, false>
 fetch_cached_quantizer_base(float dnn_sc, int32_t dnn_zp) {
   using key_t = xpu::dpcpp::lru_key_t;
   key_t key_sc_zp;
-
-  // 0 here means dnn zero_point
-  // TODO: remove after asymmetric is enabled
-  dnn_zp = 0;
   xpu::dpcpp::create_key(key_sc_zp, dnn_sc, dnn_zp);
 
   bool sc_zp_key_found = xpu::dpcpp::find_key<
       XPUQuantizerBase<float, int32_t, false>,
-      xpu::dpcpp::lru_key_t,
+      key_t,
       /*capacity*/ 256>(key_sc_zp);
 
   XPUQuantizerBase<float, int32_t, false> quant_base;
@@ -172,26 +168,17 @@ fetch_cached_quantizer_base(float dnn_sc, int32_t dnn_zp) {
         key_t,
         /*capacity*/ 256>(key_sc_zp, /*size*/ 1, dpcppGetCurrentQueue());
     sc_ptr = quant_base.scale_ptr();
-    float _scale = (float)dnn_sc;
-    dpcppGetCurrentQueue().single_task([=]() { sc_ptr[0] = _scale; });
+    dpcppGetCurrentQueue().single_task([=]() { sc_ptr[0] = dnn_sc; });
 
     zp_ptr = quant_base.zero_point_ptr();
-    int32_t _zp = 0;
-    dpcppGetCurrentQueue().single_task([=]() { zp_ptr[0] = _zp; });
+    dpcppGetCurrentQueue().single_task([=]() { zp_ptr[0] = dnn_zp; });
   }
   return quant_base;
 }
 
 static inline std::pair<float*, int32_t*> q_get_sc_zp_gpu_ptr(const Tensor qx) {
-  float dnn_scale;
-  if (is_opaque_u8(qx)) {
-    dnn_scale = qx.q_scale();
-  } else {
-    dnn_scale = (qx.scalar_type() == kQUInt8) ? qx.q_scale() / 2 : qx.q_scale();
-  }
-  // TODO: Use correct zp after aymmetric is enabled
-  auto quant_base = fetch_cached_quantizer_base(dnn_scale, /*dnn_zp=*/0);
-
+  auto quant_base =
+      fetch_cached_quantizer_base(qx.q_scale(), qx.q_zero_point());
   return {quant_base.scale_ptr(), quant_base.zero_point_ptr()};
 }
 } // namespace dpcpp
