@@ -866,6 +866,18 @@ bool LlgaNodeWrapper::useOpaqueLayout(size_t offset) const {
   return n->is(attr::output_layouts)[offset] == OPAQUE_LAYOUT;
 }
 
+bool LlgaNodeWrapper::inputValueIsNotUsedLater(size_t offset) const {
+  const auto num_inputs = n->is(Symbol::attr("future_input_uses")).size();
+  TORCH_CHECK(
+      offset < num_inputs,
+      "Out of range. (Invalid index ",
+      offset,
+      " for attr::future_input_uses with size ",
+      num_inputs,
+      ")");
+  return n->is(Symbol::attr("future_input_uses"))[offset] == 0;
+}
+
 } // namespace onednn
 } // namespace fuser
 } // namespace jit

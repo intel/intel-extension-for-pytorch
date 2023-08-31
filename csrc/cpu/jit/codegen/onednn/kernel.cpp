@@ -186,6 +186,10 @@ ArgSpecs LlgaKernel::initializeOutputSpecs(
   return outputSpecs;
 }
 
+bool LlgaKernel::inputValueIsNotUsedLater(size_t offset) const {
+  return LlgaNodeWrapper(fusionNode_).inputValueIsNotUsedLater(offset);
+}
+
 void LlgaKernel::prepareAndCacheRunArgs(
     RunArgs& runInputs,
     RunArgs& runOutputs,
@@ -223,7 +227,7 @@ void LlgaKernel::prepareAndCacheRunArgs(
 
     auto outputId = spec.tid();
     auto inputOffset = inplacePairOffsets_[i];
-    if (inputOffset != INT16_MIN) {
+    if ((inputOffset != INT16_MIN) && inputValueIsNotUsedLater(inputOffset)) {
       // output reuses one of input tensors
 #ifdef GRAPH_DEBUG_ENABLED
       GRAPH_DEBUG("Inplace computation");

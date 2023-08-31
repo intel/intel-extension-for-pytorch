@@ -131,6 +131,8 @@ class LlgaKernel {
     return "LlgaPartition_" + std::to_string(debugId++);
   }
 
+  bool inputValueIsNotUsedLater(size_t offset) const;
+
   std::string genProfileName() {
     std::vector<std::string> op_list;
     for (auto* node : graph_->block()->nodes()) {
