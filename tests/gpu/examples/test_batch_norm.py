@@ -206,7 +206,6 @@ class TestNNMethod(TestCase):
     @pytest.mark.skipif(
         not torch.xpu.has_channels_last_1d(), reason="doesn't enable channels last 1d"
     )
-    @pytest.mark.skip(reason="Has Acc issue")
     def test_channels_last_1d_fwd_and_bwd(self, dtype=torch.float):
         shapes = [
             (1, 4, 32),
@@ -280,7 +279,6 @@ class TestNNMethod(TestCase):
             self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
             self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
-    @pytest.mark.skip(reason="Has Acc issue")
     def test_channels_last_fwd_and_bwd(self, dtype=torch.float):
         shapes = [
             (1, 2, 3, 3),
@@ -295,9 +293,13 @@ class TestNNMethod(TestCase):
             (4, 1, 1, 1),
             (1, 8, 32, 32),
             (4, 32, 32, 32),
+            (4, 8, 60, 128),
             (4, 1024, 16, 16),
+            (24, 1024, 7, 7),
+            (32, 256, 56, 56),
+            (16, 32, 24, 24),
         ]
-        for dtype in [torch.float, torch.bfloat16]:
+        for dtype in [torch.bfloat16, torch.float32]:
             if dtype == torch.bfloat16:
                 rtol = 1e-3
                 atol = 1e-1
@@ -323,7 +325,6 @@ class TestNNMethod(TestCase):
 
                 y_cpu.backward(grad_cpu)
 
-
                 x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
                 grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
                 bn.to(dpcpp_device)
@@ -332,6 +333,7 @@ class TestNNMethod(TestCase):
                 y_dpcpp = bn(y_dpcpp1)
 
                 y_dpcpp.backward(grad_dpcpp)
+
 
                 if (
                     1 == y_dpcpp.shape[1]
@@ -375,7 +377,7 @@ class TestNNMethod(TestCase):
                 self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device), rtol=rtol, atol=atol)
 
     def test_batch_norm_gather_stats(self):
-        input = torch.randn(1, 3, 3, 3, device="xpu")
+        input = torch.randn(1, 3, 3, 3, device="xpu").to(memory_format=torch.channels_last)
         mean, invstd = torch.batch_norm_gather_stats(
             input,
             mean=torch.ones(64, 3, device="xpu"),
@@ -389,13 +391,17 @@ class TestNNMethod(TestCase):
         self.assertEqual(mean, torch.ones(3, device="xpu"))
         self.assertEqual(invstd, torch.ones(3, device="xpu"))
 
-    @pytest.mark.skip(reason="Has Acc issue")
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_sync_batchnorm_accuracy(self):
 
         def _batch_norm_stats(data, memory_format, mean_axes):
             mean1, _ = torch.batch_norm_stats(data, 1e-5)
             mean2, _ = torch.batch_norm_stats(data.to(memory_format=memory_format), 1e-5)
+            print("mean2:", mean2)
             mean_ref = torch.mean(data, mean_axes, keepdim=False)
+            print("mean ref end")
 
             self.assertEqual(mean_ref, mean1)
             self.assertEqual(mean_ref, mean2)

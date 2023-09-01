@@ -8,6 +8,7 @@
 #include "ReduceOpStdVar.h"
 #include "Resize.h"
 #include "comm/AccumulateType.h"
+#include "comm/Atomics.h"
 #include "comm/RegistrationDeclarations.h"
 #include "core/MemoryFormat.h"
 #include "utils/ComputeEngine.h"
@@ -29,13 +30,21 @@ struct Var {
 struct InvStd {
   template <typename T>
   inline T operator()(T var, double epsilon) const {
-    T invstd = 0;
+    T invstd = 0.0f;
     if (var != static_cast<T>(0.0f) || epsilon != static_cast<T>(0.0f)) {
-      invstd = static_cast<T>(1.0f) / Numerics<T>::sqrt(var + epsilon);
+      invstd = static_cast<T>(1.0f) /
+          Numerics<T>::sqrt(var + static_cast<T>(epsilon));
     }
     return invstd;
   }
 };
+
+inline bool batch_norm_use_channels_last_kernels(const at::Tensor& self) {
+  return (
+      self.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+      (self.is_contiguous() && self.strides()[1] == 1) ||
+      is_smf_channels_last(self));
+}
 
 static int getNumThreads(int nElem, int max_size) {
   int threadSizes[6] = {16, 32, 64, 128, 256, max_size};
@@ -87,49 +96,38 @@ int get_prefer_wg_size(unsigned int nHw, int simd) {
   return std::min(int64_t(size_problem), wg_size);
 }
 
-inline int rnd_up(const int a, const int b) {
-  return (div_up(a, b) * b);
+template <typename scalar_t>
+int inline get_nhwc_suggest_vec_size(
+    const Tensor input,
+    int reduction_size,
+    int channels) {
+  if (!batch_norm_use_channels_last_kernels(input))
+    return 1;
+  // no need to vectorize if channels < 16
+  if (channels < 16)
+    return 1;
+  // if small reduction size, make no vectorization for higher occupancy
+  if (reduction_size < 8 * dpcppMaxWorkGroupSize())
+    return 1;
+
+  // just to load/store data
+  auto func = [](scalar_t a) { return a + static_cast<scalar_t>(1.0f); };
+  xpu::dpcpp::Array<char*, 1> data;
+  data[0] = (char*)input.data_ptr();
+
+  int vec_size = at::native::Memory::can_vectorize_up_to_loop<decltype(func)>(
+      dpcppGetDeviceIdOfCurrentQueue(), data);
+
+  // for resnet50 shape, bf16 type, vec 4 have better performance
+  if (vec_size == 8 && reduction_size == 256 * 56 * 56 &&
+      (channels == 128 || channels == 256))
+    return 4;
+
+  return vec_size;
 }
 
-int get_nhwc_sp_block_size(int sp, int ic_dim, int simd = 16) {
-  int eu_count = dpcppGpuEuCount();
-  int threads_per_eu = dpcppGpuHWThreadsPerEU();
-
-  float efficiency_thr = 0.0f;
-  float efficiency_peak_eu_thr = 0.0f;
-  int block_size_thr = 1;
-  int block_size_peak_eu_thr = 1;
-  int curr_block_size = sp;
-  int nthr_mul = 1;
-  const int ic_nsg = ic_dim / simd; // number of subgroups by ic dim
-
-  // The search is based on threads wave efficiency.
-  // Higher priority for cases with peak EUs utilization.
-  while (nthr_mul <= 32) {
-    const int nthr = nthr_mul * eu_count;
-    curr_block_size = div_up(sp * ic_nsg, nthr);
-    const int nblock = div_up(sp, curr_block_size);
-    const int nthr_gen = nblock * ic_nsg;
-
-    const float curr_efficiency_eus =
-        (float)nthr_gen / rnd_up(nthr_gen, eu_count);
-    const float curr_efficiency_thr =
-        (float)nthr_gen / rnd_up(nthr_gen, eu_count * threads_per_eu);
-
-    if (curr_efficiency_thr > efficiency_thr) {
-      efficiency_thr = curr_efficiency_thr;
-      block_size_thr = curr_block_size;
-    }
-    if (curr_efficiency_eus == 1 &&
-        curr_efficiency_thr > efficiency_peak_eu_thr) {
-      efficiency_peak_eu_thr = curr_efficiency_thr;
-      block_size_peak_eu_thr = curr_block_size;
-    }
-    nthr_mul++;
-  }
-  if (efficiency_peak_eu_thr > 0.0f)
-    return block_size_peak_eu_thr;
-  return block_size_thr;
+inline int rnd_up(const int a, const int b) {
+  return (div_up(a, b) * b);
 }
 
 ScalarType first_type() {
@@ -149,13 +147,6 @@ bool is_mixed_type(const Tensor& input, const Args&... parameters) {
   return (
       (parameter_type != ScalarType::Undefined) &&
       (parameter_type != input.scalar_type()));
-}
-
-inline bool batch_norm_use_channels_last_kernels(const at::Tensor& self) {
-  return (
-      self.is_contiguous(at::MemoryFormat::ChannelsLast) ||
-      (self.is_contiguous() && self.strides()[1] == 1) ||
-      is_smf_channels_last(self));
 }
 
 enum class Impl {
@@ -204,7 +195,13 @@ std::tuple<sycl::range<2>, sycl::range<2>> flexible_launch_configs(
   }
 
   int grid_x = CeilDiv(stride, group_x);
-  int grid_y = std::min(CeilDiv(reduction, group_y * loops_per_item), 1024);
+
+  int grid_y = std::min(
+      CeilDiv(reduction, group_y * loops_per_item),
+      int(dpcppMaxWorkItemsPerTile()) / (grid_x * group_x) /
+          (group_y * loops_per_item));
+  grid_y = std::max(grid_y, 1);
+
   if (coop_flag) {
     // it's not worth having a grid reduction if the reduction dimension is not
     // big enough
@@ -303,12 +300,16 @@ void batch_norm_transform_input_kernel(
   DPCPP_Q_SUBMIT(queue, cgf);
 }
 
-template <typename scalar_t, typename accscalar_t, typename layerscalar_t>
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    typename layerscalar_t,
+    int vec_size>
 void batch_norm_transform_input_channels_last_kernel(
-    const scalar_t* input_ptr,
+    scalar_t* input_ptr,
     const scalar_t* z_ptr,
-    const accscalar_t* mean_ptr,
-    const accscalar_t* inv_std_ptr,
+    accscalar_t* mean_ptr,
+    accscalar_t* inv_std_ptr,
     const layerscalar_t* weight_ptr,
     const layerscalar_t* shift_ptr,
     scalar_t* output_ptr,
@@ -317,50 +318,63 @@ void batch_norm_transform_input_channels_last_kernel(
     const bool fuse_relu) {
   // tensor dimension (m,c)
   // loop along m dimension
-
+  int64_t total_num = reduction_size * stride;
+  using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
+  using vec_s_t =
+      at::native::Memory::aligned_vector_loop<accscalar_t, vec_size>;
   auto& queue = dpcppGetCurrentQueue();
   sycl::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
-      flexible_launch_configs(reduction_size, stride);
-
+      flexible_launch_configs(reduction_size, stride / vec_size);
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
       auto group_idx_x = item.get_group().get_group_id(1);
 
-      int inner_loop_stride = item.get_global_range(0);
+      // int inner_loop_stride = item.get_global_range(0);
       // offset along m dimension
       int m_offset = item.get_global_id(0);
-      int c_offset = item.get_global_id(1);
+      int c_offset_base = item.get_global_id(1) * vec_size;
 
-      if (c_offset >= stride || m_offset >= reduction_size) {
+      if (c_offset_base >= stride || m_offset >= reduction_size) {
         return;
       }
 
-      auto m_c = mean_ptr[c_offset];
-      auto inv_std_c = static_cast<accscalar_t>(inv_std_ptr[c_offset]);
-      auto w_c = weight_ptr == nullptr
-          ? accscalar_t(1.0)
-          : static_cast<accscalar_t>(weight_ptr[c_offset]);
-      auto s_c = shift_ptr == nullptr
-          ? accscalar_t(0.0)
-          : static_cast<accscalar_t>(shift_ptr[c_offset]);
-
-      int address_base = m_offset * stride + c_offset;
-      int address_increment = inner_loop_stride * stride;
-
-      for (int i = m_offset; i < reduction_size; i += inner_loop_stride) {
-        auto tmp = w_c *
-                (static_cast<accscalar_t>(input_ptr[address_base]) - m_c) *
-                inv_std_c +
-            s_c;
-        if (z_ptr != nullptr) {
-          tmp += z_ptr[address_base];
+      vec_s_t m_c = *(reinterpret_cast<vec_s_t*>(mean_ptr + c_offset_base));
+      vec_s_t inv_vec =
+          *(reinterpret_cast<vec_s_t*>(inv_std_ptr + c_offset_base));
+      vec_s_t w_c;
+      vec_s_t s_c;
+#pragma unroll
+      for (int j = 0; j < vec_size; j++) {
+        if (weight_ptr != nullptr) {
+          w_c[j] = static_cast<accscalar_t>(weight_ptr[c_offset_base + j]) *
+              inv_vec[j];
+        } else {
+          w_c[j] = (inv_vec[j]);
         }
-        output_ptr[address_base] =
-            (fuse_relu && tmp <= accscalar_t(0.0) ? scalar_t(0.0)
-                                                  : static_cast<scalar_t>(tmp));
-        m_offset += inner_loop_stride;
-        address_base += address_increment;
+        if (shift_ptr != nullptr) {
+          s_c[j] = shift_ptr[c_offset_base + j];
+        } else {
+          s_c[j] = static_cast<accscalar_t>(0.0f);
+        }
+      }
+
+      int address_base = m_offset * stride + c_offset_base;
+      int address_increment = item.get_global_range(0) * stride;
+
+      vec_t output_vec;
+      for (; address_base < total_num; address_base += address_increment) {
+        vec_t x_math_vec =
+            *(reinterpret_cast<vec_t*>(input_ptr + address_base));
+#pragma unroll
+        for (int j = 0; j < vec_size; j++) {
+          auto c_offset = c_offset_base + j;
+
+          output_vec[j] =
+              w_c[j] * (static_cast<accscalar_t>(x_math_vec[j]) - m_c[j]) +
+              s_c[j];
+        }
+        *(reinterpret_cast<vec_t*>(output_ptr + address_base)) = output_vec;
       }
     };
     cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
@@ -384,7 +398,8 @@ void batch_norm_elemt_channels_first_template(
        -1}); // internally we merge the feature dimensions
   auto output_reshaped = output_.view({input_.size(0), input_.size(1), -1});
 
-  // NOTE: We use transform_input_kernel in training mode, which ignores epsilon
+  // NOTE: We use transform_input_kernel in training mode, which ignores
+  // epsilon
   const double dummy_epsilon = 1e-5;
 
   batch_norm_transform_input_kernel<
@@ -417,24 +432,62 @@ void batch_norm_elemt_channels_last_template(
   const auto stride = input.sizes()[1];
   const auto reduction_size = input.numel() / stride;
 
+#define DISPATCH_TRANSFORM_INPUT_IMPL(vec_size)                   \
+  {                                                               \
+    batch_norm_transform_input_channels_last_kernel<              \
+        scalar_t,                                                 \
+        accscalar_t,                                              \
+        scalar_t,                                                 \
+        vec_size>(                                                \
+        input.data_ptr<scalar_t>(),                               \
+        z.has_value() ? z.value().data_ptr<scalar_t>() : nullptr, \
+        mean.data_ptr<accscalar_t>(),                             \
+        inv_std.data_ptr<accscalar_t>(),                          \
+        weight.defined() ? weight.data_ptr<scalar_t>() : nullptr, \
+        shift.defined() ? shift.data_ptr<scalar_t>() : nullptr,   \
+        output.data_ptr<scalar_t>(),                              \
+        reduction_size,                                           \
+        stride,                                                   \
+        fuse_relu);                                               \
+  }
+
+#define DISPATCH_TRANSFORM_ACC_INPUT_IMPL(vec_size)                  \
+  {                                                                  \
+    batch_norm_transform_input_channels_last_kernel<                 \
+        scalar_t,                                                    \
+        accscalar_t,                                                 \
+        accscalar_t,                                                 \
+        vec_size>(                                                   \
+        input.data_ptr<scalar_t>(),                                  \
+        z.has_value() ? z.value().data_ptr<scalar_t>() : nullptr,    \
+        mean.data_ptr<accscalar_t>(),                                \
+        inv_std.data_ptr<accscalar_t>(),                             \
+        weight.defined() ? weight.data_ptr<accscalar_t>() : nullptr, \
+        shift.defined() ? shift.data_ptr<accscalar_t>() : nullptr,   \
+        output.data_ptr<scalar_t>(),                                 \
+        reduction_size,                                              \
+        stride,                                                      \
+        fuse_relu);                                                  \
+  }
+
   if (input.scalar_type() != second_dtype) {
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         kHalf, kBFloat16, input.scalar_type(), "batchnorm_forward", [&] {
           using accscalar_t = acc_type<scalar_t>;
-          batch_norm_transform_input_channels_last_kernel<
-              scalar_t,
-              accscalar_t,
-              accscalar_t>(
-              input.data_ptr<scalar_t>(),
-              z.has_value() ? z.value().data_ptr<scalar_t>() : nullptr,
-              mean.data_ptr<accscalar_t>(),
-              inv_std.data_ptr<accscalar_t>(),
-              weight.defined() ? weight.data_ptr<accscalar_t>() : nullptr,
-              shift.defined() ? shift.data_ptr<accscalar_t>() : nullptr,
-              output.data_ptr<scalar_t>(),
-              reduction_size,
-              stride,
-              fuse_relu);
+          int suggest_vec_size = get_nhwc_suggest_vec_size<scalar_t>(
+              input, reduction_size, stride);
+          switch (suggest_vec_size) {
+            case 8: {
+              DISPATCH_TRANSFORM_ACC_INPUT_IMPL(8);
+              break;
+            }
+            case 4: {
+              DISPATCH_TRANSFORM_ACC_INPUT_IMPL(4);
+              break;
+            }
+            default:
+              DISPATCH_TRANSFORM_ACC_INPUT_IMPL(1);
+          }
         });
   } else {
     if (weight.defined()) {
@@ -448,22 +501,24 @@ void batch_norm_elemt_channels_last_template(
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         kHalf, kBFloat16, input.scalar_type(), "batchnorm_forward", [&] {
           using accscalar_t = acc_type<scalar_t>;
-          batch_norm_transform_input_channels_last_kernel<
-              scalar_t,
-              accscalar_t,
-              scalar_t>(
-              input.data_ptr<scalar_t>(),
-              z.has_value() ? z.value().data_ptr<scalar_t>() : nullptr,
-              mean.data_ptr<accscalar_t>(),
-              inv_std.data_ptr<accscalar_t>(),
-              weight.defined() ? weight.data_ptr<scalar_t>() : nullptr,
-              shift.defined() ? shift.data_ptr<scalar_t>() : nullptr,
-              output.data_ptr<scalar_t>(),
-              reduction_size,
-              stride,
-              fuse_relu);
+          int suggest_vec_size = get_nhwc_suggest_vec_size<scalar_t>(
+              input, reduction_size, stride);
+          switch (suggest_vec_size) {
+            case 8: {
+              DISPATCH_TRANSFORM_INPUT_IMPL(8);
+              break;
+            }
+            case 4: {
+              DISPATCH_TRANSFORM_INPUT_IMPL(4);
+              break;
+            }
+            default:
+              DISPATCH_TRANSFORM_INPUT_IMPL(1);
+          }
         });
   }
+#undef DISPATCH_TRANSFORM_INPUT_IMPL
+#undef DISPATCH_TRANSFORM_ACC_INPUT_IMPL
 }
 
 void batch_norm_elementwise(
@@ -517,8 +572,8 @@ void batch_norm_elementwise(
     case Impl::General: {
       const int64_t ndim = self.dim();
       DimVector sizes(ndim, 1), strides(ndim, 0);
-      // Helper to convert 1d tensors to an nd tensor that broadcasts with input
-      // All elements go into the channel dimension
+      // Helper to convert 1d tensors to an nd tensor that broadcasts with
+      // input All elements go into the channel dimension
       auto as_nd = [&](const Tensor& t) {
         TORCH_INTERNAL_ASSERT(t.defined() && t.dim() == 1);
         sizes[1] = t.sizes()[0];
@@ -743,205 +798,188 @@ void inline welford_merge_group_vertical(
   }
 }
 
-// welford kernel for c last tensor calculating
-// mean/biased_variance/unbiased_variance original apex name:
-// welford_kernel_c_last
+template <typename VarTransform, typename scalar_t, typename stat_accscalar_t>
+void batch_norm_update_mean_var_kernel(
+    scalar_t* mean_,
+    scalar_t* var_,
+    int channel_num,
+    scalar_t factor,
+    stat_accscalar_t epsilon) {
+  auto& queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t wg_size = std::min(
+      int64_t(channel_num),
+      dpcppMaxWorkItemsPerEU(dev_id)); // for work group barrier
+
+  sycl::range<1> local_range(wg_size);
+  sycl::range<1> global_range((channel_num + wg_size - 1) / wg_size * wg_size);
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
+      auto c_offset = item.get_global_linear_id();
+      if (c_offset < channel_num) {
+        scalar_t mean = mean_[c_offset] * factor;
+
+        mean_[c_offset] = mean;
+        var_[c_offset] =
+            VarTransform{}(var_[c_offset] * factor - mean * mean, epsilon);
+      }
+    };
+    cgh.parallel_for(sycl::nd_range<1>(global_range, local_range), kfn);
+  };
+  DPCPP_Q_SUBMIT(queue, cgf);
+}
+
+// sum x and x^2 in channels
 template <
-    typename VarTransform,
     typename scalar_t,
     typename accscalar_t,
-    int PARALLEL_LOADS>
-void batch_norm_collect_statistics_channels_last_kernel(
+    int vec_size,
+    bool two_pass_reduce>
+void batch_norm_reduce_sum_channels_last_kernel(
     const Tensor input,
     Tensor& out_mean,
     Tensor& out_invstd,
     const int reduction_size,
-    const int stride,
-    accscalar_t epsilon) {
+    const int stride) {
   sycl::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
-      flexible_launch_configs(reduction_size, stride, PARALLEL_LOADS, true);
+      flexible_launch_configs(reduction_size, stride / vec_size, true);
+  using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
   auto& queue = dpcppGetCurrentQueue();
   auto global_range_y = global_range[0];
   auto local_range_y = local_range[0];
   int group_num_x = global_range[1] / local_range[1];
   int group_num_y = global_range[0] / local_range[0];
-  at::Tensor staging_data;
-  at::Tensor staging_count;
-  at::Tensor semaphores;
-  if (group_num_y > 1) {
-    staging_data = at::empty({2 * stride * group_num_y}, out_mean.options());
-    staging_count =
-        at::empty({stride * group_num_y}, out_mean.options().dtype(at::kInt));
-    semaphores = at::zeros({group_num_x}, input.options().dtype(at::kInt));
+  Tensor temp_sum, temp_sum_sq;
+  accscalar_t* temp_sum_ptr = nullptr;
+  accscalar_t* temp_sum_sq_ptr = nullptr;
+  if constexpr (two_pass_reduce) {
+    out_mean.zero_();
+    out_invstd.zero_();
+    temp_sum = at::empty({group_num_y * stride}, out_mean.options());
+    temp_sum_sq = at::empty({group_num_y * stride}, out_mean.options());
+    temp_sum_ptr = temp_sum.data_ptr<accscalar_t>();
+    temp_sum_sq_ptr = temp_sum_sq.data_ptr<accscalar_t>();
   }
   int wg_size = local_range[0] * local_range[1];
+
   auto input_ptr = input.data_ptr<scalar_t>();
   auto out_mean_ptr = out_mean.data_ptr<accscalar_t>();
   auto out_invstd_ptr = out_invstd.data_ptr<accscalar_t>();
-  accscalar_t* staging_data_ptr =
-      group_num_y > 1 ? staging_data.data_ptr<accscalar_t>() : nullptr;
-  int* staging_count_ptr =
-      group_num_y > 1 ? staging_count.data_ptr<int>() : nullptr;
-  int* semaphores_ptr = group_num_y > 1 ? semaphores.data_ptr<int>() : nullptr;
-  int loop_count = 1 + (reduction_size - 1) / (global_range_y * PARALLEL_LOADS);
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto shmem_mean =
-        dpcpp_local_acc_t<accscalar_t, 1>(sycl::range<1>{wg_size}, cgh);
-    auto shmem_m2n =
-        dpcpp_local_acc_t<accscalar_t, 1>(sycl::range<1>{wg_size}, cgh);
-    auto shmem_count = dpcpp_local_acc_t<int, 1>(sycl::range<1>{wg_size}, cgh);
 
-    auto is_last_group_done =
-        dpcpp_local_acc_t<bool, 1>(sycl::range<1>{1}, cgh);
+  int loop_count = 1 + (reduction_size - 1) / (global_range_y);
+  using vec_y = at::detail::Array<accscalar_t, 2>;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto shared = dpcpp_local_acc_t<vec_y, 1>(sycl::range<1>{wg_size}, cgh);
+
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
       int plane = item.get_group(0);
       int tid = item.get_local_linear_id();
       auto sg = item.get_sub_group();
 
-      // hide latency with concurrency
-      accscalar_t x_mean[PARALLEL_LOADS];
-      accscalar_t m_2_n[PARALLEL_LOADS];
-      int count[PARALLEL_LOADS];
-
-#pragma unroll
-      for (int i = 0; i < PARALLEL_LOADS; i++) {
-        x_mean[i] = accscalar_t(0);
-        m_2_n[i] = accscalar_t(0);
-        count[i] = accscalar_t(0);
-      }
-      // tensor dimension (m,c)
-
-      // loop along m dimension
-      int inner_loop_stride = global_range_y;
-
       // offset along m dimension
       int m_offset = item.get_global_id(0);
-      int c_offset = item.get_global_id(1);
+      int c_offset_base = item.get_global_id(1) * vec_size;
 
       int thread_idx_y = item.get_local_id(0);
       int thread_idx_x = item.get_local_id(1);
       int group_idx_y = item.get_group(0);
       int group_idx_x = item.get_group(1);
 
-      int address_base = m_offset * stride + c_offset;
+      int address_base = m_offset * stride + c_offset_base;
+      int inner_loop_stride = global_range_y;
       int address_increment = inner_loop_stride * stride;
 
+      accscalar_t x_sum[vec_size] = {0.0f};
+      accscalar_t x_sq_sum[vec_size] = {0.0f};
+      // thread reduction
       for (int i = 0; i < loop_count; i++) {
-        accscalar_t x_math[PARALLEL_LOADS];
-        accscalar_t x_count_inv[PARALLEL_LOADS];
-        accscalar_t is_valid[PARALLEL_LOADS];
-
-        // load multiple data in
+        vec_t x_math_vec =
+            *(reinterpret_cast<vec_t*>(input_ptr + address_base));
 #pragma unroll
-        for (int j = 0; j < PARALLEL_LOADS; j++) {
+        for (int j = 0; j < vec_size; j++) {
+          auto c_offset = c_offset_base + j;
+
           if (c_offset < stride && m_offset < reduction_size) {
-            x_math[j] = input_ptr[address_base];
-            count[j]++;
-            x_count_inv[j] = accscalar_t(1) / count[j];
-            is_valid[j] = accscalar_t(1);
-          } else {
-            x_math[j] = accscalar_t(0);
-            x_count_inv[j] = accscalar_t(0);
-            is_valid[j] = accscalar_t(0);
+            scalar_t arr = input_ptr[address_base + j];
+            auto x_math = x_math_vec[j];
+            x_sum[j] += x_math;
+            x_sq_sum[j] += x_math * x_math;
           }
-          m_offset += inner_loop_stride;
-          address_base += address_increment;
         }
-
-        // calculate mean/m2n with welford
-#pragma unroll
-        for (int j = 0; j < PARALLEL_LOADS; j++) {
-          accscalar_t delta0 = x_math[j] - x_mean[j];
-          x_mean[j] += delta0 * x_count_inv[j];
-          accscalar_t delta1 = x_math[j] - x_mean[j];
-          m_2_n[j] += delta0 * delta1 * is_valid[j];
-        }
+        m_offset += inner_loop_stride;
+        address_base += address_increment;
       }
 
-      // thread reduction to accumulate mean/m_2_n/count between
-      // PARALLEL_LOADS
 #pragma unroll
-      for (int j = 1; j < PARALLEL_LOADS; j++) {
-        welford_merge_element(
-            count[0], x_mean[0], m_2_n[0], count[j], x_mean[j], m_2_n[j]);
-      }
+      for (int j = 0; j < vec_size; j++) {
+        vec_y value;
+        value[0] = x_sum[j];
+        value[1] = x_sq_sum[j];
 
-      // release x_mean / m_2_n
-      auto mean_th = x_mean[0];
-      auto m2_th = m_2_n[0];
-      auto count_th = count[0];
+        value = group_y_reduce(
+            item, shared, value, [](accscalar_t a, accscalar_t b) {
+              return a + b;
+            });
 
-      welford_merge_group_vertical(
-          item, count_th, mean_th, m2_th, shmem_count, shmem_mean, shmem_m2n);
-      if (group_num_y > 1) {
-        volatile accscalar_t* staging_mean = staging_data_ptr;
-        volatile accscalar_t* staging_m2n =
-            &staging_data_ptr[stride * group_num_y];
-        int* staging_count = staging_count_ptr;
-
-        address_base = c_offset + group_idx_y * stride;
-        // write data to staging_data;
-        if (thread_idx_y == 0 && c_offset < stride) {
-          staging_mean[address_base] = mean_th; // global data
-          staging_m2n[address_base] = m2_th;
-          staging_count[address_base] = count_th;
-        }
-
-        item.barrier(dpcpp_global_fence);
-
-        // mark group done
-        if (thread_idx_x == 0 && thread_idx_y == 0) {
-          dpcpp_atomic_ref_rlx_dev_global_t<int> target(
-              *((dpcpp_global_ptr_pt<int>)&semaphores_ptr[group_idx_x]));
-          int old = target.fetch_add(1);
-          is_last_group_done[0] = (old == (group_num_y - 1));
-        }
+        x_sum[j] = value[0];
+        x_sq_sum[j] = value[1];
 
         item.barrier(dpcpp_local_fence);
-        // check that all data is now available in global memory
-        if (is_last_group_done[0]) {
-          count_th = 0;
-          mean_th = accscalar_t(0.0);
-          m2_th = accscalar_t(0.0);
+      }
 
-          for (int y = thread_idx_y; y < group_num_y; y += local_range_y) {
-            address_base = c_offset + y * stride;
-            int count_new = c_offset < stride ? staging_count[address_base] : 0;
-            accscalar_t mean_new = c_offset < stride
-                ? staging_mean[address_base]
-                : accscalar_t(0.0);
-            accscalar_t m2n_new = c_offset < stride ? staging_m2n[address_base]
-                                                    : accscalar_t(0.0);
-
-            welford_merge_element(
-                count_th, mean_th, m2_th, count_new, mean_new, m2n_new);
+#pragma unroll
+      for (int j = 0; j < vec_size; j++) {
+        auto c_offset = c_offset_base + j;
+        // global_reduciton
+        if (thread_idx_y == 0 && c_offset < stride) {
+          if constexpr (two_pass_reduce) {
+            // write to temp[c][group_idx_y]
+            int offset = c_offset * group_num_y + group_idx_y;
+            temp_sum_ptr[c_offset * group_num_y + group_idx_y] = x_sum[j];
+            temp_sum_sq_ptr[c_offset * group_num_y + group_idx_y] = x_sq_sum[j];
+          } else {
+            out_mean_ptr[c_offset] = x_sum[j];
+            out_invstd_ptr[c_offset] = x_sq_sum[j];
           }
-
-          welford_merge_group_vertical(
-              item,
-              count_th,
-              mean_th,
-              m2_th,
-              shmem_count,
-              shmem_mean,
-              shmem_m2n);
-          if (thread_idx_y == 0 && c_offset < stride) {
-            out_mean_ptr[c_offset] = static_cast<accscalar_t>(mean_th);
-            out_invstd_ptr[c_offset] =
-                VarTransform{}(m2_th / count_th, epsilon);
-          }
-        }
-      } else {
-        if (group_idx_y == 0 && thread_idx_y == 0 && c_offset < stride) {
-          out_mean_ptr[c_offset] = static_cast<accscalar_t>(mean_th);
-          out_invstd_ptr[c_offset] = VarTransform{}(m2_th / count_th, epsilon);
         }
       }
     };
     cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
+
+  // reduce temp sum
+  if constexpr (two_pass_reduce) {
+    int wg_size = std::min(group_num_y, int(dpcppMaxWorkItemsPerEU()));
+    auto cgf_2 = DPCPP_Q_CGF(__cgh) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
+        auto local_id = item_id.get_local_linear_id();
+        auto global_id = item_id.get_global_linear_id();
+        auto c_offset = item_id.get_group_linear_id();
+
+        accscalar_t temp_sum_val = 0.0f;
+        accscalar_t temp_sum_sq_val = 0.0f;
+        for (int i = local_id; i < group_num_y; i += wg_size) {
+          int offset = c_offset * group_num_y + i;
+          temp_sum_val += temp_sum_ptr[offset];
+          temp_sum_sq_val += temp_sum_sq_ptr[offset];
+        }
+        auto total_sum = sycl::reduce_over_group(
+            item_id.get_group(), temp_sum_val, sycl::plus<accscalar_t>());
+        auto total_sum_sq = sycl::reduce_over_group(
+            item_id.get_group(), temp_sum_sq_val, sycl::plus<accscalar_t>());
+        if (local_id == 0) {
+          out_mean_ptr[c_offset] = total_sum;
+          out_invstd_ptr[c_offset] = total_sum_sq;
+        }
+      };
+      __cgh.parallel_for(sycl::nd_range<1>(stride * wg_size, wg_size), kfn);
+    };
+    DPCPP_Q_SUBMIT(queue, cgf_2);
+  }
 }
 
 template <typename scalar_t, typename index_t, typename VarTransform>
@@ -1012,13 +1050,70 @@ void batch_norm_stats_channels_last_template(
   TORCH_INTERNAL_ASSERT(
       out_mean.dim() == 1 && out_mean.is_contiguous() && out_mean.sizes()[0]);
 
-  constexpr int ELEMENTS_PER_ITER = sizeof(float) * 4 / sizeof(scalar_t);
-  batch_norm_collect_statistics_channels_last_kernel<
-      VarTransform,
-      scalar_t,
-      accscalar_t,
-      ELEMENTS_PER_ITER>(
-      input, out_mean, out_invstd, reduction_size, stride, epsilon);
+  int suggest_vec_size =
+      get_nhwc_suggest_vec_size<scalar_t>(input, reduction_size, stride);
+
+#define DISPATCH_REDUCE_2_PASS_IMPL(vec_size)                       \
+  {                                                                 \
+    batch_norm_reduce_sum_channels_last_kernel<                     \
+        scalar_t,                                                   \
+        accscalar_t,                                                \
+        vec_size,                                                   \
+        true>(input, out_mean, out_invstd, reduction_size, stride); \
+  }
+
+#define DISPATCH_REDUCE_IMPL(vec_size)                               \
+  {                                                                  \
+    batch_norm_reduce_sum_channels_last_kernel<                      \
+        scalar_t,                                                    \
+        accscalar_t,                                                 \
+        vec_size,                                                    \
+        false>(input, out_mean, out_invstd, reduction_size, stride); \
+  }
+  sycl::range<2> global_range(1, 1), local_range(1, 1);
+
+  if (stride % suggest_vec_size == 0 && suggest_vec_size == 8) {
+    constexpr int vec_size = 8;
+
+    std::tie(global_range, local_range) =
+        flexible_launch_configs(reduction_size, stride / vec_size, true);
+    int group_num_y = global_range[0] / local_range[0];
+    if (group_num_y > 1) {
+      DISPATCH_REDUCE_2_PASS_IMPL(vec_size);
+    } else {
+      DISPATCH_REDUCE_IMPL(vec_size);
+    }
+  } else if (stride % suggest_vec_size == 0 && suggest_vec_size == 4) {
+    constexpr int vec_size = 4;
+
+    std::tie(global_range, local_range) =
+        flexible_launch_configs(reduction_size, stride / vec_size, true);
+    int group_num_y = global_range[0] / local_range[0];
+    if (group_num_y > 1) {
+      DISPATCH_REDUCE_2_PASS_IMPL(vec_size);
+    } else {
+      DISPATCH_REDUCE_IMPL(vec_size);
+    }
+  } else {
+    constexpr int vec_size = 1;
+
+    std::tie(global_range, local_range) =
+        flexible_launch_configs(reduction_size, stride / vec_size, true);
+    int group_num_y = global_range[0] / local_range[0];
+    if (group_num_y > 1) {
+      DISPATCH_REDUCE_2_PASS_IMPL(vec_size);
+    } else {
+      DISPATCH_REDUCE_IMPL(vec_size);
+    }
+  }
+
+  auto out_mean_ptr = out_mean.data_ptr<accscalar_t>();
+  auto out_invstd_ptr = out_invstd.data_ptr<accscalar_t>();
+  const auto factor = static_cast<accscalar_t>(1.0f / reduction_size);
+  batch_norm_update_mean_var_kernel<VarTransform>(
+      out_mean_ptr, out_invstd_ptr, stride, factor, epsilon);
+#undef DISPATCH_REDUCE_2_PASS_IMPL
+#undef DISPATCH_REDUCE_IMPL
 }
 
 void batch_norm_mean_var(
@@ -1210,25 +1305,8 @@ std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> native_batch_norm_out(
     Tensor& save_mean,
     Tensor& save_invstd) {
   xpu::COMPUTE_ENG real_eng;
-  int sp = input.numel() / input.size(1);
-  int ic = input.size(1);
 
-  // oneDNN makes vectorized load/store for nhwc when channels is multiples of
-  // 16
-  bool onednn_nhwc_optimized =
-      batch_norm_choose_impl(input) == Impl::ChannelsLast && ic % 16 == 0;
-
-  // In oneDNN, for shapes with nhwc_optimized, spatial dim(NHW) will be divided
-  // into blocks, each thread handles one block
-  int onednn_block_size = 0;
-  if (onednn_nhwc_optimized)
-    onednn_block_size = get_nhwc_sp_block_size(sp, ic);
-
-  // For shapes with channels vectorized and spatial optimized, we adopt oneDNN
-  // implementation
-  bool adopt_onednn_path = onednn_nhwc_optimized && onednn_block_size > 1;
-
-  if (input.is_quantized() || adopt_onednn_path) {
+  if (input.is_quantized()) {
     real_eng = xpu::COMPUTE_ENG::ONEDNN;
   } else {
     real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
@@ -1916,7 +1994,7 @@ void batch_norm_backward_reduce_channels_last_kernel(
     const int stride) {
   sycl::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
-      flexible_launch_configs(reduction_size, stride, PARALLEL_LOADS, true);
+      flexible_launch_configs(reduction_size, stride, PARALLEL_LOADS, false);
   int loop_count =
       1 + (reduction_size - 1) / (global_range[0] * PARALLEL_LOADS);
   int group_num_y = global_range[0] / local_range[0];
@@ -1928,13 +2006,7 @@ void batch_norm_backward_reduce_channels_last_kernel(
   auto& queue = dpcppGetCurrentQueue();
   at::Tensor staging_data;
   at::Tensor semaphores;
-  if (group_num_y > 1) {
-    staging_data = at::empty({2 * stride * group_num_y}, mean.options());
-    semaphores = at::zeros({group_num_x}, input.options().dtype(at::kInt));
-  }
-  accscalar_t* staging_data_ptr =
-      group_num_y > 1 ? staging_data.data_ptr<accscalar_t>() : nullptr;
-  int* semaphores_ptr = group_num_y > 1 ? semaphores.data_ptr<int>() : nullptr;
+
   scalar_t* input_ptr = input.data_ptr<scalar_t>();
   accscalar_t* mean_ptr = mean.data_ptr<accscalar_t>();
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -2017,65 +2089,27 @@ void batch_norm_backward_reduce_channels_last_kernel(
       auto sum_dy_th = sum_dy[0];
       auto sum_dy_xmu_th = sum_dy_xmu[0];
 
-      // group-wise reduction with shared memory (since reduction cannot be done
-      // within a warp)
+      // group-wise reduction with shared memory (since reduction cannot be
+      // done within a warp)
 
       merge_group_vertical_backward(
           item, sum_dy_th, sum_dy_xmu_th, shmem_sum_dy, shmem_sum_dy_xmu);
       if (group_num_y > 1) {
-        volatile accscalar_t* staging_sum_dy = staging_data_ptr;
-        volatile accscalar_t* staging_sum_dy_xmu =
-            &staging_data_ptr[stride * group_num_y];
-
-        address_base = c_offset + group_id_y * stride;
-        // write data to staging_data;
         if (lidy == 0 && c_offset < stride) {
-          staging_sum_dy[address_base] = sum_dy_th;
-          staging_sum_dy_xmu[address_base] = sum_dy_xmu_th;
-        }
-
-        item.barrier(dpcpp_global_fence);
-
-        // mark group done
-        if (lidx == 0 && lidy == 0) {
-          // int old = atomicAdd(&semaphores[group_id_x], 1);
-          dpcpp_atomic_ref_rlx_dev_global_t<int> target(
-              *((dpcpp_global_ptr_pt<int>)&semaphores_ptr[group_id_x]));
-          int old = target.fetch_add(1);
-          is_last_group_done[0] = (old == (group_num_y - 1));
-        }
-        item.barrier(dpcpp_local_fence);
-
-        // check that all data is now available in global memory
-        if (is_last_group_done[0]) {
-          sum_dy_th = accscalar_t(0.0);
-          sum_dy_xmu_th = accscalar_t(0.0);
-
-          for (int y = lidy; y < group_num_y; y += local_range_y) {
-            address_base = c_offset + y * stride;
-
-            sum_dy_th +=
-                (c_offset < stride ? staging_sum_dy[address_base]
-                                   : accscalar_t(0.0));
-            sum_dy_xmu_th +=
-                (c_offset < stride ? staging_sum_dy_xmu[address_base]
-                                   : accscalar_t(0.0));
+          atomicAdd(
+              (dpcpp_global_ptr_pt<accscalar_t>)&sum_dy_o[c_offset], sum_dy_th);
+          atomicAdd(
+              (dpcpp_global_ptr_pt<accscalar_t>)&sum_dy_xmu_o[c_offset],
+              sum_dy_xmu_th);
+          if (grad_bias != nullptr) {
+            atomicAdd(
+                (dpcpp_global_ptr_pt<layerscalar_t>)&grad_bias[c_offset],
+                sum_dy_th);
           }
-
-          merge_group_vertical_backward(
-              item, sum_dy_th, sum_dy_xmu_th, shmem_sum_dy, shmem_sum_dy_xmu);
-          if (lidy == 0 && c_offset < stride) {
-            if (grad_bias != nullptr) {
-              grad_bias[c_offset] = static_cast<layerscalar_t>(sum_dy_th);
-            }
-            if (grad_weight != nullptr) {
-              grad_weight[c_offset] =
-                  static_cast<layerscalar_t>(sum_dy_xmu_th * factor);
-            }
-            // mean_dy[c_offset] = sum_dy_th / reduction_size;
-            // mean_dy_xmu[c_offset] = sum_dy_xmu_th / reduction_size;
-            sum_dy_o[c_offset] = sum_dy_th;
-            sum_dy_xmu_o[c_offset] = sum_dy_xmu_th;
+          if (grad_weight != nullptr) {
+            atomicAdd(
+                (dpcpp_global_ptr_pt<layerscalar_t>)&grad_weight[c_offset],
+                sum_dy_xmu_th * factor);
           }
         }
       } else {
@@ -2112,14 +2146,14 @@ batch_norm_backward_reduce_channels_last_template(
   const auto stride = input.sizes()[1];
   const auto reduction_size = input.numel() / stride;
 
-  at::Tensor sumn_dy = at::empty({stride}, mean.options());
-  at::Tensor sum_dy_xmu = at::empty({stride}, mean.options());
+  at::Tensor sumn_dy = at::zeros({stride}, mean.options());
+  at::Tensor sum_dy_xmu = at::zeros({stride}, mean.options());
 
   at::Tensor grad_weight;
   at::Tensor grad_bias;
   if (weight.defined()) {
-    grad_weight = at::empty({stride}, weight.options());
-    grad_bias = at::empty({stride}, weight.options());
+    grad_weight = at::zeros({stride}, weight.options());
+    grad_bias = at::zeros({stride}, weight.options());
   } else {
     // because I cannot return an uninitialized at::Tensor
     grad_weight = at::empty({0}, mean.options());
@@ -2179,7 +2213,6 @@ batch_norm_backward_reduce_channels_last_template(
               stride);
         });
   }
-
   return std::make_tuple(sumn_dy, sum_dy_xmu, grad_weight, grad_bias);
 }
 
@@ -2870,30 +2903,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm_backward(
     bool training,
     double epsilon,
     std::array<bool, 3> grad_input_mask) {
-  int sp = input.numel() / input.size(1);
-  int ic = input.size(1);
-
-  // oneDNN makes vectorized load/store for nhwc when channels is multiples of
-  // 16
-  bool onednn_nhwc_optimized =
-      batch_norm_choose_impl(input) == Impl::ChannelsLast && ic % 16 == 0;
-
-  // In oneDNN, for shapes with nhwc_optimized, spatial dim(NHW) will be divided
-  // into blocks, each thread handles one block
-  int onednn_block_size = 0;
-  if (onednn_nhwc_optimized)
-    onednn_block_size = get_nhwc_sp_block_size(sp, ic);
-
-  // For shapes with channels vectorized and spatial optimized, we adopt oneDNN
-  // implementation
-  bool adopt_onednn_path = onednn_nhwc_optimized && onednn_block_size > 1;
-
   xpu::COMPUTE_ENG real_eng;
-  if (adopt_onednn_path) {
-    real_eng = xpu::COMPUTE_ENG::ONEDNN;
-  } else {
-    real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
-  }
+  real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
 
   if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     c10::MaybeOwned<Tensor> weight_maybe_owned =
