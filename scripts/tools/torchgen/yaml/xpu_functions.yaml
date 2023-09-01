@@ -44,6 +44,8 @@ supported:
   - _fft_c2r.out
   - _fft_r2c.out
   - _fft_c2c.out
+  - _fused_adam_
+  - _fused_adamw_
   - _fused_dropout
   - _fused_moving_avg_obs_fq_helper
   - _masked_scale
