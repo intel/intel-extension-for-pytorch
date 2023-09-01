@@ -277,8 +277,16 @@ static void mm_qkv_out(
           bias_.value()[2], input, wv, at::Scalar(1), at::Scalar(1), out2_);
     }
   } else {
-    int m_real = (3 * (m + 127) / 128 * 128);
-    int selected_policy = select_gemm_config(m_real, n, k, is_b_row_major, 64);
+    int selected_policy;
+
+    if (m <= 32 && n <= 2048) {
+      selected_policy = hgemm_get_policy(
+          hgemm_policy::_8x128_8x16x32_4_true_, is_b_row_major);
+    } else {
+      int m_real = (3 * (m + 127) / 128 * 128);
+      selected_policy = select_gemm_config(m_real, n, k, is_b_row_major, 64);
+    }
+
     char str__[100];
     if (!has_bias) {
       sprintf(

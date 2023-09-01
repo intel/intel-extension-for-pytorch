@@ -139,12 +139,15 @@ namespace xetla {
 
 // clang-format off
 #define HGEMM_COMMA ,
-#define HGEMM_NUM_POLICIES 23
+#define HGEMM_NUM_POLICIES 26
 #define HGEMM_ENUMERATE_POLICIES_(_, B_ROW_MAJOR, T) \
   _(8, 64, 8, 16, 32, 8, B_ROW_MAJOR)T      \
+  _(8, 128, 8, 16, 16, 2, B_ROW_MAJOR)T     \
+  _(8, 128, 8, 16, 32, 4, B_ROW_MAJOR)T     \
   _(8, 256, 8, 16, 16, 2, B_ROW_MAJOR)T     \
   _(8, 512, 8, 16, 16, 1, B_ROW_MAJOR)T     \
   _(16, 64, 16, 16, 16, 8, B_ROW_MAJOR)T    \
+  _(16, 256, 8, 16, 16, 1, B_ROW_MAJOR)T    \
   _(16, 256, 16, 16, 16, 2, B_ROW_MAJOR)T   \
   _(16, 512, 16, 16, 16, 1, B_ROW_MAJOR)T   \
   _(32, 64, 32, 16, 16, 8, B_ROW_MAJOR)T    \
@@ -304,11 +307,58 @@ void (*hgemm_bias_res_policies[2 * HGEMM_NUM_POLICIES])(
     const int,
     const int) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_BIAS_RES_FUNC)};
 
-struct gemm_cfg_meta {
-  float wg_eff;
-  float num_ss;
-  float aspect_r;
-  int idx;
+std::unordered_map<std::string, int> special_mnk2policy = {
+    {"m=512, n=4096, k=16384", hgemm_policy::_128x256_32x32x16_1_true_},
+    {"m=1, n=11008, k=4096", hgemm_policy::_128x256_32x32x16_1_true_},
+    {"m=4, n=11008, k=4096", hgemm_policy::_128x256_32x32x16_1_true_},
+    {"m=32, n=11008, k=4096", hgemm_policy::_128x256_32x32x16_1_true_},
+    {"m=128, n=11008, k=4096", hgemm_policy::_128x256_32x32x16_1_true_},
+    {"m=4, n=32000, k=4096", hgemm_policy::_128x256_32x32x16_1_true_},
+    {"m=64, n=13824, k=5120", hgemm_policy::_128x256_32x32x16_1_true_},
+    {"m=128, n=13824, k=5120", hgemm_policy::_128x256_32x32x16_1_true_},
+    {"m=256, n=5120, k=5120", hgemm_policy::_128x256_32x32x16_1_true_},
+    {"m=32, n=16384, k=4096", hgemm_policy::_128x256_32x32x16_1_true_},
+
+    {"m=33, n=16384, k=4096", hgemm_policy::_128x512_64x32x16_1_true_},
+    {"m=513, n=4096, k=4096", hgemm_policy::_128x512_64x32x16_1_true_},
+    {"m=1, n=50400, k=4096", hgemm_policy::_128x512_64x32x16_1_true_},
+    {"m=1, n=50272, k=4096", hgemm_policy::_128x512_64x32x16_1_true_},
+    {"m=4, n=50400, k=4096", hgemm_policy::_128x512_64x32x16_1_true_},
+    {"m=4, n=50272, k=4096", hgemm_policy::_128x512_64x32x16_1_true_},
+    {"m=512, n=11008, k=4096", hgemm_policy::_128x512_64x32x16_1_true_},
+
+    {"m=1, n=16384, k=4096", hgemm_policy::_8x512_8x16x16_1_true_},
+    {"m=4, n=16384, k=4096", hgemm_policy::_8x512_8x16x16_1_true_},
+    {"m=1, n=13824, k=5120", hgemm_policy::_8x512_8x16x16_1_true_},
+    {"m=4, n=13824, k=5120", hgemm_policy::_8x512_8x16x16_1_true_},
+
+    {"m=32, n=4096, k=16384", hgemm_policy::_32x64_8x16x16_2_true_},
+    {"m=1, n=250880, k=4096", hgemm_policy::_32x64_8x16x16_2_true_},
+    {"m=4, n=250880, k=4096", hgemm_policy::_32x64_8x16x16_2_true_},
+
+    {"m=65, n=16384, k=4096", hgemm_policy::_128x256_64x16x16_1_true_},
+    {"m=1, n=32000, k=4096", hgemm_policy::_128x256_64x16x16_1_true_},
+    {"m=32, n=13824, k=5120", hgemm_policy::_128x256_64x16x16_1_true_},
+
+    {"m=1, n=5120, k=5120", hgemm_policy::_32x128_32x16x16_4_true_},
+    {"m=32, n=5120, k=5120", hgemm_policy::_32x128_32x16x16_4_true_},
+
+    {"m=1, n=32000, k=5120", hgemm_policy::_256x256_32x64x16_1_true_},
+    {"m=4, n=32000, k=5120", hgemm_policy::_256x256_32x64x16_1_true_},
+
+    {"m=64, n=11008, k=4096", hgemm_policy::_64x256_64x16x16_2_true_},
+
+    {"m=4, n=5120, k=5120", hgemm_policy::_8x128_8x16x16_2_true_},
+
+    {"m=1, n=7168, k=14336", hgemm_policy::_8x256_8x16x16_2_true_},
+    {"m=1, n=1792, k=14336", hgemm_policy::_16x64_16x16x16_8_true_},
+    {"m=32, n=7168, k=14336", hgemm_policy::_16x256_16x16x16_2_true_},
+    {"m=32, n=1792, k=14336", hgemm_policy::_16x64_16x16x16_8_true_},
+    {"m=1, n=14336, k=7168", hgemm_policy::_128x512_64x32x16_1_true_},
+    {"m=1, n=14336, k=1792", hgemm_policy::_128x256_32x32x16_1_true_},
+    {"m=1, n=250880, k=1792", hgemm_policy::_128x256_32x32x16_1_true_},
+    {"m=32, n=14336, k=7168", hgemm_policy::_256x256_64x32x16_1_true_},
+    {"m=32, n=14336, k=1792", hgemm_policy::_128x256_32x32x16_1_true_},
 };
 
 inline int select_gemm_special_config(
@@ -316,6 +366,28 @@ inline int select_gemm_special_config(
     const int n,
     const int k,
     const bool is_b_row_major) {
+  std::ostringstream traits;
+  traits << "m=" << m << ", n=" << n << ", k=" << k;
+  std::string traits_str = traits.str();
+  auto it = special_mnk2policy.find(traits_str);
+  if (it != special_mnk2policy.end()) {
+    int idx = it->second;
+    return is_b_row_major ? idx : idx + HGEMM_NUM_POLICIES;
+  }
+
+  if (n == 4096 && m <= 128) {
+    return hgemm_get_policy(
+        hgemm_policy::_128x64_16x16x64_1_true_, is_b_row_major);
+  } else if (m >= 64) {
+    if (m <= 512 && n <= 5120) {
+      return hgemm_get_policy(
+          hgemm_policy::_128x128_32x32x32_2_true_, is_b_row_major);
+    } else {
+      return hgemm_get_policy(
+          hgemm_policy::_256x256_64x32x16_1_true_, is_b_row_major);
+    }
+  }
+
   if (m <= 8 && n <= 4096) {
     return hgemm_get_policy(
         hgemm_policy::_32x64_8x16x16_2_true_, is_b_row_major);
@@ -349,6 +421,12 @@ inline int select_gemm_config(
   int idx = select_gemm_special_config(m, n, k, is_b_row_major);
   if (idx >= 0)
     return idx;
+  struct gemm_cfg_meta {
+    float wg_eff;
+    float num_ss;
+    float aspect_r;
+    int idx;
+  };
   std::vector<gemm_cfg_meta> metas;
   for (int i = 0; i < HGEMM_NUM_POLICIES; i++) {
     gemm_cfg_meta meta;
