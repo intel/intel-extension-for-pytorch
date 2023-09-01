@@ -1892,6 +1892,14 @@ Tensor add_view(
   return at::add(input, other, alpha).view(sizes);
 }
 
+Tensor add_scalar_view(
+    const Tensor& input,
+    Scalar other,
+    Scalar alpha,
+    IntArrayRef sizes) {
+  return at::add(input, other, alpha).view(sizes);
+}
+
 Tensor add_view_softmax(
     const Tensor& input,
     const Tensor& other,
@@ -2180,6 +2188,7 @@ namespace {
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   IPEX_OP_REGISTER("add_softmax", at::AtenIpexTypeXPU::add_softmax);
   IPEX_OP_REGISTER("add_view", at::AtenIpexTypeXPU::add_view);
+  IPEX_OP_REGISTER("add_view.Scalar", at::AtenIpexTypeXPU::add_scalar_view);
   IPEX_OP_REGISTER("add_view_softmax", at::AtenIpexTypeXPU::add_view_softmax);
 }
 
