@@ -3358,5 +3358,202 @@ std::tuple<Tensor&, Tensor&> batch_norm_stats_out(
   return std::tuple<Tensor&, Tensor&>(save_mean, save_invstd);
 }
 
+std::tuple<Tensor, Tensor> batch_norm_update_stats(
+    const Tensor& self,
+    const c10::optional<Tensor>& running_mean_opt,
+    const c10::optional<Tensor>& running_var_opt,
+    double momentum) {
+  c10::MaybeOwned<Tensor> running_mean =
+      at::borrow_from_optional_tensor(running_mean_opt);
+  c10::MaybeOwned<Tensor> running_var =
+      at::borrow_from_optional_tensor(running_var_opt);
+
+  const int64_t n_input = self.size(1);
+  auto options = self.options().dtype(toAccumulateType(self.scalar_type()));
+  auto save_mean = at::empty({n_input}, options);
+  auto save_var = at::empty({n_input}, options);
+
+  batch_norm_mean_var(self, save_mean, save_var);
+  TORCH_CHECK(running_mean->defined() == running_var->defined());
+  if (running_mean->defined()) {
+    const int64_t N = self.numel() / save_mean.numel();
+    batch_norm_update_stats(
+        save_mean, save_var, *running_mean, *running_var, momentum, N);
+  }
+  return std::tuple<Tensor, Tensor>(save_mean, save_var);
+}
+
+std::tuple<Tensor, Tensor, Tensor> _native_batch_norm_legit(
+    const Tensor& self,
+    const c10::optional<Tensor>& weight_opt,
+    const c10::optional<Tensor>& bias_opt,
+    Tensor& running_mean,
+    Tensor& running_var,
+    bool train,
+    double momentum,
+    double epsilon) {
+  return at::AtenIpexTypeXPU::native_batch_norm(
+      self,
+      weight_opt,
+      bias_opt,
+      running_mean,
+      running_var,
+      train,
+      momentum,
+      epsilon);
+}
+
+std::tuple<Tensor, Tensor, Tensor> _native_batch_norm_legit(
+    const Tensor& self,
+    const c10::optional<Tensor>& weight_opt,
+    const c10::optional<Tensor>& bias_opt,
+    bool train,
+    double momentum,
+    double epsilon) {
+  return at::AtenIpexTypeXPU::native_batch_norm(
+      self, weight_opt, bias_opt, Tensor(), Tensor(), train, momentum, epsilon);
+}
+
+std::tuple<Tensor&, Tensor&, Tensor&> _native_batch_norm_legit_out(
+    const Tensor& self,
+    const c10::optional<Tensor>& weight_opt,
+    const c10::optional<Tensor>& bias_opt,
+    Tensor& running_mean,
+    Tensor& running_var,
+    bool train,
+    double momentum,
+    double epsilon,
+    Tensor& output,
+    Tensor& save_mean,
+    Tensor& save_invstd) {
+  return at::AtenIpexTypeXPU::native_batch_norm_out(
+      self,
+      weight_opt,
+      bias_opt,
+      running_mean,
+      running_var,
+      train,
+      momentum,
+      epsilon,
+      output,
+      save_mean,
+      save_invstd);
+}
+
+std::tuple<Tensor&, Tensor&, Tensor&> _native_batch_norm_legit_out(
+    const Tensor& self,
+    const c10::optional<Tensor>& weight_opt,
+    const c10::optional<Tensor>& bias_opt,
+    bool train,
+    double momentum,
+    double epsilon,
+    Tensor& output,
+    Tensor& save_mean,
+    Tensor& save_invstd) {
+  return at::AtenIpexTypeXPU::native_batch_norm_out(
+      self,
+      weight_opt,
+      bias_opt,
+      Tensor(),
+      Tensor(),
+      train,
+      momentum,
+      epsilon,
+      output,
+      save_mean,
+      save_invstd);
+}
+
+Tensor batch_norm_backward_elemt_dispatch(
+    const Tensor& self,
+    const Tensor& input,
+    const Tensor& mean,
+    const Tensor& invstd,
+    const c10::optional<Tensor>& weight_opt,
+    const Tensor& sum_dy,
+    const Tensor& sum_dy_xmu,
+    const Tensor& count) {
+  // See [Note: hacky wrapper removal for optional tensor]
+  c10::MaybeOwned<Tensor> weight_maybe_owned =
+      at::borrow_from_optional_tensor(weight_opt);
+  const Tensor& weight = *weight_maybe_owned;
+
+  if (canUse32BitIndexMath(self) &&
+      batch_norm_use_channels_last_kernels(self) &&
+      batch_norm_use_channels_last_kernels(input)) {
+    return batch_norm_backward_elemt_channels_last_template(
+        self, input, mean, invstd, weight, sum_dy, sum_dy_xmu, count);
+  }
+
+  return IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "batch_norm_backward_elemt",
+      [&] {
+        auto mean_st = mean.dtype();
+        auto invstd_st = invstd.dtype();
+        TORCH_CHECK(
+            mean_st == invstd_st,
+            "mean and invstd need to have the same data types");
+        bool is_half_float =
+            std::is_same<scalar_t, at::Half>::value && mean_st == at::kFloat;
+        bool is_bfloat16_float = std::is_same<scalar_t, at::BFloat16>::value &&
+            mean_st == at::kFloat;
+        using accscalar_t = acc_type<scalar_t>;
+        if (canUse32BitIndexMath(self)) {
+          if (is_half_float || is_bfloat16_float) {
+            return batch_norm_backward_elemt_channels_first_template<
+                scalar_t,
+                accscalar_t,
+                int32_t>(self, input, mean, invstd, weight, sum_dy, sum_dy_xmu);
+          } else {
+            return batch_norm_backward_elemt_channels_first_template<
+                scalar_t,
+                scalar_t,
+                int32_t>(self, input, mean, invstd, weight, sum_dy, sum_dy_xmu);
+          }
+        } else {
+          if (is_half_float || is_bfloat16_float) {
+            return batch_norm_backward_elemt_channels_first_template<
+                scalar_t,
+                accscalar_t,
+                int64_t>(self, input, mean, invstd, weight, sum_dy, sum_dy_xmu);
+          } else {
+            return batch_norm_backward_elemt_channels_first_template<
+                scalar_t,
+                scalar_t,
+                int64_t>(self, input, mean, invstd, weight, sum_dy, sum_dy_xmu);
+          }
+        }
+      });
+}
+
+Tensor batch_norm_backward_elemt(
+    const Tensor& self,
+    const Tensor& input,
+    const Tensor& mean,
+    const Tensor& invstd,
+    const c10::optional<Tensor>& weight_opt,
+    const Tensor& sum_dy,
+    const Tensor& sum_dy_xmu,
+    const Tensor& count) {
+  return batch_norm_backward_elemt_dispatch(
+      self, input, mean, invstd, weight_opt, sum_dy, sum_dy_xmu, count);
+}
+
+std::tuple<Tensor, Tensor, Tensor, Tensor> batch_norm_backward_reduce(
+    const Tensor& grad_output,
+    const Tensor& input,
+    const Tensor& mean,
+    const Tensor& invstd,
+    const c10::optional<Tensor>& weight_opt,
+    bool input_g,
+    bool weight_g,
+    bool bias_g) {
+  return batch_norm_backward_reduce_dispatch(
+      grad_output, input, mean, invstd, weight_opt, input_g, weight_g, bias_g);
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

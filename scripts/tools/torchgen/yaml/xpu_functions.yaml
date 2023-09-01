@@ -142,6 +142,13 @@ supported:
   - batch_norm_gather_stats_with_counts
   - batch_norm_stats
   - batch_norm_stats.out
+  - batch_norm_update_stats
+  - _native_batch_norm_legit
+  - _native_batch_norm_legit.out
+  - _native_batch_norm_legit.no_stats
+  - _native_batch_norm_legit.no_stats_out
+  - batch_norm_backward_elemt
+  - batch_norm_backward_reduce
   - bernoulli_.Tensor
   - bernoulli_.float
   - bernoulli.out

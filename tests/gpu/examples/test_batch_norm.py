@@ -408,3 +408,60 @@ class TestNNMethod(TestCase):
 
         _batch_norm_stats(torch.randn(1, 96, 112, 112, dtype=torch.float, device='xpu'), torch.channels_last, (0, 2, 3))
         _batch_norm_stats(torch.randn(1, 96, 112, 112, 112, dtype=torch.float, device='xpu'), torch.channels_last_3d, (0, 2, 3, 4))
+
+    def test_batch_norm_update_stats_simple(self):
+        input_cpu = torch.randn(1, 2, 3, 3, dtype=torch.float, device=cpu_device)
+        n_input = input_cpu.size(1)
+        running_mean_cpu = torch.randn(n_input, dtype=torch.float, device=cpu_device)
+        running_var_cpu = torch.randn(n_input, dtype=torch.float, device=cpu_device)
+        momentum = 0.1
+
+        input_dpcpp = input_cpu.to(dpcpp_device)
+        running_mean_dpcpp = running_mean_cpu.to(dpcpp_device)
+        running_var_dpcpp = running_var_cpu.to(dpcpp_device)
+
+        save_mean_cpu, save_var_cpu = torch.batch_norm_update_stats(
+            input_cpu, running_mean_cpu, running_var_cpu, momentum)
+        save_mean_dpcpp, save_var_dpcpp = torch.batch_norm_update_stats(
+            input_dpcpp, running_mean_dpcpp, running_var_dpcpp, momentum)
+
+        self.assertEqual(save_mean_cpu, save_mean_dpcpp.to(cpu_device))
+        self.assertEqual(save_var_cpu, save_var_dpcpp.to(cpu_device))
+
+    def test_batch_norm_legit_simple(self):
+        input_cpu = torch.randn(1, 2, 3, 3, dtype=torch.float, device=cpu_device)
+        n_input = input_cpu.size(1)
+        weight_cpu = torch.randn(1, 2, 3, 3, dtype=torch.float, device=cpu_device)
+        bias_cpu = torch.randn(1, 2, 3, 3, dtype=torch.float, device=cpu_device)
+        train = True
+        momentum = 0.1
+        epsilon = 1e-5
+
+        input_dpcpp = input_cpu.to(dpcpp_device)
+        weight_dpcpp = weight_cpu.to(dpcpp_device)
+        bias_dpcpp = bias_cpu.to(dpcpp_device)
+
+        def _batch_norm_legit_simple(track_stats):
+            if track_stats:
+                running_mean_cpu = torch.randn(n_input, dtype=torch.float, device=cpu_device)
+                running_var_cpu = torch.randn(n_input, dtype=torch.float, device=cpu_device)
+
+                running_mean_dpcpp = running_mean_cpu.to(dpcpp_device)
+                running_var_dpcpp = running_var_cpu.to(dpcpp_device)
+
+                out_cpu, save_mean_cpu, save_invstd_cpu = torch._native_batch_norm_legit(
+                    input_cpu, weight_cpu, bias_cpu, running_mean_cpu, running_var_cpu, train, momentum, epsilon)
+                out_dpcpp, save_mean_dpcpp, save_invstd_dpcpp = torch._native_batch_norm_legit(
+                    input_dpcpp, weight_dpcpp, bias_dpcpp, running_mean_dpcpp, running_var_dpcpp, train, momentum, epsilon)
+            else:
+                out_cpu, save_mean_cpu, save_invstd_cpu = torch._native_batch_norm_legit(
+                    input_cpu, weight_cpu, bias_cpu, train, momentum, epsilon)
+                out_dpcpp, save_mean_dpcpp, save_invstd_dpcpp = torch._native_batch_norm_legit(
+                    input_dpcpp, weight_dpcpp, bias_dpcpp, train, momentum, epsilon)
+
+            self.assertEqual(out_cpu, out_dpcpp.to(cpu_device))
+            self.assertEqual(save_mean_cpu, save_mean_dpcpp.to(cpu_device))
+            self.assertEqual(save_invstd_cpu, save_invstd_dpcpp.to(cpu_device))
+
+        _batch_norm_legit_simple(track_stats=True)
+        _batch_norm_legit_simple(track_stats=False)
