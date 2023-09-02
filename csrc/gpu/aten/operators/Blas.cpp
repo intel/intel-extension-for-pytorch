@@ -72,19 +72,33 @@ Tensor& addmm_out(
   }
 
 #if defined(USE_XETLA)
-  if (alpha.to<float>() == 1.f && beta.to<float>() == 1.f) {
-    if (self.dim() == 1) {
-      auto policy = HGEMM_XETLA()
-                        .allow_perf_check()
-                        .add_matrix_c(result)
-                        .add_matrix_a(mat1)
-                        .add_matrix_b(mat2)
-                        .add_epilogue(self, HGEMM_XETLA::EpilogueType::BIAS)
-                        .build();
-      if (policy.valid()) {
-        policy.run();
-        return result;
-      }
+  if (alpha.to<float>() == 1.f && beta.to<float>() == 1.f && self.dim() == 1) {
+    auto policy = HGEMM_XETLA()
+                      .add_matrix_c(result)
+                      .add_matrix_a(mat1)
+                      .add_matrix_b(mat2)
+                      .add_epilogue(self, HGEMM_XETLA::EpilogueType::BIAS)
+                      .build();
+    if (policy.valid()) {
+      policy.run();
+      return result;
+    }
+  } else if (
+      self.dim() == 2 && self.sizes()[0] == mat1.sizes()[0] &&
+      self.sizes()[1] == mat2.sizes()[1]) {
+    auto policy = HGEMM_XETLA()
+                      .add_alpha(alpha.to<float>())
+                      .add_matrix_c(result)
+                      .add_matrix_a(mat1)
+                      .add_matrix_b(mat2)
+                      .add_epilogue(
+                          self,
+                          HGEMM_XETLA::EpilogueType::SCALED_RES_ADD,
+                          beta.to<float>())
+                      .build();
+    if (policy.valid()) {
+      policy.run();
+      return result;
     }
   }
 #endif
@@ -172,7 +186,6 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
 
 #if defined(USE_XETLA)
   auto policy = HGEMM_XETLA()
-                    .allow_perf_check()
                     .add_matrix_c(result)
                     .add_matrix_a(self)
                     .add_matrix_b(mat2)

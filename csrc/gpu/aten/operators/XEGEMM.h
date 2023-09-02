@@ -58,15 +58,15 @@ class HGEMM_XETLA final {
   bool valid_ = false;
   int m_, n_, k_;
   int selected_policy_;
-  bool perf_check_ = false;
+  float alpha_ = 1.0f;
 
  public:
   HGEMM_XETLA() = default;
   bool valid() const {
     return valid_;
   }
-  HGEMM_XETLA& allow_perf_check() {
-    perf_check_ = true;
+  HGEMM_XETLA& add_alpha(const float alpha) {
+    alpha_ = alpha;
     return *this;
   }
   HGEMM_XETLA& add_matrix_c(const Tensor& c) {
@@ -163,8 +163,10 @@ class HGEMM_XETLA final {
     using scalar_t =
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
     auto& q = dpcppGetCurrentQueue();
+
     if (num_epilogues_ == 0) {
       RECORD_FUNCTION_IMPL(hgemm)
+      TORCH_CHECK(alpha_ == 1.0f);
       hgemm_policies[selected_policy_](
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -175,6 +177,7 @@ class HGEMM_XETLA final {
           k_);
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == BIAS) {
       RECORD_FUNCTION_IMPL(hgemm_bias)
+      TORCH_CHECK(alpha_ == 1.0f);
       hgemm_bias_policies[selected_policy_](
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -189,6 +192,7 @@ class HGEMM_XETLA final {
         num_epilogues_ == 3 && epilogue_types_[0] == BIAS &&
         epilogue_types_[1] == RES_ADD && epilogue_types_[2] == RES_ADD) {
       RECORD_FUNCTION_IMPL(hgemm_bias_res_res)
+      TORCH_CHECK(alpha_ == 1.0f);
       hgemm_bias_res_res_policies[selected_policy_](
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -207,6 +211,7 @@ class HGEMM_XETLA final {
         num_epilogues_ == 2 && epilogue_types_[0] == BIAS &&
         epilogue_types_[1] == GELU) {
       RECORD_FUNCTION_IMPL(hgemm_bias_gelu)
+      TORCH_CHECK(alpha_ == 1.0f);
       hgemm_bias_gelu_policies[selected_policy_](
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -219,6 +224,7 @@ class HGEMM_XETLA final {
           k_);
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == RES_MUL) {
       RECORD_FUNCTION_IMPL(hgemm_resmul)
+      TORCH_CHECK(alpha_ == 1.0f);
       hgemm_resmul_policies[selected_policy_](
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -231,6 +237,7 @@ class HGEMM_XETLA final {
           k_);
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == SILU) {
       RECORD_FUNCTION_IMPL(hgemm_silu)
+      TORCH_CHECK(alpha_ == 1.0f);
       hgemm_silu_policies[selected_policy_](
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -241,6 +248,7 @@ class HGEMM_XETLA final {
           k_);
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == RES_ADD) {
       RECORD_FUNCTION_IMPL(hgemm_res)
+      TORCH_CHECK(alpha_ == 1.0f);
       hgemm_res_policies[selected_policy_](
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -255,6 +263,7 @@ class HGEMM_XETLA final {
         num_epilogues_ == 2 && epilogue_types_[0] == BIAS &&
         epilogue_types_[1] == SCALED_RES_ADD) {
       RECORD_FUNCTION_IMPL(hgemm_bias_res)
+      TORCH_CHECK(alpha_ == 1.0f);
       hgemm_bias_res_policies[selected_policy_](
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -268,6 +277,20 @@ class HGEMM_XETLA final {
           m_,
           n_,
           k_);
+    } else if (num_epilogues_ == 1 && epilogue_types_[0] == SCALED_RES_ADD) {
+      RECORD_FUNCTION_IMPL(hgemm_addmm)
+      hgemm_addmm_policies[selected_policy_](
+          q,
+          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(
+              epilogue_tensors_[0]->data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+          m_,
+          n_,
+          k_,
+          alpha_,
+          (scalar_t)epilogue_params_[0]);
     }
   }
 };

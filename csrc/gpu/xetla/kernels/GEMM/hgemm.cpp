@@ -6,6 +6,30 @@ namespace xetla {
 
 #define HGEMM_ENUMERATE_FUNC_IMPLS(                                            \
     WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)                         \
+  void HGEMM_ADDMM_FUNC(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(    \
+      sycl::queue & queue,                                                     \
+      sycl::half * out,                                                        \
+      const sycl::half* res,                                                   \
+      const sycl::half* a,                                                     \
+      const sycl::half* b,                                                     \
+      const int m,                                                             \
+      const int n,                                                             \
+      const int k,                                                             \
+      const float alpha,                                                       \
+      const float beta) {                                                      \
+    hgemm_addmm<                                                               \
+        sycl::half,                                                            \
+        WG_M,                                                                  \
+        WG_N,                                                                  \
+        SG_M,                                                                  \
+        SG_N,                                                                  \
+        SG_K,                                                                  \
+        SLM_KS,                                                                \
+        1,                                                                     \
+        1,                                                                     \
+        3,                                                                     \
+        B_ROW_MAJOR>(queue, out, res, a, b, m, n, k, alpha, beta);             \
+  }                                                                            \
   void HGEMM_FUNC(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(          \
       sycl::queue & queue,                                                     \
       sycl::half * out,                                                        \

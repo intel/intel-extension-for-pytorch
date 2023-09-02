@@ -9,6 +9,9 @@ namespace xetla {
     HEAD, WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR) \
   HEAD##_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##SLM_KS##_##B_ROW_MAJOR##_
 
+#define HGEMM_ADDMM_FUNC(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR) \
+  HGEMM_FUNC_NAME(                                                          \
+      hgemm_addmm, WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)
 #define HGEMM_FUNC(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR) \
   HGEMM_FUNC_NAME(hgemm, WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)
 #define HGEMM_BIAS_FUNC(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR) \
@@ -39,6 +42,17 @@ namespace xetla {
 
 #define HGEMM_ENUMERATE_FUNC_DESCS(                                            \
     WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)                         \
+  void HGEMM_ADDMM_FUNC(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(    \
+      sycl::queue & queue,                                                     \
+      sycl::half * out,                                                        \
+      const sycl::half* res,                                                   \
+      const sycl::half* a,                                                     \
+      const sycl::half* b,                                                     \
+      const int m,                                                             \
+      const int n,                                                             \
+      const int k,                                                             \
+      const float alpha,                                                       \
+      const float beta);                                                       \
   void HGEMM_FUNC(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(          \
       sycl::queue & queue,                                                     \
       sycl::half * out,                                                        \
@@ -201,6 +215,18 @@ int hgemm_get_policy(hgemm_policy name, bool is_b_row_major) {
   { WG_M, WG_N }
 int hgemm_policies_wg_mnk[2 * HGEMM_NUM_POLICIES][2]{
     HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_ENUMERATE_FUNC_TRAITS)};
+
+void (*hgemm_addmm_policies[2 * HGEMM_NUM_POLICIES])(
+    sycl::queue&,
+    sycl::half*,
+    const sycl::half*,
+    const sycl::half*,
+    const sycl::half*,
+    const int,
+    const int,
+    const int,
+    const float,
+    const float) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_ADDMM_FUNC)};
 
 void (*hgemm_policies[2 * HGEMM_NUM_POLICIES])(
     sycl::queue&,
