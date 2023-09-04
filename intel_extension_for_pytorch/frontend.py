@@ -26,6 +26,7 @@ from .cpu._auto_kernel_selection import (
 )
 
 import intel_extension_for_pytorch._C as core
+from .nn.optimize_transformers.Converter import Converter
 
 
 def _copy_model_and_optimizer(model, optimizer):
@@ -154,23 +155,26 @@ class _O1:
 
 opt_levels = {"O0": _O0(), "O1": _O1()}
 
-def optimize_transformers(model, dtype=None, optimizer=None, is_int4=False):
+def optimize_transformers(model, dtype=None, optimizer=None, is_int4=False, ckpt=None, distributed=False):
     def model_converter(model, dtype):
         transformer_frontend_replace(model, config=None, dtype=dtype, is_int4=is_int4)
         return model
-    optimize_output = optimize(model, dtype=dtype, optimizer=optimizer, inplace=True)
+    # optimize_output = optimize(model, dtype=dtype, optimizer=optimizer, inplace=True)
+    optimize_output = model
     try:
         import transformers
     except ImportError as e:
         print("Can not find transformers in your environment, disable ipex transformer optimize")
         return model
+    converter = Converter(ckpt=ckpt, distributed=distributed)
     if optimizer is None:
         model = optimize_output
-        return model_converter(model, dtype=dtype)
+        # return model_converter(model, dtype=dtype)
+        return converter.convert_model(model, dtype=dtype)
     else:
         model = optimize_output[0]
         optimizer = optimize_output[1]
-        return model_converter(model, dtype=dtype), optimizer
+        return converter.convert_model(model, dtype=dtype), optimizer
 
 def optimize(
     model,
@@ -403,10 +407,10 @@ def optimize(
     if opt_properties.auto_kernel_selection:
         _enable_dnnl()
 
-    if device_type == "cpu":
-        if opt_properties.optimize_transformers:
-            warnings.warn("Transformer opitmization is only support on XPU now.")
-            opt_properties.optimize_transformers = False
+    # if device_type == "cpu":
+    #     if opt_properties.optimize_transformers:
+    #         warnings.warn("Transformer opitmization is only support on XPU now.")
+    #         opt_properties.optimize_transformers = False
 
     # when on xpu, parts of features are not supported
     if device_type == "xpu":
