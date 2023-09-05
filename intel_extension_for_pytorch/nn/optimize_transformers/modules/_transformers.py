@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.distributed as dist
 from typing import Optional, Tuple, Union
 
-from intel_extension_for_pytorch.nn.utils._transformer_configuration import IPEXTransformerConfig
+from ._transformer_configuration import IPEXTransformerConfig
 from .Activation import ACT2FN
 from ._transformer_configuration import IPEXTransformerConfig
 import os

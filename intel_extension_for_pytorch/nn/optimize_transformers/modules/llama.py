@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss
 from typing import Optional, Tuple, Union, List
 
-from intel_extension_for_pytorch.nn.utils._transformer_configuration import IPEXTransformerConfig
+from ._transformer_configuration import IPEXTransformerConfig
 from ._transformers import IPEXTransformerAtten, IPEXTransformerMLP, IPEXEmptyLinear, IPEXTransformerConverter, MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
 from ._transformer_configuration import IPEXTransformerConfig
 from .RoPE import LlamaRotaryEmbedding
