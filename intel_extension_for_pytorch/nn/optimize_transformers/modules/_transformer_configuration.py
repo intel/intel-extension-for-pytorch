@@ -5,6 +5,7 @@ class IPEXTransformerConfig():
                  embed_dim = 4096,
                  intermediate_size = None,
                  num_attention_heads = 16,
+                 num_key_value_heads = None,
                  max_positions = 4096,
                  max_out_positions = 256,
                  rotary_embedding_class = "GPTJRotaryEmbedding",
@@ -35,6 +36,7 @@ class IPEXTransformerConfig():
         self.embed_dim = embed_dim
         self.intermediate_size = intermediate_size
         self.num_attention_heads = num_attention_heads
+        self.num_key_value_heads = num_attention_heads if num_key_value_heads is None else num_key_value_heads
         self.max_positions = max_positions
         self.max_out_positions = max_out_positions
         self.rotary_embedding_class = rotary_embedding_class

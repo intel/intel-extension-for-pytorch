@@ -6,7 +6,6 @@ import torch
 import torch._dynamo
 import torch.fx.experimental.optimization as optimization
 from enum import IntFlag, IntEnum
-from .nn.utils._transformer_converter import transformer_frontend_replace, pad_for_gptj_lm_head
 
 from .nn import utils
 from .optim._optimizer_utils import (
@@ -156,9 +155,6 @@ class _O1:
 opt_levels = {"O0": _O0(), "O1": _O1()}
 
 def optimize_transformers(model, dtype=None, optimizer=None, is_int4=False, ckpt=None, distributed=False):
-    def model_converter(model, dtype):
-        transformer_frontend_replace(model, config=None, dtype=dtype, is_int4=is_int4)
-        return model
     # optimize_output = optimize(model, dtype=dtype, optimizer=optimizer, inplace=True)
     optimize_output = model
     try:

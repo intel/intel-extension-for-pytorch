@@ -105,6 +105,7 @@ def ds_autotp_enabled(model, enable_ds=False):
         config = model._config
         tp_size = config.tensor_parallel.tp_size
         tp_group = config.tensor_parallel.tp_group
+        IPEXTransformerConverter.update_tp_data(tp_size, tp_group)
         if tp_size > 1 and tp_group is not None:
             return True
     return False

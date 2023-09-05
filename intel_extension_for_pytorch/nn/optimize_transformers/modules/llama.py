@@ -34,9 +34,11 @@ class IPEXLlamaMLP(IPEXTransformerMLP):
             hidden_states = torch.ops.torch_ipex.mm_resmul(hidden_states, self.up_wei, hidden_states1)
             shape = list(hidden_states.size())
             shape[-1] = self.fc_out_wei.shape[-1]
-            hidden_states = torch.addmm(residual.flatten(0, -2), hidden_states.flatten(0, -2), self.fc_out_wei).view(shape)
+            hidden_states = torch.addmm(residual.flatten(0, -2), hidden_states.flatten(0, -2), self.fc_out_wei, beta=1.0/self.tp_size).view(shape)
+            hidden_states = self.all_reduce_if_necessary(hidden_states)
         else:
             hidden_states = self.fc_out(self.act(self.fc_in(hidden_states)) * self.up_proj(hidden_states))
+            hidden_states = self.all_reduce_if_necessary(hidden_states)
             hidden_states += residual
         return hidden_states
 
@@ -244,6 +246,7 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
         n_positions = max(self.config.max_position_embeddings, MAX_SEQ_LEN)
         embed_dim = self.config.hidden_size
         num_head = self.config.num_attention_heads
+        num_key_value_head = self.config.num_key_value_heads
         activate_function = self.config.hidden_act
         norm_eps = self.config.rms_norm_eps
         use_cache = self.config.use_cache
@@ -252,6 +255,7 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
             embed_dim=embed_dim,
             intermediate_size=intermediate_size,
             num_attention_heads=num_head,
+            num_key_value_heads=num_key_value_head,
             max_positions=n_positions,
             max_out_positions=MAX_OUT_SEQ_LEN,
             rotary_embedding_class=LlamaRotaryEmbedding,
@@ -289,23 +293,26 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
             self.module.self_attn.v_proj.weight.data = self.module.self_attn.v_proj.weight.t().contiguous()
 
             shape = [3, -1, self.module.self_attn.q_proj.weight.shape[-1]]
-            self.ipex_optimized_module.attn.qkv_wei = torch.cat([self.module.self_attn.q_proj.weight.data, 
-                                                                 self.module.self_attn.k_proj.weight.data, 
-                                                                 self.module.self_attn.v_proj.weight.data], dim=0).view(shape)
-            self.module.self_attn.q_proj.weight.data = self.ipex_optimized_module.attn.qkv_wei[0, :, :]
-            self.module.self_attn.k_proj.weight.data = self.ipex_optimized_module.attn.qkv_wei[1, :, :]
-            self.module.self_attn.v_proj.weight.data = self.ipex_optimized_module.attn.qkv_wei[2, :, :]
+            if self.ipex_transformers_config.num_attention_heads == self.ipex_transformers_config.num_key_value_heads:
+                self.ipex_optimized_module.attn.qkv_wei = torch.cat([self.module.self_attn.q_proj.weight.data, 
+                                                                     self.module.self_attn.k_proj.weight.data, 
+                                                                     self.module.self_attn.v_proj.weight.data], dim=0).view(shape)
+                self.module.self_attn.q_proj.weight.data = self.ipex_optimized_module.attn.qkv_wei[0, :, :]
+                self.module.self_attn.k_proj.weight.data = self.ipex_optimized_module.attn.qkv_wei[1, :, :]
+                self.module.self_attn.v_proj.weight.data = self.ipex_optimized_module.attn.qkv_wei[2, :, :]
             self.ipex_optimized_module.attn.q_wei = self.module.self_attn.q_proj.weight
             self.ipex_optimized_module.attn.k_wei = self.module.self_attn.k_proj.weight
             self.ipex_optimized_module.attn.v_wei = self.module.self_attn.v_proj.weight
 
-            self.ipex_optimized_module.attn.bias = self.module.self_attn.q_proj.bias
-            self.ipex_optimized_module.attn.bias = self.module.self_attn.k_proj.bias
-            self.ipex_optimized_module.attn.bias = self.module.self_attn.v_proj.bias
+            self.ipex_optimized_module.attn.q_proj.bias = self.module.self_attn.q_proj.bias
+            self.ipex_optimized_module.attn.k_proj.bias = self.module.self_attn.k_proj.bias
+            self.ipex_optimized_module.attn.v_proj.bias = self.module.self_attn.v_proj.bias
 
             self.module.self_attn.o_proj.weight.data = self.module.self_attn.o_proj.weight.t().contiguous()
             self.ipex_optimized_module.attn.out_wei = self.module.self_attn.o_proj.weight
-            self.ipex_optimized_module.attn.out_bias = self.module.self_attn.o_proj.bias
+            if self.module.self_attn.o_proj.bias is not None:
+                self.module.self_attn.o_proj.bias = self.module.self_attn.o_proj.bias / self.tp_size
+                self.ipex_optimized_module.attn.out_bias = self.module.self_attn.o_proj.bias
         else:
             self.ipex_optimized_module.attn.k_proj.weight = self.module.self_attn.k_proj.weight
             self.ipex_optimized_module.attn.k_proj.bias = self.module.self_attn.k_proj.bias
@@ -314,7 +321,9 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
             self.ipex_optimized_module.attn.v_proj.weight = self.module.self_attn.v_proj.weight
             self.ipex_optimized_module.attn.v_proj.bias = self.module.self_attn.v_proj.bias
             self.ipex_optimized_module.attn.out_proj.weight = self.module.self_attn.o_proj.weight
-            self.ipex_optimized_module.attn.out_proj.bias = self.module.self_attn.o_proj.bias
+            if self.module.self_attn.o_proj.bias is not None:
+                self.module.self_attn.o_proj.bias = self.module.self_attn.o_proj.bias / self.tp_size
+                self.ipex_optimized_module.attn.out_proj.bias = self.module.self_attn.o_proj.bias
 
 
     def port_mlp_parameters(self):
@@ -325,7 +334,9 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
 
             self.module.mlp.down_proj.weight.data = self.module.mlp.down_proj.weight.t().contiguous()
             self.ipex_optimized_module.mlp.fc_out_wei = self.module.mlp.down_proj.weight
-            self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.down_proj.bias
+            if self.module.mlp.down_proj.bias is not None:
+                self.module.mlp.down_proj.bias = self.module.mlp.down_proj.bias / self.tp_size
+                self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.down_proj.bias
 
             self.module.mlp.up_proj.weight.data = self.module.mlp.up_proj.weight.t().contiguous()
             self.ipex_optimized_module.mlp.up_wei = self.module.mlp.up_proj.weight
@@ -334,7 +345,9 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
             self.ipex_optimized_module.mlp.fc_in.weight = self.module.mlp.gate_proj.weight
             self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.gate_proj.bias
             self.ipex_optimized_module.mlp.fc_out.weight = self.module.mlp.down_proj.weight
-            self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.down_proj.bias
+            if self.module.mlp.down_proj.bias is not None:
+                self.module.mlp.down_proj.bias = self.module.mlp.down_proj.bias / self.tp_size
+                self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.down_proj.bias
             self.ipex_optimized_module.mlp.up_proj.weight = self.module.mlp.up_proj.weight
             self.ipex_optimized_module.mlp.up_proj.bias = self.module.mlp.up_proj.bias
 

@@ -104,9 +104,12 @@ class IPEXTransformerAtten(nn.Module):
         self.layer_id = IPEXTransformerAtten.layer_id_static
         self.embed_dim = self.config.embed_dim
         self.num_attn_head = self.config.num_attention_heads
+        self.num_key_value_heads = config.num_key_value_heads
         self.tp_size = self.config.tp_size
         self.tp_group = self.config.tp_group
         self.num_attn_head = self.num_attn_head // self.tp_size
+        self.num_key_value_heads = self.num_key_value_heads // self.tp_size
+        self.num_key_value_groups = self.num_attn_head // self.num_key_value_heads
         IPEXTransformerAtten.layer_id_static += 1
         self.head_dim = self.config.embed_dim // self.config.num_attention_heads
         self.is_int4 = is_int4
@@ -210,18 +213,19 @@ class IPEXTransformerAtten(nn.Module):
     def qkv_cache_optimized_greedy(self, hidden_states, layer_past = None):
         # greedy search path
         # hidden_states has already been converted to [seq, beam, hidden_size]
+        seq_len, bs_beam, _ = hidden_states.shape
         if hidden_states.shape[0] != 1:
             # the first timestep
-            shape = [self.max_positions, hidden_states.shape[1], self.num_attn_head, self.head_dim]
-            self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-            self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            kv_shape = [self.max_positions, bs_beam, self.num_key_value_heads, self.head_dim]
+            self.key_cached = torch.empty(kv_shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            self.value_cached = torch.empty(kv_shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.prev_len = 0
         elif self.key_cached is None or self.value_cached is None:
             prev_key, value_key = layer_past[0], layer_past[1]
             self.prev_len = prev_key.size(2)
-            shape = [self.max_positions, hidden_states.shape[1], self.num_attn_head, self.head_dim]
-            self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-            self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            kv_shape = [self.max_positions, bs_beam, self.num_key_value_heads, self.head_dim]
+            self.key_cached = torch.empty(kv_shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            self.value_cached = torch.empty(kv_shape, device=hidden_states.device, dtype=hidden_states.dtype)
         else:
             self.prev_len = layer_past[0].size(2)
 
@@ -230,37 +234,76 @@ class IPEXTransformerAtten(nn.Module):
             self.key_cached[:self.prev_len, :, :, :] = layer_past[0].permute(2, 0, 1, 3)
             self.value_cached[:self.prev_len,: , :, :] = layer_past[1].permute(2, 0, 1, 3)
 
-        self.cur_len = self.prev_len + hidden_states.size(0)
+        self.cur_len = self.prev_len + seq_len
 
-        shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
+        shape = [seq_len, bs_beam, self.num_attn_head * self.head_dim]
         query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+        kv_shape = [seq_len, bs_beam, self.num_key_value_heads * self.head_dim]
         key = self.key_cached[self.prev_len : self.cur_len, :, :, :]
         value = self.value_cached[self.prev_len : self.cur_len, :, :, :]
-        key = key.view(shape)
-        value = value.view(shape)
+        key = key.view(kv_shape)
+        value = value.view(kv_shape)
       
-        if self.is_int4 and hidden_states.shape[0] == 1:
-            torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_qwei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, key, value, self.qkv_gs)
+        if self.num_key_value_groups > 1:
+            hidden_states_flat = hidden_states.flatten(0, -2)
+            if self.q_proj.bias is None:
+                torch.matmul(hidden_states, self.q_wei, out=query)
+            else:
+                torch.addmm(self.q_proj.bias, hidden_states_flat, self.q_wei, out=query.flatten(0, -2))
+
+            if self.k_proj.bias is None:
+                torch.matmul(hidden_states, self.k_wei, out=key)
+            else:
+                torch.addmm(self.k_proj.bias, hidden_states_flat, self.k_wei, out=key.flatten(0, -2))
+            
+            if self.v_proj.bias is None:
+                torch.matmul(hidden_states, self.v_wei, out=value)
+            else:
+                torch.addmm(self.v_proj.bias, hidden_states_flat, self.v_wei, out=value.flatten(0, -2))
         else:
-            torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
+            if self.is_int4 and hidden_states.shape[0] == 1:
+                torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_qwei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, key, value, self.qkv_gs)
+            else:
+                torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
         return query, key, value
 
     def qkv_cache_optimized_beam(self, hidden_states, first_token = False, layer_past = None):
         # beam search path
         # hidden_states keep the original shape [bs*beam, seq, hidden_size]
+        device, dtype = hidden_states.device, hidden_states.dtype
         if first_token:
             # the first token, shape will be [bs, seq, hidden_size]
-            bs_beam = hidden_states.shape[0]
-            seq = hidden_states.shape[1]
-            hidden_size = self.num_attn_head * self.head_dim
-            shape = [bs_beam, seq, hidden_size]
-            query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-            self.key_prompt = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-            self.value_prompt = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-            if self.is_int4 and hidden_states.shape[0] == 1:
-                torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_qwei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, self.key_prompt, self.value_prompt, self.qkv_gs)
+            bs_beam, seq, hidden_size = hidden_states.shape
+            q_proj_size = self.num_attn_head * self.head_dim
+            kv_proj_size = self.num_key_value_heads * self.head_dim
+            shape, kv_shape = [bs_beam, seq, q_proj_size], [bs_beam, seq, kv_proj_size]
+            if self.num_key_value_groups > 1:
+                query = torch.empty(shape, device=device, dtype=dtype)
+                self.key_prompt = torch.empty(kv_shape, device=device, dtype=dtype)
+                self.value_prompt = torch.empty(kv_shape, device=device, dtype=dtype)
+                hidden_states_flat = hidden_states.flatten(0, -2)
+                if self.q_proj.bias is None:
+                    torch.matmul(hidden_states, self.q_wei, out=query)
+                else:
+                    torch.addmm(self.q_proj.bias, hidden_states_flat, self.q_wei, out=query.flatten(0, -2))
+
+                if self.k_proj.bias is None:
+                    torch.matmul(hidden_states, self.k_wei, out=self.key_prompt)
+                else:
+                    torch.addmm(self.k_proj.bias, hidden_states_flat, self.k_wei, out=self.key_prompt.flatten(0, -2))
+
+                if self.v_proj.bias is None:
+                    torch.matmul(hidden_states, self.v_wei, out=self.value_prompt)
+                else:
+                    torch.addmm(self.v_proj.bias, hidden_states_flat, self.v_wei, out=self.value_prompt.flatten(0, -2))
             else:
-                torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, self.key_prompt, self.value_prompt)
+                query = torch.empty(shape, device=device, dtype=dtype)
+                self.key_prompt = torch.empty(shape, device=device, dtype=dtype)
+                self.value_prompt = torch.empty(shape, device=device, dtype=dtype)
+                if self.is_int4 and hidden_states.shape[0] == 1:
+                    torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_qwei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, self.key_prompt, self.value_prompt, self.qkv_gs)
+                else:
+                    torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, self.key_prompt, self.value_prompt)
             key = self.key_prompt
             value = self.value_prompt
             self.prev_len = 0
@@ -270,31 +313,47 @@ class IPEXTransformerAtten(nn.Module):
         else:
             # the 2nd to the last timestep
             # hidden_states has already been converted to [seq, bs*beam, hidden_size]
-            seq = hidden_states.shape[0]
-            bs_beam = hidden_states.shape[1]
-            hidden_size = self.num_attn_head * self.head_dim
+            seq, bs_beam, hidden_size = hidden_states.shape
+            q_proj_size = self.num_attn_head * self.head_dim
+            kv_proj_size = self.num_key_value_heads * self.head_dim
             if self.key_cached is None or self.value_cached is None or self.kv_cache_invalid:
                 # the 2nd generated token, create the key_cached and value_cached buffers
                 # kv_cahce shape/layout [max_seq, bs*beam, hidden_size]
-                shape = [self.max_out_positions, bs_beam, self.num_attn_head, self.head_dim]
-                self.key_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-                self.value_cached = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
+                shape = [self.max_out_positions, bs_beam, self.num_key_value_heads, self.head_dim]
+                self.key_cached = torch.empty(shape, device=device, dtype=dtype)
+                self.value_cached = torch.empty(shape, device=device, dtype=dtype)
                 self.prev_len = 0
                 self.kv_cache_invalid = False
                 if self.layer_id == IPEXTransformerAtten.layer_id_static - 1:
                     IPEXTransformerAtten.runtime_bs = bs_beam
 
+            shape, kv_shape = [seq, bs_beam, q_proj_size], [seq, bs_beam, kv_proj_size]
             self.cur_len = self.prev_len + seq
-            shape = [seq, bs_beam, hidden_size]
-            query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-            key = self.key_cached[self.prev_len : self.cur_len, :, :, :]
-            value = self.value_cached[self.prev_len : self.cur_len, :, :, :]
-            key = key.view(shape)
-            value = value.view(shape)
-            if self.is_int4 and hidden_states.shape[0] == 1:
-                torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_qwei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, key, value, self.qkv_gs)
+            query = torch.empty(shape, device=device, dtype=dtype)
+            key = self.key_cached[self.prev_len : self.cur_len, :, :, :].view(kv_shape)
+            value = self.value_cached[self.prev_len : self.cur_len, :, :, :].view(kv_shape)
+
+            if self.num_key_value_groups > 1:
+                hidden_states_flat = hidden_states.flatten(0, -2)
+                if self.q_proj.bias is None:
+                    torch.matmul(hidden_states, self.q_wei, out=query)
+                else:
+                    torch.addmm(self.q_proj.bias, hidden_states_flat, self.q_wei, out=query.flatten(0, -2))
+
+                if self.k_proj.bias is None:
+                    torch.matmul(hidden_states, self.k_wei, out=key)
+                else:
+                    torch.addmm(self.k_proj.bias, hidden_states_flat, self.k_wei, out=key.flatten(0, -2))
+
+                if self.v_proj.bias is None:
+                    torch.matmul(hidden_states, self.v_wei, out=value)
+                else:
+                    torch.addmm(self.v_proj.bias, hidden_states_flat, self.v_wei, out=value.flatten(0, -2))
             else:
-                torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
+                if self.is_int4 and hidden_states.shape[0] == 1:
+                    torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_qwei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, key, value, self.qkv_gs)
+                else:
+                    torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
         self.prev_len = self.cur_len
         return query, key, value
 
@@ -321,6 +380,7 @@ class IPEXTransformerAtten(nn.Module):
                     layer_past: Optional[Tuple[torch.Tensor]] = None,
                     first_token = False,):
         new_shape = hidden_states.size()[:-1] + (self.num_attn_head, self.head_dim)
+        new_kv_shape = hidden_states.size()[:-1] + (self.num_key_value_heads, self.head_dim)
         if self.kv_cache_optimize and self.kv_cache:
             if IPEXTransformerAtten.beam_size == 1:
                 query, key, value = self.qkv_cache_optimized_greedy(hidden_states=hidden_states, layer_past=layer_past)
@@ -334,9 +394,9 @@ class IPEXTransformerAtten(nn.Module):
                 query, key, value = self.qkv_cache_optimized_beam(hidden_states=hidden_states, first_token=first_token, layer_past=layer_past)
                 if first_token:
                     if self.key_prompt is not None:
-                        self.key_prompt = self.key_prompt.view(new_shape)
+                        self.key_prompt = self.key_prompt.view(new_kv_shape)
                     if self.value_prompt is not None:
-                        self.value_prompt = self.value_prompt.view(new_shape)
+                        self.value_prompt = self.value_prompt.view(new_kv_shape)
         else:
             query, key, value = self.qkv_normal(hidden_states=hidden_states, layer_past=layer_past)
 
@@ -346,9 +406,8 @@ class IPEXTransformerAtten(nn.Module):
         # 1st token: from (bs*beam, seq_len, num_head*head_dim) to (bs*beam, seq_len, num_head, head_dim)
         # 2nd to last token: from (seq_len, bs*beam, num_head*head_dim) to (seq_len, bs*beam, num_head, head_dim)
         query = query.view(new_shape)
-        key = key.view(new_shape)
-        value = value.view(new_shape)
-
+        key = key.view(new_kv_shape)
+        value = value.view(new_kv_shape)
         return query, key, value
 
     def optimized_combine(self, query, key, value, first_token = False, layer_past = None):
@@ -373,7 +432,7 @@ class IPEXTransformerAtten(nn.Module):
         return query, key, value
 
     def normal_combine(self, query, key, value, first_token = False, layer_past = None):
-        if first_token:
+        if first_token and IPEXTransformerAtten.beam_size > 1:
             # 1st token
             # input: shape and layout [bs*beam, seq, num_head, head_dim]
             # output: shape [bs*beam, num_head, seq, head_dim], layout [bs*beam, seq, num_head, head_dim]
@@ -412,6 +471,34 @@ class IPEXTransformerAtten(nn.Module):
             return reduce_target
         else:
             return reduce_target
+
+    def repeat_kv(self, hidden_states: torch.Tensor, n_rep: int, first_token) -> torch.Tensor:
+        """
+        This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,
+        num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
+        """
+        if n_rep == 1:
+            return hidden_states
+        
+        batch, num_key_value_heads, slen, head_dim = hidden_states.shape
+        if first_token and IPEXTransformerAtten.beam_size > 1:
+            # beam search
+            # 1st token
+            # the shape  of key, value, [bs*beam, kv_head, seq, dim]
+            # the layout of key, value, [bs*beam, seq, kv_head, dim]
+            hidden_states = hidden_states.permute(0, 2, 1, 3)
+            hidden_states = hidden_states[:, :, :, None, :].expand(batch, slen, num_key_value_heads, n_rep, head_dim)
+            hidden_states = hidden_states.reshape(batch, slen, num_key_value_heads * n_rep, head_dim)
+            hidden_states = hidden_states.permute(0, 2, 1, 3)
+        else:
+            # greedy search or beam search 2nd to last
+            # the shape of query, key, value, [bs*beam, kv_head, seq, dim]
+            # the layout of query, key, value, [seq, bs*beam, kv_head, dim]
+            hidden_states = hidden_states.permute(2, 0, 1, 3)
+            hidden_states = hidden_states[:, :, :, None, :].expand(slen, batch, num_key_value_heads, n_rep, head_dim)
+            hidden_states = hidden_states.reshape(slen, batch, num_key_value_heads * n_rep, head_dim)
+            hidden_states = hidden_states.permute(1, 2, 0, 3)
+        return hidden_states
 
     def get_blocked_alibi(self, alibi):
         if self.layer_id == 0:
@@ -485,7 +572,7 @@ class IPEXTransformerAtten(nn.Module):
 
         return attn_output, attn_weights
 
-    def self_attention(self, query, key, value, attention_mask=None, head_mask=None, alibi=None, first_token=False):
+    def self_attention(self, key_prompt, value_prompt, query, key, value, attention_mask=None, head_mask=None, alibi=None, first_token=False):
         # create the beam_idx for greedy search
         if self.layer_id == 0 and IPEXTransformerAtten.beam_size == 1: 
             IPEXTransformerAtten.beam_index = torch.zeros([self.cur_len, IPEXTransformerAtten.beam_size], dtype=torch.int, device=self.device)
@@ -537,7 +624,7 @@ class IPEXTransformerAtten(nn.Module):
                 # is_causal=False
                 # beam_idx shape [kv_len, beam], layout [kv_len, beam], dtype=int32
                 # self.cur_len = kv_len
-                attn_output = torch.xpu.IpexSDP_Index(query, self.key_prompt, self.value_prompt, key, value, IPEXTransformerAtten.beam_index, blocked_alibi, blocked_attn_mask, head_mask, self.cur_len, alpha, beta, dropout, is_causal)
+                attn_output = torch.xpu.IpexSDP_Index(query, key_prompt, value_prompt, key, value, IPEXTransformerAtten.beam_index, blocked_alibi, blocked_attn_mask, head_mask, self.cur_len, alpha, beta, dropout, is_causal)
         else:
             if not first_token and IPEXTransformerAtten.beam_size > 1:
                 key, value = self.reorder_cache(key, value, IPEXTransformerAtten.beam_index)
@@ -568,7 +655,7 @@ class IPEXTransformerAtten(nn.Module):
             expand_beam_idx[:, i*beam:(i+1)*beam] = beam_idx[:, i*beam:(i+1)*beam]  + beam * i
         return expand_beam_idx
 
-    def reorder_cache(self, key, value, beam_idx_cache):
+    def reorder_cache(self, key_prompt, value_prompt, key, value, beam_idx_cache):
         """
         This function is used to re-order the `past_key_values` cache if [`~PretrainedModel.beam_search`] or
         [`~PretrainedModel.beam_sample`] is called. This is required to match `past_key_values` with the correct
@@ -577,18 +664,18 @@ class IPEXTransformerAtten(nn.Module):
         # past_key_values: 28 decoder layers of [key, value]
         # beam_idx_cache: [kv_out_len, bs*beam]
 
-        # self.key_prompt shape[bs, head, seq, dim] layout[bs, seq, head, dim]
+        # key_prompt shape[bs, head, seq, dim] layout[bs, seq, head, dim]
         # key shape[bs*beam, head, kv_seq, dim] layout[kv_len, bs*beam, head, dim]
-        bs = self.key_prompt.shape[0]
+        bs = key_prompt.shape[0]
         beam = int(key.shape[0] // bs)
-        num_head, seq_prompt, head_dim = self.key_prompt.shape[1], self.key_prompt.shape[2], self.key_prompt.shape[3]
+        _, num_head, seq_prompt, head_dim = key_prompt.shape
         prompt_shape = [bs, 1, num_head, seq_prompt, head_dim]
         expand_shape = [bs, beam, num_head, seq_prompt, head_dim]
         shape = [bs*beam, num_head, seq_prompt, head_dim]
         # expand the key_prompt/value_prompt from shape [bs, num_head, seq_prompt, head_dim]
         # to shape [bs*beam, num_head, seq_prompt, head_dim]
-        key_prompt = self.key_prompt.reshape(prompt_shape).expand(expand_shape).reshape(shape)
-        value_prompt = self.value_prompt.reshape(prompt_shape).expand(expand_shape).reshape(shape)
+        key_prompt = key_prompt.reshape(prompt_shape).expand(expand_shape).reshape(shape)
+        value_prompt = value_prompt.reshape(prompt_shape).expand(expand_shape).reshape(shape)
         key_list = [key_prompt]
         value_list = [value_prompt]
 
@@ -613,9 +700,9 @@ class IPEXTransformerAtten(nn.Module):
                     attn_output = torch.ops.torch_ipex.mm_int4(attn_output, self.out_qwei, self.out_scl, self.out_zp, self.out_gs)
                 else:
                     attn_output = torch.matmul(attn_output, self.out_wei)
-                self.all_reduce_if_necessary(attn_output)
                 if self.out_bias is not None:
                     attn_output += self.out_bias
+                self.all_reduce_if_necessary(attn_output)
             else:
                 shape = [attn_output.shape[0], attn_output.shape[1], self.embed_dim]
                 if self.out_bias is not None:
@@ -673,7 +760,7 @@ class IPEXTransformerAtten(nn.Module):
         # 2nd to last:
         # the shape of query, key, value, [seq, bs*beam, head, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]
-        key, query = self.apply_rotary_embedding(key, query, position_ids=position_ids)
+        query, key = self.apply_rotary_embedding(query, key, position_ids=position_ids)
 
         # greedy search
         # the shape of query, key, value, [seq, bs*beam, head, dim]
@@ -709,7 +796,27 @@ class IPEXTransformerAtten(nn.Module):
         # 2nd to last:
         # the shape of query, key, value, [bs*beam, head, seq, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]
-        attn_output, attn_weight = self.self_attention(query, key, value, attention_mask, head_mask, alibi, first_token)
+        # GQA/MQA repeat k/v heads if n_kv_heads < n_heads
+        if first_token and IPEXTransformerAtten.beam_size > 1:
+            key = self.repeat_kv(key, self.num_key_value_groups, first_token)
+            value = self.repeat_kv(value, self.num_key_value_groups, first_token)
+            key_prompt, value_prompt = key, value
+        else:
+            key = self.repeat_kv(key, self.num_key_value_groups, first_token)
+            value = self.repeat_kv(value, self.num_key_value_groups, first_token)
+            key_prompt = self.repeat_kv(self.key_prompt, self.num_key_value_groups, first_token)
+            value_prompt = self.repeat_kv(self.value_prompt, self.num_key_value_groups, first_token)
+        # greedy search
+        # the shape of query, key, value, [bs*beam, head, seq, dim]
+        # the layout of query, key, value, [seq, bs*beam, head, dim]
+        # beam search
+        # 1st token
+        # the shape of query, key, value, [bs*beam, head, seq, dim]
+        # the layout of query, key, value, [bs*beam, seq, head, dim]
+        # 2nd to last:
+        # the shape of query, key, value, [bs*beam, head, seq, dim]
+        # the layout of query, key, value, [seq, bs*beam, head, dim]
+        attn_output, attn_weight = self.self_attention(key_prompt, value_prompt, query, key, value, attention_mask, head_mask, alibi, first_token)
 
         # greedy search
         # the shape of attn_output [seq, bs*beam, hidden_size]
