@@ -115,7 +115,8 @@ class IPEXBloomBlock(nn.Module):
             hidden_states = hidden_states.transpose(0, 1).contiguous()
 
         # layernorm_output = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.input_layernorm.normalized_shape, self.input_layernorm.weight, self.input_layernorm.bias, self.input_layernorm.eps)
-        layernorm_output = torch.nn.functional.layer_norm(hidden_states, self.input_layernorm.normalized_shape, self.input_layernorm.weight, self.input_layernorm.bias, self.input_layernorm.eps)
+        # NOTE: fast_layer_norm has accuracy issue in Ipex auto tp
+        layernorm_output = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.input_layernorm.normalized_shape, self.input_layernorm.weight, self.input_layernorm.bias, self.input_layernorm.eps)
         if self.config.do_norm_before:
             residual = layernorm_output
         else:
@@ -144,7 +145,7 @@ class IPEXBloomBlock(nn.Module):
         # import os
         # os.abort()
         # layernorm_output = torch.ops.torch_ipex.fast_layer_norm(attention_output, self.post_attention_layernorm.normalized_shape, self.post_attention_layernorm.weight, self.post_attention_layernorm.bias, self.post_attention_layernorm.eps)
-        layernorm_output = torch.nn.functional.layer_norm(attention_output, self.post_attention_layernorm.normalized_shape, self.post_attention_layernorm.weight, self.post_attention_layernorm.bias, self.post_attention_layernorm.eps)
+        layernorm_output = torch.ops.torch_ipex.fast_layer_norm(attention_output, self.post_attention_layernorm.normalized_shape, self.post_attention_layernorm.weight, self.post_attention_layernorm.bias, self.post_attention_layernorm.eps)
         if self.config.do_norm_before:
             redisual = layernorm_output
         else:

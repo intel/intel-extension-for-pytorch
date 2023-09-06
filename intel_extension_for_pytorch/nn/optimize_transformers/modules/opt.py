@@ -71,10 +71,11 @@ class IPEXOptMLP(IPEXTransformerMLP):
         if self.row_major:
             hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
             hidden_states = self.act(hidden_states)
-            hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_out_wei, self.fc_out.bias)
-            hidden_states += residual
+            hidden_states = torch.ops.torch_ipex.mm_bias_scaled_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, residual, 1.0/self.tp_size)
+            hidden_states = self.all_reduce_if_necessary(hidden_states)
         else:
-            hidden_states = self.fc_out(self.act(self.fc_in(hidden_states)))
+            hidden_states = torch.ops.torch_ipex.mm_bias_scaled_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, residual, 1.0/self.tp_size)
+            hidden_states = self.all_reduce_if_necessary(hidden_states)
             if residual is not None:
                 hidden_states += residual
         return hidden_states
@@ -390,7 +391,9 @@ class IPEXOptConverter(IPEXTransformerConverter):
 
             self.module.self_attn.out_proj.weight.data = self.module.self_attn.out_proj.weight.transpose(0, 1).contiguous()
             self.ipex_optimized_module.attn.out_wei = self.module.self_attn.out_proj.weight
-            self.ipex_optimized_module.attn.out_bias = self.module.self_attn.out_proj.bias
+            if self.module.self_attn.out_proj.bias is not None:
+                self.module.self_attn.out_proj.bias = nn.Parameter(self.module.self_attn.out_proj.bias / self.tp_size)
+                self.ipex_optimized_module.attn.out_bias = self.module.self_attn.out_proj.bias
 
             shape = [3, -1, self.module.self_attn.q_proj.weight.shape[-1]]
             self.ipex_optimized_module.attn.qkv_wei = torch.stack([
@@ -416,7 +419,9 @@ class IPEXOptConverter(IPEXTransformerConverter):
             self.ipex_optimized_module.attn.v_proj.weight = self.module.self_attn.v_proj.weight
             self.ipex_optimized_module.attn.v_proj.bias = self.module.self_attn.v_proj.bias
             self.ipex_optimized_module.attn.out_proj.weight = self.module.self_attn.out_proj.weight
-            self.ipex_optimized_module.attn.out_proj.bias = self.module.self_attn.out_proj.bias
+            if self.module.self_attn.out_proj.bias is not None:
+                self.module.self_attn.out_proj.bias = nn.Parameter(self.module.self_attn.out_proj.bias / self.tp_size)
+                self.ipex_optimized_module.attn.out_bias = self.module.self_attn.out_proj.bias
 
     def port_mlp_parameters(self):
         if self.row_major:
@@ -425,12 +430,16 @@ class IPEXOptConverter(IPEXTransformerConverter):
             self.ipex_optimized_module.mlp.fc_in.bias = self.module.fc1.bias
             self.module.fc2.weight.data = self.module.fc2.weight.transpose(0, 1).contiguous()
             self.ipex_optimized_module.mlp.fc_out_wei = self.module.fc2.weight
-            self.ipex_optimized_module.mlp.fc_out.bias = self.module.fc2.bias
+            if self.module.fc2.bias is not None:
+                self.module.fc2.bias = nn.Parameter(self.module.fc2.bias / self.tp_size)
+                self.ipex_optimized_module.mlp.fc_out.bias = self.module.fc2.bias
         else:
             self.ipex_optimized_module.mlp.fc_in.weight = self.module.fc1.weight
             self.ipex_optimized_module.mlp.fc_in.bias = self.module.fc1.bias
             self.ipex_optimized_module.mlp.fc_out.weight = self.module.fc2.weight
-            self.ipex_optimized_module.mlp.fc_out.bias = self.module.fc2.bias
+            if self.module.fc2.bias is not None:
+                self.module.fc2.bias = nn.Parameter(self.module.fc2.bias / self.tp_size)
+                self.ipex_optimized_module.mlp.fc_out.bias = self.module.fc2.bias
 
     def port_layer_norm_parameters(self):
         self.ipex_optimized_module.self_attn_layer_norm.weight = self.module.self_attn_layer_norm.weight

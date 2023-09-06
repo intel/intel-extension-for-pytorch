@@ -797,7 +797,7 @@ class IPEXTransformerAtten(nn.Module):
         # the shape of query, key, value, [bs*beam, head, seq, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]
         # GQA/MQA repeat k/v heads if n_kv_heads < n_heads
-        if first_token and IPEXTransformerAtten.beam_size > 1:
+        if first_token or IPEXTransformerAtten.beam_size == 1:
             key = self.repeat_kv(key, self.num_key_value_groups, first_token)
             value = self.repeat_kv(value, self.num_key_value_groups, first_token)
             key_prompt, value_prompt = key, value

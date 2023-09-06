@@ -33,11 +33,14 @@ class IPEXGPTJMLP(IPEXTransformerMLP):
                 else:
                     hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                     hidden_states = self.act(hidden_states)
-                hidden_states = torch.ops.torch_ipex.mm_bias_resadd_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output, residual)
+                hidden_states = torch.ops.torch_ipex.mm_bias_scaled_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output, 1.0/self.tp_size)
+                hidden_states = self.all_reduce_if_necessary(hidden_states)
+                hidden_states += residual
         else:
             hidden_states = self.fc_in(hidden_states)
             hidden_states = self.act(hidden_states)
-            hidden_states = self.fc_out(hidden_states) + attn_output + residual
+            hidden_states = self.all_reduce_if_necessary(hidden_states)
+            hidden_states += attn_output + residual
         return hidden_states
 
 class IPEXGPTJBlock(nn.Module):
@@ -372,12 +375,16 @@ class IPEXGPTJConverter(IPEXTransformerConverter):
             self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
             self.module.mlp.fc_out.weight.data = self.module.mlp.fc_out.weight.transpose(0, 1).contiguous()
             self.ipex_optimized_module.mlp.fc_out_wei = self.module.mlp.fc_out.weight
-            self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
+            if self.module.mlp.fc_out.bias is not None:
+                self.module.mlp.fc_out.bias = nn.Parameter(self.module.mlp.fc_out.bias / self.tp_size)
+                self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
         else:
             self.ipex_optimized_module.mlp.fc_in.weight = self.module.mlp.fc_in.weight
             self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.fc_in.bias
             self.ipex_optimized_module.mlp.fc_out.weight = self.module.mlp.fc_out.weight
-            self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
+            if self.module.mlp.fc_out.bias is not None:
+                self.module.mlp.fc_out.bias = nn.Parameter(self.module.mlp.fc_out.bias / self.tp_size)
+                self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.fc_out.bias
 
         if self.is_int4:
             if self.row_major:
