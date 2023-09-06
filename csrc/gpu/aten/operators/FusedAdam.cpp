@@ -407,6 +407,11 @@ void _fused_adam_impl_(
   if (found_inf.has_value() && found_inf->data_ptr<float>()[0] == true)
     TORCH_WARN(" found_inf not supported with ipex fused_adam.")
 
+  const float beta1_value = static_cast<float>(beta1);
+  const float beta2_value = static_cast<float>(beta2);
+  const float weight_decay_value = static_cast<float>(weight_decay);
+  const float eps_value = static_cast<float>(eps);
+
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       kHalf, kBFloat16, params[0].scalar_type(), "fused_adam_kernel", [&]() {
         multi_tensor_apply_for_fused_optimizer<4>(
@@ -414,10 +419,10 @@ void _fused_adam_impl_(
             state_steps,
             FusedAdamMathFunctor<scalar_t, 4, ADAM_MODE::ORIGINAL, false>(),
             lr,
-            beta1,
-            beta2,
-            weight_decay,
-            eps,
+            beta1_value,
+            beta2_value,
+            weight_decay_value,
+            eps_value,
             maximize);
       });
 }
@@ -449,6 +454,11 @@ void _fused_adam_amsgrad_impl_(
   if (found_inf.has_value() && found_inf->data_ptr<float>()[0] == true)
     TORCH_WARN(" found_inf not supported with ipex fused_adam.")
 
+  const float beta1_value = static_cast<float>(beta1);
+  const float beta2_value = static_cast<float>(beta2);
+  const float weight_decay_value = static_cast<float>(weight_decay);
+  const float eps_value = static_cast<float>(eps);
+
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       kHalf,
       kBFloat16,
@@ -460,10 +470,10 @@ void _fused_adam_amsgrad_impl_(
             state_steps,
             FusedAdamMathFunctor<scalar_t, 5, ADAM_MODE::ORIGINAL, true>(),
             lr,
-            beta1,
-            beta2,
-            weight_decay,
-            eps,
+            beta1_value,
+            beta2_value,
+            weight_decay_value,
+            eps_value,
             maximize);
       });
 }

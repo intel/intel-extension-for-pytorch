@@ -36,14 +36,14 @@ template <
 inline void adam_math(
     scalar_type r_args[depth][kILP],
     const float* step_count,
-    const double lr,
-    const double beta1,
-    const double beta2,
-    const double weight_decay,
-    const double eps,
+    const float beta1,
+    const float beta2,
+    const float weight_decay,
+    const float eps,
     const bool maximize,
     const opmath_t bias_correction1,
     const opmath_t step_size,
+    const opmath_t lr_weight_decay,
     const opmath_t bias_correction2,
     const opmath_t bias_correction2_sqrt) {
   bool use_weight_decay = weight_decay != 0;
@@ -72,12 +72,12 @@ inline void adam_math(
       if constexpr (mode == ADAM_MODE::ORIGINAL)
         grad += param * weight_decay;
       else // ADAM_MODE::ADAMW:
-        param -= lr * weight_decay * param;
+        param -= (lr_weight_decay * param);
     }
 
     // todo(crcrpar): use lerp
-    exp_avg = beta1 * exp_avg + (1 - beta1) * grad;
-    exp_avg_sq = beta2 * exp_avg_sq + (1 - beta2) * grad * grad;
+    exp_avg = beta1 * exp_avg + (1.0f - beta1) * grad;
+    exp_avg_sq = beta2 * exp_avg_sq + (1.0f - beta2) * grad * grad;
     opmath_t denom;
 
     if constexpr (amsgrad) {
@@ -118,10 +118,10 @@ struct FusedAdamMathFunctor {
       TLW tlWGMeta,
       sycl::nd_item<1> item,
       const double lr,
-      const double beta1,
-      const double beta2,
-      const double weight_decay,
-      const double eps,
+      const float beta1,
+      const float beta2,
+      const float weight_decay,
+      const float eps,
       const bool maximize) const {
     auto group_id = item.get_group(0);
     auto item_id = item.get_local_id(0);
@@ -140,13 +140,13 @@ struct FusedAdamMathFunctor {
     n -= chunk_idx * chunk_size;
     scalar_type r_args[depth][kILP];
 
-    const opmath_t bias_correction1 =
-        1 - Numerics<opmath_t>::pow(beta1, *step_count);
-    const opmath_t step_size = lr / bias_correction1;
-    const opmath_t bias_correction2 =
-        1 - Numerics<opmath_t>::pow(beta2, *step_count);
-    const opmath_t bias_correction2_sqrt =
-        Numerics<opmath_t>::sqrt(bias_correction2);
+    const float bias_correction1 =
+        static_cast<float>(1.0f - Numerics<float>::pow(beta1, *step_count));
+    const float bias_correction2 =
+        static_cast<float>(1.0f - Numerics<float>::pow(beta2, *step_count));
+    const float step_size = static_cast<float>(lr / bias_correction1);
+    const float bias_correction2_sqrt = Numerics<float>::sqrt(bias_correction2);
+    const float lr_weight_decay = static_cast<float>(lr * weight_decay);
 
     if ((n % kILP == 0) && (chunk_size % kILP == 0) && all_aligned) {
       for (int i_start = item_id;
@@ -159,7 +159,6 @@ struct FusedAdamMathFunctor {
         adam_math<scalar_type, opmath_t, depth, mode, amsgrad>(
             r_args,
             step_count,
-            lr,
             beta1,
             beta2,
             weight_decay,
@@ -167,6 +166,7 @@ struct FusedAdamMathFunctor {
             maximize,
             bias_correction1,
             step_size,
+            lr_weight_decay,
             bias_correction2,
             bias_correction2_sqrt);
 
@@ -185,7 +185,6 @@ struct FusedAdamMathFunctor {
         adam_math<scalar_type, opmath_t, depth, mode, amsgrad>(
             r_args,
             step_count,
-            lr,
             beta1,
             beta2,
             weight_decay,
@@ -193,6 +192,7 @@ struct FusedAdamMathFunctor {
             maximize,
             bias_correction1,
             step_size,
+            lr_weight_decay,
             bias_correction2,
             bias_correction2_sqrt);
 #pragma unroll
