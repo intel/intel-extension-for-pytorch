@@ -24,6 +24,7 @@
 #error "Unsupported compiler"
 #endif
 #include <c10/core/Stream.h>
+#include "Macros.h"
 
 namespace xpu {
 
