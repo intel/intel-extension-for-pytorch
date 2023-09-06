@@ -54,9 +54,8 @@ function (install_mkl_packages)
 endfunction()
 
 # IPEX XPU lib always use the dynamic linker for oneMKL lib if USE_ONEMKL is ON and oneMKL is available.
-# IPEX CPU lib will use the same oneMKL lib as XPU if and only if USE_ONEMKL is ON and oneMKL is available,
-# in other situation CPU lib will download and install mkl-static lib and use static linker for mkl-static lib.
-if(BUILD_WITH_XPU)
+# IPEX CPU lib always download and install mkl-static lib and use static linker for mkl-static lib.
+if(BUILD_MODULE_TYPE STREQUAL "GPU")
   set(BUILD_STATIC_ONEMKL OFF)
   if(DEFINED ENV{MKLROOT})
     set(mkl_root_hint $ENV{MKLROOT})
@@ -65,20 +64,11 @@ if(BUILD_WITH_XPU)
   elseif(MKL_ROOT)
     set(mkl_root_hint ${MKL_ROOT})
   else()
-    if(BUILD_MODULE_TYPE STREQUAL "GPU")
-      # For IPEX XPU build, if we CAN NOT find the specified oneMKL, we should return earily. ONEMKL_FOUND is OFF in this situation.
-      message(WARNING "Please set oneMKL root path by MKLROOT, or MKL_ROOT for IPEX XPU build.")
-      return()
-    else()
-      # For IPEX CPU build, if we CAN NOT find the specified oneMKL, we should download and install the MKL via pip.
-      message(WARNING "No found oneMKL root path by MKLROOT, or MKL_ROOT. Will download and install mkl-include and mkl-static for IPEX CPU build.")
-      install_mkl_packages()
-      set(BUILD_STATIC_ONEMKL ON)
-    endif()
+    message(WARNING "Please set oneMKL root path by MKLROOT, or MKL_ROOT for IPEX XPU build.")
+    return()
   endif()
 else()
   set(BUILD_STATIC_ONEMKL ON)
-  # If only build IPEX CPU libraries, we should use the downloaded MKL via pip.
   message(STATUS "Download and install mkl-include and mkl-static for IPEX CPU build automatically.")
   install_mkl_packages()
 endif()
