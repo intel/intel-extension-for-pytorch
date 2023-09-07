@@ -61,11 +61,12 @@ target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC gtest_main)
 target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC gtest)
 
 # Link Pytorch
-target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${TORCH_INSTALL_PREFIX}/lib/libtorch_cpu.so)
-target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${TORCH_INSTALL_PREFIX}/lib/libc10.so)
+target_link_directories(${CPU_CPP_TEST_NAME} PRIVATE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC torch_cpu)
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC c10)
 
 # Link IPEX
-target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib/libintel-ext-pt-cpu.so)
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC intel-ext-pt-cpu)
 
 install(TARGETS ${CPU_CPP_TEST_NAME}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

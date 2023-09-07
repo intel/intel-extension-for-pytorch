@@ -158,8 +158,10 @@ else()
 endif()
 
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${TORCH_INCLUDE_DIRS})
-target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${TORCH_INSTALL_PREFIX}/lib/libtorch_cpu.so)
-target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${TORCH_INSTALL_PREFIX}/lib/libc10.so)
+
+target_link_directories(${PLUGIN_NAME_CPU} PRIVATE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC torch_cpu)
+target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC c10)
 
 set(ATEN_THREADING "OMP" CACHE STRING "ATen parallel backend")
 message(STATUS "Using ATen parallel backend: ${ATEN_THREADING}")
