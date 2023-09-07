@@ -565,7 +565,7 @@ def get_pybind11_abi_compiler_flags():
 
 
 def _gen_build_cfg_from_cmake(
-    cmake_exec, project_root_dir, cmake_args, build_dir, build_env, use_ninja = False):
+    cmake_exec, project_root_dir, cmake_args, build_dir, build_env, use_ninja = True):
     if IS_WINDOWS:
         if use_ninja:
             check_call([cmake_exec, project_root_dir, '-GNinja'] + cmake_args, cwd=build_dir, env=build_env)
@@ -577,7 +577,7 @@ def _gen_build_cfg_from_cmake(
         check_call([cmake_exec, project_root_dir] + cmake_args, cwd=build_dir, env=build_env)
 
 
-def _build_project(build_args, build_dir, build_env, use_ninja=False):
+def _build_project(build_args, build_dir, build_env, use_ninja = True):
     if IS_WINDOWS:
         if use_ninja:
             check_call(['ninja'] + build_args, cwd=build_dir, env=build_env)
@@ -771,6 +771,7 @@ class IPEXCPPLibBuild(build_clib, object):
                 cmake_args_python,
                 ipex_python_build_dir,
                 my_env,
+                use_ninja
             )
 
         elif _get_build_target() == "cppsdk":
@@ -791,6 +792,7 @@ class IPEXCPPLibBuild(build_clib, object):
                 cmake_args_cppsdk,
                 ipex_cppsdk_build_dir,
                 my_env,
+                use_ninja
             )
 
         if build_with_xpu:
