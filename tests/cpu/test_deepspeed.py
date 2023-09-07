@@ -65,12 +65,10 @@ class MyLmHeadModel(nn.Module):
         super().__init__()
         # For deepspeed support, please do not change the ModuleList structure of the class.
         self.linears = nn.ModuleList([MyBlock()])
-        self.lm_head = nn.Linear(2, 2)
 
     def forward(self, x):
         for l in self.linears:
             x = l(x)
-        x = self.lm_head(x)
         return x
 
 
@@ -80,10 +78,12 @@ class DeepSpeedTestM(nn.Module):
     def __init__(self, module_type):
         super().__init__()
         self.linear = module_type()
+        self.lm_head = nn.Linear(2, 2)
 
     def forward(self, x):
-        z = self.linear(x)
-        return z
+        x = self.linear(x)
+        x = self.lm_head(x)
+        return x
 
 
 class DeepspeedTester(JitTestCase):
