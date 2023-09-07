@@ -6,6 +6,7 @@ from ...quantization._qconfig import get_weight_only_quant_qconfig_mapping
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     may_import_deepspeed_modules,
     _all_reduce_and_bias_add,
+    _pre_ipex_gemm,
 )
 
 
@@ -274,8 +275,4 @@ class IpexWoqLmHeadLinearAllreduce(IpexWoqLinearAllreduce):
         )
 
     def pre_ipex_gemm(self, input):
-        assert (
-            input.shape[-1] % self.world_size == 0
-        ), "please ensure input.shape[-1] % self.world_size == 0"
-        input_shard = input.shape[-1] // self.world_size
-        return input[:, :, self.rank * input_shard : (self.rank + 1) * input_shard]
+        return _pre_ipex_gemm(input, self.world_size, self.rank)

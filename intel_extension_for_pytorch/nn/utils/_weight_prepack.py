@@ -122,6 +122,14 @@ def _all_reduce_and_bias_add(mp_group, original_bias, output):
     return output
 
 
+def _pre_ipex_gemm(input, world_size, rank):
+    assert "deepspeed" in installed_pkg, "_pre_ipex_gemm requires deepspeed installed"
+    from deepspeed.utils.tp_shard import get_shard_size, get_shard_size_list
+    input_shard_size = get_shard_size(input.shape[-1], world_size)
+    input_shard_offset = sum(get_shard_size_list(input.shape[-1], world_size)[0:rank])
+    return input[:, :, input_shard_offset:input_shard_offset + input_shard_size]
+
+
 def _ipex_module_load_from_state_dict_(self, state_dict, prefix):
     w_name = prefix + "weight"
     b_name = prefix + "bias"
@@ -337,11 +345,7 @@ class _IPEXLmHeadLinearAllreduce(_IPEXLinear):
         super(_IPEXLmHeadLinearAllreduce, self).__init__()
 
     def pre_ipex_gemm(self, input):
-        assert (
-            input.shape[-1] % self.world_size == 0
-        ), "please ensure input.shape[-1] % self.world_size == 0"
-        input_shard = input.shape[-1] // self.world_size
-        return input[:, :, self.rank * input_shard : (self.rank + 1) * input_shard]
+        return _pre_ipex_gemm(input, self.world_size, self.rank)
 
     def post_ipex_gemm(self, output):
         return _all_reduce_and_bias_add(self.mp_group, self.original_bias, output)
