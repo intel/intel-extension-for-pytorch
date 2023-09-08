@@ -609,3 +609,29 @@ def meta_masked_multihead_self_attention(
     value_cache_out = query.new_empty((value_cache.shape[0], value_cache.shape[1], value.shape[2], value.shape[3]))
     beam_idx_out = query.new_empty(beam_idx.shape)
     return (attn_output, attn_weights, key_cache_out, value_cache_out, beam_idx_out)
+
+
+@register_meta("rotary_position_embedding")
+def meta_rotary_position_embedding(
+    t_in,
+    t_emb_pos,
+    t_pos,
+    N,
+    H,
+    offset,
+    rotary_ndims,
+):
+    return (t_in, t_emb_pos, t_pos)
+
+
+@register_meta("rotary_position_embedding_out")
+def meta_rotary_position_embedding_out(
+    t_in,
+    t_emb_pos,
+    t_pos,
+    N,
+    H,
+    offset,
+    rotary_ndims,
+):
+    return (t_in, t_emb_pos, t_pos)
