@@ -3,6 +3,7 @@ import torch.nn as nn
 from common_utils import TestCase
 import unittest
 from typing import Tuple
+import intel_extension_for_pytorch as ipex
 
 
 class MaskedMHA(torch.nn.Module):
@@ -115,7 +116,7 @@ class MaskedMHA(torch.nn.Module):
 
 
 class MaskedMHATest(TestCase):
-    def test_mha(self):
+    def _test_mha(self, torchcompile=False):
         beam_size_list = [1, 4]
         batch_size_list = [1, 2, 4]
         head_size = 256
@@ -132,6 +133,12 @@ class MaskedMHATest(TestCase):
                     mha = MaskedMHA(
                         n_head=head_num, n_head_kv=head_num_kv, head_dim=head_size
                     )
+
+                    if torchcompile:
+                        torch._dynamo.reset()
+                        ipex._set_compiler_backend("inductor")
+                        mha = torch.compile(mha, backend="ipex")
+
                     # first token decode
                     input_t = torch.randn(
                         batch_size,
@@ -489,6 +496,12 @@ class MaskedMHATest(TestCase):
                             value_cache_bf16.transpose(0, 1)[offset],
                             value_cache_iakv_bf16[offset, :, :, :],
                         )
+
+    def test_mha(self):
+        self._test_mha(torchcompile=False)
+
+    def test_mha_torchcompile(self):
+        self._test_mha(torchcompile=True)
 
 
 if __name__ == "__main__":

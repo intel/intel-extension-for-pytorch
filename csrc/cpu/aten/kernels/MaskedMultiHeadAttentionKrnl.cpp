@@ -710,7 +710,7 @@ first_token_masked_mha(
     attn_weights = attn_weights.to(value.dtype());
     auto attn_outputs = attn_weights.matmul(value);
     return std::make_tuple(
-        attn_outputs, attn_weights, key_cache, value_cache, beam_idx);
+        attn_outputs, at::Tensor(), key_cache, value_cache, beam_idx);
   }
 }
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>

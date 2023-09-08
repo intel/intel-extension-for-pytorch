@@ -63,6 +63,7 @@ make_fallback(torch.ops.torch_ipex.tpp_linear_relu)
 make_fallback(torch.ops.torch_ipex.tpp_linear_silu)
 make_fallback(torch.ops.torch_ipex.tpp_linear_add)
 make_fallback(torch.ops.torch_ipex.tpp_linear_mul)
+make_fallback(torch.ops.torch_ipex.masked_multihead_self_attention)
 
 make_fallback(torch.ops.torch_ipex.add_softmax_)
 make_fallback(torch.ops.torch_ipex.bmm_add)

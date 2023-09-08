@@ -231,6 +231,7 @@ at::Tensor flash_attention_kernel_impl(
   attn_weights = attn_weights.softmax(-1);
   attn_weights = attn_weights.to(value.dtype());
   auto out = attn_weights.matmul(value);
+  out = out.transpose_(1, 2).contiguous().transpose_(1, 2);
   return out;
 #endif
 }

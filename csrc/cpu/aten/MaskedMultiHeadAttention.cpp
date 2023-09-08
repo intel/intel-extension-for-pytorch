@@ -58,8 +58,8 @@ namespace {
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
-      "masked_multihead_self_attention(Tensor (a!)query, Tensor (a!)key, Tensor (a!)value, Tensor (a!)key_cache, \
-       Tensor (a!)value_cache, Tensor(a!) beam_idx, Tensor seq_info, float scale_attn, int max_positions, \
+      "masked_multihead_self_attention(Tensor query, Tensor key, Tensor value, Tensor key_cache, \
+       Tensor value_cache, Tensor beam_idx, Tensor seq_info, float scale_attn, int max_positions, \
        Tensor? head_mask, Tensor? attention_mask)-> (Tensor, Tensor, Tensor, Tensor, Tensor)");
   m.impl(
       "masked_multihead_self_attention",
