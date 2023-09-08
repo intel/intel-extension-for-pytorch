@@ -27,7 +27,7 @@ namespace xetla {
         SLM_KS,                                                                                        \
         1,                                                                                             \
         1,                                                                                             \
-        3>(queue, out, a, b, b_zp, b_scale, m, n, k);                                                  \
+        3>(queue, out, a, b, b_zp, b_scale, m, n / 2, k);                                              \
   }                                                                                                    \
   void                                                                                                 \
       hgemm_bias_wint4_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##DEQUANT_S##_##SLM_KS##_(         \
@@ -52,7 +52,7 @@ namespace xetla {
         SLM_KS,                                                                                        \
         1,                                                                                             \
         1,                                                                                             \
-        3>(queue, out, a, b, b_zp, b_scale, bias, m, n, k);                                            \
+        3>(queue, out, a, b, b_zp, b_scale, bias, m, n / 2, k);                                        \
   }                                                                                                    \
   void                                                                                                 \
       hgemm_bias_gelu_wint4_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##DEQUANT_S##_##SLM_KS##_(    \
@@ -77,7 +77,7 @@ namespace xetla {
         SLM_KS,                                                                                        \
         1,                                                                                             \
         1,                                                                                             \
-        3>(queue, out, a, b, b_zp, b_scale, bias, m, n, k);                                            \
+        3>(queue, out, a, b, b_zp, b_scale, bias, m, n / 2, k);                                        \
   }                                                                                                    \
   void                                                                                                 \
       hgemm_res_wint4_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##DEQUANT_S##_##SLM_KS##_(          \
@@ -102,7 +102,7 @@ namespace xetla {
         SLM_KS,                                                                                        \
         1,                                                                                             \
         1,                                                                                             \
-        3>(queue, out, a, b, b_zp, b_scale, res, m, n, k);                                             \
+        3>(queue, out, a, b, b_zp, b_scale, res, m, n / 2, k);                                         \
   }                                                                                                    \
   void                                                                                                 \
       hgemm_bias_res_res_wint4_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##DEQUANT_S##_##SLM_KS##_( \
@@ -129,7 +129,7 @@ namespace xetla {
         SLM_KS,                                                                                        \
         1,                                                                                             \
         1,                                                                                             \
-        3>(queue, out, a, b, b_zp, b_scale, bias, res0, res1, m, n, k);                                \
+        3>(queue, out, a, b, b_zp, b_scale, bias, res0, res1, m, n / 2, k);                            \
   }                                                                                                    \
   void                                                                                                 \
       hgemm_qkv_wint4_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##DEQUANT_S##_##SLM_KS##_(          \
@@ -155,7 +155,7 @@ namespace xetla {
         SLM_KS,                                                                                        \
         1,                                                                                             \
         1,                                                                                             \
-        3>(queue, out0, out1, out2, a, b, b_zp, b_scale, m, n, k);                                     \
+        3>(queue, out0, out1, out2, a, b, b_zp, b_scale, m, n / 2, k);                                 \
   }                                                                                                    \
   void                                                                                                 \
       hgemm_qkv_bias_wint4_##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##DEQUANT_S##_##SLM_KS##_(     \
@@ -182,7 +182,7 @@ namespace xetla {
         SLM_KS,                                                                                        \
         1,                                                                                             \
         1,                                                                                             \
-        3>(queue, out0, out1, out2, a, b, b_zp, b_scale, bias, m, n, k);                               \
+        3>(queue, out0, out1, out2, a, b, b_zp, b_scale, bias, m, n / 2, k);                           \
   }
 
 // k group

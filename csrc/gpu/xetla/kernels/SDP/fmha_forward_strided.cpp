@@ -211,7 +211,8 @@ class fmha_forward_strided_t {
 
     // Using epilogue function to save results
     using epilogue_t = gpu::xetla::group::epilogue_t<
-        gpu::xetla::group::epilogue_policy_default<gpu_arch::Xe>,
+        gpu::xetla::group::
+            epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
         tile_shape,
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>>;
 
@@ -316,7 +317,8 @@ class fmha_forward_strided_t {
     using mem_desc_output_c =
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
     using epilogue_t = gpu::xetla::group::epilogue_t<
-        gpu::xetla::group::epilogue_policy_default<gpu_arch::Xe>,
+        gpu::xetla::group::
+            epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
         tile_shape,
         mem_desc_output_c>;
 

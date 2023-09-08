@@ -167,12 +167,9 @@ inline void hgemm_addmm(
           gpu_arch::Xe,
           prefetch_distance,
           periodic_sync_interval>::brgemm;
-      using update_method = typename std::
-          conditional<(L3_KS > 1), result_reduce_sum, result_overwrite>::type;
       using epilogue_t = epilogue_t<
           epilogue_policy_tile_op<
               chained_tile_op_t<alpha_beta_t<data_type_c>>,
-              update_method,
               gpu_arch::Xe>,
           tile_shape,
           mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
@@ -261,13 +258,8 @@ inline void hgemm_common(
           gpu_arch::Xe,
           prefetch_distance,
           periodic_sync_interval>::brgemm;
-      using update_method = typename std::
-          conditional<(L3_KS > 1), result_reduce_sum, result_overwrite>::type;
       using epilogue_t = epilogue_t<
-          epilogue_policy_tile_op<
-              chained_tile_op_t<>,
-              update_method,
-              gpu_arch::Xe>,
+          epilogue_policy_tile_op<chained_tile_op_t<>, gpu_arch::Xe>,
           tile_shape,
           mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
       using gemm_op_t = gemm_t<
@@ -356,12 +348,9 @@ inline void hgemm_bias(
           gpu_arch::Xe,
           prefetch_distance,
           periodic_sync_interval>::brgemm;
-      using update_method = typename std::
-          conditional<(L3_KS > 1), result_reduce_sum, result_overwrite>::type;
       using epilogue_t = epilogue_t<
           epilogue_policy_tile_op<
               chained_tile_op_t<bias_add_op_t<data_type_bias, gpu_arch::Xe>>,
-              update_method,
               gpu_arch::Xe>,
           tile_shape,
           mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
@@ -453,14 +442,11 @@ inline void hgemm_bias_gelu(
           gpu_arch::Xe,
           prefetch_distance,
           periodic_sync_interval>::brgemm;
-      using update_method = typename std::
-          conditional<(L3_KS > 1), result_reduce_sum, result_overwrite>::type;
       using epilogue_t = epilogue_t<
           epilogue_policy_tile_op<
               chained_tile_op_t<
                   bias_add_op_t<data_type_bias, gpu_arch::Xe>,
                   gelu_fwd_op_t>,
-              update_method,
               gpu_arch::Xe>,
           tile_shape,
           mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
@@ -556,8 +542,6 @@ inline void hgemm_bias_res_res(
           gpu_arch::Xe,
           prefetch_distance,
           periodic_sync_interval>::brgemm;
-      using update_method = typename std::
-          conditional<(L3_KS > 1), result_reduce_sum, result_overwrite>::type;
       using epilogue_t = epilogue_t<
           epilogue_policy_tile_op<
               chained_tile_op_t<
@@ -570,7 +554,6 @@ inline void hgemm_bias_res_res(
                       reduce_op::sum,
                       data_type_res,
                       gpu_arch::Xe>>,
-              update_method,
               gpu_arch::Xe>,
           tile_shape,
           mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
@@ -753,14 +736,11 @@ inline void hgemm_bias_res(
           gpu_arch::Xe,
           prefetch_distance,
           periodic_sync_interval>::brgemm;
-      using update_method = typename std::
-          conditional<(L3_KS > 1), result_reduce_sum, result_overwrite>::type;
       using epilogue_t = epilogue_t<
           epilogue_policy_tile_op<
               chained_tile_op_t<
                   bias_add_op_t<data_type_bias, gpu_arch::Xe>,
                   xres_op_t<data_type_res>>,
-              update_method,
               gpu_arch::Xe>,
           tile_shape,
           mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
@@ -854,13 +834,8 @@ inline void hgemm_qkv(
           gpu_arch::Xe,
           prefetch_distance,
           periodic_sync_interval>::brgemm;
-      using update_method = typename std::
-          conditional<(L3_KS > 1), result_reduce_sum, result_overwrite>::type;
       using epilogue_t = epilogue_t<
-          epilogue_policy_tile_op<
-              chained_tile_op_t<>,
-              update_method,
-              gpu_arch::Xe>,
+          epilogue_policy_tile_op<chained_tile_op_t<>, gpu_arch::Xe>,
           tile_shape,
           mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
       using gemm_op_t = gemm_t<
@@ -869,6 +844,7 @@ inline void hgemm_qkv(
           epilogue_t>;
 
       uint32_t batch_id = ei.get_group(0);
+      slm_barrier_init<gemm_op_t>();
       scalar_t* out = (batch_id == 0) ? out0 : ((batch_id == 1) ? out1 : out2);
 
       uint32_t size_b = k * n;
@@ -883,7 +859,7 @@ inline void hgemm_qkv(
           ldb,
           out,
           ldc);
-      slm_barrier_init<gemm_op_t>();
+
       gemm_op_t gemm_op;
       gemm_op(ei, arg);
     });
@@ -958,12 +934,9 @@ inline void hgemm_qkv_bias(
           gpu_arch::Xe,
           prefetch_distance,
           periodic_sync_interval>::brgemm;
-      using update_method = typename std::
-          conditional<(L3_KS > 1), result_reduce_sum, result_overwrite>::type;
       using epilogue_t = epilogue_t<
           epilogue_policy_tile_op<
               chained_tile_op_t<bias_add_op_t<data_type_bias, gpu_arch::Xe>>,
-              update_method,
               gpu_arch::Xe>,
           tile_shape,
           mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
@@ -973,6 +946,7 @@ inline void hgemm_qkv_bias(
           epilogue_t>;
 
       uint32_t batch_id = ei.get_group(0);
+      slm_barrier_init<gemm_op_t>();
       scalar_t* out = (batch_id == 0) ? out0 : ((batch_id == 1) ? out1 : out2);
 
       uint32_t size_b = k * n;
@@ -989,7 +963,7 @@ inline void hgemm_qkv_bias(
           out,
           ldc,
           {{{const_cast<scalar_t*>(bias) + size_bias * batch_id, {n, 1, n}}}});
-      slm_barrier_init<gemm_op_t>();
+
       gemm_op_t gemm_op;
       gemm_op(ei, arg);
     });
@@ -1062,15 +1036,12 @@ inline void hgemm_mul(
           gpu_arch::Xe,
           prefetch_distance,
           periodic_sync_interval>::brgemm;
-      using update_method = typename std::
-          conditional<(L3_KS > 1), result_reduce_sum, result_overwrite>::type;
       using epilogue_t = epilogue_t<
           epilogue_policy_tile_op<
               chained_tile_op_t<elemwise_reduce_op_t<
                   reduce_op::prod,
                   data_type_mul,
                   gpu_arch::Xe>>,
-              update_method,
               gpu_arch::Xe>,
           tile_shape,
           mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
@@ -1175,13 +1146,8 @@ inline void hgemm_silu(
           gpu_arch::Xe,
           prefetch_distance,
           periodic_sync_interval>::brgemm;
-      using update_method = typename std::
-          conditional<(L3_KS > 1), result_reduce_sum, result_overwrite>::type;
       using epilogue_t = epilogue_t<
-          epilogue_policy_tile_op<
-              chained_tile_op_t<silu_op_t>,
-              update_method,
-              gpu_arch::Xe>,
+          epilogue_policy_tile_op<chained_tile_op_t<silu_op_t>, gpu_arch::Xe>,
           tile_shape,
           mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
       using gemm_op_t = gemm_t<
@@ -1273,15 +1239,12 @@ inline void hgemm_res(
           gpu_arch::Xe,
           prefetch_distance,
           periodic_sync_interval>::brgemm;
-      using update_method = typename std::
-          conditional<(L3_KS > 1), result_reduce_sum, result_overwrite>::type;
       using epilogue_t = epilogue_t<
           epilogue_policy_tile_op<
               chained_tile_op_t<elemwise_reduce_op_t<
                   reduce_op::sum,
                   data_type_res,
                   gpu_arch::Xe>>,
-              update_method,
               gpu_arch::Xe>,
           tile_shape,
           mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;

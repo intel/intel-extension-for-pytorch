@@ -129,10 +129,7 @@ struct gru_cell {
   // define arguments for each epilogue_tile_op in chained_tile_op_t<>
 
   using epilogue_t = epilogue_t<
-      epilogue_policy_tile_op<
-          subgroup::chained_tile_op_t<>,
-          result_overwrite,
-          gpu_arch::Xe>,
+      epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
       tile_shape,
       mem_desc_c_t>;
   using epilogue_args_t = typename epilogue_t::arguments_t;

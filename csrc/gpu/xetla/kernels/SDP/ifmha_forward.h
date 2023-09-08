@@ -470,9 +470,7 @@ class ifmha_forward_t {
         (layout_b == mem_layout::col_major) ? tdesc_update_dir::x_dir
                                             : tdesc_update_dir::y_dir;
 
-    // todo: fix this hardcode
-    constexpr uint32_t loop_count =
-        (256 + accum_step_bmbc - 1) / accum_step_bmbc;
+    uint32_t loop_count = (args.uH + accum_step_bmbc - 1) / accum_step_bmbc;
 
     using matA_tile_desc_t = subgroup::tile_desc_t<
         tile_size_x_a,
@@ -525,7 +523,7 @@ class ifmha_forward_t {
       matB_prefetch_payload.template update_tdesc<update_dir_b>(
           matB_t::tile_size_y);
     }
-#pragma unroll
+
     for (int i = 0; i < loop_count; i++) {
       if constexpr (sync_freq_bmbc > 0) {
         if constexpr ((i % sync_freq_bmbc) == 0) {
@@ -961,7 +959,7 @@ class ifmha_forward_t {
     using tile_mask = tile_mask_t<matSij_t>;
 
     uint32_t sg_start_T = start_T + ctx.sg_idx * kSgBc;
-    uint32_t num_keep = (end_T < sg_start_T) ? 0 : (end_T - sg_start_T);
+    uint32_t num_keep = std::max(int(end_T) - int(sg_start_T), 0);
     if (num_keep < kSgBc) {
       tile_mask::padding_mask(matSij, num_keep);
     }
@@ -1025,7 +1023,7 @@ class ifmha_forward_t {
   /// @brief store Pij to local memory.
   inline void store_Pij(matPij_t& matPij) {
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<gpu_arch::Xe>,
+        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
         tile_shape_BmBc,
         mem_desc_Pij_t>;
     epilogue_t epilogue;
@@ -1041,7 +1039,7 @@ class ifmha_forward_t {
   /// @brief store Oi to global memory.
   inline void store_Oi(matOi_t& matOi) {
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<gpu_arch::Xe>,
+        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
         tile_shape_BmHm,
         mem_desc_Oi_t>;
     epilogue_t epilogue;

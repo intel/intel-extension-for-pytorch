@@ -141,17 +141,11 @@ struct gru_layer_bpk {
   using mem_desc_hidden_t = mem_desc_t<T, layout_hidden, mem_loc_hidden>;
 
   using epilogue0_t = epilogue_t<
-      epilogue_policy_tile_op<
-          subgroup::chained_tile_op_t<>,
-          result_overwrite,
-          gpu_arch::Xe>,
+      epilogue_policy_tile_op<subgroup::chained_tile_op_t<>, gpu_arch::Xe>,
       tile_shape_0,
       mem_desc_weight_t>;
   using epilogue1_t = epilogue_t<
-      epilogue_policy_tile_op<
-          subgroup::chained_tile_op_t<>,
-          result_overwrite,
-          gpu_arch::Xe>,
+      epilogue_policy_tile_op<subgroup::chained_tile_op_t<>, gpu_arch::Xe>,
       tile_shape_1,
       mem_desc_weight_t>;
   using epilogue_args_0_t = typename epilogue0_t::arguments_t;

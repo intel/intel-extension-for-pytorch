@@ -76,13 +76,13 @@ struct tile_mask_t {
 
   // -------------------- // padding_mask // ---------------------- //
 
-  inline static void padding_mask(mat_t& src, uint32_t num_keep) {
+  inline static void padding_mask(mat_t& src, int num_keep) {
 #pragma unroll
     for (int i = 0; i < tile_size_y / block_size_y; i++) {
 #pragma unroll
       for (int j = 0; j < num_block_x; j++) {
-        uint32_t start_x = j * block_size_x;
-        uint32_t num_keep_blk = (start_x > num_keep) ? 0 : (num_keep - start_x);
+        int start_x = j * block_size_x;
+        int num_keep_blk = std::max(0, num_keep - start_x);
 
         if (num_keep_blk < block_size_x) {
           xetla_mask<block_size_x> mask =
@@ -107,8 +107,8 @@ struct tile_mask_t {
       constexpr uint32_t tail_block_elems = tail_size_y * block_size_x;
 #pragma unroll
       for (int j = 0; j < num_block_x; j++) {
-        uint32_t start_x = j * block_size_x;
-        uint32_t num_keep_blk = (start_x > num_keep) ? 0 : (num_keep - start_x);
+        int start_x = j * block_size_x;
+        int num_keep_blk = std::max(num_keep - start_x, 0);
 
         if (num_keep_blk < block_size_x) {
           xetla_mask<block_size_x> mask =
@@ -174,7 +174,7 @@ struct group_row_reduce_t {
 
   inline KERNEL_FUNC xetla_vector<T, kNum> operator()(mat_t& src) {
     xetla_vector<T, kNum> ret =
-        subgroup::tile_reduce<reduce_kind, mat_t, T, 1>(src);
+        subgroup::tile_reduce<reduce_kind, T, T, 1>(src);
     if constexpr (kNumSg == 1)
       return ret;
 

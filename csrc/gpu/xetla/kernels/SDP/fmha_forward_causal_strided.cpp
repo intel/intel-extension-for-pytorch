@@ -448,7 +448,7 @@ class fmha_forward_causal_strided_t {
     using tile_mask = tile_mask_t<matAccSij_t>;
 
     uint32_t sg_startT = startT + ctx.sg_idx * kSgBc;
-    uint32_t remainT = (args.uT < sg_startT) ? 0 : (args.uT - sg_startT);
+    uint32_t remainT = std::max(int(args.uT) - int(sg_startT), 0);
     if (remainT < kSgBc) {
       tile_mask::padding_mask(matAccSij, remainT);
     }
@@ -523,7 +523,7 @@ class fmha_forward_causal_strided_t {
 
     // save Pij to local memory
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<gpu_arch::Xe>,
+        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
         tile_shape_BrBc,
         mem_desc_Pij_L_t>;
     epilogue_t epilogue;
@@ -537,7 +537,7 @@ class fmha_forward_causal_strided_t {
   /// @brief store raw Oi to global memory. [B,N,F,H]
   inline void raw_store_Oi(matAccOi_t& matAccOi, arguments_t& args) {
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<gpu_arch::Xe>,
+        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
         tile_shape_BrHm,
         mem_desc_Oi_t>;
     epilogue_t epilogue;
@@ -686,7 +686,7 @@ class fmha_forward_causal_strided_t {
     matAccOi_t matAccOi(0);
 
     uint32_t startF = ei.get_group(1) /* 0 */ * kBr /* 64 */;
-    uint32_t endF = (startF + kBr) > args.uF ? args.uF : (startF + kBr); // 1
+    uint32_t endF = std::min(startF + kBr, args.uF);
 
     // iterate through the keys
     for (uint32_t startT = 0; startT < args.uT; startT += kBc) {

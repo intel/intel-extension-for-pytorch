@@ -374,7 +374,7 @@ class fmha_forward_causal_t {
 
     // save Pij to local memory
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<gpu_arch::Xe>,
+        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
         tile_shape_BrBc,
         mem_desc_Pij_L_t>;
     epilogue_t epilogue;
@@ -388,7 +388,7 @@ class fmha_forward_causal_t {
   /// @brief store raw Oi to global memory. [B,N,F,H]
   inline void raw_store_Oi(matAccOi_t& matAccOi, arguments_t& args) {
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<gpu_arch::Xe>,
+        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
         tile_shape_BrHm,
         mem_desc_Oi_t>;
     epilogue_t epilogue;
