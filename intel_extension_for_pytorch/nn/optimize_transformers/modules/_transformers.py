@@ -81,6 +81,45 @@ class IPEXEmptyINT4LinearWithPadding(nn.Module):
         else:
             return torch.ops.torch_ipex.mm_bias_int4(input, self.qweight, self.bias, self.scales, self.qzeros, self.group_size)[:,:,:self.n_dim]
 
+class IPEXLmHeadLinearAllreduceWithPadding(nn.Module):
+    def __init__(
+        self,
+        n_dim,
+        weight,
+        rank,
+        world_size,
+        bias=None,
+        mp_group=None,
+        ):
+        super(IPEXLmHeadLinearAllreduceWithPadding, self).__init__()
+        self.n_dim = n_dim
+        self.rank = rank
+        self.world_size = world_size
+        self.bias = bias
+        self.mp_group = mp_group
+
+        self.weight = weight.data.split(weight.shape[1] // self.world_size, dim=1)
+        self.weight = self.weight[self.rank].to("xpu:{}".format(torch.xpu.current_device()))
+        col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
+        self.row_major = not col_major
+        if self.row_major:
+            self.weight = self.weight.transpose(-1, -2).contiguous()
+        else:
+            self.weight = self.weight.transpose(-1, -2)
+
+    def forward(self, input):
+        assert input.shape[
+            -1] % self.world_size == 0, 'Please ensure that self.world_size is divisible by input.shape[-1]'
+        input_shard = input.shape[-1] // self.world_size
+        output = torch.matmul(input[:, :, self.rank * input_shard:(self.rank + 1) * input_shard],
+                              self.weight)
+        if self.mp_group is not None:
+            dist.all_reduce(output, group=self.mp_group)
+        if self.bias is not None:
+            output += self.bias
+        output = output[:,:,:self.n_dim]
+        return output
+
 class IPEXTransformerAtten(nn.Module):
 
     layer_id_static = 0
