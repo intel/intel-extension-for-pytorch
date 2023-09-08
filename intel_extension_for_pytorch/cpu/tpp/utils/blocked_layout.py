@@ -1,4 +1,5 @@
 import torch
+import torch.utils._pytree as pytree
 
 # import math
 # from enum import Enum
@@ -219,11 +220,16 @@ class BlockedParameter(torch.nn.Parameter):
             cls, data=data, requires_grad=requires_grad
         )
 
-    def __init__(self, *args, **kwarg):
-        # super(BlockedParameter, self).__init__(*args, **kwarg)
+    def __init__(self, data=None, requires_grad=True):
+        self._data = data
         self.blocked = False
         self.blocking_param = None
         self.blocking_manager = None
+        self.unblocked_dtype = None
+        self.blocked_dtype = None
+
+    def __repr__(self):
+        return f"BlockedParameter({self._data})"
 
     def set_blocking_param(self, blocking_param):
         self.blocking_param = blocking_param
@@ -242,27 +248,49 @@ class BlockedParameter(torch.nn.Parameter):
                 self.blocking_param[2] if len(self.blocking_param) > 2 else self.dtype
             )
             self.blocking_manager = BlockingManager(
-                self.data.shape,
+                self._data.shape,
                 blocking_factors=self.blocking_param[0],
                 permute=self.blocking_param[1],
             )
-        self.data = self.blocking_manager.block(self.data).to(self.blocked_dtype)
+        self._data = self.blocking_manager.block(self._data).to(self.blocked_dtype)
         if self.grad is not None:
             self.grad.data = self.blocking_manager.block(self.grad.data).to(
                 self.blocked_dtype
             )
         self.blocked = True
+        self.data = self._data
 
     def unblock(self):
         if not self.blocked:
             return
         assert self.blocking_manager is not None
-        self.data = self.blocking_manager.unblock(self.data).to(self.unblocked_dtype)
+        self._data = self.blocking_manager.unblock(self._data).to(self.unblocked_dtype)
         if self.grad is not None:
             self.grad.data = self.blocking_manager.unblock(self.grad.data).to(
                 self.unblocked_dtype
             )
         self.blocked = False
+        self.data = self._data
+
+    def __tensor_flatten__(self):
+        return ["_data"], [self.requires_grad, self.blocked, self.blocking_param, self.blocking_manager, self.unblocked_dtype, self.blocked_dtype]
+
+    @staticmethod
+    def __tensor_unflatten__(inner_tensors, ctx):
+        out = BlockedParameter(inner_tensors["_data"], requires_grad=ctx[0])
+        out.blocked = ctx[1]
+        out.blocking_param = ctx[2]
+        out.blocking_manager = ctx[3]
+        out.unblocked_dtype = ctx[4]
+        out.blocked_dtype = ctx[5]
+        return out
+
+    @classmethod
+    def __torch_dispatch__(cls, func, types, args, kwargs):
+        if kwargs is None:
+            kwargs = {}
+        args_data = pytree.tree_map_only(BlockedParameter, lambda x: x._data, args)
+        return func(*args_data, **kwargs)
 
 
 class BlockedModule(torch.nn.Module):

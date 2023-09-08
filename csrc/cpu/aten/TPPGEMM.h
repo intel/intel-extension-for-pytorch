@@ -7,40 +7,49 @@ namespace torch_ipex {
 namespace cpu {
 
 namespace {
-at::Tensor tpp_linear_nobias_forward_cpu(at::Tensor& t_in, at::Tensor& t_wt);
+at::Tensor tpp_linear_nobias_forward_cpu(
+    at::Tensor& t_in,
+    at::Tensor& t_wt,
+    c10::optional<int64_t> out_features);
 
 at::Tensor tpp_linear_bias_forward_cpu(
     at::Tensor& t_in,
     at::Tensor& t_wt,
-    at::Tensor& t_bias);
+    at::Tensor& t_bias,
+    c10::optional<int64_t> out_features);
 
 at::Tensor tpp_linear_gelu_forward_cpu(
     at::Tensor& t_in,
     at::Tensor& t_wt,
-    at::Tensor& t_bias);
+    at::Tensor& t_bias,
+    c10::optional<int64_t> out_features);
 
 at::Tensor tpp_linear_silu_forward_cpu(
     at::Tensor& t_in,
     at::Tensor& t_wt,
-    at::Tensor& t_bias);
+    at::Tensor& t_bias,
+    c10::optional<int64_t> out_features);
 
 at::Tensor tpp_linear_relu_forward_cpu(
     at::Tensor& t_in,
     at::Tensor& t_wt,
-    at::Tensor& t_bias);
+    at::Tensor& t_bias,
+    c10::optional<int64_t> out_features);
 
 at::Tensor tpp_linear_add_forward_cpu(
     at::Tensor& t_in,
     at::Tensor& t_in1,
     at::Tensor& t_wt,
     at::Tensor& t_bias,
-    double scale);
+    double scale,
+    c10::optional<int64_t> out_features);
 
 at::Tensor tpp_linear_mul_forward_cpu(
     at::Tensor& t_in,
     at::Tensor& t_in1,
     at::Tensor& t_wt,
-    at::Tensor& t_bias);
+    at::Tensor& t_bias,
+    c10::optional<int64_t> out_features);
 
 at::Tensor tpp_linear_add_add_forward_cpu(
     at::Tensor& t_in,
@@ -48,7 +57,8 @@ at::Tensor tpp_linear_add_add_forward_cpu(
     at::Tensor& t_in2,
     at::Tensor& t_wt,
     at::Tensor& t_bias,
-    double scale);
+    double scale,
+    c10::optional<int64_t> out_features);
 
 } // namespace
 

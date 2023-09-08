@@ -500,3 +500,88 @@ def meta_cumsum(
     dtype=None,
 ):
     return input.new_empty(input.shape)
+
+
+@register_meta("tpp_linear")
+def meta_tpp_linear(
+    input,
+    weight,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("tpp_linear_bias")
+def meta_tpp_linear_bias(
+    input,
+    weight,
+    bias,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("tpp_linear_gelu")
+def meta_tpp_linear_gelu(
+    input,
+    weight,
+    bias,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("tpp_linear_add_add")
+def meta_tpp_linear_add_add(
+    input,
+    input1,
+    input2,
+    weight,
+    bias,
+    scale,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("tpp_linear_relu")
+def meta_tpp_linear_relu(
+    input,
+    weight,
+    bias,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("tpp_linear_silu")
+def meta_tpp_linear_silu(
+    input,
+    weight,
+    bias,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("tpp_linear_add")
+def meta_tpp_linear_add(
+    input,
+    input1,
+    weight,
+    bias,
+    scale,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("tpp_linear_mul")
+def meta_tpp_linear_mul(
+    input,
+    input1,
+    weight,
+    bias,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
