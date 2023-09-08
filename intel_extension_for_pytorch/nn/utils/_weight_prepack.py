@@ -95,7 +95,7 @@ if "deepspeed" in installed_pkg:
     from deepspeed import comm
 
     def _all_reduce(self, reduceOp, tag, ranks, group_size):
-        comm.all_reduce(self, async_op=False)
+        comm.inference_all_reduce(self, async_op=False)
         return self
 
     ds_comm = torch.library.Library("deepspeed_comm", "DEF")
