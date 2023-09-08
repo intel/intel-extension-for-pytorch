@@ -15,6 +15,7 @@ using detail::convolution::createConvolutionPrePackOpContext;
 using detail::linear::createLinearPrePackOpContext;
 using detail::mkl_sgemm::createLinearMKLPrePackOpContext;
 using detail::woq_linear::createWoqLinearPrePackOpContext;
+using detail::woq_linear::createWoqLinearPrePackOpContextInt4;
 
 TORCH_LIBRARY(ipex_prepack, m) {
   m.class_<ConvolutionOpContext>("ConvolutionOpContext")
@@ -129,7 +130,9 @@ TORCH_LIBRARY(ipex_prepack, m) {
             return createWoqLinearPrePackOpContext(
                 std::move(std::get<0>(state)),
                 std::move(std::get<1>(state)),
-                std::move(std::get<2>(state)));
+                std::move(std::get<2>(state)),
+                std::move(std::get<3>(state)),
+                std::move(std::get<4>(state)));
           })
       .def(
           "get_weight",
@@ -158,7 +161,10 @@ TORCH_LIBRARY(ipex_prepack, m) {
       "bool input_is_channels_last, int[] input_sizes) "
       "-> __torch__.torch.classes.ipex_prepack.ConvTransposeOpContext");
   m.def(
-      "weight_only_qlinear_prepack(Tensor W, Tensor? B, int? batch_size) "
+      "weight_only_qlinear_prepack(Tensor W, Tensor? B, int? batch_size, int lowp_mode, int num_concats) "
+      "-> __torch__.torch.classes.ipex_prepack.WoqLinearOpContext");
+  m.def(
+      "weight_only_qlinear_prepack_int4(Tensor W, Tensor scales, Tensor zero_points, Tensor? B, int? batch_size, int lowp_mode, int num_concats) "
       "-> __torch__.torch.classes.ipex_prepack.WoqLinearOpContext");
 }
 
@@ -172,6 +178,11 @@ TORCH_LIBRARY_IMPL(ipex_prepack, CPU, m) {
 TORCH_LIBRARY_IMPL(ipex_prepack, QuantizedCPU, m) {
   m.impl(
       "weight_only_qlinear_prepack", TORCH_FN(createWoqLinearPrePackOpContext));
+}
+TORCH_LIBRARY_IMPL(ipex_prepack, CPU, m) {
+  m.impl(
+      "weight_only_qlinear_prepack_int4",
+      TORCH_FN(createWoqLinearPrePackOpContextInt4));
 }
 
 } // namespace cpu

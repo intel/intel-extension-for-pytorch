@@ -360,8 +360,12 @@ class IpexLinearMKLOpContext final : public MKLOpContext {
 };
 
 // Weight-only quantization
-using SerializationTypeWoqLinearPrePack =
-    std::tuple<at::Tensor, c10::optional<at::Tensor>, c10::optional<int64_t>>;
+using SerializationTypeWoqLinearPrePack = std::tuple<
+    at::Tensor,
+    c10::optional<at::Tensor>,
+    c10::optional<int64_t>,
+    int64_t,
+    int64_t>;
 
 class WoqLinearOpContext : public torch::jit::CustomClassHolder {
  protected:
@@ -371,12 +375,41 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
   SerializationTypeWoqLinearPrePack unpack() {
     auto orig_weight_ = this->to_public(this->get_at_packed_weight());
     auto orig_bias_ = this->get_context().at_bias_;
-    return std::make_tuple(orig_weight_, orig_bias_, batch_size_);
+    return std::make_tuple(
+        orig_weight_,
+        orig_bias_,
+        batch_size_,
+        this->get_context().lowp_mode_,
+        this->get_context().num_concats_);
   }
 
   virtual at::Tensor get_data_handle() = 0;
 
   virtual at::Tensor run(const at::Tensor& input) = 0;
+
+  virtual at::Tensor run_eltwise(
+      const at::Tensor& input,
+      const c10::string_view& post_op,
+      const torch::List<c10::optional<at::Scalar>>& scalars,
+      const c10::optional<c10::string_view>& algorithm) = 0;
+
+  virtual at::Tensor run_add(
+      const at::Tensor& input,
+      at::Tensor& accumu,
+      const c10::optional<at::Scalar>& alpha) = 0;
+
+  virtual at::Tensor run_add_relu(
+      const at::Tensor& input,
+      at::Tensor& accumu,
+      const c10::optional<at::Scalar>& alpha) = 0;
+
+  virtual at::Tensor run_add(
+      const at::Tensor& input,
+      const std::vector<at::Tensor>& others) = 0;
+
+  virtual at::Tensor run_add_add(
+      const at::Tensor& input,
+      const std::vector<at::Tensor>& others) = 0;
 
   virtual at::Tensor to_public(const at::Tensor& tensor) = 0;
 
@@ -399,24 +432,42 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
 class IpexWoqLinearOpContext final : public WoqLinearOpContext {
  private:
   detail::ContextLinearWoq op_context_;
-  at::Tensor zero_points_float_;
-  at::Tensor scales_float_;
 
  public:
   IpexWoqLinearOpContext(
       c10::optional<int64_t> batch_size,
-      detail::ContextLinearWoq&& op_context,
-      at::Tensor&& zero_point_float,
-      at::Tensor&& scales_float)
-      : op_context_(std::move(op_context)),
-        zero_points_float_(std::move(zero_point_float)),
-        scales_float_(std::move(scales_float)) {
+      detail::ContextLinearWoq&& op_context)
+      : op_context_(std::move(op_context)) {
     batch_size_ = batch_size;
   }
 
   virtual at::Tensor get_data_handle() override;
 
   virtual at::Tensor run(const at::Tensor& input) override;
+
+  virtual at::Tensor run_eltwise(
+      const at::Tensor& input,
+      const c10::string_view& post_op,
+      const torch::List<c10::optional<at::Scalar>>& scalars,
+      const c10::optional<c10::string_view>& algorithm) override;
+
+  virtual at::Tensor run_add(
+      const at::Tensor& input,
+      at::Tensor& accumu,
+      const c10::optional<at::Scalar>& alpha) override;
+
+  virtual at::Tensor run_add_relu(
+      const at::Tensor& input,
+      at::Tensor& accumu,
+      const c10::optional<at::Scalar>& alpha) override;
+
+  virtual at::Tensor run_add(
+      const at::Tensor& input,
+      const std::vector<at::Tensor>& others) override;
+
+  virtual at::Tensor run_add_add(
+      const at::Tensor& input,
+      const std::vector<at::Tensor>& others) override;
 
   virtual at::Tensor to_public(const at::Tensor& tensor) override;
 
@@ -429,7 +480,9 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
   static c10::intrusive_ptr<WoqLinearOpContext> create_context(
       at::Tensor&& weight,
       c10::optional<at::Tensor>&& bias,
-      c10::optional<int64_t> batch_size);
+      c10::optional<int64_t> batch_size,
+      int64_t lowp_mode,
+      int64_t num_concats);
 
   virtual void load_from_ctx(
       c10::intrusive_ptr<WoqLinearOpContext> other) override;

@@ -6,5 +6,6 @@ from ._qconfig import (
     default_dynamic_qconfig_mapping,
     get_smooth_quant_qconfig_mapping,
     get_weight_only_quant_qconfig_mapping,
+    WoqLowpMode,
 )
 from ._autotune import autotune
