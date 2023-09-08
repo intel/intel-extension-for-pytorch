@@ -6,14 +6,14 @@ import warnings
 from typing import Callable, Dict, Optional, Union, List
 
 
-_compiler_backend = "torchscript"
+_compiler_backend = "inductor"
 
 
 def _get_compiler_backend():
     return _compiler_backend
 
 
-def _set_compiler_backend(backend="torchscript"):
+def _set_compiler_backend(backend="inductor"):
     global _compiler_backend
     _compiler_backend = backend
 
@@ -57,14 +57,18 @@ def compile(
         from .compile_fx import compile_fx
 
         return compile_fx(model, example_inputs, mode, options)
-
-    try:
-        with no_dispatch():
-            real_inputs = list(map(defake, example_inputs))
-            with torch.no_grad():
-                traced_model = torch.jit.trace(model.eval(), real_inputs)
-                traced_model = torch.jit.freeze(traced_model)
-            return traced_model
-    except Exception:
-        warnings.warn("JIT trace failed during the IPEX compile process.")
-        return model
+    elif _get_compiler_backend() == "torchscript":
+        try:
+            with no_dispatch():
+                real_inputs = list(map(defake, example_inputs))
+                with torch.no_grad():
+                    traced_model = torch.jit.trace(model.eval(), real_inputs)
+                    traced_model = torch.jit.freeze(traced_model)
+                return traced_model
+        except Exception:
+            warnings.warn("JIT trace failed during the IPEX compile process.")
+            return model
+    else:
+        raise RuntimeError(
+            f"Unexpected compilation path {_get_compiler_backend()} for ipex backend. Supported are 'inductor', 'torchscript'."
+        )

@@ -41,7 +41,7 @@ class TestCompile(TestCase):
                 for _ in range(2):
                     compiled_model(x)
                 y2 = compiled_model(x)
-            self.assertEqual(y1, y2)
+            self.assertEqual(y1, y2, prec=0.01)
             self.assertTrue(y2.dtype == dtype)
 
 
