@@ -6,15 +6,59 @@ from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
 
 
-def ipex_mm(m, n, k, dtype):
+def ipex_addmm(m, n, k, dtype):
+    a = torch.randn(m, k).type(dtype).xpu()
+    b = torch.randn(k, n).type(dtype).xpu()
+    s = torch.randn(m, n).type(dtype).xpu()
+    a_cpu = a.cpu().float()
+    b_cpu = b.cpu().float()
+    s_cpu = s.cpu().float()
+    c = torch.addmm(s, a, b, alpha=0.2, beta=0.5)
+    c_cpu = torch.addmm(s_cpu, a_cpu, b_cpu, alpha=0.2, beta=0.5)
+    c_, c_cpu_ = c.cpu().float(), c_cpu
+    print('ipex_addmm:', (c_ - c_cpu_).abs().max().item())
+    return c_, c_cpu_
+
+
+def ipex_mm_common(m, n, k, dtype):
     a = torch.randn(2, m, k).type(dtype).xpu()
     b = torch.randn(k, n).type(dtype).xpu()
     a_cpu = a.cpu().float()
     b_cpu = b.cpu().float()
-    c = torch.ops.torch_ipex.mm_(a, b)
+    c = torch.ops.torch_ipex.mm_common(a, b)
     c_cpu = a_cpu @ b_cpu
     c_, c_cpu_ = c.cpu().float(), c_cpu
-    print('ipex_mm:', (c_ - c_cpu_).abs().max().item())
+    print('ipex_mm_common:', (c_ - c_cpu_).abs().max().item())
+    return c_, c_cpu_
+
+
+def ipex_mm_resadd(m, n, k, dtype):
+    a = torch.randn(2, m, k).type(dtype).xpu()
+    b = torch.randn(k, n).type(dtype).xpu()
+    res = torch.randn(2, m, n).type(dtype).xpu()
+    a_cpu = a.cpu().float()
+    b_cpu = b.cpu().float()
+    res_cpu = res.cpu().float()
+    c = torch.ops.torch_ipex.mm_resadd(a, b, res, 5.5)
+    c_cpu = a_cpu @ b_cpu + 5.5 * res_cpu
+    c_, c_cpu_ = c.cpu().float(), c_cpu
+    print('ipex_mm_resadd:', (c_ - c_cpu_).abs().max().item())
+    return c_, c_cpu_
+
+
+def ipex_mm_resadd_resadd(m, n, k, dtype):
+    a = torch.randn(2, m, k).type(dtype).xpu()
+    b = torch.randn(k, n).type(dtype).xpu()
+    res0 = torch.randn(2, m, n).type(dtype).xpu()
+    res1 = torch.randn(2, m, n).type(dtype).xpu()
+    a_cpu = a.cpu().float()
+    b_cpu = b.cpu().float()
+    res0_cpu = res0.cpu().float()
+    res1_cpu = res1.cpu().float()
+    c = torch.ops.torch_ipex.mm_resadd_resadd(a, b, res0, 5.5, res1, 4.5)
+    c_cpu = a_cpu @ b_cpu + 5.5 * res0_cpu + 4.5 * res1_cpu
+    c_, c_cpu_ = c.cpu().float(), c_cpu
+    print('ipex_mm_resadd_resadd:', (c_ - c_cpu_).abs().max().item())
     return c_, c_cpu_
 
 
@@ -25,14 +69,14 @@ def ipex_mm_bias(m, n, k, dtype):
     a_cpu = a.cpu().float()
     b_cpu = b.cpu().float()
     bias_cpu = bias.cpu().float()
-    c = torch.ops.torch_ipex.mm_bias(a, b, bias)
-    c_cpu = a_cpu @ b_cpu + bias_cpu
+    c = torch.ops.torch_ipex.mm_bias(a, b, bias, 3.3)
+    c_cpu = a_cpu @ b_cpu + 3.3 * bias_cpu
     c_, c_cpu_ = c.cpu().float(), c_cpu
     print('ipex_mm_bias:', (c_ - c_cpu_).abs().max().item())
     return c_, c_cpu_
 
 
-def ipex_mm_bias_scaled_resadd(m, n, k, dtype):
+def ipex_mm_bias_resadd(m, n, k, dtype):
     a = torch.randn(2, m, k).type(dtype).xpu()
     b = torch.randn(k, n).type(dtype).xpu()
     bias = torch.randn(n).type(dtype).xpu()
@@ -41,10 +85,10 @@ def ipex_mm_bias_scaled_resadd(m, n, k, dtype):
     b_cpu = b.cpu().float()
     bias_cpu = bias.cpu().float()
     res_cpu = res.cpu().float()
-    c = torch.ops.torch_ipex.mm_bias_scaled_resadd(a, b, bias, res, 0.5)
-    c_cpu = a_cpu @ b_cpu + bias_cpu + 0.5 * res_cpu
+    c = torch.ops.torch_ipex.mm_bias_resadd(a, b, bias, 4.4, res, 6.6)
+    c_cpu = a_cpu @ b_cpu + 4.4 * bias_cpu + 6.6 * res_cpu
     c_, c_cpu_ = c.cpu().float(), c_cpu
-    print('ipex_mm_bias_scaled_resadd:', (c_ - c_cpu_).abs().max().item())
+    print('ipex_mm_bias_resadd:', (c_ - c_cpu_).abs().max().item())
     return c_, c_cpu_
 
 
@@ -59,9 +103,8 @@ def ipex_mm_bias_resadd_resadd(m, n, k, dtype):
     bias_cpu = bias.cpu().float()
     res0_cpu = res0.cpu().float()
     res1_cpu = res1.cpu().float()
-    c = torch.ops.torch_ipex.mm_bias_resadd_resadd(a, b, bias, res0, res1)
-    print(c.shape)
-    c_cpu = a_cpu @ b_cpu + bias_cpu + res0_cpu + res1_cpu
+    c = torch.ops.torch_ipex.mm_bias_resadd_resadd(a, b, bias, 5.5, res0, 6.6, res1, 7.7)
+    c_cpu = a_cpu @ b_cpu + 5.5 * bias_cpu + 6.6 * res0_cpu + 7.7 * res1_cpu
     c_, c_cpu_ = c.cpu().float(), c_cpu
     print('ipex_mm_bias_resadd_resadd:', (c_ - c_cpu_).abs().max().item())
     return c_, c_cpu_
@@ -98,7 +141,7 @@ def ipex_mm_gelu(m, n, k, dtype):
     b = torch.randn(k, n).type(dtype).xpu()
     a_cpu = a.cpu().float()
     b_cpu = b.cpu().float()
-    c = torch.ops.torch_ipex.matmul_gelu(a, b, None, 'tanh')
+    c = torch.ops.torch_ipex.matmul_gelu(a, b, None, 1.0, 'tanh')
     c_cpu = F.gelu(a_cpu @ b_cpu)
     c_, c_cpu_ = c.cpu().float(), c_cpu
     print('ipex_mm_gelu:', (c_ - c_cpu_).abs().max().item())
@@ -112,8 +155,8 @@ def ipex_mm_bias_gelu(m, n, k, dtype):
     a_cpu = a.cpu().float()
     b_cpu = b.cpu().float()
     bias_cpu = bias.cpu().float()
-    c = torch.ops.torch_ipex.matmul_gelu(a, b, bias, 'tanh')
-    c_cpu = F.gelu(a_cpu @ b_cpu + bias_cpu)
+    c = torch.ops.torch_ipex.matmul_gelu(a, b, bias, 6.6, 'tanh')
+    c_cpu = F.gelu(a_cpu @ b_cpu + 6.6 * bias_cpu)
     c_, c_cpu_ = c.cpu().float(), c_cpu
     print('ipex_mm_bias_gelu:', (c_ - c_cpu_).abs().max().item())
     return c_, c_cpu_
@@ -163,11 +206,18 @@ class TestNNMethod(TestCase):
         ]
         for shape in shapes:
             print(shape)
-            out, ref = ipex_mm(shape[0], shape[1], shape[2], torch.half)
+            out, ref = ipex_addmm(shape[0], shape[1], shape[2], torch.half)
+            self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+
+            out, ref = ipex_mm_common(shape[0], shape[1], shape[2], torch.half)
+            self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+            out, ref = ipex_mm_resadd(shape[0], shape[1], shape[2], torch.half)
+            self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+            out, ref = ipex_mm_resadd_resadd(shape[0], shape[1], shape[2], torch.half)
             self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
             out, ref = ipex_mm_bias(shape[0], shape[1], shape[2], torch.half)
             self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
-            out, ref = ipex_mm_bias_scaled_resadd(shape[0], shape[1], shape[2], torch.half)
+            out, ref = ipex_mm_bias_resadd(shape[0], shape[1], shape[2], torch.half)
             self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
             out, ref = ipex_mm_bias_resadd_resadd(shape[0], shape[1], shape[2], torch.half)
             self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)

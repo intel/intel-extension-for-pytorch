@@ -45,12 +45,12 @@ class IPEXBloomMLP(IPEXTransformerMLP):
     def forward(self, hidden_states, residual: torch.Tensor):
         if self.row_major:
             if isinstance(self.act, nn.GELU):
-                hidden_states = torch.ops.torch_ipex.matmul_gelu(hidden_states, self.fc_in_wei, self.fc_in.bias, self.act.approximate)
+                hidden_states = torch.ops.torch_ipex.matmul_gelu(hidden_states, self.fc_in_wei, self.fc_in.bias, 1.0, self.act.approximate)
             else:
                 hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                 hidden_states = self.act(hidden_states)
             # print_rank_x(0, "before mm resadd: {}".format(hidden_states))
-            hidden_states = torch.ops.torch_ipex.mm_bias_scaled_resadd(hidden_states, self.fc_out_wei, self.fc_out_bias, residual, 1.0/self.tp_size)
+            hidden_states = torch.ops.torch_ipex.mm_bias_resadd(hidden_states, self.fc_out_wei, self.fc_out_bias, 1.0, residual, 1.0/self.tp_size)
             # print_rank_x(0, "before all reduce: {}".format(hidden_states))
             output = self.all_reduce_if_necessary(hidden_states)
         else:

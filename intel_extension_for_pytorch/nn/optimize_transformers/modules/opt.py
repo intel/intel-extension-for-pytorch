@@ -71,10 +71,10 @@ class IPEXOptMLP(IPEXTransformerMLP):
         if self.row_major:
             hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
             hidden_states = self.act(hidden_states)
-            hidden_states = torch.ops.torch_ipex.mm_bias_scaled_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, residual, 1.0/self.tp_size)
+            hidden_states = torch.ops.torch_ipex.mm_bias_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, 1.0, residual, 1.0/self.tp_size)
             hidden_states = self.all_reduce_if_necessary(hidden_states)
         else:
-            hidden_states = torch.ops.torch_ipex.mm_bias_scaled_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, residual, 1.0/self.tp_size)
+            hidden_states = torch.ops.torch_ipex.mm_bias_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, 1.0, residual, 1.0/self.tp_size)
             hidden_states = self.all_reduce_if_necessary(hidden_states)
             if residual is not None:
                 hidden_states += residual

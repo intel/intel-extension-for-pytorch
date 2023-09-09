@@ -29,11 +29,11 @@ class IPEXGPTJMLP(IPEXTransformerMLP):
                 hidden_states = torch.ops.torch_ipex.mm_bias_resadd_resadd_int4(hidden_states, self.fc_out_qwei, self.fc_out.bias, attn_output, residual, self.fc_out_scl, self.fc_out_zp, self.fc_out_gs)
             else:
                 if isinstance(self.act, nn.GELU):
-                    hidden_states = torch.ops.torch_ipex.matmul_gelu(hidden_states, self.fc_in_wei, self.fc_in.bias, self.act.approximate)
+                    hidden_states = torch.ops.torch_ipex.matmul_gelu(hidden_states, self.fc_in_wei, self.fc_in.bias, 1.0, self.act.approximate)
                 else:
                     hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                     hidden_states = self.act(hidden_states)
-                hidden_states = torch.ops.torch_ipex.mm_bias_scaled_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, attn_output, 1.0/self.tp_size)
+                hidden_states = torch.ops.torch_ipex.mm_bias_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, 1.0, attn_output, 1.0/self.tp_size)
                 hidden_states = self.all_reduce_if_necessary(hidden_states)
                 hidden_states += residual
         else:

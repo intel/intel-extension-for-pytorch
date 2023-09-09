@@ -748,7 +748,7 @@ class IPEXTransformerAtten(nn.Module):
                     if self.is_int4 and attn_output.shape[0] == 1:
                         attn_output = torch.ops.torch_ipex.mm_bias_resadd_int4(attn_output, self.out_wei, self.out_bias, residual, 1.0/self.tp_size)
                     else:
-                        attn_output = torch.ops.torch_ipex.mm_bias_scaled_resadd(attn_output, self.out_wei, self.out_bias, residual, 1.0/self.tp_size)
+                        attn_output = torch.ops.torch_ipex.mm_bias_resadd(attn_output, self.out_wei, self.out_bias, 1.0, residual, 1.0/self.tp_size)
                 else:
                     attn_output = torch.addmm(residual.flatten(0, -2), attn_output.flatten(0, -2), self.out_wei, beta=1.0/self.tp_size)
                 attn_output = attn_output.view(shape)
@@ -919,7 +919,7 @@ class IPEXTransformerMLP(nn.Module):
     def forward(self, hidden_states: Optional[torch.Tensor]):
         if self.row_major:
             if isinstance(self.act, nn.GELU):
-                hidden_states = torch.ops.torch_ipex.matmul_gelu(hidden_states, self.fc_in_wei, self.fc_in.bias, self.act.approximate)
+                hidden_states = torch.ops.torch_ipex.matmul_gelu(hidden_states, self.fc_in_wei, self.fc_in.bias, 1.0, self.act.approximate)
             else:
                 hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                 hidden_states = self.act(hidden_states)

@@ -18,7 +18,7 @@ namespace AtenIpexTypeXPU {
   sprintf(str__, "onednn_%s(%d, %d, %d)", "" #F, m, n, k); \
   RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
 
-static Tensor mm_(const Tensor& a, const Tensor& b) {
+static Tensor mm_common(const Tensor& a, const Tensor& b) {
   auto af = a.flatten(0, -2);
   int m = af.sizes()[0];
   int n = b.sizes()[1];
@@ -32,39 +32,17 @@ static Tensor mm_(const Tensor& a, const Tensor& b) {
   if (policy.valid()) {
     policy.run();
   } else {
-    RECORD_ONEDNN_FUNCTION_IMPL(mm_)
+    RECORD_ONEDNN_FUNCTION_IMPL(mm_common)
     xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, Attr());
   }
   return matmul_resize(a, output);
 }
 
-static Tensor mm_bias(const Tensor& a, const Tensor& b, const Tensor& bias) {
-  auto af = a.flatten(0, -2);
-  int m = af.sizes()[0];
-  int n = b.sizes()[1];
-  int k = b.sizes()[0];
-  auto output = at::empty({m, n}, a.options());
-  auto policy = HGEMM_XETLA()
-                    .add_matrix_c(output)
-                    .add_matrix_a(a)
-                    .add_matrix_b(b)
-                    .add_epilogue(bias, HGEMM_XETLA::EpilogueType::BIAS)
-                    .build();
-  if (policy.valid()) {
-    policy.run();
-  } else {
-    RECORD_ONEDNN_FUNCTION_IMPL(mm_bias)
-    xpu::oneDNN::matmul(output, af, b, bias, true, Attr());
-  }
-  return matmul_resize(a, output);
-}
-
-static Tensor mm_bias_scaled_resadd(
+static Tensor mm_resadd(
     const Tensor& a,
     const Tensor& b,
-    const Tensor& bias,
     const Tensor& res,
-    const double res_scale) {
+    const double res_factor) {
   auto af = a.flatten(0, -2);
   int m = af.sizes()[0];
   int n = b.sizes()[1];
@@ -75,16 +53,103 @@ static Tensor mm_bias_scaled_resadd(
           .add_matrix_c(output)
           .add_matrix_a(a)
           .add_matrix_b(b)
-          .add_epilogue(bias, HGEMM_XETLA::EpilogueType::BIAS)
-          .add_epilogue(
-              res, HGEMM_XETLA::EpilogueType::SCALED_RES_ADD, res_scale)
+          .add_epilogue(res, HGEMM_XETLA::EpilogueType::RES_ADD, res_factor)
           .build();
   if (policy.valid()) {
     policy.run();
   } else {
-    RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_scaled_resadd)
-    xpu::oneDNN::matmul(output, af, b, bias, true, Attr());
-    output = output + Scalar(res_scale) * res.flatten(0, -2);
+    RECORD_ONEDNN_FUNCTION_IMPL(mm_resadd)
+    xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, Attr());
+    output = output + Scalar(res_factor) * res.flatten(0, -2);
+  }
+  return matmul_resize(a, output);
+}
+
+static Tensor mm_resadd_resadd(
+    const Tensor& a,
+    const Tensor& b,
+    const Tensor& res0,
+    const double res0_factor,
+    const Tensor& res1,
+    const double res1_factor) {
+  auto af = a.flatten(0, -2);
+  int m = af.sizes()[0];
+  int n = b.sizes()[1];
+  int k = b.sizes()[0];
+  auto output = at::empty({m, n}, a.options());
+  auto policy =
+      HGEMM_XETLA()
+          .add_matrix_c(output)
+          .add_matrix_a(a)
+          .add_matrix_b(b)
+          .add_epilogue(res0, HGEMM_XETLA::EpilogueType::RES_ADD, res0_factor)
+          .add_epilogue(res1, HGEMM_XETLA::EpilogueType::RES_ADD, res1_factor)
+          .build();
+  if (policy.valid()) {
+    policy.run();
+  } else {
+    RECORD_ONEDNN_FUNCTION_IMPL(mm_resadd_resadd)
+    xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, Attr());
+    output = output + Scalar(res0_factor) * res0.flatten(0, -2) +
+        Scalar(res1_factor) * res1.flatten(0, -2);
+  }
+  return matmul_resize(a, output);
+}
+
+static Tensor mm_bias(
+    const Tensor& a,
+    const Tensor& b,
+    const Tensor& bias,
+    const double bias_factor) {
+  auto af = a.flatten(0, -2);
+  int m = af.sizes()[0];
+  int n = b.sizes()[1];
+  int k = b.sizes()[0];
+  auto output = at::empty({m, n}, a.options());
+  auto policy =
+      HGEMM_XETLA()
+          .add_matrix_c(output)
+          .add_matrix_a(a)
+          .add_matrix_b(b)
+          .add_epilogue(bias, HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
+          .build();
+  if (policy.valid()) {
+    policy.run();
+  } else {
+    RECORD_ONEDNN_FUNCTION_IMPL(mm_bias)
+    xpu::oneDNN::matmul(
+        output, af, b, bias * Scalar(bias_factor), true, Attr());
+  }
+  return matmul_resize(a, output);
+}
+
+static Tensor mm_bias_resadd(
+    const Tensor& a,
+    const Tensor& b,
+    const Tensor& bias,
+    const double bias_factor,
+    const Tensor& res,
+    const double res_factor) {
+  auto af = a.flatten(0, -2);
+  int m = af.sizes()[0];
+  int n = b.sizes()[1];
+  int k = b.sizes()[0];
+  auto output = at::empty({m, n}, a.options());
+  auto policy =
+      HGEMM_XETLA()
+          .add_matrix_c(output)
+          .add_matrix_a(a)
+          .add_matrix_b(b)
+          .add_epilogue(bias, HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
+          .add_epilogue(res, HGEMM_XETLA::EpilogueType::RES_ADD, res_factor)
+          .build();
+  if (policy.valid()) {
+    policy.run();
+  } else {
+    RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_resadd)
+    xpu::oneDNN::matmul(
+        output, af, b, bias * Scalar(bias_factor), true, Attr());
+    output = output + Scalar(res_factor) * res.flatten(0, -2);
   }
   return matmul_resize(a, output);
 }
@@ -93,32 +158,38 @@ static Tensor mm_bias_resadd_resadd(
     const Tensor& a,
     const Tensor& b,
     const Tensor& bias,
+    const double bias_factor,
     const Tensor& res0,
-    const Tensor& res1) {
+    const double res0_factor,
+    const Tensor& res1,
+    const double res1_factor) {
   auto af = a.flatten(0, -2);
   int m = af.sizes()[0];
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
-  auto policy = HGEMM_XETLA()
-                    .add_matrix_c(output)
-                    .add_matrix_a(a)
-                    .add_matrix_b(b)
-                    .add_epilogue(bias, HGEMM_XETLA::EpilogueType::BIAS)
-                    .add_epilogue(res0, HGEMM_XETLA::EpilogueType::RES_ADD)
-                    .add_epilogue(res1, HGEMM_XETLA::EpilogueType::RES_ADD)
-                    .build();
+  auto policy =
+      HGEMM_XETLA()
+          .add_matrix_c(output)
+          .add_matrix_a(a)
+          .add_matrix_b(b)
+          .add_epilogue(bias, HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
+          .add_epilogue(res0, HGEMM_XETLA::EpilogueType::RES_ADD, res0_factor)
+          .add_epilogue(res1, HGEMM_XETLA::EpilogueType::RES_ADD, res1_factor)
+          .build();
   if (policy.valid()) {
     policy.run();
   } else {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_resadd_resadd)
     auto split_ms = hgemm_split_m(m, n);
+    auto bias_ = bias * Scalar(bias_factor);
     for (auto data : split_ms) {
       auto newo = output.narrow(0, std::get<0>(data), std::get<1>(data));
       auto newa = af.narrow(0, std::get<0>(data), std::get<1>(data));
-      xpu::oneDNN::matmul(newo, newa, b, bias, true, Attr());
+      xpu::oneDNN::matmul(newo, newa, b, bias_, true, Attr());
     }
-    output = output + res0.flatten(0, -2) + res1.flatten(0, -2);
+    output = output + Scalar(res0_factor) * res0.flatten(0, -2) +
+        Scalar(res1_factor) * res1.flatten(0, -2);
   }
   return matmul_resize(a, output);
 }
@@ -171,6 +242,7 @@ Tensor matmul_gelu(
     const Tensor& input,
     const Tensor& weight,
     const c10::optional<Tensor>& bias,
+    const double bias_factor,
     c10::string_view approximate) {
   int m = input.flatten(0, -2).sizes()[0];
   int n = weight.sizes()[1];
@@ -182,7 +254,8 @@ Tensor matmul_gelu(
             .add_matrix_c(output)
             .add_matrix_a(input)
             .add_matrix_b(weight)
-            .add_epilogue(bias.value(), HGEMM_XETLA::EpilogueType::BIAS)
+            .add_epilogue(
+                bias.value(), HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
             .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::GELU)
             .build();
     if (policy.valid()) {
@@ -209,11 +282,22 @@ Tensor matmul_gelu(
 
   auto input_flatten = input.flatten(0, -2);
   auto split_ms = hgemm_split_m(m, n);
-  for (auto data : split_ms) {
-    auto newo = output.narrow(0, std::get<0>(data), std::get<1>(data));
-    auto newa = input_flatten.narrow(0, std::get<0>(data), std::get<1>(data));
-    linear_wrapper.call(newo, newa, weight_, bias, post_op);
+
+  if (bias.has_value() && bias_factor != 1.0f) {
+    auto bias_ = bias.value() * Scalar(bias_factor);
+    for (auto data : split_ms) {
+      auto newo = output.narrow(0, std::get<0>(data), std::get<1>(data));
+      auto newa = input_flatten.narrow(0, std::get<0>(data), std::get<1>(data));
+      linear_wrapper.call(newo, newa, weight_, bias_, post_op);
+    }
+  } else {
+    for (auto data : split_ms) {
+      auto newo = output.narrow(0, std::get<0>(data), std::get<1>(data));
+      auto newa = input_flatten.narrow(0, std::get<0>(data), std::get<1>(data));
+      linear_wrapper.call(newo, newa, weight_, bias, post_op);
+    }
   }
+
   return matmul_resize(input, output);
 }
 
@@ -259,8 +343,26 @@ static void mm_qkv_out(
       decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
   auto& q = dpcppGetCurrentQueue();
 
-  bool is_server = is_server_mode();
-  if (is_server) {
+  bool out0_valid =
+      reinterpret_cast<uint64_t>(out0.data_ptr<scalar_t>()) % 8 == 0;
+  bool out1_valid =
+      reinterpret_cast<uint64_t>(out1.data_ptr<scalar_t>()) % 8 == 0;
+  bool out2_valid =
+      reinterpret_cast<uint64_t>(out2.data_ptr<scalar_t>()) % 8 == 0;
+  bool input_valid =
+      reinterpret_cast<uint64_t>(input.data_ptr<scalar_t>()) % 8 == 0;
+  bool weight_valid =
+      reinterpret_cast<uint64_t>(weight.data_ptr<scalar_t>()) % 8 == 0;
+  bool bias_valid = true;
+  if (has_bias) {
+    bias_valid =
+        reinterpret_cast<uint64_t>(bias_.value().data_ptr<scalar_t>()) % 8 == 0;
+  }
+  bool shape_valid = k % 4 == 0 && n % 4 == 0;
+  bool use_xetla = out0_valid && out1_valid && out2_valid && input_valid &&
+      weight_valid && bias_valid && shape_valid;
+
+  if (!use_xetla) {
     auto wq = weight[0];
     auto wk = weight[1];
     auto wv = weight[2];
@@ -279,7 +381,7 @@ static void mm_qkv_out(
   } else {
     int selected_policy;
 
-    selected_policy = select_gemm_qkv_special_config(m, n, k, is_b_row_major);
+    selected_policy = hgemm_qkv_mapped_config(m, n, k, is_b_row_major);
     if (selected_policy < 0) {
       int m_real = (3 * (m + 127) / 128 * 128);
       selected_policy = select_gemm_config(m_real, n, k, is_b_row_major, 64);
@@ -356,16 +458,18 @@ static std::tuple<Tensor, Tensor, Tensor> mm_qkv(
 
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_REGISTER("mm_.xpu", at::AtenIpexTypeXPU::mm_);
-  IPEX_OP_REGISTER("mm_bias.xpu", at::AtenIpexTypeXPU::mm_bias);
+  IPEX_OP_REGISTER("mm_.xpu", at::AtenIpexTypeXPU::mm_common);
+  IPEX_OP_REGISTER("mm_common.xpu", at::AtenIpexTypeXPU::mm_common);
+  IPEX_OP_REGISTER("mm_resadd.xpu", at::AtenIpexTypeXPU::mm_resadd);
   IPEX_OP_REGISTER(
-      "mm_bias_scaled_resadd.xpu", at::AtenIpexTypeXPU::mm_bias_scaled_resadd);
+      "mm_resadd_resadd.xpu", at::AtenIpexTypeXPU::mm_resadd_resadd);
+  IPEX_OP_REGISTER("mm_bias.xpu", at::AtenIpexTypeXPU::mm_bias);
+  IPEX_OP_REGISTER("mm_bias_resadd.xpu", at::AtenIpexTypeXPU::mm_bias_resadd);
   IPEX_OP_REGISTER(
       "mm_bias_resadd_resadd.xpu", at::AtenIpexTypeXPU::mm_bias_resadd_resadd);
 
   IPEX_OP_REGISTER("mm_resmul.xpu", at::AtenIpexTypeXPU::mm_resmul);
   IPEX_OP_REGISTER("mm_silu.xpu", at::AtenIpexTypeXPU::mm_silu);
-
   IPEX_OP_REGISTER("matmul_gelu.xpu", at::AtenIpexTypeXPU::matmul_gelu);
 
   IPEX_OP_REGISTER("mm_qkv_out.xpu", at::AtenIpexTypeXPU::mm_qkv_out);
