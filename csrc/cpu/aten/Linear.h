@@ -254,7 +254,7 @@ DECLARE_DISPATCH(woq_tpp_gemm_unpackB_fn, woq_tpp_gemm_unpackB_stub);
 
 #ifdef __GNUC__
 #include <features.h>
-#if __GNUC_PREREQ(12, 3)
+#if __GNUC_PREREQ(12, 3) && __AVX512F__
 #define WOQ_TPP_KERNEL
 #define FUSE_NONE 0
 #define FUSE_GELU 1

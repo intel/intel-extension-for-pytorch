@@ -26,6 +26,15 @@
       exit(1);                 \
     }                          \
   } while (0)
+#define TLA_ASSERT(cond, x...) \
+  do {                         \
+    if (!(cond)) {             \
+      printf(x);               \
+      printf("\n");            \
+      fflush(stdout);          \
+      exit(1);                 \
+    }                          \
+  } while (0)
 
 namespace torch_ipex {
 namespace tpp {
@@ -235,7 +244,9 @@ class VLAPtr<T, 1, int64_t> {
 };
 #endif
 
-template <typename T, std::size_t N, typename index_t = int64_t>
+typedef int64_t index_t;
+
+template <typename T, std::size_t N> //, typename index_t = int64_t>
 VLAPtr<T, N, index_t> GetVLAPtr(T* data_, const index_t (&list)[N]) {
   return VLAPtr<T, N, index_t>(data_, list);
 }
@@ -249,9 +260,11 @@ inline T* pt_get_data_ptr(at::Tensor t) {
   return t.data_ptr<T>();
 }
 
-typedef int64_t index_t;
 template <typename T, std::size_t N> //, typename index_t = int64_t>
 VLAPtr<T, N, index_t> GetVLAPtr(at::Tensor t, const index_t (&sizes)[N]) {
+  if (!t.defined()) {
+    return VLAPtr<T, N, index_t>(nullptr, sizes);
+  }
   return VLAPtr<T, N, index_t>(pt_get_data_ptr<T>(t), sizes);
 }
 template <typename T>
