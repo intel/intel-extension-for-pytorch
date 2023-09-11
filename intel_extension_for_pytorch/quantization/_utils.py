@@ -733,11 +733,12 @@ def save_quant_state(quant_state_map, configure_file):
                             weight_idx
                             in v.weight_tensor_id_to_smooth_quant_scaling_factor
                         ):
-                            cur_tensor_infos[
-                                "smooth_quant_scaling_factor"
-                            ] = v.weight_tensor_id_to_smooth_quant_scaling_factor[
-                                weight_idx
-                            ].tolist()
+                            if v.weight_tensor_id_to_smooth_quant_scaling_factor[weight_idx] is not None:
+                                cur_tensor_infos[
+                                    "smooth_quant_scaling_factor"
+                                ] = v.weight_tensor_id_to_smooth_quant_scaling_factor[
+                                    weight_idx
+                                ].tolist()
                     weight_tensor_infos.append(cur_tensor_infos)
                 info["weight_tensor_infos"] = weight_tensor_infos
                 # output infos
