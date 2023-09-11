@@ -565,13 +565,16 @@ def get_pybind11_abi_compiler_flags():
 
 
 def _gen_build_cfg_from_cmake(
-    cmake_exec, project_root_dir, cmake_args, build_dir, build_env, use_ninja = True):
+    cmake_exec, project_root_dir, cmake_args, build_dir, build_env, use_ninja = True, build_gpu = False):
     if IS_WINDOWS:
         if use_ninja:
             check_call([cmake_exec, project_root_dir, '-GNinja'] + cmake_args, cwd=build_dir, env=build_env)
         else:
             # using MSVC generator
-            check_call([cmake_exec, project_root_dir, '-G Visual Studio 17 2022', '-T Intel C++ Compiler 2023'] + cmake_args, cwd=build_dir, env=build_env)
+            if build_gpu:
+                check_call([cmake_exec, project_root_dir, '-G Visual Studio 17 2022', '-T Intel C++ Compiler 2023'] + cmake_args, cwd=build_dir, env=build_env)
+            else:
+                check_call([cmake_exec, project_root_dir, '-G Visual Studio 17 2022'] + cmake_args, cwd=build_dir, env=build_env)
     else:
         # Linux
         check_call([cmake_exec, project_root_dir] + cmake_args, cwd=build_dir, env=build_env)
@@ -723,7 +726,7 @@ class IPEXCPPLibBuild(build_clib, object):
             cmake_args_gpu = []
             define_build_options(cmake_args_gpu, **build_option_gpu)
             _gen_build_cfg_from_cmake(
-                cmake_exec, project_root_dir, cmake_args_gpu, ipex_xpu_build_dir, my_env, use_ninja
+                cmake_exec, project_root_dir, cmake_args_gpu, ipex_xpu_build_dir, my_env, use_ninja=use_ninja, build_gpu=True
             )
 
         if build_with_cpu:
@@ -733,7 +736,7 @@ class IPEXCPPLibBuild(build_clib, object):
             cmake_args_cpu = []
             define_build_options(cmake_args_cpu, **build_option_cpu)
             _gen_build_cfg_from_cmake(
-                cmake_exec, project_root_dir, cmake_args_cpu, ipex_cpu_build_dir, my_env, use_ninja
+                cmake_exec, project_root_dir, cmake_args_cpu, ipex_cpu_build_dir, my_env, use_ninja=use_ninja
             )
 
             # Generate cmake for the CPP UT
@@ -752,7 +755,7 @@ class IPEXCPPLibBuild(build_clib, object):
                 cmake_args_cpp_test,
                 get_cpp_test_build_dir(),
                 my_env,
-                use_ninja
+                use_ninja=use_ninja
             )
 
         if _get_build_target() in ["develop", "python"]:
@@ -771,7 +774,7 @@ class IPEXCPPLibBuild(build_clib, object):
                 cmake_args_python,
                 ipex_python_build_dir,
                 my_env,
-                use_ninja
+                use_ninja=use_ninja
             )
 
         elif _get_build_target() == "cppsdk":
@@ -792,27 +795,27 @@ class IPEXCPPLibBuild(build_clib, object):
                 cmake_args_cppsdk,
                 ipex_cppsdk_build_dir,
                 my_env,
-                use_ninja
+                use_ninja=use_ninja
             )
 
         if build_with_xpu:
             # Build XPU module:
-            _build_project(build_args, ipex_xpu_build_dir, my_env, use_ninja)
+            _build_project(build_args, ipex_xpu_build_dir, my_env, use_ninja=use_ninja)
 
         if build_with_cpu:
             # Build CPU module:
-            _build_project(build_args, ipex_cpu_build_dir, my_env, use_ninja)
+            _build_project(build_args, ipex_cpu_build_dir, my_env, use_ninja=use_ninja)
 
             # Build the CPP UT
-            _build_project(build_args, get_cpp_test_build_dir(), my_env, use_ninja)
+            _build_project(build_args, get_cpp_test_build_dir(), my_env, use_ninja=use_ninja)
 
         if _get_build_target() in ["develop", "python"]:
             # Build common python module:
-            _build_project(build_args, ipex_python_build_dir, my_env, use_ninja)
+            _build_project(build_args, ipex_python_build_dir, my_env, use_ninja=use_ninja)
 
         elif _get_build_target() == "cppsdk":
             # Build CPPSDK package:
-            _build_project(build_args, ipex_cppsdk_build_dir, my_env, use_ninja)
+            _build_project(build_args, ipex_cppsdk_build_dir, my_env, use_ninja=use_ninja)
             cpack_exec = get_cpack_command()
             check_call([cpack_exec, "--config", cpack_out_file])
             gen_script_path = os.path.abspath(
