@@ -28,6 +28,14 @@ struct AccumulateType<float> {
   using type = float;
 };
 template <>
+struct AccumulateType<Float8_e5m2> {
+  using type = float;
+};
+template <>
+struct AccumulateType<Float8_e4m3fn> {
+  using type = float;
+};
+template <>
 struct AccumulateType<double> {
   using type = double;
 };
