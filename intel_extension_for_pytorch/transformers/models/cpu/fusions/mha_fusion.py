@@ -1,0 +1,98 @@
+import torch
+from torch import nn
+from typing import Optional, Tuple
+from ...reference.fusions.mha_fusion import RotaryEmbedding
+
+
+class _IPEXRopeCPU(nn.Module):
+    def __init__(
+        self,
+        max_position_embeddings,
+        pos_embd_dim,
+        base=10000,
+    ):
+        super().__init__()
+        self.embed_positions = RotaryEmbedding(
+            max_position_embeddings, pos_embd_dim, base
+        )
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        position_ids: torch.Tensor,
+        num_head: int,
+        head_dim: int,
+        offset: int,
+        rotary_ndims: int,
+        seq_len: Optional[int] = None,
+    ):
+        position_ids = position_ids.contiguous()
+        sin_cos, _, _ = self.embed_positions(seq_len)
+        (x, y, z) = torch.ops.torch_ipex.rotary_position_embedding_out(
+            x.contiguous(),
+            sin_cos,
+            position_ids,
+            num_head,
+            head_dim,
+            offset,
+            rotary_ndims,
+        )
+
+        return x
+
+
+class _IPEXScaleDotProductCPU(nn.Module):
+    def __init__(self, text_max_length):
+        super().__init__()
+        self.text_max_length = text_max_length
+
+    def forward(
+        self,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        scale_attn: float,
+        layer_past: Optional[Tuple[torch.Tensor]] = None,
+        head_mask: Optional[Tuple[torch.Tensor]] = None,
+        attention_mask: Optional[Tuple[torch.Tensor]] = None,
+    ):
+        if layer_past is None:
+            layer_past = (
+                torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros(1, int(query.size(0)), dtype=torch.long).contiguous(),
+            )
+        key_cache = layer_past[1].contiguous()
+        value_cache = layer_past[2].contiguous()
+        beam_idx = layer_past[3].contiguous()
+        seq_info = torch.tensor(layer_past[0].size(-2), dtype=torch.long).contiguous()
+        (
+            attn_output,
+            attn_weights,
+            key_cache,
+            value_cache,
+            beam_idx,
+        ) = torch.ops.torch_ipex.masked_multihead_self_attention(
+            query,
+            key,
+            value,
+            key_cache,
+            value_cache,
+            beam_idx,
+            seq_info,
+            scale_attn,
+            self.text_max_length,
+            head_mask,
+            attention_mask,
+        )
+
+        present = (
+            torch.zeros(
+                1, 1, (layer_past[0].size(-2) + query.shape[1]), 1, dtype=torch.long
+            ).contiguous(),
+            key_cache,
+            value_cache,
+            beam_idx,
+        )
+        return attn_output, attn_weights, present
