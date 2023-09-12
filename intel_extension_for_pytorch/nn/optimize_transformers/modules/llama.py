@@ -313,9 +313,7 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
 
             self.module.self_attn.o_proj.weight.data = self.module.self_attn.o_proj.weight.t().contiguous()
             self.ipex_optimized_module.attn.out_wei = self.module.self_attn.o_proj.weight
-            if self.module.self_attn.o_proj.bias is not None:
-                self.module.self_attn.o_proj.bias = self.module.self_attn.o_proj.bias / self.tp_size
-                self.ipex_optimized_module.attn.out_bias = self.module.self_attn.o_proj.bias
+            self.ipex_optimized_module.attn.out_bias = self.module.self_attn.o_proj.bias
         else:
             self.ipex_optimized_module.attn.k_proj.weight = self.module.self_attn.k_proj.weight
             self.ipex_optimized_module.attn.k_proj.bias = self.module.self_attn.k_proj.bias
@@ -324,9 +322,7 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
             self.ipex_optimized_module.attn.v_proj.weight = self.module.self_attn.v_proj.weight
             self.ipex_optimized_module.attn.v_proj.bias = self.module.self_attn.v_proj.bias
             self.ipex_optimized_module.attn.out_proj.weight = self.module.self_attn.o_proj.weight
-            if self.module.self_attn.o_proj.bias is not None:
-                self.module.self_attn.o_proj.bias = self.module.self_attn.o_proj.bias / self.tp_size
-                self.ipex_optimized_module.attn.out_proj.bias = self.module.self_attn.o_proj.bias
+            self.ipex_optimized_module.attn.out_proj.bias = self.module.self_attn.o_proj.bias
 
 
     def port_mlp_parameters(self):
@@ -337,9 +333,7 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
 
             self.module.mlp.down_proj.weight.data = self.module.mlp.down_proj.weight.t().contiguous()
             self.ipex_optimized_module.mlp.fc_out_wei = self.module.mlp.down_proj.weight
-            if self.module.mlp.down_proj.bias is not None:
-                self.module.mlp.down_proj.bias = self.module.mlp.down_proj.bias / self.tp_size
-                self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.down_proj.bias
+            self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.down_proj.bias
 
             self.module.mlp.up_proj.weight.data = self.module.mlp.up_proj.weight.t().contiguous()
             self.ipex_optimized_module.mlp.up_wei = self.module.mlp.up_proj.weight
@@ -348,9 +342,7 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
             self.ipex_optimized_module.mlp.fc_in.weight = self.module.mlp.gate_proj.weight
             self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.gate_proj.bias
             self.ipex_optimized_module.mlp.fc_out.weight = self.module.mlp.down_proj.weight
-            if self.module.mlp.down_proj.bias is not None:
-                self.module.mlp.down_proj.bias = self.module.mlp.down_proj.bias / self.tp_size
-                self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.down_proj.bias
+            self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.down_proj.bias
             self.ipex_optimized_module.mlp.up_proj.weight = self.module.mlp.up_proj.weight
             self.ipex_optimized_module.mlp.up_proj.bias = self.module.mlp.up_proj.bias
 

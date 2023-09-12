@@ -51,7 +51,7 @@ class IPEXBloomMLP(IPEXTransformerMLP):
                 hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                 hidden_states = self.act(hidden_states)
             # print_rank_x(0, "before mm resadd: {}".format(hidden_states))
-            hidden_states = torch.ops.torch_ipex.mm_bias_resadd(hidden_states, self.fc_out_wei, self.fc_out_bias, 1.0, residual, 1.0/self.tp_size)
+            hidden_states = torch.ops.torch_ipex.mm_bias_resadd(hidden_states, self.fc_out_wei, self.fc_out_bias, 1.0/self.tp_size, residual, 1.0/self.tp_size)
             # print_rank_x(0, "before all reduce: {}".format(hidden_states))
             output = self.all_reduce_if_necessary(hidden_states)
         else:
@@ -338,7 +338,7 @@ class IPEXBloomConverter(IPEXTransformerConverter):
             self.module.self_attention.dense.weight.data = \
                 self.module.self_attention.dense.weight.transpose(0, 1).contiguous()
             self.ipex_optimized_module.self_attention.out_wei = nn.Parameter(self.module.self_attention.dense.weight)
-            self.module.self_attention.dense.bias.data = self.module.self_attention.dense.bias.data / self.tp_size
+            self.module.self_attention.dense.bias.data = self.module.self_attention.dense.bias.data
             self.ipex_optimized_module.self_attention.out_bias = nn.Parameter(self.module.self_attention.dense.bias)
         else:
             self.ipex_optimized_module.self_attention.query_key_value.weight = nn.Parameter(self.module.self_attention.query_key_value.weight)
@@ -355,7 +355,7 @@ class IPEXBloomConverter(IPEXTransformerConverter):
 
             self.module.mlp.dense_4h_to_h.weight.data = self.module.mlp.dense_4h_to_h.weight.transpose(0, 1).contiguous()
             self.ipex_optimized_module.mlp.fc_out_wei = nn.Parameter(self.module.mlp.dense_4h_to_h.weight)
-            self.module.mlp.dense_4h_to_h.bias.data = self.module.mlp.dense_4h_to_h.bias.data / self.tp_size
+            self.module.mlp.dense_4h_to_h.bias.data = self.module.mlp.dense_4h_to_h.bias.data
             self.ipex_optimized_module.mlp.fc_out_bias = nn.Parameter(self.module.mlp.dense_4h_to_h.bias)
         else:
             self.ipex_optimized_module.mlp.fc_in.weight = nn.Parameter(self.module.mlp.dense_h_to_4h.weight)
