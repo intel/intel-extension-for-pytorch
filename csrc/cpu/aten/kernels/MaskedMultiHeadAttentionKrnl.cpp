@@ -694,7 +694,7 @@ first_token_masked_mha(
     value = value.repeat_interleave(n_req, 2);
   }
   auto attn_weights = at::Tensor();
-  if (key.scalar_type() == at::kBFloat16) {
+  if (key.scalar_type() == at::kBFloat16 && attention_mask.size(1) == 1) {
     auto attn_outputs = torch_ipex::cpu::flash_attention_kernel_stub(
         kCPU, query, key, value, scale_attn, attention_mask);
     return std::make_tuple(

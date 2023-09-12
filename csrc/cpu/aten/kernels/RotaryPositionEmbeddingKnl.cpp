@@ -209,6 +209,14 @@ void ApplyROPEKernel(
               in_ptr[in_offset] = out0;
               in_ptr[in_offset + 1] = out1;
             }
+          } else if (t_pos.numel() == 1) { // used by Falcon
+            auto in_ptr_start =
+                in_ptr + b * in_stride_b + s * in_stride_s + n * H;
+            long p = pos_ptr[0];
+            auto sin_start = emb_pos_ptr + (p + s) * HR;
+            auto cos_start = emb_pos_ptr + (p + s) * HR + COFF;
+            apply_rope_along_head<T, float>(
+                in_ptr_start, cos_start, sin_start, rotary_ndims, offset);
           } else {
             auto in_ptr_start =
                 in_ptr + b * in_stride_b + s * in_stride_s + n * H;

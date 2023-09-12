@@ -191,7 +191,7 @@ at::Tensor flash_attention_kernel_impl(
       "Q/K/V must be 4D for ipex::flash_attention_kernel_impl");
   TORCH_CHECK(
       attention_mask.size(1) == 1,
-      "Attetntion mask size(1) != 1 for ipex::flash_attention_kernel_imp");
+      "Attetntion mask size(1) != 1 for ipex::flash_attention_kernel_impl");
 
 #if defined(CPU_CAPABILITY_AVX512)
   int64_t batchSize = query.size(0);
