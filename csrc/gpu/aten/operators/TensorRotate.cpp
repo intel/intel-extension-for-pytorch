@@ -38,7 +38,10 @@ void apply_rotary_embedding_impl(
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t wg_size = std::min(max_wg_size, problem_size);
-  int64_t work_group_num = (total_size + problem_size - 1) / problem_size;
+
+  int64_t max_group_num = 32768;
+  int64_t total_group_num = (total_size + problem_size - 1) / problem_size;
+  max_group_num = std::min(max_group_num, total_group_num);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
@@ -47,23 +50,26 @@ void apply_rotary_embedding_impl(
       auto group_idx = item_id.get_group(0);
       auto sg = item_id.get_sub_group();
       scalar_t tensor_val;
-      for (int i = item_idx; i < problem_size; i += item_range) {
-        auto global_offset = group_idx * problem_size + i;
-        const auto offset = offset_calc.get(global_offset);
-        tensor_val = *(tensor + offset[1]);
-        scalar_t scale = i % 2 == 0 ? -1 : 1;
-        scalar_t shift_val = sg.shuffle_xor(tensor_val, 1) * scale;
-        scalar_t sin_val = *(sin + offset[2]);
-        scalar_t cos_val = *(cos + offset[3]);
-        scalar_t out_val = shift_val * sin_val + tensor_val * cos_val;
-        scalar_t* out_ptr = out + offset[0];
-        *out_ptr = out_val;
+      for (int group_num = group_idx; group_num < total_group_num;
+           group_num += max_group_num) {
+        for (int i = item_idx; i < problem_size; i += item_range) {
+          auto global_offset = group_num * problem_size + i;
+          const auto offset = offset_calc.get(global_offset);
+          tensor_val = *(tensor + offset[1]);
+          scalar_t scale = i % 2 == 0 ? -1 : 1;
+          scalar_t shift_val = sg.shuffle_xor(tensor_val, 1) * scale;
+          scalar_t sin_val = *(sin + offset[2]);
+          scalar_t cos_val = *(cos + offset[3]);
+          scalar_t out_val = shift_val * sin_val + tensor_val * cos_val;
+          scalar_t* out_ptr = out + offset[0];
+          *out_ptr = out_val;
+        }
       }
     };
 
     cgh.parallel_for(
         sycl::nd_range<1>(
-            sycl::range<1>(work_group_num * wg_size), sycl::range<1>(wg_size)),
+            sycl::range<1>(max_group_num * wg_size), sycl::range<1>(wg_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -138,7 +144,9 @@ void apply_rotary_embedding_two_kernel(
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t wg_size = std::min(max_wg_size, problem_size);
-  int64_t work_group_num = (total_size + problem_size - 1) / problem_size;
+  int64_t max_group_num = 32768;
+  int64_t total_group_num = (total_size + problem_size - 1) / problem_size;
+  max_group_num = std::min(max_group_num, total_group_num);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
@@ -148,36 +156,39 @@ void apply_rotary_embedding_two_kernel(
       auto group_id = item_id.get_group(0);
       auto sg = item_id.get_sub_group();
 
-      if (group_id == 0) {
-        for (int i = item_idx; i < problem_size; i += item_range) {
-          auto global_offset = group_idx * problem_size + i;
-          const auto offset = offset_calc.get(global_offset);
-          scalar_t query_val = *(query + offset[2]);
-          scalar_t scale = i % 2 == 0 ? -1 : 1;
-          scalar_t shift_val = sg.shuffle_xor(query_val, 1) * scale;
-          float sin_val = *(sin + offset[4]);
-          float cos_val = *(cos + offset[5]);
-          *(query_out + offset[0]) =
-              (scalar_t)((float)shift_val * sin_val + (float)query_val * cos_val);
-        }
-      } else {
-        for (int i = item_idx; i < problem_size; i += item_range) {
-          auto global_offset = group_idx * problem_size + i;
-          const auto offset = offset_calc.get(global_offset);
-          scalar_t key_val = *(key + offset[3]);
-          scalar_t scale = i % 2 == 0 ? -1 : 1;
-          scalar_t shift_val = sg.shuffle_xor(key_val, 1) * scale;
-          float sin_val = *(sin + offset[4]);
-          float cos_val = *(cos + offset[5]);
-          *(key_out + offset[1]) =
-              (scalar_t)((float)shift_val * sin_val + (float)key_val * cos_val);
+      for (int group_num = group_idx; group_num < total_group_num;
+           group_num += max_group_num) {
+        if (group_id == 0) {
+          for (int i = item_idx; i < problem_size; i += item_range) {
+            auto global_offset = group_num * problem_size + i;
+            const auto offset = offset_calc.get(global_offset);
+            scalar_t query_val = *(query + offset[2]);
+            scalar_t scale = i % 2 == 0 ? -1 : 1;
+            scalar_t shift_val = sg.shuffle_xor(query_val, 1) * scale;
+            float sin_val = *(sin + offset[4]);
+            float cos_val = *(cos + offset[5]);
+            *(query_out + offset[0]) =
+                (scalar_t)((float)shift_val * sin_val + (float)query_val * cos_val);
+          }
+        } else {
+          for (int i = item_idx; i < problem_size; i += item_range) {
+            auto global_offset = group_num * problem_size + i;
+            const auto offset = offset_calc.get(global_offset);
+            scalar_t key_val = *(key + offset[3]);
+            scalar_t scale = i % 2 == 0 ? -1 : 1;
+            scalar_t shift_val = sg.shuffle_xor(key_val, 1) * scale;
+            float sin_val = *(sin + offset[4]);
+            float cos_val = *(cos + offset[5]);
+            *(key_out + offset[1]) =
+                (scalar_t)((float)shift_val * sin_val + (float)key_val * cos_val);
+          }
         }
       }
     };
 
     cgh.parallel_for(
         sycl::nd_range<2>(
-            sycl::range<2>({2, work_group_num * wg_size}),
+            sycl::range<2>({2, max_group_num * wg_size}),
             sycl::range<2>({1, wg_size})),
         kfn);
   };
@@ -202,9 +213,11 @@ void apply_rotary_embedding_half_single_kernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
-  // int64_t wg_size = std::min(max_wg_size, problem_size);
   int64_t wg_size = max_wg_size;
-  int64_t work_group_num = (total_size + problem_size - 1) / problem_size;
+
+  int64_t max_group_num = 32768;
+  int64_t total_group_num = (total_size + problem_size - 1) / problem_size;
+  max_group_num = std::min(max_group_num, total_group_num);
   int64_t problem_half = problem_size / 2;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -215,26 +228,29 @@ void apply_rotary_embedding_half_single_kernel(
       auto group_id = item_id.get_group(0);
       auto sg = item_id.get_sub_group();
 
-      for (int i = item_idx; i < problem_size; i += item_range) {
-        auto global_offset1 = group_idx * problem_size + i;
-        auto global_offset2 = i < problem_half
-            ? group_idx * problem_size + problem_half + i
-            : group_idx * problem_size - problem_half + i;
-        float scale = i < problem_half ? -1 : 1;
-        const auto offset1 = offset_calc.get(global_offset1);
-        const auto offset2 = offset_calc.get(global_offset2);
-        float query_val1 = *(query + offset1[1]);
-        float query_val2 = *(query + offset2[1]);
-        float sin_val = *(sin + offset1[2]);
-        float cos_val = *(cos + offset1[3]);
-        *(query_out + offset1[0]) = static_cast<scalar_t>(
-            scale * query_val2 * sin_val + query_val1 * cos_val);
+      for (int group_num = group_idx; group_num < total_group_num;
+           group_num += max_group_num) {
+        for (int i = item_idx; i < problem_size; i += item_range) {
+          auto global_offset1 = group_num * problem_size + i;
+          auto global_offset2 = i < problem_half
+              ? group_num * problem_size + problem_half + i
+              : group_num * problem_size - problem_half + i;
+          float scale = i < problem_half ? -1 : 1;
+          const auto offset1 = offset_calc.get(global_offset1);
+          const auto offset2 = offset_calc.get(global_offset2);
+          float query_val1 = *(query + offset1[1]);
+          float query_val2 = *(query + offset2[1]);
+          float sin_val = *(sin + offset1[2]);
+          float cos_val = *(cos + offset1[3]);
+          *(query_out + offset1[0]) = static_cast<scalar_t>(
+              scale * query_val2 * sin_val + query_val1 * cos_val);
+        }
       }
     };
 
     cgh.parallel_for(
         sycl::nd_range<2>(
-            sycl::range<2>({1, work_group_num * wg_size}),
+            sycl::range<2>({1, max_group_num * wg_size}),
             sycl::range<2>({1, wg_size})),
         kfn);
   };
@@ -261,9 +277,11 @@ void apply_rotary_embedding_half_kernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
-  // int64_t wg_size = std::min(max_wg_size, problem_size);
   int64_t wg_size = max_wg_size;
-  int64_t work_group_num = (total_size + problem_size - 1) / problem_size;
+
+  int64_t max_group_num = 32768;
+  int64_t total_group_num = (total_size + problem_size - 1) / problem_size;
+  max_group_num = std::min(max_group_num, total_group_num);
   int64_t problem_half = problem_size / 2;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -274,44 +292,47 @@ void apply_rotary_embedding_half_kernel(
       auto group_id = item_id.get_group(0);
       auto sg = item_id.get_sub_group();
 
-      if (group_id == 0) {
-        for (int i = item_idx; i < problem_size; i += item_range) {
-          auto global_offset1 = group_idx * problem_size + i;
-          auto global_offset2 = i < problem_half
-              ? group_idx * problem_size + problem_half + i
-              : group_idx * problem_size - problem_half + i;
-          float scale = i < problem_half ? -1 : 1;
-          const auto offset1 = offset_calc.get(global_offset1);
-          const auto offset2 = offset_calc.get(global_offset2);
-          float query_val1 = *(query + offset1[2]);
-          float query_val2 = *(query + offset2[2]);
-          float sin_val = *(sin + offset1[4]);
-          float cos_val = *(cos + offset1[5]);
-          *(query_out + offset1[0]) = static_cast<scalar_t>(
-              scale * query_val2 * sin_val + query_val1 * cos_val);
-        }
-      } else {
-        for (int i = item_idx; i < problem_size; i += item_range) {
-          auto global_offset1 = group_idx * problem_size + i;
-          auto global_offset2 = i < problem_half
-              ? group_idx * problem_size + problem_half + i
-              : group_idx * problem_size - problem_half + i;
-          float scale = i < problem_half ? -1 : 1;
-          const auto offset1 = offset_calc.get(global_offset1);
-          const auto offset2 = offset_calc.get(global_offset2);
-          float key_val1 = *(key + offset1[3]);
-          float key_val2 = *(key + offset2[3]);
-          float sin_val = *(sin + offset1[4]);
-          float cos_val = *(cos + offset1[5]);
-          *(key_out + offset1[1]) = static_cast<scalar_t>(
-              scale * key_val2 * sin_val + key_val1 * cos_val);
+      for (int group_num = group_idx; group_num < total_group_num;
+           group_num += max_group_num) {
+        if (group_id == 0) {
+          for (int i = item_idx; i < problem_size; i += item_range) {
+            auto global_offset1 = group_num * problem_size + i;
+            auto global_offset2 = i < problem_half
+                ? group_num * problem_size + problem_half + i
+                : group_num * problem_size - problem_half + i;
+            float scale = i < problem_half ? -1 : 1;
+            const auto offset1 = offset_calc.get(global_offset1);
+            const auto offset2 = offset_calc.get(global_offset2);
+            float query_val1 = *(query + offset1[2]);
+            float query_val2 = *(query + offset2[2]);
+            float sin_val = *(sin + offset1[4]);
+            float cos_val = *(cos + offset1[5]);
+            *(query_out + offset1[0]) = static_cast<scalar_t>(
+                scale * query_val2 * sin_val + query_val1 * cos_val);
+          }
+        } else {
+          for (int i = item_idx; i < problem_size; i += item_range) {
+            auto global_offset1 = group_num * problem_size + i;
+            auto global_offset2 = i < problem_half
+                ? group_num * problem_size + problem_half + i
+                : group_num * problem_size - problem_half + i;
+            float scale = i < problem_half ? -1 : 1;
+            const auto offset1 = offset_calc.get(global_offset1);
+            const auto offset2 = offset_calc.get(global_offset2);
+            float key_val1 = *(key + offset1[3]);
+            float key_val2 = *(key + offset2[3]);
+            float sin_val = *(sin + offset1[4]);
+            float cos_val = *(cos + offset1[5]);
+            *(key_out + offset1[1]) = static_cast<scalar_t>(
+                scale * key_val2 * sin_val + key_val1 * cos_val);
+          }
         }
       }
     };
 
     cgh.parallel_for(
         sycl::nd_range<2>(
-            sycl::range<2>({2, work_group_num * wg_size}),
+            sycl::range<2>({2, max_group_num * wg_size}),
             sycl::range<2>({1, wg_size})),
         kfn);
   };
