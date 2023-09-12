@@ -191,7 +191,7 @@ void deviceSynchronize(DeviceIndex device_index) {
 
 } // namespace dpcpp
 
-sycl::queue& get_queue_from_stream(c10::Stream stream) {
+IPEX_API sycl::queue& get_queue_from_stream(c10::Stream stream) {
   dpcpp::DPCPPStream dpcpp_stream(stream);
   return dpcppGetRawQueue(
       dpcpp_stream.device_index(), dpcpp_stream.queue_index());
