@@ -12,8 +12,7 @@ namespace cpu {
 
 DEFINE_DISPATCH(rotary_position_embedding_kernel_stub);
 
-std::tuple<at::Tensor&, at::Tensor&, at::Tensor&>
-rotary_position_embedding_forward_cpu(
+at::Tensor& rotary_position_embedding_forward_cpu(
     at::Tensor& t_in,
     at::Tensor& t_emb_pos,
     at::Tensor& t_pos,
@@ -25,12 +24,10 @@ rotary_position_embedding_forward_cpu(
       "ipex::rotary_position_embedding", c10::ArrayRef<c10::IValue>({}));
   rotary_position_embedding_kernel_stub(
       kCPU, t_in, t_emb_pos, t_pos, N, H, offset, rotary_ndims);
-  return std::tuple<at::Tensor&, at::Tensor&, at::Tensor&>(
-      t_in, t_emb_pos, t_pos);
+  return t_in;
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor>
-rotary_position_embedding_forward_out_cpu(
+at::Tensor rotary_position_embedding_forward_out_cpu(
     at::Tensor& t_in,
     at::Tensor& t_emb_pos,
     at::Tensor& t_pos,
@@ -42,11 +39,10 @@ rotary_position_embedding_forward_out_cpu(
       "ipex::rotary_position_embedding_out", c10::ArrayRef<c10::IValue>({}));
   rotary_position_embedding_kernel_stub(
       kCPU, t_in, t_emb_pos, t_pos, N, H, offset, rotary_ndims);
-  return std::tuple<at::Tensor, at::Tensor, at::Tensor>(t_in, t_emb_pos, t_pos);
+  return t_in;
 }
 
-std::tuple<at::Tensor&, at::Tensor&, at::Tensor&>
-rotary_position_embedding_forward_functionalization(
+at::Tensor& rotary_position_embedding_forward_functionalization(
     at::Tensor& t_in,
     at::Tensor& t_emb_pos,
     at::Tensor& t_pos,
@@ -72,17 +68,10 @@ rotary_position_embedding_forward_functionalization(
   at::AutoDispatchSkipFunctionalize guard;
   auto tmp_output =
       op.call(t_in_, t_emb_pos_, t_pos_, N, H, offset, rotary_ndims);
-  at::functionalization::impl::replace_(t_in, std::get<0>(tmp_output));
+  at::functionalization::impl::replace_(t_in, tmp_output);
   at::functionalization::impl::commit_update(t_in);
   at::functionalization::impl::sync(t_in);
-  at::functionalization::impl::replace_(t_emb_pos, std::get<1>(tmp_output));
-  at::functionalization::impl::commit_update(t_emb_pos);
-  at::functionalization::impl::sync(t_emb_pos);
-  at::functionalization::impl::replace_(t_pos, std::get<2>(tmp_output));
-  at::functionalization::impl::commit_update(t_pos);
-  at::functionalization::impl::sync(t_pos);
-  return std::tuple<at::Tensor&, at::Tensor&, at::Tensor&>(
-      t_in, t_emb_pos, t_pos);
+  return t_in;
 }
 
 } // namespace cpu
@@ -92,7 +81,7 @@ namespace {
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
-      "rotary_position_embedding(Tensor(a!) t_in, Tensor(b!) t_emb_pos, Tensor(c!) t_pos, int N, int H, int offset, int rotary_ndims)-> (Tensor(a!), Tensor(b!), Tensor(c!))");
+      "rotary_position_embedding(Tensor(a!) t_in, Tensor t_emb_pos, Tensor t_pos, int N, int H, int offset, int rotary_ndims)-> Tensor(a!)");
   m.impl(
       "rotary_position_embedding",
       c10::DispatchKey::CPU,
@@ -102,7 +91,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       c10::DispatchKey::Functionalize,
       torch_ipex::cpu::rotary_position_embedding_forward_functionalization);
   m.def(
-      "rotary_position_embedding_out(Tensor t_in, Tensor t_emb_pos, Tensor t_pos, int N, int H, int offset, int rotary_ndims)-> (Tensor, Tensor, Tensor)");
+      "rotary_position_embedding_out(Tensor t_in, Tensor t_emb_pos, Tensor t_pos, int N, int H, int offset, int rotary_ndims)-> Tensor");
   m.impl(
       "rotary_position_embedding_out",
       c10::DispatchKey::CPU,

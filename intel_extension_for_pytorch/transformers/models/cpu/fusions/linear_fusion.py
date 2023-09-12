@@ -16,6 +16,7 @@ class _IPEXlinearSiluCPU(nn.Module):
                 x,
                 self.linear.weight,
                 self.linear.bias if self.linear.bias is not None else x.new_empty(0),
+                self.linear.out_features,
             )
         else:  # fallback path
             return nn.functional.silu(self.linear(x))
@@ -34,6 +35,7 @@ class _IPEXlinearReluCPU(nn.Module):
                 x,
                 self.linear.weight,
                 self.linear.bias if self.linear.bias is not None else x.new_empty(0),
+                self.linear.out_features,
             )
         else:  # fallback path
             return nn.functional.relu(self.linear(x))
@@ -53,6 +55,7 @@ class _IPEXlinearMulCPU(nn.Module):
                 y,
                 self.linear.weight,
                 self.linear.bias if self.linear.bias is not None else x.new_empty(0),
+                self.linear.out_features,
             )
         else:  # fallback path
             return self.linear(x) * y
@@ -73,6 +76,7 @@ class _IPEXlinearAddCPU(nn.Module):
                 self.linear.weight,
                 self.linear.bias if self.linear.bias is not None else x.new_empty(0),
                 1.0,
+                self.linear.out_features,
             )
         else:  # fallback path
             return self.linear(x) + y
@@ -94,6 +98,7 @@ class _IPEXlinearAddAddCPU(nn.Module):
                 self.linear.weight,
                 self.linear.bias if self.linear.bias is not None else x.new_empty(0),
                 1.0,
+                self.linear.out_features,
             )
         else:  # fallback path
             return self.linear(x) + y + z
@@ -112,6 +117,7 @@ class _IPEXlinearGeluCPU(nn.Module):
                 x,
                 self.linear.weight,
                 self.linear.bias if self.linear.bias is not None else x.new_empty(0),
+                self.linear.out_features,
             )
 
         else:  # fallback path

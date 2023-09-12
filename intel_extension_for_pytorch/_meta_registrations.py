@@ -621,7 +621,7 @@ def meta_rotary_position_embedding(
     offset,
     rotary_ndims,
 ):
-    return (t_in, t_emb_pos, t_pos)
+    return t_in
 
 
 @register_meta("rotary_position_embedding_out")
@@ -634,4 +634,4 @@ def meta_rotary_position_embedding_out(
     offset,
     rotary_ndims,
 ):
-    return (t_in, t_emb_pos, t_pos)
+    return t_in

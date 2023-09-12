@@ -28,7 +28,7 @@ class _IPEXRopeCPU(nn.Module):
     ):
         position_ids = position_ids.contiguous()
         sin_cos, _, _ = self.embed_positions(seq_len)
-        (x, y, z) = torch.ops.torch_ipex.rotary_position_embedding_out(
+        torch.ops.torch_ipex.rotary_position_embedding(
             x.contiguous(),
             sin_cos,
             position_ids,
