@@ -1,14 +1,14 @@
 #pragma once
-#include <cstdlib>
-
 #include <immintrin.h>
+#include <cstdlib>
+#include "utils/SysUtil.h"
 
 namespace torch_ipex {
 namespace cpu {
 namespace kernel {
 
 template <>
-inline __attribute__((always_inline)) void zero_ker(int32_t* out, int64_t len) {
+IPEX_FORCE_INLINE void zero_ker(int32_t* out, int64_t len) {
   int64_t i;
   __m512i zero_512 = _mm512_setzero_si512();
 #pragma unroll(4)
@@ -23,7 +23,7 @@ inline __attribute__((always_inline)) void zero_ker(int32_t* out, int64_t len) {
 }
 
 template <>
-inline __attribute__((always_inline)) void zero_ker(int8_t* out, int64_t len) {
+IPEX_FORCE_INLINE void zero_ker(int8_t* out, int64_t len) {
   int64_t i;
   __m512i zero_512 = _mm512_setzero_si512();
 #pragma unroll(4)
@@ -38,10 +38,7 @@ inline __attribute__((always_inline)) void zero_ker(int8_t* out, int64_t len) {
 }
 
 template <>
-inline __attribute__((always_inline)) void move_ker(
-    int64_t* out,
-    const int64_t* in,
-    int64_t len) {
+IPEX_FORCE_INLINE void move_ker(int64_t* out, const int64_t* in, int64_t len) {
   int64_t i;
 #pragma unroll(4)
   for (i = 0; i < len - 7; i += 8) {
@@ -57,10 +54,7 @@ inline __attribute__((always_inline)) void move_ker(
 }
 
 template <>
-inline __attribute__((always_inline)) void move_ker(
-    int16_t* out,
-    const int16_t* in,
-    int64_t len) {
+IPEX_FORCE_INLINE void move_ker(int16_t* out, const int16_t* in, int64_t len) {
   int64_t i;
 #pragma unroll(2)
   for (i = 0; i < len - 31; i += 32) {
@@ -76,7 +70,7 @@ inline __attribute__((always_inline)) void move_ker(
 }
 
 template <>
-inline __attribute__((always_inline)) void move_ker(
+IPEX_FORCE_INLINE void move_ker(
     unsigned char* out,
     const unsigned char* in,
     int64_t len) {
@@ -95,10 +89,7 @@ inline __attribute__((always_inline)) void move_ker(
 }
 
 template <>
-inline __attribute__((always_inline)) void move_ker(
-    bool* out,
-    const bool* in,
-    int64_t len) {
+IPEX_FORCE_INLINE void move_ker(bool* out, const bool* in, int64_t len) {
   int64_t i;
 #pragma unroll(2)
   for (i = 0; i < len - 63; i += 64) {
@@ -114,10 +105,7 @@ inline __attribute__((always_inline)) void move_ker(
 }
 
 template <>
-inline __attribute__((always_inline)) void move_ker(
-    int8_t* out,
-    const int8_t* in,
-    int64_t len) {
+IPEX_FORCE_INLINE void move_ker(int8_t* out, const int8_t* in, int64_t len) {
   int64_t i;
 #pragma unroll(2)
   for (i = 0; i < len - 63; i += 64) {
@@ -133,10 +121,7 @@ inline __attribute__((always_inline)) void move_ker(
 }
 
 template <>
-inline __attribute__((always_inline)) void move_ker(
-    int8_t* out,
-    const int32_t* in,
-    int64_t len) {
+IPEX_FORCE_INLINE void move_ker(int8_t* out, const int32_t* in, int64_t len) {
   int64_t i;
 #pragma unroll(4)
   for (i = 0; i < len - 15; i += 16) {
@@ -154,10 +139,7 @@ inline __attribute__((always_inline)) void move_ker(
 }
 
 template <>
-inline __attribute__((always_inline)) void move_ker(
-    int8_t* out,
-    const __m512i* in,
-    int64_t len) {
+IPEX_FORCE_INLINE void move_ker(int8_t* out, const __m512i* in, int64_t len) {
   int64_t i;
 #pragma unroll(2)
   for (i = 0; i < len; i++) {
@@ -166,10 +148,7 @@ inline __attribute__((always_inline)) void move_ker(
 }
 
 template <>
-inline __attribute__((always_inline)) void add_ker(
-    int8_t* inout,
-    const int8_t* in,
-    int64_t len) {
+IPEX_FORCE_INLINE void add_ker(int8_t* inout, const int8_t* in, int64_t len) {
   /*
     for (int64_t i = 0; i < len; ++i) {
       inout[i] += in[i];
@@ -193,7 +172,7 @@ inline __attribute__((always_inline)) void add_ker(
   }
 }
 
-static inline __attribute__((always_inline)) void scale_and_store_int8_128(
+static IPEX_FORCE_INLINE void scale_and_store_int8_128(
     int8_t* out,
     const int8_t* in,
     __m512& scale) {
@@ -353,7 +332,7 @@ static inline void scale_and_store_int8_maskz_16(
   _mm_mask_storeu_epi8(out, mask, _mm512_cvtsepi32_epi8(in0_32i));
 }
 
-static inline __attribute__((always_inline)) void scale_and_move_ker_128(
+static IPEX_FORCE_INLINE void scale_and_move_ker_128(
     int8_t* out,
     const int8_t* in,
     float scale) {
@@ -393,7 +372,7 @@ static inline void scale_and_move_ker(
   }
 }
 
-static inline __attribute__((always_inline)) void mul_and_sum_s8x128_to_s32x16(
+static IPEX_FORCE_INLINE void mul_and_sum_s8x128_to_s32x16(
     __m512i& out,
     const int8_t* a,
     const int8_t* b) {
@@ -427,7 +406,7 @@ static inline __attribute__((always_inline)) void mul_and_sum_s8x128_to_s32x16(
   out = _mm512_add_epi32(a_0_i, a_2_i);
 }
 
-static inline __attribute__((always_inline)) void load_s8x128_to_s16x128(
+static IPEX_FORCE_INLINE void load_s8x128_to_s16x128(
     __m512i* out_s16x4,
     const int8_t* in) {
   auto in_0 = _mm256_loadu_si256((__m256i*)in);
@@ -440,7 +419,7 @@ static inline __attribute__((always_inline)) void load_s8x128_to_s16x128(
   out_s16x4[3] = _mm512_cvtepi8_epi16(in_3);
 }
 
-static inline __attribute__((always_inline)) void load_s8x128x2_to_s16x128x2(
+static IPEX_FORCE_INLINE void load_s8x128x2_to_s16x128x2(
     __m512i* out_s16x8,
     const int8_t* in0,
     const int8_t* in1) {
@@ -462,7 +441,7 @@ static inline __attribute__((always_inline)) void load_s8x128x2_to_s16x128x2(
   out_s16x8[7] = _mm512_cvtepi8_epi16(in1_3);
 }
 
-static inline __attribute__((always_inline)) void mul_and_sum_s16x128_to_s32x16(
+static IPEX_FORCE_INLINE void mul_and_sum_s16x128_to_s32x16(
     __m512i& out,
     const __m512i* a16x4,
     const __m512i* b16x4) {
@@ -480,8 +459,7 @@ static inline __attribute__((always_inline)) void mul_and_sum_s16x128_to_s32x16(
   out = _mm512_add_epi32(a_0_i, a_2_i);
 }
 
-static inline __attribute__((always_inline)) void
-mul_and_sum_s8x128x2_to_s32x16x2(
+static IPEX_FORCE_INLINE void mul_and_sum_s8x128x2_to_s32x16x2(
     __m512i& out0,
     __m512i& out1,
     const int8_t* a0,
@@ -543,8 +521,7 @@ mul_and_sum_s8x128x2_to_s32x16x2(
   out1 = _mm512_add_epi32(a1_0_i, a1_2_i);
 }
 
-static inline __attribute__((always_inline)) void
-mul_and_sum_s16x128x2_to_s32x16x2(
+static IPEX_FORCE_INLINE void mul_and_sum_s16x128x2_to_s32x16x2(
     __m512i& out0,
     __m512i& out1,
     const __m512i* a0_16x4,
@@ -590,8 +567,7 @@ static inline int32_t reduce_add_s32x16(__m512i& acc_sum) {
   return _mm_cvtsi128_si32(ab_128_low);
 }
 
-static inline __attribute__((always_inline)) __m512i reduce_add_s32x16x16(
-    __m512i* acc_sums) {
+static IPEX_FORCE_INLINE __m512i reduce_add_s32x16x16(__m512i* acc_sums) {
   auto l0 = _mm512_unpacklo_epi32(acc_sums[0], acc_sums[1]);
   auto l1 = _mm512_unpackhi_epi32(acc_sums[0], acc_sums[1]);
   auto l2 = _mm512_unpacklo_epi32(acc_sums[2], acc_sums[3]);
@@ -643,8 +619,7 @@ static inline __attribute__((always_inline)) __m512i reduce_add_s32x16x16(
   return l1;
 }
 
-static inline __attribute__((always_inline)) void
-reduce_add_s32x16x16_with_scales(
+static IPEX_FORCE_INLINE void reduce_add_s32x16x16_with_scales(
     int8_t* outs,
     __m512i* acc_sums,
     const __m512& scales) {
@@ -657,8 +632,7 @@ reduce_add_s32x16x16_with_scales(
   _mm_storeu_si128((__m128i*)outs, out_16);
 }
 
-static inline __attribute__((always_inline)) void
-reduce_add_s32x16x16x4_with_scales(
+static IPEX_FORCE_INLINE void reduce_add_s32x16x16x4_with_scales(
     int8_t* outs,
     __m512i* acc_sums,
     const __m512 (&scales)[4]) {
@@ -692,8 +666,7 @@ reduce_add_s32x16x16x4_with_scales(
   _mm_storeu_si128((__m128i*)(outs + 48), out4_16);
 }
 
-static inline __attribute__((always_inline)) void
-reduce_add_s32x16x16_with_scales_and_mask_store(
+static IPEX_FORCE_INLINE void reduce_add_s32x16x16_with_scales_and_mask_store(
     int8_t* outs,
     __mmask16 mask,
     __m512i* acc_sums,
@@ -707,17 +680,15 @@ reduce_add_s32x16x16_with_scales_and_mask_store(
   _mm_mask_storeu_epi8((__m128i*)outs, mask, out_16);
 }
 
-static inline __attribute__((always_inline)) int32_t mul_and_sum_int8_128(
-    const int8_t* a,
-    const int8_t* b) {
+static IPEX_FORCE_INLINE int32_t
+mul_and_sum_int8_128(const int8_t* a, const int8_t* b) {
   __m512i acc_sum;
   mul_and_sum_s8x128_to_s32x16(acc_sum, a, b);
   return reduce_add_s32x16(acc_sum);
 }
 
-static inline __attribute__((always_inline)) int32_t mul_and_sum_int8_64(
-    const int8_t* a,
-    const int8_t* b) {
+static IPEX_FORCE_INLINE int32_t
+mul_and_sum_int8_64(const int8_t* a, const int8_t* b) {
   int32_t sum;
   auto a_0_16i = _mm512_cvtepi8_epi16(_mm256_loadu_si256((__m256i*)a));
   auto a_1_16i = _mm512_cvtepi8_epi16(_mm256_loadu_si256((__m256i*)(a + 32)));
@@ -740,9 +711,7 @@ static inline __attribute__((always_inline)) int32_t mul_and_sum_int8_64(
   return sum;
 }
 
-static inline __attribute__((always_inline)) int32_t _scale_int32(
-    int32_t value,
-    float scale) {
+static IPEX_FORCE_INLINE int32_t _scale_int32(int32_t value, float scale) {
   auto v_simd = _mm_setzero_ps();
   auto s_simd = _mm_set1_ps(scale);
   v_simd = _mm_cvt_si2ss(v_simd, value);
@@ -756,7 +725,7 @@ static inline __attribute__((always_inline)) int32_t _scale_int32(
   return c;
 }
 
-static inline __attribute__((always_inline)) int8_t _dot_s8s8_scale_s32s8(
+static IPEX_FORCE_INLINE int8_t _dot_s8s8_scale_s32s8(
     const int8_t* a,
     const int8_t* b,
     size_t len,
@@ -781,7 +750,7 @@ static inline __attribute__((always_inline)) int8_t _dot_s8s8_scale_s32s8(
  * load 128 * 8  from "in" and store to "out", the start of "out" should align
  * with memory unit
  */
-static inline __attribute__((always_inline)) void load_s8x128_store_aligned_ker(
+static IPEX_FORCE_INLINE void load_s8x128_store_aligned_ker(
     int8_t* __restrict__ out,
     const int8_t* __restrict__ in) {
   auto in0 = _mm512_loadu_si512(in);
@@ -794,8 +763,7 @@ static inline __attribute__((always_inline)) void load_s8x128_store_aligned_ker(
  *  load 128 * 8  from "in0" and store to "out0", from "in1" to "out1"
  * the start of "out0" and "out1" should align with memory unit
  */
-static inline __attribute__((always_inline)) void
-load_double_s8x128_store_aligned_ker(
+static IPEX_FORCE_INLINE void load_double_s8x128_store_aligned_ker(
     int8_t* __restrict__ out0,
     const int8_t* __restrict__ in0,
     int8_t* __restrict__ out1,
@@ -899,7 +867,7 @@ static inline void scale_int32_and_store_int8_maskz_16(
   _mm_mask_storeu_epi8((void*)out, mask, out_i8);
 }
 
-static inline __attribute__((always_inline)) void scale_fp32_and_fma(
+static IPEX_FORCE_INLINE void scale_fp32_and_fma(
     float* out,
     const int8_t* in,
     float scale,

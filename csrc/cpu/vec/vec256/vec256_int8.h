@@ -1,11 +1,13 @@
 #pragma once
 #include <cstdlib>
 
+#include "utils/SysUtil.h"
+
 namespace torch_ipex {
 namespace cpu {
 namespace kernel {
 
-static inline __attribute__((always_inline)) void scale_and_store_int8(
+static IPEX_FORCE_INLINE void scale_and_store_int8(
     int8_t* out,
     const int8_t* in,
     float& scale,
@@ -33,9 +35,7 @@ static inline void scale_and_move_ker(
   scale_and_store_int8(out, in, scale, len);
 }
 
-static inline __attribute__((always_inline)) int32_t _scale_int32(
-    int32_t value,
-    float scale) {
+static IPEX_FORCE_INLINE int32_t _scale_int32(int32_t value, float scale) {
   float f_val = float(value) * scale;
   int32_t i32_val = int32_t(std::round(f_val));
   if (i32_val < INT8_MIN) {
@@ -46,7 +46,7 @@ static inline __attribute__((always_inline)) int32_t _scale_int32(
   return i32_val;
 }
 
-static inline __attribute__((always_inline)) int8_t _dot_s8s8_scale_s32s8(
+static IPEX_FORCE_INLINE int8_t _dot_s8s8_scale_s32s8(
     const int8_t* a,
     const int8_t* b,
     size_t len,
@@ -60,7 +60,7 @@ static inline __attribute__((always_inline)) int8_t _dot_s8s8_scale_s32s8(
   return (int8_t)c;
 }
 
-static inline __attribute__((always_inline)) void scale_fp32_and_fma(
+static IPEX_FORCE_INLINE void scale_fp32_and_fma(
     float* out,
     const int8_t* in,
     float scale,
