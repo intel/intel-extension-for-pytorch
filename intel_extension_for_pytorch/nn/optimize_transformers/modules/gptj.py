@@ -10,6 +10,9 @@ from ._transformers import IPEXTransformerAtten, IPEXTransformerMLP, IPEXTransfo
 from ._transformer_configuration import IPEXTransformerConfig
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
+import os
+acc_test = os.environ.get("LLM_ACC_TEST", "OFF").upper() in ["1", "ON", "Y", "YES", "TRUE"]
+
 class IPEXGPTJAttn(IPEXTransformerAtten):
     def __init__(self, config, is_int4=False) -> None:
         super().__init__(config, is_int4)
@@ -33,6 +36,7 @@ class IPEXGPTJMLP(IPEXTransformerMLP):
                 else:
                     hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
                     hidden_states = self.act(hidden_states)
+
                 hidden_states = torch.ops.torch_ipex.mm_bias_resadd(hidden_states, self.fc_out_wei, self.fc_out.bias, 1.0, attn_output, 1.0/self.tp_size)
                 hidden_states = self.all_reduce_if_necessary(hidden_states)
                 hidden_states += residual
@@ -84,7 +88,7 @@ class IPEXGPTJBlock(nn.Module):
             print("Unsupported input shape")
             return
         IPEXTransformerAtten.beam_size = beam
-        first_token = True if seq > 1 else False
+        first_token = True if acc_test or layer_past is None else False
         hidden_size = hidden_states.shape[-1]
         hidden_shape = [bs, beam, seq, hidden_size]
         if first_token and beam > 1:
@@ -186,9 +190,10 @@ def IPEXGPTJForCausalLMForward(
 
         if hidden_states.dim() > 3:
             hidden_states = hidden_states.reshape([-1, hidden_states.shape[-2], hidden_states.shape[-1]])
-        shape = list(hidden_states.size())
-        shape[1] = 1
-        hidden_states = hidden_states[:, -1, :].view(shape)
+        if not acc_test:
+            shape = list(hidden_states.size())
+            shape[1] = 1
+            hidden_states = hidden_states[:, -1, :].view(shape)
         lm_logits = self.lm_head(hidden_states).to(torch.float32)
 
         loss = None

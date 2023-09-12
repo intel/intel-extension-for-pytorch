@@ -10,6 +10,9 @@ from ._transformer_configuration import IPEXTransformerConfig
 from .RoPE import LlamaRotaryEmbedding
 from .Norm import LlamaRMSNorm
 from transformers.modeling_outputs import CausalLMOutputWithPast
+        
+import os
+acc_test = os.environ.get("LLM_ACC_TEST", "OFF").upper() in ["1", "ON", "Y", "YES", "TRUE"]
 
 
 class IPEXLlamaAttn(IPEXTransformerAtten):
@@ -80,7 +83,7 @@ class IPEXLlamaBlock(nn.Module):
             print("Unsupported input shape")
             return
         IPEXTransformerAtten.beam_size = beam
-        first_token = True if seq > 1 else False
+        first_token = True if acc_test or past_key_value is None else False
         hidden_size = hidden_states.shape[-1]
         hidden_shape = [bs, beam, seq, hidden_size]
         if first_token and beam > 1:
@@ -192,13 +195,13 @@ def IPEXLlamaForCausalLMForward(
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-
         hidden_states = outputs[0]
         if hidden_states.dim() > 3:
             hidden_states = hidden_states.reshape([-1, hidden_states.shape[-2], hidden_states.shape[-1]])
-        shape = list(hidden_states.size())
-        shape[1] = 1
-        hidden_states = hidden_states[:, -1, :].view(shape)
+        if not acc_test:
+            shape = list(hidden_states.size())
+            shape[1] = 1
+            hidden_states = hidden_states[:, -1, :].view(shape)
         logits = self.lm_head(hidden_states)
         logits = logits.float()
 

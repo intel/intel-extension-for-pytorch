@@ -3,6 +3,25 @@ import warnings
 from ._parameter_wrapper import get_shared_parameter_status, patch_state_dict
 
 
+def replace_transformer_with_ipex_transformer(model):
+    try:
+        import transformers
+        from ._transformers import IPEXGPTJBlock
+    except ImportError as e:
+        warnings.warn("Can not find transformers in your environment, disable ipex transformer optimize")
+        return model
+
+    def replace_transformer_with_ipex_transformer_util(model):
+        # supported_blocks = [transformers.models.gptj.modeling_gptj.GPTJBlock]
+        for child_name, child in model.named_children():
+            if isinstance(child, transformers.models.gptj.modeling_gptj.GPTJBlock):
+                ipex_block = IPEXGPTJBlock(child)
+                setattr(model, child_name, ipex_block)
+            else:
+                replace_transformer_with_ipex_transformer_util(child)
+    replace_transformer_with_ipex_transformer_util(model)
+
+
 def replace_dropout_with_identity(model):
     # replace dropout with identity during inference, so that aten::dropout won't be on the JIT graph.
     # This optimization may provide more fusion opportunites on the graph.

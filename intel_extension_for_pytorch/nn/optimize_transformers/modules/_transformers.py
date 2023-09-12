@@ -249,32 +249,32 @@ class IPEXTransformerAtten(nn.Module):
             return False
         return True
  
-    def qkv_cache_optimized_greedy(self, hidden_states, layer_past = None):
+    def qkv_cache_optimized_greedy(self, hidden_states, first_token = False, layer_past = None):
         # greedy search path
         # hidden_states has already been converted to [seq, beam, hidden_size]
         seq_len, bs_beam, _ = hidden_states.shape
-        if hidden_states.shape[0] != 1:
+        if first_token:
             # the first timestep
             kv_shape = [self.max_positions, bs_beam, self.num_key_value_heads, self.head_dim]
             self.key_cached = torch.empty(kv_shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.value_cached = torch.empty(kv_shape, device=hidden_states.device, dtype=hidden_states.dtype)
-            self.prev_len = 0
-        elif self.key_cached is None or self.value_cached is None:
-            prev_key, value_key = layer_past[0], layer_past[1]
-            self.prev_len = prev_key.size(2)
-            kv_shape = [self.max_positions, bs_beam, self.num_key_value_heads, self.head_dim]
-            self.key_cached = torch.empty(kv_shape, device=hidden_states.device, dtype=hidden_states.dtype)
-            self.value_cached = torch.empty(kv_shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            if layer_past is not None:
+                # for acc test, user can give the layer_past value 
+                # and already have the corresponding response token
+                # layer_past in shape of [bs*beam, head, seq, head_dim]
+                self.prev_len = layer_past[0].size(2)
+                layer_past_key = layer_past[0].permute(2, 0, 1, 3)
+                layer_past_value = layer_past[1].permute(2, 0, 1, 3)
+                self.key_cached[:, self.prev_len, :, :, :] = layer_past_key
+                self.value_cached[:, self.prev_len, :, :, :] = layer_past_value
+            else:
+                # for text generation, layer_past should be None for the first token
+                # has no response token
+                self.prev_len = 0
         else:
             self.prev_len = layer_past[0].size(2)
 
-        if not self.checking_cache(layer_past):
-            self.prev_len = layer_past[0].size(2)
-            self.key_cached[:self.prev_len, :, :, :] = layer_past[0].permute(2, 0, 1, 3)
-            self.value_cached[:self.prev_len,: , :, :] = layer_past[1].permute(2, 0, 1, 3)
-
         self.cur_len = self.prev_len + seq_len
-
         shape = [seq_len, bs_beam, self.num_attn_head * self.head_dim]
         query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
         kv_shape = [seq_len, bs_beam, self.num_key_value_heads * self.head_dim]
@@ -343,8 +343,23 @@ class IPEXTransformerAtten(nn.Module):
                     torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_qwei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, self.key_prompt, self.value_prompt, self.qkv_gs)
                 else:
                     torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, self.key_prompt, self.value_prompt)
-            key = self.key_prompt
-            value = self.value_prompt
+            if layer_past is None:
+                # for text generation, layer_past should be None for the first_token
+                key = self.key_prompt
+                value = self.value_prompt
+            else:
+                # for accuracy check, layer_past may not be None for the first_token
+                # user set the layer_past value
+                # already have the response tokens
+                # layer_past in format [bs*beam, head, seq, head_dim]
+                bs_beam, head, seq, head_dim = layer_past[0].shape
+                layer_past_key = layer_past[0].permute(2, 0, 1, 3).reshape([bs_beam, seq, head*head_dim])
+                layer_past_value = layer_past[1].permute(2, 0, 1, 3).reshape([bs_beam, seq, head*head_dim])
+                self.key_prompt = torch.cat(self.key_prompt, layer_past_key, dim=1)
+                self.value_prompt = torch.cat(self.value_prompt, layer_past_key, dim=1)
+                key = self.key_prompt
+                value = self.value_prompt
+                
             self.prev_len = 0
             self.cur_len = 0
             if bs_beam != IPEXTransformerAtten.runtime_bs:
@@ -417,12 +432,12 @@ class IPEXTransformerAtten(nn.Module):
                     hidden_states: torch.Tensor,
                     key_value_state: Optional[torch.Tensor] = None,
                     layer_past: Optional[Tuple[torch.Tensor]] = None,
-                    first_token = False,):
+                    first_token = False):
         new_shape = hidden_states.size()[:-1] + (self.num_attn_head, self.head_dim)
         new_kv_shape = hidden_states.size()[:-1] + (self.num_key_value_heads, self.head_dim)
         if self.kv_cache_optimize and self.kv_cache:
             if IPEXTransformerAtten.beam_size == 1:
-                query, key, value = self.qkv_cache_optimized_greedy(hidden_states=hidden_states, layer_past=layer_past)
+                query, key, value = self.qkv_cache_optimized_greedy(hidden_states=hidden_states, first_token=first_token, layer_past=layer_past)
             else:
                 # TODO: support greedy
                 # update prompts status

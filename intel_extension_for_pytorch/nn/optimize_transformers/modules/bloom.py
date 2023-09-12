@@ -12,7 +12,8 @@ from .RoPE import PositionalEmbedding
 from transformers.modeling_outputs import CausalLMOutputWithCrossAttentions
 from .utils import print_rank_x
 
-
+import os
+acc_test = os.environ.get("LLM_ACC_TEST", "OFF").upper() in ["1", "ON", "Y", "YES", "TRUE"]
 
 class IPEXBloomAttn(IPEXTransformerAtten):
     def __init__(self, config) -> None:
@@ -97,7 +98,7 @@ class IPEXBloomBlock(nn.Module):
             print("Unsupported input shape")
             return
         IPEXTransformerAtten.beam_size = beam
-        first_token = True if seq > 1 else False 
+        first_token = True if acc_test or layer_past is None else False 
         hidden_size = hidden_states.shape[-1]
         hidden_shape = [bs, beam, seq, hidden_size]
         if first_token and beam > 1:
@@ -230,9 +231,10 @@ def IPEXBloomForCausalLMForward(
 
         if hidden_states.dim() > 3:
             hidden_states = hidden_states.reshape([-1, hidden_states.shape[-2], hidden_states.shape[-1]])
-        shape = list(hidden_states.size())
-        shape[1] = 1
-        hidden_states = hidden_states[:, -1, :].view(shape)
+        if not acc_test:
+            shape = list(hidden_states.size())
+            shape[1] = 1
+            hidden_states = hidden_states[:, -1, :].view(shape)
         lm_logits = self.lm_head(hidden_states)
 
         loss = None
