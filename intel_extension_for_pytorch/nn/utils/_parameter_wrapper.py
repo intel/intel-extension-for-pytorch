@@ -557,9 +557,9 @@ class ParameterWrapper(object):
                 use_dnnl = True if not _using_tpp() else False
         module.use_tpp = _using_tpp()
         module.use_dnnl = use_dnnl
+        if not hasattr(module, "out_features"):
+            setattr(module, "out_features", module.weight.shape[0])  # noqa: B010
         if not module.use_tpp:
-            if not hasattr(module, "out_features"):
-                setattr(module, "out_features", module.weight.shape[0])  # noqa: B010
             # prepare batch size
             module.batch_size_collapsed = None
             if hasattr(module, "input_shape"):
