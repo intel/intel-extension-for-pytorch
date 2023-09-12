@@ -270,8 +270,14 @@ class DistributedTrainingLauncher(Launcher):
         log_name = f"{args.log_file_prefix}.log"
         log_name = os.path.join(args.log_dir, log_name)
         cmd_s = " ".join(cmd)
-        if args.log_dir:
+        if not args.silent and not args.log_dir:
+            pass
+        elif args.silent and not args.log_dir:
+            cmd_s = f"{cmd_s} > /dev/null 2>&1"
+        elif not args.silent and args.log_dir:
             cmd_s = f"{cmd_s} 2>&1 | tee {log_name}"
+        else:
+            cmd_s = f"{cmd_s} > {log_name} 2>&1"
         self.verbose("info", f"cmd: {cmd_s}")
         process = subprocess.Popen(cmd_s, env=os.environ, shell=True)
         process.wait()

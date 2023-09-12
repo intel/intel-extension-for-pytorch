@@ -352,6 +352,12 @@ def init_parser(parser):
     )
 
     parser.add_argument(
+        "--silent",
+        default=False,
+        action="store_true",
+        help="Suppress printings to stdio.",
+    )
+    parser.add_argument(
         "--log-dir",
         "--log_dir",
         default="",

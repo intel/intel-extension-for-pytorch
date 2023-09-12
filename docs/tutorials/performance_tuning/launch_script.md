@@ -23,8 +23,9 @@ Available option settings (knobs) are listed below:
 | knob | type | default value | help |
 | :-- | :--: | :--: | :-- |
 | `-h`, `--help` | - | - | show this help message and exit |
-| `-m`, `--module` | - | False | Changes each process to interpret the launch script  as a python module, executing with the same behavior as 'python -m'. |
+| `-m`, `--module` | - | False | Changes each process to interpret the launch script as a python module, executing with the same behavior as 'python -m'. |
 | `--no-python` | - | False | Avoid applying `python` to execute `program`. |
+| `--silent` | - | False | Suppress printings to stdio. |
 | `--log-dir` | str | '' | The log file directory. Setting it to empty ('') disables logging to files. |
 | `--log-file-prefix` | str | 'run' | log file name prefix |
 

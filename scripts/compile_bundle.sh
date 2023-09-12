@@ -2,17 +2,13 @@
 set -x
 set -e
 
-VER_LLVM="llvmorg-13.0.0"
-VER_PYTORCH=""
-VER_TORCHVISION=""
-VER_TORCHAUDIO=""
-VER_IPEX="master"
+VER_LLVM="llvmorg-16.0.6"
+VER_IPEX="v2.1.0+cpu"
 
 # Check existance of required Linux commands
-for CMD in gcc g++ python git nproc; do
+for CMD in conda git nproc make; do
     command -v ${CMD} || (echo "Error: Command \"${CMD}\" not found." ; exit 4)
 done
-echo "You are using GCC: $(gcc --version | grep gcc)"
 
 MAX_JOBS_VAR=$(nproc)
 if [ ! -z "${MAX_JOBS}" ]; then
@@ -37,51 +33,68 @@ if [ ! -z ${VER_LLVM} ]; then
 fi
 git submodule sync
 git submodule update --init --recursive
-cd ../intel-extension-for-pytorch
+cd ..
+cd intel-extension-for-pytorch
 if [ ! -z ${VER_IPEX} ]; then
     git checkout ${VER_IPEX}
 fi
 git submodule sync
 git submodule update --init --recursive
+cd ..
 
 # Install dependencies
+conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
+conda update -y sysroot_linux-64
 python -m pip install cmake
-python -m pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
+python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 ABI=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")
 
 # Compile individual component
+export CC=${CONDA_PREFIX}/bin/gcc
+export CXX=${CONDA_PREFIX}/bin/g++
+export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
+
 #  LLVM
-cd ../llvm-project
+cd llvm-project
+LLVM_ROOT="$(pwd)/release"
+if [ -d ${LLVM_ROOT} ]; then
+    rm -rf ${LLVM_ROOT}
+fi
 if [ -d build ]; then
     rm -rf build
 fi
 mkdir build
 cd build
-cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${ABI}" -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF ../llvm/
-cmake --build . -j ${MAX_JOBS_VAR}
-LLVM_ROOT="$(pwd)/../release"
-if [ -d ${LLVM_ROOT} ]; then
-    rm -rf ${LLVM_ROOT}
-fi
-cmake -DCMAKE_INSTALL_PREFIX=${LLVM_ROOT}/../release/ -P cmake_install.cmake
+echo "***************************** cmake *****************************" > ../build.log
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${ABI}" -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF ../llvm 2>&1 | tee -a ../build.log
+echo "***************************** build *****************************" >> ../build.log
+cmake --build . -j ${MAX_JOBS_VAR} 2>&1 | tee -a ../build.log
+echo "**************************** install ****************************" >> ../build.log
+cmake -DCMAKE_INSTALL_PREFIX=${LLVM_ROOT} -P cmake_install.cmake 2>&1 | tee -a ../build.log
 #xargs rm -rf < install_manifest.txt
+cd ..
+rm -rf build
 ln -s ${LLVM_ROOT}/bin/llvm-config ${LLVM_ROOT}/bin/llvm-config-13
 export PATH=${LLVM_ROOT}/bin:$PATH
 export LD_LIBRARY_PATH=${LLVM_ROOT}/lib:$LD_LIBRARY_PATH
 cd ..
 #  Intel® Extension for PyTorch*
-cd ../intel-extension-for-pytorch
+cd intel-extension-for-pytorch
 python -m pip install -r requirements.txt
-export USE_LLVM=${LLVM_ROOT}
-export LLVM_DIR=${USE_LLVM}/lib/cmake/llvm
+export LLVM_DIR=${LLVM_ROOT}/lib/cmake/llvm
 export DNNL_GRAPH_BUILD_COMPILER_BACKEND=1
+CXXFLAGS_BK=${CXXFLAGS}
+export CXXFLAGS="${CXXFLAGS} -D__STDC_FORMAT_MACROS"
 python setup.py clean
 python setup.py bdist_wheel 2>&1 | tee build.log
+export CXXFLAGS=${CXXFLAGS_BK}
 unset DNNL_GRAPH_BUILD_COMPILER_BACKEND
 unset LLVM_DIR
-unset USE_LLVM
 python -m pip install --force-reinstall dist/*.whl
+cd ..
 
 # Sanity Test
-cd ..
+set +x
+export LD_PRELOAD=${CONDA_PREFIX}/lib/libstdc++.so
+echo "Note: Should you experience \"version \`GLIBCXX_N.N.NN' not found\" error, run command \"export LD_PRELOAD=${CONDA_PREFIX}/lib/libstdc++.so\" and try again."
 python -c "import torch; import torchvision; import torchaudio; import intel_extension_for_pytorch as ipex; print(f'torch_cxx11_abi:     {torch._C._GLIBCXX_USE_CXX11_ABI}'); print(f'torch_version:       {torch.__version__}'); print(f'torchvision_version: {torchvision.__version__}'); print(f'torchaudio_version:  {torchaudio.__version__}'); print(f'ipex_version:        {ipex.__version__}');"
