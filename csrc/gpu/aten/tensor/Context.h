@@ -152,7 +152,7 @@ struct DPCPPTensorContext {
     DPCPPTensorContext* ctx = (DPCPPTensorContext*)t.unsafeGetTensorImpl()
                                   ->storage()
                                   .unsafeGetStorageImpl()
-                                  ->data_ptr()
+                                  ->mutable_data_ptr()
                                   .release_context();
     DPCPPTensorContext copy = *ctx;
     delete ctx;
