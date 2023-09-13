@@ -17,7 +17,8 @@ float norm_fro(const at::Tensor& input_tensor) {
   int num_threads = omp_get_max_threads();
   int local_size = (input_size + num_threads - 1) / num_threads;
 
-  float scratchpad[num_threads] = {0.f};
+  std::vector<float> scratchpad(num_threads);
+  scratchpad.assign({0.f});
 // Reduce to scratchpad
 #pragma omp parallel
   {
