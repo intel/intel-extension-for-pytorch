@@ -116,17 +116,17 @@ python run_llama_quantization.py --ipex-smooth-quant --output-dir "saved_results
 ## GPT-NEOX quantization
 python run_gpt-neox_quantization.py --ipex-weight-only-quantization --output-dir "saved_results" --int8 -m <GPT-NEOX MODEL_ID>
 ## Falcon quantization (example of config-file: utils/model_config/tiiuae_falcon-40b_config.json)
-python run_falcon_quantization.py --ipex-weight-only-quantization --output-dir "saved_results"  --int8-bf16-mixed -m <MODEL_ID> --config-file <CONFIG_FILE>
+python run_falcon_quantization.py --ipex-weight-only-quantization --output-dir "saved_results"  --int8-bf16-mixed -m <FALCON MODEL_ID> --config-file <CONFIG_FILE>
 ## OPT quantization
-python run_opt_quantization.py --ipex-weight-only-quantization --output-dir "saved_results"  --int8-bf16-mixed -m <MODEL_ID> 
+python run_opt_quantization.py --ipex-weight-only-quantization --output-dir "saved_results"  --int8-bf16-mixed -m <OPT MODEL_ID> 
 
 ## (2) Run quantization performance test (note that GPT-NEOX uses --int8 instead of --int8-bf16-mixed)
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run_<MODEL>_int8.py -m <MODEL_ID> --quantized-model-path "./saved_results/best_model.pt" --benchmark --int8-bf16-mixed
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run_<MODEL>_quantization.py -m <MODEL_ID> --quantized-model-path "./saved_results/best_model.pt" --benchmark --int8-bf16-mixed
 
 ```
 ## Single Instance Accuracy
 ```bash
-Accuracy test {TASK_NAME}, choice in this [link](https://github.com/EleutherAI/lm-evaluation-harness/blob/master/docs/task_table.md), by default we use "lambada_openai"
+Accuracy test {TASK_NAME}, choice in this [link](https://github.com/EleutherAI/lm-evaluation-harness/blob/master/docs/task_table.md), by default we use "lambada_standard"
 
 # bfloat16
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run_accuracy.py --accuracy-only -m <MODEL_ID> --dtype bfloat16 --ipex --jit --tasks {TASK_NAME}

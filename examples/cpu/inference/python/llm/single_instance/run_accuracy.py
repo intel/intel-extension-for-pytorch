@@ -46,10 +46,10 @@ parser.add_argument(
     "--tasks",
     nargs="+",
     default=[
-        "lambada_openai",
+        "lambada_standard",
     ],
     type=str,
-    help="tasks list for accuracy validation, only enabled lambada_openai and lambada_standard at present",
+    help="tasks list for accuracy validation, only enabled lambada_standard and lambada_standard at present",
 )
 parser.add_argument(
     "--config-file", default=None, type=str, help="specific configuration file"

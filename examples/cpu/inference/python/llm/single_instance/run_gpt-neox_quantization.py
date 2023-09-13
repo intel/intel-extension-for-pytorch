@@ -92,7 +92,7 @@ if args.benchmark:
     try:
         with ipex.OnDevice(dtype=torch.float, device="meta"):
             user_model = AutoModelForCausalLM.from_config(config)
-    except RuntimeError:
+    except (RuntimeError, AttributeError):
         user_model = AutoModelForCausalLM.from_config(config)
 else:
     user_model = AutoModelForCausalLM.from_pretrained(
@@ -172,8 +172,7 @@ if args.ipex_weight_only_quantization:
     with torch.no_grad(), torch.cpu.amp.autocast(
         enabled=amp_enabled,
     ):
-        convert_model = convert_woq(user_model.eval(), qconfig)
-        self_jit = torch.jit.trace(convert_model.eval(), example_inputs, strict=False)
+        self_jit = torch.jit.trace(user_model.eval(), example_inputs, strict=False)
         self_jit = torch.jit.freeze(self_jit.eval())
         self_jit.save(args.output_dir + "/best_model.pt")
 
