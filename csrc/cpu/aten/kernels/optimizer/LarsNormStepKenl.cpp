@@ -1,6 +1,7 @@
 #include <ATen/Parallel.h>
 #include <aten/optimizer/optimizer.h>
 #include <torch/csrc/autograd/function.h>
+#include "vec/vec.h"
 
 namespace torch_ipex {
 namespace cpu {
