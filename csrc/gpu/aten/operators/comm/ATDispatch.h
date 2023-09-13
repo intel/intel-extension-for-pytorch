@@ -819,44 +819,44 @@
       NAME,                                                              \
       __VA_ARGS__)
 
-#define IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND5(                        \
-    SCALARTYPE1,                                                         \
-    SCALARTYPE2,                                                         \
-    SCALARTYPE3,                                                         \
-    SCALARTYPE4,                                                         \
-    SCALARTYPE5,                                                         \
-    TYPE,                                                                \
-    NAME,                                                                \
-    ...)                                                                 \
-  AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND5(                                \
-      SCALARTYPE1,                                                       \
-      SCALARTYPE2,                                                       \
-      SCALARTYPE3,                                                       \
-      SCALARTYPE4,                                                       \
-      SCALARTYPE5,                                                       \
-      TYPE,                                                              \
-      NAME,                                                              \
+#define IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND5( \
+    SCALARTYPE1,                                  \
+    SCALARTYPE2,                                  \
+    SCALARTYPE3,                                  \
+    SCALARTYPE4,                                  \
+    SCALARTYPE5,                                  \
+    TYPE,                                         \
+    NAME,                                         \
+    ...)                                          \
+  AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND5(         \
+      SCALARTYPE1,                                \
+      SCALARTYPE2,                                \
+      SCALARTYPE3,                                \
+      SCALARTYPE4,                                \
+      SCALARTYPE5,                                \
+      TYPE,                                       \
+      NAME,                                       \
       __VA_ARGS__)
 
-#define IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND6(                        \
-    SCALARTYPE1,                                                         \
-    SCALARTYPE2,                                                         \
-    SCALARTYPE3,                                                         \
-    SCALARTYPE4,                                                         \
-    SCALARTYPE5,                                                         \
-    SCALARTYPE6,                                                         \
-    TYPE,                                                                \
-    NAME,                                                                \
-    ...)                                                                 \
-  AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND6(                                \
-      SCALARTYPE1,                                                       \
-      SCALARTYPE2,                                                       \
-      SCALARTYPE3,                                                       \
-      SCALARTYPE4,                                                       \
-      SCALARTYPE5,                                                       \
-      SCALARTYPE6,                                                       \
-      TYPE,                                                              \
-      NAME,                                                              \
+#define IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND6( \
+    SCALARTYPE1,                                  \
+    SCALARTYPE2,                                  \
+    SCALARTYPE3,                                  \
+    SCALARTYPE4,                                  \
+    SCALARTYPE5,                                  \
+    SCALARTYPE6,                                  \
+    TYPE,                                         \
+    NAME,                                         \
+    ...)                                          \
+  AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND6(         \
+      SCALARTYPE1,                                \
+      SCALARTYPE2,                                \
+      SCALARTYPE3,                                \
+      SCALARTYPE4,                                \
+      SCALARTYPE5,                                \
+      SCALARTYPE6,                                \
+      TYPE,                                       \
+      NAME,                                       \
       __VA_ARGS__)
 
 #endif

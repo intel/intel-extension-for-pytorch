@@ -1,7 +1,9 @@
+// clang-format off
+#include <ATen/native/TensorTransformations.h>
+// clang-format on
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/WrapDimUtilsMulti.h>
-#include <ATen/native/TensorTransformations.h>
 #include <core/detail/OffsetCalculator.h>
 #include "Loops.h"
 #include "MemoryAccess.h"

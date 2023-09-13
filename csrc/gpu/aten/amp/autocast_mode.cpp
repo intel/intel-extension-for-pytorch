@@ -218,9 +218,15 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
       Tensor(const Tensor&, const Tensor&),
       lower_precision_fp)
   KERNEL_XPU(
-      ADD_NS(mm), "mm", Tensor(const Tensor&, const Tensor&), lower_precision_fp)
+      ADD_NS(mm),
+      "mm",
+      Tensor(const Tensor&, const Tensor&),
+      lower_precision_fp)
   KERNEL_XPU(
-      ADD_NS(mv), "mv", Tensor(const Tensor&, const Tensor&), lower_precision_fp)
+      ADD_NS(mv),
+      "mv",
+      Tensor(const Tensor&, const Tensor&),
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(linear),
       "linear",
@@ -247,9 +253,15 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           const Scalar&),
       lower_precision_fp)
   KERNEL_XPU(
-      ADD_NS(bmm), "bmm", Tensor(const Tensor&, const Tensor&), lower_precision_fp)
+      ADD_NS(bmm),
+      "bmm",
+      Tensor(const Tensor&, const Tensor&),
+      lower_precision_fp)
   KERNEL_XPU(
-      ADD_NS(chain_matmul), "chain_matmul", Tensor(TensorList), lower_precision_fp)
+      ADD_NS(chain_matmul),
+      "chain_matmul",
+      Tensor(TensorList),
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(linalg_multi_dot),
       "linalg_multi_dot",

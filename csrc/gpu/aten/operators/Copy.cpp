@@ -185,7 +185,15 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
               });
         } else {
           IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND6(
-              kBool, kHalf, kBFloat16, kComplexHalf, kFloat8_e4m3fn, kFloat8_e5m2, dtype, "copy_", [&] {
+              kBool,
+              kHalf,
+              kBFloat16,
+              kComplexHalf,
+              kFloat8_e4m3fn,
+              kFloat8_e5m2,
+              dtype,
+              "copy_",
+              [&] {
                 dpcpp_fast_mode_kernel_for_tensor_iter(
                     iter, [=](scalar_t src_val) { return src_val; });
               });
@@ -200,7 +208,15 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
               });
         } else {
           IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND6(
-              kBool, kHalf, kBFloat16, kComplexHalf, kFloat8_e4m3fn, kFloat8_e5m2, dtype, "copy_", [&] {
+              kBool,
+              kHalf,
+              kBFloat16,
+              kComplexHalf,
+              kFloat8_e4m3fn,
+              kFloat8_e5m2,
+              dtype,
+              "copy_",
+              [&] {
                 dpcpp_fast_mode_kernel_for_tensor_iter(
                     iter, [=](scalar_t src_val) { return -src_val; });
               });
