@@ -78,5 +78,12 @@ jobs:
     needs: build
     steps:
       - name: Deploy
-        id: deployment
         uses: actions/deploy-pages@v2
+
+  cleanup:
+    runs-on: self-hosted
+    needs: deploy
+    steps:
+      - name: Cleanup
+        run: |
+          rm -rf ./*
