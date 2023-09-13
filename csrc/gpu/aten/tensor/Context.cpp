@@ -78,7 +78,7 @@ at::Tensor DPCPPTensorConvertor::to_plain(const at::Tensor& from_original) {
     from.unsafeGetTensorImpl()
         ->storage()
         .unsafeGetStorageImpl()
-        ->data_ptr()
+        ->mutable_data_ptr()
         .release_context();
   }
 

@@ -151,7 +151,7 @@ void unsafe_release_and_set_data_ptr(const Tensor& src, const Tensor& dst) {
   auto src_cptr = (DPCPPTensorContext*)src.unsafeGetTensorImpl()
                       ->storage()
                       .unsafeGetStorageImpl()
-                      ->data_ptr()
+                      ->mutable_data_ptr()
                       .release_context();
   at::DataPtr dptr(
       src_cptr->data(),

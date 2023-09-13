@@ -212,7 +212,7 @@ Tensor to_plain_if_needed_(const Tensor& tensor) {
   auto plain_ctx = (DPCPPTensorContext*)plain.unsafeGetTensorImpl()
                        ->storage()
                        .unsafeGetStorageImpl()
-                       ->data_ptr()
+                       ->mutable_data_ptr()
                        .release_context();
   DPCPPTensorContext::set_tensor_ctx(tensor, std::move(*plain_ctx));
   return tensor;
