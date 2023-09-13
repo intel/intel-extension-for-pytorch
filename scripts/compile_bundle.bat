@@ -2,7 +2,7 @@
 
 set "VER_PYTORCH=v2.0.1"
 set "VER_TORCHVISION=v0.15.2"
-set "VER_IPEX=xpu-master"
+set "VER_IPEX=dev/LLM-xpu"
 
 if "%~2"=="" (
     echo Usage: %~nx0 ^<DPCPPROOT^> ^<MKLROOT^> [AOT]
