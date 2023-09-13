@@ -12,194 +12,6 @@
 namespace at {
 namespace autocast {
 
-// Policies correspond to op categories that need code-divergent handling.
-// Wrapper templates below are specialized based on a policy template parameter.
-enum class CastPolicy : uint8_t {
-  lower_precision =
-      0, // Cast all inputs to lower_precision before running the op.
-         // Currently, lower_precision is bf16 / fp16 for AutocastXPU, and is
-         // defined by user(default bf16) for AutocastXPU.
-  fp32, // Cast all inputs to at::kFloat before running the op.
-  fp32_set_opt_dtype, // Treats functions (like softmax) that
-                      //   1. we'd like to run in fp32 and
-                      //   2. have a c10::optional<ScalarType> arg that controls
-                      //   the output type.
-                      // fp32_set_opt_dtype wrappers' policy is:  if the output
-                      // type is already set, don't touch it, otherwise, set it
-                      // to at::kFloat.
-  fp32_append_dtype, // Treats functions (like norm) that
-                     //   1. we'd like to run in fp32 and
-                     //   2. have some overloads that accept an output type and
-                     //   other overloads that don't.
-                     // fp32_append_dtype wrappers wrap the overloads that don't
-                     // have an output dtype. The wrapper policy is:  append
-                     // at::kFloat to the args, and redispatch to the type-aware
-                     // overload.
-  promote, // Run in the widest dtype among several args.
-};
-
-/********************************************************************************************************
-Templates to provide wrapper functions
-
-I'm copying the pattern used in core/boxing/impl/WrapFunctionIntoFunctor.h to
-extract args and return type. (see also
-https://stackoverflow.com/questions/46533698/how-to-deduce-argument-list-from-function-pointer)
-
-This strategy uses an exterior "WrapFunction" that extracts arguments on behalf
-of (in my case several specializations of) an interior "WrapFunction_". Interior
-WrapFunction_ specializations are defined for each CastPolicy.
-********************************************************************************************************/
-
-// Base template for WrapFunction_, which is specialized to contain a "call"
-// method each CastPolicy
-template <
-    CastPolicy policy,
-    DeviceType device_type,
-    class Redispatch,
-    Redispatch* F,
-    class Ret,
-    class ArgList>
-struct WrapFunction_ {};
-
-// CastPolicy::lower_precision General_DeviceType
-template <
-    DeviceType device_type,
-    class Redispatch,
-    Redispatch* F,
-    class Ret,
-    class... Args>
-struct WrapFunction_<
-    CastPolicy::lower_precision,
-    device_type,
-    Redispatch,
-    F,
-    Ret,
-    guts::typelist::typelist<Args...>> {
-  static Ret call(Args... args) {
-    c10::impl::ExcludeDispatchKeyGuard no_autocast(
-        get_autocast_dispatch_key_from_device_type(device_type));
-    return (*F)(cached_cast(
-        get_lower_precision_fp_from_device_type(device_type),
-        args,
-        device_type)...);
-  }
-};
-
-// CastPolicy::fp32 General_DeviceType
-template <
-    DeviceType device_type,
-    class Redispatch,
-    Redispatch* F,
-    class Ret,
-    class... Args>
-struct WrapFunction_<
-    CastPolicy::fp32,
-    device_type,
-    Redispatch,
-    F,
-    Ret,
-    guts::typelist::typelist<Args...>> {
-  static Ret call(Args... args) {
-    c10::impl::ExcludeDispatchKeyGuard no_autocast(
-        get_autocast_dispatch_key_from_device_type(device_type));
-    return (*F)(cached_cast(at::kFloat, args, device_type)...);
-  }
-};
-
-// CastPolicy::fp32_set_opt_dtype DeviceType::XPU
-template <class Redispatch, Redispatch* F, class Ret, class... Args>
-struct WrapFunction_<
-    CastPolicy::fp32_set_opt_dtype,
-    DeviceType::XPU,
-    Redispatch,
-    F,
-    Ret,
-    guts::typelist::typelist<Args...>> {
-  static Ret call(Args... args) {
-    c10::impl::ExcludeDispatchKeyGuard no_autocast(DispatchKey::AutocastXPU);
-    if (firstarg_is_eligible(args...)) {
-      return (*F)(set_opt_dtype(at::kFloat, args)...);
-    } else {
-      // If ineligible, calls F with unaltered args.  Does not set opt dtype,
-      // because setting opt dtype explicitly may interfere with internal
-      // implicit promotion decisions.
-      return (*F)(args...);
-    }
-  }
-};
-
-// CastPolicy::fp32_append_dtype DeviceType::XPU
-template <class Redispatch, Redispatch* F, class Ret, class... Args>
-struct WrapFunction_<
-    CastPolicy::fp32_append_dtype,
-    DeviceType::XPU,
-    Redispatch,
-    F,
-    Ret,
-    guts::typelist::typelist<Args...>> {
-  static Ret call(Args... args) {
-    c10::impl::ExcludeDispatchKeyGuard no_autocast(DispatchKey::AutocastXPU);
-    at::ScalarType out_type = type_from_firstarg(at::kFloat, args...);
-    return (*F)(args..., out_type);
-  }
-};
-
-// CastPolicy::promote General_DeviceType
-template <
-    DeviceType device_type,
-    class Redispatch,
-    Redispatch* F,
-    class Ret,
-    class... Args>
-struct WrapFunction_<
-    CastPolicy::promote,
-    device_type,
-    Redispatch,
-    F,
-    Ret,
-    guts::typelist::typelist<Args...>> {
-  static Ret call(Args... args) {
-    c10::impl::ExcludeDispatchKeyGuard no_autocast(
-        get_autocast_dispatch_key_from_device_type(device_type));
-    auto to_type = promote_type(
-        get_lower_precision_fp_from_device_type(device_type),
-        device_type,
-        args...);
-    return (*F)(cached_cast(to_type, args, device_type)...);
-  }
-};
-
-// Wrapper to infer return_type and parameter_types for WrapFunction_ (imitating
-// core/boxing/impl/WrapFunctionIntoFunctor.h)
-template <
-    CastPolicy policy,
-    DeviceType device_type,
-    class Registered, // The signature for which we're registering.  The
-                      // dispatcher's calling code invokes our registered
-                      // functions with arguments matching Registered, so we
-                      // register WrapFunction_::call methods with a matching
-                      // signature to properly field those arguments.
-                      // guts::function_traits below extracts return_type and
-                      // parameter_types from Registered, which WrapFunction_
-                      // templates above use to declare their call methods.
-    class Redispatch, // The signature for the function we're redispatching to.
-                      // In most cases this is the same as Registered, but for
-                      // some ops (for example, ops where we append a dtype)
-                      // it's useful to redispatch to a function with a
-                      // different signature.
-    Redispatch* F> // The actual function we're redispatching to.
-struct WrapFunction final {
-  using type = WrapFunction_<
-      policy,
-      device_type,
-      Redispatch,
-      F,
-      typename guts::function_traits<Registered>::return_type,
-      typename guts::function_traits<Registered>::parameter_types>;
-};
-
-#define ADD_NS(RAW_OP) at::RAW_OP
-
 #define KERNEL_XPU(FUNC, REGISTER_NAME, SIGNATURE, POLICY) \
   m.impl(                                                  \
       TORCH_SELECTIVE_NAME("aten::" REGISTER_NAME),        \
@@ -235,7 +47,7 @@ TORCH_LIBRARY_IMPL(_, AutocastXPU, m) {
 }
 
 TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
-  // lower_precision cast policy
+  // lower_precision_fp cast policy
   KERNEL_XPU(
       ADD_NS(_convolution),
       "_convolution.deprecated",
@@ -252,7 +64,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           bool,
           bool,
           bool),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(_convolution),
       "_convolution",
@@ -270,7 +82,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           bool,
           bool,
           bool),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(conv1d),
       "conv1d",
@@ -282,7 +94,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           IntArrayRef,
           IntArrayRef,
           int64_t),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(conv2d),
       "conv2d",
@@ -294,7 +106,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           IntArrayRef,
           IntArrayRef,
           int64_t),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(conv3d),
       "conv3d",
@@ -306,12 +118,12 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           IntArrayRef,
           IntArrayRef,
           int64_t),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(conv_tbc),
       "conv_tbc",
       Tensor(const Tensor&, const Tensor&, const Tensor&, int64_t),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(conv_transpose1d),
       "conv_transpose1d",
@@ -324,7 +136,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           IntArrayRef,
           int64_t,
           IntArrayRef),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(conv_transpose2d),
       "conv_transpose2d.input",
@@ -337,7 +149,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           IntArrayRef,
           int64_t,
           IntArrayRef),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(conv_transpose3d),
       "conv_transpose3d.input",
@@ -350,7 +162,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           IntArrayRef,
           int64_t,
           IntArrayRef),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(convolution),
       "convolution",
@@ -364,12 +176,12 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           bool,
           IntArrayRef,
           int64_t),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(prelu),
       "prelu",
       Tensor(const Tensor&, const Tensor&),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(addmm),
       "addmm",
@@ -379,7 +191,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           const Tensor&,
           const Scalar&,
           const Scalar&),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(addmv),
       "addmv",
@@ -389,7 +201,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           const Tensor&,
           const Scalar&,
           const Scalar&),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(addr),
       "addr",
@@ -399,21 +211,21 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           const Tensor&,
           const Scalar&,
           const Scalar&),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(matmul),
       "matmul",
       Tensor(const Tensor&, const Tensor&),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
-      ADD_NS(mm), "mm", Tensor(const Tensor&, const Tensor&), lower_precision)
+      ADD_NS(mm), "mm", Tensor(const Tensor&, const Tensor&), lower_precision_fp)
   KERNEL_XPU(
-      ADD_NS(mv), "mv", Tensor(const Tensor&, const Tensor&), lower_precision)
+      ADD_NS(mv), "mv", Tensor(const Tensor&, const Tensor&), lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(linear),
       "linear",
       Tensor(const Tensor&, const Tensor&, const c10::optional<Tensor>&),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(addbmm),
       "addbmm",
@@ -423,7 +235,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           const Tensor&,
           const Scalar&,
           const Scalar&),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(baddbmm),
       "baddbmm",
@@ -433,22 +245,22 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           const Tensor&,
           const Scalar&,
           const Scalar&),
-      lower_precision)
+      lower_precision_fp)
   KERNEL_XPU(
-      ADD_NS(bmm), "bmm", Tensor(const Tensor&, const Tensor&), lower_precision)
+      ADD_NS(bmm), "bmm", Tensor(const Tensor&, const Tensor&), lower_precision_fp)
   KERNEL_XPU(
-      ADD_NS(chain_matmul), "chain_matmul", Tensor(TensorList), lower_precision)
+      ADD_NS(chain_matmul), "chain_matmul", Tensor(TensorList), lower_precision_fp)
   KERNEL_XPU(
       ADD_NS(linalg_multi_dot),
       "linalg_multi_dot",
       Tensor(TensorList),
-      lower_precision)
+      lower_precision_fp)
   // The macro doesn't like these (I think it chokes on commas inside <>) so
   // write them manually
   m.impl(
       "_thnn_fused_gru_cell",
       TORCH_FN((&WrapFunction<
-                CastPolicy::lower_precision,
+                CastPolicy::lower_precision_fp,
                 DeviceType::XPU,
                 std::tuple<Tensor, Tensor>(
                     const Tensor&,
@@ -466,7 +278,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
   m.impl(
       "gru_cell",
       TORCH_FN((&WrapFunction<
-                CastPolicy::lower_precision,
+                CastPolicy::lower_precision_fp,
                 DeviceType::XPU,
                 Tensor(
                     const Tensor&,
