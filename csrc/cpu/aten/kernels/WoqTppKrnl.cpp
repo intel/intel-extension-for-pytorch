@@ -6,12 +6,25 @@
 #include <aten/Linear.h>
 #include "csrc/cpu/tpp/woq/tla.h"
 
+#ifdef __GNUC__
+#include <features.h>
+#if __GNUC_PREREQ(12, 3)
+#define COMPILER_PREREQ_MET
+#endif
+#endif
+
 namespace torch_ipex {
 namespace cpu {
 namespace {
 
 using namespace tpp;
 using TensorList = std::vector<at::Tensor>;
+
+// We only build optimized kernels if AVX512_FP16 is supported and gcc>=12.3
+// Otherwise we just return empty results
+// TODO(Weiwen) Merge WoqTppKrnl.cpp and WoqLinearKrnl.cpp and put the latter in
+// the #else part
+#if defined(CPU_CAPABILITY_AVX512_FP16) && defined(COMPILER_PREREQ_MET)
 
 #define SMALL_BATCH_THRESHOLD 32
 #define PARALLEL_M_THRESHOLD 128
@@ -2434,10 +2447,40 @@ at::Tensor qlinear_woq_affine(
   }
 }
 
-// TODO(jgong5): int4 quantized linear with lut
-// at::Tensor qlinear_woq_lut(at::Tensor x, at::Tensor qw_packed, at::Tensor
-// lut, at::Tensor b, at::ScalarType compute_dtype) {
-// }
+#else // defined(CPU_CAPABILITY_AVX512_FP16) && defined(COMPILER_PREREQ_MET)
+
+static at::Tensor empty_tensor;
+
+at::Tensor qlinear_woq_affine(
+    const at::Tensor& x,
+    const at::Tensor& qw,
+    const TensorList& scales_list,
+    const TensorList& zp_list,
+    const TensorList& bias_list,
+    bool is_int4,
+    int64_t lowp_mode,
+    int64_t num_concats,
+    int64_t fusion_type,
+    const TensorList& others_list) {
+  return empty_tensor;
+}
+
+at::Tensor qlinear_woq_pack(
+    const at::Tensor& qw,
+    bool is_int4,
+    size_t block_n,
+    size_t block_k,
+    int64_t lowp_mode) {
+  return empty_tensor;
+}
+
+at::Tensor qlinear_woq_unpack(
+    const at::Tensor& qw_packed,
+    bool is_int4,
+    int64_t lowp_mode) {
+  return empty_tensor;
+}
+#endif // defined(CPU_CAPABILITY_AVX512_FP16) && defined(COMPILER_PREREQ_MET)
 
 } // namespace
 
