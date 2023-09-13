@@ -38,7 +38,7 @@ Software Requirements
      - `Intel® Arc™ & Iris® Xe Graphics - WHQL - Windows* <https://www.intel.com/content/www/us/en/download/726609/intel-arc-iris-xe-graphics-whql-windows.html>`_
    * - CPU (3\ :sup:`rd`\  and 4\ :sup:`th`\   Gen of Intel® Xeon® Scalable Processors)
      - Linux* distributions with glibc>=2.17. Validated on CentOS 8.
-     - N/A
+     - `Stable 647.21 <https://dgpu-docs.intel.com/releases/stable_647_21_20230714.html>`_
 
 - `Intel® oneAPI Base Toolkit 2023.2.0 <https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html>`_
 - Python 3.8-3.11
