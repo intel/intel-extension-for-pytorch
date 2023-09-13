@@ -60,6 +60,15 @@ void DPCPPGeneratorImpl::set_current_seed(uint64_t seed) {
   philox_offset_per_thread_ = 0;
 }
 
+void DPCPPGeneratorImpl::set_offset(uint64_t offset) {
+  // the set function checks if the offset is a multiple of 4.
+  set_philox_offset_per_thread(offset);
+}
+
+uint64_t DPCPPGeneratorImpl::get_offset() const {
+  return philox_offset_per_thread_;
+}
+
 uint64_t DPCPPGeneratorImpl::current_seed() const {
   return seed_;
 }

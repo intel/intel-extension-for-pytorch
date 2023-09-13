@@ -357,6 +357,67 @@ def current_stream(device: Optional[_device_t] = None) -> Stream:
     return Stream(stream_id=streamdata[0], device_index=streamdata[1], device_type=streamdata[2])
 
 
+def _get_device(device: Union[int, str, torch.device]) -> torch.device:
+    r"""Return the torch.device type object from the passed in device.
+
+    Args:
+        device (torch.device or int): selected device.
+    """
+    if isinstance(device, str):
+        device = torch.device(device)
+    elif isinstance(device, int):
+        device = torch.device("xpu", device)
+    return device
+
+
+def _get_generator(device: torch.device) -> torch._C.Generator:
+    r"""Return the XPU Generator object for the given device.
+
+    Args:
+        device (torch.device): selected device.
+    """
+
+    idx = device.index
+    if idx is None:
+        idx = current_device()
+    return torch.xpu.default_generators[idx]
+
+
+def _set_rng_state_offset(
+    offset: int, device: Union[int, str, torch.device] = "xpu"
+) -> None:
+    r"""Sets the random number generator state offset of the specified GPU.
+
+    Args:
+        offset (int): The desired offset
+        device (torch.device or int, optional): The device to set the RNG state.
+            Default: ``'xpu'`` (i.e., ``torch.device('xpu')``, the current XPU device).
+    """
+    final_device = _get_device(device)
+
+    def cb():
+        default_generator = _get_generator(final_device)
+        default_generator.set_offset(offset)
+
+    _lazy_call(cb)
+
+
+def _get_rng_state_offset(device: Union[int, str, torch.device] = "xpu") -> int:
+    r"""Returns the random number generator state offset of the specified GPU.
+
+    Args:
+        device (torch.device or int, optional): The device to return the RNG state offset of.
+            Default: ``'xpu'`` (i.e., ``torch.device('xpu')``, the current XPU device).
+
+    .. warning::
+        This function eagerly initializes XPU.
+    """
+    _lazy_init()
+    final_device = _get_device(device)
+    default_generator = _get_generator(final_device)
+    return default_generator.get_offset()
+
+
 @staticmethod  # type: ignore[misc]
 def _lazy_new(cls, *args, **kwargs):
     _lazy_init()
