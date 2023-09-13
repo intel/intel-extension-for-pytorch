@@ -1961,7 +1961,7 @@ class TestPrepackCases(TestCase):
         batch_size = 2
         seq_len = 3
 
-        num_directions = 2 if bidirectional else 1
+        num_directions = 2
 
         input = torch.randn(batch_size, seq_len, input_size)
         h = torch.randn(num_layers * num_directions, batch_size, hidden_size)
