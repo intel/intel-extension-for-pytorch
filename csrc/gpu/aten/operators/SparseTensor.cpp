@@ -1,5 +1,5 @@
 #include <ATen/NativeFunctions.h>
-#include <ATen/SparseTensorUtils.h>
+#include <ATen/native/SparseTensorUtils.h>
 #include <core/Memory.h>
 #include <core/detail/ListUtils.h>
 #include <core/detail/TensorInfo.h>

@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/Context.h>
-#include <ATen/SparseTensorUtils.h>
+#include <ATen/native/SparseTensorUtils.h>
 #include <ATen/autocast_mode.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>

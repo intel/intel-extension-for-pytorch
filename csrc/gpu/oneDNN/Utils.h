@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include <ATen/ATen.h>
+#include <ATen/core/grad_mode.h>
 #include <aten/quantized/QUtils.h>
 #include <aten/quantized/Quantizer.h>
 #include <core/MemoryFormat.h>
