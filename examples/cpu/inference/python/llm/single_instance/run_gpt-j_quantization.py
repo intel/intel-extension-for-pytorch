@@ -87,7 +87,7 @@ if not hasattr(config, "text_max_length") and args.prompt is None:
 
 if args.benchmark:
     try:
-        with ipex._IPEXOnDevice(dtype=torch.float, device="meta"):
+        with ipex.OnDevice(dtype=torch.float, device="meta"):
             user_model = AutoModelForCausalLM.from_config(config)
     except RuntimeError:
         user_model = AutoModelForCausalLM.from_config(config)
