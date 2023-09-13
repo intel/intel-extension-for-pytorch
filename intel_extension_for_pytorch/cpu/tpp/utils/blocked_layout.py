@@ -405,7 +405,7 @@ class TestModule(BlockedModule):
     def __init__(self):
         super(BlockedModule, self).__init__()
         self.param1 = BlockedParameter(torch.arange(10.0))
-        self.param1.set_blcoking_param(
+        self.param1.set_blocking_param(
             (
                 [5],
                 [1, 0],
