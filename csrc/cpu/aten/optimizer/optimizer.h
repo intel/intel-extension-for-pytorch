@@ -124,5 +124,9 @@ using adam_fused_step_kernel_fn = void (*)(
     double);
 DECLARE_DISPATCH(adam_fused_step_kernel_fn, adam_fused_step_kernel_stub);
 
+using lars_norm_kernel_fn = float (*)(const at::Tensor&);
+
+DECLARE_DISPATCH(lars_norm_kernel_fn, lars_norm_kernel_stub);
+
 } // namespace cpu
 } // namespace torch_ipex
