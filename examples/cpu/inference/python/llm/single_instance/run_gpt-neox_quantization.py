@@ -109,6 +109,7 @@ beam_idx_tmp = torch.zeros(
 ).contiguous()
 global_past_key_value = [
     (
+        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
         torch.zeros(
             [
                 1,
@@ -132,7 +133,6 @@ global_past_key_value = [
             ]
         ).contiguous(),
         beam_idx_tmp,
-        torch.zeros(1, dtype=torch.long).contiguous(),
     )
     for i in range(user_model.config.num_hidden_layers)
 ]
@@ -178,6 +178,14 @@ if args.ipex_weight_only_quantization:
 
 if args.benchmark:
     torch._C._jit_set_texpr_fuser_enabled(False)
+    qconfig = ipex.quantization.default_static_qconfig_mapping
+    user_model = ipex.optimize_transformers(
+        user_model.eval(),
+        dtype=torch.float,
+        inplace=True,
+        quantization_config=qconfig,
+        deployment_mode=False,
+    )
     if not hasattr(user_model, "trace_graph"):
         print("load_quantized_model")
         self_jit = torch.jit.load(args.quantized_model_path)

@@ -332,6 +332,9 @@ if args.accuracy_only:
                             [
                                 (
                                     torch.zeros(
+                                        1, 0, 0, 1, dtype=torch.long
+                                    ).contiguous(),
+                                    torch.zeros(
                                         [
                                             1,
                                             int(
@@ -360,7 +363,6 @@ if args.accuracy_only:
                                         ]
                                     ).contiguous(),
                                     beam_idx_tmp,
-                                    torch.zeros(1, dtype=torch.long).contiguous(),
                                 )
                                 for i in range(self.base_model.config.n_layer)
                             ]
@@ -375,6 +377,9 @@ if args.accuracy_only:
                             [
                                 (
                                     torch.zeros(
+                                        1, 0, 0, 1, dtype=torch.long
+                                    ).contiguous(),
+                                    torch.zeros(
                                         [
                                             1,
                                             int(
@@ -403,7 +408,6 @@ if args.accuracy_only:
                                         ]
                                     ).contiguous(),
                                     beam_idx_tmp,
-                                    torch.zeros(1, dtype=torch.long).contiguous(),
                                 )
                                 for i in range(self.base_model.config.num_hidden_layers)
                             ]
@@ -420,6 +424,9 @@ if args.accuracy_only:
                             [
                                 (
                                     torch.zeros(
+                                        1, 0, 0, 1, dtype=torch.long
+                                    ).contiguous(),
+                                    torch.zeros(
                                         [
                                             1,
                                             int(
@@ -448,7 +455,6 @@ if args.accuracy_only:
                                         ]
                                     ).contiguous(),
                                     beam_idx_tmp,
-                                    torch.zeros(1, dtype=torch.long).contiguous(),
                                 )
                                 for i in range(self.base_model.config.num_hidden_layers)
                             ]
@@ -463,6 +469,9 @@ if args.accuracy_only:
                             [
                                 (
                                     torch.zeros(
+                                        1, 0, 0, 1, dtype=torch.long
+                                    ).contiguous(),
+                                    torch.zeros(
                                         [
                                             1,
                                             int(
@@ -491,7 +500,6 @@ if args.accuracy_only:
                                         ]
                                     ).contiguous(),
                                     beam_idx_tmp,
-                                    torch.zeros(1, dtype=torch.long).contiguous(),
                                 )
                                 for i in range(self.base_model.config.num_hidden_layers)
                             ]
@@ -518,6 +526,9 @@ if args.accuracy_only:
                             [
                                 (
                                     torch.zeros(
+                                        1, 0, 0, 1, dtype=torch.long
+                                    ).contiguous(),
+                                    torch.zeros(
                                         [
                                             1,
                                             int(num_attention_heads / self._tp_number),
@@ -540,7 +551,6 @@ if args.accuracy_only:
                                         ]
                                     ).contiguous(),
                                     beam_idx_tmp,
-                                    torch.zeros(1, dtype=torch.long).contiguous(),
                                 )
                                 for i in range(num_hidden_layers)
                             ]
