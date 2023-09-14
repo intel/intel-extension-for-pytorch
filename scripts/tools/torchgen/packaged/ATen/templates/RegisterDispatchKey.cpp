@@ -37,6 +37,9 @@
 #include <ATen/Tensor.h>
 #include <ATen/native/Resize.h>
 
+#include <tensor/Tensor.h>
+#include <utils/SimpleTrace.h>
+
 #include <cstddef>
 #include <functional>
 #include <memory>

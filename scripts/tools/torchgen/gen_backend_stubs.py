@@ -347,9 +347,21 @@ def main() -> None:
         default=None,
         help="path to the source C++ file containing kernel definitions",
     )
+    parser.add_argument(
+        '--simple_trace',
+        action='store_true',
+        default=False,
+        help='simple trace the entry to ipex',
+    )
     options = parser.parse_args()
 
-    run(options.source_yaml, options.output_dir, options.dry_run, options.impl_path)
+    run(
+        options.source_yaml,
+        options.output_dir,
+        options.dry_run,
+        options.simple_trace,
+        options.impl_path,
+    )
 
 
 def gen_dispatchkey_nativefunc_headers(
@@ -416,6 +428,7 @@ def gen_dispatcher_registrations(
     backend_indices: Dict[DispatchKey, BackendIndex],
     grouped_native_functions: Sequence[Union[NativeFunction, NativeFunctionsGroup]],
     backend_dispatch_key: DispatchKey,
+    simple_trace: bool,
     dispatch_key: DispatchKey,
     selector: "SelectiveBuilder",
     # build_in_tree is true for lazy TS backend and affects include paths, not used for external backends
@@ -443,6 +456,7 @@ def gen_dispatcher_registrations(
                 selector,
                 rocm=False,
                 symint=True,
+                simple_trace=simple_trace,
                 class_method_name=f"{class_name}",
                 skip_dispatcher_op_registration=False,
             ),
@@ -511,6 +525,7 @@ TORCH_API void Register${backend_name}${dispatch_key}NativeFunctions() {
                                 selector,
                                 rocm=False,
                                 symint=True,
+                                simple_trace=simple_trace,
                                 class_method_name=f"{class_name}",
                                 skip_dispatcher_op_registration=False,
                             ),
@@ -524,7 +539,11 @@ TORCH_API void Register${backend_name}${dispatch_key}NativeFunctions() {
 
 
 def run(
-    source_yaml: str, output_dir: str, dry_run: bool, impl_path: Optional[str] = None
+    source_yaml: str,
+    output_dir: str,
+    dry_run: bool,
+    simple_trace: bool,
+    impl_path: Optional[str] = None
 ) -> None:
     # Assumes that this file lives at PYTORCH_ROOT/torchgen/gen_backend_stubs.py
     pytorch_root = pathlib.Path(__file__).parent.parent.absolute()
@@ -600,6 +619,7 @@ def run(
             backend_indices,
             grouped_native_functions,
             backend_key,
+            simple_trace,
             dispatch_key,
             selector,
         )
