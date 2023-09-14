@@ -58,6 +58,16 @@ class _IPEXlinearNewGeluRef(nn.Module):
         )
 
 
+class _IPEXlinearGeluRef(nn.Module):
+    def __init__(self, module):
+        super().__init__()
+        self.linear = module
+        self.gelu = nn.GELU()
+
+    def forward(self, x):
+        return self.gelu(self.linear(x))
+
+
 class _IPEXlinearReluRef(nn.Module):
     def __init__(self, module):
         super().__init__()

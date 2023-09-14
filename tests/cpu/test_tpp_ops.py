@@ -5,6 +5,7 @@ import copy
 import numpy
 import intel_extension_for_pytorch as ipex
 
+
 try:
     import transformers
 except ImportError:
@@ -12,7 +13,7 @@ except ImportError:
     import subprocess
 
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.11.0"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.31.0"]
     )
     import transformers
 from common_utils import TestCase

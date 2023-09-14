@@ -25,12 +25,12 @@ def convert_function(m, func_name, new_function):
     setattr(m, func_name, bound_method)
 
 
-def covert_class(m, target_m, new_class, config, distributed=False):
+def convert_class(m, target_m, new_class, config, distributed=False):
     for name, sub_m in m.named_children():
         if isinstance(sub_m, target_m):
             new_m = new_class(sub_m, config, distributed)
             setattr(m, name, new_m)
-        covert_class(sub_m, target_m, new_class, config, distributed)
+        convert_class(sub_m, target_m, new_class, config, distributed)
 
 
 def lowering_class_cpu(m, target_m, new_class, config, tpp=False, woq=False):
@@ -90,7 +90,10 @@ def model_convert_reference(_model):
     from .models.reference.modules.attentions import (
         _IPEXAttentionRef,
         _reorder_cache,
+        _convert_cache_to_standard_format,
+        _convert_to_rw_cache,
         _prepare_decoder_attention_mask,
+        _prepare_attn_mask_falcon,
     )
 
     # model wise optimization for Feedforward and Decoder layer modules
@@ -102,6 +105,7 @@ def model_convert_reference(_model):
         LlamaForCausalLM_forward,
         GPTNeoXForCausalLM_forward,
         OPTForCausalLM_forward,
+        prepare_inputs_for_generation,
     )
 
     if not hasattr(_model.config, "architectures"):
@@ -183,7 +187,7 @@ def model_convert_reference(_model):
         transformers.models.gptj.modeling_gptj.GPTJAttention,
         transformers.models.opt.modeling_opt.OPTAttention,
     ]:
-        covert_class(
+        convert_class(
             _model,
             supported_mha_class,
             _IPEXAttentionRef,
@@ -196,13 +200,61 @@ def model_convert_reference(_model):
         transformers.models.gptj.modeling_gptj.GPTJBlock,
         transformers.models.opt.modeling_opt.OPTDecoderLayer,
     ]:
-        covert_class(
+        convert_class(
             _model,
             supported_decoder_class,
             _IPEXDecoderLayerRef,
             _model.config,
             distributed=distributed,
         )
+
+    # special list that has not official transformers design
+    if re.search("falcon", _model.config.architectures[0], re.IGNORECASE) or re.search(
+        "rw", _model.config.architectures[0], re.IGNORECASE
+    ):
+        with torch.no_grad():
+            ipex.nn.utils._model_convert.replace_customized_linear_with_linear(
+                _model.eval()
+            )
+        convert_class(
+            _model,
+            type(_model.transformer.h[0].self_attention),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.transformer.h[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation,
+        )
+        convert_function(
+            _model.transformer,
+            "_prepare_attn_mask",
+            _prepare_attn_mask_falcon,
+        )
+        convert_function(
+            _model.transformer,
+            "_convert_cache_to_standard_format",
+            _convert_cache_to_standard_format,
+        )
+        convert_function(
+            _model.transformer,
+            "_convert_to_rw_cache",
+            _convert_to_rw_cache,
+        )
+        if hasattr(_model.transformer, "use_alibi"):
+            _model.transformer.alibi = _model.transformer.use_alibi
+        elif hasattr(_model.transformer, "alibi"):
+            _model.transformer.use_alibi = _model.transformer.alibi
+
     return _model
 
 
@@ -223,7 +275,7 @@ def get_dummy_input(_model, return_dict=False):
     past_key_values = tuple(
         [
             (
-                torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
+                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                 torch.zeros([1, 1, 1, 1]).contiguous(),
                 torch.zeros([1, 1, 1, 1]).contiguous(),
                 torch.zeros(1, 4, dtype=torch.long),
@@ -244,6 +296,18 @@ def get_dummy_input(_model, return_dict=False):
             }
             if return_dict
             else (input_ids.unsqueeze(0), attention_mask.unsqueeze(0), past_key_values)
+        )
+    elif re.search(
+        "falcon", _model.config.architectures[0], re.IGNORECASE
+    ) or re.search("rw", _model.config.architectures[0], re.IGNORECASE):
+        sample_inputs = (
+            {
+                "input_ids": input_ids.unsqueeze(0),
+                "past_key_values": past_key_values,
+                "attention_mask": attention_mask.unsqueeze(0),
+            }
+            if return_dict
+            else (input_ids.unsqueeze(0), past_key_values, attention_mask.unsqueeze(0))
         )
     else:
         sample_inputs = (
@@ -349,6 +413,7 @@ def model_convert_lowering(
 
     if device == "cpu":
         from .models.cpu.modules.attentions import _IPEXAttentionCPU
+        from .models.cpu.fusions.mha_fusion import _IPEXRMSNorm
         from .models.cpu.modules.decoder import _IPEXDecoderLayerCPU
 
         _disable_tpp()
@@ -356,6 +421,21 @@ def model_convert_lowering(
             if dtype is torch.bfloat16:
                 _enable_tpp()
             _model = ipex.optimize(_model.eval(), dtype=dtype, inplace=True)
+
+        if not is_quantization or woq:
+            import transformers
+
+            for supported_class in [
+                transformers.models.llama.modeling_llama.LlamaRMSNorm
+            ]:
+                lowering_class_cpu(
+                    _model,
+                    supported_class,
+                    _IPEXRMSNorm,
+                    _model.config,
+                    tpp=False,
+                    woq=False,
+                )
 
         for supported_mlp_class in [_IPEXDecoderLayerRef]:
             lowering_class_cpu(
@@ -415,7 +495,7 @@ def optimize_transformers(
     r"""
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
     This API focus on transformers models, especially for generation tasks inference.
-    Well supported model family: Llama, GPT-J, GPT-Neox, OPT.
+    Well supported model family: Llama, GPT-J, GPT-Neox, OPT, Falcon.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
@@ -499,10 +579,12 @@ def optimize_transformers(
             or re.search("llama", model.config.architectures[0], re.IGNORECASE)
             or re.search("gptneox", model.config.architectures[0], re.IGNORECASE)
             or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
+            or re.search("falcon", model.config.architectures[0], re.IGNORECASE)
+            or re.search("rw", model.config.architectures[0], re.IGNORECASE)
         )
         if not well_supported_model:
             warnings.warn(
-                "optimize_transformers supports Llama, GPT-J, GPT-Neox, and OPT, fallback to origin model"
+                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, and OPT, fallback to origin model"
             )
             return model
 

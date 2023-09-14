@@ -9,6 +9,7 @@ from ...reference.fusions.linear_fusion import (
     _IPEXlinearMulRef,
     _IPEXlinearNewGeluRef,
     _IPEXlinearReluRef,
+    _IPEXlinearGeluRef,
 )
 
 
@@ -179,6 +180,74 @@ def GPTJBlock_forward(
     return outputs  # hidden_states, present, (attentions)
 
 
+def FalconDecoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    alibi: Optional[torch.Tensor],
+    attention_mask: torch.Tensor,
+    layer_past: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+    head_mask: Optional[torch.Tensor] = None,
+    use_cache: bool = False,
+    output_attentions: bool = False,
+):
+    residual = hidden_states
+    if self.self_attention.new_decoder_architecture or not hasattr(
+        self, "input_layernorm"
+    ):
+        attention_layernorm_out = self.ln_attn(hidden_states)
+        mlp_layernorm_out = self.ln_mlp(hidden_states)
+    else:
+        attention_layernorm_out = self.input_layernorm(hidden_states)
+    # Self attention.
+    attn_outputs = self.self_attention(
+        attention_layernorm_out,
+        layer_past=layer_past,
+        attention_mask=attention_mask,
+        alibi=alibi,
+        head_mask=head_mask,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+    )
+    attention_output = attn_outputs[0]
+    if not (
+        self.self_attention.new_decoder_architecture
+        or not hasattr(self, "input_layernorm")
+    ):
+        if self.config.parallel_attn:
+            mlp_layernorm_out = attention_layernorm_out
+        else:
+            residual = attention_output + residual
+            mlp_layernorm_out = self.post_attention_layernorm(residual)
+    outputs = attn_outputs[1:]
+    # MLP.
+
+    mlp_hidden_states = self.linear_gelu(mlp_layernorm_out)
+    if not self.distributed:
+        if (
+            self.self_attention.new_decoder_architecture
+            or self.config.parallel_attn
+            or not hasattr(self, "input_layernorm")
+        ):
+            output = self.linear_add_add(mlp_hidden_states, attention_output, residual)
+        else:
+            output = self.linear_add(mlp_hidden_states, residual)
+    else:
+        mlp_output = self.mlp.dense_4h_to_h(mlp_hidden_states)
+        if (
+            self.self_attention.new_decoder_architecture
+            or self.config.parallel_attn
+            or not hasattr(self, "input_layernorm")
+        ):
+            mlp_output += attention_output
+        output = mlp_output + residual
+
+    if use_cache:
+        outputs = (output,) + outputs
+    else:
+        outputs = (output,) + outputs[1:]
+    return outputs  # hidden_states, present, attentions
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -216,6 +285,21 @@ class _IPEXDecoderLayerRef(nn.Module):
                 del self.__dict__["_modules"]["fc2"]
             self.linear_relu = _IPEXlinearReluRef(module.fc1)
             del self.__dict__["_modules"]["fc1"]
+        elif re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
+            "rw", self.model_backbone, re.IGNORECASE
+        ):
+            self.linear_gelu = _IPEXlinearGeluRef(module.mlp.dense_h_to_4h)
+            del self.__dict__["_modules"]["mlp"].dense_h_to_4h
+            if not self.distributed:
+                if (
+                    module.self_attention.new_decoder_architecture
+                    or config.parallel_attn
+                    or not hasattr(module, "input_layernorm")
+                ):
+                    self.linear_add_add = _IPEXlinearAddAddRef(self.mlp.dense_4h_to_h)
+                else:
+                    self.linear_add = _IPEXlinearAddRef(self.mlp.dense_4h_to_h)
+                del self.__dict__["_modules"]["mlp"].dense_4h_to_h
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -230,6 +314,7 @@ class _IPEXDecoderLayerRef(nn.Module):
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
         past_key_value: Optional[Tuple[torch.Tensor]] = None,
+        alibi: Optional[torch.Tensor] = None,
     ):
         if re.search("GPTJ", self.model_backbone, re.IGNORECASE):
             return GPTJBlock_forward(
@@ -261,6 +346,19 @@ class _IPEXDecoderLayerRef(nn.Module):
                 output_attentions,
                 use_cache,
                 past_key_value,
+            )
+        elif re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
+            "rw", self.model_backbone, re.IGNORECASE
+        ):
+            return FalconDecoderLayer_forward(
+                self,
+                hidden_states,
+                alibi,
+                attention_mask,
+                layer_past,
+                head_mask,
+                use_cache,
+                output_attentions,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

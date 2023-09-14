@@ -726,7 +726,9 @@ class BertEmbeddings(BlockedModule):
 
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
         self.register_buffer(
-            "position_ids", torch.arange(config.max_position_embeddings).expand((1, -1))
+            "position_ids",
+            torch.arange(config.max_position_embeddings).expand((1, -1)),
+            persistent=False,
         )
         self.position_embedding_type = getattr(
             config, "position_embedding_type", "absolute"

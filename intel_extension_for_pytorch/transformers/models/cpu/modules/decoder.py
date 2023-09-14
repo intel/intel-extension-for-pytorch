@@ -5,8 +5,9 @@ from ...cpu.fusions.linear_fusion import (
     _IPEXlinearAddCPU,
     _IPEXlinearAddAddCPU,
     _IPEXlinearMulCPU,
-    _IPEXlinearGeluCPU,
+    _IPEXlinearNewGeluCPU,
     _IPEXlinearReluCPU,
+    _IPEXlinearGeluCPU,
 )
 
 
@@ -24,7 +25,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
                 self.linear_add_add = _IPEXlinearAddAddCPU(
                     module.linear_add_add.linear, tpp=tpp, woq=woq
                 )
-            self.linear_gelu = _IPEXlinearGeluCPU(
+            self.linear_gelu = _IPEXlinearNewGeluCPU(
                 module.linear_gelu.linear, tpp=tpp, woq=woq
             )
         elif re.search("llama", self.model_backbone, re.IGNORECASE):
@@ -52,5 +53,20 @@ class _IPEXDecoderLayerCPU(nn.Module):
             self.linear_relu = _IPEXlinearReluCPU(
                 module.linear_relu.linear, tpp=tpp, woq=woq
             )
+        elif re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
+            "rw", self.model_backbone, re.IGNORECASE
+        ):
+            self.linear_gelu = _IPEXlinearGeluCPU(
+                module.linear_gelu.linear, tpp=tpp, woq=woq
+            )
+            if not self.distributed:
+                if hasattr(module, "linear_add_add"):
+                    self.linear_add_add = _IPEXlinearAddAddCPU(
+                        module.linear_add_add.linear, tpp=tpp, woq=woq
+                    )
+                elif hasattr(module, "linear_add"):
+                    self.linear_add = _IPEXlinearAddCPU(
+                        module.linear_add.linear, tpp=tpp, woq=woq
+                    )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

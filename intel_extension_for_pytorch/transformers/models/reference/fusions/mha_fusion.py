@@ -2,40 +2,62 @@ import torch
 from torch import nn
 from typing import Optional, Tuple
 import re
+import math
 
 
 class RotaryEmbedding(torch.nn.Module):
-    def __init__(self, max_position_embeddings, dim, base=10000):
+    def __init__(self, max_position_embeddings, dim, backbone, base=10000):
         super().__init__()
         inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
-        self.register_buffer("inv_freq", inv_freq)
+        self.register_buffer("inv_freq", inv_freq, persistent=False)
         self.max_seq_len_cached = max_position_embeddings
         t = torch.arange(
             self.max_seq_len_cached,
             dtype=self.inv_freq.dtype,
         )
+        self.model_backbone = str(backbone)
         freqs = torch.einsum("i,j->ij", t, self.inv_freq)
-        self.sin_cos = torch.cat((torch.sin(freqs), torch.cos(freqs)), dim=1)
-        self.emb = torch.cat((freqs, freqs), dim=-1)
-        self.register_buffer(
-            "cos_cached", self.emb.cos()[None, None, :, :], persistent=False
-        )
-        self.register_buffer(
-            "sin_cached", self.emb.sin()[None, None, :, :], persistent=False
-        )
+        if re.search("falcon", str(backbone), re.IGNORECASE) or re.search(
+            "rw", str(backbone), re.IGNORECASE
+        ):
+            self.sin_cos = torch.cat(
+                (freqs.sin().repeat(1, 2), freqs.cos().repeat(1, 2)), dim=-1
+            )
+            self.emb = torch.cat((freqs, freqs), dim=-1).float()
+            self.cos_cached = self.emb.cos()[None, :, :]
+            self.sin_cached = self.emb.sin()[None, :, :]
+        else:
+            self.sin_cos = torch.cat((torch.sin(freqs), torch.cos(freqs)), dim=1)
+            self.emb = torch.cat((freqs, freqs), dim=-1)
+            self.register_buffer(
+                "cos_cached", self.emb.cos()[None, None, :, :], persistent=False
+            )
+            self.register_buffer(
+                "sin_cached", self.emb.sin()[None, None, :, :], persistent=False
+            )
 
     def forward(self, seq_len=None):
         if seq_len is not None and seq_len > self.max_seq_len_cached:
             self.max_seq_len_cached = seq_len
             t = torch.arange(self.max_seq_len_cached, dtype=self.inv_freq.dtype)
             freqs = torch.einsum("i,j->ij", t, self.inv_freq)
-            self.sin_cos = torch.cat((torch.sin(freqs), torch.cos(freqs)), dim=1)
-            self.emb = torch.cat((freqs, freqs), dim=-1)
-            self.cos_cached = self.emb.cos()[None, None, :, :]
-            self.sin_cached = self.emb.sin()[None, None, :, :]
-            self.cos_cached[:, :, :seq_len, ...]
-            self.sin_cached[:, :, :seq_len, ...]
-        return self.sin_cos, self.cos_cached, self.sin_cached
+            if re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
+                "rw", self.model_backbone, re.IGNORECASE
+            ):
+                self.sin_cos = torch.cat(
+                    (freqs.sin().repeat(1, 2), freqs.cos().repeat(1, 2)), dim=-1
+                )
+                self.emb = torch.cat((freqs, freqs), dim=-1).float()
+                self.cos_cached = self.emb.cos()[None, :, :]
+                self.sin_cached = self.emb.sin()[None, :, :]
+            else:
+                self.sin_cos = torch.cat((torch.sin(freqs), torch.cos(freqs)), dim=1)
+                self.emb = torch.cat((freqs, freqs), dim=-1)
+                self.cos_cached = self.emb.cos()[None, None, :, :]
+                self.sin_cached = self.emb.sin()[None, None, :, :]
+                self.cos_cached[:, :, :seq_len, ...]
+                self.sin_cached[:, :, :seq_len, ...]
+        return self.sin_cos, self.sin_cached, self.cos_cached
 
 
 class _IPEXRopeRef(nn.Module):
@@ -47,10 +69,10 @@ class _IPEXRopeRef(nn.Module):
         backbone=None,
     ):
         super().__init__()
-        self.embed_positions = RotaryEmbedding(
-            max_position_embeddings, pos_embd_dim, base
-        )
         self.model_backbone = backbone
+        self.embed_positions = RotaryEmbedding(
+            max_position_embeddings, pos_embd_dim, backbone, base
+        )
 
     def rotate_every_two(self, x: torch.Tensor) -> torch.Tensor:
         x1 = x[:, :, :, ::2]
@@ -119,19 +141,26 @@ class _IPEXRopeRef(nn.Module):
                 x = self.apply_rotary_pos_emb_gptj(x, sin, cos)
         elif re.search("llama", self.model_backbone, re.IGNORECASE):
             x = x.transpose(1, 2)
-            x = self.apply_rotary_pos_emb_llama(x, _sin, _cos, position_ids)
+            x = self.apply_rotary_pos_emb_llama(x, _cos, _sin, position_ids)
         elif re.search("gptneox", self.model_backbone, re.IGNORECASE):
             x = x.transpose(1, 2)
             x_rot = x[..., :rotary_ndims]
             x_pass = x[..., rotary_ndims:]
             x = torch.cat(
                 (
-                    self.apply_rotary_pos_emb_gptneox(x_rot, _sin, _cos, position_ids),
+                    self.apply_rotary_pos_emb_gptneox(x_rot, _cos, _sin, position_ids),
                     x_pass,
                 ),
                 dim=-1,
             )
-
+        elif re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
+            "rw", self.model_backbone, re.IGNORECASE
+        ):
+            batch_size, x_length, _, _ = x.shape
+            x = x.transpose(1, 2).reshape(batch_size * num_head, x_length, head_dim)
+            _cos = _cos.type(x.dtype)[:, 0:seq_len]
+            _sin = _sin.type(x.dtype)[:, 0:seq_len]
+            x = (x * _cos) + (self.rotate_half(x) * _sin)
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
         return x
@@ -162,6 +191,16 @@ class _IPEXScaleDotProductRef(nn.Module):
                 if hasattr(module, "attention_dropout")
                 else None
             )
+        elif re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
+            "rw", self.model_backbone, re.IGNORECASE
+        ):
+            self.num_heads = module.num_heads
+            self.head_dim = module.head_dim
+            self.new_decoder_architecture = (
+                module.new_decoder_architecture
+                if hasattr(module, "new_decoder_architecture")
+                else None
+            )
 
         for k, v in module.__class__.__dict__.items():
             if k.startswith("__") or k.startswith("forward"):
@@ -190,20 +229,33 @@ class _IPEXScaleDotProductRef(nn.Module):
         layer_past: Optional[Tuple[torch.Tensor]] = None,
         head_mask: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[Tuple[torch.Tensor]] = None,
+        alibi: Optional[torch.Tensor] = None,
     ):
-        key = (
-            key.permute(0, 2, 1, 3)
-            if re.search("GPTJ", self.model_backbone, re.IGNORECASE)
-            or re.search("OPT", self.model_backbone, re.IGNORECASE)
-            else key
-        )
-        query = (
-            query.permute(0, 2, 1, 3)
-            if re.search("GPTJ", self.model_backbone, re.IGNORECASE)
-            or re.search("OPT", self.model_backbone, re.IGNORECASE)
-            else query
-        )
-        value = value.permute(0, 2, 1, 3)
+        if re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
+            "rw", self.model_backbone, re.IGNORECASE
+        ):
+            num_kv_heads = (
+                self.num_heads if self.new_decoder_architecture else self.num_kv_heads
+            )
+            BS_head_num, query_length, _ = query.shape
+            batch_size = BS_head_num // self.num_heads
+            value = value.transpose(1, 2).reshape(
+                batch_size * num_kv_heads, query_length, self.head_dim
+            )
+        else:
+            key = (
+                key.permute(0, 2, 1, 3)
+                if re.search("GPTJ", self.model_backbone, re.IGNORECASE)
+                or re.search("OPT", self.model_backbone, re.IGNORECASE)
+                else key
+            )
+            query = (
+                query.permute(0, 2, 1, 3)
+                if re.search("GPTJ", self.model_backbone, re.IGNORECASE)
+                or re.search("OPT", self.model_backbone, re.IGNORECASE)
+                else query
+            )
+            value = value.permute(0, 2, 1, 3)
         if layer_past is not None:
             past_key = layer_past[0]
             past_value = layer_past[1]
@@ -272,6 +324,57 @@ class _IPEXScaleDotProductRef(nn.Module):
                 )
                 attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
             attn_output = torch.bmm(attn_weights, value_states)
+        elif re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
+            "rw", self.model_backbone, re.IGNORECASE
+        ):
+            _, kv_length, _ = key.shape
+            attention_mask_float = attention_mask
+            query_layer_ = query.reshape(batch_size, self.num_heads, -1, self.head_dim)
+            key_layer_ = key.reshape(batch_size, num_kv_heads, -1, self.head_dim)
+            value_layer_ = value.reshape(batch_size, num_kv_heads, -1, self.head_dim)
+
+            if alibi is None:
+                attention_scores = query_layer_ @ key_layer_.transpose(-1, -2)
+                attention_scores /= math.sqrt(self.head_dim)
+                attention_scores = torch.nn.functional.softmax(
+                    attention_scores + attention_mask_float,
+                    dim=-1,
+                    dtype=torch.float,
+                )
+                attn_output = attention_scores @ value_layer_
+
+                attn_output = attn_output.view(
+                    batch_size, self.num_heads, query_length, self.head_dim
+                )
+            else:
+                matmul_result = query_layer_ @ key_layer_.transpose(-1, -2)
+                # change view to [batch_size, num_heads, q_length, kv_length]
+                attention_scores = matmul_result.view(
+                    batch_size, self.num_heads, query_length, kv_length
+                )
+                # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype
+                # [batch_size, num_heads, q_length, kv_length]
+                input_dtype = attention_scores.dtype
+                # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
+                if input_dtype == torch.float16 or input_dtype == torch.bfloat16:
+                    attention_scores = attention_scores.to(torch.float32)
+                attention_probs = torch.nn.functional.softmax(
+                    attention_mask_float,
+                    dim=-1,
+                    dtype=hidden_states.dtype,
+                )
+                # [batch_size, num_heads, q_length, kv_length]
+                attention_probs = self.attention_dropout(attention_probs)
+                if head_mask is not None:
+                    attention_probs = attention_probs * head_mask
+                # change view [batch_size, num_heads, q_length, kv_length]
+                attention_probs_reshaped = attention_probs.view(
+                    batch_size, self.num_heads, query_length, kv_length
+                )
+                # matmul: [batch_size * num_heads, q_length, head_dim]
+                context_layer = (attention_probs_reshaped @ value_layer_).flatten(0, 1)
+
+            attn_weights = attention_scores if alibi is None else attention_probs
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
         return attn_output, attn_weights, present

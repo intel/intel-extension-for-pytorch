@@ -10,10 +10,11 @@ class _IPEXRopeCPU(nn.Module):
         max_position_embeddings,
         pos_embd_dim,
         base=10000,
+        backbone=None,
     ):
         super().__init__()
         self.embed_positions = RotaryEmbedding(
-            max_position_embeddings, pos_embd_dim, base
+            max_position_embeddings, pos_embd_dim, backbone, base
         )
 
     def forward(
@@ -55,10 +56,11 @@ class _IPEXScaleDotProductCPU(nn.Module):
         layer_past: Optional[Tuple[torch.Tensor]] = None,
         head_mask: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[Tuple[torch.Tensor]] = None,
+        alibi: Optional[torch.Tensor] = None,
     ):
         if layer_past is None:
             layer_past = (
-                torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
+                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                 torch.zeros([1, 1, 1, 1]).contiguous(),
                 torch.zeros([1, 1, 1, 1]).contiguous(),
                 torch.zeros(1, int(query.size(0)), dtype=torch.long).contiguous(),
@@ -89,10 +91,26 @@ class _IPEXScaleDotProductCPU(nn.Module):
 
         present = (
             torch.zeros(
-                1, 1, (layer_past[0].size(-2) + query.shape[1]), 1, dtype=torch.long
+                1,
+                (layer_past[0].size(-2) + query.shape[1]),
+                (layer_past[0].size(-2) + query.shape[1]),
+                1,
+                dtype=torch.long,
             ).contiguous(),
             key_cache,
             value_cache,
             beam_idx,
         )
         return attn_output, attn_weights, present
+
+
+class _IPEXRMSNorm(nn.Module):
+    def __init__(self, module, config=None, tpp=False, woq=False):
+        super().__init__()
+        self.weight = module.weight
+        self.variance_epsilon = module.variance_epsilon
+
+    def forward(self, hidden_states):
+        return torch.ops.torch_ipex.rmsnorm(
+            hidden_states, self.weight, self.variance_epsilon
+        )
