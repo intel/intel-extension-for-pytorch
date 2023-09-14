@@ -4,86 +4,11 @@
 #include <torch/csrc/autograd/function.h>
 
 #include <cmath>
-#include "omp.h"
 
 namespace torch_ipex {
 namespace cpu {
 
-float norm_fro(const at::Tensor& input_tensor) {
-  int input_size = input_tensor.numel();
-
-  float* input_pointer = input_tensor.data_ptr<float>();
-  float sum_square = 0.f;
-  int num_threads = omp_get_max_threads();
-  int local_size = (input_size + num_threads - 1) / num_threads;
-
-  float scratchpad[num_threads] = {0.f};
-// Reduce to scratchpad
-#pragma omp parallel
-  {
-    int threadId = omp_get_thread_num();
-    int local_start = local_size * threadId;
-    float* local_pointer = input_pointer + local_start;
-    float local_value = 0.f;
-    int local_ind = 0;
-    while ((local_ind < local_size) && (local_start + local_ind < input_size)) {
-      local_value += local_pointer[local_ind] * local_pointer[local_ind];
-
-      local_ind++;
-    }
-    scratchpad[threadId] = local_value;
-  }
-  for (int i = 0; i < num_threads; i++) {
-    sum_square += scratchpad[i];
-  }
-  return std::sqrt(sum_square);
-}
-
-#ifdef __AVX512F__
-const int Block_Size = 16;
-const int Num_Blocks_Thread = 16;
-const int Grid_Size = Block_Size * Num_Blocks_Thread;
-
-float norm_fro_avx512(const at::Tensor& input_tensor) {
-  int input_size = 1;
-  at::IntArrayRef input_sizes = input_tensor.sizes();
-  for (int i = 0; i < input_sizes.size(); i++) {
-    input_size *= input_sizes[i];
-  }
-
-  float* input_pointer = input_tensor.data_ptr<float>();
-  float sum_square = 0.f;
-
-  const int Num_Grids = (input_size + Grid_Size - 1) / Grid_Size;
-
-  float scratchpad[Num_Grids] = {0.f};
-
-#pragma omp parallel for
-  for (int grid = 0; grid < Num_Grids; grid++) {
-    int local_start = grid * Grid_Size;
-    float* local_pointer = input_pointer + local_start;
-    int local_ind = 0;
-    __m512 acc_reg = _mm512_setzero_ps();
-    __m512 mul_reg;
-    while ((local_ind + Block_Size - 1 < Grid_Size) &&
-           (local_start + local_ind + Block_Size - 1 < input_size)) {
-      mul_reg = _mm512_load_ps(local_pointer + local_ind);
-      acc_reg = _mm512_fmadd_ps(mul_reg, mul_reg, acc_reg);
-      local_ind += Block_Size;
-    }
-    float local_value = _mm512_reduce_add_ps(acc_reg);
-    while ((local_ind < Grid_Size) && (local_start + local_ind < input_size)) {
-      local_value += local_pointer[local_ind] * local_pointer[local_ind];
-      local_ind++;
-    }
-    scratchpad[grid] = local_value;
-  }
-  for (int i = 0; i < Num_Grids; i++) {
-    sum_square += scratchpad[i];
-  }
-  return std::sqrt(sum_square);
-}
-#endif
+DEFINE_DISPATCH(lars_norm_kernel_stub);
 
 /**
  * LARS fused update kernel.
@@ -141,13 +66,8 @@ c10::optional<at::Tensor> lars_fused_step(
       param2_.sizes());
 
   at::Tensor grad_f32 = grad_.to(torch::kFloat32);
-#ifdef __AVX512F__
-  float w_norm = norm_fro_avx512(param_);
-  float g_norm = norm_fro_avx512(grad_f32);
-#else
-  float w_norm = norm_fro(param_);
-  float g_norm = norm_fro(grad_f32);
-#endif
+  float w_norm = lars_norm_kernel_stub(kCPU, param_);
+  float g_norm = lars_norm_kernel_stub(kCPU, grad_f32);
 
   float trust_ratio = 1.f;
   if ((w_norm > 0) && (g_norm > 0)) {
