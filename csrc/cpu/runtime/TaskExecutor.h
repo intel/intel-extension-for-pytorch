@@ -1,6 +1,5 @@
 #pragma once
 
-#include <dlfcn.h>
 #include <omp.h>
 #include <cassert>
 #include <condition_variable>
