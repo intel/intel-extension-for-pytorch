@@ -18,7 +18,8 @@ def gen_unstructured(f: NativeFunction, backend_index: BackendIndex) -> Optional
     if "legacy::" in metadata.kernel:
         return None
     else:
-        prefix = "static" if backend_index.external else "TORCH_API"
+        # remove warning 'function has internal linkage but is not defined.' for IPEX codegen.
+        prefix = " " if backend_index.external else "TORCH_API"
         return f"{prefix} {sig.decl(name=metadata.kernel)};"
 
 
