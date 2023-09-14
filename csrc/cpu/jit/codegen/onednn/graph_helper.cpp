@@ -106,7 +106,8 @@ Operator makeDequantOp(Node* node, Node* input_node) {
         .setInput(0)
         .setOutput(0)
         .setAttr(dnnl::graph::op::attr::qtype, std::string("per_tensor"))
-        .setAttr(dnnl::graph::op::attr::scales, std::vector<float>{scale})
+        .setAttr(
+            dnnl::graph::op::attr::scales, std::vector<float>{(float)scale})
         .setAttr(dnnl::graph::op::attr::zps, zps_vector);
   } else if (input_node->kind() == Symbol::aten("quantize_per_channel")) {
     node->s_(Symbol::attr("qtype"), std::string("per_channel"));
