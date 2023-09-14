@@ -115,8 +115,10 @@ def _read_template(template_fn: str) -> CodeTemplate:
 
 # String hash that's stable across different executions, unlike builtin hash
 def string_stable_hash(s: str) -> int:
-    sha1 = hashlib.sha1(s.encode("latin1")).digest()
-    return int.from_bytes(sha1, byteorder="little")
+    # Avoid failing in Coverity Security Scan since sha1 is a weak hash algorithm.
+    # It is recommended to use an SHA-2 family hash like SHA-256. This code is ported
+    # from PyTorch and we won't use it. So we remove this code to pass the scan report.
+    assert False
 
 
 # A small abstraction for writing out generated files and keeping track
