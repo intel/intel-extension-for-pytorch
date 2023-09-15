@@ -760,6 +760,10 @@ supported:
   - _foreach_maximum_.List
   - _foreach_minimum.List
   - _foreach_minimum_.List
+  - _foreach_lerp.List
+  - _foreach_lerp_.List
+  - _foreach_lerp.Scalar
+  - _foreach_lerp_.Scalar
   - _foreach_addcdiv.Scalar
   - _foreach_addcdiv_.Scalar
   - _foreach_addcmul.Scalar
