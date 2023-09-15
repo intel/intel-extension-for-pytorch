@@ -9,6 +9,7 @@
 #include <iostream>
 #include <memory>
 #include <unordered_map>
+#include "utils.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -17,30 +18,6 @@ namespace {
 #define INDEX(x, y, ld) ((x) * (ld) + (y))
 #define ADDRESS(p, x, y, ld) ((p) + (x) * (ld) + (y))
 
-// A class for forced loop unrolling at compile time
-// These macro utils and the small gemm intrinsics kernels are implemented
-// based on the initial code by pujiang.he@intel.com.
-template <int i>
-struct compile_time_for {
-  template <typename Lambda, typename... Args>
-  inline static void op(const Lambda& function, Args... args) {
-    compile_time_for<i - 1>::op(function, args...);
-    function(std::integral_constant<int, i - 1>{}, args...);
-  }
-};
-template <>
-struct compile_time_for<1> {
-  template <typename Lambda, typename... Args>
-  inline static void op(const Lambda& function, Args... args) {
-    function(std::integral_constant<int, 0>{}, args...);
-  }
-};
-template <>
-struct compile_time_for<0> {
-  // 0 loops, do nothing
-  template <typename Lambda, typename... Args>
-  inline static void op(const Lambda& function, Args... args) {}
-};
 // Get mask for last column
 template <int EXPANDED_N, int col>
 constexpr inline unsigned short get_mask(unsigned short mask) {

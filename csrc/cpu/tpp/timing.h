@@ -56,7 +56,8 @@ constexpr int NUM_TIMERS = ((LAST_TIMER + 7) / 8) * 8;
 extern double pass_timers[MAX_THREADS][3][NUM_TIMERS];
 extern double master_pass_timers[3];
 struct Scope {
-  Scope(std::string const& name) : name(name) {}
+  Scope(std::string const& name)
+      : name(name), master_timer(0.0), detailed_timers{0.0}, flops{0.0} {}
   const std::string name;
   double master_timer;
   double detailed_timers[MAX_THREADS][NUM_TIMERS];
@@ -82,9 +83,15 @@ inline int register_scope(std::string name) {
   return idx;
 }
 
+#ifdef PROFILE_TPP
 #define REGISTER_LOCAL_SCOPE(id, name) static int sc_##id = register_scope(name)
 #define REGISTER_SCOPE(id, name) int sc_##id = register_scope(name)
 #define USING_SCOPE(id) extern int sc_##id
+#else
+#define REGISTER_LOCAL_SCOPE(id, name)
+#define REGISTER_SCOPE(id, name)
+#define USING_SCOPE(id)
+#endif
 
 class ScopedTimer {
  public:
@@ -151,6 +158,9 @@ class GlobalPass {
   double start;
 };
 
+#ifdef DEBUG_TRACE_TPP
+static thread_local std::string prev_class_name = "";
+#endif
 template <typename T, int impl = 0>
 class ScopedTPP {
  public:
@@ -183,20 +193,20 @@ class ScopedTPP {
   DebugTimer t;
 };
 
-#if 1
 // Keeping below two definitions for backward compatibility for now
 #define SCOPEITGEMM SCOPEIT
 #define SCOPEITGEMM2 SCOPEIT
 
+#ifdef PROFILE_TPP
 #define SCOPEIT(f, ...) ScopedTPP<decltype(f), 0>(f, ##__VA_ARGS__)
 #define SCOPEIT_REF(f, ...) ScopedTPP<decltype(f), 1>(f, ##__VA_ARGS__)
-#else
-#define SCOPEIT(f, t) f
-#endif
-
 #define RECORD_SCOPE(scope, ...) \
   GlobalScope gs_(sc_##scope);   \
   RECORD_FUNCTION(#scope, std::vector<c10::IValue>(__VA_ARGS__))
+#else
+#define SCOPEIT(f, ...) f
+#define RECORD_SCOPE(scope, ...)
+#endif
 
 } // namespace tpp
 } // namespace torch_ipex

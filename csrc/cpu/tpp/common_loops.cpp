@@ -219,6 +219,35 @@ void par_nested_loops_acB(
   }
 }
 
+static void par_nested_loops_ABc(
+    LoopSpecs* loop_rt_spec,
+    std::function<void(int*)> body_func,
+    std::function<void()> init_func,
+    std::function<void()> term_func) {
+#pragma omp parallel
+  {
+    if (init_func)
+      init_func();
+#pragma omp for collapse(2) nowait
+    for (int a0 = loop_rt_spec[0].start; a0 < loop_rt_spec[0].end;
+         a0 += loop_rt_spec[0].step) {
+      for (int b0 = loop_rt_spec[1].start; b0 < loop_rt_spec[1].end;
+           b0 += loop_rt_spec[1].step) {
+        for (int c0 = loop_rt_spec[2].start; c0 < loop_rt_spec[2].end;
+             c0 += loop_rt_spec[2].step) {
+          int idx[3];
+          idx[0] = a0;
+          idx[1] = b0;
+          idx[2] = c0;
+          body_func(idx);
+        }
+      }
+    }
+    if (term_func)
+      term_func();
+  }
+}
+
 void par_nested_loops_aCb(
     LoopSpecs* loopSpecs,
     std::function<void(int*)> body_func,
@@ -271,6 +300,64 @@ void par_nested_loops_aCB(
   }
 }
 
+static void par_nested_loops_CAB(
+    LoopSpecs* loop_rt_spec,
+    std::function<void(int*)> body_func,
+    std::function<void()> init_func,
+    std::function<void()> term_func) {
+#pragma omp parallel
+  {
+    if (init_func)
+      init_func();
+#pragma omp for collapse(3) nowait
+    for (int c0 = loop_rt_spec[2].start; c0 < loop_rt_spec[2].end;
+         c0 += loop_rt_spec[2].step) {
+      for (int a0 = loop_rt_spec[0].start; a0 < loop_rt_spec[0].end;
+           a0 += loop_rt_spec[0].step) {
+        for (int b0 = loop_rt_spec[1].start; b0 < loop_rt_spec[1].end;
+             b0 += loop_rt_spec[1].step) {
+          int idx[3];
+          idx[0] = a0;
+          idx[1] = b0;
+          idx[2] = c0;
+          body_func(idx);
+        }
+      }
+    }
+    if (term_func)
+      term_func();
+  }
+}
+
+static void par_nested_loops_ACb(
+    LoopSpecs* loop_rt_spec,
+    std::function<void(int*)> body_func,
+    std::function<void()> init_func,
+    std::function<void()> term_func) {
+#pragma omp parallel
+  {
+    if (init_func)
+      init_func();
+#pragma omp for collapse(2) nowait
+    for (int a0 = loop_rt_spec[0].start; a0 < loop_rt_spec[0].end;
+         a0 += loop_rt_spec[0].step) {
+      for (int c0 = loop_rt_spec[2].start; c0 < loop_rt_spec[2].end;
+           c0 += loop_rt_spec[2].step) {
+        for (int b0 = loop_rt_spec[1].start; b0 < loop_rt_spec[1].end;
+             b0 += loop_rt_spec[1].step) {
+          int idx[3];
+          idx[0] = a0;
+          idx[1] = b0;
+          idx[2] = c0;
+          body_func(idx);
+        }
+      }
+    }
+    if (term_func)
+      term_func();
+  }
+}
+
 std::unordered_map<std::string, par_loop_kernel> pre_defined_loops = {
     {"A", par_nested_loops_A},
     {"AB", par_nested_loops_AB},
@@ -283,6 +370,9 @@ std::unordered_map<std::string, par_loop_kernel> pre_defined_loops = {
     {"acB", par_nested_loops_acB},
     {"aCb", par_nested_loops_aCb},
     {"aCB", par_nested_loops_aCB},
+    {"ABc", par_nested_loops_ABc},
+    {"CAB", par_nested_loops_CAB},
+    {"ACb", par_nested_loops_ACb},
 };
 } // namespace tpp
 } // namespace torch_ipex
