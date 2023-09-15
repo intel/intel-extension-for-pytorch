@@ -149,3 +149,12 @@ class TestNNMethod(TestCase):
         torch.topk(a_xpu.view(1, -1), 10, out=(key_xpu, value_xpu))
         self.assertEqual(key, key_xpu.cpu())
         self.assertEqual(value, value_xpu.cpu())
+
+        x = torch.rand((11000, 1))
+        x_xpu = x.to("xpu")
+        sort_cpu, index_cpu = x.topk(3, dim=0, largest=False)
+        sort_xpu, index_xpu = x_xpu.topk(3, dim=0, largest=False)
+        print(sort_cpu)
+        print(sort_xpu.cpu())
+        self.assertEqual(sort_cpu, sort_xpu.cpu())
+        self.assertEqual(index_cpu, index_xpu.cpu())

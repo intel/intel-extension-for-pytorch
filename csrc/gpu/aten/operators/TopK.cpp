@@ -116,6 +116,19 @@ std::tuple<at::Tensor&, at::Tensor&> topk_out(
   values.resize_(out_sizes);
   indices.resize_(out_sizes);
 
+  // optimized sort for large problem size and problem number is 1
+  // general sort has limitaion when problem size beyond one work group
+  // computation resource
+  // TODO: add optimized sort into general sort path
+  if (nsegments == 1 && nelements > 4096) {
+    topk_out_with_single_tile_sort(
+        self.contiguous(), k, dim, largest, values, indices);
+    return std::forward_as_tuple(values, indices);
+  } else if (k > 256) { // The fast_group_sort algorithm supports k<=256
+    topk_out_with_sort(self.contiguous(), k, dim, largest, values, indices);
+    return std::forward_as_tuple(values, indices);
+  }
+
   Tensor self_;
   bool need_infer_dim = dim != ndim - 1;
   if (!need_infer_dim) {
@@ -123,14 +136,6 @@ std::tuple<at::Tensor&, at::Tensor&> topk_out(
   } else {
     self_ = self.transpose(ndim - 1, dim).contiguous();
     std::swap(out_sizes[ndim - 1], out_sizes[dim]);
-  }
-
-  if (nsegments == 1 && nelements > 4096) {
-    topk_out_with_single_tile_sort(self_, k, dim, largest, values, indices);
-    return std::forward_as_tuple(values, indices);
-  } else if (k > 256) {
-    topk_out_with_sort(self_, k, dim, largest, values, indices);
-    return std::forward_as_tuple(values, indices);
   }
 
   Tensor values_, indices_;
