@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from typing import Optional, Tuple, Union
+from torch.nn import functional as F
 
 
 def GPTNeoXMLP_forward(self, hidden_states):
@@ -144,13 +145,14 @@ def OPTDecoderLayer_forward(
         layer_head_mask=layer_head_mask,
         output_attentions=output_attentions,
     )
-    hidden_states = torch.ops.torch_ipex.tpp_linear_add(
-        hidden_states,
-        residual,
-        self.self_attn.out_proj.weight,
-        self.self_attn.out_proj.bias,
-        1.0,
-    )
+    # hidden_states = torch.ops.torch_ipex.tpp_linear_add(
+    #     hidden_states,
+    #     residual,
+    #     self.self_attn.out_proj.weight,
+    #     self.self_attn.out_proj.bias,
+    #     1.0,
+    # )
+    hidden_states = residual + hidden_states
 
     # 350m applies layer norm AFTER attention
     if not self.do_layer_norm_before:
@@ -216,8 +218,10 @@ def OPTDecoderLayer_forward_distributed(
         layer_head_mask=layer_head_mask,
         output_attentions=output_attentions,
     )
-    hidden_states = self.self_attn.out_proj(hidden_states)
-    hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
+    # hidden_states = self.self_attn.out_proj(hidden_states)
+    hidden_states = nn.functional.dropout(
+        hidden_states, p=self.dropout, training=self.training
+    )
     hidden_states = residual + hidden_states
 
     # 350m applies layer norm AFTER attention
@@ -239,7 +243,9 @@ def OPTDecoderLayer_forward_distributed(
     )
 
     hidden_states = self.fc2(hidden_states)
-    hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
+    hidden_states = nn.functional.dropout(
+        hidden_states, p=self.dropout, training=self.training
+    )
     hidden_states = (residual + hidden_states).view(hidden_states_shape)
 
     # 350m applies layer norm AFTER attention
@@ -255,6 +261,7 @@ def OPTDecoderLayer_forward_distributed(
         outputs += (present_key_value,)
 
     return outputs
+
 
 def GPTJMLP_forward(
     self, hidden_states: Optional[torch.FloatTensor]
@@ -320,12 +327,292 @@ def GPTJBlock_forward(
     return outputs  # hidden_states, present, (attentions)
 
 
+def FalconMLP_forward(self, x: torch.Tensor) -> torch.Tensor:
+    if self.dense_h_to_4h.bias is not None:
+        x = torch.ops.torch_ipex.tpp_linear_gelu(
+            x, self.dense_h_to_4h.weight, self.dense_h_to_4h.bias
+        )
+    else:
+        x = self.act(self.dense_h_to_4h(x))
+        x = self.dense_4h_to_h(x)
+    return x
+
+
+def FalconDecoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    alibi: Optional[torch.Tensor],
+    attention_mask: torch.Tensor,
+    layer_past: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+    head_mask: Optional[torch.Tensor] = None,
+    use_cache: bool = False,
+    output_attentions: bool = False,
+):
+    residual = hidden_states
+    if self.self_attention.new_decoder_architecture or not hasattr(
+        self, "input_layernorm"
+    ):
+        attention_layernorm_out = self.ln_attn(hidden_states)
+        mlp_layernorm_out = self.ln_mlp(hidden_states)
+    else:
+        attention_layernorm_out = self.input_layernorm(hidden_states)
+    # Self attention.
+    attn_outputs = self.self_attention(
+        attention_layernorm_out,
+        layer_past=layer_past,
+        attention_mask=attention_mask,
+        alibi=alibi,
+        head_mask=head_mask,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+    )
+    attention_output = attn_outputs[0]
+    if not (
+        self.self_attention.new_decoder_architecture
+        or not hasattr(self, "input_layernorm")
+    ):
+        if self.config.parallel_attn:
+            mlp_layernorm_out = attention_layernorm_out
+        else:
+            residual = attention_output + residual
+            mlp_layernorm_out = self.post_attention_layernorm(residual)
+    outputs = attn_outputs[1:]
+    # MLP.
+    mlp_output = self.mlp(mlp_layernorm_out)
+    if (
+        self.self_attention.new_decoder_architecture
+        or self.config.parallel_attn
+        or not hasattr(self, "input_layernorm")
+    ):
+        if self.mlp.dense_4h_to_h.bias is not None:
+            output = torch.ops.torch_ipex.tpp_linear_add_add(
+                mlp_output,
+                attention_output,
+                residual,
+                self.mlp.dense_4h_to_h.weight,
+                self.mlp.dense_4h_to_h.bias,
+                1.0,
+            )
+        else:
+            mlp_output += attention_output
+            output = mlp_output + residual
+    else:
+        if self.mlp.dense_4h_to_h.bias is not None:
+            output = torch.ops.torch_ipex.tpp_linear_add(
+                mlp_output,
+                residual,
+                self.mlp.dense_4h_to_h.weight,
+                self.mlp.dense_4h_to_h.bias,
+                1.0,
+            )
+        else:
+            output = mlp_output + residual
+
+    if use_cache:
+        outputs = (output,) + outputs
+    else:
+        outputs = (output,) + outputs[1:]
+    return outputs  # hidden_states, present, attentions
+
+
+def FalconMLP_forward_distributed(self, x: torch.Tensor) -> torch.Tensor:
+    if self.dense_h_to_4h.bias is not None:
+        x = torch.ops.torch_ipex.tpp_linear_gelu(
+            x, self.dense_h_to_4h.weight, self.dense_h_to_4h.bias
+        )
+    else:
+        x = self.act(self.dense_h_to_4h(x))
+    return x
+
+
+def FalconDecoderLayer_forward_distributed(
+    self,
+    hidden_states: torch.Tensor,
+    alibi: Optional[torch.Tensor],
+    attention_mask: torch.Tensor,
+    layer_past: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+    head_mask: Optional[torch.Tensor] = None,
+    use_cache: bool = False,
+    output_attentions: bool = False,
+):
+    residual = hidden_states
+
+    if self.self_attention.new_decoder_architecture or not hasattr(
+        self, "input_layernorm"
+    ):
+        attention_layernorm_out = self.ln_attn(hidden_states)
+        mlp_layernorm_out = self.ln_mlp(hidden_states)
+    else:
+        attention_layernorm_out = self.input_layernorm(hidden_states)
+
+    # Self attention.
+    attn_outputs = self.self_attention(
+        attention_layernorm_out,
+        layer_past=layer_past,
+        attention_mask=attention_mask,
+        alibi=alibi,
+        head_mask=head_mask,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+    )
+
+    attention_output = attn_outputs[0]
+    # attention_output = self.self_attention.dense(attention_output)
+    if not (
+        self.self_attention.new_decoder_architecture
+        or not hasattr(self, "input_layernorm")
+    ):
+        if self.config.parallel_attn:
+            mlp_layernorm_out = attention_layernorm_out
+        else:
+            residual = attention_output + residual
+            mlp_layernorm_out = self.post_attention_layernorm(residual)
+
+    outputs = attn_outputs[1:]
+
+    # MLP.
+    mlp_output = self.mlp(mlp_layernorm_out)
+    mlp_output = self.mlp.dense_4h_to_h(mlp_output)
+
+    if (
+        self.self_attention.new_decoder_architecture
+        or self.config.parallel_attn
+        or not hasattr(self, "input_layernorm")
+    ):
+        mlp_output += attention_output
+
+    output = mlp_output + residual
+
+    if use_cache:
+        outputs = (output,) + outputs
+    else:
+        outputs = (output,) + outputs[1:]
+
+    return outputs  # hidden_states, present, attentions
+
+
+def BloomMLP_forward(
+    self, hidden_states: torch.Tensor, residual: torch.Tensor
+) -> torch.Tensor:
+    hidden_states = torch.ops.torch_ipex.tpp_linear_gelu(
+        hidden_states, self.dense_h_to_4h.weight, self.dense_h_to_4h.bias
+    )
+    if self.pretraining_tp > 1 and self.slow_but_exact:
+        intermediate_output = torch.zeros_like(residual)
+        slices = self.dense_4h_to_h.weight.shape[-1] / self.pretraining_tp
+        for i in range(self.pretraining_tp):
+            intermediate_output = intermediate_output + F.linear(
+                hidden_states[:, :, int(i * slices) : int((i + 1) * slices)],
+                self.dense_4h_to_h.weight[:, int(i * slices) : int((i + 1) * slices)],
+            )
+        output = intermediate_output + residual
+    else:
+        output = torch.ops.torch_ipex.tpp_linear_add(
+            hidden_states,
+            residual,
+            self.dense_4h_to_h.weight,
+            self.dense_4h_to_h.bias,
+            1.0,
+        )
+
+    return output
+
+
+def BloomMLP_forward_distributed(
+    self, hidden_states: torch.Tensor, residual: torch.Tensor
+) -> torch.Tensor:
+    hidden_states = torch.ops.torch_ipex.tpp_linear_gelu(
+        hidden_states, self.dense_h_to_4h.weight, self.dense_h_to_4h.bias
+    )
+    if self.pretraining_tp > 1 and self.slow_but_exact:
+        intermediate_output = torch.zeros_like(residual)
+        slices = self.dense_4h_to_h.weight.shape[-1] / self.pretraining_tp
+        for i in range(self.pretraining_tp):
+            intermediate_output = intermediate_output + F.linear(
+                hidden_states[:, :, int(i * slices) : int((i + 1) * slices)],
+                self.dense_4h_to_h.weight[:, int(i * slices) : int((i + 1) * slices)],
+            )
+    else:
+        intermediate_output = self.dense_4h_to_h(hidden_states)
+    output = intermediate_output + residual
+
+    return output
+
+
+def GLMMLP_forward(self, hidden_states):
+    # [s, b, 4hp]
+    intermediate_parallel = self.dense_h_to_4h(hidden_states)
+    intermediate_parallel = self.activation_func(intermediate_parallel)
+    # [s, b, h]
+    # output = self.dense_4h_to_h(intermediate_parallel)
+    # return output
+    return intermediate_parallel
+
+
+def GLMBlock_forward(
+    self,
+    hidden_states,
+    attention_mask,
+    rotary_pos_emb,
+    kv_cache=None,
+    use_cache=True,
+):
+    layernorm_output = self.input_layernorm(hidden_states)
+    # Self attention.
+    attention_output, kv_cache = self.self_attention(
+        layernorm_output,
+        attention_mask,
+        rotary_pos_emb,
+        kv_cache=kv_cache,
+        use_cache=use_cache,
+    )
+    # Residual connection.
+    if self.apply_residual_connection_post_layernorm:
+        residual = layernorm_output
+    else:
+        residual = hidden_states
+    layernorm_input = torch.nn.functional.dropout(
+        attention_output, p=self.hidden_dropout, training=self.training
+    )
+    layernorm_input = residual + layernorm_input
+
+    # Layer norm post the self attention.
+    layernorm_output = self.post_attention_layernorm(layernorm_input)
+
+    # MLP.
+    mlp_output = self.mlp(layernorm_output)
+
+    # Second residual connection.
+    if self.apply_residual_connection_post_layernorm:
+        residual = layernorm_output
+    else:
+        residual = layernorm_input
+
+    # output = torch.nn.functional.dropout(
+    #     mlp_output, p=self.hidden_dropout, training=self.training
+    # )
+    # output = residual + output
+    if self.mlp.dense_4h_to_h.bias is not None:
+        output = torch.ops.torch_ipex.tpp_linear_add(
+            mlp_output,
+            residual,
+            self.mlp.dense_4h_to_h.weight,
+            self.mlp.dense_4h_to_h.bias,
+            1.0,
+        )
+    else:
+        output = self.mlp.dense_4h_to_h(mlp_output)
+        output = residual + output
+
+    return output, kv_cache
+
+
 def Apply_TPP_optimization(model, dtype, distributed=False):
     def convert_forward(m, target_m, new_forward):
         for _, sub_m in m.named_children():
             if isinstance(sub_m, target_m):
                 bound_method = new_forward.__get__(sub_m, sub_m.__class__)
-                setattr(sub_m, "forward", bound_method)
+                sub_m.forward = bound_method
             convert_forward(sub_m, target_m, new_forward)
 
     import warnings
@@ -345,7 +632,8 @@ def Apply_TPP_optimization(model, dtype, distributed=False):
         max_version = "4.30.0"
         if "transformers" not in installed_pkg:
             raise RuntimeError(
-                "tpp rope optimization requires transformers package and its version between {} and {}, fallback due to not meet".format(
+                "tpp rope optimization requires transformers package and its version between {} and {}, \
+                    fallback due to not meet".format(
                     min_version, max_version
                 )
             )
@@ -358,7 +646,8 @@ def Apply_TPP_optimization(model, dtype, distributed=False):
             trans_version
         ) > version.parse(max_version):
             raise RuntimeError(
-                "tpp rope optimization requires the transformers with version: between {} and {} while now transformers== {}, fallback due to not meet".format(
+                "tpp rope optimization requires the transformers with version: between {} and {} while now transformers== {},\
+                     fallback due to not meet".format(
                     min_version, max_version, trans_version
                 )
             )

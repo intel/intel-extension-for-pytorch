@@ -5,7 +5,7 @@ import intel_extension_for_pytorch as ipex  # flake8: noqa
 import itertools
 import unittest
 from torch.testing._internal.common_utils import TestCase
-from common_utils import TestModule
+from common_utils import TestModule, _empty_weight_bias_parameter_names
 import bench.custom_op_bench.optimizer
 from torch.optim import Adadelta, AdamW, Adamax, ASGD, RMSprop, Rprop
 import copy
@@ -996,7 +996,13 @@ class TestPatchedMethod(TestCase):
                 y1 = ipex_model(*ipex_model.input).sum()
             y1.backward()
             # check grad are correctly attached
-            for param in ipex_model.parameters():
+            for name, param in ipex_model.named_parameters():
+                # We won't use the grad of the empty weight and bias tensor.
+                # These tensors are only used during inference.
+                if name in _empty_weight_bias_parameter_names(
+                    prefixes=["conv", "linear"]
+                ):
+                    continue
                 self.assertTrue(param.grad is not None)
             uncast_weight = [
                 ipex_model.bn.weight.data_ptr(),
@@ -1014,7 +1020,13 @@ class TestPatchedMethod(TestCase):
             with torch.autograd.profiler.profile() as ipex_prof:
                 ipex_optimizer.zero_grad(set_to_none=set_to_none)
             # check grad are zeroed or are set to none
-            for param in ipex_model.parameters():
+            for name, param in ipex_model.named_parameters():
+                # We won't use the grad of the empty weight and bias tensor.
+                # These tensors are only used during inference.
+                if name in _empty_weight_bias_parameter_names(
+                    prefixes=["conv", "linear"]
+                ):
+                    continue
                 expected_grad = None if set_to_none else torch.zeros_like(param)
                 self.assertEqual(expected_grad, param.grad)
 

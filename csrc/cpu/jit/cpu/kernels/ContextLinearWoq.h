@@ -47,14 +47,15 @@ struct ContextLinearWoq final {
     auto zp_int8 = zero_point_float.to(c10::kChar);
     zero_points_list_ = {zero_point_float, zp_fp16, zp_bf16, zp_int8};
     if (at_bias_.has_value() && at_bias_.value().defined()) {
-        auto bias_fp32 = at_bias_.value();
-        auto bias_fp16 = bias_fp32.to(c10::kHalf);
-        auto bias_bf16 = bias_fp32.to(c10::kBFloat16);
-        bias_list_ = {bias_fp32, bias_fp16, bias_bf16};
+      auto& orig_bias = at_bias_.value();
+      auto bias_fp32 = at_bias_.value().to(c10::kFloat);
+      auto bias_fp16 = at_bias_.value().to(c10::kHalf);
+      auto bias_bf16 = at_bias_.value().to(c10::kBFloat16);
+      bias_list_ = {bias_fp32, bias_fp16, bias_bf16};
     } else {
-        // bias tensor is empty (undefined). Leave the check to kernel.
-        auto bias_empty = at::Tensor();
-        bias_list_ = {bias_empty, bias_empty, bias_empty};
+      // bias tensor is empty (undefined). Leave the check to kernel.
+      auto bias_empty = at::Tensor();
+      bias_list_ = {bias_empty, bias_empty, bias_empty};
     }
   }
 

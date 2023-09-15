@@ -16,13 +16,15 @@ void linear_kernel_output(
     const ideep::tensor& mkldnn_weight,
     const at::Tensor& bias,
     at::Tensor& output,
-    const ideep::attr_t& attr);
+    const ideep::attr_t& attr,
+    const std::vector<ideep::tensor>& post_op_src = {});
 
 at::Tensor linear_kernel(
     const at::Tensor& self,
     const ideep::tensor& mkldnn_weight,
     const at::Tensor& bias,
-    const ideep::attr_t& attr);
+    const ideep::attr_t& attr,
+    const std::vector<ideep::tensor>& post_op_src = {});
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward_kernel(
     const at::Tensor& input,

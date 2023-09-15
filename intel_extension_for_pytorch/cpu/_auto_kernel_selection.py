@@ -15,6 +15,7 @@ def _using_dnnl():
     global _use_dnnl
     return _use_dnnl
 
+
 _use_tpp = False
 
 

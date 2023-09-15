@@ -268,7 +268,6 @@ inline int env2int(const char* env_name, int def_val = 0) {
   return val;
 }
 
-
 } // namespace tpp
 } // namespace torch_ipex
 #endif //_PCL_UTILS_H_

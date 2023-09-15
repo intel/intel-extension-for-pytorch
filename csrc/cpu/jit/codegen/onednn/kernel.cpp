@@ -89,10 +89,16 @@ std::map<size_t, int64_t> LlgaKernel::initializeTensorIdToOccurence() const {
   return tensorIdToOccurence;
 }
 
-
 ArgSpecs LlgaKernel::initializeInputSpecs(const TensorArgs& inputs) {
   ArgSpecs inputSpecs;
   inputSpecs.reserve(nPartitionInputs_);
+  std::call_once(tracedInputShapesInitialized_, [&]() {
+    auto numInputs = inputs.size();
+    for (size_t i = 0; i < numInputs; i++) {
+      tracedInputShapes_.push_back(inputs[i].sizes().vec());
+      tracedInputStrides_.push_back(inputs[i].strides().vec());
+    }
+  });
   GRAPH_DEBUG("Initializing graph input logical tensors");
   // initializeTensorIdToOccurence can also be called just once for the first
   // input shape
@@ -147,11 +153,28 @@ ArgSpecs LlgaKernel::initializeInputSpecs(const TensorArgs& inputs) {
   return inputSpecs;
 }
 
-ArgSpecs LlgaKernel::initializeOutputSpecs() {
+ArgSpecs LlgaKernel::initializeOutputSpecs(
+    const TensorArgs& inputs,
+    bool convertDimsToUnknown = false) {
   ArgSpecs outputSpecs;
   outputSpecs.reserve(nOutputs_);
+
+  if (convertDimsToUnknown == false) {
+    auto numInputs = inputs.size();
+    for (auto i = 0; i < numInputs; i++) {
+      if (!((inputs[i].sizes().vec() == tracedInputShapes_[i]) &&
+            (inputs[i].strides().vec() == tracedInputStrides_[i]))) {
+        convertDimsToUnknown = true;
+        break;
+      }
+    }
+  }
+
   for (size_t i = 0; i < nOutputs_; i++) {
-    auto spec = ArgSpec(graph_->outputs()[i]).convertDimsToUnknown();
+    auto spec = ArgSpec(graph_->outputs()[i]);
+    if (convertDimsToUnknown) {
+      spec = spec.convertDimsToUnknown();
+    }
 
     if (spec.is_quantized())
       spec = getQuantizedSpec(spec, i);
@@ -161,6 +184,10 @@ ArgSpecs LlgaKernel::initializeOutputSpecs() {
     outputSpecs.emplace_back(spec);
   }
   return outputSpecs;
+}
+
+bool LlgaKernel::inputValueIsNotUsedLater(size_t offset) const {
+  return LlgaNodeWrapper(fusionNode_).inputValueIsNotUsedLater(offset);
 }
 
 void LlgaKernel::prepareAndCacheRunArgs(
@@ -193,20 +220,18 @@ void LlgaKernel::prepareAndCacheRunArgs(
   }
 
   outputTensorTypes_.reserve(nOutputs_);
-  inplacePairOffsets_.reserve(nOutputs_);
+  std::fill(outputTensorTypes_.begin(), outputTensorTypes_.end(), undefined);
   for (size_t i = 0; i < nOutputs_; i++) {
     auto& spec = outputSpecs[i];
     auto opt = c10::TensorOptions(spec.aten_scalar_type()).device(device_);
 
     auto outputId = spec.tid();
-    auto iter = inplacePairs_.find(outputId);
-    if (iter != inplacePairs_.end()) {
+    auto inputOffset = inplacePairOffsets_[i];
+    if ((inputOffset != INT16_MIN) && inputValueIsNotUsedLater(inputOffset)) {
       // output reuses one of input tensors
 #ifdef GRAPH_DEBUG_ENABLED
       GRAPH_DEBUG("Inplace computation");
 #endif
-      auto inputOffset = iter->second;
-      inplacePairOffsets_[i] = static_cast<char>(inputOffset);
       GRAPH_DEBUG("INPUT INDEX OF INPLACE PAIR IS ", inputOffset);
       auto inputTensor = inputs[inputOffset];
       auto dataType = spec.dtype();
@@ -282,6 +307,11 @@ void LlgaKernel::prepareAndCacheRunArgs(
       }
     }
   }
+  TORCH_CHECK(
+      std::find(
+          outputTensorTypes_.begin(), outputTensorTypes_.end(), undefined) ==
+          outputTensorTypes_.end(),
+      "outputTensorTypes_ elements should not be undefined");
 }
 
 void LlgaKernel::prepareRunArgs(
@@ -303,13 +333,13 @@ void LlgaKernel::prepareRunArgs(
 
     switch (typeOfOutput) {
       case unwrappedInplaceCompute: {
-        auto inputTensor = inputs[static_cast<int>(inplacePairOffsets_[i])];
+        auto inputTensor = inputs[inplacePairOffsets_[i]];
         runOutputs[i].set_data_handle(inputTensor.data_ptr());
         outputs.push_back(std::move(inputTensor));
         break;
       }
       case quantizedInplaceCompute: {
-        auto inputTensor = inputs[static_cast<int>(inplacePairOffsets_[i])];
+        auto inputTensor = inputs[inplacePairOffsets_[i]];
         auto llgaImpl =
             static_cast<LlgaTensorImpl*>(inputTensor.unsafeGetTensorImpl());
         inputTensor =
@@ -319,7 +349,7 @@ void LlgaKernel::prepareRunArgs(
         break;
       }
       case unquantizedInplaceCompute: {
-        auto inputTensor = inputs[static_cast<int>(inplacePairOffsets_[i])];
+        auto inputTensor = inputs[inplacePairOffsets_[i]];
         auto llgaImpl =
             static_cast<LlgaTensorImpl*>(inputTensor.unsafeGetTensorImpl());
         inputTensor = LlgaTensorImpl::llga_to_aten_tensor(llgaImpl);
@@ -349,14 +379,42 @@ void LlgaKernel::prepareRunArgs(
   }
 }
 
-compiled_partition LlgaKernel::compile(
+std::pair<compiled_partition, ArgSpecs> LlgaKernel::compile(
     const partition& partition,
-    ArgSpecs& inputSpecs,
-    ArgSpecs& outputSpecs) {
+    const TensorArgs& inputs,
+    ArgSpecs& inputSpecs) {
   RECORD_FUNCTION("LLGA_bridge::compileKernel", c10::ArrayRef<c10::IValue>({}));
-  auto inputs = fmap(inputSpecs, toLogicalTensor);
-  auto outputs = fmap(outputSpecs, toLogicalTensor);
-  auto compilation = partition.compile(inputs, outputs, Engine::getEngine());
+  auto inputLogicalTensors = fmap(inputSpecs, toLogicalTensor);
+  auto outputSpecs = initializeOutputSpecs(inputs);
+  auto outputLogicalTensors = fmap(outputSpecs, toLogicalTensor);
+  compiled_partition compilation;
+  try {
+    compilation = partition.compile(
+        inputLogicalTensors, outputLogicalTensors, Engine::getEngine());
+  } catch (std::exception& e) {
+    // if partition compilation failed, check if outputSpecs had concrete shapes
+    // & strides
+    bool concreteOutputStrides = false;
+    for (auto outputSpec : outputSpecs) {
+      if (outputSpec.sizes().size()) {
+        if (outputSpec.sizes()[0] != INT64_MIN) {
+          concreteOutputStrides = true;
+          break;
+        }
+      }
+    }
+    if (concreteOutputStrides) {
+      // recompute outputSpecs and output logical tensors
+      // with INT64_MIN sizes & strides
+      outputSpecs = initializeOutputSpecs(inputs, true);
+      outputLogicalTensors = fmap(outputSpecs, toLogicalTensor);
+      compilation = partition.compile(
+          inputLogicalTensors, outputLogicalTensors, Engine::getEngine());
+    } else {
+      // there's nothing we can do
+      throw;
+    }
+  }
 
   // Since layouts of opaque outputs would be known after compilation,
   // we need to query them out from compilation and update outputSpecs
@@ -366,7 +424,10 @@ compiled_partition LlgaKernel::compile(
         outputSpecs[i].update_desc(compilation.query_logical_tensor(tid));
   }
 
-  // Build static mapping from output id to input offset
+  inplacePairOffsets_.resize(nOutputs_);
+  std::fill(inplacePairOffsets_.begin(), inplacePairOffsets_.end(), INT16_MIN);
+
+  // Build static mapping from output offset to input offset
   // in accordance with available inplace options
   for (auto&& option : compilation.get_inplace_ports()) {
     size_t inputId = option.first;
@@ -377,10 +438,17 @@ compiled_partition LlgaKernel::compile(
         });
     TORCH_CHECK(inputSpecIter != inputSpecs.end(), "In-place input not found");
     auto inputOffset = inputSpecIter - inputSpecs.begin();
-    inplacePairs_[outputId] = inputOffset;
+    auto outputSpecIter =
+        std::find_if(outputSpecs.begin(), outputSpecs.end(), [&](auto& spec) {
+          return spec.tid() == outputId;
+        });
+    TORCH_CHECK(
+        outputSpecIter != outputSpecs.end(), "In-place output not found");
+    auto outputOffset = outputSpecIter - outputSpecs.begin();
+    inplacePairOffsets_[outputOffset] = inputOffset;
   }
 
-  return compilation;
+  return std::make_pair(compilation, outputSpecs);
 }
 
 LlgaKernel::cp_entry& LlgaKernel::compileAndCache(
@@ -397,7 +465,13 @@ LlgaKernel::cp_entry& LlgaKernel::compileAndCache(
   std::vector<int64_t> key;
   key.reserve(1024);
   key.push_back(omp_get_max_threads());
+  // fusionNode_ may be reassigned to another LlgaFusionGroup after ~LlgaKernel
+  // would be called, and another LlgaFusionGroup may be created for another
+  // graph. But since JIT graphs have had a memory leak issue for years now,
+  // torch::jit::Graph::~Graph is not called after a model is traced.
+  // So we would use 2 pieces of info that make a partition unique.
   key.push_back((uintptr_t)((void*)fusionNode_));
+  key.push_back((uintptr_t)((void*)graph_.get()));
   for (auto& in : inputs) {
     auto shape_vec = in.sizes().vec();
     key.insert(key.end(), shape_vec.begin(), shape_vec.end());
@@ -408,9 +482,9 @@ LlgaKernel::cp_entry& LlgaKernel::compileAndCache(
     cp_entry compiledPartitionEntry;
     auto input_shape = inputs[0].sizes().vec();
     auto inputSpecs = initializeInputSpecs(inputs);
-    compiledPartitionEntry.outputSpecs_ = initializeOutputSpecs();
-    compiledPartitionEntry.cp_ = std::move(
-        compile(partition_, inputSpecs, compiledPartitionEntry.outputSpecs_));
+    auto compilationOutput = compile(partition_, inputs, inputSpecs);
+    compiledPartitionEntry.outputSpecs_ = std::move(compilationOutput.second);
+    compiledPartitionEntry.cp_ = std::move(compilationOutput.first);
     prepareAndCacheRunArgs(
         compiledPartitionEntry.inputLLGATensors_,
         compiledPartitionEntry.outputLLGATensors_,
@@ -431,6 +505,9 @@ LlgaKernel::cp_entry& LlgaKernel::compileAndCache(
     // then remove std::move above & return compiledPartitionEntry instead
     return cache_items_map_[key]->second;
   } else {
+#ifdef GRAPH_DEBUG_ENABLED
+    GRAPH_DEBUG("Cached compiled partition is available");
+#endif
     cache_items_list_.splice(
         cache_items_list_.begin(), cache_items_list_, iter->second);
     prepareRunArgs(
@@ -448,9 +525,6 @@ void LlgaKernel::run(Stack& stack) {
   TensorArgs outputs;
   outputs.reserve(nOutputs_);
 
-#ifdef GRAPH_DEBUG_ENABLED
-  GRAPH_DEBUG("Cached compilation");
-#endif
   auto& compiledPartitionEntry = compileAndCache(stack, outputs);
 
 #ifdef GRAPH_DEBUG_ENABLED

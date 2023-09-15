@@ -5,6 +5,7 @@
 
 #include "aten/AddLayerNorm.h"
 #include "aten/ConcatBnRelu.h"
+#include "aten/MergedEmbCat.h"
 #include "aten/RMSNorm.h"
 #include "cpu/kernels/ConvPacked.h"
 #include "cpu/kernels/ConvTransposePacked.h"
@@ -649,6 +650,41 @@ torch::jit::RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
+        "ipex_prepack::linear_mul_run(Tensor input, Tensor to_mul, "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) "
+        "-> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = linear_mul_run(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toTensor(),
+                (std::move(peek(stack, 2, 3)))
+                    .toCustomClass<LinearOpContext>());
+            drop(stack, 3);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::linear_mul_add_run(Tensor input, Tensor to_mul, Tensor to_add, "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) "
+        "-> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = linear_mul_add_run(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                (std::move(peek(stack, 1, 4))).toTensor(),
+                (std::move(peek(stack, 2, 4))).toTensor(),
+                (std::move(peek(stack, 3, 4)))
+                    .toCustomClass<LinearOpContext>());
+            drop(stack, 4);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
         "ipex_prepack::mkl_sgemm_run(Tensor input, "
         "__torch__.torch.classes.ipex_prepack.MKLOpContext "
         "W_prepack) -> Tensor",
@@ -683,7 +719,8 @@ torch::jit::RegisterOperators op({
         "torch_ipex::woq_linear_gelu_run(Tensor input, Tensor W_prepack, str? algorithm) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
-            auto algo = (std::move(peek(stack, 2, 3))).toOptional<c10::string_view>();
+            auto algo =
+                (std::move(peek(stack, 2, 3))).toOptional<c10::string_view>();
             auto result = woq_linear_eltwise_run(
                 (std::move(peek(stack, 0, 3))).toTensor(),
                 (std::move(peek(stack, 1, 3))).toTensor(),
@@ -697,7 +734,8 @@ torch::jit::RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     // Operator(
-    //     "torch_ipex::woq_linear_add_run(Tensor input, Tensor(a!) accumu, Scalar? alpha, Tensor W_prepack) -> Tensor",
+    //     "torch_ipex::woq_linear_add_run(Tensor input, Tensor(a!) accumu,
+    //     Scalar? alpha, Tensor W_prepack) -> Tensor",
     //     [](const Node* node) -> Operation {
     //       return [](Stack* stack) {
     //         auto output = (std::move(peek(stack, 1, 4))).toTensor();
@@ -713,7 +751,8 @@ torch::jit::RegisterOperators op({
     //     },
     //     aliasAnalysisFromSchema()),
     // Operator(
-    //     "torch_ipex::woq_linear_add_relu_run(Tensor input, Tensor(a!) accumu, Scalar? alpha, Tensor W_prepack) -> Tensor",
+    //     "torch_ipex::woq_linear_add_relu_run(Tensor input, Tensor(a!) accumu,
+    //     Scalar? alpha, Tensor W_prepack) -> Tensor",
     //     [](const Node* node) -> Operation {
     //       return [](Stack* stack) {
     //         auto output = (std::move(peek(stack, 1, 4))).toTensor();
@@ -1403,6 +1442,27 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 2, 4))).toInt(),
                 (std::move(peek(stack, 3, 4))).toScalarType());
             drop(stack, 4);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::qmerged_embeddingbag_cat(Tensor[] weights, Tensor[] index, "
+        "Tensor[] offsets, Tensor qdense, float o_scale, "
+        "int o_zp, ScalarType o_dtype) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = dil_qmerged_embeddingbag_cat(
+                (std::move(peek(stack, 0, 7))).toTensorVector(),
+                (std::move(peek(stack, 1, 7))).toTensorVector(),
+                (std::move(peek(stack, 2, 7))).toTensorVector(),
+                (std::move(peek(stack, 3, 7))).toTensor(),
+                (std::move(peek(stack, 4, 7))).toDouble(),
+                (std::move(peek(stack, 5, 7))).toInt(),
+                (std::move(peek(stack, 6, 7))).toScalarType());
+            drop(stack, 7);
             torch::jit::pack(stack, std::move(result));
             return 0;
           };

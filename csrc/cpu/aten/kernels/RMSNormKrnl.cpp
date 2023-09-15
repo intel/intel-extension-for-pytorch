@@ -15,18 +15,18 @@ void RMSNormKernelImpl(
     const at::Tensor& gamma,
     int64_t M,
     int64_t N,
-    T eps,
+    float eps,
     at::Tensor& Y) {
   DCHECK(a.numel() == M * N);
   DCHECK(!gamma.defined() || gamma.numel() == M * N);
   const T* a_data = a.data_ptr<T>();
-  const T* gamma_data = gamma.defined() ? gamma.data_ptr<T>() : nullptr;
+  const T1* gamma_data = gamma.defined() ? gamma.data_ptr<T1>() : nullptr;
   T* Y_data = Y.data_ptr<T>();
   at::parallel_for(0, M, 1, [&](int64_t start, int64_t end) {
     for (const auto i : c10::irange(start, end)) {
       const T* a_ptr = a_data + i * N;
       T* Y_ptr = Y_data + i * N;
-      kernel::_compute_rmsnorm<T>(a_ptr, N, eps, gamma_data, Y_ptr);
+      kernel::_compute_rmsnorm<T, T1>(a_ptr, N, eps, gamma_data, Y_ptr);
     }
   });
 }
@@ -52,12 +52,25 @@ at::Tensor rmsnorm_kernel_impl(
       c10::nullopt /* device */,
       c10::nullopt /* pin_memory */,
       at::MemoryFormat::Contiguous);
-  RMSNormKernelImpl<float, float>(X, b, M, N, eps, Y);
+  if (input.scalar_type() == at::ScalarType::Float) {
+    RMSNormKernelImpl<float, float>(X, b, M, N, eps, Y);
+  } else if (
+      input.scalar_type() == at::ScalarType::BFloat16 &&
+      b.scalar_type() == at::ScalarType::Float) {
+    RMSNormKernelImpl<at::BFloat16, float>(X, b, M, N, eps, Y);
+  } else if (
+      input.scalar_type() == at::ScalarType::BFloat16 &&
+      b.scalar_type() == at::ScalarType::BFloat16) {
+    RMSNormKernelImpl<at::BFloat16, at::BFloat16>(X, b, M, N, eps, Y);
+  } else {
+    TORCH_CHECK(false, "Unsupported input type");
+  }
   return Y;
 #else
-  auto variance = at::mean(at::pow(input, 2), -1, true);
+  auto input1 = input.to(at::kFloat);
+  auto variance = at::mean(at::pow(input1, 2), -1, true);
   auto hidden_states = at::rsqrt(at::add(variance, eps));
-  return at::mul(b, at::mul(input, hidden_states));
+  return at::mul(b, at::mul(input1, hidden_states)).to(input.scalar_type());
 #endif
 }
 

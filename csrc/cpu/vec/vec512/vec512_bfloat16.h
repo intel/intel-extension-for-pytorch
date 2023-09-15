@@ -323,7 +323,8 @@ inline __attribute__((always_inline)) void add_ker(
     auto in1 = _mm512_loadu_ps(in + i);
     auto in2 = _mm512_loadu_ps(in + i + 16);
     auto inout1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(inout + i)));
-    auto inout2 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(inout + i + 16)));
+    auto inout2 =
+        cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(inout + i + 16)));
     inout1 = _mm512_add_ps(inout1, in1);
     inout2 = _mm512_add_ps(inout2, in2);
     _mm256_storeu_si256((__m256i*)(inout + i), cvt_fp32_to_bf16(inout1));

@@ -7,11 +7,6 @@
 
 #include <libxsmm.h>
 #include <libxsmm_intrinsics_x86.h>
-// #ifdef TORCH_API_INCLUDE_EXTENSION_H
-// #include <torch/extension.h>
-// #else
-//  include <pytorch_extension_wrapper.h>
-// #endif
 #include <string>
 #include <unordered_map>
 

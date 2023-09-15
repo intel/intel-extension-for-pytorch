@@ -24,7 +24,6 @@ parser.add_argument(
     help="cpu",
     default="cpu",
 )
-parser.add_argument("--dtype", type=str, default="int8")
 parser.add_argument(
     "--max-new-tokens", default=32, type=int, help="output max new tokens"
 )
@@ -56,10 +55,20 @@ parser.add_argument("--greedy", action="store_true")
 parser.add_argument("--profile", action="store_true")
 parser.add_argument(
     "--lowp-mode",
-    choices=["BF16","FP32","INT8","FP16"], 
+    choices=["BF16","FP32","INT8","FP16"],
     default="BF16",
     type=str,
-    help="low precision mode for weight only quantization"
+    help="low precision mode for weight only quantization. "
+         "It indicates data type for computation for speedup, "
+         "unrelated to activation or weight data type."
+)
+parser.add_argument(
+    "--weight-dtype",
+    choices=["INT8", "INT4"],
+    default="INT8",
+    type=str,
+    help="weight data type for weight only quantization. "
+         "Unrelated to activation data type or lowp-mode."
 )
 args = parser.parse_args()
 
@@ -72,7 +81,8 @@ except Exception:
 
 # beam search = 4
 num_beams = 1 if args.greedy else 4
-generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams)
+generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams,
+                       max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens)
 
 # load model
 config = AutoConfig.from_pretrained(args.model_id, torchscript=args.jit)
@@ -353,7 +363,7 @@ if args.ipex_weight_only_quantization:
         tuple(global_past_key_value),
     )
 
-    from intel_extension_for_pytorch.quantization import prepare, convert
+    weight_dtype = torch.quint4x2 if args.weight_dtype == "INT4" else torch.qint8
     
     if args.lowp_mode == "INT8":
         lowp_mode = ipex.quantization.WoqLowpMode.INT8
@@ -365,17 +375,15 @@ if args.ipex_weight_only_quantization:
         lowp_mode = ipex.quantization.WoqLowpMode.BF16
 
     qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+        weight_dtype=weight_dtype,
         lowp_mode=lowp_mode
     )
-    with torch.no_grad():
-        convert_model = convert_woq(user_model.eval(), qconfig)
     with torch.no_grad(), torch.autocast(
         device_type=args.device,
         enabled=amp_enabled,
         dtype=amp_dtype if amp_enabled else None,
     ):
-        if amp_enabled:
-            convert_model = ipex.optimize(convert_model, dtype=torch.bfloat16, inplace=True, concat_linear=False)
+        convert_model = convert_woq(user_model.eval(), qconfig)
         self_jit = torch.jit.trace(convert_model.eval(), example_inputs, strict=False)
         self_jit = torch.jit.freeze(self_jit.eval())
         self_jit.save(args.output_dir + "/best_model.pt")
@@ -427,9 +435,7 @@ if args.benchmark:
         for i in range(num_iter):
             tic = time.time()
             input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(args.device)
-            output = user_model.generate(
-                input_ids, max_new_tokens=args.max_new_tokens, **generate_kwargs
-            )
+            output = user_model.generate(input_ids, **generate_kwargs)
             gen_ids = output[0] if args.token_latency else output
             gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
             toc = time.time()
@@ -462,9 +468,7 @@ if args.benchmark:
         ) as prof:
             for i in range(5):
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(args.device)
-                output = user_model.generate(
-                    input_ids, max_new_tokens=args.max_new_tokens, **generate_kwargs
-                )
+                output = user_model.generate(input_ids, **generate_kwargs)
                 gen_ids = output[0] if args.token_latency else output
                 gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
                 prof.step()

@@ -160,6 +160,88 @@ static void DecomposeFusedAdd(Block* block) {
   }
 }
 
+void replaceWithSelectOpNode(Node* node, Value* unexpanded_mask) {
+  WithInsertPoint guard(node);
+  auto g = node->owningGraph();
+  auto to_replace = node->input(1);
+  auto dtype = node->input(0)->type()->cast<TensorType>()->scalarType().value();
+  auto to_replace_tensor =
+      g->insert(aten::as_tensor, {to_replace}, {{"dtype", dtype}});
+  c10::optional<size_t> t_dim = 1;
+  auto target_type =
+      TensorTypePtr(TensorType::create(dtype, at::kCPU, t_dim, false));
+  target_type = target_type->withSizes({1});
+  to_replace_tensor->setType(target_type);
+  auto unsqueezed = g->insert(aten::unsqueeze, {to_replace_tensor, 0});
+  unsqueezed->setType(target_type);
+  auto selectNode = g->insert(
+      Symbol::fromQualString("llga::Select"),
+      {unexpanded_mask, unsqueezed, node->input(0)});
+  selectNode->setType(node->outputs()[0]->type());
+  node->outputs()[0]->replaceAllUsesWith(selectNode);
+}
+
+static void replaceWithSelectOp(Block* block) {
+  static auto registry = torch::RegisterOperators().op(
+      "llga::Select(Tensor mask, Tensor then_tensor, Tensor else_tensor) -> Tensor");
+  Value* unexpanded_mask = nullptr;
+  for (auto nodeIterator = block->nodes().begin();
+       nodeIterator != block->nodes().end();
+       ++nodeIterator) {
+    Node* node = *nodeIterator;
+    for (auto blockIterator = node->blocks().begin();
+         blockIterator != node->blocks().end();
+         ++blockIterator) {
+      Block* body_block = *blockIterator;
+      replaceWithSelectOp(body_block);
+    }
+    if ((node->kind() == aten::masked_fill) && (unexpanded_mask != nullptr)) {
+      replaceWithSelectOpNode(node, unexpanded_mask);
+      nodeIterator.destroyCurrent();
+    } else if (
+        (node->kind() == aten::expand_as) &&
+        (node->next()->kind() == aten::masked_fill) &&
+        ((uintptr_t)(node->input(1)) == (uintptr_t)(node->next()->input(0)))) {
+      unexpanded_mask = node->input(0);
+      node->next()->removeInput(1);
+      nodeIterator.destroyCurrent();
+    }
+  }
+}
+
+void removeSelectOpNode(Node* node) {
+  WithInsertPoint guard(node->prev()->prev()->prev()->prev());
+  auto g = node->owningGraph();
+  auto dtype = node->output()->type()->cast<TensorType>()->scalarType().value();
+  auto as_tensor_node = node->prev()->prev()->prev();
+  auto expand_as_output =
+      g->insert(aten::expand_as, {node->input(0), node->input(2)});
+  expand_as_output->setType(node->input(2)->type());
+  auto masked_fill_output = g->insert(
+      aten::masked_fill,
+      {node->input(2), expand_as_output, as_tensor_node->input(0)});
+  masked_fill_output->setType(node->input(2)->type());
+  node->output()->replaceAllUsesWith(masked_fill_output);
+}
+
+static void mayRemoveLLGASelect(Block* block) {
+  for (auto nodeIterator = block->nodes().begin();
+       nodeIterator != block->nodes().end();
+       ++nodeIterator) {
+    Node* node = *nodeIterator;
+    for (auto blockIterator = node->blocks().begin();
+         blockIterator != node->blocks().end();
+         ++blockIterator) {
+      Block* body_block = *blockIterator;
+      mayRemoveLLGASelect(body_block);
+    }
+    if (node->kind().toQualString() == std::string("llga::Select")) {
+      removeSelectOpNode(node);
+      nodeIterator.destroyCurrent();
+    }
+  }
+}
+
 static void EliminateIdentityMulAddDiv(Block* block) {
   for (auto node : block->nodes()) {
     for (auto sub : node->blocks()) {
@@ -182,6 +264,7 @@ void PrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph) {
   EliminateIdentityMulAddDiv(graph->block());
   EliminateDeadCode(graph);
   // ConvertScalarToTensor must be placed after EliminateIdentityMulAddDiv
+  replaceWithSelectOp(graph->block());
   ConvertScalarToTensor(graph->block());
   // TODO: after conv-bn folding, bias will become bias? (Optional) after this
   // pass and will lose it when using mustNotBeNone to check Optional Bias
@@ -191,6 +274,8 @@ void PrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph) {
 void RevertPrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph) {
   ConvertTensorToScalar(graph->block());
   mayRevertDtypeAttributeInsertion(graph->block());
+  mayRemoveLLGASelect(graph->block());
+  EliminateDeadCode(graph);
 }
 
 } // namespace onednn

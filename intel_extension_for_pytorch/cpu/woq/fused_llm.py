@@ -1,17 +1,18 @@
 import torch
-from torch import nn
 from typing import Optional, Tuple, Union
+
 
 def GPTJMLP_woq_forward(
     self, hidden_states: Optional[torch.FloatTensor]
 ) -> torch.FloatTensor:
-    if hasattr(self.fc_in, '_op_context') and self.fc_in._op_context is not None:
+    if hasattr(self.fc_in, "_op_context") and self.fc_in._op_context is not None:
         hidden_states = torch.ops.torch_ipex.woq_linear_gelu(
             hidden_states, self.fc_in._op_context.get_data_handle()
         )
     else:
         hidden_states = self.fc_in(hidden_states)
     return hidden_states
+
 
 def GPTJBlock_woq_forward(
     self,
@@ -40,11 +41,14 @@ def GPTJBlock_woq_forward(
     outputs = attn_outputs[1:]
     feed_forward_hidden_states = self.mlp(hidden_states)
     others = [attn_output, residual]
-    if hasattr(self.mlp.fc_out, '_op_context') and self.mlp.fc_out._op_context is not None:
+    if (
+        hasattr(self.mlp.fc_out, "_op_context")
+        and self.mlp.fc_out._op_context is not None
+    ):
         hidden_states = torch.ops.torch_ipex.woq_linear_add_add(
             feed_forward_hidden_states,
             self.mlp.fc_out._op_context.get_data_handle(),
-            others
+            others,
         )
     else:
         hidden_states = self.mlp.fc_out(feed_forward_hidden_states)

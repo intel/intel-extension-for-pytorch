@@ -167,6 +167,7 @@ class AutocastCPUTestLists(object):
                 ),
             ),
             ("addmm", mat1_fp32 + mat2_fp32 + mat3_fp32),
+            ("_addmm_activation", mat1_fp32 + mat2_fp32 + mat3_fp32),
             (
                 "addbmm",
                 mat0_fp32
@@ -425,14 +426,6 @@ class AutocastCPUTestLists(object):
                     torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
                 ),
             ),
-            (
-                "_scaled_dot_product_attention",
-                (
-                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
-                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
-                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
-                ),
-            ),
             ("adaptive_avg_pool2d", dummy_fp16[2], {"output_size": (4, 4)}),
             ("adaptive_avg_pool3d", dummy_fp16[3], {"output_size": (4, 4, 4)}),
             ("upsample_nearest1d", dummy_fp16[2], {"output_size": (n)}),
@@ -480,14 +473,6 @@ class AutocastCPUTestLists(object):
         self.nn_fallthrough_bf16 = [
             (
                 "scaled_dot_product_attention",
-                (
-                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
-                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
-                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
-                ),
-            ),
-            (
-                "_scaled_dot_product_attention",
                 (
                     torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
                     torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),

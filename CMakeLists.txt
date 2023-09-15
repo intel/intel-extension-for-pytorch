@@ -1,13 +1,27 @@
 cmake_minimum_required(VERSION 3.13 FATAL_ERROR)
 project(${IPEX_PROJ_NAME} VERSION ${CMAKE_PROJECT_VERSION})
 
+# Platform
+set(LINUX False)
+set(MACOS False)
+set(WINDOWS False)
+
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+  set(LINUX True)
+elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
+  set(WINDOWS True)
+elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+  set(MACOS True)
+endif()
+
 set(IPEX_ROOT_DIR ${PROJECT_SOURCE_DIR})
+set(IPEX_CSRC_ROOT_DIR ${IPEX_ROOT_DIR}/csrc)
 set(IPEX_CPU_ROOT_DIR ${IPEX_ROOT_DIR}/csrc/cpu)
 set(IPEX_GPU_ROOT_DIR ${IPEX_ROOT_DIR}/csrc/gpu)
+set(IPEX_THIRD_PARTY_ROOT "${PROJECT_SOURCE_DIR}/third_party")
 set(IPEX_FRONT_END_ROOT_DIR ${IPEX_ROOT_DIR}/intel_extension_for_pytorch/csrc)
 list(APPEND CMAKE_MODULE_PATH ${IPEX_ROOT_DIR}/cmake/Modules)
 
-set(LINUX TRUE)
 set(CMAKE_INSTALL_MESSAGE NEVER)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # set(CMAKE_VERBOSE_MAKEFILE ON)

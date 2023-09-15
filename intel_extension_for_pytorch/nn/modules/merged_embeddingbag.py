@@ -43,6 +43,21 @@ def merged_embeddingbag(
     )
 
 
+def merged_embeddingbag_with_cat(
+    weights,
+    indices,
+    offsets,
+    dense_feature,
+):
+    if torch.is_grad_enabled():
+        raise NotImplementedError(
+            "do not support training for merged_embeddingbag_with_cat not"
+        )
+    return torch.ops.torch_ipex.merged_embeddingbag_cat_forward(
+        weights, indices, offsets, dense_feature
+    )
+
+
 def merged_embeddingbag_sgd(
     indices,
     offsets,
@@ -554,3 +569,52 @@ class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
                 )
             )
         return cls(embedding_specs, lr, weight_decay)
+
+
+class MergedEmbeddingBagWithCat(MergedEmbeddingBag):
+    r"""
+    To support `MergedEmbeddingBag` with cat all outputs with an given input.
+    It is a common structure in recomendation system to cat dense output with
+    sparse (embeddingbag) output together. MergedEmbeddingBagWithCat aims to
+    fuse the cat together to have good memory behaviour.
+    Native usage for multiple EmbeddingBag cat with dense is:
+
+        >>> EmbLists = torch.nn.Modulist(emb1, emb2, emb3, ..., emb_m)
+        >>> inputs = [in1, in2, in3, ..., in_m]
+        >>> outputs = []
+        >>> for i in range(len(EmbLists)):
+        >>>     outputs.append(Emb[in_i])
+        >>> cat_out = torch.cat([dense_feature] + outputs, dim=1)
+
+
+    The optimized path is:
+
+        >>> EmbLists = torch.nn.Modulist(emb1, emb2, emb3, ..., emb_m)
+        >>> merged_emb = MergedEmbeddingBagWithCat.from_embeddingbag_list(EmbLists)
+        >>> cat_out = MergedEmbeddingBagWithCat(dense_feature, inputs)
+    """
+    embedding_specs: List[EmbeddingSpec]
+
+    def __init__(
+        self,
+        embedding_specs: List[EmbeddingSpec],
+    ):
+        super(MergedEmbeddingBagWithCat, self).__init__(embedding_specs)
+        assert all(PoolingMode.SUM == mode for mode in self.pooling_modes)
+        assert all(self.weights[0].dtype == w.dtype for w in self.weights)
+
+    def forward(self, indices, offsets, dense_feature):
+        r"""
+        Args:
+            indices (Tensor): a list of indices for all tables
+            offsets (Tensor): a list of offsets for all tables
+            dense_feature (Tensor): dense feature to be cat
+        Returns:
+            output shape of `(batch_size, feature_size)` which feature_size = emb_dim * (num of tables + 1).
+        """
+        return merged_embeddingbag_with_cat(
+            self.weights,
+            indices,
+            offsets,
+            dense_feature,
+        )

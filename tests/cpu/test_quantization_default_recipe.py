@@ -504,10 +504,12 @@ class TestDefaultRecipe(JitLlgaTestCase):
             model = M(feature[1], feature[2], has_bias)
             m = model.eval()
             data = torch.rand(feature[0], feature[1])
-                
-            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(weight_dtype=w_dtype)
+
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=w_dtype
+            )
             prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
-            
+
             with torch.no_grad():
                 weight = m.linear.weight
                 weight_observer = qconfig.global_qconfig.weight()
@@ -524,14 +526,20 @@ class TestDefaultRecipe(JitLlgaTestCase):
                     # if M >= 32, compute in bf16
                     # if M < 32, compute in fp32 or fp16. Depends on fp16 support.
                     if feature[0] >= 32:
-                        output1 = torch.matmul(data_bf16.float(), weight_bf16.float().T).bfloat16()
+                        output1 = torch.matmul(
+                            data_bf16.float(), weight_bf16.float().T
+                        ).bfloat16()
                         if has_bias:
                             output1 = output1 + bias_fp32.bfloat16()
                     else:
-                        output1_fp32 = torch.matmul(data_bf16.float(), weight_bf16.float().T)
+                        output1_fp32 = torch.matmul(
+                            data_bf16.float(), weight_bf16.float().T
+                        )
                         if has_bias:
                             output1_fp32 = output1_fp32 + bias_fp32
-                        output1_fp16 = torch.matmul(data_fp16.float(), weight_fp16.float().T).half()
+                        output1_fp16 = torch.matmul(
+                            data_fp16.float(), weight_fp16.float().T
+                        ).half()
                         if has_bias:
                             output1_fp16 = output1_fp16 + bias_fp32.half()
                 else:
@@ -542,20 +550,28 @@ class TestDefaultRecipe(JitLlgaTestCase):
                     if has_bias:
                         output1 = output1 + bias_fp32
                     output1 = output1.bfloat16()
-                with torch.autocast(device_type='cpu', enabled=True, dtype= torch.bfloat16):
+                with torch.autocast(
+                    device_type="cpu", enabled=True, dtype=torch.bfloat16
+                ):
                     woq_model = convert(prepared_model)
-                    woq_linear_class = ipex.nn.modules.weight_only_quantization.IpexWoqLinear
-                    assert isinstance(woq_model.linear, woq_linear_class)   
-                                            
+                    woq_linear_class = (
+                        ipex.nn.modules.weight_only_quantization.IpexWoqLinear
+                    )
+                    assert isinstance(woq_model.linear, woq_linear_class)
+
                     woq_model = torch.jit.trace(woq_model, data)
                     woq_model = torch.jit.freeze(woq_model)
                     output2 = woq_model(data)
                     output2 = output2.bfloat16()
                 if use_tpp and feature[0] < 32:
                     try:
-                        torch.testing.assert_close(output1_fp32.bfloat16(), output2, atol=0.01, rtol=0.1)
+                        torch.testing.assert_close(
+                            output1_fp32.bfloat16(), output2, atol=0.01, rtol=0.1
+                        )
                     except Exception as e:
-                        torch.testing.assert_close(output1_fp16.bfloat16(), output2, atol=0.01, rtol=0.1)
+                        torch.testing.assert_close(
+                            output1_fp16.bfloat16(), output2, atol=0.01, rtol=0.1
+                        )
                 else:
                     torch.testing.assert_close(output1, output2)
 
@@ -571,6 +587,36 @@ class TestDefaultRecipe(JitLlgaTestCase):
         for shape, use_bias, w_dtype in cases:
             test(shape, use_bias, w_dtype)
 
+    def test_weight_only_quantization_non_fp32_model(self):
+        class M(nn.Module):
+            def __init__(self, input_channel, output_channel, has_bias):
+                super(M, self).__init__()
+                self.linear = torch.nn.Linear(input_channel, output_channel, has_bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        shape_list = [
+            [2, 24, 24],
+            [8, 64, 64],
+        ]
+        use_bias_list = [True, False]
+        w_dtype_list = [torch.qint8, torch.quint4x2]
+        model_dtype_list = [torch.bfloat16, torch.half]
+        cases = itertools.product(
+            shape_list, use_bias_list, w_dtype_list, model_dtype_list
+        )
+        for shape, use_bias, w_dtype, model_dtype in cases:
+            m = M(shape[1], shape[2], use_bias).to(model_dtype).eval()
+            data = torch.rand(shape[0], shape[1])
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=w_dtype
+            )
+            prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
+            with torch.no_grad():
+                woq_model = convert(prepared_model)
+                # The following should pass
+                woq_model(data)
 
     def test_weight_only_quantization_jit_save_load(self):
         class M(nn.Module):
@@ -586,7 +632,9 @@ class TestDefaultRecipe(JitLlgaTestCase):
             m = model.eval()
             example_inputs = torch.rand(feature[0], feature[1])
 
-            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(weight_dtype=w_dtype)
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=w_dtype
+            )
             prepared_model = prepare(
                 m, qconfig, example_inputs=example_inputs, inplace=False
             )
@@ -634,9 +682,9 @@ class TestDefaultRecipe(JitLlgaTestCase):
             m = model.eval()
             data = torch.rand(feature[0], feature[1])
             weight = model.linear.weight
-            weight_observer = (
-                ipex.quantization.get_weight_only_quant_qconfig_mapping(weight_dtype=torch.quint4x2).global_qconfig.weight()
-            )
+            weight_observer = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=torch.quint4x2
+            ).global_qconfig.weight()
             weight_observer(weight)
             weight_int4 = _quantize_weight(weight, weight_observer)
             weight_fp32 = weight_int4.dequantize()
@@ -646,16 +694,20 @@ class TestDefaultRecipe(JitLlgaTestCase):
             else:
                 output1 = torch.matmul(data, weight_fp32.T)
 
-            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(weight_dtype=torch.quint4x2)
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=torch.quint4x2
+            )
             prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
             with torch.no_grad():
                 woq_model = convert(prepared_model)
-                woq_linear_class = ipex.nn.modules.weight_only_quantization.IpexWoqLinear
+                woq_linear_class = (
+                    ipex.nn.modules.weight_only_quantization.IpexWoqLinear
+                )
                 assert isinstance(woq_model.linear, woq_linear_class)
-        
+
                 output2 = woq_model(data)
                 torch.testing.assert_close(output1, output2)
-                
+
         shape_list = [
             [3, 31, 31],
             [4, 4096, 4096],
@@ -682,16 +734,26 @@ class TestDefaultRecipe(JitLlgaTestCase):
         bf16_list = [False, True]
         cases = itertools.product(bias_list, bf16_list)
         for bias, bf16 in cases:
-            with torch.cpu.amp.autocast(enabled=bf16, dtype=torch.bfloat16 if bf16 else None):
+            with torch.cpu.amp.autocast(
+                enabled=bf16, dtype=torch.bfloat16 if bf16 else None
+            ):
                 model = Mod(bias).eval()
                 data = torch.rand(4, 64)
-                qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(lowp_mode=2)
-                prepared_model = prepare(model, qconfig, example_inputs=data, inplace=False)
+                qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                    lowp_mode=2
+                )
+                prepared_model = prepare(
+                    model, qconfig, example_inputs=data, inplace=False
+                )
                 with torch.no_grad():
                     woq_model = convert(prepared_model)
                     output1 = woq_model(data)
-                    output2 = torch.ops.torch_ipex.woq_linear_gelu(data, woq_model.linear._op_context.get_data_handle())
-                    torch.testing.assert_close(output1, output2.to(output1.dtype), atol=1e-2, rtol=1e-4)
+                    output2 = torch.ops.torch_ipex.woq_linear_gelu(
+                        data, woq_model.linear._op_context.get_data_handle()
+                    )
+                    torch.testing.assert_close(
+                        output1, output2.to(output1.dtype), atol=1e-2, rtol=1e-4
+                    )
 
     def test_weight_only_quantization_add_fused_op(self):
         class Mod(nn.Module):
@@ -710,22 +772,36 @@ class TestDefaultRecipe(JitLlgaTestCase):
         others_len_list = [1, 2]
         cases = itertools.product(bias_list, bf16_list, others_len_list)
         for bias, bf16, others_len in cases:
-            with torch.cpu.amp.autocast(enabled=bf16, dtype=torch.bfloat16 if bf16 else None):
+            with torch.cpu.amp.autocast(
+                enabled=bf16, dtype=torch.bfloat16 if bf16 else None
+            ):
                 model = Mod(bias).eval()
                 data = torch.rand(4, 64)
                 others = [torch.rand(4, 64)] * others_len
-                fused_op = torch.ops.torch_ipex.woq_linear_add if others_len == 1 \
+                fused_op = (
+                    torch.ops.torch_ipex.woq_linear_add
+                    if others_len == 1
                     else torch.ops.torch_ipex.woq_linear_add_add
-                qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(lowp_mode=2)
-                prepared_model = prepare(model, qconfig, example_inputs=data, inplace=False)
+                )
+                qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                    lowp_mode=2
+                )
+                prepared_model = prepare(
+                    model, qconfig, example_inputs=data, inplace=False
+                )
                 with torch.no_grad():
                     woq_model = convert(prepared_model)
                     output1 = woq_model(data, others)
-                    output2 = fused_op(data, woq_model.linear._op_context.get_data_handle(), others)
-                    torch.testing.assert_close(output1, output2.to(output1.dtype), atol=1.5e-2, rtol=1e-3)
+                    output2 = fused_op(
+                        data, woq_model.linear._op_context.get_data_handle(), others
+                    )
+                    torch.testing.assert_close(
+                        output1, output2.to(output1.dtype), atol=1.5e-2, rtol=1e-3
+                    )
 
     def test_weight_only_quantization_eltwise_fusion(self):
-        return # disabled for now
+        return  # disabled for now
+
         class M(nn.Module):
             def __init__(self, input_channel, output_channel, has_bias, post_op):
                 super(M, self).__init__()
@@ -763,10 +839,15 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 woq_model = torch.jit.trace(woq_model, data)
                 woq_model = torch.jit.freeze(woq_model)
                 woq_model(data)
-                node_kind_list = [node.kind() for node in woq_model.graph_for(data).nodes()]
-                linear_node_kind = 'torch_ipex::ipex_woq_linear'
-                fused_node_kind = 'torch_ipex::woq_linear_' + post_op_name + '_run'
-                assert linear_node_kind not in node_kind_list and fused_node_kind in node_kind_list
+                node_kind_list = [
+                    node.kind() for node in woq_model.graph_for(data).nodes()
+                ]
+                linear_node_kind = "torch_ipex::ipex_woq_linear"
+                fused_node_kind = "torch_ipex::woq_linear_" + post_op_name + "_run"
+                assert (
+                    linear_node_kind not in node_kind_list
+                    and fused_node_kind in node_kind_list
+                )
 
                 output2 = woq_model(data)
 
@@ -779,18 +860,19 @@ class TestDefaultRecipe(JitLlgaTestCase):
         ]
         use_bias_list = [True, False]
         post_op_list = [
-            ('relu', nn.ReLU()),
-            ('relu', nn.functional.relu_),
-            ('gelu', nn.GELU(approximate='none')),
-            ('gelu', nn.GELU(approximate='tanh')),
-            ('gelu', torch._C._nn.gelu_),
+            ("relu", nn.ReLU()),
+            ("relu", nn.functional.relu_),
+            ("gelu", nn.GELU(approximate="none")),
+            ("gelu", nn.GELU(approximate="tanh")),
+            ("gelu", torch._C._nn.gelu_),
         ]
         cases = itertools.product(shape_list, use_bias_list, post_op_list)
         for shape, use_bias, post_op in cases:
             test(shape, use_bias, post_op)
 
     def test_weight_only_quantization_add_fusion(self):
-        return # disabled for now
+        return  # disabled for now
+
         class M(nn.Module):
             # on_the_left = True: linear + Y -> Y
             # on_the_left = False: Y + linear -> Y
@@ -840,15 +922,24 @@ class TestDefaultRecipe(JitLlgaTestCase):
 
             prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
             with torch.no_grad():
-                inputs = (data, copy.deepcopy(accu)) # accu is overwritten
+                inputs = (data, copy.deepcopy(accu))  # accu is overwritten
                 woq_model = convert(prepared_model)
                 woq_model = torch.jit.trace(woq_model, inputs)
                 woq_model = torch.jit.freeze(woq_model)
                 woq_model(*inputs)
-                node_kind_list = [node.kind() for node in woq_model.graph_for(*inputs).nodes()]
-                linear_node_kind = 'torch_ipex::ipex_woq_linear'
-                fused_node_kind = 'torch_ipex::woq_linear_add_relu_run' if use_relu else 'torch_ipex::woq_linear_add_run'
-                assert linear_node_kind not in node_kind_list and fused_node_kind in node_kind_list
+                node_kind_list = [
+                    node.kind() for node in woq_model.graph_for(*inputs).nodes()
+                ]
+                linear_node_kind = "torch_ipex::ipex_woq_linear"
+                fused_node_kind = (
+                    "torch_ipex::woq_linear_add_relu_run"
+                    if use_relu
+                    else "torch_ipex::woq_linear_add_run"
+                )
+                assert (
+                    linear_node_kind not in node_kind_list
+                    and fused_node_kind in node_kind_list
+                )
 
                 output2 = woq_model(data, accu)
 
@@ -863,12 +954,15 @@ class TestDefaultRecipe(JitLlgaTestCase):
         alpha_list = [1.0, 0.5, 1.5]
         on_the_left_list = [True, False]
         use_relu_list = [True, False]
-        cases = itertools.product(shape_list, use_bias_list, alpha_list, on_the_left_list, use_relu_list)
+        cases = itertools.product(
+            shape_list, use_bias_list, alpha_list, on_the_left_list, use_relu_list
+        )
         for shape, use_bias, alpha, on_the_left, use_relu in cases:
             test(shape, use_bias, alpha, on_the_left, use_relu)
 
     def test_weight_only_quantization_lowp_compute(self):
         from intel_extension_for_pytorch.quantization import WoqLowpMode
+
         class M(nn.Module):
             def __init__(self):
                 super(M, self).__init__()
@@ -880,16 +974,18 @@ class TestDefaultRecipe(JitLlgaTestCase):
         data = torch.rand(4, 64)
         m = M()
         for mode in [WoqLowpMode.FP16, WoqLowpMode.BF16, WoqLowpMode.INT8]:
-            kwargs = {'lowp_mode': mode}
+            kwargs = {"lowp_mode": mode}
             if mode == WoqLowpMode.INT8:
-                kwargs['weight_dtype'] = torch.quint4x2
+                kwargs["weight_dtype"] = torch.quint4x2
             qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(**kwargs)
             prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
             with torch.no_grad():
                 woq_model = convert(prepared_model)
                 woq_model(data)
-                assert hasattr(woq_model.linear, '_lowp_mode') and woq_model.linear._lowp_mode == mode, \
-                    'Weight-only quantization: low precision gemm flag is not correctly set'
+                assert (
+                    hasattr(woq_model.linear, "_lowp_mode")
+                    and woq_model.linear._lowp_mode == mode
+                ), "Weight-only quantization: low precision gemm flag is not correctly set"
 
     def test_weight_only_quantization_num_concats(self):
         class Mod(nn.Module):
@@ -918,19 +1014,23 @@ class TestDefaultRecipe(JitLlgaTestCase):
 
         m = Mod().eval()
         m2 = Mod2().eval()
-        m2.qkv.weight = nn.Parameter(torch.cat([m.q.weight, m.k.weight, m.v.weight], dim=0))
+        m2.qkv.weight = nn.Parameter(
+            torch.cat([m.q.weight, m.k.weight, m.v.weight], dim=0)
+        )
         data = torch.rand(4, 64)
         qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(lowp_mode=2)
         prepared = prepare(m, qconfig, example_inputs=data, inplace=True)
         prepared2 = prepare(m2, qconfig, example_inputs=data, inplace=True)
         for bf16 in [False, True]:
-            with torch.no_grad(), \
-                torch.cpu.amp.autocast(enabled=bf16, dtype=torch.bfloat16 if bf16 else None):
+            with torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=bf16, dtype=torch.bfloat16 if bf16 else None
+            ):
                 qm = convert(prepared)
                 qm2 = convert(prepared2)
                 output1 = qm(data)
                 output2 = qm2(data)
                 torch.testing.assert_close(output1, output2, atol=1e-2, rtol=1e-4)
+
 
 if __name__ == "__main__":
     run_tests()

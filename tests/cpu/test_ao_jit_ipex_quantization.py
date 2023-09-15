@@ -179,30 +179,180 @@ class TestIpexOps(JitLlgaTestCase):
         class M(nn.Module):
             def __init__(self):
                 super(M, self).__init__()
-                self.m = nn.EmbeddingBag(10, 3, mode="sum", sparse=True)
+                self.m = nn.EmbeddingBag(10, 110, mode="sum", sparse=True)
 
             def forward(self, input, offset):
                 x = self.m(input, offset)
                 return x
 
+        def get_input(bag_size_1):
+            if bag_size_1:
+                return torch.LongTensor(
+                    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+                ), torch.LongTensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+            else:
+                return torch.LongTensor(
+                    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+                ), torch.LongTensor([0])
+
+        def fake_quant(tensor, scale, zp):
+            qtensor = torch.quantize_per_tensor(tensor, scale, zp, torch.qint8)
+            return qtensor.dequantize()
+
+        def get_expect(module, input, offsets):
+            def _calculate_scale(max_val, min_val):
+                min_val_neg = torch.min(min_val, torch.zeros_like(min_val))
+                max_val_pos = torch.max(max_val, torch.zeros_like(max_val))
+                max_val_pos = torch.max(-min_val_neg, max_val_pos)
+                scale = max_val_pos / 127.5
+                scale = max(scale.item(), torch.finfo(torch.float32).eps)
+                return scale
+
+            _module = copy.deepcopy(module)
+            y = _module(input, offsets)
+            o_scale = _calculate_scale(y.max(), y.min())
+            if isinstance(_module, nn.EmbeddingBag):
+                w_scale = _calculate_scale(_module.weight.max(), _module.weight.min())
+                _module.weight.data = fake_quant(_module.weight, w_scale, 0)
+            else:
+                w_scale = _calculate_scale(
+                    _module.m.weight.max(), _module.m.weight.min()
+                )
+                _module.m.weight.data = fake_quant(_module.m.weight, w_scale, 0)
+            expect = _module(input, offsets)
+            return fake_quant(expect, o_scale, 0)
+
         # This will call in F.embeddingbag
-        m = nn.EmbeddingBag(10, 3, mode="sum", sparse=True)
-        input = torch.LongTensor([1, 2, 4, 5, 4, 3, 2, 9])
-        offsets = torch.LongTensor([0, 1, 2, 3, 4, 5, 6, 7])
+        with torch.no_grad():
+            for bag_size_1 in [True, False]:
+                input, offsets = get_input(bag_size_1)
+                m = nn.EmbeddingBag(10, 110, mode="sum", sparse=True)
+                y = get_expect(m, input, offsets)
+                tol = 1e-2 if bag_size_1 else 5e-2
+                graph = self.checkQuantizeTrace(
+                    m, [input, offsets], qconfig=static_qconfig[1], expect_result=y
+                )
+                self.assertGraphContainsExactly(graph, "ipex::qembedding_bag", 1)
+                # test nn.EmbeddingBag
+                m = M().eval()
+                y = get_expect(m, input, offsets)
+                graph = self.checkQuantizeTrace(
+                    m, [input, offsets], qconfig=static_qconfig[1], expect_result=y
+                )
+                self.assertGraphContainsExactly(graph, "ipex::qembedding_bag", 1)
 
-        graph = self.checkQuantizeTrace(
-            m, [input, offsets], atol=1e-2, qconfig=static_qconfig[1]
-        )
-        self.assertGraphContainsExactly(graph, "ipex::qembedding_bag", 1)
-        # test nn.EmbeddingBag
-        m = M().eval()
-        input = torch.LongTensor([1, 2, 4, 5, 4, 3, 2, 9])
-        offsets = torch.LongTensor([0, 1, 2, 3, 4, 5, 6, 7])
+    def test_mergedembcat_int8(self):
+        # test with module
+        class ModuleCall(torch.nn.Module):
+            def __init__(self, NUM_TABLE, NUM_DIM):
+                super(ModuleCall, self).__init__()
+                emblist = torch.nn.ModuleList()
+                for _ in range(NUM_TABLE):
+                    emblist.append(torch.nn.EmbeddingBag(1000, NUM_DIM, mode="sum"))
+                self.merged_emb = (
+                    ipex.nn.modules.MergedEmbeddingBagWithCat.from_embeddingbag_list(
+                        emblist
+                    )
+                )
 
-        graph = self.checkQuantizeTrace(
-            m, [input, offsets], atol=1e-2, qconfig=static_qconfig[1]
-        )
-        self.assertGraphContainsExactly(graph, "ipex::qembedding_bag", 1)
+            def forward(self, indices, offsets, to_cat):
+                return self.merged_emb(indices, offsets, to_cat)
+
+        # test with function
+        class FunctionCall(torch.nn.Module):
+            def __init__(self, NUM_TABLE, NUM_DIM):
+                super(FunctionCall, self).__init__()
+                self.weights = [(torch.randn(1000, NUM_DIM)) for _ in range(NUM_TABLE)]
+
+            def forward(self, indices, offsets, to_cat):
+                return torch.ops.torch_ipex.merged_embeddingbag_cat_forward(
+                    self.weights, indices, offsets, to_cat
+                )
+
+        def get_input(emb_dim, num_table, batch_size):
+            multi_hot = [
+                2,
+                3,
+                1,
+                2,
+                5,
+            ]
+            indices = tuple(
+                [
+                    torch.randint(1000, (batch_size * multi_hot[i],))
+                    for i in range(num_table)
+                ]
+            )
+            offsets = tuple(
+                [
+                    torch.arange(0, batch_size * multi_hot[i], multi_hot[i])
+                    for i in range(num_table)
+                ]
+            )
+            dense = torch.randn(batch_size, emb_dim)
+            return indices, offsets, dense
+
+        def fake_quant(tensor, scale, zp):
+            qtensor = torch.quantize_per_tensor(tensor, scale, zp, torch.qint8)
+            return qtensor.dequantize()
+
+        def get_expect(module, input, offsets, dense):
+            def _calculate_scale(max_val, min_val):
+                min_val_neg = torch.min(min_val, torch.zeros_like(min_val))
+                max_val_pos = torch.max(max_val, torch.zeros_like(max_val))
+                max_val_pos = torch.max(-min_val_neg, max_val_pos)
+                scale = max_val_pos / 127.5
+                scale = max(scale.item(), torch.finfo(torch.float32).eps)
+                return scale
+
+            _module = copy.deepcopy(module)
+            y = _module(input, offsets, dense)
+            o_scale = _calculate_scale(y.max(), y.min())
+            d_scale = _calculate_scale(dense.max(), dense.min())
+            dense = fake_quant(dense, d_scale, 0)
+
+            # fake quant weight
+            if hasattr(_module, "weights"):
+                weights = _module.weights
+            else:
+                weights = _module.merged_emb.weights
+            for i in range(len(weights)):
+                w_scale = _calculate_scale(weights[i].max(), weights[i].min())
+                weights[i].data = fake_quant(weights[i], w_scale, 0)
+
+            expect = _module(input, offsets, dense)
+            return fake_quant(expect, o_scale, 0)
+
+        with torch.no_grad():
+            for emb_dim in [128, 129]:  # fast path for 128 and general path for 129
+                NUM_TABLE = 5
+                BATCH_SIZE = 16
+                input, offsets, dense = get_input(emb_dim, NUM_TABLE, BATCH_SIZE)
+                m = ModuleCall(NUM_TABLE, emb_dim)
+                y = get_expect(m, input, offsets, dense)
+                graph = self.checkQuantizeTrace(
+                    m,
+                    [input, offsets, dense],
+                    qconfig=static_qconfig[1],
+                    rtol=2e-1,
+                    expect_result=y,
+                )
+                self.assertGraphContainsExactly(
+                    graph, "ipex::qmerged_embeddingbag_cat", 1
+                )
+                # test function call
+                m = FunctionCall(NUM_TABLE, emb_dim).eval()
+                y = get_expect(m, input, offsets, dense)
+                graph = self.checkQuantizeTrace(
+                    m,
+                    [input, offsets, dense],
+                    qconfig=static_qconfig[1],
+                    rtol=2e-1,
+                    expect_result=y,
+                )
+                self.assertGraphContainsExactly(
+                    graph, "ipex::qmerged_embeddingbag_cat", 1
+                )
 
     def test_interaction_int8(self):
         class M(nn.Module):
@@ -851,11 +1001,11 @@ class TestDictInput(JitLlgaTestCase):
                 [
                     "aten::dequantize",
                     "aten::linear",
-                    "aten::add",
                 ],
                 [
                     "aten::dequantize",
                     "aten::linear",
+                    "aten::add",
                     "aten::add",
                 ],
             ]
@@ -879,11 +1029,11 @@ class TestDictInput(JitLlgaTestCase):
                 [
                     "aten::dequantize",
                     "aten::linear",
-                    "aten::add",
                 ],
                 [
                     "aten::dequantize",
                     "aten::linear",
+                    "aten::add",
                     "aten::add",
                 ],
             ]

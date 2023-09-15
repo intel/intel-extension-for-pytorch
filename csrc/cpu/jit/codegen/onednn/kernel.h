@@ -70,6 +70,7 @@ class LlgaKernel {
   int64_t getOutputDtype(size_t offset) const;
 
   enum TypeOfOutputTensor {
+    undefined,
     unwrappedInplaceCompute,
     quantizedInplaceCompute,
     unquantizedInplaceCompute,
@@ -99,12 +100,14 @@ class LlgaKernel {
 
   ArgSpecs initializeInputSpecs(const TensorArgs& inputs);
 
-  ArgSpecs initializeOutputSpecs();
+  ArgSpecs initializeOutputSpecs(
+      const TensorArgs& inputs,
+      bool convertDimsToUnknown);
 
-  dnnl::graph::compiled_partition compile(
+  std::pair<dnnl::graph::compiled_partition, ArgSpecs> compile(
       const dnnl::graph::partition& partition,
-      ArgSpecs& inputSpecs,
-      ArgSpecs& outputSpecs);
+      const TensorArgs& inputs,
+      ArgSpecs& inputSpecs);
 
   cp_entry& compileAndCache(torch::jit::Stack& stack, TensorArgs& outputs);
 
@@ -128,6 +131,8 @@ class LlgaKernel {
     return "LlgaPartition_" + std::to_string(debugId++);
   }
 
+  bool inputValueIsNotUsedLater(size_t offset) const;
+
   std::string genProfileName() {
     std::vector<std::string> op_list;
     for (auto* node : graph_->block()->nodes()) {
@@ -147,6 +152,7 @@ class LlgaKernel {
   std::shared_ptr<torch::jit::Graph> graph_;
   int64_t nGraphInputs_ = 0; // number of inputs to graph_ on the IR
   int64_t nOutputs_ = 0;
+
   std::map<size_t, torch::jit::Value*> tensorIdToValue_;
   std::vector<int64_t> runArgsIdx_;
   dnnl::graph::partition partition_;
@@ -170,13 +176,14 @@ class LlgaKernel {
   static thread_local std::unordered_map<std::vector<int64_t>, list_iterator_t>
       cache_items_map_;
   static thread_local int capacity_;
-
-  std::unordered_map<size_t, size_t> inplacePairs_; // output id -> input offset
+  std::vector<std::vector<int64_t>> tracedInputShapes_;
+  std::vector<std::vector<int64_t>> tracedInputStrides_;
   std::string debugName_;
   std::string profileName_;
   std::vector<TypeOfOutputTensor> outputTensorTypes_;
   std::once_flag constantSpecInitializedFlag_;
-  std::vector<char> inplacePairOffsets_;
+  std::once_flag tracedInputShapesInitialized_;
+  std::vector<short> inplacePairOffsets_;
 };
 
 } // namespace onednn

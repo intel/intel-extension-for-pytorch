@@ -12,7 +12,9 @@
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
+#include "assert.h"
 #include "mkl.h"
+// #include "vec/vec.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -2832,13 +2834,7 @@ void woq_gemm_eltwise_kernel_impl(
   // TODO Postop not yet implemented in kernel
   // Here we apply post op after GEMM
   woq_gemm_kernel_impl(
-      self,
-      weight,
-      scales_float,
-      zero_points_float,
-      bias,
-      lowp_mode,
-      output);
+      self, weight, scales_float, zero_points_float, bias, lowp_mode, output);
   auto postop_func = postop_func_map[post_op](scalars, algorithm);
   postop_func(output);
 }

@@ -6,6 +6,7 @@ from common_utils import TestCase
 
 import numpy as np
 import math
+import copy
 
 try:
     import torchvision
@@ -311,10 +312,10 @@ class RoIAlignTester(TestCase):
             )
 
     @skipIfNoTorchVision
-    def test_torchvision_roialign_torchcompile(self):
+    def test_torchvision_roialign_inference_torchcompile(self):
         pool_size = 5
         n_channels = 2 * (pool_size**2)
-        x = torch.rand(2, n_channels, 10, 10)
+        x = torch.rand(2, n_channels, 10, 10).to(memory_format=torch.channels_last)
         rois = torch.tensor(
             [
                 [0, 0, 0, 9, 9],  # format is (xyxy)
@@ -325,13 +326,13 @@ class RoIAlignTester(TestCase):
         )
         pool_h, pool_w = pool_size, pool_size
 
-        # TODO: add dynamic tests when 'ipex' backend supports it.
-        for dtype, backend, dynamic in itertools.product(
-            [torch.float32, torch.bfloat16], ["ipex", "inductor"], [False]
+        for dtype, compiler_backend, dynamic in itertools.product(
+            [torch.float32, torch.bfloat16], ["torchscript", "inductor"], [True, False]
         ):
             torch._dynamo.reset()
+            ipex._set_compiler_backend(compiler_backend)
             torchcompile_torchvision_fn = torch.compile(
-                torchvision_fn, backend=backend, dynamic=dynamic
+                torchvision_fn, dynamic=dynamic, backend="ipex"
             )
             x = x.to(dtype=dtype)
             rois = rois.to(dtype=dtype)
@@ -349,10 +350,10 @@ class RoIAlignTester(TestCase):
                 self.assertTrue(y1.dtype == dtype)
 
     @skipIfNoTorchVision
-    def test_roialign_torchcompile(self):
+    def test_torchvision_roialign_train_torchcompile(self):
         pool_size = 5
         n_channels = 2 * (pool_size**2)
-        x = torch.rand(2, n_channels, 10, 10)
+        input = torch.rand(2, n_channels, 10, 10).to(memory_format=torch.channels_last)
         rois = torch.tensor(
             [
                 [0, 0, 0, 9, 9],  # format is (xyxy)
@@ -362,27 +363,34 @@ class RoIAlignTester(TestCase):
             ]
         )
         pool_h, pool_w = pool_size, pool_size
-        torch._dynamo.allow_in_graph(ipex.nn.modules._roi_align.RoIAlign)
 
-        for dtype, backend, dynamic in itertools.product(
-            [torch.float32, torch.bfloat16], ["ipex", "inductor"], [True, False]
+        for dtype, compiler_backend, dynamic in itertools.product(
+            [torch.float32, torch.bfloat16], ["inductor"], [True, False]
         ):
             torch._dynamo.reset()
-            torchcompile_fn = torch.compile(
-                fn, backend=backend, dynamic=dynamic
+            ipex._set_compiler_backend(compiler_backend)
+            torchcompile_torchvision_fn = torch.compile(
+                copy.deepcopy(torchvision_fn), dynamic=dynamic, backend="ipex"
             )
-            x = x.to(dtype=dtype)
+            input = input.to(dtype=dtype)
             rois = rois.to(dtype=dtype)
+            ori_x = input.clone().requires_grad_()
+            x = input.clone().requires_grad_()
+
             # forward
-            with torch.cpu.amp.autocast(
-                enabled=(dtype == torch.bfloat16)
-            ), torch.no_grad():
-                y0 = fn(x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
-                y1 = torchcompile_fn(
+            with torch.cpu.amp.autocast(enabled=(dtype == torch.bfloat16)):
+                ori_y = torchvision_fn(
+                    ori_x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1
+                )
+                y = torchcompile_torchvision_fn(
                     x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1
                 )
-                self.assertEqual(y0, y1)
-                self.assertTrue(y1.dtype == dtype)
+                grad_y = torch.randn(ori_y.shape, dtype=torch.float32)
+                ori_y.backward(grad_y)
+                y.backward(grad_y)
+                self.assertEqual(y, ori_y)
+                self.assertTrue(y.dtype == dtype)
+                self.assertEqual(x.grad, ori_x.grad)
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ from test_ao_jit_llga_utils import (
 )
 from torch.quantization.quantize_fx import prepare_fx, convert_fx
 from torch.ao.quantization.quantize_fx import convert_to_reference_fx, prepare_qat_fx
-
+from torch.testing._internal.common_utils import run_tests
 from torch.ao.quantization import (
     MinMaxObserver,
     PerChannelMinMaxObserver,
@@ -1318,6 +1318,42 @@ class TestFusionPattern(JitLlgaTestCase):
             )
             self.checkPatterns(graph, patterns)
 
+    def test_linear_with_multiple_add(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear1 = nn.Linear(15, 20)
+                self.linear2 = nn.Linear(15, 20)
+
+            def forward(self, x1, y1, x2, y2):
+                x1 = self.linear1(x1)
+                x1 += y1.clone()
+                x2 = self.linear2(x2)
+                x2 += y2.clone()
+                return x1 + x2
+
+        x1 = torch.randn(2, 15)
+        y1 = torch.randn(2, 20)
+        x2 = torch.randn(2, 15)
+        y2 = torch.randn(2, 20)
+
+        m = M()
+        patterns = [
+            ["aten::dequantize", "aten::linear", "aten::add"],
+            ["aten::dequantize", "aten::linear", "aten::add", "aten::add"],
+        ]
+        for qconfig in static_qconfig[:2]:
+            graph = self.checkQuantizeTrace(
+                m, [x1, y1, x2, y2], atol=2e-1, qconfig=qconfig
+            )
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+            # There shouldn't have single add node which doesn't fused into subgraph.
+            self.assertFused(
+                graph,
+                ["aten::linear", "aten::add"],
+            )
+            self.checkPatterns(graph, patterns)
+
     def test_linear_dropout_sum_bf16(self):
         class M(nn.Module):
             def __init__(self):
@@ -1340,8 +1376,6 @@ class TestFusionPattern(JitLlgaTestCase):
                 "aten::dequantize",
                 "aten::to",
                 "aten::linear",
-                "aten::to",
-                "aten::quantize_per_tensor",
             ],
             ["aten::dequantize", "aten::to", "aten::linear", "aten::add"],
         ]
@@ -2152,6 +2186,73 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ["aten::linear", "aten::gelu"])
         self.assertFused(graph, ["aten::linear", "aten::add"])
         self.checkPatterns(graph, patterns)
+
+    def test_inplace_computation_accuracy(self):
+        class LowRankCrossNet(nn.Module):
+            def __init__(
+                self, in_features: int, num_layers: int, low_rank: int
+            ) -> None:
+                super().__init__()
+                assert low_rank >= 1, "Low rank must be larger or equal to 1"
+                self._num_layers = num_layers
+                self._low_rank = low_rank
+                W_kernels: nn.ParameterList = nn.ParameterList()
+                for i in range(self._num_layers):
+                    Wp = nn.Parameter(torch.randn(in_features, self._low_rank))
+                    W_kernels.append(Wp)
+                V_kernels: nn.ParameterList = nn.ParameterList()
+                for i in range(self._num_layers):
+                    V_kernels.append(
+                        nn.Parameter(torch.randn(self._low_rank, in_features))
+                    )
+                bias: nn.ParameterList = nn.ParameterList(
+                    [
+                        nn.Parameter(nn.init.zeros_(torch.empty(in_features)))
+                        for i in range(self._num_layers)
+                    ]
+                )
+                self.MLPs = nn.ModuleDict()
+                for i in range(num_layers):
+                    self.MLPs[f"V{i}"] = nn.Linear(in_features, low_rank, bias=False)
+                    self.MLPs[f"W{i}"] = nn.Linear(low_rank, in_features, bias=True)
+                    self.MLPs[f"V{i}"].weight = V_kernels[i]
+                    self.MLPs[f"W{i}"].weight = W_kernels[i]
+                    self.MLPs[f"W{i}"].bias = bias[i]
+
+            def forward(self, input: torch.Tensor) -> torch.Tensor:
+                x_0 = input
+                x_l = x_0  # .clone()
+                for layer in range(self._num_layers):
+                    x_l_v = self.MLPs[f"V{layer}"](x_l)
+                    x_l_w = self.MLPs[f"W{layer}"](x_l_v)
+                    x_l = x_0 * x_l_w + x_l  # (B, N)
+                return x_l, x_0
+
+        class FakeQuant(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                x = torch.quantize_per_tensor(x, 0.1, 0, torch.qint8)
+                return x.dequantize()
+
+        class TinyDLRM(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.pre_model = FakeQuant()
+                self.cross_net = LowRankCrossNet(2, 2, 5)
+
+            def forward(self, x):
+                out = self.pre_model(x)
+                out = self.cross_net(out)
+                return out
+
+        m = TinyDLRM().eval()
+        x = torch.rand(2048, 2)
+        graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
+        print(graph)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 4)
+        self.assertFused(graph, ["aten::linear", "aten::mul", "aten::add"])
 
 
 class TestShapeFallback(JitLlgaTestCase):

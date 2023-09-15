@@ -1,13 +1,9 @@
 import torch
-import torch.nn as nn
 import copy
 import re
 import warnings
 import pkg_resources
-from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
-    _enable_tpp,
-    _disable_tpp,
-)
+from intel_extension_for_pytorch.cpu._auto_kernel_selection import _enable_tpp
 import intel_extension_for_pytorch
 from intel_extension_for_pytorch.frontend import optimize
 
@@ -24,7 +20,7 @@ def convert_forward(m, target_m, new_forward):
     for _, sub_m in m.named_children():
         if isinstance(sub_m, target_m):
             bound_method = new_forward.__get__(sub_m, sub_m.__class__)
-            setattr(sub_m, "forward", bound_method)
+            sub_m.forward = bound_method
         convert_forward(sub_m, target_m, new_forward)
 
 
@@ -62,9 +58,9 @@ def _set_optimized_model_for_generation(
     first_token_optimized_model=None,
 ):
     if first_token_optimized_model is not None:
-        setattr(model, "trace_graph_first", first_token_optimized_model)
+        model.trace_graph_first = first_token_optimized_model
 
-    setattr(model, "trace_graph", optimized_model)
+    model.trace_graph = optimized_model
 
 
 def _optimize_transformers(
@@ -76,7 +72,7 @@ def _optimize_transformers(
     r"""
     Apply optimizations at Python frontend to the given transformers model (nn.Module) for inference only.
     This API focus on transformers models, especially for generation tasks inference.
-    Well supported model list: Llama, GPT-J, GPT-Neox, OPT.
+    Well supported model list: Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, ChatGLM2, CodeGen.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations on.
@@ -114,7 +110,8 @@ def _optimize_transformers(
             min_version = "4.28.0"
             if "transformers" not in installed_pkg:
                 raise RuntimeError(
-                    "optimize_transformers optimization requires transformers package and its version at least {} , fallback due to not meet".format(
+                    "optimize_transformers optimization requires transformers package and its version at least {} , \
+                        fallback due to not meet".format(
                         min_version
                     )
                 )
@@ -125,7 +122,8 @@ def _optimize_transformers(
             trans_version = transformers.__version__
             if version.parse(trans_version) < version.parse(min_version):
                 raise RuntimeError(
-                    "optimize_transformers optimization requires the transformers with version: at least {} while now transformers== {}, fallback due to not meet".format(
+                    "optimize_transformers optimization requires the transformers with version: \
+                        at least {} while now transformers== {}, fallback due to not meet".format(
                         min_version, trans_version
                     )
                 )
@@ -137,25 +135,38 @@ def _optimize_transformers(
             )
             from .attentions import (
                 _prepare_decoder_attention_mask,
+                _prepare_attn_mask_falcon,
                 _LlamaAttention,
                 _LlamaAttention_GQA,
-                _LlamaRMSNorm_forward,
+                _LlamaRMSNorm_forward_v1,
+                _LlamaRMSNorm_forward_v2,
                 _GPTJAttention,
                 _GPTNeoXAttention,
                 _OPTAttention,
+                _FalconAttention,
+                _BloomAttention,
+                _GLM2Attention,
+                _CodeGenAttention,
                 _reorder_cache,
+                GLM2_get_masks,
             )
             from intel_extension_for_pytorch.cpu.tpp.fused_llm import (
                 GPTJBlock_forward,
                 GPTJMLP_forward,
                 GPTJMLP_forward_distributed,
-                GPTNeoXMLP_forward,
-                GPTNeoXLayer_forward,
                 LlamaMLP_forward,
                 LlamaMLP_forward_distributed,
                 LlamaDecoderLayer_forward,
                 OPTDecoderLayer_forward,
                 OPTDecoderLayer_forward_distributed,
+                FalconMLP_forward,
+                FalconDecoderLayer_forward,
+                FalconMLP_forward_distributed,
+                FalconDecoderLayer_forward_distributed,
+                BloomMLP_forward,
+                BloomMLP_forward_distributed,
+                GLMMLP_forward,
+                GLMBlock_forward,
             )
             from intel_extension_for_pytorch.cpu.woq.fused_llm import (
                 GPTJMLP_woq_forward,
@@ -166,10 +177,15 @@ def _optimize_transformers(
                 LlamaModel_forward,
                 GPTNeoXModel_forward,
                 OPTDecoder_forward,
+                FalconModel_forward,
+                BloomModel_forward,
+                CodeGenModel_forward,
                 GPTJForCausalLM_forward,
                 LlamaForCausalLM_forward,
                 GPTNeoXForCausalLM_forward,
                 OPTForCausalLM_forward,
+                CodeGenForCausalLM_forward,
+                prepare_inputs_for_generation,
             )
 
             well_supported_model = (
@@ -177,10 +193,15 @@ def _optimize_transformers(
                 or re.search("llama", model.config.architectures[0], re.IGNORECASE)
                 or re.search("gptneox", model.config.architectures[0], re.IGNORECASE)
                 or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
+                or re.search("falcon", model.config.architectures[0], re.IGNORECASE)
+                or re.search("rw", model.config.architectures[0], re.IGNORECASE)
+                or re.search("bloom", model.config.architectures[0], re.IGNORECASE)
+                or re.search("chatglm", model.config.architectures[0], re.IGNORECASE)
+                or re.search("codegen", model.config.architectures[0], re.IGNORECASE)
             )
             if not well_supported_model:
                 warnings.warn(
-                    "optimize_transformers currently well supports Llama, GPT-J, GPT-Neox, OPT"
+                    "optimize_transformers currently well supports Llama, GPT-J, GPT-Neox, OPT, falcon, bloom, ChatGLM2, CodeGen"
                 )
 
             if not inplace:
@@ -190,7 +211,7 @@ def _optimize_transformers(
 
             if dtype == torch.bfloat16 or dtype == torch.float or dtype == torch.int8:
                 # generation-wise optimizations
-                convert_function(_model, "_reorder_cache", _reorder_cache)
+
                 convert_function(_model, "beam_search", _beam_search)
                 convert_function(_model, "greedy_search", _greedy_search)
                 convert_function(
@@ -198,7 +219,8 @@ def _optimize_transformers(
                     "_extract_past_from_model_output",
                     _extract_past_from_model_output,
                 )
-
+                if well_supported_model:
+                    convert_function(_model, "_reorder_cache", _reorder_cache)
                 # model-wise optimizations
                 if re.search("GPTJ", model.config.architectures[0], re.IGNORECASE):
                     convert_function(
@@ -212,6 +234,12 @@ def _optimize_transformers(
                         "forward",
                         LlamaForCausalLM_forward,
                     )
+                    if dtype != torch.int8:
+                        convert_forward(
+                            _model,
+                            transformers.models.llama.modeling_llama.LlamaRMSNorm,
+                            _LlamaRMSNorm_forward_v1,
+                        )
                 elif re.search("gptneox", model.config.architectures[0], re.IGNORECASE):
                     convert_function(
                         _model,
@@ -223,6 +251,44 @@ def _optimize_transformers(
                         _model,
                         "forward",
                         OPTForCausalLM_forward,
+                    )
+                elif re.search(
+                    "falcon", model.config.architectures[0], re.IGNORECASE
+                ) or re.search("rw", model.config.architectures[0], re.IGNORECASE):
+                    convert_class(
+                        _model,
+                        type(_model.transformer.h[0].self_attention),
+                        _FalconAttention,
+                        _model.config,
+                    )
+                    convert_forward(
+                        _model,
+                        type(_model.transformer),
+                        FalconModel_forward,
+                    )
+                    convert_function(
+                        _model,
+                        "prepare_inputs_for_generation",
+                        prepare_inputs_for_generation,
+                    )
+                    convert_function(
+                        _model.transformer,
+                        "_prepare_attn_mask",
+                        _prepare_attn_mask_falcon,
+                    )
+                elif re.search("chatglm", model.config.architectures[0], re.IGNORECASE):
+                    convert_class(
+                        _model,
+                        type(_model.transformer.encoder.layers[0].self_attention),
+                        _GLM2Attention,
+                        _model.config,
+                    )
+                    convert_function(_model.transformer, "get_masks", GLM2_get_masks)
+                elif re.search("codegen", model.config.architectures[0], re.IGNORECASE):
+                    convert_function(
+                        _model,
+                        "forward",
+                        CodeGenForCausalLM_forward,
                     )
 
                 convert_forward(
@@ -245,10 +311,31 @@ def _optimize_transformers(
                     transformers.models.opt.modeling_opt.OPTDecoder,
                     OPTDecoder_forward,
                 )
+                convert_forward(
+                    _model,
+                    transformers.models.bloom.modeling_bloom.BloomModel,
+                    BloomModel_forward,
+                )
+                convert_forward(
+                    _model,
+                    transformers.models.codegen.modeling_codegen.CodeGenModel,
+                    CodeGenModel_forward,
+                )
+                convert_function(
+                    transformers.models.bloom.modeling_bloom.BloomModel,
+                    "_prepare_attn_mask",
+                    _prepare_attn_mask_falcon,
+                )
                 convert_class(
                     _model,
                     transformers.models.gpt_neox.modeling_gpt_neox.GPTNeoXAttention,
                     _GPTNeoXAttention,
+                    _model.config,
+                )
+                convert_class(
+                    _model,
+                    transformers.models.bloom.modeling_bloom.BloomAttention,
+                    _BloomAttention,
                     _model.config,
                 )
                 if hasattr(_model.config, "num_key_value_heads"):
@@ -277,6 +364,12 @@ def _optimize_transformers(
                     _OPTAttention,
                     _model.config,
                 )
+                convert_class(
+                    _model,
+                    transformers.models.codegen.modeling_codegen.CodeGenAttention,
+                    _CodeGenAttention,
+                    _model.config,
+                )
 
                 if dtype == torch.int8:
                     convert_functions(
@@ -288,7 +381,7 @@ def _optimize_transformers(
                     convert_forward(
                         _model,
                         transformers.models.llama.modeling_llama.LlamaRMSNorm,
-                        _LlamaRMSNorm_forward,
+                        _LlamaRMSNorm_forward_v2,
                     )
                     if getattr(_model.config, "weight_only_quantization", False):
                         convert_forward(
@@ -301,10 +394,21 @@ def _optimize_transformers(
                             transformers.models.gptj.modeling_gptj.GPTJMLP,
                             GPTJMLP_woq_forward,
                         )
+                        convert_forward(
+                            _model,
+                            transformers.models.codegen.modeling_codegen.CodeGenBlock,
+                            GPTJBlock_woq_forward,
+                        )
+                        convert_forward(
+                            _model,
+                            transformers.models.codegen.modeling_codegen.CodeGenMLP,
+                            GPTJMLP_woq_forward,
+                        )
                 else:
                     # linear-wise optimizations
                     _enable_tpp()
                     _model = optimize(_model.eval(), dtype=dtype, inplace=True)
+
                     # linear-postop-wise optimizations
                     is_distributed(_model)
                     if not distributed:
@@ -333,6 +437,49 @@ def _optimize_transformers(
                             transformers.models.opt.modeling_opt.OPTDecoderLayer,
                             OPTDecoderLayer_forward,
                         )
+                        convert_forward(
+                            _model,
+                            transformers.models.codegen.modeling_codegen.CodeGenBlock,
+                            GPTJBlock_forward,
+                        )
+                        convert_forward(
+                            _model,
+                            transformers.models.codegen.modeling_codegen.CodeGenMLP,
+                            GPTJMLP_forward,
+                        )
+                        if re.search(
+                            "falcon", model.config.architectures[0], re.IGNORECASE
+                        ) or re.search(
+                            "rw", model.config.architectures[0], re.IGNORECASE
+                        ):
+                            convert_forward(
+                                _model,
+                                type(_model.transformer.h[0].mlp),
+                                FalconMLP_forward,
+                            )
+                            convert_forward(
+                                _model,
+                                type(_model.transformer.h[0]),
+                                FalconDecoderLayer_forward,
+                            )
+                        convert_forward(
+                            _model,
+                            transformers.models.bloom.modeling_bloom.BloomMLP,
+                            BloomMLP_forward,
+                        )
+                        if re.search(
+                            "chatglm", model.config.architectures[0], re.IGNORECASE
+                        ):
+                            convert_forward(
+                                _model,
+                                type(_model.transformer.encoder.layers[0].mlp),
+                                GLMMLP_forward,
+                            )
+                            convert_forward(
+                                _model,
+                                type(_model.transformer.encoder.layers[0]),
+                                GLMBlock_forward,
+                            )
                     else:
                         convert_forward(
                             _model,
@@ -346,12 +493,38 @@ def _optimize_transformers(
                         )
                         convert_forward(
                             _model,
+                            transformers.models.codegen.modeling_codegen.CodeGenMLP,
+                            GPTJMLP_forward_distributed,
+                        )
+                        convert_forward(
+                            _model,
                             transformers.models.opt.modeling_opt.OPTDecoderLayer,
                             OPTDecoderLayer_forward_distributed,
                         )
+                        if re.search(
+                            "falcon", model.config.architectures[0], re.IGNORECASE
+                        ) or re.search(
+                            "rw", model.config.architectures[0], re.IGNORECASE
+                        ):
+                            convert_forward(
+                                _model,
+                                type(_model.transformer.h[0].mlp),
+                                FalconMLP_forward_distributed,
+                            )
+                            convert_forward(
+                                _model,
+                                type(_model.transformer.h[0]),
+                                FalconDecoderLayer_forward_distributed,
+                            )
+                        convert_forward(
+                            _model,
+                            transformers.models.bloom.modeling_bloom.BloomMLP,
+                            BloomMLP_forward_distributed,
+                        )
             else:
                 raise RuntimeError(
-                    "optimize_transformers optimization currently supports dtype: torch.float, torch.bfloat16, torch.int8, will cover more soon."
+                    "optimize_transformers optimization currently supports dtype: \
+                        torch.float, torch.bfloat16, torch.int8, will cover more soon."
                 )
 
             return _model

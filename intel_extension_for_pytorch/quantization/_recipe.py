@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from intel_extension_for_pytorch.nn.functional import interaction
+from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
 
 from ._utils import ParentNode, set_node_output_quantized
 
@@ -69,6 +70,7 @@ rnn_ops = [str(torch.nn.LSTM)]
 s8_s8_symmetric_ops = [
     str(interaction),
     str(torch.ops.torch_ipex.interaction_forward),
+    str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
     str(torch.embedding_bag),
     str(F.embedding_bag),
     str(torch.nn.EmbeddingBag),
@@ -340,9 +342,10 @@ def _check_has_quantizable_node_before_node(node):
                 if node.type in [
                     str(interaction),
                     str(torch.ops.torch_ipex.interaction_forward),
+                    str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
                 ]:
                     for force_inf_dtype in node.input_tensor_force_inf_dtype:
-                        if force_inf_dtype.inf_dtype == torch.qint8:
+                        if force_inf_dtype == torch.qint8:
                             return True
                     return False
                 else:
@@ -419,6 +422,15 @@ def _add_recipe(node):
                     input_idx
                 ].inf_dtype
 
+    def force_reset_input_inf_dtype_to_orig_dtype(node, input_idx):
+        if node.input_tensor_infos[input_idx] is not None:
+            node.input_tensor_infos[input_idx].inf_dtype = node.input_tensor_infos[
+                input_idx
+            ].orig_dtype
+            node.input_tensor_force_inf_dtype[input_idx] = node.input_tensor_infos[
+                input_idx
+            ].inf_dtype
+
     conv_gemm_node = _find_fused_node_with_cur_add(node, conv_gemm_ops)
     conv_node = _find_fused_node_with_cur_add(node, conv_ops)
     if conv_gemm_node is None:
@@ -434,7 +446,25 @@ def _add_recipe(node):
                 add_2_has_pre_quantizable_op = _check_has_quantizable_node_before_node(
                     node.pre_nodes[1]
                 )
+
+            # Generally, if add connected to 2 quantizable node, we will keep the fake quant
+            # in the input edges of this add.
             if not (add_1_has_pre_quantizable_op and add_2_has_pre_quantizable_op):
+                for idx, tensor_info in enumerate(node.input_tensor_infos):
+                    tensor_info.inf_dtype = tensor_info.orig_dtype
+                    node.input_tensor_force_inf_dtype[idx] = tensor_info.inf_dtype
+
+            # A corner case is
+            # add1    add2
+            #  \     /
+            #    add3
+            # which exists in GPT-J, in this case, we need to remove the fake quant in
+            # 2 inputs edge of add3
+            if (
+                (len(node.pre_nodes) == 2)
+                and (node.pre_nodes[0].type in [str(torch.Tensor.add), str(torch.add)])
+                and (node.pre_nodes[1].type in [str(torch.Tensor.add), str(torch.add)])
+            ):
                 for idx, tensor_info in enumerate(node.input_tensor_infos):
                     tensor_info.inf_dtype = tensor_info.orig_dtype
                     node.input_tensor_force_inf_dtype[idx] = tensor_info.inf_dtype
@@ -453,7 +483,11 @@ def _add_recipe(node):
             # TODO: set another input's dtype for conv nodes when oneDNN is ready.
             if conv_node is None or not _check_has_quantizable_node_after_node(node):
                 # set another input's dtype, if another's input is from non-quantizable op, we can remove the fake quant.
-                reset_input_inf_dtype_to_orig_dtype(node, 1)
+                if conv_node is None:
+                    # For linear_add pattern, force reset add's extra input's inf_dtype to orig_dtype
+                    force_reset_input_inf_dtype_to_orig_dtype(node, 1)
+                else:
+                    reset_input_inf_dtype_to_orig_dtype(node, 1)
         elif (
             node.input_tensor_infos[1] is not None
             and node.input_tensor_infos[1] in conv_gemm_node.output_tensor_infos
@@ -463,7 +497,11 @@ def _add_recipe(node):
             # TODO: set another input's dtype for conv nodes when oneDNN is ready.
             if conv_node is None or not _check_has_quantizable_node_after_node(node):
                 # set another input's dtype, if another's input is from non-quantizable op, we can remove the fake quant.
-                reset_input_inf_dtype_to_orig_dtype(node, 0)
+                if conv_node is None:
+                    # For linear_add pattern, force reset add's extra input's inf_dtype to orig_dtype
+                    force_reset_input_inf_dtype_to_orig_dtype(node, 0)
+                else:
+                    reset_input_inf_dtype_to_orig_dtype(node, 0)
 
 
 # get a default recipe
@@ -494,6 +532,8 @@ def get_default_recipe(nodes):
         str(torch.embedding_bag),
         str(F.embedding_bag),
         str(torch.nn.EmbeddingBag),
+        str(MergedEmbeddingBagWithCat),
+        str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
     ]
     for node in nodes:
         if isinstance(node, ParentNode):

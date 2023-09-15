@@ -127,9 +127,11 @@ at::Tensor flash_base_kernel(
           // update attention weights with attention mask
           for (int r = 0; r < qBlockSize; r++) {
             _dil_add_kernel<at::BFloat16>(
-              attn_mask + i * qSize * kvSize + (k * qSplitSize + r) * kvSize + l * kvSplitSize,
-              qk_fp32.data_ptr<float>() + ompIdx * qSplitSize * kvSplitSize + r * kvBlockSize,
-              kvBlockSize);
+                attn_mask + i * qSize * kvSize + (k * qSplitSize + r) * kvSize +
+                    l * kvSplitSize,
+                qk_fp32.data_ptr<float>() + ompIdx * qSplitSize * kvSplitSize +
+                    r * kvBlockSize,
+                kvBlockSize);
           }
 
           _mha_mul_softmax_bf16_kernel<at::BFloat16>(
@@ -180,28 +182,29 @@ at::Tensor flash_attention_kernel_impl(
     at::Tensor value,
     const double scale_attn,
     at::Tensor attention_mask) {
-    if (query.scalar_type() != at::kBFloat16
-             || query.dtype() != key.dtype()
-             || query.dtype() != attention_mask.dtype()) {
-        TORCH_CHECK(false, "Q/K/V/AttnMask must be BF16 to use ipex::flash_attention_kernel_impl");
-    }
-    if(query.dim() != 4 || key.dim() != 4 || value.dim() != 4){
-        TORCH_CHECK(false, "Q/K/V must be 4D for ipex::flash_attention_kernel_impl");
-    }
-    TORCH_CHECK(attention_mask.size(1) == 1, "Attetntion mask size(1) != 1 for ipex::flash_attention_kernel_imp");
+  TORCH_CHECK(
+      query.scalar_type() == at::kBFloat16 && query.dtype() == key.dtype() &&
+          query.dtype() == attention_mask.dtype(),
+      "Q/K/V/AttnMask must be BF16 to use ipex::flash_attention_kernel_impl");
+  TORCH_CHECK(
+      query.dim() == 4 && key.dim() == 4 && value.dim() == 4,
+      "Q/K/V must be 4D for ipex::flash_attention_kernel_impl");
+  TORCH_CHECK(
+      attention_mask.size(1) == 1,
+      "Attetntion mask size(1) != 1 for ipex::flash_attention_kernel_impl");
 
 #if defined(CPU_CAPABILITY_AVX512)
-    int64_t batchSize = query.size(0);
-    int64_t qSize = query.size(1);
-    int64_t kvSize = value.size(1);
-    int64_t num_head = query.size(2);
-    int64_t headSize = query.size(3);
-    int64_t hiddenSize = num_head * headSize;
+  int64_t batchSize = query.size(0);
+  int64_t qSize = query.size(1);
+  int64_t kvSize = value.size(1);
+  int64_t num_head = query.size(2);
+  int64_t headSize = query.size(3);
+  int64_t hiddenSize = num_head * headSize;
 
-    int64_t qStride = query.stride(1);
-    int64_t kStride = key.stride(1);
-    int64_t vStride = value.stride(1);
-    auto attn_outputs = flash_base_kernel(
+  int64_t qStride = query.stride(1);
+  int64_t kStride = key.stride(1);
+  int64_t vStride = value.stride(1);
+  auto attn_outputs = flash_base_kernel(
       query.data_ptr<at::BFloat16>(),
       key.data_ptr<at::BFloat16>(),
       value.data_ptr<at::BFloat16>(),
@@ -216,19 +219,19 @@ at::Tensor flash_attention_kernel_impl(
       headSize,
       hiddenSize,
       scale_attn);
-    return attn_outputs.resize_(
-        {batchSize, qSize, num_head, headSize}).transpose_(1, 2);
+  return attn_outputs.resize_({batchSize, qSize, num_head, headSize})
+      .transpose_(1, 2);
 #else
-    key = key.permute({0, 2, 1, 3});
-    query = query.permute({0, 2, 1, 3});
-    value = value.permute({0, 2, 1, 3});
-    auto attn_weights = query.matmul(key.transpose(-1, -2));
-    attn_weights = attn_weights.div(scale_attn);
-    attn_weights = attn_weights + attention_mask;
-    attn_weights = attn_weights.softmax(-1);
-    attn_weights = attn_weights.to(value.dtype());
-    auto out = attn_weights.matmul(value);
-    return out;
+  key = key.permute({0, 2, 1, 3});
+  query = query.permute({0, 2, 1, 3});
+  value = value.permute({0, 2, 1, 3});
+  auto attn_weights = query.matmul(key.transpose(-1, -2));
+  attn_weights = attn_weights.div(scale_attn);
+  attn_weights = attn_weights + attention_mask;
+  attn_weights = attn_weights.softmax(-1);
+  attn_weights = attn_weights.to(value.dtype());
+  auto out = attn_weights.matmul(value);
+  return out;
 #endif
 }
 } // anonymous namespace

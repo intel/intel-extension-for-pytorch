@@ -64,7 +64,10 @@ def IPEX_GEMM_MODULE_CPU():
 @functools.lru_cache(None)
 def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
     from ._lstm_convert import _LSTM
-    from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBag
+    from intel_extension_for_pytorch.nn.modules import (
+        MergedEmbeddingBag,
+        MergedEmbeddingBagWithCat,
+    )
 
     module_convert_list_bf16_inference = [
         torch.nn.Conv2d,
@@ -74,6 +77,8 @@ def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
         torch.nn.Linear,
         torch.nn.Embedding,
         torch.nn.LSTM,
+        MergedEmbeddingBagWithCat,
+        torch.nn.ParameterList,
     ]
 
     module_convert_list_bf16_training = [
@@ -97,6 +102,8 @@ def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
         torch.nn.Conv2d,
         torch.nn.Conv3d,
         torch.nn.Linear,
+        MergedEmbeddingBagWithCat,
+        torch.nn.ParameterList,
     ]
 
     if dtype == torch.float16:
@@ -152,6 +159,21 @@ def _should_prepack(module, is_training, is_xpu=False):
 
 def get_shared_parameter_status(module, shared_p):
     visited_wrapper = []
+
+    # TODO: weight and bias of deepspeed modules are no longer
+    # nn.Parameter starting from deepspeed commit 94c7233.
+    # Add a workaround here to convert them to Parameter.
+    # Need to check if we can upstream this fix to deepspeed
+    # and remove this workaround in IPEX later.
+    deepspeed_modules = may_import_deepspeed_modules()
+    if deepspeed_modules is not None:
+        LinearAllreduce, LinearLayer = deepspeed_modules[:2]
+
+        if isinstance(module, (LinearLayer, LinearAllreduce)):
+            module.weight = torch.nn.Parameter(module.weight, requires_grad=False)
+            if module.bias is not None:
+                module.bias = torch.nn.Parameter(module.bias, requires_grad=False)
+
     for _, param in module._parameters.items():
         if param is None:
             continue

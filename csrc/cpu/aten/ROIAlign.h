@@ -16,7 +16,7 @@ at::Tensor ROIAlign_forward_impl(
     int64_t sampling_ratio,
     bool aligned);
 
-at::Tensor ROIAlign_backward(
+at::Tensor ROIAlign_backward_impl(
     const at::Tensor& grad,
     const at::Tensor& rois,
     double spatial_scale,

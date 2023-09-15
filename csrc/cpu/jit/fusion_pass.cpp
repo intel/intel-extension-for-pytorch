@@ -153,7 +153,9 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::fuseLinearWithEltwise(graph);
   GRAPH_DUMP("After fuseLinearWithEltwise.Before fuseLinearAddRelu", graph);
   graph_rewrite::fuseLinearAddRelu(graph);
-  GRAPH_DUMP("After fuseLinearAddRelu.", graph);
+  GRAPH_DUMP("After fuseLinearAddRelu. Before fuseLinearMulAdd", graph);
+  graph_rewrite::fuseLinearMulAdd(graph);
+  GRAPH_DUMP("After fuseLinearMulAdd.", graph);
   graph_rewrite::FuseLinearSwishCustomized(graph);
   // graph_rewrite::fuseWoqLinearWithEltwise(graph);
   // graph_rewrite::fuseWoqLinearAddRelu(graph);

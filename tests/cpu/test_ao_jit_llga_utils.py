@@ -153,6 +153,7 @@ class JitLlgaTestCase(JitTestCase):
         int8_bf16=False,
         freeze=True,
         x_kwarg=None,
+        expect_result=None,
     ):
         if x is None and x_kwarg is None:
             raise AssertionError(
@@ -169,8 +170,9 @@ class JitLlgaTestCase(JitTestCase):
         with torch.no_grad():
             y = self.model_forward_helper(fp32_model, x, x_kwarg)
             y = y.to(torch.bfloat16) if int8_bf16 else y
+            expect = expect_result if expect_result is not None else y
             y_llga = self.model_forward_helper(traced_model, x, x_kwarg)
-            self.assertEqual(y, y_llga, atol=atol, rtol=rtol)
+            self.assertEqual(expect, y_llga, atol=atol, rtol=rtol)
 
             # test Fallback when input shape changes:
             if x_var:

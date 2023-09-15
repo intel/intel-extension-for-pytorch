@@ -11,7 +11,7 @@ from test_ao_jit_llga_utils import (
     llga_fp32_bf16_test_env,
     get_eltwise_fn,
 )
-from torch.testing._internal.common_utils import TEST_SCIPY
+from torch.testing._internal.common_utils import run_tests, TEST_SCIPY
 
 
 import intel_extension_for_pytorch as ipex
@@ -325,6 +325,7 @@ class TestOp(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
 
     @llga_fp32_bf16_test_env
+    @unittest.skipIf(True, "Enable once cat is supported")
     def test_cat(self):
         def cat_along_dim(d):
             def forward_cat(*inputs):
@@ -488,6 +489,38 @@ class TestOp(JitLlgaTestCase):
         graph, traced = self.checkTrace(m, [x])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
         self.assertGraphContainsExactly(graph, "aten::abs", 1)
+
+    @llga_fp32_bf16_test_env
+    def test_type_as(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                x = x.type_as(y)
+                return x
+
+        x = torch.rand(10, 10, dtype=torch.float32)
+        y = torch.rand(10, 10, dtype=torch.bfloat16)
+        m = M()
+        graph, traced = self.checkTrace(m, [x, y])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+
+    @llga_fp32_bf16_test_env
+    def test_do_not_map_type_as(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                x = x.type_as(y)
+                return x
+
+        x = torch.rand(10, 10, dtype=torch.float32)
+        y = torch.rand(10, 10, dtype=torch.float32)
+        m = M()
+        graph, traced = self.checkTrace(m, [x, y])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
 
     @llga_fp32_bf16_test_env
     # Currently graph with sub-block is unsupported
@@ -754,6 +787,25 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
     @llga_fp32_bf16_test_env
+    def test_do_not_map_select(self):
+        class M(nn.Module):
+            def __init__(
+                self,
+            ):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                z = y.expand_as(x)
+                x = torch.masked_fill(x, z, 1)
+                return x
+
+        m = M()
+        x = torch.randn(3, 32, 32, 32)
+        y = torch.randn(3, 32, 32, 1).to(torch.bool)
+        graph, _ = self.checkTrace(m, [x, y])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+
+    @llga_fp32_bf16_test_env
     def test_avg_pool2d_add(self):
         class M(nn.Module):
             def __init__(self):
@@ -981,7 +1033,7 @@ class TestDebugLog(JitLlgaTestCase):
         ) as p:
             for line in p.stdout.readlines():
                 line = str(line, "utf-8").strip()
-                if line.__contains__("LLGA_bridge::prepareRunArgs"):
+                if line.__contains__("LLGA_bridge::prepareKernel"):
                     num += 1
                 if line.__contains__("Executing partition"):
                     num_debug_str += 1

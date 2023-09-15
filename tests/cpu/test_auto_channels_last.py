@@ -271,6 +271,7 @@ class TestAutoChannelsLast(TestCase):
 
         # enable auto channels_last
         ipex.enable_auto_channels_last()
+
         self.assertTrue(_test_conv(2).is_contiguous(memory_format=torch.channels_last))
         # temporary disable before https://github.com/pytorch/pytorch/pull/74023 merged
         # self.assertTrue(_test_conv(3).is_contiguous(memory_format = torch.channels_last_3d))

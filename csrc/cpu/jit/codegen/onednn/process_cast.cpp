@@ -16,7 +16,7 @@ static void RemoveRedundantCast(Block* block) {
       RemoveRedundantCast(sub);
     }
 
-    if (node->kind() == aten::to &&
+    if (((node->kind() == aten::to) || (node->kind() == aten::type_as)) &&
         node->input(0)->type()->isSubtypeOf(TensorType::get()) &&
         node->input(0)->type()->cast<TensorType>()->scalarType().has_value()) {
       auto dtypeOfInput =

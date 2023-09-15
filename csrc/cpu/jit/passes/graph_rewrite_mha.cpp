@@ -282,7 +282,8 @@ auto split_replace_filter =
           graph_rewrite_helper::getValue("to_split", match_vmap, vmap)
               ->type()
               ->cast<TensorType>();
-      if (to_split->scalarType().value() != at::kBFloat16)
+      if (!to_split->scalarType().has_value() ||
+          to_split->scalarType().value() != at::kBFloat16)
         return false;
       auto dim =
           toIValue(graph_rewrite_helper::getValue("dim", match_vmap, vmap))

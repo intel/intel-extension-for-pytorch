@@ -23,6 +23,10 @@ MODEL_CLASSES = {
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
     "llama": (AutoModelForCausalLM, LlamaTokenizer),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
+    "falcon": (AutoModelForCausalLM, AutoTokenizer),
+    "bloom": (AutoModelForCausalLM, AutoTokenizer),
+    "chatglm": (AutoModelForCausalLM, AutoTokenizer),
+    "codegen": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -60,6 +64,9 @@ parser.add_argument(
 )
 parser.add_argument(
     "--prompt", default=None, type=str, help="input prompt for self-defined if needed"
+)
+parser.add_argument(
+    "--config-file", default=None, type=str, help="specific configuration file"
 )
 parser.add_argument("--greedy", action="store_true")
 parser.add_argument("--ipex", action="store_true")
@@ -107,13 +114,24 @@ model_type = next(
     (x for x in MODEL_CLASSES.keys() if x in args.model_id.lower()), "auto"
 )
 model_class = MODEL_CLASSES[model_type]
-config = AutoConfig.from_pretrained(args.model_id, torchscript=args.jit)
+if args.config_file is None:
+    config = AutoConfig.from_pretrained(
+        args.model_id, torchscript=args.jit, trust_remote_code=True
+    )
+else:
+    config = AutoConfig.from_pretrained(
+        args.config_file, torchscript=args.jit, trust_remote_code=True
+    )
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 model = model_class[0].from_pretrained(
-    args.model_id, torch_dtype=amp_dtype, config=config, low_cpu_mem_usage=True
+    args.model_id,
+    torch_dtype=amp_dtype,
+    config=config,
+    low_cpu_mem_usage=True,
+    trust_remote_code=True,
 )
-tokenizer = model_class[1].from_pretrained(args.model_id)
+tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
 model = model.eval().to(device)
 model = model.to(memory_format=torch.channels_last)
 
@@ -123,13 +141,16 @@ if args.ipex:
 
 num_beams = 1 if args.greedy else 4
 # generate args
-generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams)
+generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams,
+                       max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens)
 
 # dummy past key values
 past_key_values = None
 import re
 
-if re.search("GPTJ", model.config.architectures[0]):
+if re.search("GPTJ", model.config.architectures[0]) or re.search(
+    "codegen", model.config.architectures[0], re.IGNORECASE
+):
     beam_idx_tmp = torch.zeros(
         (2048, int(args.batch_size * num_beams)), dtype=torch.long
     ).contiguous()
@@ -189,9 +210,67 @@ elif re.search("opt", model.config.architectures[0], re.IGNORECASE):
             for i in range(model.config.num_hidden_layers)
         ]
     )
+    target_max_position_embeddings = int(args.input_tokens) + int(args.max_new_tokens)
+    if target_max_position_embeddings >= 2048:
+        orig_embed_weight = model.model.decoder.embed_positions.weight
+        num_embeddings, embedding_dim = orig_embed_weight.shape
+        padding_weight = torch.rand(
+            target_max_position_embeddings - 2048, embedding_dim
+        ).to(orig_embed_weight.dtype)
+        new_embed_weight = torch.cat((orig_embed_weight, padding_weight), 0)
+        model.model.decoder.embed_positions.weight = torch.nn.Parameter(
+            new_embed_weight
+        )
+elif re.search("falcon", model.config.architectures[0], re.IGNORECASE) or re.search(
+    "rw", model.config.architectures[0], re.IGNORECASE
+):
+    beam_idx_tmp = torch.zeros(
+        (2048, int(args.batch_size * num_beams)), dtype=torch.long
+    ).contiguous()
+    past_key_values = tuple(
+        [
+            (
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                beam_idx_tmp,
+                torch.zeros(1, dtype=torch.long).contiguous(),
+            )
+            for i in range(model.config.num_hidden_layers)
+        ]
+    )
+elif re.search("bloom", model.config.architectures[0], re.IGNORECASE):
+    beam_idx_tmp = torch.zeros(
+        (2048, int(args.batch_size * num_beams)), dtype=torch.long
+    ).contiguous()
+    past_key_values = tuple(
+        [
+            (
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                beam_idx_tmp,
+                torch.zeros(1, dtype=torch.long).contiguous(),
+            )
+            for i in range(model.config.n_layer)
+        ]
+    )
+elif re.search("chatglm", model.config.architectures[0], re.IGNORECASE):
+    beam_idx_tmp = torch.zeros(
+        (2048, int(args.batch_size * num_beams)), dtype=torch.long
+    ).contiguous()
+    past_key_values = tuple(
+        [
+            (
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                beam_idx_tmp,
+                torch.zeros(1, dtype=torch.long).contiguous(),
+            )
+            for i in range(model.config.num_layers)
+        ]
+    )
 else:
     print(
-        "Currently we only support jit path on GPTJ, llama, and gpt_neox models for IPEX new API ipex._optimize_transformers(), please re-run without jit "
+        "Currently we only support jit path on GPTJ, llama, gpt_neox, OPT, falcon, Bloom, chatGLM and Codegen models for IPEX new API ipex._optimize_transformers(), please re-run without jit "
     )
     exit(0)
 
@@ -200,7 +279,12 @@ if not hasattr(model, "trace_graph") and args.jit and args.benchmark and args.ip
     input_ids = torch.ones(32).to(torch.long)
     attention_mask = torch.ones(len(input_ids))
     position_ids = torch.arange(len(input_ids))
-    if re.search("opt", model.config.architectures[0], re.IGNORECASE):
+    if (
+        re.search("opt", model.config.architectures[0], re.IGNORECASE)
+        or re.search("falcon", model.config.architectures[0], re.IGNORECASE)
+        or re.search("rw", model.config.architectures[0], re.IGNORECASE)
+        or re.search("bloom", model.config.architectures[0], re.IGNORECASE)
+    ):
         example_inputs = {
             "input_ids": input_ids.unsqueeze(0),
             "attention_mask": attention_mask.unsqueeze(0),
@@ -213,6 +297,8 @@ if not hasattr(model, "trace_graph") and args.jit and args.benchmark and args.ip
             "position_ids": position_ids.unsqueeze(0),
             "past_key_values": past_key_values,
         }
+    if re.search("chatglm", model.config.architectures[0], re.IGNORECASE):
+        example_inputs["return_last_logit"] = torch.tensor(True)
 
     with torch.inference_mode(), torch.no_grad(), torch.autocast(
         device_type=args.device,
@@ -372,8 +458,8 @@ if args.accuracy_only:
 
 
 def trace_handler(prof):
-    print(prof.key_averages().table(
-        sort_by="self_cpu_time_total", row_limit=-1))
+    print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=-1))
+
 
 if args.benchmark:
     if args.token_latency:
@@ -414,24 +500,17 @@ if args.benchmark:
         if args.profile:
             with torch.profiler.profile(
                 activities=[torch.profiler.ProfilerActivity.CPU],
-                schedule=torch.profiler.schedule(
-                    wait=1,
-                    warmup=3,
-                    active=1),
-                on_trace_ready=trace_handler
+                schedule=torch.profiler.schedule(wait=1, warmup=3, active=1),
+                on_trace_ready=trace_handler,
             ) as prof:
                 for i in range(5):
                     input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
-                    output = model.generate(
-                        input_ids, max_new_tokens=args.max_new_tokens, **generate_kwargs
-                    )
+                    output = model.generate(input_ids, **generate_kwargs)
                     prof.step()
         for i in range(num_iter):
             tic = time.time()
             input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
-            output = model.generate(
-                input_ids, max_new_tokens=args.max_new_tokens, **generate_kwargs
-            )
+            output = model.generate(input_ids, **generate_kwargs)
             gen_ids = output[0] if args.token_latency else output
             gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
             toc = time.time()

@@ -6,11 +6,13 @@ model.eval()
 data = torch.rand(1, 3, 224, 224)
 
 # Experimental Feature
-#################### code changes ####################
+#################### code changes ####################  # noqa F401
 import intel_extension_for_pytorch as ipex
 model = ipex.optimize(model)
 model = torch.compile(model, backend="ipex")
-######################################################
+######################################################  # noqa F401
 
 with torch.no_grad():
-  model(data)
+    model(data)
+
+print("Execution finished")

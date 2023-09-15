@@ -12,7 +12,7 @@ from transformers.generation.beam_search import BeamScorer
 from transformers.generation.streamers import BaseStreamer
 from transformers.utils import ModelOutput
 import time
-import inspect, re
+import re
 
 
 class GreedySearchDecoderOnlyOutput(ModelOutput):
@@ -218,6 +218,11 @@ def _beam_search(
             or re.search("llama", self.config.architectures[0], re.IGNORECASE)
             or re.search("gptneox", self.config.architectures[0], re.IGNORECASE)
             or re.search("OPT", self.config.architectures[0], re.IGNORECASE)
+            or re.search("falcon", self.config.architectures[0], re.IGNORECASE)
+            or re.search("rw", self.config.architectures[0], re.IGNORECASE)
+            or re.search("bloom", self.config.architectures[0], re.IGNORECASE)
+            or re.search("chatglm", self.config.architectures[0], re.IGNORECASE)
+            or re.search("codegen", self.config.architectures[0], re.IGNORECASE)
         ):
             first_token = False
             input_bs = input_ids.size()[0]
@@ -225,7 +230,9 @@ def _beam_search(
             if model_inputs["past_key_values"] is None:
                 first_token = True
             if first_token:
-                if re.search("GPTJ", self.config.architectures[0]):
+                if re.search("GPTJ", self.config.architectures[0]) or re.search(
+                    "codegen", self.config.architectures[0], re.IGNORECASE
+                ):
                     beam_idx_tmp = torch.zeros(
                         (2048, int(batch_size * num_beams)), dtype=torch.long
                     ).contiguous()
@@ -286,6 +293,57 @@ def _beam_search(
                         ]
                     )
                     has_position_id = False
+                elif re.search(
+                    "falcon", self.config.architectures[0], re.IGNORECASE
+                ) or re.search("rw", self.config.architectures[0], re.IGNORECASE):
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(batch_size * num_beams)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, dtype=torch.long).contiguous(),
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
+                    has_position_id = False
+                elif re.search("bloom", self.config.architectures[0], re.IGNORECASE):
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(batch_size * num_beams)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, dtype=torch.long).contiguous(),
+                            )
+                            for i in range(self.config.n_layer)
+                        ]
+                    )
+                    has_position_id = False
+                elif re.search("chatglm", self.config.architectures[0], re.IGNORECASE):
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(batch_size * num_beams)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, dtype=torch.long).contiguous(),
+                            )
+                            for i in range(self.config.num_layers)
+                        ]
+                    )
+                    has_position_id = True
+                    # model_inputs["attention_mask"] = torch.zeros(model_inputs["input_ids"].shape)
 
             if hasattr(self, "trace_graph"):
                 if first_token:
@@ -294,7 +352,9 @@ def _beam_search(
                     ].clone()
                     new_input_ids = model_inputs["input_ids"][:batch_size].clone()
                     if has_position_id:
-                        new_position_ids = model_inputs["position_ids"][:batch_size].clone()
+                        new_position_ids = model_inputs["position_ids"][
+                            :batch_size
+                        ].clone()
                     for i in range(batch_size):
                         new_attention_mask[i] = model_inputs["attention_mask"][
                             i * num_beams
@@ -310,6 +370,10 @@ def _beam_search(
                         model_inputs["position_ids"] = new_position_ids
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
+                if "return_last_logit" in model_inputs:
+                    model_inputs["return_last_logit"] = torch.tensor(
+                        model_inputs["return_last_logit"]
+                    )
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
                 else:
@@ -601,13 +665,20 @@ def _greedy_search(
             or re.search("llama", self.config.architectures[0], re.IGNORECASE)
             or re.search("gptneox", self.config.architectures[0], re.IGNORECASE)
             or re.search("OPT", self.config.architectures[0], re.IGNORECASE)
+            or re.search("falcon", self.config.architectures[0], re.IGNORECASE)
+            or re.search("rw", self.config.architectures[0], re.IGNORECASE)
+            or re.search("bloom", self.config.architectures[0], re.IGNORECASE)
+            or re.search("chatglm", self.config.architectures[0], re.IGNORECASE)
+            or re.search("codegen", self.config.architectures[0], re.IGNORECASE)
         ):
             first_token = False
             input_bs = input_ids.size()[0]
             if model_inputs["past_key_values"] is None:
                 first_token = True
             if first_token:
-                if re.search("GPTJ", self.config.architectures[0]):
+                if re.search("GPTJ", self.config.architectures[0]) or re.search(
+                    "codegen", self.config.architectures[0], re.IGNORECASE
+                ):
                     beam_idx_tmp = torch.zeros(
                         (2048, int(input_bs)), dtype=torch.long
                     ).contiguous()
@@ -667,10 +738,61 @@ def _greedy_search(
                             for i in range(self.config.num_hidden_layers)
                         ]
                     )
+                elif re.search(
+                    "falcon", self.config.architectures[0], re.IGNORECASE
+                ) or re.search("rw", self.config.architectures[0], re.IGNORECASE):
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(input_bs)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, dtype=torch.long).contiguous(),
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
+                elif re.search("bloom", self.config.architectures[0], re.IGNORECASE):
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(input_bs)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, dtype=torch.long).contiguous(),
+                            )
+                            for i in range(self.config.n_layer)
+                        ]
+                    )
+                elif re.search("chatglm", self.config.architectures[0], re.IGNORECASE):
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(input_bs)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, dtype=torch.long).contiguous(),
+                            )
+                            for i in range(self.config.num_layers)
+                        ]
+                    )
 
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
+                if "return_last_logit" in model_inputs:
+                    model_inputs["return_last_logit"] = torch.tensor(
+                        model_inputs["return_last_logit"]
+                    )
                 outputs = self.trace_graph(**model_inputs)
                 if synced_gpus and this_peer_finished:
                     cur_len = cur_len + 1

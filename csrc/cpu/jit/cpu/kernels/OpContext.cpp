@@ -164,6 +164,14 @@ at::Tensor& IpexLinearOpContext::run(
   return torch_ipex::cpu::detail::linear::run(op_context_, input, accumu, attr);
 }
 
+at::Tensor IpexLinearOpContext::run_with_binary_post_op(
+    const at::Tensor& input,
+    const std::vector<ideep::tensor>& post_op_src,
+    const ideep::attr_t& attr) {
+  return torch_ipex::cpu::detail::linear::run(
+      op_context_, input, post_op_src, attr);
+}
+
 std::tuple<at::Tensor, at::Tensor, at::Tensor> IpexLinearOpContext::
     run_backward(
         const at::Tensor& input,

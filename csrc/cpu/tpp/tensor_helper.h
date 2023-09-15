@@ -164,7 +164,7 @@ inline at::Tensor wt_tensor_for_fwd(
     } else {
       if (input.dtype() == at::kBFloat16) {
         return wt_tensor_n2v<bfloat16>(Nk, Hk, Nc, Hc, input);
-      }else {
+      } else {
         AT_ASSERT(false, "Unsupported datatype!");
       }
     }

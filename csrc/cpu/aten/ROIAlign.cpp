@@ -38,7 +38,7 @@ at::Tensor ROIAlign_forward_impl(
       aligned);
 }
 
-at::Tensor ROIAlign_backward(
+at::Tensor ROIAlign_backward_impl(
     const at::Tensor& grad,
     const at::Tensor& rois,
     double spatial_scale,
@@ -59,6 +59,37 @@ at::Tensor ROIAlign_backward(
 
   return roi_align_backward_kernel_stub(
       kCPU,
+      grad,
+      rois,
+      spatial_scale,
+      pooled_height,
+      pooled_width,
+      batch_size,
+      channels,
+      height,
+      width,
+      sampling_ratio,
+      aligned,
+      is_channels_last);
+}
+
+at::Tensor ROIAlign_backward(
+    const at::Tensor& grad,
+    const at::Tensor& rois,
+    double spatial_scale,
+    c10::SymInt pooled_height,
+    c10::SymInt pooled_width,
+    c10::SymInt batch_size,
+    c10::SymInt channels,
+    c10::SymInt height,
+    c10::SymInt width,
+    int64_t sampling_ratio,
+    bool aligned,
+    bool is_channels_last) {
+  static auto op = c10::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::ROIAlign_backward", "")
+                       .typed<decltype(ROIAlign_backward)>();
+  return op.call(
       grad,
       rois,
       spatial_scale,
@@ -134,21 +165,17 @@ torch::autograd::variable_list IPEXROIAlignOp::backward(
     torch::autograd::variable_list grad_outputs) {
   RECORD_FUNCTION("IPEXROIAlignOp::backward", c10::ArrayRef<c10::IValue>({}));
 
-  auto input_shape = ctx->saved_data["input_shape"].toIntVector();
+  auto input_shape = ctx->saved_data["input_shape"].toSymIntVector();
   auto spatial_scale = ctx->saved_data["spatial_scale"].toDouble();
-  auto pooled_height = ctx->saved_data["pooled_height"].toInt();
-  auto pooled_width = ctx->saved_data["pooled_width"].toInt();
+  auto pooled_height = ctx->saved_data["pooled_height"].toSymInt();
+  auto pooled_width = ctx->saved_data["pooled_width"].toSymInt();
   auto sampling_ratio = ctx->saved_data["sampling_ratio"].toInt();
   auto aligned = ctx->saved_data["aligned"].toBool();
   auto is_channels_last = ctx->saved_data["is_channels_last"].toBool();
   auto saved = ctx->get_saved_variables();
   at::Tensor rois = saved[0];
 
-  static auto op = torch::Dispatcher::singleton()
-                       .findSchemaOrThrow("torch_ipex::ROIAlign_backward", "")
-                       .typed<decltype(ROIAlign_backward)>();
-
-  auto grad_input = op.call(
+  auto grad_input = ROIAlign_backward(
       grad_outputs[0],
       rois,
       spatial_scale,
@@ -261,11 +288,11 @@ IPEX_TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       torch_ipex::cpu::ROIAlign_forward_impl);
   // bw
   m.def(
-      "ROIAlign_backward(Tensor grad, Tensor rois, float spatial_scale, int pooled_height, int pooled_width, int batch_size, int channels, int height, int width, int sampling_ratio, bool aligned, bool is_channels_last) -> Tensor");
+      "ROIAlign_backward(Tensor grad, Tensor rois, float spatial_scale, SymInt pooled_height, SymInt pooled_width, SymInt batch_size, SymInt channels, SymInt height, SymInt width, int sampling_ratio, bool aligned, bool is_channels_last) -> Tensor");
   m.impl(
       "ROIAlign_backward",
       c10::DispatchKey::CPU,
-      torch_ipex::cpu::ROIAlign_backward);
+      torch_ipex::cpu::ROIAlign_backward_impl);
 }
 
 IPEX_TORCH_LIBRARY_FRAGMENT(torchvision, m) {

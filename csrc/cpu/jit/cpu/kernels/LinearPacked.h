@@ -77,6 +77,17 @@ at::Tensor linear_add_relu_run(
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<LinearOpContext>& op_context);
 
+at::Tensor linear_mul_run(
+    const at::Tensor& input,
+    const at::Tensor& to_mul,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
+
+at::Tensor linear_mul_add_run(
+    const at::Tensor& input,
+    const at::Tensor& to_mul,
+    const at::Tensor& to_add,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
+
 ContextLinear create(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
@@ -91,6 +102,12 @@ at::Tensor& run(
     const ContextLinear& context,
     const at::Tensor& input,
     at::Tensor& accumu,
+    const ideep::attr_t& attr);
+
+at::Tensor run(
+    const ContextLinear& context,
+    const at::Tensor& input,
+    const std::vector<ideep::tensor>& post_op_src,
     const ideep::attr_t& attr);
 
 void run_core(

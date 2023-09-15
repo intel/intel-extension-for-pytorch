@@ -35,6 +35,8 @@ void replaceEmbeddingBagWithQEmbeddingBag(
     std::shared_ptr<torch::jit::Graph>& graph);
 void replaceInteractionWithQInteraction(
     std::shared_ptr<torch::jit::Graph>& graph);
+void replaceMergedEmbCatWithQmergedEmbCat(
+    std::shared_ptr<torch::jit::Graph>& graph);
 void preprocessSizeForQLstm(std::shared_ptr<torch::jit::Graph>& graph);
 void replaceLstmWithQLstm(std::shared_ptr<torch::jit::Graph>& graph);
 void replaceAddWithQAdd(std::shared_ptr<torch::jit::Graph>& graph);
@@ -60,6 +62,7 @@ void fuseLinearWithEltwise(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseLinearAddRelu(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseWoqLinearWithEltwise(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseWoqLinearAddRelu(std::shared_ptr<torch::jit::Graph>& graph);
+void fuseLinearMulAdd(std::shared_ptr<torch::jit::Graph>& graph);
 
 void FuseRMSNorm(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseAddLayerNorm(std::shared_ptr<torch::jit::Graph>& graph);

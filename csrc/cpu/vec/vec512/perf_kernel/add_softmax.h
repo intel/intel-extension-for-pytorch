@@ -222,10 +222,7 @@ inline void _dil_normalization_kernel(
 }
 
 template <typename scalar_t>
-inline void _dil_add_kernel(
-    const scalar_t* src,
-    float* dst,
-    const int& size) {
+inline void _dil_add_kernel(const scalar_t* src, float* dst, const int& size) {
   __m512 vec_a = {};
   __m512 vec_out = {};
 
@@ -415,6 +412,70 @@ inline void _mha_update_sum_max_kernel(
     auto vec_a = _mm512_mul_ps(dat, vec_sum_cor);
     auto vec_out = _mm512_mul_ps(vec_a, exp_vec);
     _mask_storeu(out + i, vec_out, mask);
+  }
+}
+
+template <typename T>
+void _reduce_head(
+    const T* q_ptr_start,
+    const T* k_ptr_start,
+    float* attn_w_pos,
+    int64_t head_size,
+    bool store_key,
+    T* k_cache_start) {
+  auto hsi = 0;
+  auto vec_size = 16; // 512/32
+  auto qk_sum_vec = _mm512_setzero_ps();
+  for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
+    auto q_vec = _loadu(q_ptr_start + hsi);
+    auto k_vec = _loadu(k_ptr_start + hsi);
+    if (store_key) {
+      _storeu(k_cache_start + hsi, k_vec);
+    }
+    qk_sum_vec = _mm512_fmadd_ps(q_vec, k_vec, qk_sum_vec);
+  }
+  attn_w_pos[0] += _mm512_reduce_add_ps(qk_sum_vec);
+  for (; hsi < head_size; hsi++) {
+    k_cache_start[hsi] = k_ptr_start[hsi]; // cat the key into the key_cache.
+    attn_w_pos[0] += q_ptr_start[hsi] * k_ptr_start[hsi];
+  }
+}
+
+template <typename T, typename T1>
+inline void _mul_and_accumulate(
+    float& attn_w,
+    const T* v_ptr_start,
+    T1* attn_out_start,
+    int64_t head_size,
+    bool store_value,
+    T* v_cache_start,
+    int accumulated) {
+  auto vec_size = 16; // 512/32
+  auto hsi = 0;
+  for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
+    auto attn_w_vec = _mm512_set1_ps(attn_w);
+    auto v_vec = _loadu(v_ptr_start + hsi);
+    if (accumulated) {
+      auto attn_out_vec = _loadu(attn_out_start + hsi);
+      auto attn_out_vec_new = _mm512_fmadd_ps(attn_w_vec, v_vec, attn_out_vec);
+      _storeu(attn_out_start + hsi, attn_out_vec_new);
+    } else {
+      auto attn_out_vec_new = _mm512_mul_ps(attn_w_vec, v_vec);
+      _storeu(attn_out_start + hsi, attn_out_vec_new);
+    }
+    if (store_value) {
+      _storeu(v_cache_start + hsi, v_vec);
+    }
+  }
+  for (; hsi < head_size; hsi++) {
+    if (accumulated) {
+      attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+    } else {
+      attn_out_start[hsi] = attn_w * v_ptr_start[hsi];
+    }
+    if (store_value) {
+      v_cache_start[hsi] = v_ptr_start[hsi];
+    }
   }
 }
 

@@ -139,7 +139,7 @@ class TestEMB(TestCase):
             )
 
     def test_emb_fast_path(self):
-        for options in ([True, False], [True, False]):
+        for options in itertools.product([True, False], [True, False]):
             include_last_offset, sparse = options
             self._test_emb(
                 mode="sum", sparse=sparse, include_last_offset=include_last_offset
@@ -158,11 +158,14 @@ class TestEMB(TestCase):
         emb = Embeddingbag().eval()
         input = torch.LongTensor([1, 2, 4, 5, 4, 3, 2, 9])
         offsets = torch.LongTensor([0, 1, 2, 3, 4, 5, 6, 7])
-        for dtype, backend, dynamic in itertools.product(
-            [torch.float32, torch.bfloat16], ["ipex", "inductor"], [True, False]
+        for dtype, compiler_backend, dynamic in itertools.product(
+            [torch.float32, torch.bfloat16],
+            ["torchscript", "inductor"],
+            [True, False],
         ):
             torch._dynamo.reset()
-            emb_torchcompile = torch.compile(emb, backend=backend, dynamic=dynamic)
+            ipex._set_compiler_backend(compiler_backend)
+            emb_torchcompile = torch.compile(emb, dynamic=dynamic, backend="ipex")
             with torch.cpu.amp.autocast(
                 enabled=(dtype == torch.bfloat16)
             ), torch.no_grad():

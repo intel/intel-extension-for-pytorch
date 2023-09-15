@@ -60,6 +60,7 @@ import contextlib
 import torch
 import torch.nn as nn
 import torch.fx.experimental.optimization as optimization
+from torch.optim import SGD
 from torch.testing import FileCheck
 import copy
 
@@ -772,6 +773,58 @@ class LinearAddRelu(nn.Module):
         a = self.linear1(a)
         b = self.linear2(x)
         return F.relu(a.add_(b), inplace=self.inplace)
+
+
+class LinearMulAdd(nn.Module):
+    def __init__(self, in_features, num_layers, low_rank):
+        super(LinearMulAdd, self).__init__()
+        self._num_layers = num_layers
+        self._low_rank = low_rank
+        self.linears_v = nn.ModuleList()
+        self.linears_w = nn.ModuleList()
+        for i in range(self._num_layers):
+            self.linears_v.append(
+                torch.nn.Linear(in_features, self._low_rank, bias=False)
+            )
+            self.linears_w.append(
+                torch.nn.Linear(self._low_rank, in_features, bias=True)
+            )
+
+    def forward(self, input):
+        x_0 = input
+        x_l = x_0
+
+        for layer in range(self._num_layers):
+            x_l_v = self.linears_v[layer](x_l)
+            x_l_w = self.linears_w[layer](x_l_v)
+            x_l = x_0 * x_l_w + x_l
+        return x_l
+
+
+class LinearMul(nn.Module):
+    def __init__(self, in_features, num_layers, low_rank):
+        super(LinearMul, self).__init__()
+        self._num_layers = num_layers
+        self._low_rank = low_rank
+        self.linears_v = nn.ModuleList()
+        self.linears_w = nn.ModuleList()
+        for i in range(self._num_layers):
+            self.linears_v.append(
+                torch.nn.Linear(in_features, self._low_rank, bias=False)
+            )
+            self.linears_w.append(
+                torch.nn.Linear(self._low_rank, in_features, bias=True)
+            )
+
+    def forward(self, input):
+        x_0 = input
+        x_l = x_0
+
+        for layer in range(self._num_layers):
+            x_l_v = self.linears_v[layer](x_l)
+            x_l_w = self.linears_w[layer](x_l_v)
+            x_l = x_0 * x_l_w
+        return x_l
 
 
 class Linear_Reshape_Relu(nn.Module):
@@ -4413,6 +4466,33 @@ class Tester(TestCase):
                 prec=5e-2,
             )
 
+    def test_output_linear_mul_add(self):
+        m = LinearMulAdd(4, 2, 8)
+        x = torch.ones(2, 4)
+        self._test_output(m, x, kind_in_graph="aten::linear")
+        self._test_mkl_fp32(m, x, kind_in_graph="ipex_prepack::mkl_sgemm_run")
+        self._test_dnnl_fp32(m, x, kind_in_graph="ipex_prepack::linear_mul_add_run")
+        self._test_output_bf16(
+            m,
+            x,
+            kind_in_graph="ipex_prepack::linear_mul_add_run",
+            kind_not_in_graph="ipex_prepack::linear_mul_run",
+            prec=5e-2,
+        )
+
+    def test_output_linear_mul(self):
+        m = LinearMul(4, 2, 8)
+        x = torch.ones(2, 4)
+        self._test_output(m, x, kind_in_graph="aten::linear")
+        self._test_mkl_fp32(m, x, kind_in_graph="ipex_prepack::mkl_sgemm_run")
+        self._test_dnnl_fp32(m, x, kind_in_graph="ipex_prepack::linear_mul_run")
+        self._test_output_bf16(
+            m,
+            x,
+            kind_in_graph="ipex_prepack::linear_mul_run",
+            prec=5e-2,
+        )
+
     def test_output_linear_reshape_relu(self):
         self._test_output(
             Linear_Reshape_Relu(3, 32, (64, 16), bias=True),
@@ -5405,15 +5485,25 @@ class Tester(TestCase):
             torch.randn(2, 3),
             torch.randn(1, 3, 56, 56),
         ]
-        auto_kernel_selection_config = [True, False]
 
         for module, data in zip(modules, inputs):
-            for auto_kernel_selection in auto_kernel_selection_config:
+            for auto_kernel_selection, train_and_eval in itertools.product(
+                [True, False], [True, False]
+            ):
                 # Currently auto_kernel_selection only shows different behavior for nn.Linear
                 if auto_kernel_selection and not isinstance(module, nn.Linear):
                     continue
 
                 model = M(module)
+                if train_and_eval:
+                    model.train()
+                    origin_optimizer1 = SGD(model.parameters(), lr=0.01, momentum=0.9)
+                    model, _ = ipex.optimize(
+                        model,
+                        optimizer=origin_optimizer1,
+                        auto_kernel_selection=auto_kernel_selection,
+                    )
+
                 model.eval()
                 optimized = ipex.optimize(
                     model, auto_kernel_selection=auto_kernel_selection

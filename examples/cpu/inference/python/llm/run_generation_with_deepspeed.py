@@ -7,6 +7,7 @@ import time
 from argparse import ArgumentParser
 from pathlib import Path
 import torch
+import re
 
 import deepspeed
 from deepspeed.accelerator import get_accelerator
@@ -17,7 +18,6 @@ from transformers.utils import is_offline_mode
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
-    LlamaForCausalLM,
     AutoTokenizer,
     LlamaTokenizer,
 )
@@ -29,6 +29,10 @@ MODEL_CLASSES = {
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
     "llama": (AutoModelForCausalLM, LlamaTokenizer),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
+    "falcon": (AutoModelForCausalLM, AutoTokenizer),
+    "bloom": (AutoModelForCausalLM, AutoTokenizer),
+    "chatglm": (AutoModelForCausalLM, AutoTokenizer),
+    "codegen": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -88,15 +92,30 @@ parser.add_argument(
     action="store_true",
     help="use ipex weight-only quantization",
 )
+parser.add_argument(
+    "--int8-bf16-mixed",
+    action="store_true",
+    help="by default it is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
+)
 parser.add_argument("--jit", action="store_true")
 parser.add_argument("--print-memory", action="store_true")
 parser.add_argument("--token-latency", action="store_true")
 parser.add_argument(
     "--lowp-mode",
-    choices=["BF16","FP32","INT8","FP16"], 
+    choices=["BF16", "FP32", "INT8", "FP16"],
     default="BF16",
     type=str,
-    help="low precision mode for weight only quantization"
+    help="low precision mode for weight only quantization",
+)
+parser.add_argument(
+    "--weight-dtype",
+    choices=["INT8", "INT4"],
+    default="INT8",
+    type=str,
+    help="weight dtype for weight only quantization",
+)
+parser.add_argument(
+    "--config-file", default=None, type=str, help="specific configuration file"
 )
 args = parser.parse_args()
 
@@ -177,18 +196,22 @@ def get_checkpoint_files(model_name_or_path):
 
 
 model_name = args.model_id
-if args.dtype == "float16":
-    load_dtype = torch.half
-    infer_dtype = torch.half
-elif args.dtype == "bfloat16":
+if args.int8_bf16_mixed:
     load_dtype = torch.bfloat16
     infer_dtype = torch.bfloat16
-elif args.dtype == "int8":
-    load_dtype = torch.half
-    infer_dtype = torch.int8
-elif args.dtype == "float32":
-    load_dtype = torch.float32
-    infer_dtype = torch.float32
+else:
+    if args.dtype == "float16":
+        load_dtype = torch.half
+        infer_dtype = torch.half
+    elif args.dtype == "bfloat16":
+        load_dtype = torch.bfloat16
+        infer_dtype = torch.bfloat16
+    elif args.dtype == "int8":
+        load_dtype = torch.half
+        infer_dtype = torch.int8
+    elif args.dtype == "float32":
+        load_dtype = torch.float32
+        infer_dtype = torch.float32
 
 tp_presharded_mode = True if model_name in tp_presharded_models else False
 
@@ -197,8 +220,34 @@ tp_presharded_mode = True if model_name in tp_presharded_models else False
 print_rank0(f"*** Loading the model {model_name}")
 model_type = next((x for x in MODEL_CLASSES.keys() if x in model_name.lower()), "auto")
 model_class = MODEL_CLASSES[model_type]
-tokenizer = model_class[1].from_pretrained(model_name)
-config = AutoConfig.from_pretrained(model_name, torchscript=args.jit)
+tokenizer = model_class[1].from_pretrained(model_name, trust_remote_code=True)
+
+if model_type == "auto":
+    if args.config_file is None:
+        config = AutoConfig.from_pretrained(
+            args.model_id, torchscript=args.jit, trust_remote_code=True
+        )
+    else:
+        config = AutoConfig.from_pretrained(
+            args.config_file, torchscript=args.jit, trust_remote_code=True
+        )
+    if re.search("falcon", config.architectures[0], re.IGNORECASE) or re.search(
+        "rw", config.architectures[0], re.IGNORECASE
+    ):
+        model_type = "falcon"
+
+if model_type == "falcon":
+    model_input_names = ["input_ids", "attention_mask"]
+    tokenizer.model_input_names = model_input_names
+
+if args.config_file is None:
+    config = AutoConfig.from_pretrained(
+        args.model_id, torchscript=args.jit, trust_remote_code=True
+    )
+else:
+    config = AutoConfig.from_pretrained(
+        args.config_file, torchscript=args.jit, trust_remote_code=True
+    )
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 
@@ -217,15 +266,18 @@ if args.benchmark:
     deepspeed.runtime.utils.see_memory_usage("pre-from-pretrained", force=True)
 
 # Construct model with fake meta tensors, later will be replaced during ds-inference ckpt load
-with deepspeed.OnDevice(dtype=load_dtype, device="meta"):
-    # Even inside the meta device context, from_pretrained still loads the
-    # model to cpu instead of meta device. Use from_config instead to solve the issue for big models.
-    # We add the instance type check here since some of the models haven't yet supported from_config.
-    if model_class[0] == AutoModelForCausalLM:
-        model = model_class[0].from_config(config).to(load_dtype)
-    else:
-        model = model_class[0].from_pretrained(
-            model_name, config=config, low_cpu_mem_usage=True, torch_dtype=load_dtype
+if world_size == 1 or model_type == "falcon":
+    model = model_class[0].from_pretrained(
+        model_name,
+        config=config,
+        low_cpu_mem_usage=True,
+        torch_dtype=load_dtype,
+        trust_remote_code=True,
+    )
+else:
+    with deepspeed.OnDevice(dtype=load_dtype, device="meta"):
+        model = (
+            model_class[0].from_config(config, trust_remote_code=True).to(load_dtype)
         )
 
 if args.benchmark:
@@ -293,7 +345,7 @@ if args.benchmark:
 
 # to ipex
 if args.ipex:
-    ipex_woq_enabled = args.ipex_weight_only_quantization and args.dtype == "float32"
+    ipex_woq_enabled = args.ipex_weight_only_quantization
     model = ipex._optimize_transformers(
         model.eval(),
         dtype=infer_dtype if not ipex_woq_enabled else torch.int8,
@@ -301,6 +353,8 @@ if args.ipex:
     )
     if ipex_woq_enabled:
         from intel_extension_for_pytorch.quantization import convert, prepare
+
+        weight_dtype = torch.quint4x2 if args.weight_dtype == "INT4" else torch.qint8
 
         if args.lowp_mode == "INT8":
             lowp_mode = ipex.quantization.WoqLowpMode.INT8
@@ -310,13 +364,21 @@ if args.ipex:
             lowp_mode = ipex.quantization.WoqLowpMode.FP16
         else:
             lowp_mode = ipex.quantization.WoqLowpMode.BF16
-    
+
         qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
-            lowp_mode=lowp_mode
+            weight_dtype=weight_dtype, lowp_mode=lowp_mode
         )
         model = prepare(model.eval(), qconfig, inplace=True, bn_folding=False)
-        with torch.no_grad():
+        with torch.no_grad(), torch.autocast(
+            device_type=args.device,
+            enabled=infer_dtype is torch.bfloat16,
+            dtype=infer_dtype if infer_dtype is torch.bfloat16 else None,
+        ):
             model = convert(model.eval(), inplace=True).eval()
+            if infer_dtype == torch.bfloat16:
+                model = ipex.optimize(
+                    model, dtype=torch.bfloat16, inplace=True, concat_linear=False
+                )
 
 ### Generate
 
@@ -336,7 +398,9 @@ elif model_type == "auto":
         + args.model_id
     )
 elif int(args.input_tokens) > 8192:
-    input_sentences.append(prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192))
+    input_sentences.append(
+        prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
+    )
 elif args.input_tokens in prompt_pool[model_type]:
     input_sentences.append(prompt_pool[model_type][args.input_tokens])
 else:
@@ -347,7 +411,8 @@ if args.batch_size > len(input_sentences):
     # dynamically extend to support larger bs by repetition
     input_sentences *= math.ceil(args.batch_size / len(input_sentences))
 num_beams = 1 if args.greedy else 4
-generate_kwargs = dict(max_new_tokens=num_tokens, do_sample=False, num_beams=num_beams)
+generate_kwargs = dict(do_sample=False, num_beams=num_beams,
+                       max_new_tokens=num_tokens, min_new_tokens=num_tokens)
 if args.token_latency:
     if not hasattr(model.config, "token_latency"):
         model.config.token_latency = True
@@ -355,9 +420,10 @@ if args.token_latency:
 if args.jit:
     torch._C._jit_set_texpr_fuser_enabled(False)
     past_key_values = None
-    import re
 
-    if re.search("GPTJ", model.config.architectures[0]):
+    if re.search("GPTJ", model.config.architectures[0]) or re.search(
+        "codegen", model.config.architectures[0], re.IGNORECASE
+    ):
         beam_idx_tmp = torch.zeros(
             (2048, int(args.batch_size * num_beams)), dtype=torch.long
         ).contiguous()
@@ -417,6 +483,66 @@ if args.jit:
                 for i in range(model.config.num_hidden_layers)
             ]
         )
+        target_max_position_embeddings = int(args.input_tokens) + int(
+            args.max_new_tokens
+        )
+        if target_max_position_embeddings >= 2048:
+            orig_embed_weight = model.model.decoder.embed_positions.weight
+            num_embeddings, embedding_dim = orig_embed_weight.shape
+            padding_weight = torch.rand(
+                target_max_position_embeddings - 2048, embedding_dim
+            ).to(orig_embed_weight.dtype)
+            new_embed_weight = torch.cat((orig_embed_weight, padding_weight), 0)
+            model.model.decoder.embed_positions.weight = torch.nn.Parameter(
+                new_embed_weight
+            )
+    elif re.search("falcon", model.config.architectures[0], re.IGNORECASE) or re.search(
+        "rw", model.config.architectures[0], re.IGNORECASE
+    ):
+        beam_idx_tmp = torch.zeros(
+            (2048, int(args.batch_size * num_beams)), dtype=torch.long
+        ).contiguous()
+        past_key_values = tuple(
+            [
+                (
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    beam_idx_tmp,
+                    torch.zeros(1, dtype=torch.long).contiguous(),
+                )
+                for i in range(model.config.num_hidden_layers)
+            ]
+        )
+    elif re.search("bloom", model.config.architectures[0], re.IGNORECASE):
+        beam_idx_tmp = torch.zeros(
+            (2048, int(args.batch_size * num_beams)), dtype=torch.long
+        ).contiguous()
+        past_key_values = tuple(
+            [
+                (
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    beam_idx_tmp,
+                    torch.zeros(1, dtype=torch.long).contiguous(),
+                )
+                for i in range(model.config.num_hidden_layers)
+            ]
+        )
+    elif re.search("chatglm", model.config.architectures[0], re.IGNORECASE):
+        beam_idx_tmp = torch.zeros(
+            (2048, int(args.batch_size * num_beams)), dtype=torch.long
+        ).contiguous()
+        past_key_values = tuple(
+            [
+                (
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    beam_idx_tmp,
+                    torch.zeros(1, dtype=torch.long).contiguous(),
+                )
+                for i in range(model.config.num_layers)
+            ]
+        )
     else:
         print("does not support jit yet on your model, please re-run without jit")
         exit(0)
@@ -424,7 +550,12 @@ if args.jit:
     input_ids = torch.ones(32).to(torch.long)
     attention_mask = torch.ones(len(input_ids))
     position_ids = torch.arange(len(input_ids))
-    if re.search("opt", model.config.architectures[0], re.IGNORECASE):
+    if (
+        re.search("opt", model.config.architectures[0], re.IGNORECASE)
+        or re.search("falcon", model.config.architectures[0], re.IGNORECASE)
+        or re.search("rw", model.config.architectures[0], re.IGNORECASE)
+        or re.search("bloom", model.config.architectures[0], re.IGNORECASE)
+    ):
         example_inputs = {
             "input_ids": input_ids.unsqueeze(0),
             "attention_mask": attention_mask.unsqueeze(0),
@@ -437,6 +568,8 @@ if args.jit:
             "position_ids": position_ids.unsqueeze(0),
             "past_key_values": past_key_values,
         }
+    if re.search("chatglm", model.config.architectures[0], re.IGNORECASE):
+        example_inputs["return_last_logit"] = torch.tensor(True)
 
     with torch.inference_mode(), torch.no_grad(), torch.autocast(
         device_type=args.device,
@@ -484,8 +617,8 @@ def generate():
 
 
 def trace_handler(prof):
-    print(prof.key_averages().table(
-        sort_by="self_cpu_time_total", row_limit=-1))
+    print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=-1))
+
 
 # warmup is a must if measuring speed as it's when all the optimizations are performed
 # e.g. on 8x80 a100 the first pass of 100 tokens takes 23sec, and the next one is 4secs
@@ -515,11 +648,8 @@ else:
     if args.profile:
         with torch.profiler.profile(
             activities=[torch.profiler.ProfilerActivity.CPU],
-            schedule=torch.profiler.schedule(
-                wait=1,
-                warmup=3,
-                active=1),
-            on_trace_ready=trace_handler
+            schedule=torch.profiler.schedule(wait=1, warmup=3, active=1),
+            on_trace_ready=trace_handler,
         ) as prof:
             for i in range(5):
                 gen_ids, outputs = generate()

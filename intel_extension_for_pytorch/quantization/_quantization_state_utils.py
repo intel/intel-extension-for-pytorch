@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 import torch.nn.quantized.dynamic as nnqd
 from intel_extension_for_pytorch.nn.functional import interaction
+from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
 import intel_extension_for_pytorch._C as core
 
 
@@ -50,6 +51,7 @@ functions_supported_by_quantization_ipex = set(
     [
         interaction,
         torch.ops.torch_ipex.interaction_forward,
+        torch.ops.torch_ipex.merged_embeddingbag_cat_forward,
     ]
 )
 
@@ -70,6 +72,7 @@ module_types_supported_by_quantization = set(
         # torch.nn.Sigmoid,  # TODO
         # torch.nn.GELU,     # TODO
         torch.nn.EmbeddingBag,
+        MergedEmbeddingBagWithCat,
         torch.nn.Flatten,
         torch.nn.LSTM,
         # dynamic quantization module
@@ -252,7 +255,10 @@ def get_input_observed_arg_idxs(
     op_type: str,
     op_type_is_module: bool,
 ) -> Optional[List[int]]:
-    if op_type_is_module and op_type != str(torch.nn.EmbeddingBag):
+    if op_type_is_module and op_type not in (
+        str(torch.nn.EmbeddingBag),
+        str(MergedEmbeddingBagWithCat),
+    ):
         # TODO(future PR): handle RNNs
         return [0]
     elif op_type in conv_linear_ops:

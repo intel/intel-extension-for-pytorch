@@ -1,6 +1,5 @@
 import copy
 import functools
-import os
 import warnings
 
 import torch
@@ -16,6 +15,7 @@ from intel_extension_for_pytorch.cpu.utils.linear_bn_folding import linear_bn_fu
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     may_import_deepspeed_modules,
     _all_reduce_and_bias_add,
+    _pre_ipex_gemm,
 )
 from ._quantize_utils import auto_prepare, auto_convert, copy_prepared_model
 from .. import nn
@@ -107,20 +107,35 @@ def prepare(
         assert isinstance(
             example_kwarg_inputs, Dict
         ), "IPEX quantization.prepare: example_kwarg_inputs must be type of Dict."
-    return auto_prepare(prepare_model, configure, example_inputs, example_kwarg_inputs)
+    prepared_model = auto_prepare(
+        prepare_model, configure, example_inputs, example_kwarg_inputs
+    )
+    if inplace and hasattr(prepared_model, "save_qconf_summary"):
+        model.save_qconf_summary = prepared_model.save_qconf_summary
+    return prepared_model
 
 
 def _may_insert_deepspeed_modules(
-    torch_modules, q_linear_layer_module, q_linear_all_reduce_module
+    torch_modules,
+    q_linear_layer_module,
+    q_linear_all_reduce_module,
+    q_lm_head_linear_all_reduce_module,
 ):
     deepspeed_modules = may_import_deepspeed_modules()
     if deepspeed_modules is not None:
         LinearAllreduce, LinearLayer = deepspeed_modules[:2]
-        deepspeed_modules = {
+        deepspeed_modules_dict = {
             LinearLayer: q_linear_layer_module,
             LinearAllreduce: q_linear_all_reduce_module,
         }
-        torch_modules.update(deepspeed_modules)
+        if len(deepspeed_modules) > 2:
+            LmHeadLinearAllreduce = deepspeed_modules[2]
+            deepspeed_modules_dict.update(
+                {
+                    LmHeadLinearAllreduce: q_lm_head_linear_all_reduce_module,
+                }
+            )
+        torch_modules.update(deepspeed_modules_dict)
     return torch_modules
 
 
@@ -149,7 +164,10 @@ def IPEX_DYNAMIC_QUANTIZATION_MODULE_CPU():
         torch.nn.Linear: DynamicQuantizedLinearLayer,
     }
     torch_modules = _may_insert_deepspeed_modules(
-        torch_modules, DynamicQuantizedLinearLayer, DynamicQuantizedLinearAllreduce
+        torch_modules,
+        DynamicQuantizedLinearLayer,
+        DynamicQuantizedLinearAllreduce,
+        DynamicQuantizedLmHeadLinearAllreduce,
     )
     return torch_modules
 
@@ -161,6 +179,7 @@ def IPEX_WEIGHT_ONLY_QUANTIZATION_MODULE_CPU():
         torch_modules,
         nn.modules.weight_only_quantization.IpexWoqLinear,
         nn.modules.weight_only_quantization.IpexWoqLinearAllreduce,
+        nn.modules.weight_only_quantization.IpexWoqLmHeadLinearAllreduce,
     )
     return torch_modules
 
@@ -255,7 +274,12 @@ class DynamicQuantizedLinearAllreduce(_IPEXDynamicQuantizedLinear):
         self.mp_group = mp_group
         self.original_bias = bias_value
 
+    def pre_ipex_gemm(self, input):
+        return input
+
     def forward(self, x):
+        x = self.pre_ipex_gemm(x)
+
         if self._packed_params.dtype == torch.qint8:
             if self.version is None or self.version < 4:
                 Y = torch.ops.quantized.linear_dynamic(
@@ -279,6 +303,57 @@ class DynamicQuantizedLinearAllreduce(_IPEXDynamicQuantizedLinear):
         return "DynamicQuantizedLinearAllreduce()"
 
 
+class DynamicQuantizedLmHeadLinearAllreduce(DynamicQuantizedLinearAllreduce):
+    @classmethod
+    @functools.lru_cache(None)
+    def _float_module(cls):
+        deepspeed_modules = may_import_deepspeed_modules()
+        assert (
+            len(deepspeed_modules) > 2
+        ), "DynamicQuantizedLmHeadLinearAllreduce requires deepspeed to be installed and LmHeadLinearAllreduce in deepspeed"
+        LmHeadLinearAllreduce = deepspeed_modules[2]
+        _FLOAT_MODULE = [LmHeadLinearAllreduce]
+        return _FLOAT_MODULE
+
+    def __init__(
+        self,
+        in_features,
+        out_features,
+        mp_group,
+        rank,
+        world_size,
+        bias_value,
+        bias_=True,
+        dtype=torch.qint8,
+    ):
+        # Save the original bias here
+        # For bias handling, please refer to the comment in __init__ of _IPEXLinearAllreduce
+        super().__init__(in_features, out_features, mp_group, bias_value, bias_, dtype)
+        self.rank = rank
+        self.world_size = world_size
+
+    @classmethod
+    def _init_cls(cls, mod, dtype, qweight):
+        qlinear = cls(
+            mod.weight.size()[1],
+            mod.weight.size()[0],
+            mod.mp_group,
+            mod.rank,
+            mod.world_size,
+            mod.bias,
+            dtype=dtype,
+        )
+        # For bias handling, please refer to the comment in __init__ of _IPEXLinearAllreduce
+        qlinear.set_weight_bias(qweight, None)
+        return qlinear
+
+    def pre_ipex_gemm(self, input):
+        return _pre_ipex_gemm(input, self.world_size, self.rank)
+
+    def __repr__(self):
+        return "DynamicQuantizedLmHeadLinearAllreduce()"
+
+
 def may_quantize_deepspeed_modules(
     IPEX_QUANTIZATION_MODULE, q_config, module_mappings, qconfig_spec
 ):
@@ -290,6 +365,14 @@ def may_quantize_deepspeed_modules(
             LinearLayer: q_config,
             LinearAllreduce: q_config,
         }
+        if len(deepspeed_modules) > 2:
+            LmHeadLinearAllreduce = deepspeed_modules[2]
+            deepspeed_qconfig_spec.update(
+                {
+                    LmHeadLinearAllreduce: q_config,
+                }
+            )
+
         qconfig_spec.update(deepspeed_qconfig_spec)
     return module_mappings, qconfig_spec
 
@@ -347,7 +430,6 @@ def convert(model, inplace=False):
             module_mappings,
             qconfig_spec,
         )
-
         converted_model = torch.quantization.quantize_dynamic(
             convert_model,
             qconfig_spec=qconfig_spec,

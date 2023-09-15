@@ -28,9 +28,17 @@ void linear_kernel_output(
     const ideep::tensor& mkldnn_weight,
     const at::Tensor& bias,
     at::Tensor& output,
-    const ideep::attr_t& attr) {
+    const ideep::attr_t& attr,
+    const std::vector<ideep::tensor>& post_op_src) {
   auto self_ = self.is_contiguous() ? self : self.contiguous();
   const int64_t dim = self.dim();
+  // [Note: onednn inner product with Pytorc Linear]
+  // We use onednn inner_product primitive to support Pytorch linear
+  // Since the semantic of onednn inner_product is different with
+  // Pytorch linear while input's dimension > 2
+  // https://oneapi-src.github.io/oneDNN/dev_guide_inner_product.html#forward
+  // https://pytorch.org/docs/stable/generated/torch.nn.functional.linear.html?highlight=linear#torch.nn.functional.linear
+  // We need to reshape input to 2d to make them semantic aligned
   auto self_reshaped =
       dim == 2 ? self_ : self_.reshape({-1, self.size(self.dim() - 1)});
   const ideep::tensor mkldnn_input = itensor_view_from_dense(self_reshaped);
@@ -51,13 +59,30 @@ void linear_kernel_output(
   if (bias.defined()) {
     auto bias_ = self.is_contiguous() ? bias : bias.contiguous();
     const ideep::tensor mkldnn_bias = itensor_view_from_dense(bias_);
-    ideep::inner_product_forward::
-        compute</*reorder_src=*/false, /*reorder_weight=*/false>(
-            mkldnn_input, mkldnn_weight, mkldnn_bias, mkldnn_output, attr);
+    if (post_op_src.empty()) {
+      ideep::inner_product_forward::
+          compute</*reorder_src=*/false, /*reorder_weight=*/false>(
+              mkldnn_input, mkldnn_weight, mkldnn_bias, mkldnn_output, attr);
+    } else {
+      ideep::inner_product_forward::
+          compute_binary</*reorder_src=*/false, /*reorder_weight=*/false>(
+              mkldnn_input,
+              post_op_src,
+              mkldnn_weight,
+              mkldnn_bias,
+              mkldnn_output,
+              attr);
+    }
   } else {
-    ideep::inner_product_forward::
-        compute</*reorder_src=*/false, /*reorder_weight=*/false>(
-            mkldnn_input, mkldnn_weight, mkldnn_output, attr);
+    if (post_op_src.empty()) {
+      ideep::inner_product_forward::
+          compute</*reorder_src=*/false, /*reorder_weight=*/false>(
+              mkldnn_input, mkldnn_weight, mkldnn_output, attr);
+    } else {
+      ideep::inner_product_forward::
+          compute_binary</*reorder_src=*/false, /*reorder_weight=*/false>(
+              mkldnn_input, post_op_src, mkldnn_weight, mkldnn_output, attr);
+    }
   }
   if (self.dim() != 2) {
     output_ = output_.reshape(output_size);
@@ -71,12 +96,13 @@ at::Tensor linear_kernel(
     const at::Tensor& self,
     const ideep::tensor& mkldnn_weight,
     const at::Tensor& bias,
-    const ideep::attr_t& attr) {
+    const ideep::attr_t& attr,
+    const std::vector<ideep::tensor>& post_op_src) {
   auto input_size = self.sizes();
   std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
   output_size.push_back(mkldnn_weight.get_dim(0));
   auto output = at::empty(output_size, self.options());
-  linear_kernel_output(self, mkldnn_weight, bias, output, attr);
+  linear_kernel_output(self, mkldnn_weight, bias, output, attr, post_op_src);
   return output;
 }
 
@@ -177,12 +203,31 @@ at::Tensor linear_eltwise_forward(
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward(
     const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
     const at::Tensor& grad_output,
     std::array<bool, 3> output_mask,
     const at::Tensor& op_context) {
   return reinterpret_cast<IpexLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
       ->run_backward(input, grad_output, output_mask);
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_eltwise_backward(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    const at::Tensor& output,
+    const int64_t eltwise,
+    const at::Tensor& grad_output,
+    std::array<bool, 3> output_mask,
+    const at::Tensor& op_context) {
+  at::Tensor grad_output_new = eltwise == ReLU
+      ? relu_use_dst_for_bwd(grad_output, output)
+      : sigmoid_use_dst_for_bwd(grad_output, output);
+  return reinterpret_cast<IpexLinearOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run_backward(input, grad_output_new, output_mask);
 }
 
 at::Tensor IPEXLinearOp::_forward(
@@ -226,12 +271,13 @@ at::Tensor IPEXLinearOp::forward(
   ctx->saved_data["bias_requires_grad"] =
       bias.has_value() && bias.value().requires_grad() ? true : false;
   ctx->saved_data["eltwise"] = eltwise;
+  ctx->saved_data["bias"] = bias;
   auto output =
       _forward(input, weight, bias, eltwise, op_context, out_features);
   if (eltwise == NotFused)
-    ctx->save_for_backward({input});
+    ctx->save_for_backward({input, weight});
   else
-    ctx->save_for_backward({input, output});
+    ctx->save_for_backward({input, weight, output});
   return output;
 }
 
@@ -242,6 +288,7 @@ torch::autograd::tensor_list IPEXLinearOp::backward(
 
   auto saved = ctx->get_saved_variables();
   at::Tensor input = saved[0];
+  at::Tensor weight = saved[1];
   auto op_context = ctx->saved_data["op_context"].toTensor();
   std::array<bool, 3> output_mask;
   output_mask[0] = ctx->saved_data["input_requires_grad"].toBool();
@@ -249,23 +296,33 @@ torch::autograd::tensor_list IPEXLinearOp::backward(
   output_mask[2] = ctx->saved_data["bias_requires_grad"].toBool();
   int64_t eltwise = ctx->saved_data["eltwise"].toInt();
   auto batch_size = ctx->saved_data["batch_size"].toOptional<int64_t>();
+  auto bias = ctx->saved_data["bias"].toOptional<at::Tensor>();
   at::Tensor grad_output;
-  if (eltwise == NotFused) {
-    grad_output = grad_outputs[0];
-  } else {
-    at::Tensor output = saved[1];
-    grad_output = eltwise == ReLU
-        ? relu_use_dst_for_bwd(grad_outputs[0], output)
-        : sigmoid_use_dst_for_bwd(grad_outputs[0], output);
-  }
 
   at::Tensor grad_input, grad_weight, grad_bias;
-  static auto op = torch::Dispatcher::singleton()
-                       .findSchemaOrThrow("torch_ipex::linear_backward", "")
-                       .typed<decltype(linear_backward)>();
-  std::tie(grad_input, grad_weight, grad_bias) =
-      op.call(input, grad_output, output_mask, op_context);
-  // must have save nums of output with inputs args
+  if (eltwise == NotFused) {
+    static auto op = torch::Dispatcher::singleton()
+                         .findSchemaOrThrow("torch_ipex::linear_backward", "")
+                         .typed<decltype(linear_backward)>();
+    std::tie(grad_input, grad_weight, grad_bias) =
+        op.call(input, weight, bias, grad_outputs[0], output_mask, op_context);
+  } else {
+    at::Tensor output = saved[2];
+    static auto op =
+        torch::Dispatcher::singleton()
+            .findSchemaOrThrow("torch_ipex::linear_eltwise_backward", "")
+            .typed<decltype(linear_eltwise_backward)>();
+    std::tie(grad_input, grad_weight, grad_bias) = op.call(
+        input,
+        weight,
+        bias,
+        output,
+        eltwise,
+        grad_outputs[0],
+        output_mask,
+        op_context);
+  }
+
   return {
       grad_input,
       grad_weight,
@@ -859,12 +916,19 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       torch_ipex::cpu::linear_eltwise_forward);
   // bw
   m.def(
-      "linear_backward(Tensor input, Tensor grad_output, bool[3] out_mask, "
+      "linear_backward(Tensor input, Tensor weight, Tensor? bias, Tensor grad_output, bool[3] out_mask, "
       "Tensor W_prepack) -> (Tensor, Tensor, Tensor)");
   m.impl(
       "linear_backward",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::linear_backward);
+  m.def(
+      "linear_eltwise_backward(Tensor input, Tensor weight, Tensor? bias, Tensor output, int eltwise, Tensor grad_output, bool[3] out_mask, "
+      "Tensor W_prepack) -> (Tensor, Tensor, Tensor)");
+  m.impl(
+      "linear_eltwise_backward",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::linear_eltwise_backward);
 }
 
 } // namespace

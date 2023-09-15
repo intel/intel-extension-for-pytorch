@@ -440,6 +440,8 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
         .setAttr(dnnl::graph::op::attr::transpose_b, true);
   } else if (nodeKind == Symbol::aten("to")) {
     return Operator(node, opkind::TypeCast).setInput(0).setOutput(0);
+  } else if (nodeKind == Symbol::aten("type_as")) {
+    return Operator(node, opkind::TypeCast).setInput(0).setOutput(0);
   } else if (nodeKind == Symbol::aten("quantize_per_tensor")) {
     // TODO: how to handle this case
     REQ(node->input(1)->node()->kind() != Symbol::aten("q_scale"));
@@ -518,6 +520,27 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
               dnnl::graph::op::attr::order,
               toIValue(node->input(1))->toIntVector());
     }
+  } else if (nodeKind == Symbol::aten("transpose")) {
+    REQ(aliasDb_->hasInputWriters(node) == false);
+    c10::optional<size_t> maybe_num_dims = getDimensions(node->input(0));
+    REQ(maybe_num_dims != c10::nullopt);
+    auto num_dims = maybe_num_dims.value();
+    REQ(num_dims != 0);
+    std::vector<int64_t> dims(num_dims);
+    std::iota(dims.begin(), dims.end(), 0);
+    auto dim1 = toIValue(node->namedInput("dim0"))->toInt();
+    auto dim2 = toIValue(node->namedInput("dim1"))->toInt();
+    if (dim1 < 0) {
+      dim1 += num_dims;
+    }
+    if (dim2 < 0) {
+      dim2 += num_dims;
+    }
+    std::swap(dims[dim1], dims[dim2]);
+    return Operator(node, opkind::StaticTranspose)
+        .setInput(0)
+        .setOutput(0)
+        .setAttr(dnnl::graph::op::attr::order, dims);
   } else if (nodeKind == Symbol::aten("contiguous")) {
     // Contiguous should only be mapped to oneDNN Graph if the destination
     // memory-layout is different than the source memory-format
@@ -529,6 +552,8 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
     REQ(inputStrides != outputStrides);
     return Operator(node, opkind::Reorder).setInput(0).setOutput(0);
   } else if (nodeKind == Symbol::aten("where")) {
+    return Operator(node, opkind::Select).setInput(0, 1, 2).setOutput(0);
+  } else if (nodeKind == Symbol::fromQualString("llga::Select")) {
     return Operator(node, opkind::Select).setInput(0, 1, 2).setOutput(0);
   }
 
@@ -839,6 +864,18 @@ bool LlgaNodeWrapper::useOpaqueLayout(size_t offset) const {
       num_output,
       ")");
   return n->is(attr::output_layouts)[offset] == OPAQUE_LAYOUT;
+}
+
+bool LlgaNodeWrapper::inputValueIsNotUsedLater(size_t offset) const {
+  const auto num_inputs = n->is(Symbol::attr("future_input_uses")).size();
+  TORCH_CHECK(
+      offset < num_inputs,
+      "Out of range. (Invalid index ",
+      offset,
+      " for attr::future_input_uses with size ",
+      num_inputs,
+      ")");
+  return n->is(Symbol::attr("future_input_uses"))[offset] == 0;
 }
 
 } // namespace onednn

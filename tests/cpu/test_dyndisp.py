@@ -12,6 +12,7 @@ supported_isa_set = [
     "avx512_vnni",
     "avx512_bf16",
     "amx",
+    "avx512_fp16",
 ]
 
 
@@ -30,6 +31,8 @@ def get_isa_val(isa_name):
         return 5
     elif isa_name == "amx":
         return 6
+    elif isa_name == "avx512_fp16":
+        return 7
     else:
         return 100
 

@@ -2,6 +2,7 @@ from typing import Callable, List, Tuple, Any, Optional, Dict
 import torch
 import torch.nn.functional as F
 import intel_extension_for_pytorch._C as core
+from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
 
 from ._utils import (
     OpQuantizeabilityType,
@@ -308,6 +309,8 @@ class AutoQuantizationState(torch.nn.Module):
                         observer(op._flat_weights[i])
                     else:
                         pass
+                elif isinstance(op, MergedEmbeddingBagWithCat):
+                    observer(op.weights[i])
                 else:
                     observer(op.weight)
 
@@ -500,6 +503,36 @@ class AutoQuantizationState(torch.nn.Module):
                 new_args.append(arg)
             else:
                 new_args.append(op.weight)
+        elif isinstance(op, MergedEmbeddingBagWithCat):
+            weights = op.weights
+            for tensor_arg_idx in range(0, len(arg_quant_infos)):
+                quant_info = arg_quant_infos[tensor_arg_idx]
+                if (
+                    quant_info is not None
+                    and any_arg_quant_or_dequant_needed[tensor_arg_idx]
+                ):
+                    scale, zp, dtype = quant_info
+                    if (
+                        torch.is_autocast_cpu_enabled()
+                        and core.get_autocast_dtype() == torch.bfloat16
+                    ):
+                        if weights[tensor_arg_idx].dtype == torch.bfloat16:
+                            weights[tensor_arg_idx] = weights[tensor_arg_idx].to(
+                                dtype=torch.float32
+                            )
+                        arg = torch.quantize_per_tensor(
+                            weights[tensor_arg_idx], scale.item(), zp.item(), dtype
+                        )
+                        arg = arg.dequantize()
+                        arg = arg.to(dtype=torch.bfloat16)
+                    else:
+                        arg = torch.quantize_per_tensor(
+                            op.weights[tensor_arg_idx], scale.item(), zp.item(), dtype
+                        )
+                        arg = arg.dequantize()
+                    new_args.append(arg)
+                else:
+                    new_args.append(op.weights[tensor_arg_idx])
         elif isinstance(op, torch.nn.LSTM):
             step = 4 if op.bias else 2
             weights = op._flat_weights
@@ -842,12 +875,11 @@ class AutoQuantizationState(torch.nn.Module):
             weight_tensor_infos = []
             weight_idx = 0
             if type(op) in quantized_modules_has_weights:
-                if not isinstance(op, torch.nn.LSTM):
-                    weight_tensor_infos.append(
-                        QTensorInfo(weight_idx, op.weight.dtype, op.weight.dtype)
-                    )
-                else:
-                    weights = op._flat_weights
+                if isinstance(op, (torch.nn.LSTM, MergedEmbeddingBagWithCat)):
+                    if isinstance(op, torch.nn.LSTM):
+                        weights = op._flat_weights
+                    else:
+                        weights = op.weights
                     for i in range(len(weights)):
                         weight_tensor_infos.append(
                             QTensorInfo(
@@ -857,6 +889,10 @@ class AutoQuantizationState(torch.nn.Module):
                             )
                         )
                         weight_idx += 1
+                else:
+                    weight_tensor_infos.append(
+                        QTensorInfo(weight_idx, op.weight.dtype, op.weight.dtype)
+                    )
             self.idx_to_seen_q_op_infos[self.idx] = SeenQOpInfo(
                 self.idx,
                 str(op_type),
@@ -961,7 +997,10 @@ class AutoQuantizationState(torch.nn.Module):
             else:
                 # always add observer if the op can be quantized.
                 tensor_id = tensor_info.id  # type: ignore[attr-defined]
-                if seen_q_op_info.type == str(torch.nn.EmbeddingBag):
+                if seen_q_op_info.type in (
+                    str(torch.nn.EmbeddingBag),
+                    str(MergedEmbeddingBagWithCat),
+                ):
                     obs = qconfig.activation()
                     self.weight_tensor_id_to_observer[
                         str(seen_q_op_info.idx) + "_" + str(tensor_id)

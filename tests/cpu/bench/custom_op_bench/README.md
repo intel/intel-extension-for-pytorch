@@ -45,3 +45,9 @@ python -m intel_extension_for_pytorch.cpu.launch --node_id 0 merged_embeddingbag
 python -m intel_extension_for_pytorch.cpu.launch --node_id 0 merged_embeddingbag.py --data-distribution=balance --batch-size=${BATCHSIZE}
 python -m intel_extension_for_pytorch.cpu.launch --node_id 0 merged_embeddingbag.py --data-distribution=unbalance --batch-size=${BATCHSIZE}
 ```
+
+## Evaluate IPEX [MergedEmbeddingBagWithCat](../../../../intel_extension_for_pytorch/nn/module/merged_embeddingbag.py)
+```
+export CORES=`lscpu | grep Core | awk '{print $4}'`
+export BATCHSIZE=$((128*CORES))
+python -m intel_extension_for_pytorch.cpu.launch --node_id 0 merged_embeddingbag.py --inference --with-cat --batch-size=${BATCHSIZE}

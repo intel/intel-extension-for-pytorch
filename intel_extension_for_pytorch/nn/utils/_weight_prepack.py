@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import copy
 import logging
 import os
 import pkg_resources
@@ -28,7 +27,7 @@ def TPPLinear_weight_prepack(m, bk=None, bc=None, layer_dtype=torch.float32):
         )
     )
     layer_use_low_prec = layer_dtype != torch.float32
-    if layer_use_low_prec == True and USE_LOW_PREC_PARAMS:
+    if layer_use_low_prec is True and USE_LOW_PREC_PARAMS:
         low_prec_vnni_blocking = get_vnni_blocking(layer_dtype)
         m.weight.set_blocking_param(
             (
@@ -58,9 +57,9 @@ def Apply_TPPLinear_weight_prepack(m, dtype, device="cpu"):
     elif m.weight.size()[0] % 16 == 0 and m.weight.size()[1] % 64 == 0:
         m = TPPLinear_weight_prepack(m, 16, 64, dtype)
     else:
-        setattr(m, "tpp_fallback", True)
+        m.tpp_fallback = True
         return
-    setattr(m, "tpp_fallback", False)
+    m.tpp_fallback = False
 
     block(m)
 
@@ -95,13 +94,8 @@ installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
 if "deepspeed" in installed_pkg:
     from deepspeed import comm
 
-    DS_SHM_ALLREDUCE = os.getenv("DS_SHM_ALLREDUCE")
-
     def _all_reduce(self, reduceOp, tag, ranks, group_size):
-        if DS_SHM_ALLREDUCE == "1":
-            comm.all_reduce_low_latency(self, async_op=False)
-        else:
-            comm.all_reduce(self, async_op=False)
+        comm.inference_all_reduce(self, async_op=False)
         return self
 
     ds_comm = torch.library.Library("deepspeed_comm", "DEF")
@@ -126,6 +120,15 @@ def _all_reduce_and_bias_add(mp_group, original_bias, output):
         output += original_bias
 
     return output
+
+
+def _pre_ipex_gemm(input, world_size, rank):
+    assert "deepspeed" in installed_pkg, "_pre_ipex_gemm requires deepspeed installed"
+    from deepspeed.utils.tp_shard import get_shard_size, get_shard_size_list
+
+    input_shard_size = get_shard_size(input.shape[-1], world_size)
+    input_shard_offset = sum(get_shard_size_list(input.shape[-1], world_size)[0:rank])
+    return input[:, :, input_shard_offset : input_shard_offset + input_shard_size]
 
 
 def _ipex_module_load_from_state_dict_(self, state_dict, prefix):
@@ -343,11 +346,7 @@ class _IPEXLmHeadLinearAllreduce(_IPEXLinear):
         super(_IPEXLmHeadLinearAllreduce, self).__init__()
 
     def pre_ipex_gemm(self, input):
-        assert (
-            input.shape[-1] % self.world_size == 0
-        ), "please ensure input.shape[-1] % self.world_size == 0"
-        input_shard = input.shape[-1] // self.world_size
-        return input[:, :, self.rank * input_shard : (self.rank + 1) * input_shard]
+        return _pre_ipex_gemm(input, self.world_size, self.rank)
 
     def post_ipex_gemm(self, output):
         return _all_reduce_and_bias_add(self.mp_group, self.original_bias, output)
@@ -491,7 +490,9 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
                 weight_key = m.weight
                 param_wrapper.prepack(m, is_training)
                 if m.tpp_fallback:
-                    setattr(new_m, "tpp_fallback", True)
+                    new_m.tpp_fallback = True
+                else:
+                    new_m.tpp_fallback = False
                 params_attr[m.weight] = params_attr.pop(weight_key)
                 del weight_key
 
@@ -511,18 +512,21 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
                 optimizer, optimizer_para, param_wrapper
             )
             new_m.training = is_training
-            if not is_training:
-                # _ipex_module_empty_weight_tensor and _ipex_module_empty_bias_tensor
-                # have to be a Parameter so that dynamo could convert it into FakeTensor
-                new_m._ipex_module_empty_weight_tensor = torch.nn.Parameter(
-                    torch.Tensor().to(dtype=new_m.weight.dtype)
+            # _ipex_module_empty_weight_tensor and _ipex_module_empty_bias_tensor
+            # have to be a Parameter so that dynamo could convert it into FakeTensor
+            # These empty tensors will only be used during inference but we'll set
+            # it in both training and eval mode to supprt the use case of the below
+            # workflow:
+            # model.train() -> ipex.optimize(model) -> model.eval()
+            new_m._ipex_module_empty_weight_tensor = torch.nn.Parameter(
+                torch.Tensor().to(dtype=new_m.weight.dtype)
+            )
+            if new_m.bias is None:
+                new_m.register_parameter("_ipex_module_empty_bias_tensor", None)
+            else:
+                new_m._ipex_module_empty_bias_tensor = torch.nn.Parameter(
+                    torch.Tensor().to(dtype=new_m.bias.dtype)
                 )
-                if new_m.bias is None:
-                    new_m.register_parameter("_ipex_module_empty_bias_tensor", None)
-                else:
-                    new_m._ipex_module_empty_bias_tensor = torch.nn.Parameter(
-                        torch.Tensor().to(dtype=new_m.bias.dtype)
-                    )
             return new_m
         else:
             return m
@@ -568,14 +572,20 @@ def record_input_shape_for_prepack(module, sample_input):
             torch.nn.Conv3d,
             torch.nn.ConvTranspose2d,
         ]:
-            module.register_forward_pre_hook(hook_function)
+            hook = module.register_forward_pre_hook(hook_function)
+            hooks.append(hook)
 
     def register_hook_function_rec(module):
         register_hook_function(module)
         for child in module.children():
             register_hook_function_rec(child)
 
-    origin_state_dict = copy.deepcopy(module.state_dict())
+    hooks = []
+    module_is_train = module.training
+    module.eval()
     register_hook_function_rec(module)
     module(*sample_input)
-    module.load_state_dict(origin_state_dict)
+    if module_is_train:
+        module.train()
+    for hook in hooks:
+        hook.remove()

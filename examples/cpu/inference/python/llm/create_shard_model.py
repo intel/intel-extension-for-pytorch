@@ -13,6 +13,7 @@ MODEL_CLASSES = {
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
     "llama": (AutoModelForCausalLM, LlamaTokenizer),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
+    "falcon": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -56,9 +57,9 @@ if args.dtype == "float16":
 elif args.dtype == "bfloat16":
     load_dtype = torch.bfloat16
 
-tokenizer = model_class[1].from_pretrained(args.model_id)
+tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
 model = model_class[0].from_pretrained(
-    args.model_id, torch_dtype=load_dtype, low_cpu_mem_usage=True
+    args.model_id, torch_dtype=load_dtype, low_cpu_mem_usage=True, trust_remote_code=True
 )
 
 model.save_pretrained(save_directory=args.save_path, max_shard_size=args.max_shard_size)
