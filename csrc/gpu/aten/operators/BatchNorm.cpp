@@ -2220,7 +2220,8 @@ template <
     typename input_scalar_t,
     typename stat_scalar_t,
     typename stat_accscalar_t,
-    typename index_t>
+    typename index_t,
+    bool has_count = false>
 void batch_norm_backward_elemt_channels_first_kernel_impl(
     const Tensor& input,
     const Tensor& grad_output,
@@ -2229,8 +2230,9 @@ void batch_norm_backward_elemt_channels_first_kernel_impl(
     const Tensor& weight,
     const Tensor& sum_dy,
     const Tensor& sum_dy_xmu,
-    Tensor& grad_input,
-    const stat_accscalar_t norm_fct) {
+    const int* numel,
+    const int world_size,
+    Tensor& grad_input) {
   auto Hw = input.size(2);
   auto N = input.size(0);
   auto numPlane = input.size(1);
@@ -2267,12 +2269,27 @@ void batch_norm_backward_elemt_channels_first_kernel_impl(
   auto sum_dy_ptr = sum_dy.data_ptr<stat_accscalar_t>();
   auto sum_dy_xmu_ptr = sum_dy_xmu.data_ptr<stat_accscalar_t>();
 
+  auto n_input = input.size(1);
+  auto reduction_size = input.numel() / n_input;
+
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
       index_t plane = item.get_group(1);
 
       if (plane >= numPlane) {
         return;
+      }
+
+      // Use float to calculate to avoid double issues in ATSM
+      auto norm_fct = static_cast<stat_accscalar_t>(
+          static_cast<float>(1.0) / reduction_size);
+      if constexpr (has_count) {
+        int64_t total_numel = 0;
+        for (int i = 0; i < world_size; i++) {
+          total_numel += numel[i];
+        }
+        norm_fct = static_cast<stat_accscalar_t>(
+            static_cast<float>(1.0) / total_numel);
       }
 
       stat_accscalar_t m_c = mean_ptr[plane];
@@ -2322,8 +2339,6 @@ Tensor batch_norm_backward_elemt_channels_first_template(
   auto grad_input_reshaped =
       at::empty_like(input_reshaped, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
 
-  auto reduction_size = input_.numel() / n_input;
-  auto norm_fct = static_cast<stat_accscalar_t>(1.0 / reduction_size);
   batch_norm_backward_elemt_channels_first_kernel_impl<
       input_scalar_t,
       stat_scalar_t,
@@ -2336,13 +2351,58 @@ Tensor batch_norm_backward_elemt_channels_first_template(
       weight_,
       sum_dy_,
       sum_dy_xmu_,
-      grad_input_reshaped,
-      norm_fct);
+      nullptr,
+      0,
+      grad_input_reshaped);
 
   return grad_input_reshaped.view(input_.sizes());
 }
 
-template <typename scalar_t, typename accscalar_t, typename layerscalar_t>
+template <typename input_scalar_t, typename stat_scalar_t, typename index_t>
+Tensor batch_norm_backward_elemt_channels_first_template(
+    const Tensor& grad_out_,
+    const Tensor& input_,
+    const Tensor& mean_,
+    const Tensor& invstd_,
+    const Tensor& weight_,
+    const Tensor& sum_dy_,
+    const Tensor& sum_dy_xmu_,
+    const Tensor& count) {
+  using stat_accscalar_t = acc_type<stat_scalar_t>;
+  int64_t n_input = input_.size(1);
+  auto input_reshaped = input_.reshape(
+      {input_.size(0),
+       input_.size(1),
+       -1}); // internally we merge the feature dimensions
+  auto grad_output_reshaped = grad_out_.reshape(input_reshaped.sizes());
+  auto grad_input_reshaped =
+      at::empty_like(input_reshaped, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+
+  batch_norm_backward_elemt_channels_first_kernel_impl<
+      input_scalar_t,
+      stat_scalar_t,
+      stat_accscalar_t,
+      index_t,
+      true>(
+      input_reshaped,
+      grad_output_reshaped,
+      mean_,
+      invstd_,
+      weight_,
+      sum_dy_,
+      sum_dy_xmu_,
+      count.data_ptr<int>(),
+      count.numel(),
+      grad_input_reshaped);
+
+  return grad_input_reshaped.view(input_.sizes());
+}
+
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    typename layerscalar_t,
+    bool has_count = false>
 void batch_norm_backward_elemt_channels_last_kernel_impl(
     const scalar_t* grad_output,
     const scalar_t* input,
@@ -2351,8 +2411,9 @@ void batch_norm_backward_elemt_channels_last_kernel_impl(
     const layerscalar_t* weight,
     const accscalar_t* sum_dy,
     const accscalar_t* sum_dy_xmu,
+    const int* numel,
     scalar_t* grad_input,
-    const accscalar_t norm_fct,
+    const int world_size,
     const int reduction_size,
     const int stride) {
   auto& queue = dpcppGetCurrentQueue();
@@ -2372,6 +2433,18 @@ void batch_norm_backward_elemt_channels_last_kernel_impl(
 
       if (c_offset >= stride || m_offset >= reduction_size) {
         return;
+      }
+
+      // Use float to calculate to avoid double issues in ATSM
+      auto norm_fct =
+          static_cast<accscalar_t>(static_cast<float>(1.0) / reduction_size);
+      if constexpr (has_count) {
+        int64_t total_numel = 0;
+        for (int i = 0; i < world_size; i++) {
+          total_numel += numel[i];
+        }
+        norm_fct =
+            static_cast<accscalar_t>(static_cast<float>(1.0) / total_numel);
       }
 
       auto m_c = mean[c_offset];
@@ -2402,41 +2475,6 @@ void batch_norm_backward_elemt_channels_last_kernel_impl(
   DPCPP_Q_SUBMIT(queue, cgf);
 }
 
-template <typename scalar_t, typename accscalar_t, typename layerscalar_t>
-void batch_norm_backward_elemt_channels_last_kernel(
-    const scalar_t* grad_output,
-    const scalar_t* input,
-    const accscalar_t* mean,
-    const accscalar_t* inv_std,
-    const layerscalar_t* weight,
-    const accscalar_t* sum_dy,
-    const accscalar_t* sum_dy_xmu,
-    const int* numel,
-    scalar_t* grad_input,
-    const int64_t world_size,
-    const int reduction_size,
-    const int stride) {
-  int64_t total_numel = 0;
-  for (int i = 0; i < world_size; i++) {
-    total_numel += numel[i];
-  }
-
-  auto norm_fct =
-      static_cast<accscalar_t>(1) / static_cast<accscalar_t>(total_numel);
-  batch_norm_backward_elemt_channels_last_kernel_impl(
-      grad_output,
-      input,
-      mean,
-      inv_std,
-      weight,
-      sum_dy,
-      sum_dy_xmu,
-      grad_input,
-      norm_fct,
-      reduction_size,
-      stride);
-}
-
 at::Tensor batch_norm_backward_elemt_channels_last_template(
     const at::Tensor& grad_output,
     const at::Tensor& input,
@@ -2460,7 +2498,11 @@ at::Tensor batch_norm_backward_elemt_channels_last_template(
         "batchnorm_backward_element",
         [&] {
           using accscalar_t = acc_type<scalar_t>;
-          batch_norm_backward_elemt_channels_last_kernel(
+          batch_norm_backward_elemt_channels_last_kernel_impl<
+              scalar_t,
+              accscalar_t,
+              accscalar_t,
+              true>(
               grad_output.data_ptr<scalar_t>(),
               input.data_ptr<scalar_t>(),
               mean.data_ptr<accscalar_t>(),
@@ -2490,7 +2532,11 @@ at::Tensor batch_norm_backward_elemt_channels_last_template(
         "batchnorm_backward_element",
         [&] {
           using accscalar_t = acc_type<scalar_t>;
-          batch_norm_backward_elemt_channels_last_kernel(
+          batch_norm_backward_elemt_channels_last_kernel_impl<
+              scalar_t,
+              accscalar_t,
+              scalar_t,
+              true>(
               grad_output.data_ptr<scalar_t>(),
               input.data_ptr<scalar_t>(),
               mean.data_ptr<accscalar_t>(),
@@ -2519,7 +2565,6 @@ at::Tensor batch_norm_backward_elemt_channels_last_template(
     const at::Tensor& sum_dy_xmu) {
   const auto stride = input.sizes()[1];
   const auto reduction_size = input.numel() / stride;
-  auto norm_fct = 1.0 / reduction_size;
 
   // Input is guarunteed to be channels-last compatible
   at::Tensor grad_input = at::empty_like(input);
@@ -2537,8 +2582,9 @@ at::Tensor batch_norm_backward_elemt_channels_last_template(
               weight.data_ptr<accscalar_t>(),
               sum_dy.data_ptr<accscalar_t>(),
               sum_dy_xmu.data_ptr<accscalar_t>(),
+              nullptr,
               grad_input.data_ptr<scalar_t>(),
-              static_cast<accscalar_t>(norm_fct),
+              0,
               reduction_size,
               stride);
         } else {
@@ -2550,8 +2596,9 @@ at::Tensor batch_norm_backward_elemt_channels_last_template(
               weight.defined() ? weight.data_ptr<scalar_t>() : nullptr,
               sum_dy.data_ptr<accscalar_t>(),
               sum_dy_xmu.data_ptr<accscalar_t>(),
+              nullptr,
               grad_input.data_ptr<scalar_t>(),
-              static_cast<accscalar_t>(norm_fct),
+              0,
               reduction_size,
               stride);
         }
@@ -3067,8 +3114,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm_backward(
   }
 }
 
-// For native_batch_norm, we don't use this batch_norm_elemt_out
-// Because oneDNN could handle it automatically.
+// For native_batch_norm, we use batch_norm_elemt_out rather than oneDNN path.
+// Because oneDNN only could handle var input but here input is invstd.
 at::Tensor& batch_norm_elemt_out(
     const at::Tensor& input,
     const c10::optional<at::Tensor>& weight_opt,
@@ -3077,44 +3124,7 @@ at::Tensor& batch_norm_elemt_out(
     const at::Tensor& invstd,
     double eps,
     at::Tensor& out) {
-  c10::MaybeOwned<Tensor> weight_maybe_owned =
-      at::borrow_from_optional_tensor(weight_opt);
-  const Tensor& weight = *weight_maybe_owned;
-
-  c10::MaybeOwned<Tensor> bias_maybe_owned =
-      at::borrow_from_optional_tensor(bias_opt);
-  const Tensor& bias = *bias_maybe_owned;
-
-  checkBackend("batch_norm", {input, weight, bias, mean, invstd}, Backend::XPU);
-
-  // The check follows native batch norm
-  if (input.scalar_type() != at::ScalarType::Float &&
-      input.scalar_type() != at::ScalarType::Half &&
-      input.scalar_type() != at::ScalarType::BFloat16) {
-    std::stringstream ss;
-    ss << "batch_norm backend got unsupported type=" << input.scalar_type();
-    TORCH_CHECK(0, ss.str());
-  }
-
-  // Don't need these two, thus use dummy tensor.
-  // In current stat, the oneDNN batch norm flag should be
-  // inference + use_global_stats.
-  Tensor dummy_mean;
-  Tensor dummy_var;
-
-  // don't need momentum, epsilon, thus use dummy data
-  xpu::oneDNN::batch_normalization(
-      condition_contiguous(input),
-      condition_contiguous(weight),
-      condition_contiguous(bias),
-      condition_contiguous(mean),
-      condition_contiguous(invstd),
-      /* training*/ false,
-      /* momentum */ 1.0,
-      /*epsilon , dummy epsilon*/ 1e-5,
-      out,
-      dummy_mean,
-      dummy_var);
+  batch_norm_elementwise(out, input, weight_opt, bias_opt, mean, invstd);
   return out;
 }
 
@@ -3125,8 +3135,7 @@ at::Tensor batch_norm_elemt(
     const at::Tensor& mean,
     const at::Tensor& invstd,
     double eps) {
-  // Empty tensor, it will be initialized in batch_norm_elemt_out
-  Tensor out;
+  auto out = at::empty_like(input);
   batch_norm_elemt_out(input, weight, bias, mean, invstd, eps, out);
   return out;
 }
@@ -3506,24 +3515,28 @@ Tensor batch_norm_backward_elemt_dispatch(
             return batch_norm_backward_elemt_channels_first_template<
                 scalar_t,
                 accscalar_t,
-                int32_t>(self, input, mean, invstd, weight, sum_dy, sum_dy_xmu);
+                int32_t>(
+                self, input, mean, invstd, weight, sum_dy, sum_dy_xmu, count);
           } else {
             return batch_norm_backward_elemt_channels_first_template<
                 scalar_t,
                 scalar_t,
-                int32_t>(self, input, mean, invstd, weight, sum_dy, sum_dy_xmu);
+                int32_t>(
+                self, input, mean, invstd, weight, sum_dy, sum_dy_xmu, count);
           }
         } else {
           if (is_half_float || is_bfloat16_float) {
             return batch_norm_backward_elemt_channels_first_template<
                 scalar_t,
                 accscalar_t,
-                int64_t>(self, input, mean, invstd, weight, sum_dy, sum_dy_xmu);
+                int64_t>(
+                self, input, mean, invstd, weight, sum_dy, sum_dy_xmu, count);
           } else {
             return batch_norm_backward_elemt_channels_first_template<
                 scalar_t,
                 scalar_t,
-                int64_t>(self, input, mean, invstd, weight, sum_dy, sum_dy_xmu);
+                int64_t>(
+                self, input, mean, invstd, weight, sum_dy, sum_dy_xmu, count);
           }
         }
       });

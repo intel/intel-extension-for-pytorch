@@ -465,3 +465,50 @@ class TestNNMethod(TestCase):
 
         _batch_norm_legit_simple(track_stats=True)
         _batch_norm_legit_simple(track_stats=False)
+
+    def test_sync_batch_norm_elemt(self):
+        input = torch.ones(1, 4, 2, 2, device=dpcpp_device)
+        weight = torch.ones(4, device=dpcpp_device)
+        bias = torch.zeros(4, device=dpcpp_device)
+        mean = torch.tensor([1, 2, 3, 4], dtype=torch.float, device=dpcpp_device)
+        invstd = torch.tensor([1, 2, 3, 4], dtype=torch.float, device=dpcpp_device)
+        eps = 1e-5
+
+        cuda_result = torch.tensor([[[[0., 0.], [0., 0.]], 
+                                     [[-2., -2.], [-2., -2.]],
+                                     [[-6., -6.], [-6., -6.]], 
+                                     [[-12., -12.], [-12., -12.]]]])
+
+        for memory_format in [torch.contiguous_format, torch.channels_last]:
+            result = torch.batch_norm_elemt(input.contiguous(memory_format=memory_format), 
+                                            weight, bias, mean, invstd, eps)
+            self.assertEqual(result.to(cpu_device), cuda_result)
+
+
+    def test_sync_batch_norm_backward_elemt(self):
+        grad_output = torch.ones(1, 4, 2, 2, device=dpcpp_device)
+        input = torch.ones(1, 4, 2, 2, device=dpcpp_device)
+        mean = torch.tensor([1, 2, 3, 4], dtype=torch.float, device=dpcpp_device)
+        invstd = torch.tensor([1, 2, 3, 4], dtype=torch.float, device=dpcpp_device)
+        weight = torch.ones(4, device=dpcpp_device)
+        sum_dy = torch.ones(4, device=dpcpp_device)
+        sum_dy_xmu = torch.zeros(4, device=dpcpp_device)
+        count = torch.tensor([[2], [2]], dtype=torch.int, device=dpcpp_device)
+
+        cuda_result = torch.tensor([[[[0.75, 0.75], [0.75, 0.75]],
+                                     [[1.50, 1.50], [1.50, 1.50]],
+                                     [[2.25, 2.25], [2.25, 2.25]],
+                                     [[3.00, 3.00], [3.00, 3.00]]]])
+
+        for memory_format in [torch.contiguous_format, torch.channels_last]:
+            result = torch.batch_norm_backward_elemt(
+                grad_output.contiguous(memory_format=memory_format),
+                input.contiguous(memory_format=memory_format),
+                mean,
+                invstd,
+                weight,
+                sum_dy,
+                sum_dy_xmu,
+                count
+            )
+        self.assertEqual(result.to(cpu_device), cuda_result)
