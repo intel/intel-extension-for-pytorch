@@ -1,3 +1,4 @@
+import os
 import torch 
 import torch.nn
 from typing import Optional
@@ -6,6 +7,7 @@ from .WeightLoader import WeightLoader
 from .ModuleReplacer import ModuleReplacer
 from .modules.Layers import EnvParam
 from .modules._transformers import IPEXTransformerConverter
+from .transformers_model_capture import TransformersModelCapture
 import torch.distributed as dist
 
 
@@ -162,9 +164,12 @@ class Converter:
                 device = "xpu"
             model = model.to(device).to(dtype)
         self.module_replacer.replace_func(model)
-        self.module_replacer.replace_module(model, dtype, config=None)
-
         self.module_replacer.replace_op(model)
-
+        if not os.getenv("MODEL_CAPTURE", default=None):
+            is_replace_success = self.module_replacer.replace_module(model, dtype, config=None)
+            if not is_replace_success:
+                setattr(model, "model_capture", {"model_capture": TransformersModelCapture(model, dtype)})
+        else:
+            setattr(model, "model_capture", {"model_capture": TransformersModelCapture(model, dtype)})
         return model
 

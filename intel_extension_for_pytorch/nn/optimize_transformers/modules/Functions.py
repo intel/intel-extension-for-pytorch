@@ -7,6 +7,7 @@ from functools import partial
 from dataclasses import dataclass, fields
 from typing import Callable, Optional, Tuple, Union, List, Dict
 from ._transformers import IPEXTransformerAtten, IPEXTransformerMLP
+from transformers.modeling_outputs import CausalLMOutputWithPast
 import time
 # from .llama import IPEXLlamaForCausalLMForward
 from .gptj import IPEXGPTJForCausalLMForward
@@ -14,6 +15,7 @@ from .bloom import IPEXBloomForCausalLMForward
 from .utils import pad_for_gptj_lm_head, is_int4
 from .llama import IPEXLlamaForCausalLMForward
 from .opt import IPEXOPTForCausalLMForward
+
 
 class IPEXLLMResourceContrainer:
     container = []
@@ -434,12 +436,23 @@ def _ipex_beam_search(
 
         IPEXTransformerAtten.update_beam_index(index_cache)
 
-        outputs = self(
-            **model_inputs,
-            return_dict=True,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-        )
+        #if self.method == RunMethods.JITInfer: 
+        #    model_inputs.pop("use_cache", None)
+        #    model_inputs.pop("token_type_ids", None)
+        if hasattr(self, "model_capture"):
+            outputs = self.model_capture["model_capture"](
+                **model_inputs,
+                return_dict=True,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+            )
+        else:
+            outputs = self(
+                **model_inputs,
+                return_dict=True,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+            )
 
         if synced_gpus and this_peer_finished:
             cur_len = cur_len + 1
@@ -448,7 +461,7 @@ def _ipex_beam_search(
         next_token_logits = outputs.logits[:, -1, :]
         # hack: adjust tokens for Marian. For Marian we have to make sure that the `pad_token_id`
         # cannot be generated both before and after the `nn.functional.log_softmax` operation.
-        next_token_logits = self.adjust_logits_during_generation(next_token_logits, cur_len=cur_len)
+        #next_token_logits = self.adjust_logits_during_generation(next_token_logits, cur_len=cur_len)
         next_token_scores = nn.functional.log_softmax(
             next_token_logits, dim=-1
         )  # (batch_size * num_beams, vocab_size)

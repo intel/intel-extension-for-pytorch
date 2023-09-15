@@ -50,20 +50,23 @@ class ModuleReplacer:
             self.fn_dict.extend(fn_list)
         self.optimized_model = None
     
-    def replace_module(self, model, dtype, config=None, prefix=""):
+    def replace_module(self, model, dtype, config=None, prefix="") -> bool:
         if config is None and hasattr(model, "config"):
             config = model.config
             config.dtype = dtype
             config.device = "xpu"
         module_name = "" if prefix == "" else prefix + "."
+        is_replace_success = False
         for name, child in model.named_children():
             if type(child) in self.module_dict.keys():
                 module_converter = self.module_dict[type(child)](child, config, dtype=dtype, device="xpu", name=module_name + name)
                 new_module = module_converter.get_transformed_module()
                 # IPEXLLMResourceContrainer.push(new_module)
                 setattr(model, name, new_module)
+                is_replace_success = True
             else:
-                self.replace_module(child, dtype, config, module_name + name)
+                is_replace_success = is_replace_success or self.replace_module(child, dtype, config, module_name + name)
+        return is_replace_success
 
     def replace_op(self, model):
         for name, child in model.named_children():
