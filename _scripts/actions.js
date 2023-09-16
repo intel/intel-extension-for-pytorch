@@ -544,7 +544,7 @@ $(document).ready(function() {
     $.ajax({
       cache: false,
       type: "POST",
-      url: "https://pytorch-extension.intel.com/ipex-installation-guide",
+      url: "https://pytorch-extension.intel.com/installation-guide",
       data: formdata,
       processData: false,
       contentType: false,
