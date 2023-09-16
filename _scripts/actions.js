@@ -584,6 +584,7 @@ $(document).ready(function() {
     fields = $(this).attr("id").split("-");
     if(fields[1] == "options")
       return;
+    $("#" + fields[0] + "-options").val("na");
     $.reset_selection($(this));
     $(this).addClass("selected");
 
