@@ -15,8 +15,8 @@
 
 .menu-element {
   flex: 1 1 48%;
-  background-color: #0070C0;
-  color: white;
+  background-color: #F3F4F7;
+  color: black;
   text-align: center;
   margin: 2px;
   padding: 10px 24px;
@@ -30,11 +30,13 @@
 }
 
 .menu-element:hover {
-  background-color: #1A6F9B;
+  background-color: #0070C0;
+  color: white;
 }
 
 .menu-element.selected {
-  background-color: #1A6F9B;
+  background-color: #0070C0;
+  color: white;
 }
 
 
@@ -77,8 +79,8 @@
 
 .values-element {
   flex: 1 1 auto;
-  background-color: #0070C0;
-  color: white;
+  background-color: #F3F4F7;
+  color: black;
   text-align: left;
   margin: 2px;
   padding: 10px 24px;
@@ -104,11 +106,13 @@
 }
 
 .values-element:hover {
-  background-color: #1A6F9B;
+  background-color: #0070C0;
+  color: white;
 }
 
 .values-element.selected {
-  background-color: #1A6F9B;
+  background-color: #0070C0;
+  color: white;
 }
 
 #install-instructions {

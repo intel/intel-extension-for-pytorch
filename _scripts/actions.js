@@ -520,6 +520,10 @@ $(document).ready(function() {
     if($(document).width() >= width_threshold) {
       $(".install-" + stage.toLowerCase()).css("flex", "1 1 " + (96/num_elem) + "%");
     }
+
+    if(num_elem == 1) {
+      $("#col-values").children().last().children()[1].click();
+    }
   }
 
   $.query_gen = function(elem) {
