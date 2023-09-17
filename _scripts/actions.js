@@ -1,13 +1,22 @@
 $(document).ready(function() {
-  var width_threshold = 768;
-
-  if(window.location.hash == "#installation") {
+  var search_fields = [];
+  if(window.location.hash.startsWith("#installation")) {
+    var hash_list = decodeURIComponent(window.location.hash).split("?");
+    if(hash_list.length > 1) {
+      var data = hash_list[1].split("&");
+      $.each(data, function(index, value) {
+        var pair = value.split("=");
+        if(pair.length == 2) {
+          search_fields[pair[0]] = pair[1];
+        }
+      });
+    }
     setTimeout(function () {
-      $("#menu-installation").trigger('click');
+      $("#menu-installation").trigger("click");
     }, 10);
   } else {
     setTimeout(function () {
-      $("#menu-introduction").trigger('click');
+      $("#menu-introduction").trigger("click");
     }, 10);
   }
 
@@ -20,7 +29,7 @@ $(document).ready(function() {
     if($(this).attr("id") == "menu-installation") {
       $("#div-introduction").hide();
       $("#div-installation").show();
-      if(window.location.hash != "#installation")
+      if(!window.location.hash.startsWith("#installation"))
         window.location.hash = "#installation";
       if($("#col-headings").children().length == 0) {
         var query = {};
@@ -30,7 +39,7 @@ $(document).ready(function() {
     } else if($(this).attr("id") == "menu-introduction") {
       $("#div-introduction").show();
       $("#div-installation").hide();
-      if(window.location.hash != "#introduction")
+      if(!window.location.hash.startsWith("#introduction"))
         window.location.hash = "#introduction";
     } else {
       // Do nothing
@@ -470,6 +479,10 @@ $(document).ready(function() {
 
   $.row_append = function(items, num_elem = 0) {
     var stage = items[0];
+    var search_id = -2;
+    var search_val = "";
+    if(search_fields[stage.toLowerCase()] != null)
+      search_id = -1;
     items.shift();
     var row = document.createElement("div");
     row.className = "row";
@@ -482,47 +495,60 @@ $(document).ready(function() {
     if(num_elem == 0) {
       $.each(items, function(index, value) {
         var elem = document.createElement("div");
-        elem.className = "values-element install-" + stage.toLowerCase();
+        elem.className = "values-element block-" + items.length + " install-" + stage.toLowerCase();
         elem.setAttribute("id", stage.toLowerCase() + "-" + value.toLowerCase());
         elem.innerHTML = value;
         row.append(elem);
+        if(search_fields[stage.toLowerCase()] == value.toLowerCase())
+          search_id = index + 1;
       });
       num_elem = items.length;
     } else {
-      num_elem -= 1;
       var elem_sel = document.createElement("select");
-      elem_sel.className = "values-element install-" + stage.toLowerCase();
+      elem_sel.className = "values-element block-" + num_elem + " install-" + stage.toLowerCase();
       elem_sel.setAttribute("id", stage.toLowerCase() + "-options");
       var opt = document.createElement("option");
       opt.setAttribute("value", "na");
       opt.innerHTML = "select a " + stage.toLowerCase();
       elem_sel.append(opt);
       $.each(items, function(index, value) {
-        if(index < num_elem) {
+        if(index < num_elem - 1) {
           var elem = document.createElement("div");
-          elem.className = "values-element install-" + stage.toLowerCase();
+          elem.className = "values-element block-" + num_elem + " install-" + stage.toLowerCase();
           elem.setAttribute("id", stage.toLowerCase() + "-" + value.toLowerCase());
           elem.innerHTML = value;
           row.append(elem);
+          if(search_fields[stage.toLowerCase()] == value.toLowerCase())
+            search_id = index + 1;
         } else {
           var opt = document.createElement("option");
           opt.setAttribute("value", value);
           opt.innerHTML = value;
           elem_sel.append(opt);
+          if(search_fields[stage.toLowerCase()] == value.toLowerCase())
+            search_val = value;
         }
       });
       row.append(elem_sel);
-      num_elem += 1;
     }
     $("#col-headings").append("<div class=\"headings-element\">" + stage + "</div>");
     $("#col-values").append(row);
 
-    if($(document).width() >= width_threshold) {
-      $(".install-" + stage.toLowerCase()).css("flex", "1 1 " + (96/num_elem) + "%");
-    }
-
-    if(num_elem == 1) {
-      $("#col-values").children().last().children()[1].click();
+    if(search_id == -2) {
+      if(num_elem == 1) {
+        $("#col-values").children().last().children()[1].click();
+      }
+    } else {
+      if(search_id == -1 && search_val == "") {
+        alert(search_fields[stage.toLowerCase()] + " is not available for " + stage.toLowerCase());
+        search_fields = [];
+      } else if(search_id != -1) {
+        $("#col-values").children().last().children()[search_id].click();
+        delete search_fields[stage.toLowerCase()];
+      } else {
+        $("#" + stage.toLowerCase() + "-options").val(search_val).trigger("change");
+        delete search_fields[stage.toLowerCase()];
+      }
     }
   }
 
@@ -588,7 +614,7 @@ $(document).ready(function() {
     fields = $(this).attr("id").split("-");
     if(fields[1] == "options")
       return;
-    $("#" + fields[0] + "-options").val("na");
+    $("#" + fields[0] + "-options").val("na").trigger("change");
     $.reset_selection($(this));
     $(this).addClass("selected");
 

@@ -78,7 +78,6 @@
 }
 
 .values-element {
-  flex: 1 1 auto;
   background-color: #F3F4F7;
   color: black;
   text-align: left;
@@ -87,7 +86,27 @@
   cursor: pointer;
 }
 
-@media screen and (max-width: 768px) {
+.block-1 {
+  flex: 1 1 100%;
+}
+
+.block-2 {
+  flex: 1 1 49%;
+}
+
+.block-3 {
+  flex: 1 1 32%;
+}
+
+.block-4 {
+  flex: 1 1 24%;
+}
+
+.block-5 {
+  flex: 1 1 19%;
+}
+
+@media screen and (max-width: 1050px) {
   .row-element-1 {
     display: none;
   }
@@ -100,7 +119,7 @@
     display: block;
   }
 
-  .values-element {
+  .block-2,.block-3,.block-4,.block-5 {
     flex: 1 1 100%;
   }
 }
