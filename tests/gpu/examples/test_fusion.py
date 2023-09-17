@@ -1374,10 +1374,10 @@ class TestNNMethod(TestCase):
         t_model = t_model.to(dpcpp_device)
         modelJit = torch.jit.script(model)
         tmodelJit = torch.jit.script(t_model)
-        for i in range(2):
-            modelJit(m1_dpcpp, m2_dpcpp)
-            tmodelJit(m1_dpcpp, m2_dpcpp)
         with torch.no_grad():
+            for i in range(2):
+                modelJit(m1_dpcpp, m2_dpcpp)
+                tmodelJit(m1_dpcpp, m2_dpcpp)
             if print_graph:
                 print(modelJit.graph_for(m1_dpcpp, m2_dpcpp))
                 print(tmodelJit.graph_for(m1_dpcpp, m2_dpcpp))
@@ -2514,19 +2514,20 @@ class TestNNMethod(TestCase):
 
         modelJit = prepare_jit(modelJit, {"": qconfig_u8}, True)
 
-        # do calibration
-        for i in range(1):
-            calib_input = input_cpu
-            modelJit(calib_input)
-        print("start cpu convert")
-        modelJit = convert_jit(modelJit, True)
-        print(modelJit.graph_for(input_cpu))
-        print("--modelJit={}".format(modelJit))
+        with torch.no_grad():
+            # do calibration
+            for i in range(1):
+                calib_input = input_cpu
+                modelJit(calib_input)
+            print("start cpu convert")
+            modelJit = convert_jit(modelJit, True)
+            print(modelJit.graph_for(input_cpu))
+            print("--modelJit={}".format(modelJit))
 
-        # inference
-        print("start inference ...")
-        for i in range(5):
-            output_cpu = modelJit(input_cpu)
+            # inference
+            print("start inference ...")
+            for i in range(5):
+                output_cpu = modelJit(input_cpu)
 
         # xpu
         print("-------start xpu path-------")
@@ -2553,18 +2554,19 @@ class TestNNMethod(TestCase):
         modelJit = prepare_jit(modelJit, {"": qconfig_u8}, True)
         modelJit = modelJit.to("xpu")
 
-        # do calibration
-        for i in range(1):
-            calib_input = input_xpu
-            print(calib_input.size())
-            modelJit(calib_input)
-        modelJit = convert_jit(modelJit, True)
-        print(modelJit.graph_for(input_xpu))
+        with torch.no_grad():
+            # do calibration
+            for i in range(1):
+                calib_input = input_xpu
+                print(calib_input.size())
+                modelJit(calib_input)
+            modelJit = convert_jit(modelJit, True)
+            print(modelJit.graph_for(input_xpu))
 
-        print("start inference ...")
-        for i in range(5):
-            output = modelJit(input_xpu)
-            torch.xpu.synchronize()
+            print("start inference ...")
+            for i in range(5):
+                output = modelJit(input_xpu)
+                torch.xpu.synchronize()
         self.assertEqual(output.cpu(), output_cpu)
 
     def test_linear_relu_fusion(self, dtype=torch.float):

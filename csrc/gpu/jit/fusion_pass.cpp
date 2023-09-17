@@ -821,6 +821,14 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   // getSubgraphRewriter().runOnGraph(graph);
 
   auto xpu_fuser = OpFuser(graph->block(), graph);
+
+  // Disable jit fusion for training
+  if (at::GradMode::is_enabled()) {
+    TORCH_WARN(
+        "The grad mode is detected as torch.no_grad() is NOT enabled. In this mode on XPU, "
+        "please expect NO graph and fusion optimization will be applied. \n");
+    return;
+  }
   if (!torch::jit::getProfilingMode()) {
     // Case 1: Profiling mode is off, no device info can be touched,
     // eanble fusion with warning.
