@@ -4,6 +4,10 @@
 #include "Reduce.h"
 #include "comm/Numerics.h"
 
+namespace at {
+namespace AtenIpexTypeXPU {
+
+namespace impl {
 // struct for sorted topk seq
 template <typename T, int MAX_K>
 struct TopK {
@@ -383,7 +387,7 @@ void batch_topk_kernel(
               // do nothing
             } else {
               const int32_t global_batch_idx = wg_id;
-              const float normed_score = apply_length_penalty(
+              const scalar_t normed_score = apply_length_penalty(
                   total.u[i], cur_len + max_in_seq_len, length_penalty);
               const int num_beam = beam_hyps_num_beams[global_batch_idx];
               int beam_idx = num_beam;
@@ -457,7 +461,7 @@ void batch_topk_kernel(
 
               beam_hyps_num_beams[global_batch_idx]++;
               beam_hyps_score[tgt_beam_idx] =
-                  (float)topk_tmp_val_buf[wg_offset + total.p[i]];
+                  topk_tmp_val_buf[wg_offset + total.p[i]];
             }
           } else if (i < 2 * beam_size) {
             int64_t global_index = topk_tmp_id_buf[wg_offset + total.p[i]];
@@ -465,10 +469,9 @@ void batch_topk_kernel(
             top_beams[wg_offset_k + selected_beams] =
                 global_index / vocab_size % beam_size;
             top_score[wg_offset_k + selected_beams] =
-                (float)topk_tmp_val_buf[wg_offset + total.p[i]];
+                topk_tmp_val_buf[wg_offset + total.p[i]];
             selected_beams++;
           }
-          item.barrier(dpcpp_local_fence);
           if (selected_beams >= beam_size) {
             break;
           }
@@ -523,6 +526,54 @@ void update_token(
 
     cgh.parallel_for(
         sycl::nd_range<1>(sycl::range<1>(256), sycl::range<1>(256)), kfn);
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+template <typename scalar_t>
+void update_beam_indices_kernel(
+    scalar_t* src_cache_indices,
+    scalar_t* out_cache_indices,
+    int64_t* beam_ids,
+    int32_t step,
+    int32_t beam_size,
+    int32_t batch_size) {
+  int32_t num_step = step + 1;
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  int32_t wg_size = 32;
+  int32_t wg_number = (num_step + wg_size - 1) / wg_size;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
+      int32_t time_step =
+          item.get_group(0) * item.get_local_range(0) + item.get_local_id(0);
+      int32_t sentence_id =
+          item.get_group(1) * item.get_local_range(1) + item.get_local_id(1);
+
+      int32_t beam_id = sentence_id % beam_size;
+      int32_t batch_id = sentence_id / beam_size;
+      int32_t offset = num_step * batch_size * beam_size;
+
+      if (sentence_id < batch_size * beam_size && time_step < num_step) {
+        const scalar_t src_beam = beam_ids[sentence_id];
+        // const scalar_t src_beam =
+        //     (scalar_t)beam_ids[sentence_id] - batch_id * beam_size;
+        // fix for reference beam search
+        const int32_t src_offset = batch_size * beam_size * time_step +
+            batch_id * beam_size + src_beam;
+        const int32_t out_offset =
+            batch_size * beam_size * time_step + batch_id * beam_size + beam_id;
+
+        out_cache_indices[out_offset] =
+            (time_step == step) ? beam_id : src_cache_indices[src_offset];
+      }
+    };
+
+    cgh.parallel_for(
+        sycl::nd_range<2>(
+            sycl::range<2>(wg_number * wg_size, batch_size * beam_size),
+            sycl::range<2>(wg_size, 1)),
+        kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -687,3 +738,38 @@ void finalize(
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
+
+template <typename scalar_t>
+void copy_input_to_output(
+    scalar_t* input_ids,
+    scalar_t* output_ids,
+    int32_t input_len,
+    int32_t output_len,
+    int32_t seq_num,
+    int32_t beam_size,
+    int32_t out_beams) {
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int32_t wg_size = dpcppMaxWorkGroupSize(dev_id);
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
+      int32_t wi_id = item.get_local_id(0);
+      int32_t wg_id = item.get_group(0);
+
+      for (int32_t index = wi_id; index < input_len; index += wg_size) {
+        output_ids[wg_id * output_len + index] =
+            input_ids[(wg_id / out_beams) * beam_size * input_len + index];
+      }
+    };
+    cgh.parallel_for(
+        sycl::nd_range<1>(
+            sycl::range<1>(wg_size * seq_num), sycl::range<1>(wg_size)),
+        kfn);
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+} // namespace impl
+} // namespace AtenIpexTypeXPU
+} // namespace at

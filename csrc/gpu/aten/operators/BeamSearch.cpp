@@ -21,7 +21,7 @@ void beam_search_topk_kernel(
     int64_t beam_size,
     int64_t batch_size,
     int32_t num_wg_per_beam) {
-  beam_search_topk_stage1<scalar_t, MAX_K * 2>(
+  impl::beam_search_topk_stage1<scalar_t, MAX_K * 2>(
       scores,
       tmp_scores,
       tmp_idx,
@@ -31,7 +31,7 @@ void beam_search_topk_kernel(
       batch_size,
       num_wg_per_beam);
 
-  beam_search_topk_stage2<scalar_t, MAX_K * 2>(
+  impl::beam_search_topk_stage2<scalar_t, MAX_K * 2>(
       tmp_scores,
       tmp_idx,
       tmp_topk_scores,
@@ -54,25 +54,29 @@ void beam_search_topk_launch(
     int64_t beam_size,
     int64_t batch_size,
     int32_t num_wg_per_beam) {
-#define CASE_K(K)                         \
-  case K:                                 \
-    beam_search_topk_kernel<scalar_t, K>( \
-        scores,                           \
-        tmp_scores,                       \
-        tmp_idx,                          \
-        tmp_topk_scores,                  \
-        tmp_topk_idx,                     \
-        end_id,                           \
-        vocab_size,                       \
-        beam_size,                        \
-        batch_size,                       \
-        num_wg_per_beam);                 \
+#define CASE_K(K, MAX_K)                      \
+  case K ... MAX_K:                           \
+    beam_search_topk_kernel<scalar_t, MAX_K>( \
+        scores,                               \
+        tmp_scores,                           \
+        tmp_idx,                              \
+        tmp_topk_scores,                      \
+        tmp_topk_idx,                         \
+        end_id,                               \
+        vocab_size,                           \
+        beam_size,                            \
+        batch_size,                           \
+        num_wg_per_beam);                     \
     break;
 
   switch (beam_size) {
-    CASE_K(4);
-    CASE_K(8);
-    CASE_K(16);
+    CASE_K(1, 4);
+    CASE_K(5, 8);
+    CASE_K(9, 16);
+    CASE_K(17, 32);
+    // FIXME: HW limitation for scratch space. Lowering to SIMD16 also could fix
+    // https://jira.devtools.intel.com/browse/GSD-6295
+    // CASE_K(33, 64);
     default:
       throw std::runtime_error("beam size is not supported!");
   }
@@ -97,19 +101,19 @@ void beam_seach_procss_impl(
     bool early_stopping,
     int64_t max_in_seq_len,
     int64_t max_out_seq_len,
-    int64_t* cadidate_num_beams, // [batch_size] number for eos candidates
+    int64_t* candidate_num_beams, // [batch_size] number for eos candidates
     scalar_t* candidate_min_normed_scores, // [batch_size]
-    scalar_t* cadidate_normed_scores, // [batch_size * 2 * beam_size], store
-                                      // the norm scores for candidates
+    scalar_t* candidate_normed_scores, // [batch_size * 2 * beam_size], store
+                                       // the norm scores for candidates
     int64_t* candidate_output_ids, // [batch_size * 2 * beam_size, max_seq],
-                                   // cadidate output sentence
+                                   // candidate output sentence
     int64_t* output_token_ids, // [max_seq, batch_size * 2 * beam_size],
                                // the out_buffer
     int64_t* output_beam_ids, // [max_seq, batch_size, beam_size]
     int64_t* candidate_sequence_lengths, // [batch_size * 2 * beam_size]
     scalar_t* candidate_score) { // [batch_size * 2 * beam_size]
 
-  batch_topk_kernel<scalar_t, MAX_K * 2>(
+  impl::batch_topk_kernel<scalar_t, MAX_K * 2>(
       tmp_score,
       tmp_idx,
       topk_score,
@@ -118,9 +122,9 @@ void beam_seach_procss_impl(
       pad_token_id,
       eos_token_id,
       finished,
-      cadidate_num_beams,
+      candidate_num_beams,
       candidate_min_normed_scores,
-      cadidate_normed_scores,
+      candidate_normed_scores,
       candidate_output_ids,
       output_token_ids,
       output_beam_ids,
@@ -160,61 +164,67 @@ void beam_seach_procss(
     bool early_stopping,
     int64_t max_in_seq_len,
     int64_t max_out_seq_len,
-    int64_t* cadidate_num_beams,
+    int64_t* candidate_num_beams,
     scalar_t* candidate_min_normed_scores,
-    scalar_t* cadidate_normed_scores,
+    scalar_t* candidate_normed_scores,
     int64_t* candidate_output_ids,
     int64_t* output_token_ids,
     int64_t* output_beam_ids,
     int64_t* candidate_sequence_lengths,
     scalar_t* candidate_score) {
-#define CASE_P(K)                        \
-  case K:                                \
-    beam_seach_procss_impl<scalar_t, K>( \
-        tmp_score,                       \
-        tmp_idx,                         \
-        topk_score,                      \
-        topk_token,                      \
-        topk_beams,                      \
-        pad_token_id,                    \
-        eos_token_id,                    \
-        finished,                        \
-        length_penalty,                  \
-        process_length,                  \
-        beam_size,                       \
-        batch_size,                      \
-        vocab_size,                      \
-        cur_len,                         \
-        early_stopping,                  \
-        max_in_seq_len,                  \
-        max_out_seq_len,                 \
-        cadidate_num_beams,              \
-        candidate_min_normed_scores,     \
-        cadidate_normed_scores,          \
-        candidate_output_ids,            \
-        output_token_ids,                \
-        output_beam_ids,                 \
-        candidate_sequence_lengths,      \
-        candidate_score);                \
+#define CASE_P(K, MAX_K)                     \
+  case K ... MAX_K:                          \
+    beam_seach_procss_impl<scalar_t, MAX_K>( \
+        tmp_score,                           \
+        tmp_idx,                             \
+        topk_score,                          \
+        topk_token,                          \
+        topk_beams,                          \
+        pad_token_id,                        \
+        eos_token_id,                        \
+        finished,                            \
+        length_penalty,                      \
+        process_length,                      \
+        beam_size,                           \
+        batch_size,                          \
+        vocab_size,                          \
+        cur_len,                             \
+        early_stopping,                      \
+        max_in_seq_len,                      \
+        max_out_seq_len,                     \
+        candidate_num_beams,                 \
+        candidate_min_normed_scores,         \
+        candidate_normed_scores,             \
+        candidate_output_ids,                \
+        output_token_ids,                    \
+        output_beam_ids,                     \
+        candidate_sequence_lengths,          \
+        candidate_score);                    \
     break;
 
   switch (beam_size) {
-    CASE_P(4);
-    CASE_P(8);
-    CASE_P(16);
+    CASE_P(1, 4);
+    CASE_P(5, 8);
+    CASE_P(9, 16);
+    CASE_P(17, 32);
+    // CASE_P(33, 64);
     default:
       throw std::runtime_error("beam size is not supported!");
   }
 }
 
-// input: scores [batch_size*beam_size, vocab_size]
+// Select top high score token for each batch, beam_size * vocab_size number
+// scores in total, then pick beam_size top score. If the selected token is eos,
+// move the sentence to candidate pool.
+// input: logits_score [batch_size*beam_size, vocab_size]
 // output: top result
 //        top_score [batch_size * beam_size]
-//        top_token [batch_size * beam_size]
-//        top_idx   [batch_size * beam_size]
+//        top_token [batch_size * beam_size] token id
+//        top_idx   [batch_size * beam_size] beam id
+// candidate_xxx are variables to maintain the candidate pool
 std::tuple<Tensor, Tensor, Tensor> beam_search_topk(
-    const Tensor& logits_score,
-    Tensor& finished,
+    const Tensor& logits_score, // in: all token scores
+    Tensor& finished, // mark decode finishes
     int64_t pad_token_id,
     int64_t eos_token_id,
     double length_penalty,
@@ -225,12 +235,12 @@ std::tuple<Tensor, Tensor, Tensor> beam_search_topk(
     bool early_stopping,
     const int64_t max_in_seq_len,
     const int64_t max_out_seq_len,
-    Tensor& output_token_ids,
-    Tensor& output_beam_ids,
-    Tensor& cadidate_num_beams,
-    Tensor& cadidate_normed_scores,
+    Tensor& output_token_ids, // store token ids for each time step
+    Tensor& output_beam_ids, // store beam ids for each time step
+    Tensor& candidate_num_beams, // sentence number for candidate pool
+    Tensor& candidate_normed_scores,
     Tensor& candidate_min_normed_scores,
-    Tensor& candidate_output_ids,
+    Tensor& candidate_output_ids, // sentences with eos (decode done)
     Tensor& candidate_sequence_lengths,
     Tensor& candidate_score) {
   const int32_t num_wg_per_beam = 4;
@@ -238,8 +248,7 @@ std::tuple<Tensor, Tensor, Tensor> beam_search_topk(
       2 * beam_size * num_wg_per_beam * beam_size * batch_size;
   const int32_t topk_len = 2 * beam_size * beam_size * batch_size;
   const int32_t process_length = 2 * beam_size * beam_size;
-  // Tensor tmp_log_score = at::empty(logits_score.sizes(),
-  // logits_score.options());
+
   Tensor tmp_log_val = at::empty(tmp_output_len, logits_score.options());
   Tensor tmp_log_idx =
       at::empty(tmp_output_len, logits_score.options().dtype(at::kLong));
@@ -297,9 +306,9 @@ std::tuple<Tensor, Tensor, Tensor> beam_search_topk(
             early_stopping,
             max_in_seq_len,
             max_out_seq_len,
-            cadidate_num_beams.data_ptr<int64_t>(),
+            candidate_num_beams.data_ptr<int64_t>(),
             candidate_min_normed_scores.data_ptr<scalar_t>(),
-            cadidate_normed_scores.data_ptr<scalar_t>(),
+            candidate_normed_scores.data_ptr<scalar_t>(),
             candidate_output_ids.data_ptr<int64_t>(),
             output_token_ids.data_ptr<int64_t>(),
             output_beam_ids.data_ptr<int64_t>(),
@@ -310,16 +319,18 @@ std::tuple<Tensor, Tensor, Tensor> beam_search_topk(
   return std::tuple<Tensor, Tensor, Tensor>(topk_val, topk_token, topk_idx);
 }
 
+// Add current time step top tokens to global pool.
+// global pool maintains high score token, non-eos.
 void update_output_indices(
-    const Tensor& top_beam_id,
-    const Tensor& top_token_id,
-    Tensor& output_beam_ids,
-    Tensor& output_token_ids,
+    const Tensor& top_beam_id, // current time step beam id
+    const Tensor& top_token_id, // current time step token id
+    Tensor& output_beam_ids, // global beam id
+    Tensor& output_token_ids, // global token id
     Tensor& finished,
     const int64_t time_step,
     const int64_t batch_size,
     const int64_t beam_size) {
-  update_token(
+  impl::update_token(
       top_beam_id.data_ptr<int64_t>(),
       top_token_id.data_ptr<int64_t>(),
       output_beam_ids.data_ptr<int64_t>(),
@@ -330,54 +341,8 @@ void update_output_indices(
       beam_size);
 }
 
-template <typename scalar_t>
-void update_beam_indices_kernel(
-    scalar_t* src_cache_indices,
-    scalar_t* out_cache_indices,
-    int64_t* beam_ids,
-    int32_t step,
-    int32_t beam_size,
-    int32_t batch_size) {
-  int32_t num_step = step + 1;
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int32_t wg_size = 32;
-  int32_t wg_number = (num_step + wg_size - 1) / wg_size;
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-      int32_t time_step =
-          item.get_group(0) * item.get_local_range(0) + item.get_local_id(0);
-      int32_t sentence_id =
-          item.get_group(1) * item.get_local_range(1) + item.get_local_id(1);
-
-      int32_t beam_id = sentence_id % beam_size;
-      int32_t batch_id = sentence_id / beam_size;
-      int32_t offset = num_step * batch_size * beam_size;
-
-      if (sentence_id < batch_size * beam_size && time_step < num_step) {
-        const scalar_t src_beam = beam_ids[sentence_id];
-        // const scalar_t src_beam =
-        //     (scalar_t)beam_ids[sentence_id] - batch_id * beam_size;
-        // fix for reference beam search
-        const int32_t src_offset = batch_size * beam_size * time_step +
-            batch_id * beam_size + src_beam;
-        const int32_t out_offset =
-            batch_size * beam_size * time_step + batch_id * beam_size + beam_id;
-
-        out_cache_indices[out_offset] =
-            (time_step == step) ? beam_id : src_cache_indices[src_offset];
-      }
-    };
-
-    cgh.parallel_for(
-        sycl::nd_range<2>(
-            sycl::range<2>(wg_number * wg_size, batch_size * beam_size),
-            sycl::range<2>(wg_size, 1)),
-        kfn);
-  };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-}
-
+// Reorder cached beam indices according to current time step beam index,
+// and add current time step beam index
 Tensor update_beam_indices_for_cache(
     const Tensor& src_cache_indices,
     const Tensor& beam_ids,
@@ -389,7 +354,7 @@ Tensor update_beam_indices_for_cache(
   const int step = src_cache_indices.size(0);
   IPEX_DISPATCH_INTEGRAL_TYPES(
       src_cache_indices.scalar_type(), "update_beam_indices_for_cache", [&]() {
-        update_beam_indices_kernel(
+        impl::update_beam_indices_kernel(
             src_cache_indices.data_ptr<scalar_t>(),
             out_cache_indices.data_ptr<scalar_t>(),
             beam_ids.data_ptr<int64_t>(),
@@ -400,6 +365,10 @@ Tensor update_beam_indices_for_cache(
   return out_cache_indices;
 }
 
+// Decoding stops when meet the stop condition. Pick final high score sentence
+// as beam search output. When decoding ends, global/candidate pool maintain
+// high score tokens for non-eos/eos sentences. Merge two lists and select top
+// score sentence.
 Tensor beam_search_finalize(
     Tensor& candidate_num_beams,
     Tensor& candidate_sequence_lengths,
@@ -424,7 +393,7 @@ Tensor beam_search_finalize(
       candidate_score.scalar_type(),
       "insert_to_candidate_list",
       [&]() {
-        insert_to_candidate_list<scalar_t>(
+        impl::insert_to_candidate_list<scalar_t>(
             candidate_num_beams.data_ptr<int64_t>(),
             candidate_sequence_lengths.data_ptr<int64_t>(),
             output_token_ids.data_ptr<int64_t>(),
@@ -454,7 +423,7 @@ Tensor beam_search_finalize(
       candidate_normed_scores.scalar_type(),
       "finalize",
       [&]() {
-        finalize<scalar_t>(
+        impl::finalize<scalar_t>(
             output_ids.data_ptr<int64_t>(),
             sequence_length.data_ptr<int64_t>(),
             candidate_output_ids.data_ptr<int64_t>(),
@@ -471,37 +440,8 @@ Tensor beam_search_finalize(
   return output_ids;
 }
 
-template <typename scalar_t>
-void copy_input_to_output(
-    scalar_t* input_ids,
-    scalar_t* output_ids,
-    int32_t input_len,
-    int32_t output_len,
-    int32_t seq_num,
-    int32_t beam_size,
-    int32_t out_beams) {
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  int32_t wg_size = dpcppMaxWorkGroupSize(dev_id);
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      int32_t wi_id = item.get_local_id(0);
-      int32_t wg_id = item.get_group(0);
-
-      for (int32_t index = wi_id; index < input_len; index += wg_size) {
-        output_ids[wg_id * output_len + index] =
-            input_ids[(wg_id / out_beams) * beam_size * input_len + index];
-      }
-    };
-    cgh.parallel_for(
-        sycl::nd_range<1>(
-            sycl::range<1>(wg_size * seq_num), sycl::range<1>(wg_size)),
-        kfn);
-  };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-}
-
+// To align huggingface, beam search outputs is input prompt + decode sentence.
+// Copy input prompt to output buffer here.
 Tensor& update_output_sequence(
     const Tensor& input_ids,
     Tensor& output_ids,
@@ -514,7 +454,7 @@ Tensor& update_output_sequence(
 
   IPEX_DISPATCH_INTEGRAL_TYPES(
       input_ids.scalar_type(), "update_output_sequence", [&]() {
-        copy_input_to_output<scalar_t>(
+        impl::copy_input_to_output<scalar_t>(
             input_ids.data_ptr<scalar_t>(),
             output_ids.data_ptr<scalar_t>(),
             input_len,
