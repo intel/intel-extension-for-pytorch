@@ -140,7 +140,7 @@ void renorm_kernel(
         }
       }
 
-      v = GroupReduceSum(
+      v = GroupReduceSumSGSizeEqualstoNumSG(
           item, v, static_cast<accscalar_t*>(smem.get_pointer().get()));
 
       if (tid == 0) {

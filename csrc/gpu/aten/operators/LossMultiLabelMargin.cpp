@@ -21,6 +21,12 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
+// MULTILABELMARGIN_THREADS = MULTILABELMARGIN_SUB_GROUP_SIZE *
+// MULTILABELMARGIN_SUB_GROUP_SIZE, for more detail, pls refer to function
+// GroupReduceSumSGSizeEqualstoNumSG
+const int MULTILABELMARGIN_SUB_GROUP_SIZE = 32;
+const int MULTILABELMARGIN_THREADS =
+    MULTILABELMARGIN_SUB_GROUP_SIZE * MULTILABELMARGIN_SUB_GROUP_SIZE;
 
 template <typename scalar_t>
 void multilabel_margin_loss_forward_kernel(
@@ -33,14 +39,14 @@ void multilabel_margin_loss_forward_kernel(
     bool size_average) {
   auto& queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  int work_group_size = dpcppMaxWorkGroupSize(dev_id);
 
   using acc_t = acc_type<scalar_t>;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto smem = dpcpp_local_acc_t<acc_t>(work_group_size, cgh);
+    auto smem = dpcpp_local_acc_t<acc_t>(MULTILABELMARGIN_THREADS, cgh);
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id)
+        [[intel::reqd_sub_group_size(MULTILABELMARGIN_SUB_GROUP_SIZE)]] {
       int local_item_id = item_id.get_local_id(0);
       int global_item_id = item_id.get_group(0);
       int local_range = item_id.get_local_range(0);
@@ -68,7 +74,7 @@ void multilabel_margin_loss_forward_kernel(
       }
       item_id.barrier(dpcpp_global_fence);
 
-      scalar_t sum = 0.0f;
+      acc_t sum = 0.0f;
       for (int dt = 0; dt < dim; dt++) {
         // next target:
         int target_idx = target_ptr[dt];
@@ -92,7 +98,7 @@ void multilabel_margin_loss_forward_kernel(
       }
 
       acc_t total_sum = 0.0f;
-      total_sum = GroupReduceSum(
+      total_sum = GroupReduceSumSGSizeEqualstoNumSG(
           item_id,
           static_cast<acc_t>(sum),
           static_cast<acc_t*>(smem.get_pointer().get()));
@@ -108,8 +114,8 @@ void multilabel_margin_loss_forward_kernel(
 
     cgh.parallel_for(
         sycl::nd_range<1>(
-            sycl::range<1>(nframe * work_group_size),
-            sycl::range<1>(work_group_size)),
+            sycl::range<1>(nframe * MULTILABELMARGIN_THREADS),
+            sycl::range<1>(MULTILABELMARGIN_THREADS)),
         kfn);
   };
 
@@ -129,13 +135,13 @@ void multilabel_margin_loss_backward_kernel(
     bool reduce) {
   auto& queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  int work_group_size = dpcppMaxWorkGroupSize(dev_id);
 
   using acc_t = acc_type<scalar_t>;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto smem = dpcpp_local_acc_t<acc_t>(work_group_size, cgh);
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
+    auto smem = dpcpp_local_acc_t<acc_t>(MULTILABELMARGIN_THREADS, cgh);
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item)
+        [[intel::reqd_sub_group_size(MULTILABELMARGIN_SUB_GROUP_SIZE)]] {
       int local_id = item.get_local_id(0);
       int group_id = item.get_group(0);
       int local_range = item.get_local_range(0);
@@ -181,7 +187,7 @@ void multilabel_margin_loss_backward_kernel(
         item.barrier(dpcpp_global_fence);
 
         acc_t total_sum = 0.0f;
-        total_sum = GroupReduceSum(
+        total_sum = GroupReduceSumSGSizeEqualstoNumSG(
             item,
             static_cast<acc_t>(sum),
             static_cast<acc_t*>(smem.get_pointer().get()));
@@ -199,8 +205,8 @@ void multilabel_margin_loss_backward_kernel(
 
     cgh.parallel_for(
         sycl::nd_range<1>(
-            sycl::range<1>(nframe * work_group_size),
-            sycl::range<1>(work_group_size)),
+            sycl::range<1>(nframe * MULTILABELMARGIN_THREADS),
+            sycl::range<1>(MULTILABELMARGIN_THREADS)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);

@@ -41,7 +41,7 @@ inline void renormRowsL1(
       sum = sum + val;
     }
 
-    sum = GroupReduceSum(item, sum, smem);
+    sum = GroupReduceSumSGSizeEqualstoNumSG(item, sum, smem);
     if (thread_idx == 0) {
       smem[0] = sum;
     }
