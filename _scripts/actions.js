@@ -318,7 +318,7 @@ $(document).ready(function() {
             }
             ret += "<p>Prebuilt wheel files are available for Python " + value.python.join(", ") + ".";
             if(value.commands.length == 1) {
-              ret += $.code_gen(value.commands);
+              ret += $.code_gen(value.commands[0]);
             } else {
               ret += $.notes_gen(["Should you experience low downloading speed issue, try choose another storage below."]);
               ret += "<div class=\"row\" id=\"row-storage" + index + "\" style=\"width: 50%\">";
@@ -404,7 +404,7 @@ $(document).ready(function() {
           if(data.installation.files.length == 1) {
             var headers = [];
             var values = [];
-            $.each(data.installation.files, function(index, value) {
+            $.each(data.installation.files[0], function(index, value) {
               headers.push(value.abi);
               var vs = [];
               $.each(value.files, function(index, fn) {
