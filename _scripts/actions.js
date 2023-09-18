@@ -406,7 +406,11 @@ $(document).ready(function() {
             var values = [];
             $.each(data.installation.files, function(index, value) {
               headers.push(value.abi);
-              values.push("<a href=\"" + value.url + "\">" + value.filename + "</a>");
+              var vs = [];
+              $.each(value.files, function(index, fn) {
+                vs.push("<a href=\"" + fn.url + "\">" + fn.filename + "</a>");
+              });
+              values.push(vs.join(",&nbsp;"));
             });
             ret += $.table_1d_gen(headers, values);
           } else {
@@ -428,7 +432,11 @@ $(document).ready(function() {
               var values = [];
               $.each(value, function(index, v) {
                 headers.push(v.abi);
-                values.push("<a href=\"" + v.url + "\">" + v.filename + "</a>");
+                var vs = [];
+                $.each(v.files, function(index, fn) {
+                  vs.push("<a href=\"" + fn.url + "\">" + fn.filename + "</a>");
+                });
+                values.push(vs.join(",&nbsp;"));
               });
               table_cppsdk = $.table_1d_gen(headers, values);
               if(index == 0)
@@ -442,7 +450,11 @@ $(document).ready(function() {
         }
         if(data.installation.commands != null) {
           $.each(data.installation.commands, function(index, value) {
-            ret += $.notes_gen([value.usage + $.code_gen([value.command])], "Usage");
+            var cmds = [];
+            $.each(value.commands, function(index, v) {
+              cmds.push(v);
+            });
+            ret += $.notes_gen([value.usage + $.code_gen(cmds)], "Usage");
           });
         }
       } else {
