@@ -322,12 +322,12 @@ $(document).ready(function() {
             } else {
               ret += $.notes_gen(["Should you experience low downloading speed issue, try choose another storage below."]);
               ret += "<div class=\"row\" id=\"row-storage" + index + "\" style=\"width: 50%\">";
-              var flex_ratio = 96 / value.commands.length;
+              var block_n = value.commands.length;
               $.each(value.commands, function(index, value) {
                 var selected = "";
                 if(index == 0)
                   selected = " selected";
-                ret += "<div class=\"values-element elem-instruction" + selected + "\" style=\"flex: 1 1 " + flex_ratio + "%\">Storage " + index + "</div>";
+                ret += "<div class=\"values-element elem-instruction" + selected + " block-" + block_n + "\">Storage " + index + "</div>";
               });
               ret += "</div>";
               ret += "<p></p>";
@@ -416,12 +416,12 @@ $(document).ready(function() {
           } else {
             ret += $.notes_gen(["Should you experience low downloading speed issue, try choose another storage below."]);
             ret += "<div class=\"row\" id=\"row-cppsdk\" style=\"width: 50%\">";
-            var flex_ratio = 96 / data.installation.files.length;
+            var block_n = data.installation.files.length;
             $.each(data.installation.files, function(index, value) {
               var selected = "";
               if(index == 0)
                 selected = " selected";
-              ret += "<div class=\"values-element elem-instruction" + selected + "\" style=\"flex: 1 1 " + flex_ratio + "%\">Storage " + index + "</div>";
+              ret += "<div class=\"values-element elem-instruction" + selected + " block-" + block_n + "\">Storage " + index + "</div>";
             });
             ret += "</div>";
             ret += "<p></p>";
