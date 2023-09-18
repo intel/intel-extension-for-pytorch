@@ -304,6 +304,7 @@ class IPEXTransformerAtten(nn.Module):
                 torch.ops.torch_ipex.mm_qkv_out_int4(hidden_states, self.qkv_qwei, self.qkv_scl, self.qkv_zp, self.qkv_bias, query, key, value, self.qkv_gs)
             else:
                 torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
+
         return query, key, value
 
     def qkv_cache_optimized_beam(self, hidden_states, first_token = False, layer_past = None):
@@ -475,7 +476,7 @@ class IPEXTransformerAtten(nn.Module):
             value = self.value_prompt
             query = query.permute(0, 2, 1, 3)
         else:
-            # 2nd to last token
+            # greedy search or beam search 2nd to last token
             # input: shape and layout [seq, bs*beam, num_head, head_dim]
             # output: shape [bs*beam, num_head, seq, head_dim], layout [seq, bs*beam, num_head, head_dim]
             key = self.key_cached[: self.cur_len, :, :, :]
@@ -486,20 +487,26 @@ class IPEXTransformerAtten(nn.Module):
         return query, key, value
 
     def normal_combine(self, query, key, value, first_token = False, layer_past = None):
-        if first_token and IPEXTransformerAtten.beam_size > 1:
-            # 1st token
-            # input: shape and layout [bs*beam, seq, num_head, head_dim]
-            # output: shape [bs*beam, num_head, seq, head_dim], layout [bs*beam, seq, num_head, head_dim]
+        if self.row_major:
+            if first_token and IPEXTransformerAtten.beam_size > 1:
+                # 1st token
+                # input: shape and layout [bs*beam, seq, num_head, head_dim]
+                # output: shape [bs*beam, num_head, seq, head_dim], layout [bs*beam, seq, num_head, head_dim]
+                query = query.permute(0, 2, 1, 3)
+                key = key.permute(0, 2, 1, 3)
+                value = value.permute(0, 2, 1, 3)
+            else:
+                # 2nd to last token
+                # input shape/layout [seq, bs*beam, num_head, head_dim]
+                # output: shape [bs*beam, num_head, seq, head_dim], layout [seq, bs*beam, num_head, head_dim]
+                query = query.permute(1, 2, 0, 3)
+                key = key.permute(1, 2, 0, 3)
+                value = value.permute(1, 2, 0, 3)
+        else:
+            # from [bs*beam, seq, num_head, head_dim] to [bs*beam, num_head, seq, head_dim]
             query = query.permute(0, 2, 1, 3)
             key = key.permute(0, 2, 1, 3)
             value = value.permute(0, 2, 1, 3)
-        else:
-            # 2nd to last token
-            # input shape/layout [seq, bs*beam, num_head, head_dim]
-            # output: shape [bs*beam, num_head, seq, head_dim], layout [seq, bs*beam, num_head, head_dim]
-            query = query.permute(1, 2, 0, 3)
-            key = key.permute(1, 2, 0, 3)
-            value = value.permute(1, 2, 0, 3)
 
         if layer_past is not None:
             past_key = layer_past[0]
@@ -516,8 +523,8 @@ class IPEXTransformerAtten(nn.Module):
             query, key, value = self.normal_combine(query, key, value, first_token, layer_past)
         return query, key, value
 
-    def apply_rotary_embedding(self, key, query, position_ids):
-        return self.position_emb(key, query, position_ids, self.layer_id, IPEXTransformerAtten.beam_size)
+    def apply_rotary_embedding(self, key, query, position_ids, kv_seq_len):
+        return self.position_emb(key, query, position_ids, self.layer_id, IPEXTransformerAtten.beam_size, kv_seq_len)
 
     def all_reduce_if_necessary(self, reduce_target):
         if self.tp_group is not None:
@@ -683,18 +690,24 @@ class IPEXTransformerAtten(nn.Module):
             if not first_token and IPEXTransformerAtten.beam_size > 1:
                 key, value = self.reorder_cache(key, value, IPEXTransformerAtten.beam_index)
             attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi, first_token=first_token)
-
-        if first_token and IPEXTransformerAtten.beam_size > 1:
-            # 1st token
-            # reshape the attn_output shape/layour from shape [bs*beam, num_head, seq_len, head_dim], layout [bs*beam, seq_len, num_head, head_dim]
-            # to shape [bs*beam, seq_len, hidden_size], layout [bs*beam, seq_len, hidden_size]
-            attn_output = attn_output.permute(0, 2, 1, 3)
+        
+        if self.row_major:
+            if first_token and IPEXTransformerAtten.beam_size > 1:
+                # 1st token
+                # reshape the attn_output shape/layour from shape [bs*beam, num_head, seq_len, head_dim], layout [bs*beam, seq_len, num_head, head_dim]
+                # to shape [bs*beam, seq_len, hidden_size], layout [bs*beam, seq_len, hidden_size]
+                attn_output = attn_output.permute(0, 2, 1, 3)
+            else:
+                # 2nd to last token
+                # reshape the attn_output shape/layour from shape [bs*beam, num_head, seq_len, head_dim], layout [seq_len, bs*beam, num_head, head_dim]
+                # to shape [seq_len, bs*beam, hidden_size], layout [seq_len, bs*beam, hidden_size]
+                attn_output = attn_output.permute(2, 0, 1, 3)
+            attn_output = attn_output.reshape(attn_output.size()[:-2] + (self.embed_dim // self.tp_size,))
         else:
-            # 2nd to last token
-            # reshape the attn_output shape/layour from shape [bs*beam, num_head, seq_len, head_dim], layout [seq_len, bs*beam, num_head, head_dim]
-            # to shape [seq_len, bs*beam, hidden_size], layout [seq_len, bs*beam, hidden_size]
-            attn_output = attn_output.permute(2, 0, 1, 3)
-        attn_output = attn_output.reshape(attn_output.size()[:-2] + (self.embed_dim // self.tp_size,))
+            # [bs*beam, head, q_seq, dim] x [bs*beam, head, dim, kv_seq] = [bs*beam, head, q_seq, kv_seq]
+            # [bs*beam, head, q_seq, kv_seq] x [bs*beam, head, kv_seq, dim] = [bs*beam, head, q_seq, dim]
+            attn_output = attn_output.permute(0, 2, 1, 3)
+            attn_output = attn_output.reshape(attn_output.size()[:-2] + (self.embed_dim // self.tp_size,))
         return attn_output, attn_weights
     '''
     def get_beam_width(self):
@@ -792,6 +805,17 @@ class IPEXTransformerAtten(nn.Module):
         def print_rank_x(i, content):
             if dist.get_rank() == 1:
                 print(content)
+        if self.row_major:
+            if first_token and IPEXTransformerAtten.beam_size > 1:
+                # [bs*beam, seq, head, head_dim]
+                kv_seq_len = hidden_states.shape[1]
+            else:
+                kv_seq_len = hidden_states.shape[0]
+        else:
+            kv_seq_len = hidden_states.shape[1]
+        if layer_past is not None:
+            kv_seq_len += layer_past[0].shape[2]
+
         # greedy_search
         # the shape of query, key, value, [seq, bs*beam, head*dim]
         # the layout of query, key, value, [seq, bs*beam, head*dim]
@@ -804,6 +828,7 @@ class IPEXTransformerAtten(nn.Module):
         # the layout of query, key, value, [seq, bs*beam, head*dim]
         query, key, value = self.compute_qkv(hidden_states=hidden_states, key_value_state=key_value_states, layer_past=layer_past, first_token=first_token)
 
+
         # greedy_search
         # the shape of query, key, value, [seq, bs*beam, head, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]
@@ -814,7 +839,7 @@ class IPEXTransformerAtten(nn.Module):
         # 2nd to last:
         # the shape of query, key, value, [seq, bs*beam, head, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]
-        query, key = self.apply_rotary_embedding(query, key, position_ids=position_ids)
+        query, key = self.apply_rotary_embedding(query, key, position_ids, kv_seq_len)
 
         # greedy search
         # the shape of query, key, value, [seq, bs*beam, head, dim]
@@ -860,6 +885,7 @@ class IPEXTransformerAtten(nn.Module):
             value = self.repeat_kv(value, self.num_key_value_groups, first_token)
             key_prompt = self.repeat_kv(self.key_prompt, self.num_key_value_groups, first_token)
             value_prompt = self.repeat_kv(self.value_prompt, self.num_key_value_groups, first_token)
+
         # greedy search
         # the shape of query, key, value, [bs*beam, head, seq, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]
@@ -867,7 +893,7 @@ class IPEXTransformerAtten(nn.Module):
         # 1st token
         # the shape of query, key, value, [bs*beam, head, seq, dim]
         # the layout of query, key, value, [bs*beam, seq, head, dim]
-        # 2nd to last:
+        # 2nd to last
         # the shape of query, key, value, [bs*beam, head, seq, dim]
         # the layout of query, key, value, [seq, bs*beam, head, dim]
         attn_output, attn_weight = self.self_attention(key_prompt, value_prompt, query, key, value, attention_mask, head_mask, alibi, first_token)

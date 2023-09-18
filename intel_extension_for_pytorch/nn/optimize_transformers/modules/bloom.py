@@ -71,6 +71,8 @@ class IPEXBloomBlock(nn.Module):
         self.self_attention = IPEXBloomAttn(config)
         self.post_attention_layernorm = nn.LayerNorm(config.embed_dim, eps=config.norm_eps)
         self.mlp = IPEXBloomMLP(config)
+        col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
+        self.row_major = not col_major
 
     def release_resources(self):                                                                              
         self.self_attention.release_resources()
@@ -101,20 +103,21 @@ class IPEXBloomBlock(nn.Module):
         first_token = True if acc_test or layer_past is None else False 
         hidden_size = hidden_states.shape[-1]
         hidden_shape = [bs, beam, seq, hidden_size]
-        if first_token and beam > 1:
-            # for 1st token, keep the original layout
-            # reduce the duplicated info in beam dim
-            # shape -> [bs*beam, seq, hidden_size]
-            # layout -> [bs*beam, seq, hidden_size]
-            hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :].contiguous()
-            if attention_mask is not None:
-                attention_mask = attention_mask.view(bs, beam, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])[:,0,:,:,:].view(bs, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
-        else:
-            # for 2nd to last token, we convert the layout
-            # shape -> [bs*beam, seq, hidden_size]
-            # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
-            hidden_states = hidden_states.transpose(0, 1).contiguous()
-
+        if self.row_major:
+            if first_token and beam > 1:
+                # for 1st token, keep the original layout
+                # reduce the duplicated info in beam dim
+                # shape -> [bs*beam, seq, hidden_size]
+                # layout -> [bs*beam, seq, hidden_size]
+                hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :].contiguous()
+                if attention_mask is not None:
+                    attention_mask = attention_mask.view(bs, beam, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])[:,0,:,:,:].view(bs, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
+            else:
+                # for 2nd to last token, we convert the layout
+                # shape -> [bs*beam, seq, hidden_size]
+                # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
+                hidden_states = hidden_states.transpose(0, 1).contiguous()
+        
         # layernorm_output = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.input_layernorm.normalized_shape, self.input_layernorm.weight, self.input_layernorm.bias, self.input_layernorm.eps)
         # NOTE: fast_layer_norm has accuracy issue in Ipex auto tp
         layernorm_output = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.input_layernorm.normalized_shape, self.input_layernorm.weight, self.input_layernorm.bias, self.input_layernorm.eps)
@@ -153,14 +156,15 @@ class IPEXBloomBlock(nn.Module):
             residual = attention_output
         hidden_states = self.mlp(layernorm_output, residual)
 
-        if first_token and beam > 1:
-            # for 1st token, expand the result with beam
-            hidden_states = hidden_states.view(bs, 1, seq, hidden_size)
-            hidden_states = hidden_states.expand([bs, beam, seq, hidden_size])
-        else:
-            # for 2nd to last token, we convert the layout back
-            # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
-            hidden_states = hidden_states.transpose(0, 1)
+        if self.row_major:
+            if first_token and beam > 1:
+                # for 1st token, expand the result with beam
+                hidden_states = hidden_states.view(bs, 1, seq, hidden_size)
+                hidden_states = hidden_states.expand([bs, beam, seq, hidden_size])
+            else:
+                # for 2nd to last token, we convert the layout back
+                # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
+                hidden_states = hidden_states.transpose(0, 1)
 
         if use_cache:
             outputs = (hidden_states, ) + outputs

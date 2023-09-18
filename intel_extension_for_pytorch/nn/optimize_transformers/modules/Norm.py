@@ -3,29 +3,29 @@ import torch.nn as nn
 from ._transformer_configuration import IPEXTransformerConfig
 
 class LlamaRMSNorm(nn.Module):
-    def __init__(self,
-                 config: IPEXTransformerConfig):
+    def __init__(self, hidden_size, eps=1e-6):
         """
         LlamaRMSNorm is equivalent to T5LayerNorm
         """
         super().__init__()
-        self.weight = nn.Parameter(torch.ones(config.embed_dim))
-        self.variance_epsilon = config.norm_eps
+        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.hidden_size = hidden_size
+        self.variance_epsilon = eps
 
     def forward(self, hidden_states: torch.Tensor):
-        hsz = hidden_states.shape[-1]
-        hidden_states = torch.ops.torch_ipex.fast_rms_norm(hidden_states, [hsz], self.weight, None, self.variance_epsilon)
-        #output = torch.ops.torch_ipex.rms_norm(hidden_states, [hsz], self.weight)
-        #return output[0]
-        return hidden_states
+        #hidden_states = torch.ops.torch_ipex.fast_rms_norm(hidden_states, [self.hidden_size], self.weight, None, self.variance_epsilon)
+        #return hidden_states
+        # llama-7b beam=4 has accuracy issue with fast_rms_norm
+        # here we use the original rms_norm instead
+        output = torch.ops.torch_ipex.rms_norm(hidden_states, [self.hidden_size], self.weight, self.variance_epsilon)
+        return output[0]
+        
         '''
-        variance = hidden_states.to(torch.float32).pow(2).mean(-1, keepdim=True)
+        # Reference path in huggingface
+        input_dtype = hidden_states.dtype
+        hidden_states = hidden_states.to(torch.float32)
+        variance = hidden_states.pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-
-        # convert into half-precision if necessary
-        if self.weight.dtype in [torch.float16, torch.bfloat16]:
-            hidden_states = hidden_states.to(self.weight.dtype)
-
-        return self.weight * hidden_states
+        return self.weight * hidden_states.to(input_dtype)
         '''
 

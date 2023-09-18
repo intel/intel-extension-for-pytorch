@@ -8,7 +8,7 @@ class PositionalEmbedding(nn.Module):
         super().__init__()
         self.config = config
 
-    def forward(self, query, key, position_ids, layer_id, beam_size):
+    def forward(self, query, key, position_ids, layer_id, beam_size, kv_seq_len):
         return query, key
 
 class GPTJRotaryEmbeddingRef(PositionalEmbedding):
@@ -46,7 +46,7 @@ class GPTJRotaryEmbeddingRef(PositionalEmbedding):
         cos = torch.repeat_interleave(cos[:, :, None, :], 2, 3)
         return (tensor * cos) + (self.rotate_every_two(tensor) * sin)
 
-    def forward(self, query, key, position_ids, layer_id, beam_size):
+    def forward(self, query, key, position_ids, layer_id, beam_size, kv_seq_len):
         # position_ids [bs*beam, seq_len]
         first_token = position_ids.shape[-1] > 1
         # beam search first_token
@@ -132,7 +132,7 @@ class GPTJRotaryEmbedding(PositionalEmbedding):
         # GPTJRotaryEmbedding.sin is in shape of [seq, bs*beam, num_head, head_dim]
         return GPTJRotaryEmbedding.sin, GPTJRotaryEmbedding.cos
 
-    def forward(self, query, key, position_ids, layer_id, beam_size):
+    def forward(self, query, key, position_ids, layer_id, beam_size, kv_seq_len):
         sin, cos = self.get_sin_cos(position_ids, layer_id, beam_size)
         if self.rotary_dim is not None:
             self.apply_rotary_pos_emb(query[:, :, :, : self.rotary_dim], key[:, :, :, : self.rotary_dim], sin, cos)
@@ -140,31 +140,224 @@ class GPTJRotaryEmbedding(PositionalEmbedding):
             self.apply_rotary_pos_emb(query, key, sin, cos)
         return query, key
 
+
+class LlamaRotaryEmbeddingBase(torch.nn.Module):
+    def __init__(self, dim, max_position_embeddings=2048, base=10000, device=None):
+        super().__init__()
+
+        self.dim = dim
+        self.max_position_embeddings = max_position_embeddings
+        self.base = base
+        inv_freq = 1.0 / (self.base ** (torch.arange(0, self.dim, 2).float().to(device) / self.dim))
+        self.register_buffer("inv_freq", inv_freq, persistent=False)
+
+        # Build here to make `torch.jit.trace` work.
+        self._set_cos_sin_cache(
+            seq_len=max_position_embeddings, device=self.inv_freq.device, dtype=torch.get_default_dtype()
+        )
+
+    def _set_cos_sin_cache(self, seq_len, device, dtype):
+        self.max_seq_len_cached = seq_len
+        t = torch.arange(self.max_seq_len_cached, device=device, dtype=self.inv_freq.dtype)
+
+        freqs = torch.einsum("i,j->ij", t, self.inv_freq)
+        # Different from paper, but it uses a different permutation in order to obtain the same calculation
+        emb = torch.cat((freqs, freqs), dim=-1)
+        self.register_buffer("cos_cached", emb.cos()[None, None, :, :].to(dtype), persistent=False)
+        self.register_buffer("sin_cached", emb.sin()[None, None, :, :].to(dtype), persistent=False)
+
+    def forward(self, x, seq_len=None):
+        # x: [bs, num_attention_heads, seq_len, head_size]
+        if seq_len > self.max_seq_len_cached:
+            self._set_cos_sin_cache(seq_len=seq_len, device=x.device, dtype=x.dtype)
+
+        return (
+            self.cos_cached[:, :, :seq_len, ...].to(dtype=x.dtype),
+            self.sin_cached[:, :, :seq_len, ...].to(dtype=x.dtype),
+        )
+
+
+class LlamaLinearScalingRotaryEmbedding(LlamaRotaryEmbeddingBase):
+    """LlamaRotaryEmbedding extended with linear scaling. Credits to the Reddit user /u/kaiokendev"""
+
+    def __init__(self, dim, max_position_embeddings=2048, base=10000, device=None, scaling_factor=1.0):
+        self.scaling_factor = scaling_factor
+        super().__init__(dim, max_position_embeddings, base, device)
+
+    def _set_cos_sin_cache(self, seq_len, device, dtype):
+        self.max_seq_len_cached = seq_len
+        t = torch.arange(self.max_seq_len_cached, device=device, dtype=self.inv_freq.dtype)
+        t = t / self.scaling_factor
+
+        freqs = torch.einsum("i,j->ij", t, self.inv_freq)
+        # Different from paper, but it uses a different permutation in order to obtain the same calculation
+        emb = torch.cat((freqs, freqs), dim=-1)
+        self.register_buffer("cos_cached", emb.cos()[None, None, :, :].to(dtype), persistent=False)
+        self.register_buffer("sin_cached", emb.sin()[None, None, :, :].to(dtype), persistent=False)
+
+
+class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbeddingBase):
+    """LlamaRotaryEmbedding extended with Dynamic NTK scaling. Credits to the Reddit users /u/bloc97 and /u/emozilla"""
+
+    def __init__(self, dim, max_position_embeddings=2048, base=10000, device=None, scaling_factor=1.0):
+        self.scaling_factor = scaling_factor
+        super().__init__(dim, max_position_embeddings, base, device)
+
+    def _set_cos_sin_cache(self, seq_len, device, dtype):
+        self.max_seq_len_cached = seq_len
+
+        if seq_len > self.max_position_embeddings:
+            base = self.base * (
+                (self.scaling_factor * seq_len / self.max_position_embeddings) - (self.scaling_factor - 1)
+            ) ** (self.dim / (self.dim - 2))
+            inv_freq = 1.0 / (base ** (torch.arange(0, self.dim, 2).float().to(device) / self.dim))
+            self.register_buffer("inv_freq", inv_freq, persistent=False)
+
+        t = torch.arange(self.max_seq_len_cached, device=device, dtype=self.inv_freq.dtype)
+
+        freqs = torch.einsum("i,j->ij", t, self.inv_freq)
+        # Different from paper, but it uses a different permutation in order to obtain the same calculation
+        emb = torch.cat((freqs, freqs), dim=-1)
+        self.register_buffer("cos_cached", emb.cos()[None, None, :, :].to(dtype), persistent=False)
+        self.register_buffer("sin_cached", emb.sin()[None, None, :, :].to(dtype), persistent=False)
+
+
+class LlamaRotaryEmbeddingRef(torch.nn.Module):
+    def __init__(self,
+                 config: IPEXTransformerConfig):
+        super().__init__()
+        self.config = config
+        self.head_dim = int(config.embed_dim / config.num_attention_heads)
+        self.max_position_embeddings = config.max_positions
+        self.device = config.device
+        self.dtype = config.dtype
+        if self.config.rope_scaling is None: 
+            self.rotary_emb = LlamaRotaryEmbeddingBase(self.head_dim, max_position_embeddings=self.max_position_embeddings, device=self.device)
+        else:
+            scaling_type = self.config.rope_scaling["type"]
+            scaling_factor = self.config.rope_scaling["factor"]
+            if scaling_type == "linear":
+                self.rotary_emb = LlamaLinearScalingRotaryEmbedding(
+                    self.head_dim, max_position_embeddings=self.max_position_embeddings, scaling_factor=scaling_factor
+                )
+            elif scaling_type == "dynamic":
+                self.rotary_emb = LlamaDynamicNTKScalingRotaryEmbedding(
+                    self.head_dim, max_position_embeddings=self.max_position_embeddings, scaling_factor=scaling_factor
+                )
+            else:
+                raise ValueError(f"Unknown RoPE scaling type {scaling_type}")
+            
+        import os
+        col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
+        self.row_major = not col_major
+
+    def rotate_half(self, x):
+        """Rotates half the hidden dims of the input."""
+        x1 = x[..., : x.shape[-1] // 2]
+        x2 = x[..., x.shape[-1] // 2 :]
+        return torch.cat((-x2, x1), dim=-1)
+
+    def apply_rotary_pos_emb(self, q, k, cos, sin, position_ids):
+        # The first two dimensions of cos and sin are always 1, so we can `squeeze` them.
+        cos = cos.squeeze(1).squeeze(0)  # [seq_len, dim]
+        sin = sin.squeeze(1).squeeze(0)  # [seq_len, dim]
+        cos = cos[position_ids].unsqueeze(1)  # [bs, 1, seq_len, dim]
+        sin = sin[position_ids].unsqueeze(1)  # [bs, 1, seq_len, dim]
+        rotate_q = self.rotate_half(q)
+        rotate_k = self.rotate_half(k)
+        q_embed = (q * cos) + (rotate_q * sin)
+        k_embed = (k * cos) + (rotate_k * sin)
+        return q_embed, k_embed
+
+    def forward(self, query, key, position_ids, layer_id, beam_size, kv_seq_len):
+        # position_ids [bs*beam, seq_len]
+        # cos [1, 1, kv_seq_len, head_dim]
+        # sin [1, 1, kv_seq_len, head_dim]
+        first_token = position_ids.shape[-1] > 1
+        if self.row_major:
+            if first_token and beam_size > 1:
+                # from [bs*beam, seq, num_head, head_dim]
+                # to [bs*beam, num_head, seq, head_dim]
+                query_states = query.permute(0, 2, 1, 3).contiguous()
+                key_states = key.permute(0, 2, 1, 3).contiguous()
+            else:
+                # from [seq, bs*beam, num_head, head_dim]
+                # to [bs*beam, num_head, seq, head_dim]
+                query_states = query.permute(1, 2, 0, 3).contiguous()
+                key_states = key.permute(1, 2, 0, 3).contiguous()
+        else:
+            # from [bs*beam, seq, num_head, head_dim]
+            # to [bs*beam, num_head, seq, head_dim]
+            query_states = query.permute(0, 2, 1, 3).contiguous()
+            key_states = key.permute(0, 2, 1, 3).contiguous()
+        
+        cos, sin = self.rotary_emb(key_states, seq_len=kv_seq_len)
+        query_states, key_states = self.apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+
+        if self.row_major:
+            if first_token and beam_size > 1:
+                # frpm [bs*beam, num_head, seq, head_dim]
+                # to [bs*beam, seq, num_head, head_dim]
+                query_states = query_states.permute(0, 2, 1, 3).contiguous()
+                key_states = key_states.permute(0, 2, 1, 3).contiguous()
+            else:
+                # from [bs*beam, num_head, seq, head_dim]
+                # to [seq, bs*beam, num_head, head_dim]
+                query_states = query_states.permute(2, 0, 1, 3).contiguous()
+                key_states = key_states.permute(2, 0, 1, 3).contiguous()
+        else:
+            # frpm [bs*beam, num_head, seq, head_dim]
+            # to [bs*beam, seq, num_head, head_dim]
+            query_states = query_states.permute(0, 2, 1, 3).contiguous()
+            key_states = key_states.permute(0, 2, 1, 3).contiguous()
+        query.copy_(query_states)
+        key.copy_(key_states)
+        return query, key
+
 class LlamaRotaryEmbedding(torch.nn.Module):
     def __init__(self,
                  config: IPEXTransformerConfig):
         super().__init__()
         self.dim = int(config.embed_dim / config.num_attention_heads)
-        self.max_position_embedding = config.max_positions
+        self.max_position_embeddings = config.max_positions
         self.base = config.positional_embedding_base
         self.device = config.device
         self.dtype = config.dtype
-        inv_freq = 1.0 / (self.base ** (torch.arange(0, self.dim, 2).float() / self.dim))
-        self.register_buffer("inv_freq", inv_freq)
-        self.max_seq_len_cached = self.max_position_embedding
-        t = torch.arange(self.max_seq_len_cached, device=inv_freq.device, dtype=inv_freq.dtype)
+        inv_freq = 1.0 / (self.base ** (torch.arange(0, self.dim, 2).float().to(self.device) / self.dim))
+        self.register_buffer("inv_freq", inv_freq, persistent=False)
+        
+        seq_len = self.max_position_embeddings
+        device=self.inv_freq.device
+        dtype=torch.get_default_dtype()
+        self.max_seq_len_cached = seq_len
+        t = torch.arange(self.max_seq_len_cached, device=device, dtype=self.inv_freq.dtype)
+
         freqs = torch.einsum("i,j->ij", t, self.inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = torch.cat((freqs, freqs), dim=-1)
-        self.register_buffer("cos_cached", emb.cos().to(self.dtype).to(self.device), persistent=False)
-        self.register_buffer("sin_cached", emb.sin().to(self.dtype).to(self.device), persistent=False)
+        self.register_buffer("cos_cached", emb.cos().to(self.dtype), persistent=False)
+        self.register_buffer("sin_cached", emb.sin().to(self.dtype), persistent=False)
 
     def apply_rotary_pos_emb(self, query: torch.Tensor, key: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor):
         if query.shape == key.shape:
+            cos = cos.expand(query.shape)
+            sin = sin.expand(query.shape)
             torch.ops.torch_ipex.apply_rotary_embedding_half_qk(query, key, sin, cos, query, key)
         else:
-            torch.ops.torch_ipex.apply_rotary_embedding_half(query, sin, cos, query)
-            torch.ops.torch_ipex.apply_rotary_embedding_half(key, sin, cos, key)
+            cos_q = cos.expand(query.shape)
+            sin_q = sin.expand(query.shape)
+            torch.ops.torch_ipex.apply_rotary_embedding_half(query, sin_q, cos_q, query)
+            cos_k = cos.expand(key.shape)
+            sin_k = sin.expand(key.shape)
+            torch.ops.torch_ipex.apply_rotary_embedding_half(key, sin_k, cos_k, key)
+
+    def apply_rotary_pos_emb_ref(self, query: torch.Tensor, key: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor):
+        rotate_q = self.rotate_half(query)
+        rotate_k = self.rotate_half(key)
+        q_embed = (query * cos) + (rotate_q * sin)
+        k_embed = (key * cos) + (rotate_k * sin)
+        query.copy_(q_embed)
+        key.copy_(k_embed)
 
     def get_sin_cos(self, position_ids, layer_id, beam_size):
         # position_ids [bs*beam, seq_len]
@@ -173,19 +366,29 @@ class LlamaRotaryEmbedding(torch.nn.Module):
             LlamaRotaryEmbedding.position_ids = position_ids.transpose(0, 1).contiguous()
             LlamaRotaryEmbedding.sin = self.sin_cached[LlamaRotaryEmbedding.position_ids].unsqueeze(2)
             LlamaRotaryEmbedding.cos = self.cos_cached[LlamaRotaryEmbedding.position_ids].unsqueeze(2)
+
             if first_token and beam_size > 1:
                 # 1st token
                 # convert sin/cos from shape [seq, bs*beam, num_head, head_dim]
                 # to shape [bs*beam, seq, num_head, head_dim]
                 LlamaRotaryEmbedding.sin = LlamaRotaryEmbedding.sin.transpose(0, 1)
                 LlamaRotaryEmbedding.cos = LlamaRotaryEmbedding.cos.transpose(0, 1)
+            LlamaRotaryEmbedding.sin = LlamaRotaryEmbedding.sin.contiguous()
+            LlamaRotaryEmbedding.cos = LlamaRotaryEmbedding.cos.contiguous()
+
         # 1st token
-        # LlamaRotaryEmbedding.sin is in shape of [bs*beam, seq, num_head, head_dim]
+        # LlamaRotaryEmbedding.sin is in shape of [bs*beam, seq, 1, head_dim]
         # 2nd to last token or greedy
-        # GPTJRotaryEmbedding.sin is in shape of [seq, bs*beam, num_head, head_dim]
+        # GPTJRotaryEmbedding.sin is in shape of [seq, bs*beam, 1, head_dim]
         return LlamaRotaryEmbedding.sin, LlamaRotaryEmbedding.cos
 
-    def forward(self, query, key, position_ids, layer_id, beam_size):
+    def rotate_half(self, x):
+        """Rotates half the hidden dims of the input."""
+        x1 = x[..., : x.shape[-1] // 2]
+        x2 = x[..., x.shape[-1] // 2 :]
+        return torch.cat((-x2, x1), dim=-1)
+
+    def forward(self, query, key, position_ids, layer_id, beam_size, kv_seq_len):
         sin, cos = self.get_sin_cos(position_ids, layer_id, beam_size)
         self.apply_rotary_pos_emb(query, key, sin, cos)
         return query, key

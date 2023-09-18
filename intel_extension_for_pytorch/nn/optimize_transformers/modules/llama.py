@@ -52,8 +52,10 @@ class IPEXLlamaBlock(nn.Module):
         super().__init__()
         self.attn = IPEXLlamaAttn(config=config)
         self.mlp = IPEXLlamaMLP(config=config)
-        self.input_layernorm = LlamaRMSNorm(config)
-        self.post_attn_layernorm = LlamaRMSNorm(config)
+        self.input_layernorm = LlamaRMSNorm(config.embed_dim, eps=config.norm_eps)
+        self.post_attn_layernorm = LlamaRMSNorm(config.embed_dim, eps=config.norm_eps)
+        col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
+        self.row_major = not col_major
 
     def release_resources(self):
         self.attn.release_resources()
@@ -86,21 +88,22 @@ class IPEXLlamaBlock(nn.Module):
         first_token = True if acc_test or past_key_value is None else False
         hidden_size = hidden_states.shape[-1]
         hidden_shape = [bs, beam, seq, hidden_size]
-        if first_token and beam > 1:
-            # for 1st token, keep the original layout
-            # reduce the duplicated info in beam dim
-            # shape -> [bs*beam, seq, hidden_size]
-            # layout -> [bs*beam, seq, hidden_size]
-            hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :].contiguous()
-            if position_ids is not None:
-                position_ids = position_ids.view(bs, beam, position_ids.shape[1])[:,0,:].view(bs, position_ids.shape[1])
-            if attention_mask is not None:
-                attention_mask = attention_mask.view(bs, beam, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])[:,0,:,:,:].view(bs, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
-        else:
-            # for 2nd to last token, we convert the layout
-            # shape -> [bs*beam, seq, hidden_size]
-            # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
-            hidden_states = hidden_states.transpose(0, 1).contiguous()
+        if self.row_major:
+            if first_token and beam > 1:
+                # for 1st token, keep the original layout
+                # reduce the duplicated info in beam dim
+                # shape -> [bs*beam, seq, hidden_size]
+                # layout -> [bs*beam, seq, hidden_size]
+                hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :].contiguous()
+                if position_ids is not None:
+                    position_ids = position_ids.view(bs, beam, position_ids.shape[1])[:,0,:].view(bs, position_ids.shape[1])
+                if attention_mask is not None:
+                    attention_mask = attention_mask.view(bs, beam, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])[:,0,:,:,:].view(bs, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
+            else:
+                # for 2nd to last token, we convert the layout
+                # shape -> [bs*beam, seq, hidden_size]
+                # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
+                hidden_states = hidden_states.transpose(0, 1).contiguous()
 
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
@@ -115,18 +118,17 @@ class IPEXLlamaBlock(nn.Module):
             residual=residual,
             first_token = first_token
         )
-
         residual = hidden_states
         hidden_states = self.post_attn_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states, residual)
-
-        if first_token and beam > 1:
-            # for 1st token, expand the result with beam
-            hidden_states = hidden_states.view(bs, 1, seq, hidden_size).expand([bs, beam, seq, hidden_size])
-        else:
-            # for 2nd to last token, we convert the layout back
-            # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
-            hidden_states = hidden_states.transpose(0, 1)
+        if self.row_major:
+            if first_token and beam > 1:
+                # for 1st token, expand the result with beam
+                hidden_states = hidden_states.view(bs, 1, seq, hidden_size).expand([bs, beam, seq, hidden_size])
+            else:
+                # for 2nd to last token, we convert the layout back
+                # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
+                hidden_states = hidden_states.transpose(0, 1)
 
         outputs = (hidden_states, )
         if output_attentions:
@@ -254,6 +256,7 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
         norm_eps = self.config.rms_norm_eps
         use_cache = self.config.use_cache
         intermediate_size = self.config.intermediate_size
+        rope_scaling = self.config.rope_scaling
         return IPEXTransformerConfig(
             embed_dim=embed_dim,
             intermediate_size=intermediate_size,
@@ -265,6 +268,7 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
             rotary_dim=None,
             rotate_half=True,
             rotate_every_two=False,
+            rope_scaling = rope_scaling,
             use_casual_mask=False,
             activation_function=activate_function,
             norm_eps=norm_eps,

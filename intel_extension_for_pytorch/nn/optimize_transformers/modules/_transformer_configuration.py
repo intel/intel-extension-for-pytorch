@@ -12,6 +12,7 @@ class IPEXTransformerConfig():
                  rotary_dim = 64,
                  rotate_half = False,
                  rotate_every_two = True,
+                 rope_scaling = None,
                  use_casual_mask = False,
                  activation_function = 'gelu_new',
                  norm_eps = 0.001,
@@ -43,6 +44,7 @@ class IPEXTransformerConfig():
         self.rotary_dim = rotary_dim
         self.rotate_half = rotate_half
         self.rotate_every_two = rotate_every_two
+        self.rope_scaling = rope_scaling
         self.use_casual_mask = use_casual_mask
         self.activation_function = activation_function
         self.norm_eps = norm_eps

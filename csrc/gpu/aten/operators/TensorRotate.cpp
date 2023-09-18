@@ -213,37 +213,39 @@ void apply_rotary_embedding_half_single_kernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
-  int64_t wg_size = max_wg_size;
+  int64_t problem_half = problem_size / 2;
+  int64_t wg_size = std::min(max_wg_size, problem_half);
 
   int64_t max_group_num = 32768;
   int64_t total_group_num = (total_size + problem_size - 1) / problem_size;
   max_group_num = std::min(max_group_num, total_group_num);
-  int64_t problem_half = problem_size / 2;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
       auto item_idx = item_id.get_local_id(1);
-      auto item_range = item_id.get_local_range(1);
       auto group_idx = item_id.get_group(1);
       auto group_id = item_id.get_group(0);
-      auto sg = item_id.get_sub_group();
 
       for (int group_num = group_idx; group_num < total_group_num;
            group_num += max_group_num) {
-        for (int i = item_idx; i < problem_size; i += item_range) {
-          auto global_offset1 = group_num * problem_size + i;
-          auto global_offset2 = i < problem_half
-              ? group_num * problem_size + problem_half + i
-              : group_num * problem_size - problem_half + i;
-          float scale = i < problem_half ? -1 : 1;
+        for (int64_t i = item_idx; i < problem_half; i += wg_size) {
+          int64_t global_offset1 = group_num * problem_size + i;
+          int64_t global_offset2 = global_offset1 + problem_half;
           const auto offset1 = offset_calc.get(global_offset1);
           const auto offset2 = offset_calc.get(global_offset2);
-          float query_val1 = *(query + offset1[1]);
-          float query_val2 = *(query + offset2[1]);
+          float x1 = *(query + offset1[1]);
+          float x2 = *(query + offset2[1]);
+          float rotate_x1 = -x2;
+          float rotate_x2 = x1;
           float sin_val = *(sin + offset1[2]);
           float cos_val = *(cos + offset1[3]);
-          *(query_out + offset1[0]) = static_cast<scalar_t>(
-              scale * query_val2 * sin_val + query_val1 * cos_val);
+
+          // need to cast to scalar_t and then apply add
+          // otherwise the result will be wrong in llama
+          *(query_out + offset1[0]) = static_cast<scalar_t>(x1 * cos_val) +
+              static_cast<scalar_t>(rotate_x1 * sin_val);
+          *(query_out + offset2[0]) = static_cast<scalar_t>(x2 * cos_val) +
+              static_cast<scalar_t>(rotate_x2 * sin_val);
         }
       }
     };
@@ -277,54 +279,60 @@ void apply_rotary_embedding_half_kernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
-  int64_t wg_size = max_wg_size;
+  int64_t problem_half = problem_size / 2;
+  int64_t wg_size = std::min(max_wg_size, problem_half);
 
   int64_t max_group_num = 32768;
   int64_t total_group_num = (total_size + problem_size - 1) / problem_size;
   max_group_num = std::min(max_group_num, total_group_num);
-  int64_t problem_half = problem_size / 2;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
       auto item_idx = item_id.get_local_id(1);
-      auto item_range = item_id.get_local_range(1);
       auto group_idx = item_id.get_group(1);
       auto group_id = item_id.get_group(0);
-      auto sg = item_id.get_sub_group();
 
       for (int group_num = group_idx; group_num < total_group_num;
            group_num += max_group_num) {
         if (group_id == 0) {
-          for (int i = item_idx; i < problem_size; i += item_range) {
-            auto global_offset1 = group_num * problem_size + i;
-            auto global_offset2 = i < problem_half
-                ? group_num * problem_size + problem_half + i
-                : group_num * problem_size - problem_half + i;
-            float scale = i < problem_half ? -1 : 1;
+          for (int i = item_idx; i < problem_half; i += wg_size) {
+            int64_t global_offset1 = group_num * problem_size + i;
+            int64_t global_offset2 = global_offset1 + problem_half;
             const auto offset1 = offset_calc.get(global_offset1);
             const auto offset2 = offset_calc.get(global_offset2);
-            float query_val1 = *(query + offset1[2]);
-            float query_val2 = *(query + offset2[2]);
+            float x1 = *(query + offset1[2]);
+            float x2 = *(query + offset2[2]);
+            float rotate_x1 = -x2;
+            float rotate_x2 = x1;
             float sin_val = *(sin + offset1[4]);
             float cos_val = *(cos + offset1[5]);
-            *(query_out + offset1[0]) = static_cast<scalar_t>(
-                scale * query_val2 * sin_val + query_val1 * cos_val);
+
+            // need to cast to scalar_t and then apply add
+            // otherwise the result will be wrong in llama
+            *(query_out + offset1[0]) = static_cast<scalar_t>(x1 * cos_val) +
+                static_cast<scalar_t>(rotate_x1 * sin_val);
+            *(query_out + offset2[0]) = static_cast<scalar_t>(x2 * cos_val) +
+                static_cast<scalar_t>(rotate_x2 * sin_val);
           }
         } else {
-          for (int i = item_idx; i < problem_size; i += item_range) {
-            auto global_offset1 = group_num * problem_size + i;
-            auto global_offset2 = i < problem_half
-                ? group_num * problem_size + problem_half + i
-                : group_num * problem_size - problem_half + i;
-            float scale = i < problem_half ? -1 : 1;
+          for (int i = item_idx; i < problem_half; i += wg_size) {
+            int64_t global_offset1 = group_num * problem_size + i;
+            int64_t global_offset2 = global_offset1 + problem_half;
             const auto offset1 = offset_calc.get(global_offset1);
             const auto offset2 = offset_calc.get(global_offset2);
-            float key_val1 = *(key + offset1[3]);
-            float key_val2 = *(key + offset2[3]);
+            float x1 = *(key + offset1[3]);
+            float x2 = *(key + offset2[3]);
+            float rotate_x1 = -x2;
+            float rotate_x2 = x1;
             float sin_val = *(sin + offset1[4]);
             float cos_val = *(cos + offset1[5]);
-            *(key_out + offset1[1]) = static_cast<scalar_t>(
-                scale * key_val2 * sin_val + key_val1 * cos_val);
+
+            // need to cast to scalar_t and then apply add
+            // otherwise the result will be wrong in llama
+            *(key_out + offset1[1]) = static_cast<scalar_t>(x1 * cos_val) +
+                static_cast<scalar_t>(rotate_x1 * sin_val);
+            *(key_out + offset2[1]) = static_cast<scalar_t>(x2 * cos_val) +
+                static_cast<scalar_t>(rotate_x2 * sin_val);
           }
         }
       }
