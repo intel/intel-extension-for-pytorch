@@ -262,10 +262,10 @@
 </table><hr class="docutils" />
 <p>Prebuilt wheel files for generic Python* and Intel® Distribution for Python* are released in separate repositories.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># General Python*</span>
-python -m pip install <span class="nv">torch</span><span class="o">==</span><span class="m">1</span>.13.0a0 <span class="nv">torchvision</span><span class="o">==</span><span class="m">0</span>.14.1a0 <span class="nv">intel_extension_for_pytorch</span><span class="o">==</span><span class="m">1</span>.13.10+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
+python -m pip install <span class="nv">torch</span><span class="o">==</span><span class="m">1</span>.13.0a0 <span class="nv">torchvision</span><span class="o">==</span><span class="m">0</span>.14.1a0 <span class="nv">intel_extension_for_pytorch</span><span class="o">==</span><span class="m">1</span>.13.10+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 
 <span class="c1"># Intel® Distribution for Python*</span>
-python -m pip install <span class="nv">torch</span><span class="o">==</span><span class="m">1</span>.13.0a0 <span class="nv">torchvision</span><span class="o">==</span><span class="m">0</span>.14.1a0 <span class="nv">intel_extension_for_pytorch</span><span class="o">==</span><span class="m">1</span>.13.10+xpu -f https://developer.intel.com/ipex-whl-stable-xpu-idp
+python -m pip install <span class="nv">torch</span><span class="o">==</span><span class="m">1</span>.13.0a0 <span class="nv">torchvision</span><span class="o">==</span><span class="m">0</span>.14.1a0 <span class="nv">intel_extension_for_pytorch</span><span class="o">==</span><span class="m">1</span>.13.10+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu-idp/us/
 </pre></div>
 </div>
 <p><strong>Note:</strong> Wheel files for Intel® Distribution for Python* only supports Python 3.9. The support starts from 1.13.10+xpu.</p>

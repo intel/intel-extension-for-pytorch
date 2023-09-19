@@ -59,7 +59,7 @@ Prebuilt wheel files availability matrix for Python versions:
 ### Install PyTorch
 
 ```bash
-python -m pip install torch==1.10.0a0 -f https://developer.intel.com/ipex-whl-stable-xpu
+python -m pip install torch==1.10.0a0 --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 ```
 
 ### Install Numpy
@@ -79,7 +79,7 @@ Intel® Extension for PyTorch\* doesn't depend on torchvision or torchaudio.
 You can install torchvision via the following command.
 
 ```bash
-python -m pip install torchvision==0.11.0+cpu --no-deps -f https://download.pytorch.org/whl/torch_stable.html
+python -m pip install torchvision==0.11.0+cpu --no-deps --extra-index-url https://download.pytorch.org/whl/torch_stable.html
 ```
 
 For torchaudio installation, please follow the [instructions](https://github.com/pytorch/audio/tree/v0.10.0#from-source) to compile it from source. According to torchaudio-pytorch dependency table, torchaudio 0.10.0 is recommended.
@@ -87,7 +87,7 @@ For torchaudio installation, please follow the [instructions](https://github.com
 ### Install Intel® Extension for PyTorch\*
 
 ```bash
-python -m pip install intel_extension_for_pytorch==1.10.200+gpu -f https://developer.intel.com/ipex-whl-stable-xpu
+python -m pip install intel_extension_for_pytorch==1.10.200+gpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 ```
 
 ## Install via compiling from source

@@ -403,7 +403,7 @@ We are excited to announce Intel® Extension for PyTorch\* 1.11.0-cpu release by
 <td>
 
 ```python
-python -m pip install intel_extension_for_pytorch==1.10.100 -f https://software.intel.com/ipex-whl-stable
+python -m pip install intel_extension_for_pytorch==1.10.100 --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
 ```
 </td>
 <td>
@@ -744,7 +744,7 @@ with torch.no_grad():
 * Rebased the Intel Extension for Pytorch from PyTorch-1.8.0 to the official PyTorch-1.9.0 release.
 * Support binary installation.
 
-  `python -m pip install torch_ipex==1.9.0 -f https://software.intel.com/ipex-whl-stable`
+  `python -m pip install torch_ipex==1.9.0 --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/`
 * Support the C++ library. The third party App can link the Intel-Extension-for-PyTorch C++ library to enable the particular optimizations.
 
 ## 1.8.0

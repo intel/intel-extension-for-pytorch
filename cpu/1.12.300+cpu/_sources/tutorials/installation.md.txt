@@ -67,13 +67,13 @@ python -m pip install intel_extension_for_pytorch
 Alternatively, you can also install the latest version with the following commands:
 
 ```
-python -m pip install intel_extension_for_pytorch -f https://developer.intel.com/ipex-whl-stable
+python -m pip install intel_extension_for_pytorch --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
 ```
 
 For pre-built wheel files with oneDNN Graph Compiler, use the following command to perform the installation.
 <a class="headerlink" id="installation_onednn_graph_compiler" title="Permalink to this headline"></a>
 ```
-python -m pip install intel_extension_for_pytorch -f https://developer.intel.com/ipex-whl-dev
+python -m pip install intel_extension_for_pytorch --extra-index-url https://pytorch-extension.intel.com/release-whl/dev/cpu/us/
 ```
 
 **Note:** For versions before 1.10.0, use package name `torch_ipex`, rather than `intel_extension_for_pytorch`.
@@ -81,7 +81,7 @@ python -m pip install intel_extension_for_pytorch -f https://developer.intel.com
 **Note:** To install a package with a specific version, run with the following command:
 
 ```
-python -m pip install <package_name>==<version_name> -f https://developer.intel.com/ipex-whl-stable
+python -m pip install <package_name>==<version_name> --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
 ```
 
 ## Install via source compilation

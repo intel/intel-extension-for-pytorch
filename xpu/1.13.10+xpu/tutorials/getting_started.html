@@ -92,7 +92,7 @@
 <section id="installation">
 <h2>Installation<a class="headerlink" href="#installation" title="Permalink to this heading"></a></h2>
 <p>Prebuilt wheel files are released for multiple Python versions. You can install them simply with the following pip command.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python -m pip install <span class="nv">torch</span><span class="o">==</span><span class="m">1</span>.13.0a0 <span class="nv">torchvision</span><span class="o">==</span><span class="m">0</span>.14.1a0 <span class="nv">intel_extension_for_pytorch</span><span class="o">==</span><span class="m">1</span>.13.10+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python -m pip install <span class="nv">torch</span><span class="o">==</span><span class="m">1</span>.13.0a0 <span class="nv">torchvision</span><span class="o">==</span><span class="m">0</span>.14.1a0 <span class="nv">intel_extension_for_pytorch</span><span class="o">==</span><span class="m">1</span>.13.10+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 </pre></div>
 </div>
 <p>You can run a simple sanity test to double confirm if the correct version is installed, and if the software stack can get correct hardware information onboard your system.</p>

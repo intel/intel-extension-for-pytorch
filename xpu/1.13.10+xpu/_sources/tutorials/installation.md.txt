@@ -82,10 +82,10 @@ Prebuilt wheel files for generic Python\* and Intel® Distribution for Python\* 
 
 ```bash
 # General Python*
-python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 intel_extension_for_pytorch==1.13.10+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
+python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 intel_extension_for_pytorch==1.13.10+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 
 # Intel® Distribution for Python*
-python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 intel_extension_for_pytorch==1.13.10+xpu -f https://developer.intel.com/ipex-whl-stable-xpu-idp
+python -m pip install torch==1.13.0a0 torchvision==0.14.1a0 intel_extension_for_pytorch==1.13.10+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu-idp/us/
 ```
 
 **Note:** Wheel files for Intel® Distribution for Python\* only supports Python 3.9. The support starts from 1.13.10+xpu.

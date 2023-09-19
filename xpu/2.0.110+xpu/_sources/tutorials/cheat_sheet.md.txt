@@ -6,7 +6,7 @@ Get started with Intel® Extension for PyTorch\* using the following commands:
 |Description    | Command |
 | -------- | ------- |
 | Basic CPU Installation | `python -m pip install intel_extension_for_pytorch`    |
-| Basic GPU Installation | `pip install torch==<version> -f https://developer.intel.com/ipex-whl-stable-xpu`<br>`pip install intel_extension_for_pytorch==<version> -f https://developer.intel.com/ipex-whl-stable-xpu`|
+| Basic GPU Installation | `pip install torch==<version> --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/`<br>`pip install intel_extension_for_pytorch==<version> --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/-xpu`|
 | Import Intel® Extension for PyTorch\*    | `import intel_extension_for_pytorch as ipex`|
 | Capture a Verbose Log (Command Prompt)    | `export ONEDNN_VERBOSE=1`   |
 | Optimization During Training   | `model = ...`<br>`optimizer = ...`<br>`model.train()`<br>`model, optimizer = ipex.optimize(model, optimizer=optimizer)`|

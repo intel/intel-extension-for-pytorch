@@ -73,7 +73,7 @@ python -m pip install intel_extension_for_pytorch
 Alternatively, you can also install the latest version with the following commands:
 
 ```
-python -m pip install intel_extension_for_pytorch -f https://developer.intel.com/ipex-whl-stable-cpu
+python -m pip install intel_extension_for_pytorch --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
 ```
 
 **Note:** For versions before 1.10.0, use package name `torch_ipex`, rather than `intel_extension_for_pytorch`.
@@ -81,7 +81,7 @@ python -m pip install intel_extension_for_pytorch -f https://developer.intel.com
 **Note:** To install a history package with a specific version, run with the following command:
 
 ```
-python -m pip install <package_name>==<version_name> -f https://developer.intel.com/ipex-whl-stable-cpu
+python -m pip install <package_name>==<version_name> --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
 ```
 
 ## Install via source compilation
