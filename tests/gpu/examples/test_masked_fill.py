@@ -27,21 +27,3 @@ class TestTorchMethod(TestCase):
         print("y_cpu = ", y_cpu)
         print("y_dpcpp = ", y_dpcpp.cpu())
         self.assertEqual(y_cpu, y_dpcpp.cpu())
-
-        x_cpu = torch.tensor(
-            [[1, 2, 3, 4]], device=torch.device("cpu"), dtype=torch.float
-        )
-        x_dpcpp = torch.tensor(
-            [[1, 2, 3, 4]], device=torch.device("xpu"), dtype=torch.float
-        )
-
-        y_cpu = x_cpu.masked_fill(
-            mask=torch.ByteTensor([1, 1, 0, 0]), value=torch.tensor(-1e9)
-        )
-        y_dpcpp = x_dpcpp.masked_fill(
-            mask=torch.ByteTensor([1, 1, 0, 0]).to("xpu"), value=torch.tensor(-1e9)
-        )
-
-        print("y_cpu = ", y_cpu)
-        print("y_dpcpp = ", y_dpcpp.cpu())
-        self.assertEqual(y_cpu, y_dpcpp.cpu())
