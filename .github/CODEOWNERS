@@ -17,7 +17,7 @@
 /intel_extension_for_pytorch @gujinghui @wuhuikx @zejun-chen
 
 # IPEX GPU code base
-/csrc/gpu @gujinghui @arthuryuan1987 @wuhuikx @chengjunlu @majing921201
+/csrc/gpu @gujinghui @arthuryuan1987 @wuhuikx @majing921201
 
 # Documentation and tutorials
 /docs @gujinghui @tye1

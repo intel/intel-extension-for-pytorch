@@ -324,7 +324,8 @@ static void deconvolution(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto ndim = src.ndimension();
-  auto memory_layout_for_conv = get_memory_layout_for_conv(src, wgh);
+  auto memory_layout_for_conv =
+      get_memory_layout_for_conv(src, wgh, /*is_transposed=*/true);
   bool is_onednn_layout_suggested =
       memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked;
 
@@ -452,7 +453,8 @@ static void deconvolution_backward_data(
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  auto memory_layout_for_conv = get_memory_layout_for_conv(diff_dst, weight);
+  auto memory_layout_for_conv =
+      get_memory_layout_for_conv(diff_dst, weight, /*is_transposed=*/true);
   bool is_onednn_layout_suggested =
       memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked;
   // create memory desc
@@ -582,7 +584,8 @@ static void deconvolution_backward_weights(
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  auto memory_layout_for_conv = get_memory_layout_for_conv(src, diff_dst);
+  auto memory_layout_for_conv =
+      get_memory_layout_for_conv(src, diff_dst, /*is_transposed=*/true);
   bool is_onednn_layout_suggested =
       memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked;
 

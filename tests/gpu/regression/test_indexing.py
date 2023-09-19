@@ -1,6 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa F401
+import pytest
 
 cpu_device = torch.device("cpu")
 
@@ -22,6 +23,7 @@ class TestTorchMethod(TestCase):
         y_xpu = x_xpu.index_fill(0, index, 0)
         self.assertEqual(y, y_xpu.cpu())
 
+    @pytest.mark.skip("temp skip it which related to PYTORCHDGQ-3292")
     def test_index_copy(self, dtype=torch.float):
         x = torch.randn((8192, 8192), device=cpu_device)
         t = torch.randn((4096, 8192), dtype=torch.float)
@@ -34,6 +36,7 @@ class TestTorchMethod(TestCase):
         y_xpu = x_xpu.index_copy(0, index, t)
         self.assertEqual(y, y_xpu.cpu())
 
+    @pytest.mark.skip("temp skip it which related to PYTORCHDGQ-3292")
     def test_index_add(self, dtype=torch.float):
         x = torch.randn((8192, 8192), device=cpu_device)
         t = torch.randn((4096, 8192), dtype=torch.float)

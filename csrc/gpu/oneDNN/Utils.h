@@ -45,13 +45,9 @@ static inline std::pair<memory, memory> q_get_sc_zp_gpu_mem(
     dnnl::engine& engine) {
   memory qx_sc_m, qx_zp_m;
   using xpu::dpcpp::XPUQuantizerBase;
-  float dnn_scale;
-  dnn_scale = qx.q_scale();
-  if (qx.scalar_type() == kQUInt8 && (!xpu::dpcpp::is_opaque_u8(qx))) {
-    dnn_scale /= 2.f;
-  }
-
-  auto quant_base = xpu::dpcpp::fetch_cached_quantizer_base(dnn_scale, 0);
+  xpu::dpcpp::lru_key_t key_sc_zp;
+  auto quant_base =
+      xpu::dpcpp::fetch_cached_quantizer_base(qx.q_scale(), qx.q_zero_point());
   auto sc_ptr = quant_base.scale_ptr();
   auto zp_ptr = quant_base.zero_point_ptr();
   qx_sc_m = dpcpp_onednn_memory(Q_PER_TENSOR_SC_MD, engine, sc_ptr);
@@ -621,13 +617,15 @@ enum MEMORY_LAYOUT_FOR_CONV {
 
 static inline int get_memory_layout_for_conv(
     const at::Tensor& src,
-    const at::Tensor& weight) {
+    const at::Tensor& weight,
+    bool is_transpose) {
   if (!src.defined() || src.is_sparse()) {
     // suggest channels_first
     return MEMORY_LAYOUT_FOR_CONV::ChannelsFirst;
   }
 
-  if (src.is_quantized() || weight.is_quantized() || (!dpcppSupportFP64())) {
+  if (is_transpose || src.is_quantized() || weight.is_quantized() ||
+      (!dpcppSupportFP64())) {
     if (Settings::I().is_onednn_layout_enabled()) {
       // suggest blocked
       return MEMORY_LAYOUT_FOR_CONV::Blocked;
@@ -657,9 +655,10 @@ static inline int get_memory_layout_for_conv(
 
 static inline at::MemoryFormat get_tensor_format_for_conv(
     const at::Tensor& src,
-    const at::Tensor& weight) {
+    const at::Tensor& weight,
+    bool is_transposed) {
   at::MemoryFormat mfmt;
-  if (get_memory_layout_for_conv(src, weight) ==
+  if (get_memory_layout_for_conv(src, weight, is_transposed) ==
       MEMORY_LAYOUT_FOR_CONV::ChannelsLast) {
     mfmt = get_cl_tag_by_ndim(src.ndimension());
   } else {
@@ -832,7 +831,7 @@ static void dump_md_data_type(memory::data_type dt) {
   };
 }
 
-static void dump_md(const char* str, memory::desc& md) {
+static void dump_md(const char* str, memory::desc md) {
   printf("%s\n", str);
 
   print_vec_xpu("\tdims : ", md.get_dims().data(), md.get_ndims());
@@ -854,22 +853,14 @@ static void dump_md(const char* str, memory::desc& md) {
       "\t\tblks  : ", md.get_inner_blks().data(), md.get_inner_nblks());
 }
 
-#ifdef BUILD_PRIOR_SYMM_QUANT
 static inline bool requires_runtime_zp(const Tensor& src) {
   TORCH_CHECK(src.is_quantized(), "Only qtensor needs runtime zero_point")
-  // IF only Symeetric in IPEX, alwasy no zp
-  return false;
-
-  // IF Asymmetric path is enabled in IPEX, check zp for kernel choosing
-  // IF Tensor has a non-zero zp, then need runtime zp for oneDNN.
+  TORCH_CHECK(
+      src.qscheme() == kPerTensorAffine,
+      "Only per tensor quantization has non-zero zp")
   // See [Note: Use symmetric quant implementation when zp is 0]
-  // if (src.qscheme() == kPerTensorAffine) {
-  //   return (src.q_zero_point() != 0);
-  // } else if (src.qscheme() == kPerChannelAffine) {
-  //   return ((src.q_per_channel_zero_points().nonzero().numel()) != 0);
-  // }
+  return (src.q_zero_point() != 0);
 }
-#endif
 
 } // namespace oneDNN
 } // namespace xpu

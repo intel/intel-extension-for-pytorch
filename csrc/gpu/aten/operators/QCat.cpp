@@ -72,17 +72,6 @@ Tensor q_cat(
   if (!isBlockfmt) {
     at::AtenIpexTypeXPU::cat_(ITensorListRef(tensors).materialize(), dim, out);
   } else {
-    // This is a workaroud for oneDNN symmetric INT8, will remove it after
-    // oneDNN Asymmetric INT8 is ready.
-    zero_point_out = 0;
-
-    out = at::_empty_affine_quantized(
-        {0},
-        tensors.get(0).options().dtype(
-            toQIntType(tensors.get(0).scalar_type())),
-        scale_out,
-        zero_point_out,
-        MemoryFormat::Contiguous);
     std::vector<Tensor> tensors_;
     for (int i = 0; i < tensors.size(); i++) {
       auto src = tensors.get(i);

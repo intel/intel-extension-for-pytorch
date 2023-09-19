@@ -5,11 +5,6 @@ from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
 
-
-torch._C._jit_set_profiling_mode(False)
-torch._C._jit_set_profiling_executor(False)
-
-
 class PixelShuffle(torch.nn.Module):
     def __init__(self):
         super(PixelShuffle, self).__init__()

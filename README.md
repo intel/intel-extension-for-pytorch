@@ -38,7 +38,7 @@ python -m pip install torch==2.0.1a0 torchvision==0.15.2a0 intel_extension_for_p
 
 More installation methods can be found at [GPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/installation.html).
 
-Compilation instruction of the latest GPU code base `xpu-master` branch can be found at [Installation Guide](https://github.com/intel/intel-extension-for-pytorch/blob/xpu-master/docs/tutorials/installation.md#install-via-compiling-from-source).
+Compilation instruction of the latest GPU code base `xpu-master` branch can be found at [Installation Guide For Linux/WSL2](https://github.com/intel/intel-extension-for-pytorch/blob/xpu-master/docs/tutorials/installations/linux.rst#install-via-compiling-from-source) and [Installation Guide For Windows](https://github.com/intel/intel-extension-for-pytorch/blob/xpu-master/docs/tutorials/installations/windows.rst#install-via-compiling-from-source).
 
 ## Getting Started
 

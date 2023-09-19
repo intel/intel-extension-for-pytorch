@@ -28,8 +28,8 @@ IPEX_FUSED_OPTIMIZER_LIST_XPU = [
     torch.optim.SGD,
     torch.optim.AdamW,
     torch.optim.Adam,
+    torch.optim.Adagrad,
     Lamb,
-    torch.optim.Adagrad
 ]
 
 OPTIMIZER_FUSED_STEP_MAPPING_CPU = {
@@ -42,10 +42,10 @@ OPTIMIZER_FUSED_STEP_MAPPING_CPU = {
 OPTIMIZER_FUSED_STEP_MAPPING_XPU = {
     torch.optim.SGD: sgd_step,
     torch.optim.AdamW: adamw_step,
+    torch.optim.Adam: adam_step,
     torch.optim.Adagrad: adagrad_step,
     Lamb: lamb_step,
-    torch.optim.Adam: adam_step,
-    Lars: lars_step,
+    Lars: lars_step
 }
 
 
@@ -379,8 +379,17 @@ def optimizer_fusion(optimizer, master_weight_split, device_type):
             return optimizer
         if not hasattr(optimizer, "_original_step"):
             setattr(optimizer, "_original_step", optimizer.step)  # noqa: B010
-        optimizer.step = types.MethodType(step, optimizer)
-        setattr(optimizer, "fused", True)  # noqa: B010
+
+        optimizer.fused = True
+        if type(optimizer) == torch.optim.Adam or type(optimizer) == torch.optim.AdamW:
+            if optimizer.defaults['fused'] is True and not torch.jit.is_scripting():
+                optimizer.fused = False
+
+        if optimizer.fused is True:
+            optimizer.step = types.MethodType(step, optimizer)
+
+        setattr(optimizer, "fused", optimizer.fused)  # noqa: B010
+
     except KeyError:
         warnings.warn(
             "Does not suport fused step for "

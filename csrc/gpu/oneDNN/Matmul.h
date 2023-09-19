@@ -201,13 +201,11 @@ static inline void matmul(
       attr);
 #endif
 
-#ifdef BUILD_PRIOR_SYMM_QUANT
   // Only setting zp mask when zp is not zero
   // See: [Note: Use symmetric quant implementation when zp is 0]
   bool src_need_zp = m1.is_quantized() && requires_runtime_zp(m1);
   bool dst_need_zp = dst.is_quantized() && requires_runtime_zp(dst);
   bool wgh_need_zp = m2.is_quantized() && requires_runtime_zp(m2);
-#endif
 
   std::unordered_map<int, memory> args;
 
@@ -396,21 +394,17 @@ static inline void matmul(
       args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_DST, dst_sc_m});
     }
 
-#ifdef BUILD_PRIOR_SYMM_QUANT
     // Only setting zp when zp is not zero
     // See: [Note: Use symmetric quant implementation when zp is 0]
     if (src_need_zp) {
       args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, m1_zp_m});
     }
-#endif
 
-#ifdef BUILD_PRIOR_SYMM_QUANT
     // Only setting zp when zp is not zero
     // See: [Note: Use symmetric quant implementation when zp is 0]
     if (dst.is_quantized() && dst_need_zp) {
       args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zp_m});
     }
-#endif
 
     if (is_per_tensor_quantized) {
       memory m2_sc_m;

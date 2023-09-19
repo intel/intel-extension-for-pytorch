@@ -232,7 +232,7 @@ inline void device_radix_sort_impl(
             keys_per_thread,                             \
             nsort,                                       \
             stride,                                      \
-            (void*)(IPEXGetLocalAccPointer(slm)),        \
+            static_cast<void*>(slm.get_pointer().get()), \
             is_descending,                               \
             use_indices);                                \
       };                                                 \

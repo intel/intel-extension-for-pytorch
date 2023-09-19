@@ -55,6 +55,10 @@ generate the rule of pots-op fusion.
   IPEX_CONV_SYMBOL_DECLARATION(binary_##func);    \
   IPEX__CONV_SYMBOL_DECLARATION(binary_##func);
 
+#define IPEX_QLINEAR_SYMBOL_DECLARATION(func) \
+  static auto q_linear_##func##_sym =         \
+      Symbol::fromQualString("torch_ipex::q_linear_" #func)
+
 #define IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(func) \
   static auto linear_binary_##func##_sym =          \
       Symbol::fromQualString("torch_ipex::linear_binary_" #func)
@@ -132,13 +136,6 @@ IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(div);
 IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(max);
 IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(min);
 
-// IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(eq);
-// IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(ne);
-// IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(ge);
-// IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(gt);
-// IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(le);
-// IPEX_LINEAR_BINARY_SYMBOL_DECLARATION(lt);
-
 // matmul related symbol declaration
 IPEX_MATMUL_SYMBOL_DECLARATION(sigmoid);
 IPEX_MATMUL_SYMBOL_DECLARATION(relu);
@@ -159,6 +156,10 @@ IPEX_MATMUL_SYMBOL_DECLARATION(elu);
 IPEX_MATMUL_SYMBOL_DECLARATION(pow);
 IPEX_MATMUL_SYMBOL_DECLARATION(hardtanh);
 IPEX_MATMUL_SYMBOL_DECLARATION(leaky_relu);
+
+IPEX_QLINEAR_SYMBOL_DECLARATION(sigmoid);
+IPEX_QLINEAR_SYMBOL_DECLARATION(relu);
+IPEX_QLINEAR_SYMBOL_DECLARATION(mish);
 
 static auto _conv_sym = Symbol::fromQualString("aten::_convolution");
 static auto reorder_sym = Symbol::fromQualString("torch_ipex::reorder");

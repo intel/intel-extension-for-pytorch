@@ -2,7 +2,11 @@
 
 set "VER_PYTORCH=v2.0.1"
 set "VER_TORCHVISION=v0.15.2"
+<<<<<<< HEAD
 set "VER_IPEX=dev/LLM-xpu"
+=======
+set "VER_IPEX=xpu-master"
+>>>>>>> master
 
 if "%~2"=="" (
     echo Usage: %~nx0 ^<DPCPPROOT^> ^<MKLROOT^> [AOT]
@@ -20,6 +24,7 @@ if not "%~3"=="" (
 rem Check existance of DPCPP and ONEMKL environments
 set "DPCPP_ENV=%DPCPP_ROOT%\env\vars.bat"
 if NOT EXIST "%DPCPP_ENV%" (
+<<<<<<< HEAD
     echo DPC++ compiler environment %DPCPP_ENV% doesn't seem to exist.
     exit /b 2
 )
@@ -31,6 +36,19 @@ if NOT EXIST "%ONEMKL_ENV%" (
     exit /b 3
 )
 call %ONEMKL_ENV%
+=======
+    echo DPC++ compiler environment "%DPCPP_ENV%" doesn't seem to exist.
+    exit /b 2
+)
+call "%DPCPP_ENV%"
+
+set "ONEMKL_ENV=%ONEMKL_ROOT%\env\vars.bat"
+if NOT EXIST "%ONEMKL_ENV%" (
+    echo oneMKL environment "%ONEMKL_ENV%" doesn't seem to exist.
+    exit /b 3
+)
+call "%ONEMKL_ENV%"
+>>>>>>> master
 
 rem Check existence of required Windows commands
 for %%A in (python git cl) do (
@@ -142,4 +160,8 @@ for %%f in ("dist\*.whl") do python -m pip install --force-reinstall --no-deps "
 
 rem Sanity Test
 cd ..
+<<<<<<< HEAD
 python -c "import torch; import torchvision; import intel_extension_for_pytorch as ipex; print(f'torch_version:       {torch.__version__}'); print(f'torchvision_version: {torchvision.__version__}'); print(f'ipex_version:        {ipex.__version__}');"
+=======
+python -c "import torch; import torchvision; import intel_extension_for_pytorch as ipex; print(f'torch_version:       {torch.__version__}'); print(f'torchvision_version: {torchvision.__version__}'); print(f'ipex_version:        {ipex.__version__}');"
+>>>>>>> master

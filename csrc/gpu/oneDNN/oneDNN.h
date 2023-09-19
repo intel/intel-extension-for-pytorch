@@ -25,3 +25,4 @@
 // Quant
 #include "QConv.h"
 #include "QDeconv.h"
+#include "QMatmul.h"

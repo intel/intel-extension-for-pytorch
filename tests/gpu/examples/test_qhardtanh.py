@@ -2,30 +2,29 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
-
+import platform
 
 class TestTorchMethod(TestCase):
     def test_qhardtanh(self, dtype=torch.float):
-        zero_point = 0
+        zp_vec = [0] if platform.system() == 'Windows' else [0, 2]
+        for dtype in [torch.qint8, torch.quint8]:
+            for zp in zp_vec:
+                inputs = torch.randn(5, 5)
 
-        dtype_inputs = torch.quint8
+                q_inputs = torch.quantize_per_tensor(inputs, 0.4, zp, dtype)
 
-        inputs = torch.randn(5, 5)
+                output_int8 = torch.nn.quantized.functional.hardtanh(q_inputs)
 
-        q_inputs = torch.quantize_per_tensor(inputs, 0.4, zero_point, dtype_inputs)
+                print("start xpu")
+                inputs_gpu = inputs.to("xpu")
 
-        output_int8 = torch.nn.quantized.functional.hardtanh(q_inputs)
+                q_inputs_gpu = torch.quantize_per_tensor(
+                    inputs_gpu, 0.4, zp, dtype
+                )
 
-        print("start xpu")
-        inputs_gpu = inputs.to("xpu")
+                output_gpu_int8 = torch.nn.quantized.functional.hardtanh(q_inputs_gpu)
 
-        q_inputs_gpu = torch.quantize_per_tensor(
-            inputs_gpu, 0.4, zero_point, dtype_inputs
-        )
-
-        output_gpu_int8 = torch.nn.quantized.functional.hardtanh(q_inputs_gpu)
-
-        self.assertEqual(output_int8, output_gpu_int8)
+                self.assertEqual(output_int8, output_gpu_int8)
 
 
 if __name__ == "__main__":

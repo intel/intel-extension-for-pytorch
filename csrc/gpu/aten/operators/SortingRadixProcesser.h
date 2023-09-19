@@ -153,8 +153,8 @@ class GroupRadixProcesser {
       dpcpp_local_acc_t<unsigned char> buffer)
       : item_(item),
         lid_(item.get_local_id(0)),
-        local_storage_(reinterpret_cast<LocalStorage&>(
-            *(IPEXGetLocalAccPointer(buffer)))) {}
+        local_storage_(
+            reinterpret_cast<LocalStorage&>(*(buffer.get_pointer().get()))) {}
 
   inline void exchange_keys(
       KeyTraitsT (&ukeys)[KEYS_PER_ITEM],

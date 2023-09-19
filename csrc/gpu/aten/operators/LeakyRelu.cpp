@@ -57,25 +57,4 @@ Tensor& leaky_relu_backward_out(
 
 } // namespace AtenIpexTypeXPU
 
-namespace AtenIpexTypeQuantizedXPU {
-Tensor& q_leaky_relu(Tensor& out, const Tensor& self, Scalar negative_slope) {
-  float alpha = negative_slope.to<float>();
-  xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(out, self, alpha, 0.0f);
-  return out;
-}
-
-Tensor& leaky_relu_(Tensor& self, const Scalar& negative_slope) {
-  return q_leaky_relu(self, self, negative_slope);
-}
-
-Tensor leaky_relu(const Tensor& self, const Scalar& negative_slope) {
-  Tensor out = at::_empty_affine_quantized(
-      self.sizes(),
-      self.options().dtype(toQIntType(self.scalar_type())),
-      self.q_scale(),
-      self.q_zero_point());
-  auto result = q_leaky_relu(out, self, negative_slope);
-  return result;
-}
-} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

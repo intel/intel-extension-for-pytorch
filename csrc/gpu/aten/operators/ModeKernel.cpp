@@ -646,7 +646,7 @@ static void mode_xpu_kernel(
             problem_indices_ptr,
             values_info,
             indices_info,
-            (scalar_t*)(IPEXGetLocalAccPointer(slm)),
+            static_cast<scalar_t*>(slm.get_pointer().get()),
             scratch_status_ptr,
             scratch_value_ptr,
             problem_time,
@@ -690,10 +690,10 @@ static void mode_xpu_kernel(
             problem_values_ptr,
             values_info,
             indices_info,
-            (ModeOpHelper*)(IPEXGetLocalAccPointer(slm_helper)),
-            (ModeOpValueIndex<scalar_t>*)(IPEXGetLocalAccPointer(
-                slm_value_indice)),
-            (std::byte*)(IPEXGetLocalAccPointer(sort_scratch)),
+            static_cast<ModeOpHelper*>(slm_helper.get_pointer().get()),
+            static_cast<ModeOpValueIndex<scalar_t>*>(
+                slm_value_indice.get_pointer().get()),
+            static_cast<std::byte*>(sort_scratch.get_pointer().get()),
             sort_scratch_memory_size,
             problem_time,
             problem_size,

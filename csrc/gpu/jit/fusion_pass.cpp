@@ -681,6 +681,17 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
       Symbol::fromQualString("aten::quantize_per_tensor")},
      xpu::q_conv2d_dequantize_silu_quantize_sym},
 
+    // QLinear fusion variants
+    {{Symbol::fromQualString("quantized::linear"),
+      Symbol::fromQualString("aten::sigmoid")},
+     xpu::q_linear_sigmoid_sym},
+    {{Symbol::fromQualString("quantized::linear"),
+      Symbol::fromQualString("aten::relu")},
+     xpu::q_linear_relu_sym},
+    {{Symbol::fromQualString("quantized::linear"),
+      Symbol::fromQualString("aten::mish")},
+     xpu::q_linear_relu_sym},
+
     IPEX_DEFINE_TWO_SYMBOL_FUSION(
         xpu::conv2d_binary_mul_sym,
         aten::add,
@@ -780,14 +791,6 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     IPEX_DEFINE_LINEAR_BINARY_FUSION(div),
     IPEX_DEFINE_LINEAR_BINARY_FUSION(max),
     IPEX_DEFINE_LINEAR_BINARY_FUSION(min),
-
-    // Note: oneDNN not implement linear + binary_compare_ops
-    // IPEX_DEFINE_LINEAR_BINARY_FUSION(eq),
-    // IPEX_DEFINE_LINEAR_BINARY_FUSION(ne),
-    // IPEX_DEFINE_LINEAR_BINARY_FUSION(ge),
-    // IPEX_DEFINE_LINEAR_BINARY_FUSION(gt),
-    // IPEX_DEFINE_LINEAR_BINARY_FUSION(le),
-    // IPEX_DEFINE_LINEAR_BINARY_FUSION(lt),
 
     // define matmul related fusion pattern
     IPEX_DEFINE_MATMUL_FUSION(sqrt),

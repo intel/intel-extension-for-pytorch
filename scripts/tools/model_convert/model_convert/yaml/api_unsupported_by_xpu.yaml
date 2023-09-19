@@ -27,7 +27,6 @@
 - torch.cuda.traceback
 - torch.cuda._device_count_nvml
 - torch.cuda._CudaBase
-- torch.cuda.caching_allocator_alloc
 - torch.cuda.check_error
 - torch.cuda.CUDAPluggableAllocator
 - torch.cuda.has_half
@@ -54,7 +53,6 @@
 - torch.cuda._sleep
 - torch.cuda.get_allocator_backend
 - torch.cuda.set_per_process_memory_fraction
-- torch.cuda.caching_allocator_delete
 - torch.cuda._warn_typed_storage_removal
 - torch.cuda.has_magma
 - torch.cuda.mem_get_info

@@ -322,7 +322,7 @@ void LayerNormKernelImpl(
     Tensor& Y,
     Tensor& mean,
     Tensor& rstd) {
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       X.scalar_type(),
@@ -608,7 +608,7 @@ void LayerNormBackwardKernelImpl(
     Tensor& dgamma,
     Tensor& dbeta,
     std::array<bool, 3> grad_input_mask) {
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       X.scalar_type(),

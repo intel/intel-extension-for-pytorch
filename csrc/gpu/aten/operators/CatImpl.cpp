@@ -216,10 +216,6 @@ void parallel_cat(
   // Next, let's initialize the size, stride arrays for the output Tensor.
   param.zero_point_out = out.is_quantized() ? out.q_zero_point() : 0;
   param.scale_out = AsignOneDnnQuantizeScale(out, 1.0f, param.zero_point_out);
-  if ((at::kQInt8 == out.scalar_type() || at::kQUInt8 == out.scalar_type()) &&
-      (128 == param.zero_point_out)) {
-    param.zero_point_out = 0;
-  }
 
   for (int i = 0; i < nDims; ++i) {
     param.outputSize[i] = at::native::size(out, i);
@@ -252,11 +248,6 @@ void parallel_cat(
             inputs[i + batchCounter].get(),
             1.0f,
             stackInputs[batchCounter].zero_point_in);
-        if ((at::kQInt8 == inputs[i + batchCounter].get().scalar_type() ||
-             at::kQUInt8 == inputs[i + batchCounter].get().scalar_type()) &&
-            (128 == stackInputs[batchCounter].zero_point_in)) {
-          stackInputs[batchCounter].zero_point_in = 0;
-        }
 
         stackInputs[batchCounter].offset = offset;
         stackInputs[batchCounter].dimSize = dimSize;
@@ -474,13 +465,6 @@ double AsignOneDnnQuantizeScale(
     return default_scale;
   }
   double res = t.q_scale();
-  auto q_ctx = DPCPPTensorContext::get_tensor_ctx(t);
-  res = ((q_ctx.is_plain()
-              ? get_onednn_dtype(t)
-              : q_ctx.meta().get_data_type()) == memory::data_type::u8 &&
-         zero_point == 128)
-      ? static_cast<float>(res / 2)
-      : static_cast<float>(res);
   return res;
 }
 

@@ -80,17 +80,20 @@ def _single_tensor_adagrad(
         clr = lr / (1 + (step - 1) * lr_decay)
 
         if grad.is_sparse:
-            grad = grad.coalesce()  # the update is non-linear so indices must be unique
-            grad_indices = grad._indices()
-            grad_values = grad._values()
-            size = grad.size()
+            if (grad.dtype == torch.bfloat16) or (not grad.is_xpu):
+                grad = grad.coalesce()  # the update is non-linear so indices must be unique
+                grad_indices = grad._indices()
+                grad_values = grad._values()
+                size = grad.size()
 
-            state_sum.add_(_make_sparse(grad, grad_indices, grad_values.pow(2)))
-            std = state_sum.sparse_mask(grad)
-            std_values = std._values().sqrt_().add_(eps)
-            param.add_(
-                _make_sparse(grad, grad_indices, grad_values / std_values), alpha=-clr
-            )
+                state_sum.add_(_make_sparse(grad, grad_indices, grad_values.pow(2)))
+                std = state_sum.sparse_mask(grad)
+                std_values = std._values().sqrt_().add_(eps)
+                param.add_(
+                    _make_sparse(grad, grad_indices, grad_values / std_values), alpha=-clr
+                )
+            else:
+                torch.ops.torch_ipex.adagrad_fused_step_with_sparse_grad(param, state_sum, param2, grad, clr, eps)
         else:
             is_complex = torch.is_complex(param)
             if is_complex:

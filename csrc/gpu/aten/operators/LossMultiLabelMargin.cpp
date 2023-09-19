@@ -93,7 +93,9 @@ void multilabel_margin_loss_forward_kernel(
 
       acc_t total_sum = 0.0f;
       total_sum = GroupReduceSum(
-          item_id, static_cast<acc_t>(sum), IPEXGetLocalAccPointer(smem));
+          item_id,
+          static_cast<acc_t>(sum),
+          static_cast<acc_t*>(smem.get_pointer().get()));
 
       if (local_item_id == 0) {
         if (size_average) {
@@ -180,7 +182,9 @@ void multilabel_margin_loss_backward_kernel(
 
         acc_t total_sum = 0.0f;
         total_sum = GroupReduceSum(
-            item, static_cast<acc_t>(sum), IPEXGetLocalAccPointer(smem));
+            item,
+            static_cast<acc_t>(sum),
+            static_cast<acc_t*>(smem.get_pointer().get()));
         if (local_id == 0) {
           grad_input_k[target_idx] += static_cast<scalar_t>(total_sum);
         }

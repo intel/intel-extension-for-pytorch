@@ -403,10 +403,10 @@ def optimize(
     if opt_properties.auto_kernel_selection:
         _enable_dnnl()
 
-    # if device_type == "cpu":
-    #     if opt_properties.optimize_transformers:
-    #         warnings.warn("Transformer opitmization is only support on XPU now.")
-    #         opt_properties.optimize_transformers = False
+    if device_type == "cpu":
+        if opt_properties.optimize_transformers:
+            warnings.warn("Transformer opitmization is only support on XPU now.")
+            opt_properties.optimize_transformers = False
 
     # when on xpu, parts of features are not supported
     if device_type == "xpu":
@@ -491,6 +491,10 @@ def optimize(
 
     if opt_properties.optimize_lstm:
         replace_lstm_with_ipex_lstm(optimized_model, optimized_optimizer)
+
+    if opt_properties.optimize_transformers:
+        utils._model_convert.replace_transformer_with_ipex_transformer(optimized_model)
+
     if (
         model.training
         and opt_properties.split_master_weight_for_bf16
@@ -548,8 +552,8 @@ def optimize(
                 opt_properties.split_master_weight_for_bf16,
                 dtype,
                 device_type
-
             )
+
     # Since TorchDynamo cannot handle custom operations yet, for the case of inference graph mode,
     # the weights prepacking here is temporarily cancelled, and it will be completed on the graph.
     if opt_properties.weights_prepack and device_type == "cpu":

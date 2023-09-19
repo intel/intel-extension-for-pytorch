@@ -289,6 +289,47 @@ def max_memory_cached(device: Union[Device, int] = None) -> int:
     return max_memory_reserved(device=device)
 
 
+def caching_allocator_alloc(size, device: Union[Device, int] = None):
+    r"""Performs a memory allocation using the XPU memory allocator.
+
+    Memory is allocated for a given device and a stream, this
+    function is intended to be used for interoperability with other
+    frameworks. Allocated memory is released through
+    :func:`~torch.xpu.caching_allocator_delete`.
+
+    Args:
+        size (int): number of bytes to be allocated.
+        device (torch.device or int, optional): selected device. If it is
+            ``None`` the default XPU device is used.
+
+    .. note::
+        See :ref:`xpu-memory-management` for more details about GPU memory
+        management.
+    """
+    if device is None:
+        device = intel_extension_for_pytorch._C._getDevice()
+    device = _get_device_index(device)
+    with torch.xpu.device(device):
+        return torch._C._xpu_CachingAllocator_raw_alloc(size)
+
+
+def caching_allocator_delete(mem_ptr):
+    r"""Deletes memory allocated using the XPU memory allocator.
+
+    Memory allocated with :func:`~torch.xpu.caching_allocator_alloc`.
+    is freed here. The associated device and stream are tracked inside
+    the allocator.
+
+    Args:
+        mem_ptr (int): memory address to be freed by the allocator.
+
+    .. note::
+        See :ref:`xpu-memory-management` for more details about GPU memory
+        management.
+    """
+    torch._C._xpu_CachingAllocator_raw_delete(mem_ptr)
+
+
 def memory_snapshot():
     r"""Returns a snapshot of the XPU memory allocator state across all devices.
 

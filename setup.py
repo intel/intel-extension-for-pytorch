@@ -51,7 +51,6 @@
 # Common build options:
 # BUILD_WITH_CPU        - to build IPEX with CPU libraries
 # BUILD_WITH_XPU        - to build IPEX with XPU libraries
-# BUILD_STATIC_ONEMKL   - to link static oneMKL libraries
 #
 # CPU build options:
 # IPEX_DISP_OP          - to output the extension operators name for debug purpose

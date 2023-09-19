@@ -21,20 +21,20 @@ def may_import_deepspeed_modules():
         return None
 
 
-# installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
-# if "deepspeed" in installed_pkg:
-#     from deepspeed import comm
+installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
+if "deepspeed" in installed_pkg:
+    from deepspeed import comm
 
-#     def _all_reduce(self, reduceOp, tag, ranks, group_size):
-#         comm.all_reduce(self, async_op=False)
-#         return self
+    def _all_reduce(self, reduceOp, tag, ranks, group_size):
+        comm.all_reduce(self, async_op=False)
+        return self
 
-#     ds_comm = torch.library.Library("deepspeed_comm", "DEF")
-#     ds_comm.define(
-#         "all_reduce(Tensor self, str reduceOp, str tag, int[] ranks, int group_size) -> Tensor"
-#     )
-#     ds_comm_lib_cpu = torch.library.Library("deepspeed_comm", "IMPL", "CPU")
-#     ds_comm_lib_cpu.impl("all_reduce", _all_reduce)
+    ds_comm = torch.library.Library("deepspeed_comm", "DEF")
+    ds_comm.define(
+        "all_reduce(Tensor self, str reduceOp, str tag, int[] ranks, int group_size) -> Tensor"
+    )
+    ds_comm_lib_cpu = torch.library.Library("deepspeed_comm", "IMPL", "CPU")
+    ds_comm_lib_cpu.impl("all_reduce", _all_reduce)
 
 
 def _ipex_module_load_from_state_dict_(self, state_dict, prefix):

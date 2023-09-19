@@ -48,6 +48,8 @@
 - torch.cuda.set_rng_state
 - torch.cuda.seed_all
 - torch.cuda.set_rng_state_all
+- torch.cuda.caching_allocator_alloc
+- torch.cuda.caching_allocator_delete
 - torch.cuda.ComplexFloatStorage
 - torch.cuda.get_device_properties
 - torch.cuda.initial_seed

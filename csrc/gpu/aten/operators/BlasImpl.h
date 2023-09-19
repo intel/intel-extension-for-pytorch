@@ -660,6 +660,8 @@ static bool get_onednn_matmul_binary_attr(
         attr_update.append_post_eltwise(1.f, beta, 0.f, attr.kind_with_linear);
     }
   }
+  attr_update.q_scale_ = attr.q_scale_;
+  attr_update.q_zero_point_ = attr.q_zero_point_;
   attr = attr_update;
   return true;
 }

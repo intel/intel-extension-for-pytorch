@@ -21,6 +21,7 @@ from torch.utils.hipify.hipify_python import GeneratedFileCleaner
 from typing import List, Optional, Union, Tuple
 from torch.torch_version import TorchVersion
 
+from pathlib import Path
 from setuptools.command.build_ext import build_ext
 
 IS_WINDOWS = sys.platform == "win32"
@@ -457,8 +458,138 @@ class DpcppBuildExtension(build_ext, object):
 
             _write_ninja_file_and_link_library(objects, output_libname, build_directory, ldflags, verbose=True)
 
+        def win_wrap_single_compile(sources,
+                                    output_dir=None,
+                                    macros=None,
+                                    include_dirs=None,
+                                    debug=0,
+                                    extra_preargs=None,
+                                    extra_postargs=None,
+                                    depends=None):
+
+            self.cflags = copy.deepcopy(extra_postargs)
+            extra_postargs = None
+
+            def spawn(cmd):
+                # Using regex to match src, obj and include files
+                src_regex = re.compile('/T(p|c)(.*)')
+                src_list = [
+                    m.group(2) for m in (src_regex.match(elem) for elem in cmd)
+                    if m
+                ]
+
+                obj_regex = re.compile('/Fo(.*)')
+                obj_list = [
+                    m.group(1) for m in (obj_regex.match(elem) for elem in cmd)
+                    if m
+                ]
+
+                include_regex = re.compile(r'((\-|\/)I.*)')
+                include_list = [
+                    m.group(1)
+                    for m in (include_regex.match(elem) for elem in cmd) if m
+                ]
+
+                if len(src_list) >= 1 and len(obj_list) >= 1:
+                    src = src_list[0]
+                    obj = obj_list[0]
+                    if _is_cpp_file(src) or _is_c_file(src):
+                        if _is_cpp_file(src):
+                            _bin = get_dpcpp_complier()
+                        else:
+                            _bin = get_icx_complier()
+
+                        if isinstance(self.cflags, dict):
+                            cflags = self.cflags['cxx'] + COMMON_DPCPP_FLAGS
+                        elif isinstance(self.cflags, list):
+                            cflags = self.cflags + COMMON_DPCPP_FLAGS
+                        else:
+                            cflags = COMMON_DPCPP_FLAGS
+
+                        if "-fPIC" in cflags:   # Windows does not support this argument
+                            cflags.remove("-fPIC")
+                        cflags = cflags + ['-std=c++17', SYCL_FLAG]
+
+                        cmd = [_bin, '-c', src, '-o', obj] + include_list + cflags
+                    elif isinstance(self.cflags, dict):
+                        cflags = COMMON_DPCPP_FLAGS + self.cflags['cxx']
+                        append_std17_if_no_std_present(cflags)
+                        cmd += cflags
+                    elif isinstance(self.cflags, list):
+                        cflags = COMMON_DPCPP_FLAGS + self.cflags
+                        append_std17_if_no_std_present(cflags)
+                        cmd += cflags
+
+                return original_spawn(cmd)
+
+            try:
+                self.compiler.spawn = spawn
+                return original_compile(sources, output_dir, macros,
+                                        include_dirs, debug, extra_preargs,
+                                        extra_postargs, depends)
+            finally:
+                self.compiler.spawn = original_spawn
+
+        def win_wrap_single_link_shared_object(
+            objects,
+            output_libname,
+            output_dir=None,
+            libraries=None,
+            library_dirs=None,
+            runtime_library_dirs=None,
+            export_symbols=None,
+            debug=0,
+            extra_preargs=None,
+            extra_postargs=None,
+            build_temp=None,
+            target_lang=None,
+        ):
+            create_parent_dirs_by_path(output_libname)
+
+            _cxxbin = get_dpcpp_complier()
+            cmd = _gen_link_lib_cmd_line(
+                _cxxbin,
+                objects,
+                output_libname,
+                library_dirs,
+                runtime_library_dirs,
+                libraries,
+                extra_postargs,
+            )
+
+            win_lib_regex = re.compile(r"([^/\\]*)\.lib")
+            linux_lib_regex = re.compile(r"lib(.*?)\.a")
+            for i, arg in enumerate(cmd):
+                if arg == "/DLL":
+                    # "/DLL" -> "-shared"
+                    cmd[i] = "-shared"
+                elif arg.startswith("/LIBPATH:"):
+                    # "/LIBPATH:xxx" -> "-Lxxx"
+                    cmd[i] = arg.replace("/LIBPATH:", "-L")
+                elif win_lib_regex.match(arg) is not None:
+                    # "xxx.lib" -> "-lxxx"
+                    matchobj = win_lib_regex.match(arg)
+                    cmd[i] = f"-l{matchobj.group(1)}"
+                elif linux_lib_regex.match(Path(arg).name) is not None:
+                    # "libxxx.a" -> "xxx.lib"
+                    filePath = Path(arg)
+                    matchobj = linux_lib_regex.match(filePath.name)
+                    cmd[i] = str(filePath.parent / f"{matchobj.group(1)}.lib")
+
+            unavaiable_libs = ["sycl", "pthread", "m", "dl"]
+            for lib in unavaiable_libs:
+                if f"-l{lib}" in cmd:
+                    cmd.remove(f"-l{lib}")
+
+            return original_spawn(cmd)
+
         if self.compiler.compiler_type == "msvc":
-            raise "Not implemented"
+            if self.use_ninja:
+                # todo
+                raise "Not implemented"
+            else:
+                self.compiler.compile = win_wrap_single_compile
+                self.compiler.link_shared_object = win_wrap_single_link_shared_object
         else:
             if self.use_ninja:
                 self.compiler.compile = unix_wrap_ninja_compile

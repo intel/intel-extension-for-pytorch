@@ -2496,9 +2496,6 @@ class TestNNMethod(TestCase):
         input_cpu = torch.rand([1, 2, 9, 9])
         input_xpu = input_cpu.clone().to("xpu")
 
-        torch._C._jit_set_profiling_mode(True)
-        torch._C._jit_set_profiling_executor(True)
-
         # cpu int8
         modelJit = torch.jit.trace(model, input_cpu)
         modelJit.eval()
@@ -2530,9 +2527,6 @@ class TestNNMethod(TestCase):
         print("start inference ...")
         for i in range(5):
             output_cpu = modelJit(input_cpu)
-
-        torch._C._jit_set_profiling_mode(False)
-        torch._C._jit_set_profiling_executor(False)
 
         # xpu
         print("-------start xpu path-------")
