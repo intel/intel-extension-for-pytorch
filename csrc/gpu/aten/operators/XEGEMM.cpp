@@ -59,8 +59,11 @@ static Tensor mm_resadd(
     policy.run();
   } else {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_resadd)
-    xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, Attr());
-    output = output + Scalar(res_factor) * res.flatten(0, -2);
+    auto att = Attr();
+    Tensor binary =
+        (res.dim() == 1 ? res.unsqueeze(0) : res) * Scalar(res_factor);
+    att.append_post_binary(att.kind_with_binary_add, binary);
+    xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, att);
   }
   return matmul_resize(a, output);
 }
@@ -89,9 +92,14 @@ static Tensor mm_resadd_resadd(
     policy.run();
   } else {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_resadd_resadd)
-    xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, Attr());
-    output = output + Scalar(res0_factor) * res0.flatten(0, -2) +
-        Scalar(res1_factor) * res1.flatten(0, -2);
+    auto att = Attr();
+    Tensor binary0 =
+        (res0.dim() == 1 ? res0.unsqueeze(0) : res0) * Scalar(res0_factor);
+    att.append_post_binary(att.kind_with_binary_add, binary0);
+    Tensor binary1 =
+        (res1.dim() == 1 ? res1.unsqueeze(0) : res1) * Scalar(res1_factor);
+    att.append_post_binary(att.kind_with_binary_add, binary1);
+    xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, att);
   }
   return matmul_resize(a, output);
 }
@@ -147,9 +155,11 @@ static Tensor mm_bias_resadd(
     policy.run();
   } else {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_resadd)
-    xpu::oneDNN::matmul(
-        output, af, b, bias * Scalar(bias_factor), true, Attr());
-    output = output + Scalar(res_factor) * res.flatten(0, -2);
+    auto att = Attr();
+    Tensor binary =
+        (res.dim() == 1 ? res.unsqueeze(0) : res) * Scalar(res_factor);
+    att.append_post_binary(att.kind_with_binary_add, binary);
+    xpu::oneDNN::matmul(output, af, b, bias * Scalar(bias_factor), true, att);
   }
   return matmul_resize(a, output);
 }
@@ -181,15 +191,20 @@ static Tensor mm_bias_resadd_resadd(
     policy.run();
   } else {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_resadd_resadd)
+    auto att = Attr();
+    Tensor binary0 =
+        (res0.dim() == 1 ? res0.unsqueeze(0) : res0) * Scalar(res0_factor);
+    att.append_post_binary(att.kind_with_binary_add, binary0);
+    Tensor binary1 =
+        (res1.dim() == 1 ? res1.unsqueeze(0) : res1) * Scalar(res1_factor);
+    att.append_post_binary(att.kind_with_binary_add, binary1);
     auto split_ms = hgemm_split_m(m, n);
     auto bias_ = bias * Scalar(bias_factor);
     for (auto data : split_ms) {
       auto newo = output.narrow(0, std::get<0>(data), std::get<1>(data));
       auto newa = af.narrow(0, std::get<0>(data), std::get<1>(data));
-      xpu::oneDNN::matmul(newo, newa, b, bias_, true, Attr());
+      xpu::oneDNN::matmul(newo, newa, b, bias_, true, att);
     }
-    output = output + Scalar(res0_factor) * res0.flatten(0, -2) +
-        Scalar(res1_factor) * res1.flatten(0, -2);
   }
   return matmul_resize(a, output);
 }
@@ -379,25 +394,11 @@ static void mm_qkv_out(
           bias_.value()[2], input, wv, at::Scalar(1), at::Scalar(1), out2_);
     }
   } else {
-    int selected_policy;
-
-    selected_policy = hgemm_qkv_mapped_config(m, n, k, is_b_row_major);
-    if (selected_policy < 0) {
-      int m_real = (3 * (m + 127) / 128 * 128);
-      selected_policy = select_gemm_config(m_real, n, k, is_b_row_major, 64);
-    }
-
     char str__[100];
     if (!has_bias) {
-      sprintf(
-          str__,
-          "hgemm_qkv%s(%d, %d, %d)",
-          hgemm_policy_names[selected_policy],
-          m,
-          n,
-          k);
+      sprintf(str__, "hgemm_qkv(%d, %d, %d)", m, n, k);
       RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
-      hgemm_qkv_policies[selected_policy](
+      hgemm_qkv(
           q,
           reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
@@ -406,17 +407,12 @@ static void mm_qkv_out(
           reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
           m,
           n,
-          k);
+          k,
+          is_b_row_major);
     } else {
-      sprintf(
-          str__,
-          "hgemm_qkv_bias%s(%d, %d, %d)",
-          hgemm_policy_names[selected_policy],
-          m,
-          n,
-          k);
+      sprintf(str__, "hgemm_qkv_bias(%d, %d, %d)", m, n, k);
       RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
-      hgemm_qkv_bias_policies[selected_policy](
+      hgemm_qkv_bias(
           q,
           reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
@@ -426,7 +422,8 @@ static void mm_qkv_out(
           reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()),
           m,
           n,
-          k);
+          k,
+          is_b_row_major);
     }
   }
 }

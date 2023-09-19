@@ -11,16 +11,9 @@
 
 using namespace xpu::xetla;
 
-#define RECORD_FUNCTION_IMPL(F, POLICY_ID, M, N, K) \
+#define RECORD_FUNCTION_IMPL(F, M, N, K)            \
   char str__[100];                                  \
-  sprintf(                                          \
-      str__,                                        \
-      "%s%s(%d, %d, %d)",                           \
-      "" #F,                                        \
-      hgemm_policy_names[POLICY_ID],                \
-      M,                                            \
-      N,                                            \
-      K);                                           \
+  sprintf(str__, "%s(%d, %d, %d)", "" #F, M, N, K); \
   RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
 
 class HGEMM_XETLA final {
@@ -48,7 +41,6 @@ class HGEMM_XETLA final {
   bool is_b_col_major_;
   bool valid_ = false;
   int m_, n_, k_;
-  int selected_policy_;
   float alpha_ = 1.0f;
 
  public:
@@ -135,8 +127,6 @@ class HGEMM_XETLA final {
         } break;
       }
     }
-    selected_policy_ = select_gemm_config(
-        m_, n_, k_, is_b_row_major_, 64); // 64 is subslice count per tile
     valid_ = true;
     return *this;
 #undef __CHECK
@@ -148,20 +138,21 @@ class HGEMM_XETLA final {
     auto& q = dpcppGetCurrentQueue();
 
     if (num_epilogues_ == 0) {
-      RECORD_FUNCTION_IMPL(hgemm_common, selected_policy_, m_, n_, k_)
+      RECORD_FUNCTION_IMPL(hgemm_common, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
-      hgemm_common_policies[selected_policy_](
+      hgemm_common(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
           m_,
           n_,
-          k_);
+          k_,
+          is_b_row_major_);
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == RES_ADD) {
       if (alpha_ == 1.0f) {
-        RECORD_FUNCTION_IMPL(hgemm_res, selected_policy_, m_, n_, k_)
-        hgemm_res_policies[selected_policy_](
+        RECORD_FUNCTION_IMPL(hgemm_res, m_, n_, k_)
+        hgemm_res(
             q,
             reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
             reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
@@ -171,10 +162,11 @@ class HGEMM_XETLA final {
             m_,
             n_,
             k_,
-            epilogue_params_[0]);
+            epilogue_params_[0],
+            is_b_row_major_);
       } else {
-        RECORD_FUNCTION_IMPL(hgemm_addmm, selected_policy_, m_, n_, k_)
-        hgemm_addmm_policies[selected_policy_](
+        RECORD_FUNCTION_IMPL(hgemm_addmm, m_, n_, k_)
+        hgemm_addmm(
             q,
             reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
             reinterpret_cast<sycl::half*>(
@@ -185,14 +177,15 @@ class HGEMM_XETLA final {
             n_,
             k_,
             alpha_,
-            epilogue_params_[0]);
+            epilogue_params_[0],
+            is_b_row_major_);
       }
     } else if (
         num_epilogues_ == 2 && epilogue_types_[0] == RES_ADD &&
         epilogue_types_[1] == RES_ADD) {
-      RECORD_FUNCTION_IMPL(hgemm_res_res, selected_policy_, m_, n_, k_)
+      RECORD_FUNCTION_IMPL(hgemm_res_res, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
-      hgemm_res_res_policies[selected_policy_](
+      hgemm_res_res(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
@@ -205,11 +198,12 @@ class HGEMM_XETLA final {
           n_,
           k_,
           epilogue_params_[0],
-          epilogue_params_[1]);
+          epilogue_params_[1],
+          is_b_row_major_);
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == BIAS) {
-      RECORD_FUNCTION_IMPL(hgemm_bias, selected_policy_, m_, n_, k_)
+      RECORD_FUNCTION_IMPL(hgemm_bias, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
-      hgemm_bias_policies[selected_policy_](
+      hgemm_bias(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
@@ -219,13 +213,14 @@ class HGEMM_XETLA final {
           m_,
           n_,
           k_,
-          epilogue_params_[0]);
+          epilogue_params_[0],
+          is_b_row_major_);
     } else if (
         num_epilogues_ == 2 && epilogue_types_[0] == BIAS &&
         epilogue_types_[1] == RES_ADD) {
-      RECORD_FUNCTION_IMPL(hgemm_bias_res, selected_policy_, m_, n_, k_)
+      RECORD_FUNCTION_IMPL(hgemm_bias_res, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
-      hgemm_bias_res_policies[selected_policy_](
+      hgemm_bias_res(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
@@ -238,13 +233,14 @@ class HGEMM_XETLA final {
           n_,
           k_,
           epilogue_params_[0],
-          epilogue_params_[1]);
+          epilogue_params_[1],
+          is_b_row_major_);
     } else if (
         num_epilogues_ == 3 && epilogue_types_[0] == BIAS &&
         epilogue_types_[1] == RES_ADD && epilogue_types_[2] == RES_ADD) {
-      RECORD_FUNCTION_IMPL(hgemm_bias_res_res, selected_policy_, m_, n_, k_)
+      RECORD_FUNCTION_IMPL(hgemm_bias_res_res, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
-      hgemm_bias_res_res_policies[selected_policy_](
+      hgemm_bias_res_res(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
@@ -260,13 +256,14 @@ class HGEMM_XETLA final {
           k_,
           epilogue_params_[0],
           epilogue_params_[1],
-          epilogue_params_[2]);
+          epilogue_params_[2],
+          is_b_row_major_);
     } else if (
         num_epilogues_ == 2 && epilogue_types_[0] == BIAS &&
         epilogue_types_[1] == GELU) {
-      RECORD_FUNCTION_IMPL(hgemm_bias_gelu, selected_policy_, m_, n_, k_)
+      RECORD_FUNCTION_IMPL(hgemm_bias_gelu, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
-      hgemm_bias_gelu_policies[selected_policy_](
+      hgemm_bias_gelu(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
@@ -276,11 +273,12 @@ class HGEMM_XETLA final {
           m_,
           n_,
           k_,
-          epilogue_params_[0]);
+          epilogue_params_[0],
+          is_b_row_major_);
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == RES_MUL) {
-      RECORD_FUNCTION_IMPL(hgemm_resmul, selected_policy_, m_, n_, k_)
+      RECORD_FUNCTION_IMPL(hgemm_resmul, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
-      hgemm_resmul_policies[selected_policy_](
+      hgemm_resmul(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
@@ -289,18 +287,20 @@ class HGEMM_XETLA final {
               epilogue_tensors_[0]->data_ptr<scalar_t>()),
           m_,
           n_,
-          k_);
+          k_,
+          is_b_row_major_);
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == SILU) {
-      RECORD_FUNCTION_IMPL(hgemm_silu, selected_policy_, m_, n_, k_)
+      RECORD_FUNCTION_IMPL(hgemm_silu, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
-      hgemm_silu_policies[selected_policy_](
+      hgemm_silu(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
           m_,
           n_,
-          k_);
+          k_,
+          is_b_row_major_);
     } else {
       TORCH_CHECK(false, "No mateched policy");
     }

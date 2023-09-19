@@ -7,9 +7,9 @@ import intel_extension_for_pytorch  # noqa
 
 
 def ipex_addmm(m, n, k, dtype):
-    a = torch.randn(m, k).type(dtype).xpu()
-    b = torch.randn(k, n).type(dtype).xpu()
-    s = torch.randn(m, n).type(dtype).xpu()
+    a = torch.rand(m, k).type(dtype).xpu()
+    b = torch.rand(k, n).type(dtype).xpu()
+    s = torch.rand(m, n).type(dtype).xpu()
     a_cpu = a.cpu().float()
     b_cpu = b.cpu().float()
     s_cpu = s.cpu().float()
@@ -21,8 +21,8 @@ def ipex_addmm(m, n, k, dtype):
 
 
 def ipex_mm_common(m, n, k, dtype):
-    a = torch.randn(2, m, k).type(dtype).xpu()
-    b = torch.randn(k, n).type(dtype).xpu()
+    a = torch.rand(2, m, k).type(dtype).xpu()
+    b = torch.rand(k, n).type(dtype).xpu()
     a_cpu = a.cpu().float()
     b_cpu = b.cpu().float()
     c = torch.ops.torch_ipex.mm_common(a, b)
@@ -33,9 +33,9 @@ def ipex_mm_common(m, n, k, dtype):
 
 
 def ipex_mm_resadd(m, n, k, dtype):
-    a = torch.randn(2, m, k).type(dtype).xpu()
-    b = torch.randn(k, n).type(dtype).xpu()
-    res = torch.randn(2, m, n).type(dtype).xpu()
+    a = torch.rand(2, m, k).type(dtype).xpu()
+    b = torch.rand(k, n).type(dtype).xpu()
+    res = torch.rand(2, m, n).type(dtype).xpu()
     a_cpu = a.cpu().float()
     b_cpu = b.cpu().float()
     res_cpu = res.cpu().float()
@@ -47,10 +47,10 @@ def ipex_mm_resadd(m, n, k, dtype):
 
 
 def ipex_mm_resadd_resadd(m, n, k, dtype):
-    a = torch.randn(2, m, k).type(dtype).xpu()
-    b = torch.randn(k, n).type(dtype).xpu()
-    res0 = torch.randn(2, m, n).type(dtype).xpu()
-    res1 = torch.randn(2, m, n).type(dtype).xpu()
+    a = torch.rand(2, m, k).type(dtype).xpu()
+    b = torch.rand(k, n).type(dtype).xpu()
+    res0 = torch.rand(2, m, n).type(dtype).xpu()
+    res1 = torch.rand(2, m, n).type(dtype).xpu()
     a_cpu = a.cpu().float()
     b_cpu = b.cpu().float()
     res0_cpu = res0.cpu().float()
@@ -63,9 +63,9 @@ def ipex_mm_resadd_resadd(m, n, k, dtype):
 
 
 def ipex_mm_bias(m, n, k, dtype):
-    a = torch.randn(2, m, k).type(dtype).xpu()
-    b = torch.randn(k, n).type(dtype).xpu()
-    bias = torch.randn(n).type(dtype).xpu()
+    a = torch.rand(2, m, k).type(dtype).xpu()
+    b = torch.rand(k, n).type(dtype).xpu()
+    bias = torch.rand(n).type(dtype).xpu()
     a_cpu = a.cpu().float()
     b_cpu = b.cpu().float()
     bias_cpu = bias.cpu().float()
@@ -77,10 +77,10 @@ def ipex_mm_bias(m, n, k, dtype):
 
 
 def ipex_mm_bias_resadd(m, n, k, dtype):
-    a = torch.randn(2, m, k).type(dtype).xpu()
-    b = torch.randn(k, n).type(dtype).xpu()
-    bias = torch.randn(n).type(dtype).xpu()
-    res = torch.randn(2, m, n).type(dtype).xpu()
+    a = torch.rand(2, m, k).type(dtype).xpu()
+    b = torch.rand(k, n).type(dtype).xpu()
+    bias = torch.rand(n).type(dtype).xpu()
+    res = torch.rand(2, m, n).type(dtype).xpu()
     a_cpu = a.cpu().float()
     b_cpu = b.cpu().float()
     bias_cpu = bias.cpu().float()
@@ -93,11 +93,11 @@ def ipex_mm_bias_resadd(m, n, k, dtype):
 
 
 def ipex_mm_bias_resadd_resadd(m, n, k, dtype):
-    a = torch.randn(2, m, k).type(dtype).xpu()
-    b = torch.randn(k, n).type(dtype).xpu()
-    bias = torch.randn(n).type(dtype).xpu()
-    res0 = torch.randn(2, m, n).type(dtype).xpu()
-    res1 = torch.randn(2, m, n).type(dtype).xpu()
+    a = torch.rand(2, m, k).type(dtype).xpu()
+    b = torch.rand(k, n).type(dtype).xpu()
+    bias = torch.rand(n).type(dtype).xpu()
+    res0 = torch.rand(2, m, n).type(dtype).xpu()
+    res1 = torch.rand(2, m, n).type(dtype).xpu()
     a_cpu = a.cpu().float()
     b_cpu = b.cpu().float()
     bias_cpu = bias.cpu().float()
@@ -111,9 +111,9 @@ def ipex_mm_bias_resadd_resadd(m, n, k, dtype):
 
 
 def ipex_mm_resmul(m, n, k, dtype):
-    a = torch.randn(2, m, k).type(dtype).xpu()
-    b = torch.randn(k, n).type(dtype).xpu()
-    res = torch.randn(2, m, n).type(dtype).xpu()
+    a = torch.rand(2, m, k).type(dtype).xpu()
+    b = torch.rand(k, n).type(dtype).xpu()
+    res = torch.rand(2, m, n).type(dtype).xpu()
     a_cpu = a.cpu().float()
     b_cpu = b.cpu().float()
     res_cpu = res.cpu().float()
@@ -125,8 +125,8 @@ def ipex_mm_resmul(m, n, k, dtype):
 
 
 def ipex_mm_silu(m, n, k, dtype):
-    a = torch.randn(2, m, k).type(dtype).xpu()
-    b = torch.randn(k, n).type(dtype).xpu()
+    a = torch.rand(2, m, k).type(dtype).xpu()
+    b = torch.rand(k, n).type(dtype).xpu()
     a_cpu = a.cpu().float()
     b_cpu = b.cpu().float()
     c = torch.ops.torch_ipex.mm_silu(a, b)
@@ -137,8 +137,8 @@ def ipex_mm_silu(m, n, k, dtype):
 
 
 def ipex_mm_gelu(m, n, k, dtype):
-    a = torch.randn(2, m, k).type(dtype).xpu()
-    b = torch.randn(k, n).type(dtype).xpu()
+    a = torch.rand(2, m, k).type(dtype).xpu()
+    b = torch.rand(k, n).type(dtype).xpu()
     a_cpu = a.cpu().float()
     b_cpu = b.cpu().float()
     c = torch.ops.torch_ipex.matmul_gelu(a, b, None, 1.0, 'tanh')
@@ -149,9 +149,9 @@ def ipex_mm_gelu(m, n, k, dtype):
 
 
 def ipex_mm_bias_gelu(m, n, k, dtype):
-    a = torch.randn(2, m, k).type(dtype).xpu()
-    b = torch.randn(k, n).type(dtype).xpu()
-    bias = torch.randn(n).type(dtype).xpu()
+    a = torch.rand(2, m, k).type(dtype).xpu()
+    b = torch.rand(k, n).type(dtype).xpu()
+    bias = torch.rand(n).type(dtype).xpu()
     a_cpu = a.cpu().float()
     b_cpu = b.cpu().float()
     bias_cpu = bias.cpu().float()
@@ -163,12 +163,12 @@ def ipex_mm_bias_gelu(m, n, k, dtype):
 
 
 def ipex_mm_qkv(m, n, k, dtype, with_bias):
-    a = torch.randn(2, m, k).type(dtype).xpu()
-    wq = torch.randn(k, n).type(dtype).xpu()
-    wk = torch.randn(k, n).type(dtype).xpu()
-    wv = torch.randn(k, n).type(dtype).xpu()
+    a = torch.rand(2, m, k).type(dtype).xpu()
+    wq = torch.rand(k, n).type(dtype).xpu()
+    wk = torch.rand(k, n).type(dtype).xpu()
+    wv = torch.rand(k, n).type(dtype).xpu()
     wqkv = torch.stack([wq, wk, wv]).contiguous().xpu()
-    bias = torch.randn(3, n).type(dtype).xpu()
+    bias = torch.rand(3, n).type(dtype).xpu()
 
     a_cpu = a.cpu().float()
     wq_cpu = wq.cpu().float()
@@ -202,7 +202,8 @@ class TestNNMethod(TestCase):
             [3, 4096, 4096],
             [3, 4096, 16384],
             [3, 16384, 4096],
-            [3, 32000, 4096]
+            [3, 32000, 4096],
+            [1008, 8200, 512]
         ]
         for shape in shapes:
             print(shape)
