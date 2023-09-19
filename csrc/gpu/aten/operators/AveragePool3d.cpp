@@ -1,13 +1,15 @@
-#include <ATen/ATen.h>
+#include <ATen/AccumulateType.h>
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
+#include <ATen/ceil_div.h>
 #include <ATen/native/Pool.h>
 
+#include <core/detail/IndexUtils.h>
 #include <oneDNN/oneDNN.h>
+#include <vector>
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
-
-#include <vector>
+#include "utils/ComputeEngine.h"
 
 using namespace dnnl;
 using namespace at::native;
@@ -18,6 +20,125 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t, typename accscalar_t, typename index_t>
+void avg_pool3d_out_frame(
+    Tensor& work_input,
+    Tensor& work_output,
+    const int kT,
+    const int kH,
+    const int kW,
+    const int dT,
+    const int dH,
+    const int dW,
+    const int padT,
+    const int padH,
+    const int padW,
+    const bool count_include_pad,
+    const int offsetZ,
+    const int totalZ,
+    const int divisor_override) {
+  index_t oWidth = work_output.size(-1);
+  index_t oHeight = work_output.size(-2);
+  index_t oDepth = work_output.size(-3);
+  index_t iWidth = work_input.size(-1);
+  index_t iHeight = work_input.size(-2);
+  index_t iDepth = work_input.size(-3);
+
+  index_t ostride0 = work_output.stride(0);
+  index_t ostride1 = work_output.stride(1);
+  index_t ostride2 = work_output.stride(2);
+  index_t ostride3 = work_output.stride(3);
+
+  index_t istride0 = work_input.stride(0);
+  index_t istride1 = work_input.stride(1);
+  index_t istride2 = work_input.stride(2);
+  index_t istride3 = work_input.stride(3);
+
+  // width size is fixed size = 32, height dim equals = dpcppMaxWorkGroupSize /
+  // width_size
+  index_t width_group_size = 32;
+  index_t height_group_size = dpcppMaxWorkGroupSize() / width_group_size;
+  index_t width_group_range = ceil_div<index_t>(oHeight, width_group_size);
+  index_t height_group_range = ceil_div<index_t>(oHeight, height_group_size);
+
+  index_t z_group_range = totalZ > 65535 ? 65535 : totalZ;
+
+  scalar_t* input = work_input.data_ptr<scalar_t>();
+  scalar_t* output = work_output.data_ptr<scalar_t>();
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
+      index_t oCol = item.get_global_id()[2];
+      index_t oRow = item.get_global_id()[1];
+      index_t oFrame = (item.get_group(0) + offsetZ) % oDepth;
+      index_t slice = (item.get_group(0) + offsetZ) / oDepth;
+
+      if (oRow < oHeight && oCol < oWidth) {
+        accscalar_t sum = 0.0f;
+
+        index_t tstart = oFrame * dT - padT;
+        index_t hstart = oRow * dH - padH;
+        index_t wstart = oCol * dW - padW;
+        index_t tend = Numerics<index_t>::min(tstart + kT, iDepth + padT);
+        index_t hend = Numerics<index_t>::min(hstart + kH, iHeight + padH);
+        index_t wend = Numerics<index_t>::min(wstart + kW, iWidth + padW);
+        index_t pool_size = (tend - tstart) * (hend - hstart) * (wend - wstart);
+
+        tstart = Numerics<index_t>::max(tstart, 0);
+        hstart = Numerics<index_t>::max(hstart, 0);
+        wstart = Numerics<index_t>::max(wstart, 0);
+        tend = Numerics<index_t>::min(tend, iDepth);
+        hend = Numerics<index_t>::min(hend, iHeight);
+        wend = Numerics<index_t>::min(wend, iWidth);
+
+        if (tstart >= tend || hstart >= hend || wstart >= wend) {
+          output
+              [oCol * ostride3 + oRow * ostride2 + oFrame * ostride1 +
+               slice * ostride0] = 0.0f;
+          return;
+        }
+
+        accscalar_t divide_factor;
+        if (divisor_override) {
+          divide_factor = static_cast<accscalar_t>(divisor_override);
+        } else {
+          if (count_include_pad) {
+            divide_factor = static_cast<accscalar_t>(pool_size);
+          } else {
+            divide_factor = static_cast<accscalar_t>(
+                (tend - tstart) * (hend - hstart) * (wend - wstart));
+          }
+        }
+
+        index_t ti, hi, wi;
+        for (ti = tstart; ti < tend; ++ti) {
+          for (hi = hstart; hi < hend; ++hi) {
+            for (wi = wstart; wi < wend; ++wi) {
+              scalar_t val = input
+                  [wi * istride3 + hi * istride2 + ti * istride1 +
+                   slice * istride0];
+              sum += val;
+            }
+          }
+        }
+        output
+            [oCol * ostride3 + oRow * ostride2 + oFrame * ostride1 +
+             slice * ostride0] = static_cast<scalar_t>(sum / divide_factor);
+      }
+    };
+    cgh.parallel_for(
+        sycl::nd_range<3>(
+            sycl::range<3>{
+                z_group_range,
+                height_group_range * height_group_size,
+                width_group_range * width_group_size,
+            },
+            sycl::range<3>{1, height_group_size, width_group_size}),
+        kfn);
+  };
+
+  DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
+}
+
 void avg_pool3d_out_template(
     Tensor& output,
     const Tensor& input,
@@ -25,7 +146,8 @@ void avg_pool3d_out_template(
     IntArrayRef stride,
     IntArrayRef padding,
     bool ceil_mode,
-    bool count_include_pad) {
+    bool count_include_pad,
+    c10::optional<int64_t> divisor_override) {
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 3,
       "avg_pool3d: kernel_size must either be a single int, or a tuple of "
@@ -62,8 +184,8 @@ void avg_pool3d_out_template(
 
   /* Applies a 3D average pooling over an input signal composed of
      several input planes. This op only support 4D and 5D input. 4D: Input (C,
-     D, H, W),  Output (C, D0, H0, W0) 5D: Input (N, C, D, H, W),  Output (N, C,
-     D0, H0, W0)
+     D, H, W),  Output (C, D0, H0, W0) 5D: Input (N, C, D, H, W),  Output (N,
+     C, D0, H0, W0)
   */
   TORCH_CHECK(
       (input.ndimension() == 4 || input.ndimension() == 5),
@@ -82,6 +204,12 @@ void avg_pool3d_out_template(
       pooling_output_shape<int64_t>(iheight, kH, padH, dH, 1, ceil_mode);
   const int64_t outputWidth =
       pooling_output_shape<int64_t>(iwidth, kW, padW, dW, 1, ceil_mode);
+
+  // if divisor==0 then we will ignore it
+  int64_t divisor = 0;
+  if (divisor_override.has_value()) {
+    divisor = divisor_override.value();
+  }
 
   pool3d_shape_check(
       input,
@@ -107,61 +235,126 @@ void avg_pool3d_out_template(
       "avg_pool3d_out_template()",
       /*check_input_size=*/true);
 
-  Tensor input_;
-  if (input.ndimension() == 4) {
-    // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
-    // cannot give channels last for 4D tensor from frontend user perspective
-    // the 2nd dim is outputDepth, not channel dim
-    input_ = input.contiguous();
-    output.resize_({nblock, outputDepth, outputHeight, outputWidth});
-  } else {
-    // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
-    // smf supports ChannelsLast3D and Contiguous cases.
-    auto smf = input.suggest_memory_format();
-    input_ = contiguous_if_needed(input, smf);
-    output.resize_(
-        {nbatch, nblock, outputDepth, outputHeight, outputWidth}, smf);
-  }
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::ONEDNN, input);
 
-  std::vector<int64_t> kernel_size_vec = {kD, kH, kW};
-  std::vector<int64_t> stride_vec = {dD, dH, dW};
-  std::vector<int64_t> padding_vec = {padD, padH, padW};
-  // per oneDNN definition, no dilation means dilation ratio is 0
-  std::vector<int64_t> dilation_vec = {0, 0, 0};
-  if (count_include_pad) {
-    ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_include_padding>(
-        output,
-        input_,
-        nbatch,
-        nblock,
-        idepth,
-        iheight,
-        iwidth,
-        outputDepth,
-        outputHeight,
-        outputWidth,
-        stride_vec,
-        kernel_size_vec,
-        dilation_vec,
-        padding_vec,
-        padding_vec);
+  // for onednn block format
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+    Tensor input_;
+    if (input.ndimension() == 4) {
+      // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
+      // cannot give channels last for 4D tensor from frontend user
+      // perspective the 2nd dim is outputDepth, not channel dim
+      input_ = input.contiguous();
+      output.resize_({nblock, outputDepth, outputHeight, outputWidth});
+    } else {
+      // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
+      // smf supports ChannelsLast3D and Contiguous cases.
+      auto smf = input.suggest_memory_format();
+      input_ = contiguous_if_needed(input, smf);
+      output.resize_(
+          {nbatch, nblock, outputDepth, outputHeight, outputWidth}, smf);
+    }
+    std::vector<int64_t> kernel_size_vec = {kD, kH, kW};
+    std::vector<int64_t> stride_vec = {dD, dH, dW};
+    std::vector<int64_t> padding_vec = {padD, padH, padW};
+    // per oneDNN definition, no dilation means dilation ratio is 0
+    std::vector<int64_t> dilation_vec = {0, 0, 0};
+    if (count_include_pad) {
+      ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_include_padding>(
+          output,
+          input_,
+          nbatch,
+          nblock,
+          idepth,
+          iheight,
+          iwidth,
+          outputDepth,
+          outputHeight,
+          outputWidth,
+          stride_vec,
+          kernel_size_vec,
+          dilation_vec,
+          padding_vec,
+          padding_vec);
+    } else {
+      ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+          output,
+          input_,
+          nbatch,
+          nblock,
+          idepth,
+          iheight,
+          iwidth,
+          outputDepth,
+          outputHeight,
+          outputWidth,
+          stride_vec,
+          kernel_size_vec,
+          dilation_vec,
+          padding_vec,
+          padding_vec);
+    }
+    return;
   } else {
-    ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
-        output,
-        input_,
-        nbatch,
-        nblock,
-        idepth,
-        iheight,
-        iwidth,
-        outputDepth,
-        outputHeight,
-        outputWidth,
-        stride_vec,
-        kernel_size_vec,
-        dilation_vec,
-        padding_vec,
-        padding_vec);
+    // for plain format
+    Tensor work_input = input.contiguous();
+    Tensor work_output = output;
+    if (input.ndimension() == 5) {
+      work_input =
+          work_input.reshape({nbatch * nblock, idepth, iheight, iwidth});
+      work_output = at::zeros_like(output);
+      work_output = work_output.reshape(
+          {nbatch * nblock, outputDepth, outputHeight, outputWidth});
+    }
+
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        kHalf, kBFloat16, input.scalar_type(), "avg_pool3d_out_template", [&] {
+          using accscalar_t = acc_type<scalar_t, true>;
+          int64_t totalZ = outputDepth * nblock * nbatch;
+          int64_t offsetZ = 0;
+
+          while (totalZ > 0) {
+            if (xpu::dpcpp::detail::canUse32BitIndexMath(input)) {
+              avg_pool3d_out_frame<scalar_t, accscalar_t, int32_t>(
+                  work_input,
+                  work_output,
+                  kD,
+                  kH,
+                  kW,
+                  dD,
+                  dH,
+                  dW,
+                  padD,
+                  padH,
+                  padW,
+                  count_include_pad,
+                  offsetZ,
+                  totalZ,
+                  divisor);
+            } else {
+              avg_pool3d_out_frame<scalar_t, accscalar_t, int64_t>(
+                  work_input,
+                  work_output,
+                  kD,
+                  kH,
+                  kW,
+                  dD,
+                  dH,
+                  dW,
+                  padD,
+                  padH,
+                  padW,
+                  count_include_pad,
+                  offsetZ,
+                  totalZ,
+                  divisor);
+            }
+            totalZ -= 65535;
+            offsetZ += 65535;
+          }
+        });
+    output = work_output.resize_as_(output);
   }
 }
 
@@ -304,20 +497,25 @@ Tensor& avg_pool3d_backward_out_template(
 } // namespace impl
 
 Tensor& avg_pool3d_out(
-    const Tensor& self,
+    const Tensor& input,
     IntArrayRef kernel_size,
     IntArrayRef stride,
     IntArrayRef padding,
     bool ceil_mode,
     bool count_include_pad,
     c10::optional<int64_t> divisor_override,
-    Tensor& out) {
-  TORCH_CHECK(
-      !divisor_override.has_value(),
-      "dpcpp_avg_pool3d operator does not support divisor");
+    Tensor& output) {
   impl::avg_pool3d_out_template(
-      out, self, kernel_size, stride, padding, ceil_mode, count_include_pad);
-  return out;
+      output,
+      input,
+      kernel_size,
+      stride,
+      padding,
+      ceil_mode,
+      count_include_pad,
+      divisor_override);
+
+  return output;
 }
 
 Tensor& avg_pool3d_backward_out(

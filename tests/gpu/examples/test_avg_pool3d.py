@@ -10,20 +10,20 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_avg_pool3d(self, dtype=torch.float):
-        x_cpu = torch.ones([1, 8, 8, 24, 24], device=cpu_device)
-        grad_cpu = torch.ones([1, 8, 8, 24, 24], device=cpu_device)
+        x_cpu = torch.ones([1, 8, 24, 24, 24], device=cpu_device)
+        grad_cpu = torch.ones([1, 8, 24, 24, 24], device=cpu_device)
 
-        avg_pool = nn.AvgPool3d(kernel_size=3, stride=1, padding=1)
+        avg_pool = nn.AvgPool3d(kernel_size=12, stride=3, padding=4)
 
         # cpu
         x_cpu.requires_grad_(True)
         y_cpu = avg_pool(x_cpu)
         # print("y_cpu", y_cpu)
-        y_cpu.backward(torch.ones([1, 8, 8, 24, 24], device=cpu_device))
+        y_cpu.backward(torch.ones([1, 8, 7, 7, 7], device=cpu_device))
         # print("y_cpu backward", x_cpu.grad)
 
         x_dpcpp = torch.ones(
-            [1, 8, 8, 24, 24],
+            [1, 8, 24, 24, 24],
             device=dpcpp_device,
         )
         x_dpcpp.requires_grad_(True)
@@ -32,24 +32,58 @@ class TestNNMethod(TestCase):
         # print("y_dpcpp", y_dpcpp.cpu())
 
         # grad_dpcpp = grad_cpu.to("xpu")
-        y_dpcpp.backward(torch.ones([1, 8, 8, 24, 24], device=dpcpp_device))
+        y_dpcpp.backward(torch.ones([1, 8, 7, 7, 7], device=dpcpp_device))
         # print("y_dpcpp backward", x_dpcpp.grad.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
-    def test_channels_last_simple_fwd(self, dtype=torch.float):
-        x_cpu = torch.ones([8, 8, 24, 24, 24], device=cpu_device)
-        x_dpcpp = torch.ones([8, 8, 24, 24, 24], device=dpcpp_device).to(
-            memory_format=torch.channels_last_3d
-        )
+
+    def test_avg_pool3d_large_batch(self, dtype=torch.float):
+        x_cpu = torch.ones([10000, 1, 8, 24, 24], device=cpu_device)
+        grad_cpu = torch.ones([10000, 1, 8, 24, 24], device=cpu_device)
+
         avg_pool = nn.AvgPool3d(kernel_size=3, stride=1, padding=1)
 
         # cpu
+        x_cpu.requires_grad_(True)
         y_cpu = avg_pool(x_cpu)
         # print("y_cpu", y_cpu)
+        y_cpu.backward(torch.ones([10000, 1, 8, 24, 24], device=cpu_device))
+        # print("y_cpu backward", x_cpu.grad)
 
+        x_dpcpp = torch.ones(
+            [10000, 1, 8, 24, 24],
+            device=dpcpp_device,
+        )
+        x_dpcpp.requires_grad_(True)
         y_dpcpp = avg_pool(x_dpcpp)
+
         # print("y_dpcpp", y_dpcpp.cpu())
-        self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
+
+        # grad_dpcpp = grad_cpu.to("xpu")
+        y_dpcpp.backward(torch.ones([10000, 1, 8, 24, 24], device=dpcpp_device))
+        # print("y_dpcpp backward", x_dpcpp.grad.cpu())
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
+
+
+    def test_channels_last_simple_fwd(self, dtype=torch.float):
+        size_list = [[8, 8, 24, 24, 24], [1, 8, 24, 24, 24]]
+        kernel_list = [[3, 1, 1], [12, 3, 4]]
+        for size, kernel in zip(size_list, kernel_list):
+
+            x_cpu = torch.ones(size, device=cpu_device)
+            x_dpcpp = torch.ones(size, device=dpcpp_device).to(
+                memory_format=torch.channels_last_3d
+            )
+            avg_pool = nn.AvgPool3d(kernel)
+
+            # cpu
+            y_cpu = avg_pool(x_cpu)
+            # print("y_cpu", y_cpu)
+
+            y_dpcpp = avg_pool(x_dpcpp)
+            # print("y_dpcpp", y_dpcpp.cpu())
+            self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
+
 
     def test_channels_last_simple_bwd(self, dtype=torch.float):
         x_cpu = torch.ones([8, 8, 8, 8, 8], device=cpu_device)
