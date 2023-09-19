@@ -118,6 +118,7 @@ class _Properties(object):
         self.fuse_update_step = None
         self.auto_kernel_selection = None
         self.graph_mode = None
+        self.optimize_transformers = None
 
 
 # O0 properties
@@ -133,6 +134,7 @@ class _O0:
         properties.fuse_update_step = False
         properties.auto_kernel_selection = False
         properties.graph_mode = False
+        properties.optimize_transformers = False
         return properties
 
 
@@ -149,6 +151,7 @@ class _O1:
         properties.fuse_update_step = True
         properties.auto_kernel_selection = False
         properties.graph_mode = False
+        properties.optimize_transformers = True
         return properties
 
 
@@ -398,6 +401,8 @@ def optimize(
         opt_properties.auto_kernel_selection = auto_kernel_selection
     if graph_mode is not None:
         opt_properties.graph_mode = graph_mode
+    if optimize_transformers is not None:
+        opt_properties.optimize_transformers = optimize_transformers
 
     _disable_dnnl()
     if opt_properties.auto_kernel_selection:
@@ -491,10 +496,8 @@ def optimize(
 
     if opt_properties.optimize_lstm:
         replace_lstm_with_ipex_lstm(optimized_model, optimized_optimizer)
-
     if opt_properties.optimize_transformers:
         utils._model_convert.replace_transformer_with_ipex_transformer(optimized_model)
-
     if (
         model.training
         and opt_properties.split_master_weight_for_bf16
