@@ -677,10 +677,6 @@ void init_xpu_module(pybind11::module& m) {
     return Settings::I().is_multi_context_enabled();
   });
 
-  m.def("_is_jit_quantization_save_enabled", []() {
-    return Settings::I().is_jit_quantization_save_enabled();
-  });
-
   m.def("_is_channels_last_1d_enabled", []() {
     return Settings::I().is_channels_last_1d_enabled();
   });

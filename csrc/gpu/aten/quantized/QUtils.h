@@ -20,6 +20,7 @@
 
 namespace xpu {
 namespace dpcpp {
+
 // Note: [Opaque u8 tensor]
 // Due to the difference between oneDNN and PyTorch u8 quantization, we quant
 // tensor with kQUint8 and 128 zp to memory::data_type::s8 and 0 zp inside. This
@@ -326,93 +327,3 @@ struct PackedLinearWeightQDPCPP : public LinearPackedParamsBase {
 
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at
-
-#ifdef BUILD_JIT_QUANTIZATION_SAVE
-
-// Repeat torch type definition here again
-using ConvParamsSerializationTypeV2 = std::tuple<
-    // version, for versions 2 and up
-    std::string,
-    // non-optional tensors
-    std::vector<at::Tensor>,
-    // optional tensors
-    std::vector<c10::optional<at::Tensor>>>;
-using ConvParamsSerializationTypeV3 = std::tuple<
-    // version, int for versions 3 and up
-    int64_t,
-    // configuration values
-    std::vector<int64_t>,
-    // optional tensors
-    std::vector<c10::optional<at::Tensor>>>;
-
-using ConvParamsSerializationType = ConvParamsSerializationTypeV2;
-
-template <uint32_t kSpatialDim>
-c10::intrusive_ptr<ConvPackedParamsBase<kSpatialDim>> deserialize_conv_dpcpp(
-    ConvParamsSerializationTypeV3 state) {
-  int64_t version;
-  std::vector<int64_t> config_vals;
-  std::vector<c10::optional<at::Tensor>> tensors;
-
-  std::tie(version, config_vals, tensors) = state;
-  TORCH_INTERNAL_ASSERT(
-      version == 3, "Unexpected serialized qconv version: ", version);
-
-  TORCH_CHECK(tensors.size() == 3, "Wrong number of tensors", tensors.size());
-  c10::optional<at::Tensor> weight = tensors[1];
-  c10::optional<at::Tensor> bias = tensors[2];
-  TORCH_INTERNAL_ASSERT(
-      weight, "Weight should always be present in serialized qconv.");
-
-  torch::List<int64_t> stride, padding, output_padding, dilation;
-  // skip kSpatialDim
-  int idx = 1;
-  for (const auto i : c10::irange(kSpatialDim)) {
-    (void)i; // Suppress unused variable
-    stride.emplace_back(config_vals.at(idx));
-    idx++;
-  }
-  for (const auto i : c10::irange(kSpatialDim)) {
-    (void)i; // Suppress unused variable
-    padding.emplace_back(config_vals.at(idx));
-    idx++;
-  }
-  for (const auto i : c10::irange(kSpatialDim)) {
-    (void)i; // Suppress unused variable
-    dilation.emplace_back(config_vals.at(idx));
-    idx++;
-  }
-  for (const auto i : c10::irange(kSpatialDim)) {
-    (void)i; // Suppress unused variable
-    output_padding.emplace_back(config_vals.at(idx));
-    idx++;
-  }
-  int64_t groups = config_vals.at(idx);
-  idx++;
-  int64_t flags = config_vals.at(idx);
-  idx++;
-  TORCH_INTERNAL_ASSERT(
-      idx == static_cast<int64_t>(config_vals.size()),
-      "Unexpected length of config_vals, expected ",
-      idx,
-      " got ",
-      config_vals.size());
-
-  bool transpose = flags & (1 << 0);
-
-  int64_t other_flags = flags & ~(1 << 0);
-  TORCH_INTERNAL_ASSERT(
-      other_flags == 0, "Unexpected flags set in ", flags, ".");
-
-  return at::AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP<kSpatialDim>::
-      prepack(
-          weight.value(),
-          bias,
-          stride,
-          padding,
-          output_padding,
-          dilation,
-          groups,
-          transpose);
-}
-#endif

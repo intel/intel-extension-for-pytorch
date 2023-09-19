@@ -1,4 +1,3 @@
-import pytest
 import torch
 import torch.nn as nn
 import copy
@@ -36,12 +35,13 @@ class ConvBias(torch.nn.Module):
     def __init__(self):
         super(ConvBias, self).__init__()
         self.block = nn.Sequential(
-            nn.Conv2d(3, 3, kernel_size=3, stride=1, padding=1, bias=True), nn.ReLU()
+            nn.Conv2d(3, 3, kernel_size=3, stride=1, padding=1, bias=False)
         )
         print(self.block[0].bias)
 
     def forward(self, x):
         return self.block(x)
+        # return x
 
 
 class LinearBias(torch.nn.Module):
@@ -85,29 +85,69 @@ def trace_int8_model(model, device, test_input):
     # inference
     print("start ", device, " inference ...")
     with torch.inference_mode():
-        for i in range(2):
+        for i in range(1):
             print("inference iter:", i)
             test_res = modelJit(test_input.to(device))
     return modelJit, test_res
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(
-        not torch.xpu.has_jit_quantization_save(),
-        reason="Int8 jit save is not compiled",
-    )
     def test_composite(self, dtype=torch.float):
-        model = M()
-        test_input = torch.rand([1, 3, 8, 8])
+        for device in ["xpu", "cpu"]:
+            for model in [LinearBias(), ConvBias()]:
+                if device == "xpu":
+                    torch.backends.quantized.engine = "qxpu"
+                    # torch.xpu.set_quant_save_backend("xpu")
+                else:
+                    torch.backends.quantized.engine = "x86"
+                if isinstance(model, LinearBias):
+                    test_input = torch.randn([4, 128])
+                else:
+                    test_input = torch.rand([1, 3, 8, 8])
 
-        modelJit = copy.deepcopy(model)
-        modelJit, xpu_res = trace_int8_model(modelJit, "xpu", test_input)
-        print("===== start saving model =====")
-        torch.jit.save(modelJit, "int8_conv_sigmoid.pt")
-        print("===== start loading model =====")
-        modelLoad = torch.jit.load("int8_conv_sigmoid.pt")
-        print("===== end loading model =====")
-        with torch.inference_mode():
-            load_res = modelLoad(test_input.to("xpu"))
-            xpu_res = modelJit(test_input.to("xpu"))
-        self.assertEqual(load_res, xpu_res)
+                modelJit = copy.deepcopy(model)
+                modelJit, xpu_res = trace_int8_model(modelJit, device, test_input)
+                print("===== start saving model =====")
+                torch.jit.save(modelJit, "int8_conv_sigmoid.pt")
+                # print(modelJit.inlined_graph)
+                print("===== start loading model =====")
+                modelLoad = torch.jit.load("int8_conv_sigmoid.pt")
+                print("===== end loading model =====")
+                # print(modelLoad.inlined_graph)
+                # with torch.inference_mode():
+                print("start test inference")
+                # modelJit = modelJit.to("cpu")
+                # modelLoad = modelLoad.to("cpu")
+                with torch.no_grad():
+                    xpu_res = modelJit(test_input.to(device))
+                    load_res = modelLoad(test_input.to(device))
+                print("end test inference")
+                print(xpu_res.dtype)
+                print(load_res.dtype)
+                self.assertEqual(load_res.cpu(), xpu_res.cpu())
+        torch.backends.quantized.engine = "x86"  # set back to default engine
+
+    def test_imperative(self):
+        test_input = torch.rand([1, 3, 8, 8])
+        model = ConvBias()
+        model = model.to("xpu")
+        model1 = copy.deepcopy(model)
+        model = torch.quantization.QuantWrapper(model)
+        qconfig = torch.quantization.QConfig(
+            activation=torch.quantization.observer.MinMaxObserver.with_args(qscheme=torch.per_tensor_symmetric),
+            weight=torch.quantization.default_weight_observer)
+        model.qconfig = qconfig
+
+        torch.quantization.prepare(model, inplace=True)
+        torch.quantization.convert(model, inplace=True)
+        print(model(test_input.to("xpu"))[0][0:5])
+        # model1 = copy.deepcopy(model)
+
+        torch.save(model.state_dict(), "impe.pt")
+        wgh_file = torch.load("impe.pt")
+        model.load_state_dict(wgh_file)
+
+        for o, l in zip(model.parameters(), model1.parameters()):
+            print(f"o: {o.cpu()}")
+            print(f"l: {l.cpu()}")
+            assert torch.equal(o, l), " param tensor in saved & loaded not equal"

@@ -2,6 +2,7 @@
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
 
+#include <ATen/native/quantized/PackedParams.h>
 #include "comm/ParamUtils.h"
 
 #include <quantized/QUtils.h>
@@ -123,3 +124,18 @@ TORCH_LIBRARY_IMPL(quantized, XPU, m) {
 
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at
+
+int init_prepack_fn() {
+  register_prepack<2>(
+      at::QEngine::QXPU,
+      at::AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP<2>::prepack);
+  register_prepack<3>(
+      at::QEngine::QXPU,
+      at::AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP<3>::prepack);
+  register_linear_prepack(
+      at::QEngine::QXPU,
+      at::AtenIpexTypeQuantizedXPU::PackedLinearWeightQDPCPP::prepack);
+  return 1;
+}
+
+auto xpu_prepack = init_prepack_fn();

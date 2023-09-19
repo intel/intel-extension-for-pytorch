@@ -1,3 +1,4 @@
+#include <ATen/native/quantized/PackedParams.h>
 #include <oneDNN/Runtime.h>
 #include <runtime/Device.h>
 #include <utils/Settings.h>
@@ -286,14 +287,6 @@ bool Settings::is_multi_context_enabled() const {
 
 bool Settings::is_channels_last_1d_enabled() const {
 #if defined(USE_CHANNELS_LAST_1D)
-  return true;
-#else
-  return false;
-#endif
-}
-
-bool Settings::is_jit_quantization_save_enabled() const {
-#if defined(BUILD_JIT_QUANTIZATION_SAVE)
   return true;
 #else
   return false;
