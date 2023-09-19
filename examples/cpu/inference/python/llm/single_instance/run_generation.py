@@ -56,6 +56,8 @@ parser.add_argument(
 parser.add_argument("--greedy", action="store_true")
 parser.add_argument("--ipex", action="store_true")
 parser.add_argument("--deployment-mode", action="store_true")
+parser.add_argument("--torch-compile", action="store_true")
+parser.add_argument("--backend", default="ipex", type=str, help="backend of torch.compile")
 parser.add_argument("--profile", action="store_true")
 parser.add_argument("--benchmark", action="store_true")
 parser.add_argument("--num-iter", default=100, type=int, help="num iter")
@@ -115,6 +117,11 @@ if args.ipex:
         inplace=True,
         deployment_mode=args.deployment_mode,
     )
+
+if args.torch_compile:
+    if args.deployment_mode:
+        raise SystemExit("[ERROR] deployment_mode cannot co-work with torch.compile, please set deployment_mode to False if want to use torch.compile.")
+    model.generate = torch.compile(model.generate, backend=args.backend)
 
 num_beams = 1 if args.greedy else 4
 # generate args
