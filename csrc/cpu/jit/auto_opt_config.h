@@ -1,9 +1,10 @@
 #pragma once
 #include <ATen/ATen.h>
+#include <Macros.h>
 
 namespace torch_ipex {
 
-class TORCH_API AutoOptConfig {
+class IPEX_API AutoOptConfig {
  public:
   static AutoOptConfig& singleton() {
     static AutoOptConfig auto_opt_conf;

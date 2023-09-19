@@ -35,6 +35,7 @@ include_directories(${PYTORCH_INSTALL_DIR}/include)
 include_directories(${PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include/)
 include_directories(${THIRD_PARTY_ROOT}/googletest/googletest/include)
 include_directories(${IPEX_PROJECT_TOP_DIR})
+include_directories(${IPEX_PROJECT_TOP_DIR}/csrc/include)
 
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
 # search the lib directory for gtest

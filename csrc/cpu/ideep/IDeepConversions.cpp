@@ -1,5 +1,6 @@
 #include "IDeepConversions.h"
 #include <ATen/OpaqueTensorImpl.h>
+#include <Macros.h>
 #include <c10/core/Allocator.h>
 
 namespace torch_ipex {
@@ -19,7 +20,7 @@ namespace cpu {
  * NOTE: if this is generally useful we may want to move this to its own header.
  */
 template <typename T>
-struct TORCH_API IntrusivePtrTargetWrapper : c10::intrusive_ptr_target {
+struct IPEX_API IntrusivePtrTargetWrapper : c10::intrusive_ptr_target {
  private:
   T target_;
 

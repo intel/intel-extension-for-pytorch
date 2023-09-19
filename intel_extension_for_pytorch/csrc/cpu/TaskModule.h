@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <ATen/core/ivalue.h>
+#include <Macros.h>
 #include <torch/csrc/jit/api/module.h>
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/csrc/utils/pybind.h>
@@ -16,7 +17,7 @@
 
 namespace torch_ipex {
 namespace runtime {
-struct TORCH_API FutureTensor {
+struct FutureTensor {
   // script module
   std::future<c10::IValue> future_script_tensor;
   bool script_module_initialized_{false};
@@ -28,7 +29,7 @@ struct TORCH_API FutureTensor {
 };
 
 /*TaskModule is used to handle Python input of nn.module or script module*/
-class TORCH_API TaskModule {
+class TaskModule {
  public:
   explicit TaskModule(
       const torch::jit::Module& module,

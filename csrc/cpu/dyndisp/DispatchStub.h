@@ -4,6 +4,7 @@
 #include <c10/core/ScalarType.h>
 #include <c10/util/Exception.h>
 
+#include <Macros.h>
 #include <atomic>
 #include <type_traits>
 
@@ -78,7 +79,7 @@ struct DispatchStub;
  * template expansion), since it causes size bloat if there are a significant
  * number of specialization of the DispatchStub<> class.
  */
-struct TORCH_API DispatchStubImpl {
+struct IPEX_API DispatchStubImpl {
   void* get_call_ptr(
       DeviceType device_type,
       void* DEFAULT
@@ -270,7 +271,7 @@ struct RegisterHIPDispatch {
     name(const name&) = delete;            \
     name& operator=(const name&) = delete; \
   };                                       \
-  extern TORCH_API struct name name
+  extern IPEX_API struct name name
 
 #define DEFINE_DISPATCH(name) struct name name
 

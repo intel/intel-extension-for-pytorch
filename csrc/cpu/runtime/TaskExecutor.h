@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <ATen/core/ivalue.h>
+#include <Macros.h>
 #include <torch/csrc/autograd/profiler.h>
 #include <torch/csrc/jit/api/module.h>
 #include "CPUPool.h"
@@ -21,7 +22,7 @@
 namespace torch_ipex {
 namespace runtime {
 
-class TORCH_API TaskExecutor {
+class IPEX_API TaskExecutor {
  public:
   explicit TaskExecutor(const torch_ipex::runtime::CPUPool& cpu_pool);
   std::mutex& get_mutex();

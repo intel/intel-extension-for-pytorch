@@ -4,6 +4,7 @@
 #include <ATen/Config.h>
 #include <ATen/core/symbol.h>
 #include <ATen/quantized/QTensorImpl.h>
+#include <Macros.h>
 #include <oneapi/dnnl/dnnl_graph.hpp>
 #include <torch/csrc/jit/ir/ir.h>
 
@@ -255,7 +256,7 @@ struct LlgaTensorDesc {
 // The answer is that it helps us bypass guard checks because the strides of
 // tensors between partitions would be different from the ones the guard is
 // otherwise expecting.
-struct TORCH_API LlgaTensorImpl : public c10::TensorImpl {
+struct IPEX_API LlgaTensorImpl : public c10::TensorImpl {
   LlgaTensorImpl(
       c10::Storage&& storage,
       const caffe2::TypeMeta& data_type,

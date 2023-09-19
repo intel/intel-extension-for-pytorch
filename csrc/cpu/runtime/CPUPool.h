@@ -5,6 +5,7 @@
 #include <mutex>
 #include <vector>
 
+#include <Macros.h>
 #include <torch/csrc/jit/api/module.h>
 
 namespace torch_ipex {
@@ -18,7 +19,7 @@ typedef void (*kmp_destroy_affinity_mask_p)(kmp_affinity_mask_t*);
 typedef int (*kmp_get_affinity_p)(kmp_affinity_mask_t*);
 typedef int (*kmp_get_affinity_max_proc_p)();
 
-class TORCH_API CPUPool {
+class IPEX_API CPUPool {
  public:
   explicit CPUPool(const std::vector<int32_t>& cpu_core_list);
   explicit CPUPool(std::vector<kmp_affinity_mask_t>&& cpu_core_mask);
@@ -48,20 +49,20 @@ class TORCH_API CPUPool {
   CPUPool& operator=(CPUPool&& source_cpu_pool) = delete;
 };
 
-TORCH_API std::vector<int32_t> init_process_available_cores();
-TORCH_API std::vector<int32_t> get_process_available_cores();
-TORCH_API std::vector<int32_t> filter_cores_by_thread_affinity(
+IPEX_API std::vector<int32_t> init_process_available_cores();
+IPEX_API std::vector<int32_t> get_process_available_cores();
+IPEX_API std::vector<int32_t> filter_cores_by_thread_affinity(
     const std::vector<int32_t>& cpu_core_list);
 bool do_load_iomp_symbol();
-TORCH_API bool is_runtime_ext_enabled();
-TORCH_API void init_runtime_ext();
-TORCH_API void _pin_cpu_cores(const torch_ipex::runtime::CPUPool& cpu_pool);
-TORCH_API bool is_same_core_affinity_setting(
+IPEX_API bool is_runtime_ext_enabled();
+IPEX_API void init_runtime_ext();
+IPEX_API void _pin_cpu_cores(const torch_ipex::runtime::CPUPool& cpu_pool);
+IPEX_API bool is_same_core_affinity_setting(
     const std::vector<int32_t>& cpu_core_list);
-TORCH_API CPUPool get_cpu_pool_from_mask_affinity();
-TORCH_API void set_mask_affinity_from_cpu_pool(const CPUPool& cpu_pool);
+IPEX_API CPUPool get_cpu_pool_from_mask_affinity();
+IPEX_API void set_mask_affinity_from_cpu_pool(const CPUPool& cpu_pool);
 
-class TORCH_API WithCPUPool {
+class IPEX_API WithCPUPool {
  public:
   explicit WithCPUPool(CPUPool&& cpu_pool)
       : previous_cpu_pool(
