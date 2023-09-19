@@ -59,6 +59,11 @@ def is_distributed(m, ds_layers):
         is_distributed(sub_m, ds_layers)
 
 
+def _is_woq_qconfig(qconfig):
+    return isinstance(qconfig.global_qconfig.activation(), PlaceholderObserver) and \
+        not qconfig.global_qconfig.activation().is_dynamic
+
+
 def _set_optimized_model_for_generation(
     model,
     optimized_model,
@@ -379,8 +384,7 @@ def ipex_quantization_flow(
     from intel_extension_for_pytorch.quantization import prepare, convert
 
     if (
-        not isinstance(qconfig.global_qconfig.activation(), PlaceholderObserver)
-        and sample_inputs is None
+        not _is_woq_qconfig(qconfig) and sample_inputs is None
     ):
         sample_inputs = get_dummy_input(_model)
 
@@ -396,6 +400,8 @@ def ipex_quantization_flow(
         enabled=True if dtype is torch.bfloat16 else False
     ):
         convert_model = convert(prepared_model.eval(), inplace=True).eval()
+        if _is_woq_qconfig(qconfig) and dtype is torch.bfloat16:
+            convert_model = convert_model.to(dtype)
     return convert_model
 
 
@@ -601,9 +607,7 @@ def optimize_transformers(
         is_woq = False
         if quantization_config is not None:
             is_quantization = True
-            if not isinstance(
-                quantization_config.global_qconfig.activation(), PlaceholderObserver
-            ):  # static quantization
+            if not _is_woq_qconfig(quantization_config):  # static quantization
                 deployment_mode = False
 
                 if qconfig_summary_file is not None:
@@ -648,9 +652,7 @@ def optimize_transformers(
                         "ipex.optimize_transformers is prepared for the calibration of the static quantization"
                     )
 
-            elif isinstance(
-                quantization_config.global_qconfig.activation(), PlaceholderObserver
-            ):  # weight only quantization
+            elif _is_woq_qconfig(quantization_config):  # weight only quantization
                 is_woq = True
                 if low_precision_checkpoint is not None:
                     state_dict = torch.load(low_precision_checkpoint)
