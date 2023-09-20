@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import math
+import copy
 
 
 class _IPEXlinearSiluRef(nn.Module):
@@ -75,3 +76,24 @@ class _IPEXlinearReluRef(nn.Module):
 
     def forward(self, x):
         return nn.functional.relu(self.linear(x))
+
+
+class _IPEXConcatLinearRef(nn.Module):
+    def __init__(self, linear_list: list):
+        super().__init__()
+        self.num_concat = len(linear_list)
+        for i in range(self.num_concat):
+            attr_name = f'linear_{i}'
+            setattr(self, attr_name, copy.deepcopy(linear_list[i]))
+
+    def forward(self, x):
+        output_list = []
+        for i in range(self.num_concat):
+            assert hasattr(self, f'linear_{i}')
+            linear = getattr(self, f'linear_{i}')
+            y = linear(x)
+            output_list.append(y)
+        return tuple(output_list)
+
+    def extra_repr(self):
+        return f'num_concat = {self.num_concat}'

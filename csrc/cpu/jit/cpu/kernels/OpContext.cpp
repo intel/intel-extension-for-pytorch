@@ -540,6 +540,10 @@ at::Tensor IpexWoqLinearOpContext::get_at_packed_weight() {
   return op_context_.at_weight_;
 }
 
+c10::optional<at::Tensor> IpexWoqLinearOpContext::get_at_bias() {
+  return op_context_.at_bias_;
+}
+
 detail::ContextLinearWoq& IpexWoqLinearOpContext::get_context() {
   return op_context_;
 }

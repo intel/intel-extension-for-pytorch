@@ -226,41 +226,59 @@ class OptimizeTransformersTester(TestCase):
             ipex.nn.utils._model_convert.replace_customized_linear_with_linear(m.eval())
         self.model_replacement_check(m, False, torchcompile=True)
 
-    def test_weight_only_quant_flow(self):
+    def _model_replacement_check_woq(self, model):
+        qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
+        model = ipex.optimize_transformers(
+            model, dtype=torch.float, quantization_config=qconfig, deployment_mode=True
+        )
+        if not hasattr(model, "trace_graph"):
+            AssertionError(False)
+        _IPEXAttentionCPU = ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
+        _IPEXDecoderLayerCPU = ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
+        IpexWoqLinear = ipex.nn.modules.IpexWoqLinear
+        if re.search("GPTJ", model.config.architectures[0]):
+            assert (model.transformer.h[0].attn.__class__ is _IPEXAttentionCPU)
+            assert (model.transformer.h[0].__class__ is _IPEXDecoderLayerCPU)
+            assert (
+                all(mod.__class__ is IpexWoqLinear for mod in
+                    [
+                        model.transformer.h[0].attn.concat_qkv.concat_linear,
+                        model.transformer.h[0].attn.out_proj,
+                        model.transformer.h[0].linear_add_add.linear,
+                        model.transformer.h[0].linear_gelu.linear
+                    ])
+            )
+        elif re.search("llama", model.config.architectures[0], re.IGNORECASE):
+            assert (model.model.layers[0].self_attn.__class__ is _IPEXAttentionCPU)
+            assert (model.model.layers[0].__class__ is _IPEXDecoderLayerCPU)
+            assert (
+                all(mod.__class__ is IpexWoqLinear for mod in
+                    [
+                        model.model.layers[0].self_attn.concat_qkv.concat_linear,
+                        model.model.layers[0].mha_linear_add.linear,
+                        model.model.layers[0].mlp_linear_add.linear,
+                        model.model.layers[0].linear_silu.linear,
+                        model.model.layers[0].linear_mul.linear
+                    ])
+            )
+        # Ensure model can run without errors
+        with torch.no_grad():
+            example_inputs = _get_gptj_example_inputs()
+            model(*example_inputs)
+
+    def test_weight_only_quant_flow_for_gptj(self):
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/gptj", return_dict=False
         )
         m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
-        ipex_m = copy.deepcopy(m)
-        qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
-        ipex_m = ipex.optimize_transformers(
-            ipex_m, dtype=torch.float, quantization_config=qconfig, deployment_mode=True
+        self._model_replacement_check_woq(m)
+
+    def test_weight_only_quant_flow_for_llama(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/llama", return_dict=False
         )
-        if not hasattr(ipex_m, "trace_graph"):
-            AssertionError(False)
-        assert (
-            ipex_m.transformer.h[0].attn.__class__
-            is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
-        )
-        assert (
-            ipex_m.transformer.h[0].__class__
-            is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
-        )
-        assert (
-            all(mod.__class__ is ipex.nn.modules.IpexWoqLinear for mod in
-                [
-                    ipex_m.transformer.h[0].attn.k_proj,
-                    ipex_m.transformer.h[0].attn.v_proj,
-                    ipex_m.transformer.h[0].attn.q_proj,
-                    ipex_m.transformer.h[0].attn.out_proj,
-                    ipex_m.transformer.h[0].linear_add_add.linear,
-                    ipex_m.transformer.h[0].linear_gelu.linear
-                ])
-        )
-        # Ensure model can run without errors
-        with torch.no_grad():
-            example_inputs = _get_gptj_example_inputs()
-            ipex_m(*example_inputs)
+        m = transformers.models.llama.modeling_llama.LlamaForCausalLM(config).eval()
+        self._model_replacement_check_woq(m)
 
     def test_static_quant_flow(self):
         config = AutoConfig.from_pretrained(

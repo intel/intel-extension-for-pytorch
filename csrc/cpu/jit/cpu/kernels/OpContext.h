@@ -415,6 +415,8 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
 
   virtual at::Tensor get_at_packed_weight() = 0;
 
+  virtual c10::optional<at::Tensor> get_at_bias() = 0;
+
   virtual at::Tensor pack(const at::Tensor& tensor) = 0;
 
   virtual detail::ContextLinearWoq& get_context() = 0;
@@ -472,6 +474,8 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
   virtual at::Tensor to_public(const at::Tensor& tensor) override;
 
   virtual at::Tensor get_at_packed_weight() override;
+
+  virtual c10::optional<at::Tensor> get_at_bias() override;
 
   virtual at::Tensor pack(const at::Tensor& tensor) override;
 

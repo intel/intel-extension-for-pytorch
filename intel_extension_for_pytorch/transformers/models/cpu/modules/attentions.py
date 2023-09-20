@@ -4,6 +4,9 @@ from ...cpu.fusions.mha_fusion import (
     _IPEXRopeCPU,
     _IPEXScaleDotProductCPU,
 )
+from ...cpu.fusions.linear_fusion import (
+    _IPEXConcatLinearCPU,
+)
 
 
 class _IPEXAttentionCPU(nn.Module):
@@ -22,6 +25,11 @@ class _IPEXAttentionCPU(nn.Module):
                 self.pos_embd_dim,
                 self.rope_base,
                 self.model_backbone,
+            )
+        if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or \
+                re.search("LLAMA", self.model_backbone, re.IGNORECASE):
+            self.concat_qkv = _IPEXConcatLinearCPU(
+                module.concat_qkv, tpp=tpp, woq=woq
             )
 
         self.text_max_length = (
