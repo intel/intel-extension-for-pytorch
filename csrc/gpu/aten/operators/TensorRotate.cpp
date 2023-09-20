@@ -233,19 +233,17 @@ void apply_rotary_embedding_half_single_kernel(
           int64_t global_offset2 = global_offset1 + problem_half;
           const auto offset1 = offset_calc.get(global_offset1);
           const auto offset2 = offset_calc.get(global_offset2);
-          float x1 = *(query + offset1[1]);
-          float x2 = *(query + offset2[1]);
+          float x1 = static_cast<float>(*(query + offset1[1]));
+          float x2 = static_cast<float>(*(query + offset2[1]));
           float rotate_x1 = -x2;
           float rotate_x2 = x1;
-          float sin_val = *(sin + offset1[2]);
-          float cos_val = *(cos + offset1[3]);
+          float sin_val = static_cast<float>(*(sin + offset1[2]));
+          float cos_val = static_cast<float>(*(cos + offset1[3]));
 
-          // need to cast to scalar_t and then apply add
-          // otherwise the result will be wrong in llama
-          *(query_out + offset1[0]) = static_cast<scalar_t>(x1 * cos_val) +
-              static_cast<scalar_t>(rotate_x1 * sin_val);
-          *(query_out + offset2[0]) = static_cast<scalar_t>(x2 * cos_val) +
-              static_cast<scalar_t>(rotate_x2 * sin_val);
+          *(query_out + offset1[0]) =
+              static_cast<scalar_t>(x1 * cos_val + rotate_x1 * sin_val);
+          *(query_out + offset2[0]) =
+              static_cast<scalar_t>(x2 * cos_val + rotate_x2 * sin_val);
         }
       }
     };
@@ -300,19 +298,17 @@ void apply_rotary_embedding_half_kernel(
             int64_t global_offset2 = global_offset1 + problem_half;
             const auto offset1 = offset_calc.get(global_offset1);
             const auto offset2 = offset_calc.get(global_offset2);
-            float x1 = *(query + offset1[2]);
-            float x2 = *(query + offset2[2]);
+            float x1 = static_cast<float>(*(query + offset1[2]));
+            float x2 = static_cast<float>(*(query + offset2[2]));
             float rotate_x1 = -x2;
             float rotate_x2 = x1;
-            float sin_val = *(sin + offset1[4]);
-            float cos_val = *(cos + offset1[5]);
+            float sin_val = static_cast<float>(*(sin + offset1[4]));
+            float cos_val = static_cast<float>(*(cos + offset1[5]));
 
-            // need to cast to scalar_t and then apply add
-            // otherwise the result will be wrong in llama
-            *(query_out + offset1[0]) = static_cast<scalar_t>(x1 * cos_val) +
-                static_cast<scalar_t>(rotate_x1 * sin_val);
-            *(query_out + offset2[0]) = static_cast<scalar_t>(x2 * cos_val) +
-                static_cast<scalar_t>(rotate_x2 * sin_val);
+            *(query_out + offset1[0]) =
+                static_cast<scalar_t>(x1 * cos_val + rotate_x1 * sin_val);
+            *(query_out + offset2[0]) =
+                static_cast<scalar_t>(x2 * cos_val + rotate_x2 * sin_val);
           }
         } else {
           for (int i = item_idx; i < problem_half; i += wg_size) {
@@ -320,19 +316,17 @@ void apply_rotary_embedding_half_kernel(
             int64_t global_offset2 = global_offset1 + problem_half;
             const auto offset1 = offset_calc.get(global_offset1);
             const auto offset2 = offset_calc.get(global_offset2);
-            float x1 = *(key + offset1[3]);
-            float x2 = *(key + offset2[3]);
+            float x1 = static_cast<float>(*(key + offset1[3]));
+            float x2 = static_cast<float>(*(key + offset2[3]));
             float rotate_x1 = -x2;
             float rotate_x2 = x1;
-            float sin_val = *(sin + offset1[4]);
-            float cos_val = *(cos + offset1[5]);
+            float sin_val = static_cast<float>(*(sin + offset1[4]));
+            float cos_val = static_cast<float>(*(cos + offset1[5]));
 
-            // need to cast to scalar_t and then apply add
-            // otherwise the result will be wrong in llama
-            *(key_out + offset1[1]) = static_cast<scalar_t>(x1 * cos_val) +
-                static_cast<scalar_t>(rotate_x1 * sin_val);
-            *(key_out + offset2[1]) = static_cast<scalar_t>(x2 * cos_val) +
-                static_cast<scalar_t>(rotate_x2 * sin_val);
+            *(key_out + offset1[1]) =
+                static_cast<scalar_t>(x1 * cos_val + rotate_x1 * sin_val);
+            *(key_out + offset2[1]) =
+                static_cast<scalar_t>(x2 * cos_val + rotate_x2 * sin_val);
           }
         }
       }

@@ -337,11 +337,14 @@ class LlamaRotaryEmbedding(torch.nn.Module):
         emb = torch.cat((freqs, freqs), dim=-1)
         self.register_buffer("cos_cached", emb.cos().to(self.dtype), persistent=False)
         self.register_buffer("sin_cached", emb.sin().to(self.dtype), persistent=False)
+        import os
+        col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
+        self.row_major = not col_major
 
     def apply_rotary_pos_emb(self, query: torch.Tensor, key: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor):
         if query.shape == key.shape:
-            cos = cos.expand(query.shape)
-            sin = sin.expand(query.shape)
+            cos = cos.expand(query.shape).contiguous()
+            sin = sin.expand(query.shape).contiguous()
             torch.ops.torch_ipex.apply_rotary_embedding_half_qk(query, key, sin, cos, query, key)
         else:
             cos_q = cos.expand(query.shape)
@@ -352,6 +355,8 @@ class LlamaRotaryEmbedding(torch.nn.Module):
             torch.ops.torch_ipex.apply_rotary_embedding_half(key, sin_k, cos_k, key)
 
     def apply_rotary_pos_emb_ref(self, query: torch.Tensor, key: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor):
+        cos = cos.expand(query.shape).contiguous()
+        sin = sin.expand(query.shape).contiguous()
         rotate_q = self.rotate_half(query)
         rotate_k = self.rotate_half(key)
         q_embed = (query * cos) + (rotate_q * sin)

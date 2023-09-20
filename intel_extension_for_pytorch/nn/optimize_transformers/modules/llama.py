@@ -24,23 +24,26 @@ class IPEXLlamaMLP(IPEXTransformerMLP):
     def __init__(self,
                  config: IPEXTransformerConfig):
         super().__init__(config)
-        self.up_proj = IPEXEmptyLinear()
-        self.up_wei = None
+        self.fc_gate = IPEXEmptyLinear()
+        self.fc_gate_wei = None
+        self.fc_gate_bias = None
 
     def forward(self, hidden_states, residual):
         if self.row_major:
             if isinstance(self.act, nn.SiLU):
-                hidden_states1 = torch.ops.torch_ipex.mm_silu(hidden_states, self.fc_in_wei)
+                hidden_states1 = torch.ops.torch_ipex.mm_silu(hidden_states, self.fc_gate_wei)
             else:
-                hidden_states1 = torch.matmul(hidden_states, self.fc_in_wei)
+                hidden_states1 = torch.matmul(hidden_states, self.fc_gate_wei)
                 hidden_states1 = self.act(hidden_states1)
-            hidden_states = torch.ops.torch_ipex.mm_resmul(hidden_states, self.up_wei, hidden_states1)
+            hidden_states = torch.ops.torch_ipex.mm_resmul(hidden_states, self.fc_in_wei, hidden_states1)
             shape = list(hidden_states.size())
             shape[-1] = self.fc_out_wei.shape[-1]
             hidden_states = torch.addmm(residual.flatten(0, -2), hidden_states.flatten(0, -2), self.fc_out_wei, beta=1.0/self.tp_size).view(shape)
             hidden_states = self.all_reduce_if_necessary(hidden_states)
         else:
-            hidden_states = self.fc_out(self.act(self.fc_in(hidden_states)) * self.up_proj(hidden_states))
+            hidden_states_up1 = self.act(self.fc_gate(hidden_states))
+            hidden_states_up2 = self.fc_in(hidden_states)
+            hidden_states = self.fc_out(hidden_states_up1 * hidden_states_up2)
             hidden_states = self.all_reduce_if_necessary(hidden_states)
             hidden_states += residual
         return hidden_states
@@ -332,23 +335,24 @@ class IPEXLlamaConverter(IPEXTransformerConverter):
     def port_mlp_parameters(self):
         if self.row_major:
             self.module.mlp.gate_proj.weight.data = self.module.mlp.gate_proj.weight.t().contiguous()
-            self.ipex_optimized_module.mlp.fc_in_wei = self.module.mlp.gate_proj.weight
-            self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.gate_proj.bias
+            self.ipex_optimized_module.mlp.fc_gate_wei = self.module.mlp.gate_proj.weight
+            self.ipex_optimized_module.mlp.fc_gate_bias = self.module.mlp.gate_proj.bias
+
+            self.module.mlp.up_proj.weight.data = self.module.mlp.up_proj.weight.t().contiguous()
+            self.ipex_optimized_module.mlp.fc_in_wei = self.module.mlp.up_proj.weight
+            self.ipex_optimized_module.mlp.fc_in_bias = self.module.mlp.up_proj.bias
 
             self.module.mlp.down_proj.weight.data = self.module.mlp.down_proj.weight.t().contiguous()
             self.ipex_optimized_module.mlp.fc_out_wei = self.module.mlp.down_proj.weight
-            self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.down_proj.bias
-
-            self.module.mlp.up_proj.weight.data = self.module.mlp.up_proj.weight.t().contiguous()
-            self.ipex_optimized_module.mlp.up_wei = self.module.mlp.up_proj.weight
-            self.ipex_optimized_module.mlp.up_proj.bias = self.module.mlp.up_proj.bias
+            self.ipex_optimized_module.mlp.fc_out_bias = self.module.mlp.down_proj.bias
         else:
-            self.ipex_optimized_module.mlp.fc_in.weight = self.module.mlp.gate_proj.weight
-            self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.gate_proj.bias
+            self.ipex_optimized_module.mlp.fc_gate.weight = self.module.mlp.gate_proj.weight
+            self.ipex_optimized_module.mlp.fc_gate.bias = self.module.mlp.gate_proj.bias
+            self.ipex_optimized_module.mlp.fc_in.weight = self.module.mlp.up_proj.weight
+            self.ipex_optimized_module.mlp.fc_in.bias = self.module.mlp.up_proj.bias
             self.ipex_optimized_module.mlp.fc_out.weight = self.module.mlp.down_proj.weight
             self.ipex_optimized_module.mlp.fc_out.bias = self.module.mlp.down_proj.bias
-            self.ipex_optimized_module.mlp.up_proj.weight = self.module.mlp.up_proj.weight
-            self.ipex_optimized_module.mlp.up_proj.bias = self.module.mlp.up_proj.bias
+
 
     def port_layer_norm_parameters(self):
         self.ipex_optimized_module.input_layernorm.weight = self.module.input_layernorm.weight

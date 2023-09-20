@@ -688,7 +688,7 @@ class IPEXTransformerAtten(nn.Module):
                 attn_output = torch.xpu.IpexSDP_Index(query, key_prompt, value_prompt, key, value, IPEXTransformerAtten.beam_index, blocked_alibi, blocked_attn_mask, head_mask, self.cur_len, alpha, beta, dropout, is_causal)
         else:
             if not first_token and IPEXTransformerAtten.beam_size > 1:
-                key, value = self.reorder_cache(key, value, IPEXTransformerAtten.beam_index)
+                key, value = self.reorder_cache(key_prompt, value_prompt, key, value, IPEXTransformerAtten.beam_index)
             attn_output, attn_weights = self.naive_self_attention(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi, first_token=first_token)
         
         if self.row_major:
@@ -728,6 +728,8 @@ class IPEXTransformerAtten(nn.Module):
         [`~PretrainedModel.beam_sample`] is called. This is required to match `past_key_values` with the correct
         beam_idx at every generation step.
         """
+        key_prompt = key if key_prompt is None else key_prompt
+        value_prompt = value if value_prompt is None else value_prompt
         # past_key_values: 28 decoder layers of [key, value]
         # beam_idx_cache: [kv_out_len, bs*beam]
 
@@ -856,12 +858,15 @@ class IPEXTransformerAtten(nn.Module):
             if IPEXTransformerAtten.beam_size == 1:
                 present = (key, value)
             else:
-                # key, value shape [bs*beam=1, head, seq, dim]
-                seq_len = self.cur_len if self.key_prompt is None else self.cur_len + self.key_prompt.shape[2]
-                cache_shape = (1, key.shape[1], seq_len, key.shape[3])
-                key_cache = torch.empty(cache_shape, device=key.device, dtype=key.dtype)
-                value_cache = key_cache
-                present = (key_cache, value_cache)
+                if self.row_major:
+                    # key, value shape [bs*beam=1, head, seq, dim]
+                    seq_len = self.cur_len if self.key_prompt is None else self.cur_len + self.key_prompt.shape[2]
+                    cache_shape = (IPEXTransformerAtten.beam_size, key.shape[1], seq_len, key.shape[3])
+                    key_cache = torch.empty(cache_shape, device=key.device, dtype=key.dtype)
+                    value_cache = key_cache
+                    present = (key_cache, value_cache)
+                else:
+                    present = (key, value)
         else:
             present = None
 
