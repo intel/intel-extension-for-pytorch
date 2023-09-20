@@ -40,28 +40,38 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
   // points dtype = fp32 There might be an extra output channel in weight and
   // scales bool extra_o_channel = false; // scales.numel() >
   // zero_points.numel() * 8;
-  auto scales_fp32 = scales.squeeze(0).to(c10::ScalarType::Float);
+  auto scales_fp32 = scales.squeeze().to(c10::ScalarType::Float);
 
+  auto zp_fp32 = zero_points.scalar_type() == c10::kFloat
+      ? zero_points.squeeze()
+      : at::empty_like(scales_fp32);
   // Convert compressed zero points to float
-  auto zp_fp32 = at::empty_like(scales_fp32);
-  assert(zp_fp32.numel() == zero_points.numel() * 8);
-  float* zp_fp32_ptr = reinterpret_cast<float*>(zp_fp32.data_ptr());
-  int32_t* zp_int32_ptr = reinterpret_cast<int32_t*>(zero_points.data_ptr());
-  for (size_t i = 0; i < zero_points.numel(); ++i) {
-    int32_t zp_uint4x8 = zp_int32_ptr[i];
-    for (size_t j = 0; j < 8; ++j) {
-      zp_fp32_ptr[i * 8 + j] = (float)((zp_uint4x8 >> (j * 4)) & 0xf);
+  if (zero_points.scalar_type() == c10::kInt) {
+    if (zero_points.numel() == scales_fp32.numel() / 8 ||
+        zero_points.numel() == scales_fp32.numel() / 8 + 1) {
+      float* zp_fp32_ptr = reinterpret_cast<float*>(zp_fp32.data_ptr());
+      uint32_t* zp_int32_ptr =
+          reinterpret_cast<uint32_t*>(zero_points.data_ptr());
+      for (size_t i = 0; i < zero_points.numel(); ++i) {
+        uint32_t zp_uint4x8 = zp_int32_ptr[i];
+        for (size_t j = 0; j < 8; ++j) {
+          zp_fp32_ptr[i * 8 + j] = (float)((zp_uint4x8 >> (j * 4)) & 0xf);
+        }
+      }
+    } else if (zero_points.numel() == scales_fp32.numel()) {
+      zp_fp32 = zero_points.to(c10::kFloat).squeeze();
+    } else {
+      TORCH_CHECK(false, "IPEX WOQ INT4: unexpected zero points size");
     }
   }
   // Support two cases here:
-  // 1. bf16 weight after calibration
+  // 1. fp32/bf16 weight after calibration
   // 2. int4 weight after calibration, quantized and compressed, as int32
   at::Tensor weight_int4;
   if (weight.scalar_type() == c10::kInt) {
-    // Weight created by GPTQ and transposed
     // Create empty weight with desired options then copy data
-    int64_t N = weight.size(1);
-    int64_t K_int32 = weight.size(0);
+    int64_t N = weight.size(0);
+    int64_t K_int32 = weight.size(1);
     int64_t K = K_int32 * 8; // int32 = int4 * 8
     std::vector<int64_t> weight_size = {N, K};
     // Create an empty quint4x2 weight with scales and zero points
@@ -71,11 +81,10 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
         zp_fp32,
         0,
         device(c10::kCPU).dtype(c10::kQUInt4x2));
-    auto weight_t = weight.t().contiguous();
     std::memcpy(
         weight_int4.data_ptr(),
-        weight_t.data_ptr(),
-        weight_t.numel() * sizeof(uint32_t));
+        weight.data_ptr(),
+        weight.numel() * sizeof(uint32_t));
   } else if (weight.scalar_type() == c10::kBFloat16) {
     // Load bf16 weight and quantize
     auto weight_fp32 = weight.to(c10::kFloat);
