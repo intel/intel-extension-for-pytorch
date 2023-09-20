@@ -8,6 +8,9 @@
 #include <oneDNN/oneDNN.h>
 #include <vector>
 #include "comm/ATDispatch.h"
+#include "comm/AccumulateType.h"
+#include "comm/Atomics.h"
+#include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 #include "utils/ComputeEngine.h"
 
@@ -19,6 +22,326 @@ using namespace xpu::oneDNN;
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
+template <typename scalar_t, typename accscalar_t, typename index_t>
+void avg_pool3d_backward_out_frame_atomic(
+    const Tensor& grad_output,
+    Tensor& grad_input,
+    int kT,
+    int kH,
+    int kW,
+    int dT,
+    int dH,
+    int dW,
+    int padT,
+    int padH,
+    int padW,
+    bool count_include_pad,
+    int offsetZ,
+    int totalZ,
+    int divisor_override) {
+  index_t ostride0 = grad_output.stride(0);
+  index_t ostride1 = grad_output.stride(1);
+  index_t ostride2 = grad_output.stride(2);
+  index_t ostride3 = grad_output.stride(3);
+  index_t istride0 = grad_input.stride(0);
+  index_t istride1 = grad_input.stride(1);
+  index_t istride2 = grad_input.stride(2);
+  index_t istride3 = grad_input.stride(3);
+
+  // width size is fixed size = 32, height dim equals = dpcppMaxWorkGroupSize /
+  // width_size
+  index_t width_group_size = 32;
+  index_t height_group_size = dpcppMaxWorkGroupSize() / width_group_size;
+  index_t width_group_range =
+      ceil_div<index_t>(grad_output.size(-1), width_group_size);
+  index_t height_group_range =
+      ceil_div<index_t>(grad_output.size(-2), height_group_size);
+
+  index_t z_group_range = totalZ > 65535 ? 65535 : totalZ;
+
+  auto grad_output_ptr = grad_output.data_ptr<scalar_t>();
+  auto grad_input_ptr = grad_input.data_ptr<scalar_t>();
+
+  index_t osize1 = grad_output.size(1);
+  index_t osize2 = grad_output.size(2);
+  index_t osize3 = grad_output.size(3);
+
+  index_t isize1 = grad_input.size(1);
+  index_t isize2 = grad_input.size(2);
+  index_t isize3 = grad_input.size(3);
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
+      index_t oCol = item.get_global_id()[2];
+      index_t oRow = item.get_global_id()[1];
+      index_t oFrame = (item.get_group(0) + offsetZ) % osize1;
+      index_t slice = (item.get_group(0) + offsetZ) / osize1;
+
+      if (oRow < osize2 && oCol < osize3) {
+        index_t tstart = oFrame * dT - padT;
+        index_t hstart = oRow * dH - padH;
+        index_t wstart = oCol * dW - padW;
+        index_t tend = Numerics<index_t>::min(tstart + kT, isize1 + padT);
+        index_t hend = Numerics<index_t>::min(hstart + kH, isize2 + padH);
+        index_t wend = Numerics<index_t>::min(wstart + kW, isize3 + padW);
+        index_t pool_size = (tend - tstart) * (hend - hstart) * (wend - wstart);
+        tstart = Numerics<index_t>::max(tstart, 0);
+        hstart = Numerics<index_t>::max(hstart, 0);
+        wstart = Numerics<index_t>::max(wstart, 0);
+        tend = Numerics<index_t>::min(tend, isize1);
+        hend = Numerics<index_t>::min(hend, isize2);
+        wend = Numerics<index_t>::min(wend, isize3);
+
+        accscalar_t divide_factor;
+        if (divisor_override) {
+          divide_factor = static_cast<accscalar_t>(divisor_override);
+        } else {
+          if (count_include_pad) {
+            divide_factor = static_cast<accscalar_t>(pool_size);
+          } else {
+            divide_factor = static_cast<accscalar_t>(
+                (tend - tstart) * (hend - hstart) * (wend - wstart));
+          }
+        }
+
+        scalar_t val = static_cast<scalar_t>(
+            static_cast<accscalar_t>(grad_output_ptr
+                                         [slice * ostride0 + oFrame * ostride1 +
+                                          oRow * ostride2 + oCol * ostride3]) /
+            divide_factor);
+
+        for (index_t iFrame = tstart; iFrame < tend; ++iFrame) {
+          for (index_t iRow = hstart; iRow < hend; ++iRow) {
+            for (index_t iCol = wstart; iCol < wend; ++iCol) {
+              const index_t index = slice * istride0 + iFrame * istride1 +
+                  iRow * istride2 + iCol * istride3;
+              atomicAdd(
+                  (dpcpp_global_ptr_pt<scalar_t>)&grad_input_ptr[index], val);
+            }
+          }
+        }
+      }
+    };
+
+    cgh.parallel_for(
+        sycl::nd_range<3>(
+            sycl::range<3>{
+                z_group_range,
+                height_group_range * height_group_size,
+                width_group_range * width_group_size,
+            },
+            sycl::range<3>{1, height_group_size, width_group_size}),
+        kfn);
+  };
+
+  DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
+}
+
+template <typename scalar_t, typename accscalar_t, typename index_t>
+void avg_pool3d_backward_out_frame_stride1(
+    const Tensor& grad_output,
+    Tensor& grad_input,
+    int kT,
+    int kH,
+    int kW,
+    accscalar_t normFactor,
+    int offsetZ,
+    int totalZ) {
+  index_t ostride0 = grad_output.stride(0);
+  index_t ostride1 = grad_output.stride(1);
+  index_t ostride2 = grad_output.stride(2);
+  index_t ostride3 = grad_output.stride(3);
+  index_t istride0 = grad_input.stride(0);
+  index_t istride1 = grad_input.stride(1);
+  index_t istride2 = grad_input.stride(2);
+  index_t istride3 = grad_input.stride(3);
+
+  // width size is fixed size = 32, height dim equals = dpcppMaxWorkGroupSize /
+  // width_size
+  index_t width_group_size = 32;
+  index_t height_group_size = dpcppMaxWorkGroupSize() / width_group_size;
+  index_t width_group_range =
+      ceil_div<index_t>(grad_output.size(-1), width_group_size);
+  index_t height_group_range =
+      ceil_div<index_t>(grad_output.size(-2), height_group_size);
+
+  index_t z_group_range = totalZ > 65535 ? 65535 : totalZ;
+
+  auto grad_output_ptr = grad_output.data_ptr<scalar_t>();
+  auto grad_input_ptr = grad_input.data_ptr<scalar_t>();
+
+  index_t osize1 = grad_output.size(1);
+  index_t osize2 = grad_output.size(2);
+  index_t osize3 = grad_output.size(3);
+
+  index_t isize1 = grad_input.size(1);
+  index_t isize2 = grad_input.size(2);
+  index_t isize3 = grad_input.size(3);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
+      index_t iCol = item.get_global_id()[2];
+      index_t iRow = item.get_global_id()[1];
+      index_t iFrame = (item.get_group(0) + offsetZ) % isize1;
+      index_t slice = (item.get_group(0) + offsetZ) / isize1;
+
+      if (iRow < isize2 && iCol < isize3) {
+        accscalar_t sum = 0.0;
+        scalar_t* gOut =
+            &grad_output_ptr
+                [slice * ostride0 +
+                 Numerics<index_t>::max(0, iFrame - kT + 1) * ostride1 +
+                 Numerics<index_t>::max(0, iRow - kH + 1) * ostride2 +
+                 Numerics<index_t>::max(0, iCol - kW + 1) * ostride3];
+        index_t frameOffset = 0;
+        for (index_t oFrame = Numerics<index_t>::max(0, iFrame - kT + 1);
+             oFrame < Numerics<index_t>::min(iFrame + 1, osize1);
+             ++oFrame) {
+          index_t rowOffset = frameOffset;
+          for (index_t oRow = Numerics<index_t>::max(0, iRow - kH + 1);
+               oRow < Numerics<index_t>::min(iRow + 1, osize2);
+               ++oRow) {
+            index_t colOffset = rowOffset;
+            for (index_t oCol = Numerics<index_t>::max(0, iCol - kW + 1);
+                 oCol < Numerics<index_t>::min(iCol + 1, osize3);
+                 ++oCol) {
+              sum += gOut[colOffset];
+              ++colOffset;
+            }
+            rowOffset += osize3;
+          }
+          frameOffset += osize2 * osize3;
+        }
+        grad_input_ptr
+            [slice * istride0 + iFrame * istride1 + iRow * istride2 +
+             iCol * istride3] = static_cast<scalar_t>(sum * normFactor);
+      }
+    };
+
+    cgh.parallel_for(
+        sycl::nd_range<3>(
+            sycl::range<3>{
+                z_group_range,
+                height_group_range * height_group_size,
+                width_group_range * width_group_size,
+            },
+            sycl::range<3>{1, height_group_size, width_group_size}),
+        kfn);
+  };
+
+  DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
+}
+
+template <typename scalar_t, typename accscalar_t, typename index_t>
+void avg_pool3d_backward_out_frame(
+    const Tensor& grad_output,
+    Tensor& grad_input,
+    int kT,
+    int kH,
+    int kW,
+    int dT,
+    int dH,
+    int dW,
+    int padT,
+    int padH,
+    int padW,
+    bool count_include_pad,
+    int offsetZ,
+    int totalZ,
+    int divisor_override) {
+  index_t ostride0 = grad_output.stride(0);
+  index_t ostride1 = grad_output.stride(1);
+  index_t ostride2 = grad_output.stride(2);
+  index_t ostride3 = grad_output.stride(3);
+  index_t istride0 = grad_input.stride(0);
+  index_t istride1 = grad_input.stride(1);
+  index_t istride2 = grad_input.stride(2);
+  index_t istride3 = grad_input.stride(3);
+
+  // width size is fixed size = 32, height dim equals = dpcppMaxWorkGroupSize /
+  // width_size
+  index_t width_group_size = 32;
+  index_t height_group_size = dpcppMaxWorkGroupSize() / width_group_size;
+  index_t width_group_range =
+      ceil_div<index_t>(grad_output.size(-1), width_group_size);
+  index_t height_group_range =
+      ceil_div<index_t>(grad_output.size(-2), height_group_size);
+
+  index_t z_group_range = totalZ > 65535 ? 65535 : totalZ;
+
+  auto grad_output_ptr = grad_output.data_ptr<scalar_t>();
+  auto grad_input_ptr = grad_input.data_ptr<scalar_t>();
+
+  index_t osize1 = grad_output.size(1);
+  index_t osize2 = grad_output.size(2);
+  index_t osize3 = grad_output.size(3);
+
+  index_t isize1 = grad_input.size(1);
+  index_t isize2 = grad_input.size(2);
+  index_t isize3 = grad_input.size(3);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
+      index_t oCol = item.get_global_id()[2];
+      index_t oRow = item.get_global_id()[1];
+      index_t oFrame = (item.get_group(0) + offsetZ) % osize1;
+      index_t slice = (item.get_group(0) + offsetZ) / osize1;
+
+      if (oRow < osize2 && oCol < osize3) {
+        index_t tstart = oFrame * dT - padT;
+        index_t hstart = oRow * dH - padH;
+        index_t wstart = oCol * dW - padW;
+        index_t tend = Numerics<index_t>::min(tstart + kT, isize1 + padT);
+        index_t hend = Numerics<index_t>::min(hstart + kH, isize2 + padH);
+        index_t wend = Numerics<index_t>::min(wstart + kW, isize3 + padW);
+        index_t pool_size = (tend - tstart) * (hend - hstart) * (wend - wstart);
+        tstart = Numerics<index_t>::max(tstart, 0);
+        hstart = Numerics<index_t>::max(hstart, 0);
+        wstart = Numerics<index_t>::max(wstart, 0);
+        tend = Numerics<index_t>::min(tend, isize1);
+        hend = Numerics<index_t>::min(hend, isize2);
+        wend = Numerics<index_t>::min(wend, isize3);
+
+        accscalar_t divide_factor;
+        if (divisor_override) {
+          divide_factor = static_cast<accscalar_t>(divisor_override);
+        } else {
+          if (count_include_pad) {
+            divide_factor = static_cast<accscalar_t>(pool_size);
+          } else {
+            divide_factor = static_cast<accscalar_t>(
+                (tend - tstart) * (hend - hstart) * (wend - wstart));
+          }
+        }
+
+        scalar_t val = static_cast<scalar_t>(
+            static_cast<accscalar_t>(grad_output_ptr
+                                         [slice * ostride0 + oFrame * ostride1 +
+                                          oRow * ostride2 + oCol * ostride3]) /
+            divide_factor);
+        for (index_t iFrame = tstart; iFrame < tend; ++iFrame) {
+          for (index_t iRow = hstart; iRow < hend; ++iRow) {
+            for (index_t iCol = wstart; iCol < wend; ++iCol) {
+              grad_input_ptr
+                  [slice * istride0 + iFrame * istride1 + iRow * istride2 +
+                   iCol * istride3] = val;
+            }
+          }
+        }
+      }
+    };
+
+    cgh.parallel_for(
+        sycl::nd_range<3>(
+            sycl::range<3>{
+                z_group_range,
+                height_group_range * height_group_size,
+                width_group_range * width_group_size,
+            },
+            sycl::range<3>{1, height_group_size, width_group_size}),
+        kfn);
+  };
+
+  DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
+}
 
 template <typename scalar_t, typename accscalar_t, typename index_t>
 void avg_pool3d_out_frame(
@@ -236,7 +559,7 @@ void avg_pool3d_out_template(
       /*check_input_size=*/true);
 
   xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::ONEDNN, input);
+      choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
 
   // for onednn block format
   if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
@@ -310,7 +633,7 @@ void avg_pool3d_out_template(
 
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         kHalf, kBFloat16, input.scalar_type(), "avg_pool3d_out_template", [&] {
-          using accscalar_t = acc_type<scalar_t, true>;
+          using accscalar_t = acc_type<scalar_t>;
           int64_t totalZ = outputDepth * nblock * nbatch;
           int64_t offsetZ = 0;
 
@@ -366,7 +689,8 @@ Tensor& avg_pool3d_backward_out_template(
     IntArrayRef stride,
     IntArrayRef padding,
     bool ceil_mode,
-    bool count_include_pad) {
+    bool count_include_pad,
+    c10::optional<int64_t> divisor_override) {
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 3,
       "avg_pool3d: kernel_size must either be a single int, or a tuple of "
@@ -451,46 +775,261 @@ Tensor& avg_pool3d_backward_out_template(
       owidth,
       "avg_pool3d_backward_out_template()");
 
-  // per oneDNN definition, no dilation means dilation ratio is 0
-  std::vector<int64_t> dilation_vec = {0, 0, 0};
-  if (count_include_pad) {
-    ::xpu::oneDNN::pooling_backward<
-        ::xpu::oneDNN::alg::pooling_avg_include_padding>(
-        gradInput,
-        gradOutput,
-        input,
-        nbatch,
-        nblock,
-        idepth,
-        iheight,
-        iwidth,
-        odepth,
-        oheight,
-        owidth,
-        stride_vec,
-        kernel_vec,
-        dilation_vec,
-        padding_vec,
-        padding_vec);
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::BASIC, gradInput);
+
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+    // per oneDNN definition, no dilation means dilation ratio is 0
+    std::vector<int64_t> dilation_vec = {0, 0, 0};
+    if (count_include_pad) {
+      ::xpu::oneDNN::pooling_backward<
+          ::xpu::oneDNN::alg::pooling_avg_include_padding>(
+          gradInput,
+          gradOutput,
+          input,
+          nbatch,
+          nblock,
+          idepth,
+          iheight,
+          iwidth,
+          odepth,
+          oheight,
+          owidth,
+          stride_vec,
+          kernel_vec,
+          dilation_vec,
+          padding_vec,
+          padding_vec);
+    } else {
+      ::xpu::oneDNN::pooling_backward<
+          ::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+          gradInput,
+          gradOutput,
+          input,
+          nbatch,
+          nblock,
+          idepth,
+          iheight,
+          iwidth,
+          odepth,
+          oheight,
+          owidth,
+          stride_vec,
+          kernel_vec,
+          dilation_vec,
+          padding_vec,
+          padding_vec);
+    }
   } else {
-    ::xpu::oneDNN::pooling_backward<
-        ::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
-        gradInput,
-        gradOutput,
-        input,
-        nbatch,
-        nblock,
-        idepth,
-        iheight,
-        iwidth,
-        odepth,
-        oheight,
-        owidth,
-        stride_vec,
-        kernel_vec,
-        dilation_vec,
-        padding_vec,
-        padding_vec);
+    // if divisor==0 then we will ignore it
+    int64_t divisor = 0;
+    if (divisor_override.has_value()) {
+      divisor = divisor_override.value();
+    }
+
+    Tensor workOutput = const_cast<Tensor&>(gradOutput);
+    Tensor workInput = zeros_like(gradInput);
+    if (gradOutput.ndimension() == 5) {
+      // Collapse batch and feature dimensions.
+      workInput = workInput.reshape({nbatch * nblock, idepth, iheight, iwidth});
+      workOutput =
+          workOutput.reshape({nbatch * nblock, odepth, oheight, owidth});
+    }
+    if (xpu::dpcpp::detail::canUse32BitIndexMath(workInput)) {
+      if (dD == 1 && dH == 1 && dW == 1 && padD == 0 && padH == 0 &&
+          padW == 0) {
+        IPEX_DISPATCH_FLOATING_TYPES_AND2(
+            kHalf,
+            kBFloat16,
+            input.scalar_type(),
+            "avg_pool3d_backward_out_frame_stride_1",
+            [&] {
+              using accscalar_t = acc_type<scalar_t>;
+              int64_t totalZ = idepth * nblock * nbatch;
+              int64_t offsetZ = 0;
+
+              accscalar_t divide_factor;
+              if (divisor) {
+                divide_factor = static_cast<accscalar_t>(divisor);
+              } else {
+                divide_factor = static_cast<accscalar_t>(kD * kH * kW);
+              }
+
+              while (totalZ > 0) {
+                avg_pool3d_backward_out_frame_stride1<
+                    scalar_t,
+                    accscalar_t,
+                    int32_t>(
+                    workOutput,
+                    workInput,
+                    kD,
+                    kH,
+                    kW,
+                    1.0f / divide_factor,
+                    offsetZ,
+                    totalZ);
+                totalZ -= 65535;
+                offsetZ += 65535;
+              }
+            });
+      } else {
+        // for contiguous format and channels_last3d format
+        const bool kernelsOverlap = (dD < kD) || (dH < kH) || (dW < kW);
+
+        IPEX_DISPATCH_FLOATING_TYPES_AND2(
+            kHalf,
+            kBFloat16,
+            input.scalar_type(),
+            "avg_pool3d_backward_out_frame",
+            [&] {
+              using accscalar_t = acc_type<scalar_t>;
+              int64_t totalZ = odepth * nblock * nbatch;
+              int64_t offsetZ = 0;
+
+              while (totalZ > 0) {
+                if (kernelsOverlap) {
+                  avg_pool3d_backward_out_frame_atomic<
+                      scalar_t,
+                      accscalar_t,
+                      int32_t>(
+                      workOutput,
+                      workInput,
+                      kD,
+                      kH,
+                      kW,
+                      dD,
+                      dH,
+                      dW,
+                      padD,
+                      padH,
+                      padW,
+                      count_include_pad,
+                      offsetZ,
+                      totalZ,
+                      divisor);
+                } else {
+                  avg_pool3d_backward_out_frame<scalar_t, accscalar_t, int32_t>(
+                      workOutput,
+                      workInput,
+                      kD,
+                      kH,
+                      kW,
+                      dD,
+                      dH,
+                      dW,
+                      padD,
+                      padH,
+                      padW,
+                      count_include_pad,
+                      offsetZ,
+                      totalZ,
+                      divisor);
+                }
+
+                totalZ -= 65535;
+                offsetZ += 65535;
+              }
+            });
+      }
+    } else {
+      if (dD == 1 && dH == 1 && dW == 1 && padD == 0 && padH == 0 &&
+          padW == 0) {
+        IPEX_DISPATCH_FLOATING_TYPES_AND2(
+            kHalf,
+            kBFloat16,
+            input.scalar_type(),
+            "avg_pool3d_backward_out_frame_stride_1",
+            [&] {
+              using accscalar_t = acc_type<scalar_t>;
+              int64_t totalZ = idepth * nblock * nbatch;
+              int64_t offsetZ = 0;
+
+              accscalar_t divide_factor;
+              if (divisor) {
+                divide_factor = static_cast<accscalar_t>(divisor);
+              } else {
+                divide_factor = static_cast<accscalar_t>(kD * kH * kW);
+              }
+
+              while (totalZ > 0) {
+                avg_pool3d_backward_out_frame_stride1<
+                    scalar_t,
+                    accscalar_t,
+                    int64_t>(
+                    workOutput,
+                    workInput,
+                    kD,
+                    kH,
+                    kW,
+                    1.0f / divide_factor,
+                    offsetZ,
+                    totalZ);
+                totalZ -= 65535;
+                offsetZ += 65535;
+              }
+            });
+      } else {
+        // for contiguous format and channels_last3d format
+        const bool kernelsOverlap = (dD < kD) || (dH < kH) || (dW < kW);
+
+        IPEX_DISPATCH_FLOATING_TYPES_AND2(
+            kHalf,
+            kBFloat16,
+            input.scalar_type(),
+            "avg_pool3d_backward_out_frame",
+            [&] {
+              using accscalar_t = acc_type<scalar_t>;
+              int64_t totalZ = odepth * nblock * nbatch;
+              int64_t offsetZ = 0;
+
+              while (totalZ > 0) {
+                if (kernelsOverlap) {
+                  avg_pool3d_backward_out_frame_atomic<
+                      scalar_t,
+                      accscalar_t,
+                      int64_t>(
+                      workOutput,
+                      workInput,
+                      kD,
+                      kH,
+                      kW,
+                      dD,
+                      dH,
+                      dW,
+                      padD,
+                      padH,
+                      padW,
+                      count_include_pad,
+                      offsetZ,
+                      totalZ,
+                      divisor);
+                } else {
+                  avg_pool3d_backward_out_frame<scalar_t, accscalar_t, int64_t>(
+                      workOutput,
+                      workInput,
+                      kD,
+                      kH,
+                      kW,
+                      dD,
+                      dH,
+                      dW,
+                      padD,
+                      padH,
+                      padW,
+                      count_include_pad,
+                      offsetZ,
+                      totalZ,
+                      divisor);
+                }
+
+                totalZ -= 65535;
+                offsetZ += 65535;
+              }
+            });
+      }
+    }
+
+    gradInput = workInput.resize_as_(gradInput);
   }
   return gradInput;
 }
@@ -528,9 +1067,6 @@ Tensor& avg_pool3d_backward_out(
     bool count_include_pad,
     c10::optional<int64_t> divisor_override,
     Tensor& grad_input) {
-  TORCH_CHECK(
-      !divisor_override.has_value(),
-      "dpcpp_avg_pool3d operator does not support divisor");
   Tensor self, grad_output;
   if (self_.ndimension() == 4) {
     // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
@@ -556,7 +1092,8 @@ Tensor& avg_pool3d_backward_out(
       stride,
       padding,
       ceil_mode,
-      count_include_pad);
+      count_include_pad,
+      divisor_override);
   return grad_input;
 }
 } // namespace AtenIpexTypeXPU
