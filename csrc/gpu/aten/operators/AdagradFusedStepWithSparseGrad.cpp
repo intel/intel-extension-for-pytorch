@@ -9,6 +9,7 @@
 #include "Loops.h"
 #include "LoopsTemplates.h"
 #include "PSTLFunctions.h"
+#include "SparseTensorUtils.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/ApplyUtils.h"
@@ -501,7 +502,8 @@ std::tuple<at::Tensor, at::Tensor> adagrad_fused_step_kernel_stub(
   int64_t sparse_dim = grad_.sparse_dim();
   if (grad_.is_coalesced() || nnz <= 2) {
     auto grad = grad_.is_coalesced() ? grad_ : grad_.coalesce();
-    Tensor indices1D = flatten_indices(grad._indices(), grad.sizes(), true);
+    Tensor indices1D = AtenIpexTypeSparseXPU::flatten_indices(
+        grad._indices(), grad.sizes(), true);
     Tensor values = grad._values();
     auto values_size = values.sizes().vec();
     if (std::accumulate(
@@ -541,9 +543,8 @@ std::tuple<at::Tensor, at::Tensor> adagrad_fused_step_kernel_stub(
     Tensor values = grad_._values();
     int64_t newNnz = 0;
 
-    // indices will be modified by Thrust, so we have to clone or use new
-    // storage here.
-    Tensor indices1D = flatten_indices(grad_._indices(), grad_.sizes(), true);
+    Tensor indices1D = AtenIpexTypeSparseXPU::flatten_indices(
+        grad_._indices(), grad_.sizes(), true);
 
     Tensor origIndices = at::empty({nnz}, grad_._indices().options());
     Tensor uniqueOffsets = at::empty({nnz}, grad_._indices().options());

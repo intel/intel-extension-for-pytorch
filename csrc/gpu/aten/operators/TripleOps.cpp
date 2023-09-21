@@ -13,6 +13,7 @@
 
 #include "Loops.h"
 #include "PSTLFunctions.h"
+#include "SparseTensorUtils.h"
 #include "comm/AccumulateType.h"
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
@@ -459,7 +460,8 @@ Tensor packed_add(
     int64_t nDim = top_half.dim();
     int64_t nDimI = grad.sparse_dim();
     const int64_t nnz = grad._nnz();
-    Tensor indices1D = flatten_indices(indices, grad.sizes(), 0);
+    Tensor indices1D =
+        AtenIpexTypeSparseXPU::flatten_indices(indices, grad.sizes(), 0);
     int64_t view_rows = 1;
     int64_t view_columns = 1;
     for (int i = 0; i < nDimI; i++) {

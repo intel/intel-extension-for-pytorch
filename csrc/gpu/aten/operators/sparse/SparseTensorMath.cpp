@@ -6,6 +6,7 @@
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 
+#include "../SparseTensorUtils.h"
 #include "../comm/ATDispatch.h"
 #include "../comm/Numerics.h"
 
@@ -269,7 +270,8 @@ Tensor& add_out_dense_sparse(
           });
     }
   } else {
-    Tensor indices1D = flatten_indices(indices, sparse.sizes(), 0);
+    Tensor indices1D =
+        AtenIpexTypeSparseXPU::flatten_indices(indices, sparse.sizes(), 0);
 
     int64_t view_rows = 1;
     int64_t view_columns = 1;

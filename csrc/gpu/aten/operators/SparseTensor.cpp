@@ -9,6 +9,7 @@
 #include "BitonicMergeSort.h"
 #include "IndexingUtils.h"
 #include "PSTLFunctions.h"
+#include "SparseTensorUtils.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
@@ -342,9 +343,8 @@ Tensor _coalesce(const Tensor& self) {
   int64_t sparse_dim = self.sparse_dim();
   int64_t newNnz;
 
-  // indices will be modified by Thrust, so we have to clone or use new storage
-  // here.
-  Tensor indices1D = flatten_indices(self._indices(), self.sizes(), true);
+  Tensor indices1D = AtenIpexTypeSparseXPU::flatten_indices(
+      self._indices(), self.sizes(), true);
 
   Tensor origIndices = at::empty({nnz}, self._indices().options());
   Tensor uniqueOffsets = at::empty({nnz}, self._indices().options());
