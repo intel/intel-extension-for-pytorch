@@ -153,4 +153,13 @@ foreach(i RANGE ${NUM_CPU_CAPABILITY_NAMES})
   endforeach()
 endforeach()
 
+# Set -O3 flag for WOQ kernel files for performance benefit.
+# Global -O3 flag may cause issues to other parts.
+if(NOT MSVC)
+  if(NOT ("${CMAKE_BUILD_TYPE}" MATCHES "Debug"))
+    file(GLOB_RECURSE WOQ_KRNL_FILES "${CMAKE_BINARY_DIR}/isa_codegen/*Woq*Krnl.cpp.*.cpp")
+    set_property(SOURCE ${WOQ_KRNL_FILES} APPEND PROPERTY COMPILE_OPTIONS "-O3")
+  endif()
+endif()
+
 list(APPEND IPEX_CPU_CPP_ISA_SRCS_GEN ${cpu_kernel_cpp})
