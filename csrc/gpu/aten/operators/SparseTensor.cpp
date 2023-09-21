@@ -228,9 +228,11 @@ Tensor _sparse_coo_tensor_with_dims_and_tensors(
     c10::optional<at::ScalarType> dtype,
     c10::optional<at::Layout> layout,
     c10::optional<at::Device> device,
-    c10::optional<bool> pin_memory) {
+    c10::optional<bool> pin_memory,
+    c10::optional<bool> is_coalesced) {
   SparseTensor self = new_sparse(dtype, layout, device, pin_memory);
-  at::sparse::get_sparse_impl(self)->resize_(sparse_dim, dense_dim, size);
+  auto impl = at::sparse::get_sparse_impl(self);
+  impl->resize_(sparse_dim, dense_dim, size);
   // NOTE: There is no guarantee that `indices` and `values` don't contain
   // AutogradMeta. However, we want to maintain the invariant that `indices_`
   // and `values_` of a sparse tensor don't contain AutogradMeta, and to achieve
@@ -245,6 +247,20 @@ Tensor _sparse_coo_tensor_with_dims_and_tensors(
           /*allow_tensor_metadata_change=*/true));
   at::sparse::alias_into_sparse(
       self, indices_shallow_copy, values_shallow_copy);
+  // alias_into_sparse overrides coalesced flag, so resetting the flag to
+  // the desired state here:
+  if (is_coalesced.has_value()) {
+    impl->set_coalesced(*is_coalesced);
+  }
+  // TODO: alias_into_sparse sets the coalesce flag to
+  // `self._values().shape[0] < 2`. There exist methods (e.g. permute
+  // on COO tensors when `dims[0] != 0` holds) that force coalesced
+  // flag to false even when nnz is less that 2. Here we cannot
+  // determine if this is the intention of such methods but it is
+  // likely that these methods are overly restrictive when estimating
+  // is_coalesced state. The condition `!is_coalesced && self._nnz() <
+  // 2` provides a way to detect and optimize such methods with
+  // respect to estimating the is_coalesced state.
   return self;
 }
 
