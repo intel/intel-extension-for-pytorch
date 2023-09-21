@@ -4,7 +4,7 @@
 #include "utils/CustomOperatorRegistration.h"
 
 #if defined(USE_XETLA)
-#include "XEGEMM.h"
+#include "XeGemm.h"
 #endif
 
 namespace at {
@@ -82,8 +82,9 @@ Tensor& addmm_out(
                 self, HGEMM_XETLA::EpilogueType::BIAS, beta.to<float>())
             .build();
     if (policy.valid()) {
-      policy.run();
-      return result;
+      auto status = policy.run();
+      if (status == xpu::xetla::GemmStatus::kSuccess)
+        return result;
     }
   } else if (
       self.dim() == 2 && self.sizes()[0] == mat1.sizes()[0] &&
@@ -98,8 +99,9 @@ Tensor& addmm_out(
                 self, HGEMM_XETLA::EpilogueType::RES_ADD, beta.to<float>())
             .build();
     if (policy.valid()) {
-      policy.run();
-      return result;
+      auto status = policy.run();
+      if (status == xpu::xetla::GemmStatus::kSuccess)
+        return result;
     }
   }
 #endif
@@ -192,8 +194,9 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
                     .add_matrix_b(mat2)
                     .build();
   if (policy.valid()) {
-    policy.run();
-    return result;
+    auto status = policy.run();
+    if (status == xpu::xetla::GemmStatus::kSuccess)
+      return result;
   }
 #endif
 

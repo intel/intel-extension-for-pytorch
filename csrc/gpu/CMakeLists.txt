@@ -38,7 +38,7 @@ set(IPEX_DISTRIBUTED_SRCS)
 add_subdirectory(${IPEX_GPU_ROOT_DIR}/distributed)
 
 if(USE_XETLA)
-  set(IPEX_GPU_XETLA_DIR "${IPEX_GPU_ROOT_DIR}/xetla")
+  set(IPEX_GPU_XETLA_DIR "${IPEX_GPU_ROOT_DIR}/aten/operators/xetla")
   add_subdirectory(${IPEX_GPU_XETLA_DIR})
 endif()
 

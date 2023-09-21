@@ -1,17 +1,19 @@
-#include "XEGEMM.h"
+#include "XeGemm.h"
 #include <ATen/ATen.h>
 #include <ATen/CPUApplyUtils.h>
 #include <ATen/record_function.h>
 #include <runtime/Utils.h>
-#include <xetla/hgemm.h>
 #include "Linear.h"
 #include "comm/ATDispatch.h"
 #include "utils/CustomOperatorRegistration.h"
+#include "xetla/hgemm.h"
 
 #if defined(USE_XETLA)
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+using namespace xpu::xetla;
 
 #define RECORD_ONEDNN_FUNCTION_IMPL(F)                     \
   char str__[100];                                         \
@@ -29,9 +31,11 @@ static Tensor mm_common(const Tensor& a, const Tensor& b) {
                     .add_matrix_a(a)
                     .add_matrix_b(b)
                     .build();
+  GemmStatus status = GemmStatus::kError;
   if (policy.valid()) {
-    policy.run();
-  } else {
+    status = policy.run();
+  }
+  if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_common)
     xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, Attr());
   }
@@ -55,9 +59,11 @@ static Tensor mm_resadd(
           .add_matrix_b(b)
           .add_epilogue(res, HGEMM_XETLA::EpilogueType::RES_ADD, res_factor)
           .build();
+  GemmStatus status = GemmStatus::kError;
   if (policy.valid()) {
-    policy.run();
-  } else {
+    status = policy.run();
+  }
+  if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_resadd)
     auto att = Attr();
     Tensor binary =
@@ -88,9 +94,11 @@ static Tensor mm_resadd_resadd(
           .add_epilogue(res0, HGEMM_XETLA::EpilogueType::RES_ADD, res0_factor)
           .add_epilogue(res1, HGEMM_XETLA::EpilogueType::RES_ADD, res1_factor)
           .build();
+  GemmStatus status = GemmStatus::kError;
   if (policy.valid()) {
-    policy.run();
-  } else {
+    status = policy.run();
+  }
+  if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_resadd_resadd)
     auto att = Attr();
     Tensor binary0 =
@@ -121,9 +129,11 @@ static Tensor mm_bias(
           .add_matrix_b(b)
           .add_epilogue(bias, HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
           .build();
+  GemmStatus status = GemmStatus::kError;
   if (policy.valid()) {
-    policy.run();
-  } else {
+    status = policy.run();
+  }
+  if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias)
     xpu::oneDNN::matmul(
         output, af, b, bias * Scalar(bias_factor), true, Attr());
@@ -151,9 +161,11 @@ static Tensor mm_bias_resadd(
           .add_epilogue(bias, HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
           .add_epilogue(res, HGEMM_XETLA::EpilogueType::RES_ADD, res_factor)
           .build();
+  GemmStatus status = GemmStatus::kError;
   if (policy.valid()) {
-    policy.run();
-  } else {
+    status = policy.run();
+  }
+  if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_resadd)
     auto att = Attr();
     Tensor binary =
@@ -187,9 +199,11 @@ static Tensor mm_bias_resadd_resadd(
           .add_epilogue(res0, HGEMM_XETLA::EpilogueType::RES_ADD, res0_factor)
           .add_epilogue(res1, HGEMM_XETLA::EpilogueType::RES_ADD, res1_factor)
           .build();
+  GemmStatus status = GemmStatus::kError;
   if (policy.valid()) {
-    policy.run();
-  } else {
+    status = policy.run();
+  }
+  if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_resadd_resadd)
     auto att = Attr();
     Tensor binary0 =
@@ -221,9 +235,11 @@ static Tensor mm_resmul(const Tensor& a, const Tensor& b, const Tensor& res) {
                     .add_matrix_b(b)
                     .add_epilogue(res, HGEMM_XETLA::EpilogueType::RES_MUL)
                     .build();
+  GemmStatus status = GemmStatus::kError;
   if (policy.valid()) {
-    policy.run();
-  } else {
+    status = policy.run();
+  }
+  if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_resmul)
     xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, Attr());
     output = output * res.flatten(0, -2);
@@ -243,9 +259,11 @@ static Tensor mm_silu(const Tensor& a, const Tensor& b) {
                     .add_matrix_b(b)
                     .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::SILU)
                     .build();
+  GemmStatus status = GemmStatus::kError;
   if (policy.valid()) {
-    policy.run();
-  } else {
+    status = policy.run();
+  }
+  if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_silu)
     xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, Attr());
     at::AtenIpexTypeXPU::silu_out(output, output);
@@ -274,8 +292,9 @@ Tensor matmul_gelu(
             .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::GELU)
             .build();
     if (policy.valid()) {
-      policy.run();
-      return matmul_resize(input, output);
+      auto status = policy.run();
+      if (status == GemmStatus::kSuccess)
+        return matmul_resize(input, output);
     }
   }
   RECORD_ONEDNN_FUNCTION_IMPL(matmul_gelu)
@@ -377,28 +396,12 @@ static void mm_qkv_out(
   bool use_xetla = out0_valid && out1_valid && out2_valid && input_valid &&
       weight_valid && bias_valid && shape_valid;
 
-  if (!use_xetla) {
-    auto wq = weight[0];
-    auto wk = weight[1];
-    auto wv = weight[2];
-    if (!has_bias) {
-      at::AtenIpexTypeXPU::mm_out(input, wq, out0);
-      at::AtenIpexTypeXPU::mm_out(input, wk, out1);
-      at::AtenIpexTypeXPU::mm_out(input, wv, out2);
-    } else {
-      at::AtenIpexTypeXPU::addmm_out(
-          bias_.value()[0], input, wq, at::Scalar(1), at::Scalar(1), out0_);
-      at::AtenIpexTypeXPU::addmm_out(
-          bias_.value()[1], input, wk, at::Scalar(1), at::Scalar(1), out1_);
-      at::AtenIpexTypeXPU::addmm_out(
-          bias_.value()[2], input, wv, at::Scalar(1), at::Scalar(1), out2_);
-    }
-  } else {
+  if (use_xetla) {
     char str__[100];
     if (!has_bias) {
       sprintf(str__, "hgemm_qkv(%d, %d, %d)", m, n, k);
       RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
-      hgemm_qkv(
+      auto status = hgemm_qkv(
           q,
           reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
@@ -409,10 +412,12 @@ static void mm_qkv_out(
           n,
           k,
           is_b_row_major);
+      if (status == GemmStatus::kSuccess)
+        return;
     } else {
       sprintf(str__, "hgemm_qkv_bias(%d, %d, %d)", m, n, k);
       RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
-      hgemm_qkv_bias(
+      auto status = hgemm_qkv_bias(
           q,
           reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
@@ -424,7 +429,25 @@ static void mm_qkv_out(
           n,
           k,
           is_b_row_major);
+      if (status == GemmStatus::kSuccess)
+        return;
     }
+  }
+
+  auto wq = weight[0];
+  auto wk = weight[1];
+  auto wv = weight[2];
+  if (!has_bias) {
+    at::AtenIpexTypeXPU::mm_out(input, wq, out0);
+    at::AtenIpexTypeXPU::mm_out(input, wk, out1);
+    at::AtenIpexTypeXPU::mm_out(input, wv, out2);
+  } else {
+    at::AtenIpexTypeXPU::addmm_out(
+        bias_.value()[0], input, wq, at::Scalar(1), at::Scalar(1), out0_);
+    at::AtenIpexTypeXPU::addmm_out(
+        bias_.value()[1], input, wk, at::Scalar(1), at::Scalar(1), out1_);
+    at::AtenIpexTypeXPU::addmm_out(
+        bias_.value()[2], input, wv, at::Scalar(1), at::Scalar(1), out2_);
   }
 }
 

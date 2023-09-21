@@ -475,7 +475,7 @@ void (*hgemm_qkv_bias_policies[HGEMM_NUM_POLICIES])(
     const int,
     const int) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_QKV_BIAS_IMPL_NAME)};
 
-void hgemm_addmm(
+GemmStatus hgemm_addmm(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* res,
@@ -488,10 +488,13 @@ void hgemm_addmm(
     const float beta,
     const bool is_b_row_major) {
   int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
+  if (policy_id < 0)
+    return GemmStatus::kError;
   hgemm_addmm_policies[policy_id](queue, out, res, a, b, m, n, k, alpha, beta);
+  return GemmStatus::kSuccess;
 }
 
-void hgemm_common(
+GemmStatus hgemm_common(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -501,10 +504,13 @@ void hgemm_common(
     const int k,
     const bool is_b_row_major) {
   int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
+  if (policy_id < 0)
+    return GemmStatus::kError;
   hgemm_common_policies[policy_id](queue, out, a, b, m, n, k);
+  return GemmStatus::kSuccess;
 }
 
-void hgemm_res(
+GemmStatus hgemm_res(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -516,10 +522,13 @@ void hgemm_res(
     const float res_factor,
     const bool is_b_row_major) {
   int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
+  if (policy_id < 0)
+    return GemmStatus::kError;
   hgemm_res_policies[policy_id](queue, out, a, b, res, m, n, k, res_factor);
+  return GemmStatus::kSuccess;
 }
 
-void hgemm_res_res(
+GemmStatus hgemm_res_res(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -533,11 +542,14 @@ void hgemm_res_res(
     const float res1_factor,
     const bool is_b_row_major) {
   int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
+  if (policy_id < 0)
+    return GemmStatus::kError;
   hgemm_res_res_policies[policy_id](
       queue, out, a, b, res0, res1, m, n, k, res0_factor, res1_factor);
+  return GemmStatus::kSuccess;
 }
 
-void hgemm_bias(
+GemmStatus hgemm_bias(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -549,10 +561,13 @@ void hgemm_bias(
     const float bias_factor,
     const bool is_b_row_major) {
   int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
+  if (policy_id < 0)
+    return GemmStatus::kError;
   hgemm_bias_policies[policy_id](queue, out, a, b, bias, m, n, k, bias_factor);
+  return GemmStatus::kSuccess;
 }
 
-void hgemm_bias_res(
+GemmStatus hgemm_bias_res(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -566,11 +581,14 @@ void hgemm_bias_res(
     const float res_factor,
     const bool is_b_row_major) {
   int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
+  if (policy_id < 0)
+    return GemmStatus::kError;
   hgemm_bias_res_policies[policy_id](
       queue, out, a, b, bias, res, m, n, k, bias_factor, res_factor);
+  return GemmStatus::kSuccess;
 }
 
-void hgemm_bias_res_res(
+GemmStatus hgemm_bias_res_res(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -586,6 +604,8 @@ void hgemm_bias_res_res(
     const float res1_factor,
     const bool is_b_row_major) {
   int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
+  if (policy_id < 0)
+    return GemmStatus::kError;
   hgemm_bias_res_res_policies[policy_id](
       queue,
       out,
@@ -600,9 +620,10 @@ void hgemm_bias_res_res(
       bias_factor,
       res0_factor,
       res1_factor);
+  return GemmStatus::kSuccess;
 }
 
-void hgemm_bias_gelu(
+GemmStatus hgemm_bias_gelu(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -614,11 +635,14 @@ void hgemm_bias_gelu(
     const float bias_factor,
     const bool is_b_row_major) {
   int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
+  if (policy_id < 0)
+    return GemmStatus::kError;
   hgemm_bias_gelu_policies[policy_id](
       queue, out, a, b, bias, m, n, k, bias_factor);
+  return GemmStatus::kSuccess;
 }
 
-void hgemm_resmul(
+GemmStatus hgemm_resmul(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -629,10 +653,13 @@ void hgemm_resmul(
     const int k,
     const bool is_b_row_major) {
   int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
+  if (policy_id < 0)
+    return GemmStatus::kError;
   hgemm_resmul_policies[policy_id](queue, out, a, b, mul, m, n, k);
+  return GemmStatus::kSuccess;
 }
 
-void hgemm_silu(
+GemmStatus hgemm_silu(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -642,10 +669,13 @@ void hgemm_silu(
     const int k,
     const bool is_b_row_major) {
   int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
+  if (policy_id < 0)
+    return GemmStatus::kError;
   hgemm_silu_policies[policy_id](queue, out, a, b, m, n, k);
+  return GemmStatus::kSuccess;
 }
 
-void hgemm_qkv(
+GemmStatus hgemm_qkv(
     sycl::queue& queue,
     sycl::half* out0,
     sycl::half* out1,
@@ -657,10 +687,13 @@ void hgemm_qkv(
     const int k,
     const bool is_b_row_major) {
   int policy_id = hgemm_qkv_find_policy_id(m, n, k, is_b_row_major);
+  if (policy_id < 0)
+    return GemmStatus::kError;
   hgemm_qkv_policies[policy_id](queue, out0, out1, out2, a, b, m, n, k);
+  return GemmStatus::kSuccess;
 }
 
-void hgemm_qkv_bias(
+GemmStatus hgemm_qkv_bias(
     sycl::queue& queue,
     sycl::half* out0,
     sycl::half* out1,
@@ -673,8 +706,11 @@ void hgemm_qkv_bias(
     const int k,
     const bool is_b_row_major) {
   int policy_id = hgemm_qkv_find_policy_id(m, n, k, is_b_row_major);
+  if (policy_id < 0)
+    return GemmStatus::kError;
   hgemm_qkv_bias_policies[policy_id](
       queue, out0, out1, out2, a, b, bias, m, n, k);
+  return GemmStatus::kSuccess;
 }
 
 } // namespace xetla

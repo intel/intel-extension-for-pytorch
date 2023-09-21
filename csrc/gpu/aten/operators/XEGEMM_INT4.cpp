@@ -3,9 +3,9 @@
 #include <ATen/CPUApplyUtils.h>
 #include <ATen/record_function.h>
 #include <runtime/Utils.h>
-#include <xetla/GEMM_INT4.h>
 #include "comm/ATDispatch.h"
 #include "utils/CustomOperatorRegistration.h"
+#include "xetla/GEMM_INT4.h"
 
 #if defined(USE_XETLA)
 

@@ -3,8 +3,8 @@
 
 //#include <xetla/kernels/SDP/mha_forward.h>
 #include <ATen/record_function.h>
-#include <xetla/mha.h>
 #include "../comm/ATDispatch.h"
+#include "../xetla/mha.h"
 #include "NaiveScaledDotProduct.h"
 #include "sdp_utils.h"
 #include "sdp_utils_cpp.h"

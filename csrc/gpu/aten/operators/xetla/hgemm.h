@@ -5,7 +5,9 @@
 namespace xpu {
 namespace xetla {
 
-void hgemm_addmm(
+enum class GemmStatus { kSuccess, kError };
+
+GemmStatus hgemm_addmm(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* res,
@@ -18,7 +20,7 @@ void hgemm_addmm(
     const float beta,
     const bool is_b_row_major);
 
-void hgemm_common(
+GemmStatus hgemm_common(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -28,7 +30,7 @@ void hgemm_common(
     const int k,
     const bool is_b_row_major);
 
-void hgemm_res(
+GemmStatus hgemm_res(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -40,7 +42,7 @@ void hgemm_res(
     const float res_factor,
     const bool is_b_row_major);
 
-void hgemm_res_res(
+GemmStatus hgemm_res_res(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -54,7 +56,7 @@ void hgemm_res_res(
     const float res1_factor,
     const bool is_b_row_major);
 
-void hgemm_bias(
+GemmStatus hgemm_bias(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -66,7 +68,7 @@ void hgemm_bias(
     const float bias_factor,
     const bool is_b_row_major);
 
-void hgemm_bias_res(
+GemmStatus hgemm_bias_res(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -80,7 +82,7 @@ void hgemm_bias_res(
     const float res_factor,
     const bool is_b_row_major);
 
-void hgemm_bias_res_res(
+GemmStatus hgemm_bias_res_res(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -96,7 +98,7 @@ void hgemm_bias_res_res(
     const float res1_factor,
     const bool is_b_row_major);
 
-void hgemm_bias_gelu(
+GemmStatus hgemm_bias_gelu(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -108,7 +110,7 @@ void hgemm_bias_gelu(
     const float bias_factor,
     const bool is_b_row_major);
 
-void hgemm_resmul(
+GemmStatus hgemm_resmul(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -119,7 +121,7 @@ void hgemm_resmul(
     const int k,
     const bool is_b_row_major);
 
-void hgemm_silu(
+GemmStatus hgemm_silu(
     sycl::queue& queue,
     sycl::half* out,
     const sycl::half* a,
@@ -129,7 +131,7 @@ void hgemm_silu(
     const int k,
     const bool is_b_row_major);
 
-void hgemm_qkv(
+GemmStatus hgemm_qkv(
     sycl::queue& queue,
     sycl::half* out0,
     sycl::half* out1,
@@ -141,7 +143,7 @@ void hgemm_qkv(
     const int k,
     const bool is_b_row_major);
 
-void hgemm_qkv_bias(
+GemmStatus hgemm_qkv_bias(
     sycl::queue& queue,
     sycl::half* out0,
     sycl::half* out1,

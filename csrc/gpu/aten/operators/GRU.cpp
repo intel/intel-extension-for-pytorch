@@ -1,3 +1,4 @@
+#include "xetla/GRU.h"
 #include <ATen/ATen.h>
 #include <ATen/ExpandUtils.h>
 #include <ATen/MatrixRef.h>
@@ -9,7 +10,6 @@
 #include <torch/custom_class.h>
 #include <utils/Settings.h>
 #include <utils/SimpleTrace.h>
-#include <xetla/GRU.h>
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
 

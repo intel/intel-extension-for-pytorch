@@ -43,11 +43,11 @@ static void reduce(
   auto desc_src = memory::desc(src_dims, src_dt, src_format);
   auto desc_dst = memory::desc(dst_dims, dst_dt, dst_format);
 
-  auto pd = reduction::primitive_desc();
-  pd =
-      reduction::primitive_desc(engine, aalgorithm, desc_src, desc_dst, p, eps);
+  auto pd = dnnl::reduction::primitive_desc();
+  pd = dnnl::reduction::primitive_desc(
+      engine, aalgorithm, desc_src, desc_dst, p, eps);
 
-  auto prim = reduction(pd);
+  auto prim = dnnl::reduction(pd);
 
   const auto src_desc = pd.src_desc();
   const auto dst_desc = pd.dst_desc();
