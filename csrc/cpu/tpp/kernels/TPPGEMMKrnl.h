@@ -354,9 +354,11 @@ inline void tpp_linear_add_add(
   auto rem = BS % 64;
   if (large_cache_opt)
     Ncb = NCB_BLOCK_SIZE;
-
+  bool with_bias = (t_bias.numel() > 0);
   auto copy_bias_tpp = SCOPEIT(CpyBiasTPP<T>(BSb, Hk, K), BIAS);
   auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<T>(rem, Hk, K), BIAS);
+  auto zero_tpp = SCOPEIT(SetZeroTPP<T>(BSb, Hk, K), EW_ZERO);
+  auto zero_tpp_rem = SCOPEIT(SetZeroTPP<T>(rem, Hk, K), EW_ZERO);
   auto brgemm_tpp = SCOPEITGEMM(
       (BrgemmTPP<T, T>(BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
   auto brgemm_tpp_rem = SCOPEITGEMM(
@@ -379,7 +381,11 @@ inline void tpp_linear_add_add(
           bool is_rem = (s1 + BSb > BS);
           if (!is_rem) {
             if (nc == 0) {
-              copy_bias_tpp(bias[nk], out[s1][nk]);
+              if (with_bias) {
+                copy_bias_tpp(bias[nk], out[s1][nk]);
+              } else {
+                zero_tpp(out[s1][nk]);
+              }
             }
             brgemm_tpp(in[s1][nc], wt_V[nk][nc], out[s1][nk], count, true);
             if (!(nc + Ncb < Nc)) { // last nc iter
@@ -388,7 +394,11 @@ inline void tpp_linear_add_add(
             }
           } else {
             if (nc == 0) {
-              copy_bias_tpp_rem(bias[nk], out[s1][nk]);
+              if (with_bias) {
+                copy_bias_tpp_rem(bias[nk], out[s1][nk]);
+              } else {
+                zero_tpp_rem(out[s1][nk]);
+              }
             }
             brgemm_tpp_rem(in[s1][nc], wt_V[nk][nc], out[s1][nk], count, false);
             brgemm_tpp.config();
@@ -435,9 +445,11 @@ inline void tpp_linear_gelu(
   auto rem = BS % 64;
   if (large_cache_opt)
     Ncb = NCB_BLOCK_SIZE;
-
+  bool with_bias = (t_bias.numel() > 0);
   auto copy_bias_tpp = SCOPEIT(CpyBiasTPP<T>(BSb, Hk, K), BIAS);
   auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<T>(rem, Hk, K), BIAS);
+  auto zero_tpp = SCOPEIT(SetZeroTPP<T>(BSb, Hk, K), EW_ZERO);
+  auto zero_tpp_rem = SCOPEIT(SetZeroTPP<T>(rem, Hk, K), EW_ZERO);
   auto brgemm_tpp = SCOPEITGEMM(
       (BrgemmTPP<T, T>(BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
   auto brgemm_tpp_rem = SCOPEITGEMM(
@@ -458,7 +470,11 @@ inline void tpp_linear_gelu(
           bool is_rem = (s1 + BSb > BS);
           if (!is_rem) {
             if (nc == 0) {
-              copy_bias_tpp(bias[nk], out[s1][nk]);
+              if (with_bias) {
+                copy_bias_tpp(bias[nk], out[s1][nk]);
+              } else {
+                zero_tpp(out[s1][nk]);
+              }
             }
             brgemm_tpp(in[s1][nc], wt_V[nk][nc], out[s1][nk], count, true);
             if (!(nc + Ncb < Nc)) { // last nc iter
@@ -466,7 +482,11 @@ inline void tpp_linear_gelu(
             }
           } else {
             if (nc == 0) {
-              copy_bias_tpp_rem(bias[nk], out[s1][nk]);
+              if (with_bias) {
+                copy_bias_tpp_rem(bias[nk], out[s1][nk]);
+              } else {
+                zero_tpp_rem(out[s1][nk]);
+              }
             }
             brgemm_tpp_rem(in[s1][nc], wt_V[nk][nc], out[s1][nk], count, false);
             brgemm_tpp.config();

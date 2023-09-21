@@ -1,7 +1,7 @@
-import unittest
 import torch
-from torch import nn
+import torch.nn as nn
 from common_utils import TestCase
+import unittest
 
 
 class RMSNorm(nn.Module):
@@ -10,10 +10,20 @@ class RMSNorm(nn.Module):
         self.weight = nn.Parameter(torch.ones(hidden_size))
         self.variance_epsilon = eps
 
-    def forward(self, hidden_states):
-        variance = hidden_states.pow(2).mean(-1, keepdim=True)
-        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-        return self.weight * hidden_states
+    def forward(self, hidden_states, fused_rmsnorm=False):
+        if fused_rmsnorm:
+            return torch.ops.torch_ipex.rmsnorm(
+                hidden_states, self.weight, self.variance_epsilon
+            )
+        else:
+            input_dtype = hidden_states.dtype
+            hidden_states = hidden_states.to(torch.float32)
+            variance = hidden_states.pow(2).mean(-1, keepdim=True)
+            hidden_states = hidden_states * torch.rsqrt(
+                variance + self.variance_epsilon
+            )
+            res = (self.weight * hidden_states).to(input_dtype)
+            return res
 
 
 class RMSNormTester(TestCase):
@@ -28,16 +38,13 @@ class RMSNormTester(TestCase):
                 x = torch.randn(input_size)
                 # RMSNorm input is fp32
                 model = RMSNorm(input_size).eval()
-                trace_model = torch.jit.trace(model, x)
                 y1_fp32 = model(x)
-                y2_fp32 = trace_model(x)
-                rmsnorm_graph = trace_model.graph_for(x)
-                self.assertEqual(y1_fp32.dtype, torch.float32)
-                self.assertEqual(y2_fp32.dtype, torch.float32)
-                self.assertEqual(y1_fp32, y2_fp32)
-                self.assertTrue(
-                    any(n.kind() == "ipex::RMSNorm" for n in rmsnorm_graph.nodes())
-                )
+                fused_y1_fp32 = model(x, fused_rmsnorm=True)
+                self.assertEqual(y1_fp32, fused_y1_fp32)
+                x_bf16 = x.to(torch.bfloat16)
+                y1_bf16 = model(x_bf16)
+                fused_y1_bf16 = model(x_bf16, fused_rmsnorm=True)
+                self.assertEqual(y1_bf16, fused_y1_bf16, prec=1e-2)
 
 
 if __name__ == "__main__":

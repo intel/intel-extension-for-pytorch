@@ -174,6 +174,8 @@ def _beam_search(
             or re.search("llama", self.config.architectures[0], re.IGNORECASE)
             or re.search("gptneox", self.config.architectures[0], re.IGNORECASE)
             or re.search("OPT", self.config.architectures[0], re.IGNORECASE)
+            or re.search("falcon", self.config.architectures[0], re.IGNORECASE)
+            or re.search("rw", self.config.architectures[0], re.IGNORECASE)
         ):
             first_token = False
             input_bs = input_ids.size()[0]
@@ -188,7 +190,7 @@ def _beam_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 beam_idx_tmp,
@@ -203,7 +205,7 @@ def _beam_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 beam_idx_tmp,
@@ -218,7 +220,7 @@ def _beam_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 beam_idx_tmp,
@@ -233,7 +235,25 @@ def _beam_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
+                    has_position_id = False
+                elif re.search(
+                    "falcon", self.config.architectures[0], re.IGNORECASE
+                ) or re.search("rw", self.config.architectures[0], re.IGNORECASE):
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(batch_size * num_beams)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 beam_idx_tmp,
@@ -271,7 +291,6 @@ def _beam_search(
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
                 else:
-                    # print(self.trace_graph.graph_for(**model_inputs))
                     outputs = self.trace_graph(**model_inputs)
 
                 if first_token and len(model_inputs["past_key_values"][1]) == 4:

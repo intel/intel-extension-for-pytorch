@@ -155,6 +155,8 @@ def _greedy_search(
             or re.search("llama", self.config.architectures[0], re.IGNORECASE)
             or re.search("gptneox", self.config.architectures[0], re.IGNORECASE)
             or re.search("OPT", self.config.architectures[0], re.IGNORECASE)
+            or re.search("falcon", self.config.architectures[0], re.IGNORECASE)
+            or re.search("rw", self.config.architectures[0], re.IGNORECASE)
         ):
             first_token = False
             input_bs = input_ids.size()[0]
@@ -168,7 +170,7 @@ def _greedy_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 beam_idx_tmp,
@@ -183,7 +185,7 @@ def _greedy_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 beam_idx_tmp,
@@ -198,7 +200,7 @@ def _greedy_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 beam_idx_tmp,
@@ -213,7 +215,7 @@ def _greedy_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 beam_idx_tmp,
@@ -221,7 +223,23 @@ def _greedy_search(
                             for i in range(self.config.num_hidden_layers)
                         ]
                     )
-
+                elif re.search(
+                    "falcon", self.config.architectures[0], re.IGNORECASE
+                ) or re.search("rw", self.config.architectures[0], re.IGNORECASE):
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(input_bs)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)

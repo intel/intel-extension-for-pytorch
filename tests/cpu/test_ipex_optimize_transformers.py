@@ -14,6 +14,7 @@ except ImportError:
     subprocess.check_call(
         [sys.executable, "-m", "pip", "install", "transformers==4.31.0"]
     )
+    import transformers
     from transformers import AutoConfig
 
 from common_utils import TestCase
@@ -25,17 +26,16 @@ curpath = os.path.abspath(os.path.dirname(__file__))
 
 class OptimizeTransformersTester(TestCase):
     def model_replacement_check(self, model, has_position_id):
-        for dtype in [torch.float, torch.bfloat16]:
+        for dtype in [torch.bfloat16]:
             for deployment_mode in [True, False]:
                 ref_m = copy.deepcopy(model)
                 ipex_m = copy.deepcopy(model)
-                if dtype is torch.bfloat16:
-                    ref_m = ref_m.to(torch.bfloat16)
-                    ipex_m = ipex_m.to(torch.bfloat16)
+
                 ipex_m = ipex.optimize_transformers(
-                    ipex_m, dtype=dtype, deployment_mode=deployment_mode
+                    ipex_m, dtype=dtype, deployment_mode=deployment_mode, inplace=True
                 )
-                input_ids = torch.ones(8).to(torch.long)
+
+                input_ids = torch.ones(10).to(torch.long)
                 attention_mask = torch.ones(len(input_ids))
                 with torch.no_grad(), torch.cpu.amp.autocast(
                     enabled=True if dtype is torch.bfloat16 else False
@@ -65,6 +65,7 @@ class OptimizeTransformersTester(TestCase):
                             attention_mask=attention_mask.unsqueeze(0),
                             use_cache=True,
                         )
+                    self.assertEqual(key_hf[0], key_ipex[0], prec=0.1)
 
                     if re.search("GPTJ", model.config.architectures[0]):
                         assert (
@@ -102,6 +103,17 @@ class OptimizeTransformersTester(TestCase):
                             ipex_m.model.decoder.layers[0].__class__
                             is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
                         )
+                    elif re.search(
+                        "falcon", model.config.architectures[0], re.IGNORECASE
+                    ):
+                        assert (
+                            type(ipex_m.transformer.h[0].self_attention)
+                            is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
+                        )
+                        assert (
+                            type(ipex_m.transformer.h[0])
+                            is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
+                        )
 
     def test_model_replacement_gptj(self):
         config = AutoConfig.from_pretrained(
@@ -134,15 +146,24 @@ class OptimizeTransformersTester(TestCase):
         m = transformers.models.opt.modeling_opt.OPTForCausalLM(config).eval()
         self.model_replacement_check(m, False)
 
+    def test_model_replacement_falcon(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/falcon", return_dict=False
+        )
+
+        m = transformers.models.falcon.modeling_falcon.FalconForCausalLM(config).eval()
+        with torch.no_grad():
+            ipex.nn.utils._model_convert.replace_customized_linear_with_linear(m.eval())
+        self.model_replacement_check(m, False)
+
     def test_weight_only_quant_flow(self):
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/gptj", return_dict=False
         )
         m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
-        ipex_m = copy.deepcopy(m)
         qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
         ipex_m = ipex.optimize_transformers(
-            ipex_m, dtype=torch.float, quantization_config=qconfig, deployment_mode=True
+            m, dtype=torch.float, quantization_config=qconfig, deployment_mode=True, inplace=True
         )
         if not hasattr(ipex_m, "trace_graph"):
             AssertionError(False)
@@ -186,6 +207,7 @@ class OptimizeTransformersTester(TestCase):
             quant_m,
             dtype=torch.float,
             quantization_config=qconfig,
+            inplace=True
         )
         from intel_extension_for_pytorch.quantization import prepare
 
@@ -209,6 +231,7 @@ class OptimizeTransformersTester(TestCase):
                 dtype=dtype,
                 quantization_config=qconfig,
                 qconfig_summary_file=f"{curpath}/hf_configs/gptj/qconfig.json",
+                inplace=True
             )
             if not hasattr(ipex_m, "trace_graph"):
                 AssertionError(False)

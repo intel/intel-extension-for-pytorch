@@ -269,3 +269,21 @@ def OPTForCausalLM_forward(
         hidden_states=outputs.hidden_states,
         attentions=outputs.attentions,
     )
+
+
+def prepare_inputs_for_generation(
+    self,
+    input_ids: torch.LongTensor,
+    past_key_values: Optional[torch.Tensor] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    **kwargs,
+) -> dict:
+    if past_key_values is not None:
+        input_ids = input_ids[:, -1:]
+
+    return {
+        "input_ids": input_ids,
+        "past_key_values": past_key_values,
+        "use_cache": kwargs.get("use_cache"),
+        "attention_mask": attention_mask,
+    }

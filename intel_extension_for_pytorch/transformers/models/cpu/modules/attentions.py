@@ -21,6 +21,7 @@ class _IPEXAttentionCPU(nn.Module):
                 self.max_position_embeddings,
                 self.pos_embd_dim,
                 self.rope_base,
+                self.model_backbone,
             )
 
         self.text_max_length = (
