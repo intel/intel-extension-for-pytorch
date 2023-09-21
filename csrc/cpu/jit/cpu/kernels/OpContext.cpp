@@ -359,6 +359,7 @@ void IpexConvTransposeOpContext::load_from_ctx(
   load_from_ctx_template(this, other);
 }
 
+#ifdef USE_LIBXSMM
 // For weight-only quantization
 c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
     at::Tensor&& weight,
@@ -552,6 +553,6 @@ void IpexWoqLinearOpContext::load_from_ctx(
     c10::intrusive_ptr<WoqLinearOpContext> other) {
   load_from_ctx_template(this, other);
 }
-
+#endif
 } // namespace cpu
 } // namespace torch_ipex

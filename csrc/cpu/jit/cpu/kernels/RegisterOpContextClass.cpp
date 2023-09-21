@@ -14,8 +14,10 @@ using detail::conv_transpose::createConvTransposePrePackOpContext;
 using detail::convolution::createConvolutionPrePackOpContext;
 using detail::linear::createLinearPrePackOpContext;
 using detail::mkl_sgemm::createLinearMKLPrePackOpContext;
+#ifdef USE_LIBXSMM
 using detail::woq_linear::createWoqLinearPrePackOpContext;
 using detail::woq_linear::createWoqLinearPrePackOpContextInt4;
+#endif
 
 TORCH_LIBRARY(ipex_prepack, m) {
   m.class_<ConvolutionOpContext>("ConvolutionOpContext")
@@ -119,6 +121,7 @@ TORCH_LIBRARY(ipex_prepack, m) {
       .def(
           "load_from_ctx",
           &torch_ipex::cpu::ConvTransposeOpContext::load_from_ctx);
+#ifdef USE_LIBXSMM
   m.class_<WoqLinearOpContext>("WoqLinearOpContext")
       .def_pickle(
           [](const c10::intrusive_ptr<WoqLinearOpContext>& op_context)
@@ -144,6 +147,7 @@ TORCH_LIBRARY(ipex_prepack, m) {
           &torch_ipex::cpu::WoqLinearOpContext::get_data_handle)
       .def(
           "load_from_ctx", &torch_ipex::cpu::WoqLinearOpContext::load_from_ctx);
+#endif
   m.def(
       "convolution_prepack(Tensor W, Tensor? B, int[] stride, "
       "int[] padding, int[] dilation, int groups, "
@@ -160,12 +164,14 @@ TORCH_LIBRARY(ipex_prepack, m) {
       "int[] padding, int[] output_padding, int groups, int[] dilation, "
       "bool input_is_channels_last, int[] input_sizes) "
       "-> __torch__.torch.classes.ipex_prepack.ConvTransposeOpContext");
+#ifdef USE_LIBXSMM
   m.def(
       "weight_only_qlinear_prepack(Tensor W, Tensor? B, int? batch_size, int lowp_mode, int num_concats) "
       "-> __torch__.torch.classes.ipex_prepack.WoqLinearOpContext");
   m.def(
       "weight_only_qlinear_prepack_int4(Tensor W, Tensor scales, Tensor zero_points, Tensor? B, int? batch_size, int lowp_mode, int num_concats) "
       "-> __torch__.torch.classes.ipex_prepack.WoqLinearOpContext");
+#endif
 }
 
 TORCH_LIBRARY_IMPL(ipex_prepack, CPU, m) {
@@ -175,6 +181,7 @@ TORCH_LIBRARY_IMPL(ipex_prepack, CPU, m) {
   m.impl(
       "conv_transpose_prepack", TORCH_FN(createConvTransposePrePackOpContext));
 }
+#ifdef USE_LIBXSMM
 TORCH_LIBRARY_IMPL(ipex_prepack, QuantizedCPU, m) {
   m.impl(
       "weight_only_qlinear_prepack", TORCH_FN(createWoqLinearPrePackOpContext));
@@ -184,6 +191,6 @@ TORCH_LIBRARY_IMPL(ipex_prepack, CPU, m) {
       "weight_only_qlinear_prepack_int4",
       TORCH_FN(createWoqLinearPrePackOpContextInt4));
 }
-
+#endif
 } // namespace cpu
 } // namespace torch_ipex

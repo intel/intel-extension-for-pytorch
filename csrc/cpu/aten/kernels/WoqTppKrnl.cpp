@@ -1,5 +1,5 @@
 // weight-only quantization gemm kernel (int8, int4 etc.)
-// #include <torch/extension.h>
+#ifdef USE_LIBXSMM
 #include <ATen/ATen.h>
 #include <ATen/Tensor.h>
 #include <ATen/cpu/vec/vec.h>
@@ -2490,3 +2490,5 @@ REGISTER_DISPATCH(woq_tpp_gemm_unpackB_stub, &qlinear_woq_unpack);
 
 } // namespace cpu
 } // namespace torch_ipex
+
+#endif

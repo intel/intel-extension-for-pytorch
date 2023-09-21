@@ -356,6 +356,7 @@ at::Tensor ipex_linear_eltwise(
       input, weight, bias, eltwise, op_context, out_features);
 }
 
+#ifdef USE_LIBXSMM
 DEFINE_DISPATCH(woq_linear_packB_stub);
 DEFINE_DISPATCH(woq_tpp_gemm_packB_stub);
 at::Tensor woq_linear_pack_weight(
@@ -751,6 +752,7 @@ at::Tensor woq_linear_add_add_forward(
              op_context.data_ptr<int64_t>()[0])
       ->run_add_add(input, others);
 }
+#endif
 
 } // namespace cpu
 } // namespace torch_ipex
@@ -811,6 +813,7 @@ at::Tensor ipex_linear_eltwise(
       out_features);
 }
 
+#ifdef USE_LIBXSMM
 at::Tensor woq_linear_forward(
     const at::Tensor& input,
     const at::Tensor& op_context) {
@@ -862,7 +865,7 @@ at::Tensor woq_linear_add_add_forward(
       op_context,
       cpu_cached_cast(target_type, others));
 }
-
+#endif
 } // namespace autocast
 } // namespace torch_ipex
 
@@ -879,6 +882,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       c10::DispatchKey::AutocastCPU,
       torch_ipex::autocast::ipex_linear);
   m.impl("ipex_linear", c10::DispatchKey::CPU, torch_ipex::cpu::linear_forward);
+#ifdef USE_LIBXSMM
   m.def("ipex_woq_linear(Tensor input, Tensor W_prepack) -> Tensor");
   m.impl(
       "ipex_woq_linear",
@@ -917,6 +921,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "woq_linear_add_add",
       c10::DispatchKey::AutocastCPU,
       torch_ipex::autocast::woq_linear_add_add_forward);
+#endif
   // fuse eltwise
   m.def(
       "ipex_linear_eltwise(Tensor input, Tensor weight, Tensor? bias, int eltwise, "

@@ -1,3 +1,4 @@
+#ifdef USE_LIBXSMM
 #include "LinearWoqPacked.h"
 #include <ideep.hpp>
 #include "aten/Linear.h"
@@ -444,3 +445,4 @@ at::Tensor unpack(ContextLinearWoq& context, const at::Tensor& tensor) {
 } // namespace detail
 } // namespace cpu
 } // namespace torch_ipex
+#endif

@@ -7,6 +7,12 @@ set(Options_CPU_cmake_included true)
 # The options to build xpu
 include(CMakeDependentOption)
 option(IPEX_DISP_OP "output the extension operators name for debug purpose" OFF)
+
+option(USE_LIBXSMM "Enable LIBXSMM" ON)
+if(WIN32)
+  set(USE_LIBXSMM OFF)
+endif()
+
 cmake_dependent_option(BUILD_STATIC_ONEMKL "Static link with oneMKL" OFF "BUILD_WITH_XPU" ON)
 
 function (print_cpu_config_summary)
@@ -41,7 +47,7 @@ function (print_cpu_config_summary)
     message(STATUS "Options:")
     message(STATUS "  BUILD_STATIC_ONEMKL   : ${BUILD_STATIC_ONEMKL}")
     message(STATUS "  IPEX_DISP_OP          : ${IPEX_DISP_OP}")
-
+    message(STATUS "  USE_LIBXSMM           : ${USE_LIBXSMM}")
     message(STATUS "")
     message(STATUS "********************************")
 endfunction()

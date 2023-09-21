@@ -1,5 +1,5 @@
 #pragma once
-
+#ifdef USE_LIBXSMM
 #include <ATen/Tensor.h>
 #include "ContextLinearWoq.h"
 #include "OpContext.h"
@@ -97,3 +97,4 @@ at::Tensor unpack(ContextLinearWoq& context, const at::Tensor& tensor);
 } // namespace detail
 } // namespace cpu
 } // namespace torch_ipex
+#endif

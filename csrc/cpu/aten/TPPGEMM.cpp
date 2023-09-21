@@ -1,3 +1,4 @@
+#ifdef USE_LIBXSMM
 #include "TPPGEMM.h"
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
@@ -162,3 +163,4 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
 }
 
 } // namespace
+#endif

@@ -1,3 +1,4 @@
+#ifdef USE_LIBXSMM
 #include <ATen/ATen.h>
 #include <ATen/Tensor.h>
 #include <aten/Linear.h>
@@ -3000,3 +3001,4 @@ REGISTER_DISPATCH(woq_linear_unpackB_stub, &woq_linear_unpackB_impl);
 REGISTER_DISPATCH(woq_linear_packB_stub, &woq_linear_packB_impl);
 } // namespace cpu
 } // namespace torch_ipex
+#endif

@@ -1,5 +1,5 @@
 #pragma once
-
+#ifdef USE_LIBXSMM
 #include <ATen/ATen.h>
 #include <dyndisp/DispatchStub.h>
 
@@ -103,3 +103,4 @@ DECLARE_DISPATCH(
 
 } // namespace cpu
 } // namespace torch_ipex
+#endif

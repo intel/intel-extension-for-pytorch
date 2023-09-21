@@ -78,6 +78,7 @@ at::Tensor ipex_linear_eltwise(
     const at::Tensor& op_context,
     const c10::optional<int64_t> out_features);
 
+#ifdef USE_LIBXSMM
 // WOQ linear ops
 at::Tensor woq_linear_pack_weight(
     const at::Tensor& weight,
@@ -256,6 +257,7 @@ DECLARE_DISPATCH(woq_tpp_gemm_unpackB_fn, woq_tpp_gemm_unpackB_stub);
 #define WOQ_FUSE_GELU 1
 #define WOQ_FUSE_ADD 2
 #define WOQ_FUSE_ADD_ADD 3
+#endif
 
 } // namespace cpu
 } // namespace torch_ipex

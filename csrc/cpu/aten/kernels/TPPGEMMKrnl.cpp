@@ -1,4 +1,5 @@
 
+#ifdef USE_LIBXSMM
 #include "tpp/kernels/TPPGEMMKrnl.h"
 #include <ATen/record_function.h>
 #include <aten/TPPGEMM.h>
@@ -221,3 +222,4 @@ REGISTER_DISPATCH(
     &tpp_linear_add_add_kernel_impl);
 } // namespace cpu
 } // namespace torch_ipex
+#endif
