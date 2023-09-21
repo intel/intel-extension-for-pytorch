@@ -165,7 +165,7 @@ class Converter:
             model = model.to(device).to(dtype)
         self.module_replacer.replace_func(model)
         self.module_replacer.replace_op(model)
-        if not os.getenv("MODEL_CAPTURE", default=None):
+        if model.config.torchscript != True:
             is_replace_success = self.module_replacer.replace_module(model, dtype, config=None)
             if not is_replace_success:
                 setattr(model, "model_capture", {"model_capture": TransformersModelCapture(model, dtype)})

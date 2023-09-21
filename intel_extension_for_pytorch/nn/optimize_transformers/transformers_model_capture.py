@@ -5,26 +5,25 @@ import warnings
 import logging
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
-#from transformers.generation.configuration_utils import GenerationConfig
-#from transformers.generation.logits_process import LogitsProcessorList
-#from transformers.generation.stopping_criteria import (
-#    StoppingCriteriaList,
-#)
-#from transformers.generation.beam_constraints import DisjunctiveConstraint, PhrasalConstraint
-#from transformers.generation.beam_search import BeamScorer, BeamSearchScorer, ConstrainedBeamSearchScorer
-#
-#from transformers.generation.utils import GenerateOutput, GenerationMode
-#from transformers.deepspeed import is_deepspeed_zero3_enabled
-#from transformers.utils import logging
-
 import torch
 from torch._dynamo.backends.common import fake_tensor_unsupported
 from torch.jit._trace import TracerWarning
 import torch.distributed as dist
-from .model_capture import RunMethods, ModelCapture
+from intel_extension_for_pytorch.nn.utils import RunMethods, ModelCapture
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 jit_absolute_list = ["GPTJForCausalLM"]
+
+num_attention_heads_list = [ "num_decoder_attention_heads", "attention_heads", 
+                            "decoder_attention_heads",
+                            "prompt_num_attention_heads", "num_cross_attention_heads", 
+                            "encoder_attention_heads", "num_encoder_attention_heads",
+                            "num_attention_heads", "num_heads", "n_head", "n_heads",]
+
+hidden_size_list = ["dim","embed_dim",  "n_embd",  
+                    "embedding_dim", "emb_dim", "projection_dim",
+                    "d_model", "true_hidden_size", 
+                    "hidden_size", ]
 
 class TransformersModelCapture(ModelCapture):
     def __init__(self, model, dtype, is_jit_absolute=False, weights_prepack=None):
@@ -51,12 +50,29 @@ class TransformersModelCapture(ModelCapture):
         return False
 
     def jit_input_check(self, inputs, change_past_key_values):
+        attr_flag = False
+        num_attention_heads = 0
+        hidden_size = 0
+        for attr in num_attention_heads_list:
+            if hasattr(self.config, attr) and isinstance(getattr(self.config, attr), int):
+                num_attention_heads = getattr(self.config, attr)
+                attr_flag = True        
+        if not attr_flag:
+            raise RuntimeError("No attribute found here to represent num_attention_heads in model config, please double check model config or upstream this issue to intel pytorch team")
+
+        attr_flag = False
+        for attr in hidden_size_list:
+            if hasattr(self.config, attr) and isinstance(getattr(self.config, attr), int):
+                hidden_size = getattr(self.config, attr)
+                attr_flag = True        
+        if not attr_flag:
+            raise RuntimeError("No attribute found here to represent hidden_size in model config, please double check model config or upstream this issue to intel pytorch team")
         if change_past_key_values:
             inputs["past_key_values"] = tuple(
                     [
                         (
-                            torch.zeros([inputs["input_ids"].size()[0], self.config.num_attention_heads, 1, self.config.hidden_size//self.config.num_attention_heads]).contiguous().to(inputs["input_ids"].device),
-                            torch.zeros([inputs["input_ids"].size()[0], self.config.num_attention_heads, 1, self.config.hidden_size//self.config.num_attention_heads]).contiguous().to(inputs["input_ids"].device),
+                            torch.zeros([inputs["input_ids"].size()[0], num_attention_heads, 1, hidden_size//num_attention_heads]).contiguous().to(inputs["input_ids"].device),
+                            torch.zeros([inputs["input_ids"].size()[0], num_attention_heads, 1, hidden_size//num_attention_heads]).contiguous().to(inputs["input_ids"].device),
                         )
                         for i in range(self.config.num_hidden_layers)
                     ]

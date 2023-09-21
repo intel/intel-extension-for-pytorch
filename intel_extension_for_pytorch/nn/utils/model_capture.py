@@ -21,10 +21,8 @@ class RunMethods(IntEnum):
 
 
 class ModelCapture(torch.nn.Module):
-#class ModelCapture(object):
     def __init__(self, model, dtype, weights_prepack, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        #self.model = copy.deepcopy(model)
         self.model = model
         self.train = None
         self.amp_dtype = dtype
