@@ -1,10 +1,11 @@
 import functools
+import inspect
 import time
 
 import torch
 
 
-def do_bench(fn, warmup=25, rep=100, grad_to_none=None,
+def triton_do_bench(fn, warmup=25, rep=100, grad_to_none=None,
              quantiles=None,
              fast_flush=True,
              return_mode="mean"):
@@ -80,6 +81,13 @@ def do_bench(fn, warmup=25, rep=100, grad_to_none=None,
             ret = ret[0]
         return ret
     return getattr(torch, return_mode)(times).item()
+
+
+def do_bench(*args, **kwargs):
+    quantile_field_name = "quantiles"
+    if quantile_field_name not in kwargs:
+        kwargs[quantile_field_name] = (0.5, 0.2, 0.8)
+    return triton_do_bench(*args, **kwargs)[0]
 
 
 @functools.lru_cache(None)

@@ -12,7 +12,6 @@ import torch
 from torch._inductor import config
 from torch._inductor.codecache import (
     _compile_start,
-    _compile_end,
     _worker_compile,
     _load_kernel,
     TritonFuture,
@@ -60,46 +59,17 @@ class XPUAsyncCompile(AsyncCompile):
         multiprocessing.util.Finalize(None, pool.shutdown, exitpriority=sys.maxsize)
         return pool
 
-    @classmethod
-    def warm_pool(cls):
-        if config.compile_threads <= 1:
-            return
-        _compile_start()
-        pool = cls.process_pool()
-
-        # We have to fork processes for compiler workers, but the more memory and other resources that are loaded, the
-        # slower the os.fork time is, quite drastically. It also holds the GIL so we can't put it on another thread.
-
-        # Examples:
-        # A simple x + x + x script: 10ms seconds in the middle of the program, 2ms at startup
-        # tf_efficientnet_b0 benchmark: 50ms! in the middle of the program , 3ms at startup
-
-        # So we want to start the workers early when it is still cheap, and also to allow the workers to get
-        # ready before we have work for them.
-
-        # ProcessPoolExecutor also does not launch the workers until it finds a point when all the workers are idle.
-        # But if we waited until then fork time will be long and we will be waiting for the processes to initialize.
-
-        # We force them to start here with some YOLOing of the internal methods.
-        if hasattr(pool, "_start_queue_management_thread"):
-            pool._start_queue_management_thread()
-        else:
-            for _ in range(config.compile_threads):
-                pool._adjust_process_count()
-            pool._start_executor_manager_thread()
-        _compile_end()
-
-    def triton(self, source_code):
+    def triton(self, kernel_name, source_code):
         _compile_start()
 
         if config.compile_threads > 1:
             device = torch.xpu.current_device()
             cc = None
             future = self.process_pool().submit(
-                _worker_compile, source_code, cc, device
+                _worker_compile, kernel_name, source_code, cc, device
             )
-            return TritonFuture(source_code, future)
+            return TritonFuture(kernel_name, source_code, future)
         else:
-            return _load_kernel(source_code)
+            return _load_kernel(kernel_name, source_code)
 
 XPUAsyncCompile.warm_pool()
