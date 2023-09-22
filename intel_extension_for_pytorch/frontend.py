@@ -19,6 +19,7 @@ from .cpu.graph_capture import GraphCapture
 from .nn.utils._lstm_convert import _LSTM, replace_lstm_with_ipex_lstm
 from .nn.utils._weight_prepack import _IPEXConv2d, _IPEXConvTranspose2d, _IPEXLinear
 from .nn.utils._weight_prepack import weight_prepack_with_ipex, record_input_shape_for_prepack
+from .nn.utils._quantize_convert import convert_qmodel
 from .cpu._auto_kernel_selection import (
     _enable_dnnl, 
     _disable_dnnl,
@@ -26,7 +27,6 @@ from .cpu._auto_kernel_selection import (
 
 import intel_extension_for_pytorch._C as core
 from .nn.optimize_transformers.Converter import Converter
-
 
 def _copy_model_and_optimizer(model, optimizer):
     new_model = copy.deepcopy(model)
@@ -157,7 +157,15 @@ class _O1:
 
 opt_levels = {"O0": _O0(), "O1": _O1()}
 
-def optimize_transformers(model, dtype=None, optimizer=None, is_int4=False, ckpt=None, distributed=False):
+def optimize_transformers(model, dtype=None, optimizer=None, is_int4=False, ckpt=None, distributed=False, group_size=-1, weight_path="./"):
+    if is_int4:
+        print("original model:\n", model)
+        convert_qmodel(model, dtype, group_size)
+        print("converted model:\n", model)
+
+        model.load_state_dict(torch.load(weight_path))
+        model.to("xpu")
+
     # optimize_output = optimize(model, dtype=dtype, optimizer=optimizer, inplace=True)
     optimize_output = model
     try:
