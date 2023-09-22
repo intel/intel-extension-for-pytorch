@@ -529,13 +529,19 @@ Tensor var(
     bool keepdim) {
   Tensor result = at::empty({0}, options_to_value_type(self.options()));
   return at::AtenIpexTypeXPU::std_var_out(
-      "var",result, self, dim, correction, keepdim, false);
+      "var", result, self, dim, correction, keepdim, false);
 }
 
 Tensor _var(const Tensor& self, bool unbiased) {
   Tensor result = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::std_var_out(
-      "var", result, self, IntArrayRef{}, int64_t{unbiased ? 1 : 0}, false, false);
+      "var",
+      result,
+      self,
+      IntArrayRef{},
+      int64_t{unbiased ? 1 : 0},
+      false,
+      false);
 }
 
 Tensor& var_out(
@@ -551,7 +557,13 @@ Tensor& var_out(
 Tensor _std(const Tensor& self, bool unbiased) {
   Tensor result = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::std_var_out(
-      "std", result, self, IntArrayRef{}, int64_t{unbiased ? 1 : 0}, false, true);
+      "std",
+      result,
+      self,
+      IntArrayRef{},
+      int64_t{unbiased ? 1 : 0},
+      false,
+      true);
 }
 
 Tensor std(
@@ -595,7 +607,6 @@ std::tuple<Tensor, Tensor> std_mean(
   return at::AtenIpexTypeXPU::std_var_mean_out(
       "std_mean", result1, result2, self, _dim, _correction, keepdim, true);
 }
-
 
 Tensor view_as_real(const at::Tensor& self) {
   return at::native::view_as_real(self);

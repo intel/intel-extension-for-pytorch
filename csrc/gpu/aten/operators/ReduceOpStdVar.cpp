@@ -126,7 +126,7 @@ static void std_var_kernel(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
         iter.dtype(),
-        "std",
+        "std_dpcpp",
         [&]() {
           std_var_kernel_impl<scalar_t>(iter, correction_opt, take_sqrt);
         });
@@ -147,7 +147,7 @@ static double std_var_all_cpu(
   auto iter = TensorIteratorConfig().add_input(self).build();
 
   auto reduction = [&](int64_t begin, int64_t end, double thread_sum) {
-    AT_DISPATCH_FLOATING_TYPES(iter.common_dtype(), "std_var_all_cpu", [&] {
+    IPEX_DISPATCH_FLOATING_TYPES(iter.common_dtype(), "std_var_all_cpu", [&] {
       iter.serial_for_each(
           [&](char** data,
               const int64_t* strides,
@@ -157,7 +157,7 @@ static double std_var_all_cpu(
             const int64_t inner_stride = strides[0];
             const int64_t outer_stride = strides[1];
 
-            double local_sum = 0.0f;
+            double local_sum = 0.0;
             for (const auto i : c10::irange(size1)) {
               const char* row_ptr = data[0] + outer_stride * i;
               for (const auto j : c10::irange(size0)) {
@@ -177,10 +177,10 @@ static double std_var_all_cpu(
 
   // ((x - mean)**2).sum()
   const double sum_dx2 = at::parallel_reduce(
-      0, iter.numel(), at::internal::GRAIN_SIZE, 0.0f, reduction, std::plus<>{});
+      0, iter.numel(), at::internal::GRAIN_SIZE, 0.0, reduction, std::plus<>{});
 
   const auto var = [&]() __ubsan_ignore_float_divide_by_zero__ {
-    return sum_dx2 / std::max(0.0f, self.numel() - correction);
+    return sum_dx2 / std::max(0.0, self.numel() - correction);
   }();
   const auto result = take_sqrt ? std::sqrt(var) : var;
 
@@ -261,6 +261,7 @@ Tensor& std_var_out(
   if (iter.numel() == 0) {
     // Trivial reduction
     result.fill_(std::numeric_limits<double>::quiet_NaN());
+    return result;
   } else if (
       result.numel() == 1 && iter.device_type() == kCPU &&
       iter.common_dtype() != kBFloat16 && iter.common_dtype() != kHalf) {
@@ -366,4 +367,3 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
-

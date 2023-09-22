@@ -214,7 +214,6 @@ static TensorIterator make_reduction(
   int64_t ndim = self.dim();
   auto mask = make_dim_mask(dim, ndim);
   allocate_reduction_result(result, self, mask, keepdim, out_dtype);
-  // resize_reduction_result(result, self, mask, keepdim, out_dtype);
   auto viewed_result = review_reduce_result(result, ndim, mask, keepdim);
   namedinference::propagate_names_for_reduction(result, self, dim, keepdim);
   if (self.scalar_type() == in_dtype) {
@@ -307,4 +306,3 @@ static TensorIterator make_reduction(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
-

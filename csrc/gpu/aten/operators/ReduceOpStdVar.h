@@ -23,4 +23,3 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
-
