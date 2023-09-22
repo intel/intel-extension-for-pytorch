@@ -1,6 +1,6 @@
 #include "CPUPool.h"
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <Windows.h>
 #else
 #include <dlfcn.h>
@@ -35,7 +35,7 @@ thread_local std::vector<int32_t> current_cpu_core_list{-1};
 
 void* open_iomp_library() {
   void* handle = NULL;
-#ifdef WIN32
+#ifdef _WIN32
   // ToDo: need confirm search path:
   return NULL;
 
@@ -48,7 +48,7 @@ void* open_iomp_library() {
 }
 
 void* get_func_from_library(void* handle, const char* name) {
-#ifdef WIN32
+#ifdef _WIN32
   return GetProcAddress((HMODULE)handle, name);
 #else
   return dlsym(handle, name);
@@ -134,7 +134,7 @@ std::vector<int32_t> init_process_available_cores() {
     kmp_set_affinity_ext(&main_thread_pre_mask);
     kmp_destroy_affinity_mask_ext(&main_thread_pre_mask);
   } else {
-#ifdef WIN32
+#ifdef _WIN32
     int nproc_online = GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
     for (int i = 0; i < nproc_online; i++) {
       available_cpu_cores_internal.emplace_back(i);

@@ -1,9 +1,16 @@
 
 #pragma once
 
+#include <SysUtil.h>
 #include <omp.h>
 #include <cstdint>
 #include <utility>
+
+#ifdef _WIN32
+#define clz(x) __lzcnt(x)
+#else
+#define clz(x) __builtin_clz(x)
+#endif
 
 namespace torch_ipex {
 namespace cpu {
@@ -21,11 +28,21 @@ Key_Value_Weight_Tuple<T>* radix_sort_parallel(
     int64_t max_value) {
   RECORD_FUNCTION(__FUNCTION__, c10::ArrayRef<c10::IValue>({}));
   int maxthreads = omp_get_max_threads();
-  alignas(64) int histogram[HIST_SIZE * maxthreads],
-      histogram_ps[HIST_SIZE * maxthreads + 1];
+
+  // alignas(64) std::vector<int> histogram(HIST_SIZE * maxthreads),
+  //    histogram_ps(HIST_SIZE * maxthreads + 1);
+  std::unique_ptr<int, decltype(ipex_free_aligned)*> histogram_buff(
+      (int*)ipex_alloc_aligned(sizeof(int) * (HIST_SIZE * maxthreads), 64),
+      ipex_free_aligned);
+  int* histogram = histogram_buff.get();
+  std::unique_ptr<int, decltype(ipex_free_aligned)*> histogram_ps_buff(
+      (int*)ipex_alloc_aligned(sizeof(int) * (HIST_SIZE * maxthreads + 1), 64),
+      ipex_free_aligned);
+  int* histogram_ps = histogram_ps_buff.get();
+
   if (max_value == 0)
     return inp_buf;
-  int num_bits = sizeof(T) * 8 - __builtin_clz(max_value);
+  int num_bits = sizeof(T) * 8 - clz(max_value);
   int num_passes = (num_bits + 7) / 8;
 
 #pragma omp parallel

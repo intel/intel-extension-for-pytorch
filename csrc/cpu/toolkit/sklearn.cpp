@@ -1,6 +1,6 @@
 #include "sklearn.h"
 #include <ATen/Dispatch.h>
-#ifdef WIN32
+#ifdef _WIN32
 #include <ppl.h>
 #define IPEX_PARALLEL_SORT concurrency::parallel_sort
 #else

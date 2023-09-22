@@ -191,8 +191,8 @@ void lamb_fused_step_kernel<at::BFloat16, at::BFloat16>(
   double bias_correction2 = 1 - std::pow(beta2, step);
 
   int num_threads = at::get_num_threads();
-  float param_norm_acc[num_threads];
-  float rtw_norm_acc[num_threads];
+  std::vector<float> param_norm_acc(num_threads);
+  std::vector<float> rtw_norm_acc(num_threads);
   std::fill_n(&param_norm_acc[0], num_threads, float(0));
   std::fill_n(&rtw_norm_acc[0], num_threads, float(0));
 
@@ -381,8 +381,8 @@ void lamb_fused_step_kernel<float, at::BFloat16>(
   double bias_correction2 = 1 - std::pow(beta2, step);
 
   int num_threads = at::get_num_threads();
-  float param_norm_acc[num_threads];
-  float rtw_norm_acc[num_threads];
+  std::vector<float> param_norm_acc(num_threads);
+  std::vector<float> rtw_norm_acc(num_threads);
   std::fill_n(&param_norm_acc[0], num_threads, float(0));
   std::fill_n(&rtw_norm_acc[0], num_threads, float(0));
 

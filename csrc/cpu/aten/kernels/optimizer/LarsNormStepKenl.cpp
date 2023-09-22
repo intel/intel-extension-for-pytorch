@@ -1,5 +1,6 @@
 #include <ATen/Parallel.h>
 #include <aten/optimizer/optimizer.h>
+#include <omp.h>
 #include <torch/csrc/autograd/function.h>
 #include "vec/vec.h"
 
@@ -19,7 +20,7 @@ float lars_norm_kernel_impl(const at::Tensor& input_tensor_) {
   const int Num_Blocks_Thread = 16;
   const int Grid_Size = Block_Size * Num_Blocks_Thread;
   const int Num_Grids = (input_size + Grid_Size - 1) / Grid_Size;
-  float scratchpad[Num_Grids] = {0.f};
+  std::vector<float> scratchpad(Num_Grids, 0.f);
 
 #pragma omp parallel for
   for (int grid = 0; grid < Num_Grids; grid++) {
@@ -48,7 +49,8 @@ float lars_norm_kernel_impl(const at::Tensor& input_tensor_) {
   int num_threads = omp_get_max_threads();
   int local_size = (input_size + num_threads - 1) / num_threads;
 
-  float scratchpad[num_threads] = {0.f};
+  std::vector<float> scratchpad(num_threads, 0.f);
+
 // Reduce to scratchpad
 #pragma omp parallel
   {

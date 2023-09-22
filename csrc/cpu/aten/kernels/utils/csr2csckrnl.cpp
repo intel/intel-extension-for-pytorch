@@ -59,7 +59,9 @@ void sort_based_batched_csr2csc_opt_kernel_impl(
       radix_sort_parallel<int>(
           &tmpBuf[0], &tmpBuf1[0], n_indices, max_embeddings);
   int max_thds = omp_get_max_threads();
-  int num_uniq[max_thds][64];
+
+  // int num_uniq[max_thds][64];
+  std::vector<std::vector<int>> num_uniq(max_thds, std::vector<int>(64));
 
 #pragma omp parallel
   {
