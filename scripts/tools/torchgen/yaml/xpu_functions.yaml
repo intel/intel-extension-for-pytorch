@@ -755,6 +755,7 @@ supported:
   - _foreach_erf_
   - _foreach_neg
   - _foreach_neg_
+  - _foreach_norm.Scalar
   - _foreach_zero_
   - _foreach_maximum.List
   - _foreach_maximum_.List

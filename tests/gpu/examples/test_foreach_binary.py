@@ -53,30 +53,34 @@ class TestForeachBinary(TestCase):
         self.assertEqual(torch._foreach_minimum((x1_cpu, ), (3, )), torch._foreach_minimum((x1_xpu, ), (3, )))
         self.assertEqual(torch._foreach_minimum_((x1_cpu, ), (3, )), torch._foreach_minimum_((x1_xpu, ), (3, )))
 
+    def test_foreach_norm(self, dtype=torch.float):
+        shape = [1024, 1024]
+        x1 = [torch.randn(shape, dtype=torch.float) for _ in range(18)]
+        x1_xpu = []
+        for i in range(len(x1)):
+            x1_xpu.append(x1[i].clone().to('xpu'))
+
+        for scalar in [1, 2]:
+            out_x1_xpu = torch._foreach_norm(x1_xpu, scalar)
+            for j in range(len(x1)):
+                out_x1_ref = torch.norm(x1_xpu[j], scalar)
+                self.assertEqual(out_x1_ref, out_x1_xpu[j], atol=1e-6, rtol=1e-5)
 
 if __name__ == "__main__":
-    with torch.autograd.profiler_legacy.profile(
-        enabled=True, use_xpu=True, record_shapes=False
-    ) as prof:
-        x1_cpu = torch.tensor([1, 3, 9, 6]).to(cpu_device)
-        x2_cpu = torch.tensor([6, 9, 3, 7]).to(cpu_device)
+    x1_cpu = torch.tensor([1, 3, 9, 6]).to(cpu_device)
+    x2_cpu = torch.tensor([6, 9, 3, 7]).to(cpu_device)
 
-        x1_xpu = torch.tensor([1, 3, 9, 6]).to(xpu_device)
-        x2_xpu = torch.tensor([6, 9, 3, 7]).to(xpu_device)
+    x1_xpu = torch.tensor([1, 3, 9, 6]).to(xpu_device)
+    x2_xpu = torch.tensor([6, 9, 3, 7]).to(xpu_device)
 
-        x1_tuple = (x1_xpu,)
-        x2_tuple = (x2_xpu,)
-        print(torch._foreach_maximum(x1_tuple, x2_tuple))
-        print(torch._foreach_maximum((x1_cpu,), (x2_cpu,)))
+    x1_tuple = (x1_xpu,)
+    x2_tuple = (x2_xpu,)
+    print(torch._foreach_maximum(x1_tuple, x2_tuple))
+    print(torch._foreach_maximum((x1_cpu,), (x2_cpu,)))
 
-        t1 = torch.rand(16)
-        t2 = torch.rand(16)
-        t1_xpu = t1.to(xpu_device)
-        t2_xpu = t2.to(xpu_device)
-        print(torch._foreach_maximum((t1,), (t2,)))
-        print(torch._foreach_maximum((t1_xpu,), (t2_xpu,)))
-
-    torch.save(
-        prof.key_averages().table(sort_by="self_xpu_time_total"),
-        "./profiling.tile." + "pt",
-    )
+    t1 = torch.rand(16)
+    t2 = torch.rand(16)
+    t1_xpu = t1.to(xpu_device)
+    t2_xpu = t2.to(xpu_device)
+    print(torch._foreach_maximum((t1,), (t2,)))
+    print(torch._foreach_maximum((t1_xpu,), (t2_xpu,)))
