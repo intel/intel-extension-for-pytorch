@@ -140,6 +140,7 @@ TORCH_LIBRARY(ipex_prepack, m) {
       .def(
           "get_weight",
           &torch_ipex::cpu::WoqLinearOpContext::get_at_packed_weight)
+      .def("get_bias", &torch_ipex::cpu::WoqLinearOpContext::get_at_bias)
       .def("pack", &torch_ipex::cpu::WoqLinearOpContext::pack)
       .def("to_public", &torch_ipex::cpu::WoqLinearOpContext::to_public)
       .def(

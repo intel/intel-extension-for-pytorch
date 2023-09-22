@@ -6,6 +6,7 @@ import subprocess
 import os
 import copy
 import re
+import tempfile
 
 try:
     import transformers
@@ -23,6 +24,27 @@ torch.manual_seed(128)
 
 curpath = os.path.abspath(os.path.dirname(__file__))
 
+def _get_gptj_example_inputs():
+    input_ids = torch.ones(8).to(torch.long)
+    attention_mask = torch.ones(len(input_ids))
+    position_ids = torch.arange(len(input_ids))
+    past_key_values = tuple(
+        [
+            (
+                torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros(1, 4, dtype=torch.long),
+            )
+            for i in range(1)
+        ]
+    )
+    return (
+        input_ids.unsqueeze(0),
+        attention_mask.unsqueeze(0),
+        position_ids.unsqueeze(0),
+        past_key_values,
+    )
 
 class OptimizeTransformersTester(TestCase):
     def model_replacement_check(self, model, has_position_id):
@@ -156,25 +178,59 @@ class OptimizeTransformersTester(TestCase):
             ipex.nn.utils._model_convert.replace_customized_linear_with_linear(m.eval())
         self.model_replacement_check(m, False)
 
-    def test_weight_only_quant_flow(self):
+    def _model_replacement_check_woq(self, model):
+        qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
+        model = ipex.optimize_transformers(
+            model, dtype=torch.float, quantization_config=qconfig, deployment_mode=True
+        )
+        if not hasattr(model, "trace_graph"):
+            AssertionError(False)
+        _IPEXAttentionCPU = ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
+        _IPEXDecoderLayerCPU = ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
+        IpexWoqLinear = ipex.nn.modules.IpexWoqLinear
+        if re.search("GPTJ", model.config.architectures[0]):
+            assert (model.transformer.h[0].attn.__class__ is _IPEXAttentionCPU)
+            assert (model.transformer.h[0].__class__ is _IPEXDecoderLayerCPU)
+            assert (
+                all(mod.__class__ is IpexWoqLinear for mod in
+                    [
+                        model.transformer.h[0].attn.concat_qkv.concat_linear,
+                        model.transformer.h[0].attn.out_proj,
+                        model.transformer.h[0].linear_add_add.linear,
+                        model.transformer.h[0].linear_gelu.linear
+                    ])
+            )
+        elif re.search("llama", model.config.architectures[0], re.IGNORECASE):
+            assert (model.model.layers[0].self_attn.__class__ is _IPEXAttentionCPU)
+            assert (model.model.layers[0].__class__ is _IPEXDecoderLayerCPU)
+            assert (
+                all(mod.__class__ is IpexWoqLinear for mod in
+                    [
+                        model.model.layers[0].self_attn.concat_qkv.concat_linear,
+                        model.model.layers[0].mha_linear_add.linear,
+                        model.model.layers[0].mlp_linear_add.linear,
+                        model.model.layers[0].linear_silu.linear,
+                        model.model.layers[0].linear_mul.linear
+                    ])
+            )
+        # Ensure model can run without errors
+        with torch.no_grad():
+            example_inputs = _get_gptj_example_inputs()
+            model(*example_inputs)
+
+    def test_weight_only_quant_flow_for_gptj(self):
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/gptj", return_dict=False
         )
         m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
-        qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
-        ipex_m = ipex.optimize_transformers(
-            m, dtype=torch.float, quantization_config=qconfig, deployment_mode=True, inplace=True
+        self._model_replacement_check_woq(m)
+
+    def test_weight_only_quant_flow_for_llama(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/llama", return_dict=False
         )
-        if not hasattr(ipex_m, "trace_graph"):
-            AssertionError(False)
-        assert (
-            ipex_m.transformer.h[0].attn.__class__
-            is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
-        )
-        assert (
-            ipex_m.transformer.h[0].__class__
-            is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
-        )
+        m = transformers.models.llama.modeling_llama.LlamaForCausalLM(config).eval()
+        self._model_replacement_check_woq(m)
 
     def test_static_quant_flow(self):
         config = AutoConfig.from_pretrained(
@@ -183,26 +239,7 @@ class OptimizeTransformersTester(TestCase):
         m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
         quant_m = copy.deepcopy(m)
         qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
-        input_ids = torch.ones(8).to(torch.long)
-        attention_mask = torch.ones(len(input_ids))
-        position_ids = torch.arange(len(input_ids))
-        past_key_values = tuple(
-            [
-                (
-                    torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
-                    torch.zeros(1, 4, dtype=torch.long),
-                )
-                for i in range(1)
-            ]
-        )
-        example_inputs = (
-            input_ids.unsqueeze(0),
-            attention_mask.unsqueeze(0),
-            position_ids.unsqueeze(0),
-            past_key_values,
-        )
+        example_inputs = _get_gptj_example_inputs()
         quant_m = ipex.optimize_transformers(
             quant_m,
             dtype=torch.float,
@@ -217,24 +254,68 @@ class OptimizeTransformersTester(TestCase):
 
         with torch.no_grad():
             prepared_model(*example_inputs)
-        prepared_model.save_qconf_summary(
-            qconf_summary=f"{curpath}/hf_configs/gptj/qconfig.json"
-        )
+        with tempfile.NamedTemporaryFile() as fp:
+            prepared_model.save_qconf_summary(
+                qconf_summary=fp.name
+            )
 
-        for dtype in [torch.float, torch.bfloat16]:
-            ipex_m = copy.deepcopy(m)
-            if dtype is torch.bfloat16:
-                ipex_m = ipex_m.to(torch.bfloat16)
-            qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
+            for dtype in [torch.float, torch.bfloat16]:
+                ipex_m = copy.deepcopy(m)
+                if dtype is torch.bfloat16:
+                    ipex_m = ipex_m.to(torch.bfloat16)
+                qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
+                ipex_m = ipex.optimize_transformers(
+                    ipex_m,
+                    dtype=dtype,
+                    quantization_config=qconfig,
+                    qconfig_summary_file=fp.name,
+                    inplace=True
+                )
+                if not hasattr(ipex_m, "trace_graph"):
+                    AssertionError(False)
+
+    def test_weight_only_quant_gptq(self):
+        # import json
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/gptj", return_dict=False
+        )
+        m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
+        ipex_m = copy.deepcopy(m)
+        with tempfile.TemporaryDirectory() as work_dir:
+            # Generate dummy checkpoint
+            checkpoint_file_name = work_dir + '/checkpoint.pt'
+            state_dict = ipex_m.state_dict()
+            linear_keys = []
+            for k, v in state_dict.items():
+                if any(k.endswith(suffix) for suffix in ['proj.weight', 'fc_in.weight', 'fc_out.weight']):
+                    linear_keys.append(k[:-7])
+            for k in linear_keys:
+                N = state_dict[k + '.weight'].shape[0]
+                K = state_dict[k + '.weight'].shape[1]
+                del state_dict[k + '.weight']
+                state_dict[k + '.packed_weight'] = torch.randint(-2**31, 2**31 - 1, (N, K // 8), dtype=torch.int32)
+                state_dict[k + '.scale'] = torch.ones((N, 1), dtype=torch.half) * 0.5
+                state_dict[k + '.packed_zp'] = torch.ones((N, 1), dtype=torch.int32) * 4
+
+            torch.save(state_dict, checkpoint_file_name)
+            state_dict = torch.load(checkpoint_file_name)
+
+            # test loading checkpoint and quant info
+            lowp_mode = ipex.quantization.WoqLowpMode.INT8
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(lowp_mode=lowp_mode)
             ipex_m = ipex.optimize_transformers(
-                ipex_m,
-                dtype=dtype,
-                quantization_config=qconfig,
-                qconfig_summary_file=f"{curpath}/hf_configs/gptj/qconfig.json",
+                ipex_m, dtype=torch.float, quantization_config=qconfig,
+                low_precision_checkpoint=state_dict,
+                deployment_mode=True,
                 inplace=True
             )
-            if not hasattr(ipex_m, "trace_graph"):
-                AssertionError(False)
+            assert hasattr(ipex_m, "trace_graph")
+
+            # Ensure model can run without errors
+            with torch.no_grad():
+                example_inputs = _get_gptj_example_inputs()
+                # the optimized model is ipex_m.trace_graph
+                ipex_m.trace_graph(*example_inputs)
 
 
 if __name__ == "__main__":

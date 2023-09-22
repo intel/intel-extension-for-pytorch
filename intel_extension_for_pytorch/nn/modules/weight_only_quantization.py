@@ -125,13 +125,14 @@ class IpexWoqLinear(nn.Module):
         return qlinear
 
     @classmethod
-    def from_float_and_int4_weight(cls, mod, qweight, scales, zero_points):
+    def from_float_and_int4_weight(cls, mod, qweight, scales, zero_points, bias=None):
         r"""Create a weight-only quantized module from a float module and int4 weight
 
         Args:
             mod (Module): a float module, either produced by torch.ao.quantization
                           utilities or provided by the user
             qweight (Tensor): tensor in int32 dtype and contains actually int4 data
+            bias (Tensor or None): bias for linear
             scales (Tensor): scales for qweight
             zero_points (Tensor): zero points for qweight
         """
@@ -163,9 +164,11 @@ class IpexWoqLinear(nn.Module):
         if not hasattr(mod, "out_features"):
             mod.out_features = mod.weight.size()[0]
 
-        qlinear = cls(mod.in_features, mod.out_features, dtype=w_dtype)
+        qlinear = cls(mod.in_features, mod.out_features, dtype=torch.quint4x2)
+        if bias is None:
+            bias = mod.bias
         qlinear._op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack_int4(
-            qweight, scales, zero_points, mod.bias, None, int(lowp_mode), num_concats
+            qweight, scales, zero_points, bias, None, int(lowp_mode), num_concats
         )
         qlinear._lowp_mode = lowp_mode
         qlinear._num_concats = num_concats
