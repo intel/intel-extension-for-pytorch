@@ -658,8 +658,8 @@ supported:
   - _upsample_nearest_exact2d_backward.grad_input
   - _upsample_nearest_exact3d.out
   - _upsample_nearest_exact3d_backward.grad_input
-  # - var.correction
-  # - var_mean.correction
+  - var.correction
+  - var_mean.correction
   - view
   - view_as_real   # newly added
   - view_as_complex
@@ -835,7 +835,7 @@ supported:
   - _foreach_clamp_min_.ScalarList
   - mish.out
   - polar.out
-  # - var.correction_out
+  - var.correction_out
   - matrix_exp
   - logit_backward.grad_input
   - binomial

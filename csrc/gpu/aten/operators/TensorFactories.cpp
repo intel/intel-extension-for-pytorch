@@ -517,14 +517,17 @@ Tensor triu_indices(
   return AtenIpexTypeXPU::impl::triu_indices_dpcpp(row, col, offset, options);
 }
 
+static TensorOptions options_to_value_type(TensorOptions opts) {
+  auto scalar_type = typeMetaToScalarType(opts.dtype());
+  return opts.dtype(c10::toRealValueType(scalar_type));
+}
+
 Tensor var(
     const Tensor& self,
-    c10::OptionalIntArrayRef _dim,
-    c10::optional<int64_t> _correction,
+    at::OptionalIntArrayRef dim,
+    const c10::optional<Scalar>& correction,
     bool keepdim) {
-  Tensor result = at::empty({0}, self.options());
-  auto dim = _dim.value_or(IntArrayRef{});
-  auto correction = _correction.value_or(1);
+  Tensor result = at::empty({0}, options_to_value_type(self.options()));
   return at::AtenIpexTypeXPU::std_var_out(
       result, self, dim, correction, keepdim, false);
 }
@@ -535,15 +538,14 @@ Tensor _var(const Tensor& self, bool unbiased) {
       result, self, IntArrayRef{}, int64_t{unbiased ? 1 : 0}, false, false);
 }
 
-at::Tensor& var_out(
-    const at::Tensor& self,
-    c10::OptionalArrayRef<int64_t> opt_dim,
-    c10::optional<int64_t> _correction,
+Tensor& var_out(
+    const Tensor& self,
+    at::OptionalIntArrayRef dim,
+    const c10::optional<Scalar>& correction,
     bool keepdim,
-    at::Tensor& out) {
-  auto correction = _correction.value_or(1);
+    Tensor& out) {
   return at::AtenIpexTypeXPU::std_var_out(
-      out, self, opt_dim, correction, keepdim, false);
+      out, self, dim, correction, keepdim, false);
 }
 
 Tensor _std(const Tensor& self, bool unbiased) {
@@ -578,13 +580,11 @@ Tensor& std_out(
 
 std::tuple<Tensor, Tensor> var_mean(
     const Tensor& self,
-    c10::OptionalArrayRef<int64_t> _dim,
-    c10::optional<int64_t> _correction,
+    at::OptionalIntArrayRef dim,
+    const c10::optional<Scalar>& correction,
     bool keepdim) {
-  Tensor result1 = at::empty({0}, self.options());
+  Tensor result1 = at::empty({0}, options_to_value_type(self.options()));
   Tensor result2 = at::empty({0}, self.options());
-  auto dim = _dim.value_or(IntArrayRef{});
-  auto correction = _correction.value_or(1);
   return at::AtenIpexTypeXPU::std_var_mean_out(
       "var_mean", result1, result2, self, dim, correction, keepdim, false);
 }
