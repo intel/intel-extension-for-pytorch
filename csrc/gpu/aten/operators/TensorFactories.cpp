@@ -529,13 +529,13 @@ Tensor var(
     bool keepdim) {
   Tensor result = at::empty({0}, options_to_value_type(self.options()));
   return at::AtenIpexTypeXPU::std_var_out(
-      result, self, dim, correction, keepdim, false);
+      "var",result, self, dim, correction, keepdim, false);
 }
 
 Tensor _var(const Tensor& self, bool unbiased) {
   Tensor result = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::std_var_out(
-      result, self, IntArrayRef{}, int64_t{unbiased ? 1 : 0}, false, false);
+      "var", result, self, IntArrayRef{}, int64_t{unbiased ? 1 : 0}, false, false);
 }
 
 Tensor& var_out(
@@ -545,37 +545,33 @@ Tensor& var_out(
     bool keepdim,
     Tensor& out) {
   return at::AtenIpexTypeXPU::std_var_out(
-      out, self, dim, correction, keepdim, false);
+      "var", out, self, dim, correction, keepdim, false);
 }
 
 Tensor _std(const Tensor& self, bool unbiased) {
   Tensor result = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::std_var_out(
-      result, self, IntArrayRef{}, int64_t{unbiased ? 1 : 0}, false, true);
+      "std", result, self, IntArrayRef{}, int64_t{unbiased ? 1 : 0}, false, true);
 }
 
 Tensor std(
-    const Tensor& self,
-    c10::OptionalArrayRef<int64_t> _dim,
-    c10::optional<int64_t> _correction,
+    const at::Tensor& self,
+    at::OptionalIntArrayRef _dim,
+    const c10::optional<at::Scalar>& _correction,
     bool keepdim) {
-  Tensor result = at::empty({0}, self.options());
-  auto correction = _correction.value_or(1);
-  auto dim = _dim.value_or(IntArrayRef{});
+  Tensor result = at::empty({0}, options_to_value_type(self.options()));
   return at::AtenIpexTypeXPU::std_var_out(
-      result, self, dim, correction, keepdim, true);
+      "std", result, self, _dim, _correction, keepdim, true);
 }
 
 Tensor& std_out(
-    const Tensor& self,
-    c10::OptionalArrayRef<int64_t> _dim,
-    c10::optional<int64_t> _correction,
+    const at::Tensor& self,
+    at::OptionalIntArrayRef _dim,
+    const c10::optional<at::Scalar>& _correction,
     bool keepdim,
     Tensor& out) {
-  auto correction = _correction.value_or(1);
-  auto dim = _dim.value_or(IntArrayRef{});
   return at::AtenIpexTypeXPU::std_var_out(
-      out, self, dim, correction, keepdim, true);
+      "std", out, self, _dim, _correction, keepdim, true);
 }
 
 std::tuple<Tensor, Tensor> var_mean(
@@ -590,17 +586,16 @@ std::tuple<Tensor, Tensor> var_mean(
 }
 
 std::tuple<Tensor, Tensor> std_mean(
-    const Tensor& self,
-    c10::OptionalArrayRef<int64_t> _dim,
-    c10::optional<int64_t> _correction,
+    const at::Tensor& self,
+    at::OptionalIntArrayRef _dim,
+    const c10::optional<at::Scalar>& _correction,
     bool keepdim) {
-  Tensor result1 = at::empty({0}, self.options());
+  Tensor result1 = at::empty({0}, options_to_value_type(self.options()));
   Tensor result2 = at::empty({0}, self.options());
-  auto dim = _dim.value_or(IntArrayRef{});
-  auto correction = _correction.value_or(1);
   return at::AtenIpexTypeXPU::std_var_mean_out(
-      "std_mean", result1, result2, self, dim, correction, keepdim, true);
+      "std_mean", result1, result2, self, _dim, _correction, keepdim, true);
 }
+
 
 Tensor view_as_real(const at::Tensor& self) {
   return at::native::view_as_real(self);

@@ -596,9 +596,9 @@ supported:
   - special_shifted_chebyshev_polynomial_w.out
   - special_airy_ai.out
   - sqrt.out
-  # - std.correction
-  # - std.correction_out
-  # - std_mean.correction
+  - std.correction
+  - std.correction_out
+  - std_mean.correction
   - sub.out
   - sum
   - sum.IntList_out

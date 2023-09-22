@@ -210,19 +210,38 @@ static TensorIterator make_reduction(
       " and ",
       toString(out_dtype),
       ".");
-  // dim={} performs an all-reduce, same as dim=None
   IntArrayRef dim = dim_opt.value_or(IntArrayRef{});
   int64_t ndim = self.dim();
   auto mask = make_dim_mask(dim, ndim);
   allocate_reduction_result(result, self, mask, keepdim, out_dtype);
+  // resize_reduction_result(result, self, mask, keepdim, out_dtype);
   auto viewed_result = review_reduce_result(result, ndim, mask, keepdim);
-  #ifdef BUILD_NAMEDTENSOR
   namedinference::propagate_names_for_reduction(result, self, dim, keepdim);
-  #endif
   if (self.scalar_type() == in_dtype) {
     return TensorIterator::reduce_op(viewed_result, self);
   }
   return TensorIterator::reduce_op(viewed_result, self.to(in_dtype));
+}
+
+static TensorIterator make_reduction(
+    const char* name,
+    Tensor& result,
+    const Tensor& self,
+    at::OptionalIntArrayRef dim,
+    bool keepdim,
+    ScalarType out_dtype) {
+  // special case for type promotion in mixed precision, improves computational
+  // efficiency.
+  // not generalize this to common mismatched input/output types to avoid cross
+  // product of templated kernel launches.
+  const bool gpu_lowp_to_f32 =
+      (self.is_xpu() &&
+       (self.scalar_type() == kHalf || self.scalar_type() == kBFloat16) &&
+       out_dtype == kFloat);
+  auto in_dtype = gpu_lowp_to_f32 ? self.scalar_type()
+      : self.is_complex()         ? c10::toComplexType(out_dtype)
+                                  : out_dtype;
+  return make_reduction(name, result, self, dim, keepdim, out_dtype, out_dtype);
 }
 
 static TensorIterator make_reduction(
@@ -265,35 +284,14 @@ static TensorIterator make_reduction(
   // We don't generalize this to common mismatched input/output types to avoid
   // cross product of templated kernel launches.
   if (self.scalar_type() == dtype1 ||
-      (self.is_cuda() && self.scalar_type() == kHalf && dtype1 == kFloat)) {
+      (self.is_xpu() && self.scalar_type() == kHalf && dtype1 == kFloat)) {
     return TensorIterator::reduce_op(viewed_result1, viewed_result2, self);
   }
   return TensorIterator::reduce_op(
       viewed_result1, viewed_result2, self.to(dtype1));
 }
 
-static C10_UNUSED TensorIterator make_reduction(
-    const char* name,
-    Tensor& result,
-    const Tensor& self,
-    at::OptionalIntArrayRef dim,
-    bool keepdim,
-    ScalarType out_dtype) {
-  // special case for type promotion in mixed precision, improves computational
-  // efficiency.
-  // not generalize this to common mismatched input/output types to avoid cross
-  // product of templated kernel launches.
-  const bool gpu_lowp_to_f32 =
-      (self.is_cuda() &&
-       (self.scalar_type() == kHalf || self.scalar_type() == kBFloat16) &&
-       out_dtype == kFloat);
-  auto in_dtype = gpu_lowp_to_f32 ? self.scalar_type()
-      : self.is_complex()         ? c10::toComplexType(out_dtype)
-                                  : out_dtype;
-  return make_reduction(name, result, self, dim, keepdim, in_dtype, out_dtype);
-}
-
-static C10_UNUSED TensorIterator make_reduction(
+static TensorIterator make_reduction(
     const char* name,
     Tensor& result1,
     Tensor& result2,
@@ -309,3 +307,4 @@ static C10_UNUSED TensorIterator make_reduction(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
