@@ -32,8 +32,6 @@ from ..utils.capsule import get_pointer_from_capsule
 from .overrides import (
     override_tensor_totype,
     override_assert_equal,
-    override_get_stream,
-    override_recursive_to,
 )
 
 from .generator import Generator
@@ -645,8 +643,6 @@ if hasattr(intel_extension_for_pytorch._C, "_postInitExtension"):
 
 if intel_extension_for_pytorch._C._has_xpu():
     if is_available():
-        override_get_stream()
-        override_recursive_to()
         if not has_fp64_dtype():
             override_tensor_totype()
 
