@@ -1,6 +1,7 @@
 [
   "run_test.py",
   "run_tests.py",
+  "requirements.txt",
   "config/*.json",
   "config/*.yaml",
   "common/*.py",

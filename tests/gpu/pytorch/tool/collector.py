@@ -124,9 +124,28 @@ def collect_pytorch_cases(data, test_file_name):
 
     matched_cases = re.findall(pattern_case, data, re_flags)
     # xpass_cases = re.findall(pattern_xpass_case, data, re_flags)
-
+    case_num = len(matched_cases)
+    count = 1
     for case in matched_cases:
         full_case_name = test_file_name + "::" + case[1] + "::" + case[0]
+        #This is for those cases which have result but will trigger signal to break the test
+        if count == case_num:
+            alldata = data.split("\n")
+            idx = -1
+            tag = 0
+            for i in range(-1, -len(alldata), -1):
+                if not alldata[i]:
+                    idx = i - 1
+                elif tag == 0 and "[LOGGING]" in alldata[i]:
+                    idx = i - 1
+                    tag = 1
+                elif tag == 1:
+                    break
+            if "Command" in alldata[idx] and "died with" in alldata[idx]:
+                collected_cases["NO_RESULT"].append(full_case_name)
+                break
+        count = count + 1
+
         if case[2] == 'ok':
             collected_cases["PASSED"].append(full_case_name)
         elif case[2] == 'FAIL':

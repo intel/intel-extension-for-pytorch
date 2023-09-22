@@ -142,7 +142,12 @@ def select_tests_from(include_tests, options):
     # check whether there are tests not ported, skip them
     should_remove_tests = []
     for test in selected_tests:
-        file_path = os.path.join(test_suite_root, 'test/' + test) + ".py"
+        split_test_names = test.split("::")
+        assert len(split_test_names) >= 1, "[ERROR] Empty test name found. Each test must have a non-empty name"
+        test_name = split_test_names[0]
+        if test_name.endswith(".py"):
+            test_name = test_name[: -len(".py")]
+        file_path = os.path.join(test_suite_root, 'test/' + test_name) + ".py"
         if not os.path.exists(file_path):
             should_remove_tests.append(test)
     for test in should_remove_tests:
