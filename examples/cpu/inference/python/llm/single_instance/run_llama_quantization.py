@@ -276,6 +276,7 @@ if args.ipex_smooth_quant:
         convert_model = convert(prepared_model.eval(), inplace=True).eval()
         self_jit = torch.jit.trace(convert_model.eval(), example_inputs, strict=False)
         self_jit = torch.jit.freeze(self_jit.eval())
+        pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
         self_jit.save(args.output_dir + "/best_model.pt")
 elif args.ipex_weight_only_quantization:
     weight_dtype = torch.quint4x2 if args.weight_dtype == "INT4" else torch.qint8
@@ -319,6 +320,7 @@ elif args.ipex_weight_only_quantization:
     ):
         self_jit = torch.jit.trace(user_model.eval(), example_inputs, strict=False)
         self_jit = torch.jit.freeze(self_jit.eval())
+        pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
         self_jit.save(args.output_dir + "/best_model.pt")
 
 

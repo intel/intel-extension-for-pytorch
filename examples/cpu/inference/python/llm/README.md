@@ -131,7 +131,7 @@ Using INT4 weights can further improve performance by reducing memory bandwidth.
 Here is an example:
 ```bash
 # Step 1: Generate modified weights and quantization info
-python utils/run_gptq.py --model <MODEL_ID>
+python utils/run_gptq.py --model <MODEL_ID> --output-dir ./saved_results
 ```
 It may take a few hours to finish. Modified weights and their quantization info are stored in `gptq_checkpoint.pt`.
 Then generate model for weight only quantization with INT4 weights and run tasks.
