@@ -23,8 +23,7 @@ template <
     uint32_t l3_kslicing,
     uint32_t slm_kslicing,
     uint32_t dequant_s,
-    typename post_ops,
-    bool noPostOp = false>
+    typename post_ops>
 struct hgemm_wint4_func {
   using tile_shape = gpu::xetla::group::tile_shape_t<wg_n, wg_m, sg_n, sg_m>;
   static constexpr uint32_t periodic_sync_interval = 1;
@@ -83,7 +82,8 @@ struct hgemm_wint4_func {
       uint32_t mat_n,
       uint32_t mat_k,
       dtype_zero_pt* zero_pt_ptr,
-      dtype_scale* scale_ptr) {
+      dtype_scale* scale_ptr,
+      typename epilogue_t::arguments_t epilogue_args = {}) {
     typename gemm_op_t::arguments_t gemm_arg(
         mat_m,
         mat_k,
@@ -97,14 +97,10 @@ struct hgemm_wint4_func {
         scale_ptr,
         mat_n,
         zero_pt_ptr,
-        mat_n);
+        mat_n,
+        epilogue_args);
 
     cl::sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
-    // if (!gemm_op_t::can_implement(gemm_arg)) {
-    //      std::cout << "The arguments cannot be supported, aborting ... "
-    //                << std::endl;
-    //      FAIL();
-    //  }
 
     auto cgf = DPCPP_Q_CGF(cgh) {
       cgh.parallel_for(NDRange, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
@@ -162,8 +158,7 @@ inline void hgemm_wint4(
       L3_KS,
       SLM_KS,
       DQUANT_S,
-      subgroup::chained_tile_op_t<>,
-      false>;
+      subgroup::chained_tile_op_t<>>;
 
   const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
@@ -240,7 +235,8 @@ inline void hgemm_bias_wint4(
       n,
       k,
       const_cast<data_type_zp*>(b_zp_alias),
-      const_cast<scalar_t*>(b_scale));
+      const_cast<scalar_t*>(b_scale),
+      {{{const_cast<scalar_t*>(bias), {n, 1, n}}}});
 }
 
 template <
@@ -306,7 +302,8 @@ inline void hgemm_bias_gelu_wint4(
       n,
       k,
       const_cast<data_type_zp*>(b_zp_alias),
-      const_cast<scalar_t*>(b_scale));
+      const_cast<scalar_t*>(b_scale),
+      {{{const_cast<scalar_t*>(bias), {n, 1, n}}, {}}});
 }
 
 template <
@@ -373,7 +370,8 @@ inline void hgemm_res_wint4(
       n,
       k,
       const_cast<data_type_zp*>(b_zp_alias),
-      const_cast<scalar_t*>(b_scale));
+      const_cast<scalar_t*>(b_scale),
+      {{{const_cast<scalar_t*>(res), {n, m, n}}}});
 }
 
 template <
@@ -445,7 +443,10 @@ inline void hgemm_bias_res_res_wint4(
       n,
       k,
       const_cast<data_type_zp*>(b_zp_alias),
-      const_cast<scalar_t*>(b_scale));
+      const_cast<scalar_t*>(b_scale),
+      {{{const_cast<scalar_t*>(bias), {n, 1, n}},
+        {const_cast<scalar_t*>(res0), {n, m, n}},
+        {const_cast<scalar_t*>(res1), {n, m, n}}}});
 }
 
 template <
@@ -501,10 +502,19 @@ inline void hgemm_qkv_wint4(
   const data_type_b* b_alias = reinterpret_cast<const int4x2*>(b);
   const data_type_b* b_zp_alias = reinterpret_cast<const int4x2*>(b_zp);
 
+  uint32_t weight_offset = k * n / 2;
+
+  uint32_t group_num = 1;
+  if constexpr (DQUANT_S != 0) {
+    group_num = k / DQUANT_S;
+  }
+  uint32_t zp_offset = group_num * n / 2;
+  uint32_t scale_offset = group_num * n;
+
   hgemm_wint4_functor::run(
       queue,
       const_cast<scalar_t*>(a),
-      const_cast<data_type_b*>(b_alias + 0 * k * n),
+      const_cast<data_type_b*>(b_alias),
       out0,
       m,
       n,
@@ -514,23 +524,23 @@ inline void hgemm_qkv_wint4(
   hgemm_wint4_functor::run(
       queue,
       const_cast<scalar_t*>(a),
-      const_cast<data_type_b*>(b_alias + 1 * k * n),
+      const_cast<data_type_b*>(b_alias + weight_offset),
       out1,
       m,
       n,
       k,
-      const_cast<data_type_zp*>(b_zp_alias),
-      const_cast<scalar_t*>(b_scale));
+      const_cast<data_type_zp*>(b_zp_alias + zp_offset),
+      const_cast<scalar_t*>(b_scale + scale_offset));
   hgemm_wint4_functor::run(
       queue,
       const_cast<scalar_t*>(a),
-      const_cast<data_type_b*>(b_alias + 2 * k * n),
+      const_cast<data_type_b*>(b_alias + 2 * weight_offset),
       out2,
       m,
       n,
       k,
-      const_cast<data_type_zp*>(b_zp_alias),
-      const_cast<scalar_t*>(b_scale));
+      const_cast<data_type_zp*>(b_zp_alias + 2 * zp_offset),
+      const_cast<scalar_t*>(b_scale + 2 * scale_offset));
 }
 
 template <
@@ -588,36 +598,49 @@ inline void hgemm_qkv_bias_wint4(
   const data_type_b* b_alias = reinterpret_cast<const int4x2*>(b);
   const data_type_b* b_zp_alias = reinterpret_cast<const int4x2*>(b_zp);
 
+  uint32_t weight_offset = k * n / 2;
+  uint32_t bias_offset = k * n / 2;
+
+  uint32_t group_num = 1;
+  if constexpr (DQUANT_S != 0) {
+    group_num = k / DQUANT_S;
+  }
+  uint32_t zp_offset = group_num * n / 2;
+  uint32_t scale_offset = group_num * n;
+
   hgemm_wint4_functor::run(
       queue,
       const_cast<scalar_t*>(a),
-      const_cast<data_type_b*>(b_alias + 0 * k * n),
+      const_cast<data_type_b*>(b_alias),
       out0,
       m,
       n,
       k,
       const_cast<data_type_zp*>(b_zp_alias),
-      const_cast<scalar_t*>(b_scale));
+      const_cast<scalar_t*>(b_scale),
+      {{{const_cast<scalar_t*>(bias), {n, 1, n}}}});
   hgemm_wint4_functor::run(
       queue,
       const_cast<scalar_t*>(a),
-      const_cast<data_type_b*>(b_alias + 1 * k * n),
+      const_cast<data_type_b*>(b_alias + weight_offset),
       out1,
       m,
       n,
       k,
-      const_cast<data_type_zp*>(b_zp_alias),
-      const_cast<scalar_t*>(b_scale));
+      const_cast<data_type_zp*>(b_zp_alias + zp_offset),
+      const_cast<scalar_t*>(b_scale + scale_offset),
+      {{{const_cast<scalar_t*>(bias + n), {n, 1, n}}}});
   hgemm_wint4_functor::run(
       queue,
       const_cast<scalar_t*>(a),
-      const_cast<data_type_b*>(b_alias + 2 * k * n),
+      const_cast<data_type_b*>(b_alias + 2 * weight_offset),
       out2,
       m,
       n,
       k,
-      const_cast<data_type_zp*>(b_zp_alias),
-      const_cast<scalar_t*>(b_scale));
+      const_cast<data_type_zp*>(b_zp_alias + 2 * zp_offset),
+      const_cast<scalar_t*>(b_scale + 2 * scale_offset),
+      {{{const_cast<scalar_t*>(bias + 2 * n), {n, 1, n}}}});
 }
 
 } // namespace xetla
