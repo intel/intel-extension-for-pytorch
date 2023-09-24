@@ -117,6 +117,7 @@ from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl
 from .cpu.utils.verbose import verbose
 from .cpu.tpp.fused_bert import fast_bert
 from .cpu.onednn_fusion import enable_onednn_fusion
+from .quantization import woq
 
 from . import _C
 from ._version import (__version__, __ipex_gitrev__, __torch_gitrev__,
