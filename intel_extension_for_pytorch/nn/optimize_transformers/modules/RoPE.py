@@ -110,7 +110,7 @@ class GPTJRotaryEmbedding(PositionalEmbedding):
         return x.flatten(-2)  # in einsum notation: rearrange(x, '... d j -> ... (d j)')
 
     def apply_rotary_pos_emb(self, query, key, sin, cos):
-        torch.ops.torch_ipex.apply_rotary_embedding_two(query, key, sin, cos, query, key)
+        torch.ops.torch_ipex.apply_rotary_embedding_two_qk(query, key, sin, cos, query, key)
 
     def get_sin_cos(self, position_ids, layer_id, beam_size):
         # position_ids [bs*beam, seq_len]
