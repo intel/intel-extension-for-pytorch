@@ -319,12 +319,17 @@ at::Tensor embedding_bag_int8_kernel_impl(
   int8_t* output_data = reinterpret_cast<int8_t*>(output.data_ptr<at::qint8>());
   bool need_requantize = (output_scale - weight_scale) > 0.0001;
   at::parallel_for(0, output_size, 16, [&](int64_t start, int64_t end) {
-    float fp32_buffer[ddim] __attribute__((aligned(64)));
+    // float fp32_buffer[ddim] __attribute__((aligned(64)));
+    std::unique_ptr<float, decltype(ipex_free_aligned)*> fp32_buffer_uq_ptr(
+        (float*)ipex_alloc_aligned(sizeof(float) * ddim, 64),
+        ipex_free_aligned);
+    float* fp32_buffer = fp32_buffer_uq_ptr.get();
+
     for (int64_t i = start; i < end; i++) {
       int8_t* out_data_ptr = &output_data[i * ddim];
       auto inputs_start = offsets_data[i];
       auto inputs_end = i == last_offset ? last_index : offsets_data[i + 1];
-      if (inputs_end - inputs_start <= 1 and !need_requantize) {
+      if (inputs_end - inputs_start <= 1 && !need_requantize) {
         // Do not re-quantize when bag-size == 1 for performance consideraion
         // It is proved to be have enough accuracy on DLRM-V1
         // We can revise this if other models with embeddingbag are not accurate

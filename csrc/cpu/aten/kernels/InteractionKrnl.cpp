@@ -1107,7 +1107,13 @@ at::Tensor dil_qinteraction_kernel_impl(
   auto aligned_off = (interact_feature_size >> 4) << 4;
   aligned_off =
       (aligned_off < interact_feature_size) ? (aligned_off + 16) : aligned_off;
-  float out_in_scales[aligned_off] __attribute__((aligned(64)));
+
+  // float out_in_scales[aligned_off] __attribute__((aligned(64)));
+  std::unique_ptr<float, decltype(ipex_free_aligned)*> out_in_scales_buff(
+      (float*)ipex_alloc_aligned(sizeof(float) * aligned_off, 64),
+      ipex_free_aligned);
+  float* out_in_scales = out_in_scales_buff.get();
+
   size_t offset = 0;
   for (int i = 1; i < feature_nums; i++) {
     for (int j = 0; j < i; j++) {
@@ -1129,8 +1135,20 @@ at::Tensor dil_qinteraction_kernel_impl(
 #endif
 
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
-    __m512i cat_buf[aligned_off] __attribute__((aligned(64)));
-    __m512i convert_to_s16_buf[feature_nums * 4] __attribute__((aligned(64)));
+    //__m512i cat_buf[aligned_off] __attribute__((aligned(64)));
+    std::unique_ptr<__m512i, decltype(ipex_free_aligned)*> cat_buf_buff(
+        (__m512i*)ipex_alloc_aligned(sizeof(__m512i) * aligned_off, 64),
+        ipex_free_aligned);
+    __m512i* cat_buf = cat_buf_buff.get();
+
+    //__m512i convert_to_s16_buf[feature_nums * 4] __attribute__((aligned(64)));
+    std::unique_ptr<__m512i, decltype(ipex_free_aligned)*>
+        convert_to_s16_buf_buff(
+            (__m512i*)ipex_alloc_aligned(
+                sizeof(__m512i) * (feature_nums * 4), 64),
+            ipex_free_aligned);
+    __m512i* convert_to_s16_buf = convert_to_s16_buf_buff.get();
+
     std::vector<int8_t*> input_addr(feature_nums);
     for (int64_t i = start; i < end; i++) {
       int8_t* out_ptr = &out_data[i * out_data_line_len];
