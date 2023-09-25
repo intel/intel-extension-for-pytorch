@@ -47,15 +47,22 @@ def _get_gptj_example_inputs():
     )
 
 class OptimizeTransformersTester(TestCase):
-    def model_replacement_check(self, model, has_position_id):
+    def model_replacement_check(self, model, has_position_id, torchcompile=False):
         for dtype in [torch.bfloat16]:
             for deployment_mode in [True, False]:
+                if torchcompile and deployment_mode:
+                    continue
                 ref_m = copy.deepcopy(model)
                 ipex_m = copy.deepcopy(model)
 
                 ipex_m = ipex.optimize_transformers(
                     ipex_m, dtype=dtype, deployment_mode=deployment_mode, inplace=True
                 )
+
+                if torchcompile:
+                    torch._dynamo.reset()
+                    ipex._set_compiler_backend("inductor")
+                    ipex_m = torch.compile(ipex_m, backend="ipex")
 
                 input_ids = torch.ones(10).to(torch.long)
                 attention_mask = torch.ones(len(input_ids))
@@ -144,12 +151,26 @@ class OptimizeTransformersTester(TestCase):
         m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
         self.model_replacement_check(m, True)
 
+    def test_model_replacement_gptj_torchcompile(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/gptj", return_dict=False
+        )
+        m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
+        self.model_replacement_check(m, True, torchcompile=True)
+
     def test_model_replacement_llama(self):
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/llama", return_dict=False
         )
         m = transformers.models.llama.modeling_llama.LlamaForCausalLM(config).eval()
         self.model_replacement_check(m, True)
+
+    def test_model_replacement_llama_torchcompile(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/llama", return_dict=False
+        )
+        m = transformers.models.llama.modeling_llama.LlamaForCausalLM(config).eval()
+        self.model_replacement_check(m, True, torchcompile=True)
 
     def test_model_replacement_gptneox(self):
         config = AutoConfig.from_pretrained(
@@ -160,6 +181,15 @@ class OptimizeTransformersTester(TestCase):
         ).eval()
         self.model_replacement_check(m, True)
 
+    def test_model_replacement_gptneox_torchcompile(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/gptneox", return_dict=False
+        )
+        m = transformers.models.gpt_neox.modeling_gpt_neox.GPTNeoXForCausalLM(
+            config
+        ).eval()
+        self.model_replacement_check(m, True, torchcompile=True)
+
     def test_model_replacement_opt(self):
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/opt", return_dict=False
@@ -167,6 +197,14 @@ class OptimizeTransformersTester(TestCase):
 
         m = transformers.models.opt.modeling_opt.OPTForCausalLM(config).eval()
         self.model_replacement_check(m, False)
+
+    def test_model_replacement_opt_torchcompile(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/opt", return_dict=False
+        )
+
+        m = transformers.models.opt.modeling_opt.OPTForCausalLM(config).eval()
+        self.model_replacement_check(m, False, torchcompile=True)
 
     def test_model_replacement_falcon(self):
         config = AutoConfig.from_pretrained(
@@ -177,6 +215,16 @@ class OptimizeTransformersTester(TestCase):
         with torch.no_grad():
             ipex.nn.utils._model_convert.replace_customized_linear_with_linear(m.eval())
         self.model_replacement_check(m, False)
+
+    def test_model_replacement_falcon_torchcompile(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/falcon", return_dict=False
+        )
+
+        m = transformers.models.falcon.modeling_falcon.FalconForCausalLM(config).eval()
+        with torch.no_grad():
+            ipex.nn.utils._model_convert.replace_customized_linear_with_linear(m.eval())
+        self.model_replacement_check(m, False, torchcompile=True)
 
     def _model_replacement_check_woq(self, model):
         qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
