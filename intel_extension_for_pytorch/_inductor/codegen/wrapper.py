@@ -61,6 +61,7 @@ class XPUTritonWrapperCodeGen(WrapperCodeGen):
             f"""
                 from ctypes import c_void_p, c_long
                 import torch
+                import intel_extension_for_pytorch
                 import math
                 import random
                 import os
