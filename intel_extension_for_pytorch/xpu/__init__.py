@@ -60,6 +60,8 @@ else:
             return -1
         raise RuntimeError("Intel® Extension for PyTorch* was compiled without XPU support")
 
+_maybe_exchange_device = _exchange_device
+
 
 def init():
     r"""Initialize the XPU's state. This is a Python API about lazy initialization
@@ -117,7 +119,7 @@ class _DeviceGuard:
         self.prev_idx = torch.xpu._exchange_device(self.idx)
 
     def __exit__(self, type: Any, value: Any, traceback: Any):
-        torch.xpu._exchange_device(self.prev_idx)
+        torch.xpu._maybe_exchange_device(self.prev_idx)
         return False
 
 
@@ -138,7 +140,7 @@ class device(object):
         self.prev_idx = torch.xpu._exchange_device(self.idx)
 
     def __exit__(self, type: Any, value: Any, traceback: Any):
-        torch.xpu._exchange_device(self.prev_idx)
+        torch.xpu._maybe_exchange_device(self.prev_idx)
         return False
 
     @property
