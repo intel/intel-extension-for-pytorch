@@ -121,6 +121,8 @@ using namespace xpu::xetla;
   HGEMM_INT4_COMMON_DISPATCH(_##8x64_8x16x64##_##gz##_8_)
 #define HGEMM_INT4_8M_4096N_16384K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##8x64_8x16x64##_##gz##_8_)
+#define HGEMM_INT4_8M_50400N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##8x512_8x16x32##_##gz##_1_)
 #define HGEMM_INT4_8M_50416N_4096K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##8x512_8x16x32##_##gz##_1_)
 
@@ -130,6 +132,8 @@ using namespace xpu::xetla;
   HGEMM_INT4_COMMON_DISPATCH(_##16x64_16x16x32##_##gz##_8_)
 #define HGEMM_INT4_16M_4096N_16384K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##16x64_16x16x32##_##gz##_8_)
+#define HGEMM_INT4_16M_50400N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##16x512_16x16x32##_##gz##_1_)
 #define HGEMM_INT4_16M_50416N_4096K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##16x512_16x16x32##_##gz##_1_)
 
@@ -139,6 +143,8 @@ using namespace xpu::xetla;
   HGEMM_INT4_COMMON_DISPATCH(_##32x64_32x16x32##_##gz##_8_)
 #define HGEMM_INT4_32M_4096N_16384K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##32x64_32x16x32##_##gz##_8_)
+#define HGEMM_INT4_32M_50400N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##32x512_32x16x32##_##gz##_1_)
 #define HGEMM_INT4_32M_50416N_4096K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##32x512_32x16x32##_##gz##_1_)
 
@@ -148,6 +154,8 @@ using namespace xpu::xetla;
   HGEMM_INT4_COMMON_DISPATCH(_##32x128_32x16x32##_##gz##_4_)
 #define HGEMM_INT4_64M_4096N_16384K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##32x128_32x16x32##_##gz##_4_)
+#define HGEMM_INT4_64M_50400N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##64x512_64x16x32##_##gz##_1_)
 #define HGEMM_INT4_64M_50416N_4096K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##64x512_64x16x32##_##gz##_1_)
 
@@ -156,6 +164,8 @@ using namespace xpu::xetla;
 #define HGEMM_INT4_384M_4096N_4096K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
 #define HGEMM_INT4_384M_4096N_16384K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
+#define HGEMM_INT4_384M_50400N_4096K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
 #define HGEMM_INT4_384M_50416N_4096K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
@@ -166,6 +176,8 @@ using namespace xpu::xetla;
   HGEMM_INT4_COMMON_DISPATCH(_##128x256_64x16x32##_##gz##_1_)
 #define HGEMM_INT4_1024M_4096N_16384K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##128x256_64x16x32##_##gz##_1_)
+#define HGEMM_INT4_1024M_50400N_4096K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##128x512_64x32x32##_##gz##_1_)
 #define HGEMM_INT4_1024M_50416N_4096K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##128x512_64x32x32##_##gz##_1_)
 
@@ -174,6 +186,8 @@ using namespace xpu::xetla;
 #define HGEMM_INT4_INFM_4096N_4096K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
 #define HGEMM_INT4_INFM_4096N_16384K_IMPL(gz) \
+  HGEMM_INT4_COMMON_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
+#define HGEMM_INT4_INFM_50400N_4096K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
 #define HGEMM_INT4_INFM_50416N_4096K_IMPL(gz) \
   HGEMM_INT4_COMMON_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
@@ -188,6 +202,8 @@ using namespace xpu::xetla;
     HGEMM_INT4_M_N_K_DISPATCH(m, 4096, 4096, gz);  \
   } else if (n_ == 4096 && k_ == 16384) {          \
     HGEMM_INT4_M_N_K_DISPATCH(m, 4096, 16384, gz); \
+  } else if (n_ == 50400 && k_ == 4096) {          \
+    HGEMM_INT4_M_N_K_DISPATCH(m, 50400, 4096, gz); \
   } else if (n_ == 50416 && k_ == 4096) {          \
     HGEMM_INT4_M_N_K_DISPATCH(m, 50416, 4096, gz); \
   } else {                                         \
