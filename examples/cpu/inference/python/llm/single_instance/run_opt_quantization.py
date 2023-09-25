@@ -101,12 +101,6 @@ print("Data type of the model:", user_model.dtype)
 # to channels last
 user_model = user_model.to(memory_format=torch.channels_last)
 user_model.eval()
-# calling _optimize_transformers for int8 path
-if args.ipex_weight_only_quantization:
-    user_model.config.weight_only_quantization = True
-user_model = ipex._optimize_transformers(
-    user_model.eval(), dtype=torch.int8, inplace=True
-)
 
 beam_idx_tmp = torch.zeros(
     (2048, int(args.batch_size * num_beams)), dtype=torch.long
