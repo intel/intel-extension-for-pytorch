@@ -504,6 +504,13 @@ inline int hgemm_find_policy_id_(
     int idx = it->second;
     return is_b_row_major ? idx : idx + HGEMM_NUM_POLICIES_;
   }
+  if (n == 4096 && m <= 128) {
+    return hgemm_policy_id(
+        hgemm_policy::_128x64_16x16x64_1_true_, is_b_row_major);
+  } else if (m == 1028 && n == 14336) {
+    return hgemm_policy_id(
+        hgemm_policy::_256x256_64x32x16_1_true_, is_b_row_major);
+  }
   return -1;
 }
 

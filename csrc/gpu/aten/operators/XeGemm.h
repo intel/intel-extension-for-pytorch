@@ -99,7 +99,7 @@ class HGEMM_XETLA final {
     k_ = a_sizes[1];
     n_ = b_sizes[1];
     __CHECK(k_ % 4 == 0 && n_ % 4 == 0);
-    __CHECK(!(m_ > 1000 && n_ > 8192));
+    __CHECK((m_ == 1028) || (!(m_ > 1000 && n_ > 8192)));
     __CHECK(
         b_->dim() == 2 && b_sizes[0] == k_ && c_sizes[0] == m_ &&
         c_sizes[1] == n_);
