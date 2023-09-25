@@ -188,6 +188,7 @@ if args.ipex_weight_only_quantization:
     ):
         self_jit = torch.jit.trace(user_model.eval(), example_inputs, strict=False)
         self_jit = torch.jit.freeze(self_jit.eval())
+        pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
         self_jit.save(args.output_dir + "/best_model.pt")
 
 if args.benchmark:

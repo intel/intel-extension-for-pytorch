@@ -9,6 +9,7 @@ import sys
 sys.path.append('./')
 import time
 import re
+from pathlib import Path
 import torch
 from datasets import load_dataset
 from torch.nn.functional import pad
@@ -19,8 +20,8 @@ parser.add_argument(
     "--model", nargs="?", default="EleutherAI/gpt-j-6b"
 )
 parser.add_argument("--dataset", nargs="?", default="lambada", const="lambada")
-parser.add_argument("--output_dir", nargs="?", default="./saved_results")
-parser.add_argument("--calib_iters", default=512, type=int,
+parser.add_argument("--output-dir", nargs="?", default="./saved_results")
+parser.add_argument("--calib-iters", default=512, type=int,
                     help="calibration iters.")
 args = parser.parse_args()
 
@@ -216,5 +217,6 @@ compressed_model = q_model.export_compressed_model(
     compression_dim=1,
     scale_dtype=torch.float16,
 )
+Path(args.output_dir).mkdir(parents=True, exist_ok=True)
 torch.save(compressed_model.state_dict(), args.output_dir + "/gptq_checkpoint.pt")
 print('\n Checkpoint saved to', args.output_dir + "/gptq_checkpoint.pt \n")
