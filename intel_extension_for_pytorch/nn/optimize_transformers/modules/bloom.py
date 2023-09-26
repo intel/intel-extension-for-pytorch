@@ -2,81 +2,147 @@ import math
 import warnings
 import torch
 import torch.nn as nn
+import torch.distributed as dist
 from torch.nn import CrossEntropyLoss
 from typing import Optional, Tuple, Union
-
-from ._transformer_configuration import IPEXTransformerConfig
+import sys
+import os 
 from ._transformers import IPEXTransformerAtten, IPEXTransformerMLP, IPEXEmptyLinear, IPEXTransformerConverter, MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
-from ._transformer_configuration import IPEXTransformerConfig
-from .RoPE import PositionalEmbedding
+from ._transformer_configuration import IPEXTransformerConfig, SupportedActivation
+from .transformer_modules.RoPE import PositionalEmbedding
 from transformers.modeling_outputs import CausalLMOutputWithCrossAttentions
-from .utils import print_rank_x
+from .transformer_modules.BaseAttention import IPEXTransformerAttn
+from .transformer_modules.Attention import IPEXTransformerAttnNaive, IPEXTransformerAttnOptimizedFp16
+from .transformer_modules.QuantizedAttention import IPEXTransformerAttnOptimizedInt4
+from .transformer_modules.Mlp import *
+from .transformer_modules.Decoderblock import IPEXTransformerBlock
+from .transformer_modules.Linear import IPEXTransformerLinear, IPEXTransformerQLinear
 
 import os
 acc_test = os.environ.get("LLM_ACC_TEST", "OFF").upper() in ["1", "ON", "Y", "YES", "TRUE"]
 
-class IPEXBloomAttn(IPEXTransformerAtten):
-    def __init__(self, config) -> None:
-        super().__init__(config)
-        self.query_key_value = IPEXEmptyLinear()
-        self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
-        self.beta = 1.0
 
-    def qkv_normal(self, hidden_states, layer_past = None):
-        if self.row_major:
-            shape = [hidden_states.shape[0], hidden_states.shape[1], self.num_attn_head * self.head_dim]
-            query = torch.empty(shape, device=hidden_states.device, dtype=hidden_states.dtype)
-            key = torch.empty_like(query)
-            value = torch.empty_like(query)
-            torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_wei, self.qkv_bias, query, key, value)
-        else:
-            fused_qkv = self.query_key_value(hidden_states)
-            batch_size, seq_length, three_times_hidden_size = fused_qkv.shape
-            fused_qkv = fused_qkv.view(batch_size, seq_length, self.num_attn_head, 3, self.head_dim)
-            query = fused_qkv[..., 0, :].reshape(batch_size, seq_length, -1)
-            key = fused_qkv[..., 1, :].reshape(batch_size, seq_length, -1)
-            value = fused_qkv[..., 2, :].reshape(batch_size, seq_length, -1)
-        return query, key, value
+class NewIPEXBloomBlock(IPEXTransformerBlock):
+    def __init__(self,
+                 module,
+                 config: IPEXTransformerConfig,
+                 dtype="fp16",
+                 device="xpu",
+                 module_name="",
+                 tp_size=1,
+                 tp_group=None):
+        super().__init__(module, config, dtype, device, module_name)
+        self.ipex_config = self.build_ipex_transformer_config(config, device, dtype, tp_size, tp_group)
+        self.attn = self.build_attention_from_config()
+        self.mlp = self.build_mlp_from_config()
+        self.input_layernorm = nn.LayerNorm(self.ipex_config.embedding_dim, eps=self.ipex_config.norm_eps)
+        self.post_attention_layernorm = nn.LayerNorm(self.ipex_config.embedding_dim, eps=self.ipex_config.norm_eps)
+        self.port_all_parameters_to_new_module()
+
+    def build_ipex_transformer_config(self,
+                                      config,
+                                      device,
+                                      dtype,
+                                      tp_size,
+                                      tp_group):
+        activation_function = "bloom_gelu"
+        ipex_activation = None
+        for act in SupportedActivation:
+            if activation_function in act.value:
+                ipex_activation = act
+                break
+        assert ipex_activation is not None, "found unrecognized activation function, can not build ipex config from {}".format(activation_function)
+        assert dtype in ["fp16", "int4"], "dtype tag {} passed to optimized_transformers is not supported!".format(dtype)
+
+        return IPEXTransformerConfig(
+            embedding_dim = self.config.hidden_size,
+            intermediate_dim = 4 * self.config.hidden_size,
+            num_attention_head = self.config.n_head,
+            max_positions = max(2048, MAX_SEQ_LEN),
+            max_out_positions = MAX_OUT_SEQ_LEN,
+            rotary_embedding_class = PositionalEmbedding,
+            rotary_dim = None,
+            use_casual_mask = True,
+            activation_function = activation_function,
+            ipex_act = ipex_activation,
+            norm_eps = self.config.layer_norm_epsilon,
+            residual_dropout = None,
+            attn_dropout = self.config.attention_dropout,
+            enable_bias = False,
+            residual_pdrop = None,
+            scale_attention = True,
+            is_decoder = True,
+            do_norm_before = self.config.apply_residual_connection_post_layernorm,
+            ln_elementwise_affine = None,
+            dtype = dtype,
+            tp_size = tp_size,
+            tp_group = tp_group
+        )
+
+    def build_attention_from_config(self):
+        dtype = self.ipex_config.dtype
+        impl = self.ipex_config.impl
+        attn_type = IPEXTransformerAttn
+        attn_type_str = "IPEXTransformerAttn"
+        for elem in [impl.name, dtype]:
+            attn_type_str = attn_type_str + elem.capitalize()
+            if hasattr(sys.modules[__name__], attn_type_str):
+                attn_type = getattr(sys.modules[__name__], attn_type_str)
+        return attn_type(self.ipex_config)
+
+    def build_mlp_from_config(self):
+        dtype = self.ipex_config.dtype
+        impl = self.ipex_config.impl
+        activation = self.ipex_config.ipex_act
+        mlp_type = IPEXTransformerMLP
+        mlp_type_str = "IPEXTransformerMLP"
+        for elem in [impl.name, dtype, activation.name]:
+            mlp_type_str = mlp_type_str + elem.capitalize()
+            if hasattr(sys.modules[__name__], mlp_type_str):
+                mlp_type = getattr(sys.modules[__name__], mlp_type_str)
+        return mlp_type(self.ipex_config)
+
+    def port_attn_parameter(self):
+        embed_dim = self.ipex_config.embedding_dim
+        num_head = self.ipex_config.num_attention_head // self.ipex_config.tp_size
+        weight_shape = [num_head, 3, -1, embed_dim]
+        bias_shape = [num_head, 3, -1]
+        qkv_weight = self.module.self_attention.query_key_value.weight
+        qkv_bias = self.module.self_attention.query_key_value.bias
+        qkv_weight = qkv_weight.view(weight_shape).transpose(0, 1).contiguous().view([3, -1, embed_dim]).contiguous()
+        qkv_bias = qkv_bias.view(bias_shape).transpose(0, 1).contiguous().view([3, -1]).contiguous()
+        q_proj = IPEXTransformerLinear(qkv_weight[0], qkv_bias[0])
+        k_proj = IPEXTransformerLinear(qkv_weight[1], qkv_bias[1])
+        v_proj = IPEXTransformerLinear(qkv_weight[2], qkv_bias[2])
+        self.attn.load_parameter(q_proj, k_proj, v_proj, self.module.self_attention.dense)
+
+    def port_mlp_parameter(self):
+        self.mlp.load_parameter(self.module.mlp.dense_h_to_4h, self.module.mlp.dense_4h_to_h)
+    
+    def port_norm_parameter(self):
+        self.input_layernorm.weight = self.module.input_layernorm.weight
+        self.input_layernorm.bias   = self.module.input_layernorm.bias
+        self.post_attention_layernorm.weight = self.module.post_attention_layernorm.weight
+        self.post_attention_layernorm.bias   = self.module.post_attention_layernorm.bias
+    
+    def transpose_parameter(self):
+        self.attn.transpose_parameter()
+        self.mlp.transpose_parameter()
+    
+    def port_all_parameters_to_new_module(self):
+        super().port_all_parameters_to_new_module()
+        if self.ipex_config.transpose:
+            self.transpose_parameter()
+        self.attn.cat_qkv()
 
 
-class IPEXBloomMLP(IPEXTransformerMLP):
-    def __init__(self, config: IPEXTransformerConfig):
-        super().__init__(config)
-
-    def forward(self, hidden_states, residual: torch.Tensor):
-        if self.row_major:
-            if isinstance(self.act, nn.GELU):
-                hidden_states = torch.ops.torch_ipex.matmul_gelu(hidden_states, self.fc_in_wei, self.fc_in.bias, 1.0, self.act.approximate)
-            else:
-                hidden_states = torch.ops.torch_ipex.matmul_bias_out(hidden_states, self.fc_in_wei, self.fc_in.bias)
-                hidden_states = self.act(hidden_states)
-            # print_rank_x(0, "before mm resadd: {}".format(hidden_states))
-            hidden_states = torch.ops.torch_ipex.mm_bias_resadd(hidden_states, self.fc_out_wei, self.fc_out_bias, 1.0/self.tp_size, residual, 1.0/self.tp_size)
-            # print_rank_x(0, "before all reduce: {}".format(hidden_states))
-            output = self.all_reduce_if_necessary(hidden_states)
-        else:
-            intermediate_output = self.act(self.fc_in(hidden_states))
-            output = torch.matmul(intermediate_output, self.fc_out.weight.t())
-            output = self.all_reduce_if_necessary(output)
-            output += self.fc_out.bias + residual
-        return output
-
-
-class IPEXBloomBlock(nn.Module):
-    def __init__(self, 
-                 config: IPEXTransformerConfig):
-        super().__init__()
-        self.config = config
-        self.input_layernorm = nn.LayerNorm(config.embed_dim, eps=config.norm_eps)
-        self.self_attention = IPEXBloomAttn(config)
-        self.post_attention_layernorm = nn.LayerNorm(config.embed_dim, eps=config.norm_eps)
-        self.mlp = IPEXBloomMLP(config)
-        col_major = os.environ.get("COL_MAJOR", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
-        self.row_major = not col_major
-
-    def release_resources(self):                                                                              
-        self.self_attention.release_resources()
+    def release_resources(self):
+        self.attn.release_resources()
         self.mlp.release_resources()
+    
+    def print_rank_x(self, str):
+        if dist.get_rank() == 1:
+            print(str)
 
     def forward(
         self,
@@ -103,29 +169,26 @@ class IPEXBloomBlock(nn.Module):
         first_token = True if acc_test or layer_past is None else False 
         hidden_size = hidden_states.shape[-1]
         hidden_shape = [bs, beam, seq, hidden_size]
-        if self.row_major:
-            if first_token and beam > 1:
-                # for 1st token, keep the original layout
-                # reduce the duplicated info in beam dim
-                # shape -> [bs*beam, seq, hidden_size]
-                # layout -> [bs*beam, seq, hidden_size]
-                hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :].contiguous()
-                if attention_mask is not None:
-                    attention_mask = attention_mask.view(bs, beam, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])[:,0,:,:,:].view(bs, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
-            else:
-                # for 2nd to last token, we convert the layout
-                # shape -> [bs*beam, seq, hidden_size]
-                # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
-                hidden_states = hidden_states.transpose(0, 1).contiguous()
-        
-        # layernorm_output = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.input_layernorm.normalized_shape, self.input_layernorm.weight, self.input_layernorm.bias, self.input_layernorm.eps)
-        # NOTE: fast_layer_norm has accuracy issue in Ipex auto tp
+        if first_token and beam > 1:
+            # for 1st token, keep the original layout
+            # reduce the duplicated info in beam dim
+            # shape -> [bs*beam, seq, hidden_size]
+            # layout -> [bs*beam, seq, hidden_size]
+            hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :].contiguous()
+            if attention_mask is not None:
+                attention_mask = attention_mask.view(bs, beam, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])[:,0,:,:,:].view(bs, attention_mask.shape[1], attention_mask.shape[2], attention_mask.shape[3])
+        else:
+            # for 2nd to last token, we convert the layout
+            # shape -> [bs*beam, seq, hidden_size]
+            # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
+            hidden_states = hidden_states.transpose(0, 1).contiguous()
+
         layernorm_output = torch.ops.torch_ipex.fast_layer_norm(hidden_states, self.input_layernorm.normalized_shape, self.input_layernorm.weight, self.input_layernorm.bias, self.input_layernorm.eps)
-        if self.config.do_norm_before:
+        if self.ipex_config.do_norm_before:
             residual = layernorm_output
         else:
             residual = hidden_states
-        attn_outputs = self.self_attention(
+        attn_outputs = self.attn(
             hidden_states = layernorm_output,
             layer_past = layer_past,
             attention_mask = attention_mask,
@@ -139,39 +202,27 @@ class IPEXBloomBlock(nn.Module):
 
         attention_output = attn_outputs[0]
         outputs = attn_outputs[1:]
-        #layernorm_output = self.post_attention_layernorm(attention_output)
-        # import torch.distributed as dist
-        # if dist.get_rank() == 1:
-        #     torch.save(attention_output, "./attn output.pt")
-        #     torch.save(self.post_attention_layernorm.weight, "./layer_weight.pt")
-        #     torch.save(self.post_attention_layernorm.bias, "./layer_bias.pt")
-        #     # torch.save(attention_output, "./attn output.pt")
-        # import os
-        # os.abort()
-        # layernorm_output = torch.ops.torch_ipex.fast_layer_norm(attention_output, self.post_attention_layernorm.normalized_shape, self.post_attention_layernorm.weight, self.post_attention_layernorm.bias, self.post_attention_layernorm.eps)
         layernorm_output = torch.ops.torch_ipex.fast_layer_norm(attention_output, self.post_attention_layernorm.normalized_shape, self.post_attention_layernorm.weight, self.post_attention_layernorm.bias, self.post_attention_layernorm.eps)
-        if self.config.do_norm_before:
-            redisual = layernorm_output
+        if self.ipex_config.do_norm_before:
+            residual = layernorm_output
         else:
             residual = attention_output
+
         hidden_states = self.mlp(layernorm_output, residual)
 
-        if self.row_major:
-            if first_token and beam > 1:
-                # for 1st token, expand the result with beam
-                hidden_states = hidden_states.view(bs, 1, seq, hidden_size)
-                hidden_states = hidden_states.expand([bs, beam, seq, hidden_size])
-            else:
-                # for 2nd to last token, we convert the layout back
-                # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
-                hidden_states = hidden_states.transpose(0, 1)
-
+        if first_token and beam > 1:
+            # for 1st token, expand the result with beam
+            hidden_states = hidden_states.view(bs, 1, seq, hidden_size)
+            hidden_states = hidden_states.expand([bs, beam, seq, hidden_size])
+        else:
+            # for 2nd to last token, we convert the layout back
+            # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
+            hidden_states = hidden_states.transpose(0, 1)
         if use_cache:
             outputs = (hidden_states, ) + outputs
         else:
             outputs = (hidden_states, ) + outputs[1:]
         return outputs
-
 
 def _convert_to_bloom_cache_ipex(
         past_key_value: Tuple[Tuple[torch.Tensor, torch.Tensor]]
@@ -266,126 +317,3 @@ def IPEXBloomForCausalLMForward(
             hidden_states=transformer_outputs.hidden_states,
             attentions=transformer_outputs.attentions,
         )
-
-class IPEXBloomConverter(IPEXTransformerConverter):
-    def __init__(self, module, config, device="cpu", dtype=torch.float, name="") -> None:
-        from transformers.models.bloom.configuration_bloom import BloomConfig
-        super().__init__(module, config, device, dtype, name)
-        self.config: BloomConfig = config if config is not None else BloomConfig()
-        self.ipex_transformers_config = self.construct_transformer_config()
-        self.ipex_optimized_module = self.construct_ipex_optimized_module()
-        self.port_all_parameters_to_new_module()
-        # self.module_name = name
-
-    def construct_transformer_config(self):
-        # bloom don't have n_position attribute, we set it as 2048 just like other LLM models.
-        n_positions = max(2048, MAX_SEQ_LEN)
-        embed_dim = self.config.hidden_size
-        num_head = self.config.n_head
-        hidden_dropout = self.config.hidden_dropout
-        attention_dropout = self.config.attention_dropout
-        before_norm = self.config.apply_residual_connection_post_layernorm
-        # activate_function = self.config.hidden_act
-        norm_eps = self.config.layer_norm_epsilon
-        use_cache = self.config.use_cache
-        intermediate_size = 4 * embed_dim
-        return IPEXTransformerConfig(
-            embed_dim=embed_dim,
-            intermediate_size=intermediate_size,
-            num_attention_heads=num_head,
-            max_positions=n_positions,
-            max_out_positions=MAX_OUT_SEQ_LEN,
-            rotary_embedding_class=PositionalEmbedding,
-            rotary_dim=None,
-            rotate_half=False,
-            rotate_every_two=False,
-            use_casual_mask=False,
-            activation_function="bloom_gelu",
-            norm_eps=norm_eps,
-            residual_dropout=None,
-            attn_dropout=attention_dropout,
-            enable_bias=False,
-            residual_pdrop=None,
-            scale_attention=True,
-            is_decoder=False,
-            do_norm_before=before_norm,
-            ln_elementwise_affine=None,
-            seq_first=True,
-            kv_cache_optimize=True,
-            positional_embedding_base=10000,
-            sdp_fusion_enable=True,
-            device=self.device,
-            dtype=self.dtype,
-            tp_size=IPEXTransformerConverter.tp_size,
-            tp_group=IPEXTransformerConverter.tp_group
-        )
-    def construct_ipex_optimized_module(self):
-        return IPEXBloomBlock(self.ipex_transformers_config)
-
-    def port_attn_parameters(self):
-        tp_size = self.ipex_transformers_config.tp_size
-        if self.row_major:
-            embed_dim = self.config.hidden_size
-            num_head = self.config.n_head // tp_size
-            shape = [num_head, 3, -1, embed_dim]
-
-            self.module.self_attention.query_key_value.weight.data = \
-                self.module.self_attention.query_key_value.weight.view(shape).contiguous().transpose(0, 1).contiguous().view([3, -1, embed_dim]).transpose(1, 2).contiguous()
-            self.ipex_optimized_module.self_attention.qkv_wei = \
-                nn.Parameter(self.module.self_attention.query_key_value.weight)
-
-            self.module.self_attention.query_key_value.bias.data = \
-                self.module.self_attention.query_key_value.bias.view([num_head, 3, -1]).transpose(0, 1).contiguous().view([3, -1])
-            self.ipex_optimized_module.self_attention.qkv_bias = \
-                nn.Parameter(self.module.self_attention.query_key_value.bias)
-
-            self.module.self_attention.dense.weight.data = \
-                self.module.self_attention.dense.weight.transpose(0, 1).contiguous()
-            self.ipex_optimized_module.self_attention.out_wei = nn.Parameter(self.module.self_attention.dense.weight)
-            self.module.self_attention.dense.bias.data = self.module.self_attention.dense.bias.data
-            self.ipex_optimized_module.self_attention.out_bias = nn.Parameter(self.module.self_attention.dense.bias)
-        else:
-            self.ipex_optimized_module.self_attention.query_key_value.weight = nn.Parameter(self.module.self_attention.query_key_value.weight)
-            self.ipex_optimized_module.self_attention.query_key_value.bias = nn.Parameter(self.module.self_attention.query_key_value.bias)
-            self.ipex_optimized_module.self_attention.out_proj.weight = nn.Parameter(self.module.self_attention.dense.weight)
-            self.ipex_optimized_module.self_attention.out_proj.bias = nn.Parameter(self.module.self_attention.dense.bias)
-
-
-    def port_mlp_parameters(self):
-        if self.row_major:
-            self.module.mlp.dense_h_to_4h.weight.data = self.module.mlp.dense_h_to_4h.weight.transpose(0, 1).contiguous()
-            self.ipex_optimized_module.mlp.fc_in_wei = nn.Parameter(self.module.mlp.dense_h_to_4h.weight)
-            self.ipex_optimized_module.mlp.fc_in.bias = nn.Parameter(self.module.mlp.dense_h_to_4h.bias)
-
-            self.module.mlp.dense_4h_to_h.weight.data = self.module.mlp.dense_4h_to_h.weight.transpose(0, 1).contiguous()
-            self.ipex_optimized_module.mlp.fc_out_wei = nn.Parameter(self.module.mlp.dense_4h_to_h.weight)
-            self.module.mlp.dense_4h_to_h.bias.data = self.module.mlp.dense_4h_to_h.bias.data
-            self.ipex_optimized_module.mlp.fc_out_bias = nn.Parameter(self.module.mlp.dense_4h_to_h.bias)
-        else:
-            self.ipex_optimized_module.mlp.fc_in.weight = nn.Parameter(self.module.mlp.dense_h_to_4h.weight)
-            self.ipex_optimized_module.mlp.fc_in.bias = nn.Parameter(self.module.mlp.dense_h_to_4h.bias)
-            self.ipex_optimized_module.mlp.fc_out.weight = nn.Parameter(self.module.mlp.dense_4h_to_h.weight)
-            self.ipex_optimized_module.mlp.fc_out.bias = nn.Parameter(self.module.mlp.dense_4h_to_h.bias)
-
-    def port_layer_norm_parameters(self):
-        self.ipex_optimized_module.input_layernorm.weight = nn.Parameter(self.module.input_layernorm.weight)
-        self.ipex_optimized_module.input_layernorm.bias = nn.Parameter(self.module.input_layernorm.bias)
-        self.ipex_optimized_module.post_attention_layernorm.weight = nn.Parameter(self.module.post_attention_layernorm.weight)
-        self.ipex_optimized_module.post_attention_layernorm.bias = nn.Parameter(self.module.post_attention_layernorm.bias)
-
-    def port_all_parameters_to_new_module(self):
-        self.port_attn_parameters()
-        self.port_mlp_parameters()
-        self.port_layer_norm_parameters()
-        # self.print_all_param_with_name()
-
-    # def print_all_param_with_name(self):
-    #     import torch.distributed as dist
-    #     if dist.get_rank() == 0:
-    #         for name, param in self.ipex_optimized_module.named_parameters():
-    #             name = self.module_name + "." + name
-    #             print("name: ", name)
-    #             print("para: ", param)
-
-    def get_transformed_module(self):
-        return self.ipex_optimized_module

@@ -23,12 +23,12 @@ class OnDevice(object):
 
     Create MyModule which consists of many different sub-modules and parameters. In this case we can create
     MyModule as a collection of 'meta' tensors by passing `device='meta'` or we can create the module _directly_
-    on a CUDA device by passing `device=f'cuda:{local_rank}'` (where `local_rank` is the local GPU id.
+    on a XPU device by passing `device=f'xpu:{local_rank}'` (where `local_rank` is the local GPU id.
 
     with OnDevice(dtype=torch.float16, device='meta'):
         model = MyModel()
 
-    with OnDevice(dtype=torch.float16, device=f'cuda:{local_rank}'):
+    with OnDevice(dtype=torch.float16, device=f'xpu:{local_rank}'):
         model = MyModel()
 
     """
@@ -88,29 +88,6 @@ class OnDevice(object):
         torch.ones = self._orig_torch_ones
         torch.full = self._orig_torch_full
 
-def ds_kernel_injection_enabled(model, enable_ds):
-    if not enable_ds:
-        return False
-    import deepspeed
-    if isinstance(model, deepspeed.InferenceEngine):
-        config = model._config
-        ds_kernel_injection = config.replace_with_kernel_inject
-        if ds_kernel_injection:
-            return True
-    return False
-
-def ds_autotp_enabled(model, enable_ds=False):
-    if not enable_ds:
-        return False
-    import deepspeed
-    if isinstance(model, deepspeed.InferenceEngine):
-        config = model._config
-        tp_size = config.tensor_parallel.tp_size
-        tp_group = config.tensor_parallel.tp_group
-        IPEXTransformerConverter.update_tp_data(tp_size, tp_group)
-        if tp_size > 1 and tp_group is not None:
-            return True
-    return False
 
 class Converter:
     def __init__(self, ckpt = None, tp_fn = None, replaced_module = None, replaced_layer = None, replace_fn = None, distributed = False) -> None:
@@ -119,11 +96,33 @@ class Converter:
         if distributed:
             self.tp_size = dist.get_world_size()
         self.create_model_parallel_group()
-        IPEXTransformerConverter.update_tp_data(self.tp_size, self.tp_group)
+        # IPEXTransformerConverter.update_tp_data(self.tp_size, self.tp_group)
         self.tensor_slicer = TensorSlicer(self.tp_size, self.tp_group, tp_fn)
-        self.module_replacer = ModuleReplacer(replaced_module, replaced_layer, replace_fn)
+        self.module_replacer = ModuleReplacer(replaced_module, replaced_layer, replace_fn, self.tp_size, self.tp_group)
         self.weight_loader = WeightLoader(ckpt, self.tp_group, self.tp_size)
 
+    def ds_autotp_enabled(self, model, enable_ds=False):
+        if not enable_ds:
+            return False
+        import deepspeed
+        if isinstance(model, deepspeed.InferenceEngine):
+            config = model._config
+            self.module_replacer.tp_size = config.tensor_parallel.tp_size
+            self.module_replacer.tp_group = config.tensor_parallel.tp_group
+            if self.module_replacer.tp_size > 1 and self.module_replacer.tp_size is not None:
+                return True
+        return False
+
+    def ds_kernel_injection_enabled(self, model, enable_ds):
+        if not enable_ds:
+            return False
+        import deepspeed
+        if isinstance(model, deepspeed.InferenceEngine):
+            config = model._config
+            ds_kernel_injection = config.replace_with_kernel_inject
+            if ds_kernel_injection:
+                return True
+        return False
 
     def create_model_parallel_group(self):
         if self.tp_size < 2:
@@ -137,6 +136,22 @@ class Converter:
             self.tp_group = tp_group
         else:
             self.tp_group = EnvParam.tp_group
+
+    def mapping_dtype(self, dtype):
+        default_mapping = {
+            ("fp16", torch.float):    ("float32", "float", "fp32", torch.float, torch.float32),
+            ("fp16", torch.bfloat16): ("bfloat16", "bf16", torch.bfloat16),
+            ("fp16", torch.float16):  ("float16", "fp16", "half", torch.float16, torch.half),
+            ("int8", torch.int8):     ("int8", torch.int8),
+            ("int4", torch.float16):  ("int4")
+        }
+        dtype_tag = None
+        dtype_run = None
+        for key, value in default_mapping.items():
+            if dtype in value:
+                dtype_tag, dtype_run = key
+                break
+        return dtype_tag, dtype_run
 
     def convert_model(self, model, dtype):
         try:
@@ -153,9 +168,11 @@ class Converter:
                 enable_ds = True
                 self.module_replacer.update_deepspeed_supported_op()
 
-        if ds_kernel_injection_enabled(model, enable_ds):
+        if self.ds_kernel_injection_enabled(model, enable_ds):
             assert False, "Deepspeed's kernel injection is not supported in IPEX, please turn off the kernel injection option in Deepspeed and re-run the script."
-        if not ds_autotp_enabled(model, enable_ds):
+        dtype_tag, dtype = self.mapping_dtype(dtype)
+        setattr(model, "dtype_tag", dtype_tag)
+        if not self.ds_autotp_enabled(model, enable_ds):
             model = self.tensor_slicer.slicing_model(model)
             self.weight_loader.load_weight_if_necessary(model)
             if self.distributed:
@@ -166,7 +183,7 @@ class Converter:
         self.module_replacer.replace_func(model)
         self.module_replacer.replace_op(model)
         if model.config.torchscript != True:
-            is_replace_success = self.module_replacer.replace_module(model, dtype, config=None)
+            is_replace_success = self.module_replacer.replace_module(model, dtype_tag, config=None)
             if not is_replace_success:
                 setattr(model, "model_capture", {"model_capture": TransformersModelCapture(model, dtype)})
         else:

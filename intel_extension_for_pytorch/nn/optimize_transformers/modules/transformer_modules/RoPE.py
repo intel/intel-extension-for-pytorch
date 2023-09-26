@@ -1,24 +1,26 @@
 import torch
 import torch.nn as nn
-from ._transformer_configuration import IPEXTransformerConfig
+from .._transformer_configuration import IPEXTransformerConfig
 
 class PositionalEmbedding(nn.Module):
     def __init__(self, 
-                 config: IPEXTransformerConfig):
+                 config: IPEXTransformerConfig,
+                 dtype):
         super().__init__()
         self.config = config
+        self.dtype = dtype
 
     def forward(self, query, key, position_ids, layer_id, beam_size, kv_seq_len):
         return query, key
 
 class GPTJRotaryEmbeddingRef(PositionalEmbedding):
     def __init__(self,
-                 config: IPEXTransformerConfig):
-        super().__init__(config=config)
+                 config: IPEXTransformerConfig,
+                 dtype):
+        super().__init__(config=config, dtype=dtype)
         self.rotary_dim = config.rotary_dim
         self.base = config.positional_embedding_base
         self.device = config.device
-        self.dtype = config.dtype
         pos_embd_dim = self.rotary_dim or self.embed_dim
         self.embed_positions = self.create_sinusoidal_positions(config.max_positions, pos_embd_dim)
 
@@ -83,13 +85,13 @@ class GPTJRotaryEmbeddingRef(PositionalEmbedding):
 
 class GPTJRotaryEmbedding(PositionalEmbedding):
     def __init__(self,
-                 config: IPEXTransformerConfig):
-        super().__init__(config=config)
+                 config: IPEXTransformerConfig,
+                 dtype):
+        super().__init__(config=config, dtype=dtype)
         self.rotary_dim = config.rotary_dim
         self.max_position_embedding = config.max_positions
         self.base = config.positional_embedding_base
         self.device = config.device
-        self.dtype = config.dtype
         inv_freq = 1.0 / (self.base ** (torch.arange(0, self.rotary_dim, 2).float().to(self.device) / self.rotary_dim))
         self.register_buffer("inv_freq", inv_freq)
         t = torch.arange(self.max_position_embedding, dtype=torch.float, device=self.device)
@@ -316,22 +318,21 @@ class LlamaRotaryEmbeddingRef(torch.nn.Module):
 
 class LlamaRotaryEmbedding(torch.nn.Module):
     def __init__(self,
-                 config: IPEXTransformerConfig):
+                 config: IPEXTransformerConfig,
+                 dtype):
         super().__init__()
-        self.dim = int(config.embed_dim / config.num_attention_heads)
-        self.max_position_embeddings = config.max_positions
+        self.dim = int(config.embedding_dim / config.num_attention_head)
+        self.max_position_embedding = config.max_positions
         self.base = config.positional_embedding_base
         self.device = config.device
-        self.dtype = config.dtype
+        self.dtype = dtype
         inv_freq = 1.0 / (self.base ** (torch.arange(0, self.dim, 2).float().to(self.device) / self.dim))
         self.register_buffer("inv_freq", inv_freq, persistent=False)
-        
-        seq_len = self.max_position_embeddings
+        seq_len = self.max_position_embedding
         device=self.inv_freq.device
         dtype=torch.get_default_dtype()
         self.max_seq_len_cached = seq_len
         t = torch.arange(self.max_seq_len_cached, device=device, dtype=self.inv_freq.dtype)
-
         freqs = torch.einsum("i,j->ij", t, self.inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = torch.cat((freqs, freqs), dim=-1)

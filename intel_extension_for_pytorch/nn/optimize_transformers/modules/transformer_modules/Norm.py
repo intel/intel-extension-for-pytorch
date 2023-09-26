@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from ._transformer_configuration import IPEXTransformerConfig
+from .._transformer_configuration import IPEXTransformerConfig
 
 class LlamaRMSNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-6):

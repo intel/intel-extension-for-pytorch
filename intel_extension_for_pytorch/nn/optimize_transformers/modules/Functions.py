@@ -6,8 +6,9 @@ import warnings
 from functools import partial
 from dataclasses import dataclass, fields
 from typing import Callable, Optional, Tuple, Union, List, Dict
-from ._transformers import IPEXTransformerAtten, IPEXTransformerMLP
-from transformers.modeling_outputs import CausalLMOutputWithPast
+from .transformer_modules.BaseAttention import IPEXTransformerAttn
+from .transformer_modules.Attention import IPEXTransformerAttnOptimizedFp16
+from .transformer_modules.NaiveAttention import IPEXTransformerAttnNaive
 import time
 # from .llama import IPEXLlamaForCausalLMForward
 from .gptj import IPEXGPTJForCausalLMForward
@@ -142,8 +143,7 @@ def _ipex_prepare_model_inputs(
     inputs = self._maybe_initialize_input_ids_for_generation(inputs, bos_token_id, model_kwargs)
 
     bs = inputs.shape[0]
-    IPEXTransformerAtten.batch_size = bs
-    IPEXTransformerMLP.batch_size = bs
+    IPEXTransformerAttn.batch_size = bs
     return inputs, input_name, model_kwargs
 
 
@@ -420,6 +420,7 @@ def _ipex_beam_search(
     candidate_output_ids = torch.empty((batch_size * 2 * num_beams, max_out_seq_length), dtype=torch.long, device=input_ids.device)
     candidate_sequence_lengths = torch.zeros((batch_size * 2 * num_beams), dtype=torch.long, device=input_ids.device)
     origin_input_ids = input_ids
+    IPEXTransformerAttn.reset_timestamp()
     while True:
         tic = time.time()
         if synced_gpus:
@@ -434,7 +435,7 @@ def _ipex_beam_search(
 
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
-        IPEXTransformerAtten.update_beam_index(index_cache)
+        IPEXTransformerAttnNaive.update_beam_idx(index_cache)
 
         #if self.method == RunMethods.JITInfer: 
         #    model_inputs.pop("use_cache", None)
@@ -469,16 +470,13 @@ def _ipex_beam_search(
         dummy_input_ids = torch.empty((batch_size * num_beams, cur_len), dtype=torch.long, device="meta")
         next_token_scores_processed = logits_processor(dummy_input_ids, next_token_scores)
         next_token_scores = next_token_scores_processed + beam_scores[:, None].expand_as(next_token_scores)
-
         beam_scores, beam_next_tokens, beam_idx = torch.ops.torch_ipex.beam_search_topk(next_token_scores, finished, pad_token_id, eos_token_id, length_penalty, num_beams,
                                                 batch_size, next_token_scores.shape[-1], cur_len-max_in_seq_length, do_early_stopping, max_in_seq_length,
                                                 max_out_seq_length, output_token_ids, output_beam_ids, candidate_num_beams, candidate_normed_scores, candidate_min_normed_scores,
                                                 candidate_output_ids, candidate_sequence_lengths, candidate_score)
-
         index_cache = torch.ops.torch_ipex.update_beam_indices_for_cache(index_cache, beam_idx, num_beams, batch_size)
 
         input_ids = beam_next_tokens.unsqueeze(-1)
-
         torch.ops.torch_ipex.update_output_indices(beam_idx, beam_next_tokens, output_beam_ids, output_token_ids, finished, cur_len-max_in_seq_length, batch_size, num_beams)
 
         model_kwargs = self._update_model_kwargs_for_generation(
@@ -490,7 +488,6 @@ def _ipex_beam_search(
 
         if return_dict_in_generate and output_scores:
             beam_indices = tuple((beam_indices[beam_idx[i]] + (beam_idx[i],) for i in range(len(beam_indices))))
-
         # increase cur_len
         cur_len = cur_len + 1
         if hasattr(self, "token_latency") and self.token_latency:
@@ -509,7 +506,7 @@ def _ipex_beam_search(
 
     # origin_input_ids size is [batch_size * beam_size, seq_len]
     out = torch.ops.torch_ipex.update_output_sequence(origin_input_ids, out, batch_size)
-    IPEXTransformerAtten.release_all_static_cached_resources()
+    # IPEXTransformerAtten.release_all_static_cached_resources()
     reserved_mem = round(torch.xpu.memory_reserved() / 1024**3, 3)
     if reserved_mem  > 50:
         torch.xpu.synchronize()
@@ -725,7 +722,7 @@ def _ipex_beam_search_without_optimize(
 
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
-        IPEXTransformerAtten.update_beam_index(index_cache)
+        IPEXTransformerAttnNaive.update_beam_idx(index_cache)
 
         outputs = self(
             **model_inputs,

@@ -3,19 +3,20 @@ from typing import List
 import torch
 import torch.nn as nn
 from .modules.Layers import IpexFastLinear, IpexFastAllReduceLinear, IpexFastLayerNorm
-from .modules.gptj import IPEXGPTJConverter
-from .modules.llama import IPEXLlamaConverter
-from .modules.opt import IPEXOptConverter
-from .modules.bloom import IPEXBloomConverter
+from .modules.gptj import NewIPEXGPTJBlock
+from .modules.bloom import NewIPEXBloomBlock
+from .modules.llama import NewIPEXLLAMABlock
+from .modules.opt import NewIPEXOPTBlock
+
 
 
 def default_replaced_module_dict():
     import transformers
     default_replace_modules = {
-        transformers.models.gptj.modeling_gptj.GPTJBlock: IPEXGPTJConverter,
-        transformers.models.llama.modeling_llama.LlamaDecoderLayer: IPEXLlamaConverter,
-        transformers.models.opt.modeling_opt.OPTDecoderLayer: IPEXOptConverter,
-        transformers.models.bloom.modeling_bloom.BloomBlock: IPEXBloomConverter
+        transformers.models.gptj.modeling_gptj.GPTJBlock: NewIPEXGPTJBlock,
+        transformers.models.llama.modeling_llama.LlamaDecoderLayer: NewIPEXLLAMABlock,
+        transformers.models.opt.modeling_opt.OPTDecoderLayer: NewIPEXOPTBlock,
+        transformers.models.bloom.modeling_bloom.BloomBlock: NewIPEXBloomBlock,
     }
     return default_replace_modules
 
@@ -38,7 +39,7 @@ def default_override_function_list() -> List:
     return default_fn_list
 
 class ModuleReplacer:
-    def __init__(self, module_dict = None, layer_dict = None, fn_list = None) -> None:
+    def __init__(self, module_dict = None, layer_dict = None, fn_list = None, tp_size = 1, tp_group = None) -> None:
         self.module_dict = default_replaced_module_dict()
         self.layer_dict = default_replaced_layer_dict()
         self.fn_dict = default_override_function_list()
@@ -49,8 +50,10 @@ class ModuleReplacer:
         if fn_list is not None:
             self.fn_dict.extend(fn_list)
         self.optimized_model = None
-    
-    def replace_module(self, model, dtype, config=None, prefix="") -> bool:
+        self.tp_size = tp_size
+        self.tp_group = tp_group
+
+    def replace_module(self, model, dtype, config=None, prefix=""):
         if config is None and hasattr(model, "config"):
             config = model.config
             config.dtype = dtype
@@ -59,8 +62,10 @@ class ModuleReplacer:
         is_replace_success = False
         for name, child in model.named_children():
             if type(child) in self.module_dict.keys():
-                module_converter = self.module_dict[type(child)](child, config, dtype=dtype, device="xpu", name=module_name + name)
-                new_module = module_converter.get_transformed_module()
+
+                # module_converter = self.module_dict[type(child)](child, config, dtype=dtype, device="xpu", name=module_name + name)
+                # new_module = module_converter.get_transformed_module()
+                new_module = self.module_dict[type(child)](child, config, dtype=dtype, device="xpu", module_name=module_name + name, tp_size=self.tp_size, tp_group=self.tp_group)
                 # IPEXLLMResourceContrainer.push(new_module)
                 setattr(model, name, new_module)
                 is_replace_success = True

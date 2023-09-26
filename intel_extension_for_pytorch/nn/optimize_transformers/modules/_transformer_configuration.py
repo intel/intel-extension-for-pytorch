@@ -1,66 +1,51 @@
 import torch 
+from dataclasses import dataclass
+from enum import Enum
 
-class IPEXTransformerConfig():
-    def __init__(self,
-                 embed_dim = 4096,
-                 intermediate_size = None,
-                 num_attention_heads = 16,
-                 num_key_value_heads = None,
-                 max_positions = 4096,
-                 max_out_positions = 256,
-                 rotary_embedding_class = "GPTJRotaryEmbedding",
-                 rotary_dim = 64,
-                 rotate_half = False,
-                 rotate_every_two = True,
-                 rope_scaling = None,
-                 use_casual_mask = False,
-                 activation_function = 'gelu_new',
-                 norm_eps = 0.001,
-                 residual_dropout = None,
-                 attn_dropout = None,
-                 enable_bias = False,
-                 residual_pdrop = None,
-                 scale_attention = False,
-                 is_decoder = False,
-                 do_norm_before = False,
-                 ln_elementwise_affine = False,
-                 seq_first = False,
-                 kv_cache_optimize = False,
-                 positional_embedding_base = 10000,
-                 sdp_fusion_enable = True,
-                 device = "cpu",
-                 dtype = torch.half,
-                 tp_size = 1,
-                 tp_group = None
-                #  opt_drop_out = 1.0
-                 ) -> None:
-        self.embed_dim = embed_dim
-        self.intermediate_size = intermediate_size
-        self.num_attention_heads = num_attention_heads
-        self.num_key_value_heads = num_attention_heads if num_key_value_heads is None else num_key_value_heads
-        self.max_positions = max_positions
-        self.max_out_positions = max_out_positions
-        self.rotary_embedding_class = rotary_embedding_class
-        self.rotary_dim = rotary_dim
-        self.rotate_half = rotate_half
-        self.rotate_every_two = rotate_every_two
-        self.rope_scaling = rope_scaling
-        self.use_casual_mask = use_casual_mask
-        self.activation_function = activation_function
-        self.norm_eps = norm_eps
-        self.residual_dropout = residual_dropout
-        self.attn_dropout = attn_dropout
-        self.enable_bias = enable_bias
-        self.residual_pdrop = residual_pdrop
-        self.scale_attention = scale_attention # gptj and llama will need to scale attention weight
-        self.is_decoder = is_decoder # opt parameter
-        self.do_norm_before = do_norm_before
-        self.ln_elementwise_affine = ln_elementwise_affine
-        self.kv_cache_optimize = kv_cache_optimize
-        self.seq_first = seq_first
-        self.positional_embedding_base = positional_embedding_base
-        self.sdp_fusion_enable = sdp_fusion_enable
-        self.device = device
-        self.dtype = dtype
-        self.tp_size = tp_size
-        self.tp_group = tp_group
+
+class ImplementMode(Enum):
+    naive: int = 0
+    optimized: int = 1
+
+class SupportedActivation(Enum):
+    gelu: str       = "gelu", "gelu_new", "bloom_gelu"
+    relu: str       = "relu"
+    sigmoid: str    = "sigmoid"
+    silu: str       = "silu"
+    tanh: str       = "tanh"
+    bloom_gelu: str = "bloom_gelu"
+
+@dataclass
+class IPEXTransformerConfig:
+    embedding_dim: int = 4096
+    intermediate_dim: int = None
+    num_attention_head: int = 16
+    num_key_value_head: int = None
+    max_positions: int = 4096
+    max_out_positions: int = 256
+    rotary_embedding_class: str = "GPTJRotaryEmbedding"
+    rotary_dim: int = 64
+    rotary_half: bool = False
+    rotate_every_two: bool = True
+    rope_scaling = None
+    use_casual_mask: bool = False
+    activation_function: str = None
+    ipex_act: SupportedActivation = SupportedActivation.gelu
+    norm_eps: float = 0.001
+    residual_dropout: bool = False
+    attn_dropout: bool = False
+    enable_bias: bool = False
+    residual_pdrop: bool = False
+    scale_attention: bool = False
+    is_decoder: bool = False
+    do_norm_before: bool = False
+    ln_elementwise_affine: bool = False
+    positional_embedding_base: int = 10000
+    device : torch.device = "xpu"
+    dtype: str = "fp16"
+    impl: ImplementMode = ImplementMode.optimized
+    beam_num: int = 1
+    tp_size: int = 1
+    tp_group: object = None
+    transpose: bool = True
+

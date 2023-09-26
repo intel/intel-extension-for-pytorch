@@ -3,8 +3,10 @@ import torch.nn as nn
 import torch.distributed as dist
 from typing import Optional, Tuple, Union
 
+
 from ._transformer_configuration import IPEXTransformerConfig
-from .Activation import ACT2FN
+from .transformer_modules.Activation import ACT2FN
+
 from ._transformer_configuration import IPEXTransformerConfig
 import os
 import math
@@ -143,7 +145,7 @@ class IPEXTransformerAtten(nn.Module):
         self.layer_id = IPEXTransformerAtten.layer_id_static
         self.embed_dim = self.config.embed_dim
         self.num_attn_head = self.config.num_attention_heads
-        self.num_key_value_heads = config.num_key_value_heads
+        self.num_key_value_heads = self.config.num_key_value_heads
         self.tp_size = self.config.tp_size
         self.tp_group = self.config.tp_group
         self.num_attn_head = self.num_attn_head // self.tp_size
@@ -529,9 +531,7 @@ class IPEXTransformerAtten(nn.Module):
     def all_reduce_if_necessary(self, reduce_target):
         if self.tp_group is not None:
             dist.all_reduce(reduce_target, group=self.tp_group)
-            return reduce_target
-        else:
-            return reduce_target
+        return reduce_target
 
     def repeat_kv(self, hidden_states: torch.Tensor, n_rep: int, first_token) -> torch.Tensor:
         """
@@ -761,7 +761,7 @@ class IPEXTransformerAtten(nn.Module):
         key = torch.cat(key_list, dim=2)
         value = torch.cat(value_list, dim=2)
         return key, value
-
+    
     def get_final_output(self, attn_output: torch.Tensor, residual: Optional[torch.Tensor] = None):
         if self.row_major:
             if residual is None:
@@ -804,19 +804,21 @@ class IPEXTransformerAtten(nn.Module):
         alibi: torch.Tensor = None,
         first_token = False
     ):
+
         def print_rank_x(i, content):
             if dist.get_rank() == 1:
                 print(content)
-        if self.row_major:
-            if first_token and IPEXTransformerAtten.beam_size > 1:
-                # [bs*beam, seq, head, head_dim]
-                kv_seq_len = hidden_states.shape[1]
-            else:
-                kv_seq_len = hidden_states.shape[0]
-        else:
-            kv_seq_len = hidden_states.shape[1]
-        if layer_past is not None:
-            kv_seq_len += layer_past[0].shape[2]
+        # if self.row_major:
+        #     if first_token and IPEXTransformerAtten.beam_size > 1:
+        #         # [bs*beam, seq, head, head_dim]
+        #         kv_seq_len = hidden_states.shape[1]
+        #     else:
+        #         kv_seq_len = hidden_states.shape[0]
+        # else:
+        #     kv_seq_len = hidden_states.shape[1]
+        # if layer_past is not None:
+        #     kv_seq_len += layer_past[0].shape[2]
+
 
         # greedy_search
         # the shape of query, key, value, [seq, bs*beam, head*dim]
