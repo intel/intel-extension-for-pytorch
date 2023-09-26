@@ -40,6 +40,10 @@ def prepare(
             will be passed to the function while running to init quantization state. Only one of this
             argument or ``example_kwarg_inputs`` should be specified.
         inplace: (bool): It will change the given model in-place if True. The default value is ``False``.
+            Note that if ``bn_folding`` is ``True``, the returned model is a different object from the
+            original model even if ``inplace=True``. So, with the following code
+            >>> prepared_model = prepare(original_model, ..., inplace=True)
+            please use ``prepared_model`` for later operations to avoid unexpected behaviors.
         bn_folding: (bool): whether to perform ``conv_bn`` and ``linear_bn`` folding.
             The default value is ``True``.
         example_kwarg_inputs (dict):  A dict of example inputs that will be passed to the function while
@@ -107,12 +111,7 @@ def prepare(
         assert isinstance(
             example_kwarg_inputs, Dict
         ), "IPEX quantization.prepare: example_kwarg_inputs must be type of Dict."
-    prepared_model = auto_prepare(
-        prepare_model, configure, example_inputs, example_kwarg_inputs
-    )
-    if inplace and hasattr(prepared_model, "save_qconf_summary"):
-        model.save_qconf_summary = prepared_model.save_qconf_summary
-    return prepared_model
+    return auto_prepare(prepare_model, configure, example_inputs, example_kwarg_inputs)
 
 
 def _may_insert_deepspeed_modules(
