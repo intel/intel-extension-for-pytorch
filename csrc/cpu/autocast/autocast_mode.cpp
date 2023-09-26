@@ -182,12 +182,13 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
       conv_transpose2d, input, user_defined_dtype, fp32)
   MAKE_REGISTER_FUNC2_TWO_POLICIES(
       conv_transpose3d, input, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(group_norm, user_defined_dtype, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
       _native_multi_head_attention, user_defined_dtype, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
       _transform_bias_rescale_qkv, user_defined_dtype, fp32)
 
+  // bf16 and fallthrough
+  MAKE_REGISTER_FUNC_TWO_POLICIES(group_norm, user_defined_dtype, fallthrough)
   // fp32 and fp32 cast policies
   MAKE_REGISTER_FUNC_TWO_POLICIES(avg_pool3d, fp32, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(adaptive_avg_pool3d, fp32, fp32)

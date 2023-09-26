@@ -355,17 +355,6 @@ class AutocastCPUTestLists(object):
             ("conv_transpose2d", conv_args_fp16[1]),
             ("conv_transpose3d", conv_args_fp16[2]),
             (
-                "group_norm",
-                (
-                    torch.randn((4, 8, 10, 10), device=dev, dtype=torch.float16),
-                    4,
-                    torch.randn(8, device=dev, dtype=torch.float16),
-                    torch.randn(8, device=dev, dtype=torch.float16),
-                    1e-5,
-                    True,
-                ),
-            ),
-            (
                 "batch_norm",
                 dummy_fp16[2],
                 {
@@ -450,6 +439,19 @@ class AutocastCPUTestLists(object):
                 "upsample_trilinear3d",
                 dummy_fp16[4],
                 {"output_size": (n, n, n), "align_corners": False},
+            ),
+        ]
+        self.torch_fallthrough_fp16 = [
+            (
+                "group_norm",
+                (
+                    torch.randn((4, 8, 10, 10), device=dev, dtype=torch.float16),
+                    4,
+                    torch.randn(8, device=dev, dtype=torch.float16),
+                    torch.randn(8, device=dev, dtype=torch.float16),
+                    1e-5,
+                    True,
+                ),
             ),
         ]
         self.torch_fallthrough_bf16 = [

@@ -1114,6 +1114,17 @@ class TestAutocastOperations(TestCase):
                 add_kwargs=maybe_kwargs,
             )
 
+    def test_autocast_torch_fallthrough_fp16(self):
+        for op_with_args in self.autocast_lists.torch_fallthrough_fp16:
+            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
+            self._run_autocast_outofplace(
+                op,
+                args,
+                torch.float16,
+                autocast_type=torch.float16,
+                add_kwargs=maybe_kwargs,
+            )
+
 
 if __name__ == "__main__":
     test = unittest.main()
