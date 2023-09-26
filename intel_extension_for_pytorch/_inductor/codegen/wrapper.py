@@ -16,7 +16,6 @@ from torch._inductor.codegen.wrapper import (
 )
 from torch._inductor.utils import cache_on_self, get_benchmark_name
 from .. import codecache
-from ..utils import has_triton
 
 pexpr = PythonPrinter().doprint
 
@@ -52,9 +51,6 @@ class XPUTritonWrapperCodeGen(WrapperCodeGen):
 
     def __init__(self):
         super().__init__()
-        self.write_get_xpu_stream = functools.lru_cache(None)(
-            self.write_get_xpu_stream
-        )
 
     def write_header(self):
         self.header.splice(
@@ -116,7 +112,7 @@ class XPUTritonWrapperCodeGen(WrapperCodeGen):
             if config.size_asserts:
                 self.codegen_input_size_asserts()
 
-    def write_get_xpu_stream(self, index):
+    def write_get_raw_stream(self, index):
         self.write_triton_header_once()
         name = f"stream{index}"
         self.writeline(f"{name} = get_xpu_stream({index})")
@@ -216,7 +212,7 @@ class XPUTritonWrapperCodeGen(WrapperCodeGen):
             output.splice(
                 """
                 from torch._dynamo.testing import rand_strided
-                from intel_extension_for_pytorch._inductor.utils import print_performance
+                from torch._inductor.utils import print_performance
                 """,
                 strip=True,
             )
@@ -241,7 +237,7 @@ class XPUTritonWrapperCodeGen(WrapperCodeGen):
 
             call_str = f"call([{', '.join(V.graph.graph_inputs.keys())}])"
             output.writeline(
-                f"return print_performance(lambda: {call_str}, times=times, repeat=repeat)"
+                f"return print_performance(lambda: {call_str}, times=times, repeat=repeat, device='xpu')"
             )
 
     def add_benchmark_harness(self, output):
@@ -261,18 +257,3 @@ class XPUTritonWrapperCodeGen(WrapperCodeGen):
                     f"compiled_module_main('{get_benchmark_name()}', benchmark_compiled_module)",
                 ]
             )
-
-    def generate_kernel_call(
-        self, name, call_args, grid=None, device_index=None, cuda=True
-    ):
-        if cuda:
-            call_args_str = ", ".join(pexpr(item) for item in call_args)
-            grid_str = ", ".join(pexpr(item) for item in grid)
-            stream_name = self.write_get_xpu_stream(
-                V.graph.scheduler.current_device.index
-            )
-            self.writeline(
-                f"{name}.run({call_args_str}, grid=grid({grid_str}), stream={stream_name})"
-            )
-        else:
-            self.writeline(self.wrap_kernel_call(name, call_args))

@@ -1,6 +1,4 @@
 import functools
-import inspect
-import time
 
 import torch
 
@@ -100,30 +98,3 @@ def has_triton():
         return triton is not None
     except ImportError:
         return False
-
-
-def synchronize():
-    if torch.xpu.is_available():
-        torch.xpu.synchronize()
-
-
-def timed(model, example_inputs, times=1):
-    synchronize()
-    torch.manual_seed(1337)
-    # Set manual seed to XPU explictly.
-    torch.xpu.manual_seed(1337)
-    t0 = time.perf_counter()
-    for _ in range(times):
-        result = model(*example_inputs)
-        synchronize()
-    t1 = time.perf_counter()
-    # GC the result after timing
-    assert result is not None
-    return t1 - t0
-
-
-def print_performance(fn, args=(), times=10, repeat=10, baseline=1.0):
-    timings = torch.tensor([timed(fn, args, times) for _ in range(repeat)])
-    took = torch.median(timings)
-    print(f"{took/baseline:.6f}")
-    return took

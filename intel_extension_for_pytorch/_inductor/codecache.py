@@ -63,7 +63,7 @@ class XPUAsyncCompile(AsyncCompile):
         _compile_start()
 
         if config.compile_threads > 1:
-            device = torch.xpu.current_device()
+            device = torch.device("xpu", torch.xpu.current_device())
             cc = None
             future = self.process_pool().submit(
                 _worker_compile, kernel_name, source_code, cc, device

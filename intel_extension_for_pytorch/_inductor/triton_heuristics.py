@@ -22,13 +22,7 @@ log = logging.getLogger(__name__)
 if has_triton():
     import triton
     from triton import Config
-    from triton.runtime.jit import KernelInterface
-    # Here we override these objects for leveraging more codes related with them from PyTorch.
-    import torch._inductor.triton_heuristics as _triton_heuristics
-    _triton_heuristics.Config = Config
-    _triton_heuristics.KernelInterface = KernelInterface
 
-# NOTE: we have to import these objects after overriding in PyTorch to guarantee their correctness.
 from torch._inductor.triton_heuristics import (
     CachingAutotuner,
     _find_names,

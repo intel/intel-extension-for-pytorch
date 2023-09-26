@@ -52,23 +52,3 @@ class XPUForeachKernel(ForeachKernel):
                 code.splice("pass")
 
         return code.getvalue()
-
-    def call_kernel(self, code, name: str):
-        _, call_args, _ = self.args.python_argdefs()
-        # dynamo wraps unspec variable as 0d CPU tensor, need convert to scalar
-        for i in range(len(call_args)):
-            if V.graph.is_unspec_arg(call_args[i]):
-                call_args[i] = call_args[i] + ".item()"
-        if V.graph.cpp_wrapper:
-            V.graph.wrapper_code.generate_kernel_call(
-                name, call_args, device_index=V.graph.scheduler.current_device.index
-            )
-        else:
-            # TODO: refactor generate_kernel_call
-            call_args_str = ", ".join(call_args)
-            stream_name = code.write_get_xpu_stream(
-                V.graph.scheduler.current_device.index
-            )
-            code.writeline(
-                f"{name}.run({call_args_str}, grid=({self.grid()}), stream={stream_name})"
-            )

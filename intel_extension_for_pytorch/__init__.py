@@ -99,6 +99,7 @@ from . import quantization
 from . import nn
 from . import jit
 from . import optim
+from . import _dynamo
 from . import _inductor
 
 try:
