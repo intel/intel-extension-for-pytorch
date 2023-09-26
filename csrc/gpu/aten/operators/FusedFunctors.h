@@ -117,6 +117,7 @@ struct FusedAdamMathFunctor {
       TLA tlAddress,
       TLW tlWGMeta,
       sycl::nd_item<1> item,
+      const float* lr_ptr,
       const double lr,
       const float beta1,
       const float beta2,
@@ -139,14 +140,15 @@ struct FusedAdamMathFunctor {
         init_args<depth>(args, tlAddress, chunk_idx, chunk_size, tensor_loc);
     n -= chunk_idx * chunk_size;
     scalar_type r_args[depth][kILP];
+    double lr_value = lr_ptr ? *lr_ptr : lr;
 
     const float bias_correction1 =
         static_cast<float>(1.0f - Numerics<float>::pow(beta1, *step_count));
     const float bias_correction2 =
         static_cast<float>(1.0f - Numerics<float>::pow(beta2, *step_count));
-    const float step_size = static_cast<float>(lr / bias_correction1);
+    const float step_size = static_cast<float>(lr_value / bias_correction1);
     const float bias_correction2_sqrt = Numerics<float>::sqrt(bias_correction2);
-    const float lr_weight_decay = static_cast<float>(lr * weight_decay);
+    const float lr_weight_decay = static_cast<float>(lr_value * weight_decay);
 
     if ((n % kILP == 0) && (chunk_size % kILP == 0) && all_aligned) {
       for (int i_start = item_id;

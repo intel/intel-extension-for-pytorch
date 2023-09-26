@@ -665,7 +665,7 @@ class TestTorchMethod(TestCase):
         lr = 10.0
         weight_decay = 0.01
 
-        def create_model_optimizer(optimizer_string, mem_format, dtype):
+        def create_model_optimizer(optimizer_string, mem_format, dtype, lr_is_tensor):
             model_optimizer_list = []
             # create model
             model_xpu_no_fuse = TrainingModel()
@@ -686,7 +686,7 @@ class TestTorchMethod(TestCase):
                 adam_epsilon = 1e-6
                 amsgrad = True
                 weight_decay = 0.01
-                lr = 0.05
+                lr = torch.tensor(0.05) if lr_is_tensor else 0.05
                 optimizer_xpu_no_fuse = torch.optim.AdamW(model_xpu_no_fuse.parameters(),
                                                           lr=lr,
                                                           betas=(beta1, beta2),
@@ -706,7 +706,7 @@ class TestTorchMethod(TestCase):
                 adam_epsilon = 1e-6
                 amsgrad = True
                 weight_decay = 0.01
-                lr = 0.05
+                lr = torch.tensor(0.05) if lr_is_tensor else 0.05
                 optimizer_xpu_no_fuse = torch.optim.Adam(model_xpu_no_fuse.parameters(),
                                                          lr=lr,
                                                          betas=(beta1, beta2),
@@ -728,14 +728,15 @@ class TestTorchMethod(TestCase):
             model_and_optimzier_list = []
             for model_optimzier_item in model_optimizer_list:
                 # index 0 is non fuse optimizer, index 1 fuse optimizer
-                # non-fusion
+                use_split_master_weight = True if 'split' in optimizer_string.lower() else False
+                # torch.xpu.adam(w)_fuse_step
                 model_xpu_no_fuse, optimizer_xpu_no_fuse = torch.xpu.optimize(model=model_xpu_no_fuse,
                                                                               dtype=dtype,
                                                                               optimizer=model_optimzier_item[0],
-                                                                              fuse_update_step=False)
+                                                                              fuse_update_step=True,
+                                                                              split_master_weight_for_bf16=use_split_master_weight)
 
-                # fusion
-                use_split_master_weight = True if 'split' in optimizer_string.lower() else False
+                # aten::_fused_adam(w)
                 model_xpu, optimizer_xpu = torch.xpu.optimize(model=model_xpu,
                                                               dtype=dtype,
                                                               optimizer=model_optimzier_item[1],
@@ -819,50 +820,51 @@ class TestTorchMethod(TestCase):
                     checking_rtol = 1.6e-2
                 for mem_format in [torch.contiguous_format, torch.channels_last]:
                     print('checking memory format: ', mem_format)
-                    model_optimizer_list = create_model_optimizer(optimizer_string, mem_format, dtype=dtype)
-                    for model_optimizer_item in model_optimizer_list:
-                        model_xpu_no_fuse = model_optimizer_item[0]
-                        model_xpu = model_optimizer_item[1]
-                        optimizer_xpu_no_fuse = model_optimizer_item[2]
-                        optimizer_xpu = model_optimizer_item[3]
-                        for i in range(num_iter):
-                            print('checking iter: ', i, '. optimizer: ', optimizer_string, end='')
-                            print('. memory format: ', mem_format, ' dtype: ', dtype)
-                            input = torch.randn(batch_size, input_channel, 7, 7).to(device=device)
-                            target = torch.empty(batch_size, dtype=torch.long).random_(class_num).to(device=device)
+                    for is_tensor in [True, False]:
+                        model_optimizer_list = create_model_optimizer(optimizer_string, mem_format, dtype=dtype, lr_is_tensor=is_tensor)
+                        for model_optimizer_item in model_optimizer_list:
+                            model_xpu_no_fuse = model_optimizer_item[0]
+                            model_xpu = model_optimizer_item[1]
+                            optimizer_xpu_no_fuse = model_optimizer_item[2]
+                            optimizer_xpu = model_optimizer_item[3]
+                            for i in range(num_iter):
+                                print('checking iter: ', i, '. optimizer: ', optimizer_string, end='')
+                                print('. memory format: ', mem_format, ' dtype: ', dtype)
+                                input = torch.randn(batch_size, input_channel, 7, 7).to(device=device)
+                                target = torch.empty(batch_size, dtype=torch.long).random_(class_num).to(device=device)
 
-                            training(input, target, model_xpu_no_fuse, dtype, optimizer_xpu_no_fuse, mem_format)
-                            training(input, target, model_xpu, dtype, optimizer_xpu, mem_format)
-                            align_all(model_xpu, model_xpu_no_fuse)
-                            optimizer_xpu_no_fuse.step()
-                            optimizer_xpu.step()
+                                training(input, target, model_xpu_no_fuse, dtype, optimizer_xpu_no_fuse, mem_format)
+                                training(input, target, model_xpu, dtype, optimizer_xpu, mem_format)
+                                align_all(model_xpu, model_xpu_no_fuse)
+                                optimizer_xpu_no_fuse.step()
+                                optimizer_xpu.step()
 
-                            # checking updated weight
-                            for layer1 in model_xpu.modules():
-                                for layer2 in model_xpu_no_fuse.modules():
-                                    if (isinstance(layer1, nn.BatchNorm2d) and isinstance(layer2, nn.BatchNorm2d)):
-                                        self.assertEqual(layer1.weight.cpu(),
-                                                         layer2.weight.cpu(),
-                                                         atol=checking_atol,
-                                                         rtol=checking_rtol)
-                                        self.assertEqual(layer1.bias.cpu(),
-                                                         layer2.bias.cpu(),
-                                                         atol=checking_atol,
-                                                         rtol=checking_rtol)
-                                    if (isinstance(layer1, nn.Conv2d) and isinstance(layer2, nn.Conv2d)):
-                                        self.assertEqual(layer1.weight.cpu(),
-                                                         layer2.weight.cpu(),
-                                                         atol=checking_atol,
-                                                         rtol=checking_rtol)
-                                    if (isinstance(layer1, nn.Linear) and isinstance(layer2, nn.Linear)):
-                                        self.assertEqual(layer1.weight.cpu(),
-                                                         layer2.weight.cpu(),
-                                                         atol=checking_atol,
-                                                         rtol=checking_rtol)
-                                        self.assertEqual(layer1.bias.cpu(),
-                                                         layer2.bias.cpu(),
-                                                         atol=checking_atol,
-                                                         rtol=checking_rtol)
+                                # checking updated weight
+                                for layer1 in model_xpu.modules():
+                                    for layer2 in model_xpu_no_fuse.modules():
+                                        if (isinstance(layer1, nn.BatchNorm2d) and isinstance(layer2, nn.BatchNorm2d)):
+                                            self.assertEqual(layer1.weight.cpu(),
+                                                             layer2.weight.cpu(),
+                                                             atol=checking_atol,
+                                                             rtol=checking_rtol)
+                                            self.assertEqual(layer1.bias.cpu(),
+                                                             layer2.bias.cpu(),
+                                                             atol=checking_atol,
+                                                             rtol=checking_rtol)
+                                        if (isinstance(layer1, nn.Conv2d) and isinstance(layer2, nn.Conv2d)):
+                                            self.assertEqual(layer1.weight.cpu(),
+                                                             layer2.weight.cpu(),
+                                                             atol=checking_atol,
+                                                             rtol=checking_rtol)
+                                        if (isinstance(layer1, nn.Linear) and isinstance(layer2, nn.Linear)):
+                                            self.assertEqual(layer1.weight.cpu(),
+                                                             layer2.weight.cpu(),
+                                                             atol=checking_atol,
+                                                             rtol=checking_rtol)
+                                            self.assertEqual(layer1.bias.cpu(),
+                                                             layer2.bias.cpu(),
+                                                             atol=checking_atol,
+                                                             rtol=checking_rtol)
 
     def test_xpu_auto_channels_last(self):
         def check_layout_for_module(module):
