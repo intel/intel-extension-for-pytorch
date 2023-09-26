@@ -595,8 +595,11 @@ class _IPEXAttentionRef(nn.Module):
         if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or \
                 re.search("LLAMA", self.model_backbone, re.IGNORECASE):
             if hasattr(module, 'q_proj') and hasattr(module, 'k_proj') and hasattr(module, 'v_proj'):
-                self.concat_qkv = _IPEXConcatLinearRef([module.q_proj, module.k_proj, module.v_proj])
-                del module.q_proj, module.k_proj, module.v_proj
+                weight_shapes = [[mod.in_features, mod.out_features]
+                                 for mod in [module.q_proj, module.k_proj, module.v_proj]]
+                if all(weight_shapes[0] == shape for shape in weight_shapes[1:]):
+                    self.concat_qkv = _IPEXConcatLinearRef([module.q_proj, module.k_proj, module.v_proj])
+                    del module.q_proj, module.k_proj, module.v_proj
 
         self._IPEXScaleDotProduct = _IPEXScaleDotProductRef(module, config)
 
