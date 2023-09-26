@@ -25,6 +25,15 @@ from common_utils import TestModule, _empty_weight_bias_parameter_names
 from intel_extension_for_pytorch.optim._lamb import Lamb
 import os
 
+try:
+    import transformers
+
+    HAS_TRANSFORMERS = True
+except ImportError:
+    HAS_TRANSFORMERS = False
+skipIfNoTransformers = unittest.skipIf(not HAS_TRANSFORMERS, "no transformers")
+
+curpath = os.path.abspath(os.path.dirname(__file__))
 
 class ConvBatchNorm(torch.nn.Module):
     def __init__(
@@ -209,6 +218,27 @@ class TestOptimizeCases(TestCase):
         wrapper = found_wrapper(optimized_model.conv.weight, optimized_sgd.params_attr)
         self.assertTrue(wrapper is not None)
         self.assertEqual(wrapper.master_parameter.dtype, torch.float)
+
+    @skipIfNoTransformers
+    def test_optimize_bf16_AlbertMLMHead(self):
+        from transformers.models import albert
+        from intel_extension_for_pytorch.nn.utils import _parameter_wrapper
+
+        config = transformers.AutoConfig.from_pretrained(f"{curpath}/hf_configs/albert-base-v1")
+        model = albert.modeling_albert.AlbertForMaskedLM(config)
+        params_attr = {}
+        _parameter_wrapper.get_shared_parameter_status(model, params_attr)
+        for name, param in model.named_parameters():
+            if name == "albert.embeddings.word_embeddings.weight":
+                self.assertTrue(
+                    albert.modeling_albert.AlbertMLMHead
+                    in params_attr[param].modules_cls
+                )
+                self.assertEqual(param.dtype, torch.float32)
+                self.assertTrue(params_attr[param].can_cast_inference(torch.bfloat16))
+                params_attr[param].cast_for_inference(torch.bfloat16)
+                self.assertEqual(param.dtype, torch.bfloat16)
+                break
 
     def test_optimize_pretrain_model(self):
         optimizer_options = [

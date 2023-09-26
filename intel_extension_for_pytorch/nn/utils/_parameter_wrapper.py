@@ -81,6 +81,13 @@ def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
         torch.nn.ParameterList,
     ]
 
+    try:
+        from transformers.models import albert
+
+        module_convert_list_bf16_inference.append(albert.modeling_albert.AlbertMLMHead)
+    except ImportError:
+        pass
+
     module_convert_list_bf16_training = [
         torch.nn.Conv1d,
         torch.nn.Conv2d,
