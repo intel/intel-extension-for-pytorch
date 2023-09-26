@@ -4,9 +4,8 @@ if(Options_CPU_cmake_included)
 endif()
 set(Options_CPU_cmake_included true)
 
-# The options to build xpu
+# The options to build cpu
 include(CMakeDependentOption)
-option(IPEX_DISP_OP "output the extension operators name for debug purpose" OFF)
 
 option(USE_LIBXSMM "Enable LIBXSMM" ON)
 if(WIN32)
