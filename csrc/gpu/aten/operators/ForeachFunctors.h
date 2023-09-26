@@ -450,6 +450,62 @@ void binary_op_scalar(
   }
 }
 
+template <
+    int r_args_depth,
+    int res_arg_index,
+    typename Op,
+    typename T,
+    typename scalar_t = T>
+void binary_op_scalar_tensor(
+    T r_args[][kILP],
+    T** args,
+    scalar_t* scalar,
+    int n,
+    int chunk_size,
+    bool all_aligned,
+    Op op,
+    size_t item_range,
+    size_t item_idx) {
+  using opmath_t = at::opmath_type<T>;
+  // to make things simple, we put aligned case in a different code path
+  if (n % kILP == 0 && chunk_size % kILP == 0 && all_aligned) {
+    for (int64_t i = item_idx; i * kILP < n && i * kILP < chunk_size;
+         i += item_range) {
+      // load
+      load_store(r_args[0], args[0], 0, i);
+#pragma unroll
+      for (int ii = 0; ii < kILP; ii++) {
+        r_args[0][ii] = static_cast<T>(
+            op(static_cast<opmath_t>(r_args[0][ii]),
+               static_cast<opmath_t>(*scalar)));
+      }
+      // store
+      load_store(args[res_arg_index], r_args[0], i, 0);
+    }
+  } else {
+    for (int64_t i = 0; i < n && i < chunk_size; i += item_range * kILP) {
+      // Regardless if depth is 1 (for inplace) or 2 (for out of place), r_args
+      // has depth 1
+      load_args<r_args_depth>(
+          r_args, args, i, chunk_size, n, item_idx, item_range);
+#pragma unroll
+      for (int ii = 0; ii < kILP; ii++) {
+        r_args[0][ii] = static_cast<T>(
+            op(static_cast<opmath_t>(r_args[0][ii]),
+               static_cast<opmath_t>(*scalar)));
+      }
+      store_args(
+          args[res_arg_index],
+          r_args[0],
+          i,
+          chunk_size,
+          n,
+          item_idx,
+          item_range);
+    }
+  }
+}
+
 template <typename T, int depth, int r_args_depth, int res_arg_index>
 struct BinaryOpScalarFunctor {
   using opmath_t = at::opmath_type<T>;
@@ -569,6 +625,43 @@ struct BinaryOpScalarListFunctor {
     n -= chunk_idx * chunk_size;
     T r_args[r_args_depth][kILP];
     binary_op_scalar<r_args_depth, res_arg_index>(
+        r_args,
+        args,
+        scalar,
+        n,
+        chunk_size,
+        all_aligned,
+        op,
+        item_range,
+        item_idx);
+  }
+};
+
+template <typename T, int depth, int r_args_depth, int res_arg_index>
+struct BinaryOpScalarTensorFunctor {
+  using opmath_t = at::opmath_type<T>;
+  template <typename TLA, typename TLW, typename Op>
+  void operator()(
+      const int64_t chunk_size,
+      TLA tlAddress,
+      TLW tlWGMeta,
+      sycl::nd_item<1> item_id,
+      Op op,
+      T* scalar) const {
+    auto item_idx = item_id.get_local_id(0);
+    auto item_range = item_id.get_local_range(0);
+    auto group_idx = item_id.get_group(0);
+    int tensor_loc = tlWGMeta[group_idx].wg_to_tensor;
+    int chunk_idx = tlWGMeta[group_idx].wg_to_chunk;
+    int64_t n = tlAddress[tensor_loc].numel_to_tensor;
+
+    T* args[depth];
+    bool all_aligned =
+        init_args<depth>(args, tlAddress, chunk_idx, chunk_size, tensor_loc);
+    n -= chunk_idx * chunk_size;
+    T r_args[r_args_depth][kILP];
+
+    binary_op_scalar_tensor<r_args_depth, res_arg_index>(
         r_args,
         args,
         scalar,

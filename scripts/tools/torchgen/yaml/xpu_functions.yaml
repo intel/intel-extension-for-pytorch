@@ -835,6 +835,8 @@ supported:
   - _foreach_clamp_min.ScalarList
   - _foreach_clamp_min_.List
   - _foreach_clamp_min_.ScalarList
+  - _foreach_mul.Tensor
+  - _foreach_mul_.Tensor
   - mish.out
   - polar.out
   - var.correction_out
