@@ -1,19 +1,14 @@
 """
 Please set up your conda environment for each backend.
 
-if key == 'CPU':
-"Please set up your CPU environment: install pytorch-2.0.1 and ipex CPU"
-"pytorch: https://github.com/intel-innersource/frameworks.ai.pytorch.private-gpu.git"
-"ipex CPU: release/2.0: https://github.com/intel/intel-extension-for-pytorch.git"
-
-if key == 'CUDA':
-"Please set up your CUDA environment: install pytorch-2.0.1 and build with CUDA"
-"pytorch: https://github.com/intel-innersource/frameworks.ai.pytorch.private-gpu.git"
+if key == 'CPU' or 'CUDA:
+"Please set up your PyTorch environment: install pytorch-2.1 and build with CUDA"
+"pytorch: https://github.com/pytorch/pytorch/tree/release/2.1"
 
 if key == 'XPU':
-"Please set up your XPU environment: install pytorch-2.0.1 and ipex GPU",
+"Please set up your XPU environment: install pytorch-2.1 and ipex GPU",
 "pytorch: https://github.com/intel-innersource/frameworks.ai.pytorch.private-gpu.git"
-"ipex GPU: master https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu.git"
+"ipex GPU: rebase/ipex-2.1 https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu.git"
 
 usage example:
 if key == CPU or CUDA:

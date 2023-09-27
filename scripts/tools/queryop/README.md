@@ -7,6 +7,8 @@ query_op.py provides the script to get the operators registration information, w
 
 1. Query Ops in CPU or CUDA:
 
+Set up your PyTorch environment: install pytorch-2.1 and build with CUDA
+
 ```bash
 # This command output a single file of CPU or CUDA ops
 python query_op.py --key CPU --output cpu_ops.csv
@@ -15,6 +17,8 @@ python query_op.py --key CUDA --output cuda_ops.csv
 ```
 
 2. Query Ops in XPU:
+
+Set up your PyTorch environment: install pytorch-2.1 and ipex GPU
 
 ```bash
 # This command output a merged file with CPU, CUDA and XPU ops
