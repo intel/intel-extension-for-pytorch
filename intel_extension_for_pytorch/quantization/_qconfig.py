@@ -36,12 +36,16 @@ Default qconfig configuration for dynamic quantization.
 default_dynamic_qconfig_mapping = QConfigMapping().set_global(default_dynamic_qconfig)
 
 
+# Define QConfig for SmoothQuant by extending PyTorch's QConfig
+QConfigSmoothQuant = namedtuple('QConfigSmoothQuant', [*QConfig._fields, 'share_weight_observers'])
+
 def get_smooth_quant_qconfig_mapping(
     alpha=0.5,
     act_observer=None,
     act_ic_observer=None,
     wei_observer=None,
     wei_ic_observer=None,
+    share_weight_observers=True,
 ):
     """
     Configuration with SmoothQuant for static quantization of large language models (LLM)
@@ -57,8 +61,15 @@ def get_smooth_quant_qconfig_mapping(
                             calculates q-params after applying scaling factors. PerChannelMinMaxObserver by default.
         wei_ic_observer:    Per-input-channel Observer for weight. For nn.Linear with SmoothQuant enabled only.
                             PerChannelMinMaxObserver by default.
+        share_weight_observers:
+                            If True, linear layers that have shared activation (e.g., QKV) will share the same
+                            weight observer during calibration but they are not actually concatenated during
+                            computation. The activation is smoothed only once at runtime. Otherwise, each layer
+                            use their own weight observer and there will be more overhead at runtime to smooth
+                            the activation for multiple times. If accuracy requirements is met, set True to reduce
+                            the smoothing overhead.
     """
-    qconfig = QConfig(
+    qconfig = QConfigSmoothQuant(
         activation=SmoothQuantActivationObserver.with_args(
             reduce_range=False,
             alpha=alpha,
@@ -72,6 +83,7 @@ def get_smooth_quant_qconfig_mapping(
             wei_observer=wei_observer,
             wei_ic_observer=wei_ic_observer,
         ),
+        share_weight_observers=share_weight_observers,
     )
     return QConfigMapping().set_global(qconfig)
 

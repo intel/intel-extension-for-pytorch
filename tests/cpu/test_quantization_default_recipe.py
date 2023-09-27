@@ -324,6 +324,7 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 dtype=torch.qint8, qscheme=torch.per_channel_symmetric
             ),
             "wei_ic_observer": per_channel_observer(ch_axis=1),
+            "share_weight_observers": False,
         }
         for use_custom_config in [False, True]:
             kwargs = custom_config if use_custom_config else {}
@@ -345,6 +346,9 @@ class TestDefaultRecipe(JitLlgaTestCase):
                     ].weight_tensor_id_to_observer,
                 }
                 observer_info_dict = {}
+                observer_info_dict['share_weight_observers'] = \
+                    prepared_model._fqn_to_auto_quant_state_map[" "] \
+                    .idx_to_seen_q_op_infos[0].qconfig.share_weight_observers
                 for key, obs in observer_info.items():
                     observer_info_dict[key] = {
                         "smooth_quant_enabled": obs.smooth_quant_enabled,
@@ -382,6 +386,9 @@ class TestDefaultRecipe(JitLlgaTestCase):
                         ].weight_tensor_id_to_observer,
                     }
                     observer_info_dict_2 = {}
+                    observer_info_dict_2['share_weight_observers'] = \
+                        prepared_model_2._fqn_to_auto_quant_state_map[" "] \
+                        .idx_to_seen_q_op_infos[0].qconfig.share_weight_observers
                     for key, obs in observer_info_2.items():
                         observer_info_dict_2[key] = {
                             "smooth_quant_enabled": obs.smooth_quant_enabled,
@@ -404,6 +411,42 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 assert (
                     observer_info_dict == observer_info_dict_2
                 ), "Error: SmoothQuant observer info lost after saving/loading qconf JSON"
+
+    def test_smooth_quant_share_weight_observers(self):
+        class Mod(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.q_proj = nn.Linear(4, 4)
+                self.k_proj = nn.Linear(4, 4)
+                self.v_proj = nn.Linear(4, 4)
+                self.relu = nn.ReLU()
+
+            def forward(self, x):
+                q = self.q_proj(x)
+                k = self.k_proj(x)
+                v = self.v_proj(x)
+                return self.relu(torch.concat([q, k, v], axis=1))
+
+        m = Mod().eval()
+        x = torch.rand(1, 4)
+        calib_dataset = [torch.rand(1, 4) for _ in range(5)]
+        for share_weight_observers in [True, False]:
+            qconfig_mapping = ipex.quantization.get_smooth_quant_qconfig_mapping(
+                share_weight_observers=share_weight_observers
+            )
+            prepared_model = ipex.quantization.prepare(
+                m, qconfig_mapping, example_inputs=x, inplace=True
+            )
+            for data in calib_dataset:
+                prepared_model(data)
+            q_model = ipex.quantization.convert(prepared_model)
+            with torch.no_grad():
+                q_model = torch.jit.trace(q_model, x)
+                q_model = torch.jit.freeze(q_model)
+                graph = q_model.graph_for(x)
+                num_mul = [n.kind() for n in graph.nodes()].count('aten::mul')
+                assert num_mul == 1 if share_weight_observers else 3
+                q_model(x)
 
     def test_none_example_input_for_quantization(self):
         class M(nn.Module):

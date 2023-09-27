@@ -24,9 +24,6 @@ class SmoothQuantActivationObserver(UniformQuantizationObserverBase):
       just act as a normal observer
     """
 
-    # As a 1d tensor, not diagonal
-    scaling_factors: torch.Tensor
-
     def __init__(
         self,
         act_observer=None,
@@ -92,6 +89,8 @@ class SmoothQuantActivationObserver(UniformQuantizationObserverBase):
         # They are for checks, like `_check_observer_has_run`
         self.min_val = self.act_obs.min_val
         self.max_val = self.act_obs.max_val
+        # Dict of tensors. Keys are weight IDs. Factors are 1d tensors, not diagonal
+        self.scaling_factors = {}
 
     def forward(self, x_orig):
         if not self.smooth_quant_enabled:
@@ -103,31 +102,37 @@ class SmoothQuantActivationObserver(UniformQuantizationObserverBase):
     def calculate_qparams(self):
         if not self.smooth_quant_enabled:
             return self.act_obs.calculate_qparams()
-        # Get weight per IC min/max from weight observer
-        wei_min_per_ic = self.weight_obs.min_val
-        wei_max_per_ic = self.weight_obs.max_val
-        act_min_per_ic = self.ic_obs.min_val
-        act_max_per_ic = self.ic_obs.max_val
-        x_abs_max_per_ic = (
-            torch.max(torch.abs(act_min_per_ic), torch.abs(act_max_per_ic)) + 1e-6
-        )
-        w_abs_max_per_ic = (
-            torch.max(torch.abs(wei_min_per_ic), torch.abs(wei_max_per_ic)) + 1e-6
-        )
-        # Note: activation's scaling factors are reciprocals of weight's
-        self.scaling_factors = torch.pow(w_abs_max_per_ic, 1 - self.alpha) / torch.pow(
-            x_abs_max_per_ic, self.alpha
-        )
-        # Apply scaling factors to each IC's min/max
-        act_min_per_ic_new = act_min_per_ic * self.scaling_factors.reshape(
-            act_min_per_ic.shape
-        )
-        act_max_per_ic_new = act_max_per_ic * self.scaling_factors.reshape(
-            act_max_per_ic.shape
-        )
-        min_val_per_tensor = torch.min(act_min_per_ic_new)
-        max_val_per_tensor = torch.max(act_max_per_ic_new)
-        return self._calculate_qparams(min_val_per_tensor, max_val_per_tensor)
+        scales, zero_points = {}, {}
+        for k in self.weight_obs.keys():
+            # Get weight per IC min/max from weight observer
+            wei_min_per_ic = self.weight_obs[k].min_val
+            wei_max_per_ic = self.weight_obs[k].max_val
+            act_min_per_ic = self.ic_obs.min_val
+            act_max_per_ic = self.ic_obs.max_val
+            x_abs_max_per_ic = (
+                torch.max(torch.abs(act_min_per_ic), torch.abs(act_max_per_ic)) + 1e-6
+            )
+            w_abs_max_per_ic = (
+                torch.max(torch.abs(wei_min_per_ic), torch.abs(wei_max_per_ic)) + 1e-6
+            )
+            # Note: activation's scaling factors are reciprocals of weight's
+            scaling_factor = torch.pow(w_abs_max_per_ic, 1 - self.alpha) / torch.pow(
+                x_abs_max_per_ic, self.alpha
+            )
+            self.scaling_factors.update({k: scaling_factor})
+            # Apply scaling factors to each IC's min/max
+            act_min_per_ic_new = act_min_per_ic * scaling_factor.reshape(
+                act_min_per_ic.shape
+            )
+            act_max_per_ic_new = act_max_per_ic * scaling_factor.reshape(
+                act_max_per_ic.shape
+            )
+            min_val_per_tensor = torch.min(act_min_per_ic_new)
+            max_val_per_tensor = torch.max(act_max_per_ic_new)
+            scale, zp = self._calculate_qparams(min_val_per_tensor, max_val_per_tensor)
+            scales.update({k: scale})
+            zero_points.update({k: zp})
+        return scales, zero_points
 
     def get_scaling_factors(self):
         if not self.smooth_quant_enabled:
