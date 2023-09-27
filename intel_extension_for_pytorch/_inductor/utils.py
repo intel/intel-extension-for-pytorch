@@ -47,6 +47,14 @@ def triton_do_bench(fn, warmup=25, rep=100, grad_to_none=None,
     end_event.record()
     torch.xpu.synchronize()
     estimate_ms = start_event.elapsed_time(end_event) / 5
+    assert (
+        estimate_ms > 0
+    ), f'''
+    'estimate_ms' should be larger than 0, but got {estimate_ms}.
+    This is a driver bug, please run your script with UR_L0_IN_ORDER_BARRIER_BY_SIGNAL=0 to work around it,
+    like this:
+    UR_L0_IN_ORDER_BARRIER_BY_SIGNAL=0 python script.py
+    '''
 
     # compute number of warmup and repeat
     n_warmup = max(1, int(warmup / estimate_ms))
