@@ -198,25 +198,25 @@ FOREACH_BINARY_OP_LIST(
 FOREACH_BINARY_OP_LIST(
     all_types_half_bfloat16,
     clamp_max,
-    foreach_internal::maximum,
+    foreach_internal::minimum,
     /*division_op*/ false);
 FOREACH_BINARY_OP_LIST(
     all_types_half_bfloat16,
     clamp_min,
-    foreach_internal::minimum,
+    foreach_internal::maximum,
     /*division_op*/ false);
 
 std::vector<Tensor> _foreach_minimum(TensorList tensors1, TensorList tensors2) {
-  return AtenIpexTypeXPU::_foreach_clamp_min(tensors1, tensors2);
-}
-void _foreach_minimum_(TensorList tensors1, TensorList tensors2) {
-  AtenIpexTypeXPU::_foreach_clamp_min_(tensors1, tensors2);
-}
-std::vector<Tensor> _foreach_maximum(TensorList tensors1, TensorList tensors2) {
   return AtenIpexTypeXPU::_foreach_clamp_max(tensors1, tensors2);
 }
-void _foreach_maximum_(TensorList tensors1, TensorList tensors2) {
+void _foreach_minimum_(TensorList tensors1, TensorList tensors2) {
   AtenIpexTypeXPU::_foreach_clamp_max_(tensors1, tensors2);
+}
+std::vector<Tensor> _foreach_maximum(TensorList tensors1, TensorList tensors2) {
+  return AtenIpexTypeXPU::_foreach_clamp_min(tensors1, tensors2);
+}
+void _foreach_maximum_(TensorList tensors1, TensorList tensors2) {
+  AtenIpexTypeXPU::_foreach_clamp_min_(tensors1, tensors2);
 }
 
 } // namespace AtenIpexTypeXPU

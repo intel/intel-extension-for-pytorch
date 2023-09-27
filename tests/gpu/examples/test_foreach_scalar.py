@@ -82,6 +82,38 @@ class TestTorchMethod(TestCase):
         xpu_inplace = test_(x1, scalar, "xpu", is_inplace=True)
         self.result_compare(cpu_inplace, xpu_inplace)
 
+    def test_foreach_clamp_min(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+        scalar = random.uniform(-5, 5)
+        if scalar == 0:
+            scalar += 0.1
+
+        test = ForeachTest(torch._foreach_clamp_min)
+        cpu = test(x1, scalar, "cpu")
+        xpu = test(x1, scalar, "xpu")
+        self.result_compare(cpu, xpu)
+
+        test_ = ForeachTest(torch._foreach_clamp_min_)
+        cpu_inplace = test_(x1, scalar, "cpu", is_inplace=True)
+        xpu_inplace = test_(x1, scalar, "xpu", is_inplace=True)
+        self.result_compare(cpu_inplace, xpu_inplace)
+
+    def test_foreach_clamp_max(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+        scalar = random.uniform(-5, 5)
+        if scalar == 0:
+            scalar += 0.1
+
+        test = ForeachTest(torch._foreach_clamp_max)
+        cpu = test(x1, scalar, "cpu")
+        xpu = test(x1, scalar, "xpu")
+        self.result_compare(cpu, xpu)
+
+        test_ = ForeachTest(torch._foreach_clamp_max_)
+        cpu_inplace = test_(x1, scalar, "cpu", is_inplace=True)
+        xpu_inplace = test_(x1, scalar, "xpu", is_inplace=True)
+        self.result_compare(cpu_inplace, xpu_inplace)
+
     def result_compare(self, x1, x2):
         for i in range(len(x1)):
             self.assertEqual(x1[i].cpu(), x2[i].cpu())

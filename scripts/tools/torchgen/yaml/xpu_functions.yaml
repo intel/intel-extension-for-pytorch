@@ -822,6 +822,18 @@ supported:
   - _foreach_maximum_.ScalarList
   - _foreach_minimum.ScalarList
   - _foreach_minimum_.ScalarList
+  - _foreach_clamp_min.Scalar
+  - _foreach_clamp_min_.Scalar
+  - _foreach_clamp_max.Scalar
+  - _foreach_clamp_max_.Scalar
+  - _foreach_clamp_max.List
+  - _foreach_clamp_max.ScalarList
+  - _foreach_clamp_max_.List
+  - _foreach_clamp_max_.ScalarList
+  - _foreach_clamp_min.List
+  - _foreach_clamp_min.ScalarList
+  - _foreach_clamp_min_.List
+  - _foreach_clamp_min_.ScalarList
   - mish.out
   - polar.out
   - var.correction_out

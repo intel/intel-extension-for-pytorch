@@ -201,29 +201,29 @@ std::vector<Tensor> _foreach_sub(
 FOREACH_BINARY_OP_SCALARLIST(
     all_types_half_bfloat16,
     clamp_max,
-    foreach_internal::maximum,
+    foreach_internal::minimum,
     false);
 FOREACH_BINARY_OP_SCALARLIST(
     all_types_half_bfloat16,
     clamp_min,
-    foreach_internal::minimum,
+    foreach_internal::maximum,
     false);
 
 std::vector<Tensor> _foreach_minimum(
     TensorList tensors,
     at::ArrayRef<Scalar> scalars) {
-  return AtenIpexTypeXPU::_foreach_clamp_min(tensors, scalars);
+  return AtenIpexTypeXPU::_foreach_clamp_max(tensors, scalars);
 }
 void _foreach_minimum_(TensorList tensors, at::ArrayRef<Scalar> scalars) {
-  AtenIpexTypeXPU::_foreach_clamp_min_(tensors, scalars);
+  AtenIpexTypeXPU::_foreach_clamp_max_(tensors, scalars);
 }
 std::vector<Tensor> _foreach_maximum(
     TensorList tensors,
     at::ArrayRef<Scalar> scalars) {
-  return AtenIpexTypeXPU::_foreach_clamp_max(tensors, scalars);
+  return AtenIpexTypeXPU::_foreach_clamp_min(tensors, scalars);
 }
 void _foreach_maximum_(TensorList tensors, at::ArrayRef<Scalar> scalars) {
-  AtenIpexTypeXPU::_foreach_clamp_max_(tensors, scalars);
+  AtenIpexTypeXPU::_foreach_clamp_min_(tensors, scalars);
 }
 
 } // namespace AtenIpexTypeXPU
