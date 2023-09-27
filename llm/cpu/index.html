@@ -125,7 +125,7 @@
 <p>Prebuilt wheel file are available for Python 3.9. Alternatively, a script is provided to compile from source.</p>
 <section id="install-from-prebuilt-wheel-files">
 <h3>Install From Prebuilt Wheel Files<a class="headerlink" href="#install-from-prebuilt-wheel-files" title="Permalink to this heading"></a></h3>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">torch</span><span class="o">==</span><span class="m">2</span>.1.0.dev20230711+cpu<span class="w"> </span><span class="nv">torchvision</span><span class="o">==</span><span class="m">0</span>.16.0.dev20230711+cpu<span class="w"> </span><span class="nv">torchaudio</span><span class="o">==</span><span class="m">2</span>.1.0.dev20230711+cpu<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cpu
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">https://download.pytorch.org/whl/nightly/cpu/torch-2.1.0.dev20230711%2Bcpu-cp39-cp39-linux_x86_64.whl</span><span class="w"> </span><span class="nv">https://download.pytorch.org/whl/nightly/cpu/torchvision-0.16.0.dev20230711%2Bcpu-cp39-cp39-linux_x86_64.whl</span><span class="w"> </span><span class="nv">https://download.pytorch.org/whl/nightly/cpu/torchaudio-2.1.0.dev20230711%2Bcpu-cp39-cp39-linux_x86_64.whl</span>
 python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.1.0.dev0%2Bcpu.llm-cp39-cp39-linux_x86_64.whl
 conda<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>libstdcxx-ng<span class="o">=</span><span class="m">12</span><span class="w"> </span>-c<span class="w"> </span>conda-forge
 </pre></div>
@@ -133,7 +133,13 @@ conda<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> <
 </section>
 <section id="compile-from-source">
 <h3>Compile From Source<a class="headerlink" href="#compile-from-source" title="Permalink to this heading"></a></h3>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Make sure you are using a Python 3.9 conda environment.</p>
+</div>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0.dev%2Bcpu.llm/scripts/compile_bundle.sh
+sed -i "18 i conda update -y sysroot_linux-64" compile_bundle.sh
+sed -i "49s|.*|python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.1.0.dev20230711%2Bcpu-cp39-cp39-linux_x86_64.whl https://download.pytorch.org/whl/nightly/cpu/torchvision-0.16.0.dev20230711%2Bcpu-cp39-cp39-linux_x86_64.whl https://download.pytorch.org/whl/nightly/cpu/torchaudio-2.1.0.dev20230711%2Bcpu-cp39-cp39-linux_x86_64.whl|" compile_bundle.sh
 bash<span class="w"> </span>compile_bundle.sh
 </pre></div>
 </div>
