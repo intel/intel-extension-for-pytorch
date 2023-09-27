@@ -559,9 +559,8 @@ class _IPEXAttentionRef(nn.Module):
             self.num_key_value_heads = module.num_key_value_heads
         else:
             if hasattr(config, "num_key_value_heads"):
-                AssertionError(
-                    False,
-                    "Your transformers version does not support GQA feature, plese upgrade (>= 4.31.0)",
+                raise ValueError(
+                    "Your transformers version does not support GQA feature, plese upgrade (>= 4.31.0)"
                 )
             else:
                 self.num_key_value_heads = self.num_attention_heads

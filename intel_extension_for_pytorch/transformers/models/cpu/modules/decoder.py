@@ -1,13 +1,12 @@
 from torch import nn
 import re
 from ...cpu.fusions.linear_fusion import (
-    _IPEXlinearSiluCPU,
     _IPEXlinearAddCPU,
     _IPEXlinearAddAddCPU,
-    _IPEXlinearMulCPU,
     _IPEXlinearNewGeluCPU,
     _IPEXlinearReluCPU,
     _IPEXlinearGeluCPU,
+    _IPEXlinearSiluMulCPU
 )
 
 
@@ -36,11 +35,11 @@ class _IPEXDecoderLayerCPU(nn.Module):
                 self.mlp_linear_add = _IPEXlinearAddCPU(
                     module.mlp_linear_add.linear, tpp=tpp, woq=woq
                 )
-            self.linear_silu = _IPEXlinearSiluCPU(
-                module.linear_silu.linear, tpp=tpp, woq=woq
-            )
-            self.linear_mul = _IPEXlinearMulCPU(
-                module.linear_mul.linear, tpp=tpp, woq=woq
+            self.linear_silu_mul = _IPEXlinearSiluMulCPU(
+                module.linear_silu_mul.linear_s,
+                module.linear_silu_mul.linear_m,
+                tpp=tpp,
+                woq=woq,
             )
         elif re.search("OPT", self.model_backbone, re.IGNORECASE):
             if not self.distributed:

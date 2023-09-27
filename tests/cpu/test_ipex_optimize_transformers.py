@@ -267,8 +267,8 @@ class OptimizeTransformersTester(TestCase):
                     model.model.layers[0].self_attn.concat_qkv.concat_linear,
                     model.model.layers[0].mha_linear_add.linear,
                     model.model.layers[0].mlp_linear_add.linear,
-                    model.model.layers[0].linear_silu.linear,
-                    model.model.layers[0].linear_mul.linear,
+                    model.model.layers[0].linear_silu_mul.linear_s,
+                    model.model.layers[0].linear_silu_mul.linear_m,
                 ]
             )
         # Ensure model can run without errors

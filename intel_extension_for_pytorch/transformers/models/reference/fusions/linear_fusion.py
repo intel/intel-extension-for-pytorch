@@ -97,3 +97,13 @@ class _IPEXConcatLinearRef(nn.Module):
 
     def extra_repr(self):
         return f'num_concat = {self.num_concat}'
+
+
+class _IPEXlinearSiluMulRef(nn.Module):
+    def __init__(self, module_s, module_m):
+        super().__init__()
+        self.linear_s = module_s
+        self.linear_m = module_m
+
+    def forward(self, x):
+        return nn.functional.silu(self.linear_s(x)) * self.linear_m(x)
