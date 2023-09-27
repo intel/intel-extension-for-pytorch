@@ -33,7 +33,6 @@ at::Tensor dil_mha_scores_calc(
     const int64_t& softmax_dim,
     const at::IValue& dtype) {
   RECORD_FUNCTION("dil_mha_scores_calc", c10::ArrayRef<c10::IValue>({}));
-
   auto _dim_per_head = dim_per_head.to<float>();
   auto _alpha = alpha.to<float>();
   auto qk = at::Tensor();

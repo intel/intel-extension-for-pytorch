@@ -174,7 +174,8 @@ at::Tensor bmm_impl(
     output = at::empty(output_size, tensor1.options());
   }
 
-  if (tensor1.dtype() == at::kBFloat16 || attr.has_post_op()) {
+  if (tensor1.dtype() == at::kBFloat16 || tensor1.dtype() == at::kHalf ||
+      attr.has_post_op()) {
     auto tensor1_ =
         (check_tensor_dim_stride(tensor1) && check_tensor_layout(tensor1))
         ? tensor1

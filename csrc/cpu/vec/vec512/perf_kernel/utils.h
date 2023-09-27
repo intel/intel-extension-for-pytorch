@@ -19,6 +19,10 @@ inline __m512 _maskz_load_f32_data(
   return cvt_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, (__m256i*)data_base));
 }
 
+inline __m512 _maskz_load_f32_data(const at::Half* data_base, __mmask16 mask) {
+  return cvt_fp16_to_fp32(_mm256_maskz_loadu_epi16(mask, (__m256i*)data_base));
+}
+
 // below is for unaligned data load
 inline __m512 _loadu(const float* data_base) {
   return _mm512_loadu_ps(data_base);
@@ -99,7 +103,7 @@ inline void _storeu(at::BFloat16* data_base, __m512 a) {
 }
 
 #if defined(CPU_CAPABILITY_AVX512_FP16)
-inline void _storeu(at::Half* data_base, __m512h a) {
+inline void _storeu_Half(at::Half* data_base, __m512h a) {
   _mm512_storeu_ph(data_base, a);
 }
 #endif

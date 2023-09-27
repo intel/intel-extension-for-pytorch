@@ -207,7 +207,7 @@ inline void _dil_div_add_reduce_max_fusion_kernel_half(
     vec_b = _loadu_half(b + i);
     vec_out = _mm512_fmadd_ph(vec_a, vec_r_dim_per_head, vec_b);
     vec_ps_min = _mm512_max_ph(vec_ps_min, vec_out);
-    _storeu(out + i, vec_out);
+    _storeu_Half(out + i, vec_out);
   }
 
   if (i < size) {
@@ -316,7 +316,7 @@ inline void _dil_exp_reduce_sum_fusion_kernel_half(
     vec_out = _mm512_sub_ph(vec_a, vec_max);
     vec_out = _dil_exp_half_kernel(vec_out);
     vec_sum = _mm512_add_ph(vec_sum, vec_out);
-    _storeu(out + i, vec_out);
+    _storeu_Half(out + i, vec_out);
   }
 
   if (i < size) {
@@ -372,7 +372,7 @@ inline void _dil_normalization_kernel_half(
   for (; i <= size - 32; i += 32) {
     auto vec_a = _loadu_half(a + i);
     auto vec_out = _mm512_div_ph(vec_a, vec_sum);
-    _storeu(out + i, vec_out);
+    _storeu_Half(out + i, vec_out);
   }
 
   if (i < size) {

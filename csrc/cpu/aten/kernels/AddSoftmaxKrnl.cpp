@@ -251,6 +251,8 @@ at::Tensor div_add_softmax_kernel_impl(
   } else if (
       a.scalar_type() == at::kBFloat16 && b.scalar_type() == at::kBFloat16) {
     return dil_div_add_softmax<at::BFloat16>(a, b, dim_per_head);
+  } else if (a.scalar_type() == at::kHalf && b.scalar_type() == at::kHalf) {
+    return dil_div_add_softmax<at::Half>(a, b, dim_per_head);
   }
 #endif
   a = at::div(a, dim_per_head);

@@ -12,7 +12,19 @@ inline void cvt_bf16_to_fp32(float* dst, const at::BFloat16* src, int len) {
   }
 }
 
+inline void cvt_fp16_to_fp32(float* dst, const at::Half* src, int len) {
+  for (int j = 0; j < len; j++) {
+    *(dst + j) = *(src + j);
+  }
+}
+
 inline void cvt_fp32_to_bf16(at::BFloat16* dst, const float* src, int len) {
+  for (int j = 0; j < len; j++) {
+    *(dst + j) = *(src + j);
+  }
+}
+
+inline void cvt_fp32_to_fp16(at::Half* dst, const float* src, int len) {
   for (int j = 0; j < len; j++) {
     *(dst + j) = *(src + j);
   }

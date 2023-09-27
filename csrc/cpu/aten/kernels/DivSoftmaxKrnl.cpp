@@ -203,6 +203,8 @@ at::Tensor div_maskedfill_softmax_kernel_impl(
     return dil_div_maskfill_softmax<float>(a, b, fill, dim_per_head);
   } else if (a.scalar_type() == at::kBFloat16) {
     return dil_div_maskfill_softmax<at::BFloat16>(a, b, fill, dim_per_head);
+  } else if (a.scalar_type() == at::kHalf) {
+    return dil_div_maskfill_softmax<at::Half>(a, b, fill, dim_per_head);
   }
 #endif
   // convert the mask back to bool for fallback path
