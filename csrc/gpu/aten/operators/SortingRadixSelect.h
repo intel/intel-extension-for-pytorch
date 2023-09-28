@@ -287,7 +287,7 @@ scalar_t findPattern(
     sycl::nd_item<1>& item_id) {
   auto local_id = item_id.get_local_id(0);
   auto smem_ptr =
-      static_cast<scalar_t*>(static_cast<void*>(smem.get_pointer().get()));
+      static_cast<scalar_t*>(static_cast<void*>(IPEXGetLocalAccPointer(smem)));
   if (local_id < RADIX_SIZE) {
     smem_ptr[RADIX_SIZE] = ScalarConvert<int, scalar_t>::to(0);
   }
