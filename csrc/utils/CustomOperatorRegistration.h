@@ -42,7 +42,7 @@ void construct_function_schema_and_register(
   std::unique_ptr<c10::FunctionSchema> infer_schema =
       c10::detail::inferFunctionSchemaFromFunctor<std::decay_t<Func>>();
   auto parse_name = torch::jit::parseSchemaOrName(name);
-  c10::OperatorName op_name = std::get<0>(std::move(parse_name));
+  c10::OperatorName op_name = std::move(parse_name).left();
   c10::FunctionSchema s = infer_schema->cloneWithName(
       std::move(op_name.name), std::move(op_name.overload_name));
   s.setAliasAnalysis(c10::AliasAnalysisKind::CONSERVATIVE);

@@ -30,9 +30,9 @@ torch::jit::tensorexpr::Tensor computeMatmulDiv(
   auto te_dtype = torch::jit::tensorexpr::Dtype(*output_type);
   PytTeBufHandle result_buf(
       "nnc_ipex_matmul_div", output_shape, output_strides, te_dtype);
-  const PytTeBufHandle& mm_a = c10::get<PytTeBufHandle>(inputs[0]);
-  const PytTeBufHandle& mm_b = c10::get<PytTeBufHandle>(inputs[1]);
-  const PytTeBufHandle& div_a = c10::get<PytTeBufHandle>(inputs[2]);
+  const PytTeBufHandle& mm_a = std::get<PytTeBufHandle>(inputs[0]);
+  const PytTeBufHandle& mm_b = std::get<PytTeBufHandle>(inputs[1]);
+  const PytTeBufHandle& div_a = std::get<PytTeBufHandle>(inputs[2]);
   PytTeStmtPtr s = PytTeExternalCall::make(
       result_buf, "nnc_ipex_matmul_div", {mm_a, mm_b, div_a}, {});
   return PytTeTensor(result_buf.node(), s);
