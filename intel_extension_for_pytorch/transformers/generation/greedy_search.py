@@ -245,7 +245,6 @@ def _greedy_search(
                 model_inputs.pop("token_type_ids", None)
                 outputs = self.trace_graph(**model_inputs)
                 if synced_gpus and this_peer_finished:
-                    cur_len = cur_len + 1
                     continue  # don't waste resources running the code we don't need
                 next_token_logits = outputs[0][:, -1, :]
             else:
@@ -256,7 +255,6 @@ def _greedy_search(
                     output_hidden_states=output_hidden_states,
                 )
                 if synced_gpus and this_peer_finished:
-                    cur_len = cur_len + 1
                     continue  # don't waste resources running the code we don't need
                 next_token_logits = outputs.logits[:, -1, :]
         else:
@@ -267,7 +265,6 @@ def _greedy_search(
                 output_hidden_states=output_hidden_states,
             )
             if synced_gpus and this_peer_finished:
-                cur_len = cur_len + 1
                 continue  # don't waste resources running the code we don't need
             next_token_logits = outputs.logits[:, -1, :]
 
