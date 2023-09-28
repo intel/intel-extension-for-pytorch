@@ -821,7 +821,12 @@ class TestTorchMethod(TestCase):
                 for mem_format in [torch.contiguous_format, torch.channels_last]:
                     print('checking memory format: ', mem_format)
                     for is_tensor in [True, False]:
-                        model_optimizer_list = create_model_optimizer(optimizer_string, mem_format, dtype=dtype, lr_is_tensor=is_tensor)
+                        model_optimizer_list = create_model_optimizer(
+                            optimizer_string,
+                            mem_format,
+                            dtype=dtype,
+                            lr_is_tensor=is_tensor
+                        )
                         for model_optimizer_item in model_optimizer_list:
                             model_xpu_no_fuse = model_optimizer_item[0]
                             model_xpu = model_optimizer_item[1]

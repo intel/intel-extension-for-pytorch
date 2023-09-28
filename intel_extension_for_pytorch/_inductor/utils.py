@@ -3,10 +3,15 @@ import functools
 import torch
 
 
-def triton_do_bench(fn, warmup=25, rep=100, grad_to_none=None,
-             quantiles=None,
-             fast_flush=True,
-             return_mode="mean"):
+def triton_do_bench(
+    fn,
+    warmup=25,
+    rep=100,
+    grad_to_none=None,
+    quantiles=None,
+    fast_flush=True,
+    return_mode="mean"
+):
     assert return_mode in ["min", "max", "mean", "median"]
     """
     Benchmark the runtime of the provided function. By default, return the median runtime of :code:`fn` along with

@@ -1,7 +1,5 @@
 import contextlib
 import dataclasses
-import functools
-import hashlib
 import sympy
 
 from torch._dynamo.utils import dynamo_timed

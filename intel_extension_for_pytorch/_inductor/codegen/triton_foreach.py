@@ -1,6 +1,5 @@
 from torch._inductor.codegen.common import IndentedBuffer
 from torch._inductor.codegen.triton_foreach import ForeachKernel
-from torch._inductor.virtualized import V
 
 
 class XPUForeachKernel(ForeachKernel):

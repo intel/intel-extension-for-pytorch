@@ -71,7 +71,9 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu[0], y_dpcpp[0].cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
-    @pytest.mark.skip("RuntimeError: Unsupport memory format. Supports only ChannelsLast3d, Contiguous for rebase 2.1 without CPU lib")
+    @pytest.mark.skip(
+        "RuntimeError: Unsupport memory format. Supports only ChannelsLast3d, Contiguous for rebase 2.1 without CPU lib"
+    )
     def test_max_pool3d_4D(self, dtype=torch.float):
         x = torch.randn([20, 30, 40, 50])
         grad = torch.randn([20, 30, 40, 50])

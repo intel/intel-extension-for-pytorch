@@ -1,7 +1,6 @@
 import torch
 import intel_extension_for_pytorch  # noqa F401
 from functools import wraps
-from torch.nn.parallel.scatter_gather import _is_namedtuple
 
 
 def override_tensor_totype():

@@ -11,7 +11,7 @@ import torch
 
 from torch._inductor import config
 from torch._inductor.ir import ReductionHint, TileHint
-from torch._inductor.triton_heuristics import AutotuneHint
+from torch._inductor.triton_heuristics import AutotuneHint  # noqa
 from torch._inductor.utils import get_num_bytes, create_bandwidth_info_str
 
 from .utils import do_bench, has_triton

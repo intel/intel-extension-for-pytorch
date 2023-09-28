@@ -19,17 +19,17 @@ class ForeachBinaryTensorTest:
         return self.func(input_tensor_for_func, input_other_for_func)
 
 class ForeachBinaryTensorTestInplace:
-     def __init__(self, func):
-         self.func = func
+    def __init__(self, func):
+        self.func = func
 
-     def __call__(self, input, other, device):
-         input_tensor_for_func = []
-         input_other_for_func = []
-         for i in range(len(input)):
-             input_tensor_for_func.append(input[i].clone().to(device))
-             input_other_for_func.append(other[i].clone().to(device))
-         self.func(input_tensor_for_func, input_other_for_func)
-         return input_tensor_for_func
+    def __call__(self, input, other, device):
+        input_tensor_for_func = []
+        input_other_for_func = []
+        for i in range(len(input)):
+            input_tensor_for_func.append(input[i].clone().to(device))
+            input_other_for_func.append(other[i].clone().to(device))
+        self.func(input_tensor_for_func, input_other_for_func)
+        return input_tensor_for_func
 
 
 class TestTorchMethod(TestCase):
