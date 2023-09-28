@@ -594,9 +594,16 @@ class _IPEXAttentionRef(nn.Module):
         if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or \
                 re.search("LLAMA", self.model_backbone, re.IGNORECASE):
             if hasattr(module, 'q_proj') and hasattr(module, 'k_proj') and hasattr(module, 'v_proj'):
-                weight_shapes = [[mod.in_features, mod.out_features]
+                def get_weight_shape(mod):
+                    if hasattr(mod, 'in_features') and hasattr(mod, 'out_features'):
+                        return [mod.in_features, mod.out_features]
+                    elif hasattr(mod, 'weight') and hasattr(mod.weight, 'shape'):
+                        return list(mod.weight.shape)
+                    return None
+                weight_shapes = [get_weight_shape(mod)
                                  for mod in [module.q_proj, module.k_proj, module.v_proj]]
-                if all(weight_shapes[0] == shape for shape in weight_shapes[1:]):
+                if weight_shapes[0] is not None and \
+                        all(weight_shapes[0] == shape for shape in weight_shapes[1:]):
                     self.concat_qkv = _IPEXConcatLinearRef([module.q_proj, module.k_proj, module.v_proj])
                     del module.q_proj, module.k_proj, module.v_proj
 
