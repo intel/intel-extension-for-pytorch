@@ -215,10 +215,10 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
             bias_list = []
             w_dtype = self.linear_list[0].dtype
             lowp_mode = self.linear_list[0]._lowp_mode
-            qconfig = get_weight_only_quant_qconfig_mapping(
+            qconfig_mapping = get_weight_only_quant_qconfig_mapping(
                 weight_dtype=w_dtype, lowp_mode=lowp_mode
             )
-            qconfig = qconfig.global_qconfig
+            qconfig = qconfig_mapping.global_qconfig
             for i in range(self.num_concat):
                 linear = self.linear_list[i]
                 if not hasattr(linear, '_op_context'):
