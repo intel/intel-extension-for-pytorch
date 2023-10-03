@@ -1264,6 +1264,6 @@ The following third party programs have their own third party program files. The
 
 1.	mkl-dnn intel-extension-for-pytorch/third-party-programs/oneDNN
 2.	tbb intel-extension-for-pytorch/third-party-programs/oneTBB
-3. 	oneMKL intel-extension-for-pytorch/third-party-programs/oneMKL
+3.	oneMKL intel-extension-for-pytorch/third-party-programs/oneMKL
 
 -------------------------------------------------------------
