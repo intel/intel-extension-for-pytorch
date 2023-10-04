@@ -89,18 +89,27 @@ class IpexWoqLinear(nn.Module):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
             float_modules.extend(deepspeed_modules)
+        if any(issubclass(type(mod), float_module) for float_module in float_modules):
+            float_modules.extend([type(mod)])
 
         assert (
             type(mod) in float_modules
         ), "IpexWoqLinear.from_float only works for one of" + str(
             [float_mod.__name__ for float_mod in float_modules]
-        )
+        ) + f" or their subclasses, but found {type(mod)}"
         assert hasattr(mod, "qconfig"), "Input float module must have qconfig defined"
         lowp_mode = 0
         if mod.qconfig is not None and mod.qconfig.weight is not None:
             weight_observer = mod.qconfig.weight()
             if hasattr(mod.qconfig, 'lowp_mode'):
                 lowp_mode = mod.qconfig.lowp_mode
+                if mod.qconfig.lowp_mode == 3 and weight_observer.dtype == torch.qint8:
+                    # lowp_mode=3 (INT8) is not yet supported for INT8 weight
+                    # Fall back to lowp_mode=2 in this case
+                    # TODO(Weiwen) Support lowp_mode=3
+                    lowp_mode = 2
+                    print('Warning: lowp_mode=3(INT8) is not supported yet in this case. '
+                          'Falling back to 2(BF16).')
         else:
             weight_observer = (
                 get_weight_only_quant_qconfig_mapping().global_qconfig.weight()
@@ -140,12 +149,14 @@ class IpexWoqLinear(nn.Module):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
             float_modules.extend(deepspeed_modules)
+        if any(issubclass(type(mod), float_module) for float_module in float_modules):
+            float_modules.extend([type(mod)])
 
         assert (
             type(mod) in float_modules
         ), "IpexWoqLinear.from_float only works for one of" + str(
             [float_mod.__name__ for float_mod in float_modules]
-        )
+        ) + f" or their subclasses, but found {type(mod)}"
         assert hasattr(mod, "qconfig"), "Input float module must have qconfig defined"
 
         lowp_mode = 0
