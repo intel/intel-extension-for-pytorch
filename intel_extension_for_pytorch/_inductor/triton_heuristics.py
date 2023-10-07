@@ -297,7 +297,7 @@ def pointwise(size_hints, meta, tile_hint=None, filename=None):
     Construct @triton.heuristics() based on size_hints.
     """
     numel = functools.reduce(operator.mul, size_hints)
-    bs = max(256, min(numel // 128, 4096))
+    bs = max(256, min(numel // 128, 1024))
 
     hinted_configs = autotune_hints_to_configs(
         meta.get("autotune_hints", set()), size_hints, bs
@@ -332,7 +332,7 @@ def pointwise(size_hints, meta, tile_hint=None, filename=None):
         ):
             return cached_autotune(
                 size_hints,
-                [triton_config(size_hints, 64, 64)],
+                [triton_config(size_hints, 32, 32)],
                 meta=meta,
                 heuristic_type=HeuristicType.POINTWISE,
                 filename=filename,
@@ -386,11 +386,11 @@ def reduction(size_hints, reduction_hint=False, meta=None, filename=None):
     rnumel = size_hints[-1]
     if len(size_hints) == 2:
         contiguous_config = triton_config_reduction(
-            size_hints, 1, (rnumel if 512 <= rnumel < 4096 else 4096)
+            size_hints, 1, (rnumel if 256 <= rnumel < 2048 else 2048)
         )
-        outer_config = triton_config_reduction(size_hints, 128, 32)
+        outer_config = triton_config_reduction(size_hints, 128, 8)
         tiny_config = triton_config_reduction(
-            size_hints, 2 * (512 // rnumel) if rnumel <= 512 else 1, min(rnumel, 4096)
+            size_hints, 2 * (256 // rnumel) if rnumel <= 256 else 1, min(rnumel, 2048)
         )
         if config.max_autotune or config.max_autotune_pointwise:
             pass  # skip all these cases
@@ -434,7 +434,6 @@ def reduction(size_hints, reduction_hint=False, meta=None, filename=None):
                 tiny_config,
                 triton_config_reduction(size_hints, 64, 64),
                 triton_config_reduction(size_hints, 8, 512),
-                triton_config_reduction(size_hints, 8, 2048),
                 # halve the XBLOCK/RBLOCK compared to outer_config
                 # TODO: this may only be beneficial when each iteration of the reduciton
                 # is quite heavy. E.g. https://gist.github.com/shunting314/189a8ef69f90db9d614a823385147a72
