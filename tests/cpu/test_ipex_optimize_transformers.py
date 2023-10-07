@@ -249,17 +249,17 @@ class OptimizeTransformersTester(TestCase):
                     ])
             )
         elif re.search("llama", model.config.architectures[0], re.IGNORECASE):
-            assert (model.model.layers[0].self_attn.__class__ is _IPEXAttentionCPU)
-            assert (model.model.layers[0].__class__ is _IPEXDecoderLayerCPU)
-            assert (
-                all(mod.__class__ is IpexWoqLinear for mod in
-                    [
-                        model.model.layers[0].self_attn.concat_qkv.concat_linear,
-                        model.model.layers[0].mha_linear_add.linear,
-                        model.model.layers[0].mlp_linear_add.linear,
-                        model.model.layers[0].linear_silu.linear,
-                        model.model.layers[0].linear_mul.linear
-                    ])
+            assert model.model.layers[0].self_attn.__class__ is _IPEXAttentionCPU
+            assert model.model.layers[0].__class__ is _IPEXDecoderLayerCPU
+            assert all(
+                mod.__class__ is IpexWoqLinear
+                for mod in [
+                    model.model.layers[0].self_attn.concat_qkv.concat_linear,
+                    model.model.layers[0].mha_linear_add.linear,
+                    model.model.layers[0].mlp_linear_add.linear,
+                    model.model.layers[0].linear_silu_mul.linear_s,
+                    model.model.layers[0].linear_silu_mul.linear_m,
+                ]
             )
         # Ensure model can run without errors
         with torch.no_grad():

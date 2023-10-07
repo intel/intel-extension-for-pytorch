@@ -285,3 +285,36 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
             y = linear(x)
             output_list.append(y)
         return tuple(output_list)
+
+
+class _IPEXlinearSiluMulCPU(nn.Module):
+    def __init__(self, module_s, module_m, tpp=False, woq=False):
+        super().__init__()
+        self.tpp = tpp
+        self.woq = woq
+        self.linear_s = module_s
+        self.linear_m = module_m
+        self.dtype = module_s.weight.dtype if self.tpp else None
+
+    def forward(self, x):
+        if self.tpp:
+            x = x.to(self.dtype).contiguous()
+            x1 = torch.ops.torch_ipex.tpp_linear_silu(
+                x,
+                self.linear_s.weight,
+                self.linear_s.bias
+                if self.linear_s.bias is not None
+                else x.new_empty(0),
+                self.linear_s.out_features,
+            )
+            return torch.ops.torch_ipex.tpp_linear_mul(
+                x,
+                x1,
+                self.linear_m.weight,
+                self.linear_m.bias
+                if self.linear_m.bias is not None
+                else x.new_empty(0),
+                self.linear_m.out_features,
+            )
+        else:  # fallback path
+            return nn.functional.silu(self.linear_s(x)) * self.linear_m(x)

@@ -3,13 +3,12 @@ from torch import nn
 from typing import Optional, Tuple, Union
 import re
 from ...reference.fusions.linear_fusion import (
-    _IPEXlinearSiluRef,
     _IPEXlinearAddRef,
     _IPEXlinearAddAddRef,
-    _IPEXlinearMulRef,
     _IPEXlinearNewGeluRef,
     _IPEXlinearReluRef,
     _IPEXlinearGeluRef,
+    _IPEXlinearSiluMulRef,
 )
 
 
@@ -45,7 +44,7 @@ def LlamaDecoderLayer_forward(
     residual = hidden_states
     hidden_states = self.post_attention_layernorm(hidden_states)
 
-    mlp_gate = self.linear_mul(hidden_states, self.linear_silu(hidden_states))
+    mlp_gate = self.linear_silu_mul(hidden_states)
 
     if not self.distributed:
         hidden_states = self.mlp_linear_add(mlp_gate, residual)
@@ -272,8 +271,9 @@ class _IPEXDecoderLayerRef(nn.Module):
                 self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.down_proj)
                 del self.__dict__["_modules"]["self_attn"].o_proj
                 del self.__dict__["_modules"]["mlp"].down_proj
-            self.linear_silu = _IPEXlinearSiluRef(module.mlp.gate_proj)
-            self.linear_mul = _IPEXlinearMulRef(module.mlp.up_proj)
+            self.linear_silu_mul = _IPEXlinearSiluMulRef(
+                module.mlp.gate_proj, module.mlp.up_proj
+            )
             del self.__dict__["_modules"]["mlp"].gate_proj
             del self.__dict__["_modules"]["mlp"].up_proj
 
