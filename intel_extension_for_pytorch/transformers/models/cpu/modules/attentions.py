@@ -28,9 +28,10 @@ class _IPEXAttentionCPU(nn.Module):
             )
         if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or \
                 re.search("LLAMA", self.model_backbone, re.IGNORECASE):
-            self.concat_qkv = _IPEXConcatLinearCPU(
-                module.concat_qkv, tpp=tpp, woq=woq
-            )
+            if hasattr(module, 'concat_qkv'):
+                self.concat_qkv = _IPEXConcatLinearCPU(
+                    module.concat_qkv, tpp=tpp, woq=woq
+                )
 
         self.text_max_length = (
             config.text_max_length if hasattr(config, "text_max_length") else 2048
