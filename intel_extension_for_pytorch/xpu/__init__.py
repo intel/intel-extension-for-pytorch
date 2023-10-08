@@ -43,6 +43,7 @@ from intel_extension_for_pytorch._version import (
 
 default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]
+_is_in_bad_fork = getattr(intel_extension_for_pytorch._C, "_xpu_isInBadFork", lambda: False)
 
 
 def is_initialized():
