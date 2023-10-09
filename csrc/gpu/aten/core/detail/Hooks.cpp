@@ -80,6 +80,21 @@ DLDevice_& XPUHooks::getDLPackDeviceFromATenDevice(
   return dl_device;
 }
 
+Generator XPUHooks::getXPUGenerator(DeviceIndex device_index) const {
+  auto generator = make_generator<xpu::dpcpp::DPCPPGeneratorImpl>(device_index);
+  return generator;
+}
+
+const Generator& XPUHooks::getDefaultXPUGenerator(
+    DeviceIndex device_index) const {
+  const auto& generator = getDefaultDPCPPGenerator(device_index);
+  return generator;
+}
+
+int XPUHooks::getNumGPUs() const {
+  return xpu::dpcpp::device_count();
+}
+
 REGISTER_XPU_HOOKS(XPUHooks);
 
 } // namespace detail

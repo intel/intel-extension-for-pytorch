@@ -145,7 +145,6 @@ c10::intrusive_ptr<c10::TensorImpl> DPCPPGeneratorImpl::get_state() const {
   static_assert(
       std::is_pod<DPCPPGeneratorImplState>::value,
       "DPCPPGeneratorImplState is not a PODType");
-
   auto state_tensor = at::detail::empty_cpu(
       {(int64_t)size},
       ScalarType::Byte,
@@ -154,12 +153,10 @@ c10::intrusive_ptr<c10::TensorImpl> DPCPPGeneratorImpl::get_state() const {
       c10::nullopt,
       c10::nullopt);
   auto rng_state = state_tensor.data_ptr();
-
   // accumulate generator data to be copied into byte tensor
   auto accum_state = std::make_unique<DPCPPGeneratorImplState>();
   accum_state->seed = this->seed_;
   accum_state->philox_offset_per_thread = this->philox_offset_per_thread_;
-
   memcpy(rng_state, accum_state.get(), size);
   return state_tensor.getIntrusivePtr();
 }

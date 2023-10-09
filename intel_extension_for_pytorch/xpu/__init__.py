@@ -18,7 +18,7 @@ from torch.storage import _StorageBase
 from torch import device as _device
 from torch._utils import classproperty, _get_device_index
 
-from .lazy_init import _lazy_init, _lazy_call, _is_initialized, is_initialized
+from .lazy_init import _lazy_init, _lazy_call, _is_initialized, is_initialized, _is_in_bad_fork
 from .streams import Stream, Event
 from .intrinsic import *
 from .cpp_extension import *

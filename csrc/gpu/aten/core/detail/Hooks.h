@@ -21,6 +21,10 @@ struct XPUHooks : public at::XPUHooksInterface {
       DLDevice_& dl_device,
       const at::Device& aten_device,
       void* data) const override;
+  Generator getXPUGenerator(DeviceIndex device_index = -1) const override;
+  const Generator& getDefaultXPUGenerator(
+      DeviceIndex device_index = -1) const override;
+  int getNumGPUs() const override;
 };
 
 } // namespace detail
