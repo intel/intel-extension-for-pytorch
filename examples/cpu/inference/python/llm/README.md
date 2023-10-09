@@ -82,13 +82,13 @@ wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prom
 |---|:---:|:---:|:---:|:---:|:---:|
 |LLAMA| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" | ✅ | ✅ | ✅ | ✅ | 
 |GPT-J| "EleutherAI/gpt-j-6b" | ✅ | ✅ | ✅ | ✅ | 
-|GPT-NOEX| "EleutherAI/gpt-neox-20b" | ✅ | ✅ | ✅ | ❎ ** | 
+|GPT-NEOX| "EleutherAI/gpt-neox-20b" | ✅ | ✅ | ✅ | ❎ ** | 
 |FALCON*|"tiiuae/falcon-40b" | ✅ | ✅ |  ✅ | ❎ **| 
 |OPT|"facebook/opt-30b", "facebook/opt-1.3b"| ✅ | ✅ |  ✅ | ❎ **| 
 
 *For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for FP32/BF16 but needed for quantizations.
 
-** For GPT-NOEX/FALCON/OPT models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.
+** For GPT-NEOX/FALCON/OPT models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM model families, we are working in progress to cover those optimizations, which will expand the model list above.
 
@@ -125,7 +125,7 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list
 Notes:
 (1) for quantization benchmarks, the first runs will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, you can reuse these quantized models for inference-only benchmarks by using "--quantized-model-path <output_dir + "best_model.pt">".
 (2) for Falcon quantizations, "--config-file <CONFIG_FILE>" is needed and example of <CONFIG_FILE>: "utils/model_config/tiiuae_falcon-40b_config.json".
-(3) for GPT-NOEX quantizations, using "--int8" instead of "--int8-bf16-mixed" for accuracy concerns.
+(3) for GPT-NEOX quantizations, using "--int8" instead of "--int8-bf16-mixed" for accuracy concerns.
 (4) By default, generations are based on "beam search", and beam size = 4. For beam size = 1, please add "--greedy"
 
 ```
@@ -144,7 +144,7 @@ deepspeed --bind_cores_to_rank run.py  --benchmark -m <MODEL_ID> --ipex --ipex-w
 
 Notes:
 (1) for Falcon quantizations, "--config-file <CONFIG_FILE>" is needed and example of <CONFIG_FILE>: "utils/model_config/tiiuae_falcon-40b_config.json".
-(2) for GPT-NOEX quantizations, using "--int8" instead of "--int8-bf16-mixed" for accuracy concerns.
+(2) for GPT-NEOX quantizations, using "--int8" instead of "--int8-bf16-mixed" for accuracy concerns.
 (3) by default, we use "--shard-model" for better memory usage, if your model is already sharded, please remove "--shard-model"
 (4) By default, generations are based on "beam search", and beam size = 4. For beam size = 1, please add "--greedy"
 
