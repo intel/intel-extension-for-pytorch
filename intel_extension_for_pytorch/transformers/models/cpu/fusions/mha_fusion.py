@@ -91,7 +91,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
         )
 
         present = (
-            torch.zeros(
+            torch.empty(
                 1,
                 (layer_past[0].size(-2) + query.shape[1]),
                 (layer_past[0].size(-2) + query.shape[1]),
