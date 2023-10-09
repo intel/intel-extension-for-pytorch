@@ -46,17 +46,26 @@ def get_smooth_quant_qconfig_mapping(
     """
     Configuration with SmoothQuant for static quantization of large language models (LLM)
     For SmoothQuant, see https://arxiv.org/pdf/2211.10438.pdf
-    Arguments:
-        alpha:              Hyper-parameter for SmoothQuant.
-        act_observer:       Observer for activation of ops other than nn.Linear. HistogramObserver by default.
-                            For nn.Linear with SmoothQuant enabled, q-param is calculated based on act_ic_observer's
-                            and wei_ic_observer's min/max. It is not affected by this argument.
-        act_ic_observer:    Per-input-channel Observer for activation. For nn.Linear with SmoothQuant enabled only.
-                            PerChannelMinMaxObserver by default.
-        wei_observer:       Observer for weight of all weighted ops. For nn.Linear with SmoothQuant enabled, it
-                            calculates q-params after applying scaling factors. PerChannelMinMaxObserver by default.
-        wei_ic_observer:    Per-input-channel Observer for weight. For nn.Linear with SmoothQuant enabled only.
-                            PerChannelMinMaxObserver by default.
+
+    Args:
+        alpha: Hyper-parameter for SmoothQuant.
+        act_observer: Observer for activation of ops other than nn.Linear.
+            HistogramObserver by default. For nn.Linear with SmoothQuant
+            enabled, q-param is calculated based on act_ic_observer's and
+            wei_ic_observer's min/max. It is not affected by this argument.
+        act_ic_observer: Per-input-channel Observer for activation.
+            For nn.Linear with SmoothQuant enabled only.
+            PerChannelMinMaxObserver by default.
+        wei_observer: Observer for weight of all weighted ops.
+            For nn.Linear with SmoothQuant enabled, it calculates q-params
+            after applying scaling factors. PerChannelMinMaxObserver by
+            default.
+        wei_ic_observer: Per-input-channel Observer for weight.
+            For nn.Linear with SmoothQuant enabled only.
+            PerChannelMinMaxObserver by default.
+
+    Returns:
+        torch.ao.quantization.QConfig
     """
     qconfig = QConfig(
         activation=SmoothQuantActivationObserver.with_args(

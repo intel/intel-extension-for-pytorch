@@ -49,6 +49,8 @@ Minor code changes are required for users to get start with Intel® Extension fo
 
 The following code snippet shows an inference code with FP32 data type. More examples on CPU, including training and C++ examples, are available at [CPU Example page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/examples.html). More examples on GPU are available at [GPU Example page](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/examples.html).
 
+**NOTE:** More detailed information about `torch.compile()` with `ipex` backend can be found at [Tutorial features page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/features.html#torch-compile-experimental-new-feature-from-2-0-0).
+
 ### Inference on CPU
 
 ```python
