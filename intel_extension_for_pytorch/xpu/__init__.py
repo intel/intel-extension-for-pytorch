@@ -8,7 +8,7 @@ import sys
 from typing import List, Optional, Tuple, Union, Dict
 import torch
 import intel_extension_for_pytorch
-from .lazy_init import _lazy_init, _lazy_call
+from .lazy_init import _lazy_init, _lazy_call, _is_in_bad_fork
 from torch import device as _device
 from torch._utils import classproperty
 
@@ -43,7 +43,6 @@ from intel_extension_for_pytorch._version import (
 
 default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]
-_is_in_bad_fork = getattr(intel_extension_for_pytorch._C, "_xpu_isInBadFork", lambda: False)
 
 
 def is_initialized():
