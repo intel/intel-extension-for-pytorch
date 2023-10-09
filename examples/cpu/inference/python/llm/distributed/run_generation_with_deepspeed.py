@@ -94,17 +94,24 @@ parser.add_argument("--print-memory", action="store_true")
 parser.add_argument("--token-latency", action="store_true")
 parser.add_argument(
     "--lowp-mode",
-    choices=["BF16", "FP32", "INT8", "FP16"],
-    default="BF16",
+    choices=["AUTO", "BF16", "FP32", "INT8", "FP16"],
+    default="AUTO",
     type=str,
-    help="low precision mode for weight only quantization",
+    help="low precision mode for weight only quantization. "
+         "It indicates data type for computation for speedup at the cost "
+         "of accuracy. Unrelated to activation or weight data type."
+         "It is not supported yet to use lowp_mode=INT8 for INT8 weight, "
+         "falling back to lowp_mode=BF16 implicitly in this case."
+         "If set to AUTO, lowp_mode is determined by weight data type: "
+         "lowp_mode=BF16 is used for INT8 weight "
+         "and lowp_mode=INT8 used for INT4 weight",
 )
 parser.add_argument(
     "--weight-dtype",
     choices=["INT8", "INT4"],
     default="INT8",
     type=str,
-    help="weight dtype for weight only quantization",
+    help="weight data type for weight only quantization. Unrelated to activation data type or lowp-mode.",
 )
 parser.add_argument(
     "--config-file", default=None, type=str, help="specific configuration file"
@@ -341,8 +348,13 @@ if args.ipex:
             lowp_mode = ipex.quantization.WoqLowpMode.NONE
         elif args.lowp_mode == "FP16":
             lowp_mode = ipex.quantization.WoqLowpMode.FP16
-        else:
+        elif args.lowp_mode == "BF16":
             lowp_mode = ipex.quantization.WoqLowpMode.BF16
+        else:  # AUTO
+            if weight_dtype == torch.quint4x2:
+                lowp_mode = ipex.quantization.WoqLowpMode.INT8
+            else:
+                lowp_mode = ipex.quantization.WoqLowpMode.BF16
 
         qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
             weight_dtype=weight_dtype, lowp_mode=lowp_mode

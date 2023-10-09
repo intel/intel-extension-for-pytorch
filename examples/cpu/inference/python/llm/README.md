@@ -82,9 +82,9 @@ wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prom
 |---|:---:|:---:|:---:|:---:|:---:|
 |LLAMA| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" | ✅ | ✅ | ✅ | ✅ | 
 |GPT-J| "EleutherAI/gpt-j-6b" | ✅ | ✅ | ✅ | ✅ | 
-|GPT-NOEX| "EleutherAI/gpt-neox-20b" | ✅ | ✅ | ✅ | X ** | 
-|FALCON*|"tiiuae/falcon-40b" | ✅ | ✅ |  ✅ | X **| 
-|OPT|"facebook/opt-30b", "facebook/opt-1.3b"| ✅ | ✅ |  ✅ | X **| 
+|GPT-NOEX| "EleutherAI/gpt-neox-20b" | ✅ | ✅ | ✅ | ❎ ** | 
+|FALCON*|"tiiuae/falcon-40b" | ✅ | ✅ |  ✅ | ❎ **| 
+|OPT|"facebook/opt-30b", "facebook/opt-1.3b"| ✅ | ✅ |  ✅ | ❎ **| 
 
 *For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for FP32/BF16 but needed for quantizations.
 
@@ -97,7 +97,7 @@ wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prom
 | Benchmark mode | FP32/BF16 | Weight only quantzation INT8 | Weight only quantization INT4 | Static quantization INT8 | 
 |---|:---:|:---:|:---:|:---:|
 |Single instance | ✅ | ✅ | ✅ | ✅ | 
-| Distributed (autotp) |  ✅ | ✅ | X | X | 
+| Distributed (autotp) |  ✅ | ✅ | ❎ | ❎ | 
 
 You can run LLM with a one-click Python script "run.py" for all inference cases.
 ```
@@ -140,7 +140,7 @@ unset KMP_AFFINITY
 deepspeed --bind_cores_to_rank  run.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --deployment-mode --autotp --shard-model
 
 # weight only quantization int8 benchmark
-deepspeed --bind_cores_to_rank run.py  --benchmark -m <MODEL_ID> --ipex-weight-only-quantization  --output-dir "saved_results" --int8-bf16-mixed --autotp --shard-model
+deepspeed --bind_cores_to_rank run.py  --benchmark -m <MODEL_ID> --ipex --ipex-weight-only-quantization --output-dir "saved_results" --int8-bf16-mixed --autotp --shard-model
 
 Notes:
 (1) for Falcon quantizations, "--config-file <CONFIG_FILE>" is needed and example of <CONFIG_FILE>: "utils/model_config/tiiuae_falcon-40b_config.json".
