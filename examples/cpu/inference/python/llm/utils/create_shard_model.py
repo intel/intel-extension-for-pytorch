@@ -40,26 +40,29 @@ parser.add_argument(
     type=str,
     default="500MB",
 )
+parser.add_argument(
+    "--local_rank", required=False, type=int, default=0, help="used by dist launchers"
+)
 args = parser.parse_args()
 print(args)
-model_type = next(
-    (x for x in MODEL_CLASSES.keys() if x in args.model_id.lower()), "auto"
-)
-model_class = MODEL_CLASSES[model_type]
+if args.local_rank == 0 :
+    model_type = next(
+        (x for x in MODEL_CLASSES.keys() if x in args.model_id.lower()), "auto"
+    )
+    model_class = MODEL_CLASSES[model_type]
 
-load_dtype = torch.float32
-if args.dtype == "float16":
-    load_dtype = torch.half
-elif args.dtype == "bfloat16":
-    load_dtype = torch.bfloat16
+    load_dtype = torch.float32
+    if args.dtype == "float16":
+        load_dtype = torch.half
+    elif args.dtype == "bfloat16":
+        load_dtype = torch.bfloat16
 
-tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
-model = model_class[0].from_pretrained(
-    args.model_id,
-    torch_dtype=load_dtype,
-    low_cpu_mem_usage=True,
-    trust_remote_code=True,
-)
-
-model.save_pretrained(save_directory=args.save_path, max_shard_size=args.max_shard_size)
-tokenizer.save_pretrained(save_directory=args.save_path)
+    tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
+    model = model_class[0].from_pretrained(
+        args.model_id,
+        torch_dtype=load_dtype,
+        low_cpu_mem_usage=True,
+        trust_remote_code=True,
+    )
+    model.save_pretrained(save_directory=args.save_path, max_shard_size=args.max_shard_size)
+    tokenizer.save_pretrained(save_directory=args.save_path)

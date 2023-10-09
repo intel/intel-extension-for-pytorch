@@ -20,6 +20,7 @@ parser.add_argument(
 parser.add_argument(
     "--max-new-tokens", default=32, type=int, help="output max new tokens"
 )
+parser.add_argument("--dataset", nargs="?", default="lambada", const="lambada")
 parser.add_argument("--output-dir", nargs="?", default="./saved_results")
 parser.add_argument(
     "--ipex-weight-only-quantization",
@@ -271,7 +272,7 @@ elif args.ipex_smooth_quant:
                 torch.tensor(last_ind),
             )
 
-    full_dataset = load_dataset("lambada")
+    full_dataset = load_dataset(args.dataset)
     dataset = full_dataset["validation"]
     calib_dataset = full_dataset["train"]
     evaluator = Evaluator(dataset, tokenizer, args, batch_size=args.batch_size)

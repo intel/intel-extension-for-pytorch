@@ -25,7 +25,9 @@ from transformers import (
 # supported models now
 MODEL_CLASSES = {
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
+    "gptj": (AutoModelForCausalLM, AutoTokenizer),
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
+    "gptneox": (AutoModelForCausalLM, AutoTokenizer),
     "llama": (AutoModelForCausalLM, LlamaTokenizer),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
@@ -51,21 +53,11 @@ parser.add_argument(
     help="the huggingface mdoel id",
 )
 parser.add_argument(
-    "--device",
-    type=str,
-    choices=["cpu"],
-    help="cpu",
-    default="cpu",
-)
-parser.add_argument(
     "--dtype",
     type=str,
-    help="float16 or bfloat16 or int8",
-    choices=["int8", "float16", "bfloat16", "float32"],
-    default="float16",
-)
-parser.add_argument(
-    "--local_rank", required=False, type=int, help="used by dist launchers"
+    help="float16 or bfloat16",
+    choices=["bfloat16", "float32"],
+    default="bfloat16",
 )
 parser.add_argument(
     "--batch-size", "--batch-size", default=1, type=int, help="batch size"
@@ -91,11 +83,13 @@ parser.add_argument(
     help="use ipex weight-only quantization",
 )
 parser.add_argument(
+    "--local_rank", required=False, type=int, help="used by dist launchers"
+)
+parser.add_argument(
     "--int8-bf16-mixed",
     action="store_true",
     help="by default it is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
 )
-parser.add_argument("--jit", action="store_true")
 parser.add_argument("--print-memory", action="store_true")
 parser.add_argument("--token-latency", action="store_true")
 parser.add_argument(
@@ -199,16 +193,10 @@ if args.int8_bf16_mixed:
     load_dtype = torch.bfloat16
     infer_dtype = torch.bfloat16
 else:
-    if args.dtype == "float16":
-        load_dtype = torch.half
-        infer_dtype = torch.half
-    elif args.dtype == "bfloat16":
+    if args.dtype == "bfloat16":
         load_dtype = torch.bfloat16
         infer_dtype = torch.bfloat16
-    elif args.dtype == "int8":
-        load_dtype = torch.half
-        infer_dtype = torch.int8
-    elif args.dtype == "float32":
+    else:
         load_dtype = torch.float32
         infer_dtype = torch.float32
 
@@ -378,6 +366,10 @@ input_sentences = []
 current_path = pathlib.Path(__file__).parent.resolve()
 with open(str(current_path) + "/prompt.json") as f:
     prompt_pool = json.load(f)
+if model_type == "gptj":
+    model_type = "gpt-j"
+if model_type == "gptneox":
+    model_type = "gpt-neox"
 if args.prompt is not None:
     input_sentences.append(args.prompt)
 elif model_type == "auto":
