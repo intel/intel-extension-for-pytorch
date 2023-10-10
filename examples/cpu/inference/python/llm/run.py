@@ -57,8 +57,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
     )
     parser.add_argument("--quantized-model-path", default="")
 
-    parser.add_argument("--dataset", nargs="?", default="lambada", const="lambada")
+    parser.add_argument("--dataset", nargs="?", default="NeelNanda/pile-10k")
     parser.add_argument("--ipex-smooth-quant", action="store_true")
+    parser.add_argument("--alpha", default=0.5, type=float, help="alpha value for smoothquant")
     parser.add_argument(
         "--ipex-weight-only-quantization",
         action="store_true",
@@ -222,6 +223,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                             )
                 else:
                     quant_cmd.extend(["--ipex-smooth-quant"])
+                    quant_cmd.extend(["--alpha", str(args.alpha)])
                     quant_cmd.extend(["--dataset", str(args.dataset)])
                 print("quantizing model ...")
                 subprocess.run(quant_cmd)

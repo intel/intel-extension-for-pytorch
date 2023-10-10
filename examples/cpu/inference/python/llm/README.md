@@ -120,7 +120,9 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-weight-only-quantization --gptq --output-dir "saved_results" --int8-bf16-mixed
 
 # static quantization int8 benchmark
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-smooth-quant --int8-bf16-mixed --output-dir "saved_results" --int8-bf16-mixed
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-smooth-quant --alpha <Tuned alpha for specific models> --output-dir "saved_results" --int8-bf16-mixed
+# For the best alpha values (range [0, 1.0], float) tuned for specific models, we verified good accuracy: "EleutherAI/gpt-j-6b" with alpha=1.0, "meta-llama/Llama-2-7b-chat-hf" with alpha=0.8.
+# For other variant models, suggest using default alpha=0.5, and could be further tuned in the range [0, 1.0]. (suggest step_size of 0.05)
 
 Notes:
 (1) for quantization benchmarks, the first runs will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, you can reuse these quantized models for inference-only benchmarks by using "--quantized-model-path <output_dir + "best_model.pt">".
@@ -167,9 +169,12 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list
 mkdir saved_results
 
 ## GPT-J quantization
-python run_gpt-j_quantization.py --ipex-smooth-quant --output-dir "saved_results" --int8-bf16-mixed -m <GPTJ MODEL_ID>
+python run_gpt-j_quantization.py --ipex-smooth-quant --alpha <Tuned alpha for specific models> --output-dir "saved_results" --int8-bf16-mixed -m <GPTJ MODEL_ID>
 ## Llama 2 quantization
-python run_llama_quantization.py --ipex-smooth-quant --output-dir "saved_results" --int8-bf16-mixed -m <LLAMA MODEL_ID>
+python run_llama_quantization.py --ipex-smooth-quant --alpha <Tuned alpha for specific models> --output-dir "saved_results" --int8-bf16-mixed -m <LLAMA MODEL_ID>
+# For the best alpha values (range [0, 1.0], float) tuned for specific models, we verified good accuracy: "EleutherAI/gpt-j-6b" with alpha=1.0, "meta-llama/Llama-2-7b-chat-hf" with alpha=0.8.
+# For other variant models, suggest using default alpha=0.5, and could be further tuned in the range [0, 1.0]. (suggest step_size of 0.05)
+
 ## GPT-NEOX quantization
 python run_gpt-neox_quantization.py --ipex-weight-only-quantization --output-dir "saved_results" --int8 -m <GPT-NEOX MODEL_ID>
 ## Falcon quantization (example of config-file: utils/model_config/tiiuae_falcon-40b_config.json)
