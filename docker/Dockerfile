@@ -37,11 +37,9 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf  /var/lib/apt/lists/*
 
-ARG DEVICE
-
 RUN no_proxy=$no_proxy wget -qO - https://repositories.intel.com/graphics/intel-graphics.key | \
     gpg --dearmor --output /usr/share/keyrings/intel-graphics.gpg
-RUN printf 'deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu jammy %s\n' "$DEVICE" | \
+RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu jammy max" | \
     tee  /etc/apt/sources.list.d/intel.gpu.jammy.list
 
 ARG ICD_VER
@@ -65,16 +63,13 @@ RUN no_proxy=$no_proxy wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-P
 
 ARG DPCPP_VER
 ARG MKL_VER
-ARG CCL_VER="N/A"
+ARG CCL_VER
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends --fix-missing \
     intel-oneapi-runtime-dpcpp-cpp=${DPCPP_VER} \
-    intel-oneapi-runtime-mkl=${MKL_VER}
-RUN if [ ${CCL_VER} != "N/A" ]; then \
-        apt-get install -y --no-install-recommends --fix-missing \
-        intel-oneapi-runtime-ccl=${CCL_VER}; \
-    fi
+    intel-oneapi-runtime-mkl=${MKL_VER} \
+    intel-oneapi-runtime-ccl=${CCL_VER}
 
 ARG PYTHON
 RUN apt-get update && apt install -y software-properties-common 
@@ -100,21 +95,18 @@ RUN ln -sf $(which ${PYTHON}) /usr/local/bin/python && \
 ARG TORCH_VERSION
 ARG TORCHVISION_VERSION
 ARG IPEX_VERSION
-ARG ONECCL_BIND_PT_VERSION="N/A"
+ARG ONECCL_BIND_PT_VERSION
 ARG TORCH_WHL_URL
 ARG IPEX_WHL_URL
 ARG TORCHVISION_WHL_URL
-ARG ONECCL_BIND_PT_WHL_URL="N/A"
+ARG ONECCL_BIND_PT_WHL_URL
 
 RUN python -m pip install numpy
 
 RUN python -m pip install torch==${TORCH_VERSION} -f ${TORCH_WHL_URL} && \
     python -m pip install intel_extension_for_pytorch==${IPEX_VERSION} -f ${IPEX_WHL_URL} && \
-    python -m pip install torchvision==${TORCHVISION_VERSION} -f ${TORCHVISION_WHL_URL}
-
-RUN if [ ${ONECCL_BIND_PT_VERSION} != "N/A" ] && [ ${ONECCL_BIND_PT_WHL_URL} != "N/A" ]; then \
-        python -m pip install oneccl_bind_pt==${ONECCL_BIND_PT_VERSION} -f ${ONECCL_BIND_PT_WHL_URL}; \
-    fi
+    python -m pip install torchvision==${TORCHVISION_VERSION} -f ${TORCHVISION_WHL_URL} && \
+    python -m pip install oneccl_bind_pt==${ONECCL_BIND_PT_VERSION} -f ${ONECCL_BIND_PT_WHL_URL} 
 
 ENV LD_LIBRARY_PATH=/opt/intel/oneapi/lib:/opt/intel/oneapi/lib/intel64:$LD_LIBRARY_PATH
 

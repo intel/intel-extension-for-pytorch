@@ -17,18 +17,12 @@ Assumptions:
 `./build.sh` script has docker build command, update all the relevant build arguments and execute the script.
 
 ```bash
-./build.sh [xpu-flex/xpu-max]
+./build.sh 
 ```
-To pull docker images use the following commands:
+To pull docker images use the following command:
 
-For Flex GPU:
 ```bash
-docker pull intel/intel-extension-for-pytorch:xpu-flex
-```
-
-For Max GPU:
-```bash
-docker pull intel/intel-extension-for-pytorch:xpu-max
+docker pull intel/intel-extension-for-pytorch:xpu
 ```
 ### Running container:
 
@@ -37,13 +31,8 @@ local directory into the container. The `-v` argument can be omitted if you do n
 access to a local directory in the container. Pass the video and render groups to your
 docker container so that the GPU is accessible.
 
-For Flex GPU:
 ```
-IMAGE_NAME=intel/intel-extension-for-pytorch:xpu-flex
-```
-For Max GPU:
-```
-IMAGE_NAME=intel/intel-extension-for-pytorch:xpu-max
+IMAGE_NAME=intel/intel-extension-for-pytorch:xpu
 ```
 ```bash
 
