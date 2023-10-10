@@ -25,7 +25,9 @@ from transformers import (
 # supported models now
 MODEL_CLASSES = {
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
+    "gptj": (AutoModelForCausalLM, AutoTokenizer),
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
+    "gptneox": (AutoModelForCausalLM, AutoTokenizer),
     "llama": (AutoModelForCausalLM, LlamaTokenizer),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
@@ -51,21 +53,11 @@ parser.add_argument(
     help="the huggingface mdoel id",
 )
 parser.add_argument(
-    "--device",
-    type=str,
-    choices=["cpu"],
-    help="cpu",
-    default="cpu",
-)
-parser.add_argument(
     "--dtype",
     type=str,
-    help="float16 or bfloat16 or int8",
-    choices=["int8", "float16", "bfloat16", "float32"],
-    default="float16",
-)
-parser.add_argument(
-    "--local_rank", required=False, type=int, help="used by dist launchers"
+    help="float16 or bfloat16",
+    choices=["bfloat16", "float32"],
+    default="bfloat16",
 )
 parser.add_argument(
     "--batch-size", "--batch-size", default=1, type=int, help="batch size"
@@ -91,26 +83,35 @@ parser.add_argument(
     help="use ipex weight-only quantization",
 )
 parser.add_argument(
+    "--local_rank", required=False, type=int, help="used by dist launchers"
+)
+parser.add_argument(
     "--int8-bf16-mixed",
     action="store_true",
     help="by default it is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
 )
-parser.add_argument("--jit", action="store_true")
 parser.add_argument("--print-memory", action="store_true")
 parser.add_argument("--token-latency", action="store_true")
 parser.add_argument(
     "--lowp-mode",
-    choices=["BF16", "FP32", "INT8", "FP16"],
-    default="BF16",
+    choices=["AUTO", "BF16", "FP32", "INT8", "FP16"],
+    default="AUTO",
     type=str,
-    help="low precision mode for weight only quantization",
+    help="low precision mode for weight only quantization. "
+         "It indicates data type for computation for speedup at the cost "
+         "of accuracy. Unrelated to activation or weight data type."
+         "It is not supported yet to use lowp_mode=INT8 for INT8 weight, "
+         "falling back to lowp_mode=BF16 implicitly in this case."
+         "If set to AUTO, lowp_mode is determined by weight data type: "
+         "lowp_mode=BF16 is used for INT8 weight "
+         "and lowp_mode=INT8 used for INT4 weight",
 )
 parser.add_argument(
     "--weight-dtype",
     choices=["INT8", "INT4"],
     default="INT8",
     type=str,
-    help="weight dtype for weight only quantization",
+    help="weight data type for weight only quantization. Unrelated to activation data type or lowp-mode.",
 )
 parser.add_argument(
     "--config-file", default=None, type=str, help="specific configuration file"
@@ -199,16 +200,10 @@ if args.int8_bf16_mixed:
     load_dtype = torch.bfloat16
     infer_dtype = torch.bfloat16
 else:
-    if args.dtype == "float16":
-        load_dtype = torch.half
-        infer_dtype = torch.half
-    elif args.dtype == "bfloat16":
+    if args.dtype == "bfloat16":
         load_dtype = torch.bfloat16
         infer_dtype = torch.bfloat16
-    elif args.dtype == "int8":
-        load_dtype = torch.half
-        infer_dtype = torch.int8
-    elif args.dtype == "float32":
+    else:
         load_dtype = torch.float32
         infer_dtype = torch.float32
 
@@ -353,8 +348,13 @@ if args.ipex:
             lowp_mode = ipex.quantization.WoqLowpMode.NONE
         elif args.lowp_mode == "FP16":
             lowp_mode = ipex.quantization.WoqLowpMode.FP16
-        else:
+        elif args.lowp_mode == "BF16":
             lowp_mode = ipex.quantization.WoqLowpMode.BF16
+        else:  # AUTO
+            if weight_dtype == torch.quint4x2:
+                lowp_mode = ipex.quantization.WoqLowpMode.INT8
+            else:
+                lowp_mode = ipex.quantization.WoqLowpMode.BF16
 
         qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
             weight_dtype=weight_dtype, lowp_mode=lowp_mode
@@ -378,6 +378,10 @@ input_sentences = []
 current_path = pathlib.Path(__file__).parent.resolve()
 with open(str(current_path) + "/prompt.json") as f:
     prompt_pool = json.load(f)
+if model_type == "gptj":
+    model_type = "gpt-j"
+if model_type == "gptneox":
+    model_type = "gpt-neox"
 if args.prompt is not None:
     input_sentences.append(args.prompt)
 elif model_type == "auto":

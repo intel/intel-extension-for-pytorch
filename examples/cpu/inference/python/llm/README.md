@@ -1,10 +1,10 @@
 # Text Generation
 We provide the inference benchmarking scripts for large language models text generation.<br/>
-Support large language models, such as GPT-J, LLaMA, GPT-Neox, OPT, Falcon.<br/>
+Support large language model families, including GPT-J, LLaMA, GPT-Neox, OPT, Falcon.<br/>
 The scripts include both single instance and distributed (DeepSpeed) use cases.<br/>
 The scripts cover model generation inference with low precions cases for different models with best perf and accuracy (bf16 AMP，static quantization and weight only quantization).<br/>
 
-## Setup
+# Setup
 ```bash
 WORK_DIR=$PWD
 # GCC 12.3 is required, please set it firstly
@@ -76,24 +76,83 @@ wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prom
 
 ```
 
-## Supported Model List
-```
-<MODEL ID> in
-(1) "EleutherAI/gpt-j-6b" (model id from transformers Hub)
-(2) "EleutherAI/gpt-neox-20b" (model id from transformers Hub)
-(3) Llama 2 Model directory path
-(4) "facebook/opt-30b" (model id from transformers Hub)
-(5) "tiiuae/falcon-40b" (model id from transformers Hub)
-Note: Above models are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM models, we could still run with this BKC, and may get parts of optimizations like prepacked TPP Linear (fp32/bf16), and we are working in progress to cover all optimizations to these other LLM models, which will expand the model list above.
-```
-* Llama 2 model conversion steps:
-    1) [transformers conversion tool](https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/convert_llama_weights_to_hf.py) (Verified [meta-llama/Llama-2-7b-chat](https://huggingface.co/meta-llama/Llama-2-7b-chat) and [meta-llama/Llama-2-13b-chat](https://huggingface.co/meta-llama/Llama-2-13b-chat)).
-    2) Follow [instructions](https://github.com/facebookresearch/llama#access-on-hugging-face) to download model files for conversion.
-    3) Decompress the downloaded model file.
-    4) Follow [instructions](https://github.com/facebookresearch/llama-recipes#model-conversion-to-hugging-face) to convert the model.
-    5) Launch example scripts with the place holder <MODEL_ID> substituted by the --output_dir argument value of the conversion script.
-* For Falcon model from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for BF16, but must for quantization benchmark.
+# Supported Model List
 
+| MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP32/BF16 | Weight only quantzation INT8 | Weight only quantization INT4| Static quantization INT8 | 
+|---|:---:|:---:|:---:|:---:|:---:|
+|LLAMA| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" | ✅ | ✅ | ✅ | ✅ | 
+|GPT-J| "EleutherAI/gpt-j-6b" | ✅ | ✅ | ✅ | ✅ | 
+|GPT-NEOX| "EleutherAI/gpt-neox-20b" | ✅ | ✅ | ✅ | ❎ ** | 
+|FALCON*|"tiiuae/falcon-40b" | ✅ | ✅ |  ✅ | ❎ **| 
+|OPT|"facebook/opt-30b", "facebook/opt-1.3b"| ✅ | ✅ |  ✅ | ❎ **| 
+
+*For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for FP32/BF16 but needed for quantizations.
+
+** For GPT-NEOX/FALCON/OPT models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.
+
+*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM model families, we are working in progress to cover those optimizations, which will expand the model list above.
+
+# Run Models Generations
+
+| Benchmark mode | FP32/BF16 | Weight only quantzation INT8 | Weight only quantization INT4 | Static quantization INT8 | 
+|---|:---:|:---:|:---:|:---:|
+|Single instance | ✅ | ✅ | ✅ | ✅ | 
+| Distributed (autotp) |  ✅ | ✅ | ❎ | ❎ | 
+
+You can run LLM with a one-click Python script "run.py" for all inference cases.
+```
+python run.py --help # for more detailed usages
+```
+## Example usages of one-click Python script
+### Single Instance Performance
+```bash
+# Get prompt file to the path of scripts
+mv PATH/TO/prompt.json ./single_instance
+export WORK_DIR=./
+
+# bf16 benchmark
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --deployment-mode
+
+# weight only quantization int8 benchmark
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-weight-only-quantization  --output-dir "saved_results" --int8-bf16-mixed
+
+# weight only quantization int4 benchmark
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-weight-only-quantization --gptq --output-dir "saved_results" --int8-bf16-mixed
+
+# static quantization int8 benchmark
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-smooth-quant --alpha <Tuned alpha for specific models> --output-dir "saved_results" --int8-bf16-mixed
+# For the best alpha values (range [0, 1.0], float) tuned for specific models, we verified good accuracy: "EleutherAI/gpt-j-6b" with alpha=1.0, "meta-llama/Llama-2-7b-chat-hf" with alpha=0.8.
+# For other variant models, suggest using default alpha=0.5, and could be further tuned in the range [0, 1.0]. (suggest step_size of 0.05)
+
+Notes:
+(1) for quantization benchmarks, the first runs will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, you can reuse these quantized models for inference-only benchmarks by using "--quantized-model-path <output_dir + "best_model.pt">".
+(2) for Falcon quantizations, "--config-file <CONFIG_FILE>" is needed and example of <CONFIG_FILE>: "utils/model_config/tiiuae_falcon-40b_config.json".
+(3) for GPT-NEOX quantizations, using "--int8" instead of "--int8-bf16-mixed" for accuracy concerns.
+(4) By default, generations are based on "beam search", and beam size = 4. For beam size = 1, please add "--greedy"
+
+```
+### Distributed Performance with DeepSpeed (autoTP)
+```bash
+# Get prompt file to the path of scripts
+mv PATH/TO/prompt.json ./distributed
+export WORK_DIR=./
+unset KMP_AFFINITY
+
+# bf16 benchmark
+deepspeed --bind_cores_to_rank  run.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --deployment-mode --autotp --shard-model
+
+# weight only quantization int8 benchmark
+deepspeed --bind_cores_to_rank run.py  --benchmark -m <MODEL_ID> --ipex --ipex-weight-only-quantization --output-dir "saved_results" --int8-bf16-mixed --autotp --shard-model
+
+Notes:
+(1) for Falcon quantizations, "--config-file <CONFIG_FILE>" is needed and example of <CONFIG_FILE>: "utils/model_config/tiiuae_falcon-40b_config.json".
+(2) for GPT-NEOX quantizations, using "--int8" instead of "--int8-bf16-mixed" for accuracy concerns.
+(3) by default, we use "--shard-model" for better memory usage, if your model is already sharded, please remove "--shard-model"
+(4) By default, generations are based on "beam search", and beam size = 4. For beam size = 1, please add "--greedy"
+
+```
+
+# Advanced Usage
 ## Single Instance Performance
 ```bash
 # Get prompt file to the path of scripts
@@ -110,9 +169,12 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list
 mkdir saved_results
 
 ## GPT-J quantization
-python run_gpt-j_quantization.py --ipex-smooth-quant --output-dir "saved_results" --int8-bf16-mixed -m <GPTJ MODEL_ID>
+python run_gpt-j_quantization.py --ipex-smooth-quant --alpha <Tuned alpha for specific models> --output-dir "saved_results" --int8-bf16-mixed -m <GPTJ MODEL_ID>
 ## Llama 2 quantization
-python run_llama_quantization.py --ipex-smooth-quant --output-dir "saved_results" --int8-bf16-mixed -m <LLAMA MODEL_ID>
+python run_llama_quantization.py --ipex-smooth-quant --alpha <Tuned alpha for specific models> --output-dir "saved_results" --int8-bf16-mixed -m <LLAMA MODEL_ID>
+# For the best alpha values (range [0, 1.0], float) tuned for specific models, we verified good accuracy: "EleutherAI/gpt-j-6b" with alpha=1.0, "meta-llama/Llama-2-7b-chat-hf" with alpha=0.8.
+# For other variant models, suggest using default alpha=0.5, and could be further tuned in the range [0, 1.0]. (suggest step_size of 0.05)
+
 ## GPT-NEOX quantization
 python run_gpt-neox_quantization.py --ipex-weight-only-quantization --output-dir "saved_results" --int8 -m <GPT-NEOX MODEL_ID>
 ## Falcon quantization (example of config-file: utils/model_config/tiiuae_falcon-40b_config.json)
