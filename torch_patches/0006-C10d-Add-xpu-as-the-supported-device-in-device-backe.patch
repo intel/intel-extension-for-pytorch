@@ -1,0 +1,26 @@
+From 407a10305a5c104edc1e5bdd22cf7aa3544c7894 Mon Sep 17 00:00:00 2001
+From: zhuhong61 <95205772+zhuhong61@users.noreply.github.com>
+Date: Thu, 21 Sep 2023 13:14:52 +0800
+Subject: [PATCH 6/9] C10d: Add xpu as the supported device in device backend
+ map (#166)
+
+---
+ torch/distributed/distributed_c10d.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/torch/distributed/distributed_c10d.py b/torch/distributed/distributed_c10d.py
+index 098e209264c..07decc2ad9b 100644
+--- a/torch/distributed/distributed_c10d.py
++++ b/torch/distributed/distributed_c10d.py
+@@ -254,7 +254,7 @@ class Backend:
+                 "`cuda`. Please specify it via the `devices` argument of "
+                 "`register_backend`."
+             )
+-            Backend.backend_capability[name.lower()] = ["cpu", "cuda"]
++            Backend.backend_capability[name.lower()] = ["cpu", "cuda", "xpu"]
+         elif isinstance(devices, str):
+             # Single device string specified. Simply convert to list.
+             Backend.backend_capability[name.lower()] = [devices]
+-- 
+2.34.1
+

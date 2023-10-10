@@ -1,0 +1,599 @@
+From 0d61b020088d65064072b1cb4d64d249120a88fe Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
+Date: Tue, 26 Sep 2023 20:49:36 +0800
+Subject: [PATCH 8/9] generalize inductor triton backend device agnostic (#168)
+
+---
+ torch/_dynamo/device_interface.py         | 162 ++++++++++++++++++++++
+ torch/_inductor/codecache.py              |  29 ++--
+ torch/_inductor/codegen/triton_foreach.py |   2 +-
+ torch/_inductor/codegen/wrapper.py        |  12 +-
+ torch/_inductor/cuda_properties.py        |  58 --------
+ torch/_inductor/ir.py                     |   7 +-
+ torch/_inductor/select_algorithm.py       |   2 +-
+ torch/_inductor/triton_heuristics.py      |  14 +-
+ torch/_inductor/utils.py                  |  48 +++++--
+ torch/sparse/_triton_ops.py               |  13 +-
+ 10 files changed, 240 insertions(+), 107 deletions(-)
+ create mode 100644 torch/_dynamo/device_interface.py
+ delete mode 100644 torch/_inductor/cuda_properties.py
+
+diff --git a/torch/_dynamo/device_interface.py b/torch/_dynamo/device_interface.py
+new file mode 100644
+index 00000000000..8d19cb92d51
+--- /dev/null
++++ b/torch/_dynamo/device_interface.py
+@@ -0,0 +1,162 @@
++from typing import Any, Dict, Union
++
++import torch
++
++if torch.cuda._is_compiled():
++    from torch._C import _cuda_getCurrentRawStream as get_cuda_stream
++else:
++    get_cuda_stream = None
++
++_device_t = Union[torch.device, str, int, None]
++
++# Recording the device properties in the main process but used in worker process.
++caching_worker_device_properties: Dict[str, Any] = {}
++caching_worker_current_devices: Dict[str, int] = {}
++
++
++class DeviceInterface:
++    """
++    This is a simple device runtime interface for Inductor. It enables custom
++    backends to be integrated with Inductor in a device-agnostic semantic.
++    """
++
++    class Event:
++        def __new__(cls, *args, **kwargs):
++            raise NotImplementedError()
++
++    class device:
++        def __new__(cls, device: _device_t):
++            raise NotImplementedError()
++
++    class Worker:
++        """
++        Worker API to query device properties that will work in multi processing
++        workers that cannot use the GPU APIs (due to processing fork() and
++        initialization time issues). Properties are recorded in the main process
++        before we fork the workers.
++        """
++
++        @staticmethod
++        def set_device(device: int):
++            raise NotImplementedError()
++
++        @staticmethod
++        def current_device() -> int:
++            raise NotImplementedError()
++
++        @staticmethod
++        def get_device_properties(device: _device_t = None):
++            raise NotImplementedError()
++
++    @staticmethod
++    def current_device():
++        raise NotImplementedError()
++
++    @staticmethod
++    def set_device(device: _device_t):
++        raise NotImplementedError()
++
++    @staticmethod
++    def device_count():
++        raise NotImplementedError()
++
++    @staticmethod
++    def is_available() -> bool:
++        raise NotImplementedError()
++
++    @staticmethod
++    def current_stream():
++        raise NotImplementedError()
++
++    @staticmethod
++    def set_stream(stream: torch.Stream):
++        raise NotImplementedError()
++
++    @staticmethod
++    def get_raw_stream():
++        raise NotImplementedError()
++
++    @staticmethod
++    def synchronize(device: _device_t = None):
++        raise NotImplementedError()
++
++    @staticmethod
++    def get_device_properties(device: _device_t = None):
++        raise NotImplementedError()
++
++    @staticmethod
++    def get_compute_capability(device: _device_t = None):
++        raise NotImplementedError()
++
++
++class CudaInterface(DeviceInterface):
++    Event = torch.cuda.Event
++    device = torch.cuda.device
++
++    class Worker:
++        @staticmethod
++        def set_device(device: int):
++            caching_worker_current_devices["cuda"] = device
++
++        @staticmethod
++        def current_device() -> int:
++            if "cuda" in caching_worker_current_devices:
++                return caching_worker_current_devices["cuda"]
++            return torch.cuda.current_device()
++
++        @staticmethod
++        def get_device_properties(device: _device_t = None):
++            if device is not None:
++                if isinstance(device, str):
++                    device = torch.device(device)
++                    assert device.type == "cuda"
++                if isinstance(device, torch.device):
++                    device = device.index
++            if device is None:
++                device = CudaInterface.Worker.current_device()
++
++            if "cuda" not in caching_worker_device_properties:
++                device_prop = [
++                    torch.cuda.get_device_properties(i)
++                    for i in range(torch.cuda.device_count())
++                ]
++                caching_worker_device_properties["cuda"] = device_prop
++
++            return caching_worker_device_properties["cuda"][device]
++
++    current_device = staticmethod(torch.cuda.current_device)
++    set_device = staticmethod(torch.cuda.set_device)
++    device_count = staticmethod(torch.cuda.device_count)
++    current_stream = staticmethod(torch.cuda.current_stream)
++    set_stream = staticmethod(torch.cuda.set_stream)
++    synchronize = staticmethod(torch.cuda.synchronize)
++    get_device_properties = staticmethod(torch.cuda.get_device_properties)
++    get_raw_stream = staticmethod(get_cuda_stream)
++
++    # Can be mock patched by @patch decorator.
++    @staticmethod
++    def is_available() -> bool:
++        return torch.cuda.is_available()
++
++    @staticmethod
++    def get_compute_capability(device: _device_t = None):
++        major, min = torch.cuda.get_device_capability(device)
++        return major * 10 + min
++
++
++device_interfaces: Dict[str, DeviceInterface] = {}
++
++
++def register_interface_for_device(device: str, device_interface: DeviceInterface):
++    device_interfaces[device] = device_interface
++
++
++def get_interface_for_device(device: str):
++    return device_interfaces[device] if device in device_interfaces else None
++
++
++def get_registered_device_interfaces():
++    return device_interfaces.items()
++
++
++register_interface_for_device("cuda", CudaInterface)
+diff --git a/torch/_inductor/codecache.py b/torch/_inductor/codecache.py
+index 2fd3e710fdb..e68b83cf919 100644
+--- a/torch/_inductor/codecache.py
++++ b/torch/_inductor/codecache.py
+@@ -35,7 +35,11 @@ from typing import Any, Callable, Dict, List, Set, Union
+ 
+ import torch
+ 
+-from torch._inductor import config, cuda_properties, exc
++from torch._dynamo.device_interface import (
++    get_interface_for_device,
++    get_registered_device_interfaces,
++)
++from torch._inductor import config, exc
+ from torch._inductor.utils import developer_warning
+ from torch.hub import _Faketqdm, tqdm
+ 
+@@ -1250,8 +1254,17 @@ class TritonCodeCache:
+         return getattr(mod, kernel_name)
+ 
+ 
+-def _worker_compile(kernel_name, source_code, cc, device):
+-    cuda_properties.set_compiler_worker_current_device(device)
++def caching_device_properties():
++    for _, device_interface in get_registered_device_interfaces():
++        if device_interface.is_available():
++            device_interface.Worker.get_device_properties()
++
++
++def _worker_compile(
++    kernel_name: str, source_code: str, cc: int, device: torch.device
++) -> None:
++    device_interface = get_interface_for_device(device.type)
++    device_interface.Worker.set_device(device.index)
+     kernel = TritonCodeCache.load(kernel_name, source_code)
+     kernel.precompile(warm_cache_only_with_cc=cc)
+ 
+@@ -1301,7 +1314,7 @@ class AsyncCompile:
+     def process_pool():
+         # ensure properties have been calculated before processes
+         # are forked
+-        cuda_properties._properties()
++        caching_device_properties()
+         assert config.compile_threads > 1
+         orig_ppid = os.getpid()
+ 
+@@ -1376,13 +1389,13 @@ class AsyncCompile:
+             return list(map(fn, seq))
+         return [t.result() for t in [cls.pool().submit(fn, x) for x in seq]]
+ 
+-    def triton(self, kernel_name, source_code):
++    def triton(self, kernel_name, source_code, device: str = "cuda"):
+         _compile_start()
+ 
+         if config.compile_threads > 1:
+-            major, minor = torch.cuda.get_device_capability()
+-            device = torch.cuda.current_device()
+-            cc = major * 10 + minor
++            device_interface = get_interface_for_device(device)
++            device = torch.device(device, device_interface.current_device())
++            cc = device_interface.get_compute_capability(device)
+             future = self.process_pool().submit(
+                 _worker_compile, kernel_name, source_code, cc, device
+             )
+diff --git a/torch/_inductor/codegen/triton_foreach.py b/torch/_inductor/codegen/triton_foreach.py
+index 865a01f440c..f0fa4c877fa 100644
+--- a/torch/_inductor/codegen/triton_foreach.py
++++ b/torch/_inductor/codegen/triton_foreach.py
+@@ -226,7 +226,7 @@ class ForeachKernel(Kernel):
+         else:
+             # TODO: refactor generate_kernel_call
+             call_args_str = ", ".join(call_args)
+-            stream_name = code.write_get_cuda_stream(
++            stream_name = code.write_get_raw_stream(
+                 V.graph.scheduler.current_device.index
+             )
+             code.writeline(
+diff --git a/torch/_inductor/codegen/wrapper.py b/torch/_inductor/codegen/wrapper.py
+index 389e9e88d5c..17c94e084f6 100644
+--- a/torch/_inductor/codegen/wrapper.py
++++ b/torch/_inductor/codegen/wrapper.py
+@@ -304,8 +304,8 @@ class WrapperCodeGen(CodeGen):
+         # maps from reusing buffer to reused buffer
+         self.reuses = dict()
+ 
+-        self.write_get_cuda_stream = functools.lru_cache(None)(  # type: ignore[assignment]
+-            self.write_get_cuda_stream
++        self.write_get_raw_stream = functools.lru_cache(None)(  # type: ignore[assignment]
++            self.write_get_raw_stream
+         )
+ 
+         @functools.lru_cache(None)
+@@ -404,7 +404,7 @@ class WrapperCodeGen(CodeGen):
+             if config.size_asserts:
+                 self.codegen_input_size_asserts()
+ 
+-    def write_get_cuda_stream(self, index):
++    def write_get_raw_stream(self, index):
+         self.write_triton_header_once()
+         name = f"stream{index}"
+         self.writeline(f"{name} = get_cuda_stream({index})")
+@@ -729,7 +729,7 @@ class WrapperCodeGen(CodeGen):
+         if cuda:
+             call_args_str = ", ".join(pexpr(item) for item in call_args)
+             grid_str = ", ".join(pexpr(item) for item in grid)
+-            stream_name = self.write_get_cuda_stream(
++            stream_name = self.write_get_raw_stream(
+                 V.graph.scheduler.current_device.index
+             )
+             self.writeline(
+@@ -1409,7 +1409,7 @@ class CudaWrapperCodeGen(CppWrapperCodeGen):
+             """
+         )
+ 
+-    def write_get_cuda_stream(self, index):
++    def write_get_raw_stream(self, index):
+         name = f"stream{index}"
+         self.writeline(
+             f"cudaStream_t {name} = at::cuda::getCurrentCUDAStream({index});"
+@@ -1489,7 +1489,7 @@ class CudaWrapperCodeGen(CppWrapperCodeGen):
+         kernel_args_var = f"kernel_args_var_{next(self.kernel_callsite_id)}"
+         self.writeline(f"void* {kernel_args_var}[] = {{{call_args}}};")
+         stream = (
+-            "stream" if V.graph.aot_mode else self.write_get_cuda_stream(device_index)
++            "stream" if V.graph.aot_mode else self.write_get_raw_stream(device_index)
+         )
+         self.writeline(
+             "launchKernel({}, {}, {}, {}, {}, {}, {}, {});".format(
+diff --git a/torch/_inductor/cuda_properties.py b/torch/_inductor/cuda_properties.py
+deleted file mode 100644
+index 59bcc4e9128..00000000000
+--- a/torch/_inductor/cuda_properties.py
++++ /dev/null
+@@ -1,58 +0,0 @@
+-import functools
+-from typing import Dict, Optional, Tuple, Union
+-
+-import torch
+-from torch.cuda import _CudaDeviceProperties
+-
+-# API to query cuda properties that will work in a triton compile process
+-# that cannot use the GPU APIs (due to processing fork() and initialization
+-# time issues). Properties are recorded in the main process before
+-# we fork the workers.
+-
+-_compile_worker_current_device: Optional[int] = None
+-
+-
+-@functools.lru_cache(None)
+-def _properties() -> Dict[int, _CudaDeviceProperties]:
+-    if not torch.cuda.is_available():
+-        return {}
+-    try:
+-        return {
+-            i: torch.cuda.get_device_properties(i)
+-            for i in range(torch.cuda.device_count())
+-        }
+-    except RuntimeError:
+-        return {}
+-
+-
+-def set_compiler_worker_current_device(device: int) -> None:
+-    global _compile_worker_current_device
+-    _compile_worker_current_device = device
+-
+-
+-def current_device() -> int:
+-    if _compile_worker_current_device is not None:
+-        return _compile_worker_current_device
+-    return torch.cuda.current_device()
+-
+-
+-def _device(device: Optional[Union[torch.device, int]]) -> int:
+-    if device is not None:
+-        if isinstance(device, torch.device):
+-            assert device.type == "cuda"
+-            device = device.index
+-        return device
+-    return current_device()
+-
+-
+-def get_device_properties(
+-    device: Optional[Union[torch.device, int]] = None
+-) -> _CudaDeviceProperties:
+-    return _properties()[_device(device)]
+-
+-
+-def get_device_capability(
+-    device: Optional[Union[torch.device, int]] = None
+-) -> Tuple[int, int]:
+-    p = get_device_properties(device)
+-    return p.major, p.minor
+diff --git a/torch/_inductor/ir.py b/torch/_inductor/ir.py
+index 8077ede7324..d66a5f4a280 100644
+--- a/torch/_inductor/ir.py
++++ b/torch/_inductor/ir.py
+@@ -32,6 +32,7 @@ import torch._logging
+ 
+ import torch.fx
+ import torch.utils._pytree as pytree
++from torch._dynamo.device_interface import get_interface_for_device
+ from torch._dynamo.utils import identity
+ from torch._prims_common import (
+     compute_required_storage_length,
+@@ -45,7 +46,6 @@ from torch.utils._sympy.functions import CleanDiv, FloorDiv, ModularIndexing
+ 
+ from . import config, dependencies
+ from .codegen.common import index_prevent_reordering
+-from .cuda_properties import get_device_properties
+ from .dependencies import extract_read_writes, var_builder
+ from .utils import (
+     argsort,
+@@ -631,7 +631,10 @@ class Reduction(Loops):
+         if not should_split:
+             return ReductionHint.DEFAULT, 1
+ 
+-        num_sm = get_device_properties(device).multi_processor_count
++        device_interface = get_interface_for_device(get_device_type(device))
++        num_sm = device_interface.Worker.get_device_properties(
++            device
++        ).multi_processor_count
+         min_elements_per_thread = 32
+         max_elements_per_thread = 512
+         threads_per_sm = 2048
+diff --git a/torch/_inductor/select_algorithm.py b/torch/_inductor/select_algorithm.py
+index 7ff74929391..936792cf827 100644
+--- a/torch/_inductor/select_algorithm.py
++++ b/torch/_inductor/select_algorithm.py
+@@ -356,7 +356,7 @@ class TritonTemplateKernel(TritonKernel):
+             )
+         else:
+             call_args = ", ".join(call_args)  # type: ignore[assignment]
+-            stream_name = wrapper.write_get_cuda_stream(
++            stream_name = wrapper.write_get_raw_stream(
+                 V.graph.scheduler.current_device.index
+             )
+ 
+diff --git a/torch/_inductor/triton_heuristics.py b/torch/_inductor/triton_heuristics.py
+index 3e14c752263..7b21d632099 100644
+--- a/torch/_inductor/triton_heuristics.py
++++ b/torch/_inductor/triton_heuristics.py
+@@ -16,6 +16,7 @@ from typing import Any, Callable, List, Optional, Set, Tuple
+ import torch
+ 
+ import torch.autograd.profiler as autograd_profiler
++from torch._dynamo.device_interface import get_interface_for_device
+ from torch._dynamo.utils import dynamo_timed
+ 
+ from . import config
+@@ -29,6 +30,7 @@ from .utils import (
+     create_bandwidth_info_str,
+     do_bench,
+     get_num_bytes,
++    has_triton_package,
+     has_triton,
+     next_power_of_2,
+     triton_config_to_hashable,
+@@ -37,15 +39,19 @@ from .utils import (
+ 
+ log = logging.getLogger(__name__)
+ 
+-if has_triton():
++if has_triton_package():
+     import triton
+     from triton import Config
+-    from triton.runtime.jit import get_cuda_stream, KernelInterface
++    from triton.runtime.jit import KernelInterface
+ else:
+     Config = object
+-    get_cuda_stream = None
+-    KernelInterface = object
+     triton = None
++    KernelInterface = object
++
++if has_triton():
++    from triton.runtime.jit import get_cuda_stream
++else:
++    get_cuda_stream = None
+ 
+ 
+ class HeuristicType(Enum):
+diff --git a/torch/_inductor/utils.py b/torch/_inductor/utils.py
+index 417defc24c2..1b208789146 100644
+--- a/torch/_inductor/utils.py
++++ b/torch/_inductor/utils.py
+@@ -32,11 +32,11 @@ from unittest import mock
+ import sympy
+ 
+ import torch
++from torch._dynamo.device_interface import get_interface_for_device
+ from torch.fx.immutable_collections import immutable_dict, immutable_list
+ from torch.utils._sympy.functions import CleanDiv, FloorDiv, ModularIndexing
+ 
+ from . import config
+-from .cuda_properties import current_device, get_device_capability
+ 
+ log = logging.getLogger(__name__)
+ 
+@@ -76,17 +76,27 @@ def do_bench(*args, **kwargs):
+ 
+ 
+ @functools.lru_cache(None)
+-def has_triton() -> bool:
+-    if not torch.cuda.is_available():
+-        return False
++def has_triton_package() -> bool:
+     try:
+         import triton
+ 
+-        return triton is not None and get_device_capability() >= (7, 0)
++        return triton is not None
+     except ImportError:
+         return False
+ 
+ 
++@functools.lru_cache(None)
++def has_triton() -> bool:
++    def is_cuda_compatible_with_triton():
++        device_interface = get_interface_for_device("cuda")
++        return (
++            device_interface.is_available()
++            and device_interface.Worker.get_device_properties().major >= 7
++        )
++
++    return is_cuda_compatible_with_triton() and has_triton_package()
++
++
+ @functools.lru_cache(None)
+ def has_torchvision_roi_align() -> bool:
+     try:
+@@ -108,8 +118,9 @@ def decode_device(device: Union[Optional[torch.device], str]) -> torch.device:
+         return torch.tensor(0.0).device  # default device
+     if isinstance(device, str):
+         device = torch.device(device)
+-    if device.type == "cuda" and device.index is None:
+-        return torch.device("cuda", index=current_device())
++    if device.type != "cpu" and device.index is None:
++        device_interface = get_interface_for_device(device.type)
++        return torch.device(device.type, index=device_interface.Worker.current_device())
+     return device
+ 
+ 
+@@ -202,26 +213,33 @@ def gen_gm_and_inputs(target, args, kwargs):
+     return gm, a_args
+ 
+ 
+-def synchronize():
+-    if torch.cuda.is_available():
+-        torch.cuda.synchronize()
++def synchronize(device: str = "cuda"):
++    if device == "cpu":
++        return
++    device_interface = get_interface_for_device(device)
++    if device_interface.is_available():
++        device_interface.synchronize()
+ 
+ 
+-def timed(model: Callable[..., Any], example_inputs, times: int = 1) -> float:
+-    synchronize()
++def timed(
++    model: Callable[..., Any], example_inputs, times: int = 1, device: str = "cuda"
++) -> float:
++    synchronize(device)
+     torch.manual_seed(1337)
+     t0 = time.perf_counter()
+     for _ in range(times):
+         result = model(*example_inputs)
+-        synchronize()
++        synchronize(device)
+     t1 = time.perf_counter()
+     # GC the result after timing
+     assert result is not None
+     return t1 - t0
+ 
+ 
+-def print_performance(fn, args=(), times=10, repeat=10, baseline=1.0):
+-    timings = torch.tensor([timed(fn, args, times) for _ in range(repeat)])
++def print_performance(
++    fn, args=(), times=10, repeat=10, baseline=1.0, device: str = "cuda"
++):
++    timings = torch.tensor([timed(fn, args, times, device) for _ in range(repeat)])
+     took = torch.median(timings)
+     print(f"{took/baseline:.6f}")
+     return took
+diff --git a/torch/sparse/_triton_ops.py b/torch/sparse/_triton_ops.py
+index 57c9ac0168a..dea50b6432f 100644
+--- a/torch/sparse/_triton_ops.py
++++ b/torch/sparse/_triton_ops.py
+@@ -1,18 +1,7 @@
+ import math
+ 
+ import torch
+-from torch._inductor.cuda_properties import get_device_capability
+-
+-
+-def _has_triton():
+-    if not torch.cuda.is_available():
+-        return False
+-    try:
+-        import triton
+-
+-        return triton is not None and get_device_capability() >= (7, 0)
+-    except ImportError:
+-        return False
++from torch._inductor.utils import has_triton as _has_triton
+ 
+ 
+ def check(cond, msg):
+-- 
+2.34.1
+
