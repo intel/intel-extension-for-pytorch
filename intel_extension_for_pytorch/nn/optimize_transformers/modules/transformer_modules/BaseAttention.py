@@ -26,7 +26,6 @@ class IPEXTransformerAttn(nn.Module):
     def release_resources():
         raise NotImplementedError
 
-
     def forward(
         self,
         hidden_states: torch.FloatTensor,
@@ -57,7 +56,6 @@ class IPEXTransformerAttn(nn.Module):
         attn_output = self.post_sdp(attn_output, residual)
 
         self.end_of_attention()
-
         outputs = (attn_output, present)
         if output_attentions:
             outputs += (attn_weight, )

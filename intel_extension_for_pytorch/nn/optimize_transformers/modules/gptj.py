@@ -183,7 +183,6 @@ class NewIPEXGPTJBlock(IPEXTransformerBlock):
             # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
             hidden_states = hidden_states.transpose(0, 1)
 
-
         if use_cache:
             outputs = (hidden_states, ) + outputs
         else:
@@ -228,7 +227,6 @@ def IPEXGPTJForCausalLMForward(
             return_dict=return_dict,
         )
         hidden_states = transformer_outputs[0]
-
         # Set device for model parallelism
         if self.model_parallel:
             torch.cuda.set_device(self.transformer.first_device)
@@ -262,7 +260,6 @@ def IPEXGPTJForCausalLMForward(
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]
             return ((loss,) + output) if loss is not None else output
-
         return CausalLMOutputWithPast(
             loss=loss,
             logits=lm_logits,

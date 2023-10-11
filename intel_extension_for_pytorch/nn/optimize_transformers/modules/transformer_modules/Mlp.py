@@ -115,7 +115,9 @@ class IPEXTransformerMLPOptimizedFp16GeluGptj(IPEXTransformerMLPOptimizedFp16Gel
         return out
     
     def out_mm(self, inter_out, attn_out, residual):
-        return  torch.ops.torch_ipex.mm_bias_resadd_resadd(inter_out, self.fc_out.weight, self.fc_out.bias, 1.0/self.tp_size, attn_out, 1.0/self.tp_size, residual, 1.0/self.tp_size)
+        hidden_states = torch.ops.torch_ipex.mm_bias_resadd_resadd(inter_out, self.fc_out.weight, self.fc_out.bias, 1.0/self.tp_size, attn_out, 1.0/self.tp_size, residual, 1.0/self.tp_size)
+        hidden_states = self.all_reduce_if_necessary(hidden_states)
+        return hidden_states
 
 class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
     def __init__(self, config) -> None:

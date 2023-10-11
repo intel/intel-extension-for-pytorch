@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import dataclasses
+import torch.distributed as dist 
 
 
 class IPEXTransformerBlock(nn.Module):

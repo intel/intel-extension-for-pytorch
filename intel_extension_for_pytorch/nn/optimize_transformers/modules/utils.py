@@ -85,7 +85,7 @@ def pad_for_gptj_lm_head(model, is_int4=False):
 
         # tensor parallel for the last linear
         # TOTO: update IPEXEmptyLinearWithPadding after DeepSpeed PR (https://github.com/microsoft/DeepSpeed/pull/3962) merge or Ipex auto TP
-        if hasattr(model, "lm_head") and dist.is_initialized():
+        if hasattr(model, "lm_head") and dist.is_initialized() and False:
             lm_head_new = IPEXLmHeadLinearAllreduceWithPadding(
                 n, torch.nn.parameter.Parameter(model.lm_head.weight, requires_grad=False), dist.get_rank(), dist.get_world_size(),
                 model.lm_head.bias if model.lm_head.bias is None else torch.nn.parameter.Parameter(model.lm_head.bias), IPEXTransformerConverter.tp_group)

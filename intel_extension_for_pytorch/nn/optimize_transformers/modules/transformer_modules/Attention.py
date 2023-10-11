@@ -66,9 +66,11 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
             self.seq_len = self.prev_seq_len + 1
 
     def prepare_kv_prompt(self, hidden_states):
+        bs_beam, seq_len, embed_dim = self.get_runtime_shape(hidden_states)
         if self.runtime_cache.key_prompt is None or self.runtime_cache.value_prompt is None or IPEXTransformerAttn.timestamp == 0:
-            self.runtime_cache.key_prompt = torch.empty_like(hidden_states)
-            self.runtime_cache.value_prompt = torch.empty_like(hidden_states)
+            out_shape = [bs_beam, seq_len, self.head_dim * self.num_attn_head]
+            self.runtime_cache.key_prompt = torch.empty(out_shape, device=hidden_states.device, dtype=hidden_states.dtype)
+            self.runtime_cache.value_prompt = torch.empty(out_shape, device=hidden_states.device, dtype=hidden_states.dtype)
 
     def prepare_kv_cache(self, hidden_states):
         bs_beam, seq_len, embed_dim = self.get_runtime_shape(hidden_states)
