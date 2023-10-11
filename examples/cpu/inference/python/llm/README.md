@@ -146,7 +146,7 @@ deepspeed --bind_cores_to_rank run.py  --benchmark -m <MODEL_ID> --ipex --ipex-w
 
 Notes:
 (1) for Falcon quantizations, "--config-file <CONFIG_FILE>" is needed and example of <CONFIG_FILE>: "utils/model_config/tiiuae_falcon-40b_config.json".
-(2) for GPT-NEOX quantizations, using "--int8" instead of "--int8-bf16-mixed" for accuracy concerns.
+(2) for GPT-NEOX quantizations, using "--int8" instead of "--int8-bf16-mixed", and "--dtype float32" for accuracy concerns.
 (3) by default, we use "--shard-model" for better memory usage, if your model is already sharded, please remove "--shard-model"
 (4) By default, generations are based on "beam search", and beam size = 4. For beam size = 1, please add "--greedy"
 
