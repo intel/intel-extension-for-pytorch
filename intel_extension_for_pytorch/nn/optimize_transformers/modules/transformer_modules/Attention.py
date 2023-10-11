@@ -73,7 +73,6 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     def prepare_kv_cache(self, hidden_states):
         bs_beam, seq_len, embed_dim = self.get_runtime_shape(hidden_states)
         batch_size = bs_beam // self.beam_size
-
         if self.runtime_cache.key_cache is None or self.runtime_cache.value_cache is None or batch_size != self.batch_size:
             cache_shape = [self.max_position, bs_beam, self.num_attn_head, self.head_dim]
             self.runtime_cache.key_cache = torch.empty(cache_shape, device=hidden_states.device, dtype=hidden_states.dtype)

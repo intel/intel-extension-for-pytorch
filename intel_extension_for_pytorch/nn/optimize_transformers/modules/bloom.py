@@ -7,7 +7,7 @@ from torch.nn import CrossEntropyLoss
 from typing import Optional, Tuple, Union
 import sys
 import os 
-from ._transformers import IPEXTransformerAtten, IPEXTransformerMLP, IPEXEmptyLinear, IPEXTransformerConverter, MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
+from ._transformers import MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
 from ._transformer_configuration import IPEXTransformerConfig, SupportedActivation
 from .transformer_modules.RoPE import PositionalEmbedding
 from transformers.modeling_outputs import CausalLMOutputWithCrossAttentions
@@ -109,8 +109,8 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
         bias_shape = [num_head, 3, -1]
         qkv_weight = self.module.self_attention.query_key_value.weight
         qkv_bias = self.module.self_attention.query_key_value.bias
-        qkv_weight = qkv_weight.view(weight_shape).transpose(0, 1).contiguous().view([3, -1, embed_dim]).contiguous()
-        qkv_bias = qkv_bias.view(bias_shape).transpose(0, 1).contiguous().view([3, -1]).contiguous()
+        qkv_weight.data = qkv_weight.view(weight_shape).transpose(0, 1).contiguous().view([3, -1, embed_dim]).contiguous()
+        qkv_bias.data = qkv_bias.view(bias_shape).transpose(0, 1).contiguous().view([3, -1]).contiguous()
         q_proj = IPEXTransformerLinear(qkv_weight[0], qkv_bias[0])
         k_proj = IPEXTransformerLinear(qkv_weight[1], qkv_bias[1])
         v_proj = IPEXTransformerLinear(qkv_weight[2], qkv_bias[2])
@@ -134,6 +134,8 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
         if self.ipex_config.transpose:
             self.transpose_parameter()
         self.attn.cat_qkv()
+        self.module.self_attention.query_key_value.weight.data = self.attn.qkv_proj.weight.data
+        self.module.self_attention.query_key_value.bias.data = self.attn.qkv_proj.bias.data
 
 
     def release_resources(self):
@@ -154,7 +156,7 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
         use_cache: bool = False,
         output_attentions: bool = False,
     ):
-        bs = IPEXTransformerAtten.batch_size
+        bs = IPEXTransformerAttn.batch_size
         dim = hidden_states.dim()
         if dim == 3:
             beam = hidden_states.shape[0] // bs
@@ -165,7 +167,7 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
         else:
             print("Unsupported input shape")
             return
-        IPEXTransformerAtten.beam_size = beam
+        IPEXTransformerAttn.beam_size = beam
         first_token = True if acc_test or layer_past is None else False 
         hidden_size = hidden_states.shape[-1]
         hidden_shape = [bs, beam, seq, hidden_size]

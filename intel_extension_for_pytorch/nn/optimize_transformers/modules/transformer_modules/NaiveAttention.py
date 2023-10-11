@@ -96,9 +96,13 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
         self.q_proj.weight.data = self.qkv_proj.weight[0, :, :]
         self.k_proj.weight.data = self.qkv_proj.weight[1, :, :]
         self.v_proj.weight.data = self.qkv_proj.weight[2, :, :]
+
         if self.q_proj.bias is not None:
             bias_shape = [3, -1]
             self.qkv_proj.bias = torch.stack([self.q_proj.bias, self.k_proj.bias, self.v_proj.bias]).contiguous().view(bias_shape)
+            self.q_proj.bias.data = self.qkv_proj.bias[0]
+            self.k_proj.bias.data = self.qkv_proj.bias[1]
+            self.v_proj.bias.data = self.qkv_proj.bias[2]
 
 # ################################ pre_qkv ######################################################
     def pre_qkv(self, hidden_states, layer_past, **kwargs):
