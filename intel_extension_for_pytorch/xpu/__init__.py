@@ -34,8 +34,6 @@ from .overrides import (
     override_assert_equal,
 )
 
-from .generator import Generator
-
 import intel_extension_for_pytorch.optim as optim
 from intel_extension_for_pytorch._version import (
     __version__,

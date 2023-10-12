@@ -2,6 +2,7 @@
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/THP.h>
 #include <torch/csrc/tensor/python_tensor.h>
+#include <torch/csrc/utils/pycfunction_helpers.h>
 
 #include <ATen/autocast_mode.h>
 
@@ -13,7 +14,6 @@
 #include <pybind11/stl.h>
 #include <utils/Settings.h>
 #include "Event.h"
-#include "Generator.h"
 #include "LazyInit.h"
 #include "Module.h"
 #include "Stream.h"
@@ -546,10 +546,6 @@ static struct PyMethodDef _THPModule_methods[] = {
     {"is_autocast_xpu_enabled", is_autocast_xpu_enabled, METH_NOARGS, nullptr},
     {"set_autocast_xpu_dtype", set_autocast_xpu_dtype, METH_O, nullptr},
     {"get_autocast_xpu_dtype", get_autocast_xpu_dtype, METH_NOARGS, nullptr},
-    {"generator_new",
-     castPyCFunctionWithKeywords(THPGenerator_New),
-     METH_VARARGS | METH_KEYWORDS,
-     nullptr},
     {"_from_usm", THPModule_fromUSM, METH_VARARGS, nullptr},
     {"_to_usm", THPModule_toUSM, METH_O, nullptr},
     {nullptr}};
