@@ -2,6 +2,11 @@
 #include <ATen/native/Resize.h>
 #include "BlasImpl.h"
 #include "utils/CustomOperatorRegistration.h"
+
+#if defined(USE_XETLA)
+#include "XeGemm.h"
+#endif
+
 namespace at {
 namespace AtenIpexTypeXPU {
 
@@ -65,6 +70,41 @@ Tensor& addmm_out(
         "Double and complex datatype matmul is not supported. Include oneMKL library in compilation");
 #endif
   }
+
+#if defined(USE_XETLA)
+  if (alpha.to<float>() == 1.f && self.dim() == 1) {
+    auto policy =
+        HGEMM_XETLA()
+            .add_matrix_c(result)
+            .add_matrix_a(mat1)
+            .add_matrix_b(mat2)
+            .add_epilogue(
+                self, HGEMM_XETLA::EpilogueType::BIAS, beta.to<float>())
+            .build();
+    if (policy.valid()) {
+      auto status = policy.run();
+      if (status == xpu::xetla::GemmStatus::kSuccess)
+        return result;
+    }
+  } else if (
+      self.dim() == 2 && self.sizes()[0] == mat1.sizes()[0] &&
+      self.sizes()[1] == mat2.sizes()[1]) {
+    auto policy =
+        HGEMM_XETLA()
+            .add_alpha(alpha.to<float>())
+            .add_matrix_c(result)
+            .add_matrix_a(mat1)
+            .add_matrix_b(mat2)
+            .add_epilogue(
+                self, HGEMM_XETLA::EpilogueType::RES_ADD, beta.to<float>())
+            .build();
+    if (policy.valid()) {
+      auto status = policy.run();
+      if (status == xpu::xetla::GemmStatus::kSuccess)
+        return result;
+    }
+  }
+#endif
 
   // general case
   Tensor bias = at::Tensor();
@@ -146,6 +186,19 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
         "Double and complex datatype matmul is not supported. Include oneMKL library in compilation");
 #endif
   }
+
+#if defined(USE_XETLA)
+  auto policy = HGEMM_XETLA()
+                    .add_matrix_c(result)
+                    .add_matrix_a(self)
+                    .add_matrix_b(mat2)
+                    .build();
+  if (policy.valid()) {
+    auto status = policy.run();
+    if (status == xpu::xetla::GemmStatus::kSuccess)
+      return result;
+  }
+#endif
 
   xpu::oneDNN::matmul(result, self, mat2, at::Tensor(), true, Attr());
   return result;
@@ -1115,7 +1168,44 @@ at::Tensor t_matmul_gelu(
       result, tensor1, tensor2, false, attr, is_fused);
 }
 
+Tensor matmul_bias_out(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias_opt) {
+  // See [Note: hacky wrapper removal for optional tensor]
+  auto bias = bias_opt.has_value()
+      ? c10::MaybeOwned<Tensor>::borrowed(*bias_opt)
+      : c10::MaybeOwned<Tensor>::owned(c10::in_place);
+
+  if (input.dim() == 2 && bias->defined()) {
+    // Fused op is marginally faster.
+    return at::addmm(*bias, input, weight);
+  }
+  if (input.dim() == 3 && bias->defined() && input.is_contiguous() &&
+      !input.is_xla()) {
+    // Also hit the fused path for contiguous 3D input, if not using xla
+    // backend. Reshaping/flattening has some performance implications on xla.
+    const auto input_sizes = input.sym_sizes();
+    const auto result = at::addmm(
+        *bias,
+        input.view_symint({input_sizes[0] * input_sizes[1], input_sizes[2]}),
+        weight);
+    return result.view_symint(
+        {input_sizes[0], input_sizes[1], result.sym_size(1)});
+  }
+  auto output = at::matmul(input, weight);
+  if (bias->defined()) {
+    output = at::add(output, *bias);
+  }
+  return output;
+}
 } // namespace AtenIpexTypeXPU
+
+namespace {
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER("matmul_bias_out", at::AtenIpexTypeXPU::matmul_bias_out);
+}
+} // namespace
 
 namespace AtenIpexTypeQuantizedXPU {
 
