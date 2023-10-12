@@ -19,7 +19,7 @@ Channels Last
 
 Compared with the default NCHW memory format, using channels_last (NHWC) memory format can further accelerate convolutional neural networks. In Intel® Extension for PyTorch\*, NHWC memory format has been enabled for most key CPU and GPU operators. More detailed information is available at `Channels Last <features/nhwc.md>`_.
 
-Intel® Extension for PyTorch* automatically converts a model to channels last memory format when users optimize the model with `ipex.optimize(model)`. With this feature users won't need to manually apply `model=model.to(memory_format=torch.channels_last)` any more. More detailed information is available at `Auto Channels Last <features/auto_channels_last.md>`_.
+Intel® Extension for PyTorch* automatically converts a model to channels last memory format when users optimize the model with `ipex.optimize(model)`. With this feature users won't need to manually apply `model=model.to(memory_format=torch.channels_last)` any more. However, models running on Intel® Data Center GPU Flex Series will choose oneDNN layout, so users still need to manually convert the model and data to channels last format. More detailed information is available at `Auto Channels Last <features/auto_channels_last.md>`_.
 
 .. toctree::
    :hidden:
