@@ -1,0 +1,68 @@
+From dea0fdd40c61eafeb70e2634c34833d10cab0d58 Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
+Date: Wed, 4 Oct 2023 11:42:44 +0800
+Subject: [PATCH 25/25] fix a missing keyword virtual and manual seed (#170)
+
+* fix a missing keyword virtual
+
+* use manual_seed_all
+---
+ aten/src/ATen/detail/XPUHooksInterface.h | 6 +++---
+ torch/random.py                          | 4 ++--
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/aten/src/ATen/detail/XPUHooksInterface.h b/aten/src/ATen/detail/XPUHooksInterface.h
+index 53e14046199..bc40baebf1c 100644
+--- a/aten/src/ATen/detail/XPUHooksInterface.h
++++ b/aten/src/ATen/detail/XPUHooksInterface.h
+@@ -55,7 +55,7 @@ struct TORCH_API XPUHooksInterface {
+         false,
+         "Cannot get XPU device without Intel Extension for Pytorch. ",
+         XPU_HELP);
+-  };
++  }
+ 
+   virtual DLDevice_& getDLPackDeviceFromATenDevice(
+       DLDevice_& dl_device,
+@@ -65,14 +65,14 @@ struct TORCH_API XPUHooksInterface {
+         false,
+         "Cannot get XPU DL device without Intel Extension for Pytorch. ",
+         XPU_HELP);
+-  };
++  }
+ 
+   virtual Generator getXPUGenerator(DeviceIndex device_index = -1) const {
+     (void)device_index; // Suppress unused variable warning
+     TORCH_CHECK(false, "Cannot get XPU generator without Intel Extension for Pytorch. ", XPU_HELP);
+   }
+ 
+-    const Generator& getDefaultXPUGenerator(DeviceIndex device_index = -1) const {
++  virtual const Generator& getDefaultXPUGenerator(DeviceIndex device_index = -1) const {
+     (void)device_index; // Suppress unused variable warning
+     TORCH_CHECK(false, "Cannot get default XPU generator without Intel Extension for Pytorch. ", XPU_HELP);
+   }
+diff --git a/torch/random.py b/torch/random.py
+index 0cc90675a0f..bb2490d5771 100644
+--- a/torch/random.py
++++ b/torch/random.py
+@@ -44,7 +44,7 @@ def manual_seed(seed) -> torch._C.Generator:
+         torch.mps.manual_seed(seed)
+ 
+     if hasattr(torch, 'xpu') and not torch.xpu._is_in_bad_fork():
+-        torch.xpu.manual_seed(seed)
++        torch.xpu.manual_seed_all(seed)
+ 
+     return default_generator.manual_seed(seed)
+ 
+@@ -64,7 +64,7 @@ def seed() -> int:
+         torch.mps.manual_seed(seed)
+ 
+     if hasattr(torch, 'xpu') and not torch.xpu._is_in_bad_fork():
+-        torch.xpu.manual_seed(seed)
++        torch.xpu.manual_seed_all(seed)
+ 
+     return seed
+ 
+-- 
+2.34.1
+

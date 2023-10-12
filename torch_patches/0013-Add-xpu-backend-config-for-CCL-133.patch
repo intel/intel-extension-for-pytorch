@@ -1,14 +1,14 @@
 From 7ca13eb324fc490f1f7e5101213f36cf9bcc3bf6 Mon Sep 17 00:00:00 2001
 From: zhuhong61 <95205772+zhuhong61@users.noreply.github.com>
 Date: Fri, 9 Jun 2023 12:53:33 +0800
-Subject: [PATCH 13/18] Add xpu backend config for CCL (#133)
+Subject: [PATCH 13/25] Add xpu backend config for CCL (#133)
 
 ---
  torch/distributed/distributed_c10d.py | 1 +
  1 file changed, 1 insertion(+)
 
 diff --git a/torch/distributed/distributed_c10d.py b/torch/distributed/distributed_c10d.py
-index 6fc6c059c2..211817b124 100644
+index 6fc6c059c24..211817b124f 100644
 --- a/torch/distributed/distributed_c10d.py
 +++ b/torch/distributed/distributed_c10d.py
 @@ -240,6 +240,7 @@ class BackendConfig:

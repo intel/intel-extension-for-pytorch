@@ -1,0 +1,1734 @@
+From 390f407663d1958b7ec9bf16ba71a1590d6317d4 Mon Sep 17 00:00:00 2001
+From: zhuhong61 <95205772+zhuhong61@users.noreply.github.com>
+Date: Tue, 29 Aug 2023 09:49:00 +0800
+Subject: [PATCH 20/25] Enable FSDP for xpu  (#153)
+
+* [Feature] storage resize_ support custom device. (#99882)
+
+Fixes #99326
+
+Support storage resize_ for custom device, by calling dispatched tensor operations.
+
+@ezyang  this pr is another case  that was brought up in issue #99326,  please take a moment to review this change.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/99882
+Approved by: https://github.com/ezyang
+
+* Change `THPStorage::cdata` to be a `MaybeOwned<Storage>`, add unpack func (#96801)
+
+Part of #91395
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/96801
+Approved by: https://github.com/ezyang
+
+* [pt] move csrc shm logic to aten storage utils (#95228)
+
+Summary:
+This is part 1 of the effort to support `share_memory_()` in C++ aten library.
+
+This allows C++ code to in place replace the tensor storage to shm based.
+For now fd based shm is the only implementation supported to simplify memory management in general.
+
+This first part intentionally avoids public api changes (to `TensorBase`, see comments in `StorageUtil.h`) such that we can get the core features usable outside pt/csrc first. The API addition to `Tensor` or `TensorBase` would involve more distracting changes and make the change harder to review.
+
+Test Plan:
+```
+buck test caffe2:StorageUtils_test
+```
+
+Differential Revision: D43467616
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/95228
+Approved by: https://github.com/ezyang
+
+* Making fsdp device-agnostic for custom-backend which implement cuda-semantics
+
+---------
+
+Co-authored-by: wbigat <wbigat@163.com>
+Co-authored-by: Kurt Mohler <kmohler@quansight.com>
+Co-authored-by: Shawn Xu <sxu0@meta.com>
+---
+ aten/src/ATen/StorageUtils.cpp                |  47 ++++++
+ aten/src/ATen/StorageUtils.h                  |  50 +++++++
+ aten/src/ATen/test/CMakeLists.txt             |   1 +
+ aten/src/ATen/test/StorageUtils_test.cpp      |  33 ++++
+ .../open_registration_extension.cpp           |  19 +++
+ ...cpp_extensions_open_device_registration.py |  25 +++-
+ torch/csrc/DynamicTypes.cpp                   |  14 +-
+ torch/csrc/PythonTypes.h                      |  20 ---
+ torch/csrc/Storage.cpp                        | 115 +++++++-------
+ torch/csrc/Storage.h                          |  81 +++++++++-
+ torch/csrc/StorageMethods.cpp                 | 117 +++++++++------
+ torch/csrc/StorageSharing.cpp                 | 141 ++++++++----------
+ torch/csrc/utils.cpp                          |   9 --
+ torch/csrc/utils.h                            |   1 -
+ torch/distributed/fsdp/_common_utils.py       |  53 ++++++-
+ torch/distributed/fsdp/_init_utils.py         |  20 ++-
+ torch/distributed/fsdp/_optim_utils.py        |   6 +-
+ torch/distributed/fsdp/_runtime_utils.py      |  42 +++---
+ torch/distributed/fsdp/_state_dict_utils.py   |  10 +-
+ .../distributed/fsdp/_unshard_param_utils.py  |   4 +-
+ torch/distributed/fsdp/flat_param.py          |   6 +-
+ 21 files changed, 545 insertions(+), 269 deletions(-)
+ create mode 100644 aten/src/ATen/StorageUtils.cpp
+ create mode 100644 aten/src/ATen/StorageUtils.h
+ create mode 100644 aten/src/ATen/test/StorageUtils_test.cpp
+ delete mode 100644 torch/csrc/PythonTypes.h
+
+diff --git a/aten/src/ATen/StorageUtils.cpp b/aten/src/ATen/StorageUtils.cpp
+new file mode 100644
+index 00000000000..a9cd5368d31
+--- /dev/null
++++ b/aten/src/ATen/StorageUtils.cpp
+@@ -0,0 +1,47 @@
++#include <ATen/Functions.h>
++#include <ATen/MapAllocator.h>
++#include <ATen/StorageUtils.h>
++#include <c10/core/TensorOptions.h>
++
++namespace at {
++
++C10_EXPORT c10::intrusive_ptr<c10::StorageImpl> new_shm_fd_storage(
++    size_t size) {
++  int flags = ALLOCATOR_MAPPED_SHAREDMEM | ALLOCATOR_MAPPED_EXCLUSIVE |
++      ALLOCATOR_MAPPED_KEEPFD | ALLOCATOR_MAPPED_UNLINK;
++  std::string handle = NewProcessWideShmHandle();
++  auto sptr = MapAllocator::makeDataPtr(
++      handle.c_str(), flags, size * sizeof(uint8_t), nullptr);
++  return c10::make_intrusive<StorageImpl>(
++      c10::StorageImpl::use_byte_size_t(),
++      size,
++      std::move(sptr),
++      /*allocator=*/nullptr,
++      /*resizable=*/false);
++}
++
++C10_EXPORT void storage_copy(
++    c10::Storage& dst,
++    const c10::Storage& src,
++    bool non_blocking) {
++  auto dst_options = c10::TensorOptions().device(dst.device()).dtype(at::kByte);
++  auto dst_t = at::empty({0}, {}, dst_options).set_(dst);
++
++  auto src_options = c10::TensorOptions().device(src.device()).dtype(at::kByte);
++  auto src_t = at::empty({0}, {}, src_options).set_(src);
++  dst_t.copy_(src_t, non_blocking);
++}
++
++C10_EXPORT void share_memory_(TensorBase& t) {
++  if (t.device() != at::kCPU) {
++    return;
++  }
++
++  const at::Storage& origStorage = t.storage();
++  at::Storage newStorage(new_shm_fd_storage(origStorage.nbytes()));
++  storage_copy(newStorage, origStorage);
++  std::swap(
++      *origStorage.unsafeGetStorageImpl(), *newStorage.unsafeGetStorageImpl());
++}
++
++} // namespace at
+diff --git a/aten/src/ATen/StorageUtils.h b/aten/src/ATen/StorageUtils.h
+new file mode 100644
+index 00000000000..d95fb64531b
+--- /dev/null
++++ b/aten/src/ATen/StorageUtils.h
+@@ -0,0 +1,50 @@
++#pragma once
++
++#include <c10/core/Storage.h>
++#include <c10/core/StorageImpl.h>
++#include <c10/util/intrusive_ptr.h>
++
++namespace at {
++
++class TensorBase;
++
++// Here we define a series of utils to create/manipulate ATen backed
++// c10 storage implementations.
++
++/**
++ * Create a new shared memory storage impl managed by file descriptor
++ *
++ * @param size  size in bytes
++ */
++C10_EXPORT c10::intrusive_ptr<c10::StorageImpl> new_shm_fd_storage(size_t size);
++
++/**
++ * Copy src to dst
++ * Caller must guarantee the validness of the storage objects
++ * during the entire copy process, esp. when it's async.
++ *
++ * This can probably live in c10 namespace later if needed,
++ * but for now keep it in at to keep implementation simple.
++ *
++ * @param dst  dst tensor
++ * @param src  src tensor
++ * @param non_blocking  (default false) whether this operation blocks caller
++ */
++C10_EXPORT void storage_copy(
++    c10::Storage& dst,
++    const c10::Storage& src,
++    bool non_blocking = false);
++
++/**
++ * In place change the storage to shm based.
++ *
++ * This would later be invoked by at::TensorBase user facing API.
++ * For now, to keep the change minimal,
++ * intentionally separate the API changes from the core logic,
++ * as the API changes may also need to handle device/OS specifics.
++ *
++ * @param t  a tensor
++ */
++C10_EXPORT void share_memory_(TensorBase& t);
++
++} // namespace at
+diff --git a/aten/src/ATen/test/CMakeLists.txt b/aten/src/ATen/test/CMakeLists.txt
+index cc1a8988895..00256cb9c1a 100644
+--- a/aten/src/ATen/test/CMakeLists.txt
++++ b/aten/src/ATen/test/CMakeLists.txt
+@@ -36,6 +36,7 @@ list(APPEND ATen_CPU_TEST_SRCS
+   ${CMAKE_CURRENT_SOURCE_DIR}/reportMemoryUsage_test.cpp
+   ${CMAKE_CURRENT_SOURCE_DIR}/scalar_tensor_test.cpp
+   ${CMAKE_CURRENT_SOURCE_DIR}/scalar_test.cpp
++  ${CMAKE_CURRENT_SOURCE_DIR}/StorageUtils_test.cpp
+   ${CMAKE_CURRENT_SOURCE_DIR}/stride_properties_test.cpp
+   ${CMAKE_CURRENT_SOURCE_DIR}/tensor_iterator_test.cpp
+   ${CMAKE_CURRENT_SOURCE_DIR}/test_parallel.cpp
+diff --git a/aten/src/ATen/test/StorageUtils_test.cpp b/aten/src/ATen/test/StorageUtils_test.cpp
+new file mode 100644
+index 00000000000..bc4855778e6
+--- /dev/null
++++ b/aten/src/ATen/test/StorageUtils_test.cpp
+@@ -0,0 +1,33 @@
++#include <gtest/gtest.h>
++
++#include <ATen/Functions.h>
++#include <ATen/Tensor.h>
++#include <ATen/StorageUtils.h>
++
++using namespace ::testing;
++
++TEST(StorageUtilsTest, shm_storage_refcount) {
++  auto t1 = std::make_unique<at::Tensor>(
++      at::full({5, 5}, 7, at::dtype(at::kLong).device(at::kCPU)));
++  auto t2 = std::make_unique<at::Tensor>(t1->slice(0, 0, 3));
++
++  auto verificationTensor = t1->clone();
++  ASSERT_EQ(t1->storage().use_count(), 2);
++  ASSERT_EQ(t2->storage().use_count(), 2);
++  ASSERT_EQ(verificationTensor.storage().use_count(), 1);
++
++  at::share_memory_(*t1);
++  ASSERT_EQ(t1->storage().allocator(), nullptr)
++      << "Expect original storage allocator to be detached";
++  ASSERT_NE(verificationTensor.storage().allocator(), nullptr);
++  ASSERT_EQ(t1->storage().use_count(), 2) << "Expect refcount to be the same";
++  ASSERT_EQ(t2->storage().use_count(), 2);
++
++  ASSERT_TRUE(t1->equal(verificationTensor));
++  auto weakStoragePtr = t1->storage().getWeakStorageImpl();
++  // weak + 1 (if any strong ref exists due to how intrusive_ptr refcount works)
++  ASSERT_EQ(weakStoragePtr.weak_use_count(), 2);
++  t1.reset();
++  t2.reset();
++  ASSERT_TRUE(weakStoragePtr.expired());
++}
+diff --git a/test/cpp_extensions/open_registration_extension.cpp b/test/cpp_extensions/open_registration_extension.cpp
+index ad036109903..9dbcd48dfc0 100644
+--- a/test/cpp_extensions/open_registration_extension.cpp
++++ b/test/cpp_extensions/open_registration_extension.cpp
+@@ -74,6 +74,20 @@ at::Tensor custom__copy_from(const at::Tensor& self, const at::Tensor& dst, bool
+ }
+ 
+ 
++const at::Tensor& custom_resize_(const at::Tensor& self, at::IntArrayRef size,
++                          c10::optional<at::MemoryFormat> optional_memory_format) {
++  self.unsafeGetTensorImpl()->set_sizes_contiguous(size);
++  const auto itemsize = self.unsafeGetTensorImpl()->dtype().itemsize();
++  const auto offset = self.unsafeGetTensorImpl()->storage_offset();
++  const auto storage_size = at::detail::computeStorageNbytesContiguous(size, itemsize, offset);
++  const auto &storage = self.unsafeGetTensorImpl()->unsafe_storage();
++  if (storage_size > storage.nbytes()) {
++    storage.unsafeGetStorageImpl()->set_nbytes(storage_size);
++  }
++
++  return self;
++}
++
+ // This macro does the heavy lifting.
+ // With TORCH_LIBRARY_IMPL, you can register custom kernels for your backend.
+ // For open registration, we're registering all of our kernels to the PrivateUse1 dispatch key.
+@@ -88,6 +102,11 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse1, m) {
+   m.impl("empty.memory_format", &custom_empty_symint);
+   m.impl("fill_.Scalar", &custom_fill__scalar);
+   m.impl("_copy_from", &custom__copy_from);
++  m.impl("empty_strided", &custom_empty_strided);
++  m.impl("set_.source_Storage", &custom_set_source_Storage);
++  m.impl("_pin_memory", &custom__pin_memory);
++  m.impl("is_pinned", &custom_is_pinned);
++  m.impl("resize_", &custom_resize_);
+ }
+ 
+ // This basic implementation doesn't bother dealing with different device indices
+diff --git a/test/test_cpp_extensions_open_device_registration.py b/test/test_cpp_extensions_open_device_registration.py
+index 61dda497cb6..1f9c70f2ceb 100644
+--- a/test/test_cpp_extensions_open_device_registration.py
++++ b/test/test_cpp_extensions_open_device_registration.py
+@@ -97,8 +97,29 @@ class TestCppExtensionOpenRgistration(common.TestCase):
+ 
+         z2 = z_cpu + z_cpu
+ 
+-        # None of our CPU operations should call the custom add function.
+-        self.assertFalse(module.custom_add_called())
++        def test_open_device_storage_resize(self):
++            torch.utils.rename_privateuse1_backend('foo')
++            cpu_tensor = torch.randn([8])
++            foo_tensor = cpu_tensor.foo()
++            foo_storage = foo_tensor.storage()
++            self.assertTrue(foo_storage.size() == 8)
++            foo_storage.resize_(8)
++            self.assertTrue(foo_storage.size() == 8)
++            with self.assertRaisesRegex(RuntimeError, 'overflow'):
++                foo_storage.resize_(8**29)
++
++        test_base_device_registration()
++        test_before_common_registration()
++        test_common_registration()
++        test_after_common_registration()
++        test_generator_registration()
++        test_open_device_random()
++        test_open_device_tensor()
++        test_open_device_storage()
++        test_open_device_storage_pin_memory()
++        test_open_device_serialization()
++        test_open_device_storage_resize()
++
+ 
+ if __name__ == "__main__":
+     common.run_tests()
+diff --git a/torch/csrc/DynamicTypes.cpp b/torch/csrc/DynamicTypes.cpp
+index e818016202a..7132417c821 100644
+--- a/torch/csrc/DynamicTypes.cpp
++++ b/torch/csrc/DynamicTypes.cpp
+@@ -5,7 +5,6 @@
+ #include <torch/csrc/DynamicTypes.h>
+ #include <torch/csrc/Exceptions.h>
+ #include <torch/csrc/Layout.h>
+-#include <torch/csrc/PythonTypes.h>
+ #include <torch/csrc/Storage.h>
+ #include <torch/csrc/autograd/generated/VariableType.h>
+ #include <torch/csrc/utils/cuda_enabled.h>
+@@ -91,8 +90,8 @@ PyObject* createPyObject(const at::Storage& storage) {
+   auto obj = THPObjectPtr(type->tp_alloc(type, 0));
+   if (!obj)
+     throw python_error();
+-  ((THPVoidStorage*)obj.get())->cdata =
+-      at::Storage(/* copy */ storage).unsafeReleaseStorageImpl();
++  ((THPStorage*)obj.get())->cdata =
++      c10::MaybeOwned<at::Storage>::owned(at::Storage(/* copy */ storage));
+   return obj.release();
+ }
+ 
+@@ -154,14 +153,11 @@ at::Storage createStorageGetType(
+     throw TypeError("not a storage '%s'", Py_TYPE(obj)->tp_name);
+   }
+ 
+-  c10::StorageImpl* impl = static_cast<c10::StorageImpl*>(
+-      ((THPVoidStorage*)untyped_storage_obj)->cdata);
+-  c10::DeviceType device_type = impl->device().type();
+-
++  const auto& storage = THPStorage_Unpack(untyped_storage_obj);
++  c10::DeviceType device_type = storage.device().type();
+   auto type_properties = get_type_properties(device_type, at::kByte);
+-
+   return type_properties->unsafeStorageFromTH(
+-      ((THPVoidStorage*)untyped_storage_obj)->cdata, true);
++      storage.unsafeGetStorageImpl(), true);
+ }
+ 
+ at::Storage createStorage(PyObject* obj) {
+diff --git a/torch/csrc/PythonTypes.h b/torch/csrc/PythonTypes.h
+deleted file mode 100644
+index e457ab891da..00000000000
+--- a/torch/csrc/PythonTypes.h
++++ /dev/null
+@@ -1,20 +0,0 @@
+-#pragma once
+-
+-#include <c10/core/StorageImpl.h>
+-#include <c10/core/TensorImpl.h>
+-#include <torch/csrc/Types.h>
+-#include <torch/csrc/python_headers.h>
+-
+-namespace torch {
+-
+-struct THPVoidTensor {
+-  PyObject_HEAD c10::TensorImpl* cdata;
+-  char device_type;
+-  char data_type;
+-};
+-
+-struct THPVoidStorage {
+-  PyObject_HEAD c10::StorageImpl* cdata;
+-};
+-
+-} // namespace torch
+diff --git a/torch/csrc/Storage.cpp b/torch/csrc/Storage.cpp
+index e998198cdf7..83e7ff9935f 100644
+--- a/torch/csrc/Storage.cpp
++++ b/torch/csrc/Storage.cpp
+@@ -29,12 +29,12 @@ void THPPointer<c10::StorageImpl>::free() {
+ 
+ PyObject* THPStorageClass = nullptr;
+ 
+-PyObject* THPStorage_New(c10::intrusive_ptr<c10::StorageImpl> ptr) {
+-  AT_ASSERT(ptr);
++PyObject* THPStorage_New(c10::Storage storage) {
+   PyTypeObject* type = (PyTypeObject*)THPStorageClass;
+   PyObject* obj = type->tp_alloc(type, 0);
+   if (obj) {
+-    ((THPStorage*)obj)->cdata = ptr.release();
++    ((THPStorage*)obj)->cdata =
++        c10::MaybeOwned<c10::Storage>::owned(std::move(storage));
+   }
+   return obj;
+ }
+@@ -47,9 +47,7 @@ static void THPStorage_subclass_dealloc(PyObject* self) {
+   if (PyType_HasFeature(type, Py_TPFLAGS_HAVE_GC) != 0) {
+     PyObject_GC_UnTrack(self);
+   }
+-  if (_self->cdata) {
+-    c10::raw::intrusive_ptr::decref(_self->cdata);
+-  }
++  _self->cdata.~MaybeOwned<c10::Storage>();
+   Py_TYPE(_self)->tp_free(self);
+ }
+ 
+@@ -126,23 +124,23 @@ static PyObject* THPStorage_pynew(
+ 
+   // torch.Storage(*, ...)
+   if (r.idx == 0) {
+-    self->cdata = c10::make_intrusive<at::StorageImpl>(
+-                      c10::StorageImpl::use_byte_size_t(),
+-                      0,
+-                      allocator,
+-                      /*resizable=*/true)
+-                      .release();
++    self->cdata = c10::MaybeOwned<c10::Storage>::owned(
++        c10::make_intrusive<c10::StorageImpl>(
++            c10::StorageImpl::use_byte_size_t(),
++            0,
++            allocator,
++            /*resizable=*/true));
+     return (PyObject*)self.release();
+ 
+     // torch.Storage(size, *, ...)
+   } else if (r.idx == 1) {
+     int64_t size = r.toInt64(0);
+-    self->cdata = c10::make_intrusive<at::StorageImpl>(
+-                      c10::StorageImpl::use_byte_size_t(),
+-                      size,
+-                      allocator,
+-                      /*resizable=*/true)
+-                      .release();
++    self->cdata = c10::MaybeOwned<c10::Storage>::owned(
++        c10::make_intrusive<c10::StorageImpl>(
++            c10::StorageImpl::use_byte_size_t(),
++            size,
++            allocator,
++            /*resizable=*/true));
+     return (PyObject*)self.release();
+ 
+     // torch.Storage(sequence, *, ...)
+@@ -159,24 +157,24 @@ static PyObject* THPStorage_pynew(
+         THPStorageStr,
+         "(): Could not obtain the length of sequence of type ",
+         THPUtils_typename(sequence));
+-    self->cdata = c10::make_intrusive<at::StorageImpl>(
+-                      c10::StorageImpl::use_byte_size_t(),
+-                      length,
+-                      allocator,
+-                      /*resizable=*/true)
+-                      .release();
++    self->cdata = c10::MaybeOwned<c10::Storage>::owned(
++        c10::make_intrusive<c10::StorageImpl>(
++            c10::StorageImpl::use_byte_size_t(),
++            length,
++            allocator,
++            /*resizable=*/true));
+     THPObjectPtr item;
+     try {
+       for (Py_ssize_t i = 0; i < length; i++) {
+         item = PySequence_GetItem(sequence, i);
+         // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+         uint8_t value = THPByteUtils_unpackReal(item.get());
++        const auto& storage = THPStorage_Unpack(self);
+         if (allocator == c10::GetDefaultCPUAllocator()) {
+-          self->cdata->unsafe_data<uint8_t>()[i] = value;
++          storage.unsafe_data<uint8_t>()[i] = value;
+         } else {
+           // TODO: this might be slow - consider batched updates?
+-          storage_set(
+-              at::unsafeStorageFromTH(self->cdata, /*retain=*/true), i, value);
++          storage_set(storage, i, value);
+         }
+       }
+     } catch (const std::exception& e) {
+@@ -196,36 +194,34 @@ static PyObject* THPStorage_pynew(
+ 
+ static Py_ssize_t THPStorage_length(THPStorage* self) {
+   HANDLE_TH_ERRORS
+-  return self->cdata->nbytes() / sizeof(uint8_t);
++  return THPStorage_Unpack(self).nbytes();
+   END_HANDLE_TH_ERRORS_RET(-1)
+ }
+ 
+ static PyObject* THPStorage_get(THPStorage* self, PyObject* index) {
+   HANDLE_TH_ERRORS
++  const auto& storage = THPStorage_Unpack(self);
+   /* Integer index */
+   if (THPUtils_checkLong(index)) {
+     int64_t nindex = THPUtils_unpackLong(index);
+     if (nindex < 0)
+-      nindex += (self->cdata->nbytes() / sizeof(uint8_t));
+-    if (nindex < 0 ||
+-        nindex >=
+-            static_cast<int64_t>(self->cdata->nbytes() / sizeof(uint8_t))) {
++      nindex += storage.nbytes();
++    if (nindex < 0 || nindex >= static_cast<int64_t>(storage.nbytes())) {
+       PyErr_SetString(
+           PyExc_IndexError,
+           fmt::format(
+               "index {} out of range for storage of size {}",
+               nindex,
+-              self->cdata->nbytes() / sizeof(uint8_t)));
++              storage.nbytes()));
+       return nullptr;
+     }
+-    uint8_t value = storage_get(
+-        at::unsafeStorageFromTH(self->cdata, /*retain=*/true), nindex);
++    uint8_t value = storage_get(storage, nindex);
+     return THPByteUtils_newReal(value);
+     /* Slice index */
+   } else if (PySlice_Check(index)) {
+     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+     Py_ssize_t start, stop, slicelength, step;
+-    int64_t len = self->cdata->nbytes() / sizeof(uint8_t);
++    int64_t len = storage.nbytes();
+     if (PySlice_GetIndicesEx(index, len, &start, &stop, &step, &slicelength) !=
+         0)
+       return nullptr;
+@@ -237,28 +233,29 @@ static PyObject* THPStorage_get(THPStorage* self, PyObject* index) {
+       return nullptr;
+     }
+ 
+-    uint8_t* data = self->cdata->data<uint8_t>();
++    const auto& storage = THPStorage_Unpack(self);
++    uint8_t* data = storage.data<uint8_t>();
+ 
+-    at::StorageImpl* old_storage = self->cdata;
+-    c10::raw::intrusive_ptr::incref(old_storage);
+-    auto new_storage = c10::make_intrusive<at::StorageImpl>(
++    at::StorageImpl* old_storage_impl = storage.unsafeGetStorageImpl();
++    c10::raw::intrusive_ptr::incref(old_storage_impl);
++    auto new_storage_impl = c10::make_intrusive<at::StorageImpl>(
+         c10::StorageImpl::use_byte_size_t(),
+ #ifdef THQUANTIZED
+         slicelength * sizeof(quantized_t),
+ #else
+-        slicelength * sizeof(uint8_t),
++        slicelength,
+ #endif
+         at::DataPtr(
+             static_cast<void*>(data + start),
+-            old_storage,
++            old_storage_impl,
+             [](void* s) {
+               c10::raw::intrusive_ptr::decref(static_cast<at::StorageImpl*>(s));
+             },
+-            old_storage->device()),
+-        old_storage->allocator(),
++            old_storage_impl->device()),
++        old_storage_impl->allocator(),
+         /* resizable */ false);
+ 
+-    PyObject* _ret = THPStorage_New(std::move(new_storage));
++    PyObject* _ret = THPStorage_New(std::move(new_storage_impl));
+     return _ret;
+   }
+   PyErr_Format(
+@@ -280,15 +277,15 @@ static int THPStorage_set(THPStorage* self, PyObject* index, PyObject* value) {
+   }
+ 
+   uint8_t rvalue = THPByteUtils_unpackReal(value);
++  const auto& storage = THPStorage_Unpack(self);
+   if (THPUtils_checkLong(index)) {
+     int64_t nindex = THPUtils_unpackLong(index);
+-    storage_set(
+-        at::unsafeStorageFromTH(self->cdata, /*retain=*/true), nindex, rvalue);
++    storage_set(storage, nindex, rvalue);
+     return 0;
+   } else if (PySlice_Check(index)) {
+     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+     Py_ssize_t start, stop, slicelength, step;
+-    int64_t len = self->cdata->nbytes() / sizeof(uint8_t);
++    int64_t len = storage.nbytes();
+     if (PySlice_GetIndicesEx(index, len, &start, &stop, &step, &slicelength) !=
+         0)
+       return -1;
+@@ -302,8 +299,7 @@ static int THPStorage_set(THPStorage* self, PyObject* index, PyObject* value) {
+     // TODO: check the bounds only once
+     // TODO: fill?
+     for (; start < stop; start++)
+-      storage_set(
+-          at::unsafeStorageFromTH(self->cdata, /*retain=*/true), start, rvalue);
++      storage_set(storage, start, rvalue);
+     return 0;
+   }
+   THPUtils_setError(
+@@ -418,18 +414,15 @@ int THPStorageMetaType_init(PyObject* cls, PyObject* args, PyObject* kwargs) {
+   return 0;
+ }
+ 
+-// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays,cppcoreguidelines-avoid-non-const-global-variables)
+-static struct PyMemberDef THPStorage_members[] = {
+-    {(char*)"_cdata",
+-     T_ULONGLONG,
+-     offsetof(THPStorage, cdata),
+-     READONLY,
+-     nullptr},
+-    {nullptr}};
+-
+ static PyObject* THPStorage_device(THPStorage* self, void* unused) {
+   HANDLE_TH_ERRORS
+-  return THPDevice_New(self->cdata->device());
++  return THPDevice_New(THPStorage_Unpack(self).device());
++  END_HANDLE_TH_ERRORS
++}
++
++PyObject* THPStorage_get_cdata(THPStorage* self, void* unused) {
++  HANDLE_TH_ERRORS
++  return PyLong_FromVoidPtr(THPStorage_Unpack(self).unsafeGetStorageImpl());
+   END_HANDLE_TH_ERRORS
+ }
+ 
+@@ -438,6 +431,7 @@ typedef PyObject* (*getter)(PyObject*, void*);
+ // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays,cppcoreguidelines-avoid-non-const-global-variables)
+ static struct PyGetSetDef THPStorage_properties[] = {
+     {"device", (getter)THPStorage_device, nullptr, nullptr, nullptr},
++    {"_cdata", (getter)THPStorage_get_cdata, nullptr, nullptr, nullptr},
+     {nullptr}};
+ 
+ bool THPStorage_init(PyObject* module) {
+@@ -452,7 +446,6 @@ bool THPStorage_init(PyObject* module) {
+   PyModule_AddObject(module, "_StorageMeta", (PyObject*)&THPStorageMetaType);
+ 
+   THPStorageType.tp_methods = methods.data();
+-  THPStorageType.tp_members = THPStorage_members;
+   THPStorageType.tp_getset = THPStorage_properties;
+   if (PyType_Ready(&THPStorageType) < 0)
+     return false;
+diff --git a/torch/csrc/Storage.h b/torch/csrc/Storage.h
+index 645249b8bbd..794e2dda009 100644
+--- a/torch/csrc/Storage.h
++++ b/torch/csrc/Storage.h
+@@ -5,12 +5,79 @@
+ 
+ #define THPStorageStr "torch.UntypedStorage"
+ 
++namespace c10 {
++
++template <>
++struct MaybeOwnedTraits<c10::Storage> {
++  using owned_type = c10::Storage;
++  using borrow_type = c10::Storage;
++
++  static borrow_type createBorrow(const owned_type& from) {
++    return borrow_type(from);
++  }
++
++  static void assignBorrow(borrow_type& lhs, const borrow_type& rhs) {
++    lhs.unsafeReleaseStorageImpl();
++    lhs = borrow_type(rhs);
++  }
++
++  static void destroyBorrow(borrow_type& toDestroy) {
++    toDestroy.unsafeReleaseStorageImpl(); // "leak" it, but it was already +0.
++  }
++
++  static const owned_type& referenceFromBorrow(const borrow_type& borrow) {
++    return borrow;
++  }
++
++  static const owned_type* pointerFromBorrow(const borrow_type& borrow) {
++    return &borrow;
++  }
++
++  static bool debugBorrowIsValid(const borrow_type& /*borrow*/) {
++    return true;
++  }
++};
++
++template <>
++struct ExclusivelyOwnedTraits<c10::Storage> {
++  using repr_type = c10::Storage;
++  using pointer_type = c10::Storage*;
++  using const_pointer_type = const c10::Storage*;
++
++  static repr_type nullRepr() {
++    return c10::Storage();
++  }
++
++  template <class... Args>
++  static repr_type createInPlace(Args&&... args) {
++    return c10::Storage(std::forward<Args>(args)...);
++  }
++
++  static repr_type moveToRepr(c10::Storage&& x) {
++    return std::move(x);
++  }
++
++  static c10::Storage take(c10::Storage& x) {
++    return std::move(x);
++  }
++
++  static pointer_type getImpl(repr_type& x) {
++    return &x;
++  }
++
++  static const_pointer_type getImpl(const repr_type& x) {
++    return &x;
++  }
++};
++
++} // namespace c10
++
+ struct THPStorage {
+-  PyObject_HEAD c10::StorageImpl* cdata;
++  PyObject_HEAD;
++  c10::MaybeOwned<c10::Storage> cdata;
+ };
+ 
+-TORCH_PYTHON_API PyObject* THPStorage_New(
+-    c10::intrusive_ptr<c10::StorageImpl> ptr);
++TORCH_PYTHON_API PyObject* THPStorage_New(c10::Storage storage);
+ extern PyObject* THPStorageClass;
+ 
+ bool THPStorage_init(PyObject* module);
+@@ -18,4 +85,12 @@ void THPStorage_postInit(PyObject* module);
+ 
+ extern PyTypeObject THPStorageType;
+ 
++inline const c10::Storage& THPStorage_Unpack(THPStorage* storage) {
++  return *storage->cdata;
++}
++
++inline const c10::Storage& THPStorage_Unpack(PyObject* obj) {
++  return THPStorage_Unpack(reinterpret_cast<THPStorage*>(obj));
++}
++
+ #endif
+diff --git a/torch/csrc/StorageMethods.cpp b/torch/csrc/StorageMethods.cpp
+index af22f46151e..52541a5b974 100644
+--- a/torch/csrc/StorageMethods.cpp
++++ b/torch/csrc/StorageMethods.cpp
+@@ -21,6 +21,7 @@
+ 
+ #include <ATen/ATen.h>
+ #include <ATen/MapAllocator.h>
++#include <ATen/StorageUtils.h>
+ #include <torch/csrc/utils/pycfunction_helpers.h>
+ #include <torch/csrc/utils/python_arg_parser.h>
+ #include <torch/csrc/utils/python_numbers.h>
+@@ -38,17 +39,15 @@
+ #define LSEEK lseek
+ #endif
+ 
+-static PyObject* THPStorage_nbytes(PyObject* _self, PyObject* noargs) {
++static PyObject* THPStorage_nbytes(PyObject* self, PyObject* noargs) {
+   HANDLE_TH_ERRORS
+-  auto self = (THPStorage*)_self;
+-  return py::cast(self->cdata->sym_nbytes()).release().ptr();
++  return py::cast(THPStorage_Unpack(self).sym_nbytes()).release().ptr();
+   END_HANDLE_TH_ERRORS
+ }
+ 
+-static PyObject* THPStorage_dataPtr(PyObject* _self, PyObject* noargs) {
++static PyObject* THPStorage_dataPtr(PyObject* self, PyObject* noargs) {
+   HANDLE_TH_ERRORS
+-  auto self = (THPStorage*)_self;
+-  return PyLong_FromVoidPtr(self->cdata->data<uint8_t>());
++  return PyLong_FromVoidPtr(THPStorage_Unpack(self).data<uint8_t>());
+   END_HANDLE_TH_ERRORS
+ }
+ 
+@@ -71,7 +70,7 @@ static PyObject* THPStorage_copy_(
+ 
+   TORCH_CHECK(self_.nbytes() == src.nbytes(), "size does not match");
+ 
+-  storage_copy(self_, src, non_blocking);
++  at::storage_copy(self_, src, non_blocking);
+ 
+   Py_INCREF(self);
+   return self;
+@@ -79,12 +78,11 @@ static PyObject* THPStorage_copy_(
+   END_HANDLE_TH_ERRORS
+ }
+ 
+-static PyObject* THPStorage_isPinned(PyObject* _self, PyObject* noargs) {
++static PyObject* THPStorage_isPinned(PyObject* self, PyObject* noargs) {
+   HANDLE_TH_ERRORS
+ #if defined(USE_CUDA)
+-  auto self = (THPStorage*)_self;
+   return PyBool_FromLong(
+-      at::globalContext().isPinnedPtr(self->cdata->data<uint8_t>()));
++      at::globalContext().isPinnedPtr(THPStorage_Unpack(self).data<uint8_t>()));
+ #else
+   Py_RETURN_FALSE;
+ #endif
+@@ -97,10 +95,9 @@ static PyObject* THPStorage_elementSize(PyObject* _self, PyObject* noargs) {
+   END_HANDLE_TH_ERRORS
+ }
+ 
+-static PyObject* THPStorage_new(PyObject* _self, PyObject* noargs) {
++static PyObject* THPStorage_new(PyObject* self, PyObject* noargs) {
+   HANDLE_TH_ERRORS
+-  auto self = (THPStorage*)_self;
+-  c10::Allocator* allocator = self->cdata->allocator();
++  c10::Allocator* allocator = THPStorage_Unpack(self).allocator();
+   auto new_storage = c10::make_intrusive<at::StorageImpl>(
+       c10::StorageImpl::use_byte_size_t(),
+       0,
+@@ -112,18 +109,18 @@ static PyObject* THPStorage_new(PyObject* _self, PyObject* noargs) {
+   END_HANDLE_TH_ERRORS
+ }
+ 
+-static PyObject* THPStorage_resize_(PyObject* _self, PyObject* number_arg) {
++static PyObject* THPStorage_resize_(PyObject* self, PyObject* number_arg) {
+   HANDLE_TH_ERRORS
+-  auto self = (THPStorage*)_self;
++  const auto& storage = THPStorage_Unpack(self);
+   THPUtils_assert(
+       THPUtils_checkLong(number_arg),
+       "resize_ expects an int, "
+       "but got %s",
+       THPUtils_typename(number_arg));
+   int64_t newsize = THPUtils_unpackLong(number_arg);
+-  c10::DeviceType device_type = self->cdata->device_type();
++  c10::DeviceType device_type = storage.device_type();
+   if (device_type == at::kCPU) {
+-    at::native::resize_bytes_cpu(self->cdata, newsize);
++    at::native::resize_bytes_cpu(storage.unsafeGetStorageImpl(), newsize);
+ #ifdef USE_CUDA
+   } else if (device_type == at::kCUDA) {
+     ptrdiff_t size_bytes_i = newsize;
+@@ -133,8 +130,36 @@ static PyObject* THPStorage_resize_(PyObject* _self, PyObject* number_arg) {
+         size_bytes_i,
+         ") cannot be represented as a size_t");
+     const auto size_bytes = static_cast<size_t>(size_bytes_i);
+-    at::native::resize_bytes_cuda(self->cdata, size_bytes);
++    at::native::resize_bytes_cuda(storage.unsafeGetStorageImpl(), size_bytes);
+ #endif
++  } else if (device_type == at::kXPU || device_type == at::kPrivateUse1) {
++    ptrdiff_t size_bytes_i = newsize;
++    TORCH_CHECK(
++        !c10::overflows<int64_t>(size_bytes_i),
++        "Requested storage size (",
++        size_bytes_i,
++        ") cannot be represented as a int64_t");
++    const auto size_bytes = static_cast<int64_t>(size_bytes_i);
++    void* original_data_ptr = storage.data_ptr().get();
++
++    auto src_option =
++        c10::TensorOptions().device(storage.device()).dtype(at::kByte);
++    auto src_tensor = at::empty({0}, {}, src_option).set_(storage);
++    src_tensor.resize_({size_bytes});
++
++    // When using resize_ to replace resize_bytes_xxx, in some cases
++    // the original data_ptr is still returned, which is an inconsistent
++    // behavior when compared to resize_bytes_xxx. For these cases,
++    // an additional memory copy and update for storage are required.
++    if (original_data_ptr == src_tensor.storage().data_ptr().get()) {
++      auto new_tensor = at::empty(src_tensor.sizes(), src_tensor.options());
++      new_tensor.copy_(src_tensor);
++      storage.set_data_ptr_noswap(
++          std::move(const_cast<at::DataPtr&>(new_tensor.storage().data_ptr())));
++      storage.unsafeGetStorageImpl()->set_allocator(
++          new_tensor.storage().unsafeGetStorageImpl()->allocator());
++      storage.set_nbytes(new_tensor.storage().nbytes());
++    }
+   } else {
+     TORCH_CHECK(
+         false,
+@@ -142,23 +167,21 @@ static PyObject* THPStorage_resize_(PyObject* _self, PyObject* number_arg) {
+         device_type);
+   }
+   Py_INCREF(self);
+-  return (PyObject*)self;
++  return self;
+   END_HANDLE_TH_ERRORS
+ }
+ 
+-static PyObject* THPStorage_fill_(PyObject* _self, PyObject* number_arg) {
++static PyObject* THPStorage_fill_(PyObject* self, PyObject* number_arg) {
+   HANDLE_TH_ERRORS
+-  auto self = (THPStorage*)_self;
++  const auto& storage = THPStorage_Unpack(self);
+   THPUtils_assert(
+       THPByteUtils_checkReal(number_arg),
+       "fill_ expects int, "
+       "but got %s",
+       THPUtils_typename(number_arg));
+-  storage_fill(
+-      at::unsafeStorageFromTH(self->cdata, /*retain=*/true),
+-      THPByteUtils_unpackReal(number_arg));
++  storage_fill(storage, THPByteUtils_unpackReal(number_arg));
+   Py_INCREF(self);
+-  return (PyObject*)self;
++  return self;
+   END_HANDLE_TH_ERRORS
+ }
+ 
+@@ -366,9 +389,9 @@ static PyObject* THPStorage_fromFile(
+   END_HANDLE_TH_ERRORS
+ }
+ 
+-PyObject* THPStorage_writeFile(PyObject* _self, PyObject* args) {
++PyObject* THPStorage_writeFile(PyObject* self, PyObject* args) {
+   HANDLE_TH_ERRORS
+-  auto self = (THPStorage*)_self;
++  const auto& storage = THPStorage_Unpack(self);
+   PyObject* file = PyTuple_GetItem(args, 0);
+   bool is_real_file = PyTuple_GetItem(args, 1) == Py_True;
+   bool save_size = PyTuple_GetItem(args, 2) == Py_True;
+@@ -380,7 +403,7 @@ PyObject* THPStorage_writeFile(PyObject* _self, PyObject* args) {
+ 
+   if (!is_real_file) {
+     THPStorage_writeFileRaw<PyObject*>(
+-        self->cdata, file, save_size, element_size);
++        storage.unsafeGetStorageImpl(), file, save_size, element_size);
+     Py_RETURN_NONE;
+   }
+ 
+@@ -389,7 +412,8 @@ PyObject* THPStorage_writeFile(PyObject* _self, PyObject* args) {
+       fd != -1,
+       "_write_file couldn't retrieve a file descriptor "
+       "from given object");
+-  THPStorage_writeFileRaw(self->cdata, fd, save_size, element_size);
++  THPStorage_writeFileRaw(
++      storage.unsafeGetStorageImpl(), fd, save_size, element_size);
+   Py_RETURN_NONE;
+   END_HANDLE_TH_ERRORS
+ }
+@@ -416,9 +440,9 @@ PyObject* THPStorage_newWithFile(PyObject* _unused, PyObject* args) {
+   END_HANDLE_TH_ERRORS
+ }
+ 
+-static PyObject* THPStorage_setFromFile(PyObject* _self, PyObject* args) {
++static PyObject* THPStorage_setFromFile(PyObject* self, PyObject* args) {
+   HANDLE_TH_ERRORS
+-  auto self = (THPStorage*)_self;
++  const auto& storage = THPStorage_Unpack(self);
+   PyObject* file = PyTuple_GET_ITEM(args, 0);
+   PyObject* offset = PyTuple_GET_ITEM(args, 1);
+   bool is_real_file = PyTuple_GET_ITEM(args, 2) == Py_True;
+@@ -437,11 +461,11 @@ static PyObject* THPStorage_setFromFile(PyObject* _self, PyObject* args) {
+         offset == Py_None,
+         "_set_from_file: offset is NYI for filelike objects");
+ 
+-    auto self_storage =
+-        c10::intrusive_ptr<c10::StorageImpl>::reclaim_copy(self->cdata);
+-    auto storage = THPStorage_readFileRaw<PyObject*>(
+-        file, std::move(self_storage), element_size);
+-    if (!storage.defined()) {
++    auto self_storage_impl = c10::intrusive_ptr<c10::StorageImpl>::reclaim_copy(
++        storage.unsafeGetStorageImpl());
++    auto storage_impl = THPStorage_readFileRaw<PyObject*>(
++        file, std::move(self_storage_impl), element_size);
++    if (!storage_impl.defined()) {
+       return nullptr;
+     }
+     Py_INCREF(self);
+@@ -458,10 +482,11 @@ static PyObject* THPStorage_setFromFile(PyObject* _self, PyObject* args) {
+       fd != -1,
+       "_set_from_file couldn't retrieve a file "
+       "descriptor from given object");
+-  auto self_storage =
+-      c10::intrusive_ptr<c10::StorageImpl>::reclaim_copy(self->cdata);
+-  auto storage = THPStorage_readFileRaw<int>(fd, self_storage, element_size);
+-  if (!storage.defined())
++  auto self_storage_impl = c10::intrusive_ptr<c10::StorageImpl>::reclaim_copy(
++      storage.unsafeGetStorageImpl());
++  auto storage_impl =
++      THPStorage_readFileRaw<int>(fd, self_storage_impl, element_size);
++  if (!storage_impl.defined())
+     return nullptr;
+   Py_INCREF(self);
+ 
+@@ -477,7 +502,7 @@ static PyObject* THPStorage_setFromFile(PyObject* _self, PyObject* args) {
+   }
+   Py_DECREF(seek_return);
+ 
+-  return (PyObject*)self;
++  return self;
+   END_HANDLE_TH_ERRORS
+ }
+ 
+@@ -490,13 +515,9 @@ PyObject* THPStorage__setCdata(PyObject* _self, PyObject* new_cdata) {
+       "_set_cdata - expected an int or long, but got %s",
+       THPUtils_typename(new_cdata));
+   c10::StorageImpl* ptr = (c10::StorageImpl*)PyLong_AsVoidPtr(new_cdata);
+-  if (ptr) {
+-    c10::raw::intrusive_ptr::incref(ptr);
+-  }
+-  if (self->cdata) {
+-    c10::raw::intrusive_ptr::decref(self->cdata);
+-  }
+-  self->cdata = ptr;
++  self->cdata.~MaybeOwned<c10::Storage>();
++  self->cdata = c10::MaybeOwned<c10::Storage>::owned(
++      c10::Storage(c10::intrusive_ptr<c10::StorageImpl>::reclaim_copy(ptr)));
+   Py_INCREF(self);
+   return (PyObject*)self;
+   END_HANDLE_TH_ERRORS
+diff --git a/torch/csrc/StorageSharing.cpp b/torch/csrc/StorageSharing.cpp
+index 81e7d041da5..918e3737469 100644
+--- a/torch/csrc/StorageSharing.cpp
++++ b/torch/csrc/StorageSharing.cpp
+@@ -26,35 +26,34 @@
+ #endif
+ 
+ #include <ATen/MapAllocator.h>
++#include <ATen/StorageUtils.h>
+ #include <torch/csrc/utils/python_numbers.h>
+ #include <atomic>
+ #include <string>
+ 
+-static PyObject* THPStorage_sharedDecref(PyObject* _self, PyObject* noargs) {
++static PyObject* THPStorage_sharedDecref(PyObject* self, PyObject* noargs) {
+   HANDLE_TH_ERRORS
+-  auto self = (THPStorage*)_self;
+-  c10::DeviceType device_type = self->cdata->device_type();
++  const auto& storage = THPStorage_Unpack(self);
++  c10::DeviceType device_type = storage.device_type();
+   if (device_type == at::kCPU) {
+-    c10::StorageImpl* storage = self->cdata;
+     THManagedMapAllocator* ctx =
+-        THManagedMapAllocator::fromDataPtr(storage->data_ptr());
++        THManagedMapAllocator::fromDataPtr(storage.data_ptr());
+     if (ctx) {
+       ctx->decref();
+     }
+   }
+   Py_INCREF(self);
+-  return (PyObject*)self;
++  return self;
+   END_HANDLE_TH_ERRORS
+ }
+ 
+-static PyObject* THPStorage_sharedIncref(PyObject* _self, PyObject* noargs) {
++static PyObject* THPStorage_sharedIncref(PyObject* self, PyObject* noargs) {
+   HANDLE_TH_ERRORS
+-  auto self = (THPStorage*)_self;
+-  c10::DeviceType device_type = self->cdata->device_type();
++  const auto& storage = THPStorage_Unpack(self);
++  c10::DeviceType device_type = storage.device_type();
+   if (device_type == at::kCPU) {
+-    c10::StorageImpl* storage = self->cdata;
+     THManagedMapAllocator* ctx =
+-        THManagedMapAllocator::fromDataPtr(storage->data_ptr());
++        THManagedMapAllocator::fromDataPtr(storage.data_ptr());
+     if (ctx) {
+       ctx->incref();
+     }
+@@ -84,15 +83,14 @@ static PyObject* THPStorage_pyNewFilenameStorage(
+   END_HANDLE_TH_ERRORS
+ }
+ 
+-static PyObject* THPStorage_shareFilename(PyObject* _self, PyObject* noargs) {
++static PyObject* THPStorage_shareFilename(PyObject* self, PyObject* noargs) {
+   HANDLE_TH_ERRORS
++  const auto& storage = THPStorage_Unpack(self);
+   TORCH_CHECK(
+-      reinterpret_cast<THPStorage*>(_self)->cdata->device_type() == at::kCPU,
++      storage.device_type() == at::kCPU,
+       "_share_filename_: only available on CPU");
+-  auto self = (THPStorage*)_self;
+-  c10::StorageImpl* storage = self->cdata;
+   THManagedMapAllocator* ctx =
+-      THManagedMapAllocator::fromDataPtr(storage->data_ptr());
++      THManagedMapAllocator::fromDataPtr(storage.data_ptr());
+   // Storage is already in shared memory, just return a handle
+   if (ctx) {
+     // done
+@@ -103,21 +101,24 @@ static PyObject* THPStorage_shareFilename(PyObject* _self, PyObject* noargs) {
+     std::string handle = at::NewProcessWideShmHandle();
+     at::Storage new_storage(c10::make_intrusive<at::StorageImpl>(
+         c10::StorageImpl::use_byte_size_t(),
+-        storage->nbytes(),
++        storage.nbytes(),
+         THManagedMapAllocator::makeDataPtr(
+-            "", handle.c_str(), flags, storage->nbytes()),
++            "", handle.c_str(), flags, storage.nbytes()),
+         /*allocator=*/nullptr,
+         /*resizable=*/false));
+ 
+-    at::Storage _self_aten = torch::createStorage(_self);
+     {
+       // Copying into shared memory can be slow, so release the GIL
+       pybind11::gil_scoped_release no_gil;
+-      storage_copy(new_storage, _self_aten);
++      // Copy data from old storage into the new one
++      at::storage_copy(new_storage, storage);
+     }
+ 
+-    std::swap(*storage, *new_storage.unsafeGetStorageImpl());
+-    ctx = THManagedMapAllocator::fromDataPtr(storage->data_ptr());
++    // Replace the old data_ptr and allocator with the new ones
++    storage.set_data_ptr(std::move(new_storage.data_ptr()));
++    storage.unsafeGetStorageImpl()->set_allocator(new_storage.allocator());
++
++    ctx = THManagedMapAllocator::fromDataPtr(storage.data_ptr());
+     AT_ASSERT(ctx);
+   }
+ 
+@@ -127,7 +128,7 @@ static PyObject* THPStorage_shareFilename(PyObject* _self, PyObject* noargs) {
+   THPObjectPtr storage_handle(PyBytes_FromString(ctx->filename()));
+   if (!storage_handle)
+     return nullptr;
+-  THPObjectPtr size(THPUtils_packUInt64(storage->nbytes() / sizeof(uint8_t)));
++  THPObjectPtr size(THPUtils_packUInt64(storage.nbytes()));
+   if (!size)
+     return nullptr;
+ 
+@@ -173,21 +174,6 @@ static PyObject* THPStorage_newSharedFilename(
+   END_HANDLE_TH_ERRORS
+ }
+ 
+-static c10::intrusive_ptr<c10::StorageImpl> THPStorage_newFdStorage(
+-    ptrdiff_t size) {
+-  int flags = at::ALLOCATOR_MAPPED_SHAREDMEM | at::ALLOCATOR_MAPPED_EXCLUSIVE |
+-      at::ALLOCATOR_MAPPED_KEEPFD | at::ALLOCATOR_MAPPED_UNLINK;
+-  std::string handle = at::NewProcessWideShmHandle();
+-  auto sptr = at::MapAllocator::makeDataPtr(
+-      handle, flags, size * sizeof(uint8_t), nullptr);
+-  return c10::make_intrusive<at::StorageImpl>(
+-      c10::StorageImpl::use_byte_size_t(),
+-      size,
+-      std::move(sptr),
+-      /*allocator=*/nullptr,
+-      /*resizable=*/false);
+-}
+-
+ static PyObject* THPStorage_pyNewFdStorage(PyObject* _unused, PyObject* args) {
+   HANDLE_TH_ERRORS
+   // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+@@ -195,40 +181,41 @@ static PyObject* THPStorage_pyNewFdStorage(PyObject* _unused, PyObject* args) {
+   if (!PyArg_ParseTuple(args, "L", &size)) {
+     return nullptr;
+   }
+-  return THPStorage_New(THPStorage_newFdStorage(size));
++  return THPStorage_New(at::new_shm_fd_storage(size));
+   END_HANDLE_TH_ERRORS
+ }
+ 
+-static PyObject* THPStorage_shareFd(PyObject* _self, PyObject* noargs) {
++static PyObject* THPStorage_shareFd(PyObject* self, PyObject* noargs) {
+   HANDLE_TH_ERRORS
++  const auto& storage = THPStorage_Unpack(self);
+   TORCH_CHECK(
+-      reinterpret_cast<THPStorage*>(_self)->cdata->device_type() == at::kCPU,
+-      "_share_fd_: only available on CPU");
+-  auto self = (THPStorage*)_self;
+-  c10::StorageImpl* storage = self->cdata;
++      storage.device_type() == at::kCPU, "_share_fd_: only available on CPU");
+   // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+   at::MapAllocator* ctx;
+   // Storage is already in shared memory, just return a handle
+-  if ((ctx = at::MapAllocator::fromDataPtr(storage->data_ptr()))) {
++  if ((ctx = at::MapAllocator::fromDataPtr(storage.data_ptr()))) {
+     // done
+   } else {
+-    at::Storage new_storage(THPStorage_newFdStorage(storage->nbytes()));
+-    at::Storage _self_aten = torch::createStorage(_self);
++    at::Storage new_storage(at::new_shm_fd_storage(storage.nbytes()));
+     {
+       // Copying into shared memory can be slow, so release the GIL
+       pybind11::gil_scoped_release no_gil;
+-      storage_copy(new_storage, _self_aten);
++      // Copy data from old storage into the new one
++      at::storage_copy(new_storage, storage);
+     }
+ 
+-    std::swap(*storage, *new_storage.unsafeGetStorageImpl());
+-    ctx = at::MapAllocator::fromDataPtr(storage->data_ptr());
++    // Replace the old data_ptr and allocator with the new ones
++    storage.set_data_ptr(std::move(new_storage.data_ptr()));
++    storage.unsafeGetStorageImpl()->set_allocator(new_storage.allocator());
++
++    ctx = at::MapAllocator::fromDataPtr(storage.data_ptr());
+     AT_ASSERT(ctx);
+   }
+ 
+   THPObjectPtr storage_handle(THPUtils_packInt32(ctx->fd()));
+   if (!storage_handle)
+     return nullptr;
+-  THPObjectPtr size(THPUtils_packUInt64(storage->nbytes() / sizeof(uint8_t)));
++  THPObjectPtr size(THPUtils_packUInt64(storage.nbytes()));
+   if (!size)
+     return nullptr;
+ 
+@@ -275,26 +262,26 @@ static PyObject* THPStorage_newSharedFd(PyObject* _unused, PyObject* args) {
+   END_HANDLE_TH_ERRORS
+ }
+ 
+-static PyObject* THPStorage_shareCuda(PyObject* _self, PyObject* noargs) {
++static PyObject* THPStorage_shareCuda(PyObject* self, PyObject* noargs) {
+   HANDLE_TH_ERRORS
+ #ifdef USE_CUDA
++  const auto& storage = THPStorage_Unpack(self);
+   TORCH_CHECK(
+-      reinterpret_cast<THPStorage*>(_self)->cdata->device_type() == at::kCUDA,
++      storage.device_type() == at::kCUDA,
+       "_share_cuda_: only available on CUDA");
+-  auto self = (THPStorage*)_self;
+-  c10::StorageImpl* storage = self->cdata;
++  c10::StorageImpl* storage_impl = storage.unsafeGetStorageImpl();
+ 
+-  if (storage->received_cuda()) {
++  if (storage_impl->received_cuda()) {
+     AT_ERROR(
+         "Attempted to send CUDA tensor received from another process; this is not currently supported. Consider cloning before sending.");
+   }
+ 
+-  at::DeviceGuard device_guard(storage->device());
++  at::DeviceGuard device_guard(storage.device());
+   THPObjectPtr tuple(PyTuple_New(8));
+-  THPObjectPtr device(THPUtils_packInt32(storage->device().index()));
++  THPObjectPtr device(THPUtils_packInt32(storage.device().index()));
+   THPObjectPtr _handle(Py_None);
+   Py_INCREF(Py_None);
+-  THPObjectPtr size_bytes(THPUtils_packUInt64(storage->nbytes()));
++  THPObjectPtr size_bytes(THPUtils_packUInt64(storage.nbytes()));
+   THPObjectPtr _offset_bytes(THPUtils_packInt32(0));
+   THPObjectPtr _ref_counter(Py_None);
+   Py_INCREF(Py_None);
+@@ -303,12 +290,12 @@ static PyObject* THPStorage_shareCuda(PyObject* _self, PyObject* noargs) {
+   Py_INCREF(Py_None);
+   THPObjectPtr _event_sync_required(Py_None);
+   Py_INCREF(Py_None);
+-  if (storage->data<uint8_t>()) {
++  if (storage.data<uint8_t>()) {
+     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+     size_t base_size;
+     void* base_ptr = c10::cuda::CUDACachingAllocator::getBaseAllocation(
+-        storage->data<uint8_t>(), &base_size);
+-    ptrdiff_t offset_bytes = (char*)storage->data<uint8_t>() - (char*)base_ptr;
++        storage.data<uint8_t>(), &base_size);
++    ptrdiff_t offset_bytes = (char*)storage.data<uint8_t>() - (char*)base_ptr;
+ 
+     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+     cudaIpcMemHandle_t handle;
+@@ -320,10 +307,10 @@ static PyObject* THPStorage_shareCuda(PyObject* _self, PyObject* noargs) {
+     // Put Storage Data behind new ref counting context
+     // See Note [CUDA IPC Refcounting implementation explained]
+     at::DataPtr sent_data_ptr =
+-        torch::GetNewRefCountedSentData(storage->data(), storage->device());
+-    auto old_data_ptr = storage->set_data_ptr(std::move(sent_data_ptr));
++        torch::GetNewRefCountedSentData(storage.data(), storage.device());
++    auto old_data_ptr = storage.set_data_ptr(std::move(sent_data_ptr));
+     auto sent_data =
+-        static_cast<torch::CudaIPCSentData*>(storage->data_ptr().get_context());
++        static_cast<torch::CudaIPCSentData*>(storage.data_ptr().get_context());
+     sent_data->set_original_ptr(std::move(old_data_ptr));
+     _ref_counter = PyBytes_FromString((sent_data->handle()).c_str());
+     _ref_counter_offset = THPUtils_packInt64(sent_data->offset());
+@@ -565,10 +552,9 @@ static PyObject* THPStorage_newSharedCuda(PyObject* _unused, PyObject* args) {
+ // pointer.
+ //
+ // NB: This does NOT preserve object identity when you call it multiple times
+-static PyObject* THPStorage_weakRef(PyObject* _self, PyObject* args) {
++static PyObject* THPStorage_weakRef(PyObject* self, PyObject* args) {
+   HANDLE_TH_ERRORS
+-  auto self = (THPStorage*)_self;
+-  c10::StorageImpl* storage = self->cdata;
++  c10::StorageImpl* storage = THPStorage_Unpack(self).unsafeGetStorageImpl();
+   return PyLong_FromVoidPtr(c10::raw::intrusive_ptr::make_weak(storage));
+   END_HANDLE_TH_ERRORS
+ }
+@@ -609,13 +595,12 @@ PyObject* THPStorage_expired(PyObject* _unused, PyObject* arg) {
+   END_HANDLE_TH_ERRORS
+ }
+ 
+-PyObject* THPStorage_sharedFd(PyObject* _self, PyObject* noargs) {
++PyObject* THPStorage_sharedFd(PyObject* self, PyObject* noargs) {
+   HANDLE_TH_ERRORS
+-  auto self = (THPStorage*)_self;
+   at::MapAllocator* ctx = nullptr;
+-  if (self->cdata->device_type() == at::kCPU) {
+-    c10::StorageImpl* storage = self->cdata;
+-    ctx = at::MapAllocator::fromDataPtr(storage->data_ptr());
++  const auto& storage = THPStorage_Unpack(self);
++  if (storage.device_type() == at::kCPU) {
++    ctx = at::MapAllocator::fromDataPtr(storage.data_ptr());
+   }
+ 
+   THPUtils_assert(ctx, "couldn't retrieve a shared file descriptor");
+@@ -623,13 +608,13 @@ PyObject* THPStorage_sharedFd(PyObject* _self, PyObject* noargs) {
+   END_HANDLE_TH_ERRORS
+ }
+ 
+-PyObject* THPStorage_isShared(PyObject* _self, PyObject* noargs) {
+-  auto self = (THPStorage*)_self;
+-  if (self->cdata->device_type() == at::kCUDA) {
++PyObject* THPStorage_isShared(PyObject* self, PyObject* noargs) {
++  const auto& storage = THPStorage_Unpack(self);
++  if (storage.device_type() == at::kCUDA) {
+     Py_RETURN_TRUE;
+   }
+-  if (at::MapAllocator::fromDataPtr(self->cdata->data_ptr()) ||
+-      THManagedMapAllocator::fromDataPtr(self->cdata->data_ptr())) {
++  if (at::MapAllocator::fromDataPtr(storage.data_ptr()) ||
++      THManagedMapAllocator::fromDataPtr(storage.data_ptr())) {
+     Py_RETURN_TRUE;
+   } else {
+     Py_RETURN_FALSE;
+diff --git a/torch/csrc/utils.cpp b/torch/csrc/utils.cpp
+index b42e389723b..9338105c95d 100644
+--- a/torch/csrc/utils.cpp
++++ b/torch/csrc/utils.cpp
+@@ -195,15 +195,6 @@ void THPPointer<THPStorage>::free() {
+     Py_DECREF(ptr);
+ }
+ 
+-void storage_copy(at::Storage dst, at::Storage src, bool non_blocking) {
+-  auto dst_options = c10::TensorOptions().device(dst.device()).dtype(at::kByte);
+-  auto dst_t = at::empty({0}, {}, dst_options).set_(dst);
+-
+-  auto src_options = c10::TensorOptions().device(src.device()).dtype(at::kByte);
+-  auto src_t = at::empty({0}, {}, src_options).set_(src);
+-  dst_t.copy_(src_t, non_blocking);
+-}
+-
+ void storage_fill(at::Storage self, uint8_t value) {
+   auto options = c10::TensorOptions().device(self.device()).dtype(at::kByte);
+   auto self_t = at::empty({0}, {}, options).set_(self);
+diff --git a/torch/csrc/utils.h b/torch/csrc/utils.h
+index 97c878dba33..7b307cbc5f0 100644
+--- a/torch/csrc/utils.h
++++ b/torch/csrc/utils.h
+@@ -219,7 +219,6 @@ std::vector<c10::optional<at::cuda::CUDAStream>>
+ THPUtils_PySequence_to_CUDAStreamList(PyObject* obj);
+ #endif
+ 
+-void storage_copy(at::Storage dst, at::Storage src, bool non_blocking = false);
+ void storage_fill(at::Storage self, uint8_t value);
+ void storage_set(at::Storage self, ptrdiff_t idx, uint8_t value);
+ uint8_t storage_get(at::Storage self, ptrdiff_t idx);
+diff --git a/torch/distributed/fsdp/_common_utils.py b/torch/distributed/fsdp/_common_utils.py
+index 8cea2e70a2f..4d4afb34e82 100644
+--- a/torch/distributed/fsdp/_common_utils.py
++++ b/torch/distributed/fsdp/_common_utils.py
+@@ -6,6 +6,7 @@ import traceback
+ import warnings
+ from enum import auto, Enum
+ from typing import (
++    Any,
+     Callable,
+     Dict,
+     Generator,
+@@ -39,6 +40,53 @@ FSDP_PREFIX = FSDP_WRAPPED_MODULE + "."
+ FSDP_FLATTENED = "_fsdp_flattened"
+ 
+ 
++class _FSDPDeviceHandle:
++    """
++    This is a simple abstraction for FSDP computing devices,
++    which enables custom backends that implement CUDA-like
++    semantics to be integrated with FSDP.
++    """
++
++    def __init__(self, device: torch.device, backend: Any = None):
++        if backend is None:
++            try:
++                self.__backend = getattr(torch, device.type)
++                self.__device = device
++            except AttributeError:
++                raise AttributeError(
++                    f"Device '{device}' does not have a corresponding backend registered as 'torch.{device.type}'."
++                )
++        else:
++            self.__backend = backend
++
++    @classmethod
++    def from_device(cls, device: torch.device) -> "_FSDPDeviceHandle":
++        """
++        Return an device handle corresponding to the device, and through this handle,
++        operations with the same semantics as CUDA can be performed on the device.
++        Just return torch.cuda if the device is cuda to make attribute-access faster.
++        Custom backend must first register a module with the same name with {device.type} on torch.
++        """
++        if device.type == "cuda":
++            return cast(_FSDPDeviceHandle, torch.cuda)
++        return cls(device)
++
++    def __getattr__(self, __name: str) -> Any:
++        try:
++            return getattr(self.__backend, __name)
++        except AttributeError:
++            raise AttributeError(
++                f"Custom backend '{self.__device.type}' not implement 'torch.{self.__device.type}.{__name}'"
++            )
++
++
++class _UninitializedDeviceHandle(_FSDPDeviceHandle):
++    def __init__(self):
++        pass
++
++    def __getattribute__(self, __name: str) -> Any:
++        raise RuntimeError("Trying to use an uninitialized device handle.")
++
+ class _FSDPState(_State):
+     def __init__(self) -> None:
+         # TODO: Move all the attributes to this class to enable typing for
+@@ -60,7 +108,10 @@ class _FSDPState(_State):
+         self._fully_sharded_module_to_handles: Dict[
+             nn.Module, flat_param_file.FlatParamHandle
+         ] = {}
+-        self.compute_device = torch.device("cuda", torch.cuda.current_device())
++        self.compute_device = Optional[torch.device] = None
++        # Abstract device handle for fsdp compute device. For now,
++        # the compute device must implement cuda semantics used by fsdp
++        self._device_handle: _FSDPDeviceHandle = _UninitializedDeviceHandle()
+ 
+ 
+ def _get_module_fsdp_state(module: nn.Module) -> Optional[_FSDPState]:
+diff --git a/torch/distributed/fsdp/_init_utils.py b/torch/distributed/fsdp/_init_utils.py
+index b92df41648b..067d85f7ec1 100644
+--- a/torch/distributed/fsdp/_init_utils.py
++++ b/torch/distributed/fsdp/_init_utils.py
+@@ -25,6 +25,7 @@ import torch.nn as nn
+ from torch.distributed.algorithms._comm_hooks import default_hooks
+ from torch.distributed.distributed_c10d import _get_default_group
+ from torch.distributed.fsdp._common_utils import (
++    _FSDPDeviceHandle,
+     _FSDPState,
+     _get_module_fsdp_state,
+     _is_fsdp_flattened,
+@@ -421,6 +422,8 @@ def _init_param_handle_from_module(
+         device_from_device_id,
+         state.rank,
+     )
++    state._device_handle = _FSDPDeviceHandle.from_device(state.compute_device)
++    
+     managed_params = list(_get_orig_params(fully_sharded_module, state._ignored_params))
+     if sync_module_states:
+         _sync_module_params_and_buffers(
+@@ -504,6 +507,7 @@ def _init_param_handles_from_module(
+                 device_from_device_id,
+                 state.rank,
+             )
++            state._device_handle = _FSDPDeviceHandle.from_device(state.compute_device)
+         if sync_module_states:
+             _sync_module_states(params, buffers, state.process_group)
+         _init_param_handle_from_params(state, params, fully_sharded_module)
+@@ -861,8 +865,9 @@ def _get_compute_device(
+     rank: int,
+ ) -> torch.device:
+     """
+-    Determines and returns this FSDP instance's compute device. If the module
+-    is already on a non-CPU device, then the compute device is that non-CPU
++    Determines and returns this FSDP instance's compute device. If a device is
++    specified by ``device_id``, then returns that device. Otherwise, If the
++    module is already on a non-CPU device, then the compute device is that non-CPU
+     device. If the module is on CPU, then the compute device is the current
+     device.
+ 
+@@ -873,13 +878,14 @@ def _get_compute_device(
+     Precondition: ``_check_single_device_module()`` and
+     ``_move_module_to_device()``.
+     """
+-    # If the module is on GPU already, then that GPU device has priority
+-    # over the current device
+     param = next(_get_orig_params(module, ignored_params), None)
+-    if param is not None and param.device.type == "cuda":
+-        compute_device = param.device
++    if param is not None and param.device.type != "cpu":
++        compute_device = param.device  # Determined by model param placement
+     else:
+-        compute_device = torch.device("cuda", torch.cuda.current_device())
++        if device_from_device_id is not None and device_from_device_id.type != "cuda":
++            compute_device = device_from_device_id  # Determined by custom backend
++        else:
++            compute_device = torch.device("cuda", torch.cuda.current_device())
+     if device_from_device_id is not None and compute_device != device_from_device_id:
+         raise ValueError(
+             f"Inconsistent compute device and `device_id` on rank {rank}: "
+diff --git a/torch/distributed/fsdp/_optim_utils.py b/torch/distributed/fsdp/_optim_utils.py
+index 1353391cc96..10fd811647b 100644
+--- a/torch/distributed/fsdp/_optim_utils.py
++++ b/torch/distributed/fsdp/_optim_utils.py
+@@ -209,7 +209,7 @@ def _communicate_optim_state(
+             dist.all_gather_into_tensor(
+                 tensor_buffer, value, group=fsdp_state.process_group
+             )
+-            torch.cuda.synchronize()
++            fsdp_state._device_handle.synchronize()
+             unpadded_numel = cast(
+                 nn.Parameter, flat_param._unpadded_unsharded_size
+             ).numel()
+@@ -274,7 +274,7 @@ def _unflatten_communicated_optim_state(
+                     optim_state,
+                     fsdp_state.rank,
+                     fsdp_state.world_size,
+-                    torch.cuda.device_count(),
++                    fsdp_state._device_handle.device_count(),
+                     fsdp_state.process_group,
+                 )
+             unflat_state_param[state_name] = optim_state
+@@ -1703,7 +1703,7 @@ def _gather_orig_param_state(
+                 value,
+                 fsdp_state.rank,
+                 fsdp_state.world_size,
+-                torch.cuda.device_count(),
++                fsdp_state._device_handle.device_count(),
+                 fsdp_state.process_group,
+             )
+         value = value.cpu()
+diff --git a/torch/distributed/fsdp/_runtime_utils.py b/torch/distributed/fsdp/_runtime_utils.py
+index ab12987a14e..62071f50c32 100644
+--- a/torch/distributed/fsdp/_runtime_utils.py
++++ b/torch/distributed/fsdp/_runtime_utils.py
+@@ -162,7 +162,7 @@ def _lazy_init(
+     """
+     if state._is_root is not None:
+         return  # no-op: already lazily initialized
+-    if not torch.cuda.is_available():
++    if not state._device_handle.is_available():
+         # Allow the FSDP constructor to run even without CUDA but check this
+         # once we start real execution
+         raise RuntimeError("FSDP does not support CPU only execution")
+@@ -276,20 +276,20 @@ def _init_streams(
+     data transfers. The streams should be shared across FSDP instances.
+     """
+     assert state._is_root
+-    assert torch.cuda.is_available()
++    assert state._device_handle.is_available()
+     # Stream for unshard logic, including allocating the all-gather destination
+     # tensors and the all-gathers themselves.
+-    state._streams["unshard"] = torch.cuda.Stream()
++    state._streams["unshard"] = state._device_handle.Stream()
+     # Stream for overlapping gradient reduction with the backward pass gradient
+     # computation.
+-    state._streams["post_backward"] = torch.cuda.Stream()
++    state._streams["post_backward"] = state._device_handle.Stream()
+     # Stream for pre-unshard logic, namely allocations and writes for CPU
+     # offloading (H2D copy) and mixed precision (low precision cast).
+-    state._streams["pre_unshard"] = torch.cuda.Stream()
++    state._streams["pre_unshard"] = state._device_handle.Stream()
+     # Default stream for computation
+-    state._streams["default"] = torch.cuda.current_stream()
++    state._streams["default"] = state._device_handle.current_stream()
+     state._stream_to_name = {
+-        torch.cuda.current_stream(): "default",
++        state._device_handle.current_stream(): "default",
+         state._streams["unshard"]: "unshard",
+         state._streams["pre_unshard"]: "pre_unshard",
+         state._streams["post_backward"]: "post_backward",
+@@ -314,7 +314,7 @@ def _unshard(
+     if not handles:
+         return
+     any_ran_pre_unshard = False
+-    with torch.cuda.stream(pre_unshard_stream):
++    with state._device_handle.stream(pre_unshard_stream):
+         for handle in handles:
+             ran_pre_unshard = handle.pre_unshard()
+             any_ran_pre_unshard = any_ran_pre_unshard or ran_pre_unshard
+@@ -324,7 +324,7 @@ def _unshard(
+         event = state._free_event_queue.dequeue_if_needed()
+         if event:
+             event.synchronize()
+-    with torch.cuda.stream(unshard_stream):
++    with state._device_handle.stream(unshard_stream):
+         for handle in handles:
+             handle.unshard()
+             handle.post_unshard()
+@@ -355,7 +355,7 @@ def _reshard(
+     ):
+         handle.reshard(free_unsharded_flat_param)
+         if state.limit_all_gathers and free_unsharded_flat_param:
+-            free_event = torch.cuda.Event()
++            free_event = state._device_handle.Event()
+             free_event.record()
+             state._free_event_queue.enqueue(free_event)
+         handle.post_reshard()
+@@ -434,7 +434,7 @@ def _pre_forward_unshard(
+     _unshard(state, handles, state._streams["unshard"], state._streams["pre_unshard"])
+     handles_key = tuple(handles)
+     state._needs_pre_forward_unshard[handles_key] = False
+-    torch.cuda.current_stream().wait_stream(state._streams["unshard"])
++    state._device_handle.current_stream().wait_stream(state._streams["unshard"])
+     _prefetch_handles(state, handles_key)
+ 
+ 
+@@ -533,7 +533,7 @@ def _root_pre_forward(
+         for handles_key in handles_keys:
+             state._needs_pre_forward_unshard[handles_key] = True
+     _wait_for_computation_stream(
+-        torch.cuda.current_stream(),
++        state._device_handle.current_stream(),
+         state._streams["unshard"],
+         state._streams["pre_unshard"],
+     )
+@@ -635,7 +635,7 @@ def _pre_backward_hook(
+         _unshard(
+             state, _handles, state._streams["unshard"], state._streams["pre_unshard"]
+         )
+-        torch.cuda.current_stream().wait_stream(state._streams["unshard"])
++        state._device_handle.current_stream().wait_stream(state._streams["unshard"])
+ 
+         # Set this to `False` to ensure that a mistargeted prefetch does not
+         # actually unshard these handles
+@@ -703,9 +703,11 @@ def _post_backward_hook(
+ 
+         # Wait for all ops in the current stream (e.g. gradient
+         # computation) to finish before reduce-scattering the gradient
+-        state._streams["post_backward"].wait_stream(torch.cuda.current_stream())
++        state._streams["post_backward"].wait_stream(
++            state._device_handle.current_stream()
++        )
+ 
+-        with torch.cuda.stream(state._streams["post_backward"]):
++        with state._device_handle.stream(state._streams["post_backward"]):
+             autograd_computed_grad = flat_param.grad.data
+             if state._exec_order_data.is_first_iter:  # only check once
+                 _check_comm_hook(
+@@ -848,7 +850,9 @@ def _cast_grad_to_param_dtype(
+         # caching allocator; for the sharded strategies, the gradient is
+         # produced in the post-backward stream, so this `record_stream()`
+         # should be a no-op
+-        _no_dispatch_record_stream(low_prec_grad_data, torch.cuda.current_stream())
++        _no_dispatch_record_stream(
++            low_prec_grad_data, state._device_handle.current_stream()
++        )
+ 
+ 
+ def _check_comm_hook(
+@@ -902,12 +906,14 @@ def _post_backward_final_callback(
+     root_state = state
+ 
+     if root_state._sync_gradients:
+-        torch.cuda.current_stream().wait_stream(root_state._streams["post_backward"])
++        state._device_handle.current_stream().wait_stream(
++            root_state._streams["post_backward"]
++        )
+         if root_state.cpu_offload.offload_params:
+             # Wait for non-blocking GPU -> CPU sharded gradient copies from the
+             # post-backward hooks to finish explicitly since CPU gradients do
+             # not automatically synchronize with the GPU
+-            torch.cuda.current_stream().synchronize()
++            state._device_handle.current_stream().synchronize()
+     root_state._exec_order_data.next_iter()
+ 
+     for fsdp_state in traversal_utils._get_fsdp_states(module):
+diff --git a/torch/distributed/fsdp/_state_dict_utils.py b/torch/distributed/fsdp/_state_dict_utils.py
+index 9da28a60580..ca31baaba81 100644
+--- a/torch/distributed/fsdp/_state_dict_utils.py
++++ b/torch/distributed/fsdp/_state_dict_utils.py
+@@ -121,8 +121,8 @@ def _common_pre_state_dict_hook(
+     fsdp_state: _FSDPState,
+ ) -> None:
+     """Performs the pre-state_dict tasks shared by all state_dict types."""
+-    if torch.cuda.is_available():
+-        torch.cuda.synchronize()
++    if fsdp_state._device_handle.is_available():
++        fsdp_state._device_handle.synchronize()
+     # TODO: need to check if this is always correct for composable FSDP.
+     _lazy_init(fsdp_state, module)
+     # TODO: change to this call after pre_state_dict_hook is in `nn.Module`.
+@@ -512,7 +512,7 @@ def _sharded_post_state_dict_hook(
+             tensor=param,
+             rank=fsdp_state.rank,
+             world_size=fsdp_state.world_size,
+-            num_devices_per_node=torch.cuda.device_count(),
++            num_devices_per_node=fsdp_state._device_handle.device_count(),
+             pg=fsdp_state.process_group,
+         )
+         if fsdp_state._state_dict_config.offload_to_cpu:
+@@ -694,8 +694,8 @@ def _pre_load_state_dict_hook(
+         StateDictType.SHARDED_STATE_DICT: _sharded_pre_load_state_dict_hook,
+     }
+     # Code that is common for all state_dict impls
+-    if torch.cuda.is_available():
+-        torch.cuda.synchronize()
++    if fsdp_state._device_handle.is_available():
++        fsdp_state._device_handle.synchronize()
+     # Dispatch into state_dict specific implementation of pre-hook.
+     _pre_load_state_dict_hook_fn[fsdp_state._state_dict_type](
+         module, fsdp_state, state_dict, prefix
+diff --git a/torch/distributed/fsdp/_unshard_param_utils.py b/torch/distributed/fsdp/_unshard_param_utils.py
+index e1c4b7e8704..d14e0c3f5c8 100644
+--- a/torch/distributed/fsdp/_unshard_param_utils.py
++++ b/torch/distributed/fsdp/_unshard_param_utils.py
+@@ -171,7 +171,7 @@ def _unshard_fsdp_state_params(
+     _validate_unshard_params_args(
+         state, writeback, rank0_only, offload_to_cpu, with_grads
+     )
+-    torch.cuda.synchronize()
++    fsdp_state._device_handle.synchronize()
+     # If handles are shared by other module(s), the handle may be already unsharded.
+     handles = [
+         handle
+@@ -194,7 +194,7 @@ def _unshard_fsdp_state_params(
+     free_unsharded_flat_params = [handle.needs_unshard() for handle in handles]
+     # No need to call `wait_stream()` since we unshard in the computation
+     # stream directly
+-    computation_stream = torch.cuda.current_stream()
++    computation_stream = fsdp_state._device_handle.current_stream()
+     _unshard(state, handles, computation_stream, computation_stream)
+     if with_grads:
+         _unshard_grads(handles)
+diff --git a/torch/distributed/fsdp/flat_param.py b/torch/distributed/fsdp/flat_param.py
+index 3cb4efd7a7f..d9c36577835 100644
+--- a/torch/distributed/fsdp/flat_param.py
++++ b/torch/distributed/fsdp/flat_param.py
+@@ -24,6 +24,7 @@ import torch.nn.functional as F
+ from torch import Tensor
+ from torch.distributed._tensor import DTensor
+ from torch.distributed.fsdp._common_utils import (
++    _FSDPDeviceHandle,
+     _set_fsdp_flattened,
+     HandleTrainingState,
+ )
+@@ -353,6 +354,7 @@ class FlatParamHandle:
+     ):
+         super().__init__()
+         self.device = device
++        self._device_handle = _FSDPDeviceHandle.from_device(self.device)
+         self.process_group = process_group
+         self.rank = process_group.rank()
+         self.world_size = process_group.size()
+@@ -1038,7 +1040,7 @@ class FlatParamHandle:
+         # default stream suffices since the default stream waits for the
+         # unshard stream.
+         _no_dispatch_record_stream(
+-            self.flat_param._mp_shard, torch.cuda.current_stream()  # type: ignore[attr-defined]
++            self.flat_param._mp_shard, self._device_handle.current_stream()  # type: ignore[attr-defined]
+         )
+         _free_storage(self.flat_param._mp_shard)  # type: ignore[attr-defined]
+ 
+@@ -1306,7 +1308,7 @@ class FlatParamHandle:
+         self._check_storage_allocated(unsharded_flat_param)
+         self._check_on_compute_device(unsharded_flat_param)
+         # Do not free the memory until all ops in the current stream finish
+-        _no_dispatch_record_stream(unsharded_flat_param, torch.cuda.current_stream())
++        _no_dispatch_record_stream(unsharded_flat_param, self._device_handle.current_stream())
+         _free_storage(unsharded_flat_param)
+ 
+     def _use_sharded_flat_param(self) -> None:
+-- 
+2.34.1
+

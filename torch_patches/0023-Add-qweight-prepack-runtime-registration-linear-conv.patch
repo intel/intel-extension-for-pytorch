@@ -1,0 +1,521 @@
+From 84bd17a7985cb2c8d5b4442792a7019a32ebdd24 Mon Sep 17 00:00:00 2001
+From: Zhiwei <532707544@qq.com>
+Date: Wed, 13 Sep 2023 13:31:06 +0800
+Subject: [PATCH 23/25] Add qweight prepack runtime registration(linear, conv)
+ & Add QXPU QEngine (#147)
+
+Add qweight prepack runtime registration(linear, conv) & Add QXPU QEngine
+---
+ aten/src/ATen/Context.cpp                     |   2 +
+ aten/src/ATen/native/native_functions.yaml    |   2 +-
+ aten/src/ATen/native/quantized/PackedParams.h |  27 +++
+ aten/src/ATen/native/quantized/QTensor.cpp    |   6 +-
+ .../native/quantized/cpu/conv_serialization.h |  74 ++-----
+ .../native/quantized/cpu/fbgemm_utils.cpp     | 182 ++++++++++++++----
+ c10/core/QEngine.h                            |   4 +
+ torch/backends/quantized/__init__.py          |   2 +
+ torch/csrc/jit/serialization/pickler.cpp      |  33 +++-
+ torch/csrc/jit/serialization/unpickler.cpp    |   3 +-
+ 10 files changed, 223 insertions(+), 112 deletions(-)
+
+diff --git a/aten/src/ATen/Context.cpp b/aten/src/ATen/Context.cpp
+index 1ec545dfc06..b7b124817a9 100644
+--- a/aten/src/ATen/Context.cpp
++++ b/aten/src/ATen/Context.cpp
+@@ -340,6 +340,8 @@ const std::vector<at::QEngine>& Context::supportedQEngines() {
+     engines.push_back(at::kONEDNN);
+ #endif
+ 
++    engines.push_back(at::kQXPU);
++
+ #ifdef USE_FBGEMM
+     if (fbgemm::fbgemmSupportedCPU()) {
+       engines.push_back(at::kX86);
+diff --git a/aten/src/ATen/native/native_functions.yaml b/aten/src/ATen/native/native_functions.yaml
+index 6464615d925..79ff27721f1 100644
+--- a/aten/src/ATen/native/native_functions.yaml
++++ b/aten/src/ATen/native/native_functions.yaml
+@@ -7294,7 +7294,7 @@
+   device_check: NoCheck
+   device_guard: False
+   dispatch:
+-    CPU, CUDA, Meta, MPS: set_
++    CPU, CUDA, QuantizedCPU, Meta, MPS: set_
+   autogen: set.source_Storage, set.source_Storage_out
+ 
+ - func: set_.source_Storage_storage_offset(Tensor(a!) self, Storage source, SymInt storage_offset, SymInt[] size, SymInt[] stride=[]) -> Tensor(a!)
+diff --git a/aten/src/ATen/native/quantized/PackedParams.h b/aten/src/ATen/native/quantized/PackedParams.h
+index a442628573f..7a4b6e17971 100644
+--- a/aten/src/ATen/native/quantized/PackedParams.h
++++ b/aten/src/ATen/native/quantized/PackedParams.h
+@@ -1,5 +1,7 @@
+ #pragma once
++#include <map>
+ 
++#include <ATen/Context.h>
+ #include <ATen/core/Tensor.h>
+ #include <ATen/core/ivalue.h>
+ 
+@@ -145,3 +147,28 @@ struct ConvPackedParamsBase : public torch::jit::CustomClassHolder {
+   virtual int64_t groups() const = 0;
+   virtual bool transpose() const = 0;
+ };
++
++template<uint32_t kSpatialDim>
++using prepack_fn = c10::intrusive_ptr<ConvPackedParamsBase<kSpatialDim>> (*)(at::Tensor weight,
++        c10::optional<at::Tensor>,
++        torch::List<int64_t> ,
++        torch::List<int64_t> ,
++        torch::List<int64_t> ,
++        torch::List<int64_t> ,
++        int64_t ,
++        bool );
++
++template <int kSpatialDim>
++TORCH_API std::map<at::QEngine, prepack_fn<kSpatialDim>>& get_prepack_fns();
++template <int kSpatialDim>
++TORCH_API void register_prepack(at::QEngine device, prepack_fn<kSpatialDim> prepack);
++template <int kSpatialDim>
++TORCH_API prepack_fn<kSpatialDim> get_device_prepack_fn(at::QEngine device);
++
++using linear_prepack_fn = c10::intrusive_ptr<LinearPackedParamsBase> (*)(at::Tensor ,
++      c10::optional<at::Tensor>);
++
++TORCH_API void register_linear_prepack(at::QEngine device, linear_prepack_fn prepack);
++TORCH_API void register_linear_prepack_fp16(at::QEngine device, linear_prepack_fn prepack);
++TORCH_API linear_prepack_fn get_device_linear_prepack_fn(at::QEngine device);
++TORCH_API linear_prepack_fn get_device_linear_prepack_fn_fp16(at::QEngine device);
+diff --git a/aten/src/ATen/native/quantized/QTensor.cpp b/aten/src/ATen/native/quantized/QTensor.cpp
+index eeb8a64635b..6469deaad47 100644
+--- a/aten/src/ATen/native/quantized/QTensor.cpp
++++ b/aten/src/ATen/native/quantized/QTensor.cpp
+@@ -178,7 +178,11 @@ Tensor& set_storage_quantized_(
+   auto* self_ = self.unsafeGetTensorImpl();
+   self_->set_storage_keep_dtype(std::move(storage));
+   self_->set_storage_offset(storage_offset);
+-  self_->set_sizes_and_strides(sizes, strides);
++  if (strides.data() == nullptr) {
++    self_->set_sizes_contiguous(sizes);
++  } else {
++    self_->set_sizes_and_strides(sizes, strides);
++  }
+   return self;
+ }
+ 
+diff --git a/aten/src/ATen/native/quantized/cpu/conv_serialization.h b/aten/src/ATen/native/quantized/cpu/conv_serialization.h
+index cae0a23b91c..41aeb8495f3 100644
+--- a/aten/src/ATen/native/quantized/cpu/conv_serialization.h
++++ b/aten/src/ATen/native/quantized/cpu/conv_serialization.h
+@@ -336,86 +336,38 @@ c10::intrusive_ptr<ConvPackedParamsBase<kSpatialDim>> deserialize_conv(
+   TORCH_INTERNAL_ASSERT(other_flags == 0, "Unexpected flags set in ", flags, ".");
+ 
+   auto& ctx = at::globalContext();
+-
+-#ifdef USE_FBGEMM
+-  if (ctx.qEngine() == at::QEngine::X86) {
+-#if AT_MKLDNN_ENABLED()
++  auto eng = ctx.qEngine();
++  if (eng == at::QEngine::X86) {
++  #if AT_MKLDNN_ENABLED()
+     bool use_onednn = onednn_utils::should_use_onednn_quant(
+         weight.value(), transpose, groups, output_padding);
+-    if (use_onednn) {
+-      return PackedConvWeightsOnednn<kSpatialDim>::prepack(
+-        weight.value(),
+-        bias,
+-        stride,
+-        padding,
+-        output_padding,
+-        dilation,
+-        groups,
+-        transpose
+-      );
+-    }
+-#endif
+-    return PackedConvWeight<kSpatialDim>::prepack(
+-      weight.value(),
+-      bias,
+-      stride,
+-      padding,
+-      output_padding,
+-      dilation,
+-      groups,
+-      transpose
+-    );
+-  } // x86
+-#endif
+-
+-#ifdef USE_FBGEMM
+-  if (ctx.qEngine() == at::QEngine::FBGEMM) {
+-    return PackedConvWeight<kSpatialDim>::prepack(
+-      weight.value(),
++    if(use_onednn){
++      return get_device_prepack_fn<kSpatialDim>(at::QEngine::ONEDNN)(weight.value(),
+       bias,
+       stride,
+       padding,
+       output_padding,
+       dilation,
+       groups,
+-      transpose
+-    );
+-  }
+-#endif // USE_FBGEMM
+-#ifdef USE_PYTORCH_QNNPACK
+-  if (ctx.qEngine() == at::QEngine::QNNPACK) {
+-    TORCH_CHECK(
+-        kSpatialDim == 2,
+-        "prepack/__setstate__: QNNPACK only supports Conv2d "
+-        "now.");
+-    return PackedConvWeightsQnnp<kSpatialDim>::prepack(
+-      weight.value(),
++      transpose);
++    }
++  #endif
++    return get_device_prepack_fn<kSpatialDim>(at::QEngine::FBGEMM)(weight.value(),
+       bias,
+       stride,
+       padding,
+       output_padding,
+       dilation,
+       groups,
+-      transpose
+-    );
+-  }
+-#endif // USE_PYTORCH_QNNPACK
+-#if AT_MKLDNN_ENABLED()
+-  if (ctx.qEngine() == at::QEngine::ONEDNN) {
+-    return PackedConvWeightsOnednn<kSpatialDim>::prepack(
+-      weight.value(),
++      transpose);
++  }else{
++    return get_device_prepack_fn<kSpatialDim>(eng)(weight.value(),
+       bias,
+       stride,
+       padding,
+       output_padding,
+       dilation,
+       groups,
+-      transpose
+-    );
++      transpose);
+   }
+-#endif // AT_MKLDNN_ENABLED()
+-TORCH_CHECK(
+-  false,
+-  "Didn't find engine for when deserializing ConvPackedParams: ",
+-  toString(ctx.qEngine()));
+ }
+diff --git a/aten/src/ATen/native/quantized/cpu/fbgemm_utils.cpp b/aten/src/ATen/native/quantized/cpu/fbgemm_utils.cpp
+index c2d36304556..1136f9bb8dd 100644
+--- a/aten/src/ATen/native/quantized/cpu/fbgemm_utils.cpp
++++ b/aten/src/ATen/native/quantized/cpu/fbgemm_utils.cpp
+@@ -457,48 +457,22 @@ int register_linear_params() {
+                 c10::optional<at::Tensor> bias;
+                 weight = std::move(std::get<0>(state));
+                 bias = std::move(std::get<1>(state));
+-
+-#ifdef USE_FBGEMM
+-                if (at::globalContext().qEngine() == at::QEngine::FBGEMM ||
+-                    at::globalContext().qEngine() == at::QEngine::X86) {
+-                  if (weight.scalar_type() == at::kQInt8) {
+-                    return PackedLinearWeight::prepack(
+-                        std::move(weight), std::move(bias));
+-                  } else if (weight.scalar_type() == at::kFloat) {
+-                    // NB: fp16 weight is serialized as float
+-                    return PackedLinearWeightFp16::prepack(
+-                        std::move(weight), std::move(bias));
+-                  } else {
++                auto eng = at::globalContext().qEngine();
++                if(weight.scalar_type() == at::kQInt8){
++                  return get_device_linear_prepack_fn(eng)(std::move(weight), std::move(bias));
++                }else if(weight.scalar_type() == at::kFloat){
++                  TORCH_CHECK(eng != at::QEngine::QNNPACK && eng != at::QEngine::ONEDNN,
++                  "Unsupported data type",
++                      c10::toString(weight.scalar_type()),
++                    " in serialized LinearPackedParams object for current QEngine!" );
++                  return get_device_linear_prepack_fn_fp16(eng)(std::move(weight), std::move(bias));
++                }else{
+                     TORCH_CHECK(
+                         false,
+                         "Unsupported data type",
+                         c10::toString(weight.scalar_type()),
+                         " in serialized LinearPackedParams object!");
+-                  }
+-                }
+-#endif // USE_FBGEMM
+-#ifdef USE_PYTORCH_QNNPACK
+-                if (at::globalContext().qEngine() == at::QEngine::QNNPACK) {
+-                  TORCH_CHECK(
+-                      weight.scalar_type() == at::kQInt8,
+-                      "QNNPACK only supports INT8 bit width currently. Got ",
+-                      c10::toString(weight.scalar_type()));
+-                  return PackedLinearWeightsQnnp::prepack(
+-                      std::move(weight), std::move(bias));
+-                }
+-#endif // USE_PYTORCH_QNNPACK
+-#if AT_MKLDNN_ENABLED()
+-                if (at::globalContext().qEngine() == at::QEngine::ONEDNN) {
+-                  TORCH_CHECK(
+-                      weight.scalar_type() == at::kQInt8,
+-                      "ONEDNN only supports INT8 bit width currently. Got ",
+-                      c10::toString(weight.scalar_type()));
+-                  return PackedLinearWeightsOnednn::prepack(
+-                      std::move(weight), std::move(bias));
+-                }
+-#endif // #if AT_MKLDNN_ENABLED()
+-                TORCH_CHECK(false, "Unknown qengine");
+-              })
++                }})
+               .def("bias", [](const c10::intrusive_ptr<LinearPackedParamsBase>& self) {
+                    at::Tensor weight;
+                    c10::optional<at::Tensor> bias;
+@@ -568,6 +542,136 @@ int register_embedding_params() {
+   return 0;
+ }
+ 
++int init_conv2d_prepack(){
++#ifdef USE_FBGEMM
++  register_prepack<2>(at::QEngine::FBGEMM, (PackedConvWeight<2>::prepack));
++  register_prepack<2>(at::QEngine::X86, (PackedConvWeight<2>::prepack));
++#endif
++
++#if AT_MKLDNN_ENABLED()
++  register_prepack<2>(at::QEngine::ONEDNN, (PackedConvWeightsOnednn<2>::prepack));
++#endif
++
++#ifdef USE_PYTORCH_QNNPACK
++  register_prepack<2>(at::QEngine::QNNPACK, (PackedConvWeightsQnnp<2>::prepack));
++#endif
++
++  return 0;
++}
++
++TORCH_API int init_conv3d_prepack(){
++#ifdef USE_FBGEMM
++  register_prepack<3>(at::QEngine::FBGEMM, (PackedConvWeight<3>::prepack));
++  register_prepack<3>(at::QEngine::X86, (PackedConvWeight<3>::prepack));
++#endif
++
++#ifdef USE_PYTORCH_QNNPACK
++  register_prepack<3>(at::QEngine::QNNPACK, (PackedConvWeightsQnnp<3>::prepack));
++#endif
++
++#if AT_MKLDNN_ENABLED()
++  register_prepack<3>(at::QEngine::ONEDNN, (PackedConvWeightsOnednn<3>::prepack));
++#endif
++
++  return 0;
++}
++
++int init_linear_prepack(){
++#ifdef USE_FBGEMM
++  register_linear_prepack(at::QEngine::FBGEMM, PackedLinearWeight::prepack);
++  register_linear_prepack_fp16(at::QEngine::FBGEMM, PackedLinearWeightFp16::prepack);
++  register_linear_prepack(at::QEngine::X86, PackedLinearWeight::prepack);
++  register_linear_prepack_fp16(at::QEngine::X86, PackedLinearWeightFp16::prepack);
++#endif
++
++#ifdef USE_PYTORCH_QNNPACK
++ register_linear_prepack(at::QEngine::QNNPACK, PackedLinearWeightsQnnp::prepack);
++#endif
++
++#if AT_MKLDNN_ENABLED()
++  register_linear_prepack(at::QEngine::ONEDNN, PackedLinearWeightsOnednn::prepack);
++#endif
++
++  return 0;
++}
++
++template <int kSpatialDim>
++std::map<at::QEngine, prepack_fn<kSpatialDim>>& get_prepack_fns() {
++  static std::map<at::QEngine, prepack_fn<kSpatialDim>> device2prepackfn;
++  return device2prepackfn;
++}
++
++template <int kSpatialDim>
++void register_prepack(at::QEngine device, prepack_fn<kSpatialDim> prepack){
++  get_prepack_fns<kSpatialDim>().insert(std::make_pair(device, prepack));
++}
++
++template <int kSpatialDim>
++prepack_fn<kSpatialDim> get_device_prepack_fn(at::QEngine device){
++  auto fns = get_prepack_fns<kSpatialDim>();
++  auto fn = fns.find(device);
++  if (fn != fns.end()) {
++    return fn->second;
++  } else {
++    TORCH_CHECK(
++        false,
++        "Does not find Prepack function definition for", toString(device), " when deserializing ConvPackedParams<", std::to_string(kSpatialDim), ">");
++    return nullptr;
++  }
++}
++
++std::map<at::QEngine, linear_prepack_fn>& get_linear_prepack_fns() {
++  static std::map<at::QEngine, linear_prepack_fn> device2prepackfn;
++  return device2prepackfn;
++}
++
++TORCH_API void register_linear_prepack(at::QEngine device, linear_prepack_fn prepack){
++  get_linear_prepack_fns().insert(std::make_pair(device, prepack));
++}
++
++linear_prepack_fn get_device_linear_prepack_fn(at::QEngine device){
++  auto fns = get_linear_prepack_fns();
++  auto fn = fns.find(device);
++  if (fn != fns.end()) {
++    return fn->second;
++  } else {
++    TORCH_CHECK(
++        false,
++        "Does not find Prepack function definition for QEngine", toString(device), " during deserializing LinearPackedParamsBase");
++    return nullptr;
++  }
++}
++
++std::map<at::QEngine, linear_prepack_fn>& get_linear_prepack_fns_fp16() {
++  static std::map<at::QEngine, linear_prepack_fn> device2prepackfn;
++  return device2prepackfn;
++}
++
++TORCH_API void register_linear_prepack_fp16(at::QEngine device, linear_prepack_fn prepack){
++  get_linear_prepack_fns().insert(std::make_pair(device, prepack));
++}
++
++linear_prepack_fn get_device_linear_prepack_fn_fp16(at::QEngine device){
++  auto fns = get_linear_prepack_fns_fp16();
++  auto fn = fns.find(device);
++  if (fn != fns.end()) {
++    return fn->second;
++  } else {
++      TORCH_CHECK(
++        false,
++        "Does not find Prepack fp16 function definition for QEngine", toString(device), " during deserializing LinearPackedParamsBase");
++    return nullptr;
++  }
++}
++
++ #define DEFINE_PREPACK_FUNC_BY_DIM(dim) \
++     template TORCH_API std::map<at::QEngine, prepack_fn<dim>>& get_prepack_fns<dim>(); \
++     template TORCH_API void register_prepack<dim>(at::QEngine device, prepack_fn<dim> prepack); \
++     template TORCH_API prepack_fn<dim> get_device_prepack_fn<dim>(at::QEngine device);
++
++DEFINE_PREPACK_FUNC_BY_DIM(2)
++DEFINE_PREPACK_FUNC_BY_DIM(3)
++
+ namespace {
+ 
+ static C10_UNUSED auto conv2d_params = register_conv_params<2>();
+@@ -575,4 +679,8 @@ static C10_UNUSED auto conv3d_params = register_conv_params<3>();
+ static C10_UNUSED auto linear_params = register_linear_params();
+ static C10_UNUSED auto embedding_params = register_embedding_params();
+ 
++static C10_UNUSED auto conv2d_prepack = init_conv2d_prepack();
++static C10_UNUSED auto conv3d_prepack = init_conv3d_prepack();
++static C10_UNUSED auto linear_prepack = init_linear_prepack();
++
+ } // namespace
+diff --git a/c10/core/QEngine.h b/c10/core/QEngine.h
+index 71eb4b34ac9..77fa8e267c8 100644
+--- a/c10/core/QEngine.h
++++ b/c10/core/QEngine.h
+@@ -17,6 +17,7 @@ enum class QEngine : uint8_t {
+   QNNPACK = 2,
+   ONEDNN = 3,
+   X86 = 4,
++  QXPU = 5,
+ };
+ 
+ constexpr auto kNoQEngine = QEngine::NoQEngine;
+@@ -24,6 +25,7 @@ constexpr auto kFBGEMM = QEngine::FBGEMM;
+ constexpr auto kQNNPACK = QEngine::QNNPACK;
+ constexpr auto kONEDNN = QEngine::ONEDNN;
+ constexpr auto kX86 = QEngine::X86;
++constexpr auto kQXPU = QEngine::QXPU;
+ 
+ inline std::string toString(QEngine qengine) {
+   switch (qengine) {
+@@ -37,6 +39,8 @@ inline std::string toString(QEngine qengine) {
+       return "ONEDNN";
+     case kX86:
+       return "X86";
++    case kQXPU:
++      return "QXPU";
+     default:
+       TORCH_CHECK(
+           false, "Unrecognized Quantized Engine: ", static_cast<int>(qengine));
+diff --git a/torch/backends/quantized/__init__.py b/torch/backends/quantized/__init__.py
+index c0d60916084..67364d4d7d1 100644
+--- a/torch/backends/quantized/__init__.py
++++ b/torch/backends/quantized/__init__.py
+@@ -15,6 +15,8 @@ def _get_qengine_id(qengine: str) -> int:
+         ret = 3
+     elif qengine == 'x86':
+         ret = 4
++    elif qengine == 'qxpu':
++        ret = 5
+     else:
+         ret = -1
+         raise RuntimeError("{} is not a valid value for quantized engine".format(qengine))
+diff --git a/torch/csrc/jit/serialization/pickler.cpp b/torch/csrc/jit/serialization/pickler.cpp
+index 1ecdaf2a7d7..605fd924691 100644
+--- a/torch/csrc/jit/serialization/pickler.cpp
++++ b/torch/csrc/jit/serialization/pickler.cpp
+@@ -709,16 +709,29 @@ WriteableTensorData getWriteableTensorData(
+     // NB: This new tensor is created to support cuda tensors.
+     // Storages can be mutated when converting tensors from cuda to cpu,
+     // and we need a cpu tensor to copy data from.
+-    result.tensor_ =
+-        at::empty({0}, tensor.options())
+-            .set_(
+-                tensor.storage(),
+-                /* storage_offset = */ 0,
+-                /* size = */
+-                {static_cast<int64_t>(
+-                    tensor.storage().nbytes() / tensor.element_size())},
+-                /* stride = */ {1})
+-            .cpu();
++    if (tensor.is_quantized()) {
++      result.tensor_ =
++          at::empty_quantized({0}, tensor)
++              .set_(
++                  tensor.storage(),
++                  /* storage_offset = */ 0,
++                  /* size = */
++                  {static_cast<int64_t>(
++                      tensor.storage().nbytes() / tensor.element_size())},
++                  /* stride = */ {1})
++              .cpu();
++    } else {
++      result.tensor_ =
++          at::empty({0}, tensor.options())
++              .set_(
++                  tensor.storage(),
++                  /* storage_offset = */ 0,
++                  /* size = */
++                  {static_cast<int64_t>(
++                      tensor.storage().nbytes() / tensor.element_size())},
++                  /* stride = */ {1})
++              .cpu();
++    }
+     TORCH_CHECK(
+         result.tensor_.storage().nbytes() == result.size_,
+         "Storage tensor size did not match record size");
+diff --git a/torch/csrc/jit/serialization/unpickler.cpp b/torch/csrc/jit/serialization/unpickler.cpp
+index 056865ba5e7..ed231f2cbd3 100644
+--- a/torch/csrc/jit/serialization/unpickler.cpp
++++ b/torch/csrc/jit/serialization/unpickler.cpp
+@@ -531,8 +531,7 @@ PickleOpCode Unpickler::readInstruction() {
+ 
+       at::Tensor tensor;
+       if (options.backend() == c10::Backend::QuantizedCPU) {
+-        tensor = at::_empty_affine_quantized({}, options, 0, 0)
+-                     .set_(storage, 0, {}, {});
++        tensor = at::_empty_affine_quantized({}, options, 0, 0).set_(storage);
+       } else {
+         tensor = at::empty({0}, options).set_(storage);
+       }
+-- 
+2.34.1
+

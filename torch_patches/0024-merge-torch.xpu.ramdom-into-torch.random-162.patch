@@ -1,0 +1,165 @@
+From d1c57ac01390d7f99f21ba3dc884b526984cdb6f Mon Sep 17 00:00:00 2001
+From: leizhenyuan <110007460+leizhenyuan@users.noreply.github.com>
+Date: Thu, 28 Sep 2023 09:55:36 +0800
+Subject: [PATCH 24/25] merge torch.xpu.ramdom into torch.random (#162)
+
+* port changes to other machine
+
+* use torch.seed instead of torch.xpu.seed
+
+* refine coda and remove unuse code
+
+* convert intel_extension_for_pytorch._C to torch.xpu
+
+* add current code for review
+
+* revert code changes
+
+* solove null ptr
+
+* refine code
+
+* remove unuse code
+
+* fix lint error and build related question
+
+---------
+
+Co-authored-by: gta <gta@DUT738-PVC.fm.intel.com>
+---
+ aten/src/ATen/Context.h                  | 21 ++++++++++++++++++---
+ aten/src/ATen/detail/XPUHooksInterface.h | 16 +++++++++++++++-
+ torch/csrc/Generator.cpp                 |  5 ++++-
+ torch/random.py                          |  6 ++++++
+ 4 files changed, 43 insertions(+), 5 deletions(-)
+
+diff --git a/aten/src/ATen/Context.h b/aten/src/ATen/Context.h
+index 679b8545cb9..bd0f85697a0 100644
+--- a/aten/src/ATen/Context.h
++++ b/aten/src/ATen/Context.h
+@@ -42,6 +42,8 @@ class TORCH_API Context {
+       return at::detail::getCUDAHooks().getDefaultCUDAGenerator(device.index());
+     } else if (device_type == at::kMPS) {
+       return at::detail::getMPSHooks().getDefaultMPSGenerator();
++    } else if (device_type == at::kXPU) {
++      return at::detail::getXPUHooks().getDefaultXPUGenerator(device.index());
+     } else {
+       AT_ERROR(DeviceTypeName(device_type), " device type not enabled.");
+     }
+@@ -428,9 +430,9 @@ static inline void manual_seed(uint64_t seed) {
+   }
+   // NB: Sometimes we build with CUDA, but we don't have any GPUs
+   // available. In that case, we must not seed CUDA; it will fail!
+-  const auto num_gpus = detail::getCUDAHooks().getNumGPUs();
+-  if (hasCUDA() && num_gpus > 0) {
+-    for (const auto i : c10::irange(num_gpus)) {
++  const auto cuda_num_gpus = detail::getCUDAHooks().getNumGPUs();
++  if (hasCUDA() && cuda_num_gpus > 0) {
++    for (const auto i : c10::irange(cuda_num_gpus)) {
+       auto cuda_gen = globalContext().defaultGenerator(
+           Device(at::kCUDA, static_cast<c10::DeviceIndex>(i)));
+       {
+@@ -447,6 +449,19 @@ static inline void manual_seed(uint64_t seed) {
+     std::lock_guard<std::mutex> lock(mps_gen.mutex());
+     mps_gen.set_current_seed(seed);
+   }
++
++  const auto xpu_num_gpus = detail::getXPUHooks().getNumGPUs();
++  if (hasXPU() && xpu_num_gpus > 0) {
++    for (const auto i : c10::irange(xpu_num_gpus)) {
++      auto xpu_gen = globalContext().defaultGenerator(
++          Device(at::kXPU, static_cast<c10::DeviceIndex>(i)));
++      {
++        // See Note [Acquire lock when using random generators]
++        std::lock_guard<std::mutex> lock(xpu_gen.mutex());
++        xpu_gen.set_current_seed(seed);
++      }
++    }
++  }
+ }
+ 
+ // When the global flag `allow_tf32` is set to true, cuBLAS handles are
+diff --git a/aten/src/ATen/detail/XPUHooksInterface.h b/aten/src/ATen/detail/XPUHooksInterface.h
+index 584ccf8d8c4..53e14046199 100644
+--- a/aten/src/ATen/detail/XPUHooksInterface.h
++++ b/aten/src/ATen/detail/XPUHooksInterface.h
+@@ -2,7 +2,7 @@
+ 
+ #include <c10/core/Device.h>
+ #include <c10/util/Exception.h>
+-
++#include <ATen/core/Generator.h>
+ #include <c10/util/Registry.h>
+ 
+ #include <cstddef>
+@@ -66,6 +66,20 @@ struct TORCH_API XPUHooksInterface {
+         "Cannot get XPU DL device without Intel Extension for Pytorch. ",
+         XPU_HELP);
+   };
++
++  virtual Generator getXPUGenerator(DeviceIndex device_index = -1) const {
++    (void)device_index; // Suppress unused variable warning
++    TORCH_CHECK(false, "Cannot get XPU generator without Intel Extension for Pytorch. ", XPU_HELP);
++  }
++
++    const Generator& getDefaultXPUGenerator(DeviceIndex device_index = -1) const {
++    (void)device_index; // Suppress unused variable warning
++    TORCH_CHECK(false, "Cannot get default XPU generator without Intel Extension for Pytorch. ", XPU_HELP);
++  }
++
++  virtual int getNumGPUs() const {
++    return 0;
++  }
+ };
+ 
+ struct TORCH_API XPUHooksArgs {};
+diff --git a/torch/csrc/Generator.cpp b/torch/csrc/Generator.cpp
+index 44a0d0242b9..6640101cf03 100644
+--- a/torch/csrc/Generator.cpp
++++ b/torch/csrc/Generator.cpp
+@@ -12,7 +12,7 @@
+ #include <torch/csrc/autograd/python_variable.h>
+ #include <torch/csrc/utils/python_arg_parser.h>
+ #include <torch/csrc/utils/tensor_types.h>
+-
++#include <ATen/detail/XPUHooksInterface.h>
+ #ifdef USE_CUDA
+ #include <ATen/cuda/CUDAGeneratorImpl.h>
+ #endif
+@@ -68,6 +68,9 @@ static PyObject* THPGenerator_pynew(
+     self->cdata = make_generator<MPSGeneratorImpl>();
+   }
+ #endif
++  else if (device.type() == at::kXPU) {
++    self->cdata = at::detail::getXPUHooks().getXPUGenerator(device.index());
++  }
+   else {
+     AT_ERROR(
+         "Device type ",
+diff --git a/torch/random.py b/torch/random.py
+index e4795907a3a..0cc90675a0f 100644
+--- a/torch/random.py
++++ b/torch/random.py
+@@ -43,6 +43,9 @@ def manual_seed(seed) -> torch._C.Generator:
+     if not torch.mps._is_in_bad_fork():
+         torch.mps.manual_seed(seed)
+ 
++    if hasattr(torch, 'xpu') and not torch.xpu._is_in_bad_fork():
++        torch.xpu.manual_seed(seed)
++
+     return default_generator.manual_seed(seed)
+ 
+ 
+@@ -60,6 +63,9 @@ def seed() -> int:
+     if not torch.mps._is_in_bad_fork():
+         torch.mps.manual_seed(seed)
+ 
++    if hasattr(torch, 'xpu') and not torch.xpu._is_in_bad_fork():
++        torch.xpu.manual_seed(seed)
++
+     return seed
+ 
+ 
+-- 
+2.34.1
+

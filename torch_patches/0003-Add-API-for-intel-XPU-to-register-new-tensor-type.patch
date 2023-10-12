@@ -1,7 +1,7 @@
 From 6493115242ca9657826b50b21383cec922c253ae Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <guangye.yu@intel.com>
 Date: Mon, 22 May 2023 09:56:52 +0000
-Subject: [PATCH 03/18] Add API for intel XPU to register new tensor type
+Subject: [PATCH 03/25] Add API for intel XPU to register new tensor type
 
 ---
  torch/csrc/tensor/python_tensor.cpp | 152 +++++++++++++++-------------
@@ -11,7 +11,7 @@ Subject: [PATCH 03/18] Add API for intel XPU to register new tensor type
  4 files changed, 90 insertions(+), 73 deletions(-)
 
 diff --git a/torch/csrc/tensor/python_tensor.cpp b/torch/csrc/tensor/python_tensor.cpp
-index 648fd04186..4d6778a7b0 100644
+index 648fd041868..4d6778a7b08 100644
 --- a/torch/csrc/tensor/python_tensor.cpp
 +++ b/torch/csrc/tensor/python_tensor.cpp
 @@ -60,8 +60,7 @@ static_assert(
@@ -224,7 +224,7 @@ index 648fd04186..4d6778a7b0 100644
  }
  
 diff --git a/torch/csrc/tensor/python_tensor.h b/torch/csrc/tensor/python_tensor.h
-index ab74e05341..5827f3b4ce 100644
+index ab74e053419..5827f3b4ce3 100644
 --- a/torch/csrc/tensor/python_tensor.h
 +++ b/torch/csrc/tensor/python_tensor.h
 @@ -4,6 +4,11 @@
@@ -250,7 +250,7 @@ index ab74e05341..5827f3b4ce 100644
  //
  // TODO: This is nuts!  There is no reason to let the default tensor type id
 diff --git a/torch/csrc/utils/tensor_types.cpp b/torch/csrc/utils/tensor_types.cpp
-index decf407b98..d4e4dd1d38 100644
+index decf407b982..d4e4dd1d38c 100644
 --- a/torch/csrc/utils/tensor_types.cpp
 +++ b/torch/csrc/utils/tensor_types.cpp
 @@ -19,7 +19,7 @@ using namespace at;
@@ -263,7 +263,7 @@ index decf407b98..d4e4dd1d38 100644
      case at::Backend::CPU:
        return "torch";
 diff --git a/torch/csrc/utils/tensor_types.h b/torch/csrc/utils/tensor_types.h
-index b45c284c9c..729b3e326f 100644
+index b45c284c9c1..729b3e326f1 100644
 --- a/torch/csrc/utils/tensor_types.h
 +++ b/torch/csrc/utils/tensor_types.h
 @@ -8,6 +8,7 @@

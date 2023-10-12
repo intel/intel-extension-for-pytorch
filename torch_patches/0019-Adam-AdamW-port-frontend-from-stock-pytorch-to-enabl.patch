@@ -1,0 +1,206 @@
+From d47557103000fda355578b361d0cd8ce4938a1ac Mon Sep 17 00:00:00 2001
+From: "Weishi.Deng" <weishi.deng@intel.com>
+Date: Mon, 14 Aug 2023 11:42:39 +0800
+Subject: [PATCH 19/25] Adam/AdamW: port frontend from stock pytorch to enable
+ fused_adam/fused_adamw (#139)
+
+* Adam/AdamW: rebase to stock pytorch to enable fused_adam/fused_adamw
+* add xpu support for 'foreach' option
+
+pytorch/pytorch#102047 #96188 and #106021
+---
+ torch/_dynamo/variables/torch.py    |  1 +
+ torch/csrc/Module.cpp               | 13 +++++++++++++
+ torch/optim/adam.py                 |  8 ++++++--
+ torch/optim/adamw.py                |  8 ++++++--
+ torch/optim/optimizer.py            | 12 ++++++++++--
+ torch/utils/_foreach_utils.py       | 13 +++++++++++++
+ torch/utils/backend_registration.py |  6 ++++--
+ 7 files changed, 53 insertions(+), 8 deletions(-)
+
+diff --git a/torch/_dynamo/variables/torch.py b/torch/_dynamo/variables/torch.py
+index bc9524db3c6..a5694cb15a7 100644
+--- a/torch/_dynamo/variables/torch.py
++++ b/torch/_dynamo/variables/torch.py
+@@ -66,6 +66,7 @@ constant_fold_functions = [
+     torch.iinfo,
+     torch.is_floating_point,
+     torch.nn.functional._Reduction.get_enum,
++    torch._C._get_privateuse1_backend_name,
+ ]
+ if torch.distributed.is_available():
+     constant_fold_functions.append(torch.distributed.is_initialized)
+diff --git a/torch/csrc/Module.cpp b/torch/csrc/Module.cpp
+index a5ef894e41b..00b6891c65b 100644
+--- a/torch/csrc/Module.cpp
++++ b/torch/csrc/Module.cpp
+@@ -464,6 +464,7 @@ PyObject* THModule_getCppBacktrace(PyObject* _unused, PyObject* args) {
+       c10::get_backtrace(frames_to_skip, maximum_number_of_frames, true));
+   END_HANDLE_TH_ERRORS
+ }
++
+ static PyObject* THModule_rename_privateuse1_backend(
+     PyObject* _unused,
+     PyObject* arg) {
+@@ -479,6 +480,14 @@ static PyObject* THModule_rename_privateuse1_backend(
+   END_HANDLE_TH_ERRORS
+ }
+ 
++static PyObject* THModule_get_privateuse1_backend_name(
++    PyObject* _unused,
++    PyObject* arg) {
++  HANDLE_TH_ERRORS
++  return THPUtils_packString(c10::get_privateuse1_backend());
++  END_HANDLE_TH_ERRORS
++}
++
+ PyObject* THPModule_setAllowTF32CuDNN(PyObject* _unused, PyObject* arg) {
+   THPUtils_assert(
+       PyBool_Check(arg),
+@@ -1134,6 +1143,10 @@ static PyMethodDef TorchMethods[] = {
+      THModule_rename_privateuse1_backend,
+      METH_O,
+      nullptr},
++    {"_get_privateuse1_backend_name",
++     THModule_get_privateuse1_backend_name,
++     METH_NOARGS,
++     nullptr},
+     {"set_flush_denormal", THPModule_setFlushDenormal, METH_O, nullptr},
+     {"get_default_dtype", THPModule_getDefaultDtype, METH_NOARGS, nullptr},
+     {"_get_default_device", THPModule_getDefaultDevice, METH_NOARGS, nullptr},
+diff --git a/torch/optim/adam.py b/torch/optim/adam.py
+index abfbe1e9efa..0eb8103ac0c 100644
+--- a/torch/optim/adam.py
++++ b/torch/optim/adam.py
+@@ -6,6 +6,7 @@ from .optimizer import (Optimizer, _use_grad_for_differentiable, _get_value, _st
+                         _dispatch_sqrt, _default_to_fused_or_foreach, _capturable_doc,
+                         _differentiable_doc, _foreach_doc, _fused_doc, _maximize_doc)
+ from torch.utils._foreach_utils import _group_tensors_by_device_and_dtype
++from torch.utils._foreach_utils import _get_fused_kernels_supported_devices
+ 
+ __all__ = ['Adam', 'adam']
+ 
+@@ -40,11 +41,14 @@ class Adam(Optimizer):
+             # Suppor AMP with FP16/BF16 model params which would need
+             # higher prec copy of params to do update math in higher prec to
+             # alleviate the loss of information.
++            fused_supported_devices = _get_fused_kernels_supported_devices()
+             if not all(
+-                p.is_cuda and torch.is_floating_point(p)
++                p.device.type in fused_supported_devices and
++                torch.is_floating_point(p)
+                 for pg in self.param_groups for p in pg['params']
+             ):
+-                raise RuntimeError("`fused=True` requires all the params to be CUDA, floating point Tensor")
++                raise RuntimeError("`fused=True` requires all the params to be floating point Tensors of "
++                                   f"supported devices: {fused_supported_devices}.")
+             if foreach:
+                 raise RuntimeError("`fused` and `foreach` cannot be `True` together.")
+ 
+diff --git a/torch/optim/adamw.py b/torch/optim/adamw.py
+index d3be11e0b99..61095baab1e 100644
+--- a/torch/optim/adamw.py
++++ b/torch/optim/adamw.py
+@@ -5,6 +5,7 @@ from .optimizer import (Optimizer, _use_grad_for_differentiable, _get_value, _di
+                         _fused_doc, _maximize_doc, _default_to_fused_or_foreach)
+ from typing import List, Optional
+ from torch.utils._foreach_utils import _group_tensors_by_device_and_dtype
++from torch.utils._foreach_utils import _get_fused_kernels_supported_devices
+ 
+ __all__ = ["AdamW", "adamw"]
+ 
+@@ -57,11 +58,14 @@ class AdamW(Optimizer):
+             # Suppor AMP with FP16/BF16 model params which would need
+             # higher prec copy of params to do update math in higher prec to
+             # alleviate the loss of information.
++            fused_supported_devices = _get_fused_kernels_supported_devices()
+             if not all(
+-                p.is_cuda and torch.is_floating_point(p)
++                p.device.type in fused_supported_devices and
++                torch.is_floating_point(p)
+                 for pg in self.param_groups for p in pg['params']
+             ):
+-                raise RuntimeError("`fused=True` requires all the params to be CUDA, floating point Tensor")
++                raise RuntimeError("`fused=True` requires all the params to be floating point Tensors of "
++                                   f"supported devices: {fused_supported_devices}.")
+             if foreach:
+                 raise RuntimeError("`fused` and `foreach` cannot be `True` together.")
+ 
+diff --git a/torch/optim/optimizer.py b/torch/optim/optimizer.py
+index 38192b4491e..21bd7165ce3 100644
+--- a/torch/optim/optimizer.py
++++ b/torch/optim/optimizer.py
+@@ -10,6 +10,8 @@ from typing import Callable, Dict, List, Tuple
+ 
+ import torch.utils.hooks as hooks
+ from torch.utils.hooks import RemovableHandle
++from torch.utils._foreach_utils import (_get_fused_kernels_supported_devices,
++                                        _get_foreach_kernels_supported_devices)
+ from torch._utils import is_compiling
+ 
+ __all__ = ['Optimizer', 'register_optimizer_step_pre_hook', 'register_optimizer_step_post_hook']
+@@ -66,11 +68,17 @@ def _default_to_fused_or_foreach(params: List[torch.Tensor],
+                                  use_fused: bool = False) -> Tuple[bool, bool]:
+     if torch.jit.is_scripting() or differentiable:
+         return False, False
++
++    fused_supported_devices = _get_fused_kernels_supported_devices()
++    foreach_supported_devices = _get_foreach_kernels_supported_devices()
+     fused = use_fused and all(
+-        p is None or (type(p) in _foreach_supported_types and p.is_cuda and torch.is_floating_point(p)) for p in params
++        p is None or (type(p) in _foreach_supported_types and
++                      p.device.type in fused_supported_devices and
++                      torch.is_floating_point(p)) for p in params
+     )
+     foreach = not fused and all(
+-        p is None or (type(p) in _foreach_supported_types and p.is_cuda) for p in params
++        p is None or (type(p) in _foreach_supported_types and
++                      p.device.type in foreach_supported_devices) for p in params
+     )
+     return fused, foreach
+ 
+diff --git a/torch/utils/_foreach_utils.py b/torch/utils/_foreach_utils.py
+index fd7af0f8abf..05e06887364 100644
+--- a/torch/utils/_foreach_utils.py
++++ b/torch/utils/_foreach_utils.py
+@@ -6,6 +6,19 @@ from torch import Tensor
+ from torch.autograd.grad_mode import no_grad
+ 
+ 
++def _get_foreach_kernels_supported_devices() -> List[str]:
++    r"""
++    Return the device type list that supports foreach kernels.
++    """
++    return ["cuda", "xpu", torch._C._get_privateuse1_backend_name()]
++
++def _get_fused_kernels_supported_devices() -> List[str]:
++    r"""
++    Return the device type list that supports fused kernels in optimizer.
++    """
++    return ["cuda", "xpu", torch._C._get_privateuse1_backend_name()]
++
++
+ # This util function splits tensors into groups by device and dtype, which is useful before sending
+ # tensors off to a foreach implementation, which requires tensors to be on one device and dtype.
+ # If tensorlistlist contains more than one tensorlist, the following assumptions are made BUT NOT verified:
+diff --git a/torch/utils/backend_registration.py b/torch/utils/backend_registration.py
+index fd153db1e24..8b904b90547 100644
+--- a/torch/utils/backend_registration.py
++++ b/torch/utils/backend_registration.py
+@@ -1,4 +1,4 @@
+-from torch._C import _rename_privateuse1_backend
++from torch._C import _rename_privateuse1_backend, _get_privateuse1_backend_name
+ 
+ def rename_privateuse1_backend(backend_name: str) -> None:
+     r"""
+@@ -28,4 +28,6 @@ def rename_privateuse1_backend(backend_name: str) -> None:
+         # to implement torch.ones.
+         >>> a = torch.ones(2, device="foo")
+         """
+-    return _rename_privateuse1_backend(backend_name)
++    _rename_privateuse1_backend(backend_name)
++    global _privateuse1_backend_name
++    _privateuse1_backend_name = backend_name
+-- 
+2.34.1
+

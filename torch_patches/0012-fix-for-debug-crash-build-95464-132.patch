@@ -1,7 +1,7 @@
 From 25af877b8f88d0fc59aa80bfb3088e22dbdbc29c Mon Sep 17 00:00:00 2001
 From: chengjunlu <chengjun.lu@intel.com>
 Date: Wed, 7 Jun 2023 11:14:06 +0800
-Subject: [PATCH 12/18] fix for debug crash build (#95464) (#132)
+Subject: [PATCH 12/25] fix for debug crash build (#95464) (#132)
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -24,7 +24,7 @@ Co-authored-by: kshitij12345 <kshitijkalambarkar@gmail.com>
  1 file changed, 9 insertions(+), 2 deletions(-)
 
 diff --git a/c10/core/impl/PyInterpreter.cpp b/c10/core/impl/PyInterpreter.cpp
-index 2f8f2fa730..d574de071d 100644
+index 2f8f2fa7307..d574de071d7 100644
 --- a/c10/core/impl/PyInterpreter.cpp
 +++ b/c10/core/impl/PyInterpreter.cpp
 @@ -97,9 +97,16 @@ struct NoopPyInterpreterVTable final : public PyInterpreterVTable {

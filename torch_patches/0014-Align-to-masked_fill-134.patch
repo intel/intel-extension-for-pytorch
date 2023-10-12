@@ -1,14 +1,14 @@
 From 4a3d0d4e39ad1017a4ff688e199ac90ff8de2b43 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Sat, 17 Jun 2023 00:58:30 +0800
-Subject: [PATCH 14/18] Align to masked_fill (#134)
+Subject: [PATCH 14/25] Align to masked_fill (#134)
 
 ---
  torch/_refs/__init__.py | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/torch/_refs/__init__.py b/torch/_refs/__init__.py
-index f5e6bd70f3..9c0f1f22e1 100644
+index f5e6bd70f3e..9c0f1f22e12 100644
 --- a/torch/_refs/__init__.py
 +++ b/torch/_refs/__init__.py
 @@ -4885,8 +4885,8 @@ def masked_fill(a: TensorLikeType, mask: TensorLikeType, value: TensorOrNumberLi

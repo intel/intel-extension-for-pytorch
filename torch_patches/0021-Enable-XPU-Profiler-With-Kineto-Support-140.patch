@@ -1,0 +1,1764 @@
+From afc10ec391931a3cc9d5344a867da79e1d77e919 Mon Sep 17 00:00:00 2001
+From: "Xunsong, Huang" <xunsong.huang@intel.com>
+Date: Wed, 6 Sep 2023 22:43:58 +0800
+Subject: [PATCH 21/25] Enable XPU Profiler With Kineto Support (#140)
+
+* Revert "Add xpu legacy profiler"
+
+This reverts commit c4422a87bf40fe2fc7ea6ca9a81989ba280c8b93.
+
+* (1/4) To enable XPU profiler with Kineto support
+
+This part has been upstreamed to PyTorch:main branch
+
+Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
+
+* (2/4) To enable XPU profiler with Kineto support
+
+We need to return DeviceType::XPU in the fallback flow when XPU was
+enabled instead of DeviceType::CUDA
+
+Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
+
+* (3/4) To enable XPU profiler with Kineto support
+
+This part contains all modification in data post-processing in python
+scripts
+
+Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
+
+* (4/4) To enable XPU profiler with Kineto support
+
+This commit is only for private-pytorch because we must catch the kineto
+and some parts in pytorch up to the main branch of kineto and pytorch
+
+Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
+
+---------
+
+Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
+---
+ third_party/kineto                            |   2 +-
+ torch/_C/_autograd.pyi                        |   1 -
+ torch/autograd/profiler.py                    |  51 +++--
+ torch/autograd/profiler_legacy.py             | 116 ++--------
+ torch/autograd/profiler_util.py               | 216 ++++++++----------
+ torch/csrc/autograd/init.cpp                  |  14 +-
+ torch/csrc/autograd/profiler_kineto.cpp       |   2 +-
+ torch/csrc/autograd/profiler_legacy.cpp       |  94 ++------
+ torch/csrc/autograd/profiler_legacy.h         |  55 +----
+ .../csrc/profiler/kineto_client_interface.cpp |  29 ++-
+ torch/csrc/profiler/kineto_shim.cpp           |  16 ++
+ torch/csrc/profiler/orchestration/observer.h  |   2 +-
+ torch/csrc/profiler/python/init.cpp           |   2 +-
+ torch/csrc/profiler/stubs/base.cpp            |   5 -
+ torch/csrc/profiler/stubs/base.h              |  12 +-
+ torch/csrc/profiler/stubs/cuda.cpp            |  38 +--
+ torch/csrc/profiler/stubs/itt.cpp             |   4 -
+ torch/profiler/profiler.py                    |   1 +
+ .../_internal/distributed/rpc/rpc_test.py     |   4 +-
+ 19 files changed, 231 insertions(+), 433 deletions(-)
+
+diff --git a/third_party/kineto b/third_party/kineto
+index 2da532c91de..c9362f65fb3 160000
+--- a/third_party/kineto
++++ b/third_party/kineto
+@@ -1 +1 @@
+-Subproject commit 2da532c91dee9dc36cccc6088206daa1b69e3966
++Subproject commit c9362f65fb30d9854de19920edd2082e8e2c5477
+diff --git a/torch/_C/_autograd.pyi b/torch/_C/_autograd.pyi
+index 2539fe796c3..391095e3b3b 100644
+--- a/torch/_C/_autograd.pyi
++++ b/torch/_C/_autograd.pyi
+@@ -9,7 +9,6 @@ from ._profiler import _ProfilerEvent, ActiveProfilerType, ProfilerActivity, Pro
+ class DeviceType(Enum):
+     CPU = ...
+     CUDA = ...
+-    XPU = ...
+     MKLDNN = ...
+     OPENGL = ...
+     OPENCL = ...
+diff --git a/torch/autograd/profiler.py b/torch/autograd/profiler.py
+index eb3f2692f6b..af04f0e1eba 100644
+--- a/torch/autograd/profiler.py
++++ b/torch/autograd/profiler.py
+@@ -69,8 +69,6 @@ class profile:
+         use_cuda (bool, optional): Enables timing of CUDA events as well using the cudaEvent API.
+             Adds approximately 4us of overhead to each tensor operation.
+ 
+-        use_xpu (bool, optional): Enables timing of XPU events as well using the xpuEvent API.
+-
+         record_shapes (bool, optional): If shapes recording is set, information
+             about input dimensions will be collected. This allows one to see which
+             dimensions have been used under the hood and further group by them
+@@ -146,8 +144,8 @@ class profile:
+             self,
+             enabled=True,
+             *,
+-            use_cuda=False,
+             use_xpu=False,
++            use_cuda=False,
+             record_shapes=False,
+             with_flops=False,
+             profile_memory=False,
+@@ -159,8 +157,8 @@ class profile:
+         self.enabled: bool = enabled
+         if not self.enabled:
+             return
+-        self.use_cuda = use_cuda
+         self.use_xpu = use_xpu
++        self.use_cuda = use_cuda
+         self.function_events: Optional[EventList] = None
+         self.entered = False
+         self.record_shapes = record_shapes
+@@ -179,14 +177,14 @@ class profile:
+             assert use_kineto, \
+                 "Device-only events supported only with Kineto (use_kineto=True)"
+ 
++        if self.use_xpu and not torch.xpu.is_available():   # type: ignore[attr-defined]
++            warn("XPU is not available, disabling XPU profiling")
++            self.use_xpu = False
++
+         if self.use_cuda and not torch.cuda.is_available():
+             warn("CUDA is not available, disabling CUDA profiling")
+             self.use_cuda = False
+ 
+-        if self.use_xpu and not (hasattr(torch, 'xpu') and torch.xpu.is_available()):    # type: ignore[attr-defined]
+-            warn("XPU is not available, disabling XPU profiling")
+-            self.use_xpu = False
+-
+         self.kineto_activities = set()
+         if self.use_cpu:
+             self.kineto_activities.add(ProfilerActivity.CPU)
+@@ -200,8 +198,9 @@ class profile:
+             else:
+                 self.kineto_activities.add(ProfilerActivity.CUDA)
+         elif self.use_xpu:
+-            # legacy XPU mode
+-            self.profiler_kind = ProfilerState.XPU
++            assert use_kineto and ProfilerActivity.XPU in _supported_activities(), \
++                "XPU profiling requires Kineto enabled and XPU supported"
++            self.kineto_activities.add(ProfilerActivity.XPU)
+ 
+         assert len(self.kineto_activities) > 0, \
+             "No activities specified for the profiler"
+@@ -239,12 +238,14 @@ class profile:
+             return
+         if self.use_cuda:
+             torch.cuda.synchronize()
++        if self.use_xpu:
++            torch.xpu.synchronize()     # type: ignore[attr-defined]
+         self.kineto_results = _disable_profiler()
+         parsed_results = self._parse_kineto_results(self.kineto_results)
+         self.function_events = EventList(
+             parsed_results,
+-            use_cuda=self.use_cuda,
+             use_xpu=self.use_xpu,
++            use_cuda=self.use_cuda,
+             profile_memory=self.profile_memory,
+             with_flops=self.with_flops)
+         self.function_events._build_tree()
+@@ -335,6 +336,11 @@ class profile:
+                 mem_record.device_type() in [DeviceType.CPU, DeviceType.MKLDNN, DeviceType.IDEEP] \
+                 else 0
+ 
++        def _xpu_memory_usage(mem_record):
++            return mem_record.nbytes() if \
++                mem_record.device_type() in [DeviceType.XPU] \
++                else 0
++
+         def _cuda_memory_usage(mem_record):
+             return mem_record.nbytes() if \
+                 mem_record.device_type() in [DeviceType.CUDA, DeviceType.HIP] \
+@@ -343,6 +349,7 @@ class profile:
+         # Create and return FunctionEvent list
+         function_events = []
+         cuda_corr_map: Dict[int, List[FunctionEvent]] = {}
++        xpu_corr_map: Dict[int, List[FunctionEvent]] = {}
+         max_evt_id = 0
+         for kineto_event in result.events():
+             if _filter_name(kineto_event.name()):
+@@ -352,11 +359,13 @@ class profile:
+             abs_end_us = kineto_event.start_us() + kineto_event.duration_us()
+ 
+             cpu_memory_usage = 0
++            xpu_memory_usage = 0
+             cuda_memory_usage = 0
+             if kineto_event.device_type() == DeviceType.CPU:
+                 # find the corresponding memory allocation events
+                 for mem_record in mem_records_acc.in_interval(kineto_event.start_us(), abs_end_us):
+                     cpu_memory_usage += _cpu_memory_usage(mem_record[0])
++                    xpu_memory_usage += _xpu_memory_usage(mem_record[0])
+                     cuda_memory_usage += _cuda_memory_usage(mem_record[0])
+                     mem_record[1] = True
+ 
+@@ -376,6 +385,7 @@ class profile:
+                 stack=[entry for entry in kineto_event.stack() if _filter_stack_entry(entry)],
+                 scope=kineto_event.scope(),
+                 cpu_memory_usage=cpu_memory_usage,
++                xpu_memory_usage=xpu_memory_usage,
+                 cuda_memory_usage=cuda_memory_usage,
+                 is_async=is_async,
+                 sequence_nr=kineto_event.sequence_nr(),
+@@ -399,6 +409,11 @@ class profile:
+                 if corr_id not in cuda_corr_map:
+                     cuda_corr_map[corr_id] = []
+                 cuda_corr_map[corr_id].append(fe)
++                if self.use_xpu:
++                    if corr_id not in xpu_corr_map:
++                        xpu_corr_map[corr_id] = []
++                    xpu_corr_map[corr_id].append(fe)
++        xpu_corr_map_values = [fe for fe_list in xpu_corr_map.values() for fe in fe_list]
+ 
+         # associate CUDA kernels and CUDA runtime (CPU) with CPU events
+         for fe in function_events:
+@@ -408,13 +423,23 @@ class profile:
+                     if f_evt.device_type == DeviceType.CUDA:
+                         fe.append_kernel(
+                             f_evt.name,
+-                            torch.device("cuda:{}".format(fe.device_index)),
++                            torch.device('cuda:{}'.format(f_evt.device_index)),
+                             f_evt.time_range.end - f_evt.time_range.start)
+                     elif f_evt.device_type == DeviceType.CPU:
+                         # make sure that 'thread' of a CPU Kineto (e.g. CUDA Runtime) event is associated
+                         # with the 'thread' of the corresponding linked PyTorch event to properly track
+                         # parents and children
+                         f_evt.thread = fe.thread
++            if (self.use_xpu and fe.device_type == DeviceType.CPU and not fe.is_async and
++                    fe.id in xpu_corr_map and fe not in xpu_corr_map_values):
++                for f_evt in xpu_corr_map[fe.id]:
++                    if f_evt.device_type == DeviceType.XPU:
++                        fe.append_kernel(
++                            f_evt.name,
++                            torch.device("xpu:{}".format(fe.device_index)),
++                            f_evt.time_range.end - f_evt.time_range.start)
++                    elif f_evt.device_type == DeviceType.CPU:
++                        f_evt.thread = fe.thread
+ 
+ 
+         def createFunctionEventForMemoryEvents(evt):
+@@ -822,7 +847,7 @@ def parse_nvprof_trace(path):
+         assert (row['cbid'] == 211)
+         evt = functions_map[row['marker_id']]
+         evt.append_kernel(row['kernel_name'],
+-                          torch.device("cuda:0"),
++                          0,
+                           row['kernel_end'] - row['kernel_start'])
+ 
+     functions.sort(key=lambda evt: evt.time_range.start)
+diff --git a/torch/autograd/profiler_legacy.py b/torch/autograd/profiler_legacy.py
+index 667fee32b81..1f71c61d51d 100644
+--- a/torch/autograd/profiler_legacy.py
++++ b/torch/autograd/profiler_legacy.py
+@@ -1,7 +1,7 @@
+ import torch
+ import torch.cuda
+ from torch.autograd.profiler_util import (
+-    EventList, FunctionEvent, MEMORY_EVENT_NAME, Interval,
++    EventList, FunctionEvent, MEMORY_EVENT_NAME,
+     _filter_name, _filter_stack_entry, _rewrite_name
+ )
+ 
+@@ -22,10 +22,8 @@ class profile:
+             enabled=True,
+             *,
+             use_cuda=False,
+-            use_xpu=False,
+             record_shapes=False,
+             with_flops=False,
+-            with_calling_stack=False,
+             profile_memory=False,
+             with_stack=False,
+             with_modules=False):
+@@ -33,12 +31,10 @@ class profile:
+         if not self.enabled:
+             return
+         self.use_cuda = use_cuda
+-        self.use_xpu = use_xpu
+         self.function_events = None
+         self.entered = False
+         self.record_shapes = record_shapes
+         self.with_flops = with_flops
+-        self.with_calling_stack = with_calling_stack
+         self.record_shapes |= self.with_flops
+         self.profile_memory = profile_memory
+         self.with_stack = with_stack
+@@ -48,14 +44,8 @@ class profile:
+             warn("CUDA is not available, disabling CUDA profiling")
+             self.use_cuda = False
+ 
+-        if self.use_xpu and not (hasattr(torch, 'xpu') and torch.xpu.is_available()):    # type: ignore[attr-defined]
+-            warn("XPU is not available, disabling XPU profiling")
+-            self.use_xpu = False
+-
+         if self.use_cuda:
+             self.profiler_kind = ProfilerState.CUDA
+-        elif self.use_xpu:
+-            self.profiler_kind = ProfilerState.XPU
+         else:
+             self.profiler_kind = ProfilerState.CPU
+ 
+@@ -88,18 +78,14 @@ class profile:
+             return
+         if self.use_cuda:
+             torch.cuda.synchronize()
+-        if self.use_xpu:
+-            torch.xpu.synchronize()    # type: ignore[attr-defined]
+ 
+         records = _disable_profiler_legacy()
+         parsed_results = _parse_legacy_records(records)
+         self.function_events = EventList(
+             parsed_results,
+             use_cuda=self.use_cuda,
+-            use_xpu=self.use_xpu,
+             profile_memory=self.profile_memory,
+-            with_flops=self.with_flops,
+-            with_calling_stack=self.with_calling_stack)
++            with_flops=self.with_flops)
+         self.function_events._build_tree()
+         return False
+ 
+@@ -124,7 +110,6 @@ class profile:
+             max_src_column_width=75,
+             max_name_column_width=55,
+             max_shapes_column_width=80,
+-            max_depth=10,
+             header=None,
+             top_level_events_only=False
+     ):
+@@ -136,7 +121,6 @@ class profile:
+             max_src_column_width=max_src_column_width,
+             max_name_column_width=max_name_column_width,
+             max_shapes_column_width=max_shapes_column_width,
+-            max_depth=max_depth,
+             header=header,
+             top_level_events_only=top_level_events_only
+         )
+@@ -201,12 +185,8 @@ def _parse_legacy_records(thread_records):
+         # accumulated memory allocations per handle
+         cpu_memory_allocs = {}
+         cuda_memory_allocs = {}
+-        xpu_memory_allocs = {}
+         # ranges per handle
+         range_starts = {}
+-        function_stack = []
+-        calling_stack = []
+-        calling_id = 0
+ 
+         filtered_handles = set()
+         prev_record = None
+@@ -230,27 +210,9 @@ def _parse_legacy_records(thread_records):
+                         filtered_handles.add(record_key)
+                         continue
+ 
+-                calling_stack.append(calling_id + 1)
+-                calling_id = 0
+-                # create the function event for appending kernel
+-                fe = FunctionEvent(
+-                    id=record.handle(),
+-                    name=_rewrite_name(name=record.name(), with_wildcard=True),
+-                    thread=record.thread_id(),
+-                    start_us=0,
+-                    end_us=0,
+-                    stack=[],
+-                    node_id=record.node_id(),
+-                    input_shapes=record.shapes(),
+-                    cstack=tuple(calling_stack),
+-                    device_type=DeviceType.CPU,
+-                    is_legacy=True,
+-                )
+-                function_stack.append(fe)
+-                range_starts[record_key] = (record, fe)
++                range_starts[record_key] = record
+                 cpu_memory_allocs[record_key] = 0
+                 cuda_memory_allocs[record_key] = 0
+-                xpu_memory_allocs[record_key] = 0
+             elif record.kind() == 'pop':
+                 assert (
+                     record_key in range_starts
+@@ -259,33 +221,37 @@ def _parse_legacy_records(thread_records):
+                     record_key
+                 )
+ 
+-                start, fe = range_starts[record_key]
+-
+-                calling_id = calling_stack.pop()
++                start = range_starts[record_key]
+ 
+                 cpu_memory_usage = cpu_memory_allocs[record_key]
+                 cuda_memory_usage = cuda_memory_allocs[record_key]
+-                xpu_memory_usage = xpu_memory_allocs[record_key]
+                 is_async = start.is_async() or (
+                     start.thread_id() != record.thread_id()
+                 )
+                 is_remote_event = record.is_remote()
+                 start_flops = start.flops()
+ 
+-                fe.time_range = Interval(start_record.cpu_elapsed_us(start), start_record.cpu_elapsed_us(record))
+-                fe.cpu_memory_usage = cpu_memory_usage
+-                fe.cuda_memory_usage = cuda_memory_usage
+-                fe.xpu_memory_usage = xpu_memory_usage
+-                fe.is_async = is_async
+-                fe.is_remote = is_remote_event
+-                fe.fwd_thread = start.fwd_thread_id()
+-                fe.stack = [entry for entry in start.stack() if _filter_stack_entry(entry)]
+-                fe.scope = start.scope()
+-                fe.sequence_nr = start.sequence_nr()
+-                fe.trace_name = _rewrite_name(name=start.name(), with_wildcard=False)
+-                fe.fwd_thread = start.fwd_thread_id()
+-                fe.flops = start_flops
+-
++                fe = FunctionEvent(
++                    id=record.handle(),
++                    node_id=record.node_id(),
++                    name=_rewrite_name(name=start.name(), with_wildcard=True),
++                    trace_name=_rewrite_name(name=start.name(), with_wildcard=False),
++                    thread=start.thread_id(),
++                    start_us=start_record.cpu_elapsed_us(start),
++                    end_us=start_record.cpu_elapsed_us(record),
++                    fwd_thread=start.fwd_thread_id(),
++                    input_shapes=start.shapes(),
++                    stack=[entry for entry in start.stack() if _filter_stack_entry(entry)],
++                    scope=start.scope(),
++                    cpu_memory_usage=cpu_memory_usage,
++                    cuda_memory_usage=cuda_memory_usage,
++                    is_async=is_async,
++                    is_remote=is_remote_event,
++                    sequence_nr=start.sequence_nr(),
++                    device_type=DeviceType.CPU,
++                    is_legacy=True,
++                    flops=start_flops,
++                )
+                 # note: async events have only cpu total time
+                 if not is_async and start.has_cuda():
+                     duration = start.cuda_elapsed_us(record)
+@@ -295,11 +261,9 @@ def _parse_legacy_records(thread_records):
+                             start.device(),
+                             duration)
+                 functions.append(fe)
+-                function_stack.remove(fe)
+                 del range_starts[record_key]
+                 del cpu_memory_allocs[record_key]
+                 del cuda_memory_allocs[record_key]
+-                del xpu_memory_allocs[record_key]
+             elif record.kind() == 'memory_alloc':
+                 num_open_handles_cpu = len(cpu_memory_allocs)
+                 num_open_handles_cuda = len(cuda_memory_allocs)
+@@ -308,8 +272,6 @@ def _parse_legacy_records(thread_records):
+                     cpu_memory_allocs[handle] += record.cpu_memory_usage()
+                 for handle in cuda_memory_allocs.keys():
+                     cuda_memory_allocs[handle] += record.cuda_memory_usage()
+-                for handle in xpu_memory_allocs.keys():
+-                    xpu_memory_allocs[handle] += record.xpu_memory_usage()
+                 if num_open_handles_cpu == 0:
+                     # output event as a top-level memory event
+                     fe = FunctionEvent(
+@@ -322,37 +284,9 @@ def _parse_legacy_records(thread_records):
+                         stack=[],
+                         cpu_memory_usage=record.cpu_memory_usage(),
+                         cuda_memory_usage=record.cuda_memory_usage(),
+-                        xpu_memory_usage=record.xpu_memory_usage(),
+                         is_legacy=True,
+                     )
+                     functions.append(fe)
+-            elif record.kind() == 'mark':
+-                if '__xpu_start_event' in record.name():
+-                    continue
+-                if record.has_xpu():
+-                    if len(function_stack) > 0:
+-                        fe = function_stack[-1]
+-                        fe.append_kernel(fe.name + "(" + record.name() + ")",
+-                                         record.device(),
+-                                         record.xpu_elapsed_us())
+-                    else:
+-                        # An xpu event is recorded but no parent function was recorded.
+-                        fe = FunctionEvent(
+-                            id=record.handle(),
+-                            node_id=record.node_id(),
+-                            name=_rewrite_name(name=record.name(), with_wildcard=True),
+-                            thread=record.thread_id(),
+-                            start_us=0,
+-                            end_us=0,
+-                            stack=[],
+-                            cstack=tuple(calling_stack),
+-                            input_shapes=record.shapes(),
+-                            is_legacy=True)
+-                        fe.stack = []
+-                        fe.append_kernel(fe.name + "(" + record.name() + ")",
+-                                         record.device(),
+-                                         record.xpu_elapsed_us())
+-                        functions.append(fe)
+             prev_record = record
+ 
+     # Sort functions by start time then by end time ascending.
+diff --git a/torch/autograd/profiler_util.py b/torch/autograd/profiler_util.py
+index d08de81066b..5915f35b317 100644
+--- a/torch/autograd/profiler_util.py
++++ b/torch/autograd/profiler_util.py
+@@ -16,18 +16,16 @@ __all__ = ["EventList", "FormattedTimesMixin", "Interval", "Kernel", "FunctionEv
+ class EventList(list):
+     """A list of Events (for pretty printing)"""
+     def __init__(self, *args, **kwargs):
+-        use_cuda = kwargs.pop('use_cuda', True)
+         use_xpu = kwargs.pop('use_xpu', False)
++        use_cuda = kwargs.pop('use_cuda', False)
+         profile_memory = kwargs.pop('profile_memory', False)
+         with_flops = kwargs.pop('with_flops', False)
+-        with_calling_stack = kwargs.pop('with_calling_stack', False)
+         super().__init__(*args, **kwargs)
+-        self._use_cuda = use_cuda
+         self._use_xpu = use_xpu
++        self._use_cuda = use_cuda
+         self._profile_memory = profile_memory
+         self._tree_built = False
+         self._with_flops = with_flops
+-        self._with_calling_stack = with_calling_stack
+ 
+     def _build_tree(self):
+         self._populate_cpu_children()
+@@ -159,7 +157,6 @@ class EventList(list):
+             max_src_column_width=75,
+             max_name_column_width=55,
+             max_shapes_column_width=80,
+-            max_depth=10,
+             header=None,
+             top_level_events_only=False
+     ):
+@@ -187,11 +184,9 @@ class EventList(list):
+             max_src_column_width=max_src_column_width,
+             max_name_column_width=max_name_column_width,
+             max_shapes_column_width=max_shapes_column_width,
+-            max_depth=10,
+             header=header,
+             profile_memory=self._profile_memory,
+             with_flops=self._with_flops,
+-            with_calling_stack=self._with_calling_stack,
+             top_level_events_only=top_level_events_only)
+ 
+     def export_chrome_trace(self, path):
+@@ -244,21 +239,6 @@ class EventList(list):
+                                                    evt.thread, next_id))
+                         # Note: use torch.profiler to get device kernel trace
+                         next_id += 1
+-                if self._use_xpu is True:
+-                    for k in evt.kernels:
+-                        # 's' and 'f' draw Flow arrows from
+-                        # the CPU launch to the GPU kernel
+-                        f.write('{"name": "%s", '
+-                                '"ph": "s", '
+-                                '"ts": %s, '
+-                                '"tid": %s, '
+-                                '"pid": "CPU functions", '
+-                                '"id": %s, '
+-                                '"cat": "cpu_to_xpu", '
+-                                '"args": {}}, ' % (evt.trace_name, evt.time_range.start,
+-                                                   evt.thread, next_id))
+-                        # Note: use torch.profiler to get device kernel trace
+-                        next_id += 1
+             if len(self) > 0:
+                 # remove trailing whitespace and comma
+                 f.seek(f.tell() - 2, os.SEEK_SET)
+@@ -266,7 +246,7 @@ class EventList(list):
+             f.write("]")
+ 
+     def supported_export_stacks_metrics(self):
+-        return ["self_cpu_time_total", "self_cuda_time_total"]
++        return ["self_cpu_time_total", "self_xpu_time_total", "self_cuda_time_total"]
+ 
+     def export_stacks(self, path: str, metric: str):
+         if metric not in self.supported_export_stacks_metrics():
+@@ -314,11 +294,10 @@ class EventList(list):
+ 
+         avg_list = EventList(
+             stats.values(),
+-            use_cuda=self._use_cuda,
+             use_xpu=self._use_xpu,
++            use_cuda=self._use_cuda,
+             profile_memory=self._profile_memory,
+-            with_flops=self._with_flops,
+-            with_calling_stack=self._with_calling_stack)
++            with_flops=self._with_flops)
+         for evt in avg_list:
+             evt.stack = evt.stack[:group_by_stack_n]
+             if not group_by_input_shapes:
+@@ -380,27 +359,27 @@ class FormattedTimesMixin:
+     The subclass should define `*_time_total` and `count` attributes.
+     """
+     cpu_time_str = _attr_formatter('cpu_time')
+-    cuda_time_str = _attr_formatter('cuda_time')
+     xpu_time_str = _attr_formatter('xpu_time')
++    cuda_time_str = _attr_formatter('cuda_time')
+     cpu_time_total_str = _attr_formatter('cpu_time_total')
+-    cuda_time_total_str = _attr_formatter('cuda_time_total')
+     xpu_time_total_str = _attr_formatter('xpu_time_total')
++    cuda_time_total_str = _attr_formatter('cuda_time_total')
+     self_cpu_time_total_str = _attr_formatter('self_cpu_time_total')
+-    self_cuda_time_total_str = _attr_formatter('self_cuda_time_total')
+     self_xpu_time_total_str = _attr_formatter('self_xpu_time_total')
++    self_cuda_time_total_str = _attr_formatter('self_cuda_time_total')
+ 
+     @property
+     def cpu_time(self):
+         return 0.0 if self.count == 0 else 1.0 * self.cpu_time_total / self.count  # type: ignore[attr-defined]
+ 
+-    @property
+-    def cuda_time(self):
+-        return 0.0 if self.count == 0 else 1.0 * self.cuda_time_total / self.count  # type: ignore[attr-defined]
+-
+     @property
+     def xpu_time(self):
+         return 0.0 if self.count == 0 else 1.0 * self.xpu_time_total / self.count  # type: ignore[attr-defined]
+ 
++    @property
++    def cuda_time(self):
++        return 0.0 if self.count == 0 else 1.0 * self.cuda_time_total / self.count  # type: ignore[attr-defined]
++
+ 
+ class Interval:
+     def __init__(self, start, end):
+@@ -418,7 +397,7 @@ class FunctionEvent(FormattedTimesMixin):
+     """Profiling information about a single function."""
+     def __init__(
+             self, id, name, thread, start_us, end_us, fwd_thread=None, input_shapes=None,
+-            stack=None, cstack=None, scope=0, cpu_memory_usage=0, cuda_memory_usage=0, xpu_memory_usage=0, is_async=False,
++            stack=None, scope=0, cpu_memory_usage=0, xpu_memory_usage=0, cuda_memory_usage=0, is_async=False,
+             is_remote=False, sequence_nr=-1, node_id=-1, device_type=DeviceType.CPU, device_index=0,
+             is_legacy=False, flops=None, trace_name=None):
+         self.id: int = id
+@@ -434,11 +413,10 @@ class FunctionEvent(FormattedTimesMixin):
+         self.cpu_parent: Optional[FunctionEvent] = None
+         self.input_shapes: Tuple[int, ...] = input_shapes
+         self.stack: List = stack
+-        self.cstack: Tuple[int, ...] = cstack
+         self.scope: int = scope
+         self.cpu_memory_usage: int = cpu_memory_usage
+-        self.cuda_memory_usage: int = cuda_memory_usage
+         self.xpu_memory_usage: int = xpu_memory_usage
++        self.cuda_memory_usage: int = cuda_memory_usage
+         self.is_async: bool = is_async
+         self.is_remote: bool = is_remote
+         self.sequence_nr: int = sequence_nr
+@@ -447,7 +425,7 @@ class FunctionEvent(FormattedTimesMixin):
+         self.is_legacy: bool = is_legacy
+         self.flops: Optional[int] = flops
+ 
+-    def append_kernel(self, name, device : torch.device, duration):
++    def append_kernel(self, name, device, duration):
+         assert self.device_type == DeviceType.CPU
+         self.kernels.append(Kernel(name, device, duration))
+ 
+@@ -485,18 +463,20 @@ class FunctionEvent(FormattedTimesMixin):
+         )
+ 
+     @property
+-    def self_cuda_memory_usage(self):
++    def self_xpu_memory_usage(self):
+         if self.is_async or self.device_type != DeviceType.CPU:
+             return 0
+-        return self.cuda_memory_usage - sum(
+-            [child.cuda_memory_usage for child in self.cpu_children]
++        return self.xpu_memory_usage - sum(
++            [child.xpu_memory_usage for child in self.cpu_children]
+         )
+ 
+     @property
+-    def self_xpu_memory_usage(self):
+-        if self.is_async:
++    def self_cuda_memory_usage(self):
++        if self.is_async or self.device_type != DeviceType.CPU:
+             return 0
+-        return self.xpu_memory_usage - sum([child.xpu_memory_usage for child in self.cpu_children])
++        return self.cuda_memory_usage - sum(
++            [child.cuda_memory_usage for child in self.cpu_children]
++        )
+ 
+     @property
+     def self_cpu_time_total(self):
+@@ -513,11 +493,11 @@ class FunctionEvent(FormattedTimesMixin):
+         if self.device_type == DeviceType.CPU:
+             if not self.is_legacy:
+                 # account for the kernels in the children ops
+-                return (sum(kinfo.duration for kinfo in self.kernels if kinfo.device.type == DeviceType.CUDA) +
++                return (sum(kinfo.duration for kinfo in self.kernels if kinfo.device.type == 'cuda') +
+                         sum(ch.cuda_time_total for ch in self.cpu_children))
+             else:
+                 # each legacy cpu events has a single (fake) kernel
+-                return sum(kinfo.duration for kinfo in self.kernels if kinfo.device.type == DeviceType.CUDA)
++                return sum(kinfo.duration for kinfo in self.kernels)
+         elif self.device_type == DeviceType.CUDA:
+             return self.time_range.elapsed_us()
+         else:
+@@ -547,11 +527,14 @@ class FunctionEvent(FormattedTimesMixin):
+         if self.is_async:
+             return 0
+         if self.device_type == DeviceType.CPU:
+-            # account for the kernels in the children ops
+-            return (sum(kinfo.duration for kinfo in self.kernels if kinfo.device.type == "xpu") +
+-                    sum(ch.xpu_time_total for ch in self.cpu_children))
++            if not self.is_legacy:
++                # account for the kernels in the children ops
++                return (sum(kinfo.duration for kinfo in self.kernels if kinfo.device.type == 'xpu') +
++                        sum(ch.xpu_time_total for ch in self.cpu_children))
++            else:
++                # each legacy cpu events has a single (fake) kernel
++                return sum(kinfo.duration for kinfo in self.kernels)
+         elif self.device_type == DeviceType.XPU:
+-            print("self.device_type = ", 'xpu')
+             return self.time_range.elapsed_us()
+         else:
+             return 0
+@@ -560,8 +543,13 @@ class FunctionEvent(FormattedTimesMixin):
+     def self_xpu_time_total(self):
+         if self.is_async:
+             return 0
++        if self.device_type == DeviceType.CPU:
++            return self.xpu_time_total - \
++                sum([child.xpu_time_total for child in self.cpu_children])
++        elif self.device_type == DeviceType.XPU:
++            return self.xpu_time_total
+         else:
+-            return sum(kinfo.duration for kinfo in self.kernels if kinfo.device.type == "xpu")
++            return 0
+ 
+     @property
+     def key(self):
+@@ -570,8 +558,8 @@ class FunctionEvent(FormattedTimesMixin):
+     def __repr__(self):
+         return (
+             '<FunctionEvent id={} name={} device_type={} node_id={} cpu_time={} start_us={} end_us={} '
+-            'cpu_children={} cuda_time={} xpu_time={} name={} thread={} input_shapes={} cstack={}'
+-            'cpu_memory_usage={} cuda_memory_usage={} xpu_memory_usage={} is_async={} is_remote={} seq_nr={} is_legacy={}>'.format(
++            'cpu_children={} xpu_time={} cuda_time={} name={} thread={} input_shapes={} '
++            'cpu_memory_usage={} xpu_memory_usage={} cuda_memory_usage={} is_async={} is_remote={} seq_nr={} is_legacy={}>'.format(
+                 self.id,
+                 self.name,
+                 self.device_type,
+@@ -580,15 +568,14 @@ class FunctionEvent(FormattedTimesMixin):
+                 self.time_range.start,
+                 self.time_range.end,
+                 str([child.id for child in self.cpu_children]),
+-                self.cuda_time_str,
+                 self.xpu_time_str,
++                self.cuda_time_str,
+                 self.name,
+                 self.thread,
+                 str(self.input_shapes),
+-                str(self.cstack),
+                 self.cpu_memory_usage,
+-                self.cuda_memory_usage,
+                 self.xpu_memory_usage,
++                self.cuda_memory_usage,
+                 self.is_async,
+                 self.is_remote,
+                 self.sequence_nr,
+@@ -606,21 +593,20 @@ class FunctionEventAvg(FormattedTimesMixin):
+         self.is_async: bool = False
+         self.is_remote: bool = False
+         self.cpu_time_total: int = 0
+-        self.cuda_time_total: int = 0
+         self.xpu_time_total: int = 0
++        self.cuda_time_total: int = 0
+         self.self_cpu_time_total: int = 0
+-        self.self_cuda_time_total: int = 0
+         self.self_xpu_time_total: int = 0
++        self.self_cuda_time_total: int = 0
+         self.input_shapes: Optional[List[List[int]]] = None
+         self.stack: Optional[List] = None
+-        self.cstack: Optional[List] = None
+         self.scope: Optional[int] = None
+         self.cpu_memory_usage: int = 0
+-        self.cuda_memory_usage: int = 0
+         self.xpu_memory_usage: int = 0
++        self.cuda_memory_usage: int = 0
+         self.self_cpu_memory_usage: int = 0
+-        self.self_cuda_memory_usage: int = 0
+         self.self_xpu_memory_usage: int = 0
++        self.self_cuda_memory_usage: int = 0
+         self.cpu_children: Optional[List[FunctionEvent]] = None
+         self.cpu_parent: Optional[FunctionEvent] = None
+         self.device_type: DeviceType = DeviceType.CPU
+@@ -640,7 +626,6 @@ class FunctionEventAvg(FormattedTimesMixin):
+ 
+             self.input_shapes = other.input_shapes
+             self.stack = other.stack
+-            self.cstack = other.cstack
+             self.scope = other.scope
+             self.device_type = other.device_type
+             self.is_legacy = other.is_legacy
+@@ -648,17 +633,17 @@ class FunctionEventAvg(FormattedTimesMixin):
+         assert isinstance(other, (FunctionEvent, FunctionEventAvg))
+         assert other.key == self.key
+         self.cpu_time_total += other.cpu_time_total
+-        self.cuda_time_total += other.cuda_time_total
+         self.xpu_time_total += other.xpu_time_total
++        self.cuda_time_total += other.cuda_time_total
+         self.self_cpu_time_total += other.self_cpu_time_total
+-        self.self_cuda_time_total += other.self_cuda_time_total
+         self.self_xpu_time_total += other.self_xpu_time_total
++        self.self_cuda_time_total += other.self_cuda_time_total
+         self.cpu_memory_usage += other.cpu_memory_usage
+-        self.cuda_memory_usage += other.cuda_memory_usage
+         self.xpu_memory_usage += other.xpu_memory_usage
++        self.cuda_memory_usage += other.cuda_memory_usage
+         self.self_cpu_memory_usage += other.self_cpu_memory_usage
+-        self.self_cuda_memory_usage += other.self_cuda_memory_usage
+         self.self_xpu_memory_usage += other.self_xpu_memory_usage
++        self.self_cuda_memory_usage += other.self_cuda_memory_usage
+         self.count += other.count
+         if self.flops is None:
+             self.flops = other.flops
+@@ -672,20 +657,19 @@ class FunctionEventAvg(FormattedTimesMixin):
+     def __repr__(self):
+         return (
+             '<FunctionEventAvg key={} self_cpu_time={} cpu_time={} '
+-            ' self_cuda_time={} cuda_time={} self_xpu_time={} xpu_time={} input_shapes={} cstack={}'
+-            'cpu_memory_usage={} cuda_memory_usage={} xpu_memory_usage={}>'.format(
++            ' self_xpu_time={} xpu_time= {} self_cuda_time={} cuda_time={} input_shapes={}'
++            ' cpu_memory_usage={} xpu_memory_usage={} cuda_memory_usage={}>'.format(
+                 self.key,
+                 self.self_cpu_time_total_str,
+                 self.cpu_time_str,
+-                self.self_cuda_time_total_str,
+-                self.cuda_time_str,
+                 self.self_xpu_time_total_str,
+                 self.xpu_time_str,
++                self.self_cuda_time_total_str,
++                self.cuda_time_str,
+                 str(self.input_shapes),
+-                str(self.cstack),
+                 self.cpu_memory_usage,
+-                self.cuda_memory_usage,
+                 self.xpu_memory_usage,
++                self.cuda_memory_usage,
+             )
+         )
+ 
+@@ -765,26 +749,24 @@ def _build_table(
+         max_src_column_width=75,
+         max_name_column_width=55,
+         max_shapes_column_width=80,
+-        max_depth=10,
+         with_flops=False,
+-        with_calling_stack=False,
+         profile_memory=False,
+         top_level_events_only=False):
+     """Prints a summary of events (which can be a list of FunctionEvent or FunctionEventAvg)."""
+     if len(events) == 0:
+         return ""
+ 
+-    has_cuda_time = any([event.self_cuda_time_total > 0 for event in events])
+-    has_cuda_mem = any([event.self_cuda_memory_usage > 0 for event in events])
+     has_xpu_time = any([event.self_xpu_time_total > 0 for event in events])
+     has_xpu_mem = any([event.self_xpu_memory_usage > 0 for event in events])
++    has_cuda_time = any([event.self_cuda_time_total > 0 for event in events])
++    has_cuda_mem = any([event.self_cuda_memory_usage > 0 for event in events])
+     has_input_shapes = any(
+         [(event.input_shapes is not None and len(event.input_shapes) > 0) for event in events])
+ 
+     if sort_by is not None:
+         events = EventList(sorted(
+             events, key=lambda evt: getattr(evt, sort_by), reverse=True
+-        ), use_cuda=has_cuda_time, use_xpu=has_xpu_time, profile_memory=profile_memory, with_flops=with_flops, with_calling_stack=with_calling_stack)
++        ), use_xpu=has_xpu_time, use_cuda=has_cuda_time, profile_memory=profile_memory, with_flops=with_flops)
+ 
+     name_column_width = max([len(evt.key) for evt in events]) + 4
+     if max_name_column_width is not None:
+@@ -797,10 +779,6 @@ def _build_table(
+     DEFAULT_COLUMN_WIDTH = 12
+     flops_column_width = DEFAULT_COLUMN_WIDTH
+ 
+-    if with_calling_stack:
+-        cstack_column_width = max([len(str(evt.cstack[:max_depth])[1:-1]) for evt in events]) + 8
+-        cstack_column_width = max(cstack_column_width, 20)
+-
+     src_column_width = None
+     stacks = []
+     for evt in events:
+@@ -820,13 +798,6 @@ def _build_table(
+         'CPU total',
+         'CPU time avg',
+     ]
+-    if has_cuda_time:
+-        headers.extend([
+-            'Self CUDA',
+-            'Self CUDA %',
+-            'CUDA total',
+-            'CUDA time avg',
+-        ])
+     if has_xpu_time:
+         headers.extend([
+             'Self XPU',
+@@ -834,21 +805,28 @@ def _build_table(
+             'XPU total',
+             'XPU time avg',
+         ])
++    if has_cuda_time:
++        headers.extend([
++            'Self CUDA',
++            'Self CUDA %',
++            'CUDA total',
++            'CUDA time avg',
++        ])
+     if profile_memory:
+         headers.extend([
+             'CPU Mem',
+             'Self CPU Mem',
+         ])
+-        if has_cuda_mem:
+-            headers.extend([
+-                'CUDA Mem',
+-                'Self CUDA Mem',
+-            ])
+         if has_xpu_mem:
+             headers.extend([
+                 'XPU Mem',
+                 'Self XPU Mem',
+             ])
++        if has_cuda_mem:
++            headers.extend([
++                'CUDA Mem',
++                'Self CUDA Mem',
++            ])
+     headers.append(
+         '# of Calls'
+     )
+@@ -908,10 +886,6 @@ def _build_table(
+         else:
+             with_flops = False  # can't find any valid flops
+ 
+-    if with_calling_stack:
+-        headers.append('Calling Stack Tree'.ljust(cstack_column_width))
+-        add_column(cstack_column_width)
+-
+     row_format = row_format_lst[0]
+     header_sep = header_sep_lst[0]
+     line_length = line_length_lst[0]
+@@ -925,20 +899,19 @@ def _build_table(
+         result.append('\n')  # Yes, newline after the end as well
+ 
+     sum_self_cpu_time_total = sum([event.self_cpu_time_total for event in events])
+-    sum_self_cuda_time_total = 0
+     sum_self_xpu_time_total = 0
++    sum_self_cuda_time_total = 0
+     for evt in events:
+         if evt.device_type == DeviceType.CPU:
+             # in legacy profiler, kernel info is stored in cpu events
+             if evt.is_legacy:
+                 sum_self_cuda_time_total += evt.self_cuda_time_total
+-                sum_self_xpu_time_total += evt.self_xpu_time_total
++        elif evt.device_type == DeviceType.XPU:
++            # in kineto profiler, there're events with current device type (e.g. XPU)
++            sum_self_xpu_time_total += evt.self_xpu_time_total
+         elif evt.device_type == DeviceType.CUDA:
+             # in kineto profiler, there're events with the correct device type (e.g. CUDA)
+             sum_self_cuda_time_total += evt.self_cuda_time_total
+-        elif evt.device_type == DeviceType.XPU:
+-            # The XPU doesn't support kineto yet
+-            pass
+ 
+     # Actual printing
+     if header is not None:
+@@ -981,6 +954,14 @@ def _build_table(
+             evt.cpu_time_total_str,  # CPU total
+             evt.cpu_time_str,  # CPU time avg
+         ]
++        if has_xpu_time:
++            row_values.extend([
++                evt.self_xpu_time_total_str,
++                # CUDA time total %
++                _format_time_share(evt.self_xpu_time_total, sum_self_xpu_time_total),
++                evt.xpu_time_total_str,
++                evt.xpu_time_str,  # Cuda time avg
++            ])
+         if has_cuda_time:
+             row_values.extend([
+                 evt.self_cuda_time_total_str,
+@@ -989,14 +970,6 @@ def _build_table(
+                 evt.cuda_time_total_str,
+                 evt.cuda_time_str,  # Cuda time avg
+             ])
+-        if has_xpu_time:
+-            row_values.extend([
+-                evt.self_xpu_time_total_str,
+-                # SYCL time total %
+-                _format_time_share(evt.self_xpu_time_total, sum_self_xpu_time_total),
+-                evt.xpu_time_total_str,
+-                evt.xpu_time_str,   # SYCL time avg
+-            ])
+         if profile_memory:
+             row_values.extend([
+                 # CPU Mem Total
+@@ -1004,6 +977,13 @@ def _build_table(
+                 # Self CPU Mem Total
+                 _format_memory(evt.self_cpu_memory_usage),
+             ])
++            if has_xpu_mem:
++                row_values.extend([
++                    # XPU Mem Total
++                    _format_memory(evt.xpu_memory_usage),
++                    # Self XPU Mem Total
++                    _format_memory(evt.self_xpu_memory_usage),
++                ])
+             if has_cuda_mem:
+                 row_values.extend([
+                     # CUDA Mem Total
+@@ -1011,13 +991,6 @@ def _build_table(
+                     # Self CUDA Mem Total
+                     _format_memory(evt.self_cuda_memory_usage),
+                 ])
+-            if has_xpu_mem:
+-                row_values.extend([
+-                    # SYCL Mem Total
+-                    _format_memory(evt.xpu_memory_usage),
+-                    # Self SYCL Mem Total
+-                    _format_memory(evt.self_xpu_memory_usage),
+-                ])
+         row_values.append(
+             evt.count,  # Number of calls
+         )
+@@ -1036,12 +1009,6 @@ def _build_table(
+             if len(evt.stack) > 0:
+                 src_field = trim_path(evt.stack[0], src_column_width)
+             row_values.append(src_field)
+-        if with_calling_stack:
+-            if len(evt.cstack) > max_depth:
+-                cstack_str = str(evt.cstack[:max_depth])[1:-1] + ",..."
+-            else:
+-                cstack_str = str(evt.cstack)[1:-1]
+-            row_values.append(cstack_str.ljust(cstack_column_width))
+         append(row_format.format(*row_values))
+ 
+         if has_stack:
+@@ -1051,11 +1018,10 @@ def _build_table(
+             empty_headers.append("")
+             append(row_format.format(*empty_headers))
+ 
+-
+     append(header_sep)
+     append("Self CPU time total: {}".format(_format_time(sum_self_cpu_time_total)))
+-    if has_cuda_time:
+-        append("Self CUDA time total: {}".format(_format_time(sum_self_cuda_time_total)))
+     if has_xpu_time:
+         append("Self XPU time total: {}".format(_format_time(sum_self_xpu_time_total)))
++    if has_cuda_time:
++        append("Self CUDA time total: {}".format(_format_time(sum_self_cuda_time_total)))
+     return ''.join(result)
+diff --git a/torch/csrc/autograd/init.cpp b/torch/csrc/autograd/init.cpp
+index 600b4c534be..6126989061f 100644
+--- a/torch/csrc/autograd/init.cpp
++++ b/torch/csrc/autograd/init.cpp
+@@ -139,20 +139,10 @@ PyObject* THPAutograd_initExtension(PyObject* _unused, PyObject* unused) {
+       .def("device", &LegacyEvent::device)
+       .def("cpu_elapsed_us", &LegacyEvent::cpuElapsedUs)
+       .def("cuda_elapsed_us", &LegacyEvent::cudaElapsedUs)
+-      .def(
+-          "xpu_elapsed_us",
+-          static_cast<double (LegacyEvent::*)(void) const>(
+-              &LegacyEvent::xpuElapsedUs))
+-      .def(
+-          "xpu_elapsed_us",
+-          static_cast<double (LegacyEvent::*)(const LegacyEvent& e) const>(
+-              &LegacyEvent::xpuElapsedUs))
+       .def("has_cuda", &LegacyEvent::hasCuda)
+-      .def("has_xpu", &LegacyEvent::hasXpu)
+       .def("shapes", &LegacyEvent::shapes)
+       .def("cpu_memory_usage", &LegacyEvent::cpuMemoryUsage)
+       .def("cuda_memory_usage", &LegacyEvent::cudaMemoryUsage)
+-      .def("xpu_memory_usage", &LegacyEvent::xpuMemoryUsage)
+       .def("handle", &LegacyEvent::handle)
+       .def("node_id", &LegacyEvent::nodeId)
+       .def("is_remote", &LegacyEvent::isRemote)
+@@ -307,6 +297,10 @@ PyObject* THPAutograd_initExtension(PyObject* _unused, PyObject* unused) {
+     if (at::getNumGPUs() > 0) {
+       activities.insert(ActivityType::CUDA);
+     }
++#elif defined(USE_KINETO)
++    if (at::hasXPU()) {
++      activities.insert(ActivityType::XPU);
++    }
+ #endif
+     return activities;
+   });
+diff --git a/torch/csrc/autograd/profiler_kineto.cpp b/torch/csrc/autograd/profiler_kineto.cpp
+index ef98d8f8b4d..4e9f5bb501b 100644
+--- a/torch/csrc/autograd/profiler_kineto.cpp
++++ b/torch/csrc/autograd/profiler_kineto.cpp
+@@ -567,7 +567,7 @@ void prepareProfiler(
+           config.state == ProfilerState::KINETO_GPU_FALLBACK,
+       "Supported only in Kineto profiler");
+   torch::profiler::impl::kineto::prepareTrace(
+-      /*cpuOnly=*/!at::hasCUDA(), activities, config.experimental_config);
++      /*cpuOnly=*/!(at::hasCUDA() || at::hasXPU()), activities, config.experimental_config);
+ 
+   if (!config.experimental_config.performance_events.empty()) {
+     /* For now only CPU activity is supported */
+diff --git a/torch/csrc/autograd/profiler_legacy.cpp b/torch/csrc/autograd/profiler_legacy.cpp
+index e8ac623136c..35b8fac7e87 100644
+--- a/torch/csrc/autograd/profiler_legacy.cpp
++++ b/torch/csrc/autograd/profiler_legacy.cpp
+@@ -140,10 +140,6 @@ struct ProfilerLegacyThreadLocalState : public ProfilerStateBase {
+ 
+   void mark(std::string name, bool include_cuda = true);
+ 
+-  void markKernel(
+-      std::string name,
+-      torch::profiler::impl::ProfilerEventStub kernel_event);
+-
+   void setOrAddRemoteProfiledEvents(
+       std::vector<LegacyEvent>&& remoteProfiledEvents);
+ 
+@@ -199,9 +195,7 @@ thread_event_lists ProfilerLegacyThreadLocalState::consolidate() {
+   return result;
+ }
+ 
+-void ProfilerLegacyThreadLocalState::mark(
+-    std::string name,
+-    bool include_kernel) {
++void ProfilerLegacyThreadLocalState::mark(std::string name, bool include_cuda) {
+   if (config_.disabled()) {
+     return;
+   }
+@@ -212,29 +206,13 @@ void ProfilerLegacyThreadLocalState::mark(
+         EventKind::Mark,
+         at::StringView(std::move(name)),
+         at::RecordFunction::currentThreadId(),
+-        include_kernel,
+-        config_.state);
++        include_cuda &&
++            config_.state == torch::profiler::impl::ProfilerState::CUDA);
+     evt.setNodeId(at::RecordFunction::getDefaultNodeId());
+     getEventList().record(std::move(evt));
+   }
+ }
+ 
+-void ProfilerLegacyThreadLocalState::markKernel(
+-    std::string name,
+-    torch::profiler::impl::ProfilerEventStub kernel_event) {
+-  if (config_.state == ProfilerState::Disabled) {
+-    return;
+-  }
+-  if (config_.state == ProfilerState::XPU) {
+-    getEventList().record(
+-        EventKind::Mark,
+-        at::StringView(std::move(name)),
+-        at::RecordFunction::currentThreadId(),
+-        config_.state,
+-        kernel_event);
+-  }
+-}
+-
+ void ProfilerLegacyThreadLocalState::setOrAddRemoteProfiledEvents(
+     std::vector<LegacyEvent>&& remoteProfiledEvents) {
+   // Lock to serialize access from multiple callback threads.
+@@ -248,7 +226,7 @@ void ProfilerLegacyThreadLocalState::setOrAddRemoteProfiledEvents(
+ 
+ void ProfilerLegacyThreadLocalState::pushRange(
+     const at::RecordFunction& fn,
+-    const bool include_kernel,
++    const bool record_cuda,
+     std::vector<std::vector<int64_t>>&& shapes) {
+   if (config_.disabled()) {
+     return;
+@@ -262,8 +240,7 @@ void ProfilerLegacyThreadLocalState::pushRange(
+         EventKind::PushRange,
+         at::StringView(std::string(fn.name())),
+         at::RecordFunction::currentThreadId(),
+-        include_kernel,
+-        config_.state,
++        record_cuda,
+         fn.handle(),
+         std::move(shapes),
+         at::RecordFunction::getDefaultNodeId(),
+@@ -298,7 +275,7 @@ void ProfilerLegacyThreadLocalState::pushRange(
+ 
+ void ProfilerLegacyThreadLocalState::popRange(
+     const at::RecordFunction& fn,
+-    const bool include_kernel) {
++    const bool record_cuda) {
+   if (config_.disabled()) {
+     return;
+   }
+@@ -313,8 +290,7 @@ void ProfilerLegacyThreadLocalState::popRange(
+         EventKind::PopRange,
+         at::StringView(""),
+         at::RecordFunction::currentThreadId(),
+-        include_kernel,
+-        config_.state,
++        record_cuda,
+         fn.handle());
+     evt.setNodeId(at::RecordFunction::getDefaultNodeId());
+     getEventList(fn.threadId()).record(std::move(evt));
+@@ -333,8 +309,7 @@ void ProfilerLegacyThreadLocalState::reportMemoryUsage(
+         EventKind::MemoryAlloc,
+         at::StringView(""),
+         thread_id,
+-        false,
+-        config_.state);
++        config_.state == torch::profiler::impl::ProfilerState::CUDA);
+     evt.updateMemoryStats(alloc_size, device);
+     getEventList(thread_id).record(std::move(evt));
+   }
+@@ -446,10 +421,6 @@ void enableProfilerLegacy(
+       new_config.state != torch::profiler::impl::ProfilerState::NVTX ||
+           torch::profiler::impl::cudaStubs()->enabled(),
+       "Can't use NVTX profiler - PyTorch was compiled without CUDA");
+-  TORCH_CHECK(
+-      new_config.state != ProfilerState::ITT ||
+-          torch::profiler::impl::xpuStubs()->enabled(),
+-      "Can't use Intel(R) VTune Profiler's ITT functionality - PyTorch was compiled without XPU");
+ 
+   TORCH_CHECK(new_config.state != torch::profiler::impl::ProfilerState::KINETO);
+ 
+@@ -463,13 +434,6 @@ void enableProfilerLegacy(
+   state->mark("__start_profile", false);
+ }
+ 
+-void markKernel(
+-    std::string name,
+-    torch::profiler::impl::ProfilerEventStub& kernel_event) {
+-  auto state_ptr = ProfilerLegacyThreadLocalState::getTLS();
+-  state_ptr->markKernel(name, kernel_event);
+-}
+-
+ thread_event_lists disableProfilerLegacy(
+     c10::optional<ProfilerDisableOptions> profilerDisableOptions) {
+   auto cleanupTLSState =
+@@ -508,23 +472,10 @@ void addEventList(std::vector<LegacyEvent>&& profiledEvents) {
+   state_ptr->setOrAddRemoteProfiledEvents(std::move(profiledEvents));
+ }
+ 
+-void LegacyEvent::record(bool include_kernel, ProfilerState state) {
+-  if (include_kernel) {
+-    int device_id;
+-    switch (state) {
+-      case ProfilerState::CUDA:
+-        torch::profiler::impl::cudaStubs()->record(
+-            &device_id, &kernel_event_, &cpu_ns_);
+-        device_ = at::Device(DeviceType::CUDA, device_id);
+-        break;
+-      case ProfilerState::XPU:
+-        torch::profiler::impl::xpuStubs()->record(
+-            &device_id, &kernel_event_, &cpu_ns_);
+-        device_ = at::Device(DeviceType::XPU, device_id);
+-        break;
+-      default:
+-        break;
+-    }
++void LegacyEvent::record(bool record_cuda) {
++  if (record_cuda) {
++    torch::profiler::impl::cudaStubs()->record(&device_, &cuda_event, &cpu_ns_);
++    return;
+   }
+   cpu_ns_ = torch::profiler::impl::getTime();
+ }
+@@ -578,7 +529,7 @@ void LegacyEvent::record(bool include_kernel, ProfilerState state) {
+       ivalues.get(EventIValueIdx::CPU_NS).toInt(), // cpu_ns
+       ivalues.get(EventIValueIdx::CUDA_RECORDED).toBool(), // was cuda recorded
+       ivalues.get(EventIValueIdx::CUDA_MEM_USAGE).toInt(), // cuda memory usage
+-      ivalues.get(EventIValueIdx::CUDA_DEVICE).toDevice(), // device
++      ivalues.get(EventIValueIdx::CUDA_DEVICE).toInt(), // device
+       ivalues.get(EventIValueIdx::CUDA_US).toInt() // cuda_us
+   );
+   return evt;
+@@ -628,24 +579,7 @@ double LegacyEvent::cudaElapsedUs(const LegacyEvent& e) const {
+     return static_cast<double>(e.cuda_us_ - cuda_us_);
+   }
+   return torch::profiler::impl::cudaStubs()->elapsed(
+-      &kernel_event_, &e.kernel_event_);
+-}
+-
+-double LegacyEvent::xpuElapsedUs() const {
+-  if (!hasXpu()) {
+-    throw std::logic_error("Events were not recorded for XPU");
+-  }
+-  return torch::profiler::impl::xpuStubs()->elapsed(&kernel_event_);
+-}
+-
+-double LegacyEvent::xpuElapsedUs(const LegacyEvent& e) const {
+-  TORCH_CHECK(e.hasXpu() && hasXpu(), "Events were not recorded for XPU");
+-  TORCH_CHECK(
+-      e.device() == device(),
+-      c10::str(
+-          "Events are not on the same device: ", e.device(), " vs ", device()));
+-  return torch::profiler::impl::xpuStubs()->elapsed(
+-      &kernel_event_, &e.kernel_event_);
++      &cuda_event, &e.cuda_event);
+ }
+ 
+ static const at::jit::CodeTemplate event_template(R"(
+diff --git a/torch/csrc/autograd/profiler_legacy.h b/torch/csrc/autograd/profiler_legacy.h
+index f916dcded46..c77b373819a 100644
+--- a/torch/csrc/autograd/profiler_legacy.h
++++ b/torch/csrc/autograd/profiler_legacy.h
+@@ -36,8 +36,7 @@ struct TORCH_API LegacyEvent {
+       EventKind kind,
+       at::StringView name,
+       uint16_t thread_id,
+-      bool include_kernel,
+-      ProfilerState state,
++      bool record_cuda,
+       at::RecordFunctionHandle handle = 0,
+       std::vector<std::vector<int64_t>>&& shapes = {},
+       int node_id = -1,
+@@ -49,21 +48,7 @@ struct TORCH_API LegacyEvent {
+         shapes_(shapes),
+         node_id_(node_id),
+         is_async_(is_async) {
+-    record(include_kernel, state);
+-  }
+-
+-  // Constructor to be used in marking a kernel event.
+-  LegacyEvent(
+-      EventKind kind,
+-      at::StringView name,
+-      uint16_t thread_id,
+-      ProfilerState state,
+-      torch::profiler::impl::ProfilerEventStub event)
+-      : name_(std::move(name)),
+-        kind_(kind),
+-        thread_id_(thread_id),
+-        kernel_event_(event) {
+-    record(true, state);
++    record(record_cuda);
+   }
+ 
+   // Constructor to be used in conjunction with LegacyEvent::fromIValue.
+@@ -80,7 +65,7 @@ struct TORCH_API LegacyEvent {
+       int64_t cpu_ns,
+       bool cuda_recorded,
+       int64_t cuda_memory_usage = 0,
+-      at::Device device = at::Device(DeviceType::CPU),
++      int device = -1,
+       double cuda_us = -1)
+       : cpu_ns_(cpu_ns),
+         name_(std::move(name)),
+@@ -97,7 +82,7 @@ struct TORCH_API LegacyEvent {
+     // Sanity check values that were deserialized
+     TORCH_INTERNAL_ASSERT(cpu_ns_ > 0);
+     if (cuda_recorded) {
+-      TORCH_INTERNAL_ASSERT(device_.index() >= 0);
++      TORCH_INTERNAL_ASSERT(device_ >= 0);
+       TORCH_INTERNAL_ASSERT(cuda_us_ >= 0);
+     }
+   }
+@@ -109,7 +94,7 @@ struct TORCH_API LegacyEvent {
+   // Reconstructs an event from IValues given by toIValue.
+   static LegacyEvent fromIValue(const at::IValue& eventIValue);
+ 
+-  void record(bool include_kernel, ProfilerState state);
++  void record(bool record_cuda);
+ 
+   std::string kindStr() const {
+     switch (kind_) {
+@@ -154,24 +139,13 @@ struct TORCH_API LegacyEvent {
+     return static_cast<double>(cpu_ns_) / (1000.0);
+   }
+ 
+-  bool hasKernel() const {
+-    return kernel_event_ != nullptr || (isRemote() && device_.index() != -1);
+-  }
+-
+   double cudaElapsedUs(const LegacyEvent& e) const;
+ 
+   bool hasCuda() const {
+-    return hasKernel() && device_.type() == DeviceType::CUDA;
+-  }
+-
+-  double xpuElapsedUs() const;
+-  double xpuElapsedUs(const LegacyEvent& e) const;
+-
+-  bool hasXpu() const {
+-    return hasKernel() && device_.type() == DeviceType::XPU;
++    return cuda_event != nullptr || (isRemote() && device_ != -1);
+   }
+ 
+-  at::Device device() const {
++  int device() const {
+     return device_;
+   }
+ 
+@@ -182,8 +156,6 @@ struct TORCH_API LegacyEvent {
+         device.is_cpu() || device.type() == c10::DeviceType::MKLDNN ||
+         device.type() == c10::DeviceType::IDEEP) {
+       cpu_memory_usage_ = alloc_size;
+-    } else if (device.is_xpu()) {
+-      xpu_memory_usage_ = alloc_size;
+     } else {
+       LOG(WARNING) << "Unsupported memory profiling device: " << device;
+     }
+@@ -197,10 +169,6 @@ struct TORCH_API LegacyEvent {
+     return cuda_memory_usage_;
+   }
+ 
+-  int64_t xpuMemoryUsage() const {
+-    return xpu_memory_usage_;
+-  }
+-
+   at::RecordFunctionHandle handle() const {
+     return handle_;
+   }
+@@ -298,9 +266,8 @@ struct TORCH_API LegacyEvent {
+   std::vector<std::vector<int64_t>> shapes_;
+   int64_t cpu_memory_usage_ = 0;
+   int64_t cuda_memory_usage_ = 0;
+-  int64_t xpu_memory_usage_ = 0;
+-  at::Device device_ = at::Device(DeviceType::CPU);
+-  torch::profiler::impl::ProfilerEventStub kernel_event_ = nullptr;
++  int device_ = -1;
++  torch::profiler::impl::ProfilerEventStub cuda_event = nullptr;
+   int node_id_ = 0;
+   bool is_remote_ = false;
+   int64_t cuda_us_ = -1;
+@@ -387,10 +354,6 @@ TORCH_API void addEventList(std::vector<LegacyEvent>&& profiledEvents);
+ TORCH_API void writeProfilerEventsToStream(
+     std::ostream& out,
+     const std::vector<LegacyEvent*>& events);
+-// Add a kernel event to profile.
+-TORCH_API void markKernel(
+-    std::string name,
+-    torch::profiler::impl::ProfilerEventStub& kernel_event);
+ 
+ // Usage:
+ //   {
+diff --git a/torch/csrc/profiler/kineto_client_interface.cpp b/torch/csrc/profiler/kineto_client_interface.cpp
+index 76e77360259..946a94d8671 100644
+--- a/torch/csrc/profiler/kineto_client_interface.cpp
++++ b/torch/csrc/profiler/kineto_client_interface.cpp
+@@ -22,18 +22,27 @@ class LibKinetoClient : public libkineto::ClientInterface {
+  public:
+   void init() override {}
+ 
+-  void warmup(bool setupOpInputsCollection) override {
+-    reportInputShapes_ = setupOpInputsCollection;
++  void prepare(
++      bool report_input_shapes = false,
++      bool profile_memory = false,
++      bool with_stack = false,
++      bool with_flops = false,
++      bool with_modules = false) override {
++    reportInputShapes_ = report_input_shapes;
++    profileMemory_ = profile_memory;
++    withStack_ = with_stack;
++    withFlops_ = with_flops;
++    withModules_ = with_modules;
+   }
+ 
+   void start() override {
+     ProfilerConfig cfg{
+         ProfilerState::KINETO_ONDEMAND,
+         /*report_input_shapes=*/reportInputShapes_,
+-        /*profile_memory=*/false,
++        /*profile_memory=*/profileMemory_,
+         /*with_stack=*/withStack_,
+-        /*with_flops=*/false,
+-        /*with_modules=*/false};
++        /*with_flops=*/withFlops_,
++        /*with_modules=*/withModules_};
+     std::set<ActivityType> activities{ActivityType::CPU};
+     std::unordered_set<at::RecordScope> scopes;
+     scopes.insert(at::RecordScope::FUNCTION);
+@@ -46,14 +55,12 @@ class LibKinetoClient : public libkineto::ClientInterface {
+     (void)disableProfiler();
+   }
+ 
+-  // NOLINTNEXTLINE(modernize-use-override)
+-  void set_withstack(bool withStack) override {
+-    withStack_ = withStack;
+-  }
+-
+  private:
+-  bool reportInputShapes_{true};
++  bool reportInputShapes_{false};
++  bool profileMemory_{false};
+   bool withStack_{false};
++  bool withFlops_{false};
++  bool withModules_{false};
+ };
+ 
+ } // namespace
+diff --git a/torch/csrc/profiler/kineto_shim.cpp b/torch/csrc/profiler/kineto_shim.cpp
+index e8cb031fc30..cfd0d01ac32 100644
+--- a/torch/csrc/profiler/kineto_shim.cpp
++++ b/torch/csrc/profiler/kineto_shim.cpp
+@@ -1,4 +1,5 @@
+ #include <torch/csrc/profiler/kineto_shim.h>
++#include <ATen/Context.h>
+ 
+ #include <type_traits>
+ 
+@@ -22,10 +23,19 @@ const std::set<libkineto::ActivityType> cpuTypes{
+     libkineto::ActivityType::CPU_INSTANT_EVENT,
+     libkineto::ActivityType::USER_ANNOTATION,
+     libkineto::ActivityType::EXTERNAL_CORRELATION,
++    libkineto::ActivityType::XPU_RUNTIME,
+     libkineto::ActivityType::CUDA_RUNTIME,
+     libkineto::ActivityType::PYTHON_FUNCTION,
+ };
+ 
++const std::set<libkineto::ActivityType> xpuTypes = {
++    libkineto::ActivityType::GPU_MEMCPY,
++    libkineto::ActivityType::GPU_MEMSET,
++    libkineto::ActivityType::CONCURRENT_KERNEL,
++    // XPU_RUNTIME appears in both cpuTypes and xpuTypes.
++    libkineto::ActivityType::XPU_RUNTIME,
++};
++
+ const std::set<libkineto::ActivityType> cudaTypes = {
+     libkineto::ActivityType::GPU_MEMCPY,
+     libkineto::ActivityType::GPU_MEMSET,
+@@ -214,6 +224,9 @@ void prepareTrace(
+   if (activities.count(torch::autograd::profiler::ActivityType::CPU)) {
+     k_activities.insert(cpuTypes.begin(), cpuTypes.end());
+   }
++  if (activities.count(torch::autograd::profiler::ActivityType::XPU)) {
++    k_activities.insert(xpuTypes.begin(), xpuTypes.end());
++  }
+   if (activities.count(torch::autograd::profiler::ActivityType::CUDA)) {
+     k_activities.insert(cudaTypes.begin(), cudaTypes.end());
+   }
+@@ -301,6 +314,8 @@ c10::DeviceType deviceTypeFromActivity(libkineto::ActivityType activity_type) {
+     case libkineto::ActivityType::GPU_MEMCPY:
+     case libkineto::ActivityType::GPU_MEMSET:
+     case libkineto::ActivityType::CONCURRENT_KERNEL:
++      if (at::hasXPU())
++        return c10::DeviceType::XPU;
+     case libkineto::ActivityType::GPU_USER_ANNOTATION:
+     case libkineto::ActivityType::CUDA_PROFILER_RANGE:
+       return c10::DeviceType::CUDA;
+@@ -310,6 +325,7 @@ c10::DeviceType deviceTypeFromActivity(libkineto::ActivityType activity_type) {
+     case libkineto::ActivityType::CUDA_RUNTIME:
+     case libkineto::ActivityType::CPU_INSTANT_EVENT:
+     case libkineto::ActivityType::GLOW_RUNTIME:
++    case libkineto::ActivityType::XPU_RUNTIME:
+     case libkineto::ActivityType::PYTHON_FUNCTION:
+       return c10::DeviceType::CPU;
+     default: {
+diff --git a/torch/csrc/profiler/orchestration/observer.h b/torch/csrc/profiler/orchestration/observer.h
+index fcc8e78c581..95d2aac581e 100644
+--- a/torch/csrc/profiler/orchestration/observer.h
++++ b/torch/csrc/profiler/orchestration/observer.h
+@@ -14,6 +14,7 @@ namespace impl {
+ // ----------------------------------------------------------------------------
+ enum class C10_API_ENUM ActivityType {
+   CPU = 0,
++  XPU, // XPU kernels, runtime
+   CUDA, // CUDA kernels, runtime
+   NUM_KINETO_ACTIVITIES, // must be the last one
+ };
+@@ -22,7 +23,6 @@ enum class C10_API_ENUM ProfilerState {
+   Disabled = 0,
+   CPU, // CPU-only profiling
+   CUDA, // CPU + CUDA events
+-  XPU, // CPU + XPU events
+   NVTX, // only emit NVTX markers
+   ITT, // only emit ITT markers
+   KINETO, // use libkineto
+diff --git a/torch/csrc/profiler/python/init.cpp b/torch/csrc/profiler/python/init.cpp
+index e8d53ee4544..4813238f901 100644
+--- a/torch/csrc/profiler/python/init.cpp
++++ b/torch/csrc/profiler/python/init.cpp
+@@ -34,7 +34,6 @@ void initPythonBindings(PyObject* module) {
+       .value("Disabled", ProfilerState::Disabled)
+       .value("CPU", ProfilerState::CPU)
+       .value("CUDA", ProfilerState::CUDA)
+-      .value("XPU", ProfilerState::XPU)
+       .value("NVTX", ProfilerState::NVTX)
+       .value("ITT", ProfilerState::ITT)
+       .value("KINETO", ProfilerState::KINETO)
+@@ -49,6 +48,7 @@ void initPythonBindings(PyObject* module) {
+ 
+   py::enum_<ActivityType>(m, "ProfilerActivity")
+       .value("CPU", ActivityType::CPU)
++      .value("XPU", ActivityType::XPU)
+       .value("CUDA", ActivityType::CUDA);
+ 
+   py::class_<ExperimentalConfig>(m, "_ExperimentalConfig")
+diff --git a/torch/csrc/profiler/stubs/base.cpp b/torch/csrc/profiler/stubs/base.cpp
+index 4ba7d5b7ec1..8695c7bb5ad 100644
+--- a/torch/csrc/profiler/stubs/base.cpp
++++ b/torch/csrc/profiler/stubs/base.cpp
+@@ -20,10 +20,6 @@ struct DefaultStubs : public ProfilerStubs {
+     fail();
+     return 0.f;
+   }
+-  virtual float elapsed(const ProfilerEventStub* event) const override {
+-    fail();
+-    return 0.f;
+-  }
+   void mark(const char*) const override {
+     fail();
+   }
+@@ -78,7 +74,6 @@ struct DefaultStubs : public ProfilerStubs {
+ 
+ REGISTER_DEFAULT(cuda, CUDA)
+ REGISTER_DEFAULT(itt, ITT)
+-REGISTER_DEFAULT(xpu, XPU)
+ #undef REGISTER_DEFAULT
+ 
+ } // namespace impl
+diff --git a/torch/csrc/profiler/stubs/base.h b/torch/csrc/profiler/stubs/base.h
+index e7e65c2056f..7d0a3712f1c 100644
+--- a/torch/csrc/profiler/stubs/base.h
++++ b/torch/csrc/profiler/stubs/base.h
+@@ -6,19 +6,16 @@
+ #include <c10/util/strong_type.h>
+ #include <torch/csrc/Export.h>
+ 
++struct CUevent_st;
++
+ namespace torch {
+ namespace profiler {
+ namespace impl {
+ 
+-class KernelEventBase {
+- public:
+-  virtual ~KernelEventBase() = default;
+-};
+-
+ // ----------------------------------------------------------------------------
+ // -- Annotation --------------------------------------------------------------
+ // ----------------------------------------------------------------------------
+-using ProfilerEventStub = std::shared_ptr<KernelEventBase>;
++using ProfilerEventStub = std::shared_ptr<CUevent_st>;
+ 
+ struct TORCH_API ProfilerStubs {
+   virtual void record(int* device, ProfilerEventStub* event, int64_t* cpu_ns)
+@@ -26,7 +23,6 @@ struct TORCH_API ProfilerStubs {
+   virtual float elapsed(
+       const ProfilerEventStub* event,
+       const ProfilerEventStub* event2) const = 0;
+-  virtual float elapsed(const ProfilerEventStub* event) const = 0;
+   virtual void mark(const char* name) const = 0;
+   virtual void rangePush(const char* name) const = 0;
+   virtual void rangePop() const = 0;
+@@ -42,8 +38,6 @@ TORCH_API void registerCUDAMethods(ProfilerStubs* stubs);
+ TORCH_API const ProfilerStubs* cudaStubs();
+ TORCH_API void registerITTMethods(ProfilerStubs* stubs);
+ TORCH_API const ProfilerStubs* ittStubs();
+-TORCH_API void registerXPUMethods(ProfilerStubs* stubs);
+-TORCH_API const ProfilerStubs* xpuStubs();
+ 
+ using vulkan_id_t = strong::type<
+     int64_t,
+diff --git a/torch/csrc/profiler/stubs/cuda.cpp b/torch/csrc/profiler/stubs/cuda.cpp
+index e482811bb67..6731d0f4d3b 100644
+--- a/torch/csrc/profiler/stubs/cuda.cpp
++++ b/torch/csrc/profiler/stubs/cuda.cpp
+@@ -7,8 +7,6 @@
+ #include <torch/csrc/profiler/stubs/base.h>
+ #include <torch/csrc/profiler/util.h>
+ 
+-struct CUevent_st;
+-
+ namespace torch {
+ namespace profiler {
+ namespace impl {
+@@ -37,22 +35,6 @@ static inline void cudaCheck(cudaError_t result, const char* file, int line) {
+ }
+ #define TORCH_CUDA_CHECK(result) cudaCheck(result, __FILE__, __LINE__);
+ 
+-class CUDAEventProfiler : public KernelEventBase {
+- public:
+-  CUDAEventProfiler(CUevent_st* evt_ptr = nullptr)
+-      : event_(evt_ptr, CUDAEventDestory){};
+-  virtual ~CUDAEventProfiler() = default;
+-  CUevent_st* get() const {
+-    return event_.get();
+-  }
+-
+- private:
+-  static void CUDAEventDestory(CUevent_st* ptr) {
+-    TORCH_CUDA_CHECK(cudaEventDestroy(ptr));
+-  }
+-  std::unique_ptr<CUevent_st, std::function<void(CUevent_st*)>> event_;
+-};
+-
+ struct CUDAMethods : public ProfilerStubs {
+   void record(int* device, ProfilerEventStub* event, int64_t* cpu_ns)
+       const override {
+@@ -62,8 +44,9 @@ struct CUDAMethods : public ProfilerStubs {
+     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+     CUevent_st* cuda_event_ptr;
+     TORCH_CUDA_CHECK(cudaEventCreate(&cuda_event_ptr));
+-    auto cuda_event_stub = std::make_shared<CUDAEventProfiler>(cuda_event_ptr);
+-    *event = cuda_event_stub;
++    *event = std::shared_ptr<CUevent_st>(cuda_event_ptr, [](CUevent_st* ptr) {
++      TORCH_CUDA_CHECK(cudaEventDestroy(ptr));
++    });
+     auto stream = at::cuda::getCurrentCUDAStream();
+     if (cpu_ns) {
+       *cpu_ns = torch::profiler::impl::getTime();
+@@ -73,24 +56,15 @@ struct CUDAMethods : public ProfilerStubs {
+ 
+   float elapsed(const ProfilerEventStub* event, const ProfilerEventStub* event2)
+       const override {
+-    CUDAEventProfiler* cuda_event_ =
+-        dynamic_cast<CUDAEventProfiler*>(event->get());
+-    CUDAEventProfiler* cuda_event2_ =
+-        dynamic_cast<CUDAEventProfiler*>(event2->get());
+-    TORCH_CUDA_CHECK(cudaEventSynchronize(cuda_event_->get()));
+-    TORCH_CUDA_CHECK(cudaEventSynchronize(cuda_event2_->get()));
++    TORCH_CUDA_CHECK(cudaEventSynchronize(event->get()));
++    TORCH_CUDA_CHECK(cudaEventSynchronize(event2->get()));
+     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+     float ms;
+-    TORCH_CUDA_CHECK(
+-        cudaEventElapsedTime(&ms, cuda_event_->get(), cuda_event2_->get()));
++    TORCH_CUDA_CHECK(cudaEventElapsedTime(&ms, event->get(), event2->get()));
+     // NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-avoid-magic-numbers,cppcoreguidelines-narrowing-conversions)
+     return ms * 1000.0;
+   }
+ 
+-  float elapsed(const ProfilerEventStub* event) const override {
+-    TORCH_CHECK(false, "Profiler cannot use this method on CUDA backend.");
+-  }
+-
+   void mark(const char* name) const override {
+     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+     ::nvtxMark(name);
+diff --git a/torch/csrc/profiler/stubs/itt.cpp b/torch/csrc/profiler/stubs/itt.cpp
+index 5cfe718843f..4759ea1993a 100644
+--- a/torch/csrc/profiler/stubs/itt.cpp
++++ b/torch/csrc/profiler/stubs/itt.cpp
+@@ -18,10 +18,6 @@ struct ITTMethods : public ProfilerStubs {
+     return 0;
+   }
+ 
+-  virtual float elapsed(const ProfilerEventStub* event) const override {
+-    return 0;
+-  }
+-
+   void mark(const char* name) const override {
+     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+     torch::profiler::itt_mark(name);
+diff --git a/torch/profiler/profiler.py b/torch/profiler/profiler.py
+index c50c0e62beb..af6563e0b53 100644
+--- a/torch/profiler/profiler.py
++++ b/torch/profiler/profiler.py
+@@ -103,6 +103,7 @@ class _KinetoProfile:
+     def prepare_trace(self):
+         self.profiler = prof.profile(
+             use_cuda=(ProfilerActivity.CUDA in self.activities),
++            use_xpu=(ProfilerActivity.XPU in self.activities),
+             use_cpu=(ProfilerActivity.CPU in self.activities),
+             record_shapes=self.record_shapes,
+             with_flops=self.with_flops,
+diff --git a/torch/testing/_internal/distributed/rpc/rpc_test.py b/torch/testing/_internal/distributed/rpc/rpc_test.py
+index 610f01a2d95..d85066930cf 100644
+--- a/torch/testing/_internal/distributed/rpc/rpc_test.py
++++ b/torch/testing/_internal/distributed/rpc/rpc_test.py
+@@ -4621,9 +4621,9 @@ class CudaRpcTest(RpcAgentTestFixture):
+                     self.assertEqual(1, len(event.kernels))
+                     kernel = event.kernels[0]
+                     if event.node_id == dst_cuda_0:
+-                        self.assertEqual(kernel.device, torch.device("cuda:{}".format(0)))
++                        self.assertEqual(kernel.device, 0)
+                     if event.node_id == dst_cuda_1:
+-                        self.assertEqual(kernel.device, torch.device("cuda:{}".format(1)))
++                        self.assertEqual(kernel.device, 1)
+                     self.assertGreater(event.cuda_time, 0)
+ 
+         # Validate that EXPECTED_REMOTE_EVENTS is a subset of remotely profiled
+-- 
+2.34.1
+

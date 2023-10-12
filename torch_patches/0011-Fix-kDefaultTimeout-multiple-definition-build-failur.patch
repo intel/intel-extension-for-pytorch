@@ -1,7 +1,7 @@
 From 4f8e107bd5a90a3e8c228dd5d38c03e644ef673c Mon Sep 17 00:00:00 2001
 From: sclarkson <sc@lambdal.com>
 Date: Tue, 21 Mar 2023 21:44:49 +0000
-Subject: [PATCH 11/18] Fix kDefaultTimeout multiple definition build failure
+Subject: [PATCH 11/25] Fix kDefaultTimeout multiple definition build failure
  (#97270)
 
 Make the namespace explicit to avoid the constexpr conflict on GCC 11.
@@ -19,7 +19,7 @@ Approved by: https://github.com/ezyang
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/torch/csrc/distributed/c10d/ProcessGroupGloo.hpp b/torch/csrc/distributed/c10d/ProcessGroupGloo.hpp
-index a64bc37c4d..e4d2967c86 100644
+index a64bc37c4de..e4d2967c860 100644
 --- a/torch/csrc/distributed/c10d/ProcessGroupGloo.hpp
 +++ b/torch/csrc/distributed/c10d/ProcessGroupGloo.hpp
 @@ -125,7 +125,7 @@ class TORCH_API ProcessGroupGloo : public Backend {

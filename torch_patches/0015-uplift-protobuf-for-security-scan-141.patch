@@ -1,14 +1,14 @@
 From 5c87e67586ccdcfcf54d5b47e0d4c782de9e3bf1 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Thu, 20 Jul 2023 11:04:23 +0800
-Subject: [PATCH 15/18] uplift protobuf for security scan (#141)
+Subject: [PATCH 15/25] uplift protobuf for security scan (#141)
 
 ---
  third_party/protobuf | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/third_party/protobuf b/third_party/protobuf
-index 6c6b0778b7..a3888f5331 160000
+index 6c6b0778b70..a3888f53317 160000
 --- a/third_party/protobuf
 +++ b/third_party/protobuf
 @@ -1 +1 @@

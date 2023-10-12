@@ -1,7 +1,7 @@
 From 372d4b8f53bba9ca207887dd36e9ba2d750ecbd0 Mon Sep 17 00:00:00 2001
 From: "Wang, Chuanqi" <chuanqi.wang@intel.com>
 Date: Mon, 24 Jul 2023 09:18:49 +0800
-Subject: [PATCH 16/18] Enable xpu backend in torchdynamo benchmarks (#143)
+Subject: [PATCH 16/25] Enable xpu backend in torchdynamo benchmarks (#143)
 
 ---
  benchmarks/dynamo/common.py      | 26 ++++++++++++++++++++------
@@ -12,7 +12,7 @@ Subject: [PATCH 16/18] Enable xpu backend in torchdynamo benchmarks (#143)
  5 files changed, 35 insertions(+), 12 deletions(-)
 
 diff --git a/benchmarks/dynamo/common.py b/benchmarks/dynamo/common.py
-index 1fbd012d82..c2e0bdc75c 100644
+index 1fbd012d823..c2e0bdc75ca 100644
 --- a/benchmarks/dynamo/common.py
 +++ b/benchmarks/dynamo/common.py
 @@ -953,7 +953,7 @@ class BenchmarkRunner:
@@ -76,7 +76,7 @@ index 1fbd012d82..c2e0bdc75c 100644
          # OOM errors on an RTX 3090 with 24gb RAM
          runner.skip_models.update(
 diff --git a/benchmarks/dynamo/huggingface.py b/benchmarks/dynamo/huggingface.py
-index 893a50ccb9..8b2cc096e4 100755
+index 893a50ccb94..8b2cc096e4d 100755
 --- a/benchmarks/dynamo/huggingface.py
 +++ b/benchmarks/dynamo/huggingface.py
 @@ -481,13 +481,13 @@ class HuggingfaceRunner(BenchmarkRunner):
@@ -96,7 +96,7 @@ index 893a50ccb9..8b2cc096e4 100755
              loss = self.compute_loss(pred)
          self.grad_scaler.scale(loss).backward()
 diff --git a/benchmarks/dynamo/runner.py b/benchmarks/dynamo/runner.py
-index e21312ca15..e879f9f4cf 100755
+index e21312ca15b..e879f9f4cfb 100755
 --- a/benchmarks/dynamo/runner.py
 +++ b/benchmarks/dynamo/runner.py
 @@ -460,6 +460,15 @@ def build_summary(args):
@@ -116,7 +116,7 @@ index e21312ca15..e879f9f4cf 100755
      title = "## Build Summary"
      comment = generate_dropdown_comment(title, out_io.getvalue())
 diff --git a/benchmarks/dynamo/timm_models.py b/benchmarks/dynamo/timm_models.py
-index 905ea324c2..064415ae1d 100755
+index 905ea324c25..064415ae1d5 100755
 --- a/benchmarks/dynamo/timm_models.py
 +++ b/benchmarks/dynamo/timm_models.py
 @@ -319,13 +319,13 @@ class TimmRunnner(BenchmarkRunner):
@@ -136,7 +136,7 @@ index 905ea324c2..064415ae1d 100755
              if isinstance(pred, tuple):
                  pred = pred[0]
 diff --git a/benchmarks/dynamo/torchbench.py b/benchmarks/dynamo/torchbench.py
-index 48a7da1d2d..90314234b6 100755
+index 48a7da1d2d5..90314234b66 100755
 --- a/benchmarks/dynamo/torchbench.py
 +++ b/benchmarks/dynamo/torchbench.py
 @@ -358,13 +358,13 @@ class TorchBenchmarkRunner(BenchmarkRunner):

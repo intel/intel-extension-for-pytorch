@@ -1,14 +1,14 @@
 From 41de4274ae00d11102075f8eddda9f5615eedc96 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Mon, 24 Jul 2023 12:29:23 +0800
-Subject: [PATCH 18/18] downlift protobuf to 3.20.x for windows build (#145)
+Subject: [PATCH 18/25] downlift protobuf to 3.20.x for windows build (#145)
 
 ---
  third_party/protobuf | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/third_party/protobuf b/third_party/protobuf
-index a3888f5331..24b65038cf 160000
+index a3888f53317..24b65038cfe 160000
 --- a/third_party/protobuf
 +++ b/third_party/protobuf
 @@ -1 +1 @@

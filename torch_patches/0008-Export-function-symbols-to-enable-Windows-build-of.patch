@@ -1,7 +1,7 @@
 From 1924c805a9a4a678380b0472ca9534321edf92e0 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <guangye.yu@intel.com>
 Date: Mon, 22 May 2023 10:01:21 +0000
-Subject: [PATCH 08/18] Export function symbols to enable Windows build of 
+Subject: [PATCH 08/25] Export function symbols to enable Windows build of 
  Intel Extension for PyTorch
 
 ---
@@ -16,7 +16,7 @@ Subject: [PATCH 08/18] Export function symbols to enable Windows build of
  8 files changed, 14 insertions(+), 10 deletions(-)
 
 diff --git a/torch/csrc/Dtype.h b/torch/csrc/Dtype.h
-index 648a8091d9..70cee858f9 100644
+index 648a8091d93..70cee858f9f 100644
 --- a/torch/csrc/Dtype.h
 +++ b/torch/csrc/Dtype.h
 @@ -23,6 +23,8 @@ inline bool THPPythonScalarType_Check(PyObject* obj) {
@@ -30,7 +30,7 @@ index 648a8091d9..70cee858f9 100644
  
  void THPDtype_init(PyObject* module);
 diff --git a/torch/csrc/DynamicTypes.h b/torch/csrc/DynamicTypes.h
-index 7ca1894256..bb481556ab 100644
+index 7ca18942564..bb481556ab0 100644
 --- a/torch/csrc/DynamicTypes.h
 +++ b/torch/csrc/DynamicTypes.h
 @@ -33,6 +33,6 @@ at::Storage createStorageGetType(
@@ -42,7 +42,7 @@ index 7ca1894256..bb481556ab 100644
  THPLayout* getTHPLayout(at::Layout layout);
  } // namespace torch
 diff --git a/torch/csrc/Exceptions.h b/torch/csrc/Exceptions.h
-index 7c448ddc67..819b261e29 100644
+index 7c448ddc67f..819b261e29a 100644
 --- a/torch/csrc/Exceptions.h
 +++ b/torch/csrc/Exceptions.h
 @@ -314,7 +314,7 @@ struct TypeError : public PyTorchError {
@@ -55,7 +55,7 @@ index 7c448ddc67..819b261e29 100644
      return PyExc_ValueError;
    }
 diff --git a/torch/csrc/Stream.h b/torch/csrc/Stream.h
-index ec983203a1..656e37a495 100644
+index ec983203a12..656e37a4954 100644
 --- a/torch/csrc/Stream.h
 +++ b/torch/csrc/Stream.h
 @@ -1,6 +1,7 @@
@@ -76,7 +76,7 @@ index ec983203a1..656e37a495 100644
  void THPStream_init(PyObject* module);
  
 diff --git a/torch/csrc/tensor/python_tensor.h b/torch/csrc/tensor/python_tensor.h
-index 5827f3b4ce..8d74f66a2b 100644
+index 5827f3b4ce3..8d74f66a2b0 100644
 --- a/torch/csrc/tensor/python_tensor.h
 +++ b/torch/csrc/tensor/python_tensor.h
 @@ -28,14 +28,14 @@ void py_set_default_tensor_type(PyObject* type_obj);
@@ -97,7 +97,7 @@ index 5827f3b4ce..8d74f66a2b 100644
  
  // Gets the ScalarType for the default tensor type.
 diff --git a/torch/csrc/utils.h b/torch/csrc/utils.h
-index 925981fbb6..97c878dba3 100644
+index 925981fbb64..97c878dba33 100644
 --- a/torch/csrc/utils.h
 +++ b/torch/csrc/utils.h
 @@ -169,7 +169,7 @@ TORCH_PYTHON_API void THPUtils_invalidArguments(
@@ -119,7 +119,7 @@ index 925981fbb6..97c878dba3 100644
      PyObject* tensor,
      const char* name,
 diff --git a/torch/csrc/utils/object_ptr.h b/torch/csrc/utils/object_ptr.h
-index 359e177f4f..35302e2187 100644
+index 359e177f4f5..35302e21878 100644
 --- a/torch/csrc/utils/object_ptr.h
 +++ b/torch/csrc/utils/object_ptr.h
 @@ -1,9 +1,10 @@
@@ -135,7 +135,7 @@ index 359e177f4f..35302e2187 100644
    THPPointer() : ptr(nullptr){};
    explicit THPPointer(T* ptr) noexcept : ptr(ptr){};
 diff --git a/torch/csrc/utils/python_arg_parser.h b/torch/csrc/utils/python_arg_parser.h
-index d9d14a83a9..ae91c76119 100644
+index d9d14a83a9c..ae91c761190 100644
 --- a/torch/csrc/utils/python_arg_parser.h
 +++ b/torch/csrc/utils/python_arg_parser.h
 @@ -132,7 +132,7 @@ struct ParsedArgs {

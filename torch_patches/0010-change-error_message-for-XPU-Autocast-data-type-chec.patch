@@ -1,7 +1,7 @@
 From eb2ecf44d7f5f988215bc2b45a50373ea76e7f5a Mon Sep 17 00:00:00 2001
 From: xiaolil1 <xiaoli.liu@intel.com>
 Date: Wed, 24 May 2023 14:00:55 +0800
-Subject: [PATCH 10/18] change error_message for XPU Autocast data type check
+Subject: [PATCH 10/25] change error_message for XPU Autocast data type check
  (#130)
 
 (cherry picked from commit 922f52a5078799f64359b8179a1db143cdba2fda)
@@ -10,7 +10,7 @@ Subject: [PATCH 10/18] change error_message for XPU Autocast data type check
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/torch/amp/autocast_mode.py b/torch/amp/autocast_mode.py
-index 11ce2c7beb..9dca47c7e7 100644
+index 11ce2c7beb4..9dca47c7e73 100644
 --- a/torch/amp/autocast_mode.py
 +++ b/torch/amp/autocast_mode.py
 @@ -219,7 +219,7 @@ class autocast:

@@ -1,7 +1,7 @@
 From a6c98d9bae86055c3b072da8002735a4f1490d43 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Mon, 24 Jul 2023 11:39:28 +0800
-Subject: [PATCH 17/18] [inductor]Extend Inductor to support the third-party
+Subject: [PATCH 17/25] [inductor]Extend Inductor to support the third-party
  backend (#137)
 
 * Support the third-party backend that could implement in PyTorch extension for different devices
@@ -23,7 +23,7 @@ Subject: [PATCH 17/18] [inductor]Extend Inductor to support the third-party
 
 diff --git a/test/inductor/extension_backends/extension_codegen_backend.py b/test/inductor/extension_backends/extension_codegen_backend.py
 new file mode 100644
-index 0000000000..634a8e257f
+index 00000000000..634a8e257fe
 --- /dev/null
 +++ b/test/inductor/extension_backends/extension_codegen_backend.py
 @@ -0,0 +1,35 @@
@@ -64,7 +64,7 @@ index 0000000000..634a8e257f
 +        self._scheduling.flush()
 diff --git a/test/inductor/extension_backends/extension_device.cpp b/test/inductor/extension_backends/extension_device.cpp
 new file mode 100644
-index 0000000000..c130add17e
+index 00000000000..c130add17e9
 --- /dev/null
 +++ b/test/inductor/extension_backends/extension_device.cpp
 @@ -0,0 +1,190 @@
@@ -260,7 +260,7 @@ index 0000000000..c130add17e
 +}
 diff --git a/test/inductor/test_extension_backend.py b/test/inductor/test_extension_backend.py
 new file mode 100644
-index 0000000000..124c6c50fe
+index 00000000000..124c6c50fe9
 --- /dev/null
 +++ b/test/inductor/test_extension_backend.py
 @@ -0,0 +1,138 @@
@@ -403,7 +403,7 @@ index 0000000000..124c6c50fe
 +    if HAS_CPU and not IS_MACOS:
 +        run_tests(needs="filelock")
 diff --git a/torch/_inductor/codegen/common.py b/torch/_inductor/codegen/common.py
-index ed36b6e68e..af987496fe 100644
+index ed36b6e68ea..af987496fe1 100644
 --- a/torch/_inductor/codegen/common.py
 +++ b/torch/_inductor/codegen/common.py
 @@ -26,6 +26,25 @@ log = logging.getLogger(__name__)
@@ -433,7 +433,7 @@ index ed36b6e68e..af987496fe 100644
  def index_prevent_reordering(index: typing.List[sympy.Expr], index_vars, sizes):
      from ..ir import FlexibleLayout
 diff --git a/torch/_inductor/codegen/cpp.py b/torch/_inductor/codegen/cpp.py
-index de6a32421c..301208b264 100644
+index de6a32421c1..301208b2640 100644
 --- a/torch/_inductor/codegen/cpp.py
 +++ b/torch/_inductor/codegen/cpp.py
 @@ -16,6 +16,7 @@ from torch._prims_common import is_float_dtype
@@ -454,7 +454,7 @@ index de6a32421c..301208b264 100644
          self.scheduler = scheduler
          self.get_kernel_group()
 diff --git a/torch/_inductor/codegen/triton.py b/torch/_inductor/codegen/triton.py
-index f09616a8af..89f2b6f698 100644
+index f09616a8af9..89f2b6f698e 100644
 --- a/torch/_inductor/codegen/triton.py
 +++ b/torch/_inductor/codegen/triton.py
 @@ -16,6 +16,7 @@ from ..._dynamo import config as dynamo_config
@@ -483,7 +483,7 @@ index f09616a8af..89f2b6f698 100644
          self.scheduler = scheduler
  
 diff --git a/torch/_inductor/codegen/wrapper.py b/torch/_inductor/codegen/wrapper.py
-index 00e903d577..5a6dacc753 100644
+index 00e903d5772..5a6dacc7534 100644
 --- a/torch/_inductor/codegen/wrapper.py
 +++ b/torch/_inductor/codegen/wrapper.py
 @@ -455,10 +455,10 @@ class WrapperCodeGen(CodeGen):
@@ -500,7 +500,7 @@ index 00e903d577..5a6dacc753 100644
  
      def generate_return(self, output_refs):
 diff --git a/torch/_inductor/graph.py b/torch/_inductor/graph.py
-index 1333093ba1..1b3cf4b350 100644
+index 1333093ba14..1b3cf4b3505 100644
 --- a/torch/_inductor/graph.py
 +++ b/torch/_inductor/graph.py
 @@ -18,6 +18,11 @@ from torch.utils._mode_utils import no_dispatch
@@ -566,7 +566,7 @@ index 1333093ba1..1b3cf4b350 100644
      def codegen(self):
          from .scheduler import Scheduler
 diff --git a/torch/_inductor/scheduler.py b/torch/_inductor/scheduler.py
-index 452df067b2..37ba33c00e 100644
+index 452df067b21..37ba33c00e5 100644
 --- a/torch/_inductor/scheduler.py
 +++ b/torch/_inductor/scheduler.py
 @@ -14,6 +14,7 @@ import torch
@@ -692,7 +692,7 @@ index 452df067b2..37ba33c00e 100644
 +        """
 +        raise NotImplementedError()
 diff --git a/torch/_inductor/select_algorithm.py b/torch/_inductor/select_algorithm.py
-index cc5cb9c58c..6e4220dbc4 100644
+index cc5cb9c58cf..6e4220dbc4b 100644
 --- a/torch/_inductor/select_algorithm.py
 +++ b/torch/_inductor/select_algorithm.py
 @@ -84,6 +84,7 @@ class TritonTemplateKernel(TritonKernel):

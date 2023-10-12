@@ -1,7 +1,7 @@
 From 1fde62d270d4548a8feafe5ddfd0734f4d2211c2 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <guangye.yu@intel.com>
 Date: Mon, 22 May 2023 10:01:40 +0000
-Subject: [PATCH 09/18] enable is_xpu for tensor type
+Subject: [PATCH 09/25] enable is_xpu for tensor type
 
 ---
  test/test_torch.py                  | 11 +++++++++++
@@ -9,7 +9,7 @@ Subject: [PATCH 09/18] enable is_xpu for tensor type
  2 files changed, 23 insertions(+)
 
 diff --git a/test/test_torch.py b/test/test_torch.py
-index c86535e22c..3fa843d8cb 100644
+index c86535e22c0..3fa843d8cbc 100644
 --- a/test/test_torch.py
 +++ b/test/test_torch.py
 @@ -4408,6 +4408,17 @@ else:
@@ -31,7 +31,7 @@ index c86535e22c..3fa843d8cb 100644
      @deviceCountAtLeast(2)
      @skipCUDAMemoryLeakCheckIf(True)
 diff --git a/torch/csrc/tensor/python_tensor.cpp b/torch/csrc/tensor/python_tensor.cpp
-index 4d6778a7b0..a5cc18f154 100644
+index 4d6778a7b08..a5cc18f1541 100644
 --- a/torch/csrc/tensor/python_tensor.cpp
 +++ b/torch/csrc/tensor/python_tensor.cpp
 @@ -36,6 +36,7 @@ struct PyTensorType {

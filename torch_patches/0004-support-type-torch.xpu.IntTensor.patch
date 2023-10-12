@@ -1,7 +1,7 @@
 From cecd8b6b34ddc12b26df29313c4443d83fbfe48b Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <guangye.yu@intel.com>
 Date: Mon, 22 May 2023 09:57:16 +0000
-Subject: [PATCH 04/18] support type(torch.xpu.IntTensor)
+Subject: [PATCH 04/25] support type(torch.xpu.IntTensor)
 
 ---
  tools/autograd/templates/VariableType.h    |  1 +
@@ -10,7 +10,7 @@ Subject: [PATCH 04/18] support type(torch.xpu.IntTensor)
  3 files changed, 18 insertions(+)
 
 diff --git a/tools/autograd/templates/VariableType.h b/tools/autograd/templates/VariableType.h
-index ad2abc2bdb..abad2f9338 100644
+index ad2abc2bdb7..abad2f93384 100644
 --- a/tools/autograd/templates/VariableType.h
 +++ b/tools/autograd/templates/VariableType.h
 @@ -46,6 +46,7 @@ using c10::optional;
@@ -22,7 +22,7 @@ index ad2abc2bdb..abad2f9338 100644
  
    at::Tensor & unpack(Tensor & t, const char * name, int pos);
 diff --git a/torch/csrc/autograd/VariableTypeManual.cpp b/torch/csrc/autograd/VariableTypeManual.cpp
-index 2998e65d97..705c6b0c9d 100644
+index 2998e65d975..705c6b0c9df 100644
 --- a/torch/csrc/autograd/VariableTypeManual.cpp
 +++ b/torch/csrc/autograd/VariableTypeManual.cpp
 @@ -46,6 +46,10 @@ C10_EXPORT std::vector<at::DeprecatedTypeProperties*> allCUDATypes() {
@@ -37,7 +37,7 @@ index 2998e65d97..705c6b0c9d 100644
  const Variable& checked_cast_variable(
      const Tensor& t,
 diff --git a/torch/csrc/utils/tensor_types.cpp b/torch/csrc/utils/tensor_types.cpp
-index d4e4dd1d38..3df3e0b7ec 100644
+index d4e4dd1d38c..3df3e0b7ecc 100644
 --- a/torch/csrc/utils/tensor_types.cpp
 +++ b/torch/csrc/utils/tensor_types.cpp
 @@ -70,9 +70,12 @@ std::string type_to_string(const at::DeprecatedTypeProperties& type) {
