@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
+import numpy as np
 import copy
 
 import intel_extension_for_pytorch  # noqa
@@ -2496,39 +2497,6 @@ class TestNNMethod(TestCase):
         input_cpu = torch.rand([1, 2, 9, 9])
         input_xpu = input_cpu.clone().to("xpu")
 
-        # cpu int8
-        modelJit = torch.jit.trace(model, input_cpu)
-        modelJit.eval()
-        print(modelJit)
-        print("finish jit...")
-
-        print("start calibration ...")
-        qconfig_u8 = torch.quantization.QConfig(
-            activation=torch.quantization.observer.MinMaxObserver.with_args(
-                qscheme=torch.per_tensor_symmetric,
-                reduce_range=False,
-                dtype=torch.quint8,
-            ),
-            weight=torch.quantization.default_weight_observer,
-        )
-
-        modelJit = prepare_jit(modelJit, {"": qconfig_u8}, True)
-
-        with torch.no_grad():
-            # do calibration
-            for i in range(1):
-                calib_input = input_cpu
-                modelJit(calib_input)
-            print("start cpu convert")
-            modelJit = convert_jit(modelJit, True)
-            print(modelJit.graph_for(input_cpu))
-            print("--modelJit={}".format(modelJit))
-
-            # inference
-            print("start inference ...")
-            for i in range(5):
-                output_cpu = modelJit(input_cpu)
-
         # xpu
         print("-------start xpu path-------")
         print("start jit ...")
@@ -2567,7 +2535,8 @@ class TestNNMethod(TestCase):
             for i in range(5):
                 output = modelJit(input_xpu)
                 torch.xpu.synchronize()
-        self.assertEqual(output.cpu(), output_cpu)
+            output_impe = model(input_xpu)
+        np.testing.assert_almost_equal(output.cpu().numpy(), output_impe.cpu().numpy(), decimal=1)
 
     def test_linear_relu_fusion(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)

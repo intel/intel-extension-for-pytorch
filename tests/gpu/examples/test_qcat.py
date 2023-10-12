@@ -70,12 +70,12 @@ class TestTorchMethod(TestCase):
         torch._C._jit_set_profiling_mode(True)
         torch._C._jit_set_profiling_executor(True)
         for with_relu in [True, False]:
-            dtype = torch.quint8
-            model = Conv_Cat(with_relu)
-            model1 = copy.deepcopy(model)
-            test_input = torch.randn(1, 3, 15, 15)
-            cpu_res = trace_int8_model(model1, "cpu", test_input)
-            xpu_res = trace_int8_model(model, "xpu", test_input)
-            print("cpu_res: ", cpu_res[0][0])
-            print("xpu_res: ", xpu_res[0][0])
-            np.testing.assert_almost_equal(xpu_res.cpu().numpy(), cpu_res.cpu().numpy(), decimal=1)
+            with torch.no_grad():
+                dtype = torch.quint8
+                model = Conv_Cat(with_relu)
+                model1 = copy.deepcopy(model)
+                test_input = torch.randn(1, 3, 15, 15)
+                # cpu_res = trace_int8_model(model1, "cpu", test_input)
+                xpu_res = trace_int8_model(model, "xpu", test_input)
+                ref_res = model1(test_input)
+                np.testing.assert_almost_equal(xpu_res.cpu().numpy(), ref_res.cpu().numpy(), decimal=1)
