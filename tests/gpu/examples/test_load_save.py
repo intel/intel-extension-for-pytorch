@@ -23,7 +23,8 @@ class TestTorchMethod(TestCase):
     def test_load_save(self, dtype=torch.float):
         save = torch.randn((2, 2), device="xpu", dtype=dtype)
         ckpt = tempfile.NamedTemporaryFile()
-        torch.save(save, ckpt.name)
+        with tempfile.NamedTemporaryFile(delete=False) as ckpt:
+            torch.save(save, ckpt.name)
         load = torch.load(ckpt.name, map_location=xpu_device)
         self.assertEqual(save.to(cpu_device), load.to(cpu_device))
 

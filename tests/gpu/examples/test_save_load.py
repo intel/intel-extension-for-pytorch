@@ -27,14 +27,16 @@ class TestTorchMethod(TestCase):
         a = torch.ones([10], dtype=torch.float64)
         a = a.to(xpu_device)
         ckpt = tempfile.NamedTemporaryFile()
-        torch.save(a, ckpt.name)
+        with tempfile.NamedTemporaryFile(delete=False) as ckpt:
+            torch.save(a, ckpt.name)
         b = torch.load(ckpt.name)
         assert torch.equal(a, b), "tensor saved & loaded not equal"
 
     def test_serialization_map_location(self):
         a = torch.randn(5)
         ckpt = tempfile.NamedTemporaryFile()
-        torch.save(a, ckpt.name)
+        with tempfile.NamedTemporaryFile(delete=False) as ckpt:
+            torch.save(a, ckpt.name)
         b = torch.load(ckpt.name, map_location=lambda storage, loc: storage.xpu(0))
         self.assertEqual(a, b.to(cpu_device))
 
@@ -44,7 +46,8 @@ class TestTorchMethod(TestCase):
     def test_serialization_multi_map_location(self):
         a = torch.randn(5, device="xpu:0")
         ckpt = tempfile.NamedTemporaryFile()
-        torch.save(a, ckpt.name)
+        with tempfile.NamedTemporaryFile(delete=False) as ckpt:
+            torch.save(a, ckpt.name)
         b = torch.load(ckpt.name, map_location={"xpu:0": "xpu:1"})
         self.assertEqual(a.to(cpu_device), b.to(cpu_device))
         self.assertEqual(b.device.__str__(), "xpu:1")

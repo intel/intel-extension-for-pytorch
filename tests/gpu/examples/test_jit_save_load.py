@@ -26,7 +26,8 @@ class TestJitSaveLoadMethod(TestCase):
         model = model.to("xpu").eval()
         origin_modelJit = torch.jit.script(model)
         ckpt = tempfile.NamedTemporaryFile()
-        origin_modelJit.save(ckpt.name)
+        with tempfile.NamedTemporaryFile(delete=False) as ckpt:
+            origin_modelJit.save(ckpt.name)
         loaded_modelJit = torch.jit.load(ckpt.name)
 
         for o, l in zip(origin_modelJit.parameters(), loaded_modelJit.parameters()):
