@@ -120,4 +120,13 @@ def compiled_module_main(benchmark_name, benchmark_compiled_module_fn):
     if args.benchmark_kernels:
         benchmark_all_kernels(benchmark_name, args.benchmark_all_configs)
     else:
+        times = 10
+        repeat = 10
+        wall_time_ms = (
+            benchmark_compiled_module_fn(times=times, repeat=repeat) / times * 1000
+        )
+
+        if not args.profile:
+            return
+
         raise NotImplementedError("torch.profiler is not supported on XPU.")
