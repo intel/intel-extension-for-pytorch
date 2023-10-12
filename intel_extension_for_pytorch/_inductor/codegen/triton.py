@@ -1,11 +1,13 @@
 import itertools
+import sympy
 
 import torch  # noqa
 
+from torch.utils._sympy.value_ranges import ValueRanges
 from torch._dynamo.utils import counters
 from torch._inductor.ir import ReductionHint
 
-from torch._inductor.virtualized import V
+from torch._inductor.virtualized import ops, V
 
 from torch._inductor.codegen.common import (
     IndentedBuffer,
@@ -15,17 +17,43 @@ from torch._inductor.codegen.common import (
 from torch._inductor.codegen.triton import (
     signature_of,
     config_of,
+    TritonOverrides,
     TritonKernel,
     TritonScheduling,
 )
 from torch._inductor import config, scheduler
 from torch._inductor.codegen.triton_utils import signature_to_meta
+from torch._inductor.utils import DeferredLineBase, sympy_symbol, unique
 
 
 pexpr = PythonPrinter().doprint
 
+class XPUTritonOverrides(TritonOverrides):
+    """
+    Map element-wise ops to Triton. This is a WA solution to mute tl.device_assert, which
+    is not supported on Triton XPU backend.
+    """
+
+    @staticmethod
+    def relu(x):
+        bug = config.triton.inject_relu_bug_TESTING_ONLY
+        if bug == "compile_error":
+            return "compile error!"
+        elif bug == "runtime_error":
+            # NB: this only triggers runtime error as long as input
+            # is not all zero
+            return f'# triton_helpers.device_assert_then({x} == 0, "injected assert fail", {x})'
+        elif bug == "accuracy":
+            return f"{x} + 1"
+        elif bug is None:
+            return ops.maximum("0", x)
+        else:
+            raise AssertionError(
+                f"unrecognized config triton.inject_relu_bug_TESTING_ONLY = {bug!r}"
+            )
 
 class XPUTritonKernel(TritonKernel):
+    overrides = XPUTritonOverrides
 
     def __init__(
         self,
@@ -42,6 +70,104 @@ class XPUTritonKernel(TritonKernel):
             pid_cache=pid_cache,
             reduction_hint=reduction_hint,
         )
+
+    def indirect_indexing(self, var, size, check=True):
+        """
+        Override this method to mute tl.device_assert which is not supported on Triton XPU backend.
+        """
+        # TODO: This code should be lifted to codegen/common.py.
+        # This should be easy, as now CSE variables carry bounds info
+        class IndirectAssertLine(DeferredLineBase):
+            def __init__(self, line, var, mask, size_map):
+                self.var = var
+                self.mask = mask
+                self.line = line
+                self.size_map = size_map
+
+            def __call__(self):
+                size, size_str = self.size_map[(self.var, self.mask)]
+
+                # We assert if we've not been able to prove the bound
+                assert_min = (self.var.bounds.lower >= 0) != sympy.true
+                assert_max = (self.var.bounds.upper < size) != sympy.true
+
+                # FooBar interview question
+                if not (assert_min or assert_max):
+                    return None
+                elif assert_min and assert_max:
+                    # The conditions need to be in parens because of Python's operator precedence.
+                    # It'd be less error-prone to use and/or/not, which is suported by triton
+                    cond = f"(0 <= {self.var}) & ({self.var} < {size_str})"
+                    cond_print = f"0 <= {self.var} < {size_str}"
+                elif assert_min:
+                    cond = f"0 <= {self.var}"
+                    cond_print = cond
+                else:
+                    assert assert_max
+                    cond = f"{self.var} < {size_str}"
+                    cond_print = cond
+
+                if self.mask:
+                    cond = f"({cond}) | ~{self.mask}"
+                return self.line.format(cond=cond, cond_print=cond_print)
+
+            def _new_line(self, line):
+                return IndirectAssertLine(line, self.var, self.mask, self.size_map)
+
+        if var.bounds.lower < 0:
+            new_bounds = ValueRanges.unknown()
+            if var.bounds != ValueRanges.unknown() and isinstance(size, sympy.Number):
+                # Take the negative part of the bound and add size to it
+                # Then take union of that and the positive part
+                # This is a tighter bound than that of a generic ops.where, as we have info on the cond
+                neg = var.bounds & ValueRanges(-sympy.oo, -1)
+                new_bounds = ValueRanges(neg.lower + size, neg.upper + size)
+                # We don't have a good way of representing the empty range
+                if var.bounds.upper >= 0:
+                    pos = var.bounds & ValueRanges(0, sympy.oo)
+                    new_bounds = new_bounds | pos
+
+            stm = f"{var} + {self.index_to_str(size)}"
+            # Mixed negative and non-negative
+            if var.bounds.upper >= 0:
+                stm = f"tl.where({var} < 0, {stm}, {var})"
+            new_var = self.cse.generate(self.compute, stm, bounds=new_bounds)
+
+            new_var.update_on_args("index_wrap", (var,), {})
+            var = new_var
+
+        generate_assert = (
+            (check or config.debug_index_asserts)
+            and config.triton.assert_indirect_indexing
+        )
+        if generate_assert:
+            mask_vars = set(var.mask_vars)
+            if self._load_mask:
+                mask_vars.add(self._load_mask)
+
+            mask = ""
+            if mask_vars:
+                mask = (
+                    f"{list(mask_vars)[0]}"
+                    if len(mask_vars) == 1
+                    else f"({' & '.join(str(v) for v in mask_vars)})"
+                )
+
+            # An assertion line may have been written already, if so just
+            # update the max size.
+            map_key = (var, mask)
+            existing_size, _ = self.indirect_max_sizes.get(map_key, (None, None))
+            if existing_size is not None:
+                size = sympy.Min(size, existing_size)
+            else:
+                line = '# tl.device_assert({cond}, "index out of bounds: {cond_print}")'
+                self.compute.writeline(
+                    IndirectAssertLine(line, var, mask, self.indirect_max_sizes)
+                )
+
+            self.indirect_max_sizes[map_key] = (size, self.index_to_str(size))
+
+        return sympy_symbol(str(var))
 
     def codegen_kernel_benchmark(self):
         result = IndentedBuffer()
