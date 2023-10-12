@@ -1843,6 +1843,31 @@ Tensor host_softmax(
   return output;
 }
 
+bool shape_use_fused_path(const Tensor& input, const Tensor& other) {
+  // for add_softmaxi_fusion, we support shapes like:
+  // [N, C, H, W], [N1, C1, H1, W1] which X is divisible by X1
+  // [N, C, H, W], [C1, H1, W1] which X is divisible by X1
+  // [N, C, H, W], [H1, W1] which X is divisible by X1
+  // [N, C, H, W], [W1] which X is divisible by X1
+  // likewise for 3D and 5D inputs
+
+  if (input.sizes() == other.sizes())
+    return true;
+  auto a_dim = input.dim();
+  auto b_dim = other.dim();
+  if (b_dim > a_dim)
+    return false;
+  auto input_size = input.sizes();
+  auto other_size = other.sizes();
+  // loop for the smaller shape from end
+  for (int i = 1; i <= b_dim; i++) {
+    if (input_size[a_dim - i] % other_size[b_dim - i] != 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 Tensor add_softmax(
     const Tensor& input,
     const Tensor& other,
@@ -1850,22 +1875,17 @@ Tensor add_softmax(
     const int64_t dim,
     c10::optional<ScalarType> dtype) {
   RECORD_FUNCTION("torch_ipex::add_softmax", {});
-  if (other.numel() > input.numel()) {
+
+  // fall back to no fuse path for different type inputs or not supported shapes
+  if (!shape_use_fused_path(input, other) ||
+      (input.scalar_type() != other.scalar_type()) ||
+      (dtype.has_value() && (dtype.value() != input.scalar_type()))) {
     return at::softmax(at::add(input, other, alpha), dim, dtype);
   }
-  Tensor converted_input =
-      dtype.has_value() ? input.toType(dtype.value()) : input;
-  Tensor converted_other =
-      dtype.has_value() ? other.toType(dtype.value()) : other;
   IntArrayRef sizes;
   Tensor output;
-  if (other.numel() <= input.numel()) {
-    sizes = input.sizes();
-    output = at::empty_like(input);
-  } else {
-    sizes = other.sizes();
-    output = at::empty_like(other);
-  }
+  sizes = input.sizes();
+  output = at::empty_like(input);
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
@@ -1873,13 +1893,8 @@ Tensor add_softmax(
       "add_softmax",
       [&] {
         using accscalar_t = acc_type<scalar_t>;
-        if (other.numel() <= input.numel()) {
-          impl::add_view_softmax_impl<scalar_t, accscalar_t>(
-              converted_input, converted_other, dim, alpha, output, sizes);
-        } else {
-          impl::add_view_softmax_impl<scalar_t, accscalar_t>(
-              converted_other, converted_input, dim, alpha, output, sizes);
-        }
+        impl::add_view_softmax_impl<scalar_t, accscalar_t>(
+            input, other, dim, alpha, output, sizes);
       });
   return output;
 }
@@ -1908,16 +1923,16 @@ Tensor add_view_softmax(
     const int64_t dim,
     c10::optional<ScalarType> dtype) {
   RECORD_FUNCTION("torch_ipex::add_view_softmax", {});
-  Tensor converted_input =
-      dtype.has_value() ? input.toType(dtype.value()) : input;
-  Tensor converted_other =
-      dtype.has_value() ? other.toType(dtype.value()) : other;
-  Tensor output;
-  if (other.numel() <= input.numel()) {
-    output = at::empty_like(input).view(sizes);
-  } else {
-    output = at::empty_like(other).view(sizes);
+  // fall back to no fuse path for different type inputs or not supported shapes
+
+  if (!shape_use_fused_path(input, other) ||
+      (input.scalar_type() != other.scalar_type()) ||
+      (dtype.has_value() && dtype.value() != input.scalar_type())) {
+    return at::softmax(at::add(input, other, alpha).view(sizes), dim, dtype);
   }
+
+  Tensor output = at::empty_like(input).view(sizes);
+
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
@@ -1925,13 +1940,8 @@ Tensor add_view_softmax(
       "add_view_softmax",
       [&] {
         using accscalar_t = acc_type<scalar_t>;
-        if (other.numel() <= input.numel()) {
-          impl::add_view_softmax_impl<scalar_t, accscalar_t>(
-              converted_input, converted_other, dim, alpha, output, sizes);
-        } else {
-          impl::add_view_softmax_impl<scalar_t, accscalar_t>(
-              converted_other, converted_input, dim, alpha, output, sizes);
-        }
+        impl::add_view_softmax_impl<scalar_t, accscalar_t>(
+            input, other, dim, alpha, output, sizes);
       });
   return output;
 }

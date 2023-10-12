@@ -114,11 +114,12 @@ class Mish(torch.nn.Module):
         return x
 
 class AddSoftmax(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, dtype):
         super().__init__()
+        self.dtype = dtype
 
     def forward(self, x, y):
-        x = torch.softmax(x + y, dim=-1)
+        x = torch.softmax(x + y, dim=-1, dtype=self.dtype)
         return x
 
 class AddViewSoftmax(torch.nn.Module):
@@ -3146,20 +3147,36 @@ class TestNNMethod(TestCase):
         del modelJit
 
     def test_add_softmax_fusion(self, dtype=torch.float16):
+
         m1 = torch.randn([4, 2, 4, 4], device=dpcpp_device, dtype=dtype)
-        m2 = torch.randn([1, 2, 1, 4], device=dpcpp_device, dtype=dtype)
+        m2 = torch.randn([4, 2, 1, 1], device=dpcpp_device, dtype=dtype)
 
         m1_dpcpp = m1.to(dpcpp_device)
         m2_dpcpp = m2.to(dpcpp_device)
-        model = AddSoftmax()
-        raw = model(m2, m1)
+        model = AddSoftmax(dtype)
+        raw = model(m1, m2)
         modelJit = torch.jit.script(model)
         with torch.no_grad():
-            real = modelJit(m2_dpcpp, m1_dpcpp)
-            print(modelJit.graph_for(m2_dpcpp, m1_dpcpp))
-            real = modelJit(m2_dpcpp, m1_dpcpp)
+            real = modelJit(m1_dpcpp, m2_dpcpp)
+            print(modelJit.graph_for(m1_dpcpp, m2_dpcpp))
+            real = modelJit(m1_dpcpp, m2_dpcpp)
         self.assertEqual(raw, real.to(cpu_device))
+
+        m1 = torch.randn([4, 2, 1, 4], device=dpcpp_device, dtype=dtype)
+        m2 = torch.randn([4, 2, 4, 4], device=dpcpp_device, dtype=dtype)
+
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+        model_fp32 = AddSoftmax(torch.float)
+        raw_fp32 = model_fp32(m2, m1)
+        modelJit_fp32 = torch.jit.script(model_fp32)
+        with torch.no_grad():
+            real_fp32 = modelJit_fp32(m2_dpcpp, m1_dpcpp)
+            print(modelJit_fp32.graph_for(m2_dpcpp, m1_dpcpp))
+            real_fp32 = modelJit_fp32(m2_dpcpp, m1_dpcpp)
+        self.assertEqual(raw_fp32, real_fp32.to(cpu_device), atol=1e-4, rtol=1e-3)
         del modelJit
+        del modelJit_fp32
 
     def test_add_view_softmax_fusion(self, dtype=torch.float16):
         m1 = torch.randn([52, 14, 4, 19, 19], device=dpcpp_device, dtype=dtype)
@@ -3168,16 +3185,17 @@ class TestNNMethod(TestCase):
         m1_dpcpp = m1.to(dpcpp_device)
         m2_dpcpp = m2.to(dpcpp_device)
         model = AddViewSoftmax()
-        raw = model(m2, m1)
+        raw = model(m1, m2)
         modelJit = torch.jit.script(model)
         with torch.no_grad():
-            real = modelJit(m2_dpcpp, m1_dpcpp)
-            print(modelJit.graph_for(m2_dpcpp, m1_dpcpp))
-            real = modelJit(m2_dpcpp, m1_dpcpp)
+            real = modelJit(m1_dpcpp, m2_dpcpp)
+            print(modelJit.graph_for(m1_dpcpp, m2_dpcpp))
+            real = modelJit(m1_dpcpp, m2_dpcpp)
         self.assertEqual(raw, real.to(cpu_device))
         del modelJit
 
     def test_add_view_softmax_fallback(self, dtype=torch.float):
+        # fallback case for large dim size
         m1 = torch.randn([12, 6, 4, 19, 12 * 1024], device=cpu_device)
         m2 = torch.randn([1, 6, 1, 19, 12 * 1024], device=cpu_device)
 
@@ -3190,7 +3208,23 @@ class TestNNMethod(TestCase):
             real = modelJit(m1_dpcpp, m2_dpcpp)
             print(modelJit.graph_for(m1_dpcpp, m2_dpcpp))
         self.assertEqual(raw, real.to(cpu_device))
+
+        # fallback case for not supported broadcast shape
+        m1 = torch.randn([1, 2, 4, 4], device=dpcpp_device, dtype=dtype)
+        m2 = torch.randn([4, 2, 1, 4], device=dpcpp_device, dtype=dtype)
+
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+        model = AddSoftmax(dtype)
+        raw = model(m2, m1)
+        modelJit2 = torch.jit.script(model)
+        with torch.no_grad():
+            real = modelJit2(m2_dpcpp, m1_dpcpp)
+            print(modelJit2.graph_for(m2_dpcpp, m1_dpcpp))
+            real = modelJit2(m2_dpcpp, m1_dpcpp)
+        self.assertEqual(raw, real.to(cpu_device))
         del modelJit
+        del modelJit2
 
     # @pytest.mark.skip("oneDNN not implement yet")
     # def test_linear_binary_ge_fusion(self, dtype=torch.float):
