@@ -296,8 +296,8 @@ class TestNNMethod(TestCase):
             (4, 8, 60, 128),
             (4, 1024, 16, 16),
             (24, 1024, 7, 7),
-            (32, 256, 56, 56),
             (16, 32, 24, 24),
+            (32, 256, 56, 56),
         ]
         for dtype in [torch.bfloat16, torch.float32]:
             if dtype == torch.bfloat16:
@@ -331,9 +331,7 @@ class TestNNMethod(TestCase):
 
                 y_dpcpp1 = bn(x_dpcpp)
                 y_dpcpp = bn(y_dpcpp1)
-
                 y_dpcpp.backward(grad_dpcpp)
-
 
                 if (
                     1 == y_dpcpp.shape[1]

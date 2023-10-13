@@ -123,11 +123,54 @@ int inline get_nhwc_suggest_vec_size(
       (channels == 128 || channels == 256))
     return 4;
 
+  if (channels % vec_size != 0)
+    return 1;
   return vec_size;
 }
 
 inline int rnd_up(const int a, const int b) {
   return (div_up(a, b) * b);
+}
+
+int get_nhwc_sp_block_size(int sp, int ic_dim, int simd = 16) {
+  int eu_count = dpcppGpuEuCount();
+  int threads_per_eu = dpcppGpuHWThreadsPerEU();
+
+  float efficiency_thr = 0.0f;
+  float efficiency_peak_eu_thr = 0.0f;
+  int block_size_thr = 1;
+  int block_size_peak_eu_thr = 1;
+  int curr_block_size = sp;
+  int nthr_mul = 1;
+  const int ic_nsg = ic_dim / simd; // number of subgroups by ic dim
+
+  // The search is based on threads wave efficiency.
+  // Higher priority for cases with peak EUs utilization.
+  while (nthr_mul <= 32) {
+    const int nthr = nthr_mul * eu_count;
+    curr_block_size = div_up(sp * ic_nsg, nthr);
+    const int nblock = div_up(sp, curr_block_size);
+    const int nthr_gen = nblock * ic_nsg;
+
+    const float curr_efficiency_eus =
+        (float)nthr_gen / rnd_up(nthr_gen, eu_count);
+    const float curr_efficiency_thr =
+        (float)nthr_gen / rnd_up(nthr_gen, eu_count * threads_per_eu);
+
+    if (curr_efficiency_thr > efficiency_thr) {
+      efficiency_thr = curr_efficiency_thr;
+      block_size_thr = curr_block_size;
+    }
+    if (curr_efficiency_eus == 1 &&
+        curr_efficiency_thr > efficiency_peak_eu_thr) {
+      efficiency_peak_eu_thr = curr_efficiency_thr;
+      block_size_peak_eu_thr = curr_block_size;
+    }
+    nthr_mul++;
+  }
+  if (efficiency_peak_eu_thr > 0.0f)
+    return block_size_peak_eu_thr;
+  return block_size_thr;
 }
 
 ScalarType first_type() {
@@ -184,8 +227,8 @@ inline Impl batch_norm_choose_impl(const Tensor& in1, const Tensor& in2) {
 std::tuple<sycl::range<2>, sycl::range<2>> flexible_launch_configs(
     const int reduction,
     const int stride,
-    const int loops_per_item = 1,
-    const bool coop_flag = false) {
+    const bool coop_flag = false,
+    const int loops_per_item = 1) {
   int wg_size = dpcppMaxWorkItemsPerEU();
   int group_x = std::min(last_pow2(stride), 32);
   int group_y = std::min(
@@ -195,11 +238,10 @@ std::tuple<sycl::range<2>, sycl::range<2>> flexible_launch_configs(
   }
 
   int grid_x = CeilDiv(stride, group_x);
-
+  //  int grid_y = std::min(CeilDiv(reduction, group_y * loops_per_item), 1024);
   int grid_y = std::min(
       CeilDiv(reduction, group_y * loops_per_item),
-      int(dpcppMaxWorkItemsPerTile()) / (grid_x * group_x) /
-          (group_y * loops_per_item));
+      int(dpcppMaxWorkItemsPerTile()) / (grid_x * group_x) / (group_y));
   grid_y = std::max(grid_y, 1);
 
   if (coop_flag) {
@@ -1072,38 +1114,44 @@ void batch_norm_stats_channels_last_template(
   }
   sycl::range<2> global_range(1, 1), local_range(1, 1);
 
-  if (stride % suggest_vec_size == 0 && suggest_vec_size == 8) {
-    constexpr int vec_size = 8;
+  switch (suggest_vec_size) {
+    case 8: {
+      constexpr int vec_size = 8;
 
-    std::tie(global_range, local_range) =
-        flexible_launch_configs(reduction_size, stride / vec_size, true);
-    int group_num_y = global_range[0] / local_range[0];
-    if (group_num_y > 1) {
-      DISPATCH_REDUCE_2_PASS_IMPL(vec_size);
-    } else {
-      DISPATCH_REDUCE_IMPL(vec_size);
+      std::tie(global_range, local_range) =
+          flexible_launch_configs(reduction_size, stride / vec_size, true);
+      int group_num_y = global_range[0] / local_range[0];
+      if (group_num_y > 1) {
+        DISPATCH_REDUCE_2_PASS_IMPL(vec_size);
+      } else {
+        DISPATCH_REDUCE_IMPL(vec_size);
+      }
+      break;
     }
-  } else if (stride % suggest_vec_size == 0 && suggest_vec_size == 4) {
-    constexpr int vec_size = 4;
+    case 4: {
+      constexpr int vec_size = 4;
 
-    std::tie(global_range, local_range) =
-        flexible_launch_configs(reduction_size, stride / vec_size, true);
-    int group_num_y = global_range[0] / local_range[0];
-    if (group_num_y > 1) {
-      DISPATCH_REDUCE_2_PASS_IMPL(vec_size);
-    } else {
-      DISPATCH_REDUCE_IMPL(vec_size);
+      std::tie(global_range, local_range) =
+          flexible_launch_configs(reduction_size, stride / vec_size, true);
+      int group_num_y = global_range[0] / local_range[0];
+      if (group_num_y > 1) {
+        DISPATCH_REDUCE_2_PASS_IMPL(vec_size);
+      } else {
+        DISPATCH_REDUCE_IMPL(vec_size);
+      }
+      break;
     }
-  } else {
-    constexpr int vec_size = 1;
+    default: {
+      constexpr int vec_size = 1;
 
-    std::tie(global_range, local_range) =
-        flexible_launch_configs(reduction_size, stride / vec_size, true);
-    int group_num_y = global_range[0] / local_range[0];
-    if (group_num_y > 1) {
-      DISPATCH_REDUCE_2_PASS_IMPL(vec_size);
-    } else {
-      DISPATCH_REDUCE_IMPL(vec_size);
+      std::tie(global_range, local_range) =
+          flexible_launch_configs(reduction_size, stride / vec_size, true);
+      int group_num_y = global_range[0] / local_range[0];
+      if (group_num_y > 1) {
+        DISPATCH_REDUCE_2_PASS_IMPL(vec_size);
+      } else {
+        DISPATCH_REDUCE_IMPL(vec_size);
+      }
     }
   }
 
@@ -1305,8 +1353,25 @@ std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> native_batch_norm_out(
     Tensor& save_mean,
     Tensor& save_invstd) {
   xpu::COMPUTE_ENG real_eng;
+  int sp = input.numel() / input.size(1);
+  int ic = input.size(1);
 
-  if (input.is_quantized()) {
+  // oneDNN makes vectorized load/store for nhwc when channels is multiples of
+  // 16
+  bool onednn_nhwc_optimized =
+      batch_norm_choose_impl(input) == Impl::ChannelsLast && ic % 16 == 0;
+
+  // In oneDNN, for shapes with nhwc_optimized, spatial dim(NHW) will be divided
+  // into blocks, each thread handles one block
+  int onednn_block_size = 0;
+  if (onednn_nhwc_optimized)
+    onednn_block_size = get_nhwc_sp_block_size(sp, ic);
+
+  // For shapes with channels vectorized and spatial optimized, we adopt oneDNN
+  // implementation
+  bool adopt_onednn_path = onednn_nhwc_optimized && onednn_block_size > 1;
+
+  if (input.is_quantized() || adopt_onednn_path) {
     real_eng = xpu::COMPUTE_ENG::ONEDNN;
   } else {
     real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
@@ -1977,55 +2042,64 @@ inline void merge_group_vertical_backward(
 }
 
 template <
-    int PARALLEL_LOADS,
+    int vec_size,
+    bool two_pass_reduce,
     typename scalar_t,
     typename accscalar_t,
     typename layerscalar_t>
 void batch_norm_backward_reduce_channels_last_kernel(
     const Tensor& input,
-    const scalar_t* grad_output,
+    scalar_t* grad_output,
     const Tensor& mean,
-    const accscalar_t* inv_std,
-    accscalar_t* sum_dy_o,
-    accscalar_t* sum_dy_xmu_o,
+    accscalar_t* inv_std,
+    Tensor& sum_dy,
+    Tensor& sum_dy_xmu,
     layerscalar_t* grad_weight,
     layerscalar_t* grad_bias,
     const int reduction_size,
     const int stride) {
   sycl::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
-      flexible_launch_configs(reduction_size, stride, PARALLEL_LOADS, false);
-  int loop_count =
-      1 + (reduction_size - 1) / (global_range[0] * PARALLEL_LOADS);
+      flexible_launch_configs(reduction_size, stride / vec_size);
+  int loop_count = 1 + (reduction_size - 1) / (global_range[0]);
   int group_num_y = global_range[0] / local_range[0];
   int group_num_x = global_range[1] / local_range[1];
   int global_range_y = global_range[0];
   int local_range_y = local_range[0];
   int global_range_x = global_range[1];
+  int local_range_x = local_range[1];
   auto wg_size = local_range[0] * local_range[1];
+  accscalar_t* sum_dy_o = sum_dy.data_ptr<accscalar_t>();
+  accscalar_t* sum_dy_xmu_o = sum_dy_xmu.data_ptr<accscalar_t>();
+  Tensor temp_sum_dy;
+  Tensor temp_sum_dy_xmu;
+  accscalar_t* temp_sum_dy_ptr;
+  accscalar_t* temp_sum_dy_xmu_ptr;
+
+  if constexpr (two_pass_reduce) {
+    temp_sum_dy = at::empty({group_num_y * stride}, sum_dy.options());
+    temp_sum_dy_xmu = at::empty({group_num_y * stride}, sum_dy_xmu.options());
+    temp_sum_dy_ptr = temp_sum_dy.data_ptr<accscalar_t>();
+    temp_sum_dy_xmu_ptr = temp_sum_dy_xmu.data_ptr<accscalar_t>();
+  }
   auto& queue = dpcppGetCurrentQueue();
-  at::Tensor staging_data;
-  at::Tensor semaphores;
+  int total_count = stride * reduction_size;
 
   scalar_t* input_ptr = input.data_ptr<scalar_t>();
   accscalar_t* mean_ptr = mean.data_ptr<accscalar_t>();
+  using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
+  using vec_y = at::detail::Array<accscalar_t, 2>;
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto shmem_sum_dy =
-        dpcpp_local_acc_t<accscalar_t, 1>(sycl::range<1>{wg_size}, cgh);
-    auto shmem_sum_dy_xmu =
-        dpcpp_local_acc_t<accscalar_t, 1>(sycl::range<1>{wg_size}, cgh);
-
-    auto is_last_group_done =
-        dpcpp_local_acc_t<bool, 1>(sycl::range<1>{1}, cgh);
+    auto shared = dpcpp_local_acc_t<vec_y, 1>(sycl::range<1>{wg_size}, cgh);
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
       // hide latency with concurrency
-      accscalar_t sum_dy[PARALLEL_LOADS];
-      accscalar_t sum_dy_xmu[PARALLEL_LOADS];
+      accscalar_t sum_dy[vec_size];
+      accscalar_t sum_dy_xmu[vec_size];
 
 #pragma unroll
-      for (int i = 0; i < PARALLEL_LOADS; i++) {
-        sum_dy[i] = accscalar_t(0);
-        sum_dy_xmu[i] = accscalar_t(0);
+      for (int i = 0; i < vec_size; i++) {
+        sum_dy[i] = accscalar_t(0.0f);
+        sum_dy_xmu[i] = accscalar_t(0.0f);
       }
       // tensor dimension (m,c)
 
@@ -2034,103 +2108,152 @@ void batch_norm_backward_reduce_channels_last_kernel(
 
       // offset along m dimension
       int m_offset = item.get_global_id(0);
-      int c_offset = item.get_global_id(1);
+      int c_offset_base = item.get_global_id(1) * vec_size;
       auto lidx = item.get_local_id(1);
       auto lidy = item.get_local_id(0);
-      auto group_id_y = item.get_group().get_group_id(0);
-      auto group_id_x = item.get_group().get_group_id(1);
+      auto group_idx_y = item.get_group().get_group_id(0);
+      auto group_idx_x = item.get_group().get_group_id(1);
 
-      int loop_count =
-          1 + (reduction_size - 1) / (inner_loop_stride * PARALLEL_LOADS);
-      int address_base = m_offset * stride + c_offset;
+      int loop_count = 1 + (reduction_size - 1) / (inner_loop_stride);
+      int address_base = m_offset * stride + c_offset_base;
       int address_increment = inner_loop_stride * stride;
 
-      accscalar_t r_mean = 0;
-      accscalar_t factor = 1;
-      if (c_offset < stride) {
-        r_mean = mean_ptr[c_offset];
-        factor = inv_std[c_offset];
+      accscalar_t r_mean[vec_size] = {0.0f};
+      accscalar_t factor[vec_size] = {1.0f};
+#pragma unroll
+      for (int j = 0; j < vec_size; j++) {
+        if (c_offset_base + j < stride) {
+          r_mean[j] = mean_ptr[c_offset_base + j];
+          factor[j] = inv_std[c_offset_base + j];
+        }
       }
       for (int i = 0; i < loop_count; i++) {
-        accscalar_t x_input[PARALLEL_LOADS];
-        accscalar_t x_grad_output[PARALLEL_LOADS];
+        accscalar_t x_input[vec_size];
+        accscalar_t x_grad_output[vec_size];
+        vec_t input_vec;
+        vec_t grad_out_vec;
+        if ((c_offset_base) < stride && m_offset < reduction_size) {
+          input_vec = *(reinterpret_cast<vec_t*>(input_ptr + address_base));
+          grad_out_vec =
+              *(reinterpret_cast<vec_t*>(grad_output + address_base));
+        }
 
         // load multiple data in
 #pragma unroll
-        for (int j = 0; j < PARALLEL_LOADS; j++) {
-          if (c_offset < stride && m_offset < reduction_size) {
-            x_input[j] = input_ptr[address_base];
-            x_grad_output[j] = grad_output[address_base];
+        for (int j = 0; j < vec_size; j++) {
+          if (c_offset_base < stride && m_offset < reduction_size) {
+            x_input[j] = input_vec[j];
+            x_grad_output[j] = grad_out_vec[j];
           } else {
             x_input[j] = accscalar_t(0);
             x_grad_output[j] = accscalar_t(0);
           }
-          m_offset += inner_loop_stride;
-          address_base += address_increment;
         }
 
         // calculate sum_dy / sum_dy_xmu
 #pragma unroll
-        for (int j = 0; j < PARALLEL_LOADS; j++) {
+        for (int j = 0; j < vec_size; j++) {
           sum_dy[j] += x_grad_output[j];
-          sum_dy_xmu[j] += x_grad_output[j] * (x_input[j] - r_mean);
+          sum_dy_xmu[j] += x_grad_output[j] * (x_input[j] - r_mean[j]);
         }
+        m_offset += inner_loop_stride;
+        address_base += address_increment;
       }
 
-      // thread reduction to accumulate sum_dy / sum_dy_xmu between
-      // PARALLEL_LOADS
 #pragma unroll
-      for (int j = 1; j < PARALLEL_LOADS; j++) {
-        sum_dy[0] += sum_dy[j];
-        sum_dy_xmu[0] += sum_dy_xmu[j];
+      for (int j = 0; j < vec_size; j++) {
+        vec_y value;
+        value[0] = sum_dy[j];
+        value[1] = sum_dy_xmu[j];
+
+        value = group_y_reduce(
+            item, shared, value, [](accscalar_t a, accscalar_t b) {
+              return a + b;
+            });
+        sum_dy[j] = value[0];
+        sum_dy_xmu[j] = value[1];
+
+        item.barrier(dpcpp_local_fence);
       }
 
-      // release array of registers
-      auto sum_dy_th = sum_dy[0];
-      auto sum_dy_xmu_th = sum_dy_xmu[0];
-
-      // group-wise reduction with shared memory (since reduction cannot be
-      // done within a warp)
-
-      merge_group_vertical_backward(
-          item, sum_dy_th, sum_dy_xmu_th, shmem_sum_dy, shmem_sum_dy_xmu);
-      if (group_num_y > 1) {
-        if (lidy == 0 && c_offset < stride) {
-          atomicAdd(
-              (dpcpp_global_ptr_pt<accscalar_t>)&sum_dy_o[c_offset], sum_dy_th);
-          atomicAdd(
-              (dpcpp_global_ptr_pt<accscalar_t>)&sum_dy_xmu_o[c_offset],
-              sum_dy_xmu_th);
-          if (grad_bias != nullptr) {
-            atomicAdd(
-                (dpcpp_global_ptr_pt<layerscalar_t>)&grad_bias[c_offset],
-                sum_dy_th);
-          }
-          if (grad_weight != nullptr) {
-            atomicAdd(
-                (dpcpp_global_ptr_pt<layerscalar_t>)&grad_weight[c_offset],
-                sum_dy_xmu_th * factor);
+      if constexpr (two_pass_reduce) {
+#pragma unroll
+        for (int j = 0; j < vec_size; j++) {
+          int c_offset = c_offset_base + j;
+          if (lidy == 0 && (c_offset) < stride) {
+            // write to temp[c][group_idx_y]
+            int offset = c_offset * group_num_y + group_idx_y;
+            temp_sum_dy_ptr[offset] = sum_dy[j];
+            temp_sum_dy_xmu_ptr[offset] = sum_dy_xmu[j];
           }
         }
+
       } else {
-        if (group_id_y == 0 && lidy == 0 && c_offset < stride) {
-          if (grad_bias != nullptr) {
-            grad_bias[c_offset] = static_cast<layerscalar_t>(sum_dy_th);
+#pragma unroll
+        for (int j = 0; j < vec_size; j++) {
+          int c_offset = c_offset_base + j;
+          if (lidy == 0 && c_offset < stride) {
+            if (grad_bias != nullptr) {
+              grad_bias[c_offset] = static_cast<layerscalar_t>(sum_dy[j]);
+            }
+            if (grad_weight != nullptr) {
+              grad_weight[c_offset] =
+                  static_cast<layerscalar_t>(sum_dy_xmu[j] * factor[j]);
+            }
+            // mean_dy[c_offset] = sum_dy_th / reduction_size;
+            // mean_dy_xmu[c_offset] = sum_dy_xmu_th / reduction_size;
+            sum_dy_o[c_offset] = sum_dy[j];
+            sum_dy_xmu_o[c_offset] = sum_dy_xmu[j];
           }
-          if (grad_weight != nullptr) {
-            grad_weight[c_offset] =
-                static_cast<layerscalar_t>(sum_dy_xmu_th * factor);
-          }
-          // mean_dy[c_offset] = sum_dy_th / reduction_size;
-          // mean_dy_xmu[c_offset] = sum_dy_xmu_th / reduction_size;
-          sum_dy_o[c_offset] = sum_dy_th;
-          sum_dy_xmu_o[c_offset] = sum_dy_xmu_th;
         }
       }
     };
     cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
+
+  // reduce temp sum
+  if constexpr (two_pass_reduce) {
+    int wg_size = std::min(group_num_y, int(dpcppMaxWorkItemsPerEU()));
+    auto cgf_2 = DPCPP_Q_CGF(__cgh) {
+      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
+        auto local_id = item_id.get_local_linear_id();
+        auto global_id = item_id.get_global_linear_id();
+        auto c_offset = item_id.get_group_linear_id();
+        accscalar_t r_mean = 0.0f;
+        accscalar_t factor = 1.0f;
+        if (c_offset < stride) {
+          r_mean = mean_ptr[c_offset];
+          factor = inv_std[c_offset];
+        }
+
+        accscalar_t temp_sum_dy = 0.0f;
+        accscalar_t temp_sum_dy_xmu = 0.0f;
+        for (int i = local_id; i < group_num_y; i += wg_size) {
+          int offset = c_offset * group_num_y + i;
+          temp_sum_dy += temp_sum_dy_ptr[offset];
+          temp_sum_dy_xmu += temp_sum_dy_xmu_ptr[offset];
+        }
+        auto total_sum_dy = sycl::reduce_over_group(
+            item_id.get_group(), temp_sum_dy, sycl::plus<accscalar_t>());
+        auto total_sum_dy_xmu = sycl::reduce_over_group(
+            item_id.get_group(), temp_sum_dy_xmu, sycl::plus<accscalar_t>());
+        if (local_id == 0) {
+          sum_dy_o[c_offset] = total_sum_dy;
+          sum_dy_xmu_o[c_offset] = total_sum_dy_xmu;
+          if (grad_bias != nullptr) {
+            grad_bias[c_offset] = static_cast<layerscalar_t>(total_sum_dy);
+          }
+          if (grad_weight != nullptr) {
+            grad_weight[c_offset] =
+                static_cast<layerscalar_t>(total_sum_dy_xmu * factor);
+          }
+        }
+      };
+      __cgh.parallel_for(sycl::nd_range<1>(stride * wg_size, wg_size), kfn);
+    };
+    DPCPP_Q_SUBMIT(queue, cgf_2);
+  }
 }
 
 std::tuple<Tensor, Tensor, Tensor, Tensor>
@@ -2160,6 +2283,33 @@ batch_norm_backward_reduce_channels_last_template(
     grad_bias = at::empty({0}, mean.options());
   }
 
+#define DISPATCH_BWD_REDUCE_ACC_IMPL(vec_size, two_pass)               \
+  batch_norm_backward_reduce_channels_last_kernel<vec_size, two_pass>( \
+      input,                                                           \
+      grad_output.data_ptr<scalar_t>(),                                \
+      mean,                                                            \
+      inv_std.data_ptr<accscalar_t>(),                                 \
+      sumn_dy,                                                         \
+      sum_dy_xmu,                                                      \
+      grad_weight.data_ptr<accscalar_t>(),                             \
+      grad_bias.data_ptr<accscalar_t>(),                               \
+      reduction_size,                                                  \
+      stride);
+
+#define DISPATCH_BWD_REDUCE_IMPL(vec_size, two_pass)                   \
+  batch_norm_backward_reduce_channels_last_kernel<vec_size, two_pass>( \
+      input,                                                           \
+      grad_output.data_ptr<scalar_t>(),                                \
+      mean,                                                            \
+      inv_std.data_ptr<accscalar_t>(),                                 \
+      sumn_dy,                                                         \
+      sum_dy_xmu,                                                      \
+      weight.defined() ? grad_weight.data_ptr<scalar_t>() : nullptr,   \
+      weight.defined() ? grad_bias.data_ptr<scalar_t>() : nullptr,     \
+      reduction_size,                                                  \
+      stride);
+
+  sycl::range<2> global_range(1, 1), local_range(1, 1);
   if (weight.defined() && input.scalar_type() != weight.scalar_type()) {
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         kHalf,
@@ -2168,19 +2318,46 @@ batch_norm_backward_reduce_channels_last_template(
         "batchnorm_backward_reduce",
         [&] {
           using accscalar_t = acc_type<scalar_t>;
-          constexpr int ELEMENTS_PER_ITER =
-              sizeof(float) * 4 / sizeof(scalar_t);
-          batch_norm_backward_reduce_channels_last_kernel<ELEMENTS_PER_ITER>(
-              input,
-              grad_output.data_ptr<scalar_t>(),
-              mean,
-              inv_std.data_ptr<accscalar_t>(),
-              sumn_dy.data_ptr<accscalar_t>(),
-              sum_dy_xmu.data_ptr<accscalar_t>(),
-              grad_weight.data_ptr<accscalar_t>(),
-              grad_bias.data_ptr<accscalar_t>(),
-              reduction_size,
-              stride);
+          int suggest_vec_size = get_nhwc_suggest_vec_size<scalar_t>(
+              input, reduction_size, stride);
+
+          switch (suggest_vec_size) {
+            case 8: {
+              constexpr int vec_size = 8;
+              std::tie(global_range, local_range) = flexible_launch_configs(
+                  reduction_size, stride, false, vec_size);
+              int group_num_y = global_range[0] / local_range[0];
+              if (group_num_y > 1) {
+                DISPATCH_BWD_REDUCE_ACC_IMPL(8, true);
+              } else {
+                DISPATCH_BWD_REDUCE_ACC_IMPL(8, false);
+              }
+              break;
+            }
+            case 4: {
+              constexpr int vec_size = 4;
+              std::tie(global_range, local_range) = flexible_launch_configs(
+                  reduction_size, stride, false, vec_size);
+              int group_num_y = global_range[0] / local_range[0];
+              if (group_num_y > 1) {
+                DISPATCH_BWD_REDUCE_ACC_IMPL(4, true);
+              } else {
+                DISPATCH_BWD_REDUCE_ACC_IMPL(4, false);
+              }
+              break;
+            }
+            default: {
+              constexpr int vec_size = 1;
+              std::tie(global_range, local_range) = flexible_launch_configs(
+                  reduction_size, stride, false, vec_size);
+              int group_num_y = global_range[0] / local_range[0];
+              if (group_num_y > 1) {
+                DISPATCH_BWD_REDUCE_ACC_IMPL(1, true);
+              } else {
+                DISPATCH_BWD_REDUCE_ACC_IMPL(1, false);
+              }
+            }
+          }
         });
   } else {
     if (weight.defined()) {
@@ -2198,19 +2375,45 @@ batch_norm_backward_reduce_channels_last_template(
         "batchnorm_backward_reduce",
         [&] {
           using accscalar_t = acc_type<scalar_t>;
-          constexpr int ELEMENTS_PER_ITER =
-              sizeof(float) * 4 / sizeof(scalar_t);
-          batch_norm_backward_reduce_channels_last_kernel<ELEMENTS_PER_ITER>(
-              input,
-              grad_output.data_ptr<scalar_t>(),
-              mean,
-              inv_std.data_ptr<accscalar_t>(),
-              sumn_dy.data_ptr<accscalar_t>(),
-              sum_dy_xmu.data_ptr<accscalar_t>(),
-              weight.defined() ? grad_weight.data_ptr<scalar_t>() : nullptr,
-              weight.defined() ? grad_bias.data_ptr<scalar_t>() : nullptr,
-              reduction_size,
-              stride);
+          int suggest_vec_size = get_nhwc_suggest_vec_size<scalar_t>(
+              input, reduction_size, stride);
+          switch (suggest_vec_size) {
+            case 8: {
+              constexpr int vec_size = 8;
+              std::tie(global_range, local_range) = flexible_launch_configs(
+                  reduction_size, stride, false, vec_size);
+              int group_num_y = global_range[0] / local_range[0];
+              if (group_num_y > 1) {
+                DISPATCH_BWD_REDUCE_IMPL(8, true);
+              } else {
+                DISPATCH_BWD_REDUCE_IMPL(8, false);
+              }
+              break;
+            }
+            case 4: {
+              constexpr int vec_size = 4;
+              std::tie(global_range, local_range) = flexible_launch_configs(
+                  reduction_size, stride, false, vec_size);
+              int group_num_y = global_range[0] / local_range[0];
+              if (group_num_y > 1) {
+                DISPATCH_BWD_REDUCE_IMPL(4, true);
+              } else {
+                DISPATCH_BWD_REDUCE_IMPL(4, false);
+              }
+              break;
+            }
+            default: {
+              constexpr int vec_size = 1;
+              std::tie(global_range, local_range) = flexible_launch_configs(
+                  reduction_size, stride, false, vec_size);
+              int group_num_y = global_range[0] / local_range[0];
+              if (group_num_y > 1) {
+                DISPATCH_BWD_REDUCE_IMPL(1, true);
+              } else {
+                DISPATCH_BWD_REDUCE_IMPL(1, false);
+              }
+            }
+          }
         });
   }
   return std::make_tuple(sumn_dy, sum_dy_xmu, grad_weight, grad_bias);
@@ -2402,15 +2605,16 @@ template <
     typename scalar_t,
     typename accscalar_t,
     typename layerscalar_t,
+    int vec_size = 1,
     bool has_count = false>
 void batch_norm_backward_elemt_channels_last_kernel_impl(
-    const scalar_t* grad_output,
-    const scalar_t* input,
-    const accscalar_t* mean,
-    const accscalar_t* inv_std,
+    scalar_t* grad_output,
+    scalar_t* input,
+    accscalar_t* mean,
+    accscalar_t* inv_std,
     const layerscalar_t* weight,
-    const accscalar_t* sum_dy,
-    const accscalar_t* sum_dy_xmu,
+    accscalar_t* sum_dy,
+    accscalar_t* sum_dy_xmu,
     const int* numel,
     scalar_t* grad_input,
     const int world_size,
@@ -2419,8 +2623,10 @@ void batch_norm_backward_elemt_channels_last_kernel_impl(
   auto& queue = dpcppGetCurrentQueue();
   sycl::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
-      flexible_launch_configs(reduction_size, stride);
-
+      flexible_launch_configs(reduction_size, stride / vec_size);
+  using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
+  using vec_s_t =
+      at::native::Memory::aligned_vector_loop<accscalar_t, vec_size>;
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
       // tensor dimension (m,c)
@@ -2429,11 +2635,19 @@ void batch_norm_backward_elemt_channels_last_kernel_impl(
 
       // offset along m dimension
       int m_offset = item.get_global_id(0);
-      int c_offset = item.get_global_id(1);
+      int c_offset_base = item.get_global_id(1) * vec_size;
 
-      if (c_offset >= stride || m_offset >= reduction_size) {
+      if (c_offset_base >= stride || m_offset >= reduction_size) {
         return;
       }
+
+      vec_s_t m_c = *(reinterpret_cast<vec_s_t*>(mean + c_offset_base));
+      vec_s_t m_dy_c = *(reinterpret_cast<vec_s_t*>(sum_dy + c_offset_base));
+      vec_s_t sum_dy_xmu_vec =
+          *(reinterpret_cast<vec_s_t*>(sum_dy_xmu + c_offset_base));
+      vec_s_t factor_1_c =
+          *(reinterpret_cast<vec_s_t*>(inv_std + c_offset_base));
+      vec_s_t factor_2_c;
 
       // Use float to calculate to avoid double issues in ATSM
       auto norm_fct =
@@ -2447,26 +2661,38 @@ void batch_norm_backward_elemt_channels_last_kernel_impl(
             static_cast<accscalar_t>(static_cast<float>(1.0) / total_numel);
       }
 
-      auto m_c = mean[c_offset];
-      auto m_dy_c = sum_dy[c_offset] * norm_fct;
-      auto factor_1_c = inv_std[c_offset];
-      auto factor_2_c =
-          (weight == nullptr ? accscalar_t(1.0)
-                             : static_cast<accscalar_t>(weight[c_offset])) *
-          factor_1_c;
-      factor_1_c = factor_1_c * factor_1_c * sum_dy_xmu[c_offset] * norm_fct;
+#pragma unroll
+      for (int j = 0; j < vec_size; j++) {
+        if (weight != nullptr) {
+          factor_2_c[j] = static_cast<accscalar_t>(weight[c_offset_base + j]) *
+              factor_1_c[j];
+        } else {
+          factor_2_c[j] = accscalar_t(1.0f);
+        }
+        m_dy_c[j] = m_dy_c[j] * norm_fct;
+        factor_1_c[j] =
+            factor_1_c[j] * factor_1_c[j] * sum_dy_xmu_vec[j] * norm_fct;
+      }
 
-      int address_base = m_offset * stride + c_offset;
-      int address_increment = inner_loop_stride * stride;
+      int address_base = m_offset * stride + c_offset_base;
+      int address_increment = item.get_global_range(0) * stride;
 
       for (int m_offset_loop = item.get_global_id(0);
            m_offset_loop < reduction_size;
            m_offset_loop += inner_loop_stride) {
-        grad_input[address_base] = static_cast<scalar_t>(
-            (static_cast<accscalar_t>(grad_output[address_base]) - m_dy_c -
-             (static_cast<accscalar_t>(input[address_base]) - m_c) *
-                 factor_1_c) *
-            factor_2_c);
+        vec_t input_vec = *(reinterpret_cast<vec_t*>(input + address_base));
+        vec_t grad_output_vec =
+            *(reinterpret_cast<vec_t*>(grad_output + address_base));
+        vec_t output_vec;
+#pragma unroll
+        for (int j = 0; j < vec_size; j++) {
+          output_vec[j] = static_cast<scalar_t>(
+              (static_cast<accscalar_t>(grad_output_vec[j]) - m_dy_c[j] -
+               (static_cast<accscalar_t>(input_vec[j]) - m_c[j]) *
+                   factor_1_c[j]) *
+              factor_2_c[j]);
+        }
+        *(reinterpret_cast<vec_t*>(grad_input + address_base)) = output_vec;
         address_base += address_increment;
       }
     };
@@ -2951,7 +3177,28 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm_backward(
     double epsilon,
     std::array<bool, 3> grad_input_mask) {
   xpu::COMPUTE_ENG real_eng;
-  real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+  int sp = input.numel() / input.size(1);
+  int ic = input.size(1);
+
+  // oneDNN makes vectorized load/store for nhwc when channels is multiples of
+  // 16
+  bool onednn_nhwc_optimized =
+      batch_norm_choose_impl(input) == Impl::ChannelsLast && ic % 16 == 0;
+
+  // In oneDNN, for shapes with nhwc_optimized, spatial dim(NHW) will be divided
+  // into blocks, each thread handles one block
+  int onednn_block_size = 0;
+  if (onednn_nhwc_optimized)
+    onednn_block_size = get_nhwc_sp_block_size(sp, ic);
+
+  // For shapes with channels vectorized and spatial optimized, we adopt oneDNN
+  // implementation
+  bool adopt_onednn_path = onednn_nhwc_optimized && onednn_block_size > 1;
+  if (adopt_onednn_path) {
+    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+  } else {
+    real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+  }
 
   if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     c10::MaybeOwned<Tensor> weight_maybe_owned =
