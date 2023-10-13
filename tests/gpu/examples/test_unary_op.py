@@ -162,6 +162,20 @@ self.assertEqual(y_cpu, y_xpu.cpu())
         sign_xpu = torch.signbit(sign_xpu)
         self.assertFalse(sign_xpu.any())
 
+    def test_unary_op_foreach_sign(self):
+        x1_cpu = torch.randn(5, 5)
+        x2_cpu = torch.randn(5, 5)
+        sign1_cpu, sign2_cpu = torch._foreach_sign((x1_cpu, x2_cpu))
+        x1_xpu = x1_cpu.clone().to("xpu")
+        x2_xpu = x2_cpu.clone().to("xpu")
+        sign1_xpu, sign2_xpu = torch._foreach_sign((x1_xpu, x2_xpu))
+        self.assertEqual(sign1_cpu, sign1_xpu)
+        self.assertEqual(sign2_cpu, sign2_xpu)
+        torch._foreach_sign_((x1_cpu, x2_cpu))
+        torch._foreach_sign_((x1_xpu, x2_xpu))
+        self.assertEqual(x1_cpu, x1_xpu)
+        self.assertEqual(x2_cpu, x2_xpu)
+
     @dtypes([torch.float, torch.half, torch.bfloat16])
     def test_unary_op_round_with_decimals(self, dtype=torch.float):
         x_cpu = torch.tensor([4.7, -2.3, 9.1, -7.7])

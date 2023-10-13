@@ -252,10 +252,18 @@ struct Reciprocal {
   }
 };
 
+template <typename T>
+struct Sign {
+  T operator()(T t) const {
+    return c10::signum<T>(t);
+  }
+};
+
 OP_CUSTOM_FUNCTOR(floating_half_bfloat16, sigmoid, Sigmoid)
 OP_CUSTOM_FUNCTOR(floating_half_bfloat16, round, Round)
 OP_CUSTOM_FUNCTOR(floating_half_bfloat16, frac, Trunc)
 OP_CUSTOM_FUNCTOR(floating_complex_half_bfloat16, reciprocal, Reciprocal)
+OP_CUSTOM_FUNCTOR(floating_half_bfloat16, sign, Sign)
 
 std::vector<Tensor> _foreach_neg(TensorList tensors) {
   at::native::check_foreach_api_restrictions(tensors);

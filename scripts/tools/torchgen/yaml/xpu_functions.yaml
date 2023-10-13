@@ -741,6 +741,8 @@ supported:
   - _foreach_sin_
   - _foreach_sinh
   - _foreach_sinh_
+  - _foreach_sign
+  - _foreach_sign_
   - _foreach_exp
   - _foreach_exp_
   - _foreach_tanh
