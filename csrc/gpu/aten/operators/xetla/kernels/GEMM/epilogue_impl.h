@@ -79,7 +79,7 @@ struct alpha_beta_op_t {
             (i * num_block_x + j) * block_elems);
         auto src_reg = mat_in_acc.reg.xetla_select<block_elems, 1>(
             (i * num_block_x + j) * block_elems);
-        dst_reg = args.alpha * dst_reg + args.beta * src_reg;
+        dst_reg = args.beta * src_reg + args.alpha * dst_reg;
       }
     }
     // process the tail
@@ -94,7 +94,7 @@ struct alpha_beta_op_t {
             tail_start_y * tile_size_x + j * tail_block_elems);
         auto src_reg = mat_in_acc.reg.xetla_select<tail_block_elems, 1>(
             tail_start_y * tile_size_x + j * tail_block_elems);
-        dst_reg = args.alpha * dst_reg + args.beta * src_reg;
+        dst_reg = args.beta * src_reg + args.alpha * dst_reg;
       }
     }
   }

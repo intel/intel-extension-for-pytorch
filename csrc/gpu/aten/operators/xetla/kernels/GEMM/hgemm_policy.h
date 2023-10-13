@@ -279,7 +279,7 @@ static std::unordered_map<GemmShapeT, int, GemmShapeT> hgemm_special_table = {
     {{1, 2048, 4096}, hgemm_policy::_16x64_16x16x16_8_true_},
     {{1, 4096, 2048}, hgemm_policy::_128x64_16x16x64_1_true_},
     {{4, 5504, 4096}, hgemm_policy::_8x128_8x16x16_2_true_},
-    {{4, 4096, 5504}, hgemm_policy::_128x128_32x32x32_2_true_},
+    {{4, 4096, 5504}, hgemm_policy::_128x64_16x16x64_1_true_},
     {{4, 2048, 4096}, hgemm_policy::_16x64_16x16x16_8_true_},
     {{4, 4096, 2048}, hgemm_policy::_128x64_16x16x64_1_true_},
     {{32, 5504, 4096}, hgemm_policy::_32x128_32x16x16_4_true_},
