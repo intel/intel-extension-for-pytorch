@@ -93,5 +93,16 @@ Tensor min(const Tensor& self) {
       result, self, std::vector<int64_t>{}, false);
 }
 
+Tensor& min_out(const Tensor& self, Tensor& out) {
+  TORCH_CHECK(self.device() == out.device());
+
+  TORCH_CHECK(canCast(
+      typeMetaToScalarType(self.dtype()), typeMetaToScalarType(out.dtype())));
+
+  resize_output(out, {});
+  at::AtenIpexTypeXPU::min_out(out, self, std::vector<int64_t>{}, false);
+  return out;
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

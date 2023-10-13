@@ -94,3 +94,17 @@ class TestTorchMethod(TestCase):
         output_xpu = a_xpu[mask_xpu]
 
         self.assertEqual(output_cpu, output_xpu)
+
+    def test_unsafe_index(self, dtype=torch.float):
+        input_cpu = torch.randn(5, 20, dtype=dtype, device=cpu_device)
+        input_dpcpp = input_cpu.to(dpcpp_device)
+
+        for i in range(5):
+            for j in range(20):
+                output_cpu = torch._unsafe_index(
+                    input_cpu, [torch.tensor([i]), torch.tensor([j])])
+                output_dpcpp = torch._unsafe_index(
+                    input_dpcpp, 
+                    [torch.tensor([i]).to(dpcpp_device), 
+                     torch.tensor([j]).to(dpcpp_device)])
+                self.assertEqual(output_cpu, output_dpcpp.to(cpu_device))

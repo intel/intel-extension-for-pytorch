@@ -318,6 +318,7 @@ supported:
   - im2col
   - im2col.out
   - index.Tensor
+  - _unsafe_index.Tensor
   - index_fill_.int_Scalar
   - index_fill_.int_Tensor
   - index_select
@@ -380,6 +381,7 @@ supported:
   - max
   - max.dim
   - max.dim_max
+  - max.unary_out
   - max_pool2d_with_indices.out
   - max_pool2d_with_indices_backward.grad_input
   - max_pool3d_with_indices
@@ -400,6 +402,7 @@ supported:
   - min
   - min.dim
   - min.dim_min
+  - min.unary_out
   - minimum
   - minimum.out
   - mm

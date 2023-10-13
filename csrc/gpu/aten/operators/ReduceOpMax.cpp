@@ -83,5 +83,16 @@ Tensor max(const Tensor& self) {
       self, std::vector<int64_t>{}, false, result);
 }
 
+Tensor& max_out(const Tensor& self, Tensor& out) {
+  TORCH_CHECK(self.device() == out.device());
+
+  TORCH_CHECK(canCast(
+      typeMetaToScalarType(self.dtype()), typeMetaToScalarType(out.dtype())));
+
+  resize_output(out, {});
+  at::AtenIpexTypeXPU::amax_out(self, std::vector<int64_t>{}, false, out);
+  return out;
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

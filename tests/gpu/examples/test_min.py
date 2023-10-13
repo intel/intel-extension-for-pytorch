@@ -109,3 +109,15 @@ class TestTorchMethod(TestCase):
         print("\n")
         self.assertEqual(torch.min(a_cpu, 1)[0], b_dpcpp.to("cpu"))
         self.assertEqual(torch.min(a_cpu, 1)[1], b_dpcpp_index.to("cpu"))
+
+    def test_unary_min_out(self, dtype=torch.float):
+        input_cpu = torch.randn(4, 10, dtype=dtype, device=cpu_device)
+        input_dpcpp = input_cpu.to(dpcpp_device)
+
+        output_cpu = torch.empty(1)
+        output_dpcpp = output_cpu.to(dpcpp_device)
+
+        torch.min(input_cpu, out=output_cpu)
+        torch.min(input_dpcpp, out=output_dpcpp)
+
+        self.assertEqual(output_cpu, output_dpcpp.to(cpu_device))

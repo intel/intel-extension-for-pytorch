@@ -1652,6 +1652,23 @@ Tensor index(
   return iter.output();
 }
 
+Tensor _unsafe_index(
+    const Tensor& self,
+    const torch::List<c10::optional<Tensor>>& indices) {
+  // Disallow boolean indexing since it leads to dynamic output shapes
+  for (auto i : c10::irange(indices.size())) {
+    auto index = indices.get(i);
+    if (index.has_value()) {
+      auto dtype = index->scalar_type();
+      TORCH_CHECK(
+          dtype == kLong || dtype == kInt,
+          "_unsafe_index found unexpected index type ",
+          dtype);
+    }
+  }
+  return at::AtenIpexTypeXPU::index(self, indices);
+}
+
 Tensor& _index_put_impl_(
     Tensor& self,
     const c10::List<c10::optional<Tensor>>& indices,

@@ -42,7 +42,6 @@ class TestTorchMethod(TestCase):
         #
         print("Testing max OP!\n")
         a_dpcpp = torch.randn((4, 10)).to("xpu")
-
         print("1-test (-2) dim")
 
         a_cpu = a_dpcpp.to("cpu")
@@ -104,3 +103,15 @@ class TestTorchMethod(TestCase):
         print("\n")
         self.assertEqual(b_cpu[0], b_dpcpp.cpu())
         self.assertEqual(b_cpu[1], b_dpcpp_index.cpu())
+
+    def test_unary_max_out(self, dtype=torch.float):
+        input_cpu = torch.randn(4, 10, dtype=dtype, device=cpu_device)
+        input_dpcpp = input_cpu.to(dpcpp_device)
+
+        output_cpu = torch.empty(1)
+        output_dpcpp = output_cpu.to(dpcpp_device)
+
+        torch.max(input_cpu, out=output_cpu)
+        torch.max(input_dpcpp, out=output_dpcpp)
+
+        self.assertEqual(output_cpu, output_dpcpp.to(cpu_device))
