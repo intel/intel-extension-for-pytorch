@@ -282,6 +282,8 @@ supported:
   - glu.out
   - glu_backward
   - glu_backward.grad_input
+  - glu_backward_jvp
+  - glu_jvp
   - gt.Scalar
   - gt.Scalar_out
   - gt.Tensor

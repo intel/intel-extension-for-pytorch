@@ -1,10 +1,11 @@
 #include <ATen/ATen.h>
 #include <ATen/Functions.h>
+#include <ATen/OpMathType.h>
 #include <ATen/TensorUtils.h>
-
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 
+#include "Loops.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
@@ -111,6 +112,90 @@ Tensor glu_backward(
   Tensor grad_input = at::empty({}, self.options());
   return at::AtenIpexTypeXPU::glu_backward_out(
       grad_output, self, dim, grad_input);
+}
+
+Tensor glu_jvp(
+    const Tensor& glu,
+    const Tensor& x,
+    const Tensor& dx,
+    int64_t dim) {
+  dim = maybe_wrap_dim(dim, x.dim());
+  const auto glu_size = glu.size(dim);
+  const auto b = x.narrow(dim, glu_size, glu_size);
+  const auto da = dx.narrow(dim, 0, glu_size);
+  const auto db = dx.narrow(dim, glu_size, glu_size);
+  auto dglu = at::empty_like(glu);
+  auto iter = at::TensorIteratorConfig()
+                  .add_output(dglu)
+                  .add_input(glu)
+                  .add_input(b)
+                  .add_input(da)
+                  .add_input(db)
+                  .build();
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      kHalf, kBFloat16, iter.dtype(), "glu_jvp", [&]() {
+        using opmath_t = at::opmath_type<scalar_t>;
+        dpcpp_kernel_for_tensor_iter(
+            iter,
+            [](scalar_t res_, scalar_t b_, scalar_t da_, scalar_t db_)
+                -> scalar_t {
+              const opmath_t res = res_;
+              const opmath_t b = b_;
+              const opmath_t da = da_;
+              const opmath_t db = db_;
+              const opmath_t one = opmath_t(1.0f);
+
+              const opmath_t sig_b = one / (one + Numerics<opmath_t>::exp(-b));
+              return (da * sig_b + res * (db - sig_b * db));
+            });
+      });
+  return dglu;
+}
+
+Tensor glu_backward_jvp(
+    const Tensor& grad_x,
+    const Tensor& grad_glu,
+    const Tensor& x,
+    const Tensor& dgrad_glu,
+    const Tensor& dx,
+    int64_t dim) {
+  dim = maybe_wrap_dim(dim, x.dim());
+  const auto glu_size = grad_glu.size(dim);
+  const auto a = x.narrow(dim, 0, glu_size);
+  const auto b = x.narrow(dim, glu_size, glu_size);
+  const auto da = dx.narrow(dim, 0, glu_size);
+  const auto db = dx.narrow(dim, glu_size, glu_size);
+  // grad_x_a = grad_glu * sigmoid(b)
+  const auto grad_x_a = grad_x.narrow(dim, 0, glu_size);
+  // grad_x_b = grad_x_a * a * (1 - sigmoid(b))
+  const auto grad_x_b = grad_x.narrow(dim, glu_size, glu_size);
+
+  const auto sig_b = at::sigmoid(b);
+  // TODO: use glu from forward.
+  // TODO: fuse kernels.
+  const auto glu = a * sig_b;
+  const auto db_neg_sig_b = db - db * sig_b;
+
+  // dgrad_x_a = d(grad_glu * sigmoid(b))
+  //           = dgrad_glu * sigmoid(b) + grad_glu * sigmoid(b) * (1 -
+  //           sigmoid(b)) * db = dgrad_glu * sig_b + grad_x_a * (db - db *
+  //           sig_b) = dgrad_glu * sig_b + grad_x_a * db_neg_sig_b
+  const auto dgrad_x_a = dgrad_glu * sig_b + grad_x_a * db_neg_sig_b;
+
+  // dgrad_x_b = d(grad_glu * sigmoid(b) * a * (1 - sigmoid(b))
+  //           =  d(grad_glu * sigmoid(b)) * a * (1 - sigmoid(b))
+  //            + grad_glu * sigmoid(b) * da * (1 - sigmoid(b))
+  //            - grad_glu * sigmoid(b) * a * sigmoid(b) * (1 - sigmoid(b)) * db
+  //          =   dgrad_x_a * a * (1 - sigmoid(b))
+  //           + (grad_glu * sigmoid(b)) * (da * (1 - sigmoid(b)) - a *
+  //           sigmoid(b) * (1 - sigmoid(b)) * db)
+  //          = dgrad_x_a * (a - glu) + grad_x_a * (da - da * sig_b - glu *
+  //          db_neg_sig_b
+  const auto dgrad_x_b =
+      dgrad_x_a * (a - glu) + grad_x_a * (da - da * sig_b - glu * db_neg_sig_b);
+  auto out = at::cat({dgrad_x_a, dgrad_x_b}, dim);
+
+  return at::cat({dgrad_x_a, dgrad_x_b}, dim);
 }
 
 } // namespace AtenIpexTypeXPU
