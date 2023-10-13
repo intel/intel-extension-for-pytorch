@@ -16,21 +16,22 @@ import warnings
 import unittest
 from itertools import product, combinations, combinations_with_replacement, permutations
 import random
+from typing import Any, Dict, List, Tuple
 
 from torch.testing import make_tensor
 from torch.testing._internal.common_utils import (
     TestCase, run_tests, do_test_empty_full, TEST_WITH_ROCM, suppress_warnings,
     torch_to_numpy_dtype_dict, numpy_to_torch_dtype_dict, slowTest,
-    TEST_SCIPY, IS_MACOS, IS_PPC, IS_WINDOWS, parametrize, skipIfTorchDynamo)
+    TEST_SCIPY, IS_MACOS, IS_PPC, IS_JETSON, IS_WINDOWS, parametrize, skipIfTorchDynamo)
 from torch.testing._internal.common_device_type import (
     expectedFailureMeta, instantiate_device_type_tests, deviceCountAtLeast, onlyNativeDeviceTypes,
     onlyCPU, largeTensorTest, precisionOverride, dtypes,
     onlyCUDA, skipCPUIf, dtypesIfCUDA, skipMeta)
 from torch.testing._internal.common_dtype import (
-    all_types_and_complex_and, all_types_and, floating_and_complex_types,
-    floating_types, floating_and_complex_types_and, integral_types, integral_types_and, get_all_dtypes
+    all_types_and_complex, all_types_and_complex_and, all_types_and, floating_and_complex_types, complex_types,
+    floating_types, floating_and_complex_types_and, integral_types, integral_types_and, get_all_dtypes,
+    float_to_corresponding_complex_type_map
 )
-from torch.testing._creation import float_to_corresponding_complex_type_map
 
 from torch.utils.dlpack import to_dlpack
 
@@ -177,21 +178,21 @@ class TestTensorCreation(TestCase):
 
         single_roll = numbers.roll(1, 0)
         expected = torch.tensor([8, 1, 2, 3, 4, 5, 6, 7], device=device)
-        self.assertEqual(single_roll, expected, msg="{} did not equal expected result".format(single_roll))
+        self.assertEqual(single_roll, expected, msg=f"{single_roll} did not equal expected result")
 
         roll_backwards = numbers.roll(-2, 0)
         expected = torch.tensor([3, 4, 5, 6, 7, 8, 1, 2], device=device)
-        self.assertEqual(roll_backwards, expected, msg="{} did not equal expected result".format(roll_backwards))
+        self.assertEqual(roll_backwards, expected, msg=f"{roll_backwards} did not equal expected result")
 
         data = numbers.view(2, 2, 2)
         rolled = data.roll(1, 0)
         expected = torch.tensor([5, 6, 7, 8, 1, 2, 3, 4], device=device).view(2, 2, 2)
-        self.assertEqual(expected, rolled, msg="{} did not equal expected result: {}".format(rolled, expected))
+        self.assertEqual(expected, rolled, msg=f"{rolled} did not equal expected result: {expected}")
 
         data = data.view(2, 4)
         # roll a loop until back where started
         loop_rolled = data.roll(2, 0).roll(4, 1)
-        self.assertEqual(data, loop_rolled, msg="{} did not equal the original: {}".format(loop_rolled, data))
+        self.assertEqual(data, loop_rolled, msg=f"{loop_rolled} did not equal the original: {data}")
         # multiple inverse loops
         self.assertEqual(data, data.roll(-20, 0).roll(-40, 1))
         self.assertEqual(torch.tensor([8, 1, 2, 3, 4, 5, 6, 7], device=device), numbers.roll(1, 0))
@@ -203,7 +204,7 @@ class TestTensorCreation(TestCase):
         expected = torch.tensor([4, 8, 1, 5, 2, 6, 3, 7]).view(4, 2)
         rolled = strided.roll(1, 0)
         self.assertEqual(expected, rolled,
-                         msg="non contiguous tensor rolled to {} instead of {} ".format(rolled, expected))
+                         msg=f"non contiguous tensor rolled to {rolled} instead of {expected} ")
 
         # test roll with no dimension specified
         expected = numbers.roll(1, 0).view(2, 4)
@@ -214,7 +215,7 @@ class TestTensorCreation(TestCase):
         expected = torch.tensor([[7, 8, 5, 6], [3, 4, 1, 2]], device=device)
         double_rolled = data.roll(shifts=(2, -1), dims=(1, 0))
         self.assertEqual(double_rolled, expected,
-                         msg="should be able to roll over two dimensions, got {}".format(double_rolled))
+                         msg=f"should be able to roll over two dimensions, got {double_rolled}")
 
         self.assertRaisesRegex(RuntimeError, "required", lambda: data.roll(shifts=(), dims=()))
         self.assertRaisesRegex(RuntimeError, "required", lambda: data.roll(shifts=(), dims=1))
@@ -457,9 +458,8 @@ class TestTensorCreation(TestCase):
             other_dtype = torch.float64 if dtype == torch.float32 else torch.float32
             a = torch.tensor([1, 2], device=device, dtype=dtype)
             b = torch.tensor([3, 4], device=device, dtype=other_dtype)
-            error = "Expected object of scalar type {} but got scalar type " \
-                    "{} for second argument".format(dtype_name(dtype),
-                                                    dtype_name(other_dtype))
+            error = f"Expected object of scalar type {dtype_name(dtype)} but got scalar type " \
+                    f"{dtype_name(other_dtype)} for second argument"
             with self.assertRaisesRegex(RuntimeError, error):
                 op(a, b)
 
@@ -478,9 +478,8 @@ class TestTensorCreation(TestCase):
             b = torch.tensor([3, 4], device=device, dtype=dtype)
             out = torch.zeros(2, device=device, dtype=dtype)
             expected_dtype = torch.complex64 if dtype == torch.float32 else torch.complex128
-            error = "Expected object of scalar type {} but got scalar type " \
-                    "{} for argument 'out'".format(
-                        complex_dtype_name(expected_dtype), dtype_name(dtype))
+            error = f"Expected object of scalar type {complex_dtype_name(expected_dtype)} but got scalar type " \
+                    f"{dtype_name(dtype)} for argument 'out'"
             with self.assertRaisesRegex(RuntimeError, error):
                 op(a, b, out=out)
 
@@ -520,6 +519,7 @@ class TestTensorCreation(TestCase):
         a = torch.cat([w[:2], w[4:6]])
         b = torch.cat([w[:2], w[4:6]], out=w[6:10])
         self.assertEqual(a, b)
+        self.assertEqual(a, w[6:10])
         self.assertEqual(w[:6], y.view(-1)[:6])
 
         # Case:
@@ -547,6 +547,68 @@ class TestTensorCreation(TestCase):
 
             self.assertEqual(y, expected_y)
             self.assertEqual(x, expected_x)
+
+    @dtypes(*all_types_and_complex())
+    def test_cat_out_fast_path_dim0_dim1(self, device, dtype):
+        x = torch.zeros((0), device=device, dtype=dtype)
+        if dtype in integral_types():
+            y = torch.randint(low=0, high=100, size=(4, 6), device=device, dtype=dtype)
+        else:
+            y = torch.randn((4, 6), device=device, dtype=dtype)
+        # Test concat on dimension 0
+        w = y.view(-1).clone()
+        a = torch.cat([w[:2], w[4:6]])
+        b = torch.cat([w[:2], w[4:6]], out=w[6:10])
+        # Note that there is no guarantee that slicing here will result in
+        # contiguous tensors
+        self.assertEqual(a, b)
+        self.assertEqual(a, w[6:10])
+        self.assertEqual(w[:6], y.view(-1)[:6])
+        # If inputs are contiguous tensors, then fast concat paths will be invoked
+        a_fastcat = torch.cat([w[:2].contiguous(), w[4:6].contiguous()])
+        self.assertEqual(a_fastcat, a)
+        # Test concat on dimension 1
+        w = y.clone()
+        w_slices = torch.tensor_split(w, (2, 4), dim=1)
+        # Note that the tensor in w_slices[] here may not be a contiguous
+        # tensor and we need to make sure this is not broken by fast concat
+        b = torch.cat([w_slices[0], w_slices[1]], dim=1)
+        expected_b = torch.index_select(w, 1, torch.tensor([0, 1, 2, 3], device=device))
+        self.assertEqual(b, expected_b)
+        # If inputs are contiguous tensors, then fast concat paths will be invoked
+        b_fastcat = torch.cat([w_slices[0].contiguous(), w_slices[1].contiguous()], dim=1)
+        self.assertEqual(b_fastcat, expected_b)
+        # Finally, we need to make sure backward is not broken
+        # Integral types will not have grad
+        if dtype not in integral_types():
+            a = torch.randn((4, 3), device=device, dtype=dtype, requires_grad=True)
+            b = torch.randn((2, 3), device=device, dtype=dtype, requires_grad=True)
+            c = torch.randn((5, 3), device=device, dtype=dtype, requires_grad=True)
+            d = torch.randn((5, 2), device=device, dtype=dtype, requires_grad=True)
+            expected_a_grad = torch.ones((4, 3), device=device, dtype=dtype)
+            expected_b_grad = torch.ones((2, 3), device=device, dtype=dtype)
+            expected_c_grad = torch.ones((5, 3), device=device, dtype=dtype)
+            expected_d_grad = torch.ones((5, 2), device=device, dtype=dtype)
+            # All the new tensors should be contiguous here. Let us make sure
+            # to explicitly set them contiguous to enforce fast cat
+            dim0_cat = torch.cat([a.contiguous(), b.contiguous()], dim=0)
+            if dtype in complex_types():
+                dim0_cat.sum().abs().backward()
+                self.assertEqual(a.grad.abs(), expected_a_grad.abs())
+                self.assertEqual(b.grad.abs(), expected_b_grad.abs())
+            else:
+                dim0_cat.sum().backward()
+                self.assertEqual(a.grad, expected_a_grad)
+                self.assertEqual(b.grad, expected_b_grad)
+            dim1_cat = torch.cat([c.contiguous(), d.contiguous()], dim=1)
+            if dtype in complex_types():
+                dim1_cat.sum().abs().backward()
+                self.assertEqual(c.grad.abs(), expected_c_grad.abs())
+                self.assertEqual(d.grad.abs(), expected_d_grad.abs())
+            else:
+                dim1_cat.sum().backward()
+                self.assertEqual(c.grad, expected_c_grad)
+                self.assertEqual(d.grad, expected_d_grad)
 
     def test_cat_out_channels_last(self, device):
         x = torch.randn((4, 3, 8, 8))
@@ -819,7 +881,7 @@ class TestTensorCreation(TestCase):
             torch_fn(t)
         # Test error for a single array
         with self.assertRaisesRegex(TypeError, "must be tuple of Tensors, not Tensor"):
-            torch_fn((t))
+            torch_fn(t)
 
         # Test 0-D
         num_tensors = random.randint(1, 5)
@@ -948,20 +1010,23 @@ class TestTensorCreation(TestCase):
             a = np.array(val, dtype=torch_to_numpy_dtype_dict[dtype])
             self.assertEqual(t, torch.from_numpy(a))
 
-    def _float_to_int_conversion_helper(self, vals, device, dtype):
-        a = np.array(vals, dtype=np.float32).astype(torch_to_numpy_dtype_dict[dtype])
+    def _float_to_int_conversion_helper(self, vals, device, dtype, refs=None):
+        if refs is None:
+            a = np.array(vals, dtype=np.float32).astype(torch_to_numpy_dtype_dict[dtype])
+            refs = torch.from_numpy(a)
         t = torch.tensor(vals, device=device, dtype=torch.float).to(dtype)
-        self.assertEqual(torch.from_numpy(a), t.cpu())
+        self.assertEqual(refs, t.cpu())
 
     # Checks that float->integer casts don't produce undefined behavior errors.
     # Note: In C++, casting from a floating value to an integral dtype
     # is undefined if the floating point value is not within the integral
     # dtype's dynamic range. This can (and should) cause undefined behavior
     # errors with UBSAN. These casts are deliberate in PyTorch, however, and
-    # NumPy has the same behavior.
+    # NumPy may have the same behavior.
     @onlyNativeDeviceTypes
-    @unittest.skipIf(IS_MACOS, "Test is broken on MacOS, see https://github.com/pytorch/pytorch/issues/38752")
-    @unittest.skipIf(IS_PPC, "Test is borken on PowerPC, see https://github.com/pytorch/pytorch/issues/39671")
+    @unittest.skipIf(IS_MACOS or IS_JETSON, "Test is broken on MacOS and Jetson, \
+        see https://github.com/pytorch/pytorch/issues/38752")
+    @unittest.skipIf(IS_PPC, "Test is broken on PowerPC, see https://github.com/pytorch/pytorch/issues/39671")
     @dtypes(torch.bool, torch.uint8, torch.int8, torch.int16, torch.int32, torch.int64)
     def test_float_to_int_conversion_finite(self, device, dtype):
         min = torch.finfo(torch.float).min
@@ -969,14 +1034,21 @@ class TestTensorCreation(TestCase):
 
         # Note: CUDA max float -> integer conversion is divergent on some dtypes
         vals = (min, -2, -1.5, -.5, 0, .5, 1.5, 2, max)
+        refs = None
         if self.device_type == 'cuda':
             if torch.version.hip:
                 # HIP min float -> int64 conversion is divergent
                 vals = (-2, -1.5, -.5, 0, .5, 1.5, 2)
             else:
                 vals = (min, -2, -1.5, -.5, 0, .5, 1.5, 2)
+        elif dtype == torch.uint8:
+            # Note: CPU max float -> uint8 conversion is divergent
+            vals = (min, -2, -1.5, -.5, 0, .5, 1.5, 2)
+            # Note: numpy -2.0 or -1.5 -> uint8 conversion is undefined
+            #       see https://github.com/pytorch/pytorch/issues/97794
+            refs = (0, 254, 255, 0, 0, 0, 1, 2)
 
-        self._float_to_int_conversion_helper(vals, device, dtype)
+        self._float_to_int_conversion_helper(vals, device, dtype, refs)
 
     # Note: CUDA will fail this test on most dtypes, often dramatically.
     @onlyCPU
@@ -2510,6 +2582,8 @@ class TestTensorCreation(TestCase):
             torch.empty([8, 8, 2**29, 2**29], dtype=torch.float64)
         with self.assertRaisesRegex(RuntimeError, 'Storage size calculation overflowed'):
             torch.empty_strided([8, 8], [2**61, 1], dtype=torch.float64)
+        with self.assertRaisesRegex(RuntimeError, 'Stride calculation overflowed'):
+            torch.empty([0, 4, 2305843009213693952], dtype=torch.float32)
 
     def test_eye(self, device):
         for dtype in all_types_and_complex_and(torch.half, torch.bool, torch.bfloat16):
@@ -3670,10 +3744,10 @@ class TestBufferProtocol(TestCase):
             torch.frombuffer(byte_arr, dtype=dtype)
 
     def test_byte_to_int(self):
-        byte_array = np.array([-1, 0, 0, 0, -1, 0, 0, 0], dtype=np.byte)
+        byte_array = np.array([-1, 0, 0, 0, -1, 0, 0, 0], dtype=np.byte) if sys.byteorder == 'little' \
+            else np.array([0, 0, 0, -1, 0, 0, 0, -1], dtype=np.byte)
         tensor = torch.frombuffer(byte_array, dtype=torch.int32)
         self.assertEqual(tensor.numel(), 2)
-        # Assuming little endian machine
         self.assertSequenceEqual(tensor, [255, 255])
 
 # Tests for the `asarray` function:
@@ -3943,6 +4017,7 @@ class TestAsArray(TestCase):
             t = torch.asarray(e)
             self.assertEqual(t, original)
 
+    @skipIfTorchDynamo
     @onlyCPU
     def test_numpy_scalars(self, device):
         scalar = np.float64(0.5)
@@ -3960,6 +4035,27 @@ class TestAsArray(TestCase):
         self.assertEqual(tensor.dim(), 0)
         self.assertEqual(tensor.item(), zerodim_arr.item())
         self.assertEqual(tensor.dtype, torch.int32)
+
+    def test_default_device(self, device):
+        original = torch.arange(5)
+
+        examples: List[Tuple[Any, Dict]] = [
+            (3, {}),
+            (original, {}),
+            (to_numpy(original), {}),
+            (to_memview(original), {"dtype": original.dtype}),
+        ]
+
+        for data, kwargs in examples:
+            with torch.device(device):
+                tensor = torch.asarray(data, **kwargs)
+                self.assertEqual(tensor.device, torch.device(device))
+
+                # Check the contents of the tensor.
+                if isinstance(data, int):
+                    self.assertEqual(data, tensor.item())
+                else:
+                    self.assertEqual(data, tensor)
 
 
 instantiate_device_type_tests(TestTensorCreation, globals())

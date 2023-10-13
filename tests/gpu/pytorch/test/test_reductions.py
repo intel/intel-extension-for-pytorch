@@ -31,7 +31,7 @@ from torch.testing._internal.common_device_type import (
     OpDTypes, expectedFailureMeta, instantiate_device_type_tests, onlyCPU, dtypes, dtypesIfCUDA, dtypesIfCPU,
     onlyNativeDeviceTypes, onlyCUDA, largeTensorTest, ops, precisionOverride)
 from torch.testing._internal.common_methods_invocations import (
-    ReductionOpInfo, reduction_ops, reference_masked_ops)
+    ReductionOpInfo, ReductionPythonRefInfo, reduction_ops, reference_masked_ops)
 
 # TODO: replace with make_tensor
 def _generate_input(shape, dtype, device, with_extremal):
@@ -303,8 +303,13 @@ class TestReductions(TestCase):
                 self.assertEqual(result, torch.full_like(result, torch.nan))
             else:
                 # Reducing along empty slice should raise an error
-                with self.assertRaises(IndexError):
-                    op(t, *args, dim=dim, **kwargs)
+                if isinstance(op, ReductionPythonRefInfo):
+                    # ref reductions throw RuntimeError for this
+                    with self.assertRaises(RuntimeError):
+                        op(t, *args, dim=dim, **kwargs)
+                else:
+                    with self.assertRaises(IndexError):
+                        op(t, *args, dim=dim, **kwargs)
 
     @ops(reduction_ops, dtypes=OpDTypes.none)
     def test_empty_tensor_nonempty_slice(self, device, op: ReductionOpInfo):
@@ -1570,6 +1575,14 @@ class TestReductions(TestCase):
             _, sorted_idx = torch.sort(sequence)
             torch.searchsorted(sequence, values_1d, sorter=sorted_idx.to(torch.float32))
 
+        # invalid sorter value, out of bound (>= innermost size)
+        with self.assertRaisesRegex(RuntimeError, "sorter index out of range"):
+            torch.searchsorted(torch.tensor([1, 2, 3]), 2.5, sorter=torch.tensor([0, 1, 3]))
+
+        # invalid sorter value, out of bound (< 0)
+        with self.assertRaisesRegex(RuntimeError, "sorter index out of range"):
+            torch.searchsorted(torch.tensor([1, 2, 3]), 2.5, sorter=torch.tensor([-1, 1, 2]))
+
         # scalar type bfloat16
         if self.device_type == 'cpu':
             def test_dtype_bfloat16(values_bf16=False, boundaries_bf16=False):
@@ -1688,6 +1701,7 @@ class TestReductions(TestCase):
         self._test_sum_reduction_vs_numpy(torch.nansum, np.nansum, device, dtype, with_extremal=True)
         self._test_sum_reduction_vs_numpy(torch.nansum, np.nansum, device, dtype, with_keepdim=True)
 
+    @onlyCPU
     @dtypes(*complex_types())
     def test_nansum_complex(self, device, dtype):
         x = torch.randn((3, 3, 3), device=device, dtype=dtype)
@@ -1966,9 +1980,9 @@ class TestReductions(TestCase):
             a[2, 2] = nan
             actual = f(a.to(device)).cpu()
             expected = f(a).cpu()
-            self.assertEqual(torch.isnan(actual), torch.isnan(expected), msg='nans for {}'.format(name))
+            self.assertEqual(torch.isnan(actual), torch.isnan(expected), msg=f'nans for {name}')
             self.assertEqual(actual[~torch.isnan(actual)],
-                             expected[~torch.isnan(expected)], msg='nans for {}'.format(name))
+                             expected[~torch.isnan(expected)], msg=f'nans for {name}')
 
     # TODO: make this test generic using OpInfos
     @onlyCUDA
@@ -2197,16 +2211,16 @@ class TestReductions(TestCase):
                 fn_tuple(y, 1, keepdim=False, out=(values[:, 1], indices[:, 1]))
                 values_expected, indices_expected = fn_tuple(y, 1, keepdim=False)
                 self.assertEqual(values[:, 1], values_expected,
-                                 msg='{} values with out= kwarg'.format(fn_name))
+                                 msg=f'{fn_name} values with out= kwarg')
                 self.assertEqual(indices[:, 1], indices_expected,
-                                 msg='{} indices with out= kwarg'.format(fn_name))
+                                 msg=f'{fn_name} indices with out= kwarg')
                 continue
 
             x = torch.randn(5, 3, device=device)
             y = torch.randn(5, 3, device=device)
             fn(y, 1, keepdim=False, out=x[:, 1])
             expected = fn(y, 1, keepdim=False)
-            self.assertEqual(x[:, 1], expected, msg='{} with out= kwarg'.format(fn_name))
+            self.assertEqual(x[:, 1], expected, msg=f'{fn_name} with out= kwarg')
 
     @onlyCUDA
     @largeTensorTest('10GB')
@@ -3496,8 +3510,8 @@ as the input tensor excluding its innermost dimension'):
             expected = np.asarray(expected)  # transform numpy scalars to numpy.ndarray instances
 
             msg = ("Failed to produce expected results! Input tensor was"
-                   " {0}, torch result is {1}, and reference result is"
-                   " {2}.").format(t, actual, expected) if t.numel() < 10 else None
+                   f" {t}, torch result is {actual}, and reference result is"
+                   f" {expected}.") if t.numel() < 10 else None
 
             self.assertEqual(actual, expected, msg, exact_dtype=exact_dtype)
 

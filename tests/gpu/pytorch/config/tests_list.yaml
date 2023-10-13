@@ -16,6 +16,7 @@
   - test_decomp
   - test_dlpack
   - test_expanded_weights
+  - test_fake_tensor
   - test_foreach
   - test_fx
   - test_fx_experimental

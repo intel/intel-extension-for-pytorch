@@ -1,6 +1,7 @@
 import __main__
 import intel_extension_for_pytorch
 import torch
+import time
 
 from torch.testing._internal.common_device_type import (
     CUDATestBase,
@@ -66,6 +67,7 @@ def reload_dyn_skip_list():
             dynamic_skipped_cases_list.extend(dynamic_skipped_dict['cases'])
 
 def customized_skipper():
+    start_config_time = time.perf_counter()
     # load dynamic skipped cases list every time we start a run
     reload_dyn_skip_list()
     suite = unittest.TestLoader().loadTestsFromModule(__main__)
@@ -100,7 +102,9 @@ def customized_skipper():
         elif match_dtype(test_case_full_name, unsupported_dtypes):
             setattr(test_class, case_name, unsupported_dtype_test)
             print(f"[INFO] trying to skip unsupported dtype case {test_case_full_name}")
-
+    end_config_time = time.perf_counter()
+    config_duration = end_config_time - start_config_time
+    print(f"[INFO] the configuration time is {config_duration}")
 # Test Base is which used to generate each device type specific test class instances
 class XPUTestBase(CUDATestBase):
     # we must cheat PyTorch to run XPU cases as what CUDA runs to change this field in case to "cuda"
@@ -281,7 +285,7 @@ try:
     import torch._prims
     import torch._prims.context
     import torch._prims.executor
-    import torch._prims.nvfuser_executor
+    #import torch._prims.nvfuser_executor
     import torch._prims_common
     print("[INFO] Pre-load torch._prims and all things under this module without changing 'cuda' to 'xpu'")
 except ImportError as e_import:
@@ -301,4 +305,4 @@ except ImportError as e_import:
 # Wait for fixing from grangye and remove following lines
 torch.cuda.is_bf16_supported = lambda: True 
 torch.cuda.is_initialized = lambda: True
-
+torch.cuda.get_device_capability = lambda x=None: (8, 6)

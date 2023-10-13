@@ -111,6 +111,12 @@ def parse_args():
         help="autoskip those fatal errored cases to make sure each test run to an end."
     )
     parser.add_argument(
+        '-r',
+        '--resume',
+        action="store_true",
+        help="resume the last run based on the test-reports log files."
+    )
+    parser.add_argument(
         "test",
         nargs="*",
         type=str,
@@ -139,6 +145,19 @@ def select_tests_from(include_tests, options):
         selected_tests = tests_list['TESTS'] + include_tests
     else:
         selected_tests = include_tests if include_tests else tests_list['TESTS']
+    # remove those already finished case in resume mode
+    if options.resume:
+        output_path = os.path.join(os.path.abspath(options.log_dir), "test-reports")
+        if os.path.exists(output_path):
+            finished_tests = os.listdir(output_path)
+            for test in finished_tests:
+                testcase = test.split(".")[0].replace("-", "/")
+                if testcase in selected_tests:
+                    selected_tests.remove(testcase)
+                    warnings.warn(f"[INFO] Remove finished case {testcase} when resume")
+        else:
+             warnings.warn(f"[INFO] No old output directory {output_path} for resuming, ignore it")
+             options.resume = False
     # check whether there are tests not ported, skip them
     should_remove_tests = []
     for test in selected_tests:
@@ -171,17 +190,17 @@ def run_test(cmd, timeout, quiet, test, logfile):
                               check=True)
         returncode = proc.returncode
         outmsg = proc.stdout.decode('utf-8')
-        errmsg = proc.stderr.decode('utf-8')
+        errmsg = proc.stderr.decode('utf-8', 'ignore')
         end_time = time.perf_counter()
         duration = end_time - start_time
     except subprocess.TimeoutExpired as e_time:
         outmsg = e_time.stdout.decode('utf-8') if e_time.stdout else ""
-        errmsg = e_time.stderr.decode('utf-8') + str(e_time) if e_time.stderr else str(e_time)
+        errmsg = e_time.stderr.decode('utf-8', 'ignore') + str(e_time) if e_time.stderr else str(e_time)
         end_time = time.perf_counter()
         duration = end_time - start_time
     except subprocess.CalledProcessError as e_called:
         outmsg = e_called.stdout.decode('utf-8') if e_called.stdout else ""
-        errmsg = e_called.stderr.decode('utf-8') + str(e_called) if e_called.stderr else str(e_called)
+        errmsg = e_called.stderr.decode('utf-8', 'ignore') + str(e_called) if e_called.stderr else str(e_called)
         end_time = time.perf_counter()
         duration = end_time - start_time
     # finally:
@@ -199,10 +218,43 @@ def run_tests(selected_tests, options):
     global test_suite_root
     test_root = os.path.join(test_suite_root, 'test/')
     output_path = os.path.join(os.path.abspath(options.log_dir), "test-reports")
-    if os.path.exists(output_path):
+    #if os.path.exists(output_path) and options.resume:
+    #    warnings.warn(f"[INFO] Resume running based on old output directory for log files: {output_path}")
+    #elif options.resume:
+    #    warnings.warn(f"[INFO] There is no old output directory for log files: {output_path} for resuming")
+    #    os.makedirs(output_path)
+    details_msg_list = []
+    checked_cases = {}
+    total_results = {}
+    timeout_list = load_from_yaml(os.path.join(test_suite_root, "config/timeout_config.yaml"))
+    if options.resume:
+        warnings.warn(f"Resume running based on old output directory for log files: {output_path}")
+        warnings.warn(f"Loading results from log files: {output_path}")
+        finished_tests = os.listdir(output_path)
+        for test in finished_tests:
+            testcase = test.split(".")[0].replace("-", "/")
+            print(f"Loading {testcase} result from log file: {test}")
+            duration, cases_result = collect_cases_from_logfile(testcase, os.path.join(output_path, test))
+            if testcase not in total_results:
+                total_results[testcase] = []
+            total_results[testcase].append((duration, cases_result))
+            for tag, cases in check_reference(cases_result).items():
+                if tag not in checked_cases:
+                    checked_cases[tag] = []
+                checked_cases[tag].extend(cases)
+            for tag, cases in cases_result.items():
+                details_msg_list.extend(collect_detailed_issues(cases, os.path.join(output_path, test)))
+            if options.update_timeout is not None:
+                if timeout > 0 and duration >= timeout:
+                    timeout_list[test_name] = timeout
+                else:
+                    timeout_list[test_name] = max(timeout, ceil(2 * duration))
+    elif os.path.exists(output_path):
         shutil.rmtree(output_path)
         warnings.warn(f"[INFO] Clean old output directory for log files: {output_path}")
-    os.makedirs(output_path)
+        os.makedirs(output_path)
+    else:
+        os.makedirs(output_path)
     anls_path = os.path.join(os.path.abspath(options.log_dir), "analysis-reports")
     if os.path.exists(anls_path):
         shutil.rmtree(anls_path)
@@ -215,11 +267,7 @@ def run_tests(selected_tests, options):
     weekly_report_path = os.path.join(anls_path, "weekly_summary.log")
     weekly_diffs_path = os.path.join(anls_path, "weekly_diffs.log")
     weekly_details_path = os.path.join(anls_path, "weekly_details.log")
-    details_msg_list = []
-    checked_cases = {}
-    total_results = {}
     warnings.warn(f"[INFO] Created output directory for log files: {output_path}")
-    timeout_list = load_from_yaml(os.path.join(test_suite_root, "config/timeout_config.yaml"))
     for test in selected_tests:
         split_test_names = test.split("::")
         assert len(split_test_names) >= 1, "[ERROR] Empty test name found. Each test must have a non-empty name"
@@ -271,8 +319,10 @@ def run_tests(selected_tests, options):
                 report_configurations(iter=i, log_path=full_log_path, options=options, timeout=timeout,
                                       cmd=" ".join(cmd), file=configure_log_file_path)
                 autoskip = options.autoskip # whether to automatially skip fatal errors (seg fault, core dumped, timeout)
+                skiptimes = 99999 #This will control the autoskip rerun times, because it is much time consuming with too much exptions
                 if options.mode[0] in ['weekly', 'maintain']:
                     autoskip = True
+                    skiptimes = 3 # It is no meaning for run too much times for autoskip in weekly and maintain
                 print(f"[INFO] Begin to run '{test_name}'")
                 duration, cases_result = run_test(
                     cmd,
@@ -281,6 +331,13 @@ def run_tests(selected_tests, options):
                     test_name,
                     full_log_path)
                 while autoskip and cases_result["NO_RESULT"]:
+                    if skiptimes == 0:
+                        break
+                    exception_path = os.path.join(os.path.abspath(options.log_dir), "test-exception")
+                    if not os.path.exists(exception_path):
+                        os.makedirs(exception_path)
+                    exception_full_path = os.path.join(exception_path, log_file_name + "-" + str(skiptimes))
+                    shutil.copyfile(full_log_path, exception_full_path)
                     add_dynamic_skipped_cases(cases_result["NO_RESULT"], "Auto skipped due to Fatal Error or Timed Out")
                     print(f"[INFO] Re-run '{test_name}' triggered by autoskip")
                     duration, cases_result = run_test(
@@ -289,6 +346,7 @@ def run_tests(selected_tests, options):
                         options.quiet,
                         test_name,
                         full_log_path)
+                    skiptimes = skiptimes - 1
                 print(f"[INFO] Finished '{test_name}' with time cost : {duration}s")
 
                 if options.mode[0] == 'ci':

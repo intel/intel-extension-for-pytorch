@@ -27,8 +27,8 @@ from torch.testing._internal.common_methods_invocations import (
 from torch.testing._internal.common_cuda import SM53OrLater
 from torch._prims_common import corresponding_complex_dtype
 
-from setuptools import distutils
 from typing import Optional, List
+from packaging import version
 
 
 if TEST_NUMPY:
@@ -45,11 +45,10 @@ try:
 except ModuleNotFoundError:
     pass
 
-LooseVersion = distutils.version.LooseVersion
 REFERENCE_NORM_MODES = (
     (None, "forward", "backward", "ortho")
-    if LooseVersion(np.__version__) >= '1.20.0' and (
-        not has_scipy_fft or LooseVersion(scipy.__version__) >= '1.6.0')
+    if version.parse(np.__version__) >= version.parse('1.20.0') and (
+        not has_scipy_fft or version.parse(scipy.__version__) >= version.parse('1.6.0'))
     else (None, "ortho"))
 
 
@@ -818,8 +817,10 @@ class TestFFT(TestCase):
                 plan_cache = torch.backends.cuda.cufft_plan_cache[device]
             original = plan_cache.max_size
             plan_cache.max_size = n
-            yield
-            plan_cache.max_size = original
+            try:
+                yield
+            finally:
+                plan_cache.max_size = original
 
         with plan_cache_max_size(devices[0], max(1, torch.backends.cuda.cufft_plan_cache.size - 10)):
             self._test_fft_ifft_rfft_irfft(devices[0], dtype)
