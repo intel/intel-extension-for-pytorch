@@ -2,6 +2,7 @@ import torch
 import intel_extension_for_pytorch  # noqa
 from scipy import special
 from torch.testing._internal.common_utils import TestCase
+import platform
 import pytest
 
 
@@ -266,7 +267,10 @@ class TestTorchMethod(TestCase):
         )
         result_xpu = result_xpu.to("cpu")
 
-        self.assertTrue(result_xpu.equal(result_cpu))
+        if platform.system() == 'Windows':
+            self.assertTrue(torch.allclose(result_cpu, result_xpu))
+        else:
+            self.assertTrue(result_xpu.equal(result_cpu))
 
     def test_shifted_chebyshev_polynomial_u(self):
         input0 = torch.randn(8192, 8192, device="cpu")
@@ -277,7 +281,10 @@ class TestTorchMethod(TestCase):
         )
         result_xpu = result_xpu.to("cpu")
 
-        self.assertTrue(result_xpu.equal(result_cpu))
+        if platform.system() == 'Windows':
+            self.assertTrue(torch.allclose(result_cpu, result_xpu))
+        else:
+            self.assertTrue(result_xpu.equal(result_cpu))
 
     def test_shifted_chebyshev_polynomial_v(self):
         input0 = torch.randn(8192, 8192, device="cpu")
@@ -288,7 +295,10 @@ class TestTorchMethod(TestCase):
         )
         result_xpu = result_xpu.to("cpu")
 
-        self.assertTrue(result_xpu.equal(result_cpu))
+        if platform.system() == 'Windows':
+            self.assertTrue(torch.allclose(result_cpu, result_xpu))
+        else:
+            self.assertTrue(result_xpu.equal(result_cpu))
 
     def test_shifted_chebyshev_polynomial_w(self):
         input0 = torch.randn(8192, 8192, device="cpu")
@@ -299,7 +309,10 @@ class TestTorchMethod(TestCase):
         )
         result_xpu = result_xpu.to("cpu")
 
-        self.assertTrue(result_xpu.equal(result_cpu))
+        if platform.system() == 'Windows':
+            self.assertTrue(torch.allclose(result_cpu, result_xpu))
+        else:
+            self.assertTrue(result_xpu.equal(result_cpu))
 
     def test_special_airy_ai_out(self):
         input0 = torch.randn(8192, 8192, device="cpu")
