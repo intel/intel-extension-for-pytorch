@@ -698,6 +698,9 @@ class IPEXCPPLibBuild(build_clib, object):
                 "BUILD_MODULE_TYPE": "GPU",
                 "CMAKE_C_COMPILER": gpu_cc,
                 "CMAKE_CXX_COMPILER": gpu_cxx,
+                # To skip oneMKL's dependence on TBB if oneAPI version >= 2024.0
+                # IPEX GPU will not use TBB-related MKL primitives.
+                "MKL_SYCL_THREADING": "intel_thread",
             }
 
             if get_build_type() == "Debug":
