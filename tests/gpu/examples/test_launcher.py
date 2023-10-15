@@ -9,6 +9,9 @@ import os
 from tempfile import mkstemp
 import uuid
 
+import platform
+import pytest
+
 cpu_device = torch.device("cpu")
 xpu_device = torch.device("xpu")
 device_pool = [cpu_device, xpu_device]
@@ -94,6 +97,8 @@ print("All check passed.")
 
         return generate_file
 
+    @pytest.mark.skipif(platform.system() == 'Windows', 
+                        reason="Launcher is not supported on Windows.")
     def test_convert_fp64_to_fp32(self):
         dev_prod = product(device_pool, device_pool)
         dtype_prod = product(dtype_pool, dtype_pool)
