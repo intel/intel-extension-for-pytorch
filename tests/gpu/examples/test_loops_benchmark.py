@@ -15,6 +15,9 @@ mb = None
 PRINT_TIME_INFO = False
 VERBOSE_ONLY = False
 
+import platform
+import pytest
+
 
 test_shapes = [
     # instruction bound nobc
@@ -446,6 +449,8 @@ def run_tests():
 
 
 class TestTensorMethod(TestCase):
+    @pytest.mark.skipif(platform.system() == 'Windows', 
+                        reason="torch.autograd.profiler_legacy not available on Windows.")
     def test_loops_backbone(self):
         run_tests()
 
