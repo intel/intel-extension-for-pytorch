@@ -7,7 +7,7 @@ GPU in a container.
 
 Assumptions:
 * Host machine has the Intel® Data Center GPU 
-* Host machine has the Intel® Data Center GPU Ubuntu driver
+* Host machine has the [Intel® Data Center GPU Ubuntu driver](https://dgpu-docs.intel.com/releases/index.html)
 * Host machine has Docker installed
 
 ## Docker
