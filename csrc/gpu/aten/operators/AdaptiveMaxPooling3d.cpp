@@ -59,19 +59,19 @@ void adaptive_max_pool3d_out_template(
   int64_t outputWidth = output_size[2];
 
   int dD = std::floor((float)2 * inputDepth / outputDepth) -
-      std::floor((float)inputDepth / outputDepth);
+      (inputDepth / outputDepth);
   int dH = std::floor((float)2 * inputHeight / outputHeight) -
-      std::floor((float)inputHeight / outputHeight);
+      (inputHeight / outputHeight);
   int dW = std::floor((float)2 * inputWidth / outputWidth) -
-      std::floor((float)inputWidth / outputWidth);
+      (inputWidth / outputWidth);
   std::vector<int64_t> stride_vec = {dD, dH, dW};
 
   int kD = std::ceil((float)2 * inputDepth / outputDepth) -
-      std::floor((float)inputDepth / outputDepth);
+      (inputDepth / outputDepth);
   int kH = std::ceil((float)2 * inputHeight / outputHeight) -
-      std::floor((float)inputHeight / outputHeight);
+      (inputHeight / outputHeight);
   int kW = std::ceil((float)2 * inputWidth / outputWidth) -
-      std::floor((float)inputWidth / outputWidth);
+      (inputWidth / outputWidth);
   std::vector<int64_t> kernel_vec = {kD, kH, kW};
 
   int padD = (dD * (outputDepth - 1) + kD - inputDepth) / 2;
@@ -136,19 +136,19 @@ Tensor& adaptive_max_pool3d_backward_out_template(
   int64_t gradOutputWidth = gradOutput.size(-1);
 
   int dD = std::floor((float)2 * gradInputDepth / gradOutputDepth) -
-      std::floor((float)gradInputDepth / gradOutputDepth);
+      (gradInputDepth / gradOutputDepth);
   int dH = std::floor((float)2 * gradInputHeight / gradOutputHeight) -
-      std::floor((float)gradInputHeight / gradOutputHeight);
+      (gradInputHeight / gradOutputHeight);
   int dW = std::floor((float)2 * gradInputWidth / gradOutputWidth) -
-      std::floor((float)gradInputWidth / gradOutputWidth);
+      (gradInputWidth / gradOutputWidth);
   std::vector<int64_t> stride_vec = {dD, dH, dW};
 
   int kD = std::ceil((float)2 * gradInputDepth / gradOutputDepth) -
-      std::floor((float)gradInputDepth / gradOutputDepth);
+      (gradInputDepth / gradOutputDepth);
   int kH = std::ceil((float)2 * gradInputHeight / gradOutputHeight) -
-      std::floor((float)gradInputHeight / gradOutputHeight);
+      (gradInputHeight / gradOutputHeight);
   int kW = std::ceil((float)2 * gradInputWidth / gradOutputWidth) -
-      std::floor((float)gradInputWidth / gradOutputWidth);
+      (gradInputWidth / gradOutputWidth);
   std::vector<int64_t> kernel_vec = {kD, kH, kW};
 
   int padD = (dD * (gradOutputDepth - 1) + kD - gradInputDepth) / 2;

@@ -53,14 +53,14 @@ void adaptive_max_pool2d_out_template(
   const auto inputWidth = input.size(-1);
 
   int dH = std::floor((float)2 * inputHeight / outputHeight) -
-      std::floor((float)inputHeight / outputHeight);
+      (inputHeight / outputHeight);
   int dW = std::floor((float)2 * inputWidth / outputWidth) -
-      std::floor((float)inputWidth / outputWidth);
+      (inputWidth / outputWidth);
 
   int kH = std::ceil((float)2 * inputHeight / outputHeight) -
-      std::floor((float)inputHeight / outputHeight);
+      (inputHeight / outputHeight);
   int kW = std::ceil((float)2 * inputWidth / outputWidth) -
-      std::floor((float)inputWidth / outputWidth);
+      (inputWidth / outputWidth);
 
   int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
@@ -128,15 +128,15 @@ Tensor& adaptive_max_pool2d_backward_out_template(
   const auto inputWidth = input.size(-1);
 
   int dH = std::floor((float)2 * inputHeight / outputHeight) -
-      std::floor((float)inputHeight / outputHeight);
+      (inputHeight / outputHeight);
   int dW = std::floor((float)2 * inputWidth / outputWidth) -
-      std::floor((float)inputWidth / outputWidth);
+      (inputWidth / outputWidth);
   std::vector<int64_t> stride_vec = {dH, dW};
 
   int kH = std::ceil((float)2 * inputHeight / outputHeight) -
-      std::floor((float)inputHeight / outputHeight);
+      (inputHeight / outputHeight);
   int kW = std::ceil((float)2 * inputWidth / outputWidth) -
-      std::floor((float)inputWidth / outputWidth);
+      (inputWidth / outputWidth);
   std::vector<int64_t> kernel_vec = {kH, kW};
 
   int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
