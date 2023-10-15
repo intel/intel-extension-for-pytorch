@@ -32,12 +32,6 @@ inline bool is_lerp_weight_small(c10::complex<scalar_t> weight) {
       scalar_t(0.25f);
 }
 
-inline void increment_version(TensorList tensors) {
-  for (const auto& t : tensors) {
-    t.unsafeGetTensorImpl()->bump_version();
-  }
-}
-
 template <typename scalar_t, typename weight_t>
 inline scalar_t lerp(scalar_t self_, scalar_t end_, weight_t weight_) {
   using opmath_t = at::opmath_type<scalar_t>;

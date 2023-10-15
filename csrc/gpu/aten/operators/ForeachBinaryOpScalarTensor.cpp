@@ -59,12 +59,6 @@ std::vector<Tensor> foreach_binary_op(
   return tensor_lists[1];
 }
 
-inline void increment_version(TensorList tensors) {
-  for (const auto& t : tensors) {
-    t.unsafeGetTensorImpl()->bump_version();
-  }
-}
-
 template <typename T, template <class> class Op>
 void foreach_binary_op_(at::TensorList tensors, const at::Tensor& scalar) {
   TORCH_CHECK(

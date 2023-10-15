@@ -9,6 +9,12 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace {
 
+inline void increment_version(TensorList tensors) {
+  for (const auto& t : tensors) {
+    t.unsafeGetTensorImpl()->bump_version();
+  }
+}
+
 template <int depth, typename T, typename TL>
 bool init_args(
     T** args,

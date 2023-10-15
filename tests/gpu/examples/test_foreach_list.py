@@ -12,7 +12,7 @@ class ForeachTest:
     def __init__(self, func):
         self.func = func
 
-    def __call__(self, input1, input2, device, is_inplace=False, scalar=None):
+    def __call__(self, input1, input2, device, is_inplace=False, scalar=None, non_blocking=None):
         input1_for_func = []
         input2_for_func = []
         for i in input1:
@@ -20,16 +20,20 @@ class ForeachTest:
         for i in input2:
             input2_for_func.append(i.clone().to(device))
         if is_inplace:
-            if scalar is None:
-                self.func(input1_for_func, input2_for_func)
-            else:
+            if scalar is not None:
                 self.func(input1_for_func, input2_for_func, alpha=scalar)
+            elif non_blocking is not None:
+                self.func(input1_for_func, input2_for_func, non_blocking=non_blocking)
+            else:
+                self.func(input1_for_func, input2_for_func)
             return input1_for_func
         else:
-            if scalar is None:
-                return self.func(input1_for_func, input2_for_func)
-            else:
+            if scalar is not None:
                 return self.func(input1_for_func, input2_for_func, alpha=scalar)
+            elif non_blocking is not None:
+                return self.func(input1_for_func, input2_for_func, non_blocking=non_blocking)
+            else:
+                return self.func(input1_for_func, input2_for_func)
 
 
 class TestTorchMethod(TestCase):
@@ -121,6 +125,20 @@ class TestTorchMethod(TestCase):
         test_ = ForeachTest(torch._foreach_clamp_max_)
         cpu_inplace = test_(x1, x2, "cpu", is_inplace=True)
         xpu_inplace = test_(x1, x2, "xpu", is_inplace=True)
+        self.result_compare(cpu_inplace, xpu_inplace)
+
+    def test_foreach_copy(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+        x2 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_copy_)
+        cpu_inplace = test(x1, x2, "cpu", is_inplace=True, non_blocking=True)
+        xpu_inplace = test(x1, x2, "xpu", is_inplace=True, non_blocking=True)
+        self.result_compare(cpu_inplace, xpu_inplace)
+
+        test = ForeachTest(torch._foreach_copy_)
+        cpu_inplace = test(x1, x2, "cpu", is_inplace=True, non_blocking=False)
+        xpu_inplace = test(x1, x2, "xpu", is_inplace=True, non_blocking=False)
         self.result_compare(cpu_inplace, xpu_inplace)
 
     def result_compare(self, x1, x2):

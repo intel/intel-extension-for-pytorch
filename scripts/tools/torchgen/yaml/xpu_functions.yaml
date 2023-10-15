@@ -707,6 +707,7 @@ supported:
   - hardsigmoid_backward.grad_input
   - _foreach_abs
   - _foreach_abs_
+  - _foreach_copy_
   - _foreach_sigmoid
   - _foreach_sigmoid_
   - _foreach_round

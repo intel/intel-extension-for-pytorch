@@ -219,5 +219,45 @@ void _foreach_maximum_(TensorList tensors1, TensorList tensors2) {
   AtenIpexTypeXPU::_foreach_clamp_min_(tensors1, tensors2);
 }
 
+template <typename T>
+struct Identity {
+  T operator()(const T& x) {
+    return x;
+  }
+};
+
+void _foreach_copy_(
+    at::TensorList self,
+    at::TensorList src,
+    bool non_blocking) {
+  at::native::check_foreach_api_restrictions(self, src);
+  if (!at::native::can_use_fast_route(
+          self, src, /* does_op_promote_integer_inputs_to_float */ false)) {
+    return at::native::foreach_tensor_copy_list_kernel_slow_(
+        self, src, non_blocking);
+  }
+
+  std::vector<std::vector<at::Tensor>> tensor_lists{src.vec(), self.vec()};
+
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      self[0].scalar_type(),
+      "foreach_tensor_copy",
+      [&]() {
+        using opmath_t = at::opmath_type<scalar_t>;
+        multi_tensor_apply<2>(
+            tensor_lists,
+            UnaryOpFunctor<
+                scalar_t,
+                /* depth */ 2,
+                /* r_args_depth */ 1,
+                /* res_arg_index */ 1>(),
+            Identity<opmath_t>());
+      });
+  increment_version(self);
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
