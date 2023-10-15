@@ -3387,6 +3387,123 @@ at::Tensor batch_norm_elemt(
   return out;
 }
 
+// instead of having one thread (work-item) reduce one column,
+// split the column into chunks (work-groups) for each thread to
+// parallely compute a partial result for each chunk
+// until the number of chunks is 1
+template <typename scalar_t, typename accscalar_t, typename index_t>
+void batch_norm_gather_stats_reduction(
+    sycl::queue* q,
+    accscalar_t* save_mean_in,
+    accscalar_t* save_mean_out,
+    accscalar_t* save_invstd_in,
+    accscalar_t* save_invstd_out,
+    scalar_t* counts_in,
+    scalar_t* counts_out,
+    scalar_t* running_mean,
+    scalar_t* running_var,
+    int len,
+    int n_wgroups_batch_dim,
+    int wgroup_size_batch_dim,
+    int n_wgroups_feature_dim,
+    int wgroup_size_feature_dim,
+    int feature_sz,
+    float momentum_,
+    float epsilon_) {
+  sycl::range<2> global_range{
+      n_wgroups_batch_dim * wgroup_size_batch_dim,
+      n_wgroups_feature_dim * wgroup_size_feature_dim};
+  sycl::range<2> local_range{wgroup_size_batch_dim, wgroup_size_feature_dim};
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto save_mean_local_mem = dpcpp_local_acc_t<accscalar_t, 2>(
+        sycl::range<2>{wgroup_size_batch_dim, wgroup_size_feature_dim}, cgh);
+
+    auto var_n_local_mem = dpcpp_local_acc_t<accscalar_t, 2>(
+        sycl::range<2>{wgroup_size_batch_dim, wgroup_size_feature_dim}, cgh);
+
+    auto counts_local_mem = dpcpp_local_acc_t<accscalar_t, 2>(
+        sycl::range<2>{wgroup_size_batch_dim, wgroup_size_feature_dim}, cgh);
+
+    cgh.parallel_for(
+        sycl::nd_range<2>{global_range, local_range},
+        [=](sycl::nd_item<2> item) {
+          int global_row = item.get_global_id(0);
+          int global_col = item.get_global_id(1);
+          int group_row = item.get_group(0);
+          int group_col = item.get_group(1);
+          int local_row = item.get_local_id(0);
+          int local_col = item.get_local_id(1);
+
+          int global_len = len;
+          int local_len = len;
+
+          if (global_row < global_len && global_col < feature_sz) {
+            save_mean_local_mem[local_row][local_col] =
+                save_mean_in[global_row * feature_sz + global_col];
+            counts_local_mem[local_row][local_col] = counts_in[global_row];
+            accscalar_t v =
+                1.0f / save_invstd_in[global_row * feature_sz + global_col];
+            var_n_local_mem[local_row][local_col] =
+                (v * v - epsilon_) * counts_local_mem[local_row][local_col];
+          }
+
+          // Do a tree reduction on work-items in work-group
+          for (int i = wgroup_size_batch_dim / 2; i > 0; i >>= 1) {
+            item.barrier(sycl::access::fence_space::local_space);
+            if (local_row < i && global_row < global_len &&
+                global_row + i < global_len && local_row < local_len &&
+                local_row + i < local_len && global_col < feature_sz) {
+              index_t n_1 = counts_local_mem[local_row + i][local_col];
+              index_t n_0 = counts_local_mem[local_row][local_col];
+              accscalar_t m_1 = save_mean_local_mem[local_row + i][local_col];
+              accscalar_t m_0 = save_mean_local_mem[local_row][local_col];
+              accscalar_t v_1 = var_n_local_mem[local_row + i][local_col];
+              accscalar_t v = std::sqrt(v_1 / n_1 + epsilon_);
+              v = (v * v - epsilon_) * n_1;
+              accscalar_t factor = 1.0f / (n_0 + n_1);
+
+              var_n_local_mem[local_row][local_col] +=
+                  v + (m_0 - m_1) * (m_0 - m_1) * n_0 * n_1 * factor;
+              save_mean_local_mem[local_row][local_col] =
+                  n_0 * factor * m_0 + n_1 * factor * m_1;
+              counts_local_mem[local_row][local_col] += n_1;
+            }
+            local_len = i;
+            i = i + (i % 2 && i != 1);
+          }
+
+          if (local_row == 0 && global_col < feature_sz) {
+            save_mean_out[group_row * feature_sz + global_col] =
+                save_mean_local_mem[0][local_col];
+            save_invstd_out[group_row * feature_sz + global_col] =
+                static_cast<accscalar_t>(1.0f) /
+                std::sqrt(
+                    var_n_local_mem[0][local_col] /
+                        counts_local_mem[0][local_col] +
+                    epsilon_);
+            counts_out[group_row] = counts_local_mem[0][0];
+          }
+
+          if (n_wgroups_batch_dim == 1 && local_row == 0) {
+            if (running_mean != nullptr) {
+              running_mean[global_col] = static_cast<scalar_t>(
+                  (1 - momentum_) * running_mean[global_col] +
+                  momentum_ * save_mean_local_mem[0][global_col]);
+            }
+            if (running_var != nullptr) {
+              running_var[global_col] = static_cast<scalar_t>(
+                  (1 - momentum_) * running_var[global_col] +
+                  momentum_ *
+                      (var_n_local_mem[0][global_col] /
+                       (counts_local_mem[0][global_col] - 1)));
+            }
+          }
+        });
+  };
+  DPCPP_Q_SUBMIT(*q, cgf);
+}
+
 template <typename scalar_t, typename accscalar_t, typename index_t>
 std::tuple<Tensor, Tensor> batch_norm_gather_stats_xpu_template(
     const Tensor& mean_,
@@ -3396,76 +3513,132 @@ std::tuple<Tensor, Tensor> batch_norm_gather_stats_xpu_template(
     double momentum,
     double epsilon,
     const Tensor& counts_) {
-  Tensor save_mean_;
-  Tensor save_invstd_;
+  int feature_sz = mean_.size(1);
+  int batch_sz = mean_.size(0);
 
-  auto features = mean_.size(1);
   auto input_options = mean_.options();
   if (mean_.scalar_type() == at::ScalarType::Half ||
       mean_.scalar_type() == at::ScalarType::BFloat16) {
     input_options = input_options.dtype(ScalarType::Float);
   }
-  save_mean_ = at::empty({features}, input_options);
-  save_invstd_ = at::empty({features}, input_options);
 
-  auto mean = mean_.data_ptr<accscalar_t>();
-  auto invstd = invstd_.data_ptr<accscalar_t>();
+  auto counts_options = counts_.options();
+  if (counts_.scalar_type() == at::ScalarType::Half ||
+      counts_.scalar_type() == at::ScalarType::BFloat16) {
+    counts_options = counts_options.dtype(ScalarType::Float);
+  }
+
   auto running_mean =
       running_mean_.defined() ? running_mean_.data_ptr<scalar_t>() : nullptr;
   auto running_var =
       running_var_.defined() ? running_var_.data_ptr<scalar_t>() : nullptr;
-  auto counts = counts_.data_ptr<scalar_t>();
-  auto save_mean = save_mean_.data_ptr<accscalar_t>();
-  auto save_invstd = save_invstd_.data_ptr<accscalar_t>();
 
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  const auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
-  const auto ngroups = (features + wgroup_size - 1) / wgroup_size;
-
-  int world_size = mean_.size(0);
   // Avoid double issues in ATSM
   float momentum_ = momentum;
   float epsilon_ = epsilon;
+  auto dpcpp_queue = dpcppGetCurrentQueue();
+  const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int max_work_items_per_eu = dpcppMaxWorkItemsPerEU(dev_id);
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(
-        sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size),
-        [=](sycl::nd_item<1> itemId) {
-          auto tid = itemId.get_global_id(0);
+  int wgroup_size_feature_dim = std::min(feature_sz, 32);
+  int n_wgroups_feature_dim =
+      (feature_sz + wgroup_size_feature_dim - 1) / wgroup_size_feature_dim;
 
-          // first the reductions each thread does separately
-          if (tid < features) {
-            accscalar_t avg = 0;
-            accscalar_t var_n = 0;
-            index_t n = 0;
-            for (int j = 0; j < world_size; j++) {
-              scalar_t count = counts[j];
-              accscalar_t m = mean[j * features + tid];
-              accscalar_t v = accscalar_t(1.0f) / (invstd[j * features + tid]);
-              v = (v * v - epsilon_) * count;
-              accscalar_t factor = 1.0f / (n + count);
-              var_n += v + (avg - m) * (avg - m) * n * count * factor;
-              avg = n * factor * avg + count * factor * m;
-              n += count;
-            }
-            save_mean[tid] = avg;
-            save_invstd[tid] = static_cast<accscalar_t>(1) /
-                Numerics<accscalar_t>::sqrt(var_n / n + epsilon_);
-            if (running_mean != nullptr) {
-              running_mean[tid] = static_cast<scalar_t>(
-                  (1 - momentum_) * running_mean[tid] + momentum_ * avg);
-            }
-            accscalar_t unbiasedVar = var_n / (n - 1);
-            if (running_var != nullptr) {
-              running_var[tid] = static_cast<scalar_t>(
-                  (1 - momentum_) * running_var[tid] + momentum_ * unbiasedVar);
-            }
-          }
-        });
-  };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-  return std::make_tuple(save_mean_, save_invstd_);
+  int len = batch_sz;
+
+  accscalar_t* save_mean_prev = mean_.data_ptr<accscalar_t>();
+  accscalar_t* save_invstd_prev = invstd_.data_ptr<accscalar_t>();
+  scalar_t* counts_prev = counts_.data_ptr<scalar_t>();
+
+  Tensor save_mean_tmp;
+  Tensor save_invstd_tmp;
+  Tensor counts_tmp;
+
+  if (len == 1) {
+    int wgroup_size_batch_dim = 2;
+    int n_wgroups_batch_dim = 1;
+
+    save_mean_tmp = at::empty({feature_sz}, input_options);
+    accscalar_t* save_mean_curr = save_mean_tmp.data_ptr<accscalar_t>();
+
+    save_invstd_tmp = at::empty({feature_sz}, input_options);
+    accscalar_t* save_invstd_curr = save_invstd_tmp.data_ptr<accscalar_t>();
+
+    counts_tmp = at::empty({1}, counts_options);
+    scalar_t* counts_curr = counts_tmp.data_ptr<scalar_t>();
+
+    batch_norm_gather_stats_reduction<scalar_t, accscalar_t, index_t>(
+        &dpcpp_queue,
+        save_mean_prev,
+        save_mean_curr,
+        save_invstd_prev,
+        save_invstd_curr,
+        counts_prev,
+        counts_curr,
+        running_mean,
+        running_var,
+        len,
+        n_wgroups_batch_dim,
+        wgroup_size_batch_dim,
+        n_wgroups_feature_dim,
+        wgroup_size_feature_dim,
+        feature_sz,
+        momentum_,
+        epsilon_);
+
+    return std::make_tuple(save_mean_tmp, save_invstd_tmp);
+  }
+
+  while (len != 1) {
+    int wgroup_size = std::min(max_work_items_per_eu, len + (len % 2));
+    int wgroup_size_batch_dim = (wgroup_size_feature_dim == 1)
+        ? wgroup_size
+        : ((wgroup_size * wgroup_size_feature_dim <= max_work_items_per_eu)
+               ? wgroup_size
+               : max_work_items_per_eu /
+                   (wgroup_size_feature_dim + (wgroup_size_feature_dim % 2)));
+    wgroup_size_batch_dim = wgroup_size_batch_dim + (wgroup_size_batch_dim % 2);
+    int n_wgroups_batch_dim =
+        len / wgroup_size_batch_dim + (len % wgroup_size_batch_dim != 0);
+
+    save_mean_tmp =
+        at::empty({n_wgroups_batch_dim * feature_sz}, input_options);
+    accscalar_t* save_mean_curr = save_mean_tmp.data_ptr<accscalar_t>();
+
+    save_invstd_tmp =
+        at::empty({n_wgroups_batch_dim * feature_sz}, input_options);
+    accscalar_t* save_invstd_curr = save_invstd_tmp.data_ptr<accscalar_t>();
+
+    counts_tmp = at::empty({n_wgroups_batch_dim}, counts_options);
+    scalar_t* counts_curr = counts_tmp.data_ptr<scalar_t>();
+
+    batch_norm_gather_stats_reduction<scalar_t, accscalar_t, index_t>(
+        &dpcpp_queue,
+        save_mean_prev,
+        save_mean_curr,
+        save_invstd_prev,
+        save_invstd_curr,
+        counts_prev,
+        counts_curr,
+        running_mean,
+        running_var,
+        len,
+        n_wgroups_batch_dim,
+        wgroup_size_batch_dim,
+        n_wgroups_feature_dim,
+        wgroup_size_feature_dim,
+        feature_sz,
+        momentum_,
+        epsilon_);
+
+    save_mean_prev = save_mean_curr;
+    save_invstd_prev = save_invstd_curr;
+    counts_prev = counts_curr;
+
+    len = n_wgroups_batch_dim;
+  }
+
+  return std::make_tuple(save_mean_tmp, save_invstd_tmp);
 }
 
 std::tuple<Tensor, Tensor> batch_norm_gather_stats_with_counts_xpu(

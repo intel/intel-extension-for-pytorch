@@ -5,6 +5,7 @@ from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
 import pytest
+import itertools
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -388,6 +389,86 @@ class TestNNMethod(TestCase):
         )
         self.assertEqual(mean, torch.ones(3, device="xpu"))
         self.assertEqual(invstd, torch.ones(3, device="xpu"))
+
+    """
+    tests on various batch sizes and feature sizes
+    batch_size:
+        3072           case1: wgroup_size_batch_dim = dpcppMaxWorkItemsPerEU
+                              n_wgroups_batch_dim = evenly divisible by wgroup_size_batch_dim
+        3073           case2: wgroup_size_batch_dim = dpcppMaxWorkItemsPerEU
+                              n_wgroups_batch_dim = not evenly divisible by wgroup_size_batch_dim
+        1, 2, 256      case3: wgroup_size_batch_dim = even batch_size < dpcppMaxWorkItemsPerEU
+                              n_wgroups_batch_dim = evenly divisible by wgroup_size_batch_dim
+        3              case4: wgroup_size_batch_dim = odd batch_size < dpcppMaxWorkItemsPerEU
+                              n_wgroups_batch_dim = not evenly divisible by wgroup_size_batch_dim
+
+    feature_size:
+        1, 4, 7        case1: wgroup_size_feature_dim = feature_size
+                              n_wgroups_feature_dim = evenly divisible by wgroup_size_feature_dim
+        32, 64         case2: wgroup_size_feature_dim = 32 (SIMD wdith)
+                              n_wgroups_feature_dim = evenly divisible by wgroup_size_feature_dim
+        33             case3: wgroup_size_feature_dim = 32 (SIMD wdith)
+                              n_wgroups_feature_dim = not evenly divisible by wgroup_size_feature_dim
+
+    """
+    def test_batch_norm_gather_stats_comprehensive(self):
+        input = torch.randn(1, 3, 3, 3, device="xpu").to(memory_format=torch.channels_last)
+        for [batch_size, feature_size] in itertools.product([1, 256, 3072, 3073, 2, 3], [1, 4, 7, 32, 63, 64]):
+            print("\n================== batch_size: ", batch_size, ", feature_size:", feature_size, "==================")
+            mean_in = torch.arange(1, batch_size + 1, dtype=torch.float, device='xpu').view(-1, 1).repeat(1, feature_size)
+            invstd_in = torch.arange(1, batch_size + 1, dtype=torch.float, device='xpu').view(-1, 1).repeat(1, feature_size)
+            mean_out, invstd_out = torch.batch_norm_gather_stats(
+                input,
+                mean_in,
+                invstd_in,
+                running_mean=None,
+                running_var=None,
+                momentum=0.1,
+                eps=0,
+                count=2,
+            )
+            if batch_size == 1:
+                mean_correct = torch.tensor([1.], device='xpu').repeat(feature_size)
+                invstd_correct = torch.tensor([1.], device='xpu').repeat(feature_size)
+            elif batch_size == 256:
+                mean_correct = torch.tensor([128.5000], device='xpu').repeat(feature_size)
+                invstd_correct = torch.tensor([0.0135], device='xpu').repeat(feature_size)
+            elif batch_size == 3072:
+                mean_correct = torch.tensor([1536.5000], device='xpu').repeat(feature_size)
+                invstd_correct = torch.tensor([0.0011], device='xpu').repeat(feature_size)
+            elif batch_size == 3073:
+                mean_correct = torch.tensor([1537.], device='xpu').repeat(feature_size)
+                invstd_correct = torch.tensor([0.0011], device='xpu').repeat(feature_size)
+            elif batch_size == 2:
+                mean_correct = torch.tensor([1.5000], device='xpu').repeat(feature_size)
+                invstd_correct = torch.tensor([1.0690], device='xpu').repeat(feature_size)
+            elif batch_size == 3:
+                mean_correct = torch.tensor([2.], device='xpu').repeat(feature_size)
+                invstd_correct = torch.tensor([0.9448], device='xpu').repeat(feature_size)
+
+            self.assertTrue(torch.allclose(mean_out, mean_correct))
+            self.assertTrue(torch.allclose(invstd_out, invstd_correct, atol=1e-4))
+
+    def test_batch_norm_gather_stats_running_mean_and_running_var(self):
+        input = torch.randn(1, 3, 3, 3, device="xpu").to(memory_format=torch.channels_last)
+
+        running_mean_ptr = torch.tensor([1., 2., 3., 4., 5., 6., 7., 8.], device='xpu')
+        running_var_ptr = torch.tensor([1., 2., 3., 4., 5., 6., 7., 8.], device='xpu')
+
+        torch.batch_norm_gather_stats(
+            input,
+            mean=torch.ones(64, 8, device="xpu"),
+            invstd=torch.ones(64, 8, device="xpu"),
+            running_mean=running_mean_ptr,
+            running_var=running_var_ptr,
+            momentum=0.1,
+            eps=1e-5,
+            count=2,
+        )
+        running_mean_correct = torch.tensor([1., 1.9, 2.8, 3.7, 4.6, 5.5, 6.4, 7.3], device='xpu')
+        running_var_correct = torch.tensor([1.0008, 1.9008, 2.8008, 3.7008, 4.6008, 5.5008, 6.4008, 7.3008], device='xpu')
+        self.assertTrue(torch.allclose(running_mean_ptr, running_mean_correct))
+        self.assertTrue(torch.allclose(running_var_ptr, running_var_correct, atol=1e-4))
 
     @pytest.mark.skipif(
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
