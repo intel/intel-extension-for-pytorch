@@ -205,6 +205,7 @@ def _build_installation_dependency():
     install_requires = []
     install_requires.append("psutil")
     install_requires.append("numpy")
+    install_requires.append("packaging")
     return install_requires
 
 
@@ -654,7 +655,7 @@ class IPEXCPPLibBuild(build_clib, object):
         use_ninja = False
         # Windows uses Ninja as default generator
         if IS_WINDOWS:
-            use_ninja = True        
+            use_ninja = True
         sequential_build = False
 
         cmake_common_args = []
@@ -674,7 +675,7 @@ class IPEXCPPLibBuild(build_clib, object):
                     continue
                 if IS_WINDOWS and var == 'USE_MSVC' and val.upper() in ON_ENV_VAL:
                     use_ninja = False
-                    continue                
+                    continue
                 if var == "BUILD_STATS" and val.upper() in ON_ENV_VAL:
                     sequential_build = True
                     # fall through
