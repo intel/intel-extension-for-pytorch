@@ -4,13 +4,12 @@
 #include <runtime/Device.h>
 #include <runtime/Queue.h>
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <deque>
-#include <mutex>
-#include <vector>
-
 #include <iostream>
+#include <mutex>
 
 namespace xpu {
 namespace dpcpp {
@@ -179,14 +178,28 @@ void deviceSynchronize(DeviceIndex device_index) {
   check_device_index(device_index);
   dpcppInitDeviceQueueOnce(device_index);
 
+#ifndef USE_QUEUE_BARRIER
+  std::array<sycl::event, kQueuesPerPool> events = {};
+#endif
+
   // For each device, we have 32 (kQueuesPerPool) reserved queues.
   for (auto i = 0; i < kQueuesPerPool; i++) {
     /**
      * Why we don NOT need a barrier for synchronization snapshot here? Because
      * xpu::dpcpp::queue_barrier is so much time-consuming.
      */
+#ifdef USE_QUEUE_BARRIER
     dpcppGetRawQueue(device_index, i).wait();
+#else
+    events[i] = xpu::dpcpp::queue_barrier(dpcppGetRawQueue(device_index, i));
+#endif
   }
+
+#ifndef USE_QUEUE_BARRIER
+  for (auto& e : events) {
+    e.wait();
+  }
+#endif
 }
 
 } // namespace dpcpp
