@@ -29,9 +29,9 @@ class TestNNMethod(TestCase):
             # scalar type
             x = torch.tensor([1.5, 2.5, 3.5])
             y = torch.tensor(2)
-            searchsorted_result_cpu = torch.searchsorted(x, y)
+            searchsorted_result_cpu = torch.searchsorted(x, 2)
             searchsorted_result_xpu = torch.searchsorted(
-                x.to("xpu").to(dtype), y.to("xpu").to(dtype)
+                x.to("xpu").to(dtype), 2
             )
             self.assertEqual(searchsorted_result_cpu, searchsorted_result_xpu)
 

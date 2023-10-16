@@ -244,6 +244,26 @@ Tensor& searchsorted_out(
   return result;
 }
 
+Tensor& searchsorted_out(
+    const Tensor& sorted_sequence,
+    const Scalar& self,
+    bool out_int32,
+    bool right,
+    const c10::optional<c10::string_view> side_opt,
+    const c10::optional<Tensor>& sorter_opt,
+    Tensor& result) {
+  const Tensor& scalar_tensor =
+      at::native::searchsorted_scalar_tensor(self, sorted_sequence.device());
+  return searchsorted_out(
+      sorted_sequence,
+      scalar_tensor,
+      out_int32,
+      right,
+      side_opt,
+      sorter_opt,
+      result);
+}
+
 Tensor searchsorted(
     const Tensor& sorted_sequence,
     const Tensor& self,
