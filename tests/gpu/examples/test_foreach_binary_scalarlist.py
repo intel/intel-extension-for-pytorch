@@ -111,6 +111,20 @@ class TestTorchMethod(TestCase):
         xpu_ = test_(x1, scalarlist, "xpu", True)
         self.result_compare(cpu_, xpu_)
 
+    def test_foreach_pow_scalarlist(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+        scalarlist = torch.randn(250)
+
+        test = ForeachBinaryScalarListTest(torch._foreach_pow)
+        cpu = test(x1, scalarlist, "cpu")
+        xpu = test(x1, scalarlist, "xpu")
+        self.result_compare(cpu, xpu)
+
+        test_ = ForeachBinaryScalarListTest(torch._foreach_pow_)
+        cpu_ = test_(x1, scalarlist, "cpu", True)
+        xpu_ = test_(x1, scalarlist, "xpu", True)
+        self.result_compare(cpu_, xpu_)
+
 
     def result_compare(self, x1, x2):
         for i in range(len(x1)):

@@ -132,6 +132,36 @@ void all_types_half_bfloat16_(
       });
 }
 
+template <template <class> class Op>
+void all_types_complex_half_bfloat16_(
+    TensorList tensors1,
+    TensorList tensors2,
+    const Scalar& alpha = 1) {
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+      kBFloat16,
+      kHalf,
+      tensors1[0].scalar_type(),
+      "foreach_binary_op_list_dpcpp_",
+      [&]() {
+        foreach_tensor_list_op_<scalar_t, Op>(tensors1, tensors2, alpha);
+      });
+}
+
+template <template <class> class Op>
+std::vector<Tensor> all_types_complex_half_bfloat16(
+    TensorList tensors1,
+    TensorList tensors2,
+    const Scalar& alpha = 1) {
+  return IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+      kBFloat16,
+      kHalf,
+      tensors1[0].scalar_type(),
+      "foreach_binary_op_list_dpcpp",
+      [&]() {
+        return foreach_tensor_list_op<scalar_t, Op>(tensors1, tensors2, alpha);
+      });
+}
+
 #define FOREACH_BINARY_OP_LIST(FUNCTION, NAME, OP, DIVISION_OP)             \
   void _foreach_##NAME##_(TensorList tensors1, TensorList tensors2) {       \
     at::native::check_foreach_api_restrictions(tensors1, tensors2);         \
@@ -205,6 +235,15 @@ FOREACH_BINARY_OP_LIST(
     clamp_min,
     foreach_internal::maximum,
     /*division_op*/ false);
+// NOTE(crcrpar): [Why is foreach_pow's division_op=true?]
+// To push integer inputs to slow path. This is because with integer type inputs
+// the fast path behaves differently from the slow one. Need to investigate
+// later.
+FOREACH_BINARY_OP_LIST(
+    all_types_complex_half_bfloat16,
+    pow,
+    power_functor,
+    /*division_op*/ true);
 
 std::vector<Tensor> _foreach_minimum(TensorList tensors1, TensorList tensors2) {
   return AtenIpexTypeXPU::_foreach_clamp_max(tensors1, tensors2);

@@ -722,6 +722,13 @@ supported:
   - _foreach_expm1_
   - _foreach_lgamma
   - _foreach_lgamma_
+  - _foreach_pow.Scalar
+  - _foreach_pow_.Scalar
+  - _foreach_pow.ScalarAndTensor
+  - _foreach_pow.List
+  - _foreach_pow_.List
+  - _foreach_pow.ScalarList
+  - _foreach_pow_.ScalarList
   - _foreach_trunc
   - _foreach_trunc_
   - _foreach_floor

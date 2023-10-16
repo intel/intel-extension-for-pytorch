@@ -4,6 +4,7 @@
 #include "Loops.h"
 #include "MemoryAccess.h"
 #include "MultiTensorApply.h"
+#include "Pow.h"
 using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -814,6 +815,20 @@ struct TernaryOpScalarFunctor {
             item_range);
       }
     }
+  }
+};
+
+template <typename T>
+struct power_functor {
+  T operator()(const T& a, const T& b) const {
+    return at::AtenIpexTypeXPU::powI_(a, b);
+  }
+};
+
+template <typename T>
+struct reverse_power_functor {
+  T operator()(const T& a, const T& b) const {
+    return at::AtenIpexTypeXPU::powI_(b, a);
   }
 };
 

@@ -113,6 +113,30 @@ void all_types_half_bfloat16_(
       [&]() { foreach_binary_op_<scalar_t, Op>(tensors, scalars); });
 }
 
+template <template <class> class Op>
+std::vector<Tensor> all_types_complex_half_bfloat16(
+    TensorList tensors,
+    at::ArrayRef<Scalar> scalars) {
+  return IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+      kHalf,
+      kBFloat16,
+      tensors[0].scalar_type(),
+      "foreach_binary_op_scalarlist_cuda",
+      [&]() { return foreach_binary_op<scalar_t, Op>(tensors, scalars); });
+}
+
+template <template <class> class Op>
+void all_types_complex_half_bfloat16_(
+    TensorList tensors,
+    at::ArrayRef<Scalar> scalars) {
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+      kHalf,
+      kBFloat16,
+      tensors[0].scalar_type(),
+      "foreach_binary_op_scalarlist_cuda_",
+      [&]() { foreach_binary_op_<scalar_t, Op>(tensors, scalars); });
+}
+
 #define FOREACH_BINARY_OP_SCALARLIST(FUNCTION, NAME, OP, DIV_OP)              \
   void _foreach_##NAME##_(TensorList tensors, at::ArrayRef<Scalar> scalars) { \
     at::native::check_foreach_api_restrictions(tensors, scalars);             \
@@ -149,6 +173,12 @@ FOREACH_BINARY_OP_SCALARLIST(
     all_types_complex_bool_half_bfloat16,
     div,
     std::divides,
+    /*div_op*/ true);
+// See [Why is foreach_pow's division_op=true?]
+FOREACH_BINARY_OP_SCALARLIST(
+    all_types_complex_half_bfloat16,
+    pow,
+    power_functor,
     /*div_op*/ true);
 
 // This does not use FOREACH_BINARY_OP_SCALARLIST because

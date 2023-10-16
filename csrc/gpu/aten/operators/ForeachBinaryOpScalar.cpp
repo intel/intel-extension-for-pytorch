@@ -72,7 +72,7 @@ std::vector<Tensor> all_types_complex_bool_half_bfloat16(
       kHalf,
       kBFloat16,
       tensors[0].scalar_type(),
-      "foreach_binary_op_scalar_cuda",
+      "foreach_binary_op_scalar_dpcpp",
       [&]() { return foreach_binary_op<scalar_t, Op>(tensors, scalar); });
 }
 
@@ -85,7 +85,7 @@ void all_types_complex_bool_half_bfloat16_(
       kHalf,
       kBFloat16,
       tensors[0].scalar_type(),
-      "foreach_binary_op_scalar_cuda_",
+      "foreach_binary_op_scalar_dpcpp_",
       [&]() { foreach_binary_op_<scalar_t, Op>(tensors, scalar); });
 }
 
@@ -104,6 +104,30 @@ std::vector<Tensor> all_types_half_bfloat16(
 template <template <class> class Op>
 void all_types_half_bfloat16_(TensorList tensors, const Scalar& scalar) {
   IPEX_DISPATCH_ALL_TYPES_AND2(
+      kHalf,
+      kBFloat16,
+      tensors[0].scalar_type(),
+      "foreach_binary_op_scalar_cuda_",
+      [&]() { foreach_binary_op_<scalar_t, Op>(tensors, scalar); });
+}
+
+template <template <class> class Op>
+std::vector<Tensor> all_types_complex_half_bfloat16(
+    TensorList tensors,
+    const Scalar& scalar) {
+  return IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+      kHalf,
+      kBFloat16,
+      tensors[0].scalar_type(),
+      "foreach_binary_op_scalar_cuda",
+      [&]() { return foreach_binary_op<scalar_t, Op>(tensors, scalar); });
+}
+
+template <template <class> class Op>
+void all_types_complex_half_bfloat16_(
+    TensorList tensors,
+    const Scalar& scalar) {
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
       kHalf,
       kBFloat16,
       tensors[0].scalar_type(),
@@ -143,6 +167,21 @@ FOREACH_BINARY_OP_SCALAR(
     mul,
     std::multiplies,
     false);
+FOREACH_BINARY_OP_SCALAR(
+    all_types_complex_half_bfloat16,
+    pow,
+    power_functor,
+    /*div_op*/ true);
+std::vector<Tensor> _foreach_pow(
+    const at::Scalar& scalar,
+    at::TensorList exponent) {
+  at::native::check_foreach_api_restrictions(exponent);
+  if (!at::native::can_use_fast_route(exponent)) {
+    return at::native::foreach_scalar_pow_list_kernel_slow(scalar, exponent);
+  }
+  return all_types_complex_half_bfloat16<reverse_power_functor>(
+      exponent, scalar);
+}
 
 // In the case of division, integer inputs will result in float.
 // Currently multi tensor apply can only return result of the same type as

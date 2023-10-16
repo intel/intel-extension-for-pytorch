@@ -141,6 +141,20 @@ class TestTorchMethod(TestCase):
         xpu_inplace = test(x1, x2, "xpu", is_inplace=True, non_blocking=False)
         self.result_compare(cpu_inplace, xpu_inplace)
 
+    def test_foreach_pow(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+        x2 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+
+        test = ForeachTest(torch._foreach_pow)
+        cpu = test(x1, x2, "cpu")
+        xpu = test(x1, x2, "xpu")
+        self.result_compare(cpu, xpu)
+
+        test_ = ForeachTest(torch._foreach_pow_)
+        cpu_inplace = test_(x1, x2, "cpu", is_inplace=True)
+        xpu_inplace = test_(x1, x2, "xpu", is_inplace=True)
+        self.result_compare(cpu_inplace, xpu_inplace)
+
     def result_compare(self, x1, x2):
         for i in range(len(x1)):
             self.assertEqual(x1[i].cpu(), x2[i].cpu())

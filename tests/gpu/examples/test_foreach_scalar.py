@@ -12,10 +12,14 @@ class ForeachTest:
     def __init__(self, func):
         self.func = func
 
-    def __call__(self, input, scalar, device, is_inplace=False):
+    def __call__(self, input, scalar, device, is_inplace=False, reverse=False):
         input_for_func = []
         for i in input:
             input_for_func.append(i.clone().to(device))
+        if reverse:
+            x = input_for_func
+            input_for_func = scalar
+            scalar = x
         if is_inplace:
             self.func(input_for_func, scalar)
             return input_for_func
@@ -113,6 +117,33 @@ class TestTorchMethod(TestCase):
         cpu_inplace = test_(x1, scalar, "cpu", is_inplace=True)
         xpu_inplace = test_(x1, scalar, "xpu", is_inplace=True)
         self.result_compare(cpu_inplace, xpu_inplace)
+
+    def test_foreach_pow(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+        scalar = random.uniform(-5, 5)
+        if scalar == 0:
+            scalar += 0.1
+
+        test = ForeachTest(torch._foreach_pow)
+        cpu = test(x1, scalar, "cpu")
+        xpu = test(x1, scalar, "xpu")
+        self.result_compare(cpu, xpu)
+
+        test_ = ForeachTest(torch._foreach_pow_)
+        cpu_inplace = test_(x1, scalar, "cpu", is_inplace=True)
+        xpu_inplace = test_(x1, scalar, "xpu", is_inplace=True)
+        self.result_compare(cpu_inplace, xpu_inplace)
+
+    def test_foreach_pow_ScalarAndTensor(self, dtype=torch.float):
+        x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
+        scalar = random.uniform(-5, 5)
+        if scalar == 0:
+            scalar += 0.1
+
+        test = ForeachTest(torch._foreach_pow)
+        cpu = test(x1, scalar, "cpu", reverse=True)
+        xpu = test(x1, scalar, "xpu", reverse=True)
+        self.result_compare(cpu, xpu)
 
     def result_compare(self, x1, x2):
         for i in range(len(x1)):
