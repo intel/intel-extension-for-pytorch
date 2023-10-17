@@ -45,19 +45,20 @@ static bool copy_requires_temporaries(TensorIterator& iter, bool p2p_enabled) {
 
   if (dst_device == src_device) {
     // We never require temporaries for copies on the same GPU.
-    TORCH_INTERNAL_ASSERT(
-        dst_device.type() == c10::DeviceType::XPU &&
-        src_device.type() == c10::DeviceType::XPU);
+    TORCH_INTERNAL_ASSERT(dst_device.is_xpu() && src_device.is_xpu());
     return false;
+  } else if (
+      dst_device.is_xpu() && src_device.is_xpu() &&
+      (dst_device != src_device)) {
+    // Across device copies need temporaries if p2p not enabled
+    return !p2p_enabled;
   }
 
   bool same_dtype = iter.dtype(0) == iter.dtype(1);
   if (same_dtype && iter.is_contiguous()) {
-    // Contiguous same-dtype copies can always use sycl copy
+    // Contiguous same-dtype copies can always use memcpyAsync
     return false;
-  } else if (
-      dst_device.type() == c10::DeviceType::XPU &&
-      src_device.type() == c10::DeviceType::XPU) {
+  } else if (dst_device.is_xpu() && src_device.is_xpu()) {
     // Copies between GPUs can use the copy kernel if P2P is supported
     return !p2p_enabled;
   } else {
@@ -71,16 +72,15 @@ static bool maybe_enable_p2p_access(Device dst_device, Device src_device) {
   if (dst_device.is_cpu() || src_device.is_cpu()) {
     return false;
   }
-#ifdef USE_MULTI_CONTEXT
-  // TODO: Support multi-context tensor copy. JIRA:
-  // https://jira.devtools.intel.com/browse/PYTORCHDGQ-2045
-  return false;
-#else
-  // TODO: Before P2P query API is ready, we always return false here,
-  // even with global default SYCL context.
-  // https://jira.devtools.intel.com/browse/CMPLRLLVM-35987
-  return false;
-#endif
+
+  auto dst_queue =
+      (sycl::queue*)getCurrentDPCPPStream(dst_device.index()).queue();
+  auto src_queue =
+      (sycl::queue*)getCurrentDPCPPStream(src_device.index()).queue();
+  auto dst_dev = dst_queue->get_device();
+  auto src_dev = src_queue->get_device();
+  return src_dev.ext_oneapi_can_access_peer(
+      dst_dev, sycl::ext::oneapi::peer_access::access_supported);
 }
 
 template <typename func_t>
@@ -108,46 +108,14 @@ void dpcpp_kernel_loops_memcpy_for_tensor_iter(
   dpcpp_loops_memcpy_kernel<func_t>(iter, f);
 }
 
-void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
-  auto numel = iter.numel();
-  if (numel == 0) {
-    return;
-  }
-
-  // We can memcpy the memory if both tensors have the same type AND both
-  // tensors are contiguous after dimension coalescing and reordering.
-  bool same_type = iter.dtype(0) == iter.dtype(1);
-  bool same_conj = iter.tensor(0).is_conj() == iter.tensor(1).is_conj();
-  bool same_neg = iter.tensor(0).is_neg() == iter.tensor(1).is_neg();
-  bool memcpy_eligible =
-      same_type && same_conj && same_neg && iter.is_contiguous();
-
+void memcpyAsync(
+    TensorIteratorBase& iter,
+    DPCPPStream& copy_stream,
+    bool p2p_enabled) {
   Device dst_device = iter.device(0);
   Device src_device = iter.device(1);
-
-  // We always perform the copy on the source device, using the current stream
-  // on the source device, and we fully synchronize on both src and dst's
-  // current streams for completion of the copy.
-  DPCPPGuard device_guard(src_device);
-  DPCPPStream copy_stream = getCurrentDPCPPStream(src_device.index());
-  if (src_device != dst_device) {
-    // This is a cross-device copy on the src current stream and dst current
-    // stream. We perform a two-way barrier between both devices' streams
-    // before the copy. This ensures that any write-after-write and
-    // write-after-read dependencies on the destination side are handled, so
-    // that no one is operating on the dst memory when we perform the copy.
-    // src waits on dst barrier (src already waits on src)
-    DPCPPEvent dst_ready;
-    dst_ready.record(getCurrentDPCPPStream(dst_device.index()));
-
-    dst_ready.block(copy_stream);
-  }
-
-  if (memcpy_eligible) {
-    // SYCL queue.memcpy performance is worse than SYCL copy kernel
-    // implementation. JIRA:
-    // https://jira.devtools.intel.com/browse/CMPLRLLVM-41292
-    auto dtype = iter.dtype(0);
+  auto dtype = iter.dtype(0);
+  if (dst_device == src_device) {
     if (isQIntType(dtype)) {
       IPEX_DISPATCH_QINT_TYPES(dtype, "copy_loops_memcpy", [&] {
         dpcpp_kernel_loops_memcpy_for_tensor_iter(
@@ -168,6 +136,62 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
                 iter, [=](scalar_t src_val) { return src_val; });
           });
     }
+  } else {
+    TORCH_INTERNAL_ASSERT(p2p_enabled == true);
+    auto dst = (char*)iter.data_ptr(0);
+    auto src = (char*)iter.data_ptr(1);
+    size_t size = iter.numel() * iter.element_size(0);
+    auto q = (sycl::queue*)copy_stream.queue();
+    q->copy(src, dst, size);
+  }
+}
+
+void copy_device_to_device(
+    TensorIterator& iter,
+    bool non_blocking,
+    bool p2p_enabled) {
+  auto numel = iter.numel();
+  if (numel == 0) {
+    return;
+  }
+
+  // We can memcpy the memory if both tensors have the same type AND both
+  // tensors are contiguous after dimension coalescing and reordering.
+  bool same_type = iter.dtype(0) == iter.dtype(1);
+  bool same_conj = iter.tensor(0).is_conj() == iter.tensor(1).is_conj();
+  bool same_neg = iter.tensor(0).is_neg() == iter.tensor(1).is_neg();
+  bool memcpy_eligible =
+      same_type && same_conj && same_neg && iter.is_contiguous();
+
+  Device dst_device = iter.device(0);
+  Device src_device = iter.device(1);
+
+  DPCPPGuard device_guard(src_device);
+
+  // We always perform the copy on the source device, using the current stream
+  // on the source device, and we fully synchronize on both src and dst's
+  // current streams for completion of the copy.
+  DPCPPStream copy_stream = getCurrentDPCPPStream(src_device.index());
+  if (src_device != dst_device) {
+    // This is a cross-device copy on the src current stream and dst current
+    // stream. We perform a two-way barrier between both devices' streams
+    // before the copy. This ensures that any write-after-write and
+    // write-after-read dependencies on the destination side are handled, so
+    // that no one is operating on the dst memory when we perform the copy.
+    // src waits on dst barrier (src already waits on src)
+    DPCPPEvent dst_ready;
+    device_guard.set_device(dst_device);
+    dst_ready.record(getCurrentDPCPPStream(dst_device.index()));
+
+    device_guard.set_device(src_device);
+    dst_ready.block(copy_stream);
+  }
+
+  if (memcpy_eligible) {
+    // SYCL queue.memcpy performance is worse than SYCL copy kernel
+    // implementation. JIRA:
+    // https://jira.devtools.intel.com/browse/CMPLRLLVM-41292
+    memcpyAsync(iter, copy_stream, p2p_enabled);
   } else {
     auto dtype = iter.dtype(0);
     if (isQIntType(dtype)) {
@@ -232,6 +256,7 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
     DPCPPEvent src_ready;
     src_ready.record(copy_stream);
 
+    device_guard.set_device(dst_device);
     src_ready.block(getCurrentDPCPPStream(dst_device.index()));
   }
 }
@@ -252,12 +277,22 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
     Tensor dst_contig;
     Tensor src_contig;
 
-    // Type conversions are performed on the CPU for CPU-GPU copies and on
-    // the src device for GPU-GPU copies.
-    if (iter.device_type(0) == kXPU) {
-      dst_contig = dst.is_contiguous()
-          ? dst
-          : at::empty_like(dst, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+    bool requires_across_device_temporaries =
+        (iter.device(0) != iter.device(1)) &&
+        iter.device(0).type() == c10::DeviceType::XPU &&
+        iter.device(1).type() == c10::DeviceType::XPU;
+
+    // If non_blocking is true - type conversions are performed on the GPU
+    // for CPU-GPU copies, otherwise type conversions are performed on the CPU.
+    // Type conversions are performed on the src device for GPU-GPU copies.
+    if (iter.device_type(0) == kXPU || non_blocking) {
+      if (requires_across_device_temporaries) {
+        dst_contig = at::empty(dst.sizes(), dst.options().device(kCPU));
+      } else {
+        dst_contig = dst.is_contiguous()
+            ? dst
+            : at::empty_like(dst, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+      }
       if (dst.is_quantized()) {
         src_contig =
             expand_as_quantized_dpcpp(iter.tensor(1).to(iter.dtype(0)), dst)
@@ -274,6 +309,13 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
       src_contig = iter.tensor(1).expand_as(dst).contiguous();
     }
 
+    // propagate the correct conjugate bit
+    dst_contig._set_conj(dst.is_conj());
+    src_contig._set_conj(iter.tensor(1).is_conj());
+
+    dst_contig._set_neg(dst.is_neg());
+    src_contig._set_neg(iter.tensor(1).is_neg());
+
     // perform a same-dtype copy on contiguous tensors
     TORCH_INTERNAL_ASSERT(dst_contig.sizes().equals(src_contig.sizes()));
     TORCH_INTERNAL_ASSERT(dst_contig.scalar_type() == src_contig.scalar_type());
@@ -281,16 +323,15 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
 
     // if necessary, copy back into dst
     if (!dst_contig.is_same(dst)) {
-      TORCH_INTERNAL_ASSERT(dst_contig.device() == dst.device());
+      // TORCH_INTERNAL_ASSERT(dst_contig.device() == dst.device());
       dst.copy_(dst_contig, non_blocking);
     }
     return;
   }
 
   // Copy on GPU (or between GPUs)
-  if (dst_device.type() == c10::DeviceType::XPU &&
-      src_device.type() == c10::DeviceType::XPU) {
-    copy_device_to_device(iter, non_blocking);
+  if (dst_device.is_xpu() && src_device.is_xpu()) {
+    copy_device_to_device(iter, non_blocking, p2p_enabled);
     return;
   }
 
@@ -318,6 +359,13 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
     dpcppMemcpyAsync(dst, src, nbytes, kind);
   } else {
     dpcppMemcpy(dst, src, nbytes, kind);
+  }
+
+  if (iter.tensor(0).is_conj() != iter.tensor(1).is_conj()) {
+    iter.tensor(0).conj_physical_();
+  }
+  if (iter.tensor(0).is_neg() != iter.tensor(1).is_neg()) {
+    iter.tensor(0).neg_();
   }
 }
 
