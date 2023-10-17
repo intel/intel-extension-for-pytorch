@@ -107,6 +107,11 @@ void _assert_async(const Tensor& self) {
       [&]() { _assert_async_kernel<scalar_t>(self.data_ptr<scalar_t>()); });
 }
 
+// TODO: Ignore assert msg for now
+void _assert_async(const Tensor& self_tensor, c10::string_view assert_msg) {
+  at::AtenIpexTypeXPU::_assert_async(self_tensor);
+}
+
 Tensor& isneginf_out(const Tensor& self, Tensor& out) {
   TORCH_CHECK(!self.is_complex(), "isneginf does not support complex inputs.");
   TORCH_CHECK(

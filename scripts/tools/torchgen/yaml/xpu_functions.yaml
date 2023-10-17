@@ -9,6 +9,7 @@ supported:
   - _amp_foreach_non_finite_check_and_unscale_
   - _amp_update_scale_
   - _assert_async
+  - _assert_async.msg
   - cat
   - cat.out
   - _cdist_backward
