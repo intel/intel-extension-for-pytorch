@@ -1,9 +1,10 @@
 import ctypes
+from torch._streambase import _EventBase, _StreamBase
 import intel_extension_for_pytorch
 from ..utils.capsule import get_pointer_from_capsule
 
 
-class Stream(intel_extension_for_pytorch._C._XPUStreamBase):
+class Stream(intel_extension_for_pytorch._C._XPUStreamBase, _StreamBase):
     def __new__(cls, device=None, priority=0, **kwargs):
         # setting device manager is expensive, so we avoid it unless necessary
         if device is None or ("stream_id" in kwargs and "device_index" in kwargs):
@@ -81,7 +82,7 @@ class Stream(intel_extension_for_pytorch._C._XPUStreamBase):
         super(Stream, self).synchronize()
 
 
-class Event(intel_extension_for_pytorch._C._XPUEventBase):
+class Event(intel_extension_for_pytorch._C._XPUEventBase, _EventBase):
     def __new__(cls, **kwargs):
         return super(Event, cls).__new__(cls, **kwargs)
 

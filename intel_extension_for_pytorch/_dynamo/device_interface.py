@@ -11,8 +11,9 @@ from intel_extension_for_pytorch._C import _getCurrentRawStream as get_xpu_strea
 _device_t = Union[torch.device, str, int, None]
 
 class XPUInterface(DeviceInterface):
-    Event = torch.xpu.Event
     device = torch.xpu.device
+    Event = torch.xpu.Event
+    Stream = torch.xpu.Stream
 
     class Worker:
         @staticmethod
@@ -48,8 +49,10 @@ class XPUInterface(DeviceInterface):
     current_device = staticmethod(torch.xpu.current_device)
     set_device = staticmethod(torch.xpu.set_device)
     device_count = staticmethod(torch.xpu.device_count)
+    stream = staticmethod(torch.xpu.stream)
     current_stream = staticmethod(torch.xpu.current_stream)
     set_stream = staticmethod(torch.xpu.set_stream)
+    _set_stream_by_id = staticmethod(torch.xpu._set_stream_by_id)
     synchronize = staticmethod(torch.xpu.synchronize)
     get_device_properties = staticmethod(torch.xpu.get_device_properties)
     get_raw_stream = staticmethod(get_xpu_stream)

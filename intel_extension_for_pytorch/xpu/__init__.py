@@ -324,6 +324,22 @@ def stream(stream: Optional["Stream"]) -> StreamContext:
     return StreamContext(stream)
 
 
+def _set_stream_by_id(stream_id, device_index, device_type):
+    r"""set stream specified by the stream id, device index and device type
+
+    Args:
+        stream_id (int): not visible to the user, used to assigned to the
+            specific stream.
+        device_index (int): selected device index.
+        device_type (int): selected device type.
+    """
+    intel_extension_for_pytorch._C._setCurrentStream(
+        stream_id=stream_id,
+        device_index=device_index,
+        device_type=device_type,
+    )
+
+
 def set_stream(stream: Stream):
     r"""Sets the current stream.This is a wrapper API to set the stream.
         Usage of this function is discouraged in favor of the ``stream``
@@ -335,8 +351,11 @@ def set_stream(stream: Stream):
     """
     if stream is None:
         return
-    intel_extension_for_pytorch._C._setCurrentStream(
-        stream_id=stream.stream_id, device_index=stream.device_index, device_type=stream.device_type)
+    _set_stream_by_id(
+        stream_id=stream.stream_id,
+        device_index=stream.device_index,
+        device_type=stream.device_type,
+    )
 
 
 def current_stream(device: Optional[_device_t] = None) -> Stream:
