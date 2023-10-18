@@ -239,6 +239,7 @@ user_model = ipex.optimize_transformers(
 
 Intel(R) Extension for PyTorch* with INT4 weight only quantization has been used in latest MLPerf submission (August 2023) to fully maximize the power of Intel(R) Xeon((R), and also shows good accuracy as comparing with FP32. This example is a simplified version of the MLPerf task. It will download a finetuned FP32 GPT-J model used for MLPerf submission, quantize the model to INT4 and run a text summarization task on the `cnn_dailymail` dataset. The example runs for 1000 samples, which is a good approximation of the results for the entire dataset and saves time.
 ```sh
+pip install evaluate nltk absl-py rouge_score
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> bash single_instance/run_int4_gpt-j_on_cnndailymail.sh
 ```
 Please note that 100 GB disk space, 100 GB memory and Internet access are needed to run this example. The example will run for a few hours depending on your hardware and network condition. The example is verified on the 4th generation Intel(R) Xeon(R) Scalable (Sapphire Rapids) platform. You may get different results on older platforms as some new hardware features are unavailable.
