@@ -235,7 +235,6 @@ class HGEMMXetla_INT4 final {
     GELU,
     RES_MUL,
     SILU,
-    SCALED_RES_ADD,
   };
 
  private:
