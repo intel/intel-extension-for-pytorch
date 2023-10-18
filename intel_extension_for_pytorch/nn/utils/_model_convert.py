@@ -22,6 +22,28 @@ def replace_transformer_with_ipex_transformer(model):
     replace_transformer_with_ipex_transformer_util(model)
 
 
+def replace_customized_linear_with_linear(model):
+    if isinstance(model, torch.jit.ScriptModule):
+        return
+    if not model.training:
+        for child_name, child in model.named_children():
+            if isinstance(child, torch.nn.Linear) and child.__class__.__name__ in [
+                "FalconLinear",
+                "Linear",
+            ]:
+                new_m = torch.nn.Linear(
+                    child.in_features,
+                    child.out_features,
+                    bias=False if child.bias is None else True,
+                )
+                new_m.weight = child.weight
+                if child.bias is not None:
+                    new_m.bias = child.bias
+                setattr(model, child_name, new_m)
+            else:
+                replace_customized_linear_with_linear(child)
+
+
 def replace_dropout_with_identity(model):
     # replace dropout with identity during inference, so that aten::dropout won't be on the JIT graph.
     # This optimization may provide more fusion opportunites on the graph.

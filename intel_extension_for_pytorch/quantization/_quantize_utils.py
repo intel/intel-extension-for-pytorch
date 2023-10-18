@@ -1,6 +1,6 @@
 import os
 import copy
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Optional
 import torch
 from torch.fx.node import map_aggregate
 from torch.ao.quantization import PlaceholderObserver
@@ -45,16 +45,6 @@ def _nn_sequential_patched_forward(cls, input):
     return input
 
 
-def _check_add_has_scalar_input(args):
-    r"""
-    This function is about check add whether has scalar input.
-    """
-    for arg in args:
-        if not isinstance(arg, torch.Tensor):
-            return True
-    return False
-
-
 def _convert_PackedSequence_to_tuple_lstm(args):
     if isinstance(args, tuple) and len(args) == 2:  # (PackedSequence, hx)
         input, batch_sizes, sorted_indices, unsorted_indices = args[0]
@@ -64,7 +54,7 @@ def _convert_PackedSequence_to_tuple_lstm(args):
         args = (input, batch_sizes, sorted_indices, unsorted_indices)
     else:
         AssertionError(
-            False,
+            False
         ), "_convert_PackedSequence_to_tuple args should be a tuple with size 2 or PackedSequence"
     return args
 
@@ -82,7 +72,8 @@ def _convert_tuple_to_PackedSequence_lstm(args):
 def auto_prepare(
     model: torch.nn.Module,
     configure: QConfig,
-    example_inputs: Tuple[Any],
+    example_inputs: Optional[Tuple[Any]],
+    example_kwarg_inputs: Optional[Dict[Any, Any]],
 ) -> torch.nn.Module:
     def convert_to_interception_proxy(x):
         if isinstance(x, torch.Tensor):
@@ -107,6 +98,26 @@ def auto_prepare(
 
     global_disable_torch_function_override = False
 
+    def check_add_has_scalar_tensor_input(args):
+        r"""
+        This function is about check add whether has scalar(tensor) input.
+        """
+        nonlocal global_disable_torch_function_override
+        old_global_disable_torch_function_override = (
+            global_disable_torch_function_override
+        )
+        global_disable_torch_function_override = True
+        for arg in args:
+            if not isinstance(arg, torch.Tensor) or arg.dim() == 0:
+                global_disable_torch_function_override = (
+                    old_global_disable_torch_function_override
+                )
+                return True
+        global_disable_torch_function_override = (
+            old_global_disable_torch_function_override
+        )
+        return False
+
     class QuantizationPrepareTensorProxy(torch.Tensor):
         """
         An override of `torch.Tensor` to enable dynamic tracing for
@@ -128,11 +139,13 @@ def auto_prepare(
             nonlocal global_disable_torch_function_override
             if (
                 # global override means disable the override here
-                # we don't need to override getters in this framework
-                # to prevent printing things from going into an infinite loop
                 global_disable_torch_function_override
-                or func == torch.Tensor.__repr__
-                or func.__name__ == "__get__"
+                or
+                # to prevent printing things from going into an infinite loop
+                func == torch.Tensor.__repr__
+                or
+                # we don't need to override getters in this framework
+                func.__name__ == "__get__"
             ):
                 return super().__torch_function__(func, types, args, kwargs)
 
@@ -147,9 +160,9 @@ def auto_prepare(
             # but we didn't collect the quant info at calibration step, which can't get
             # quant info here(asster KeyError), so we disable torch.add(tensor, scaler) quantizaiton.
             if (
-                hook_type is HookType.OP_HOOKS and
-                func in [torch.add, torch.Tensor.add] and
-                _check_add_has_scalar_input(args)
+                hook_type is HookType.OP_HOOKS
+                and func in [torch.add, torch.Tensor.add]
+                and check_add_has_scalar_tensor_input(args)
             ):
                 hook_type = None
 
@@ -474,7 +487,20 @@ def auto_prepare(
     if not isinstance(configure.activation(), PlaceholderObserver):
         model.__class__ = QuantizationInterceptionModule
         # init model quantization state using example_inputs
-        model(*example_inputs)
+        assert example_inputs is not None or example_kwarg_inputs is not None, (
+            "IPEX: example_inputs and example_kwarg_inputs cannot be None at same time "
+            "for static quantization."
+        )
+        if example_kwarg_inputs is None:
+            model(*example_inputs)
+        elif example_inputs is None:
+            model(**example_kwarg_inputs)
+        else:
+            AssertionError(
+                False,
+                "IPEX quantization.prepare: example_inputs and example_kwarg_inputs cannot be set at same time "
+                "for static quantization.",
+            )
     return model
 
 
@@ -511,6 +537,26 @@ def auto_convert(
 
     global_disable_torch_function_override = False
 
+    def check_add_has_scalar_tensor_input(args):
+        r"""
+        This function is about check add whether has scalar(tensor) input.
+        """
+        nonlocal global_disable_torch_function_override
+        old_global_disable_torch_function_override = (
+            global_disable_torch_function_override
+        )
+        global_disable_torch_function_override = True
+        for arg in args:
+            if not isinstance(arg, torch.Tensor) or arg.dim() == 0:
+                global_disable_torch_function_override = (
+                    old_global_disable_torch_function_override
+                )
+                return True
+        global_disable_torch_function_override = (
+            old_global_disable_torch_function_override
+        )
+        return False
+
     class QuantizationConvertTensorProxy(torch.Tensor):
         """
         An override of `torch.Tensor` to enable dynamic dispatch for
@@ -533,11 +579,13 @@ def auto_convert(
             nonlocal global_disable_torch_function_override
             if (
                 # global override means disable the override here
-                # we don't need to override getters in this framework
-                # to prevent printing things from going into an infinite loop
                 global_disable_torch_function_override
-                or func == torch.Tensor.__repr__
-                or func.__name__ == "__get__"
+                or
+                # to prevent printing things from going into an infinite loop
+                func == torch.Tensor.__repr__
+                or
+                # we don't need to override getters in this framework
+                func.__name__ == "__get__"
             ):
                 return super().__torch_function__(func, types, args, kwargs)
 
@@ -550,9 +598,9 @@ def auto_convert(
             # but we didn't collect the quant info at calibration step, which can't get
             # quant info here(asster KeyError), so we disable torch.add(tensor, scaler) quantizaiton.
             if (
-                hook_type is HookType.OP_HOOKS and
-                func in [torch.add, torch.Tensor.add] and
-                _check_add_has_scalar_input(args)
+                hook_type is HookType.OP_HOOKS
+                and func in [torch.add, torch.Tensor.add]
+                and check_add_has_scalar_tensor_input(args)
             ):
                 hook_type = None
 

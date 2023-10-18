@@ -58,4 +58,5 @@ IPEX_LIBRARY_FRAGMENT() {
       torch_ipex::cpu::bf16::converter::cat_bfloat16_float,
       c10::DispatchKey::CPU);
 }
+
 } // namespace

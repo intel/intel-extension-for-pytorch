@@ -17,12 +17,23 @@ from .utils.channels_last_1d import to_channels_last_1d
 from .cpu.utils.linear_bn_folding import linear_bn_fuse
 from .cpu.graph_capture import GraphCapture
 from .nn.utils._lstm_convert import _LSTM, replace_lstm_with_ipex_lstm
-from .nn.utils._weight_prepack import _IPEXConv2d, _IPEXConvTranspose2d, _IPEXLinear
-from .nn.utils._weight_prepack import weight_prepack_with_ipex, record_input_shape_for_prepack
+from .nn.utils._weight_prepack import (
+    _IPEXConv1d,
+    _IPEXConv2d,
+    _IPEXConv3d,
+    _IPEXConvTranspose2d,
+    _IPEXConvTranspose3d,
+    _IPEXLinear,
+)
+from .nn.utils._weight_prepack import (
+    weight_prepack_with_ipex,
+    record_input_shape_for_prepack,
+)
 from .cpu._auto_kernel_selection import (
-    _enable_dnnl, 
+    _enable_dnnl,
     _disable_dnnl,
 )
+from .fx.concat_linear import _concat_linear
 
 import intel_extension_for_pytorch._C as core
 
@@ -72,7 +83,6 @@ def _copy_model_and_optimizer(model, optimizer):
                 setattr(  # noqa: B010
                     new_module, "master_weight_split", old_module.master_weight_split
                 )
-
             for (_, old_child), (_, new_child) in zip(
                 old_module.named_children(), new_module.named_children()
             ):
@@ -133,6 +143,7 @@ class _O0:
         properties.fuse_update_step = False
         properties.auto_kernel_selection = False
         properties.graph_mode = False
+        properties.concat_linear = False
         properties.optimize_transformers = False
         return properties
 
@@ -150,6 +161,7 @@ class _O1:
         properties.fuse_update_step = True
         properties.auto_kernel_selection = False
         properties.graph_mode = False
+        properties.concat_linear = False
         properties.optimize_transformers = True
         return properties
 
@@ -173,6 +185,7 @@ def optimize(
     auto_kernel_selection=None,
     sample_input=None,
     graph_mode=None,
+    concat_linear=None,
     optimize_transformers=None
 ):
     r"""
@@ -262,6 +275,9 @@ def optimize(
             configuration set by ``level`` knob. Auto kernel selection works for CPU only.
         graph_mode: (bool) [experimental]: It will automatically apply a combination of methods
             to generate graph or multiple subgraphs if True. The default value is ``False``.
+        concat_linear (bool): Whether to perform ``concat_linear``. It only
+            works for inference model. The default value is ``None``. Explicitly
+            setting this knob overwrites the configuration set by ``level`` knob.
 
     Returns:
         Model and optimizer (if given) modified according to the ``level`` knob
@@ -329,8 +345,7 @@ def optimize(
     opt_properties = _Properties()
     if level not in opt_levels:
         raise RuntimeError(
-            "Unexpected optimization level {}. ".format(level)
-            + "Options are 'O0', 'O1'."
+            f"Unexpected optimization level {level}. Options are 'O0', 'O1'."
         )
     else:
         opt_properties = opt_levels[level](opt_properties)
@@ -384,6 +399,8 @@ def optimize(
         opt_properties.auto_kernel_selection = auto_kernel_selection
     if graph_mode is not None:
         opt_properties.graph_mode = graph_mode
+    if concat_linear is not None:
+        opt_properties.concat_linear = concat_linear
     if optimize_transformers is not None:
         opt_properties.optimize_transformers = optimize_transformers
 
@@ -456,19 +473,21 @@ def optimize(
         if opt_properties.conv_bn_folding:
             try:
                 optimized_model = optimization.fuse(optimized_model, inplace=True)
-            except Exception:
+            except:  # noqa E722
                 warnings.warn(
                     "Conv BatchNorm folding failed during the optimize process."
                 )
         if opt_properties.linear_bn_folding:
             try:
                 optimized_model = linear_bn_fuse(optimized_model, inplace=True)
-            except Exception:
+            except BaseException:
                 warnings.warn(
                     "Linear BatchNorm folding failed during the optimize process."
                 )
         if opt_properties.replace_dropout_with_identity:
             utils._model_convert.replace_dropout_with_identity(optimized_model)
+        if opt_properties.concat_linear:
+            optimized_model = _concat_linear(optimized_model, inplace=True)
         if dtype in (
             torch.bfloat16,
             torch.float16,
@@ -479,6 +498,7 @@ def optimize(
 
     if opt_properties.optimize_lstm:
         replace_lstm_with_ipex_lstm(optimized_model, optimized_optimizer)
+        torch._dynamo.allow_in_graph(_LSTM)
     if opt_properties.optimize_transformers:
         utils._model_convert.replace_transformer_with_ipex_transformer(optimized_model)
     if (
@@ -489,10 +509,10 @@ def optimize(
         if not opt_properties.fuse_update_step:
             opt_properties.split_master_weight_for_bf16 = False
             warnings.warn(
-                "IPEX does not support non-fused split master weight for bf16 training, "
-                + "reset split_master_weight_for_bf16 flag to False. "
-                + "If you want to use split_master_weight_for_bf16, "
-                + "please set both split_master_weight_for_bf16 and fuse_update_step to True."
+                "IPEX does not non-fused split master weight for bf16 training, "
+                + "have reset split_master_weight_for_bf16 flag to False. "
+                + "If you want to use split_master_weight_for_bf16. "
+                + "Please set both split_master_weight_for_bf16 and fuse_update_step to True."
             )
         elif (
             type(optimizer) not in IPEX_FUSED_OPTIMIZER_LIST_CPU
@@ -503,7 +523,7 @@ def optimize(
             warnings.warn(
                 "IPEX CPU does not support fused/fused split update for "
                 + str(type(optimizer))
-                + ", use non-fused master weight update for bf16 training on CPU."
+                + " will use non-fused master weight update for bf16 training on CPU."
             )
         elif (
             type(optimizer) not in IPEX_FUSED_OPTIMIZER_LIST_XPU
@@ -514,7 +534,7 @@ def optimize(
             warnings.warn(
                 "IPEX XPU does not support fused/fused split update for "
                 + str(type(optimizer))
-                + ", use non-fused master weight update for bf16 training on XPU."
+                + " will use non-fused master weight update for bf16 training on XPU."
             )
 
     if model.training:
@@ -560,11 +580,12 @@ def optimize(
         ) = weight_prepack_with_ipex(
             optimized_model, optimized_optimizer, params_attr, "cpu"
         )
+        torch._dynamo.allow_in_graph(_IPEXConv1d)
         torch._dynamo.allow_in_graph(_IPEXConv2d)
+        torch._dynamo.allow_in_graph(_IPEXConv3d)
         torch._dynamo.allow_in_graph(_IPEXConvTranspose2d)
+        torch._dynamo.allow_in_graph(_IPEXConvTranspose3d)
         torch._dynamo.allow_in_graph(_IPEXLinear)
-        torch._dynamo.allow_in_graph(_LSTM)
-
 
     if opt_properties.graph_mode:
         _old_forward = optimized_model.forward
@@ -587,31 +608,6 @@ def optimize(
             device_type,
         )
     return optimized_model, optimized_optimizer
-
-
-def enable_onednn_fusion(enabled):
-    r"""
-    Enables or disables oneDNN fusion functionality. If enabled, oneDNN
-    operators will be fused in runtime, when intel_extension_for_pytorch
-    is imported.
-
-    Args:
-        enabled (bool): Whether to enable oneDNN fusion functionality or not.
-            Default value is ``True``.
-
-    Examples:
-
-        >>> import intel_extension_for_pytorch as ipex
-        >>> # to enable the oneDNN fusion
-        >>> ipex.enable_onednn_fusion(True)
-        >>> # to disable the oneDNN fusion
-        >>> ipex.enable_onednn_fusion(False)
-    """
-
-    if enabled:
-        core.enable_jit_opt()
-    else:
-        core.disable_jit_opt()
 
 
 def _convert_convNd_deconvNd_weight_memory_format(module):

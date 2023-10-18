@@ -1,6 +1,8 @@
 import torch
 import intel_extension_for_pytorch as ipex  # noqa F401
-from ...nn.utils._weight_prepack import _IPEXLinear as _IPEXLinear
+from intel_extension_for_pytorch.nn.utils._weight_prepack import (
+    _IPEXLinear as _IPEXLinear,
+)
 import enum
 
 

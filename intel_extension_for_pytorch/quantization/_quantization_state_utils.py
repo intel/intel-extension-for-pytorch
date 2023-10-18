@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 import torch.nn.quantized.dynamic as nnqd
 from intel_extension_for_pytorch.nn.functional import interaction
+from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
 import intel_extension_for_pytorch._C as core
 
 
@@ -50,6 +51,7 @@ functions_supported_by_quantization_ipex = set(
     [
         interaction,
         torch.ops.torch_ipex.interaction_forward,
+        torch.ops.torch_ipex.merged_embeddingbag_cat_forward,
     ]
 )
 
@@ -70,6 +72,7 @@ module_types_supported_by_quantization = set(
         # torch.nn.Sigmoid,  # TODO
         # torch.nn.GELU,     # TODO
         torch.nn.EmbeddingBag,
+        MergedEmbeddingBagWithCat,
         torch.nn.Flatten,
         torch.nn.LSTM,
         # dynamic quantization module
@@ -206,7 +209,7 @@ class SeenQOpInfo:
     output_tensor_infos: List[QTensorInfo]
     # Some operator only support INT8->INT8, if post operator is non-quantized op,
     # the output_tensor_infos's inf dtype always same as orig dtype, we can set the output_tensor_infos's
-    # inf dtype to int8, and do a check whether add fake quant after output accoreding to the inf dtype,
+    # inf dtype to int8, and do a check whether add fake quant after output according to the inf dtype,
     # but if the post operator is quantized op, we will add two fake quant if we only check the inf dtype.
     # so we introduce insert_fake_quant_after_output to fix this issue: if insert_fake_quant_after_output is true,
     # and the the inf dtype is int8, we will add fake quant after the output, otherwise, we will not insert fake quant
@@ -252,7 +255,10 @@ def get_input_observed_arg_idxs(
     op_type: str,
     op_type_is_module: bool,
 ) -> Optional[List[int]]:
-    if op_type_is_module and op_type != str(torch.nn.EmbeddingBag):
+    if op_type_is_module and op_type not in (
+        str(torch.nn.EmbeddingBag),
+        str(MergedEmbeddingBagWithCat),
+    ):
         # TODO(future PR): handle RNNs
         return [0]
     elif op_type in conv_linear_ops:
@@ -267,6 +273,20 @@ def get_weight_arg_idx(op: str) -> Optional[int]:
     if op in conv_linear_ops:
         return 1
     return None
+
+
+def set_tensor_info_dtype(tensor_info: QTensorInfo, observer):
+    """
+    This function is expected to be called on the prepare step which is tensor_info's
+    inf_dtype is not same as observe's dtype when user load a changed configure json file.
+    """
+    quantized_dtype = [torch.quint8, torch.qint8]
+    if (
+        tensor_info.inf_dtype in quantized_dtype
+        and tensor_info.inf_dtype != tensor_info.orig_dtype
+        and tensor_info.inf_dtype != observer.dtype
+    ):
+        tensor_info.inf_dtype = observer.dtype
 
 
 def iterate_and_apply(
@@ -397,11 +417,10 @@ def iterate_and_apply_convert(
                 ):
                     # do autocast in Python side
                     if args.dtype == torch.float32:
-                        args = args.to(torch.bfloat16)
-                    args = args.to(torch.float32)
+                        args = args.to(dtype=torch.float32)
                     args = torch.quantize_per_channel(args, scale, zp, ch_axis, dtype)
                     args = args.dequantize()
-                    args = args.to(torch.bfloat16)
+                    args = args.to(dtype=torch.bfloat16)
                 else:
                     args = torch.quantize_per_channel(args, scale, zp, ch_axis, dtype)
                     args = args.dequantize()
@@ -423,14 +442,13 @@ def iterate_and_apply_convert(
                         torch.is_autocast_cpu_enabled()
                         and core.get_autocast_dtype() == torch.bfloat16
                     ):
-                        if args.dtype == torch.float32:
-                            args = args.to(torch.bfloat16)
-                        args = args.to(torch.float32)
+                        if args.dtype == torch.bfloat16:
+                            args = args.to(dtype=torch.float32)
                         args = torch.quantize_per_tensor(
                             args, scale.item(), zp.item(), dtype
                         )
                         args = args.dequantize()
-                        args = args.to(torch.bfloat16)
+                        args = args.to(dtype=torch.bfloat16)
                     else:
                         args = torch.quantize_per_tensor(
                             args, scale.item(), zp.item(), dtype
@@ -441,13 +459,13 @@ def iterate_and_apply_convert(
                     args_is_bfloat16 = False
                     if args.dtype == torch.bfloat16:
                         args_is_bfloat16 = True
-                        args = args.to(torch.float32)
+                        args = args.to(dtype=torch.float32)
                     args = torch.quantize_per_tensor(
                         args, scale.item(), zp.item(), dtype
                     )
                     args = args.dequantize()
                     if args_is_bfloat16:
-                        args = args.to(torch.bfloat16)
+                        args = args.to(dtype=torch.bfloat16)
         flattened_tensor_infos_idx[0] += 1
         return args
 

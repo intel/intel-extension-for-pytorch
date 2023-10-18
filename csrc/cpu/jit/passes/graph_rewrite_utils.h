@@ -125,6 +125,31 @@ inline auto fuse_add_filter_accumu_on_the_left =
       return true;
     };
 
+inline auto fuse_binary_add_filter =
+    [](const torch::jit::Match& match,
+       const std::unordered_map<std::string, torch::jit::Value*>& vmap) {
+      // onednn binary post ops binary_add do not support scale
+      if (vmap.find("alpha") != vmap.end()) {
+        auto alpha = toIValue(match.values_map.at(vmap.at("alpha")));
+        if (alpha.has_value()) {
+          if (alpha.value().isDouble()) {
+            auto alpha_ = alpha.value().toDouble();
+            if (alpha_ != 1.0) {
+              return false;
+            }
+          } else if (alpha.value().isInt()) {
+            auto alpha_ = alpha.value().toInt();
+            if (alpha_ != 1) {
+              return false;
+            }
+          } else {
+            return false;
+          }
+        }
+      }
+      return true;
+    };
+
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch_ipex

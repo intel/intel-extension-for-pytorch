@@ -9,7 +9,7 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../../../cmake/Modules)
 
 # specify the C++ standard
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 # relocatable binary with automatically rpath of depend libraries
 set(CMAKE_INSTALL_RPATH $ORIGIN)
@@ -48,6 +48,7 @@ set(IPEX_CPP_TEST_SOURCES test_runtime_api.cpp test_dyndisp_and_isa_api.cpp)
 
 add_executable(${CPU_CPP_TEST_NAME} ${IPEX_CPP_TEST_SOURCES})
 
+set(BUILD_STATIC_ONEMKL ON)
 find_package(oneMKL QUIET)
 if (ONEMKL_FOUND)
   target_include_directories(${CPU_CPP_TEST_NAME} PUBLIC ${ONEMKL_INCLUDE_DIR})
@@ -60,11 +61,12 @@ target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC gtest_main)
 target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC gtest)
 
 # Link Pytorch
-target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${TORCH_INSTALL_PREFIX}/lib/libtorch_cpu.so)
-target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${TORCH_INSTALL_PREFIX}/lib/libc10.so)
+target_link_directories(${CPU_CPP_TEST_NAME} PRIVATE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC torch_cpu)
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC c10)
 
 # Link IPEX
-target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib/libintel-ext-pt-cpu.so)
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC intel-ext-pt-cpu)
 
 install(TARGETS ${CPU_CPP_TEST_NAME}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

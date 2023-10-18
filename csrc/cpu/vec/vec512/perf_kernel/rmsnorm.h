@@ -11,12 +11,12 @@
 namespace torch_ipex {
 namespace cpu {
 namespace kernel {
-template <typename T>
+template <typename T, typename T1>
 void _compute_rmsnorm(
     const T* a_ptr,
     const int& size,
     float eps,
-    const T* gamma_ptr,
+    const T1* gamma_ptr,
     T* out_ptr) {
   auto vec_acc_pow = _mm512_set1_ps(0.0);
   int i;

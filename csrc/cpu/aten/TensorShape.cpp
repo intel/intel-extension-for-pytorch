@@ -5,12 +5,12 @@
 #include <ATen/MemoryOverlap.h>
 #include <ATen/NamedTensorUtils.h>
 #include <ATen/NativeFunctions.h>
-#include <ATen/SparseTensorUtils.h>
 #include <ATen/WrapDimUtils.h>
 #include <ATen/core/DimVector.h>
 #include <ATen/core/IListRef.h>
 #include <ATen/native/Copy.h>
 #include <ATen/native/Resize.h>
+#include <ATen/native/SparseTensorUtils.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/TensorShape.h>
 #include <ATen/native/TypeProperties.h>
@@ -224,7 +224,7 @@ at::Tensor& cat_out_cpu(
   ScalarType dtype = materialized[valid].get().scalar_type();
   bool serial_dtype =
       (dtype == ScalarType::Double || dtype == ScalarType::Float ||
-       dtype == ScalarType::BFloat16);
+       dtype == ScalarType::BFloat16 || dtype == ScalarType::Half);
   if (all_contiguous && all_same_dtype && serial_dtype) {
     cat_contig_stub(kCPU, result, materialized, dim, all_same_sizes_and_stride);
     return result;

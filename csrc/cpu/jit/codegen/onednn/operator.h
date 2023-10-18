@@ -15,8 +15,13 @@ class Operator {
       : n(node), o(getId(node), kind, node->kind().toQualString()), k(kind) {}
 
   Operator& setInputValue(torch::jit::Value* v) {
-    if (v->mustNotBeNone())
-      o.add_input(createLogicalTensor(v));
+    if (v->mustNotBeNone()) {
+      if ((v->node()->kind() != torch::jit::prim::Constant)) {
+        o.add_input(logicalTensorWithUndefSizesStrides(v));
+      } else {
+        o.add_input(createLogicalTensor(v));
+      }
+    }
     return *this;
   }
 
@@ -31,8 +36,13 @@ class Operator {
   }
 
   Operator& setOutputValue(torch::jit::Value* v) {
-    if (v->mustNotBeNone())
-      o.add_output(createLogicalTensor(v));
+    if (v->mustNotBeNone()) {
+      if (v->node()->kind() != torch::jit::prim::Constant) {
+        o.add_output(logicalTensorWithUndefSizesStrides(v));
+      } else {
+        o.add_output(createLogicalTensor(v));
+      }
+    }
     return *this;
   }
 
@@ -47,13 +57,13 @@ class Operator {
   }
 
   template <typename Attr>
-  Operator& setAttr(std::string name, Attr&& attr) {
+  Operator& setAttr(dnnl::graph::op::attr name, Attr&& attr) {
     o.set_attr(name, std::forward<Attr>(attr));
     return *this;
   }
 
   template <typename F>
-  Operator& setAttr(std::string name, const F& fn, size_t offset) {
+  Operator& setAttr(dnnl::graph::op::attr name, const F& fn, size_t offset) {
     return setAttr(name, fn(n, offset));
   }
 
@@ -153,6 +163,13 @@ class Operator {
   dnnl::graph::logical_tensor createLogicalTensor(
       torch::jit::Value* value) const {
     return LlgaTensorDesc(value).logical_tensor();
+  }
+
+  // We use shapes & strides as -1 for outputs of ops that we'd try mapping to
+  // LLGA
+  dnnl::graph::logical_tensor logicalTensorWithUndefSizesStrides(
+      torch::jit::Value* value) const {
+    return LlgaTensorDesc(value).convertDimsToUnknown().logical_tensor();
   }
 
   const torch::jit::Node* n;

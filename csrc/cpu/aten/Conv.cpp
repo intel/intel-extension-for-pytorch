@@ -227,10 +227,12 @@ at::Tensor convolution_backward_input(
   if (is_channels_last_contiguous) {
     return grad_input;
   } else {
-    return mkldnn_to_dense(new_with_itensor_mkldnn(
-        std::move(mkldnn_grad_input),
-        optTypeMetaToScalarType(grad_output.options().dtype_opt()),
-        grad_output.options().device_opt()));
+    return mkldnn_to_dense(
+               new_with_itensor_mkldnn(
+                   std::move(mkldnn_grad_input),
+                   optTypeMetaToScalarType(grad_output.options().dtype_opt()),
+                   grad_output.options().device_opt()))
+        .contiguous(memory_format);
   }
 }
 
@@ -370,9 +372,12 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward_kernel(
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward(
     const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias_opt,
     const at::Tensor& grad_output,
     std::array<bool, 3> output_mask,
-    const at::Tensor& op_context) {
+    const at::Tensor& op_context,
+    c10::optional<bool> weight_channels_last) {
   return reinterpret_cast<IpexConvolutionOpContext*>(
              op_context.data_ptr<int64_t>()[0])
       ->run_backward(input, grad_output, output_mask);
@@ -426,7 +431,9 @@ at::Tensor IPEXConvolutionOp::forward(
   ctx->saved_data["weight_requires_grad"] = weight.requires_grad();
   ctx->saved_data["bias_requires_grad"] =
       bias_opt.has_value() && bias_opt.value().requires_grad() ? true : false;
-  ctx->save_for_backward({input});
+  ctx->saved_data["bias_opt"] = bias_opt;
+  ctx->saved_data["weight_channels_last"] = weight_channels_last;
+  ctx->save_for_backward({input, weight});
 
   return _forward(
       input,
@@ -451,15 +458,25 @@ torch::autograd::variable_list IPEXConvolutionOp::backward(
   output_mask[0] = ctx->saved_data["input_requires_grad"].toBool();
   output_mask[1] = ctx->saved_data["weight_requires_grad"].toBool();
   output_mask[2] = ctx->saved_data["bias_requires_grad"].toBool();
+  auto bias_opt = ctx->saved_data["bias_opt"].toOptional<at::Tensor>();
+  auto weight_channels_last =
+      ctx->saved_data["weight_channels_last"].toOptional<bool>();
   auto saved = ctx->get_saved_variables();
   at::Tensor input = saved[0];
+  at::Tensor weight = saved[1];
   at::Tensor grad_input, grad_weight, grad_bias;
   static auto op =
       torch::Dispatcher::singleton()
           .findSchemaOrThrow("torch_ipex::convolution_backward", "")
           .typed<decltype(convolution_backward)>();
-  std::tie(grad_input, grad_weight, grad_bias) =
-      op.call(input, grad_outputs[0], output_mask, op_context);
+  std::tie(grad_input, grad_weight, grad_bias) = op.call(
+      input,
+      weight,
+      bias_opt,
+      grad_outputs[0],
+      output_mask,
+      op_context,
+      weight_channels_last);
   return {
       grad_input,
       grad_weight,
@@ -504,53 +521,6 @@ at::Tensor convolution_forward(
       stride,
       dilation,
       weight_channels_last);
-}
-
-at::Tensor convolution_forward_meta(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const c10::optional<at::Tensor>& bias_opt,
-    const at::Tensor& op_context,
-    c10::optional<at::IntArrayRef> kernel_size,
-    c10::optional<at::IntArrayRef> padding,
-    c10::optional<at::IntArrayRef> stride,
-    c10::optional<at::IntArrayRef> dilation,
-    c10::optional<bool> weight_channels_last) {
-  TORCH_CHECK(
-      kernel_size.has_value() && padding.has_value() && stride.has_value() &&
-          dilation.has_value() && weight_channels_last.has_value(),
-      "kernel_size, padding, stride, dilation and weight_channels_last must have value for convolution_forward_meta");
-  auto input_size = input.sym_sizes();
-  c10::SymDimVector output_sizes = calc_conv_output_size(
-      input_size,
-      kernel_size.value(),
-      padding.value(),
-      stride.value(),
-      dilation.value());
-  auto output = at::empty_symint(output_sizes, input.options());
-
-  bool use_channels_last =
-      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
-      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d ||
-      weight_channels_last.value();
-
-  auto memory_format = at::MemoryFormat::Contiguous;
-  if (use_channels_last) {
-    if (input.dim() == 4) {
-      memory_format = at::MemoryFormat::ChannelsLast;
-    } else if (input.dim() == 5) {
-      memory_format = at::MemoryFormat::ChannelsLast3d;
-    }
-  }
-
-  if (!is_channels_last_1d(output)) {
-    output = output.contiguous(memory_format);
-    if (input.dim() == 3) {
-      output = to_channels_last_1d(output);
-    }
-  }
-
-  return output;
 }
 
 } // namespace cpu
@@ -609,14 +579,10 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "convolution_forward",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::convolution_forward_impl);
-  m.impl(
-      "convolution_forward",
-      c10::DispatchKey::Meta,
-      torch_ipex::cpu::convolution_forward_meta);
   // bw
   m.def(
-      "convolution_backward(Tensor input, Tensor grad_output, bool[3] out_mask, "
-      "Tensor W_prepack) -> (Tensor, Tensor, Tensor)");
+      "convolution_backward(Tensor input, Tensor weight, Tensor? bias, Tensor grad_output, bool[3] out_mask, "
+      "Tensor W_prepack, bool? weight_channels_last) -> (Tensor, Tensor, Tensor)");
   m.impl(
       "convolution_backward",
       c10::DispatchKey::CPU,

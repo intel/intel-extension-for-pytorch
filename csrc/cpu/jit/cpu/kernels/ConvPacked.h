@@ -162,6 +162,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
 // weight This n-D ATen weight will be used for autograd and optimizer update
 at::Tensor get_at_packed_weight(ContextConvolution& context);
 
+c10::optional<at::Tensor> get_at_bias(ContextConvolution& context);
+
 // Pack given tensor to same format with mkldnn packed weight
 at::Tensor pack(ContextConvolution& context, const at::Tensor& tensor);
 

@@ -251,7 +251,7 @@ class XPUTritonWrapperCodeGen(WrapperCodeGen):
         with output.indent():
             output.writelines(
                 [
-                    "from intel_extension_for_pytorch._inductor.wrapper_benchmark import compiled_module_main",
+                    "from intel_extension_for_pytorch._inductor.xpu.wrapper_benchmark import compiled_module_main",
                     f"compiled_module_main('{get_benchmark_name()}', benchmark_compiled_module)",
                 ]
             )

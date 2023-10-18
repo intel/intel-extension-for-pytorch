@@ -27,7 +27,7 @@ def tensor_to_channels_last_1d(t):
 
 
 def to_channels_last_1d(t):
-    scope = (torch.nn.Conv1d)
+    scope = torch.nn.Conv1d
     if isinstance(t, torch.nn.Module):
         for m in t.modules():
             for param in m.parameters():

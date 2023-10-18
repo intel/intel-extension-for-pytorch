@@ -2,7 +2,9 @@
 
 #include <ATen/Dispatch.h>
 #include <ATen/NativeFunctions.h>
+#include <ATen/OpMathType.h>
 #include <ATen/Parallel.h>
+#include <ATen/cpu/vec/functional.h>
 #include <ATen/cpu/vec/vec.h>
 #include <ATen/native/Pool.h>
 #include <ATen/native/cpu/utils.h>
@@ -128,7 +130,10 @@ void cpu_avg_pool(
 }
 
 template <typename scalar_t, bool is_3d>
-void cpu_avg_pool_channels_last(
+typename std::enable_if<
+    std::is_same<scalar_t, at::opmath_type<scalar_t>>::value,
+    void>::type
+cpu_avg_pool_channels_last(
     const at::Tensor& output_,
     const at::Tensor& input_,
     int64_t kW,
@@ -290,8 +295,11 @@ void cpu_avg_pool_channels_last(
   }
 }
 
-template <>
-void cpu_avg_pool_channels_last<at::BFloat16, false>(
+template <typename scalar_t, bool is_3d>
+typename std::enable_if<
+    !std::is_same<scalar_t, at::opmath_type<scalar_t>>::value,
+    void>::type
+cpu_avg_pool_channels_last(
     const at::Tensor& output_,
     const at::Tensor& input_,
     int64_t kW,
@@ -312,8 +320,8 @@ void cpu_avg_pool_channels_last<at::BFloat16, false>(
   auto input = input_.contiguous(memory_format);
   auto output = output_.contiguous(memory_format);
 
-  auto input_data = input.data_ptr<at::BFloat16>();
-  auto output_data = output.data_ptr<at::BFloat16>();
+  auto input_data = input.data_ptr<scalar_t>();
+  auto output_data = output.data_ptr<scalar_t>();
 
   int64_t nbatch = input.size(0);
   int64_t channels = input.size(1);
@@ -322,7 +330,7 @@ void cpu_avg_pool_channels_last<at::BFloat16, false>(
   int64_t output_height = output.size(2);
   int64_t output_width = output.size(3);
 
-  using bVec = at::vec::Vectorized<at::BFloat16>;
+  using bVec = at::vec::Vectorized<scalar_t>;
   using fVec = at::vec::Vectorized<float>;
   // parallel on dim N, H, W
   at::parallel_for(
@@ -337,7 +345,7 @@ void cpu_avg_pool_channels_last<at::BFloat16, false>(
             begin, n, nbatch, oh, output_height, ow, output_width);
 
         // temp buffer for sum, use float as accumulation type
-        // can't reuse output buffer to store sum since it is BFloat16
+        // can't reuse output buffer to store sum since it is BFloat16/Half
         std::unique_ptr<float[]> sum_arr(new float[channels]);
         float* sum = sum_arr.get();
 
@@ -365,7 +373,7 @@ void cpu_avg_pool_channels_last<at::BFloat16, false>(
             }
           }
 
-          at::BFloat16* out = output_data + i * channels;
+          scalar_t* out = output_data + i * channels;
 
           // Pass I: zero the out lane
           int64_t d1 = 0;
@@ -393,7 +401,7 @@ void cpu_avg_pool_channels_last<at::BFloat16, false>(
           // Pass II: compute local sum
           for (const auto ih : c10::irange(ih0, ih1)) {
             for (const auto iw : c10::irange(iw0, iw1)) {
-              at::BFloat16* in = input_data +
+              scalar_t* in = input_data +
                   n * input_height * input_width * channels +
                   ih * input_width * channels + iw * channels;
 
@@ -402,7 +410,7 @@ void cpu_avg_pool_channels_last<at::BFloat16, false>(
                 bVec data_bvec = bVec::loadu(in + d2);
                 fVec data_fvec0, data_fvec1;
                 std::tie(data_fvec0, data_fvec1) =
-                    convert_bfloat16_float(data_bvec);
+                    at::vec::convert_to_float<scalar_t>(data_bvec);
 
                 fVec sum_fvec0 = fVec::loadu(sum + d2) + data_fvec0;
                 fVec sum_fvec1 =
@@ -423,11 +431,12 @@ void cpu_avg_pool_channels_last<at::BFloat16, false>(
             fVec out_fvec1 = fVec::loadu(sum + d3 + fVec::size()) /
                 fVec(float(divide_factor));
 
-            bVec out_bvec = convert_float_bfloat16(out_fvec0, out_fvec1);
+            bVec out_bvec =
+                at::vec::convert_from_float<scalar_t>(out_fvec0, out_fvec1);
             out_bvec.store(out + d3);
           }
           for (; d3 < size; d3++) {
-            out[d3] = at::BFloat16(sum[d3] / divide_factor);
+            out[d3] = scalar_t(sum[d3] / divide_factor);
           }
 
           // move on to next output index
@@ -666,15 +675,16 @@ void avg_pool2d_kernel_impl(
     c10::optional<int64_t> divisor_override) {
   switch (input.suggest_memory_format()) {
     case at::MemoryFormat::Contiguous: {
-      AT_DISPATCH_FLOATING_TYPES_AND2(
+      AT_DISPATCH_FLOATING_TYPES_AND3(
           at::ScalarType::Long,
           at::ScalarType::BFloat16,
+          at::ScalarType::Half,
           input.scalar_type(),
           "avg_pool2d",
           [&] {
-            if (input.scalar_type() == at::ScalarType::BFloat16) {
+            if (at::isReducedFloatingType(input.scalar_type())) {
               cpu_avg_pool<
-                  at::BFloat16,
+                  scalar_t,
                   /*accscalar_t*/ float,
                   /* is_3d */ false>(
                   output,
@@ -746,9 +756,10 @@ void avg_pool2d_kernel_impl(
       break;
     }
     case at::MemoryFormat::ChannelsLast: {
-      AT_DISPATCH_FLOATING_TYPES_AND2(
+      AT_DISPATCH_FLOATING_TYPES_AND3(
           at::ScalarType::Long,
           at::ScalarType::BFloat16,
+          at::ScalarType::Half,
           input.scalar_type(),
           "avg_pool2d_channels_last",
           [&] {
@@ -789,8 +800,9 @@ void avg_pool2d_backward_kernel_impl(
     c10::optional<int64_t> divisor_override) {
   switch (grad_output.suggest_memory_format()) {
     case at::MemoryFormat::Contiguous: {
-      AT_DISPATCH_FLOATING_TYPES_AND(
+      AT_DISPATCH_FLOATING_TYPES_AND2(
           at::ScalarType::BFloat16,
+          at::ScalarType::Half,
           grad_output.scalar_type(),
           "avg_pool2d_backward",
           [&] {
@@ -812,8 +824,9 @@ void avg_pool2d_backward_kernel_impl(
       break;
     }
     case at::MemoryFormat::ChannelsLast: {
-      AT_DISPATCH_FLOATING_TYPES_AND(
+      AT_DISPATCH_FLOATING_TYPES_AND2(
           at::ScalarType::BFloat16,
+          at::ScalarType::Half,
           grad_output.scalar_type(),
           "avg_pool2d_backward_channels_last",
           [&] {

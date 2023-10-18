@@ -1,4 +1,3 @@
-import torch  # noqa F401
 import functools
 import warnings
 import intel_extension_for_pytorch as ipex

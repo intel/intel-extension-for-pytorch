@@ -12,12 +12,14 @@ from torch.utils import ThroughputBenchmark
 
 try:
     import torchvision
+
     HAS_TORCHVISION = True
 except ImportError:
     HAS_TORCHVISION = False
 except RuntimeError:
     HAS_TORCHVISION = False
-skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, 'no torchvision')
+skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
+
 
 class Conv_Bn_Relu(nn.Module):
     def __init__(self):
@@ -28,6 +30,7 @@ class Conv_Bn_Relu(nn.Module):
 
     def forward(self, x):
         return F.relu(self.bn(self.conv(x)), inplace=True)
+
 
 class Conv_IF_Relu(nn.Module):
     def __init__(self):
@@ -40,6 +43,7 @@ class Conv_IF_Relu(nn.Module):
             return F.relu(self.conv(x), inplace=True)
         else:
             return F.relu(self.conv(x))
+
 
 class LinearBatchNormNd(torch.nn.Module):
     def __init__(self, dim):
@@ -54,23 +58,27 @@ class LinearBatchNormNd(torch.nn.Module):
         elif dim == 3:
             self.input1 = torch.randn(1, 32, 32, 32, 32)
             self.bn = torch.nn.BatchNorm3d(32)
-        
+
     def forward(self, x):
         return self.bn(self.linear(x))
 
+
 class ConvBatchNormLinearBatchNorm(torch.nn.Module):
-    def __init__(self, ):
+    def __init__(
+        self,
+    ):
         super(ConvBatchNormLinearBatchNorm, self).__init__()
         self.input1 = torch.randn(1, 32, 32, 32)
         self.conv = torch.nn.Conv2d(32, 32, 1)
         self.bn1 = torch.nn.BatchNorm2d(32)
         self.linear = torch.nn.Linear(32, 32)
         self.bn2 = torch.nn.BatchNorm2d(32)
-        
+
     def forward(self, x):
         return self.bn2(self.linear(self.bn1(self.conv(x))))
 
-class TestGraphCapture(TestCase):    
+
+class TestGraphCapture(TestCase):
     def test_inference_graph_mode_jit(self):
         model = Conv_Bn_Relu().to(memory_format=torch.channels_last).eval()
         x = torch.randn(3, 6, 10, 10).to(memory_format=torch.channels_last)
@@ -133,26 +141,41 @@ class TestGraphCapture(TestCase):
         self.assertEqual(y1, y2)
 
         freeze_graph = traced_model.graph_for(x)
-        self.assertTrue(any(n.kind() == "ipex_prepack::convolution_relu_run" for n in freeze_graph.nodes()))
+        self.assertTrue(
+            any(
+                n.kind() == "ipex_prepack::convolution_relu_run"
+                for n in freeze_graph.nodes()
+            )
+        )
         self.assertTrue(isinstance(traced_model, torch.jit.RecursiveScriptModule))
 
         # JIT save, load
         with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, 'scriptmodule.pt')
+            path = os.path.join(tmp, "scriptmodule.pt")
             torch.jit.save(traced_model, path)
             load_model = torch.jit.load(path)
-    
+
             with torch.no_grad():
                 for _ in range(10):
                     y3 = load_model(x)
             self.assertEqual(y1, y3)
-    
+
             freeze_graph = load_model.graph_for(x)
-            self.assertTrue(any(n.kind() == "ipex_prepack::convolution_relu_run" for n in freeze_graph.nodes()))
+            self.assertTrue(
+                any(
+                    n.kind() == "ipex_prepack::convolution_relu_run"
+                    for n in freeze_graph.nodes()
+                )
+            )
             self.assertTrue(isinstance(load_model, torch.jit.RecursiveScriptModule))
-    
+
     def test_inference_trace_graph_mode_linear_bn(self):
-        for model in [LinearBatchNormNd(dim=1).eval(), LinearBatchNormNd(dim=2).eval(), LinearBatchNormNd(dim=3).eval(), ConvBatchNormLinearBatchNorm().eval()]:
+        for model in [
+            LinearBatchNormNd(dim=1).eval(),
+            LinearBatchNormNd(dim=2).eval(),
+            LinearBatchNormNd(dim=3).eval(),
+            ConvBatchNormLinearBatchNorm().eval(),
+        ]:
             x = model.input1
             y1 = model(x)
             # JIT trace and freeze
@@ -160,31 +183,35 @@ class TestGraphCapture(TestCase):
             traced_model = torch.jit.freeze(traced_model)
             # graph capture
             traced_model = ipex.optimize(traced_model, graph_mode=True)
-            
+
             with torch.no_grad():
                 for _ in range(10):
                     y2 = traced_model(x)
             self.assertEqual(y1, y2)
-            
+
             freeze_graph = traced_model.graph_for(x)
-            self.assertFalse(any(n.kind() == "ipex::batch_norm" for n in freeze_graph.nodes()))
+            self.assertFalse(
+                any(n.kind() == "ipex::batch_norm" for n in freeze_graph.nodes())
+            )
             self.assertTrue(isinstance(traced_model, torch.jit.RecursiveScriptModule))
-            
+
             # JIT save, load
             with tempfile.TemporaryDirectory() as tmp:
-                path = os.path.join(tmp, 'scriptmodule.pt')
+                path = os.path.join(tmp, "scriptmodule.pt")
                 torch.jit.save(traced_model, path)
                 load_model = torch.jit.load(path)
-        
+
                 with torch.no_grad():
                     for _ in range(10):
                         y3 = load_model(x)
                 self.assertEqual(y1, y3)
-        
+
                 freeze_graph = load_model.graph_for(x)
-                self.assertFalse(any(n.kind() == "ipex::batch_norm" for n in freeze_graph.nodes()))
+                self.assertFalse(
+                    any(n.kind() == "ipex::batch_norm" for n in freeze_graph.nodes())
+                )
                 self.assertTrue(isinstance(load_model, torch.jit.RecursiveScriptModule))
-                
+
     def test_inference_graph_mode_trace(self):
         model = Conv_Bn_Relu().to(memory_format=torch.channels_last).eval()
         x = torch.randn(3, 6, 10, 10).to(memory_format=torch.channels_last)
@@ -202,22 +229,32 @@ class TestGraphCapture(TestCase):
         self.assertEqual(y1, y2)
 
         freeze_graph = traced_model.graph_for(x)
-        self.assertTrue(any(n.kind() == "ipex_prepack::convolution_relu_run" for n in freeze_graph.nodes()))
+        self.assertTrue(
+            any(
+                n.kind() == "ipex_prepack::convolution_relu_run"
+                for n in freeze_graph.nodes()
+            )
+        )
         self.assertTrue(isinstance(traced_model, torch.jit.RecursiveScriptModule))
 
         # JIT save, load
         with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, 'scriptmodule.pt')
+            path = os.path.join(tmp, "scriptmodule.pt")
             torch.jit.save(traced_model, path)
             load_model = torch.jit.load(path)
-    
+
             with torch.no_grad():
                 for _ in range(10):
                     y3 = load_model(x)
             self.assertEqual(y1, y3)
-    
+
             freeze_graph = load_model.graph_for(x)
-            self.assertTrue(any(n.kind() == "ipex_prepack::convolution_relu_run" for n in freeze_graph.nodes()))
+            self.assertTrue(
+                any(
+                    n.kind() == "ipex_prepack::convolution_relu_run"
+                    for n in freeze_graph.nodes()
+                )
+            )
             self.assertTrue(isinstance(load_model, torch.jit.RecursiveScriptModule))
 
     def test_inference_graph_mode_trace2(self):
@@ -242,22 +279,32 @@ class TestGraphCapture(TestCase):
         self.assertEqual(y1, y3)
 
         freeze_graph = traced_model.graph_for(x)
-        self.assertTrue(any(n.kind() == "ipex_prepack::convolution_relu_run" for n in freeze_graph.nodes()))
+        self.assertTrue(
+            any(
+                n.kind() == "ipex_prepack::convolution_relu_run"
+                for n in freeze_graph.nodes()
+            )
+        )
         self.assertTrue(isinstance(traced_model, torch.jit.RecursiveScriptModule))
 
         # JIT save, load
         with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, 'scriptmodule.pt')
+            path = os.path.join(tmp, "scriptmodule.pt")
             torch.jit.save(traced_model, path)
             load_model = torch.jit.load(path)
-    
+
             with torch.no_grad():
                 for _ in range(10):
                     y4 = load_model(x)
             self.assertEqual(y1, y4)
-    
+
             freeze_graph = load_model.graph_for(x)
-            self.assertTrue(any(n.kind() == "ipex_prepack::convolution_relu_run" for n in freeze_graph.nodes()))
+            self.assertTrue(
+                any(
+                    n.kind() == "ipex_prepack::convolution_relu_run"
+                    for n in freeze_graph.nodes()
+                )
+            )
             self.assertTrue(isinstance(load_model, torch.jit.RecursiveScriptModule))
 
     def test_throughput_benchmark_graph_mode_jit(self):
@@ -269,10 +316,7 @@ class TestGraphCapture(TestCase):
 
         bench = ThroughputBenchmark(model)
         bench.add_input(x)
-        bench.benchmark(
-                num_calling_threads=14,
-                num_warmup_iters=10,
-                num_iters=100)
+        bench.benchmark(num_calling_threads=14, num_warmup_iters=10, num_iters=100)
 
         y_bench = bench.run_once(x)
 
@@ -289,10 +333,7 @@ class TestGraphCapture(TestCase):
 
         bench = ThroughputBenchmark(model)
         bench.add_input(x)
-        bench.benchmark(
-                num_calling_threads=14,
-                num_warmup_iters=10,
-                num_iters=100)
+        bench.benchmark(num_calling_threads=14, num_warmup_iters=10, num_iters=100)
 
         y_bench = bench.run_once(x)
 
@@ -310,10 +351,7 @@ class TestGraphCapture(TestCase):
         bench = ThroughputBenchmark(model)
         bench.add_input(x)
         with torch.cpu.amp.autocast():
-            bench.benchmark(
-                    num_calling_threads=14,
-                    num_warmup_iters=10,
-                    num_iters=100)
+            bench.benchmark(num_calling_threads=14, num_warmup_iters=10, num_iters=100)
 
             y_bench = bench.run_once(x)
 
@@ -332,10 +370,7 @@ class TestGraphCapture(TestCase):
         bench = ThroughputBenchmark(model)
         bench.add_input(x)
         with torch.cpu.amp.autocast():
-            bench.benchmark(
-                    num_calling_threads=14,
-                    num_warmup_iters=10,
-                    num_iters=100)
+            bench.benchmark(num_calling_threads=14, num_warmup_iters=10, num_iters=100)
 
             y_bench = bench.run_once(x)
 
@@ -415,7 +450,9 @@ class TestGraphCapture(TestCase):
         y1.sum().backward()
 
         sgd = torch.optim.SGD(model.parameters(), lr=0.1)
-        model, opt = ipex.optimize(model, optimizer=sgd, dtype=torch.bfloat16, graph_mode=True)
+        model, opt = ipex.optimize(
+            model, optimizer=sgd, dtype=torch.bfloat16, graph_mode=True
+        )
         with torch.cpu.amp.autocast():
             y2 = model(x2)
             y2.sum().backward()
@@ -433,7 +470,9 @@ class TestGraphCapture(TestCase):
         y1.sum().backward()
 
         sgd = torch.optim.SGD(model.parameters(), lr=0.1)
-        model, opt = ipex.optimize(model, optimizer=sgd, dtype=torch.bfloat16, graph_mode=True)
+        model, opt = ipex.optimize(
+            model, optimizer=sgd, dtype=torch.bfloat16, graph_mode=True
+        )
         with torch.cpu.amp.autocast():
             y2 = model(x2)
             y2.sum().backward()
@@ -450,7 +489,9 @@ class TestGraphCapture(TestCase):
         origin_model = copy.deepcopy(model).train()
         lr = 1e-2
         origin_optimizer = torch.optim.SGD(origin_model.parameters(), lr=lr)
-        ipex_model, ipex_optimizer = ipex.optimize(origin_model, optimizer=origin_optimizer, graph_mode=True)
+        ipex_model, ipex_optimizer = ipex.optimize(
+            origin_model, optimizer=origin_optimizer, graph_mode=True
+        )
         # train one step for origin.
         y1 = origin_model(origin_x)
         loss1 = y1.sum()
@@ -465,41 +506,59 @@ class TestGraphCapture(TestCase):
         loss2.backward()
         torch.nn.utils.clip_grad_value_(ipex_model.parameters(), 10)
         ipex_optimizer.step()
-        
+
         with tempfile.TemporaryDirectory() as tmp:
-            origin_checkpoint_path = os.path.join(tmp, 'origin_checkpoint.pth')
-            ipex_checkpoint_path = os.path.join(tmp, 'ipex_checkpoint.pth')
-            torch.save({'model_state_dict': origin_model.state_dict(),
-                        'optimizer_state_dict': origin_optimizer.state_dict()
-                        }, origin_checkpoint_path)
-            torch.save({'model_state_dict': ipex_model.state_dict(),
-                        'optimizer_state_dict': ipex_optimizer.state_dict()
-                        }, ipex_checkpoint_path)
-                        
+            origin_checkpoint_path = os.path.join(tmp, "origin_checkpoint.pth")
+            ipex_checkpoint_path = os.path.join(tmp, "ipex_checkpoint.pth")
+            torch.save(
+                {
+                    "model_state_dict": origin_model.state_dict(),
+                    "optimizer_state_dict": origin_optimizer.state_dict(),
+                },
+                origin_checkpoint_path,
+            )
+            torch.save(
+                {
+                    "model_state_dict": ipex_model.state_dict(),
+                    "optimizer_state_dict": ipex_optimizer.state_dict(),
+                },
+                ipex_checkpoint_path,
+            )
+
             self.assertEqual(y1, y2)
             origin_model_state = origin_model.state_dict()
             ipex_model_state = ipex_model.state_dict()
             for var_name in origin_model_state:
-                self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name])
+                self.assertEqual(
+                    origin_model_state[var_name], ipex_model_state[var_name]
+                )
             # check state_buffer works.
             origin_optimizer_state = origin_optimizer.state_dict()
             ipex_optimizer_state = ipex_optimizer.state_dict()
             for var_name in origin_optimizer_state:
-                if var_name == 'state':
-                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state[var_name])
-    
+                if var_name == "state":
+                    self.assertEqual(
+                        origin_optimizer_state[var_name], ipex_optimizer_state[var_name]
+                    )
+
             origin_model = copy.deepcopy(model).train()
             origin_optimizer = torch.optim.SGD(origin_model.parameters(), lr=lr)
             origin_checkpoint = torch.load(origin_checkpoint_path)
-            origin_model.load_state_dict(origin_checkpoint['model_state_dict'])
-            origin_optimizer.load_state_dict(origin_checkpoint['optimizer_state_dict'])
+            origin_model.load_state_dict(origin_checkpoint["model_state_dict"])
+            origin_optimizer.load_state_dict(origin_checkpoint["optimizer_state_dict"])
             # load ipex model state
             origin_ipex_model = copy.deepcopy(model)
-            origin_ipex_optimizer = torch.optim.SGD(origin_ipex_model.parameters(), lr=lr)
+            origin_ipex_optimizer = torch.optim.SGD(
+                origin_ipex_model.parameters(), lr=lr
+            )
             ipex_checkpoint = torch.load(ipex_checkpoint_path)
-            origin_ipex_model.load_state_dict(ipex_checkpoint['model_state_dict'])
-            origin_ipex_optimizer.load_state_dict(ipex_checkpoint['optimizer_state_dict'])
-            ipex_model, ipex_optimizer = ipex.optimize(origin_model, optimizer=origin_optimizer, graph_mode=True)
+            origin_ipex_model.load_state_dict(ipex_checkpoint["model_state_dict"])
+            origin_ipex_optimizer.load_state_dict(
+                ipex_checkpoint["optimizer_state_dict"]
+            )
+            ipex_model, ipex_optimizer = ipex.optimize(
+                origin_model, optimizer=origin_optimizer, graph_mode=True
+            )
             # train second step for origin.
             y1 = origin_model(origin_x)
             loss = y1.sum()
@@ -516,16 +575,24 @@ class TestGraphCapture(TestCase):
             origin_model_state = origin_model.state_dict()
             ipex_model_state = ipex_model.state_dict()
             for var_name in origin_model_state:
-                self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name])
+                self.assertEqual(
+                    origin_model_state[var_name], ipex_model_state[var_name]
+                )
             # check state_buffer works.
             origin_optimizer_state = origin_optimizer.state_dict()
             ipex_optimizer_state = ipex_optimizer.state_dict()
             for var_name in origin_optimizer_state:
-                if var_name == 'state':
-                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state[var_name])
+                if var_name == "state":
+                    self.assertEqual(
+                        origin_optimizer_state[var_name], ipex_optimizer_state[var_name]
+                    )
+
 
 class TestGraphCaptureMultiStream(TestCase):
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_multi_stream_graph_mode_jit(self):
         model = Conv_Bn_Relu().to(memory_format=torch.channels_last)
@@ -536,7 +603,9 @@ class TestGraphCaptureMultiStream(TestCase):
 
         # Create MultiStreamModule
         cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
-        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(model, num_streams=28, cpu_pool=cpu_pool)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(
+            model, num_streams=28, cpu_pool=cpu_pool
+        )
 
         for _ in range(10):
             y_runtime = multi_stream_model(x)
@@ -545,7 +614,10 @@ class TestGraphCaptureMultiStream(TestCase):
         y = model(x)
         self.assertEqual(y, y_runtime)
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_multi_stream_graph_mode_torchdynamo(self):
         model = Conv_IF_Relu().to(memory_format=torch.channels_last)
@@ -556,7 +628,9 @@ class TestGraphCaptureMultiStream(TestCase):
 
         # Create MultiStreamModule
         cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
-        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(model, num_streams=28, cpu_pool=cpu_pool)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(
+            model, num_streams=28, cpu_pool=cpu_pool
+        )
 
         for _ in range(10):
             y_runtime = multi_stream_model(x)
@@ -565,7 +639,10 @@ class TestGraphCaptureMultiStream(TestCase):
         y = model(x)
         self.assertEqual(y, y_runtime)
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_multi_stream_graph_mode_jit_autocast(self):
         model = Conv_Bn_Relu().to(memory_format=torch.channels_last)
@@ -576,7 +653,9 @@ class TestGraphCaptureMultiStream(TestCase):
 
         # Create MultiStreamModule
         cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
-        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(model, num_streams=28, cpu_pool=cpu_pool)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(
+            model, num_streams=28, cpu_pool=cpu_pool
+        )
 
         with torch.cpu.amp.autocast():
             for _ in range(10):
@@ -587,7 +666,10 @@ class TestGraphCaptureMultiStream(TestCase):
         self.assertEqual(y, y_runtime)
         self.assertTrue(y_runtime.dtype == torch.bfloat16)
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_multi_stream_graph_mode_torchdynamo_autocast(self):
         model = Conv_IF_Relu().to(memory_format=torch.channels_last)
@@ -598,7 +680,9 @@ class TestGraphCaptureMultiStream(TestCase):
 
         # Create MultiStreamModule
         cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
-        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(model, num_streams=28, cpu_pool=cpu_pool)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(
+            model, num_streams=28, cpu_pool=cpu_pool
+        )
 
         with torch.cpu.amp.autocast():
             for _ in range(10):
@@ -609,5 +693,6 @@ class TestGraphCaptureMultiStream(TestCase):
         self.assertEqual(y, y_runtime)
         self.assertTrue(y_runtime.dtype == torch.bfloat16)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test = unittest.main()

@@ -78,25 +78,14 @@ at::Tensor dil_bert_flash_mha(
 at::Tensor dil_sd_flash_mha(
     const at::Tensor& qkv,
     const at::IntArrayRef& split_list,
-    const double& scale,
+    const at::IValue& scale,
     const int64_t& num_head);
 
 at::Tensor dil_sd_flash_mha(
     const at::Tensor& query,
     const at::Tensor& key,
     const at::Tensor& value,
-    const double& scale,
-    const int64_t& num_head);
-
-at::Tensor dil_sd_flash_mha(
-    const at::Tensor& qkv,
-    const at::IntArrayRef& split_list,
-    const int64_t& num_head);
-
-at::Tensor dil_sd_flash_mha(
-    const at::Tensor& query,
-    const at::Tensor& key,
-    const at::Tensor& value,
+    const at::IValue& scale,
     const int64_t& num_head);
 
 template <typename T>

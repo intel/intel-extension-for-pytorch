@@ -4,6 +4,8 @@ endif()
 
 include(${IPEX_ROOT_DIR}/cmake/BuildFlags.cmake)
 
+set(CMAKE_CXX_STANDARD 17)
+
 find_package(pybind11)
 if(NOT pybind11_FOUND)
   find_package(pybind11 CONFIG)
@@ -41,6 +43,7 @@ if(CLANG_FORMAT)
   add_custom_target(CL_FORMAT_FRONT_END_NATIVE_CSRC COMMAND ${CLANG_FORMAT_EXEC} -i -style=file ${ALL_FRONT_END_NATIVE_CSRC_FILES})
   add_dependencies(intel-ext-pt-python CL_FORMAT_FRONT_END_NATIVE_CSRC)
 endif()
+include_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/include)
 
 target_include_directories(intel-ext-pt-python PUBLIC ${TORCH_INCLUDE_DIRS})
 target_include_directories(intel-ext-pt-python PUBLIC ${PYTHON_INCLUDE_DIR})
@@ -60,10 +63,11 @@ endif()
 if(BUILD_WITH_XPU)
   target_compile_definitions(intel-ext-pt-python PUBLIC "BUILD_WITH_XPU")
   target_link_libraries(intel-ext-pt-python PUBLIC intel-ext-pt-gpu)
-  if(WINDOWS)
-    target_link_libraries(intel-ext-pt-python PUBLIC ${PYTHON_LIBRARIES})
-    target_link_libraries(intel-ext-pt-python PUBLIC ${TORCH_PYTHON_LIBRARIES})
-  endif()
+endif()
+
+if(WINDOWS)
+  target_link_libraries(intel-ext-pt-python PUBLIC ${PYTHON_LIBRARIES})
+  target_link_libraries(intel-ext-pt-python PUBLIC ${TORCH_PYTHON_LIBRARIES})
 endif()
 
 function (print_python_config_summary)

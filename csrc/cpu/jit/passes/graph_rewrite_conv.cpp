@@ -2,6 +2,7 @@
 #include "aten/WeightPack.h"
 #include "cpu/kernels/OpContext.h"
 #include "graph_rewrite.h"
+#include "graph_rewrite_helper.h"
 #include "graph_rewrite_utils.h"
 #include "passes/utils.h"
 
@@ -40,8 +41,14 @@ void replaceFrozenIPEXConvWithAtenConv(
         continue;
       auto conv_op_ctx =
           toIValue(prepack_node).value().toCustomClass<ConvolutionOpContext>();
-      at::Tensor weight_tensor = conv_op_ctx->to_public(
-          constant_as<at::Tensor>(n->namedInput("weight")).value());
+
+      // In inference case, the input weight tensor to this OP has been set to
+      // an empty tensor. Need to get the real weight tensor from the op
+      // context.
+      // Please refer to [ Note -- Fix the size of the saved TorchScript model ]
+      // for the details.
+      at::Tensor weight_tensor =
+          conv_op_ctx->to_public(conv_op_ctx->get_at_packed_weight());
       WithInsertPoint guard(n);
       auto graph = n->owningGraph();
 
@@ -49,10 +56,20 @@ void replaceFrozenIPEXConvWithAtenConv(
           input_size_option.value().size() == 4 ? aten::conv2d : aten::conv3d,
           1));
       aten_conv->addInput(n->inputs().at(0));
+
+      // weight
       IValue weight_value(weight_tensor);
       auto weight = graph->insertConstant(weight_value);
       aten_conv->addInput(weight);
-      aten_conv->addInput(n->inputs().at(2));
+
+      // bias
+      // In inference case, the input bias tensor to this OP has been set to an
+      // empty tensor. Need to get the real bias tensor from the op context.
+      // Please refer to [ Note -- Fix the size of the saved TorchScript model ]
+      // for the details.
+      auto may_get_bias_tensor = conv_op_ctx->get_at_bias();
+      graph_rewrite_helper::insertBias(graph, aten_conv, may_get_bias_tensor);
+
       IValue stride_value(conv_op_ctx->get_stride());
       auto stride = graph->insertConstant(stride_value);
       aten_conv->addInput(stride);

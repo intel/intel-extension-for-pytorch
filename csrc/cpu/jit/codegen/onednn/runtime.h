@@ -9,14 +9,14 @@ namespace onednn {
 
 struct Engine {
   // CPU engine singleton
-  static dnnl::graph::engine& getEngine();
+  static dnnl::engine& getEngine();
   Engine(const Engine&) = delete;
   void operator=(const Engine&) = delete;
 };
 
 struct Stream {
   // CPU stream singleton
-  static dnnl::graph::stream& getStream();
+  static dnnl::stream& getStream();
   Stream(const Stream&) = delete;
   void operator=(const Stream&) = delete;
 };

@@ -1,5 +1,6 @@
 #include "initialization.h"
 #include <ATen/core/jit_type.h>
+#include <oneapi/dnnl/dnnl_graph.hpp>
 #include <stdio.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/passes/autocast.h>
@@ -70,13 +71,22 @@ void disable_autocast_for_jit_script() {
   torch::jit::setAutocastMode(false);
 }
 
+void enable_onednn_graph_constant_tensor_cache() {
+  // oneDNN graph constant cache was enabled by default.
+  // It is changed to be disabled by default now to avoid potential OOM issues.
+  // Turn it on here to enable weight cache in inference to avoid performance
+  // regressions.
+  dnnl::graph::set_constant_tensor_cache(true);
+}
+
 InitIPEX::InitIPEX() = default;
 InitIPEX::~InitIPEX() = default;
 InitIPEX::InitIPEX(InitIPEX&&) noexcept = default;
 
 static auto init = InitIPEX()
                        .init(&init_jit_fusion_pass)
-                       .init(&disable_autocast_for_jit_script);
+                       .init(&disable_autocast_for_jit_script)
+                       .init(&enable_onednn_graph_constant_tensor_cache);
 
 void InitIPEX::check_pytorch_version() {
   int IPEX_VERSION_MAJOR = 0;

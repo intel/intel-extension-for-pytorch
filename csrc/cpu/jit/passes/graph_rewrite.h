@@ -35,10 +35,13 @@ void replaceEmbeddingBagWithQEmbeddingBag(
     std::shared_ptr<torch::jit::Graph>& graph);
 void replaceInteractionWithQInteraction(
     std::shared_ptr<torch::jit::Graph>& graph);
+void replaceMergedEmbCatWithQmergedEmbCat(
+    std::shared_ptr<torch::jit::Graph>& graph);
 void preprocessSizeForQLstm(std::shared_ptr<torch::jit::Graph>& graph);
 void replaceLstmWithQLstm(std::shared_ptr<torch::jit::Graph>& graph);
 void replaceAddWithQAdd(std::shared_ptr<torch::jit::Graph>& graph);
 
+void simplifyAllReduce(std::shared_ptr<torch::jit::Graph>& graph);
 void replaceFrozenIPEXConvWithAtenConv(
     std::shared_ptr<torch::jit::Graph>& graph);
 void replaceFrozenIPEXLinearWithAtenLinear(
@@ -48,7 +51,6 @@ void insertPrePackedConvOp(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseConvWithEltwiseAdd(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseConvAddRelu(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseBottleneck(std::shared_ptr<torch::jit::Graph>& graph);
-
 void RecordAtenLinearNodes(
     std::shared_ptr<torch::jit::Graph>& graph,
     std::unordered_set<torch::jit::Node*>& aten_linear,
@@ -59,6 +61,7 @@ void insertPrePackedLinearOp(
     const bool& use_mkl_sgemm);
 void fuseLinearWithEltwise(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseLinearAddRelu(std::shared_ptr<torch::jit::Graph>& graph);
+void fuseLinearMulAdd(std::shared_ptr<torch::jit::Graph>& graph);
 
 void FuseRMSNorm(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseAddLayerNorm(std::shared_ptr<torch::jit::Graph>& graph);
@@ -72,6 +75,7 @@ void fuseConvTransposeAdd(std::shared_ptr<torch::jit::Graph>& graph);
 void FusedEinsumPost(std::shared_ptr<torch::jit::Graph>& graph);
 
 void FusedTransFreeMha(std::shared_ptr<torch::jit::Graph>& graph);
+void FusePythonGELUWithAten(std::shared_ptr<torch::jit::Graph>& graph);
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch_ipex

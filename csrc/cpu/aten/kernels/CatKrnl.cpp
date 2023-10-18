@@ -393,8 +393,12 @@ void cat_contig_kernel(
     const at::MaterializedITensorListRef& tensors,
     int64_t dim,
     bool all_same_sizes_and_stride) {
-  AT_DISPATCH_FLOATING_TYPES_AND(
-      ScalarType::BFloat16, result.scalar_type(), "cat_contig_kernel", [&]() {
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      ScalarType::BFloat16,
+      ScalarType::Half,
+      result.scalar_type(),
+      "cat_contig_kernel",
+      [&]() {
         cpu_cat_contig_dispatch<scalar_t>(
             result, tensors, dim, all_same_sizes_and_stride);
       });

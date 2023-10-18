@@ -4,7 +4,10 @@ import functools
 import contextlib
 import types
 import warnings
-from intel_extension_for_pytorch.cpu._auto_kernel_selection import _using_dnnl
+from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
+    _using_dnnl,
+    _using_tpp,
+)
 from intel_extension_for_pytorch import frontend
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     _IPEXLinear,
@@ -14,6 +17,7 @@ from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     _IPEXConvTranspose2d,
     _IPEXConvTranspose3d,
     _IPEXLinearAllreduce,
+    _IPEXLmHeadLinearAllreduce,
     may_import_deepspeed_modules,
 )
 
@@ -31,12 +35,17 @@ def IPEX_WEIGHT_PREPACK_MODULE_CPU():
 
     deepspeed_modules = may_import_deepspeed_modules()
     if deepspeed_modules is not None:
-        LinearAllreduce, LinearLayer = deepspeed_modules
-        deepspeed_modules = {
+        LinearAllreduce, LinearLayer = deepspeed_modules[:2]
+        deepspeed_modules_mapping = {
             LinearLayer: _IPEXLinear,
             LinearAllreduce: _IPEXLinearAllreduce,
         }
-        torch_modules.update(deepspeed_modules)
+        if len(deepspeed_modules) > 2:
+            LmHeadLinearAllreduce = deepspeed_modules[2]
+            deepspeed_modules_mapping.update(
+                {LmHeadLinearAllreduce: _IPEXLmHeadLinearAllreduce}
+            )
+        torch_modules.update(deepspeed_modules_mapping)
 
     return torch_modules
 
@@ -55,7 +64,10 @@ def IPEX_GEMM_MODULE_CPU():
 @functools.lru_cache(None)
 def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
     from ._lstm_convert import _LSTM
-    from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBag
+    from intel_extension_for_pytorch.nn.modules import (
+        MergedEmbeddingBag,
+        MergedEmbeddingBagWithCat,
+    )
 
     module_convert_list_bf16_inference = [
         torch.nn.Conv2d,
@@ -65,6 +77,8 @@ def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
         torch.nn.Linear,
         torch.nn.Embedding,
         torch.nn.LSTM,
+        MergedEmbeddingBagWithCat,
+        torch.nn.ParameterList,
     ]
 
     module_convert_list_bf16_training = [
@@ -95,6 +109,8 @@ def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
         torch.nn.Conv2d,
         torch.nn.Conv3d,
         torch.nn.Linear,
+        MergedEmbeddingBagWithCat,
+        torch.nn.ParameterList,
     ]
 
     if dtype == torch.float16:
@@ -172,15 +188,29 @@ def _should_prepack(module, is_training, is_xpu=False):
         torch.float,
         torch.float32,
         torch.bfloat16,
+        torch.half,
     ):
         return False
     return True
 
 
 def get_shared_parameter_status(module, shared_p):
-    if module is None:
-        return
     visited_wrapper = []
+
+    # TODO: weight and bias of deepspeed modules are no longer
+    # nn.Parameter starting from deepspeed commit 94c7233.
+    # Add a workaround here to convert them to Parameter.
+    # Need to check if we can upstream this fix to deepspeed
+    # and remove this workaround in IPEX later.
+    deepspeed_modules = may_import_deepspeed_modules()
+    if deepspeed_modules is not None:
+        LinearAllreduce, LinearLayer = deepspeed_modules[:2]
+
+        if isinstance(module, (LinearLayer, LinearAllreduce)):
+            module.weight = torch.nn.Parameter(module.weight, requires_grad=False)
+            if module.bias is not None:
+                module.bias = torch.nn.Parameter(module.bias, requires_grad=False)
+
     for _, param in module._parameters.items():
         if param is None:
             continue
@@ -214,6 +244,20 @@ def get_shared_parameter_status(module, shared_p):
         get_shared_parameter_status(child, shared_p)
 
 
+def remove_empty_tensor(out):
+    empty_tensor_key = [
+        key
+        for key in out.keys()
+        if key.endswith(
+            ("_ipex_module_empty_weight_tensor", "_ipex_module_empty_bias_tensor")
+        )
+    ]
+
+    for key in empty_tensor_key:
+        del out[key]
+    return out
+
+
 def patch_state_dict(model, params_attr, mode):
     def cast_back_state_dict(self, *args, destination=None, prefix="", keep_vars=False):
         with torch.no_grad(), contextlib.ExitStack() as stack:
@@ -228,6 +272,8 @@ def patch_state_dict(model, params_attr, mode):
             out = self._original_state_dict(
                 *args, destination=destination, prefix=prefix, keep_vars=keep_vars
             )
+            # We don't save the _ipex_module_empty_weight_tensor or _ipex_module_empty_bias_tensor Parameter in the state dict
+            out = remove_empty_tensor(out)
         return out
 
     if not hasattr(model, "_original_state_dict"):
@@ -283,7 +329,6 @@ class ParameterWrapper(object):
             raise AssertionError("Unsupported device, only support CPU and XPU for now")
         return all(cls in module_cls for cls in self.modules_cls)
 
-    # cast util function is device netural
     def cast_for_inference(self, dtype):
         if self.original_dtype is not None:
             # current parameter is casted
@@ -318,7 +363,6 @@ class ParameterWrapper(object):
             raise AssertionError("Unsupported device, only support CPU and XPU for now")
         return all(cls in module_cls for cls in self.modules_cls)
 
-    # cast util function is device netural
     def cast_for_training(self, dtype, split):
         if self.original_dtype is not None:
             # current parameter is casted
@@ -471,6 +515,7 @@ class ParameterWrapper(object):
             assert target_module in (
                 _IPEXLinear,
                 _IPEXLinearAllreduce,
+                _IPEXLmHeadLinearAllreduce,
             )
             self.linear_prepack(module, is_training)
 
@@ -561,26 +606,36 @@ class ParameterWrapper(object):
                     torch.float32,
                     torch.bfloat16,
                 ], "Only float, bf16 and fp16 are supported"
-                use_dnnl = True
+                use_dnnl = True if not _using_tpp() else False
+        module.use_tpp = _using_tpp()
         module.use_dnnl = use_dnnl
-        if not hasattr(module, "out_features"):
-            setattr(module, "out_features", module.weight.shape[0])  # noqa: B010
-        # prepare batch size
-        module.batch_size_collapsed = None
-        if hasattr(module, "input_shape"):
-            module.batch_size_collapsed = 1
-            for i in range(len(module.input_shape) - 1):
-                module.batch_size_collapsed *= module.input_shape[i]
-        # create linear op context
-        if module.use_dnnl:
-            self.op_ctx = torch.ops.ipex_prepack.linear_prepack(
-                module.weight, module.bias, module.batch_size_collapsed
-            )
+        if not module.use_tpp:
+            if not hasattr(module, "out_features"):
+                setattr(module, "out_features", module.weight.shape[0])  # noqa: B010
+            # prepare batch size
+            module.batch_size_collapsed = None
+            if hasattr(module, "input_shape"):
+                module.batch_size_collapsed = 1
+                for i in range(len(module.input_shape) - 1):
+                    module.batch_size_collapsed *= module.input_shape[i]
+            # create linear op context
+            if module.use_dnnl:
+                self.op_ctx = torch.ops.ipex_prepack.linear_prepack(
+                    module.weight, module.bias, module.batch_size_collapsed
+                )
+            else:
+                self.op_ctx = torch.ops.ipex_prepack.mkl_sgemm_prepack(
+                    module.weight, module.bias, module.batch_size_collapsed
+                )
+            self.pack_weight(use_dnnl)
         else:
-            self.op_ctx = torch.ops.ipex_prepack.mkl_sgemm_prepack(
-                module.weight, module.bias, module.batch_size_collapsed
+            from intel_extension_for_pytorch.nn.utils import (
+                Apply_TPPLinear_weight_prepack,
             )
-        self.pack_weight(use_dnnl)
+
+            Apply_TPPLinear_weight_prepack(module, dtype=module.weight.dtype)
+            self.parameter.data = module.weight.data
+            self.parameter = module.weight
 
     def load_cast_and_prepack(self, module, param):
         # load from state dict

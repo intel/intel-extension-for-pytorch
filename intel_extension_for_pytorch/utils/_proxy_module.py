@@ -58,6 +58,7 @@ _register_proxy('QUInt8StorageBase')
 _register_proxy('QInt8StorageBase')
 _register_proxy('_XPUStreamBase')
 _register_proxy('_XPUEventBase')
+_register_proxy('_getCurrentRawStream')
 
 
 if not hasattr(intel_extension_for_pytorch._C, 'XPUFP32MathMode'):

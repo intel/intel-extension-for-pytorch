@@ -748,6 +748,78 @@ void replaceInteractionWithQInteraction(std::shared_ptr<Graph>& graph) {
   }
 }
 
+void replaceMergedEmbCatWithQmergedEmbCat(std::shared_ptr<Graph>& graph) {
+  // graph->print(std::cout);
+  std::vector<std::string> patterns;
+  std::vector<std::string> replacements;
+  std::string graph_common_head = R"(graph()";
+  std::string graph_common_tail =
+      R"(, %indices, %offsets, %qdense, %o_scale, %o_zp, %o_dtype):
+  )";
+  std::string list_construct_common_head =
+      R"(%weights : Tensor[] = prim::ListConstruct()";
+  std::string list_construct_common_tail = R"() )";
+  std::string replacement_common_tail =
+      R"(%out = ipex::qmerged_embeddingbag_cat(%weights, %indices,  %offsets, %qdense, %o_scale, %o_zp, %o_dtype) return (%out) )";
+  std::string pattern_common_tail =
+      R"(%dense=aten::dequantize(%qdense)  %out = torch_ipex::merged_embeddingbag_cat_forward(%weights, %indices, %offsets, %dense)  %qout = aten::quantize_per_tensor(%out, %o_scale, %o_zp, %o_dtype) return (%qout) )";
+
+  for (auto* n : graph->block()->nodes()) {
+    if (n->kind() ==
+        Symbol::fromQualString("torch_ipex::merged_embeddingbag_cat_forward")) {
+      size_t id = 0;
+      auto weightslist = n->input(0)->node();
+
+      bool is_quantized = std::any_of(
+          weightslist->inputs().begin(),
+          weightslist->inputs().end(),
+          [](auto& v) {
+            return v->node()->kind() == Symbol::aten("dequantize");
+          });
+
+      if (!is_quantized)
+        return;
+
+      std::string pattern = R"()";
+      std::string replacement = R"()";
+      std::string dequantizes = R"()";
+      std::vector<std::string> qinputs;
+      std::vector<std::string> dqinputs;
+      for (auto input : weightslist->inputs()) {
+        if (input->node()->kind() == Symbol::aten("dequantize")) {
+          qinputs.push_back("%q" + std::to_string(id));
+          dqinputs.push_back("%dq" + std::to_string(id));
+          std::string dequantize = "%dq" + std::to_string(id) +
+              " : Tensor = aten::dequantize(" + "%q" + std::to_string(id) + ")";
+          dequantizes.append(dequantize);
+          ++id;
+        }
+      }
+
+      std::string header =
+          graph_common_head + c10::Join(", ", qinputs) + graph_common_tail;
+      pattern += header;
+      pattern += dequantizes;
+      pattern += list_construct_common_head + c10::Join(", ", dqinputs) +
+          list_construct_common_tail;
+      pattern += pattern_common_tail;
+      patterns.push_back(pattern);
+
+      replacement = header;
+      replacement += list_construct_common_head + c10::Join(", ", qinputs) +
+          list_construct_common_tail;
+      replacement += replacement_common_tail;
+      replacements.push_back(replacement);
+    }
+  }
+
+  SubgraphRewriter rewriter;
+  for (size_t i = 0; i < patterns.size(); i++) {
+    rewriter.RegisterRewritePattern(patterns[i], replacements[i]);
+    rewriter.runOnGraph(graph);
+  }
+}
+
 // When converting LSTM to int8 LSTM, IPEX will pre-hook the LSTM forward
 // function to insert quant and dequant node. After converting the model, when
 // entering the forward function, if the hidden state and cell state are empty,
@@ -1074,6 +1146,139 @@ void FuseLinearSwishCustomized(std::shared_ptr<Graph>& graph) {
   ls_fusion.runOnGraph(graph);
 }
 
+void FusePythonGELUWithAten(std::shared_ptr<Graph>& graph) {
+  // from transformers common defined python gelu
+  // ref:
+  // https://github.com/huggingface/transformers/blob/main/src/transformers/activations.py#L56
+  std::string PythonGELUTanh_v1 = R"(
+      graph(%x, %const_value1, %const_value2, %const_value3, %const_value4, %const_value5, %const_value6):
+        %res_tmp1 = aten::mul(%x, %const_value1)
+        %res_tmp2 = aten::pow(%x, %const_value2)
+        %res_tmp2_ = aten::mul(%res_tmp2, %const_value3)
+        %res_tmp3 = aten::add(%x, %res_tmp2_, %const_value4)
+        %res_tmp4 = aten::mul(%res_tmp3, %const_value5)
+        %res_tmp5 = aten::tanh(%res_tmp4)
+        %res_tmp6 = aten::add(%res_tmp5, %const_value6, %const_value4)
+        %res = aten::mul(%res_tmp1, %res_tmp6)
+        return (%res) )";
+
+  // from transformers defined python gelu in bloom model
+  // ref:
+  // https://github.com/huggingface/transformers/blob/main/src/transformers/models/bloom/modeling_bloom.py#L158
+  std::string PythonGELUTanh_v2 = R"(
+      graph(%x, %const_value1, %const_value2, %const_value3, %const_value4, %const_value5):
+        %res_tmp1 = aten::mul(%x, %const_value1)
+        %res_tmp2 = aten::mul(%x, %const_value2)
+        %res_tmp3 = aten::mul(%x, %const_value3)
+        %res_tmp3_ = aten::mul(%res_tmp3, %x)
+        %res_tmp4 = aten::add(%res_tmp3_, %const_value4, %const_value4)
+        %res_tmp5 = aten::mul(%res_tmp2, %res_tmp4)
+        %res_tmp6 = aten::tanh(%res_tmp5)
+        %res_tmp7 = aten::add(%res_tmp6, %const_value5, %const_value4)
+        %res = aten::mul(%res_tmp1, %res_tmp7)
+        return (%res) )";
+
+  std::string AtenGELUTanh_argv1 = R"(
+      graph(%x, %const_value1, %const_value2, %const_value3, %const_value4, %const_value5, %const_value6):
+        %tanh_ : str = prim::Constant[value="tanh"]()
+        %res = aten::gelu(%x, %tanh_)
+        return (%res) )";
+
+  std::string AtenGELUTanh_argv2 = R"(
+      graph(%x, %const_value1, %const_value2, %const_value3, %const_value4, %const_value5):
+        %tanh_ : str = prim::Constant[value="tanh"]()
+        %res = aten::gelu(%x, %tanh_)
+        return (%res) )";
+  auto filter_v1 = [](const Match& match,
+                      const std::unordered_map<std::string, Value*>& vmap) {
+    const auto& match_vmap = match.values_map;
+    auto const_value1 = toIValue(
+        graph_rewrite_helper::getValue("const_value1", match_vmap, vmap));
+    if (!const_value1.has_value() ||
+        const_value1->toScalar().to<float>() != 0.5) {
+      return false;
+    }
+    auto const_value2 = toIValue(
+        graph_rewrite_helper::getValue("const_value2", match_vmap, vmap));
+    if (!const_value2.has_value() ||
+        const_value2->toScalar().to<float>() != 3.0) {
+      return false;
+    }
+    auto const_value3 = toIValue(
+        graph_rewrite_helper::getValue("const_value3", match_vmap, vmap));
+    if (!const_value3.has_value() ||
+        std::fabs(const_value3->toScalar().to<float>() - 0.044715) >
+            0.0000001) {
+      return false;
+    }
+    auto const_value4 = toIValue(
+        graph_rewrite_helper::getValue("const_value4", match_vmap, vmap));
+    if (!const_value4.has_value() || const_value4->toInt() != 1) {
+      return false;
+    }
+    auto const_value5 = toIValue(
+        graph_rewrite_helper::getValue("const_value5", match_vmap, vmap));
+    if (!const_value5.has_value() ||
+        std::fabs(const_value5->toScalar().to<float>() - 0.79788456) >
+            0.0000001) {
+      return false;
+    }
+    auto const_value6 = toIValue(
+        graph_rewrite_helper::getValue("const_value6", match_vmap, vmap));
+    if (!const_value6.has_value() ||
+        const_value6->toScalar().to<float>() != 1.0) {
+      return false;
+    }
+    return true;
+  };
+
+  auto filter_v2 = [](const Match& match,
+                      const std::unordered_map<std::string, Value*>& vmap) {
+    const auto& match_vmap = match.values_map;
+    auto const_value1 = toIValue(
+        graph_rewrite_helper::getValue("const_value1", match_vmap, vmap));
+    if (!const_value1.has_value() ||
+        const_value1->toScalar().to<float>() != 0.5) {
+      return false;
+    }
+    auto const_value2 = toIValue(
+        graph_rewrite_helper::getValue("const_value2", match_vmap, vmap));
+    if (!const_value2.has_value() ||
+        std::fabs(const_value2->toScalar().to<float>() - 0.79788456) >
+            0.0000001) {
+      return false;
+    }
+    auto const_value3 = toIValue(
+        graph_rewrite_helper::getValue("const_value3", match_vmap, vmap));
+    if (!const_value3.has_value() ||
+        std::fabs(const_value3->toScalar().to<float>() - 0.044715) >
+            0.0000001) {
+      return false;
+    }
+    auto const_value4 = toIValue(
+        graph_rewrite_helper::getValue("const_value4", match_vmap, vmap));
+    if (!const_value4.has_value() || const_value4->toInt() != 1) {
+      return false;
+    }
+    auto const_value5 = toIValue(
+        graph_rewrite_helper::getValue("const_value5", match_vmap, vmap));
+    if (!const_value5.has_value() ||
+        const_value5->toScalar().to<float>() != 1.0) {
+      return false;
+    }
+    return true;
+  };
+
+  SubgraphRewriter SingleGeluTanh_v1;
+  SingleGeluTanh_v1.RegisterRewritePattern(
+      PythonGELUTanh_v1, AtenGELUTanh_argv1);
+  SingleGeluTanh_v1.runOnGraph(graph, filter_v1);
+  SubgraphRewriter SingleGeluTanh_v2;
+  SingleGeluTanh_v2.RegisterRewritePattern(
+      PythonGELUTanh_v2, AtenGELUTanh_argv2);
+  SingleGeluTanh_v2.runOnGraph(graph, filter_v2);
+}
+
 // This path will be removed after pytorch offical path is optimized well.
 void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
   std::string max_pool2d = R"(
@@ -1104,6 +1309,58 @@ void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
     return true;
   };
   rewriter_max_pool2d.runOnGraph(graph, filter);
+}
+
+void simplifyAllReduce(std::shared_ptr<Graph>& graph) {
+  std::string all_reduce_v1 = R"(
+    graph(%a, %weight, %out_features1, %out_features2, %reduceop, %tag, %ranks, %group_size, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha, %idx, %no, %dtype, %zero):
+      %r1 = torch_ipex::tpp_linear(%a, %weight, %out_features1)
+      %r2 = deepspeed_comm::all_reduce(%r1, %reduceop, %tag, %ranks, %group_size)
+      %r3 = torch_ipex::tpp_linear_gelu(%b, %fc_in_weight, %fc_in_bias, %out_features2)
+      %r4 = aten::to(%r3, %idx, %no, %no, %dtype)
+      %r5 = aten::contiguous(%r4, %zero)
+      %r6 = torch_ipex::tpp_linear(%r5, %fc_out_weight, %out_features1)
+      %r7 = deepspeed_comm::all_reduce(%r6, %reduceop, %tag, %ranks, %group_size)
+      %r8 = aten::add_(%r7, %fc_out_bias, %alpha)
+      %r = aten::add(%r2, %r8, %alpha)
+      return (%r) )";
+  std::string all_reduce_repl_v1 = R"(
+    graph(%a, %weight, %out_features1, %out_features2, %reduceop, %tag, %ranks, %group_size, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha, %idx, %no, %dtype, %zero):
+      %r1 = torch_ipex::tpp_linear(%a, %weight, %out_features1)
+      %r2 = torch_ipex::tpp_linear_gelu(%b, %fc_in_weight, %fc_in_bias, %out_features2)
+      %r3 = aten::to(%r2, %idx, %no, %no, %dtype)
+      %r4 = aten::contiguous(%r3, %zero)
+      %r5 = torch_ipex::tpp_linear(%r4, %fc_out_weight, %out_features1)
+      %r6 = aten::add(%r1, %r5, %alpha)
+      %r7 = deepspeed_comm::all_reduce(%r6, %reduceop, %tag, %ranks, %group_size)
+      %r = aten::add_(%r7, %fc_out_bias, %alpha)
+      return (%r) )";
+
+  std::string all_reduce_v2 = R"(
+    graph(%a, %weight, %reduceop, %tag, %ranks, %group_size, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha):
+      %r1 = ipex_prepack::linear_run(%a, %weight)
+      %r2 = deepspeed_comm::all_reduce(%r1, %reduceop, %tag, %ranks, %group_size)
+      %r3 = ipex_prepack::linear_gelu_run(%b, %fc_in_weight, %fc_in_bias)
+      %r4 = ipex_prepack::linear_run(%r3, %fc_out_weight)
+      %r5 = deepspeed_comm::all_reduce(%r4, %reduceop, %tag, %ranks, %group_size)
+      %r6 = aten::add_(%r5, %fc_out_bias, %alpha)
+      %r = aten::add(%r2, %r6, %alpha)
+      return (%r) )";
+  std::string all_reduce_repl_v2 = R"(
+    graph(%a, %weight, %reduceop, %tag, %ranks, %group_size, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha):
+      %r1 = ipex_prepack::linear_run(%a, %weight)
+      %r2 = ipex_prepack::linear_gelu_run(%b, %fc_in_weight, %fc_in_bias)
+      %r3 = ipex_prepack::linear_run(%r2, %fc_out_weight)
+      %r4 = aten::add(%r1, %r3, %alpha)
+      %r5 = deepspeed_comm::all_reduce(%r4, %reduceop, %tag, %ranks, %group_size)
+      %r = aten::add_(%r5, %fc_out_bias, %alpha)
+      return (%r) )";
+
+  SubgraphRewriter rewriter_v1, rewriter_v2;
+  rewriter_v1.RegisterRewritePattern(all_reduce_v1, all_reduce_repl_v1);
+  rewriter_v2.RegisterRewritePattern(all_reduce_v2, all_reduce_repl_v2);
+  rewriter_v1.runOnGraph(graph);
+  rewriter_v2.runOnGraph(graph);
 }
 
 } // namespace graph_rewrite

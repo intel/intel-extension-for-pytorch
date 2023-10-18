@@ -1,21 +1,24 @@
 import torch
 import torch.nn as nn
-import intel_extension_for_pytorch as ipex
-from torch.nn.modules.linear import Linear
 from torch.testing._internal.jit_utils import JitTestCase
 import unittest
 import torch.nn.functional as F
 import time
 
+
 def get_rand_seed():
     return int(time.time() * 1000000000)
 
-conv_module = {1: torch.nn.Conv1d, 2 : torch.nn.Conv2d, 3 : torch.nn.Conv3d}
 
-class EltwiseFusionOp:
-    def __init__(self, ipex_eltwise_op, op_input_list={}):
-        self.ipex_eltwise_op = ipex_eltwise_op
-        self.op_input_list = op_input_list
+conv_module = {1: torch.nn.Conv1d, 2: torch.nn.Conv2d, 3: torch.nn.Conv3d}
+
+from typing import Dict, NamedTuple
+
+
+class EltwiseFusionOp(NamedTuple):
+    ipex_eltwise_op: str
+    op_input_list: Dict = {}
+
 
 unary_PyTorch_op_to_IPEX_op_map = {
     torch.relu: EltwiseFusionOp("relu"),
@@ -59,8 +62,18 @@ non_unary_PyTorch_op_to_IPEX_op_map = {
     nn.LeakyReLU(negative_slope=0.02, inplace=True): EltwiseFusionOp("leaky_relu_"),
 }
 
+
 class ConvEltwise(nn.Module):
-    def __init__(self, eltwise_fn, dim, in_channels, out_channels, kernel_size, image_size, **kwargs):
+    def __init__(
+        self,
+        eltwise_fn,
+        dim,
+        in_channels,
+        out_channels,
+        kernel_size,
+        image_size,
+        **kwargs
+    ):
         super(ConvEltwise, self).__init__()
         self.conv = conv_module[dim](in_channels, out_channels, kernel_size)
         self.eltwise = eltwise_fn
@@ -70,6 +83,7 @@ class ConvEltwise(nn.Module):
         a = self.conv(x)
         b = self.eltwise(a, **self.kwargs)
         return b
+
 
 class IPEXConvAdd(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -82,6 +96,7 @@ class IPEXConvAdd(nn.Module):
         b = self.conv2(x)
         return a.add_(b)
 
+
 class IPEXConvAddRelu(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(IPEXConvAddRelu, self).__init__()
@@ -92,6 +107,7 @@ class IPEXConvAddRelu(nn.Module):
         a = F.relu(self.conv1(x))
         b = self.conv2(x)
         return F.relu(a.add_(b), inplace=True)
+
 
 class IPEXConvConvRelu(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -104,6 +120,7 @@ class IPEXConvConvRelu(nn.Module):
         res = self.conv2(res)
         return F.relu(res, inplace=True)
 
+
 class IPEXConvSigmoidMul(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(IPEXConvSigmoidMul, self).__init__()
@@ -113,6 +130,7 @@ class IPEXConvSigmoidMul(nn.Module):
         a = self.conv(x)
         b = torch.sigmoid(a)
         return a.mul_(b)
+
 
 class LinearEltwise(nn.Module):
     def __init__(self, eltwise_fn, in_channels, out_channels, bias, **kwargs):
@@ -127,6 +145,7 @@ class LinearEltwise(nn.Module):
         b = self.eltwise(a, **self.kwargs)
         return b
 
+
 class IPEXLinearAdd(nn.Module):
     def __init__(self, in_channels, out_channels, bias):
         super(IPEXLinearAdd, self).__init__()
@@ -138,6 +157,7 @@ class IPEXLinearAdd(nn.Module):
         b = self.linear2(x)
         return a.add_(b)
 
+
 class IPEXLinearAddRelu(nn.Module):
     def __init__(self, in_channels, out_channels, bias):
         super(IPEXLinearAddRelu, self).__init__()
@@ -147,6 +167,7 @@ class IPEXLinearAddRelu(nn.Module):
         a = F.relu(self.linear(x))
         b = self.linear(x)
         return F.relu(a.add_(b), inplace=True)
+
 
 class IPEXLinearSigmoidMul(nn.Module):
     def __init__(self, in_channels, out_channels, bias):
@@ -158,6 +179,7 @@ class IPEXLinearSigmoidMul(nn.Module):
         b = torch.sigmoid(a)
         return a.mul_(b)
 
+
 class IPEXMatmulDiv(nn.Module):
     def __init__(self):
         super(IPEXMatmulDiv, self).__init__()
@@ -166,6 +188,7 @@ class IPEXMatmulDiv(nn.Module):
 
     def forward(self, x1, x2, x3):
         return torch.matmul(x1, x2) / x3 + x3
+
 
 class TestTE(JitTestCase):
     def test_ipex_unary_conv_fusion(self, op_list=unary_PyTorch_op_to_IPEX_op_map):
@@ -185,7 +208,9 @@ class TestTE(JitTestCase):
                 for batch_size, image_size in [[8, 20], [3, 256]]:
                     input_size = [batch_size, in_channels, image_size, image_size]
                     x = torch.randn(input_size)
-                    te_model = ConvEltwise(eltwise, dim, in_channels, out_channels, kernel_size, image_size).eval()
+                    te_model = ConvEltwise(
+                        eltwise, dim, in_channels, out_channels, kernel_size, image_size
+                    ).eval()
                     if use_channels_last:
                         x = x.to(memory_format=torch.channels_last)
                         te_model = te_model.to(memory_format=torch.channels_last)
@@ -196,10 +221,16 @@ class TestTE(JitTestCase):
 
                     res_jit = te_model_traced(x)
                     res_imperative = te_model(x)
-                    self.assertEqual(res_jit, res_imperative, "{}, {}".format(res_jit, res_imperative))
+                    self.assertEqual(
+                        res_jit,
+                        res_imperative,
+                        "{}, {}".format(res_jit, res_imperative),
+                    )
         torch._C._debug_set_fusion_group_inlining(old)
 
-    def test_ipex_non_unary_conv_fusion(self, op_list=non_unary_PyTorch_op_to_IPEX_op_map):
+    def test_ipex_non_unary_conv_fusion(
+        self, op_list=non_unary_PyTorch_op_to_IPEX_op_map
+    ):
         old = torch._C._debug_get_fusion_group_inlining()
         torch._C._debug_set_fusion_group_inlining(False)
         dim = 2
@@ -217,7 +248,15 @@ class TestTE(JitTestCase):
                     input_size = [batch_size, in_channels, image_size, image_size]
                     x = torch.randn(input_size)
                     op_input_list = fusion_op.op_input_list
-                    te_model = ConvEltwise(eltwise, dim, in_channels, out_channels, kernel_size, image_size, **op_input_list).eval()
+                    te_model = ConvEltwise(
+                        eltwise,
+                        dim,
+                        in_channels,
+                        out_channels,
+                        kernel_size,
+                        image_size,
+                        **op_input_list
+                    ).eval()
                     if use_channels_last:
                         x = x.to(memory_format=torch.channels_last)
                         te_model = te_model.to(memory_format=torch.channels_last)
@@ -228,7 +267,11 @@ class TestTE(JitTestCase):
 
                     res_jit = te_model_traced(x)
                     res_imperative = te_model(x)
-                    self.assertEqual(res_jit, res_imperative, "{}, {}".format(res_jit, res_imperative))
+                    self.assertEqual(
+                        res_jit,
+                        res_imperative,
+                        "{}, {}".format(res_jit, res_imperative),
+                    )
         torch._C._debug_set_fusion_group_inlining(old)
 
     def test_ipex_conv_add(self):
@@ -371,7 +414,7 @@ class TestTE(JitTestCase):
             torch.manual_seed(rand_seed)
             fusion_op = op_list[eltwise]
             ipex_eltwise_op = fusion_op.ipex_eltwise_op
-            ''' # Issue of "round" 
+            """ # Issue of "round" 
                 The OP "round" in ideep has numeric issue when input is exactly 0.500,
                 so we fix the seed here for "round".
                 For example:
@@ -379,7 +422,7 @@ class TestTE(JitTestCase):
                     ideep: 1.0 = torch.round(x)
                     expected: 0.0 = torch.round(x)
                 The seed to reproduce the failure: 1665593217573048320
-            ''' 
+            """
             if "round" in ipex_eltwise_op:
                 torch.manual_seed(1665594679504775936)
             print("TEST linear+%s" % ipex_eltwise_op)
@@ -387,8 +430,12 @@ class TestTE(JitTestCase):
                 input_size = [batch_size, in_channels]
                 x = torch.randn(input_size)
                 # linear fusion only supports bf16
-                with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
-                    te_model = LinearEltwise(eltwise, in_channels, out_channels, bias).eval()
+                with torch.cpu.amp.autocast(
+                    enabled=True, dtype=torch.bfloat16
+                ), torch.no_grad():
+                    te_model = LinearEltwise(
+                        eltwise, in_channels, out_channels, bias
+                    ).eval()
                     te_model_traced = torch.jit.trace(te_model, (x))
                     te_model_traced = torch.jit.freeze(te_model_traced)
                     te_model_traced(x)
@@ -396,10 +443,18 @@ class TestTE(JitTestCase):
 
                     res_jit = te_model_traced(x)
                     res_imperative = te_model(x)
-                self.assertEqual(res_jit, res_imperative, rtol=0.02, atol=0.01, msg="{}, {}".format(res_jit, res_imperative))
+                self.assertEqual(
+                    res_jit,
+                    res_imperative,
+                    rtol=0.02,
+                    atol=0.01,
+                    msg="{}, {}".format(res_jit, res_imperative),
+                )
         torch._C._debug_set_fusion_group_inlining(old)
-    
-    def test_ipex_non_unary_linear_fusion(self, op_list=non_unary_PyTorch_op_to_IPEX_op_map):
+
+    def test_ipex_non_unary_linear_fusion(
+        self, op_list=non_unary_PyTorch_op_to_IPEX_op_map
+    ):
         old = torch._C._debug_get_fusion_group_inlining()
         torch._C._debug_set_fusion_group_inlining(False)
         batch_size = 3
@@ -416,8 +471,12 @@ class TestTE(JitTestCase):
                 x = torch.randn(input_size)
                 op_input_list = fusion_op.op_input_list
                 # linear fusion only supports bf16
-                with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
-                    te_model = LinearEltwise(eltwise, in_channels, out_channels, bias, **op_input_list).eval()
+                with torch.cpu.amp.autocast(
+                    enabled=True, dtype=torch.bfloat16
+                ), torch.no_grad():
+                    te_model = LinearEltwise(
+                        eltwise, in_channels, out_channels, bias, **op_input_list
+                    ).eval()
                     te_model_traced = torch.jit.trace(te_model, (x))
                     te_model_traced = torch.jit.freeze(te_model_traced)
                     te_model_traced(x)
@@ -425,7 +484,13 @@ class TestTE(JitTestCase):
 
                     res_jit = te_model_traced(x)
                     res_imperative = te_model(x)
-                self.assertEqual(res_jit, res_imperative, rtol=0.02, atol=0.01, msg="{}, {}".format(res_jit, res_imperative))
+                self.assertEqual(
+                    res_jit,
+                    res_imperative,
+                    rtol=0.02,
+                    atol=0.01,
+                    msg="{}, {}".format(res_jit, res_imperative),
+                )
         torch._C._debug_set_fusion_group_inlining(old)
 
     def test_ipex_linear_add(self):
@@ -435,7 +500,9 @@ class TestTE(JitTestCase):
         rand_seed = int(get_rand_seed())
         torch.manual_seed(rand_seed)
         for bias in [True, False]:
-            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+            with torch.cpu.amp.autocast(
+                enabled=True, dtype=torch.bfloat16
+            ), torch.no_grad():
                 te_model = IPEXLinearAdd(3, 32, bias).eval()
                 x = torch.randn(3, 3)
                 te_model_traced = torch.jit.trace(te_model, (x))
@@ -445,12 +512,24 @@ class TestTE(JitTestCase):
 
                 res_jit = te_model_traced(x)
                 res_imperative = te_model(x)
-                self.assertEqual(res_jit, res_imperative, rtol=0.02, atol=0.01, msg="{}, {}".format(res_jit, res_imperative))
+                self.assertEqual(
+                    res_jit,
+                    res_imperative,
+                    rtol=0.02,
+                    atol=0.01,
+                    msg="{}, {}".format(res_jit, res_imperative),
+                )
 
                 x = torch.randn(8, 3)
                 res_jit = te_model_traced(x)
                 res_imperative = te_model(x)
-                self.assertEqual(res_jit, res_imperative, rtol=0.02, atol=0.01, msg="{}, {}".format(res_jit, res_imperative))
+                self.assertEqual(
+                    res_jit,
+                    res_imperative,
+                    rtol=0.02,
+                    atol=0.01,
+                    msg="{}, {}".format(res_jit, res_imperative),
+                )
 
     def test_ipex_linear_add_relu(self):
         old = torch._C._debug_get_fusion_group_inlining()
@@ -459,7 +538,9 @@ class TestTE(JitTestCase):
         rand_seed = int(get_rand_seed())
         torch.manual_seed(rand_seed)
         for bias in [True, False]:
-            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+            with torch.cpu.amp.autocast(
+                enabled=True, dtype=torch.bfloat16
+            ), torch.no_grad():
                 te_model = IPEXLinearAddRelu(3, 32, bias).eval()
                 x = torch.randn(3, 3)
                 te_model_traced = torch.jit.trace(te_model, (x))
@@ -469,12 +550,24 @@ class TestTE(JitTestCase):
 
                 res_jit = te_model_traced(x)
                 res_imperative = te_model(x)
-                self.assertEqual(res_jit, res_imperative, rtol=0.02, atol=0.01, msg="{}, {}".format(res_jit, res_imperative))
+                self.assertEqual(
+                    res_jit,
+                    res_imperative,
+                    rtol=0.02,
+                    atol=0.01,
+                    msg="{}, {}".format(res_jit, res_imperative),
+                )
 
                 x = torch.randn(8, 3)
                 res_jit = te_model_traced(x)
                 res_imperative = te_model(x)
-                self.assertEqual(res_jit, res_imperative, rtol=0.02, atol=0.01, msg="{}, {}".format(res_jit, res_imperative))
+                self.assertEqual(
+                    res_jit,
+                    res_imperative,
+                    rtol=0.02,
+                    atol=0.01,
+                    msg="{}, {}".format(res_jit, res_imperative),
+                )
 
     def test_ipex_linear_sigmoid_mul(self):
         old = torch._C._debug_get_fusion_group_inlining()
@@ -483,7 +576,9 @@ class TestTE(JitTestCase):
         rand_seed = int(get_rand_seed())
         torch.manual_seed(rand_seed)
         for bias in [True, False]:
-            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+            with torch.cpu.amp.autocast(
+                enabled=True, dtype=torch.bfloat16
+            ), torch.no_grad():
                 te_model = IPEXLinearSigmoidMul(3, 32, bias).eval()
                 x = torch.randn(3, 3)
                 te_model_traced = torch.jit.trace(te_model, (x))
@@ -493,13 +588,26 @@ class TestTE(JitTestCase):
 
                 res_jit = te_model_traced(x)
                 res_imperative = te_model(x)
-                self.assertEqual(res_jit, res_imperative, rtol=0.02, atol=0.01, msg="{}, {}".format(res_jit, res_imperative))
+                self.assertEqual(
+                    res_jit,
+                    res_imperative,
+                    rtol=0.02,
+                    atol=0.01,
+                    msg="{}, {}".format(res_jit, res_imperative),
+                )
 
                 x = torch.randn(8, 3)
                 res_jit = te_model_traced(x)
                 res_imperative = te_model(x)
-                self.assertEqual(res_jit, res_imperative, rtol=0.02, atol=0.01, msg="{}, {}".format(res_jit, res_imperative))
+                self.assertEqual(
+                    res_jit,
+                    res_imperative,
+                    rtol=0.02,
+                    atol=0.01,
+                    msg="{}, {}".format(res_jit, res_imperative),
+                )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # ipex._C.enable_custom_op_2_nnc_fuser()
     test = unittest.main()

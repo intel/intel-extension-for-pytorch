@@ -2,7 +2,9 @@
 #include <ideep.hpp>
 #include "passes/utils.h"
 
+#include "auto_opt_config.h"
 #include "graph_rewrite.h"
+#include "graph_rewrite_helper.h"
 #include "graph_rewrite_utils.h"
 
 namespace torch_ipex {
@@ -53,16 +55,19 @@ void replaceFrozenIPEXLinearWithAtenLinear(
       if (!toIValue(prepack_node).has_value())
         continue;
       at::Tensor weight_tensor;
+      c10::optional<at::Tensor> may_get_bias_tensor;
       if (use_mkl_sgemm) {
         auto linear_op_ctx =
             toIValue(prepack_node).value().toCustomClass<MKLOpContext>();
-        weight_tensor = linear_op_ctx->to_public(
-            constant_as<at::Tensor>(n->namedInput("weight")).value());
+        weight_tensor =
+            linear_op_ctx->to_public(linear_op_ctx->get_at_packed_weight());
+        may_get_bias_tensor = linear_op_ctx->get_at_bias();
       } else {
         auto linear_op_ctx =
             toIValue(prepack_node).value().toCustomClass<LinearOpContext>();
-        weight_tensor = linear_op_ctx->to_public(
-            constant_as<at::Tensor>(n->namedInput("weight")).value());
+        weight_tensor =
+            linear_op_ctx->to_public(linear_op_ctx->get_at_packed_weight());
+        may_get_bias_tensor = linear_op_ctx->get_at_bias();
       }
       WithInsertPoint guard(n);
       auto graph = n->owningGraph();
@@ -72,7 +77,12 @@ void replaceFrozenIPEXLinearWithAtenLinear(
       IValue weight_value(weight_tensor);
       auto weight = graph->insertConstant(weight_value);
       aten_linear->addInput(weight);
-      aten_linear->addInput(n->inputs().at(2));
+
+      // bias
+      // Please refer to [ Note -- Fix the size of the saved TorchScript model ]
+      // for the details.
+      graph_rewrite_helper::insertBias(graph, aten_linear, may_get_bias_tensor);
+
       aten_linear->output()->setType(n->output()->type()->cast<TensorType>());
       n->output()->replaceAllUsesWith(aten_linear->output());
       get_data_handle_nodes.emplace_back(n->inputs().at(3)->node());
@@ -93,6 +103,101 @@ void replaceFrozenIPEXLinearWithAtenLinear(
   EliminateDeadCode(graph);
 }
 
+void replaceAtenLinearWithPrepackNode(
+    Node* n,
+    std::unordered_set<Node*>& aten_linear,
+    const bool& use_mkl_sgemm) {
+  WithInsertPoint guard(n);
+  auto graph = n->owningGraph();
+  auto input_size_option =
+      n->inputs().at(0)->type()->cast<TensorType>()->sizes().concrete_sizes();
+  if (!(input_size_option.has_value() &&
+        input_size_option.value().size() >= 2)) {
+    return;
+  }
+  auto input_size = input_size_option.value();
+  int64_t b_size =
+      std::accumulate(
+          input_size.begin(), input_size.end(), 1, std::multiplies<double>()) /
+      input_size[input_size.size() - 1];
+  IValue batch_size_value(b_size);
+  auto batch_size = graph->insertConstant(batch_size_value);
+  auto tt = n->inputs().at(1)->type()->cast<TensorType>();
+  auto weight_size_option = tt->sizes().concrete_sizes();
+  if (!(weight_size_option.has_value() &&
+        weight_size_option.value().size() == 2)) {
+    return;
+  }
+  auto weight_dtype_option = tt->scalarType();
+  bool should_repack = aten_linear.find(n) == aten_linear.end() &&
+      AutoOptConfig::singleton().get_jit_repack_for_linear();
+
+  // we should pack aten linear to ipex prepack linear for 2 cases:
+  // (1): Repack case, this aten linear is created by ipex linear
+  // (2) BF16 case, we believe IPEX BF16 prepack linear always better than aten
+  // BF16 linear
+  bool should_pack_for_bf16 = weight_dtype_option.has_value() &&
+      weight_dtype_option.value() == at::ScalarType::BFloat16 &&
+      ideep::has_bf16_type_support();
+  bool should_pack = should_repack || should_pack_for_bf16;
+  if (!(should_pack))
+    return;
+
+  auto weight_size = weight_size_option.value();
+
+  // Note that once creating a graph node, make sure it is also inserted into
+  // the graph, for: PyTorch (when disabled TE) has a check on the graph node,
+  // pointing out that every mutable value in the system has a corresponding
+  // element. So if creating a graph node but not inserted, it will not pass
+  // the check since its graph element is not initialized. Details please
+  // refer to
+  // https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/ir/alias_analysis.cpp#L1956
+  auto use_mkl_sgemm_ =
+      use_mkl_sgemm && weight_dtype_option.value() != at::ScalarType::BFloat16;
+  auto prepack_node = graph->create(
+      use_mkl_sgemm_ ? Symbol::fromQualString("ipex_prepack::mkl_sgemm_prepack")
+                     : Symbol::fromQualString("ipex_prepack::linear_prepack"),
+      1);
+  for (auto i = 1; i < n->inputs().size(); ++i) {
+    Value* v = n->inputs().at(i);
+    prepack_node->addInput(v);
+  }
+  prepack_node->addInput(batch_size);
+  prepack_node->output()->setType(
+      use_mkl_sgemm_
+          ? getCustomClass("__torch__.torch.classes.ipex_prepack.MKLOpContext")
+          : getCustomClass(
+                "__torch__.torch.classes.ipex_prepack.LinearOpContext"));
+  graph->insertNode(prepack_node);
+  auto prepack_linear = graph->insertNode(graph->create(
+      use_mkl_sgemm_ ? Symbol::fromQualString("ipex_prepack::mkl_sgemm_run")
+                     : Symbol::fromQualString("ipex_prepack::linear_run"),
+      1));
+  prepack_linear->addInput(n->inputs().at(0));
+  prepack_linear->addInput(prepack_node->output());
+  prepack_linear->output()->setType(n->output()->type()->cast<TensorType>());
+  auto v = n->outputs().at(0);
+  n->output()->replaceAllUsesWith(prepack_linear->output());
+}
+
+void replaceIpexLinearWithLinearRunNode(Node* n) {
+  WithInsertPoint guard(n);
+  auto graph = n->owningGraph();
+  auto use_mkl_sgemm =
+      n->kind() == Symbol::fromQualString("torch_ipex::ipex_MKLSGEMM");
+  auto get_data_handle_node = n->inputs().at(3)->node();
+  auto linear_ctx = get_data_handle_node->inputs().at(0);
+  auto linear_run = graph->insertNode(graph->create(
+      use_mkl_sgemm ? Symbol::fromQualString("ipex_prepack::mkl_sgemm_run")
+                    : Symbol::fromQualString("ipex_prepack::linear_run"),
+      1));
+  linear_run->addInput(n->inputs().at(0));
+  linear_run->addInput(linear_ctx);
+  linear_run->output()->setType(n->output()->type()->cast<TensorType>());
+  n->output()->replaceAllUsesWith(linear_run->output());
+  return;
+}
+
 void insertPrePackedLinearOp(
     Block* b,
     std::unordered_set<Node*>& aten_linear,
@@ -101,75 +206,15 @@ void insertPrePackedLinearOp(
     for (Block* block : n->blocks()) {
       insertPrePackedLinearOp(block, aten_linear, use_mkl_sgemm);
     }
-    if (n->kind() != aten::linear)
-      continue;
-    WithInsertPoint guard(n);
-    auto graph = n->owningGraph();
-    auto input_size_option =
-        n->inputs().at(0)->type()->cast<TensorType>()->sizes().concrete_sizes();
-    if (!(input_size_option.has_value() &&
-          input_size_option.value().size() >= 2)) {
-      continue;
-    }
-    auto input_size = input_size_option.value();
-    int64_t b_size = std::accumulate(
-                         input_size.begin(),
-                         input_size.end(),
-                         1,
-                         std::multiplies<double>()) /
-        input_size[input_size.size() - 1];
-    IValue batch_size_value(b_size);
-    auto batch_size = graph->insertConstant(batch_size_value);
-    auto tt = n->inputs().at(1)->type()->cast<TensorType>();
-    auto weight_size_option = tt->sizes().concrete_sizes();
-    if (!(weight_size_option.has_value() &&
-          weight_size_option.value().size() == 2)) {
+    if (n->kind() == aten::linear) {
+      replaceAtenLinearWithPrepackNode(n, aten_linear, use_mkl_sgemm);
+    } else if (
+        n->kind() == Symbol::fromQualString("torch_ipex::ipex_linear") ||
+        n->kind() == Symbol::fromQualString("torch_ipex::ipex_MKLSGEMM")) {
+      replaceIpexLinearWithLinearRunNode(n);
+    } else {
       continue;
     }
-    auto weight_dtype_option = tt->scalarType();
-    if (!(weight_dtype_option.has_value() &&
-              (weight_dtype_option.value() == at::ScalarType::BFloat16) &&
-              ideep::has_bf16_type_support() ||
-          aten_linear.find(n) == aten_linear.end())) {
-      continue;
-    }
-    auto weight_size = weight_size_option.value();
-
-    // Note that once creating a graph node, make sure it is also inserted into
-    // the graph, for: PyTorch (when disabled TE) has a check on the graph node,
-    // pointing out that every mutable value in the system has a corresponding
-    // element. So if creating a graph node but not inserted, it will not pass
-    // the check since its graph element is not initialized. Details please
-    // refer to
-    // https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/ir/alias_analysis.cpp#L1956
-    auto use_mkl_sgemm_ = use_mkl_sgemm &&
-        weight_dtype_option.value() != at::ScalarType::BFloat16;
-    auto prepack_node = graph->create(
-        use_mkl_sgemm_
-            ? Symbol::fromQualString("ipex_prepack::mkl_sgemm_prepack")
-            : Symbol::fromQualString("ipex_prepack::linear_prepack"),
-        1);
-    for (auto i = 1; i < n->inputs().size(); ++i) {
-      Value* v = n->inputs().at(i);
-      prepack_node->addInput(v);
-    }
-    prepack_node->addInput(batch_size);
-    prepack_node->output()->setType(
-        use_mkl_sgemm_
-            ? getCustomClass(
-                  "__torch__.torch.classes.ipex_prepack.MKLOpContext")
-            : getCustomClass(
-                  "__torch__.torch.classes.ipex_prepack.LinearOpContext"));
-    graph->insertNode(prepack_node);
-    auto prepack_linear = graph->insertNode(graph->create(
-        use_mkl_sgemm_ ? Symbol::fromQualString("ipex_prepack::mkl_sgemm_run")
-                       : Symbol::fromQualString("ipex_prepack::linear_run"),
-        1));
-    prepack_linear->addInput(n->inputs().at(0));
-    prepack_linear->addInput(prepack_node->output());
-    prepack_linear->output()->setType(n->output()->type()->cast<TensorType>());
-    auto v = n->outputs().at(0);
-    n->output()->replaceAllUsesWith(prepack_linear->output());
   }
   EliminateDeadCode(b);
 }
@@ -367,6 +412,92 @@ void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {
   rewriter_add_accumu_on_the_left.runOnGraph(
       graph, fuse_add_filter_accumu_on_the_left);
   rewriter_add_relu.runOnGraph(graph);
+}
+
+void fuseLinearMulAdd(std::shared_ptr<Graph>& graph) {
+  SubgraphRewriter rewriter_add_operand_on_the_right,
+      rewriter_add_operand_on_the_left, rewriter_mul_operand_on_the_right,
+      rewriter_mul_operand_on_the_left;
+  std::array<std::string, 2> add_operators = {"add", "add_"};
+  std::array<std::string, 2> mul_operators = {"mul", "mul_"};
+
+  // linear + mul
+  // linear   Y
+  //   \   /
+  //    mul
+  // output = linear_output * Y
+  auto linear_mul_operand_on_the_right_rstring = CodeTemplate(R"(
+    graph(%input, %operand, %packed_weight):
+        %x = ipex_prepack::linear_run(%input, %packed_weight)
+        %res = aten::${mul}(%x, %operand)
+        return (%res))");
+
+  //  Y     linear
+  //   \   /
+  //    mul
+  // output = Y * linear_output
+  auto linear_mul_operand_on_the_left_rstring = CodeTemplate(R"(
+    graph(%input, %operand, %packed_weight):
+        %x = ipex_prepack::linear_run(%input, %packed_weight)
+        %res = aten::${mul}(%operand, %x)
+        return (%res))");
+
+  std::string linear_mul_fused = R"(
+    graph(%input, %operand, %packed_weight):
+        %res = ipex_prepack::linear_mul_run(%input, %operand, %packed_weight)
+        return (%res))";
+
+  for (const auto& mul : mul_operators) {
+    TemplateEnv env;
+    env.s("mul", mul);
+    rewriter_mul_operand_on_the_right.RegisterRewritePattern(
+        linear_mul_operand_on_the_right_rstring.format(env), linear_mul_fused);
+    rewriter_mul_operand_on_the_left.RegisterRewritePattern(
+        linear_mul_operand_on_the_left_rstring.format(env), linear_mul_fused);
+  }
+
+  rewriter_mul_operand_on_the_right.runOnGraph(graph);
+  rewriter_mul_operand_on_the_left.runOnGraph(graph);
+
+  // linear + mul + add
+  // linear_mul   Y
+  //   \         /
+  //       add
+  // output = linear_mul + alpha * Y
+  auto linear_add_operand_on_the_right_rstring = CodeTemplate(R"(
+    graph(%input, %operand, %packed_weight, %add_operand, %alpha):
+        %x = ipex_prepack::linear_mul_run(%input, %operand, %packed_weight)
+        %res = aten::${add}(%x, %add_operand, %alpha)
+        return (%res))");
+
+  //  Y     linear_mul
+  //   \   /
+  //    add
+  // output = alpha * linear_mul + Y
+  auto linear_add_operand_on_the_left_rstring = CodeTemplate(R"(
+    graph(%input, %operand, %packed_weight, %add_operand, %alpha):
+        %x = ipex_prepack::linear_mul_run(%input, %operand, %packed_weight)
+        %res = aten::${add}(%add_operand, %x, %alpha)
+        return (%res))");
+
+  std::string linear_mul_add_fused = R"(
+    graph(%input, %operand, %packed_weight, %add_operand, %alpha):
+        %res = ipex_prepack::linear_mul_add_run(%input, %operand, %add_operand, %packed_weight)
+        return (%res))";
+
+  for (const auto& add : add_operators) {
+    TemplateEnv env;
+    env.s("add", add);
+    rewriter_add_operand_on_the_right.RegisterRewritePattern(
+        linear_add_operand_on_the_right_rstring.format(env),
+        linear_mul_add_fused);
+    rewriter_add_operand_on_the_left.RegisterRewritePattern(
+        linear_add_operand_on_the_left_rstring.format(env),
+        linear_mul_add_fused);
+  }
+
+  rewriter_add_operand_on_the_right.runOnGraph(graph, fuse_binary_add_filter);
+  rewriter_add_operand_on_the_left.runOnGraph(graph, fuse_binary_add_filter);
 }
 
 } // namespace graph_rewrite

@@ -226,64 +226,47 @@ at::Tensor dil_bert_flash_mha(
 
 /**
  *  This kernel implements Flast attention on stable-diffusion models (from
- * Diffusers 0.12.1) for BF16 dtype, where qkv is from one aten::linear
+ * Diffusers 0.12.1 and 0.13) for BF16 dtype, where qkv is from one
+ * aten::linear; Note that in 0.13, aten::scaled_dot_product_attention uses the
+ * scale of sqrt(headSize) if no scale is provided for query, where we are
+ * following
  */
 at::Tensor dil_sd_flash_mha(
     const at::Tensor& qkv,
     const at::IntArrayRef& split_list,
-    const double& scale,
+    const at::IValue& scale,
     const int64_t& num_head) {
   RECORD_FUNCTION("dil_sd_flash_mha_v1", c10::ArrayRef<c10::IValue>({}));
   int64_t headSize = qkv.size(-1) / split_list.size() / num_head;
-  return sd_flash_mha(qkv, num_head, headSize, scale);
+  if (!scale.isNone()) {
+    return sd_flash_mha(qkv, num_head, headSize, scale.toDouble());
+  } else {
+    auto scale_ = 1.f / sqrt(headSize);
+    return sd_flash_mha(qkv, num_head, headSize, scale_);
+  }
 }
 
 /**
  *  This kernel implements Flast attention on stable-diffusion models (from
- * Diffusers 0.12.1) for BF16 dtype, where qkv is splited
+ * Diffusers 0.12.1 and 0.13) for BF16 dtype, where qkv is splited; Note that
+ * in 0.13, aten::scaled_dot_product_attention uses the scale of sqrt(headSize)
+ * if no scale is provided for query, where we are following
  */
 at::Tensor dil_sd_flash_mha(
     const at::Tensor& query,
     const at::Tensor& key,
     const at::Tensor& value,
-    const double& scale,
+    const at::IValue& scale,
     const int64_t& num_head) {
   RECORD_FUNCTION("dil_sd_flash_mha_v2", c10::ArrayRef<c10::IValue>({}));
   int64_t headSize = query.size(-1) / num_head;
-  return sd_flash_mha(query, key, value, num_head, headSize, scale);
-}
-
-/**
- *  This kernel implements Flast attention on stable-diffusion models (from
- * Diffusers 0.13) for BF16 dtype, where qkv is from one aten::linear Note that
- * aten::scaled_dot_product_attention uses the scale of sqrt(headSize) for
- * query, where we are following
- */
-at::Tensor dil_sd_flash_mha(
-    const at::Tensor& qkv,
-    const at::IntArrayRef& split_list,
-    const int64_t& num_head) {
-  RECORD_FUNCTION("dil_sd_flash_mha_v3", c10::ArrayRef<c10::IValue>({}));
-  int64_t headSize = qkv.size(-1) / split_list.size() / num_head;
-  auto scale = 1.f / sqrt(headSize);
-  return sd_flash_mha(qkv, num_head, headSize, scale);
-}
-
-/**
- *  This kernel implements Flast attention on stable-diffusion models (from
- * Diffusers 0.13) for BF16 dtype, where qkv is splited Note that
- * aten::scaled_dot_product_attention uses the scale of sqrt(headSize) for
- * query, where we are following
- */
-at::Tensor dil_sd_flash_mha(
-    const at::Tensor& query,
-    const at::Tensor& key,
-    const at::Tensor& value,
-    const int64_t& num_head) {
-  RECORD_FUNCTION("dil_sd_flash_mha_v4", c10::ArrayRef<c10::IValue>({}));
-  int64_t headSize = query.size(-1) / num_head;
-  auto scale = 1.f / sqrt(headSize);
-  return sd_flash_mha(query, key, value, num_head, headSize, scale);
+  if (!scale.isNone()) {
+    return sd_flash_mha(
+        query, key, value, num_head, headSize, scale.toDouble());
+  } else {
+    auto scale_ = 1.f / sqrt(headSize);
+    return sd_flash_mha(query, key, value, num_head, headSize, scale_);
+  }
 }
 
 template <typename T>
@@ -294,7 +277,6 @@ std::vector<at::Tensor> dil_mat_split(
   int64_t sequenceSize = mat.dim() > 2 ? mat.size(1) : mat.size(0);
   int64_t total_size = (mat.dim() > 2 ? mat.size(2) : mat.size(1));
   int64_t split_size = split_list.size();
-
   std::vector<at::Tensor> split_mat;
   for (int i = 0; i < split_size; ++i) {
     split_mat.push_back(
@@ -302,8 +284,8 @@ std::vector<at::Tensor> dil_mat_split(
             ? at::empty({batchSize, sequenceSize, split_list[i]}, mat.dtype())
             : at::empty({sequenceSize, split_list[i]}, mat.dtype()));
   }
-
-  T* src = mat.data_ptr<T>();
+  auto mat_ = mat.contiguous();
+  T* src = mat_.data_ptr<T>();
   at::parallel_for(
       0, batchSize * sequenceSize, 1, [&](int64_t begin, int64_t end) {
         for (const auto i : c10::irange(begin, end)) {

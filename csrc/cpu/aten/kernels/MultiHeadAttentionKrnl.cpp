@@ -405,12 +405,15 @@ at::Tensor sd_mha_kernel_v1_impl(
 }
 
 at::Tensor sd_mha_kernel_v2_impl(
-    const at::Tensor& query,
-    const at::Tensor& key,
-    const at::Tensor& value,
+    const at::Tensor& _query,
+    const at::Tensor& _key,
+    const at::Tensor& _value,
     const int64_t& num_head,
     const int64_t& headSize,
     const double& scale) {
+  auto query = _query.contiguous();
+  auto key = _key.contiguous();
+  auto value = _value.contiguous();
   TORCH_CHECK(
       (query.dtype() == at::kBFloat16 && key.dtype() == at::kBFloat16 &&
        value.dtype() == at::kBFloat16),

@@ -1,30 +1,34 @@
-import unittest, copy
+import unittest
 import torch
-import torch.nn as nn
 import intel_extension_for_pytorch as ipex
-from common_utils import TestCase
 from torch.testing._internal.jit_utils import JitTestCase
-import time, sys
 from test_ao_jit_llga_utils import JitLlgaTestCase
-import torch.fx.experimental.optimization as optimization
-from test_runtime_api import TestInputOutputModule, TestInputOutputModule2
+from test_runtime_api import TestInputOutputModule
 from common_ipex_conf import runtime_thread_affinity_test_env
+
 
 class SimpleNet(torch.nn.Module):
     def __init__(self):
         super(SimpleNet, self).__init__()
-        self.conv = torch.nn.Conv2d(64, 128, (3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+        self.conv = torch.nn.Conv2d(
+            64, 128, (3, 3), stride=(2, 2), padding=(1, 1), bias=False
+        )
 
     def forward(self, x):
         x1 = self.conv(x)
         y = torch.flatten(x1, start_dim=1)
         return y
 
+
 class SimpleNet_v2(torch.nn.Module):
     def __init__(self):
         super(SimpleNet_v2, self).__init__()
-        self.conv = torch.nn.Conv2d(3, 64, (3, 3), stride=(2, 2), padding=(1, 1), bias=False)
-        self.conv2 = torch.nn.Conv2d(64, 64, (3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+        self.conv = torch.nn.Conv2d(
+            3, 64, (3, 3), stride=(2, 2), padding=(1, 1), bias=False
+        )
+        self.conv2 = torch.nn.Conv2d(
+            64, 64, (3, 3), stride=(2, 2), padding=(1, 1), bias=False
+        )
 
     def forward(self, x):
         x1 = self.conv(x)
@@ -32,8 +36,12 @@ class SimpleNet_v2(torch.nn.Module):
         y = torch.flatten(x1, start_dim=1)
         return y
 
+
 class TestJitRuntimeAPI(JitTestCase):
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_task_async_api_fp32_jit_model(self):
         model = SimpleNet()
@@ -53,7 +61,10 @@ class TestJitRuntimeAPI(JitTestCase):
         y_runtime = y_runtime_future.get()
         self.assertEqual(y, y_runtime)
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_task_sync_api_fp32_jit_model(self):
         model = SimpleNet()
@@ -72,7 +83,10 @@ class TestJitRuntimeAPI(JitTestCase):
         y_runtime = task.run_sync(x)
         self.assertEqual(y, y_runtime)
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_task_async_api_bf16_jit_model(self):
         model = SimpleNet()
@@ -80,7 +94,9 @@ class TestJitRuntimeAPI(JitTestCase):
         x = torch.rand(64, 64, 3, 3)
 
         # Calculate the reference result
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+        with torch.cpu.amp.autocast(
+            enabled=True, dtype=torch.bfloat16
+        ), torch.no_grad():
             trace_mode = torch.jit.trace(model, x)
         y = trace_mode(x)
 
@@ -93,7 +109,10 @@ class TestJitRuntimeAPI(JitTestCase):
         y_runtime = y_runtime_future.get()
         self.assertEqual(y, y_runtime)
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_task_async_api_bf16_jit_model_multi_submission(self):
         model = SimpleNet()
@@ -101,7 +120,9 @@ class TestJitRuntimeAPI(JitTestCase):
         x = torch.rand(64, 64, 3, 3)
 
         # Calculate the reference result
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+        with torch.cpu.amp.autocast(
+            enabled=True, dtype=torch.bfloat16
+        ), torch.no_grad():
             trace_mode = torch.jit.trace(model, x)
         y = trace_mode(x)
 
@@ -121,7 +142,10 @@ class TestJitRuntimeAPI(JitTestCase):
         self.assertEqual(y, y_runtime[1])
         self.assertEqual(y, y_runtime[2])
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_task_copy_bf16_jit_mode(self):
         model = SimpleNet()
@@ -129,7 +153,9 @@ class TestJitRuntimeAPI(JitTestCase):
         x = torch.rand(64, 64, 3, 3)
 
         # Calculate the reference result
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+        with torch.cpu.amp.autocast(
+            enabled=True, dtype=torch.bfloat16
+        ), torch.no_grad():
             trace_mode = torch.jit.trace(model, x)
         y = trace_mode(x)
 
@@ -148,8 +174,12 @@ class TestJitRuntimeAPI(JitTestCase):
         self.assertEqual(y, y_runtime)
         self.assertEqual(y, y_runtime2)
 
+
 class TestJITMultiStreamModule(JitTestCase):
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_multi_stream_module_bf16_jit_model(self):
         model = SimpleNet()
@@ -160,18 +190,25 @@ class TestJITMultiStreamModule(JitTestCase):
         num_streams = batch_size
 
         # Calculate the reference result
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+        with torch.cpu.amp.autocast(
+            enabled=True, dtype=torch.bfloat16
+        ), torch.no_grad():
             trace_model = torch.jit.trace(model, x)
         y = trace_model(x)
 
         # Create MultiStreamModule
         cpu_pool = ipex.cpu.runtime.CPUPool()
-        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(trace_model, num_streams=num_streams, cpu_pool=cpu_pool)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(
+            trace_model, num_streams=num_streams, cpu_pool=cpu_pool
+        )
 
         y_runtime = multi_stream_model(x)
         self.assertEqual(y, y_runtime)
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_multi_stream_module_bf16_jit_model_concat_output(self):
         model = SimpleNet()
@@ -183,20 +220,29 @@ class TestJITMultiStreamModule(JitTestCase):
         num_streams = batch_size
 
         # Calculate the reference result
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+        with torch.cpu.amp.autocast(
+            enabled=True, dtype=torch.bfloat16
+        ), torch.no_grad():
             trace_model = torch.jit.trace(model, x)
 
         # Create MultiStreamModule
-        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(trace_model, num_streams=num_streams, cpu_pool=cpu_pool)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(
+            trace_model, num_streams=num_streams, cpu_pool=cpu_pool
+        )
         y_runtime = multi_stream_model(x)
 
         # Create MultiStreamModule with concat_output=False
-        multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(trace_model, num_streams=num_streams, cpu_pool=cpu_pool, concat_output=False)
+        multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(
+            trace_model, num_streams=num_streams, cpu_pool=cpu_pool, concat_output=False
+        )
         y_runtime2 = multi_stream_model2(x)
         self.assertEqual(y_runtime2.__len__(), num_streams)
         self.assertEqual(y_runtime, torch.cat(y_runtime2))
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_single_stream_module_bf16_jit_model(self):
         model = SimpleNet()
@@ -205,23 +251,32 @@ class TestJITMultiStreamModule(JitTestCase):
         x = torch.rand(batch_size, 64, 3, 3)
 
         # Calculate the reference result
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+        with torch.cpu.amp.autocast(
+            enabled=True, dtype=torch.bfloat16
+        ), torch.no_grad():
             trace_model = torch.jit.trace(model, x)
 
         y = trace_model(x)
 
         # Create MultiStreamModule
         cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
-        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(trace_model, num_streams=1, cpu_pool=cpu_pool)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(
+            trace_model, num_streams=1, cpu_pool=cpu_pool
+        )
         y_runtime = multi_stream_model(x)
 
         # Create MultiStreamModule with concat_output=False
-        multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(trace_model, num_streams=1, cpu_pool=cpu_pool, concat_output=False)
+        multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(
+            trace_model, num_streams=1, cpu_pool=cpu_pool, concat_output=False
+        )
         y_runtime2 = multi_stream_model2(x)
         self.assertEqual(y, y_runtime)
         self.assertEqual(y, y_runtime2[0])
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_core_number_not_divisible_stream_number_bf16_jit_model(self):
         model = SimpleNet()
@@ -231,25 +286,37 @@ class TestJITMultiStreamModule(JitTestCase):
         x = torch.rand(batch_size, 64, 3, 3)
 
         # Calculate the reference result
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+        with torch.cpu.amp.autocast(
+            enabled=True, dtype=torch.bfloat16
+        ), torch.no_grad():
             traced_model = torch.jit.trace(model, x)
         traced_model = torch.jit.freeze(traced_model)
-        
+
         # Calculate the reference result
         y = traced_model(x)
 
         # Create MultiStreamModule
         # Core Number is 3, stream Number is 2
         cpu_pool = ipex.cpu.runtime.CPUPool(core_ids=[0, 1, 2])
-        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(traced_model, num_streams=num_streams, cpu_pool=cpu_pool)
-        multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(traced_model, num_streams=num_streams, cpu_pool=cpu_pool, concat_output=False)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(
+            traced_model, num_streams=num_streams, cpu_pool=cpu_pool
+        )
+        multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(
+            traced_model,
+            num_streams=num_streams,
+            cpu_pool=cpu_pool,
+            concat_output=False,
+        )
 
         y_runtime = multi_stream_model(x)
         y_runtime2 = multi_stream_model2(x)
         self.assertEqual(y, y_runtime)
         self.assertEqual(y, torch.cat(y_runtime2))
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_batchsize_less_than_stream_number_bf16_jit_model(self):
         model = SimpleNet()
@@ -259,7 +326,9 @@ class TestJITMultiStreamModule(JitTestCase):
         x = torch.rand(batch_size, 64, 3, 3)
 
         # Calculate the reference result
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+        with torch.cpu.amp.autocast(
+            enabled=True, dtype=torch.bfloat16
+        ), torch.no_grad():
             traced_model = torch.jit.trace(model, x)
         traced_model = torch.jit.freeze(traced_model)
 
@@ -269,15 +338,25 @@ class TestJITMultiStreamModule(JitTestCase):
         # Create MultiStreamModule
         # Batchsize 2, Core Number is 3, stream Number is 3
         cpu_pool = ipex.cpu.runtime.CPUPool(core_ids=[0, 1, 2])
-        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(traced_model, num_streams=num_streams, cpu_pool=cpu_pool)
-        multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(traced_model, num_streams=num_streams, cpu_pool=cpu_pool, concat_output=False)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(
+            traced_model, num_streams=num_streams, cpu_pool=cpu_pool
+        )
+        multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(
+            traced_model,
+            num_streams=num_streams,
+            cpu_pool=cpu_pool,
+            concat_output=False,
+        )
 
         y_runtime = multi_stream_model(x)
         y_runtime2 = multi_stream_model2(x)
         self.assertEqual(y, y_runtime)
         self.assertEqual(y, torch.cat(y_runtime2))
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_batchsize_not_divisible_stream_number_bf16_jit_model(self):
         model = SimpleNet()
@@ -287,7 +366,9 @@ class TestJITMultiStreamModule(JitTestCase):
         x = torch.rand(batch_size, 64, 3, 3)
 
         # Calculate the reference result
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+        with torch.cpu.amp.autocast(
+            enabled=True, dtype=torch.bfloat16
+        ), torch.no_grad():
             traced_model = torch.jit.trace(model, x)
         traced_model = torch.jit.freeze(traced_model)
 
@@ -297,8 +378,15 @@ class TestJITMultiStreamModule(JitTestCase):
         # Create MultiStreamModule
         # Batchsize 4, Core Number is 3, stream Number is 3
         cpu_pool = ipex.cpu.runtime.CPUPool(core_ids=[0, 1, 2])
-        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(traced_model, num_streams=num_streams, cpu_pool=cpu_pool)
-        multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(traced_model, num_streams=num_streams, cpu_pool=cpu_pool, concat_output=False)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(
+            traced_model, num_streams=num_streams, cpu_pool=cpu_pool
+        )
+        multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(
+            traced_model,
+            num_streams=num_streams,
+            cpu_pool=cpu_pool,
+            concat_output=False,
+        )
 
         y_runtime = multi_stream_model(x)
         y_runtime2 = multi_stream_model2(x)
@@ -309,17 +397,22 @@ class TestJITMultiStreamModule(JitTestCase):
         self.assertEqual(y_runtime2[1].size(0), 1)
         self.assertEqual(y_runtime2[2].size(0), 1)
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_stream_number_auto_bf16_jit_model(self):
         model = torch.nn.Softmax(dim=-1)
         model.eval()
         for i in range(ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()):
-            batch_size = list(range(i+1)).__len__()
+            batch_size = list(range(i + 1)).__len__()
             x = torch.rand(batch_size, 64)
 
             # Calculate the reference result
-            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+            with torch.cpu.amp.autocast(
+                enabled=True, dtype=torch.bfloat16
+            ), torch.no_grad():
                 traced_model = torch.jit.trace(model, x)
             traced_model = torch.jit.freeze(traced_model)
 
@@ -330,16 +423,23 @@ class TestJITMultiStreamModule(JitTestCase):
             # Calculate the reference result
             y = traced_model(x)
 
-            cpu_pool = ipex.cpu.runtime.CPUPool(core_ids=list(range(i+1)))
+            cpu_pool = ipex.cpu.runtime.CPUPool(core_ids=list(range(i + 1)))
 
             # The stream number will be determined automatically.
-            multi_stream_model = ipex.cpu.runtime.MultiStreamModule(traced_model, cpu_pool=cpu_pool)
+            multi_stream_model = ipex.cpu.runtime.MultiStreamModule(
+                traced_model, cpu_pool=cpu_pool
+            )
             y_runtime = multi_stream_model(x)
             stream_num_ground_truth = ipex.cpu.runtime.get_default_num_streams(cpu_pool)
             self.assertEqual(y, y_runtime)
-            self.assertEqual(multi_stream_model.get_stream_number(), stream_num_ground_truth)
+            self.assertEqual(
+                multi_stream_model.get_stream_number(), stream_num_ground_truth
+            )
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_stream_number_larger_than_core_number(self):
         model = torch.nn.Softmax(dim=-1)
@@ -351,7 +451,9 @@ class TestJITMultiStreamModule(JitTestCase):
         x = torch.rand(batch_size, 64)
 
         # Calculate the reference result
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+        with torch.cpu.amp.autocast(
+            enabled=True, dtype=torch.bfloat16
+        ), torch.no_grad():
             traced_model = torch.jit.trace(model, x)
         traced_model = torch.jit.freeze(traced_model)
 
@@ -363,14 +465,22 @@ class TestJITMultiStreamModule(JitTestCase):
         y = traced_model(x)
 
         # The stream number will be determined automatically.
-        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(traced_model, num_streams=num_streams, cpu_pool=cpu_pool)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(
+            traced_model, num_streams=num_streams, cpu_pool=cpu_pool
+        )
         y_runtime = multi_stream_model(x)
         stream_num_ground_truth = ipex.cpu.runtime.get_default_num_streams(cpu_pool)
         self.assertEqual(y, y_runtime)
-        self.assertEqual(multi_stream_model.get_stream_number(), cpu_pool.core_ids.__len__())
+        self.assertEqual(
+            multi_stream_model.get_stream_number(), cpu_pool.core_ids.__len__()
+        )
+
 
 class TestLLGARuntimeAPI(JitLlgaTestCase):
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_task_async_api_int8_jit_model(self):
         with torch.no_grad():
@@ -391,7 +501,10 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
             y_runtime = y_runtime_future.get()
             self.assertEqual(y, y_runtime)
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_multi_stream_module_int8_jit_model(self):
         with torch.no_grad():
@@ -405,8 +518,12 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
 
             # Create task
             cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
-            multi_stream_model = ipex.cpu.runtime.MultiStreamModule(m_llga, num_streams=1, cpu_pool=cpu_pool)
-            multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(m_llga, num_streams=1, cpu_pool=cpu_pool, concat_output=False)
+            multi_stream_model = ipex.cpu.runtime.MultiStreamModule(
+                m_llga, num_streams=1, cpu_pool=cpu_pool
+            )
+            multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(
+                m_llga, num_streams=1, cpu_pool=cpu_pool, concat_output=False
+            )
 
             # Task submit and wait
             y_runtime = multi_stream_model(x)
@@ -414,7 +531,10 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
             self.assertEqual(y, y_runtime)
             self.assertEqual(y, torch.cat(y_runtime2))
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_core_number_not_divisible_stream_number_int8_jit_model(self):
         with torch.no_grad():
@@ -422,7 +542,9 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
             model.eval()
             num_streams = 2
             batch_size = num_streams
-            x = torch.rand(batch_size, 3, 16, 16).contiguous(memory_format=torch.channels_last)
+            x = torch.rand(batch_size, 3, 16, 16).contiguous(
+                memory_format=torch.channels_last
+            )
 
             # Calculate the reference result
             graph, m_llga, m_cpu = self.prepareModel(model, [x])
@@ -431,8 +553,12 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
             # Create MultiStreamModule
             # Core Number is 3, stream Number is 2
             cpu_pool = ipex.cpu.runtime.CPUPool(core_ids=[0, 1, 2])
-            multi_stream_model = ipex.cpu.runtime.MultiStreamModule(m_llga, num_streams=num_streams, cpu_pool=cpu_pool)
-            multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(m_llga, num_streams=num_streams, cpu_pool=cpu_pool, concat_output=False)
+            multi_stream_model = ipex.cpu.runtime.MultiStreamModule(
+                m_llga, num_streams=num_streams, cpu_pool=cpu_pool
+            )
+            multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(
+                m_llga, num_streams=num_streams, cpu_pool=cpu_pool, concat_output=False
+            )
 
             # Task submit and wait
             y_runtime = multi_stream_model(x)
@@ -440,7 +566,10 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
             self.assertEqual(y, y_runtime)
             self.assertEqual(y, torch.cat(y_runtime2))
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_batchsize_less_than_stream_number_int8_jit_model(self):
         with torch.no_grad():
@@ -448,7 +577,9 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
             model.eval()
             num_streams = 3
             batch_size = 2
-            x = torch.rand(batch_size, 3, 16, 16).contiguous(memory_format=torch.channels_last)
+            x = torch.rand(batch_size, 3, 16, 16).contiguous(
+                memory_format=torch.channels_last
+            )
 
             # Calculate the reference result
             graph, m_llga, m_cpu = self.prepareModel(model, [x])
@@ -457,8 +588,12 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
             # Create MultiStreamModule
             # Batchsize is 2, Core Number is 3, stream Number is 3
             cpu_pool = ipex.cpu.runtime.CPUPool(core_ids=[0, 1, 2])
-            multi_stream_model = ipex.cpu.runtime.MultiStreamModule(m_llga, num_streams=num_streams, cpu_pool=cpu_pool)
-            multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(m_llga, num_streams=num_streams, cpu_pool=cpu_pool, concat_output=False)
+            multi_stream_model = ipex.cpu.runtime.MultiStreamModule(
+                m_llga, num_streams=num_streams, cpu_pool=cpu_pool
+            )
+            multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(
+                m_llga, num_streams=num_streams, cpu_pool=cpu_pool, concat_output=False
+            )
 
             # Task submit and wait
             y_runtime = multi_stream_model(x)
@@ -466,6 +601,7 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
             self.assertEqual(y, y_runtime)
             self.assertEqual(y, torch.cat(y_runtime2))
             self.assertEqual(y_runtime2.__len__(), batch_size)
+
 
 class TestMultiStreamModuleHint(JitTestCase):
     def init_set_up(self):
@@ -480,29 +616,37 @@ class TestMultiStreamModuleHint(JitTestCase):
         traced_model = torch.jit.freeze(traced_model)
         return traced_model
 
-    def create_multi_stream_module(self,
-                                traced_model,
-                                num_streams,
-                                cpu_pool,
-                                multi_stream_input_hint,
-                                multi_stream_output_hint = None,
-                                concat_output = True):
-
+    def create_multi_stream_module(
+        self,
+        traced_model,
+        num_streams,
+        cpu_pool,
+        multi_stream_input_hint,
+        multi_stream_output_hint=None,
+        concat_output=True,
+    ):
         if not concat_output:
-            return ipex.cpu.runtime.MultiStreamModule(traced_model,
-                                                    num_streams=num_streams,
-                                                    cpu_pool=cpu_pool,
-                                                    concat_output = False,
-                                                    input_split_hint = multi_stream_input_hint)
+            return ipex.cpu.runtime.MultiStreamModule(
+                traced_model,
+                num_streams=num_streams,
+                cpu_pool=cpu_pool,
+                concat_output=False,
+                input_split_hint=multi_stream_input_hint,
+            )
 
         else:
-            return ipex.cpu.runtime.MultiStreamModule(traced_model,
-                                                    num_streams=num_streams,
-                                                    cpu_pool=cpu_pool,
-                                                    input_split_hint = multi_stream_input_hint,
-                                                    output_concat_hint = multi_stream_output_hint)
+            return ipex.cpu.runtime.MultiStreamModule(
+                traced_model,
+                num_streams=num_streams,
+                cpu_pool=cpu_pool,
+                input_split_hint=multi_stream_input_hint,
+                output_concat_hint=multi_stream_output_hint,
+            )
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_input_output_hint(self):
         batch_size, num_streams, cpu_pool = self.init_set_up()
@@ -511,7 +655,7 @@ class TestMultiStreamModuleHint(JitTestCase):
         #   * Accept 3 tensors as input
         #   * Return a tuple of 3 tensors as output
         model = TestInputOutputModule().eval()
-        for batch_size in (num_streams-1, num_streams):
+        for batch_size in (num_streams - 1, num_streams):
             # There is test for when batch_size is less than num_streams
             input_tensor1 = torch.rand(batch_size, 1)
             input_tensor2 = torch.rand(batch_size, 1)
@@ -532,37 +676,52 @@ class TestMultiStreamModuleHint(JitTestCase):
 
             multi_stream_input_hint = ipex.cpu.runtime.MultiStreamModuleHint(0, 0, 0)
 
-            multi_stream_model = self.create_multi_stream_module(traced_model,
-                                                                num_streams,
-                                                                cpu_pool,
-                                                                multi_stream_input_hint,
-                                                                concat_output=False)
+            multi_stream_model = self.create_multi_stream_module(
+                traced_model,
+                num_streams,
+                cpu_pool,
+                multi_stream_input_hint,
+                concat_output=False,
+            )
             y_runtime = multi_stream_model(input_tensor1, input_tensor2, input_tensor3)
 
             # Manually concat the output
             y_runtime_res1 = []
             y_runtime_res2 = []
             y_runtime_res3 = []
-            for stream_id in range(num_streams if ((batch_size // num_streams) >= 1) else batch_size):
+            for stream_id in range(
+                num_streams if ((batch_size // num_streams) >= 1) else batch_size
+            ):
                 y_runtime_res1.append(y_runtime[stream_id][0])
                 y_runtime_res2.append(y_runtime[stream_id][1])
                 y_runtime_res3.append(y_runtime[stream_id][2])
-            y_runtime_res = (torch.cat(y_runtime_res1), torch.cat(y_runtime_res2), torch.cat(y_runtime_res3))
+            y_runtime_res = (
+                torch.cat(y_runtime_res1),
+                torch.cat(y_runtime_res2),
+                torch.cat(y_runtime_res3),
+            )
             self.assertEqual(y_ref, y_runtime_res)
 
             # Create Multi Stream Module with concat output
             multi_stream_output_hint = ipex.cpu.runtime.MultiStreamModuleHint((0, 0, 0))
 
-            multi_stream_model2 = self.create_multi_stream_module(traced_model,
-                                                                        num_streams,
-                                                                        cpu_pool,
-                                                                        multi_stream_input_hint,
-                                                                        multi_stream_output_hint,
-                                                                        concat_output=True)
-            y_runtime_res2 = multi_stream_model2(input_tensor1, input_tensor2, input_tensor3)
+            multi_stream_model2 = self.create_multi_stream_module(
+                traced_model,
+                num_streams,
+                cpu_pool,
+                multi_stream_input_hint,
+                multi_stream_output_hint,
+                concat_output=True,
+            )
+            y_runtime_res2 = multi_stream_model2(
+                input_tensor1, input_tensor2, input_tensor3
+            )
             self.assertEqual(y_ref, y_runtime_res2)
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_simulate_bert_large_input_output(self):
         class TestModule(torch.nn.Module):
@@ -570,14 +729,19 @@ class TestMultiStreamModuleHint(JitTestCase):
                 super(TestModule, self).__init__()
 
             def forward(self, key1, key2, key3):
-                return key1*2, key2*2
+                return key1 * 2, key2 * 2
+
         # This module simulates the behaviour of Bert Large LZ models:
         #   * Accept 3 tensors (with key word) as input
         #   * Return a tuple of 2 tensors as output
         model = TestModule().eval()
 
         batch_size, num_streams, cpu_pool = self.init_set_up()
-        jit_input = (torch.rand(batch_size, 1), torch.rand(batch_size, 2), torch.rand(batch_size, 3))
+        jit_input = (
+            torch.rand(batch_size, 1),
+            torch.rand(batch_size, 2),
+            torch.rand(batch_size, 3),
+        )
         traced_model = self.create_jit_traced_model(model, jit_input)
 
         input_tensor1 = torch.rand(batch_size, 1)
@@ -591,14 +755,20 @@ class TestMultiStreamModuleHint(JitTestCase):
         # Calculate the reference result
         y_ref = traced_model(key1=input_tensor1, key2=input_tensor2, key3=input_tensor3)
 
-        multi_stream_input_hint = ipex.cpu.runtime.MultiStreamModuleHint(key1=0, key2=0, key3=0)
+        multi_stream_input_hint = ipex.cpu.runtime.MultiStreamModuleHint(
+            key1=0, key2=0, key3=0
+        )
 
-        multi_stream_model = self.create_multi_stream_module(traced_model,
-                                                            num_streams,
-                                                            cpu_pool,
-                                                            multi_stream_input_hint,
-                                                            concat_output=False)
-        y_runtime = multi_stream_model(key1=input_tensor1, key2=input_tensor2, key3=input_tensor3)
+        multi_stream_model = self.create_multi_stream_module(
+            traced_model,
+            num_streams,
+            cpu_pool,
+            multi_stream_input_hint,
+            concat_output=False,
+        )
+        y_runtime = multi_stream_model(
+            key1=input_tensor1, key2=input_tensor2, key3=input_tensor3
+        )
 
         # Manually Concat the output
         y_runtime_res1 = []
@@ -611,24 +781,31 @@ class TestMultiStreamModuleHint(JitTestCase):
 
         multi_stream_output_hint = ipex.cpu.runtime.MultiStreamModuleHint((0, 0))
 
-        multi_stream_model2 = self.create_multi_stream_module(traced_model,
-                                                                    num_streams,
-                                                                    cpu_pool,
-                                                                    multi_stream_input_hint,
-                                                                    multi_stream_output_hint,
-                                                                    concat_output=True)
-        y_runtime_res2 = multi_stream_model2(key1=input_tensor1, key2=input_tensor2, key3=input_tensor3)
+        multi_stream_model2 = self.create_multi_stream_module(
+            traced_model,
+            num_streams,
+            cpu_pool,
+            multi_stream_input_hint,
+            multi_stream_output_hint,
+            concat_output=True,
+        )
+        y_runtime_res2 = multi_stream_model2(
+            key1=input_tensor1, key2=input_tensor2, key3=input_tensor3
+        )
 
         self.assertEqual(y_ref, y_runtime_res2)
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_mix_position_keyword_input_output_hint(self):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super(TestModule, self).__init__()
 
-            def forward(self, param1, param2, key1 = None):
+            def forward(self, param1, param2, key1=None):
                 return param1, param2, key1
 
         batch_size, num_streams, cpu_pool = self.init_set_up()
@@ -637,9 +814,11 @@ class TestMultiStreamModuleHint(JitTestCase):
         #   * Return a tuple of 3 tensors as output
         model = TestModule().eval()
 
-        jit_input = (torch.rand(batch_size, 1),
-                torch.rand(batch_size, 2),
-                torch.rand(batch_size, 3))
+        jit_input = (
+            torch.rand(batch_size, 1),
+            torch.rand(batch_size, 2),
+            torch.rand(batch_size, 3),
+        )
 
         traced_model = self.create_jit_traced_model(model, jit_input)
 
@@ -647,7 +826,7 @@ class TestMultiStreamModuleHint(JitTestCase):
         input_tensor2 = torch.rand(batch_size, 2)
         input_tensor3 = torch.rand(batch_size, 3)
         input = (input_tensor1, input_tensor2)
-        k_input = {"key1":input_tensor3}
+        k_input = {"key1": input_tensor3}
 
         # Warm Up
         for _ in range(3):
@@ -656,7 +835,7 @@ class TestMultiStreamModuleHint(JitTestCase):
         # Calculate the reference result
         y_ref = traced_model(*input, **k_input)
         y_ref2 = traced_model(input_tensor1, input_tensor2, input_tensor3)
-        y_ref3 = traced_model(input_tensor1, input_tensor2, key1 = input_tensor3)
+        y_ref3 = traced_model(input_tensor1, input_tensor2, key1=input_tensor3)
         self.assertEqual(y_ref, y_ref2)
         self.assertEqual(y_ref, y_ref3)
 
@@ -666,19 +845,26 @@ class TestMultiStreamModuleHint(JitTestCase):
         # Create Multi Stream Module with concat output
         multi_stream_output_hint = ipex.cpu.runtime.MultiStreamModuleHint((0, 0, 0))
 
-        multi_stream_model = self.create_multi_stream_module(traced_model,
-                                                            num_streams,
-                                                            cpu_pool,
-                                                            multi_stream_input_hint,
-                                                            multi_stream_output_hint,
-                                                            concat_output=True)
+        multi_stream_model = self.create_multi_stream_module(
+            traced_model,
+            num_streams,
+            cpu_pool,
+            multi_stream_input_hint,
+            multi_stream_output_hint,
+            concat_output=True,
+        )
         # There are 2 ways to write now
-        y_runtime_res = multi_stream_model(input_tensor1, input_tensor2, key1 = input_tensor3)
+        y_runtime_res = multi_stream_model(
+            input_tensor1, input_tensor2, key1=input_tensor3
+        )
         y_runtime_res2 = multi_stream_model(*input, **k_input)
         self.assertEqual(y_ref, y_runtime_res)
         self.assertEqual(y_ref, y_runtime_res2)
 
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_input_output_hint_not_along_dim_zero(self):
         batch_size, num_streams, cpu_pool = self.init_set_up()
@@ -707,38 +893,54 @@ class TestMultiStreamModuleHint(JitTestCase):
 
         multi_stream_input_hint = ipex.cpu.runtime.MultiStreamModuleHint(1, 0, 1)
 
-        multi_stream_model = self.create_multi_stream_module(traced_model,
-                                                            num_streams,
-                                                            cpu_pool,
-                                                            multi_stream_input_hint,
-                                                            concat_output=False)
+        multi_stream_model = self.create_multi_stream_module(
+            traced_model,
+            num_streams,
+            cpu_pool,
+            multi_stream_input_hint,
+            concat_output=False,
+        )
         y_runtime = multi_stream_model(input_tensor1, input_tensor2, input_tensor3)
 
         # Manually concat the output
         y_runtime_res1 = []
         y_runtime_res2 = []
         y_runtime_res3 = []
-        for stream_id in range(num_streams if ((batch_size // num_streams) >= 1) else batch_size):
+        for stream_id in range(
+            num_streams if ((batch_size // num_streams) >= 1) else batch_size
+        ):
             y_runtime_res1.append(y_runtime[stream_id][0])
             y_runtime_res2.append(y_runtime[stream_id][1])
             y_runtime_res3.append(y_runtime[stream_id][2])
-        y_runtime_res = (torch.cat(y_runtime_res1, 1), torch.cat(y_runtime_res2, 0), torch.cat(y_runtime_res3, 1))
+        y_runtime_res = (
+            torch.cat(y_runtime_res1, 1),
+            torch.cat(y_runtime_res2, 0),
+            torch.cat(y_runtime_res3, 1),
+        )
         self.assertEqual(y_ref, y_runtime_res)
 
         # Create Multi Stream Module with concat output
         multi_stream_output_hint = ipex.cpu.runtime.MultiStreamModuleHint((1, 0, 1))
 
-        multi_stream_model2 = self.create_multi_stream_module(traced_model,
-                                                                    num_streams,
-                                                                    cpu_pool,
-                                                                    multi_stream_input_hint,
-                                                                    multi_stream_output_hint,
-                                                                    concat_output=True)
-        y_runtime_res2 = multi_stream_model2(input_tensor1, input_tensor2, input_tensor3)
+        multi_stream_model2 = self.create_multi_stream_module(
+            traced_model,
+            num_streams,
+            cpu_pool,
+            multi_stream_input_hint,
+            multi_stream_output_hint,
+            concat_output=True,
+        )
+        y_runtime_res2 = multi_stream_model2(
+            input_tensor1, input_tensor2, input_tensor3
+        )
         self.assertEqual(y_ref, y_runtime_res2)
 
+
 class TestMultiStreamBenchmarkModule(JitTestCase):
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @unittest.skipIf(
+        not ipex.cpu.runtime.is_runtime_ext_enabled(),
+        "Skip when IPEX Runtime extension is not enabled",
+    )
     @runtime_thread_affinity_test_env
     def test_multi_stream_benchmark_module_bf16_jit_model(self):
         model = SimpleNet().eval()
@@ -746,7 +948,9 @@ class TestMultiStreamBenchmarkModule(JitTestCase):
         x = torch.rand(batch_size, 64, 3, 3)
 
         # Calculate the reference result
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+        with torch.cpu.amp.autocast(
+            enabled=True, dtype=torch.bfloat16
+        ), torch.no_grad():
             trace_model = torch.jit.trace(model, x)
         # Warm Up
         for _ in range(3):
@@ -756,5 +960,6 @@ class TestMultiStreamBenchmarkModule(JitTestCase):
         multi_stream_model = ipex.cpu.runtime._MultiStreamBenchmarkModule(trace_model)
         multi_stream_model(x)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test = unittest.main()

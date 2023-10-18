@@ -11,13 +11,6 @@ at::Tensor embedding_bag(
     bool sparse,
     bool include_last_offset);
 
-at::Tensor embedding_bag_meta(
-    const at::Tensor& weight,
-    const at::Tensor& indices,
-    const at::Tensor& offsets,
-    bool sparse,
-    bool include_last_offset);
-
 } // namespace torch_ipex
 
 namespace torch_ipex {
@@ -42,6 +35,7 @@ at::Tensor embedding_bag_int8_kernel_impl(
     const at::Tensor& qweight,
     const at::Tensor& indices,
     const at::Tensor& offsets,
+    double o_scale,
     bool include_last_offset);
 
 } // namespace
@@ -67,6 +61,7 @@ using embedding_bag_int8_kernel_fn = at::Tensor (*)(
     const at::Tensor&,
     const at::Tensor&,
     const at::Tensor&,
+    double,
     bool);
 DECLARE_DISPATCH(embedding_bag_int8_kernel_fn, embedding_bag_int8_kernel_stub);
 

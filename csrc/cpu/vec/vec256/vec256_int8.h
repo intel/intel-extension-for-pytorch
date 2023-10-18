@@ -60,6 +60,25 @@ static inline __attribute__((always_inline)) int8_t _dot_s8s8_scale_s32s8(
   return (int8_t)c;
 }
 
+static inline __attribute__((always_inline)) void scale_fp32_and_fma(
+    float* out,
+    const int8_t* in,
+    float scale,
+    int64_t len) {
+  int64_t i;
+  __m256 scale_vec256 = _mm256_set1_ps(scale);
+  for (i = 0; i < len - 7; i += 8) {
+    auto i8 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(in + i));
+    auto i32 = _mm256_cvtepi8_epi32(i8);
+    auto f32 = _mm256_cvtepi32_ps(i32);
+    auto fma_out = _mm256_fmadd_ps(scale_vec256, f32, _mm256_loadu_ps(out + i));
+    _mm256_storeu_ps(out + i, fma_out);
+  }
+  for (; i < len; i++) {
+    out[i] = std::fma(scale, float(in[i]), out[i]);
+  }
+}
+
 } // namespace kernel
 } // namespace cpu
 } // namespace torch_ipex

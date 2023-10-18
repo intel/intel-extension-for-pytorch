@@ -5,15 +5,16 @@ from common_utils import TestCase
 from intel_extension_for_pytorch.nn import FrozenBatchNorm2d
 
 try:
-    import torchvision
+    import torchvision  # noqa: F401
     from torchvision.ops.misc import FrozenBatchNorm2d as FrozenBN2d
+
     HAS_TORCHVISION = True
 except ImportError:
     HAS_TORCHVISION = False
 skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
 
-class FrozenBNTester(TestCase):
 
+class FrozenBNTester(TestCase):
     @skipIfNoTorchVision
     def test_frozen_batch_norm(self):
         m = FrozenBatchNorm2d(100)
@@ -39,7 +40,12 @@ class FrozenBNTester(TestCase):
         self.assertEqual(x.grad, x1.grad)
 
         # test channels last
-        x2 = input.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+        x2 = (
+            input.clone()
+            .detach()
+            .to(memory_format=torch.channels_last)
+            .requires_grad_()
+        )
         y2 = m(x2)
         self.assertTrue(y2.dtype == torch.float32)
         self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
@@ -76,7 +82,12 @@ class FrozenBNTester(TestCase):
             self.assertEqual(x.grad, x1.grad)
 
             # test channels last
-            x2 = input.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+            x2 = (
+                input.clone()
+                .detach()
+                .to(memory_format=torch.channels_last)
+                .requires_grad_()
+            )
             y2 = m(x2)
             self.assertTrue(y2.dtype == torch.bfloat16)
             self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
@@ -88,5 +99,5 @@ class FrozenBNTester(TestCase):
             self.assertEqual(x2.grad, x1.grad)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test = unittest.main()

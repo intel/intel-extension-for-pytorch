@@ -537,7 +537,7 @@ static void ComputeLARSKernel(
  *@param lr Learning rate.
  *@param eps Args eps.
  */
-c10::optional<at::Tensor> lars_fused_step(
+c10::optional<at::Tensor> lars_xpu_fused_step(
     at::Tensor& fp32_weight,
     at::Tensor& weight,
     const at::Tensor& grad,
@@ -548,7 +548,7 @@ c10::optional<at::Tensor> lars_fused_step(
     double lr,
     double eps) {
   RECORD_FUNCTION(
-      "lars_fused_step",
+      "lars_xpu_fused_step",
       std::vector<c10::IValue>({fp32_weight, weight, grad, momentum_buffer_}));
   const OptionalDeviceGuard device_guard(device_of(fp32_weight));
 
@@ -648,8 +648,8 @@ c10::optional<at::Tensor> lars_fused_step(
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
-      "lars_fused_step",
-      at::AtenIpexTypeXPU::lars_fused_step,
+      "lars_xpu_fused_step",
+      at::AtenIpexTypeXPU::lars_xpu_fused_step,
       c10::DispatchKey::XPU);
 }
 } // namespace

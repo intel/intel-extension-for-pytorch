@@ -22,7 +22,8 @@ def interaction(*args):
         *args: Multiple tensors which represent different features
 
     Shape
-        - Input: :math:`N * (B, D)`, where N is the number of different kinds of features, B is the batch size, D is feature size
+        - Input: :math:`N * (B, D)`, where N is the number of different kinds of features,
+            B is the batch size, D is feature size
         - Output: :math:`(B, D + N * ( N - 1 ) / 2)`
     """
 

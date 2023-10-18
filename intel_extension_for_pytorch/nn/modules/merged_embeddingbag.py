@@ -43,6 +43,21 @@ def merged_embeddingbag(
     )
 
 
+def merged_embeddingbag_with_cat(
+    weights,
+    indices,
+    offsets,
+    dense_feature,
+):
+    if torch.is_grad_enabled():
+        raise NotImplementedError(
+            "do not support training for merged_embeddingbag_with_cat not"
+        )
+    return torch.ops.torch_ipex.merged_embeddingbag_cat_forward(
+        weights, indices, offsets, dense_feature
+    )
+
+
 def merged_embeddingbag_sgd(
     indices,
     offsets,
@@ -238,8 +253,9 @@ class MergedEmbeddingBag(nn.Module):
             elif mode == "mean":
                 self.pooling_modes.append(PoolingMode.MEAN)
             else:
-                assert_status = False
-                assert (assert_status), r"MergedEmbeddingBag only support EmbeddingBag with model sum or mean"
+                AssertionError(
+                    False
+                ), r"MergedEmbeddingBag only support EmbeddingBag with model sum or mean"
             if weight is None:
                 weight = torch.empty((num_of_features, feature_size), dtype=dtype)
             self.weights[i] = nn.Parameter(weight)
@@ -347,8 +363,8 @@ class MergedEmbeddingBag(nn.Module):
         offset_start = 0
         for i in range(self.n_tables):
             n_indice = indices[i].numel()
-            merged_indices[idx_start: idx_start + n_indice].copy_(indices[i].view(-1))
-            merged_indices_with_row_offsets[idx_start: idx_start + n_indice].copy_(
+            merged_indices[idx_start : idx_start + n_indice].copy_(indices[i].view(-1))
+            merged_indices_with_row_offsets[idx_start : idx_start + n_indice].copy_(
                 indices[i].view(-1) + self.row_offsets[i]
             )
             if indices[i].dim() == 2:
@@ -357,7 +373,7 @@ class MergedEmbeddingBag(nn.Module):
             else:
                 offset = offsets[i][:-1] if include_last_offsets[i] else offsets[i]
             assert offset.numel() == batch_size
-            merged_offsets[offset_start: offset_start + batch_size].copy_(
+            merged_offsets[offset_start : offset_start + batch_size].copy_(
                 offset + idx_start
             )
             idx_start += n_indice
@@ -372,16 +388,16 @@ class MergedEmbeddingBag(nn.Module):
     ):
         r"""
         Args:
-            input (Tuple[Tensor]): a tuple of (indices, offsets, include_last_offsets(if not merged)/
-            indices_with_row_offsets(if merged))
+            input (Tuple[Tensor]): a tuple of (indices, offsets, \
+                include_last_offsets(if not merged)/indices_with_row_offsets(if merged))
             need_linearize_indices_and_offsets: indicate whether input need to be linearized
         Returns:
             List[Tensor] output shape of `(batch_size, feature_size)` which length = num of tables.
         """
         assert (
             self.alldense
-        ), "MergedEmbeddingBag only support EmbeddingBag List with all dense gradient, \
-            please use MergedEmbeddingBagWith[Optimizer] for sparse gridient EmbeddingBag"
+        ), "MergedEmbeddingBag only support EmbeddingBag List with all dense gradient, please use \
+            MergedEmbeddingBagWith[Optimizer] for sparse gridient EmbeddingBag"
         if need_linearize_indices_and_offsets.item():
             indices, offsets, include_last_offsets = input
             (
@@ -493,9 +509,8 @@ class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
                     self.weights[i].float()
                 )
             else:
-                assert_status = False
-                assert (
-                    assert_status
+                AssertionError(
+                    False
                 ), r"MergedEmbeddingBag only support dtypes with bfloat, float and double"
             trails.append(trail)
             self.weights[i] = torch.nn.Parameter(bf16_w)
@@ -506,8 +521,8 @@ class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
     ):
         r"""
         Args:
-            input (Tuple[Tensor]): a tuple of (indices, offsets,
-            include_last_offsets(if not merged)/indices_with_row_offsets(if merged))
+            input (Tuple[Tensor]): a tuple of (indices, offsets, \
+                include_last_offsets(if not merged)/indices_with_row_offsets(if merged))
             need_linearize_indices_and_offsets: indicate whether input need to be linearized
         Returns:
             List[Tensor] output shape of `(batch_size, feature_size)` which length = num of tables.
@@ -554,3 +569,52 @@ class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
                 )
             )
         return cls(embedding_specs, lr, weight_decay)
+
+
+class MergedEmbeddingBagWithCat(MergedEmbeddingBag):
+    r"""
+    To support `MergedEmbeddingBag` with cat all outputs with an given input.
+    It is a common structure in recomendation system to cat dense output with
+    sparse (embeddingbag) output together. MergedEmbeddingBagWithCat aims to
+    fuse the cat together to have good memory behaviour.
+    Native usage for multiple EmbeddingBag cat with dense is:
+
+        >>> EmbLists = torch.nn.Modulist(emb1, emb2, emb3, ..., emb_m)
+        >>> inputs = [in1, in2, in3, ..., in_m]
+        >>> outputs = []
+        >>> for i in range(len(EmbLists)):
+        >>>     outputs.append(Emb[in_i])
+        >>> cat_out = torch.cat([dense_feature] + outputs, dim=1)
+
+
+    The optimized path is:
+
+        >>> EmbLists = torch.nn.Modulist(emb1, emb2, emb3, ..., emb_m)
+        >>> merged_emb = MergedEmbeddingBagWithCat.from_embeddingbag_list(EmbLists)
+        >>> cat_out = MergedEmbeddingBagWithCat(dense_feature, inputs)
+    """
+    embedding_specs: List[EmbeddingSpec]
+
+    def __init__(
+        self,
+        embedding_specs: List[EmbeddingSpec],
+    ):
+        super(MergedEmbeddingBagWithCat, self).__init__(embedding_specs)
+        assert all(PoolingMode.SUM == mode for mode in self.pooling_modes)
+        assert all(self.weights[0].dtype == w.dtype for w in self.weights)
+
+    def forward(self, indices, offsets, dense_feature):
+        r"""
+        Args:
+            indices (Tensor): a list of indices for all tables
+            offsets (Tensor): a list of offsets for all tables
+            dense_feature (Tensor): dense feature to be cat
+        Returns:
+            output shape of `(batch_size, feature_size)` which feature_size = emb_dim * (num of tables + 1).
+        """
+        return merged_embeddingbag_with_cat(
+            self.weights,
+            indices,
+            offsets,
+            dense_feature,
+        )

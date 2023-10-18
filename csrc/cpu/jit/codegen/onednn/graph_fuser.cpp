@@ -126,7 +126,9 @@ class GraphRewriter {
 
     while (curr != block_->param_node()) {
       // cannot reorder around side effectful nodes
-      if (curr->hasSideEffects()) {
+      if (curr->hasSideEffects() &&
+          std::string(curr->kind().toQualString())
+                  .find(std::string("llga::")) != 0) {
         worklist.emplace_back(curr, end_bound_node);
         end_bound_node = curr;
       }

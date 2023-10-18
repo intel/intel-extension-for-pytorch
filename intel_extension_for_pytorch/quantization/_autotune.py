@@ -1,7 +1,8 @@
+# This Python file uses the following encoding: utf-8
+
 import sys
 import subprocess
 import time
-from . import default_static_qconfig, prepare
 
 
 def autotune(
@@ -34,57 +35,54 @@ def autotune(
         sampling_sizes = [100]
     if accuracy_criterion is None:
         accuracy_criterion = {"relative": 0.01}
+    neural_compressor_version = "2.1"
     try:
         import neural_compressor
+
+        if neural_compressor.__version__ != neural_compressor_version:
+            raise RuntimeError(
+                "Please install Intel® Neural Compressor with version {} while the current version of \
+                    Intel® Neural Compressor is {}.".format(
+                    neural_compressor_version, neural_compressor.__version__
+                )
+            )
     except ImportError:
         try:
             subprocess.check_call(
-                [sys.executable, "-m", "pip", "install", "neural_compressor==1.14.1"]
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "neural_compressor=={}".format(neural_compressor_version),
+                ]
             )
-            import neural_compressor  # noqa F401
-        except Exception:
-            assert_status = False
-            assert (
-                assert_status
+            import neural_compressor
+        except BaseException:
+            AssertionError(
+                False
             ), "Unable to import neural_compressor from the local environment."
-    from neural_compressor import config
-    from neural_compressor.experimental import Quantization, common
-    from neural_compressor.adaptor.torch_utils.util import auto_copy
-    from neural_compressor.adaptor.pytorch import get_example_inputs
+    from neural_compressor import PostTrainingQuantConfig
+    from neural_compressor.config import TuningCriterion, AccuracyCriterion
+    from neural_compressor import quantization
 
-    config.quantization.backend = "pytorch_ipex"
-    config.quantization.approach = "post_training_static_quant"
-    config.quantization.device = "cpu"
-    config.quantization.use_bf16 = False
-    config.quantization.calibration_sampling_size = sampling_sizes
-    if accuracy_criterion.get("relative"):
-        config.quantization.accuracy_criterion.relative = accuracy_criterion.get(
-            "relative"
-        )
-    if accuracy_criterion.get("absolute"):
-        config.quantization.accuracy_criterion.absolute = accuracy_criterion.get(
-            "absolute"
-        )
-    config.quantization.timeout = tuning_time
-    quantizer = Quantization(config)
-    fp32_model = auto_copy(prepared_model)
-    quantizer.model = common.Model(fp32_model)
-    quantizer.calib_dataloader = calib_dataloader
-    quantizer.eval_func = eval_func
-    q_model = quantizer.fit()
+    conf = PostTrainingQuantConfig(
+        backend="ipex",
+        calibration_sampling_size=sampling_sizes,
+        tuning_criterion=TuningCriterion(timeout=tuning_time),
+        accuracy_criterion=AccuracyCriterion(
+            criterion=list(accuracy_criterion.keys())[0],
+            tolerable_loss=list(accuracy_criterion.values())[0],
+        ),
+        excluded_precisions=["bf16"],
+    )
+    q_model = quantization.fit(
+        prepared_model, conf, calib_dataloader=calib_dataloader, eval_func=eval_func
+    )
     dirname_str = "./saved_tuning_results_" + time.strftime("%Y%m%d_%H%M%S")
     q_model.save(dirname_str)
 
-    # This is a workaround for the bug that the auto_copy function will change its input prepared_model.
-    qconfig = default_static_qconfig
-    new_prepared_model = prepare(
-        fp32_model,
-        qconfig,
-        example_inputs=get_example_inputs(calib_dataloader),
-        inplace=True,
-    )
-    new_prepared_model.load_qconf_summary(
+    prepared_model.load_qconf_summary(
         qconf_summary=dirname_str + "/best_configure.json"
     )
-
-    return new_prepared_model
+    return prepared_model

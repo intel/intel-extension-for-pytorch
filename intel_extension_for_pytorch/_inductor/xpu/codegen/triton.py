@@ -247,7 +247,7 @@ class XPUTritonKernel(TritonKernel):
         result.writelines(["\n", "\n", "if __name__ == '__main__':"])
         with result.indent():
             result.writeline("from torch._inductor.utils import get_num_bytes")
-            result.writeline("from intel_extension_for_pytorch._inductor.utils import do_bench")
+            result.writeline("from intel_extension_for_pytorch._inductor.xpu.utils import do_bench")
             result.writeline("")
 
             result.writeline("args = get_args()")
@@ -288,7 +288,7 @@ class XPUTritonKernel(TritonKernel):
                     import triton.language as tl
                     from torch._inductor.ir import ReductionHint
                     from torch._inductor.ir import TileHint
-                    from intel_extension_for_pytorch._inductor.triton_heuristics import AutotuneHint, {heuristics}
+                    from intel_extension_for_pytorch._inductor.xpu.triton_heuristics import AutotuneHint, {heuristics}
                     from torch._inductor.utils import instance_descriptor
                     from torch._inductor import triton_helpers
                 """

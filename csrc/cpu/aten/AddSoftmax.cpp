@@ -28,9 +28,8 @@ namespace {
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   // This custom op is needed because some models cannot be JIT-ed right now.
   // It will be removed after these models can be JIT-ed.
-  m.def(
-      "add_softmax_(Tensor(a!) self, Tensor other) -> Tensor(a!)",
-      torch_ipex::cpu::AddSoftmax_);
+  m.def("add_softmax_(Tensor(a!) self, Tensor other) -> Tensor(a!)");
+  m.impl("add_softmax_", c10::DispatchKey::CPU, torch_ipex::cpu::AddSoftmax_);
 }
 
 } // namespace

@@ -306,3 +306,13 @@ at::Tensor dil_bmm_add(
 
 } // namespace cpu
 } // namespace torch_ipex
+
+namespace {
+
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "bmm_add(Tensor input, Tensor batch1, Tensor batch2, Scalar alpha) -> Tensor");
+  m.impl("bmm_add", c10::DispatchKey::CPU, torch_ipex::cpu::dil_bmm_add);
+}
+
+} // namespace

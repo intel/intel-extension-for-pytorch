@@ -289,6 +289,23 @@ bool isClampFusable(
   return is_fusable;
 }
 
+void insertBias(
+    torch::jit::Graph* graph,
+    torch::jit::Node* node,
+    c10::optional<at::Tensor> may_get_bias_tensor) {
+  at::Tensor bias_tensor;
+  if (may_get_bias_tensor.has_value()) {
+    bias_tensor = may_get_bias_tensor.value().set_requires_grad(false);
+    IValue bias_value(bias_tensor);
+    auto bias = graph->insertConstant(bias_value);
+    node->addInput(bias);
+  } else {
+    auto n = graph->createNone();
+    auto v = n->insertBefore(node)->output();
+    node->addInput(v);
+  }
+}
+
 } // namespace graph_rewrite_helper
 } // namespace jit
 } // namespace torch_ipex

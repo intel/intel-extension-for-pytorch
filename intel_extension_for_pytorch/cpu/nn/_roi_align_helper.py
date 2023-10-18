@@ -1,4 +1,5 @@
-# coding: utf-8
+# This Python file uses the following encoding: utf-8
+
 from typing import List, Union
 
 import torch
@@ -19,7 +20,7 @@ def _cat(tensors: List[Tensor], dim: int = 0) -> Tensor:
 
 
 def _convert_boxes_to_roi_format(boxes: List[Tensor]) -> Tensor:
-    concat_boxes = _cat(list(boxes), dim=0)
+    concat_boxes = _cat(list(b for b in boxes), dim=0)
     temp = []
     for i, b in enumerate(boxes):
         temp.append(torch.full_like(b[:, :1], i))
@@ -54,21 +55,17 @@ def roi_align(
     aligned: bool = False,
 ) -> Tensor:
     """
-    Performs Region of Interest (RoI) Align operator with average pooling,
-    as described in Mask R-CNN. It is optimized with parallelization and
-    channels last support on the basis of the torchvision's roi_align.
+    Performs Region of Interest (RoI) Align operator with average pooling, as described in Mask R-CNN.
+    It is optimized with parallelization and channels last support on the basis of the torchvision's roi_align.
 
-    The semantics of Intel® Extension for PyTorch* roi_align is exactly the
-    same as that of torchvision. We override roi_align in the torchvision
-    with Intel® Extension for PyTorch* roi_align via ATen op registration.
-    It is activated when Intel® Extension for PyTorch* is imported from
-    the Python frontend or when it is linked by a C++ program. It is
-    fully transparent to users.
+    The semantics of Intel® Extension for PyTorch* roi_align is exactly the same as that of torchvision.
+    We override roi_align in the torchvision with Intel® Extension for PyTorch* roi_align via ATen op registration.
+    It is activated when Intel® Extension for PyTorch* is imported from the Python frontend or when it is linked
+    by a C++ program. It is fully transparent to users.
 
-    In certain cases, if you are using a self-implemented roi_align class
-    or function that behave exactly the same as the ones in torchvision,
-    please import the optimized one in Intel® Extension for PyTorch*
-    as the following examples to get performance boost on Intel platforms.
+    In certain cases, if you are using a self-implemented roi_align class or function that behave exactly the same as
+    the ones in torchvision, please import the optimized one in Intel® Extension for PyTorch* as the following
+    examples to get performance boost on Intel platforms.
 
     .. highlight:: python
     .. code-block:: python

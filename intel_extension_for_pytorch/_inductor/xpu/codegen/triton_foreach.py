@@ -13,7 +13,7 @@ class XPUForeachKernel(ForeachKernel):
             """
                 import triton
                 import triton.language as tl
-                from intel_extension_for_pytorch._inductor.triton_heuristics import foreach
+                from intel_extension_for_pytorch._inductor.xpu.triton_heuristics import foreach
                 from torch._inductor.utils import instance_descriptor
                 from torch._inductor import triton_helpers
             """

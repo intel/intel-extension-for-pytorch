@@ -1,5 +1,6 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 #include "aten/Interaction.h"
+#include "aten/utils/utils.h"
 #include "autocast/autocast_mode.h"
 #include "cpu/kernels/Interaction.h"
 #include "ideep/IDeepConversions.h"
@@ -10,7 +11,6 @@
 #include <c10/util/Exception.h>
 #include <torch/csrc/autograd/function.h>
 #include <algorithm>
-
 /*
  Custom op to optimize DLRM interaction part
 */
@@ -34,6 +34,274 @@ static inline void cat(
     move_ker(&out[offset], in_ptr[j], feature_size);
     offset += out_stride;
   }
+}
+
+#if defined(CPU_CAPABILITY_AVX512)
+auto set_zero_inner = [](auto i, __m512* vset) {
+  vset[i] = _mm512_setzero_ps();
+};
+auto set_zero = [set_zero_inner](auto i, __m512** vset) {
+  compile_time_for<4>::op(set_zero_inner, vset[i]);
+};
+auto fma = [](auto i, __m512* inout_vset, __m512 m1_vset, __m512* m2_vset) {
+  inout_vset[i] = _mm512_fmadd_ps(m1_vset, m2_vset[i], inout_vset[i]);
+};
+auto bcast_fma = [fma](
+                     auto i,
+                     __m512** inout_vset,
+                     __m512* m2_vset,
+                     __m512 bcast,
+                     auto* basic_ptr,
+                     int32_t* offset) {
+  *offset += 27;
+  bcast = _mm512_set1_ps(*(basic_ptr + *offset));
+  compile_time_for<4>::op(fma, inout_vset[i], bcast, m2_vset);
+};
+auto acc_with_fma = [](auto i, __m512* dst, __m512* vset_1, __m512* vset_2) {
+  *dst = _mm512_fmadd_ps(vset_1[i], vset_2[i], *dst);
+};
+auto load = [](auto i, __m512* in_vset, auto* basic_ptr) {
+  in_vset[i] = _mm512_loadu_ps(basic_ptr + 16 * i);
+};
+auto load_bf16_cast_fp32 = [](auto i,
+                              __m512i* bf16_vset,
+                              __m512* fp32_vset,
+                              auto* basic_ptr) {
+  bf16_vset[i] = _mm512_loadu_si512(basic_ptr + 32 * i);
+  fp32_vset[i * 2] = _mm512_castsi512_ps(_mm512_slli_epi32(
+      _mm512_cvtepu16_epi32(_mm512_extracti32x8_epi32(bf16_vset[i], 0)), 16));
+  fp32_vset[i * 2 + 1] = _mm512_castsi512_ps(_mm512_slli_epi32(
+      _mm512_cvtepu16_epi32(_mm512_extracti32x8_epi32(bf16_vset[i], 1)), 16));
+};
+auto store_inner = [](auto i, __m512* out_vset, auto* basic_ptr) {
+  _mm512_storeu_ps(basic_ptr + 16 * i, out_vset[i]);
+};
+auto store =
+    [store_inner](auto i, __m512** out_vset, auto* basic_ptr, int32_t* offset) {
+      *offset += 128;
+      compile_time_for<4>::op(store_inner, out_vset[i], basic_ptr + *offset);
+    };
+auto cast_bf16_and_store_inner = [](auto i, __m512* out_vset, auto* basic_ptr) {
+  _mm256_storeu_si256(
+      reinterpret_cast<__m256i*>(basic_ptr + 16 * i),
+      reinterpret_cast<__m256i>(_mm512_cvtneps_pbh(out_vset[i])));
+};
+auto cast_bf16_and_store = [cast_bf16_and_store_inner](
+                               auto i,
+                               __m512** out_vset,
+                               auto* basic_ptr,
+                               int32_t* offset) {
+  *offset += 128;
+  compile_time_for<4>::op(
+      cast_bf16_and_store_inner, out_vset[i], basic_ptr + *offset);
+};
+#endif
+
+template <typename T>
+inline void mm(T* out, T* mat1, T* mat2, uint32_t M, uint32_t K, uint32_t N) {
+#if defined(CPU_CAPABILITY_AVX512)
+  if (M == 27 && K == 27 & N == 128) {
+    uint32_t ld_block = 64;
+    uint32_t bd_block = 6;
+    // Hold C result
+    __m512 v_c_m0[4];
+    __m512 v_c_m1[4];
+    __m512 v_c_m2[4];
+    __m512 v_c_m3[4];
+    __m512 v_c_m4[4];
+    __m512 v_c_m5[4];
+    __m512* v_c[6] = {v_c_m0, v_c_m1, v_c_m2, v_c_m3, v_c_m4, v_c_m5};
+    // Load B
+    __m512 v_b[4];
+    // Bcast A
+    __m512 bcast;
+    for (int n = 0; n < N; n += ld_block) {
+      int32_t mat1_m_off = -189; // 27 * (bd_block + 1)
+      int32_t out_m_off = -128;
+      for (int m = 0; m < 27; m += bd_block) {
+        mat1_m_off += 162; // 27 * bd_block
+        int32_t mat2_k_off = -128;
+        // set zeros
+        compile_time_for<6>::op(set_zero, v_c);
+        for (int k = 0; k < 27; k++) {
+          mat2_k_off += 128;
+          // load mat2 value
+          compile_time_for<4>::op(load, v_b, mat2 + mat2_k_off + n);
+          if (m == 24) {
+            compile_time_for<3>::op(
+                bcast_fma, v_c, v_b, bcast, mat1 + k, &mat1_m_off);
+            mat1_m_off -= 81;
+          } else {
+            compile_time_for<6>::op(
+                bcast_fma, v_c, v_b, bcast, mat1 + k, &mat1_m_off);
+            mat1_m_off -= 162;
+          }
+        }
+        // reduce end, write c buffer to out
+        if (m == 24) {
+          compile_time_for<3>::op(store, v_c, out + n, &out_m_off);
+        } else {
+          compile_time_for<6>::op(store, v_c, out + n, &out_m_off);
+        }
+      }
+    }
+    return;
+  }
+#endif
+  // mat1  + mat1_m_off + k, mat2 [K, N], out[M, N], all contiguous
+  int m_off = -K;
+  int o_off = 0;
+  for (int m = 0; m < M; m++) {
+    m_off += K;
+    for (int n = 0; n < N; n++) {
+      float acc = 0;
+      int k_off = -N;
+#pragma omp simd
+      for (int k = 0; k < K; k++) {
+        k_off += N;
+        acc += mat1[m_off + k] * mat2[k_off + n];
+      }
+      out[o_off++] = acc;
+    }
+  }
+}
+
+template <>
+inline void mm<BFloat16>(
+    BFloat16* out,
+    BFloat16* mat1,
+    BFloat16* mat2,
+    uint32_t M,
+    uint32_t K,
+    uint32_t N) {
+#if defined(CPU_CAPABILITY_AVX512_BF16)
+  if (M == 27 && K == 27 & N == 128) {
+    uint32_t ld_block = 64;
+    uint32_t bd_block = 6;
+    // Hold C result
+    __m512 v_c_m0[4];
+    __m512 v_c_m1[4];
+    __m512 v_c_m2[4];
+    __m512 v_c_m3[4];
+    __m512 v_c_m4[4];
+    __m512 v_c_m5[4];
+    __m512* v_c[6] = {v_c_m0, v_c_m1, v_c_m2, v_c_m3, v_c_m4, v_c_m5};
+    // Load B
+    __m512i bf16_v_b[2];
+    __m512 v_b[4];
+    // Bcast A
+    __m512 bcast;
+
+    for (int n = 0; n < N; n += ld_block) {
+      int32_t mat1_m_off = -189; // 27 * (bd_block + 1)
+      int32_t out_m_off = -128;
+      for (int m = 0; m < 27; m += bd_block) {
+        mat1_m_off += 162; // 27 * bd_block
+        int32_t mat2_k_off = -128;
+        // set zeros
+        compile_time_for<6>::op(set_zero, v_c);
+        for (int k = 0; k < 27; k++) {
+          mat2_k_off += 128;
+          // load mat2 value
+          compile_time_for<2>::op(
+              load_bf16_cast_fp32, bf16_v_b, v_b, mat2 + mat2_k_off + n);
+          if (m == 24) {
+            compile_time_for<3>::op(
+                bcast_fma, v_c, v_b, bcast, mat1 + k, &mat1_m_off);
+            mat1_m_off -= 81;
+          } else {
+            compile_time_for<6>::op(
+                bcast_fma, v_c, v_b, bcast, mat1 + k, &mat1_m_off);
+            mat1_m_off -= 162;
+          }
+        }
+        // reduce end, write c buffer to out
+        if (m == 24) {
+          compile_time_for<3>::op(
+              cast_bf16_and_store, v_c, out + n, &out_m_off);
+        } else {
+          compile_time_for<6>::op(
+              cast_bf16_and_store, v_c, out + n, &out_m_off);
+        }
+      }
+    }
+    return;
+  }
+#endif
+  // mat1  + mat1_m_off + k, mat2 [K, N], out[M, N], all contiguous
+  int m_off = -K;
+  int o_off = 0;
+  for (int m = 0; m < M; m++) {
+    m_off += K;
+    for (int n = 0; n < N; n++) {
+      float acc = 0;
+      int k_off = -N;
+#pragma omp simd
+      for (int k = 0; k < K; k++) {
+        k_off += N;
+        acc += mat1[m_off + k] * mat2[k_off + n];
+      }
+      out[o_off++] = acc;
+    }
+  }
+}
+
+template <typename T>
+inline void dot_product(T* out, T* v1, T* v2, uint32_t len) {
+  float acc = 0;
+#if defined(CPU_CAPABILITY_AVX512)
+  if (len == 128) {
+    __m512 v_x[8];
+    __m512 v_y[8];
+    __m512 sum = _mm512_set1_ps(0.f);
+    // load v1, v2
+    compile_time_for<8>::op(load, v_x, v1);
+    compile_time_for<8>::op(load, v_y, v2);
+    // fma
+    compile_time_for<8>::op(acc_with_fma, &sum, v_x, v_y);
+    // vertical sum
+    acc = _mm512_reduce_add_ps(sum);
+    out[0] = acc;
+    return;
+  }
+#endif
+#pragma omp simd
+  for (uint32_t i = 0; i < len; i++) {
+    acc += v1[i] * v2[i];
+  }
+  out[0] = acc;
+}
+
+template <>
+inline void dot_product<BFloat16>(
+    BFloat16* out,
+    BFloat16* v1,
+    BFloat16* v2,
+    uint32_t len) {
+  float acc = 0;
+#if defined(CPU_CAPABILITY_AVX512)
+  if (len == 128) {
+    __m512i bf16_v_x[4];
+    __m512i bf16_v_y[4];
+    __m512 v_x[8];
+    __m512 v_y[8];
+    __m512 sum = _mm512_set1_ps(0.f);
+    // load v1, v2 and cast to fp32
+    compile_time_for<4>::op(load_bf16_cast_fp32, bf16_v_x, v_x, v1);
+    compile_time_for<4>::op(load_bf16_cast_fp32, bf16_v_y, v_y, v2);
+    // fma
+    compile_time_for<8>::op(acc_with_fma, &sum, v_x, v_y);
+    // vertical sum
+    acc = _mm512_reduce_add_ps(sum);
+    out[0] = BFloat16(acc);
+    return;
+  }
+#endif
+#pragma omp simd
+  for (uint32_t i = 0; i < len; i++) {
+    acc += float(v1[i]) * float(v2[i]);
+  }
+  out[0] = BFloat16(acc);
 }
 
 template <typename Tout, typename Tin>
@@ -118,26 +386,6 @@ inline at::Tensor _interaction_forward(const std::vector<at::Tensor>& input) {
   auto out = at::empty({batch_size, out_data_line_len}, input[0].options());
   auto out_data = out.data_ptr<T>();
 
-  auto mkldnn_dtype = cpu::get_mkldnn_dtype(input[0].scalar_type());
-  std::vector<int64_t> lhs_shape({feature_nums, feature_size});
-  std::vector<int64_t> lhs_stride({feature_size, 1});
-  std::vector<int64_t> rhs_shape({feature_size, feature_nums});
-  std::vector<int64_t> rhs_stride({1, feature_size});
-  std::vector<int64_t> res_shape({feature_nums, feature_nums});
-  std::vector<int64_t> res_stride({feature_nums, 1});
-  ideep::tensor::desc lhs_desc(
-      std::move(lhs_shape), mkldnn_dtype, std::move(lhs_stride));
-  ideep::tensor::desc rhs_desc(
-      std::move(rhs_shape), mkldnn_dtype, std::move(rhs_stride));
-  ideep::tensor::desc res_desc(
-      std::move(res_shape), mkldnn_dtype, std::move(res_stride));
-
-  auto op_attr = dnnl::primitive_attr();
-  op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-
-  auto pd = ideep::matmul_forward::primitive_desc(
-      ideep::engine::cpu_engine(), lhs_desc, rhs_desc, res_desc, op_attr);
-
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
     T cat_buf[feature_nums * feature_size] __attribute__((aligned(64)));
     T mm_buf[feature_nums * feature_nums] __attribute__((aligned(64)));
@@ -145,22 +393,19 @@ inline at::Tensor _interaction_forward(const std::vector<at::Tensor>& input) {
     for (uint32_t n = 0; n < feature_nums; n++) {
       input_ptr[n] = &input_data[n][start * feature_size];
     }
-    ideep::tensor lhs({lhs_desc, cat_buf});
-    ideep::tensor rhs({lhs_desc, cat_buf});
-    ideep::tensor res({res_desc, mm_buf});
-    ideep::tensor scratchpad(pd.scratchpad_desc());
-    auto p = dnnl::matmul(pd);
     for (int64_t i = start; i < end; i++) {
       move_ker(&out_data[i * out_data_line_len], input_ptr[0], feature_size);
-      cat<T>(cat_buf, input_ptr, feature_size, feature_size);
-      p.execute(
-          ideep::stream::default_stream(),
-          {{DNNL_ARG_SRC, lhs},
-           {DNNL_ARG_WEIGHTS, rhs},
-           {DNNL_ARG_DST, res},
-           {DNNL_ARG_SCRATCHPAD, scratchpad}});
       T* flat_buf = (T*)(&out_data[i * out_data_line_len] + feature_size);
-      flat_triangle<T>(mm_buf, flat_buf, feature_nums);
+      auto o_offset = interact_feature_size;
+      for (int f1 = feature_nums - 1; f1 > 0; f1--) {
+        o_offset = o_offset - f1;
+        T* v1 = input_ptr[f1];
+        for (int f2 = 0; f2 < f1; f2++) {
+          T* v2 = input_ptr[f2];
+          T* out = flat_buf + o_offset + f2;
+          dot_product<T>(out, v1, v2, feature_size);
+        }
+      }
       for (uint32_t n = 0; n < feature_nums; n++) {
         input_ptr[n] += feature_size;
       }
@@ -192,26 +437,6 @@ inline std::vector<at::Tensor> _interaction_backward(
   auto grad_out_data_line_len = interact_feature_size + feature_size;
   auto grad_out_data = grad_out.data_ptr<T>();
 
-  auto mkldnn_dtype = cpu::get_mkldnn_dtype(input[0].scalar_type());
-  std::vector<int64_t> lhs_shape({feature_nums, feature_nums});
-  std::vector<int64_t> lhs_stride({feature_nums, 1});
-  std::vector<int64_t> rhs_shape({feature_nums, feature_size});
-  std::vector<int64_t> rhs_stride({feature_size, 1});
-  std::vector<int64_t> res_shape({feature_nums, feature_size});
-  std::vector<int64_t> res_stride({feature_size, 1});
-  ideep::tensor::desc lhs_desc(
-      std::move(lhs_shape), mkldnn_dtype, std::move(lhs_stride));
-  ideep::tensor::desc rhs_desc(
-      std::move(rhs_shape), mkldnn_dtype, std::move(rhs_stride));
-  ideep::tensor::desc res_desc(
-      std::move(res_shape), mkldnn_dtype, std::move(res_stride));
-
-  auto op_attr = dnnl::primitive_attr();
-  op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-
-  auto pd = ideep::matmul_forward::primitive_desc(
-      ideep::engine::cpu_engine(), lhs_desc, rhs_desc, res_desc, op_attr);
-
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
     auto mm_elems = feature_nums * feature_nums;
     T grad_mm_buf[mm_elems] __attribute__((aligned(64)));
@@ -226,11 +451,6 @@ inline std::vector<at::Tensor> _interaction_backward(
       input_ptr[n] = &input_data[n][start * feature_size];
       output_ptr[n] = &output_data[n][start * feature_size];
     }
-    ideep::tensor lhs({lhs_desc, sum_buf});
-    ideep::tensor rhs({lhs_desc, cat_buf});
-    ideep::tensor res({res_desc, grad_cat_buf});
-    ideep::tensor scratchpad(pd.scratchpad_desc());
-    auto p = dnnl::matmul(pd);
     for (int64_t i = start; i < end; i++) {
       // Special BMM characteristics in Interaction layer
       //  bmm(A, A'): two inputs are transposed to each other.
@@ -256,12 +476,13 @@ inline std::vector<at::Tensor> _interaction_backward(
       transpose_add(sum_buf, grad_mm_buf, feature_nums, feature_nums);
       // Calculate A
       cat<T>(cat_buf, input_ptr, feature_size, feature_size);
-      p.execute(
-          ideep::stream::default_stream(),
-          {{DNNL_ARG_SRC, lhs},
-           {DNNL_ARG_WEIGHTS, rhs},
-           {DNNL_ARG_DST, res},
-           {DNNL_ARG_SCRATCHPAD, scratchpad}});
+      mm<T>(
+          grad_cat_buf,
+          sum_buf,
+          cat_buf,
+          feature_nums,
+          feature_nums,
+          feature_size);
       cat_backward<T, T>(grad_cat_buf, output_ptr, feature_size, feature_size);
       add_ker(output_ptr[0], grad_out_ptr, feature_size);
       grad_out_ptr += grad_out_data_line_len;

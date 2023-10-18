@@ -25,6 +25,7 @@ function (print_cpu_config_summary)
     message(STATUS "  C++ compiler ID       : ${CMAKE_CXX_COMPILER_ID}")
     message(STATUS "  C++ compiler version  : ${CMAKE_CXX_COMPILER_VERSION}")
 
+    message(STATUS "  CXX standard          : ${CMAKE_CXX_STANDARD}")
     message(STATUS "  CXX flags             : ${CMAKE_CXX_FLAGS}")
     message(STATUS "  Compile definitions   : ${CPU_NATIVE_DEFINITIONS}")
     message(STATUS "  CXX Linker options    : ${CMAKE_SHARED_LINKER_FLAGS}")
@@ -37,6 +38,7 @@ function (print_cpu_config_summary)
     message(STATUS "  oneMKL include        : ${ONEMKL_INCLUDE_DIR}")
 
     message(STATUS "Options:")
+    message(STATUS "  BUILD_STATIC_ONEMKL   : ${BUILD_STATIC_ONEMKL}")
     message(STATUS "  IPEX_DISP_OP          : ${IPEX_DISP_OP}")
 
     message(STATUS "")

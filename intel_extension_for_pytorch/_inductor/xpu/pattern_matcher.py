@@ -25,7 +25,7 @@ config.post_grad_custom_post_pass = _precompiled_pattern_matcher_post_grad_post_
 import torch
 from torch._inductor.lowering import lowerings as L
 import intel_extension_for_pytorch
-from intel_extension_for_pytorch._inductor.pattern_matcher import _register_lowering_pattern_post_grad_pre_pass
+from intel_extension_for_pytorch._inductor.xpu.pattern_matcher import _register_lowering_pattern_post_grad_pre_pass
 
 @_register_lowering_pattern_post_grad_pre_pass(..)
 def your_replacement(match, *args, **kwargs):

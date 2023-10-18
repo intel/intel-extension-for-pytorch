@@ -11,10 +11,11 @@ import warnings
 from .optim import AdamW, SGD
 import intel_extension_for_pytorch._C as torch_ipex_cpp
 import copy
+
 try:
     from transformers.modeling_utils import apply_chunking_to_forward
     from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions
-except Exception:
+except ImportError:
     pass
 USE_BF16_PARAMS = True
 layer_use_bf16 = False
@@ -113,7 +114,7 @@ class UnpadInput(torch.autograd.Function):
 #             init.uniform_(self.bias, -bound, bound)
 #
 #     def forward(self, input):
-#         raise NotImplemented
+#         raise NotImplementedError
 #         return input
 
 
@@ -288,7 +289,7 @@ class BertSelfAttention(BlockedModule):
             )
         )
         self.blocked_input_signature = get_blocking_signature("SF", "SFSF")
-        if layer_use_bf16 and USE_BF16_PARAMS:
+        if layer_use_bf16 is True and USE_BF16_PARAMS:
             self.query.weight.set_blocking_param(
                 (
                     [self.attention_head_size, [self.attention_head_size // 2, 2]],
@@ -372,8 +373,8 @@ class BertSelfAttention(BlockedModule):
             # B, S1, N, S2, H = hidden_states.shape
             # S = S1 * S2
             # print("Before attention_mask shape = %s (%s)" % (attention_mask.shape, attention_mask.numel()))
-            # attention_mask = attention_mask.expand([B, N, S, S]).view([B, N, S1, S2, S1, S2]).
-            # permute([0, 2, 1, 4, 3, 5]).contiguous()
+            # attention_mask = attention_mask.expand([B, N, S, S]).view(
+            #   [B, N, S1, S2, S1, S2]).permute([0, 2, 1, 4, 3, 5]).contiguous()
             # assert (
             #     attention_mask.size(1) == attention_mask.size(2) == 1
             # ), "unsupported attention_mask shape %s" % (attention_mask.shape,)
@@ -385,8 +386,8 @@ class BertSelfAttention(BlockedModule):
             print(f"encoder_attention_mask: {encoder_attention_mask.shape}")
             # B, S1, N, S2, H = encoder_hidden_states.shape
             # S = S1 * S2
-            # encoder_attention_mask = encoder_attention_mask.expand([B, N, S, S]).
-            # view([B, N, S1, S2, S1, S2]).permute([0, 2, 1, 4, 3, 5]).contiguous()
+            # encoder_attention_mask = encoder_attention_mask.expand([B, N, S, S]).view(
+            #   [B, N, S1, S2, S1, S2]).permute([0, 2, 1, 4, 3, 5]).contiguous()
             assert (
                 encoder_attention_mask.size(1) == encoder_attention_mask.size(2) == 1
             ), "unsupported encoder_attention_mask shape %s" % (
@@ -499,7 +500,7 @@ class BertOutputBase(BlockedModule):
             )
         )
         self.blocked_input_signature = get_blocking_signature("SF", "SFSF")
-        if layer_use_bf16 and USE_BF16_PARAMS:
+        if layer_use_bf16 is True and USE_BF16_PARAMS:
             self.dense.weight.set_blocking_param(
                 (
                     [self.attention_head_size, [self.attention_head_size // 2, 2]],
@@ -511,7 +512,7 @@ class BertOutputBase(BlockedModule):
             self.LayerNorm.weight.set_blocking_param((None, None, torch.bfloat16))
             self.LayerNorm.bias.set_blocking_param((None, None, torch.bfloat16))
         self.use_bf16 = layer_use_bf16
-        # print(f"config.hidden_size = {config.hidden_size}, ifm = {ifm}, 
+        # print(f"config.hidden_size = {config.hidden_size}, ifm = {ifm},
         # p = {config.hidden_dropout_prob}, eps = {config.layer_norm_eps}")
 
     def maybe_block_params(self):
@@ -607,7 +608,7 @@ class BertIntermediate(BlockedModule):
         )
         self.hidden_act = config.hidden_act
         self.blocked_input_signature = get_blocking_signature("SF", "SFSF")
-        if layer_use_bf16 and USE_BF16_PARAMS:
+        if layer_use_bf16 is True and USE_BF16_PARAMS:
             self.dense.weight.set_blocking_param(
                 (
                     [self.attention_head_size, [self.attention_head_size // 2, 2]],
@@ -725,7 +726,9 @@ class BertEmbeddings(BlockedModule):
 
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
         self.register_buffer(
-            "position_ids", torch.arange(config.max_position_embeddings).expand((1, -1))
+            "position_ids",
+            torch.arange(config.max_position_embeddings).expand((1, -1)),
+            persistent=False,
         )
         self.position_embedding_type = getattr(
             config, "position_embedding_type", "absolute"
@@ -738,8 +741,8 @@ class BertEmbeddings(BlockedModule):
         self.use_bf16 = layer_use_bf16
         if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
             print(
-                f"config.hidden_size = {config.hidden_size}, config.intermediate_size = {config.intermediate_size}, \
-                    p = {config.hidden_dropout_prob}, eps = {config.layer_norm_eps}, bf16 = {layer_use_bf16}"
+                f"config.hidden_size = {config.hidden_size}, config.intermediate_size = {config.intermediate_size},\
+                p = {config.hidden_dropout_prob}, eps = {config.layer_norm_eps}, bf16 = {layer_use_bf16}"
             )
 
     def forward(
@@ -940,8 +943,8 @@ class BertLayer(nn.Module):
         if self.is_decoder and encoder_hidden_states is not None:
             assert hasattr(
                 self, "crossattention"
-            ), f"If `encoder_hidden_states` are passed, {self} has to be instantiated with cross-attention \
-                layers by setting `config.add_cross_attention=True`"
+            ), f"If `encoder_hidden_states` are passed, {self} has to be instantiated\
+                with cross-attention layers by setting `config.add_cross_attention=True`"
 
             # cross_attn cached key/values tuple is at positions 3,4 of past_key_value tuple
             cross_attn_past_key_value = (
@@ -1182,7 +1185,7 @@ try:
         return False
 
     transformers.file_utils.is_tensor = is_tensor
-except Exception:
+except ImportError:
     pass
 
 
@@ -1196,6 +1199,7 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     r"""
     Use TPP to speedup training/inference. fast_bert API is still a experimental
     feature and now only optimized for bert model.
+
     Args:
         model (torch.nn.Module): User model to apply optimizations on.
         dtype (torch.dtype): Only works for ``torch.bfloat16`` and ``torch.float`` .
@@ -1205,15 +1209,23 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         unpad(bool): Unpad the squence to reduce the sparsity.
         seed(string): The seed used for the libxsmm kernel. In general it should be same
             to the torch.seed
+
     .. warning::
+
         Please invoke ``fast_bert`` function AFTER loading weights to model via
         ``model.load_state_dict(torch.load(PATH))``.
+
     .. warning::
+
         This API can't be used when you have applied the ipex.optimize.
+
     .. warning::
+
         Please invoke ``optimize`` function BEFORE invoking DDP in distributed
         training scenario.
+
     Examples:
+
         >>> # bfloat16 inference case.
         >>> model = ...
         >>> model.load_state_dict(torch.load(PATH))
@@ -1226,6 +1238,7 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         >>> optimized_model, optimized_optimizer = ipex.fast_bert(model, dtype=torch.bfloat16,
                 optimizer=optimizer, unpad=True, seed=args.seed)
         >>> # running training step.
+
     """
     # tpp bert optimization depends on the transformers repo to implementate the related module
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}

@@ -1,4 +1,3 @@
-import torch  # noqa F401
 from torch import nn, Tensor
 from torch.jit.annotations import BroadcastingList2
 

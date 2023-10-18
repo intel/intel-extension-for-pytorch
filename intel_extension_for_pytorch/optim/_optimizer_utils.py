@@ -12,9 +12,10 @@ from ._functional import (
     adam_step,
     adamw_step,
     lars_step,
+    lars_xpu_step,
 )
 from ._lamb import Lamb
-from .lars import Lars
+from ._lars import Lars
 from ..nn import utils
 
 IPEX_FUSED_OPTIMIZER_LIST_CPU = [
@@ -22,6 +23,7 @@ IPEX_FUSED_OPTIMIZER_LIST_CPU = [
     torch.optim.Adagrad,
     torch.optim.Adam,
     Lamb,
+    Lars,
 ]
 
 IPEX_FUSED_OPTIMIZER_LIST_XPU = [
@@ -37,6 +39,7 @@ OPTIMIZER_FUSED_STEP_MAPPING_CPU = {
     torch.optim.Adagrad: adagrad_step,
     torch.optim.Adam: adam_step,
     Lamb: lamb_step,
+    Lars: lars_step,
 }
 
 OPTIMIZER_FUSED_STEP_MAPPING_XPU = {
@@ -45,7 +48,7 @@ OPTIMIZER_FUSED_STEP_MAPPING_XPU = {
     torch.optim.Adam: adam_step,
     torch.optim.Adagrad: adagrad_step,
     Lamb: lamb_step,
-    Lars: lars_step
+    Lars: lars_xpu_step,
 }
 
 
@@ -56,7 +59,7 @@ def patch_zero_grad_for_master_weight_training(optimizer):
     So the 'zero_grad' should work on the 'bf16_params' or 'fp16_params' too.
     """
 
-    def zero_grad(self, set_to_none: bool = False):
+    def zero_grad(self, set_to_none: bool = True):
         for _, v in self.params_attr.items():
             _param = v.parameter
             if _param is None:
@@ -379,17 +382,8 @@ def optimizer_fusion(optimizer, master_weight_split, device_type):
             return optimizer
         if not hasattr(optimizer, "_original_step"):
             setattr(optimizer, "_original_step", optimizer.step)  # noqa: B010
-
-        optimizer.fused = True
-        if type(optimizer) == torch.optim.Adam or type(optimizer) == torch.optim.AdamW:
-            if optimizer.defaults['fused'] is True and not torch.jit.is_scripting():
-                optimizer.fused = False
-
-        if optimizer.fused is True:
-            optimizer.step = types.MethodType(step, optimizer)
-
-        setattr(optimizer, "fused", optimizer.fused)  # noqa: B010
-
+        optimizer.step = types.MethodType(step, optimizer)
+        setattr(optimizer, "fused", True)  # noqa: B010
     except KeyError:
         warnings.warn(
             "Does not suport fused step for "

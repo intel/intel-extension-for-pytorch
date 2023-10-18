@@ -89,6 +89,8 @@ data_type LlgaTensorDesc::getLlgaDataType(at::ScalarType dt) const {
       return data_type::f32;
     case at::ScalarType::BFloat16:
       return data_type::bf16;
+    case at::ScalarType::Bool:
+      return data_type::boolean;
     case at::kInt:
       return data_type::s32;
     case at::ScalarType::QInt8:
@@ -112,8 +114,18 @@ LlgaTensorDesc LlgaTensorDesc::supplementTensorInfo(const at::Tensor& t) const {
     auto dtype = getLlgaDataType(t.scalar_type());
     TORCH_CHECK(
         dtype != data_type::undef, "Not support data type ", t.scalar_type());
-    return {tid_, sizes, strides, dtype, property_type_};
+    return {tid_, sizes, strides, dtype, property_type_, is_scalar_tensor_};
   }
+}
+
+LlgaTensorDesc LlgaTensorDesc::convertDimsToUnknown() {
+  if (!is_dimensionality_unknown() && !is_opaque()) {
+    for (int i = 0; i < sizes_.size(); i++) {
+      sizes_[i] = INT64_MIN;
+      strides_[i] = INT64_MIN;
+    }
+  }
+  return {tid_, sizes_, strides_, dtype_, property_type_, is_scalar_tensor_};
 }
 
 at::ScalarType LlgaTensorDesc::aten_scalar_type() const {
@@ -122,6 +134,8 @@ at::ScalarType LlgaTensorDesc::aten_scalar_type() const {
       return at::ScalarType::Float;
     case data_type::bf16:
       return at::ScalarType::BFloat16;
+    case data_type::boolean:
+      return at::ScalarType::Bool;
     case data_type::s32:
       return at::kInt;
     case data_type::s8:

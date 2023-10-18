@@ -288,7 +288,9 @@ at::Tensor IPEXConvTransposeOp::forward(
   ctx->saved_data["weight_requires_grad"] = weight.requires_grad();
   ctx->saved_data["bias_requires_grad"] =
       bias_opt.has_value() && bias_opt.value().requires_grad() ? true : false;
-  ctx->save_for_backward({input});
+  ctx->saved_data["bias_opt"] = bias_opt;
+  ctx->saved_data["weight_channels_last"] = weight_channels_last;
+  ctx->save_for_backward({input, weight});
 
   return _forward(
       input,
@@ -413,9 +415,12 @@ std::tuple<at::Tensor, at::Tensor> conv_transpose_backward_weights(
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> conv_transpose_backward(
     const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias_opt,
     const at::Tensor& grad_output_t,
     std::array<bool, 3> output_mask,
-    const at::Tensor& op_context) {
+    const at::Tensor& op_context,
+    c10::optional<bool> weight_channels_last) {
   return reinterpret_cast<IpexConvTransposeOpContext*>(
              op_context.data_ptr<int64_t>()[0])
       ->run_backward(input, grad_output_t, output_mask);
@@ -440,7 +445,19 @@ conv_transpose_backward_kernel_impl(
   RECORD_FUNCTION(
       "torch_ipex::conv_transpose_backward", c10::ArrayRef<c10::IValue>({}));
 
-  auto memory_format = input.suggest_memory_format();
+  bool use_channels_last =
+      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
+      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d ||
+      weight_channels_last;
+
+  auto memory_format = at::MemoryFormat::Contiguous;
+  if (use_channels_last) {
+    if (input.dim() == 4) {
+      memory_format = at::MemoryFormat::ChannelsLast;
+    } else {
+      memory_format = at::MemoryFormat::ChannelsLast3d;
+    }
+  }
   at::Tensor grad_output = grad_output_t.contiguous(memory_format);
 
   at::Tensor grad_input, grad_weight, grad_bias;
@@ -482,11 +499,25 @@ torch::autograd::variable_list IPEXConvTransposeOp::backward(
   output_mask[0] = ctx->saved_data["input_requires_grad"].toBool();
   output_mask[1] = ctx->saved_data["weight_requires_grad"].toBool();
   output_mask[2] = ctx->saved_data["bias_requires_grad"].toBool();
+  auto bias_opt = ctx->saved_data["bias_opt"].toOptional<at::Tensor>();
+  auto weight_channels_last =
+      ctx->saved_data["weight_channels_last"].toOptional<bool>();
   auto saved = ctx->get_saved_variables();
   at::Tensor input = saved[0];
+  at::Tensor weight = saved[1];
   at::Tensor grad_input, grad_weight, grad_bias;
-  std::tie(grad_input, grad_weight, grad_bias) =
-      conv_transpose_backward(input, grad_outputs[0], output_mask, op_context);
+  static auto op =
+      torch::Dispatcher::singleton()
+          .findSchemaOrThrow("torch_ipex::conv_transpose_backward", "")
+          .typed<decltype(conv_transpose_backward)>();
+  std::tie(grad_input, grad_weight, grad_bias) = op.call(
+      input,
+      weight,
+      bias_opt,
+      grad_outputs[0],
+      output_mask,
+      op_context,
+      weight_channels_last);
   return {
       grad_input,
       grad_weight,
@@ -539,53 +570,6 @@ at::Tensor conv_transpose(
       dilation,
       groups,
       weight_channels_last);
-}
-
-at::Tensor conv_transpose_forward_meta(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const c10::optional<at::Tensor>& bias_opt,
-    const at::Tensor& op_context,
-    c10::optional<at::IntArrayRef> weight_size,
-    c10::optional<at::IntArrayRef> padding,
-    c10::optional<at::IntArrayRef> output_padding,
-    c10::optional<at::IntArrayRef> stride,
-    c10::optional<at::IntArrayRef> dilation,
-    c10::optional<int64_t> groups,
-    c10::optional<bool> weight_channels_last) {
-  TORCH_CHECK(
-      weight_size.has_value() && padding.has_value() &&
-          output_padding.has_value() && stride.has_value() &&
-          dilation.has_value() && groups.has_value() &&
-          weight_channels_last.has_value(),
-      "weight_size, padding, output_padding, stride, dilation, groups and weight_channels_last must have value for conv_transpose_forward_meta");
-  auto input_size = input.sym_sizes();
-  c10::SymDimVector output_sizes = conv_input_size(
-      input_size,
-      weight_size.value(),
-      padding.value(),
-      output_padding.value(),
-      stride.value(),
-      dilation.value(),
-      groups.value());
-  auto output = at::empty_symint(output_sizes, input.options());
-
-  bool use_channels_last =
-      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
-      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d ||
-      weight_channels_last.value();
-  auto memory_format = at::MemoryFormat::Contiguous;
-  if (use_channels_last) {
-    // TODO: support ConvTranspose1d
-    if (input.dim() == 4) {
-      memory_format = at::MemoryFormat::ChannelsLast;
-    } else if (input.dim() == 5) {
-      memory_format = at::MemoryFormat::ChannelsLast3d;
-    }
-  }
-
-  output = output.contiguous(memory_format);
-  return output;
 }
 
 } // namespace cpu
@@ -646,15 +630,11 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       torch_ipex::cpu::conv_transpose_forward);
   m.impl(
       "conv_transpose",
-      c10::DispatchKey::Meta,
-      torch_ipex::cpu::conv_transpose_forward_meta);
-  m.impl(
-      "conv_transpose",
       c10::DispatchKey::AutocastCPU,
       torch_ipex::autocast::conv_transpose);
   m.def(
-      "conv_transpose_backward(Tensor input, Tensor grad_out, bool[3] output_mask, "
-      "Tensor W_prepack) "
+      "conv_transpose_backward(Tensor input, Tensor weight, Tensor? bias_opt, Tensor grad_out, bool[3] output_mask, "
+      "Tensor W_prepack, bool? weight_channels_last) "
       " -> (Tensor, Tensor, Tensor)");
   m.impl(
       "conv_transpose_backward",

@@ -1,3 +1,1 @@
-from .lars import Lars
-
-del lars
+from ._lars import Lars

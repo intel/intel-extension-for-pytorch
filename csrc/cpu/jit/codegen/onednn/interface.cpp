@@ -10,6 +10,7 @@
 #include "prepare_binary.h"
 #include "prepare_dequant.h"
 #include "prepare_silu.h"
+#include "process_cast.h"
 #include "quantization_patterns.h"
 #include "remove_mutation.h"
 
@@ -63,11 +64,10 @@ void fuseGraph(std::shared_ptr<Graph>& g) {
     DecomposeOps(g);
     GRAPH_DUMP("After DecomposeOps. Before PrepareBinaryForLLGA", g);
     PrepareBinaryForLLGA(g);
-    GRAPH_DUMP("After DecomposeOps. Before PrepareSiluForLLGA", g);
+    GRAPH_DUMP("After PrepareBinaryForLLGA. Before PrepareSiluForLLGA", g);
     PrepareSiluForLLGA(g);
-    GRAPH_DUMP("After PrepareSiluForLLGA. Before PrepareBinaryForLLGA", g);
     GRAPH_DUMP(
-        "After PrepareBinaryForLLGA. Before EliminateCommonSubexpression", g);
+        "After PrepareSiluForLLGA. Before EliminateCommonSubexpression", g);
     EliminateCommonSubexpression(g);
     GRAPH_DUMP(
         "After EliminateCommonSubexpression. Before SaveDequantInformation", g);
@@ -79,7 +79,9 @@ void fuseGraph(std::shared_ptr<Graph>& g) {
     GRAPH_DUMP("After PrepareDequantForLLGA. Before LiftUpQuant", g);
     // LiftUpQuant must be place before DeferSizeCheck
     LiftUpQuant(g);
-    GRAPH_DUMP("After LiftUpQuant. Before DeferSizeCheck", g);
+    GRAPH_DUMP("After LiftUpQuant. Before ProcessCast", g);
+    ProcessCast(g);
+    GRAPH_DUMP("After ProcessCast. Before DeferSizeCheck", g);
     DeferSizeCheck(g);
     GRAPH_DUMP("After DeferSizeCheck. Before CreateLlgaSubgraphs", g);
     // CreateLlgaSubgraphs must be placed after all the preparation passes above
@@ -87,16 +89,7 @@ void fuseGraph(std::shared_ptr<Graph>& g) {
     GRAPH_DUMP("After CreateLlgaSubgraphs. Before PropagateLayout", g);
     // PropagateLayout must be placed after CreateLlgaSubgraphs
     PropagateLayout(g);
-    GRAPH_DUMP(
-        "After PropagateLayout. Before prepareFusionGroupAndGuardOutputs", g);
-
-    // Add shape guard for profiling mode and wipe the tensor type information
-    // from the IR
-    prepareFusionGroupAndGuardOutputs(g->block());
-    GRAPH_DUMP(
-        "After prepareFusionGroupAndGuardOutputs. Before "
-        "RevertPrepareBinaryForLLGA",
-        g);
+    GRAPH_DUMP("After PropagateLayout. Before RevertPrepareBinaryForLLGA", g);
     RevertPrepareBinaryForLLGA(g);
     GRAPH_DUMP("After RevertPrepareBinaryForLLGA. Before IpexQuantFusion", g);
     IpexQuantFusion(g);
@@ -131,61 +124,6 @@ torch::jit::RegisterOperators LLGAFusionGroupOp({
     torch::jit::Operator(
         Symbol::fromQualString(fuser::onednn::LlgaFusionGroupName()),
         createLlgaKernel,
-        AliasAnalysisKind::PURE_FUNCTION),
-});
-
-Operation createLlgaGuardKernel(const Node* node) {
-  return [node](Stack* stack) {
-    RECORD_FUNCTION(
-        fuser::onednn::LlgaGuardName(), c10::ArrayRef<c10::IValue>());
-
-    GRAPH_DEBUG("Guarding node: ", node->kind().toQualString());
-    std::vector<TypePtr> types = node->tys(attr::types);
-    const auto num_inputs = types.size();
-
-    GRAPH_DEBUG("num_inputs to guard: ", num_inputs);
-
-    for (size_t i = 0; i < num_inputs; i++) {
-      GRAPH_DEBUG("checking input ", i);
-      auto& input = peek(stack, i, num_inputs);
-      const c10::TensorTypePtr& guard_tensor_type =
-          types[i]->cast<TensorType>();
-
-      if (!input.isTensor()) {
-        GRAPH_DEBUG("input ", i, " is not a tensor, return false");
-        push(stack, IValue(false));
-        return;
-      }
-      const at::Tensor& tensor = input.toTensor();
-
-      // If input tensor is of mkldnn, it's originated from an upstream
-      // LLGA partition that has passed the check on input shapes.
-      // It is valid to continue here as long as the output shapes from
-      // oneDNN graph partitions are determined by the input shapes.
-      if (tensor.is_mkldnn()) {
-        GRAPH_DEBUG("input ", i, " is_mkldnn, continue");
-        continue;
-      }
-
-      if (!guard_tensor_type->matchTensor(tensor)) {
-        GRAPH_DEBUG("input ", i, " check failed, return false");
-        push(stack, IValue(false));
-        return;
-      }
-    }
-
-    // TODO: check type and return the right flag
-    // naively return true;
-    GRAPH_DEBUG("all check done, return true");
-    push(stack, IValue(true));
-    return;
-  };
-}
-
-torch::jit::RegisterOperators LLGAGuardOp({
-    torch::jit::Operator(
-        Symbol::fromQualString(fuser::onednn::LlgaGuardName()),
-        createLlgaGuardKernel,
         AliasAnalysisKind::PURE_FUNCTION),
 });
 

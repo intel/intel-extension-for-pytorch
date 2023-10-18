@@ -99,6 +99,8 @@ class LlgaNodeWrapper {
 
   bool useOpaqueLayout(size_t offset) const;
 
+  bool inputValueIsNotUsedLater(size_t offset) const;
+
   friend class LlgaGraphHelper;
 
  private:

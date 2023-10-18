@@ -1,5 +1,5 @@
-# reference:
-# https://github.com/intel/neural-compressor/blob/15477100cef756e430c8ef8ef79729f0c80c8ce6/neural_compressor/conf/dotdict.py
+# reference: https://github.com/intel/neural-compressor/blob/\
+#            15477100cef756e430c8ef8ef79729f0c80c8ce6/neural_compressor/conf/dotdict.py
 class DotDict(dict):
     """access yaml using attributes instead of using the dictionary notation.
     Args:

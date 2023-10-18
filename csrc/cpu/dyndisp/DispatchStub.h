@@ -48,14 +48,16 @@ using namespace c10;
 namespace torch_ipex {
 namespace cpu {
 
+// ISA level number should order by required compiler version.
 enum class CPUCapability {
   DEFAULT = 0,
   AVX2 = 1,
   AVX2_VNNI = 2,
   AVX512 = 3,
-  AVX512_VNNI = 4,
-  AVX512_BF16 = 5,
-  AMX = 6,
+  AVX512_VNNI = 4, // gcc 9.2+
+  AVX512_BF16 = 5, // gcc 10.3+
+  AMX = 6, // gcc 11.2+
+  AVX512_FP16 = 7, // gcc 12.1+
   NUM_OPTIONS
 };
 
@@ -80,6 +82,10 @@ struct TORCH_API DispatchStubImpl {
   void* get_call_ptr(
       DeviceType device_type,
       void* DEFAULT
+#ifdef HAVE_AVX512_FP16_CPU_DEFINITION
+      ,
+      void* AVX512_FP16
+#endif
 #ifdef HAVE_AMX_CPU_DEFINITION
       ,
       void* AMX
@@ -113,6 +119,10 @@ struct TORCH_API DispatchStubImpl {
    */
   void* choose_cpu_impl(
       void* DEFAULT
+#ifdef HAVE_AVX512_FP16_CPU_DEFINITION
+      ,
+      void* AVX512_FP16
+#endif
 #ifdef HAVE_AMX_CPU_DEFINITION
       ,
       void* AMX
@@ -163,6 +173,10 @@ struct DispatchStub<rT (*)(Args...), T> {
     return reinterpret_cast<FnPtr>(impl.get_call_ptr(
         device_type,
         reinterpret_cast<void*>(DEFAULT)
+#ifdef HAVE_AVX512_FP16_CPU_DEFINITION
+            ,
+        reinterpret_cast<void*>(AVX512_FP16)
+#endif
 #ifdef HAVE_AMX_CPU_DEFINITION
             ,
         reinterpret_cast<void*>(AMX)
@@ -202,6 +216,9 @@ struct DispatchStub<rT (*)(Args...), T> {
   }
 
   static FnPtr DEFAULT;
+#ifdef HAVE_AVX512_FP16_CPU_DEFINITION
+  static FnPtr AVX512_FP16;
+#endif
 #ifdef HAVE_AMX_CPU_DEFINITION
   static FnPtr AMX;
 #endif

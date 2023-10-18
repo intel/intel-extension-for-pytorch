@@ -247,7 +247,7 @@ inline LoopingScheme* getLoopingScheme(std::string scheme) {
 template <int N>
 class ThreadedLoop {
  public:
-  ThreadedLoop(std::array<LoopSpecs, N> bounds, std::string scheme = "")
+  ThreadedLoop(const LoopSpecs (&bounds)[N], std::string scheme = "")
       : bounds(bounds), scheme(scheme) {
     if (scheme == "")
       scheme = getDefaultScheme();
@@ -256,11 +256,11 @@ class ThreadedLoop {
 
   template <class T>
   void operator()(T func) {
-    loopScheme->call(bounds.data(), func, NULL, NULL);
+    loopScheme->call(bounds, func, NULL, NULL);
   }
   template <class T, class Ti, class Tf>
   void operator()(T func, Ti init, Tf fini) {
-    loopScheme->call(bounds.data(), func, init, fini);
+    loopScheme->call(bounds, func, init, fini);
   }
 
   std::string getDefaultScheme() {
@@ -275,7 +275,7 @@ class ThreadedLoop {
   }
 
  private:
-  std::array<LoopSpecs, N> bounds;
+  LoopSpecs bounds[N];
   std::string scheme;
   LoopingScheme* loopScheme;
 };

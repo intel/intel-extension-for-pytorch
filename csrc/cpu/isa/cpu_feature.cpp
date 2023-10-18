@@ -1,6 +1,6 @@
 #include "cpu_feature.hpp"
-#include <c10/util/Exception.h>
 #include <stdio.h>
+#include <exception>
 #include "embedded_function.h"
 
 #ifdef __linux__
@@ -323,7 +323,7 @@ bool CPUFeature::init_amx() {
 }
 #else
 bool CPUFeature::init_amx() {
-  AT_ERROR("DispatchStub: only support init amx on Linux now");
+  throw std::exception("DispatchStub: only support init amx on Linux now");
   return false;
 }
 #endif
@@ -368,6 +368,11 @@ bool CPUFeature::isa_level_amx() {
   // check and init in a funtion, avoid to double init.
   static bool b_is_support = _do_check_and_init_amx();
 
+  return b_is_support;
+}
+
+bool CPUFeature::isa_level_avx512_fp16() {
+  static bool b_is_support = isa_level_amx() && cpuid_avx512_fp16();
   return b_is_support;
 }
 

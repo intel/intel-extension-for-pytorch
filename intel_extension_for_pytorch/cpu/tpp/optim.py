@@ -401,9 +401,7 @@ class Lamb(Optimizer):
                 state["step"] += 1
 
                 if p.data.dtype == torch.bfloat16:
-                    AssertionError(
-                        False
-                    ), "BF16 LAMB optimizer not implemented yet!"
+                    AssertionError(False, "BF16 LAMB optimizer not implemented yet!")
                     state["weight_norm"] = ipex_cpp.tpp_fused_split_lamb(
                         p.data,
                         low_bits,
@@ -597,7 +595,7 @@ class DistLamb(Optimizer):
                     p.grad = self._flat_g[s:e].view_as(p.data).copy_(p.grad.data)
 
     def _one_time_setup(self):
-        if self._one_time_setup_done:
+        if self._one_time_setup_done is True:
             return
         from collections import defaultdict
 
@@ -732,9 +730,10 @@ class DistLamb(Optimizer):
                 self._step,
                 self.fused_param_norm,
             )
-            # if weight_decay > 0.0 and torch.distributed.get_rank() < 2: 
-            # print(f"wn: {fp._weight_norms[:5].sqrt()}  un: {fp._update_norms[:5].sqrt()}")
-            # if weight_decay > 0.0: print(f"XXX {self._step:3d} NORM {ii}: wn: 
-            # {fp._weight_norms[0].sqrt().item():.10f}  un: {fp._update_norms[0].sqrt().item():.10f}")
+            # if weight_decay > 0.0 and torch.distributed.get_rank() < 2:
+            #   print(f"wn: {fp._weight_norms[:5].sqrt()}  un: {fp._update_norms[:5].sqrt()}")
+            # if weight_decay > 0.0:
+            #   print(f"XXX {self._step:3d} NORM {ii}: wn: \
+            #   {fp._weight_norms[0].sqrt().item():.10f}  un: {fp._update_norms[0].sqrt().item():.10f}")
 
         return loss

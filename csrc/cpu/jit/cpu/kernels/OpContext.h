@@ -9,6 +9,8 @@
 #include "ContextConvolution.h"
 #include "ContextLinear.h"
 #include "ContextLinearMKL.h"
+#include "ContextLinearWoq.h"
+#include "assert.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -67,6 +69,8 @@ class ConvolutionOpContext : public torch::jit::CustomClassHolder {
   // Return the n-D ATen weight which sharing same memory with the mkldnn packed
   // weight This n-D ATen weight will be used for autograd and optimizer update
   virtual at::Tensor get_at_packed_weight() = 0;
+
+  virtual c10::optional<at::Tensor> get_at_bias() = 0;
 
   // Pack given tensor to same format with mkldnn packed weight
   virtual at::Tensor pack(const at::Tensor& tensor) = 0;
@@ -130,6 +134,8 @@ class IpexConvolutionOpContext final : public ConvolutionOpContext {
 
   virtual at::Tensor get_at_packed_weight() override;
 
+  virtual c10::optional<at::Tensor> get_at_bias() override;
+
   virtual at::Tensor pack(const at::Tensor& tensor) override;
 
   virtual at::Tensor to_public(const at::Tensor& tensor) override;
@@ -179,6 +185,11 @@ class LinearOpContext : public torch::jit::CustomClassHolder {
       at::Tensor& accumu,
       const ideep::attr_t& attr) = 0;
 
+  virtual at::Tensor run_with_binary_post_op(
+      const at::Tensor& input,
+      const std::vector<ideep::tensor>& post_op_src,
+      const ideep::attr_t& attr) = 0;
+
   // Runing backward for linear by given grad_output, input and grad_masks.
   // Will using the mkldnn_weight stored in the context
   virtual std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
@@ -189,6 +200,8 @@ class LinearOpContext : public torch::jit::CustomClassHolder {
   // Return the n-D ATen weight which sharing same memory with the mkldnn packed
   // weight This n-D ATen weight will be used for autograd and optimizer update
   virtual at::Tensor get_at_packed_weight() = 0;
+
+  virtual c10::optional<at::Tensor> get_at_bias() = 0;
 
   // Pack given tensor to same format with mkldnn packed weight
   virtual at::Tensor pack(const at::Tensor& tensor) = 0;
@@ -230,12 +243,19 @@ class IpexLinearOpContext final : public LinearOpContext {
       at::Tensor& accumu,
       const ideep::attr_t& attr) override;
 
+  virtual at::Tensor run_with_binary_post_op(
+      const at::Tensor& input,
+      const std::vector<ideep::tensor>& post_op_src,
+      const ideep::attr_t& attr) override;
+
   virtual std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
       const at::Tensor& input,
       const at::Tensor& grad_output,
       std::array<bool, 3> output_mask) override;
 
   virtual at::Tensor get_at_packed_weight() override;
+
+  virtual c10::optional<at::Tensor> get_at_bias() override;
 
   virtual at::Tensor pack(const at::Tensor& tensor) override;
 
@@ -267,6 +287,8 @@ class MKLOpContext : public torch::jit::CustomClassHolder {
   }
 
   virtual at::Tensor get_at_packed_weight() = 0;
+
+  virtual c10::optional<at::Tensor> get_at_bias() = 0;
 
   virtual at::Tensor get_data_handle() = 0;
 
@@ -311,6 +333,8 @@ class IpexLinearMKLOpContext final : public MKLOpContext {
 
   virtual at::Tensor get_at_packed_weight() override;
 
+  virtual c10::optional<at::Tensor> get_at_bias() override;
+
   virtual at::Tensor get_data_handle() override;
 
   virtual at::Tensor pack(const at::Tensor& tensor) override;
@@ -333,6 +357,139 @@ class IpexLinearMKLOpContext final : public MKLOpContext {
       c10::optional<int64_t> batch_size);
 
   virtual void load_from_ctx(c10::intrusive_ptr<MKLOpContext> other) override;
+};
+
+// Weight-only quantization
+using SerializationTypeWoqLinearPrePack = std::tuple<
+    at::Tensor,
+    c10::optional<at::Tensor>,
+    c10::optional<int64_t>,
+    int64_t,
+    int64_t>;
+
+class WoqLinearOpContext : public torch::jit::CustomClassHolder {
+ protected:
+  c10::optional<int64_t> batch_size_;
+
+ public:
+  SerializationTypeWoqLinearPrePack unpack() {
+    auto orig_weight_ = this->to_public(this->get_at_packed_weight());
+    auto orig_bias_ = this->get_context().at_bias_;
+    return std::make_tuple(
+        orig_weight_,
+        orig_bias_,
+        batch_size_,
+        this->get_context().lowp_mode_,
+        this->get_context().num_concats_);
+  }
+
+  virtual at::Tensor get_data_handle() = 0;
+
+  virtual at::Tensor run(const at::Tensor& input) = 0;
+
+  virtual at::Tensor run_eltwise(
+      const at::Tensor& input,
+      const c10::string_view& post_op,
+      const torch::List<c10::optional<at::Scalar>>& scalars,
+      const c10::optional<c10::string_view>& algorithm) = 0;
+
+  virtual at::Tensor run_add(
+      const at::Tensor& input,
+      at::Tensor& accumu,
+      const c10::optional<at::Scalar>& alpha) = 0;
+
+  virtual at::Tensor run_add_relu(
+      const at::Tensor& input,
+      at::Tensor& accumu,
+      const c10::optional<at::Scalar>& alpha) = 0;
+
+  virtual at::Tensor run_add(
+      const at::Tensor& input,
+      const std::vector<at::Tensor>& others) = 0;
+
+  virtual at::Tensor run_add_add(
+      const at::Tensor& input,
+      const std::vector<at::Tensor>& others) = 0;
+
+  virtual at::Tensor to_public(const at::Tensor& tensor) = 0;
+
+  virtual at::Tensor get_at_packed_weight() = 0;
+
+  virtual c10::optional<at::Tensor> get_at_bias() = 0;
+
+  virtual at::Tensor pack(const at::Tensor& tensor) = 0;
+
+  virtual detail::ContextLinearWoq& get_context() = 0;
+
+  // The load_state_dict behavior for nn.Modules are inplace copy weight from
+  // state_dict So the load_state_dict for optimizer can only handle the states
+  // and keep parameter groups un-changed Thus we need this method to apply
+  // inplace copy on weight/bias for IPEX modules with op context The process
+  // is:
+  //         new_ctx = create_ctx(state_dict[weight])
+  //         self.ctx.load_from_ctx(new_ctx)
+  virtual void load_from_ctx(c10::intrusive_ptr<WoqLinearOpContext> other) = 0;
+};
+
+class IpexWoqLinearOpContext final : public WoqLinearOpContext {
+ private:
+  detail::ContextLinearWoq op_context_;
+
+ public:
+  IpexWoqLinearOpContext(
+      c10::optional<int64_t> batch_size,
+      detail::ContextLinearWoq&& op_context)
+      : op_context_(std::move(op_context)) {
+    batch_size_ = batch_size;
+  }
+
+  virtual at::Tensor get_data_handle() override;
+
+  virtual at::Tensor run(const at::Tensor& input) override;
+
+  virtual at::Tensor run_eltwise(
+      const at::Tensor& input,
+      const c10::string_view& post_op,
+      const torch::List<c10::optional<at::Scalar>>& scalars,
+      const c10::optional<c10::string_view>& algorithm) override;
+
+  virtual at::Tensor run_add(
+      const at::Tensor& input,
+      at::Tensor& accumu,
+      const c10::optional<at::Scalar>& alpha) override;
+
+  virtual at::Tensor run_add_relu(
+      const at::Tensor& input,
+      at::Tensor& accumu,
+      const c10::optional<at::Scalar>& alpha) override;
+
+  virtual at::Tensor run_add(
+      const at::Tensor& input,
+      const std::vector<at::Tensor>& others) override;
+
+  virtual at::Tensor run_add_add(
+      const at::Tensor& input,
+      const std::vector<at::Tensor>& others) override;
+
+  virtual at::Tensor to_public(const at::Tensor& tensor) override;
+
+  virtual at::Tensor get_at_packed_weight() override;
+
+  virtual c10::optional<at::Tensor> get_at_bias() override;
+
+  virtual at::Tensor pack(const at::Tensor& tensor) override;
+
+  virtual detail::ContextLinearWoq& get_context() override;
+
+  static c10::intrusive_ptr<WoqLinearOpContext> create_context(
+      at::Tensor&& weight,
+      c10::optional<at::Tensor>&& bias,
+      c10::optional<int64_t> batch_size,
+      int64_t lowp_mode,
+      int64_t num_concats);
+
+  virtual void load_from_ctx(
+      c10::intrusive_ptr<WoqLinearOpContext> other) override;
 };
 
 // deconv op
@@ -394,6 +551,8 @@ class ConvTransposeOpContext : public torch::jit::CustomClassHolder {
   // weight This n-D ATen weight will be used for autograd and optimizer update
   virtual at::Tensor get_at_packed_weight() = 0;
 
+  virtual c10::optional<at::Tensor> get_at_bias() = 0;
+
   // Pack given tensor to same format with mkldnn packed weight
   virtual at::Tensor pack(const at::Tensor& tensor) = 0;
 
@@ -453,6 +612,8 @@ class IpexConvTransposeOpContext final : public ConvTransposeOpContext {
       std::array<bool, 3> output_mask) override;
 
   virtual at::Tensor get_at_packed_weight() override;
+
+  virtual c10::optional<at::Tensor> get_at_bias() override;
 
   virtual at::Tensor pack(const at::Tensor& tensor) override;
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <vector>
 #include "codegen/LlgaTensorImpl.h"
 #include "graph_helper.h"
 #include "utils/rw_lock.h"
@@ -9,6 +10,34 @@
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/runtime/interpreter.h>
+
+namespace std {
+template <>
+struct hash<std::vector<int64_t>> {
+  size_t operator()(const std::vector<int64_t>& key) const {
+    size_t total = key.size();
+    size_t sum = 0;
+    if (total < 64) {
+      for (size_t i = 0; i < total; i++) {
+        sum += key[i] << i;
+      }
+    } else {
+      size_t batch = total / 64;
+      size_t remain = total % 64;
+      for (size_t bs = 0; bs < batch; bs++) {
+        for (size_t i = 0; i < 64; i++) {
+          sum += key[bs * 64 + i] << i;
+        }
+      }
+      for (size_t i = 0; i < remain; i++) {
+        sum += key[batch * 64 + i] << i;
+      }
+    }
+    return sum;
+  }
+};
+
+} // namespace std
 
 namespace torch_ipex {
 namespace jit {
@@ -20,8 +49,6 @@ using ArgSpecs = std::vector<ArgSpec>;
 using RunArg = dnnl::graph::tensor;
 using RunArgs = std::vector<RunArg>;
 using TensorArgs = std::vector<at::Tensor>;
-
-constexpr int MAX_COMPILATION_CACHE_SIZE = 1024;
 
 class LlgaKernel {
  public:
@@ -42,6 +69,23 @@ class LlgaKernel {
 
   int64_t getOutputDtype(size_t offset) const;
 
+  enum TypeOfOutputTensor {
+    undefined,
+    unwrappedInplaceCompute,
+    quantizedInplaceCompute,
+    unquantizedInplaceCompute,
+    betweenPartitions,
+    quantizedInputToFW,
+    unquantizedInputToFW
+  };
+
+  struct cp_entry {
+    dnnl::graph::compiled_partition cp_;
+    RunArgs inputLLGATensors_;
+    RunArgs outputLLGATensors_;
+    ArgSpecs outputSpecs_;
+  };
+
   // Get the scale, zp and dtype from the node on the graph
   // and save them in the spec to re-use during runtime to
   // create qtensor for output of public format
@@ -53,27 +97,41 @@ class LlgaKernel {
   // Constants inputs to the partition are no longer in the graph->inputs().
   // Need use the tid retrieved from the partition to find the missing
   // constant inputs.
-  void initializeConstantInputs();
 
   ArgSpecs initializeInputSpecs(const TensorArgs& inputs);
 
-  ArgSpecs initializeOutputSpecs() const;
-
-  dnnl::graph::compiled_partition compile(
-      const dnnl::graph::partition& partition);
-
-  dnnl::graph::compiled_partition& compileAndCache(
-      const dnnl::graph::partition& partition,
-      int n_thread);
-
-  std::tuple<RunArgs, RunArgs> prepareRunArgs(
+  ArgSpecs initializeOutputSpecs(
       const TensorArgs& inputs,
-      TensorArgs& outputs) const;
+      bool convertDimsToUnknown);
+
+  std::pair<dnnl::graph::compiled_partition, ArgSpecs> compile(
+      const dnnl::graph::partition& partition,
+      const TensorArgs& inputs,
+      ArgSpecs& inputSpecs);
+
+  cp_entry& compileAndCache(torch::jit::Stack& stack, TensorArgs& outputs);
+
+  void prepareRunArgs(
+      RunArgs& inputLlgaTensors,
+      RunArgs& outputLlgaTensors,
+      const TensorArgs& inputs,
+      TensorArgs& outputs,
+      ArgSpecs& outputSpecs);
+
+  void prepareAndCacheRunArgs(
+      RunArgs& inputLlgaTensors,
+      RunArgs& outputLlgaTensors,
+      const TensorArgs& inputs,
+      TensorArgs& outputs,
+      ArgSpecs& inputSpecs,
+      ArgSpecs& outputSpecs);
 
   static std::string genDebugName() {
     static size_t debugId = 0;
     return "LlgaPartition_" + std::to_string(debugId++);
   }
+
+  bool inputValueIsNotUsedLater(size_t offset) const;
 
   std::string genProfileName() {
     std::vector<std::string> op_list;
@@ -94,6 +152,7 @@ class LlgaKernel {
   std::shared_ptr<torch::jit::Graph> graph_;
   int64_t nGraphInputs_ = 0; // number of inputs to graph_ on the IR
   int64_t nOutputs_ = 0;
+
   std::map<size_t, torch::jit::Value*> tensorIdToValue_;
   std::vector<int64_t> runArgsIdx_;
   dnnl::graph::partition partition_;
@@ -102,20 +161,29 @@ class LlgaKernel {
   // nPartitionInputs_ = nGraphInputs_ + constantInputs_.size() since Constant
   // inputs are copied to the inside of the subgraph
   int64_t nPartitionInputs_;
-  // We cache the compilation for each omp_num_threads
-  std::vector<dnnl::graph::compiled_partition> compilations_ =
-      std::vector<dnnl::graph::compiled_partition>(MAX_COMPILATION_CACHE_SIZE);
   std::set<size_t> initializedInputIds_;
   std::vector<torch::jit::Value*> constantValues_;
   TensorArgs constantInputs_;
-  ArgSpecs inputSpecs_;
-  ArgSpecs outputSpecs_;
-  std::unordered_map<size_t, size_t> inplacePairs_; // output id -> input offset
+
+  // We'll do LRU without helper functions to minimize calls to the hash
+  // function. Adopted from
+  // https://github.com/lamerman/cpp-lru-cache/blob/master/include/lrucache.hpp
+  // LRU cache is per-thread, so as to enable weight sharing among groups of
+  // threads.
+  using key_value_pair_t = std::pair<std::vector<int64_t>, cp_entry>;
+  using list_iterator_t = std::list<key_value_pair_t>::iterator;
+  static thread_local std::list<key_value_pair_t> cache_items_list_;
+  static thread_local std::unordered_map<std::vector<int64_t>, list_iterator_t>
+      cache_items_map_;
+  static thread_local int capacity_;
+  std::vector<std::vector<int64_t>> tracedInputShapes_;
+  std::vector<std::vector<int64_t>> tracedInputStrides_;
   std::string debugName_;
   std::string profileName_;
-  std::once_flag spec_initialized_flag_;
-  std::vector<std::once_flag> compilation_initialized_flags_ =
-      std::vector<std::once_flag>(MAX_COMPILATION_CACHE_SIZE);
+  std::vector<TypeOfOutputTensor> outputTensorTypes_;
+  std::once_flag constantSpecInitializedFlag_;
+  std::once_flag tracedInputShapesInitialized_;
+  std::vector<short> inplacePairOffsets_;
 };
 
 } // namespace onednn

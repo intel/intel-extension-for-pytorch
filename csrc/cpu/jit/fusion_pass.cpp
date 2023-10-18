@@ -1,5 +1,6 @@
 #include "fusion_pass.h"
 #include <string>
+#include "auto_opt_config.h"
 #include "codegen/onednn/interface.h"
 #include "cpu/kernels/Matmul.h"
 #include "passes/concat_linear.h"
@@ -8,6 +9,7 @@
 #include "passes/graph_rewrite.h"
 #include "passes/graph_rewrite_helper.h"
 #include "passes/prepack_folding.h"
+#include "passes/qpadding.h"
 #include "passes/remove_redundant_aliases.h"
 
 #include <c10/util/hash.h>
@@ -82,6 +84,10 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // ipex einsum
   graph_rewrite::FusedEinsumPost(graph);
 
+  // replace python GELU to Aten GELU which are equally in math for more post-op
+  // fusions
+  graph_rewrite::FusePythonGELUWithAten(graph);
+
   // Fuse the scores calculation(dim + matmul + (add)? + softmax) for
   // Multi-Head-Attention
   // Note that we make scalar div or mul after matmul first
@@ -93,11 +99,16 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
 
   // Replace _convolution with conv2d or conv3d
   torch_ipex::jit::graph_rewrite_helper::replaceConvolutionWithAtenConv(graph);
+  GRAPH_DUMP(
+      "After replaceConvolutionWithAtenConv.Before replaceFrozenIPEXConvWithAtenConv",
+      graph);
 
   // Replace torch_ipex::convolution_forward with conv2d or conv3d when conv
   // weights are constant. Conv weights will be unpacked in this step.
   graph_rewrite::replaceFrozenIPEXConvWithAtenConv(graph);
-
+  GRAPH_DUMP(
+      "After replaceFrozenIPEXConvWithAtenConv.Before FrozenConvFolding",
+      graph);
   // convolution folding
   graph_rewrite::FrozenConvFolding(graph);
 
@@ -122,8 +133,10 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // up fusion pass, will further abstract this as a class method.
   auto aten_linear_recorder = ATenLinearRecorder(graph);
   // linear folding
-  graph_rewrite::replaceFrozenIPEXLinearWithAtenLinear(
-      graph, aten_linear_recorder.use_mkl());
+  if (AutoOptConfig::singleton().get_jit_repack_for_linear()) {
+    graph_rewrite::replaceFrozenIPEXLinearWithAtenLinear(
+        graph, aten_linear_recorder.use_mkl());
+  }
   // concat multi-linear with same input
   torch_ipex::jit::FrozenConcatLinear(
       graph, aten_linear_recorder.get_records());
@@ -140,7 +153,9 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::fuseLinearWithEltwise(graph);
   GRAPH_DUMP("After fuseLinearWithEltwise.Before fuseLinearAddRelu", graph);
   graph_rewrite::fuseLinearAddRelu(graph);
-  GRAPH_DUMP("After fuseLinearAddRelu.", graph);
+  GRAPH_DUMP("After fuseLinearAddRelu. Before fuseLinearMulAdd", graph);
+  graph_rewrite::fuseLinearMulAdd(graph);
+  GRAPH_DUMP("After fuseLinearMulAdd.", graph);
   graph_rewrite::FuseLinearSwishCustomized(graph);
 
   // fuse rmsnorm
@@ -180,6 +195,7 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::replaceAtenBatchNormWithIpexBatchNorm(graph);
   // TODO: Some post processing?? ECS/EDC/Peephole???
 
+  graph_rewrite::simplifyAllReduce(graph);
   // This path contains two functions:
   // 1. Fuse BF16 Mha for ViT because ViT has a special QKV split algorithm
   // 2. Replace the Matmul OP with MKL or DNNL Matmul kernels to enable
@@ -254,6 +270,7 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
 
   if (isQuantized(graph) || fuser::onednn::is_llga_fp32_bf16_enabled()) {
     RemoveRedundantAliases(graph);
+    QPaddingConversion(graph);
     fuser::onednn::fuseGraph(graph);
   }
   GRAPH_DUMP(

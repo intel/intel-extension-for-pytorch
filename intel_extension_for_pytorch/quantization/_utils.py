@@ -13,7 +13,8 @@ from torch.quantization.qconfig import QConfig
 from intel_extension_for_pytorch.nn.functional import interaction
 
 from ._quantization_state_utils import QTensorInfo
-
+from ._smooth_quant import SmoothQuantActivationObserver, SmoothQuantWeightObserver
+from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
 
 add_and_mul_ops = set(
     [
@@ -29,6 +30,7 @@ quantized_modules_has_weights = set(
         torch.nn.Conv3d,
         torch.nn.Linear,
         torch.nn.EmbeddingBag,
+        MergedEmbeddingBagWithCat,
         torch.nn.ConvTranspose2d,
         torch.nn.ConvTranspose3d,
         torch.nn.LSTM,
@@ -67,9 +69,11 @@ int8_int8_ops = set(
         # ipex customer op
         str(interaction),
         str(torch.ops.torch_ipex.interaction_forward),
+        str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
         str(torch.embedding_bag),
         str(F.embedding_bag),
         str(torch.nn.EmbeddingBag),
+        str(MergedEmbeddingBagWithCat),
         str(torch.nn.LSTM),
     ]
 )
@@ -216,6 +220,7 @@ def attach_scale_zp_values_to_model(
                 AssertionError(
                     False
                 ), "The observer's dtype only can be torch.quint8 or torch.qint8"
+        _attach_smooth_quant_scaling_factor_to_model(module)
         qstate.tensor_id_to_observer.clear()
         qstate.weight_tensor_id_to_observer.clear()
 
@@ -240,7 +245,12 @@ def check_model_obsever_has_run(
 ) -> None:
     """
     This function is about check whether the module's observer has been run by checking the
-    observer's min_value and max_max_value is the init value or not.
+        observer's min_value and max_max_value is the init value or not.
+    Rules:
+    - If no observer found, return false.
+    - If any observer returns true or false, return that value.
+    - To avoid wrong results in case no observer found at the beginning, only return false
+        if all checks of the module and its children return false.
     """
     if hasattr(module, "_auto_quant_state"):
         qstate: AutoQuantizationState = module._auto_quant_state  # type: ignore[assignment]
@@ -261,9 +271,10 @@ def check_model_obsever_has_run(
                 ), "The observer's dtype only can be torch.quint8 or torch.qint8"
 
     for _, child in module.named_children():
-        check_model_obsever_has_run(child)
+        if check_model_obsever_has_run(child):
+            return True
 
-    return True
+    return False
 
 
 def attach_op_convert_info_to_model(
@@ -283,6 +294,7 @@ def attach_op_convert_info_to_model(
             qstate.idx_to_op_weight_convert_info[
                 seen_q_op_info.idx
             ] = qstate.calculate_op_weight_convert_info(seen_q_op_info)
+        _map_smooth_quant_info_to_idx(module)
 
     for _, child in module.named_children():
         attach_op_convert_info_to_model(child)
@@ -458,14 +470,17 @@ def _check_after_nodes_all_quantized_give_node(node):
                 int8_int8_symmetric_ops = [
                     str(interaction),
                     str(torch.ops.torch_ipex.interaction_forward),
+                    str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
                     str(torch.embedding_bag),
                     str(F.embedding_bag),
                     str(torch.nn.EmbeddingBag),
+                    str(MergedEmbeddingBagWithCat),
                 ]
                 if next.type in int8_int8_symmetric_ops:
                     if next.type in [
                         str(interaction),
                         str(torch.ops.torch_ipex.interaction_forward),
+                        str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
                     ]:
                         # node.input_tensor_infos may be set, we can use force_inf_dtype to check whether this op is quantizabled.
                         for force_inf_dtype in next.input_tensor_force_inf_dtype:
@@ -485,7 +500,8 @@ def _check_after_nodes_all_quantized_give_node(node):
 
 def set_node_output_quantized(nodes):
     r"""
-    # For interation EmbeddingBag, pooling and elt_wise, we only support INT8->INT*, if those ops have quantized their inputs,
+    # For interation, EmbeddingBag, MergedEmbWithCat, pooling and elt_wise,
+    # we only support INT8->INT*, if those ops have quantized their inputs,
     # we need make sure their output also have falk quant to make them call in INT8 kernel.
     # this function will check whether the output inf dtype is int8 dtype if its' input is set to quantized, if the
     # output's infe dtype is not int8, set it and also set insert_fake_quant_after_output to True.
@@ -509,7 +525,10 @@ def set_node_output_quantized(nodes):
             continue
         if node.qconfig is not None and node.type in int8_int8_ops:
             post_node_are_quantized = _check_after_nodes_all_quantized_give_node(node)
-            if node.type in str(torch.nn.EmbeddingBag):
+            if node.type in (
+                str(torch.nn.EmbeddingBag),
+                str(MergedEmbeddingBagWithCat),
+            ):
                 if (
                     node.weight_tensor_infos[0].inf_dtype == torch.qint8
                     and not post_node_are_quantized
@@ -528,6 +547,7 @@ def set_node_output_quantized(nodes):
             elif node.type in [
                 str(interaction),
                 str(torch.ops.torch_ipex.interaction_forward),
+                str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
             ]:
                 if (
                     node.input_tensor_force_inf_dtype[0] == torch.qint8
@@ -580,6 +600,11 @@ dtype_dict = {
     str(torch.quint4x2): torch.quint4x2,
 }
 
+IPEX_OBSERVERS = {
+    "SmoothQuantActivationObserver": SmoothQuantActivationObserver,
+    "SmoothQuantWeightObserver": SmoothQuantWeightObserver,
+}
+
 
 def _get_observer_setting(observer):
     r"""
@@ -622,6 +647,20 @@ def _create_observer(setting):
         observer = getattr(torch.quantization.observer, setting["name"])
         setting.pop("name", None)
         return observer.with_args(**setting)
+    elif setting["name"] in IPEX_OBSERVERS:
+        observer = IPEX_OBSERVERS[setting["name"]]
+        setting.pop("name", None)
+        # SmoothQuant observers contain sub-observers
+        smooth_quant_sub_obs_keys = [
+            "act_observer",
+            "act_ic_observer",
+            "wei_observer",
+            "wei_ic_observer",
+        ]
+        for key in smooth_quant_sub_obs_keys:
+            if key in setting:
+                setting[key] = _create_observer(setting[key])()
+        return observer.with_args(**setting)
     else:
         raise NameError("torch.quantization.observer %s not found" % setting["name"])
 
@@ -641,6 +680,7 @@ def save_quant_state(quant_state_map, configure_file):
                 info["op_type_is_module"] = op_info.type_is_module
                 info["fqn"] = op_info.fqn
                 input_tensor_infos = []
+                smooth_quant_enabled = False
                 for tensor_info, force_dtype in zip(
                     op_info.input_tensor_infos, op_info.input_tensor_force_inf_dtype
                 ):
@@ -658,6 +698,20 @@ def save_quant_state(quant_state_map, configure_file):
                             cur_tensor_infos["zero_point"] = v.tensor_id_to_scale_zp[
                                 tensor_info.id
                             ][1].tolist()
+                        if (
+                            str(tensor_info.id)
+                            in v.tensor_id_to_smooth_quant_scaling_factor
+                            and v.tensor_id_to_smooth_quant_scaling_factor[
+                                str(tensor_info.id)
+                            ]
+                            is not None
+                        ):
+                            cur_tensor_infos[
+                                "smooth_quant_scaling_factor"
+                            ] = v.tensor_id_to_smooth_quant_scaling_factor[
+                                str(tensor_info.id)
+                            ].tolist()
+                            smooth_quant_enabled = True
                     input_tensor_infos.append(cur_tensor_infos)
                 info["input_tensor_infos"] = input_tensor_infos
                 # weight infos
@@ -675,6 +729,15 @@ def save_quant_state(quant_state_map, configure_file):
                             cur_tensor_infos[
                                 "zero_point"
                             ] = v.weight_tensor_id_to_scale_zp[weight_idx][1].tolist()
+                        if (
+                            weight_idx
+                            in v.weight_tensor_id_to_smooth_quant_scaling_factor
+                        ):
+                            cur_tensor_infos[
+                                "smooth_quant_scaling_factor"
+                            ] = v.weight_tensor_id_to_smooth_quant_scaling_factor[
+                                weight_idx
+                            ].tolist()
                     weight_tensor_infos.append(cur_tensor_infos)
                 info["weight_tensor_infos"] = weight_tensor_infos
                 # output infos
@@ -692,15 +755,43 @@ def save_quant_state(quant_state_map, configure_file):
                             cur_tensor_infos["zero_point"] = v.tensor_id_to_scale_zp[
                                 tensor_info.id
                             ][1].tolist()
+                        if tensor_info.id in v.tensor_id_to_smooth_quant_scaling_factor:
+                            cur_tensor_infos[
+                                "smooth_quant_scaling_factor"
+                            ] = v.tensor_id_to_smooth_quant_scaling_factor[
+                                tensor_info.id
+                            ].tolist()
                     output_tensor_infos.append(cur_tensor_infos)
                 info["output_tensor_infos"] = output_tensor_infos
                 # qconfig
                 info["activation_observer"] = _get_observer_setting(
                     op_info.qconfig.activation()
                 )
+                if isinstance(
+                    op_info.qconfig.activation(), SmoothQuantActivationObserver
+                ):
+                    info["activation_observer"][
+                        "smooth_quant_enabled"
+                    ] = smooth_quant_enabled
+                    info["activation_observer"]["act_observer"] = _get_observer_setting(
+                        op_info.qconfig.activation().act_obs
+                    )
+                    info["activation_observer"][
+                        "act_ic_observer"
+                    ] = _get_observer_setting(op_info.qconfig.activation().ic_obs)
                 info["weight_observer"] = _get_observer_setting(
                     op_info.qconfig.weight()
                 )
+                if isinstance(op_info.qconfig.weight(), SmoothQuantWeightObserver):
+                    info["weight_observer"][
+                        "smooth_quant_enabled"
+                    ] = smooth_quant_enabled
+                    info["weight_observer"]["wei_observer"] = _get_observer_setting(
+                        op_info.qconfig.weight().oc_obs
+                    )
+                    info["weight_observer"]["wei_ic_observer"] = _get_observer_setting(
+                        op_info.qconfig.weight().ic_obs
+                    )
                 q_op_infos[q_k] = info
             layer_infos["q_op_infos"] = q_op_infos
         if len(v.seen_nonq_op_infos) == 0:
@@ -788,6 +879,13 @@ def load_qconf_summary_to_model(model, qconf_summary):
                         scale = torch.FloatTensor(tensor_info["scale"])
                         zp = torch.LongTensor(tensor_info["zero_point"])
                         v.tensor_id_to_scale_zp[tensor_info["id"]] = (scale, zp)
+                    if "smooth_quant_scaling_factor" in tensor_info:
+                        scaling_factor = torch.FloatTensor(
+                            tensor_info["smooth_quant_scaling_factor"]
+                        )
+                        v.tensor_id_to_smooth_quant_scaling_factor[
+                            str(tensor_info["id"])
+                        ] = scaling_factor
                 else:
                     input_tensor_infos.append(None)
                     input_force_dtype_infos.append(None)
@@ -808,6 +906,13 @@ def load_qconf_summary_to_model(model, qconf_summary):
                         v.weight_tensor_id_to_scale_zp[
                             str(i) + "_" + str(weight_idx)
                         ] = (scale, zp)
+                    if "smooth_quant_scaling_factor" in tensor_info:
+                        scaling_factor = torch.FloatTensor(
+                            tensor_info["smooth_quant_scaling_factor"]
+                        )
+                        v.weight_tensor_id_to_smooth_quant_scaling_factor[
+                            str(i) + "_" + str(weight_idx)
+                        ] = scaling_factor
                     weight_idx += 1
                 else:
                     weight_tensor_infos.append(None)
@@ -1038,6 +1143,10 @@ def module_call_to_function_call(module, args, weights):
             module.include_last_offset,
             module.padding_idx,
         )
+    elif isinstance(module, MergedEmbeddingBagWithCat):
+        output = torch.ops.torch_ipex.merged_embeddingbag_cat_forward(
+            weights, args[0], args[1], args[2]
+        )
     elif isinstance(module, torch.nn.ConvTranspose2d) or isinstance(
         module, torch.nn.ConvTranspose3d
     ):
@@ -1092,3 +1201,70 @@ def module_call_to_function_call(module, args, weights):
             module, args[0], args[1] if len(args) == 2 else None, weights
         )
     return output
+
+
+def _attach_smooth_quant_scaling_factor_to_model(module):
+    """
+    Get scaling factors for SmoothQuant from observers and
+    store them in qstate
+    """
+    if not hasattr(module, "_auto_quant_state"):
+        return
+    qstate = module._auto_quant_state
+    qconfig = qstate.qconfig
+    if not isinstance(
+        qconfig.activation(), SmoothQuantActivationObserver
+    ) or not isinstance(qconfig.weight(), SmoothQuantWeightObserver):
+        return
+    if not qstate.tensor_id_to_observer:
+        return
+    for key, obs in qstate.tensor_id_to_observer.items():
+        if key in qstate.tensor_id_to_smooth_quant_scaling_factor:
+            continue
+        scaling_factors = obs.get_scaling_factors()
+        qstate.tensor_id_to_smooth_quant_scaling_factor[key] = scaling_factors
+
+    for key, obs in qstate.weight_tensor_id_to_observer.items():
+        if key in qstate.weight_tensor_id_to_smooth_quant_scaling_factor:
+            continue
+        scaling_factors = obs.get_scaling_factors()
+        qstate.weight_tensor_id_to_smooth_quant_scaling_factor[key] = scaling_factors
+
+
+def _map_smooth_quant_info_to_idx(module):
+    """
+    Map dict of {tensor id: smooth quant scaling factor} to
+        dict of {idx: smooth quant scaling factor}.
+    For nn.Linear module only.
+    """
+    if not hasattr(module, "_auto_quant_state"):
+        return
+    qstate: AutoQuantizationState = module._auto_quant_state  # type: ignore[assignment]
+    qconfig = qstate.qconfig
+    if not isinstance(
+        qconfig.activation(), SmoothQuantActivationObserver
+    ) or not isinstance(qconfig.weight(), SmoothQuantWeightObserver):
+        return
+    for _, seen_q_op_info in qstate.idx_to_seen_q_op_infos.items():
+        if not seen_q_op_info.input_tensor_infos:
+            continue
+        # Linear has only one activation
+        for input_arg in seen_q_op_info.input_tensor_infos:
+            if input_arg is None:
+                continue
+            tensor_id = str(input_arg.id)
+            if tensor_id in qstate.tensor_id_to_smooth_quant_scaling_factor:
+                key = str(seen_q_op_info.idx)
+                qstate.idx_to_smooth_quant_scaling_factor[
+                    key
+                ] = qstate.tensor_id_to_smooth_quant_scaling_factor[tensor_id]
+        # Linear has only one weight. Key is not changed.
+        for weight_arg in seen_q_op_info.weight_tensor_infos:
+            if weight_arg is None:
+                continue
+            tensor_id = str(seen_q_op_info.idx) + "_" + str(weight_arg.id)
+            if tensor_id in qstate.weight_tensor_id_to_smooth_quant_scaling_factor:
+                key = str(seen_q_op_info.idx) + "_" + str(weight_arg.id)
+                qstate.idx_to_smooth_quant_scaling_factor[
+                    key
+                ] = qstate.weight_tensor_id_to_smooth_quant_scaling_factor[tensor_id]

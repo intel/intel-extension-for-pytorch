@@ -11,7 +11,6 @@ def override_size_asserts():
     off `TORCHINDUCTOR_SIZE_ASSERTS`.
     """
     if "torch._inductor.config" not in sys.modules:
-        print("1")
         os.environ["TORCHINDUCTOR_SIZE_ASSERTS"] = "0"
         return
 

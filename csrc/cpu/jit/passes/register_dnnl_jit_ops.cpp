@@ -5,6 +5,7 @@
 
 #include "aten/AddLayerNorm.h"
 #include "aten/ConcatBnRelu.h"
+#include "aten/MergedEmbCat.h"
 #include "aten/RMSNorm.h"
 #include "cpu/kernels/ConvPacked.h"
 #include "cpu/kernels/ConvTransposePacked.h"
@@ -18,6 +19,7 @@
 #include "cpu/kernels/MaxPool2D.h"
 #include "cpu/kernels/Mha.h"
 #include "cpu/kernels/OpContext.h"
+#include "cpu/kernels/QCircularPad.h"
 #include "cpu/kernels/RNN.h"
 #include "cpu/kernels/Shuffle.h"
 #include "cpu/kernels/Softmax.h"
@@ -646,6 +648,41 @@ torch::jit::RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
+        "ipex_prepack::linear_mul_run(Tensor input, Tensor to_mul, "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) "
+        "-> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = linear_mul_run(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toTensor(),
+                (std::move(peek(stack, 2, 3)))
+                    .toCustomClass<LinearOpContext>());
+            drop(stack, 3);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::linear_mul_add_run(Tensor input, Tensor to_mul, Tensor to_add, "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) "
+        "-> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = linear_mul_add_run(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                (std::move(peek(stack, 1, 4))).toTensor(),
+                (std::move(peek(stack, 2, 4))).toTensor(),
+                (std::move(peek(stack, 3, 4)))
+                    .toCustomClass<LinearOpContext>());
+            drop(stack, 4);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
         "ipex_prepack::mkl_sgemm_run(Tensor input, "
         "__torch__.torch.classes.ipex_prepack.MKLOpContext "
         "W_prepack) -> Tensor",
@@ -1202,12 +1239,12 @@ torch::jit::RegisterOperators op({
 
     Operator(
         "ipex::sd_flash_mha(Tensor qkv, int[] list, "
-        "float scale, int head_num) -> Tensor",
+        "float ? scale, int head_num) -> Tensor",
         [](Stack& stack) {
           auto result = dil_sd_flash_mha(
               peek(stack, 0, 4).toTensor(),
               peek(stack, 1, 4).toIntVector(),
-              peek(stack, 2, 4).toDouble(),
+              peek(stack, 2, 4),
               peek(stack, 3, 4).toInt());
           drop(stack, 4);
           torch::jit::pack(stack, std::move(result));
@@ -1216,44 +1253,15 @@ torch::jit::RegisterOperators op({
 
     Operator(
         "ipex::sd_flash_mha(Tensor query, Tensor key, Tensor value, "
-        "float scale, int head_num) -> Tensor",
+        "float ? scale, int head_num) -> Tensor",
         [](Stack& stack) {
           auto result = dil_sd_flash_mha(
               peek(stack, 0, 5).toTensor(),
               peek(stack, 1, 5).toTensor(),
               peek(stack, 2, 5).toTensor(),
-              peek(stack, 3, 5).toDouble(),
+              peek(stack, 3, 5),
               peek(stack, 4, 5).toInt());
           drop(stack, 5);
-          torch::jit::pack(stack, std::move(result));
-        },
-        aliasAnalysisFromSchema()),
-
-    Operator(
-        "ipex::sd_flash_mha(Tensor qkv, int[] list, "
-        "int head_num) -> Tensor",
-        [](Stack& stack) {
-          auto div_input_data = 1.0f;
-          auto result = dil_sd_flash_mha(
-              peek(stack, 0, 3).toTensor(),
-              peek(stack, 1, 3).toIntVector(),
-              peek(stack, 2, 3).toInt());
-          drop(stack, 3);
-          torch::jit::pack(stack, std::move(result));
-        },
-        aliasAnalysisFromSchema()),
-
-    Operator(
-        "ipex::sd_flash_mha(Tensor query, Tensor key, Tensor value, "
-        "int head_num) -> Tensor",
-        [](Stack& stack) {
-          auto div_input_data = 1.0f;
-          auto result = dil_sd_flash_mha(
-              peek(stack, 0, 4).toTensor(),
-              peek(stack, 1, 4).toTensor(),
-              peek(stack, 2, 4).toTensor(),
-              peek(stack, 3, 4).toInt());
-          drop(stack, 4);
           torch::jit::pack(stack, std::move(result));
         },
         aliasAnalysisFromSchema()),
@@ -1364,6 +1372,27 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 2, 4))).toInt(),
                 (std::move(peek(stack, 3, 4))).toScalarType());
             drop(stack, 4);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::qmerged_embeddingbag_cat(Tensor[] weights, Tensor[] index, "
+        "Tensor[] offsets, Tensor qdense, float o_scale, "
+        "int o_zp, ScalarType o_dtype) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = dil_qmerged_embeddingbag_cat(
+                (std::move(peek(stack, 0, 7))).toTensorVector(),
+                (std::move(peek(stack, 1, 7))).toTensorVector(),
+                (std::move(peek(stack, 2, 7))).toTensorVector(),
+                (std::move(peek(stack, 3, 7))).toTensor(),
+                (std::move(peek(stack, 4, 7))).toDouble(),
+                (std::move(peek(stack, 5, 7))).toInt(),
+                (std::move(peek(stack, 6, 7))).toScalarType());
+            drop(stack, 7);
             torch::jit::pack(stack, std::move(result));
             return 0;
           };
@@ -1536,6 +1565,19 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 4, 6))).toIntVector(),
                 (std::move(peek(stack, 5, 6))).toBool());
             drop(stack, 6);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex::qpad_circular(Tensor input, int[] padding) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = qpad_circular(
+                (std::move(peek(stack, 0, 2))).toTensor(),
+                (std::move(peek(stack, 1, 2))).toIntVector());
+            drop(stack, 2);
             torch::jit::pack(stack, std::move(result));
             return 0;
           };

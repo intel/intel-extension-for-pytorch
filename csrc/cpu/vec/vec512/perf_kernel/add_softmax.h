@@ -77,6 +77,14 @@ inline __m512 _dil_exp_kernel(__m512 vec_src) {
   return vec_res;
 }
 
+/**
+ * Previously vec_ps_min was set to std::numeric_limits<float>::min(),
+ * the smallest positive number (FLT_MIN). This was wrong for ReduceMax
+ * if all the input elements are negative, which will lead to exponent
+ * overflow. The correct initial number to compare the max value should
+ * be std::numeric_limits<float>::lowest() (-FLT_MAX), thus this kernel
+ * can generate the correct max value for negative inputs.
+ **/
 template <typename scalar_a, typename scalar_b>
 inline void _dil_div_add_reduce_max_fusion_kernel(
     const scalar_a* a,
@@ -213,6 +221,28 @@ inline void _dil_normalization_kernel(
   }
 }
 
+template <typename scalar_t>
+inline void _dil_add_kernel(const scalar_t* src, float* dst, const int& size) {
+  __m512 vec_a = {};
+  __m512 vec_out = {};
+
+  int j = 0;
+  for (; j <= size - 16; j += 16) {
+    vec_a = _loadu(src + j);
+    vec_out = _loadu(dst + j);
+    vec_out = _mm512_add_ps(vec_a, vec_out);
+    _storeu(dst + j, vec_out);
+  }
+
+  if (j < size) {
+    __mmask16 mask = (1 << (size - j)) - 1;
+    vec_a = _maskz_loadu(src + j, mask);
+    vec_out = _maskz_loadu(dst + j, mask);
+    vec_out = _mm512_add_ps(vec_out, vec_a);
+    _mask_storeu(dst + j, vec_out, mask);
+  }
+}
+
 inline void _dil_add_reduce_max_fusion_kernel(
     float* a,
     const float* b,
@@ -238,6 +268,32 @@ inline void _dil_add_reduce_max_fusion_kernel(
     vec_a = _maskz_loadu(a + i, mask);
     vec_b = _maskz_loadu(b + i, mask);
     vec_out = _mm512_add_ps(vec_a, vec_b);
+    vec_ps_min = _mm512_mask_max_ps(vec_ps_min, mask, vec_out, vec_ps_min);
+    _mm512_mask_storeu_ps(out + i, mask, vec_out);
+  }
+
+  // NOTE: _mm512_reduce_max_ps is sequence instruction
+  max = _mm512_reduce_max_ps(vec_ps_min);
+}
+
+inline void _dil_reduce_max_fusion_kernel(
+    const float* a,
+    const int& size,
+    float* out,
+    float& max) {
+  auto vec_ps_min = _mm512_set1_ps(std::numeric_limits<float>::lowest());
+  auto vec_out = vec_ps_min;
+
+  int i = 0;
+  for (; i <= size - 16; i += 16) {
+    vec_out = _loadu(a + i);
+    vec_ps_min = _mm512_max_ps(vec_ps_min, vec_out);
+    _mm512_storeu_ps(out + i, vec_out);
+  }
+
+  if (i < size) {
+    __mmask16 mask = (1 << (size - i)) - 1;
+    vec_out = _maskz_loadu(a + i, mask);
     vec_ps_min = _mm512_mask_max_ps(vec_ps_min, mask, vec_out, vec_ps_min);
     _mm512_mask_storeu_ps(out + i, mask, vec_out);
   }
