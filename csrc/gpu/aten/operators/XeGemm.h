@@ -7,6 +7,7 @@
 #include <utils/oneMKLUtils.h>
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
+#include "utils/ComputeEngine.h"
 #include "xetla/hgemm.h"
 
 using namespace xpu::xetla;
@@ -111,8 +112,18 @@ class HGEMM_XETLA final {
     __CHECK(is_a_row_major_);
     __CHECK(is_b_row_major_);
 
+    // check the input tensor
+    xpu::COMPUTE_ENG real_eng =
+        choose_compute_eng(xpu::COMPUTE_ENG::XETLA, *a_, *b_);
+    __CHECK(real_eng == xpu::COMPUTE_ENG::XETLA);
+
     for (int i = 0; i < num_epilogues_; i++) {
       auto eptensor = epilogue_tensors_[i];
+      // check all epilogues
+      xpu::COMPUTE_ENG real_eng =
+          choose_compute_eng(xpu::COMPUTE_ENG::XETLA, *eptensor);
+      __CHECK(real_eng == xpu::COMPUTE_ENG::XETLA);
+
       switch (epilogue_types_[i]) {
         case BIAS: {
           __CHECK(

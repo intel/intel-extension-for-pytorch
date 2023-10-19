@@ -3,11 +3,11 @@
 #include <ATen/CPUApplyUtils.h>
 #include <ATen/record_function.h>
 #include <runtime/Utils.h>
+#include <iostream>
 #include "Linear.h"
 #include "comm/ATDispatch.h"
 #include "utils/CustomOperatorRegistration.h"
 #include "xetla/hgemm.h"
-
 #if defined(USE_XETLA)
 
 namespace at {
@@ -37,7 +37,10 @@ static Tensor mm_common(const Tensor& a, const Tensor& b) {
   }
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_common)
-    xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, Attr());
+    bool is_fused;
+    Attr attr;
+    output = impl::matmul_fusion_variants(
+        output, a, b, true, attr, is_fused = false);
   }
   return matmul_resize(a, output);
 }
@@ -65,11 +68,14 @@ static Tensor mm_resadd(
   }
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_resadd)
-    auto att = Attr();
-    Tensor binary =
-        (res.dim() == 1 ? res.unsqueeze(0) : res) * Scalar(res_factor);
-    att.append_post_binary(att.kind_with_binary_add, binary);
-    xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, att);
+    bool is_fused;
+    Attr attr;
+    attr.append_scale_binary(attr.kind_with_binary_add, res, float(res_factor));
+
+    output = impl::matmul_fusion_variants(output, a, b, true, attr, is_fused);
+    if (!is_fused) {
+      output += at::mul(res, Scalar(res_factor));
+    }
   }
   return matmul_resize(a, output);
 }
@@ -100,14 +106,17 @@ static Tensor mm_resadd_resadd(
   }
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_resadd_resadd)
-    auto att = Attr();
-    Tensor binary0 =
-        (res0.dim() == 1 ? res0.unsqueeze(0) : res0) * Scalar(res0_factor);
-    att.append_post_binary(att.kind_with_binary_add, binary0);
-    Tensor binary1 =
-        (res1.dim() == 1 ? res1.unsqueeze(0) : res1) * Scalar(res1_factor);
-    att.append_post_binary(att.kind_with_binary_add, binary1);
-    xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, att);
+    bool is_fused;
+    Attr attr;
+    attr.append_scale_binary(
+        attr.kind_with_binary_add, res0, float(res0_factor));
+    attr.append_scale_binary(
+        attr.kind_with_binary_add, res1, float(res1_factor));
+    output = impl::matmul_fusion_variants(output, a, b, true, attr, is_fused);
+    if (!is_fused) {
+      output += at::mul(res0, Scalar(res0_factor)) +
+          at::mul(res1, Scalar(res1_factor));
+    }
   }
   return matmul_resize(a, output);
 }
@@ -135,8 +144,14 @@ static Tensor mm_bias(
   }
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias)
-    xpu::oneDNN::matmul(
-        output, af, b, bias * Scalar(bias_factor), true, Attr());
+    bool is_fused;
+    Attr attr;
+    attr.append_scale_binary(
+        attr.kind_with_binary_add, bias, float(bias_factor));
+    output = impl::matmul_fusion_variants(output, a, b, true, attr, is_fused);
+    if (!is_fused) {
+      output += at::mul(bias, Scalar(bias_factor));
+    }
   }
   return matmul_resize(a, output);
 }
@@ -167,11 +182,16 @@ static Tensor mm_bias_resadd(
   }
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_resadd)
-    auto att = Attr();
-    Tensor binary =
-        (res.dim() == 1 ? res.unsqueeze(0) : res) * Scalar(res_factor);
-    att.append_post_binary(att.kind_with_binary_add, binary);
-    xpu::oneDNN::matmul(output, af, b, bias * Scalar(bias_factor), true, att);
+    bool is_fused;
+    Attr attr;
+    attr.append_scale_binary(
+        attr.kind_with_binary_add, bias, float(bias_factor));
+    attr.append_scale_binary(attr.kind_with_binary_add, res, float(res_factor));
+    output = impl::matmul_fusion_variants(output, a, b, true, attr, is_fused);
+    if (!is_fused) {
+      output +=
+          at::mul(bias, Scalar(bias_factor)) + at::mul(res, Scalar(res_factor));
+    }
   }
   return matmul_resize(a, output);
 }
@@ -205,19 +225,19 @@ static Tensor mm_bias_resadd_resadd(
   }
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_resadd_resadd)
-    auto att = Attr();
-    Tensor binary0 =
-        (res0.dim() == 1 ? res0.unsqueeze(0) : res0) * Scalar(res0_factor);
-    att.append_post_binary(att.kind_with_binary_add, binary0);
-    Tensor binary1 =
-        (res1.dim() == 1 ? res1.unsqueeze(0) : res1) * Scalar(res1_factor);
-    att.append_post_binary(att.kind_with_binary_add, binary1);
-    auto split_ms = hgemm_split_m(m, n);
-    auto bias_ = bias * Scalar(bias_factor);
-    for (auto data : split_ms) {
-      auto newo = output.narrow(0, std::get<0>(data), std::get<1>(data));
-      auto newa = af.narrow(0, std::get<0>(data), std::get<1>(data));
-      xpu::oneDNN::matmul(newo, newa, b, bias_, true, att);
+    bool is_fused;
+    Attr attr;
+    attr.append_scale_binary(
+        attr.kind_with_binary_add, bias, float(bias_factor));
+    attr.append_scale_binary(
+        attr.kind_with_binary_add, res0, float(res0_factor));
+    attr.append_scale_binary(
+        attr.kind_with_binary_add, res1, float(res1_factor));
+    output = impl::matmul_fusion_variants(output, a, b, true, attr, is_fused);
+    if (!is_fused) {
+      output += at::mul(bias, Scalar(bias_factor)) +
+          at::mul(res0, Scalar(res0_factor)) +
+          at::mul(res1, Scalar(res1_factor));
     }
   }
   return matmul_resize(a, output);
@@ -377,6 +397,12 @@ static void mm_qkv_out(
       decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
   auto& q = dpcppGetCurrentQueue();
 
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, input);
+  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
   bool out0_valid =
       reinterpret_cast<uint64_t>(out0.data_ptr<scalar_t>()) % 8 == 0;
   bool out1_valid =
@@ -393,8 +419,9 @@ static void mm_qkv_out(
         reinterpret_cast<uint64_t>(bias_.value().data_ptr<scalar_t>()) % 8 == 0;
   }
   bool shape_valid = k % 4 == 0 && n % 4 == 0;
-  bool use_xetla = out0_valid && out1_valid && out2_valid && input_valid &&
-      weight_valid && bias_valid && shape_valid;
+  bool use_xetla = fp64_valid && compute_eng_valid && out0_valid &&
+      out1_valid && out2_valid && input_valid && weight_valid && bias_valid &&
+      shape_valid;
 
   if (use_xetla) {
     char str__[100];
