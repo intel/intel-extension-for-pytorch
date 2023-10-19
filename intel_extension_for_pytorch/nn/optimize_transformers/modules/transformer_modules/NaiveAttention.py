@@ -28,6 +28,7 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
         self.head_dim = self.embed_dim // self.num_attn_head
         self.num_attn_head = self.num_attn_head // self.tp_size
         self.max_position = config.max_positions
+        self.max_out_position = config.max_out_positions
         self.seq_len = 0
         self.prev_seq_len = 0
         self.is_decoder = config.is_decoder

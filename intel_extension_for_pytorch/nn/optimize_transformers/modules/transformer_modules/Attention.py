@@ -53,6 +53,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     def prepare_cache_for_greedy_search(self, hidden_states, layer_past):
         bs_beam, seq_len, _ = self.get_runtime_shape(hidden_states)
         self.prepare_kv_cache(hidden_states)
+        
         self.prev_seq_len = layer_past[0].size(2) if layer_past is not None else 0
         self.seq_len = self.prev_seq_len + 1 if self.prev_seq_len != 0 else seq_len
 
@@ -76,7 +77,10 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         bs_beam, seq_len, embed_dim = self.get_runtime_shape(hidden_states)
         batch_size = bs_beam // self.beam_size
         if self.runtime_cache.key_cache is None or self.runtime_cache.value_cache is None or batch_size != self.batch_size:
-            cache_shape = [self.max_position, bs_beam, self.num_attn_head, self.head_dim]
+            if self.is_beam_search():
+                cache_shape = [self.max_out_position, bs_beam, self.num_attn_head, self.head_dim]
+            else:
+                cache_shape = [self.max_position, bs_beam, self.num_attn_head, self.head_dim]
             self.runtime_cache.key_cache = torch.empty(cache_shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.runtime_cache.value_cache = torch.empty(cache_shape, device=hidden_states.device, dtype=hidden_states.dtype)
             self.batch_size = batch_size
@@ -102,10 +106,10 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     def prepare_qkv_input_1st_token_beam_search(self, hidden_states, **kwargs):
         bs_beam, seq_len, embed_dim = self.get_runtime_shape(hidden_states)
         out_shape = [bs_beam, seq_len, self.head_dim * self.num_attn_head]
-        query = torch.empty(out_shape, device=hidden_states.device, dtype=hidden_states.dtype)
-        return query, self.runtime_cache.key_prompt, self.runtime_cache.value_prompt
+        query = torch.empty(out_shape, device=hidden_states.device, dtype=hidden_states.dtype)       
+        return query, self.runtime_cache.key_prompt.view(out_shape), self.runtime_cache.value_prompt.view(out_shape)
 
-    def prepare_qkv_input_2nd2last(self, hidden_states, **kwargs):
+    def prepare_qkv_input_2nd2last(self, hidden_states, **kwargs):    
         bs_beam, seq_len, embed_dim = self.get_runtime_shape(hidden_states)
         out_shape = [seq_len, bs_beam, self.head_dim * self.num_attn_head]
         query = torch.empty(out_shape, device=hidden_states.device, dtype=hidden_states.dtype)
@@ -166,7 +170,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         return key, value
 
     def sdp_kv_preprocess(self, key, value):
-        if self.is_1st_token_beam_search():
+        if self.beam_size == 1 or self.is_1st_token():
             return self.sdp_kv_preprocess_1st_token_beam_search(key, value)
         else:
             return self.sdp_kv_preprocess_2nd2last(key, value)
@@ -191,6 +195,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
         dropout, alpha, beta, is_casual, blocked_attn_mask, blocked_alibi = self.prepare_sdp_input(query, key, value, attention_mask, alibi)
         attention_output, attn_weight = self.compute_sdp(query, key, value, key_prompt, value_prompt, blocked_attn_mask, blocked_alibi, head_mask, alpha, beta, dropout, is_casual)
+        
         attention_output = self.process_sdp_output(attention_output)
         attention_output = attention_output.reshape(attention_output.size()[:-2] + (self.head_dim * self.num_attn_head,))
         return attention_output, attn_weight
@@ -306,7 +311,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
             kv = kv.permute(0, 2, 1, 3)
             kv = kv[:, :, :, None, :].expand(bs_beam, seq_len, num_kv_heads, n_rep, head_dim)
             kv = kv.reshape(bs_beam, seq_len, num_kv_heads * n_rep, head_dim)
-            kv = kv.permute(1, 2, 0, 3)
+            kv = kv.permute(0, 2, 1, 3)
         else:
             kv = kv.permute(2, 0, 1, 3)
             kv = kv[:, :, :, None, :].expand(seq_len, bs_beam, num_kv_heads, n_rep, head_dim)

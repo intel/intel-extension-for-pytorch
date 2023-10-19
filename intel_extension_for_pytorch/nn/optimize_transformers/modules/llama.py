@@ -44,7 +44,7 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
         impl = self.ipex_config.impl
         attn_type = IPEXTransformerAttn
         attn_type_str = "IPEXTransformerAttn"
-        for elem in [impl.name, dtype]:
+        for elem in [impl.name, dtype, "Grouped"]:
             attn_type_str = attn_type_str + elem.capitalize()
             if hasattr(sys.modules[__name__], attn_type_str):
                 attn_type = getattr(sys.modules[__name__], attn_type_str)
@@ -179,7 +179,8 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
 
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
-
+        
+        
         hidden_states, present_key_value, self_attn_weights = self.attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
@@ -190,6 +191,7 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
             residual=residual,
             first_token = first_token
         )
+
         residual = hidden_states
         hidden_states = self.post_attn_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states, residual)
