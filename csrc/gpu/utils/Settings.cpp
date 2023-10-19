@@ -27,8 +27,6 @@ namespace dpcpp {
  *      Default = 0 | Set verbose level with synchronization execution mode
  *   IPEX_XPU_SYNC_MODE:
  *      Default = 0 | Set 1 to enforce synchronization execution mode
- *   IPEX_TILE_AS_DEVICE:
- *      Default = 1 | Set 0 to disable tile partition and map per root device
  * ==========GPU==========
  *
  * EXPERIMENTAL options:
@@ -117,9 +115,6 @@ Settings::Settings() {
 
   sync_mode_enabled = ENV_VAL::OFF;
   DPCPP_INIT_ENV_VAL(XPU_SYNC_MODE, sync_mode_enabled, ENV_VAL, show_opt);
-
-  tile_as_device_enabled = ENV_VAL::ON;
-  DPCPP_INIT_ENV_VAL(TILE_AS_DEVICE, tile_as_device_enabled, ENV_VAL, show_opt);
 
   onednn_layout_enabled = ENV_VAL::OFF;
   DPCPP_INIT_ENV_VAL(
@@ -211,25 +206,6 @@ void Settings::enable_sync_mode() {
 void Settings::disable_sync_mode() {
   std::lock_guard<std::mutex> lock(s_mutex);
   sync_mode_enabled = ENV_VAL::OFF;
-}
-
-bool Settings::is_tile_as_device_enabled() const {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  return tile_as_device_enabled == ENV_VAL::ON;
-}
-
-void Settings::enable_tile_as_device() {
-  if (!dpcppIsDevPoolInit()) {
-    std::lock_guard<std::mutex> lock(s_mutex);
-    tile_as_device_enabled = ENV_VAL::ON;
-  }
-}
-
-void Settings::disable_tile_as_device() {
-  if (!dpcppIsDevPoolInit()) {
-    std::lock_guard<std::mutex> lock(s_mutex);
-    tile_as_device_enabled = ENV_VAL::OFF;
-  }
 }
 
 bool Settings::is_onednn_layout_enabled() const {

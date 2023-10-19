@@ -22,8 +22,6 @@ static thread_local DeviceId cur_dev_index = 0;
 
 struct DPCPPDevicePool {
   std::vector<std::unique_ptr<sycl::device>> devices;
-  // Record all device ids for each card
-  std::vector<std::vector<int>> deviceids_card;
   // If macro USE_MULTI_CONTEXT is enabled, contexts will be constructed by SYCL
   // runtime API sycl::context. Otherwise, contexts will be initialized by
   // default context that shared by all GPU devices.
@@ -31,89 +29,25 @@ struct DPCPPDevicePool {
   std::mutex devices_mutex;
 } gDevPool;
 
-static void enumDevices(
-    std::vector<std::unique_ptr<sycl::device>>& devices,
-    std::vector<std::vector<int>>& deviceids_card) {
-  std::vector<sycl::device> root_devices;
+static void enumDevices(std::vector<std::unique_ptr<sycl::device>>& devices) {
   auto platform_list = sycl::platform::get_platforms();
-  // Enumerated root devices(GPU cards) from GPU Platform firstly.
+  // Enumerated GPU devices from GPU platform firstly.
   for (const auto& platform : platform_list) {
-    if (platform.get_backend() != sycl::backend::ext_oneapi_level_zero)
+    if (platform.get_backend() != sycl::backend::ext_oneapi_level_zero) {
       continue;
+    }
     auto device_list = platform.get_devices();
     for (const auto& device : device_list) {
       if (device.is_gpu()) {
-        root_devices.push_back(device);
+        devices.push_back(std::make_unique<sycl::device>(device));
       }
     }
   }
-
-  // Mapping framework device to physical tile by default.
-  // If IPEX_TILE_AS_DEVICE disabled, mapping framework device to
-  // physical device.
-  if (Settings::I().is_tile_as_device_enabled()) {
-    constexpr sycl::info::partition_property partition_by_affinity =
-        sycl::info::partition_property::partition_by_affinity_domain;
-    constexpr sycl::info::partition_affinity_domain next_partitionable =
-        sycl::info::partition_affinity_domain::next_partitionable;
-    for (const auto& root_device : root_devices) {
-      std::vector<int> deviceids_eachcard = {};
-      try {
-        auto sub_devices =
-            root_device.create_sub_devices<partition_by_affinity>(
-                next_partitionable);
-        for (auto& s_dev : sub_devices) {
-          devices.push_back(std::make_unique<sycl::device>(s_dev));
-          deviceids_eachcard.push_back(devices.size() - 1);
-        }
-        deviceids_card.push_back(deviceids_eachcard);
-      } catch (sycl::exception& e) {
-        // FIXME: should only check feature_not_supported here.
-        // But for now we got invalid here if partition is not supported.
-        if (e.code() != sycl::errc::feature_not_supported &&
-            e.code() != sycl::errc::invalid) {
-          throw std::runtime_error(
-              std::string("Failed to apply tile partition: ") + e.what());
-        }
-        static auto verbose = Settings::I().get_verbose_level();
-        if (verbose) {
-          TORCH_WARN_ONCE(
-              "Tile partition is UNSUPPORTED : ",
-              root_device.get_info<dpcpp_dev_name>());
-        }
-        devices.push_back(std::make_unique<sycl::device>(root_device));
-        deviceids_eachcard.push_back(devices.size() - 1);
-        deviceids_card.push_back(deviceids_eachcard);
-      }
-    }
-  } else {
-    for (const auto& root_device : root_devices) {
-      std::vector<int> deviceids_eachcard = {};
-      devices.push_back(std::make_unique<sycl::device>(root_device));
-      deviceids_eachcard.push_back(devices.size() - 1);
-      deviceids_card.push_back(deviceids_eachcard);
-    }
-  }
-}
-
-// By default, get the first card id that contains max number of devices.
-static int getMaxTilesCardId(std::vector<std::vector<int>>& deviceids_card) {
-  int card_id = -1;
-  int maxnum_devices = 0;
-  int num_cards = deviceids_card.size();
-  for (int i = 0; i < num_cards; i++) {
-    auto num_devices = deviceids_card[i].size();
-    if (maxnum_devices < num_devices) {
-      maxnum_devices = num_devices;
-      card_id = i;
-    }
-  }
-  return card_id;
 }
 
 // It should be call only once. (std::call_once)
 static void initGlobalDevicePoolState() {
-  enumDevices(gDevPool.devices, gDevPool.deviceids_card);
+  enumDevices(gDevPool.devices);
 
   auto device_count = gDevPool.devices.size();
   if (device_count <= 0) {
@@ -184,20 +118,6 @@ DeviceId dpcppGetDeviceIndex(sycl::device device) {
     return std::distance(gDevPool.devices.begin(), it);
   }
   return -1;
-}
-
-std::vector<int>& dpcppGetDeviceIdListForCard(int card_id) {
-  initDevicePoolCallOnce();
-  std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
-  if (card_id == -1) {
-    card_id = getMaxTilesCardId(gDevPool.deviceids_card);
-  }
-  TORCH_CHECK(
-      card_id >= 0 && card_id < gDevPool.deviceids_card.size(),
-      "card_id ",
-      card_id,
-      " out of range");
-  return gDevPool.deviceids_card[card_id];
 }
 
 bool dpcppIsDevPoolInit() {
@@ -398,27 +318,8 @@ DeviceInfo* dpcppGetDeviceInfo(DeviceId device_id) {
 // called before forking process.
 int dpcppPrefetchDeviceCount() noexcept {
   std::vector<std::unique_ptr<sycl::device>> devices;
-  std::vector<std::vector<int>> deviceids_card;
-  enumDevices(devices, deviceids_card);
+  enumDevices(devices);
   return devices.size();
-}
-
-// This function can be used to prefetch device list for each card. It is used
-// in getDeviceIdListForCard() such that this function can be called before
-// forking process.
-std::vector<int> dpcppPrefetchDeviceIdListForCard(int card_id) {
-  std::vector<std::unique_ptr<sycl::device>> devices;
-  std::vector<std::vector<int>> deviceids_card;
-  enumDevices(devices, deviceids_card);
-  if (card_id == -1) {
-    card_id = getMaxTilesCardId(deviceids_card);
-  }
-  TORCH_CHECK(
-      card_id >= 0 && card_id < deviceids_card.size(),
-      "card_id ",
-      card_id,
-      " out of range");
-  return deviceids_card[card_id];
 }
 
 } // namespace dpcpp

@@ -43,32 +43,17 @@ DLDevice_& XPUHooks::getDLPackDeviceFromATenDevice(
     const at::Device& aten_device,
     void* data) const {
   TORCH_CHECK(aten_device.is_xpu(), "Only the XPU device type is expected.");
-  sycl::device& xpu_dev = xpu::dpcpp::dpcppGetRawDevice(aten_device.index());
+  sycl::device& xpu_device = xpu::dpcpp::dpcppGetRawDevice(aten_device.index());
 
-  sycl::device parent_root_device;
-  if (Settings::I().is_tile_as_device_enabled()) {
-    try {
-      parent_root_device =
-          xpu_dev.get_info<sycl::info::device::parent_device>();
-    } catch (sycl::exception e) {
-      if (e.code() == sycl::errc::invalid) {
-        // Gen9 device without tile?
-        parent_root_device = xpu_dev;
-      } else {
-        throw e;
-      }
-    }
-  } else {
-    // the root device is returned directly.
-    parent_root_device = xpu_dev;
-  }
-
-  // find position of parent_root_device in sycl::get_devices
-  auto all_root_devs = sycl::device::get_devices();
-  auto beg = std::begin(all_root_devs);
-  auto end = std::end(all_root_devs);
-  auto selector_fn = [parent_root_device](const sycl::device& root_d) -> bool {
-    return parent_root_device == root_d;
+  // After device hierarchy is controled by driver, all the components use the
+  // same device partition mode. So we don't need to find the parent device
+  // anymore and directly find position of sycl device `xpu_device` in
+  // sycl::device::get_devices()
+  auto device_list = sycl::device::get_devices();
+  auto beg = std::begin(device_list);
+  auto end = std::end(device_list);
+  auto selector_fn = [xpu_device](const sycl::device& device) -> bool {
+    return xpu_device == device;
   };
   auto pos = find_if(beg, end, selector_fn);
 

@@ -1,8 +1,10 @@
 # coding: utf-8
+from enum import Enum
+import os
+import warnings
+
 import torch
 from .. import _C
-from enum import Enum
-import warnings
 from .. import frontend
 import intel_extension_for_pytorch  # noqa F401
 
@@ -24,13 +26,13 @@ def from_usm(src, dtype, shape, stride=None, device_id: int = -1) -> torch.Tenso
         shape: the desired shape of returned tensor.
         stride: the desired stride of returned tensor. Default: if None,
             returned tensor is contiguous.
-        device_id: the root device id where the USM pointer is allocated. Default: -1,
+        device_id: the device id where the USM pointer is allocated. Default: -1,
             if the user is not sure.
 
-    Warning: This is decrepated. Please use torch.from_dlpack instead.
+    Warning: This is deprecated. Please use torch.from_dlpack instead.
     """
 
-    warnings.warn("from_usm is decrepated. Please use torch.from_dlpack instead.")
+    warnings.warn("from_usm is deprecated. Please use torch.from_dlpack instead.")
     return _C._from_usm(src, dtype, shape, stride, device_id)
 
 
@@ -43,10 +45,10 @@ def to_usm(src: torch.Tensor):
     Args:
         src: a torch tensor.
 
-    Warning: This is decrepated. Please use torch.to_dlpack instead.
+    Warning: This is deprecated. Please use torch.to_dlpack instead.
     """
 
-    warnings.warn("to_usm is decrepated. Please use torch.to_dlpack instead.")
+    warnings.warn("to_usm is deprecated. Please use torch.to_dlpack instead.")
     return _C._to_usm(src)
 
 
@@ -288,19 +290,43 @@ class sync_mode(OnOff):
         super().__init__(using_sync_mode, enable_sync_mode, disable_sync_mode)
 
 
-# Tile Partition As Device
 def using_tile_as_device():
-    return _C._is_tile_as_device_enabled()
+    r"""Device Hierarchy Note.
+
+    `ZE_FLAT_DEVICE_HIERARCHY` allows users to select the device hierarchy model
+    with which the underlying hardware is exposed and the types of devices
+    returned with SYCL runtime.
+
+    When setting to `COMPOSITE`, all root-devices are returned and traversing
+    the device hierarchy is possible.
+
+    When setting to `FLAT`, all sub-devices are returned and traversing the
+    device hierarchy is NOT possible. So we can NOT access the their root
+    devices.
+
+    When setting to `COMBINED`, it combined `COMPOSITE` and `FLAT` mode. All
+    sub-devices are returned and traversing the device hierarchy is possible.
+
+    By default, driver selects `FLAT` mode, where all sub-devices are exposed.
+    """
+    warnings.warn("using_tile_as_device was deprecated.")
+    if "ZE_FLAT_DEVICE_HIERARCHY" not in os.environ:
+        return True
+    if os.environ["ZE_FLAT_DEVICE_HIERARCHY"] == "COMPOSITE":
+        return False
+    return True
 
 
-# Only work before lazy init
 def enable_tile_as_device():
-    _C._enable_tile_as_device()
+    warnings.warn(
+        "enable_tile_as_device is deprecated. Currently, enabling tile as device is a feature that are enabled by default."  # noqa: B950
+    )
 
 
-# Only work before lazy init
 def disable_tile_as_device():
-    _C._disable_tile_as_device()
+    warnings.warn(
+        "disable_tile_as_device is deprecated. Please re-run your script with enviroment variable `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE` to disable tile as device feature."  # noqa: B950
+    )
 
 
 ################################################################

@@ -93,20 +93,6 @@ def is_available() -> bool:
     return device_count() > 0
 
 
-# This API can be used before forking process if _lazy_init() has not been called.
-@lru_cache(maxsize=1)
-def get_device_id_list_per_card(card_id=-1) -> list:
-    r"""Returns the device list of card_id.
-    By default, return device list of the card which contains max number of devices."""
-    if not _is_compiled():
-        return []
-    else:
-        if _is_initialized():
-            return intel_extension_for_pytorch._C._get_device_id_list_per_card(card_id)
-        else:
-            return intel_extension_for_pytorch._C._prefetch_get_device_id_list_per_card(card_id)
-
-
 class _DeviceGuard:
     def __init__(self, index: int):
         self.idx = index

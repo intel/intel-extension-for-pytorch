@@ -54,10 +54,6 @@ class IPEX_API Settings final {
   void enable_sync_mode();
   void disable_sync_mode();
 
-  bool is_tile_as_device_enabled() const;
-  void enable_tile_as_device();
-  void disable_tile_as_device();
-
   bool is_onednn_layout_enabled() const;
   void enable_onednn_layout();
   void disable_onednn_layout();
@@ -85,7 +81,6 @@ class IPEX_API Settings final {
   FP32_MATH_MODE fp32_math_mode;
 
   ENV_VAL sync_mode_enabled;
-  ENV_VAL tile_as_device_enabled;
   ENV_VAL onednn_layout_enabled;
 
 #ifdef BUILD_SIMPLE_TRACE

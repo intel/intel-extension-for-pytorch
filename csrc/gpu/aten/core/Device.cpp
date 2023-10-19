@@ -88,14 +88,5 @@ DeviceInfo* getDeviceInfo(DeviceIndex device) {
   return dpcppGetDeviceInfo(device);
 }
 
-std::vector<int> prefetchDeviceIdListForCard(int card_id) {
-  return dpcppPrefetchDeviceIdListForCard(card_id);
-}
-
-std::vector<int>& getDeviceIdListForCard(int card_id) {
-  do_pre_init_hook();
-  return dpcppGetDeviceIdListForCard(card_id);
-}
-
 } // namespace dpcpp
 } // namespace xpu

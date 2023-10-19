@@ -37,8 +37,5 @@ sycl::context& dpcppGetDeviceContext(DeviceId device_id = -1);
 
 DeviceId dpcppGetDeviceIndex(sycl::device device);
 
-std::vector<int>& dpcppGetDeviceIdListForCard(int card_id = -1);
-
-std::vector<int> dpcppPrefetchDeviceIdListForCard(int card_id = -1);
 } // namespace dpcpp
 } // namespace xpu

@@ -26,7 +26,6 @@ Miscellaneous
 .. autoclass:: device
 .. autofunction:: device_count
 .. autoclass:: device_of
-.. autofunction:: get_device_id_list_per_card
 .. autofunction:: get_device_name
 .. autofunction:: get_device_properties
 .. get_gencode_flags

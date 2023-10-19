@@ -82,23 +82,6 @@ class TestVerbose(TestCase):
             )
 
 
-class TestDevicdeListForCard(TestCase):
-    def test_devicelist_empty(self):
-        if torch.xpu.device_count() > 0:
-            assert torch.xpu.get_device_id_list_per_card(), "Device list should not be empty"
-
-    def test_devicelist_size(self):
-        assert (
-            len(torch.xpu.get_device_id_list_per_card()) <= torch.xpu.device_count()
-        ), "The size of device list should not be larger than device count"
-
-    def test_implicit_mode(self):
-        if not torch.xpu.using_tile_as_device():
-            assert (
-                len(torch.xpu.get_device_id_list_per_card()) == 1
-            ), "The size of device list should be always 1 with implicit mode"
-
-
 class TestHasDtypes(TestCase):
     @pytest.mark.skipif(
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"

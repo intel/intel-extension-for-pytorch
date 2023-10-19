@@ -96,28 +96,6 @@ PyObject* THPModule_prefetchDeviceCount_wrap(PyObject* self, PyObject* noargs) {
   END_HANDLE_TH_ERRORS
 }
 
-PyObject* THPModule_getDeviceIdListForCard_wrap(PyObject* self, PyObject* arg) {
-  HANDLE_TH_ERRORS
-  THPUtils_assert(THPUtils_checkLong(arg), "invalid argument to get card id");
-  int card_id = THPUtils_unpackInt(arg);
-  auto deviceid_card = xpu::dpcpp::getDeviceIdListForCard(card_id);
-  py::list deviceid_card_pylist = py::cast(deviceid_card);
-  return deviceid_card_pylist.release().ptr();
-  END_HANDLE_TH_ERRORS
-}
-
-PyObject* THPModule_prefetchDeviceIdListForCard_wrap(
-    PyObject* self,
-    PyObject* arg) {
-  HANDLE_TH_ERRORS
-  THPUtils_assert(THPUtils_checkLong(arg), "invalid argument to get card id");
-  int card_id = THPUtils_unpackInt(arg);
-  auto deviceid_card = xpu::dpcpp::prefetchDeviceIdListForCard(card_id);
-  py::list deviceid_card_pylist = py::cast(deviceid_card);
-  return deviceid_card_pylist.release().ptr();
-  END_HANDLE_TH_ERRORS
-}
-
 static PyObject* THPModule_isInBadFork(PyObject* self, PyObject* noargs) {
   HANDLE_TH_ERRORS
   return PyBool_FromLong(in_bad_fork);
@@ -504,14 +482,6 @@ static struct PyMethodDef _THPModule_methods[] = {
      (PyCFunction)THPModule_prefetchDeviceCount_wrap,
      METH_NOARGS,
      nullptr},
-    {"_get_device_id_list_per_card",
-     (PyCFunction)THPModule_getDeviceIdListForCard_wrap,
-     METH_O,
-     nullptr},
-    {"_prefetch_get_device_id_list_per_card",
-     (PyCFunction)THPModule_prefetchDeviceIdListForCard_wrap,
-     METH_O,
-     nullptr},
     {"_xpu_isInBadFork",
      (PyCFunction)THPModule_isInBadFork,
      METH_NOARGS,
@@ -700,18 +670,6 @@ void init_xpu_module(pybind11::module& m) {
   m.def("_enable_sync_mode", []() { Settings::I().enable_sync_mode(); });
 
   m.def("_disable_sync_mode", []() { Settings::I().disable_sync_mode(); });
-
-  m.def("_is_tile_as_device_enabled", []() {
-    return Settings::I().is_tile_as_device_enabled();
-  });
-
-  m.def("_enable_tile_as_device", []() {
-    Settings::I().enable_tile_as_device();
-  });
-
-  m.def("_disable_tile_as_device", []() {
-    Settings::I().disable_tile_as_device();
-  });
 
   m.def("_is_onednn_layout_enabled", []() {
     return Settings::I().is_onednn_layout_enabled();
