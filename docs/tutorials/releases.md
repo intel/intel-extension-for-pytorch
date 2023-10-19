@@ -1,6 +1,37 @@
 Releases
 =============
 
+## 2.1.0
+
+### Highlights
+
+- **Large Language Model (LLM) optimization (Experimental)**: Intel® Extension for PyTorch\* provides a lot of specific optimizations for LLMs in this new release. In operator level, we provide highly efficient GEMM kernel to speedup Linear layer and customized operators to reduce the memory footprint. To better trade-off the performance and accuracy, different low-precision solutions e.g., smoothQuant for INT8 and weight-only-quantization for INT4 and INT8 are also enabled. Besides, tensor parallel can also be adopt to get lower latency for LLMs.
+
+  A new API function, `ipex.optimize_transformers`, is designed to optimize transformer-based models within frontend Python modules, with a particular focus on Large Language Models (LLMs). It provides optimizations for both model-wise and content-generation-wise. You just need to invoke the `ipex.optimize_transformers` function instead of the `ipex.optimize` function to apply all optimizations transparently. More detailed information can be found at [Large Language Model optimizations overview](./llm.rst).
+
+  Specifically, this new release includes the support of [SmoothQuant]( https://arxiv.org/abs/2211.10438) and weight only quantization (both INT8 weight and INT4 weight) as to provide better performance and accuracy for low precision scenarios.
+
+  A typical usage of this new feature is quite simple as below:
+
+  ```python
+  import torch
+  import intel_extension_for_pytorch as ipex
+  ...
+  model = ipex.optimize_transformers(model, dtype=dtype)
+  ```
+
+- **torch.compile backend optimization with PyTorch Inductor (Experimental)**: We optimized Intel® Extension for PyTorch to leverage PyTorch Inductor’s capability when working as a backend of torch.compile, which can better utilize torch.compile’s power of graph capture, Inductor’s scalable fusion capability, and still keep customized optimization from Intel® Extension for PyTorch.
+
+- **performance optimization of static quantization under dynamic shape**: We optimized the static quantization performance of Intel® Extension for PyTorch for dynamic shapes. The usage is the same as the workflow of running static shapes while inputs of variable shapes could be provided during runtime.
+
+- **Bug fixing and other optimization**
+    - Optimized the runtime memory usage [#1563](https://github.com/intel/intel-extension-for-pytorch/commit/a821c0aef97ee6252d2bfbe6a75b6085f78bcc59)
+    - Fixed the excessive size of the saved model [#1677](https://github.com/intel/intel-extension-for-pytorch/commit/39f2d0f4e91c6007cb58566b63e06b72d7b17ce4) [#1688](https://github.com/intel/intel-extension-for-pytorch/commit/58adee5b043a52e0c0a60320d48eae82de557074)
+    - Supported shared parameters in `ipex.optimize` [#1664](https://github.com/intel/intel-extension-for-pytorch/commit/4fa37949385db88b854eb60ab6de7178706cdcfe)
+    - Enabled the optimization of LARS fusion [#1695](https://github.com/intel/intel-extension-for-pytorch/commit/e5b169e8d1e06558bb366eeaf4c793a382bc2d62)
+    - Supported dictionary input in `ipex.quantization.prepare` [#1682](https://github.com/intel/intel-extension-for-pytorch/commit/30b70e4b0bd8c3d1b2be55147ebd74fbfebe6093)
+    - Updated oneDNN to v3.3 [#2137](https://github.com/intel/intel-extension-for-pytorch/commit/4dc4bb5f9d1cfb9f958893a410f7332be4b5f783)
+
 ## 2.0.100
 
 ### Highlights
@@ -49,7 +80,7 @@ model = torch.compile(model, backend='ipex')
 
 ### Known Issues
 
-Please check at [Known Issues webpage](./performance_tuning/known_issues.md).
+Please check at [Known Issues webpage](./known_issues.md).
 
 ## 1.13.100
 
@@ -151,7 +182,7 @@ We are pleased to announce the release of Intel® Extension for PyTorch\* 1.13.0
 
 ### Known Issues
 
-Please check at [Known Issues webpage](./performance_tuning/known_issues.md).
+Please check at [Known Issues webpage](./known_issues.md).
 
 ## 1.12.300
 

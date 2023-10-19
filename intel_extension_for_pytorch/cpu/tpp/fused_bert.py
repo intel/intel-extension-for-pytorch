@@ -732,7 +732,10 @@ class BertEmbeddings(BlockedModule):
                 persistent=False,
             )
         else:
-            self.register_buffer("position_ids", torch.arange(config.max_position_embeddings).expand((1, -1)))
+            self.register_buffer(
+                "position_ids",
+                torch.arange(config.max_position_embeddings).expand((1, -1)),
+            )
         self.position_embedding_type = getattr(
             config, "position_embedding_type", "absolute"
         )
@@ -1303,7 +1306,9 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         assert isinstance(
             new_model.embeddings, transformers.models.bert.modeling_bert.BertEmbeddings
         )
-        new_model.embeddings = BertEmbeddings(model.config, position_ids_persistent=position_ids_persistent)
+        new_model.embeddings = BertEmbeddings(
+            model.config, position_ids_persistent=position_ids_persistent
+        )
         assert isinstance(
             new_model.encoder, transformers.models.bert.modeling_bert.BertEncoder
         )
@@ -1315,7 +1320,9 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
             new_model.bert.embeddings,
             transformers.models.bert.modeling_bert.BertEmbeddings,
         )
-        new_model.bert.embeddings = BertEmbeddings(model.bert.config, position_ids_persistent=position_ids_persistent)
+        new_model.bert.embeddings = BertEmbeddings(
+            model.bert.config, position_ids_persistent=position_ids_persistent
+        )
         assert isinstance(
             new_model.bert.encoder, transformers.models.bert.modeling_bert.BertEncoder
         )

@@ -1,12 +1,14 @@
 Features
 ========
 
-Ease-of-use Python API
+This section provides a detailed overview of supported features.
+
+Easy-to-use Python API
 ----------------------
 
 With only two or three clauses added to your original code, Intel® Extension for PyTorch\* provides simple frontend Python APIs and utilities to get performance optimizations such as graph optimization and operator optimization.
 
-Check the `API Documentation`_ for details of API functions. `Examples <examples.md>`_ are also available.
+Check the `API Documentation`_ for API functions description and `Examples <examples.md>`_ for usage guidance.
 
 .. note::
 
@@ -15,30 +17,44 @@ Check the `API Documentation`_ for details of API functions. `Examples <examples
   ``intel_extension_for_pytorch`` (for versions 1.10.0 and later). Use the
   correct package name depending on the version you are using.
 
-Here are detailed discussions of specific feature topics, summarized in the rest
-of this document:
+
+Large Language Models (LLM, *NEW feature from 2.1.0*)
+-----------------------------------------------------
+
+In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Starting from 2.1.0, specific optimizations for certain LLM models are 
+introduced in the Intel® Extension for PyTorch*.
+
+For more detailed information, check `LLM Optimizations Overview <./llm.html>`_.
 
 torch.compile (Experimental, *NEW feature from 2.0.0*)
 ------------------------------------------------------
 
-PyTorch* 2.0 introduces a new feature, `torch.compile`, to speed up PyTorch* code. It makes PyTorch code run faster by JIT-compiling PyTorch code into optimized kernels, all while requiring minimal code changes. Intel® Extension for PyTorch\* enables a backend, `ipex`, in the `torch.compile` to optimize generation of the graph model.
+PyTorch* 2.0 introduces a new feature ``torch.compile`` to speed up PyTorch* code. It makes PyTorch code run faster by JIT-compiling of PyTorch code into optimized kernels. Intel® Extension for PyTorch\* enables a backend, ``ipex``, in the ``torch.compile`` to optimize generation of the graph model.
 
-Usage is as simple as importing Intel® Extension for PyTorch\* and setting `backend` parameter of the `torch.compile` to `ipex`. While optimizations with `torch.compile` applies to backend, invocation of `ipex.optimize` function is highly recommended as well to apply optimizations in frontend.
+To use the feature, import the Intel® Extension for PyTorch* and set the backend parameter of the ``torch.compile`` to ``ipex``.
+
+With ``torch.compile`` backend set to ``ipex``, the following will happen:
+
+1. Register Intel® Extension for PyTorch\* operators to Inductor.
+2. Custom fusions at FX graph level, e.g., the migration of existing TorchScript-based fusion kernels in IPEX to inductor, pattern-based fusions to achieve peak performance.
+
+While optimizations with ``torch.compile`` apply to backend, invocation of the ``ipex.optimize`` function is highly recommended as well to apply optimizations in frontend.
 
 .. code-block:: python
 
    import torch
    import intel_extension_for_pytorch as ipex
    ...
-   model = ipex.optimize(model)
+   model = ipex.optimize(model, weights_prepack=False)
    model = torch.compile(model, backend='ipex')
+   ...
 
 ISA Dynamic Dispatching
 -----------------------
 
 Intel® Extension for PyTorch\* features dynamic dispatching functionality to automatically adapt execution binaries to the most advanced instruction set available on your machine.
 
-For more detailed information, check `ISA Dynamic Dispatching <features/isa_dynamic_dispatch.md>`_.
+For details, refer to `ISA Dynamic Dispatching <features/isa_dynamic_dispatch.md>`_.
 
 .. toctree::
    :hidden:
@@ -51,7 +67,7 @@ Auto Channels Last
 
 Comparing to the default NCHW memory format, using channels_last (NHWC) memory format could further accelerate convolutional neural networks. In Intel® Extension for PyTorch*, NHWC memory format has been enabled for most key CPU operators. More detailed information is available at `Channels Last <features/nhwc.md>`_.
 
-Intel® Extension for PyTorch* automatically converts a model to channels last memory format when users optimize the model with `ipex.optimize(model)`. With this feature users won't need to manually apply `model=model.to(memory_format=torch.channels_last)` any more. More detailed information is available at `Auto Channels Last <features/auto_channels_last.md>`_.
+Intel® Extension for PyTorch* automatically converts a model to channels last memory format when users optimize the model with ``ipex.optimize(model)``. With this feature, there is no need to manually apply ``model=model.to(memory_format=torch.channels_last)`` anymore. More detailed information is available at `Auto Channels Last <features/auto_channels_last.md>`_.
 
 .. toctree::
    :hidden:
@@ -65,7 +81,9 @@ Auto Mixed Precision (AMP)
 
 Low precision data type BFloat16 has been natively supported on 3rd Generation Xeon® Scalable Processors (aka Cooper Lake) with AVX512 instruction set. It will also be supported on the next generation of Intel® Xeon® Scalable Processors with Intel® Advanced Matrix Extensions (Intel® AMX) instruction set providing further boosted performance. The support of Auto Mixed Precision (AMP) with BFloat16 for CPU and BFloat16 optimization of operators has been enabled in Intel® Extension for PyTorch\*, and partially upstreamed to PyTorch master branch. These optimizations will be landed in PyTorch master through PRs that are being submitted and reviewed.
 
-For more detailed information, check `Auto Mixed Precision (AMP) <features/amp.md>`_.
+Prefer to use `torch.cpu.amp.autocast()` instead of `torch.autocast(device_name="cpu")`.
+
+For details, refer to `Auto Mixed Precision (AMP) <features/amp.md>`_.
 
 Bfloat16 computation can be conducted on platforms with AVX512 instruction set. On platforms with `AVX512 BFloat16 instruction <https://www.intel.com/content/www/us/en/developer/articles/technical/intel-deep-learning-boost-new-instruction-bfloat16.html>`_, there will be an additional performance boost.
 
@@ -81,7 +99,7 @@ Graph Optimization
 To further optimize TorchScript performance, Intel® Extension for PyTorch\* supports transparent fusion of frequently used operator patterns such as Conv2D+ReLU and Linear+ReLU.
 For more detailed information, check `Graph Optimization <features/graph_optimization.md>`_.
 
-Compared to eager mode, graph mode in PyTorch normally yields better performance from optimization methodologies such as operator fusion. Intel® Extension for PyTorch* provides further optimizations in graph mode. We recommend you take advantage of Intel® Extension for PyTorch* with `TorchScript <https://pytorch.org/docs/stable/jit.html>`_. You may wish to run with the `torch.jit.trace()` function first, since it generally works better with Intel® Extension for PyTorch* than using the `torch.jit.script()` function. More detailed information can be found at the `pytorch.org website <https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html#tracing-modules>`_.
+Compared to eager mode, graph mode in PyTorch normally yields better performance from optimization methodologies such as operator fusion. Intel® Extension for PyTorch* provides further optimizations in graph mode. We recommend taking advantage of Intel® Extension for PyTorch* with `TorchScript <https://pytorch.org/docs/stable/jit.html>`_. You may wish to run with the ``torch.jit.trace()`` function first, since it generally works better with Intel® Extension for PyTorch* than using the ``torch.jit.script()`` function. More detailed information can be found at the `pytorch.org website <https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html#tracing-modules>`_.
 
 .. toctree::
    :hidden:
@@ -104,18 +122,19 @@ Intel® Extension for PyTorch* also optimizes operators and implements several c
 .. autoclass:: MergedEmbeddingBag
 .. autoclass:: MergedEmbeddingBagWithSGD
 
-**Auto kernel selection** is a feature that enables users to tune for better performance with GEMM operations. It is provided as parameter –auto_kernel_selection, with boolean value, of the ipex.optimize() function. By default, the GEMM kernel is computed with oneMKL primitives. However, under certain circumstances oneDNN primitives run faster. Users are able to set –auto_kernel_selection to True to run GEMM kernels with oneDNN primitives.” -> "We aim to provide good default performance by leveraging the best of math libraries and enabled weights_prepack, and it has been verified with broad set of models. If you would like to try other alternatives, you can use auto_kernel_selection toggle in ipex.optimize to switch, and you can disable weights_preack in ipex.optimize if you are concerning the memory footprint more than performance gain. However in majority cases, keeping default is what we recommend.
+**Auto kernel selection** is a feature that enables users to tune for better performance with GEMM operations. We aim to provide good default performance by leveraging the best of math libraries and enabling `weights_prepack`. The feature was tested with broad set of models. If you want to try other options, you can use `auto_kernel_selection` toggle in `ipex.optimize()` to switch, and you can disable `weights_prepack` in `ipex.optimize()` if you are more concerned about the memory footprint than performance gain. However, in most cases, we recommend sticking with the default settings for the best experience.
+
 
 Optimizer Optimization
 ----------------------
 
 Optimizers are one of key parts of the training workloads. Intel® Extension for PyTorch* brings two types of optimizations to optimizers:
 
-1.	Operator fusion for the computation in the optimizers.
-2.	SplitSGD for BF16 training, which reduces the memory footprint of the master weights by half.
+1. Operator fusion for the computation in the optimizers.
+2. SplitSGD for BF16 training, which reduces the memory footprint of the master weights by half.
 
 
-For more detailed information, check `Optimizer Fusion <features/optimizer_fusion.md>`_ and `Split SGD <features/split_sgd.html>`_ 
+For details, refer to `Optimizer Fusion <features/optimizer_fusion.md>`_ and `Split SGD <features/split_sgd.html>`_ 
 
 .. toctree::
    :hidden:
@@ -175,7 +194,7 @@ For more detailed information, check `Codeless Optimization <features/codeless_o
 Graph Capture (Experimental, *NEW feature from 1.13.0*)
 -------------------------------------------------------
 
-Since graph mode is key for deployment performance, this feature automatically captures graphs based on set of technologies that PyTorch supports, such as TorchScript and TorchDynamo. Users won't need to learn and try different PyTorch APIs to capture graphs, instead, they can turn on a new boolean flag `--graph_mode` (default off) in `ipex.optimize` to get the best of graph optimization.
+Since graph mode is key for deployment performance, this feature automatically captures graphs based on set of technologies that PyTorch supports, such as TorchScript and TorchDynamo. Users won't need to learn and try different PyTorch APIs to capture graphs, instead, they can turn on a new boolean flag `--graph_mode` (default off) in `ipex.optimize()` to get the best of graph optimization.
 
 For more detailed information, check `Graph Capture <features/graph_capture.md>`_.
 
@@ -201,7 +220,7 @@ For more detailed information, check `HyperTune <features/hypertune.md>`_.
 Fast BERT Optimization (Experimental, *NEW feature from 2.0.0*)
 ---------------------------------------------------------------
 
-Intel proposed a technique to speed up BERT workloads. Implementation is integrated into Intel® Extension for PyTorch\*. An API `ipex.fast_bert` is provided for a simple usage.
+Intel proposed a technique to speed up BERT workloads. Implementation is integrated into Intel® Extension for PyTorch\*. An API `ipex.fast_bert()` is provided for a simple usage.
 
 For more detailed information, check `Fast BERT <features/fast_bert.md>`_.
 

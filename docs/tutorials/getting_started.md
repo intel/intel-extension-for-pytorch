@@ -1,36 +1,19 @@
-# Getting Started
+# Get Started
 
-## Installation
+The following instructions assume you have installed the Intel® Extension for PyTorch\*. For installation instructions, refer to [Installation](../../../index.html#installation?platform=cpu&version=v2.1.0%2Bcpu).
 
-Prebuilt wheel files are released for multiple Python versions. You can install them simply with the following pip command.
+To start using the Intel® Extension for PyTorch\* in your code, you need to make the following changes:
 
-```bash
-python -m pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
-python -m pip install intel_extension_for_pytorch
-```
-
-You can run a simple sanity test to double confirm if the correct version is installed, and if the software stack can get correct hardware information onboard your system.
-
-```bash
-python -c "import torch; import intel_extension_for_pytorch as ipex; print(torch.__version__); print(ipex.__version__);"
-```
-
-More detailed instructions can be found at [Installation Guide](./installation.md).
-
-
-## Coding
-
-Intel® Extension for PyTorch\* doesn't require complex code changes to get it working. Usage is as simple as several-line code change.
-
-In general, APIs invocation should follow orders below.
-
-1. `import intel_extension_for_pytorch as ipex`
-2. Invoke `optimize()` function to apply optimizations.
+1. Import the extension with `import intel_extension_for_pytorch as ipex`.
+2. Invoke the `optimize()` function to apply optimizations.
 3. Convert the imperative model to a graph model.
-    - For TorchScript, invoke `torch.jit.trace()` and `torch.jit.freeze()`.
-    - For TorchDynamo, invoke `torch.compile(model, backend="ipex")`. (*Experimental feature*, FP32 ONLY)
+    - For TorchScript, invoke `torch.jit.trace()` and `torch.jit.freeze()`
+    - For TorchDynamo, invoke `torch.compile(model, backend="ipex")`(*Experimental feature*)
 
-**Note:** It is highly recommended to `import intel_extension_for_pytorch` right after `import torch`, prior to importing other packages.
+**Important:** It is highly recommended to `import intel_extension_for_pytorch` right after `import torch`, prior to importing other packages.
+
+The example below demostrates how to use the Intel® Extension for PyTorch\*:
+
 
 ```python
 import torch
@@ -52,7 +35,7 @@ with torch.no_grad(), torch.cpu.amp.autocast():
 ##########################################
 
 ############## TorchDynamo ###############
-model = ipex.optimize(model)
+model = ipex.optimize(model, weights_prepack=False)
 
 model = torch.compile(model, backend="ipex")
 with torch.no_grad():
@@ -60,4 +43,6 @@ with torch.no_grad():
 ##########################################
 ```
 
-More examples, including training and usage of low precision data types are available at [Examples](./examples.md).
+More examples, including training and usage of low precision data types are available in the [Examples](./examples.md) section.
+
+In [Cheat Sheet](cheat_sheet.md), you can find more commands that can help you start using the Intel® Extension for PyTorch\*.

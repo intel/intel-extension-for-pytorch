@@ -6,6 +6,7 @@ General
 
 .. currentmodule:: intel_extension_for_pytorch
 .. autofunction:: optimize
+.. autofunction:: optimize_transformers
 .. autoclass:: verbose
 
 Fast Bert (Experimental)
@@ -24,6 +25,7 @@ Quantization
 ************
 
 .. automodule:: intel_extension_for_pytorch.quantization
+.. autofunction:: get_smooth_quant_qconfig_mapping
 .. autofunction:: prepare
 .. autofunction:: convert
 

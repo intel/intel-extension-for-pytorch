@@ -7,6 +7,8 @@ Auto Mixed Precision (AMP)
 
 `torch.cpu.amp` only supports `torch.bfloat16`. It is the default lower precision floating point data type when `torch.cpu.amp` is enabled. `torch.cpu.amp` primarily benefits when running on Intel CPU with BFloat16 instruction set support.
 
+Prefer to use `torch.cpu.amp.autocast()` instead of `torch.autocast(device_name="cpu")`.
+
 ## Use Case
 
 The following simple network should show a speedup with mixed precision.

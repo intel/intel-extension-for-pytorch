@@ -125,9 +125,10 @@ def _all_reduce_and_bias_add(mp_group, original_bias, output):
 def _pre_ipex_gemm(input, world_size, rank):
     assert "deepspeed" in installed_pkg, "_pre_ipex_gemm requires deepspeed installed"
     from deepspeed.utils.tp_shard import get_shard_size, get_shard_size_list
+
     input_shard_size = get_shard_size(input.shape[-1], world_size)
     input_shard_offset = sum(get_shard_size_list(input.shape[-1], world_size)[0:rank])
-    return input[:, :, input_shard_offset:input_shard_offset + input_shard_size]
+    return input[:, :, input_shard_offset : input_shard_offset + input_shard_size]
 
 
 def _ipex_module_load_from_state_dict_(self, state_dict, prefix):
@@ -272,7 +273,9 @@ class _IPEXLinear(_IPEXPrepackModule):
                         x, self.weight, self.bias, self.out_features
                     )
                 else:
-                    output = torch.ops.torch_ipex.tpp_linear(x, self.weight, self.out_features)
+                    output = torch.ops.torch_ipex.tpp_linear(
+                        x, self.weight, self.out_features
+                    )
         else:
             output = torch.ops.torch_ipex.ipex_MKLSGEMM(
                 x,

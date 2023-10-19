@@ -9,7 +9,7 @@ The Implementation is integrated into Intel® Extension for PyTorch\*. BERT coul
 
 ### Prerequisite
 
-- Transformers 4.6.0 ~ 4.20.0
+- Transformers 4.6.0 ~ 4.31.0
 
 ### Usage Example
 
