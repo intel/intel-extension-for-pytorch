@@ -2,8 +2,6 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
-import pytest
-
 
 class TestTorchMethod(TestCase):
     def test_gcd(self, dtype=torch.int):
@@ -26,7 +24,6 @@ class TestTorchMethod(TestCase):
         a_xpu.gcd_(b_xpu)
         self.assertEqual(a_cpu, a_xpu.to("cpu"))
 
-    @pytest.mark.skip("temp skip it which related to GSD-6250")
     def test_lcm(self, dtype=torch.int):
         a_cpu = torch.randint(0, 100000, [100, 100])
         b_cpu = torch.randint(0, 1000, [100])
