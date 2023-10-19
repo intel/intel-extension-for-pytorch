@@ -3,7 +3,6 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
-import pytest
 
 
 cpu_device = torch.device("cpu")
@@ -71,9 +70,6 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu[0], y_dpcpp[0].cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
-    @pytest.mark.skip(
-        "RuntimeError: Unsupport memory format. Supports only ChannelsLast3d, Contiguous for rebase 2.1 without CPU lib"
-    )
     def test_max_pool3d_4D(self, dtype=torch.float):
         x = torch.randn([20, 30, 40, 50])
         grad = torch.randn([20, 30, 40, 50])
@@ -99,10 +95,10 @@ class TestNNMethod(TestCase):
         self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
 
         # 4D channel_last input
-        # CPU
-        input_cpu = x.clone().contiguous(memory_format=mem_format)
+        # NOTE: since PyTorch 2.1, CPU only support ChannelsLast3d and Contiguous
+        input_cpu = x.clone()
         input_cpu.requires_grad_(True)
-        grad_cpu = grad.clone().contiguous(memory_format=mem_format)
+        grad_cpu = grad.clone()
         output_cpu = m(input_cpu)
         output_cpu[0].backward(grad_cpu)
 
