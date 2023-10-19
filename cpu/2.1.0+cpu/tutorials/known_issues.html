@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Troubleshooting &mdash; Intel&amp;#174 Extension for PyTorch* 2.1.0+cpu documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Blogs &amp; Publications" href="blogs_publications.html" />
+    <link rel="prev" title="Releases" href="releases.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                <a href="../../../">2.1.0+cpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Troubleshooting</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#general-usage">General Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#performance-regression">Performance Regression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#torchdynamo">TorchDynamo</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dynamic-shape">Dynamic Shape</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#int8">INT8</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#bfloat16">BFloat16</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#runtime-extension">Runtime Extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#result-correctness">Result Correctness</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#float32-training">Float32 Training</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="llm.html">LLM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Install</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Get Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cheat_sheet.html">Cheat Sheet</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">PERFORMANCE TUNING</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning/tuning_guide.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning/launch_script.html">Launch Script Usage Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning/torchserve.html">TorchServe with Intel® Extension for PyTorch*</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Troubleshooting</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/known_issues.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="troubleshooting">
+<h1>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permalink to this heading"></a></h1>
+<section id="general-usage">
+<h2>General Usage<a class="headerlink" href="#general-usage" title="Permalink to this heading"></a></h2>
+<ul>
+<li><p><strong>Problem</strong>: Issues with the <code class="docutils literal notranslate"><span class="pre">+cpu</span></code> PyTorch package.</p>
+<ul class="simple">
+<li><p><strong>Cause</strong>: Certain Python packages may have PyTorch as a hard dependency. If you installed the <code class="docutils literal notranslate"><span class="pre">+cpu</span></code> version of PyTorch, installation of these packages might replace the <code class="docutils literal notranslate"><span class="pre">+cpu</span></code> version with the default version released on Pypi.org.</p></li>
+<li><p><strong>Solution</strong>: Reinstall the <code class="docutils literal notranslate"><span class="pre">+cpu</span></code> version back.</p></li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: The workload running with Intel® Extension for PyTorch* occupies a remarkably large amount of memory.</p>
+<ul class="simple">
+<li><p><strong>Solution</strong>: Try to reduce the occupied memory size by setting the <code class="docutils literal notranslate"><span class="pre">--weights_prepack</span></code> parameter of the <code class="docutils literal notranslate"><span class="pre">ipex.optimize()</span></code> function to <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: The <code class="docutils literal notranslate"><span class="pre">conv+bn</span></code> folding feature of the <code class="docutils literal notranslate"><span class="pre">ipex.optimize()</span></code> function does not work if inference is done with a custom function:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_pytorch_extension</span> <span class="k">as</span> <span class="nn">ipex</span>
+
+<span class="k">class</span> <span class="nc">Module</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Module</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bn</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm2d</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">relu</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bn</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span>
+
+    <span class="k">def</span> <span class="nf">inference</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">Module</span><span class="p">()</span>
+    <span class="n">m</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s2">&quot;O0&quot;</span><span class="p">)</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">112</span><span class="p">,</span> <span class="mi">112</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+      <span class="n">m</span><span class="o">.</span><span class="n">inference</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><strong>Cause</strong>: PyTorch FX limitation.</p></li>
+<li><p><strong>Solution</strong>: You can avoid this error by calling <code class="docutils literal notranslate"><span class="pre">m</span> <span class="pre">=</span> <span class="pre">ipex.optimize(m,</span> <span class="pre">level=&quot;O0&quot;)</span></code>, which doesn’t apply ipex optimization, or disable <code class="docutils literal notranslate"><span class="pre">conv+bn</span></code> folding by calling <code class="docutils literal notranslate"><span class="pre">m</span> <span class="pre">=</span> <span class="pre">ipex.optimize(m,</span> <span class="pre">level=&quot;O1&quot;,</span> <span class="pre">conv_bn_folding=False)</span></code>.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="performance-regression">
+<h2>Performance Regression<a class="headerlink" href="#performance-regression" title="Permalink to this heading"></a></h2>
+<ul class="simple">
+<li><p>Some models may experience performance regression comparing to 2.0.x due to deprecation of the NNC feature in PyTorch*.</p></li>
+</ul>
+</section>
+<section id="torchdynamo">
+<h2>TorchDynamo<a class="headerlink" href="#torchdynamo" title="Permalink to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Problem</strong>: A workload that uses <code class="docutils literal notranslate"><span class="pre">torch.compile()</span></code> fails to run or demonstrates poor performance.</p>
+<ul>
+<li><p><strong>Cause</strong>: The support of <code class="docutils literal notranslate"><span class="pre">torch.compile()</span></code> with <code class="docutils literal notranslate"><span class="pre">ipex</span></code> as the backend is still an experimental feature. Currently, the following HuggingFace models fail to run using <code class="docutils literal notranslate"><span class="pre">torch.compile()</span></code> with <code class="docutils literal notranslate"><span class="pre">ipex</span></code> backend due to memory issues:</p>
+<ul>
+<li><p>masked-language-modeling+xlm-roberta-base</p></li>
+<li><p>casual-language-modeling+gpt2</p></li>
+<li><p>casual-language-modeling+xlm-roberta-base</p></li>
+<li><p>summarization+t5-base</p></li>
+<li><p>text-classification+allenai-longformer-base-409</p></li>
+</ul>
+</li>
+<li><p><strong>Solution</strong>: Use the <code class="docutils literal notranslate"><span class="pre">torch.jit</span></code> APIs and graph optimization APIs of the Intel® Extension for PyTorch*.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="dynamic-shape">
+<h2>Dynamic Shape<a class="headerlink" href="#dynamic-shape" title="Permalink to this heading"></a></h2>
+<ul>
+<li><p><strong>Problem</strong>: When working with an NLP model inference with dynamic input data length using TorchScript (either <code class="docutils literal notranslate"><span class="pre">torch.jit.trace</span></code> or <code class="docutils literal notranslate"><span class="pre">torch.jit.script</span></code>), performance with Intel® Extension for PyTorch* may be less than that without Intel®
+Extension for PyTorch*.</p>
+<ul>
+<li><p><strong>Solution</strong>: Use the workaround below:</p>
+<ul>
+<li><p>Python interface</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_jit_set_texpr_fuser_enabled</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p>C++ interface</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;torch/csrc/jit/passes/tensorexpr_fuser.h&gt;</span>
+<span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">setTensorExprFuserEnabled</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="int8">
+<h2>INT8<a class="headerlink" href="#int8" title="Permalink to this heading"></a></h2>
+<ul>
+<li><p><strong>Problem</strong>: Limitations of dynamic shapes support of static quantization:</p>
+<ul class="simple">
+<li><p>When an input shape is provided in runtime for the first time, execution could take longer time to compile a new kernel for this shape. Specifically, the new kernel compilation time could be long for complicated kernels.</p></li>
+<li><p>Channels Last format won’t take effect with dynamic input shapes for CNN models at this time. Optimizations are undergoing.</p></li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: <code class="docutils literal notranslate"><span class="pre">RuntimeError:</span> <span class="pre">Overflow</span> <span class="pre">when</span> <span class="pre">unpacking</span> <span class="pre">long</span></code> when a tensor’s min max value exceeds int range while performing int8 calibration.</p>
+<ul class="simple">
+<li><p><strong>Solution</strong>: Customize <code class="docutils literal notranslate"><span class="pre">QConfig</span></code> to use min-max calibration method.</p></li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: Models get large accuracy loss with the default quantization recipe.</p>
+<ul class="simple">
+<li><p><strong>Solution</strong>: Try using the <a class="reference internal" href="features/int8_recipe_tuning_api.html"><span class="doc">the INT8 Recipe Tuning API</span></a> to tune a recipe with satisfied accuracy loss.</p></li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: Incorrect results with large tensors when calibrating with <code class="docutils literal notranslate"><span class="pre">quantize_per_tensor</span></code>, when benchmarking with 1 OpenMP* thread (find more detailed info <a class="reference external" href="https://github.com/pytorch/pytorch/issues/80501">here</a>.</p>
+<ul>
+<li><p><strong>Solution</strong>: Editing your code following the pseudocode below can workaround this issue, if you do need to explicitly set <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREAEDS=1</span></code> for benchmarking. However, there could be a performance regression if oneDNN graph compiler prototype feature is used.</p>
+<p>Workaround pseudocode:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># perform convert/trace/freeze with omp_num_threads &gt; 1(N)</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">set_num_threads</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
+<span class="n">prepared_model</span> <span class="o">=</span> <span class="n">prepare</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">input</span><span class="p">)</span>
+<span class="n">converted_model</span> <span class="o">=</span> <span class="n">convert</span><span class="p">(</span><span class="n">prepared_model</span><span class="p">)</span>
+<span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">converted_model</span><span class="p">,</span> <span class="nb">input</span><span class="p">)</span>
+<span class="n">freezed_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">traced_model</span><span class="p">)</span>
+<span class="c1"># run freezed model to apply optimization pass</span>
+<span class="n">freezed_model</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+
+<span class="c1"># benchmarking with omp_num_threads = 1</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">set_num_threads</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">run_benchmark</span><span class="p">(</span><span class="n">freezed_model</span><span class="p">,</span> <span class="nb">input</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</li>
+<li><p>For models with dynamic control flow, please try dynamic quantization. Users are likely to get performance gain for GEMM models.</p></li>
+<li><p>Support for <code class="docutils literal notranslate"><span class="pre">EmbeddingBag</span></code> with INT8 when bag size &gt; 1 is work in progress.</p></li>
+</ul>
+</section>
+<section id="bfloat16">
+<h2>BFloat16<a class="headerlink" href="#bfloat16" title="Permalink to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Problem</strong>: BF16 AMP(auto-mixed-precision) runs abnormally with the extension on the AVX2-only machine if the topology contains <code class="docutils literal notranslate"><span class="pre">Conv</span></code>, <code class="docutils literal notranslate"><span class="pre">Matmul</span></code>, <code class="docutils literal notranslate"><span class="pre">Linear</span></code>, and <code class="docutils literal notranslate"><span class="pre">BatchNormalization</span></code>.</p>
+<ul>
+<li><p><strong>Solution</strong>: TBD</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="runtime-extension">
+<h2>Runtime Extension<a class="headerlink" href="#runtime-extension" title="Permalink to this heading"></a></h2>
+<p>The following limitations currently exist:</p>
+<ul class="simple">
+<li><p>Runtime extension of <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> does not support DLRM inference, since the input of DLRM (EmbeddingBag specifically) cannot be simply batch split.</p></li>
+<li><p>Runtime extension of <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> has poor performance of RNNT Inference comparing with native throughput mode. Only part of the RNNT models (<code class="docutils literal notranslate"><span class="pre">joint_net</span></code> specifically) can be jit traced into graph. However, in one batch inference, <code class="docutils literal notranslate"><span class="pre">joint_net</span></code> is invoked multiple times. It increases the overhead of <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> as input batch split, thread synchronization and output concat.</p></li>
+</ul>
+</section>
+<section id="result-correctness">
+<h2>Result Correctness<a class="headerlink" href="#result-correctness" title="Permalink to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Problem</strong>: Incorrect Conv and Linear result if the number of OMP threads is changed at runtime.</p>
+<ul>
+<li><p><strong>Cause</strong>: The oneDNN memory layout depends on the number of OMP threads, which requires the caller to detect the changes for the # of OMP threads while this release has not implemented it yet.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="float32-training">
+<h2>Float32 Training<a class="headerlink" href="#float32-training" title="Permalink to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Problem</strong>: Low throughput with DLRM FP32 Train.</p>
+<ul>
+<li><p><strong>Solution</strong>: A ‘Sparse Add’ <a class="reference external" href="https://github.com/pytorch/pytorch/pull/23057">PR</a> is pending on review. The issue will be fixed when the PR is merged.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="releases.html" class="btn btn-neutral float-left" title="Releases" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="blogs_publications.html" class="btn btn-neutral float-right" title="Blogs &amp; Publications" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7ff5f9e20a90> 
+  <p>*Other names and brands may be claimed as the property of others. <a href="http://www.intel.com/content/www/us/en/legal/trademarks.html">Trademarks</a></p>
+  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a></div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

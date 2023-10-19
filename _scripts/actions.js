@@ -164,6 +164,7 @@ $(document).ready(function() {
     if(data.system_requirements != null) {
       ret += "<div class=\"simple\">";
       ret += "<h2>" + $.secid_gen([indexa]) + "System Requirements</h2>";
+      ret += "<p>Make sure that your system complies with the following system requirements:</p>";
 
       var indexb = 1;
       if(data.system_requirements.hardware != null) {
@@ -171,7 +172,6 @@ $(document).ready(function() {
         ret += "<h3>" + $.secid_gen([indexa, indexb]) + "Hardware</h3>";
 
         if(data.system_requirements.hardware.support != null) { // Array of text
-          ret += "<p><strong>Support:</strong></p>";
           ret += $.ul_gen(data.system_requirements.hardware.support);
         }
         if(data.system_requirements.hardware.verified != null) { // Array of text
@@ -308,6 +308,9 @@ $(document).ready(function() {
           ret += $.notes_gen(data.installation.notes);
         var indexb = 0;
         if(data.installation.repos != null) {
+          if(data.installation.repos.length > 1) {
+            ret += "<p>Prebuilt wheel files are provided via multiple channels. You can choose either to install the packages.</p>";
+          }
           $.each(data.installation.repos, function(index, value) {
             ret += "<div class=\"simple\">";
             if(value.repo != null) {
@@ -351,10 +354,10 @@ $(document).ready(function() {
           ret += $.notes_gen(data.installation.notes);
         if(data.installation.aot != null)
           ret += $.notes_gen(["Refer to <a class=\"reference external\" href=\"" + data.installation.aot + "\">AOT documentation</a> for how to configure <cite>USE_AOT_DEVLIST</cite>. Without configuring AOT, the start-up time for processes using Intel® Extension for PyTorch* will be long, so this step is important."]);
-        ret += "<p>To ensure a smooth compilation, a script is provided in the Github repo. If you would like to compile the binaries from source, it is highly recommended to utilize this script.</p>";
+        ret += "<p>To ensure a smooth compilation, a script is provided. If you would like to compile the binaries from source, it is highly recommended to utilize this script.</p>";
         if(data.installation.commands != null)
           ret += $.code_gen(data.installation.commands);
-        ret += "<p>When compilation succeeds, directory structure should look like what is shown below.</p>";
+        ret += "<p>An example usage flow of this script is shown as below. After a successful compilation, you should see similar directory structure.</p>";
         if(data.installation.outputs != null)
           ret += $.code_gen(data.installation.outputs);
       } else if(data.package == "docker") {
@@ -446,16 +449,15 @@ $(document).ready(function() {
             });
             ret += "</div>";
           }
-
-        }
-        if(data.installation.commands != null) {
-          $.each(data.installation.commands, function(index, value) {
-            var cmds = [];
-            $.each(value.commands, function(index, v) {
-              cmds.push(v);
+          if(data.installation.commands != null) {
+            $.each(data.installation.commands, function(index, value) {
+              var cmds = [];
+              $.each(value.commands, function(index, v) {
+                cmds.push(v);
+              });
+              ret += $.notes_gen([value.usage + $.code_gen(cmds)], "Usage");
             });
-            ret += $.notes_gen([value.usage + $.code_gen(cmds)], "Usage");
-          });
+          }
         }
       } else {
         // Do nothing
@@ -472,15 +474,19 @@ $(document).ready(function() {
       if(data.system_requirements.software.basekit != null &&
          data.preparation.basekit.install != null &&
          !$.pkgInArray(data.package, ["docker"])) {
-        ret += "<p>You can run a simple sanity test to double confirm if the correct version is installed, and if the software stack can get correct hardware information onboard your system.</p>";
+        ret += "<p>You can run a simple sanity test to double confirm if the correct version is installed, and if the software stack can get correct hardware information onboard your system. The command should return PyTorch* and Intel® Extension for PyTorch* versions installed, as well as GPU card(s) information detected.</p>";
         $.each(data.preparation.basekit.install, function(index, value) {
           commands.push(value.env);
         });
       } else {
-        ret += "<p>You can run a simple sanity test to double confirm if the correct version is installed.</p>";
+        ret += "<p>You can run a simple sanity test to double confirm if the correct version is installed. The command should return PyTorch* and Intel® Extension for PyTorch* versions installed.</p>";
       }
       commands.push(data.sanity_test);
       ret += $.code_gen(commands);
+      m = data.version.match("v([0-9\\.]+\\+([a-zA-Z]+))");
+      if(m != null && m.length == 3) {
+        ret += "<p>Once installation succeeds, visit <a href=\"./" + m[2] + "/" + m[1] + "/tutorials/getting_started.html\">Get Started</a> and <a href=\"./" + m[2] + "/" + m[1] + "/tutorials/examples.html\">Examples</a> sections to start using the extension in your code.</p>";
+      }
       ret += "</div>";
       indexa += 1;
     } else {
