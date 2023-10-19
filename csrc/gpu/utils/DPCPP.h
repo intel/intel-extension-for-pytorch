@@ -270,6 +270,8 @@ using dpcpp_dev_ext_intel_gpu_hw_threads_per_eu =
     sycl::ext::intel::info::device::gpu_hw_threads_per_eu;
 using dpcpp_dev_ext_intel_gpu_eu_count =
     sycl::ext::intel::info::device::gpu_eu_count;
+using dpcpp_dev_ext_intel_gpu_eu_count_per_subslice =
+    sycl::ext::intel::info::device::gpu_eu_count_per_subslice;
 
 // aspects for extensions
 static constexpr auto dpcpp_dev_aspect_gpu_eu_simd_width =
@@ -278,6 +280,8 @@ static constexpr auto dpcpp_dev_aspect_hw_threads_per_eu =
     sycl::aspect::ext_intel_gpu_hw_threads_per_eu;
 static constexpr auto dpcpp_dev_aspect_gpu_eu_count =
     sycl::aspect::ext_intel_gpu_eu_count;
+static constexpr auto dpcpp_dev_aspect_gpu_eu_count_per_subslice =
+    sycl::aspect::ext_intel_gpu_eu_count_per_subslice;
 static constexpr auto dpcpp_dev_aspect_fp64 = sycl::aspect::fp64;
 static constexpr auto dpcpp_dev_aspect_atomic64 = sycl::aspect::atomic64;
 

@@ -585,6 +585,7 @@ static void register_xpu_device_info(PyObject* module) {
       .def_readonly("total_memory", &DeviceInfo::global_mem_size)
       .def_readonly("max_compute_units", &DeviceInfo::max_compute_units)
       .def_readonly("gpu_eu_count", &DeviceInfo::gpu_eu_count)
+      .def_readonly("gpu_subslice_count", &DeviceInfo::gpu_subslice_count)
       .def_readonly("max_work_group_size", &DeviceInfo::max_work_group_size)
       .def_readonly("max_num_sub_groups", &DeviceInfo::max_num_sub_groups)
       .def_readonly("sub_group_sizes", &DeviceInfo::sub_group_sizes)
