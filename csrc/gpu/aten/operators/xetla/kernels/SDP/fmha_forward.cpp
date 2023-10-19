@@ -696,9 +696,6 @@ void fmha_forward_impl(
   sycl::nd_range<3> NdRange =
       fmha_forward_op_t::get_nd_range(num_batches * num_heads, num_queries);
 
-  //  auto event = q.submit([&](sycl::handler& cgh) {
-  //    cgh.parallel_for<
-  //        class FmhaForwardKernel<fmha_policy, T, kUseBias, kUseDropout>>(
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(NdRange, [=](sycl::nd_item<3> item) SYCL_ESIMD_KERNEL {
       // exec item
@@ -724,25 +721,8 @@ void fmha_forward_impl(
       fmha_fwd_op(ei, &args);
     });
   };
+
   DPCPP_Q_SUBMIT(q, cgf);
-  // event.wait();
-  //  double time =
-  //      (event.template get_profiling_info<
-  //           sycl::info::event_profiling::command_end>() -
-  //       event.template get_profiling_info<
-  //           sycl::info::event_profiling::command_start>());
-  //  uint64_t ops = num_batches * num_heads *
-  //      uint64_t(head_size * num_queries * num_keys) * 2L * 2L;
-  //  double tflops = (ops / 1024.0f / 1024.0f / 1024.0f / 1024.0f) / (time
-  //  / 1e9); printf(
-  //      "B, N, F, T, H: %d, %d, %d, %d, %d, time: %f us, tflops: %f\n",
-  //      num_batches,
-  //      num_heads,
-  //      num_queries,
-  //      num_keys,
-  //      head_size,
-  //      time / 1e3,
-  //      tflops);
 }
 
 } // namespace

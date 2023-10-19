@@ -165,7 +165,7 @@ void renorm_kernel(
   };
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  dpcpp_queue.submit(cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 } // namespace impl

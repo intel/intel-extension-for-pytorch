@@ -134,7 +134,7 @@ void segment_reduce_forward_kernel(
   };
 
   auto& dpcpp_queue = xpu::dpcpp::dpcppGetCurrentQueue();
-  dpcpp_queue.submit(cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename scalar_t, typename index_t>
@@ -263,7 +263,7 @@ void segment_reduce_backward_kernel(
   };
 
   auto& dpcpp_queue = xpu::dpcpp::dpcppGetCurrentQueue();
-  dpcpp_queue.submit(cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 SegmentReductionType get_reduction_enum(const c10::string_view& reduce) {
