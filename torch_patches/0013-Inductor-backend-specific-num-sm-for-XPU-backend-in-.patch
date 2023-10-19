@@ -1,0 +1,53 @@
+From 00f48b6ff7b342a322098dbeec0b9488f52823df Mon Sep 17 00:00:00 2001
+From: Feng Yuan <feng1.yuan@intel.com>
+Date: Thu, 19 Oct 2023 09:49:25 +0800
+Subject: [PATCH 13/13] [Inductor] backend specific num sm for XPU backend in
+ Triton reduction kernel (#176)
+
+Signed-off-by: Feng Yuan <feng1.yuan@intel.com>
+---
+ torch/_inductor/ir.py | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/torch/_inductor/ir.py b/torch/_inductor/ir.py
+index d66a5f4a280..6589bd1055e 100644
+--- a/torch/_inductor/ir.py
++++ b/torch/_inductor/ir.py
+@@ -256,10 +256,18 @@ def get_device_type(x):
+     return None
+ 
+ 
+-def is_triton(x):
++def is_cuda(x):
+     return get_device_type(x) == "cuda"
+ 
+ 
++def is_xpu(x):
++    return get_device_type(x) == "xpu"
++
++
++def is_triton(x):
++    return is_cuda(x) or is_xpu(x)
++
++
+ def is_cpu(x):
+     return get_device_type(x) == "cpu"
+ 
+@@ -632,9 +640,11 @@ class Reduction(Loops):
+             return ReductionHint.DEFAULT, 1
+ 
+         device_interface = get_interface_for_device(get_device_type(device))
+-        num_sm = device_interface.Worker.get_device_properties(
+-            device
+-        ).multi_processor_count
++        device_properties = device_interface.Worker.get_device_properties(device)
++        if is_cuda(device):
++            num_sm = device_properties.multi_processor_count
++        elif is_xpu(device):
++            num_sm = device_properties.gpu_subslice_count
+         min_elements_per_thread = 32
+         max_elements_per_thread = 512
+         threads_per_sm = 2048
+-- 
+2.34.1
+
