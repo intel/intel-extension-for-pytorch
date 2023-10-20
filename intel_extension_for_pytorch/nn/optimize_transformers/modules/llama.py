@@ -28,10 +28,11 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
                  dtype = "fp16",
                  device = "xpu",
                  module_name = "",
+                 impl_mode = None,
                  tp_size = 1, 
                  tp_group = None):
         super().__init__(module, config, dtype, device, module_name)
-        self.ipex_config = self.build_ipex_transformer_config(config, device, dtype, tp_size, tp_group)
+        self.ipex_config = self.build_ipex_transformer_config(config, device, dtype, impl_mode, tp_size, tp_group)
         self.attn = self.build_attention_from_config()
         self.mlp = self.build_mlp_from_config()
         self.input_layernorm = LlamaRMSNorm(self.ipex_config.embedding_dim, self.ipex_config.norm_eps)
@@ -67,6 +68,7 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
                                       config,
                                       device,
                                       dtype,
+                                      impl_mode,
                                       tp_size,
                                       tp_group) -> IPEXTransformerConfig:
         activation_function = self.config.hidden_act
@@ -106,6 +108,7 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
             positional_embedding_base = 10000,
             device = self.device,
             dtype = dtype,
+            impl = impl_mode,
             tp_size = tp_size,
             tp_group = tp_group
         )

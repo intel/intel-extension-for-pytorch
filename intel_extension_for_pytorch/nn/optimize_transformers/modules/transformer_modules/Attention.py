@@ -8,23 +8,9 @@ import os
 import math
 from dataclasses import dataclass
 from .NaiveAttention import IPEXTransformerAttnNaive
-from .BaseAttention import IPEXTransformerAttn
+from .BaseAttention import IPEXTransformerAttn, IPEXRuntimeAttnCache
 from .Linear import matmul_add_add
 
-
-
-@dataclass
-class IPEXRuntimeAttnCache:
-    key_cache:   torch.Tensor = None
-    value_cache: torch.Tensor = None
-    key_prompt:  torch.Tensor = None
-    value_prompt:torch.Tensor = None
-
-    def clear_cache(self):
-        self.key_cache    = None
-        self.value_cache  = None
-        self.key_prompt   = None
-        self.value_prompt = None
 
 
 class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):

@@ -6,7 +6,22 @@ from typing import Optional, Tuple, Union
 from .Activation import ACT2FN
 import os
 import math
-import dataclasses
+from dataclasses import dataclass
+
+
+
+@dataclass
+class IPEXRuntimeAttnCache:
+    key_cache:   torch.Tensor = None
+    value_cache: torch.Tensor = None
+    key_prompt:  torch.Tensor = None
+    value_prompt:torch.Tensor = None
+
+    def clear_cache(self):
+        self.key_cache    = None
+        self.value_cache  = None
+        self.key_prompt   = None
+        self.value_prompt = None
 
 
 class IPEXTransformerAttn(nn.Module):

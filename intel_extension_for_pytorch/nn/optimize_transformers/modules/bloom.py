@@ -29,10 +29,11 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
                  dtype="fp16",
                  device="xpu",
                  module_name="",
+                 impl_mode = None,
                  tp_size=1,
                  tp_group=None):
         super().__init__(module, config, dtype, device, module_name)
-        self.ipex_config = self.build_ipex_transformer_config(config, device, dtype, tp_size, tp_group)
+        self.ipex_config = self.build_ipex_transformer_config(config, device, dtype, impl_mode, tp_size, tp_group)
         self.attn = self.build_attention_from_config()
         self.mlp = self.build_mlp_from_config()
         self.input_layernorm = nn.LayerNorm(self.ipex_config.embedding_dim, eps=self.ipex_config.norm_eps)
@@ -43,6 +44,7 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
                                       config,
                                       device,
                                       dtype,
+                                      impl_mode,
                                       tp_size,
                                       tp_group):
         activation_function = "bloom_gelu"
@@ -75,6 +77,7 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
             do_norm_before = self.config.apply_residual_connection_post_layernorm,
             ln_elementwise_affine = None,
             dtype = dtype,
+            impl = impl_mode,
             tp_size = tp_size,
             tp_group = tp_group
         )

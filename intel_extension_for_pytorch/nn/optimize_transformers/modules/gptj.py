@@ -13,7 +13,9 @@ from ._transformer_configuration import IPEXTransformerConfig, SupportedActivati
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from .transformer_modules.Decoderblock import IPEXTransformerBlock
 import sys
+import intel_extension_for_pytorch as ipex
 
+enable_naive_path = os.environ.get("ENABLE_NAIVE_PATH", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
 acc_test = os.environ.get("LLM_ACC_TEST", "OFF").upper() in ["1", "ON", "Y", "YES", "TRUE"]
 class NewIPEXGPTJBlock(IPEXTransformerBlock):
     def __init__(self,
@@ -22,10 +24,11 @@ class NewIPEXGPTJBlock(IPEXTransformerBlock):
                  dtype = "fp16",
                  device = "xpu",
                  module_name = "",
+                 impl_mode = None,
                  tp_size = 1, 
                  tp_group = None):
         super().__init__(module, config, dtype, device, module_name)
-        self.ipex_config = self.build_ipex_transformer_config(config, device, dtype, tp_size, tp_group)
+        self.ipex_config = self.build_ipex_transformer_config(config, device, dtype, impl_mode, tp_size, tp_group)
         self.attn = self.build_attention_from_config()
         self.mlp = self.build_mlp_from_config()
         self.ln = nn.LayerNorm(self.ipex_config.embedding_dim, eps=self.ipex_config.norm_eps)
@@ -61,6 +64,7 @@ class NewIPEXGPTJBlock(IPEXTransformerBlock):
                                       config,
                                       device,
                                       dtype,
+                                      impl_mode,
                                       tp_size,
                                       tp_group) -> IPEXTransformerConfig:
         activation_function = self.config.activation_function
@@ -90,6 +94,7 @@ class NewIPEXGPTJBlock(IPEXTransformerBlock):
             residual_pdrop = self.config.resid_pdrop,
             scale_attention = True,
             dtype = dtype,
+            impl = impl_mode,
             tp_size = tp_size,
             tp_group = tp_group
         )
@@ -139,6 +144,7 @@ class NewIPEXGPTJBlock(IPEXTransformerBlock):
             print("Unsupported input shape")
             return
         IPEXTransformerAttn.beam_size = beam
+        IPEXTransformerMLP.beam_size = beam
         first_token = True if seq > 1 else False
         hidden_size = hidden_states.shape[-1]
         hidden_shape = [bs, beam, seq, hidden_size]
@@ -178,9 +184,9 @@ class NewIPEXGPTJBlock(IPEXTransformerBlock):
             # for 1st token, expand the result with beam
             hidden_states = hidden_states.view(bs, 1, seq, hidden_size)
             hidden_states = hidden_states.expand([bs, beam, seq, hidden_size])
-        else:
-            # for 2nd to last token, we convert the layout back
-            # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
+        elif ipex._C._has_2d_block_array(0) and not enable_naive_path or beam > 1:
+        #     # for 2nd to last token, we convert the layout back
+        #     # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
             hidden_states = hidden_states.transpose(0, 1)
 
         if use_cache:
