@@ -485,7 +485,7 @@ def optimize_transformers(
             It means there is no need to further apply optimization like torchscirpt. Default value is ``True``.
 
     Returns:
-        optimized model object for model.generate(), also workable with model.forward
+        Optimized model object for model.generate(), also workable with model.forward
 
     .. warning::
         Please invoke ``optimize_transformers`` function AFTER invoking DeepSpeed in Tensor Parallel

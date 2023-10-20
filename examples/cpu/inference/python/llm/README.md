@@ -49,7 +49,7 @@ pip install neural-compressor==2.3.1
 # [Optional] The following is only for DeepSpeed case
 #Install oneccl-bind-pt(also named torch-ccl)
 git clone https://github.com/intel/torch-ccl.git
-cd torch-ccl && git checkout ccl_torch_dev_0905
+cd torch-ccl && git checkout v2.1.0+cpu
 git submodule sync && git submodule update --init --recursive
 python setup.py install
 cd ../

@@ -6,6 +6,8 @@ Intel® Extension for PyTorch\* provides optimizations for both eager mode and g
 
 The extension can be loaded as a Python module for Python programs or linked as a C++ library for C++ programs. In Python scripts users can enable it dynamically by importing `intel_extension_for_pytorch`.
 
+In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Starting from 2.1.0, specific optimizations for certain LLM models are introduced in the Intel® Extension for PyTorch\*. Check [LLM optimizations](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/llm.html) for details.
+
 * Check [CPU tutorial](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® CPUs. Source code is available at the [master branch](https://github.com/intel/intel-extension-for-pytorch/tree/master).
 * Check [GPU tutorial](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® GPUs. Source code is available at the [xpu-master branch](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-master).
 
@@ -49,6 +51,8 @@ Minor code changes are required for users to get start with Intel® Extension fo
 
 The following code snippet shows an inference code with FP32 data type. More examples on CPU, including training and C++ examples, are available at [CPU Example page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/examples.html). More examples on GPU are available at [GPU Example page](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/examples.html).
 
+**NOTE:** More detailed information about `torch.compile()` with `ipex` backend can be found at [Tutorial features page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/features.html#torch-compile-experimental-new-feature-from-2-0-0).
+
 ### Inference on CPU
 
 ```python
@@ -87,7 +91,7 @@ with torch.no_grad():
 
 ## Model Zoo
 
-Use cases that had already been optimized by Intel engineers are available at [Model Zoo for Intel® Architecture](https://github.com/IntelAI/models/tree/pytorch-r2.0-models). A bunch of PyTorch use cases for benchmarking are also available on the [Github page](https://github.com/IntelAI/models/tree/pytorch-r2.0-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running scipts in the Model Zoo.
+Use cases that had already been optimized by Intel engineers are available at [Model Zoo for Intel® Architecture](https://github.com/IntelAI/models/tree/pytorch-r2.1-models). A bunch of PyTorch use cases for benchmarking are also available on the [Github page](https://github.com/IntelAI/models/tree/pytorch-r2.1-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running scipts in the Model Zoo.
 
 ## License
 

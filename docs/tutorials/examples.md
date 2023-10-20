@@ -1,20 +1,40 @@
 Examples
 ========
 
-**_NOTE:_** Check individual feature page for examples of feature usage. All features are listed in the [feature page](./features.rst).
+These examples will guide you through using the Intel® Extension for PyTorch\* on Intel CPUs.
 
-**_NOTE:_** Feature examples and examples below are available at Github source tree, under `examples` directory.
+You can also refer to the [Features](./features.rst) section to get the examples and usage instructions related to particular features.
 
-## Training
+The source code for these examples, as well as the feature examples, can be found in the GitHub source tree under the `examples` directory.
 
-### Single-instance Training
+- [Python](#python) examples demonstrate usage of Python APIs:
 
-#### Code Changes Highlight
+  - [Training](#training)
+  - [Inference](#inference)
 
-There is only a line of code change required to use Intel® Extension for PyTorch\* on training, as shown:
-1. `ipex.optimize` function applies optimizations against the model object, as well as an optimizer object.
+- [C++](#c) examples demonstrate usage of C++ APIs
+- [Intel® AI Reference Models](#intel-ai-reference-models) provide out-of-the-box use cases, demonstrating the performance benefits achievable with Intel Extension for PyTorch\*
 
-```
+**Prerequisites**:
+Before running these examples, please note the following:
+
+- To run the examples, install the `torchvision` and `transformers` Python packages.
+- Examples using the BFloat16 data type require machines with the  Intel® Advanced Vector Extensions 512 (Intel® AVX-512) BF16 and Intel® Advanced Matrix Extensions (Intel® AMX) BF16 instruction sets.
+
+
+## Python
+
+### Training
+
+#### Single-instance Training
+
+To use Intel® Extension for PyTorch\* on training, you need to make the following changes in your code:
+
+1. Import `intel_extension_for_pytorch` as `ipex`.
+2. Invoke the `ipex.optimize` function to apply optimizations against the model and optimizer objects, as shown below:
+
+
+```python
 ...
 import torch
 import intel_extension_for_pytorch as ipex
@@ -27,30 +47,34 @@ model.train()
 model, optimizer = ipex.optimize(model, optimizer=optimizer)
 # For BFloat16
 model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
+# Invoke the code below to enable experimental feature torch.compile
+model = torch.compile(model, backend="ipex")
 ...
 optimizer.zero_grad()
 output = model(data)
 ...
 ```
 
-#### Complete - Float32
+Below you can find complete code examples demonstrating how to use the extension on training for different data types:
+
+##### Float32
 
 [//]: # (marker_train_single_fp32_complete)
 [//]: # (marker_train_single_fp32_complete)
 
-#### Complete - BFloat16
+##### BFloat16
 
 [//]: # (marker_train_single_bf16_complete)
 [//]: # (marker_train_single_bf16_complete)
 
-### Distributed Training
+#### Distributed Training
 
-Distributed training with PyTorch DDP is accelerated by oneAPI Collective Communications Library Bindings for Pytorch\* (oneCCL Bindings for Pytorch\*). The extension supports FP32 and BF16 data types. More detailed information and examples are available at its [Github repo](https://github.com/intel/torch-ccl).
+Distributed training with PyTorch DDP is accelerated by oneAPI Collective Communications Library Bindings for Pytorch\* (oneCCL Bindings for Pytorch\*). The extension supports FP32 and BF16 data types. More detailed information and examples are available at the [Github repo](https://github.com/intel/torch-ccl).
 
 **Note:** When performing distributed training with BF16 data type, use oneCCL Bindings for Pytorch\*. Due to a PyTorch limitation, distributed training with BF16 data type with Intel® Extension for PyTorch\* is not supported.
 
 [//]: # (marker_train_ddp_complete)
-```
+```python
 import os
 import torch
 import torch.distributed as dist
@@ -109,93 +133,105 @@ torch.save({
 ```
 [//]: # (marker_train_ddp_complete)
 
-## Inference
+### Inference
 
 The `optimize` function of Intel® Extension for PyTorch\* applies optimizations to the model, bringing additional performance boosts. For both computer vision workloads and NLP workloads, we recommend applying the `optimize` function against the model object.
 
-### Float32
+#### Float32
 
-#### Imperative Mode
+##### Imperative Mode
 
-##### Resnet50
+###### Resnet50
 
 [//]: # (marker_inf_rn50_imp_fp32)
 [//]: # (marker_inf_rn50_imp_fp32)
 
-##### BERT
+###### BERT
 
 [//]: # (marker_inf_bert_imp_fp32)
 [//]: # (marker_inf_bert_imp_fp32)
 
-#### TorchScript Mode
+##### TorchScript Mode
 
-We recommend you take advantage of Intel® Extension for PyTorch\* with [TorchScript](https://pytorch.org/docs/stable/jit.html) for further optimizations.
+We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://pytorch.org/docs/stable/jit.html) for further optimizations.
 
-##### Resnet50
+###### Resnet50
 
 [//]: # (marker_inf_rn50_ts_fp32)
 [//]: # (marker_inf_rn50_ts_fp32)
 
-##### BERT
+###### BERT
 
 [//]: # (marker_inf_bert_ts_fp32)
 [//]: # (marker_inf_bert_ts_fp32)
 
-#### TorchDynamo Mode (Experimental, _NEW feature from 2.0.0_)
+##### TorchDynamo Mode (Experimental, _NEW feature from 2.0.0_)
 
-##### Resnet50
+###### Resnet50
 
 [//]: # (marker_inf_rn50_dynamo_fp32)
 [//]: # (marker_inf_rn50_dynamo_fp32)
 
-##### BERT
+###### BERT
 
 [//]: # (marker_inf_bert_dynamo_fp32)
 [//]: # (marker_inf_bert_dynamo_fp32)
 
-### BFloat16
+#### BFloat16
 
-Similar to running with FP32, the `optimize` function also works for BFloat16 data type. The only difference is setting `dtype` parameter to `torch.bfloat16`.
+The `optimize` function works for both Float32 and BFloat16 data type. For BFloat16 data type, set the `dtype` parameter to `torch.bfloat16`.
 We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.
 
-#### Imperative Mode
+##### Imperative Mode
 
-##### Resnet50
+###### Resnet50
 
 [//]: # (marker_inf_rn50_imp_bf16)
 [//]: # (marker_inf_rn50_imp_bf16)
 
-##### BERT
+###### BERT
 
 [//]: # (marker_inf_bert_imp_bf16)
 [//]: # (marker_inf_bert_imp_bf16)
 
-#### TorchScript Mode
+##### TorchScript Mode
 
-We recommend you take advantage of Intel® Extension for PyTorch\* with [TorchScript](https://pytorch.org/docs/stable/jit.html) for further optimizations.
+We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://pytorch.org/docs/stable/jit.html) for further optimizations.
 
-##### Resnet50
+###### Resnet50
 
 [//]: # (marker_inf_rn50_ts_bf16)
 [//]: # (marker_inf_rn50_ts_bf16)
 
-##### BERT
+###### BERT
 
 [//]: # (marker_inf_bert_ts_bf16)
 [//]: # (marker_inf_bert_ts_bf16)
 
-### Fast Bert (*Experimental*)
+##### TorchDynamo Mode (Experimental, _NEW feature from 2.0.0_)
+
+###### Resnet50
+
+[//]: # (marker_inf_rn50_dynamo_bf16)
+[//]: # (marker_inf_rn50_dynamo_bf16)
+
+###### BERT
+
+[//]: # (marker_inf_bert_dynamo_bf16)
+[//]: # (marker_inf_bert_dynamo_bf16)
+
+#### Fast Bert (*Experimental*)
 
 [//]: # (marker_inf_bert_fast_bf16)
 [//]: # (marker_inf_bert_fast_bf16)
 
-### INT8
+#### INT8
 
 Starting from Intel® Extension for PyTorch\* 1.12.0, quantization feature supports both static and dynamic modes.
 
-#### Calibration
+##### Calibration
 
-##### Static Quantization
+###### Static Quantization
 
 Please follow the steps below to perform static calibration:
 
@@ -211,7 +247,7 @@ Please follow the steps below to perform static calibration:
 [//]: # (marker_int8_static)
 [//]: # (marker_int8_static)
 
-##### Dynamic Quantization
+###### Dynamic Quantization
 
 Please follow the steps below to perform static calibration:
 
@@ -226,7 +262,7 @@ Please follow the steps below to perform static calibration:
 [//]: # (marker_int8_dynamic)
 [//]: # (marker_int8_dynamic)
 
-#### Deployment
+##### Deployment
 
 For deployment, the INT8 model is loaded from the local file and can be used directly on the inference.
 
@@ -273,8 +309,8 @@ If *Found IPEX* is shown as with a dynamic library path, the extension had been 
 
 ```bash
 $ cmake -DCMAKE_PREFIX_PATH=/workspace/libtorch ..
--- The C compiler identification is GNU 11.2.1
--- The CXX compiler identification is GNU 11.2.1
+-- The C compiler identification is GNU XX.X.X
+-- The CXX compiler identification is GNU XX.X.X
 -- Detecting C compiler ABI info
 -- Detecting C compiler ABI info - done
 -- Check for working C compiler: /usr/bin/cc - skipped
@@ -310,6 +346,7 @@ $ ldd example-app
         ...
 ```
 
-## Model Zoo
+## Intel® AI Reference Models
 
-Use cases that had already been optimized by Intel engineers are available at [Model Zoo for Intel® Architecture](https://github.com/IntelAI/models/tree/pytorch-r2.0.100-models). A bunch of PyTorch use cases for benchmarking are also available on the [GitHub page](https://github.com/IntelAI/models/tree/pytorch-r2.0.100-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running scipts in the Model Zoo.
+Use cases that have already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/pytorch-r2.1-models) (former Model Zoo). A number of PyTorch use cases for benchmarking are also available in the [benchmarks](https://github.com/IntelAI/models/tree/pytorch-r2.1-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-the-box by simply running scripts in the Intel® AI Reference Models.
+

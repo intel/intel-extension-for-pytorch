@@ -26,7 +26,10 @@ model = torchvision.models.resnet50()
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=LR, momentum=0.9)
 model.train()
+
 model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
+# Uncomment the code below to enable experimental feature torch.compile
+# model = torch.compile(model, backend="ipex")
 
 for batch_idx, (data, target) in enumerate(train_loader):
     optimizer.zero_grad()
@@ -36,6 +39,7 @@ for batch_idx, (data, target) in enumerate(train_loader):
         loss.backward()
     optimizer.step()
     print(batch_idx)
+
 torch.save({
     'model_state_dict': model.state_dict(),
     'optimizer_state_dict': optimizer.state_dict(),
