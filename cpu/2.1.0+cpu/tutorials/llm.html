@@ -180,7 +180,7 @@
 <p>* For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like “–config-file=model_config/tiiuae_falcon-40b_config.json”. This is optional for FP32/BF16 but needed for quantizations.</p>
 <p>** For GPT-NEOX/FALCON/OPT models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.</p>
 <p><em>Note</em>: The above verified models (including other models in the same model family, like “codellama/CodeLlama-7b-hf” from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM model families, we are working in progress to cover those optimizations, which will expand the model list above.</p>
-<p>Example scripts are available at <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/v2.1.0%2Bcpu/examples/cpu/inference/python/llm">Github repo</a>.</p>
+<p>Check <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/v2.1.0%2Bcpu/examples/cpu/inference/python/llm">LLM best known practice</a> for instructions to install/setup environment and example scripts..</p>
 </section>
 <section id="demos">
 <h2>Demos<a class="headerlink" href="#demos" title="Permalink to this heading"></a></h2>
@@ -302,7 +302,7 @@
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7ff5f9f89d00> 
+   <jinja2.runtime.BlockReference object at 0x7fb03c703820> 
   <p>*Other names and brands may be claimed as the property of others. <a href="http://www.intel.com/content/www/us/en/legal/trademarks.html">Trademarks</a></p>
   <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a></div>
 

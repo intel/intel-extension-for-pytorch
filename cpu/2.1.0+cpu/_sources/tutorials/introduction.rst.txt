@@ -18,6 +18,7 @@ Get Started
 - `Installation <../../../index.html#installation?platform=cpu&version=v2.1.0%2Bcpu>`_
 - `Get Started <getting_started.md>`_
 - `Examples <examples.md>`_
+- `Large Language Models (LLM) <llm.html>`_
 
 API Reference
 -------------

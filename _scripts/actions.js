@@ -400,7 +400,7 @@ $(document).ready(function() {
         indexb += 1;
         if(data.installation.run != null) {
           ret += "<h3>" + $.secid_gen([indexa, indexb]) + "Run Docker Image</h3>";
-          ret += $.code_gen([data.installation.run]);
+          ret += $.code_gen(data.installation.run);
         }
       } else if(data.package == "cppsdk") {
         if(data.installation.files != null) {
