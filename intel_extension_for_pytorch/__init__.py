@@ -97,6 +97,7 @@ from .utils.utils import has_cpu, has_xpu
 if has_cpu():
     from . import cpu
     from . import quantization
+    from .quantization import woq
     from . import _meta_registrations
     try:
         from .cpu import tpp
