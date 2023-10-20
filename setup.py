@@ -207,6 +207,7 @@ def _build_installation_dependency():
     install_requires = []
     install_requires.append("psutil")
     install_requires.append("numpy")
+    install_requires.append("packaging")
     return install_requires
 
 

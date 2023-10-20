@@ -26,7 +26,25 @@ from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
 )
 
 from test_weight_prepack import module_found
+try:
+    import transformers
+    from transformers import AutoConfig
+except ImportError:
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "transformers==4.31.0"]
+    )
+    import transformers
+    from transformers import AutoConfig
 
+try:
+    import deepspeed
+
+    HAS_DEEPSPEED = True
+except ImportError:
+    HAS_DEEPSPEED = False
+except RuntimeError:
+    HAS_DEEPSPEED = False
+skipIfNoDeepspeed = unittest.skipIf(not HAS_DEEPSPEED, "no deepspeed")
 
 class MyAttention(nn.Module):
     def __init__(self):
@@ -177,6 +195,7 @@ class DeepspeedTester(JitTestCase):
         ds_model = engine.module
         return ds_model
 
+    @skipIfNoDeepspeed
     def test_ipex_optimize(self):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
@@ -216,6 +235,7 @@ class DeepspeedTester(JitTestCase):
                 jit_res = jit_optimized(x)
                 self.assertEqual(y, jit_res)
 
+    @skipIfNoDeepspeed
     def _test_quantization(
         self,
         dynamic_qconfig,
@@ -292,6 +312,7 @@ class DeepspeedTester(JitTestCase):
                     y_loaded = loaded(x)
                     self.assertEqual(y, y_loaded, atol=atol, rtol=rtol)
 
+    @skipIfNoDeepspeed
     def test_dynamic_quantization(self):
         self._test_quantization(
             ipex.quantization.default_dynamic_qconfig,
@@ -302,6 +323,7 @@ class DeepspeedTester(JitTestCase):
             rtol=1.3e-6,
         )
 
+    @skipIfNoDeepspeed
     def test_weight_only_quantization(self):
         self._test_quantization(
             ipex.quantization.get_weight_only_quant_qconfig_mapping(),
@@ -313,6 +335,7 @@ class DeepspeedTester(JitTestCase):
             ["torch_ipex::ipex_woq_linear", "deepspeed_comm::all_reduce"],
         )
 
+    @skipIfNoDeepspeed
     def test_simplify_allreduce_for_gptj(self):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
@@ -343,6 +366,65 @@ class DeepspeedTester(JitTestCase):
                     self.assertEqual(y, jit_res)
                 _disable_tpp()
 
+    @skipIfNoDeepspeed
+    def test_llama_with_optimize_transformers(self):
+        curpath = os.path.abspath(os.path.dirname(__file__))
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/llama", return_dict=False
+        )
+        model = transformers.models.llama.modeling_llama.LlamaForCausalLM(config).eval()
+        model = self._get_ds_model(model)
+        qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
+        model = ipex.optimize_transformers(
+            model.eval(),
+            dtype=torch.bfloat16,
+            quantization_config=qconfig,
+            inplace=True,
+            deployment_mode=True,
+        )
+        print(model)
+        if not hasattr(model, "trace_graph"):
+            AssertionError(False)
+        _IPEXAttentionCPU = (
+            ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
+        )
+        _IPEXDecoderLayerCPU = (
+            ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
+        )
+        IpexWoqLinear = ipex.nn.modules.IpexWoqLinear
+        assert model.model.layers[0].self_attn.__class__ is _IPEXAttentionCPU
+        assert model.model.layers[0].__class__ is _IPEXDecoderLayerCPU
+        assert all(
+            mod.__class__ is IpexWoqLinear
+            for mod in [
+                model.model.layers[0].self_attn.concat_qkv.concat_linear,
+                model.model.layers[0].linear_silu_mul.linear_s,
+                model.model.layers[0].linear_silu_mul.linear_m,
+            ]
+        )
+        # Ensure model can run without errors
+        input_ids = torch.ones(8).to(torch.long)
+        attention_mask = torch.ones(len(input_ids))
+        position_ids = torch.arange(len(input_ids))
+        past_key_values = tuple(
+            [
+                (
+                    torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros(1, 4, dtype=torch.long),
+                )
+                for i in range(1)
+            ]
+        )
+        example_inputs = (
+            input_ids.unsqueeze(0),
+            attention_mask.unsqueeze(0),
+            position_ids.unsqueeze(0),
+            past_key_values,
+        )
+        with torch.no_grad():
+            model(*example_inputs)
 
 if __name__ == "__main__":
     deepspeed_modules = may_import_deepspeed_modules()

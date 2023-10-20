@@ -6,7 +6,7 @@ from torchvision.transforms import ToTensor
 
 import intel_extension_for_pytorch as ipex
 
-########################################################################
+########################################################################  # noqa F401
 # Reference for training portion:
 # https://pytorch.org/tutorials/beginner/basics/quickstart_tutorial.html
 
@@ -36,7 +36,6 @@ for X, y in test_dataloader:
     print(f"Shape of y: {y.shape} {y.dtype}")
     break
 
-
 # Define model
 class NeuralNetwork(nn.Module):
     def __init__(self):
@@ -47,7 +46,7 @@ class NeuralNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(512, 512),
             nn.ReLU(),
-            nn.Linear(512, 10),
+            nn.Linear(512, 10)
         )
 
     def forward(self, x):
@@ -55,16 +54,15 @@ class NeuralNetwork(nn.Module):
         logits = self.linear_relu_stack(x)
         return logits
 
-
 model = NeuralNetwork()
 loss_fn = nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
-
 
 def train(dataloader, model, loss_fn, optimizer):
     size = len(dataloader.dataset)
     model.train()
     for batch, (X, y) in enumerate(dataloader):
+
         # Compute prediction error
         pred = model(X)
         loss = loss_fn(pred, y)
@@ -76,7 +74,7 @@ def train(dataloader, model, loss_fn, optimizer):
 
         if batch % 100 == 0:
             loss, current = loss.item(), batch * len(X)
-            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+            print(f"loss: {loss:>7f}    [{current:>5d}/{size:>5d}]")
 
 
 model, optimizer = ipex.optimize(model, optimizer=optimizer)
@@ -87,11 +85,10 @@ for t in range(epochs):
     train(train_dataloader, model, loss_fn, optimizer)
 print("Done!")
 
-########################################################################
+########################################################################  # noqa F401
 
-################################ QUANTIZE ##############################
+################################ QUANTIZE ##############################  # noqa F401
 model.eval()
-
 
 def evaluate(dataloader, model):
     size = len(dataloader.dataset)
@@ -105,31 +102,21 @@ def evaluate(dataloader, model):
     accuracy /= size
     return accuracy
 
-
 # prepare model, do conv+bn folding, and init model quant_state.
 qconfig = ipex.quantization.default_static_qconfig
 data = torch.randn(1, 1, 28, 28)
-prepared_model = ipex.quantization.prepare(
-    model, qconfig, example_inputs=data, inplace=False
-)
+prepared_model = ipex.quantization.prepare(model, qconfig, example_inputs=data, inplace=False)
 
 
-######################## recipe tuning with INC ########################
+######################## recipe tuning with INC ########################  # noqa F401
 def eval(prepared_model):
     accu = evaluate(test_dataloader, prepared_model)
     return float(accu)
 
-
 # print(eval(prepared_model))
-tuned_model = ipex.quantization.autotune(
-    prepared_model,
-    test_dataloader,
-    eval,
-    sampling_sizes=[100],
-    accuracy_criterion={"relative": 0.01},
-    tuning_time=0,
-)
-########################################################################
+tuned_model = ipex.quantization.autotune(prepared_model, test_dataloader, eval, sampling_sizes=[100],
+                                         accuracy_criterion={'relative': .01}, tuning_time=0)
+########################################################################  # noqa F401
 
 # run tuned model
 convert_model = ipex.quantization.convert(tuned_model)

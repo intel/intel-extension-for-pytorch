@@ -1,0 +1,11 @@
+tuning:                                                        # optional.
+  strategy: grid                                               # optional. The tuning strategy. Default is grid. Must be one of {grid, random}.
+  max_trials: 100                                              # optional. Allowed number of trials. Default is 100. If given time, set max_trials to product of length of all search spaces to try all possible combinations of hyperparameters.
+
+# output_dir: /path/to/saving/directory                        # optional. Directory to which the tuning history will be saved in record.csv file. Default is current working directory.
+
+hyperparams:                                                   # mandatory.
+  launcher:                                                    # optional.
+    hp: ['ncores_per_instance', 'ninstances']                  # mandatory. Mandatory if hyperparams.launcher is specified. Specify the launcher hyperparameters to tune.
+    ncores_per_instance: all_physical_cores                    # optional.  Search space of ncore_per_instance if chosen to tune. If not defined, default search space of ncore_per_instance is used.
+    ninstances:  [1]                                           # optional.  Search space of ninstances if chosen to tune. If not defined, default search space of ninstances is used.

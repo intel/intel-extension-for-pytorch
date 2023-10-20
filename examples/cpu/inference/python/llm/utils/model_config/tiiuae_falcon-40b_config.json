@@ -1,0 +1,30 @@
+{
+   "_name_or_path": "tiiuae/falcon-40b",
+   "alibi": false,
+   "apply_residual_connection_post_layernorm": false,
+   "architectures": [
+     "FalconForCausalLM"
+   ],
+   "attention_dropout": 0.0,
+   "bias": false,
+   "bos_token_id": 11,
+   "eos_token_id": 11,
+   "hidden_dropout": 0.0,
+   "hidden_size": 8192,
+   "initializer_range": 0.02,
+   "layer_norm_epsilon": 1e-05,
+   "model_type": "falcon",
+   "multi_query": true,
+   "n_head": 128,
+   "n_layer": 60,
+   "new_decoder_architecture": true,
+   "num_attention_heads": 128,
+   "num_hidden_layers": 60,
+   "num_kv_heads": 8,
+   "parallel_attn": true,
+   "torch_dtype": "bfloat16",
+   "transformers_version": "4.33.0.dev0",
+   "use_cache": true,
+   "vocab_size": 65024
+}
+
