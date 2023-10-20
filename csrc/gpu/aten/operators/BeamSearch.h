@@ -124,7 +124,8 @@ void beam_search_topk_stage1(
     int64_t beam_size,
     int64_t batch_size,
     int32_t num_wg_per_beam) {
-  int32_t wg_size = 128;
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int32_t wg_size = 256;
   int slm_size = (sizeof(int) + sizeof(scalar_t)) * MAX_K * (wg_size);
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();

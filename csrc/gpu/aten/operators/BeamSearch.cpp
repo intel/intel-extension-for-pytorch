@@ -243,7 +243,12 @@ std::tuple<Tensor, Tensor, Tensor> beam_search_topk(
     Tensor& candidate_output_ids, // sentences with eos (decode done)
     Tensor& candidate_sequence_lengths,
     Tensor& candidate_score) {
-  const int32_t num_wg_per_beam = 4;
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int32_t wg_size = 256;
+  int32_t num_wg_per_beam = std::max(
+      (int32_t)CeilDiv(
+          dpcppMaxWorkItemsPerTile(dev_id) / wg_size, batch_size * beam_size),
+      2);
   const int32_t tmp_output_len =
       2 * beam_size * num_wg_per_beam * beam_size * batch_size;
   const int32_t topk_len = 2 * beam_size * beam_size * batch_size;
