@@ -26,6 +26,7 @@ from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
 )
 
 from test_weight_prepack import module_found
+
 try:
     import transformers
     from transformers import AutoConfig
@@ -400,6 +401,7 @@ class DeepspeedTester(JitTestCase):
         )
         with torch.no_grad():
             model(*example_inputs)
+
 
 if __name__ == "__main__":
     deepspeed_modules = may_import_deepspeed_modules()

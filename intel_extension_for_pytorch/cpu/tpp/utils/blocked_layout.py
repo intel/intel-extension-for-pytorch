@@ -273,7 +273,14 @@ class BlockedParameter(torch.nn.Parameter):
         self.data = self._data
 
     def __tensor_flatten__(self):
-        return ["_data"], [self.requires_grad, self.blocked, self.blocking_param, self.blocking_manager, self.unblocked_dtype, self.blocked_dtype]
+        return ["_data"], [
+            self.requires_grad,
+            self.blocked,
+            self.blocking_param,
+            self.blocking_manager,
+            self.unblocked_dtype,
+            self.blocked_dtype,
+        ]
 
     @staticmethod
     def __tensor_unflatten__(inner_tensors, ctx):

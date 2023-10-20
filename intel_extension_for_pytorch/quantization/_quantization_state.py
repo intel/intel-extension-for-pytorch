@@ -393,13 +393,22 @@ class AutoQuantizationState(torch.nn.Module):
             act_scaling_factors = self.idx_to_smooth_quant_scaling_factor[act_key]
             if act_scaling_factors is not None:
                 w_key = str(self.idx) + "_0"
-                act_scaling_factors = act_scaling_factors[w_key] \
-                    if len(act_scaling_factors) > 1 else next(iter(act_scaling_factors.values()))
+                act_scaling_factors = (
+                    act_scaling_factors[w_key]
+                    if len(act_scaling_factors) > 1
+                    else next(iter(act_scaling_factors.values()))
+                )
                 # update arg_quant_infos
-                scale = arg_quant_infos[0][0][w_key] \
-                    if len(arg_quant_infos[0][0]) > 1 else next(iter(arg_quant_infos[0][0].values()))
-                zp = arg_quant_infos[0][1][w_key] \
-                    if len(arg_quant_infos[0][1]) > 1 else next(iter(arg_quant_infos[0][1].values()))
+                scale = (
+                    arg_quant_infos[0][0][w_key]
+                    if len(arg_quant_infos[0][0]) > 1
+                    else next(iter(arg_quant_infos[0][0].values()))
+                )
+                zp = (
+                    arg_quant_infos[0][1][w_key]
+                    if len(arg_quant_infos[0][1]) > 1
+                    else next(iter(arg_quant_infos[0][1].values()))
+                )
                 arg_quant_infos = [(scale, zp, arg_quant_infos[0][2])]
                 args = list(args)
                 new_act = torch.mul(args[0], act_scaling_factors)
@@ -1072,9 +1081,12 @@ class AutoQuantizationState(torch.nn.Module):
                 x_obs.weight_obs = {w_id_str: w_obs.ic_obs}
             else:
                 # The input (activation) is shared by more than one linear layers
-                if getattr(qconfig, 'share_weight_observers', True):
+                if getattr(qconfig, "share_weight_observers", True):
                     # Weights of these layers share the same per-IC observer
-                    assert isinstance(x_obs.weight_obs, dict) and len(x_obs.weight_obs) == 1
+                    assert (
+                        isinstance(x_obs.weight_obs, dict)
+                        and len(x_obs.weight_obs) == 1
+                    )
                     w_obs.ic_obs = next(iter(x_obs.weight_obs.values()))
                 else:
                     # Weights of these layers use different observers

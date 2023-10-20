@@ -35,6 +35,7 @@ skipIfNoTransformers = unittest.skipIf(not HAS_TRANSFORMERS, "no transformers")
 
 curpath = os.path.abspath(os.path.dirname(__file__))
 
+
 class ConvBatchNorm(torch.nn.Module):
     def __init__(
         self,
@@ -224,7 +225,9 @@ class TestOptimizeCases(TestCase):
         from transformers.models import albert
         from intel_extension_for_pytorch.nn.utils import _parameter_wrapper
 
-        config = transformers.AutoConfig.from_pretrained(f"{curpath}/hf_configs/albert-base-v1")
+        config = transformers.AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/albert-base-v1"
+        )
         model = albert.modeling_albert.AlbertForMaskedLM(config)
         params_attr = {}
         _parameter_wrapper.get_shared_parameter_status(model, params_attr)

@@ -26,9 +26,10 @@ class _IPEXAttentionCPU(nn.Module):
                 self.rope_base,
                 self.model_backbone,
             )
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or \
-                re.search("LLAMA", self.model_backbone, re.IGNORECASE):
-            if hasattr(module, 'concat_qkv'):
+        if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or re.search(
+            "LLAMA", self.model_backbone, re.IGNORECASE
+        ):
+            if hasattr(module, "concat_qkv"):
                 self.concat_qkv = _IPEXConcatLinearCPU(
                     module.concat_qkv, tpp=tpp, woq=woq
                 )

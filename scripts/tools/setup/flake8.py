@@ -28,11 +28,24 @@ def check_flake8_errors(base_dir, filepath):
         flak8_cmd.append(filepath)
 
     # Auto format python code.
-    subprocess.call(black_cmd, cwd=base_dir)
+    blk_output = subprocess.check_output(
+        black_cmd,
+        cwd=base_dir,
+        stderr=subprocess.STDOUT,
+    )
+    output_string = blk_output.decode("utf-8")
+    print(output_string)
+    if output_string.find("reformatted") == -1:
+        ret_blk = 0
+    else:
+        ret_blk = 1
 
     # Check code style.
-    ret = subprocess.call(flak8_cmd, cwd=base_dir)
-    return ret
+    ret_flak8 = subprocess.call(flak8_cmd, cwd=base_dir)
+    status_code = ret_flak8 + ret_blk
+    print("status code: ", status_code)
+
+    return status_code
 
 
 if __name__ == "__main__":

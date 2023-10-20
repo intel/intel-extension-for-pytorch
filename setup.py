@@ -565,34 +565,62 @@ def get_pybind11_abi_compiler_flags():
 
 
 def _gen_build_cfg_from_cmake(
-    cmake_exec, project_root_dir, cmake_args, build_dir, build_env, use_ninja = True, build_gpu = False):
+    cmake_exec,
+    project_root_dir,
+    cmake_args,
+    build_dir,
+    build_env,
+    use_ninja=True,
+    build_gpu=False,
+):
     if IS_WINDOWS:
         if use_ninja:
-            check_call([cmake_exec, project_root_dir, '-GNinja'] + cmake_args, cwd=build_dir, env=build_env)
+            check_call(
+                [cmake_exec, project_root_dir, "-GNinja"] + cmake_args,
+                cwd=build_dir,
+                env=build_env,
+            )
         else:
             # using MSVC generator
             if build_gpu:
-                check_call([cmake_exec, project_root_dir, '-G Visual Studio 17 2022', '-T Intel C++ Compiler 2023'] + cmake_args, cwd=build_dir, env=build_env)
+                check_call(
+                    [
+                        cmake_exec,
+                        project_root_dir,
+                        "-G Visual Studio 17 2022",
+                        "-T Intel C++ Compiler 2023",
+                    ]
+                    + cmake_args,
+                    cwd=build_dir,
+                    env=build_env,
+                )
             else:
-                check_call([cmake_exec, project_root_dir, '-G Visual Studio 17 2022'] + cmake_args, cwd=build_dir, env=build_env)
+                check_call(
+                    [cmake_exec, project_root_dir, "-G Visual Studio 17 2022"]
+                    + cmake_args,
+                    cwd=build_dir,
+                    env=build_env,
+                )
     else:
         # Linux
-        check_call([cmake_exec, project_root_dir] + cmake_args, cwd=build_dir, env=build_env)
+        check_call(
+            [cmake_exec, project_root_dir] + cmake_args, cwd=build_dir, env=build_env
+        )
 
 
-def _build_project(build_args, build_dir, build_env, use_ninja = True):
+def _build_project(build_args, build_dir, build_env, use_ninja=True):
     if IS_WINDOWS:
         if use_ninja:
-            check_call(['ninja'] + build_args, cwd=build_dir, env=build_env)
+            check_call(["ninja"] + build_args, cwd=build_dir, env=build_env)
         else:
             # Current Windows MSVC needs manual build
             pass
     else:
         # Linux
         if use_ninja:
-            check_call(['ninja'] + build_args, cwd=build_dir, env=build_env)
+            check_call(["ninja"] + build_args, cwd=build_dir, env=build_env)
         else:
-            check_call(['make'] + build_args, cwd=build_dir, env=build_env)
+            check_call(["make"] + build_args, cwd=build_dir, env=build_env)
 
 
 def define_build_options(args, **kwargs):
@@ -657,7 +685,7 @@ class IPEXCPPLibBuild(build_clib, object):
         use_ninja = False
         # Windows uses Ninja as default generator
         if IS_WINDOWS:
-            use_ninja = True        
+            use_ninja = True
         sequential_build = False
 
         cmake_common_args = []
@@ -675,9 +703,9 @@ class IPEXCPPLibBuild(build_clib, object):
                     use_ninja = True
                     cmake_common_args.append("-GNinja")
                     continue
-                if IS_WINDOWS and var == 'USE_MSVC' and val.upper() in ON_ENV_VAL:
+                if IS_WINDOWS and var == "USE_MSVC" and val.upper() in ON_ENV_VAL:
                     use_ninja = False
-                    continue                
+                    continue
                 if var == "BUILD_STATS" and val.upper() in ON_ENV_VAL:
                     sequential_build = True
                     # fall through
@@ -726,7 +754,13 @@ class IPEXCPPLibBuild(build_clib, object):
             cmake_args_gpu = []
             define_build_options(cmake_args_gpu, **build_option_gpu)
             _gen_build_cfg_from_cmake(
-                cmake_exec, project_root_dir, cmake_args_gpu, ipex_xpu_build_dir, my_env, use_ninja=use_ninja, build_gpu=True
+                cmake_exec,
+                project_root_dir,
+                cmake_args_gpu,
+                ipex_xpu_build_dir,
+                my_env,
+                use_ninja=use_ninja,
+                build_gpu=True,
             )
 
         if build_with_cpu:
@@ -736,7 +770,12 @@ class IPEXCPPLibBuild(build_clib, object):
             cmake_args_cpu = []
             define_build_options(cmake_args_cpu, **build_option_cpu)
             _gen_build_cfg_from_cmake(
-                cmake_exec, project_root_dir, cmake_args_cpu, ipex_cpu_build_dir, my_env, use_ninja=use_ninja
+                cmake_exec,
+                project_root_dir,
+                cmake_args_cpu,
+                ipex_cpu_build_dir,
+                my_env,
+                use_ninja=use_ninja,
             )
 
             # Generate cmake for the CPP UT
@@ -755,7 +794,7 @@ class IPEXCPPLibBuild(build_clib, object):
                 cmake_args_cpp_test,
                 get_cpp_test_build_dir(),
                 my_env,
-                use_ninja=use_ninja
+                use_ninja=use_ninja,
             )
 
         if _get_build_target() in ["develop", "python"]:
@@ -774,7 +813,7 @@ class IPEXCPPLibBuild(build_clib, object):
                 cmake_args_python,
                 ipex_python_build_dir,
                 my_env,
-                use_ninja=use_ninja
+                use_ninja=use_ninja,
             )
 
         elif _get_build_target() == "cppsdk":
@@ -795,7 +834,7 @@ class IPEXCPPLibBuild(build_clib, object):
                 cmake_args_cppsdk,
                 ipex_cppsdk_build_dir,
                 my_env,
-                use_ninja=use_ninja
+                use_ninja=use_ninja,
             )
 
         if build_with_xpu:
@@ -807,15 +846,21 @@ class IPEXCPPLibBuild(build_clib, object):
             _build_project(build_args, ipex_cpu_build_dir, my_env, use_ninja=use_ninja)
 
             # Build the CPP UT
-            _build_project(build_args, get_cpp_test_build_dir(), my_env, use_ninja=use_ninja)
+            _build_project(
+                build_args, get_cpp_test_build_dir(), my_env, use_ninja=use_ninja
+            )
 
         if _get_build_target() in ["develop", "python"]:
             # Build common python module:
-            _build_project(build_args, ipex_python_build_dir, my_env, use_ninja=use_ninja)
+            _build_project(
+                build_args, ipex_python_build_dir, my_env, use_ninja=use_ninja
+            )
 
         elif _get_build_target() == "cppsdk":
             # Build CPPSDK package:
-            _build_project(build_args, ipex_cppsdk_build_dir, my_env, use_ninja=use_ninja)
+            _build_project(
+                build_args, ipex_cppsdk_build_dir, my_env, use_ninja=use_ninja
+            )
             cpack_exec = get_cpack_command()
             check_call([cpack_exec, "--config", cpack_out_file])
             gen_script_path = os.path.abspath(
@@ -939,63 +984,72 @@ def pyi_module():
     library_dirs = ["lib", os.path.join(pytorch_install_dir, "lib")]
 
     if not IS_WINDOWS:
-        library_dirs = [
-            "lib",
-            os.path.join(pytorch_install_dir, "lib")
-            ]
+        library_dirs = ["lib", os.path.join(pytorch_install_dir, "lib")]
 
         extra_compile_args = [
-            '-Wall',
-            '-Wextra',
-            '-Wno-strict-overflow',
-            '-Wno-unused-parameter',
-            '-Wno-missing-field-initializers',
-            '-Wno-write-strings',
-            '-Wno-unknown-pragmas',
+            "-Wall",
+            "-Wextra",
+            "-Wno-strict-overflow",
+            "-Wno-unused-parameter",
+            "-Wno-missing-field-initializers",
+            "-Wno-write-strings",
+            "-Wno-unknown-pragmas",
             # This is required for Python 2 declarations that are deprecated in 3.
-            '-Wno-deprecated-declarations',
+            "-Wno-deprecated-declarations",
             # Python 2.6 requires -fno-strict-aliasing, see
             # http://legacy.python.org/dev/peps/pep-3123/
             # We also depend on it in our code (even Python 3).
-            '-fno-strict-aliasing',
+            "-fno-strict-aliasing",
             # Clang has an unfixed bug leading to spurious missing
             # braces warnings, see
             # https://bugs.llvm.org/show_bug.cgi?id=21629
-            '-Wno-missing-braces']
+            "-Wno-missing-braces",
+        ]
 
         C_ext = CppExtension(
             "{}._C".format(PACKAGE_NAME),
             libraries=main_libraries,
             sources=main_sources,
-            language='c++',
+            language="c++",
             extra_compile_args=extra_compile_args,
             include_dirs=include_dirs,
             library_dirs=library_dirs,
-            extra_link_args=[make_relative_rpath('lib')])
+            extra_link_args=[make_relative_rpath("lib")],
+        )
     else:
-        library_dirs = [
-            "bin",
-            os.path.join(pytorch_install_dir, "lib")
-            ]
-        extra_link_args = ['/NODEFAULTLIB:LIBCMT.LIB']
+        library_dirs = ["bin", os.path.join(pytorch_install_dir, "lib")]
+        extra_link_args = ["/NODEFAULTLIB:LIBCMT.LIB"]
         # /MD links against DLL runtime
         # and matches the flags set for protobuf and ONNX
         # /EHsc is about standard C++ exception handling
         # /DNOMINMAX removes builtin min/max functions
         # /wdXXXX disables warning no. XXXX
-        extra_compile_args = ['/MD', '/EHsc', '/DNOMINMAX',
-                              '/wd4267', '/wd4251', '/wd4522', '/wd4522', '/wd4838',
-                              '/wd4305', '/wd4244', '/wd4190', '/wd4101', '/wd4996',
-                              '/wd4275']
+        extra_compile_args = [
+            "/MD",
+            "/EHsc",
+            "/DNOMINMAX",
+            "/wd4267",
+            "/wd4251",
+            "/wd4522",
+            "/wd4522",
+            "/wd4838",
+            "/wd4305",
+            "/wd4244",
+            "/wd4190",
+            "/wd4101",
+            "/wd4996",
+            "/wd4275",
+        ]
         C_ext = CppExtension(
             "{}._C".format(PACKAGE_NAME),
             libraries=main_libraries,
             sources=main_sources,
-            language='c++',
+            language="c++",
             extra_compile_args=extra_compile_args,
             include_dirs=include_dirs,
             library_dirs=library_dirs,
-            extra_link_args=extra_link_args)
+            extra_link_args=extra_link_args,
+        )
     return C_ext
 
 
@@ -1016,63 +1070,72 @@ def pyi_isa_help_module():
     ]
 
     if not IS_WINDOWS:
-        library_dirs = [
-            "lib",
-            os.path.join(pytorch_install_dir, "lib")
-            ]
+        library_dirs = ["lib", os.path.join(pytorch_install_dir, "lib")]
 
         extra_compile_args = [
-            '-Wall',
-            '-Wextra',
-            '-Wno-strict-overflow',
-            '-Wno-unused-parameter',
-            '-Wno-missing-field-initializers',
-            '-Wno-write-strings',
-            '-Wno-unknown-pragmas',
+            "-Wall",
+            "-Wextra",
+            "-Wno-strict-overflow",
+            "-Wno-unused-parameter",
+            "-Wno-missing-field-initializers",
+            "-Wno-write-strings",
+            "-Wno-unknown-pragmas",
             # This is required for Python 2 declarations that are deprecated in 3.
-            '-Wno-deprecated-declarations',
+            "-Wno-deprecated-declarations",
             # Python 2.6 requires -fno-strict-aliasing, see
             # http://legacy.python.org/dev/peps/pep-3123/
             # We also depend on it in our code (even Python 3).
-            '-fno-strict-aliasing',
+            "-fno-strict-aliasing",
             # Clang has an unfixed bug leading to spurious missing
             # braces warnings, see
             # https://bugs.llvm.org/show_bug.cgi?id=21629
-            '-Wno-missing-braces']
+            "-Wno-missing-braces",
+        ]
 
         C_ext = CppExtension(
             "{}._isa_help".format(PACKAGE_NAME),
             libraries=main_libraries,
             sources=main_sources,
-            language='c++',
+            language="c++",
             extra_compile_args=extra_compile_args,
             include_dirs=include_dirs,
             library_dirs=library_dirs,
-            extra_link_args=[make_relative_rpath('lib')])
+            extra_link_args=[make_relative_rpath("lib")],
+        )
     else:
-        library_dirs = [
-            "bin",
-            os.path.join(pytorch_install_dir, "lib")
-            ]
-        extra_link_args = ['/NODEFAULTLIB:LIBCMT.LIB']
+        library_dirs = ["bin", os.path.join(pytorch_install_dir, "lib")]
+        extra_link_args = ["/NODEFAULTLIB:LIBCMT.LIB"]
         # /MD links against DLL runtime
         # and matches the flags set for protobuf and ONNX
         # /EHsc is about standard C++ exception handling
         # /DNOMINMAX removes builtin min/max functions
         # /wdXXXX disables warning no. XXXX
-        extra_compile_args = ['/MD', '/EHsc', '/DNOMINMAX',
-                              '/wd4267', '/wd4251', '/wd4522', '/wd4522', '/wd4838',
-                              '/wd4305', '/wd4244', '/wd4190', '/wd4101', '/wd4996',
-                              '/wd4275']
+        extra_compile_args = [
+            "/MD",
+            "/EHsc",
+            "/DNOMINMAX",
+            "/wd4267",
+            "/wd4251",
+            "/wd4522",
+            "/wd4522",
+            "/wd4838",
+            "/wd4305",
+            "/wd4244",
+            "/wd4190",
+            "/wd4101",
+            "/wd4996",
+            "/wd4275",
+        ]
         C_ext = CppExtension(
             "{}._isa_help".format(PACKAGE_NAME),
             libraries=main_libraries,
             sources=main_sources,
-            language='c++',
+            language="c++",
             extra_compile_args=extra_compile_args,
             include_dirs=include_dirs,
             library_dirs=library_dirs,
-            extra_link_args=extra_link_args)
+            extra_link_args=extra_link_args,
+        )
     return C_ext
 
 

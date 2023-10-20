@@ -231,7 +231,7 @@ class TestTPPlinear(TestCase):
 
             _enable_tpp()
             model = ipex.optimize(model, dtype=dtype)
-            
+
             def fn(x):
                 return torch.ops.torch_ipex.tpp_linear_silu(
                     x, model.mlp.weight, x.new_empty(0), model.mlp.out_features
@@ -286,7 +286,7 @@ class TestTPPlinear(TestCase):
 
             _enable_tpp()
             model = ipex.optimize(model, dtype=dtype)
-            
+
             def fn(x):
                 return torch.ops.torch_ipex.tpp_linear_relu(
                     x, model.mlp.weight, x.new_empty(0), model.mlp.out_features
@@ -341,7 +341,7 @@ class TestTPPlinear(TestCase):
 
             _enable_tpp()
             model = ipex.optimize(model, dtype=dtype)
-            
+
             def fn(x):
                 return torch.ops.torch_ipex.tpp_linear_mul(
                     x, x, model.mlp.weight, x.new_empty(0), model.mlp.out_features
@@ -396,7 +396,7 @@ class TestTPPlinear(TestCase):
 
             _enable_tpp()
             model = ipex.optimize(model, dtype=dtype)
-            
+
             def fn(x):
                 return torch.ops.torch_ipex.tpp_linear_add(
                     x, x, model.mlp.weight, x.new_empty(0), 1.0, model.mlp.out_features
@@ -432,7 +432,7 @@ class TestTPPlinear(TestCase):
                 )
                 self.assertEqual(out, ref_out)
                 _disable_tpp()
-                
+
     def test_tpp_linear_add2_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
@@ -451,10 +451,16 @@ class TestTPPlinear(TestCase):
 
             _enable_tpp()
             model = ipex.optimize(model, dtype=dtype)
-            
+
             def fn(x):
                 return torch.ops.torch_ipex.tpp_linear_add_add(
-                    x, x, x, model.mlp.weight, model.mlp.bias, 1.0, model.mlp.out_features
+                    x,
+                    x,
+                    x,
+                    model.mlp.weight,
+                    model.mlp.bias,
+                    1.0,
+                    model.mlp.out_features,
                 )
 
             with torch.no_grad():

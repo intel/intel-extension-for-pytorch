@@ -712,16 +712,28 @@ class CPUOPsTester(TestCase):
 
         cl_formats = {4: torch.channels_last, 5: torch.channels_last_3d}
         for dtype in [torch.bfloat16, torch.half]:
-            for shape, g in [((1, 8, 4, 3), 2), ((1, 8, 3, 4), 4),
-                             ((4, 40, 40, 40), 2), ((4, 8, 40, 40), 4),
-                             ((1, 8, 40, 40), 4), ((1, 8, 40, 40), 2),
-                             ((1, 8, 50, 50), 2), ((1, 8, 50, 50), 4),
-                             ((1, 40, 50, 50), 2), ((1, 9, 3, 4, 5), 3),
-                             ((1, 60, 10, 10, 10), 3), ((1, 9, 10, 50, 50), 3),
-                             ((1, 60, 10, 50, 50), 3), ((1, 8, 65, 55), 2),
-                             ((1, 3, 65, 55), 1), ((1, 3, 20, 20), 1)]:
+            for shape, g in [
+                ((1, 8, 4, 3), 2),
+                ((1, 8, 3, 4), 4),
+                ((4, 40, 40, 40), 2),
+                ((4, 8, 40, 40), 4),
+                ((1, 8, 40, 40), 4),
+                ((1, 8, 40, 40), 2),
+                ((1, 8, 50, 50), 2),
+                ((1, 8, 50, 50), 4),
+                ((1, 40, 50, 50), 2),
+                ((1, 9, 3, 4, 5), 3),
+                ((1, 60, 10, 10, 10), 3),
+                ((1, 9, 10, 50, 50), 3),
+                ((1, 60, 10, 50, 50), 3),
+                ((1, 8, 65, 55), 2),
+                ((1, 3, 65, 55), 1),
+                ((1, 3, 20, 20), 1),
+            ]:
                 for is_cl in [False, True]:
-                    format = cl_formats[len(shape)] if is_cl else torch.contiguous_format
+                    format = (
+                        cl_formats[len(shape)] if is_cl else torch.contiguous_format
+                    )
                     helper(shape, g, format, dtype)
 
     def test_groupnorm_nhwc(self):

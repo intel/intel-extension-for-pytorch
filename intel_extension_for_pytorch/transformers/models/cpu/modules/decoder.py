@@ -6,7 +6,7 @@ from ...cpu.fusions.linear_fusion import (
     _IPEXlinearNewGeluCPU,
     _IPEXlinearReluCPU,
     _IPEXlinearGeluCPU,
-    _IPEXlinearSiluMulCPU
+    _IPEXlinearSiluMulCPU,
 )
 
 

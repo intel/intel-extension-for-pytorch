@@ -83,20 +83,20 @@ class _IPEXConcatLinearRef(nn.Module):
         super().__init__()
         self.num_concat = len(linear_list)
         for i in range(self.num_concat):
-            attr_name = f'linear_{i}'
+            attr_name = f"linear_{i}"
             setattr(self, attr_name, copy.deepcopy(linear_list[i]))
 
     def forward(self, x):
         output_list = []
         for i in range(self.num_concat):
-            assert hasattr(self, f'linear_{i}')
-            linear = getattr(self, f'linear_{i}')
+            assert hasattr(self, f"linear_{i}")
+            linear = getattr(self, f"linear_{i}")
             y = linear(x)
             output_list.append(y)
         return tuple(output_list)
 
     def extra_repr(self):
-        return f'num_concat = {self.num_concat}'
+        return f"num_concat = {self.num_concat}"
 
 
 class _IPEXlinearSiluMulRef(nn.Module):

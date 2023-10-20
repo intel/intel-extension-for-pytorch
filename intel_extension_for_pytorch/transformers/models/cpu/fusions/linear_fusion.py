@@ -4,7 +4,10 @@ import math
 import warnings
 import copy
 from intel_extension_for_pytorch.nn.modules import IpexWoqLinear
-from intel_extension_for_pytorch.quantization import get_weight_only_quant_qconfig_mapping
+from intel_extension_for_pytorch.quantization import (
+    get_weight_only_quant_qconfig_mapping,
+)
+
 
 class _IPEXlinearFusionCPU(nn.Module):
     def __init__(self, linear, tpp=False, woq=False):
@@ -14,7 +17,7 @@ class _IPEXlinearFusionCPU(nn.Module):
         self.dtype = linear.weight.dtype if self.tpp else None
 
     def extra_repr(self):
-        extra_repr_str = f'dtype = {self.dtype}, tpp = {self.tpp}, woq = {self.woq}'
+        extra_repr_str = f"dtype = {self.dtype}, tpp = {self.tpp}, woq = {self.woq}"
         return extra_repr_str
 
 
@@ -91,8 +94,11 @@ class _IPEXlinearAddCPU(_IPEXlinearFusionCPU):
                 1.0,
                 self.linear.out_features,
             )
-        if self.woq and hasattr(self.linear, "_op_context") and \
-                self.linear._op_context is not None:
+        if (
+            self.woq
+            and hasattr(self.linear, "_op_context")
+            and self.linear._op_context is not None
+        ):
             return torch.ops.torch_ipex.woq_linear_add(
                 x,
                 self.linear._op_context.get_data_handle(),
@@ -121,8 +127,11 @@ class _IPEXlinearAddAddCPU(_IPEXlinearFusionCPU):
                 1.0,
                 self.linear.out_features,
             )
-        if self.woq and hasattr(self.linear, "_op_context") and \
-                self.linear._op_context is not None:
+        if (
+            self.woq
+            and hasattr(self.linear, "_op_context")
+            and self.linear._op_context is not None
+        ):
             return torch.ops.torch_ipex.woq_linear_add_add(
                 x,
                 self.linear._op_context.get_data_handle(),
@@ -146,8 +155,11 @@ class _IPEXlinearNewGeluCPU(_IPEXlinearFusionCPU):
                 self.linear.bias if self.linear.bias is not None else x.new_empty(0),
                 self.linear.out_features,
             )
-        if self.woq and hasattr(self.linear, "_op_context") and \
-                self.linear._op_context is not None:
+        if (
+            self.woq
+            and hasattr(self.linear, "_op_context")
+            and self.linear._op_context is not None
+        ):
             return torch.ops.torch_ipex.woq_linear_gelu(
                 x,
                 self.linear._op_context.get_data_handle(),
@@ -188,17 +200,19 @@ class _IPEXlinearGeluCPU(_IPEXlinearFusionCPU):
 
 class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
     def __init__(self, module, tpp=False, woq=False):
-        assert hasattr(module, 'linear_0')
+        assert hasattr(module, "linear_0")
         super().__init__(module.linear_0, tpp=tpp, woq=woq)
-        assert hasattr(module, 'num_concat')
+        assert hasattr(module, "num_concat")
         self.num_concat = module.num_concat
         self.linear_list = []
         for i in range(self.num_concat):
-            attr_name = f'linear_{i}'
+            attr_name = f"linear_{i}"
             assert hasattr(module, attr_name)
             self.linear_list.append(getattr(module, attr_name))
         self.concat_linear = None
-        if woq and all(isinstance(linear, IpexWoqLinear) for linear in self.linear_list):
+        if woq and all(
+            isinstance(linear, IpexWoqLinear) for linear in self.linear_list
+        ):
             # Quantization is done before lowering to CPU.
             # We assume weights are all in shape [N, K] and per-channel quantized, axis = 0.
             # And it must be one of the two cases below.
@@ -221,22 +235,27 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
             qconfig = qconfig_mapping.global_qconfig
             for i in range(self.num_concat):
                 linear = self.linear_list[i]
-                if not hasattr(linear, '_op_context'):
+                if not hasattr(linear, "_op_context"):
                     warnings.warn(
-                        'Concat linear fusion for CPU WOQ failed '
-                        'because linear is not converted to WOQ Linear. '
-                        'Falling back to separate linears.'
+                        "Concat linear fusion for CPU WOQ failed "
+                        "because linear is not converted to WOQ Linear. "
+                        "Falling back to separate linears."
                     )
                     weights_list = []
                     break
                 qw = linear._op_context.to_public(linear._op_context.get_weight())
-                if qw.qscheme() not in \
-                        [torch.per_channel_affine, torch.per_channel_affine_float_qparams] \
-                        or qw.q_per_channel_axis() != 0:
+                if (
+                    qw.qscheme()
+                    not in [
+                        torch.per_channel_affine,
+                        torch.per_channel_affine_float_qparams,
+                    ]
+                    or qw.q_per_channel_axis() != 0
+                ):
                     warnings.warn(
-                        'Concat linear fusion for CPU WOQ failed '
-                        'because quantization type of weight is not supported. '
-                        'Falling back to separate linears.'
+                        "Concat linear fusion for CPU WOQ failed "
+                        "because quantization type of weight is not supported. "
+                        "Falling back to separate linears."
                     )
                     weights_list = []
                     break
@@ -253,7 +272,9 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                 concat_zeros = torch.concat(zeros_list, -1)
                 use_bias = all(bias_list)
                 concat_bias = torch.concat(bias_list, 0) if use_bias else None
-                mod = nn.Linear(concat_weight.shape[1], concat_weight.shape[0], use_bias)
+                mod = nn.Linear(
+                    concat_weight.shape[1], concat_weight.shape[0], use_bias
+                )
                 mod.weight = nn.Parameter(concat_weight)
                 mod.bias = nn.Parameter(concat_bias) if use_bias else None
                 mod.qconfig = qconfig
@@ -267,7 +288,7 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                     self.concat_linear = IpexWoqLinear.from_float(mod)
         else:
             for i in range(self.num_concat):
-                attr_name = f'linear_{i}'
+                attr_name = f"linear_{i}"
                 setattr(self, attr_name, copy.deepcopy(getattr(module, attr_name)))
 
     def forward(self, x):
@@ -277,11 +298,13 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
             hidden_size = concat_output.shape[-1] // num_concats
             concat_output = concat_output.view(num_concats, -1, hidden_size)
             expected_shape = list(x.shape)[:-1] + [hidden_size]
-            return tuple([concat_output[i].view(expected_shape) for i in range(num_concats)])
+            return tuple(
+                [concat_output[i].view(expected_shape) for i in range(num_concats)]
+            )
         output_list = []
         for i in range(self.num_concat):
-            assert hasattr(self, f'linear_{i}')
-            linear = getattr(self, f'linear_{i}')
+            assert hasattr(self, f"linear_{i}")
+            linear = getattr(self, f"linear_{i}")
             y = linear(x)
             output_list.append(y)
         return tuple(output_list)

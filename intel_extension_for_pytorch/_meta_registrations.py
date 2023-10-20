@@ -601,12 +601,26 @@ def meta_masked_multihead_self_attention(
     head_mask,
     attention_mask,
 ):
-    attn_output = query.new_empty((query.shape[0], query.shape[2], query.shape[1], query.shape[3]))
+    attn_output = query.new_empty(
+        (query.shape[0], query.shape[2], query.shape[1], query.shape[3])
+    )
     if query.dtype == torch.bfloat16:
-        attn_output.as_strided_(attn_output.shape, (query.shape[1] * query.shape[2] * query.shape[3], query.shape[3], query.shape[2] * query.shape[3], 1))
+        attn_output.as_strided_(
+            attn_output.shape,
+            (
+                query.shape[1] * query.shape[2] * query.shape[3],
+                query.shape[3],
+                query.shape[2] * query.shape[3],
+                1,
+            ),
+        )
     attn_weights = None
-    key_cache_out = query.new_empty((key_cache.shape[0], key_cache.shape[1], key.shape[2], key.shape[3]))
-    value_cache_out = query.new_empty((value_cache.shape[0], value_cache.shape[1], value.shape[2], value.shape[3]))
+    key_cache_out = query.new_empty(
+        (key_cache.shape[0], key_cache.shape[1], key.shape[2], key.shape[3])
+    )
+    value_cache_out = query.new_empty(
+        (value_cache.shape[0], value_cache.shape[1], value.shape[2], value.shape[3])
+    )
     beam_idx_out = query.new_empty(beam_idx.shape)
     return (attn_output, attn_weights, key_cache_out, value_cache_out, beam_idx_out)
 
