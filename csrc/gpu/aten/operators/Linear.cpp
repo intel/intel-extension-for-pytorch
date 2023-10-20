@@ -1,11 +1,11 @@
 #include "Linear.h"
+#include "FusionUtils.h"
 #include "utils/CustomOperatorRegistration.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
 
 using namespace impl;
-
 #define IPEX_LINEAR_DEFINATION(func)                                       \
   Tensor linear_##func(                                                    \
       const Tensor& input,                                                 \
@@ -414,6 +414,81 @@ Tensor dpcpp_linear(
   auto linear_wrapper = LinearConverter();
   Tensor result;
   return linear_wrapper.call(result, input, weight, bias, post_op);
+}
+
+Tensor linear_pointwise_meta(
+    const Tensor& input_t,
+    const Tensor& weight_t,
+    const c10::optional<Tensor>& bias_opt,
+    c10::string_view attr,
+    torch::List<c10::optional<at::Scalar>> scalars,
+    c10::optional<c10::string_view> algorithm) {
+  Attr att;
+  att = construct_unary_attr(attr, scalars, algorithm, att);
+  Tensor result;
+  Tensor _bias = bias_opt.has_value() ? bias_opt.value() : at::Tensor();
+  Tensor _input =
+      input_t.dim() <= 2 ? input_t : xpu::oneDNN::contiguous_if_needed(input_t);
+  bool is_fused = false;
+  result = matmul_fusion_variants_meta(
+      result, _input, weight_t, true, att, /*is_fused*/ is_fused, _bias);
+  return result;
+}
+
+Tensor linear_pointwise(
+    const Tensor& input_t,
+    const Tensor& weight_t,
+    const c10::optional<Tensor>& bias_opt,
+    c10::string_view attr,
+    torch::List<c10::optional<at::Scalar>> scalars,
+    c10::optional<c10::string_view> algorithm) {
+  Attr att;
+  att = construct_unary_attr(attr, scalars, algorithm, att);
+  auto linear_wrapper = LinearConverter();
+
+  Tensor result;
+  return linear_wrapper.call(result, input_t, weight_t, bias_opt, att);
+}
+
+Tensor linear_pointwise_binary(
+    const Tensor& input_t,
+    const Tensor& other_t,
+    const Tensor& weight_t,
+    const c10::optional<Tensor>& bias_opt,
+    c10::string_view binary_attr) {
+  Tensor output;
+
+  Attr attr;
+  attr = construct_binary_attr(binary_attr, /*alpha*/ 1.f, other_t, attr);
+
+  Tensor _input =
+      input_t.dim() <= 2 ? input_t : xpu::oneDNN::contiguous_if_needed(input_t);
+  bool is_fused = false;
+  auto linear_wrapper = LinearConverter();
+  Tensor result;
+  return linear_wrapper.call(result, input_t, weight_t, bias_opt, attr);
+}
+
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(TORCH_SELECTIVE_SCHEMA(
+      "torch_ipex::_linear_pointwise(Tensor X, Tensor W, Tensor? B, str attr, Scalar?[] scalars, str? algorithm) -> Tensor Y"));
+  m.def(TORCH_SELECTIVE_SCHEMA(
+      "torch_ipex::_linear_pointwise.binary(Tensor X, Tensor other, Tensor W, Tensor? B, str attr) -> Tensor Y"));
+}
+
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.impl(
+      TORCH_SELECTIVE_NAME("torch_ipex::_linear_pointwise"),
+      c10::DispatchKey::Meta,
+      TORCH_FN(linear_pointwise_meta));
+  m.impl(
+      TORCH_SELECTIVE_NAME("torch_ipex::_linear_pointwise"),
+      c10::DispatchKey::XPU,
+      TORCH_FN(linear_pointwise));
+  m.impl(
+      TORCH_SELECTIVE_NAME("torch_ipex::_linear_pointwise.binary"),
+      c10::DispatchKey::XPU,
+      TORCH_FN(linear_pointwise_binary));
 }
 
 #define IPEX_OP_REGISTER_LINEAR(op) \

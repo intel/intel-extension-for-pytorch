@@ -1,9 +1,7 @@
 import torch
 import torch._inductor.pattern_matcher as pattern_matcher
-
 from torch._inductor import config
 from torch._inductor.pattern_matcher import PatternMatcherPass
-
 
 class _PrecompiledPatternMatcherPass(PatternMatcherPass):
     def __init__(self):

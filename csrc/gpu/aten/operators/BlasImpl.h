@@ -972,6 +972,181 @@ static Tensor& matmul_fusion_variants(
   }
 }
 
+// Matmul_fusion_variants for Meta backend(only query shape)
+static Tensor& matmul_fusion_variants_meta(
+    Tensor& output,
+    const Tensor& tensor1,
+    const Tensor& tensor2,
+    bool trans,
+    Attr& attr,
+    bool& is_fused,
+    Tensor bias = at::Tensor()) {
+  const auto dim_tensor1 = tensor1.dim();
+  const auto dim_tensor2 = tensor2.dim();
+  // This is checked up here to simplify the logic below
+  // Note that the strings are just evaluated on failure, so almost always we
+  // just evaluate the condition and move on
+  TORCH_CHECK(
+      dim_tensor1 != 0 && dim_tensor2 != 0,
+      "both arguments to matmul need to be at least 1D, but they are ",
+      dim_tensor1,
+      "D and ",
+      dim_tensor2,
+      "D");
+
+  bool should_fold_tensor1 = should_fold(tensor1, dim_tensor2);
+  bool should_fold_tensor2 = should_fold(tensor2, dim_tensor1);
+
+  if (dim_tensor1 == 1 && dim_tensor2 == 1) {
+    // case1:
+    // original size: [6] x [6] -> []
+    is_fused = true;
+    output = output.defined() ? output.view({1, 1})
+                              : at::empty({1, 1}, tensor1.options());
+  } else if (dim_tensor1 == 2 && dim_tensor2 == 1) {
+    // case2:
+    // original sizes: [4, 2] x [2] -> [4]
+    // onednn sizes: [4, 2] x [2, 1] -> [4, 1]
+    DimVector output_shape({tensor1.size(0)});
+    DimVector result_shape({tensor1.size(0), 1});
+    output = output.defined() ? output.view(result_shape)
+                              : at::empty(result_shape, tensor1.options());
+    Tensor t2 = tensor2.view({tensor2.size(0), 1});
+  } else if (dim_tensor1 == 1 && dim_tensor2 == 2) {
+    // case3:
+    // original sizes: [2] x [2, 6] -> [6]
+    // onednn sizes: [1, 2] x [2, 6] -> [1, 6]
+    DimVector output_shape({tensor2.size(1)});
+    if (!trans)
+      output_shape[0] = tensor2.size(0);
+    Tensor t1 = tensor1.unsqueeze(0);
+    DimVector result_shape({1, output_shape[0]});
+    output = output.defined() ? output.view(result_shape)
+                              : at::empty(result_shape, tensor1.options());
+  } else if (dim_tensor1 == 2 && dim_tensor2 == 2) {
+    // case4:
+    // original sizes: [4, 2] x [2, 6] -> [4, 6]
+    // onednn sizes: [4, 2] x [2, 6] -> [4, 6]
+    DimVector output_shape({tensor1.size(0), tensor2.size(1)});
+    if (!trans)
+      output_shape[1] = tensor2.size(0);
+
+    output =
+        output.defined() ? output : at::empty(output_shape, tensor1.options());
+
+  } else if (should_fold_tensor1) {
+    // dim_tensor1 >=3 && (dim_tensor2 == 1 || dim_tensor2 == 2)
+    // case5-1:
+    // original sizes: [3, 4, 2] x [2, 6] -> [3, 4, 6]
+    // onednn sizes: [12, 2] x [2, 6] -> [12, 6]
+    // case5-2:
+    // original sizes: [3, 4, 2] x [2] -> [3, 4]
+    // onednn sizes: [12, 2] x [2, 1] -> [12, 1]
+    const auto t1_own = MaybeOwned<Tensor>::borrowed(tensor1);
+    const auto t2_own = MaybeOwned<Tensor>::borrowed(tensor2);
+
+    const auto sizes_1 = t1_own->sizes();
+    auto output_shape = DimVector(sizes_1.begin(), sizes_1.end() - 1);
+    const auto folded_dim1 = c10::multiply_integers(output_shape);
+    const auto t1 = t1_own->reshape({folded_dim1, sizes_1.back()});
+    const auto t2_is_matrix = t2_own->dim() == 2;
+    Tensor t2 = t2_is_matrix ? *t2_own : t2_own->view({t2_own->size(0), 1});
+    if (trans)
+      output_shape.push_back(t2.size(1));
+    else
+      output_shape.push_back(t2.size(0));
+    DimVector result_shape({t1.size(0), output_shape[output_shape.size() - 1]});
+    output = output.defined() ? output.view(result_shape)
+                              : at::empty(result_shape, tensor1.options());
+  } else if (should_fold_tensor2) {
+    // dim_tensor2 >=3 && (dim_tensor1 == 1 || dim_tensor1 == 2)
+    // case6-1:
+    // original sizes: [2] x [3, 2, 4] = [3, 4]
+    // onednn sizes: [12, 2] x [2, 1] = [12, 1]
+    // or
+    // original sizes: [2] x [2, 3, 2, 4] = [2, 3, 4]
+    // onednn sizes: [24, 2] x [2, 1] = [24, 1]
+
+    // case6-2:
+    // original sizes: [6, 2] x [3, 2, 4] = [3, 6, 4]
+    // onednn sizes: [12, 2] x [2, 6] = [12, 6]
+    // or
+    // original sizes: [6, 2] x [2, 3, 2, 4] = [2, 3, 6, 4]
+    // onednn sizes: [24, 2] x [2, 6] = [24, 6]
+
+    const auto t1_own = trans
+        ? MaybeOwned<Tensor>::owned(tensor2.mT())
+        : MaybeOwned<Tensor>::owned(tensor2.transpose(-1, -2).mT());
+    trans = true;
+    const auto t2_own = dim_tensor1 == 2
+        ? MaybeOwned<Tensor>::owned(tensor1.t())
+        : MaybeOwned<Tensor>::borrowed(tensor1);
+
+    const auto sizes_1 = t1_own->sizes();
+    auto output_shape = DimVector(sizes_1.begin(), sizes_1.end() - 1);
+    const auto folded_dim1 = c10::multiply_integers(output_shape);
+    const auto t1 = t1_own->reshape({folded_dim1, sizes_1.back()});
+    const auto t2_is_matrix = t2_own->dim() == 2;
+    Tensor t2 = t2_is_matrix ? *t2_own : t2_own->view({t2_own->size(0), 1});
+    output_shape.push_back(t2.size(1));
+    DimVector result_shape({t1.size(0), t2.size(1)});
+    output = output.defined() ? output.view(result_shape)
+                              : at::empty(result_shape, tensor1.options());
+
+  } else {
+    // dim_tensor1 >= 3 || dim_tensor2 >= 3
+    // case7-1:
+    // original sizes: [3, 4, 2] x [3, 2, 6] = [3, 4, 6]
+    // onednn sizes: [3, 4, 2] x [3, 2, 6] = [3, 4, 6]
+    // case7-2:
+    // original sizes: [5, 1, 4, 2] x [3, 2, 6] = [5, 3, 4, 6]
+    // onednn sizes: [15, 4, 2] x [15, 2, 6] = [15, 4, 6]
+    const auto t2_own = trans
+        ? MaybeOwned<Tensor>::borrowed(tensor2)
+        : MaybeOwned<Tensor>::owned(tensor2.transpose(-1, -2));
+    trans = true;
+
+    const int64_t n = dim_tensor1 > 1 ? tensor1.sizes().cend()[-2] : 1LL;
+    const int64_t m1 = tensor1.sizes().back();
+    const IntArrayRef batch_tensor1(
+        tensor1.sizes().data(), std::max<int64_t>(dim_tensor1 - 2, 0LL));
+    const int64_t m2 =
+        dim_tensor2 > 1 ? t2_own->sizes().cend()[-2] : t2_own->sizes().back();
+    const int64_t p = dim_tensor2 > 1 ? t2_own->sizes().back() : 1LL;
+    const IntArrayRef batch_tensor2(
+        t2_own->sizes().data(), std::max<int64_t>(dim_tensor2 - 2, 0LL));
+    auto output_shape = infer_size_dimvector(batch_tensor1, batch_tensor2);
+
+    const auto tensor1_expand_size = [&output_shape, n, m1] {
+      DimVector ret(output_shape);
+      ret.append({n, m1});
+      return ret;
+    }();
+    const auto tensor2_expand_size = [&output_shape, m2, p] {
+      DimVector ret(output_shape);
+      ret.append({m2, p});
+      return ret;
+    }();
+    const int64_t expand_batch_product = c10::multiply_integers(output_shape);
+
+    // flatten expanded batches
+    const auto tensor1_expanded = tensor1.expand(tensor1_expand_size)
+                                      .reshape({expand_batch_product, n, m1});
+    const auto tensor2_expanded = t2_own->expand(tensor2_expand_size)
+                                      .reshape({expand_batch_product, m2, p});
+    if (dim_tensor1 > 1) {
+      output_shape.push_back(n);
+    }
+    if (dim_tensor2 > 1) {
+      output_shape.push_back(p);
+    }
+    DimVector result_shape({expand_batch_product, n, p});
+    output = output.defined() ? output.view(result_shape)
+                              : at::empty(result_shape, tensor1.options());
+  }
+  return output;
+}
+
 } // namespace impl
 } // namespace AtenIpexTypeXPU
 } // namespace at

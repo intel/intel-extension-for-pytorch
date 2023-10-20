@@ -1,4 +1,5 @@
 #include "BlasImpl.h"
+#include "oneDNN/oneDNN.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -22,6 +23,19 @@ struct LinearConverter {
         input.dim() <= 2 ? input : xpu::oneDNN::contiguous_if_needed(input);
     return impl::matmul_fusion_variants(
         result, _input, weight, false, attr, is_fused_, _bias);
+  }
+
+  Tensor& call(
+      Tensor& result,
+      const Tensor& input,
+      const Tensor& weight,
+      const c10::optional<Tensor>& bias,
+      xpu::oneDNN::Attr attr) {
+    Tensor _bias = bias.has_value() ? bias.value() : at::Tensor();
+    Tensor _input =
+        input.dim() <= 2 ? input : xpu::oneDNN::contiguous_if_needed(input);
+    return impl::matmul_fusion_variants(
+        result, _input, weight, /*trans*/ true, attr, is_fused_, _bias);
   }
 
   bool is_fused() {

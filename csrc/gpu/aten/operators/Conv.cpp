@@ -10,6 +10,7 @@
 #include "ATen/core/interned_strings.h"
 #include "ATen/ops/full.h"
 #include "ATen/ops/neg.h"
+#include "FusionUtils.h"
 #include "c10/core/Scalar.h"
 #include "c10/util/Exception.h"
 #include "c10/util/Optional.h"
@@ -2789,6 +2790,210 @@ Tensor _convolution_sigmoid_binary_mul_add_relu(
   return AtenIpexTypeXPU::relu(ret);
 }
 
+Tensor onednn_convolution(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias_,
+    IntArrayRef padding_,
+    IntArrayRef stride_,
+    IntArrayRef dilation_,
+    int64_t groups_,
+    c10::string_view attr = "none",
+    torch::List<c10::optional<at::Scalar>> scalars =
+        torch::List<c10::optional<at::Scalar>>(),
+    c10::optional<c10::string_view> algorithm = c10::nullopt) {
+  Attr att;
+  att = construct_unary_attr(attr, scalars, algorithm, att);
+  const Tensor bias = bias_.has_value() ? bias_.value() : at::Tensor();
+  auto dim = input.ndimension();
+  std::vector<int64_t> output_padding = {0};
+
+  return _convolution(
+      input,
+      weight,
+      bias,
+      stride_,
+      padding_,
+      dilation_,
+      /*transposed*/ false,
+      output_padding,
+      groups_,
+      att);
+}
+
+Tensor convolution_pointwise(
+    const Tensor& input_t,
+    const Tensor& weight_t,
+    const c10::optional<Tensor>& bias_opt,
+    IntArrayRef padding,
+    IntArrayRef stride,
+    IntArrayRef dilation,
+    int64_t groups,
+    c10::string_view attr,
+    torch::List<c10::optional<at::Scalar>> scalars,
+    c10::optional<c10::string_view> algorithm) {
+  return onednn_convolution(
+      input_t,
+      weight_t,
+      bias_opt,
+      padding,
+      stride,
+      dilation,
+      groups,
+      attr,
+      scalars,
+      algorithm);
+}
+
+Tensor convolution_pointwise_meta(
+    const Tensor& input_t,
+    const Tensor& weight_t,
+    const c10::optional<Tensor>& bias_opt,
+    IntArrayRef padding,
+    IntArrayRef stride,
+    IntArrayRef dilation,
+    int64_t groups,
+    c10::string_view attr,
+    torch::List<c10::optional<at::Scalar>> scalars,
+    c10::optional<c10::string_view> algorithm) {
+  // oneDNN supports padding the two sides of src with different values
+  // the padding order should be front_top_left and back_bottom_right
+  auto padding_front_top_left = padding.vec();
+  auto padding_back_bottom_right = padding.vec();
+
+  auto k = weight_t.ndimension();
+  if (k == input_t.ndimension() + 1) {
+    k = input_t.ndimension();
+  }
+  int64_t dim = k - 2;
+
+  auto dst_tz = conv_dst_tz(
+      input_t.ndimension(),
+      input_t.sizes(),
+      weight_t.sizes(),
+      padding,
+      padding,
+      stride,
+      dilation);
+  Tensor output = at::empty(dst_tz, input_t.options());
+  return output;
+}
+
+Tensor convolution_pointwise_binary(
+    const Tensor& input_t,
+    Tensor& other_t,
+    const Tensor& weight_t,
+    const c10::optional<Tensor>& bias_opt,
+    IntArrayRef padding,
+    IntArrayRef stride,
+    IntArrayRef dilation,
+    int64_t groups,
+    c10::string_view binary_attr,
+    c10::optional<at::Scalar> alpha,
+    c10::optional<c10::string_view> unary_attr,
+    torch::List<c10::optional<at::Scalar>> unary_scalars,
+    c10::optional<c10::string_view> unary_algorithm) {
+  Tensor output;
+  Tensor bias = bias_opt.has_value() ? bias_opt.value() : at::Tensor();
+  // Step1: Construct binary attr
+  Attr attr;
+  bool is_fused = true;
+  if (binary_attr != "add") {
+    attr = construct_binary_attr(binary_attr, alpha, other_t, attr);
+  } else {
+    attr = get_onednn_conv_sum_attr(
+        input_t,
+        weight_t,
+        stride,
+        padding,
+        dilation,
+        other_t,
+        alpha.has_value() ? alpha.value().toFloat() : 1.f,
+        output,
+        /*is_fused*/ is_fused,
+        attr);
+  }
+
+  // Step2: Append unary attr
+  if (unary_attr.has_value())
+    attr = construct_unary_attr(
+        unary_attr.value(), unary_scalars, unary_algorithm, attr);
+
+  Tensor res = _convolution_out(
+      output,
+      input_t,
+      weight_t,
+      bias,
+      stride,
+      padding,
+      dilation,
+      /*transpoced*/ false,
+      {{0, 0}},
+      groups,
+      attr);
+
+  // Step3: Run conv
+  return res;
+}
+
+Tensor convolution_pointwise_binary_(
+    Tensor& other_t,
+    const Tensor& input_t,
+    const Tensor& weight_t,
+    const c10::optional<Tensor>& bias_opt,
+    IntArrayRef padding,
+    IntArrayRef stride,
+    IntArrayRef dilation,
+    int64_t groups,
+    c10::string_view binary_attr,
+    c10::optional<at::Scalar> alpha,
+    c10::optional<c10::string_view> unary_attr,
+    torch::List<c10::optional<at::Scalar>> unary_scalars,
+    c10::optional<c10::string_view> unary_algorithm) {
+  Tensor output;
+  Tensor bias = bias_opt.has_value() ? bias_opt.value() : at::Tensor();
+  // Step1: Construct binary attr
+  Attr attr;
+  bool is_fused = true;
+  if (binary_attr != "add") {
+    attr = construct_binary_attr(binary_attr, alpha, other_t, attr);
+  } else {
+    attr = get_onednn_conv_sum_attr(
+        input_t,
+        weight_t,
+        stride,
+        padding,
+        dilation,
+        other_t,
+        alpha.has_value() ? alpha.value().toFloat() : 1.f,
+        output,
+        /*is_fused*/ is_fused,
+        attr,
+        /*force_inplace*/ true);
+  }
+
+  // Step2: Append unary attr
+  if (unary_attr.has_value())
+    attr = construct_unary_attr(
+        unary_attr.value(), unary_scalars, unary_algorithm, attr);
+
+  Tensor res = _convolution_out(
+      output,
+      input_t,
+      weight_t,
+      bias,
+      stride,
+      padding,
+      dilation,
+      /*transpoced*/ false,
+      {{0, 0}},
+      groups,
+      attr);
+
+  // Step3: Run conv
+  return res;
+}
+
 #define IPEX_OP_REGISTER_CONVOLUTION(op, ...)                    \
   IPEX_OP_REGISTER("conv2d_" #op __VA_ARGS__, convolution_##op); \
   IPEX_OP_REGISTER("_convolution_" #op __VA_ARGS__, _convolution_##op);
@@ -2850,6 +3055,34 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_CONVOLUTION(sigmoid_binary_mul);
   IPEX_OP_REGISTER_CONVOLUTION(sigmoid_binary_mul_add);
   IPEX_OP_REGISTER_CONVOLUTION(sigmoid_binary_mul_add_relu);
+}
+
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(TORCH_SELECTIVE_SCHEMA(
+      "torch_ipex::_convolution_pointwise(Tensor X, Tensor W, Tensor? B, int[] padding, int[] stride, int[] dilation, int groups, str attr, Scalar?[] scalars, str? algorithm) -> Tensor Y"));
+  m.def(TORCH_SELECTIVE_SCHEMA(
+      "torch_ipex::_convolution_pointwise.binary(Tensor X, Tensor(a!) other, Tensor W, Tensor? B, int[] padding, int[] stride, int[] dilation, int groups, str binary_attr, Scalar? alpha, str? unary_attr, Scalar?[] unary_scalars, str? unary_algorithm) -> Tensor Y"));
+  m.def(TORCH_SELECTIVE_SCHEMA(
+      "torch_ipex::_convolution_pointwise_.binary(Tensor(a!) other, Tensor X,Tensor W, Tensor? B, int[] padding, int[] stride, int[] dilation, int groups, str binary_attr, Scalar? alpha, str? unary_attr, Scalar?[] unary_scalars, str? unary_algorithm) -> Tensor(a!) Y"));
+}
+
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.impl(
+      TORCH_SELECTIVE_NAME("torch_ipex::_convolution_pointwise"),
+      c10::DispatchKey::XPU,
+      TORCH_FN(at::AtenIpexTypeXPU::convolution_pointwise));
+  m.impl(
+      TORCH_SELECTIVE_NAME("torch_ipex::_convolution_pointwise.binary"),
+      c10::DispatchKey::XPU,
+      TORCH_FN(at::AtenIpexTypeXPU::convolution_pointwise_binary));
+  m.impl(
+      TORCH_SELECTIVE_NAME("torch_ipex::_convolution_pointwise_.binary"),
+      c10::DispatchKey::XPU,
+      TORCH_FN(at::AtenIpexTypeXPU::convolution_pointwise_binary_));
+  m.impl(
+      TORCH_SELECTIVE_NAME("torch_ipex::_convolution_pointwise"),
+      c10::DispatchKey::Meta,
+      TORCH_FN(at::AtenIpexTypeXPU::convolution_pointwise_meta));
 }
 
 } // namespace AtenIpexTypeXPU
