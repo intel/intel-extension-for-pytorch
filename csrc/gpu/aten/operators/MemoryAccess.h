@@ -123,7 +123,9 @@ struct multi_outputs_store_helper {
   _(float, Float)                                                         \
   _(c10::complex<float>, ComplexFloat)                                    \
   _(bool, Bool)                                                           \
-  _(at::BFloat16, BFloat16)
+  _(at::BFloat16, BFloat16)                                               \
+  _(c10::Float8_e4m3fn, Float8_e4m3fn)                                    \
+  _(c10::Float8_e5m2, Float8_e5m2)
 
 #define NO_DOUBLE_FETCH_AND_CAST_CASE(type, scalartype) \
   case ScalarType::scalartype:                          \

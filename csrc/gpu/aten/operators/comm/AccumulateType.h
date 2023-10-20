@@ -1,6 +1,8 @@
 #pragma once
 #include <ATen/Config.h>
 #include <c10/util/BFloat16.h>
+#include <c10/util/Float8_e4m3fn.h>
+#include <c10/util/Float8_e5m2.h>
 #include <c10/util/Half.h>
 #include "ScalarType.h"
 
@@ -25,14 +27,6 @@ struct AccumulateType<at::BFloat16> {
 };
 template <>
 struct AccumulateType<float> {
-  using type = float;
-};
-template <>
-struct AccumulateType<Float8_e5m2> {
-  using type = float;
-};
-template <>
-struct AccumulateType<Float8_e4m3fn> {
   using type = float;
 };
 template <>
@@ -63,7 +57,14 @@ template <>
 struct AccumulateType<int64_t> {
   using type = int64_t;
 };
-
+template <>
+struct AccumulateType<Float8_e4m3fn> {
+  using type = float;
+};
+template <>
+struct AccumulateType<Float8_e5m2> {
+  using type = float;
+};
 template <>
 struct AccumulateType<c10::complex<float>> {
   using type = c10::complex<float>;

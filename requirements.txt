@@ -9,3 +9,4 @@ scipy>=1.8.0
 setuptools
 types-dataclasses
 typing_extensions
+pydantic

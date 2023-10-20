@@ -13,10 +13,12 @@ namespace impl {
 
 Scalar _local_scalar_dense_dpcpp(const Tensor& self) {
   Scalar r;
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND5(
       at::ScalarType::Bool,
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
+      at::ScalarType::Float8_e4m3fn,
+      at::ScalarType::Float8_e5m2,
       self.scalar_type(),
       "_local_scalar_dense_dpcpp",
       [&] {

@@ -1685,3 +1685,21 @@ def DPCPPExtension(name, sources, *args, **kwargs):
     kwargs["extra_compile_args"] = extra_compile_args
 
     return setuptools.Extension(name, sources, *args, **kwargs)
+
+# for FP8
+def cast_to_fp8(
+    inp,
+    fp8_meta_tensor,
+    fp8_tensor,
+    otype,
+) -> torch.Tensor:
+    return fp8.utils.cast_to_fp8
+
+def cast_from_fp8(
+    inp,
+    fp8_meta_tensor,
+    fp8_tensor,
+    itype,
+    otype,
+) -> torch.Tensor:
+    return fp8.utils.cast_from_fp8
