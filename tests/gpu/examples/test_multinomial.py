@@ -1,4 +1,6 @@
 import torch
+import numpy as np
+import random
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
 
@@ -47,6 +49,26 @@ class TestTorchMethod(TestCase):
         for c, r in zip(outl, ref):
             if c != r:
                 raise RuntimeError("test_multinomial_align_to_cuda error")
+
+    def test_multinomial_align_to_cuda_2(self):
+        np.random.seed(0)
+        random.seed(0)
+        torch.manual_seed(0)
+        torch.xpu.manual_seed(0)
+        for i in range(1000): 
+            b = torch.Tensor(list(range(0, i)) + [i + 9999.0])
+            prob4 = torch.nn.functional.softmax(b)
+            # fp32 on cpu
+            n4 = torch.multinomial(prob4, num_samples=1)
+            # fp32 on xpu
+            n5 = torch.multinomial(prob4.to('xpu'), num_samples=1)
+            # fp16 on xpu
+            n6 = torch.multinomial(prob4.half().to('xpu'), num_samples=1)
+            # repeat fp16 on xpu
+            n7 = torch.multinomial(prob4.half().to('xpu'), num_samples=1)
+            self.assertEqual(n4, n5.cpu())
+            self.assertEqual(n5, n6)
+            self.assertEqual(n6, n7)
 
     def test_multinomial(self, dtype=torch.float):
         #  create a tensor of weights

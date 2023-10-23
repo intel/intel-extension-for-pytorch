@@ -38,11 +38,22 @@ Tensor& exponential_(
         using accscalar_t = acc_type<scalar_t>;
         auto lambd = static_cast<accscalar_t>(lambda);
         auto exponential_func = [lambd](accscalar_t val) {
-          auto log = val >= static_cast<accscalar_t>(1.) -
-                      std::numeric_limits<accscalar_t>::epsilon() / 2
-              ? -std::numeric_limits<accscalar_t>::epsilon() / 2
-              : Numerics<accscalar_t>::log(val);
-          return static_cast<accscalar_t>(-1.0) / lambd * log;
+          // BEFORE TOUCHING THIS CODE READ:
+          // https://github.com/pytorch/pytorch/issues/16706
+          // rand_uniform has (0,1] bounds. log(1) is 0 and exponential
+          // excludes 0. we need log to be not 0, and not underflow when
+          // converted to half
+          accscalar_t log;
+          if (val >= static_cast<accscalar_t>(1.f) -
+                  std::numeric_limits<scalar_t>::epsilon() / 2.f) {
+            // Need an epsilon of appropriate precision.
+            // Unlike CUDA behavior, DPCPP dtype conversions do not support
+            // epsilon downgrading.
+            log = -std::numeric_limits<scalar_t>::epsilon() / 2.f;
+          } else {
+            log = Numerics<accscalar_t>::log(val);
+          }
+          return static_cast<accscalar_t>(-1.f) / lambd * log;
         };
         uniform_and_transform<scalar_t, accscalar_t, PHILOX_ENGINE_CALLS>(
             iter, gen, exponential_func);
