@@ -515,6 +515,16 @@ create_version_files(
 )
 
 
+def auto_format_python_code():
+    script_path = os.path.join(base_dir, "scripts", "tools", "setup", "flake8.py")
+    script_cmd = ["python"]
+    script_cmd.append(script_path)
+    subprocess.call(
+        script_cmd,
+        cwd=base_dir,
+    )
+
+
 # global setup modules
 class IPEXClean(distutils.command.clean.clean, object):
     def run(self):
@@ -634,6 +644,8 @@ class IPEXCPPLibBuild(build_clib, object):
     def run(self):
         self.build_lib = os.path.relpath(get_package_dir())
         self.build_temp = os.path.relpath(get_build_type_dir())
+
+        auto_format_python_code()
 
         cmake_exec = get_cmake_command()
         if cmake_exec is None:

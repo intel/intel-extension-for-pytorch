@@ -9,12 +9,14 @@ def check_flake8_errors(base_dir, filepath):
         print(
             "WARNING: Please install flake8 by pip install -r requirements-flake8.txt to check format!"
         )
+        return 1
     flak8_cmd = ["flake8"]  # '--quiet'
 
     if shutil.which("black") is None:
         print(
             "WARNING: Please install black by pip install -r requirements-flake8.txt to auto format!"
         )
+        return 1
     black_cmd = ["black"]
 
     if os.path.isdir(filepath):
