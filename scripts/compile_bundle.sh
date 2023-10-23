@@ -131,46 +131,12 @@ git submodule sync
 git submodule update --init --recursive
 
 # Compile individual component
-<<<<<<< HEAD
-=======
-#  LLVM
-cd ../llvm-project
-if [ -d build ]; then
-    rm -rf build
-fi
-mkdir build
-cd build
-cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=1" -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF ../llvm/
-cmake --build . -j $MAX_JOBS
-LLVM_ROOT="$(pwd)/../release"
-if [ -d ${LLVM_ROOT} ]; then
-    rm -rf ${LLVM_ROOT}
-fi
-cmake -DCMAKE_INSTALL_PREFIX=${LLVM_ROOT}/../release/ -P cmake_install.cmake
-ln -s ${LLVM_ROOT}/bin/llvm-config ${LLVM_ROOT}/bin/llvm-config-13
-export PATH=${LLVM_ROOT}/bin:$PATH
-set +uex
-env | grep LD_LIBRARY_PATH > /dev/null
-if [ $? -ne 0 ]; then
-    export LD_LIBRARY_PATH=
-fi
-set -uex
-export LD_LIBRARY_PATH=${LLVM_ROOT}/lib:$LD_LIBRARY_PATH
-cd ..
->>>>>>> master
 #  PyTorch
 cd ../pytorch
 git apply ../intel-extension-for-pytorch/torch_patches/*.patch
-<<<<<<< HEAD
 # Install python dependency
 python -m pip install -r requirements.txt
 python -m pip install cmake ninja mkl-static mkl-include
-=======
-mv version.txt version.txt.bk
-echo "2.0.1a0" > version.txt
-export USE_LLVM=${LLVM_ROOT}
-export LLVM_DIR=${USE_LLVM}/lib/cmake/llvm
->>>>>>> master
 # Ensure cmake can find python packages when using conda or virtualenv
 if [ -n "${CONDA_PREFIX-}" ]; then
     export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(command -v conda))/../"}
@@ -188,12 +154,6 @@ unset USE_NUMA
 unset _GLIBCXX_USE_CXX11_ABI
 unset USE_STATIC_MKL
 unset CMAKE_PREFIX_PATH
-<<<<<<< HEAD
-=======
-unset LLVM_DIR
-unset USE_LLVM
-mv version.txt.bk version.txt
->>>>>>> master
 python -m pip uninstall -y mkl-static mkl-include
 python -m pip install --force-reinstall dist/*.whl
 #  TorchVision
