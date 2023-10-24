@@ -215,6 +215,8 @@ class IPEXTransformerMLPOptimizedFp16SiluLlama(IPEXTransformerMLPOptimizedFp16Si
     def transpose_parameter(self):
         super().transpose_parameter()
         self.up_proj.weight.data = self.up_proj.weight.transpose(0, 1).contiguous()
+        # Note: synchronize to ensure the completion of contiguous
+        torch.xpu.synchronize()
         self.origin_up_proj.data = self.up_proj.weight.data
 
     def inter_mm(self, hidden_states):

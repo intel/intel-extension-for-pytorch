@@ -92,7 +92,8 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
         self.k_proj.weight.data   = self.k_proj.weight.transpose(0, 1).contiguous()
         self.v_proj.weight.data   = self.v_proj.weight.transpose(0, 1).contiguous()
         self.out_proj.weight.data = self.out_proj.weight.transpose(0, 1).contiguous()
-
+        # Note: synchronize to ensure the completion of contiguous
+        torch.xpu.synchronize()
         self.origin_q_proj.weight.data   = self.q_proj.weight.data
         self.origin_k_proj.weight.data   = self.k_proj.weight.data
         self.origin_v_proj.weight.data   = self.v_proj.weight.data
@@ -102,6 +103,8 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
     def cat_qkv(self):
         shape = [3, -1, self.q_proj.weight.shape[-1]]
         self.qkv_proj.weight = torch.stack([self.q_proj.weight, self.k_proj.weight, self.v_proj.weight]).contiguous().view(shape)
+        # Note: synchronize to ensure the completion of contiguous
+        torch.xpu.synchronize()
         self.q_proj.weight.data = self.qkv_proj.weight[0, :, :]
         self.k_proj.weight.data = self.qkv_proj.weight[1, :, :]
         self.v_proj.weight.data = self.qkv_proj.weight[2, :, :]
@@ -109,6 +112,8 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
         if self.q_proj.bias is not None:
             bias_shape = [3, -1]
             self.qkv_proj.bias = torch.stack([self.q_proj.bias, self.k_proj.bias, self.v_proj.bias]).contiguous().view(bias_shape)
+            # Note: synchronize to ensure the completion of contiguous
+            torch.xpu.synchronize()
             self.q_proj.bias.data = self.qkv_proj.bias[0]
             self.k_proj.bias.data = self.qkv_proj.bias[1]
             self.v_proj.bias.data = self.qkv_proj.bias[2]
