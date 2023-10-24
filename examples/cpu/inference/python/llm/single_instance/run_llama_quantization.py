@@ -77,6 +77,20 @@ parser.add_argument(
          " modified weights, scales, zero points, etc. For better accuracy of weight only"
          " quantization with INT4 weight.",
 )
+parser.add_argument(
+    "--act-quant-mode",
+    choices=["PER_TENSOR", "PER_IC_BLOCK", "PER_BATCH", "PER_BATCH_IC_BLOCK"],
+    default="PER_IC_BLOCK",
+    type=str,
+    help="Quantization mode for activation with different granularity. "
+         "For lowp-mode=INT8 only. For other cases, it has no effect. "
+         "Assume the activation tensor has shape batch_size x input_channel. "
+         "PER_TENSOR(0): quantize per tensor; "
+         "PER_IC_BLOCK(1): quantize per group along IC with group size = IC_BLOCK; "
+         "PER_BATCH(2): quantize per batch; "
+         "PER_BATCH_IC_BLOCK(3): quantize per block of size 1 x IC_BLOCK. "
+         "IC_BLOCK is determined by IC automatically."
+)
 args = parser.parse_args()
 
 
@@ -290,8 +304,16 @@ elif args.ipex_weight_only_quantization:
         else:
             lowp_mode = ipex.quantization.WoqLowpMode.BF16
 
+    act_quant_mode_dict = {
+        "PER_TENSOR": ipex.quantization.WoqActQuantMode.PER_TENSOR,
+        "PER_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_IC_BLOCK,
+        "PER_BATCH": ipex.quantization.WoqActQuantMode.PER_BATCH,
+        "PER_BATCH_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_BATCH_IC_BLOCK,
+    }
     qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
-        weight_dtype=weight_dtype, lowp_mode=lowp_mode
+        weight_dtype=weight_dtype,
+        lowp_mode=lowp_mode,
+        act_quant_mode=act_quant_mode_dict[args.act_quant_mode]
     )
     if args.low_precision_checkpoint != "":
         low_precision_checkpoint = torch.load(args.low_precision_checkpoint)

@@ -458,7 +458,8 @@ at::Tensor woq_linear_kernel(
     const std::vector<at::Tensor>& bias_list,
     bool is_int4,
     int64_t lowp_mode,
-    int64_t num_concats) {
+    int64_t num_concats,
+    int64_t act_quant_mode) {
   if (weight.dim() > 2) {
     auto out = woq_tpp_gemm_kernel_stub(
         kCPU,
@@ -471,7 +472,8 @@ at::Tensor woq_linear_kernel(
         lowp_mode,
         num_concats,
         WOQ_FUSE_NONE, // no post op fusion
-        std::vector<at::Tensor>());
+        std::vector<at::Tensor>(),
+        act_quant_mode);
     if (out.defined()) {
       return out;
     }
@@ -548,7 +550,8 @@ at::Tensor woq_linear_eltwise_kernel(
     const c10::optional<c10::string_view>& algorithm,
     bool is_int4,
     int64_t lowp_mode,
-    int64_t num_concats) {
+    int64_t num_concats,
+    int64_t act_quant_mode) {
   int64_t post_op_fusion_type =
       post_op == "gelu" ? WOQ_FUSE_GELU : WOQ_FUSE_NONE;
   if (weight.dim() > 2) {
@@ -563,7 +566,8 @@ at::Tensor woq_linear_eltwise_kernel(
         lowp_mode,
         num_concats,
         post_op_fusion_type,
-        std::vector<at::Tensor>());
+        std::vector<at::Tensor>(),
+        act_quant_mode);
     if (out.defined()) {
       return out;
     }
@@ -607,6 +611,7 @@ at::Tensor woq_linear_add_kernel(
     bool is_int4,
     int64_t lowp_mode,
     int64_t num_concats,
+    int64_t act_quant_mode,
     at::Tensor& accumu,
     const c10::optional<at::Scalar>& alpha) {
   c10::Scalar a = alpha.has_value() ? alpha.value() : 1.0f;
@@ -622,7 +627,8 @@ at::Tensor woq_linear_add_kernel(
         lowp_mode,
         num_concats,
         WOQ_FUSE_NONE, // no eltwise post op
-        std::vector<at::Tensor>());
+        std::vector<at::Tensor>(),
+        act_quant_mode);
     if (output.defined()) {
       at::add_out(accumu, output, accumu, a);
       return accumu;
@@ -654,7 +660,8 @@ at::Tensor woq_linear_add_kernel(
     bool is_int4,
     int64_t lowp_mode,
     int64_t num_concats,
-    const std::vector<at::Tensor>& others) {
+    const std::vector<at::Tensor>& others,
+    int64_t act_quant_mode) {
   if (weight.dim() > 2) {
     auto out = woq_tpp_gemm_kernel_stub(
         kCPU,
@@ -667,7 +674,8 @@ at::Tensor woq_linear_add_kernel(
         lowp_mode,
         num_concats,
         WOQ_FUSE_ADD, // post op add
-        others);
+        others,
+        act_quant_mode);
     if (out.defined()) {
       return out;
     }
@@ -697,7 +705,8 @@ at::Tensor woq_linear_add_add_kernel(
     bool is_int4,
     int64_t lowp_mode,
     int64_t num_concats,
-    const std::vector<at::Tensor>& others) {
+    const std::vector<at::Tensor>& others,
+    int64_t act_quant_mode) {
   if (weight.dim() > 2) {
     auto out = woq_tpp_gemm_kernel_stub(
         kCPU,
@@ -710,7 +719,8 @@ at::Tensor woq_linear_add_add_kernel(
         lowp_mode,
         num_concats,
         WOQ_FUSE_ADD_ADD, // post op add-add
-        others);
+        others,
+        act_quant_mode);
     if (out.defined()) {
       return out;
     }

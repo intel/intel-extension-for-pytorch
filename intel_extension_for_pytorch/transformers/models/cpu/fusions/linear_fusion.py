@@ -229,8 +229,11 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
             bias_list = []
             w_dtype = self.linear_list[0].dtype
             lowp_mode = self.linear_list[0]._lowp_mode
+            act_quant_mode = self.linear_list[0]._act_quant_mode
             qconfig_mapping = get_weight_only_quant_qconfig_mapping(
-                weight_dtype=w_dtype, lowp_mode=lowp_mode
+                weight_dtype=w_dtype,
+                lowp_mode=lowp_mode,
+                act_quant_mode=act_quant_mode,
             )
             qconfig = qconfig_mapping.global_qconfig
             for i in range(self.num_concat):

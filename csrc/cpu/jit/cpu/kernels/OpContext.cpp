@@ -366,7 +366,8 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
     c10::optional<at::Tensor>&& bias,
     c10::optional<int64_t> batch_size,
     int64_t lowp_mode,
-    int64_t num_concats) {
+    int64_t num_concats,
+    int64_t act_quant_mode) {
   auto N = weight.size(0);
   const auto qtype = weight.qscheme();
   if (weight.scalar_type() == c10::ScalarType::QInt8) {
@@ -434,7 +435,8 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
         bias,
         batch_size,
         lowp_mode,
-        num_concats);
+        num_concats,
+        act_quant_mode);
     return c10::make_intrusive<IpexWoqLinearOpContext>(
         batch_size, std::move(op_context));
   } else {
@@ -478,7 +480,8 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
         bias,
         batch_size,
         lowp_mode,
-        num_concats);
+        num_concats,
+        act_quant_mode);
     return c10::make_intrusive<IpexWoqLinearOpContext>(
         batch_size, std::move(op_context));
   }

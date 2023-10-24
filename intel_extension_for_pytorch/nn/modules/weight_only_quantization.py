@@ -55,6 +55,7 @@ class IpexWoqLinear(nn.Module):
         self._op_context = None
         self._lowp_mode = 0
         self._num_concats = 1
+        self._act_quant_mode = 0
 
     def pre_ipex_gemm(self, input):
         return input
@@ -79,6 +80,7 @@ class IpexWoqLinear(nn.Module):
         extra_repr_str += ", bias={}".format(self.bias)
         extra_repr_str += ", lowp_mode={}".format(self._lowp_mode)
         extra_repr_str += ", num_concats={}".format(self._num_concats)
+        extra_repr_str += ", act_quant_mode={}".format(self._act_quant_mode)
         return extra_repr_str
 
     @classmethod
@@ -103,6 +105,7 @@ class IpexWoqLinear(nn.Module):
         )
         assert hasattr(mod, "qconfig"), "Input float module must have qconfig defined"
         lowp_mode = 0
+        act_quant_mode = 0
         if mod.qconfig is not None and mod.qconfig.weight is not None:
             weight_observer = mod.qconfig.weight()
             if hasattr(mod.qconfig, "lowp_mode"):
@@ -116,6 +119,8 @@ class IpexWoqLinear(nn.Module):
                         "Warning: lowp_mode=3(INT8) is not supported yet in this case. "
                         "Falling back to 2(BF16)."
                     )
+            if hasattr(mod.qconfig, "act_quant_mode"):
+                act_quant_mode = mod.qconfig.act_quant_mode
         else:
             weight_observer = (
                 get_weight_only_quant_qconfig_mapping().global_qconfig.weight()
@@ -137,7 +142,9 @@ class IpexWoqLinear(nn.Module):
         if not hasattr(mod, "out_features"):
             mod.out_features = mod.weight.size()[0]
 
-        qlinear = cls._init_cls(mod, dtype, qweight, lowp_mode, num_concats)
+        qlinear = cls._init_cls(
+            mod, dtype, qweight, lowp_mode, num_concats, act_quant_mode
+        )
         del qweight
         return qlinear
 
@@ -168,8 +175,12 @@ class IpexWoqLinear(nn.Module):
         assert hasattr(mod, "qconfig"), "Input float module must have qconfig defined"
 
         lowp_mode = 0
-        if mod.qconfig is not None and hasattr(mod.qconfig, "lowp_mode"):
-            lowp_mode = mod.qconfig.lowp_mode
+        act_quant_mode = 0
+        if mod.qconfig is not None:
+            if hasattr(mod.qconfig, "lowp_mode"):
+                lowp_mode = mod.qconfig.lowp_mode
+            if hasattr(mod.qconfig, "act_quant_mode"):
+                act_quant_mode = mod.qconfig.act_quant_mode
         num_concats = 1
         if hasattr(mod, "_num_concats"):
             num_concats = mod._num_concats
@@ -192,23 +203,32 @@ class IpexWoqLinear(nn.Module):
         if bias is None:
             bias = mod.bias
         qlinear._op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack_int4(
-            qweight, scales, zero_points, bias, None, int(lowp_mode), num_concats
+            qweight,
+            scales,
+            zero_points,
+            bias,
+            None,
+            int(lowp_mode),
+            num_concats,
+            act_quant_mode,
         )
         qlinear._lowp_mode = lowp_mode
         qlinear._num_concats = num_concats
+        qlinear._act_quant_mode = act_quant_mode
         del qweight
         return qlinear
 
     @classmethod
-    def _init_cls(cls, mod, dtype, qweight, lowp_mode, num_concats):
+    def _init_cls(cls, mod, dtype, qweight, lowp_mode, num_concats, act_quant_mode):
         qlinear = cls(
             mod.in_features, mod.out_features, mod.bias is not None, dtype=dtype
         )
         qlinear._op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
-            qweight, mod.bias, None, int(lowp_mode), num_concats
+            qweight, mod.bias, None, int(lowp_mode), num_concats, act_quant_mode
         )
         qlinear._lowp_mode = lowp_mode
         qlinear._num_concats = num_concats
+        qlinear._act_quant_mode = act_quant_mode
         return qlinear
 
 
@@ -239,7 +259,7 @@ class IpexWoqLinearAllreduce(IpexWoqLinear):
         )
 
     @classmethod
-    def _init_cls(cls, mod, dtype, qweight, lowp_mode, num_concats):
+    def _init_cls(cls, mod, dtype, qweight, lowp_mode, num_concats, act_quant_mode):
         qlinear = cls._init_from_mod(mod, dtype)
 
         qlinear._op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
@@ -248,6 +268,7 @@ class IpexWoqLinearAllreduce(IpexWoqLinear):
             None,  # batch_size
             lowp_mode,
             num_concats,
+            act_quant_mode,
         )
 
         return qlinear

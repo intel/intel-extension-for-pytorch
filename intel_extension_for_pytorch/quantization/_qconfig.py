@@ -101,12 +101,47 @@ class WoqLowpMode(IntEnum):
     INT8 = 3
 
 
-QConfigWoq = namedtuple("QConfigWoq", [*QConfig._fields, "lowp_mode"])
+class WoqActQuantMode(IntEnum):
+    NONE = -1
+    PER_TENSOR = 0
+    PER_IC_BLOCK = 1  # IC = Input Channel
+    PER_BATCH = 2
+    PER_BATCH_IC_BLOCK = 3
+
+
+QConfigWoq = namedtuple("QConfigWoq", [*QConfig._fields, "lowp_mode", "act_quant_mode"])
 
 
 def get_weight_only_quant_qconfig_mapping(
-    *, weight_dtype: torch.dtype = torch.qint8, lowp_mode: int = WoqLowpMode.NONE
+    *,
+    weight_dtype: torch.dtype = torch.qint8,
+    lowp_mode: int = WoqLowpMode.NONE,
+    act_quant_mode: int = WoqActQuantMode.PER_IC_BLOCK
 ):
+    """
+    Configuration for weight-only quantization (WOQ) for LLM.
+    Arguments:
+        weight_dtype:   Data type for weight, torch.qint8 or torch.quint4x2.
+        lowp_mode:      specify the lowest precision data type for computation. Data types
+                        that has even lower precision won't be used.
+                        Not necessarily related to activation or weight dtype.
+                        - NONE(0): Use the activation data type for computation.
+                        - FP16(1): Use float16 (a.k.a. half) as the lowest precision for computation.
+                        - BF16(2): Use bfloat16 as the lowest precision for computation.
+                        - INT8(3): Use INT8 as the lowest precision for computation.
+                                   Activation is quantized to int8 at runtime in this case.
+                        Note that lowp_mode=INT8(3) is only available when weight_dtype=torch.quint4x2.
+                        In other cases, it will fall back to lowp_mode=BF16(2).
+        act_quant_mode: Quantization granularity of activation. It only works for lowp_mode=INT8.
+                        It has no effect in other cases. The tensor is divided into groups, and
+                        each group is quantized with its own quantization parameters.
+                        Suppose the activation has shape batch_size by input_channel (IC).
+                        - PER_TENSOR(0): Use the same quantization parameters for the entire tensor.
+                        - PER_IC_BLOCK(1): Tensor is divided along IC with group size = IC_BLOCK.
+                        - PER_BATCH(2): Tensor is divided along batch_size with group size = 1.
+                        - PER_BATCH_IC_BLOCK(3): Tenosr is divided into blocks of 1 x IC_BLOCK.
+                        Note that IC_BLOCK is determined by IC automatically, not configurable.
+    """
     dtype_to_qscheme = {
         torch.qint8: torch.per_channel_affine,
         torch.quint8: torch.per_channel_affine,
@@ -120,6 +155,7 @@ def get_weight_only_quant_qconfig_mapping(
             dtype=weight_dtype, qscheme=weight_qscheme
         ),
         lowp_mode=lowp_mode,
+        act_quant_mode=act_quant_mode,
     )
     weight_only_quant_qconfig_mapping = QConfigMapping().set_global(
         _weight_only_quant_qconfig

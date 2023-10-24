@@ -108,7 +108,8 @@ at::Tensor woq_linear_kernel(
     const std::vector<at::Tensor>& bias_list,
     bool is_int4,
     int64_t lowp_mode,
-    int64_t num_concats);
+    int64_t num_concats,
+    int64_t act_quant_mode);
 
 void woq_linear_eltwise_kernel_output(
     const at::Tensor& self,
@@ -133,7 +134,8 @@ at::Tensor woq_linear_eltwise_kernel(
     const c10::optional<c10::string_view>& algorithm,
     bool is_int4,
     int64_t lowp_mode,
-    int64_t num_concats);
+    int64_t num_concats,
+    int64_t act_quant_mode);
 
 at::Tensor woq_linear_add_kernel(
     const at::Tensor& self,
@@ -144,6 +146,7 @@ at::Tensor woq_linear_add_kernel(
     bool is_int4,
     int64_t lowp_mode,
     int64_t num_concats,
+    int64_t act_quant_mode,
     at::Tensor& accumu,
     const c10::optional<at::Scalar>& alpha);
 
@@ -156,7 +159,8 @@ at::Tensor woq_linear_add_kernel(
     bool is_int4,
     int64_t lowp_mode,
     int64_t num_concats,
-    const std::vector<at::Tensor>& others);
+    const std::vector<at::Tensor>& others,
+    int64_t act_quant_mode);
 
 at::Tensor woq_linear_add_add_kernel(
     const at::Tensor& self,
@@ -167,7 +171,8 @@ at::Tensor woq_linear_add_add_kernel(
     bool is_int4,
     int64_t lowp_mode,
     int64_t num_concats,
-    const std::vector<at::Tensor>& others);
+    const std::vector<at::Tensor>& others,
+    int64_t act_quant_mode);
 
 namespace {
 void woq_gemm_kernel_impl(
@@ -241,7 +246,8 @@ using woq_tpp_gemm_kernel_fn = at::Tensor (*)(
     int64_t,
     int64_t,
     int64_t,
-    const std::vector<at::Tensor>&);
+    const std::vector<at::Tensor>&,
+    int64_t);
 
 using woq_tpp_gemm_packB_fn =
     at::Tensor (*)(const at::Tensor&, bool, size_t, size_t, int64_t);

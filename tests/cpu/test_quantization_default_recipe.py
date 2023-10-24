@@ -917,6 +917,134 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 output2 = qm2(data)
                 torch.testing.assert_close(output1, output2, atol=1e-2, rtol=1e-4)
 
+    def test_weight_only_quantization_act_quant_mode(self):
+        M, N, K = 4, 64, 128
+        groupsize = 64
+
+        class Mod(nn.Module):
+            def __init__(self, has_bias):
+                super(Mod, self).__init__()
+                self.linear = torch.nn.Linear(K, N, has_bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        def fakequant_by_group(t, quant_a_mode, groupsize):
+            assert quant_a_mode >= 0 and quant_a_mode <= 3
+            if quant_a_mode == 0:
+                obs = torch.ao.quantization.MinMaxObserver(torch.quint8)
+                obs(t)
+                scale, zero_point = obs.calculate_qparams()
+                return (
+                    torch.quantize_per_tensor(
+                        t.to(torch.float), scale, zero_point, torch.quint8
+                    )
+                    .dequantize()
+                    .to(t.dtype)
+                )
+            assert t.shape[-1] % groupsize == 0
+            grouped = t.view(-1, t.shape[-1] // groupsize, groupsize)
+            if quant_a_mode == 1:
+                grouped_min = grouped.min(dim=-1)[0].min(dim=0)[0]
+                grouped_max = grouped.max(dim=-1)[0].max(dim=0)[0]
+            elif quant_a_mode == 2:
+                grouped_min = grouped.min(dim=-1)[0].min(dim=1)[0]
+                grouped_max = grouped.max(dim=-1)[0].max(dim=1)[0]
+            else:
+                grouped_min = grouped.min(dim=-1)[0]
+                grouped_max = grouped.max(dim=-1)[0]
+            zeros = torch.zeros_like(grouped_min)
+            min = torch.minimum(grouped_min, zeros)
+            max = torch.maximum(grouped_max, zeros)
+            scales = (max - min) / 255
+            zps = -torch.round(min / scales)
+            if quant_a_mode == 1:
+                qt = torch.clamp(
+                    torch.round(grouped / scales.unsqueeze(1)) + zps.unsqueeze(1),
+                    min=0,
+                    max=255,
+                )
+                return (
+                    ((qt - zps.unsqueeze(1)) * scales.unsqueeze(1))
+                    .to(t.dtype)
+                    .view(t.shape)
+                )
+            elif quant_a_mode == 2:
+                qt = torch.clamp(
+                    torch.round(grouped / scales.unsqueeze(1).unsqueeze(2))
+                    + zps.unsqueeze(1).unsqueeze(2),
+                    min=0,
+                    max=255,
+                )
+                return (
+                    (
+                        (qt - zps.unsqueeze(1).unsqueeze(2))
+                        * scales.unsqueeze(1).unsqueeze(2)
+                    )
+                    .to(t.dtype)
+                    .view(t.shape)
+                )
+            else:
+                qt = torch.clamp(
+                    torch.round(grouped / scales.unsqueeze(-1)) + zps.unsqueeze(-1),
+                    min=0,
+                    max=255,
+                )
+                return (
+                    ((qt - zps.unsqueeze(-1)) * scales.unsqueeze(-1))
+                    .to(t.dtype)
+                    .view(t.shape)
+                )
+
+        def test(has_bias, act_quant_mode):
+            dtype = torch.bfloat16
+            model = Mod(has_bias)
+            m = model.eval()
+            m2 = copy.deepcopy(m)
+            data = torch.rand(M, K) * 0.5
+            qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=torch.quint4x2,
+                lowp_mode=ipex.quantization.WoqLowpMode.INT8,
+                act_quant_mode=act_quant_mode,
+            )
+            fake_quant_x = fakequant_by_group(data, act_quant_mode, groupsize)
+            prepared_model = prepare(m2, qconfig_mapping, inplace=True)
+            with torch.no_grad(), torch.autocast(
+                device_type="cpu", enabled=True, dtype=dtype
+            ):
+                woq_model = convert(prepared_model)
+                # Behavior of WOQ Linear to simulate:
+                # Quantize weight to int4 by float qparams at quantization time
+                # Quantize activation to int8 at runtime
+                # Convert weight and its zero points to INT8 for computation
+                qw = woq_model.linear._op_context.to_public(
+                    woq_model.linear._op_context.get_weight()
+                )
+                w_scales = qw.q_per_channel_scales().unsqueeze(-1)
+                w_zero_points = qw.q_per_channel_zero_points().unsqueeze(-1)
+                w = copy.deepcopy(m.linear.weight.data)
+                fake_quant_w = (
+                    w / w_scales + w_zero_points - w_zero_points.int()
+                ) * w_scales
+                m.linear.weight.data = fake_quant_w
+                y_ref = m(fake_quant_x).to(dtype)
+                y = woq_model(data)
+                try:
+                    torch.testing.assert_close(y, y_ref, atol=1e-2 * 5, rtol=1e-1 * 2)
+                except Exception:
+                    # The fallback kernel does not support act quant mode
+                    # It computes in fp32 by dequantizing weight.
+                    fake_quant_w = qw.dequantize()
+                    y_ref = data @ fake_quant_w.T + (m.linear.bias if has_bias else 0)
+                    y_ref = y_ref.to(dtype)
+                    torch.testing.assert_close(y, y_ref, atol=1e-2, rtol=1e-1)
+
+        has_bias_list = [False, True]
+        quant_mode_list = [0, 1, 2, 3]
+        cases = itertools.product(has_bias_list, quant_mode_list)
+        for has_bias, quant_mode in cases:
+            test(has_bias, quant_mode)
+
 
 if __name__ == "__main__":
     run_tests()

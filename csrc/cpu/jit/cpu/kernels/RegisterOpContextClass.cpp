@@ -135,7 +135,8 @@ TORCH_LIBRARY(ipex_prepack, m) {
                 std::move(std::get<1>(state)),
                 std::move(std::get<2>(state)),
                 std::move(std::get<3>(state)),
-                std::move(std::get<4>(state)));
+                std::move(std::get<4>(state)),
+                std::move(std::get<5>(state)));
           })
       .def(
           "get_weight",
@@ -167,10 +168,10 @@ TORCH_LIBRARY(ipex_prepack, m) {
       "-> __torch__.torch.classes.ipex_prepack.ConvTransposeOpContext");
 #ifdef USE_LIBXSMM
   m.def(
-      "weight_only_qlinear_prepack(Tensor W, Tensor? B, int? batch_size, int lowp_mode, int num_concats) "
+      "weight_only_qlinear_prepack(Tensor W, Tensor? B, int? batch_size, int lowp_mode, int num_concats, int act_quant_mode) "
       "-> __torch__.torch.classes.ipex_prepack.WoqLinearOpContext");
   m.def(
-      "weight_only_qlinear_prepack_int4(Tensor W, Tensor scales, Tensor zero_points, Tensor? B, int? batch_size, int lowp_mode, int num_concats) "
+      "weight_only_qlinear_prepack_int4(Tensor W, Tensor scales, Tensor zero_points, Tensor? B, int? batch_size, int lowp_mode, int num_concats, int act_quant_mode) "
       "-> __torch__.torch.classes.ipex_prepack.WoqLinearOpContext");
 #endif
 }

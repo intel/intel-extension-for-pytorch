@@ -15,7 +15,8 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
     c10::optional<at::Tensor>&& bias,
     c10::optional<int64_t> batch_size,
     int64_t lowp_mode,
-    int64_t num_concats);
+    int64_t num_concats,
+    int64_t act_quant_mode);
 
 c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     at::Tensor&& weight,
@@ -24,7 +25,8 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     c10::optional<at::Tensor>&& bias,
     c10::optional<int64_t> batch_size,
     int64_t lowp_mode,
-    int64_t num_concats);
+    int64_t num_concats,
+    int64_t act_quant_mode);
 
 at::Tensor woq_linear_run(
     const at::Tensor& input,
@@ -37,7 +39,8 @@ ContextLinearWoq create(
     const c10::optional<at::Tensor>& bias,
     const c10::optional<int64_t> batch_size,
     int64_t lowp_mode,
-    int64_t num_concats);
+    int64_t num_concats,
+    int64_t act_quant_mode);
 
 at::Tensor run(ContextLinearWoq& context, const at::Tensor& input);
 

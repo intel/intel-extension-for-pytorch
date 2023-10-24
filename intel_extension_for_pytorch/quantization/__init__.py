@@ -7,5 +7,6 @@ from ._qconfig import (
     get_smooth_quant_qconfig_mapping,
     get_weight_only_quant_qconfig_mapping,
     WoqLowpMode,
+    WoqActQuantMode,
 )
 from ._autotune import autotune

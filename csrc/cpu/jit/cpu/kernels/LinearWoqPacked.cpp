@@ -15,13 +15,19 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
     c10::optional<at::Tensor>&& bias,
     c10::optional<int64_t> batch_size,
     int64_t lowp_mode,
-    int64_t num_concats) {
+    int64_t num_concats,
+    int64_t act_quant_mode) {
   RECORD_FUNCTION(
       "ipex_prepack::createWoqLinearPrePackOpContext",
       c10::ArrayRef<c10::IValue>({}));
 
   return IpexWoqLinearOpContext::create_context(
-      std::move(weight), std::move(bias), batch_size, lowp_mode, num_concats);
+      std::move(weight),
+      std::move(bias),
+      batch_size,
+      lowp_mode,
+      num_concats,
+      act_quant_mode);
 }
 
 c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
@@ -31,7 +37,8 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     c10::optional<at::Tensor>&& bias,
     c10::optional<int64_t> batch_size,
     int64_t lowp_mode,
-    int64_t num_concats) {
+    int64_t num_concats,
+    int64_t act_quant_mode) {
   RECORD_FUNCTION(
       "ipex_prepack::createWoqLinearPrePackOpContextInt4",
       c10::ArrayRef<c10::IValue>({}));
@@ -100,7 +107,8 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
       std::move(bias),
       batch_size,
       lowp_mode,
-      num_concats);
+      num_concats,
+      act_quant_mode);
 }
 
 at::Tensor woq_linear_run(
@@ -119,7 +127,8 @@ ContextLinearWoq create(
     const c10::optional<at::Tensor>& bias,
     const c10::optional<int64_t> batch_size,
     int64_t lowp_mode,
-    int64_t num_concats) {
+    int64_t num_concats,
+    int64_t act_quant_mode) {
   auto packed_weight =
       woq_linear_pack_weight(weight, scales, zero_points, lowp_mode);
   bool is_int4 = weight.scalar_type() == c10::kQUInt4x2;
@@ -151,6 +160,7 @@ ContextLinearWoq create(
           is_int4,
           lowp_mode,
           num_concats,
+          act_quant_mode,
           c10::make_optional(weight.sizes().vec()));
     } else {
       return ContextLinearWoq(
@@ -161,6 +171,7 @@ ContextLinearWoq create(
           is_int4,
           lowp_mode,
           num_concats,
+          act_quant_mode,
           c10::make_optional(weight.sizes().vec()));
     }
   }
@@ -172,6 +183,7 @@ ContextLinearWoq create(
       is_int4,
       lowp_mode,
       num_concats,
+      act_quant_mode,
       weight_is_padded ? c10::make_optional(weight.sizes().vec())
                        : c10::nullopt);
 }
@@ -199,7 +211,8 @@ at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
         context.bias_list_,
         context.is_int4_,
         context.lowp_mode_,
-        context.num_concats_);
+        context.num_concats_,
+        context.act_quant_mode_);
     // weight shape is [N by K], output shape is [M by N] or [batch by M by N]
     int64_t N = context.orig_wei_shape_.value()[0];
     return at::slice(res, /*dim*/ -1, /*start*/ 0, /*end*/ N, /*step*/ 1);
@@ -212,7 +225,8 @@ at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
       context.bias_list_,
       context.is_int4_,
       context.lowp_mode_,
-      context.num_concats_);
+      context.num_concats_,
+      context.act_quant_mode_);
 }
 
 // Called by IpexWoqLinearOpContext::run_eltwise
@@ -245,7 +259,8 @@ at::Tensor run_eltwise(
       algorithm,
       context.is_int4_,
       context.lowp_mode_,
-      context.num_concats_);
+      context.num_concats_,
+      context.act_quant_mode_);
 }
 
 // Registered as JIT op
@@ -293,6 +308,7 @@ at::Tensor run_add(
       context.is_int4_,
       context.lowp_mode_,
       context.num_concats_,
+      context.act_quant_mode_,
       accumu,
       alpha);
 }
@@ -323,7 +339,8 @@ at::Tensor run_add_relu(
       context.bias_list_,
       context.is_int4_,
       context.lowp_mode_,
-      context.num_concats_);
+      context.num_concats_,
+      context.act_quant_mode_);
   at::add_out(accumu, output, accumu, alpha.value());
   at::relu_(accumu);
   return accumu;
@@ -355,7 +372,8 @@ at::Tensor run_add(
       context.is_int4_,
       context.lowp_mode_,
       context.num_concats_,
-      others);
+      others,
+      context.act_quant_mode_);
 }
 
 // Called by IpexWoqLinearOpContext::run_add_add
@@ -384,7 +402,8 @@ at::Tensor run_add_add(
       context.is_int4_,
       context.lowp_mode_,
       context.num_concats_,
-      others);
+      others,
+      context.act_quant_mode_);
 }
 
 // Registered as JIT op

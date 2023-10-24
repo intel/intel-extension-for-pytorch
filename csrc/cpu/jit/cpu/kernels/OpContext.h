@@ -365,6 +365,7 @@ using SerializationTypeWoqLinearPrePack = std::tuple<
     c10::optional<at::Tensor>,
     c10::optional<int64_t>,
     int64_t,
+    int64_t,
     int64_t>;
 
 class WoqLinearOpContext : public torch::jit::CustomClassHolder {
@@ -380,7 +381,8 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
         orig_bias_,
         batch_size_,
         this->get_context().lowp_mode_,
-        this->get_context().num_concats_);
+        this->get_context().num_concats_,
+        this->get_context().act_quant_mode_);
   }
 
   virtual at::Tensor get_data_handle() = 0;
@@ -486,7 +488,8 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
       c10::optional<at::Tensor>&& bias,
       c10::optional<int64_t> batch_size,
       int64_t lowp_mode,
-      int64_t num_concats);
+      int64_t num_concats,
+      int64_t act_quant_mode);
 
   virtual void load_from_ctx(
       c10::intrusive_ptr<WoqLinearOpContext> other) override;

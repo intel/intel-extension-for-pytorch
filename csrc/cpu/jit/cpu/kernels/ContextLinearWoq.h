@@ -17,6 +17,7 @@ struct ContextLinearWoq final {
   bool is_int4_;
   int64_t lowp_mode_;
   int64_t num_concats_;
+  int64_t act_quant_mode_;
   // Original weight shape. Weight may be padded after packing
   c10::optional<std::vector<int64_t>> orig_wei_shape_;
 
@@ -30,12 +31,14 @@ struct ContextLinearWoq final {
       bool is_int4 = false,
       int64_t lowp_mode = 0,
       int64_t num_concats = 1,
+      int64_t act_quant_mode = 0,
       c10::optional<std::vector<int64_t>>&& orig_wei_shape = c10::nullopt)
       : at_weight_(std::move(at_weight)),
         at_bias_(std::move(bias)),
         is_int4_(is_int4),
         lowp_mode_(lowp_mode),
         num_concats_(num_concats),
+        act_quant_mode_(act_quant_mode),
         orig_wei_shape_(std::move(orig_wei_shape)) {
     // Make three dtype versions of scale, zp and bias
     // There is one more dtype for zp
