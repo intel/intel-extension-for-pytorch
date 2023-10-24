@@ -3,6 +3,7 @@ from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
 
+
 class TestTorchMethod(TestCase):
     def test_gcd(self, dtype=torch.int):
         a_cpu = torch.randint(0, 100000, [100, 100])

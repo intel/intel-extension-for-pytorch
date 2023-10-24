@@ -99,6 +99,7 @@ if has_cpu():
     from . import quantization
     from .quantization import woq
     from . import _meta_registrations
+
     try:
         from .cpu import tpp
     except BaseException:
@@ -108,6 +109,7 @@ if has_cpu():
 
 if has_xpu():
     from . import xpu
+
     # This code used to check the deprecated tile partition feature option. Should remove this check in next release.
     if "IPEX_TILE_AS_DEVICE" in os.environ:
         warnings.warn(
@@ -135,7 +137,11 @@ if has_cpu():
     from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl
     from .cpu.utils.verbose import verbose
     from .cpu.tpp.fused_bert import fast_bert
-    from ._inductor.cpu.compiler import _set_compiler_backend, _get_compiler_backend, compile
+    from ._inductor.cpu.compiler import (
+        _set_compiler_backend,
+        _get_compiler_backend,
+        compile,
+    )
     from ._inductor.cpu.dynamo_backends import *
     from .cpu.onednn_fusion import enable_onednn_fusion
     from ._init_on_device import OnDevice
@@ -155,12 +161,12 @@ from ._version import (
 cmake_prefix_path = os.path.join(os.path.dirname(__file__), "share", "cmake")
 
 
-torch_version = ''
-ipex_version = ''
-matches = re.match(r'(\d+\.\d+).*', torch.__version__)
+torch_version = ""
+ipex_version = ""
+matches = re.match(r"(\d+\.\d+).*", torch.__version__)
 if matches and len(matches.groups()) == 1:
     torch_version = matches.group(1)
-matches = re.match(r'(\d+\.\d+).*', __version__)
+matches = re.match(r"(\d+\.\d+).*", __version__)
 if matches and len(matches.groups()) == 1:
     ipex_version = matches.group(1)
 if torch_version == "" or ipex_version == "" or torch_version != ipex_version:
@@ -176,6 +182,7 @@ if torch_version == "" or ipex_version == "" or torch_version != ipex_version:
 
 if has_cpu():
     from .cpu.utils import _cpu_isa, _custom_fx_tracer
+
     _cpu_isa.check_minimal_isa_support()
 
 

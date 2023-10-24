@@ -9,6 +9,7 @@ import numpy as np
 import platform
 import pytest
 
+
 class Conv_Cat(nn.Module):
     def __init__(self, with_relu):
         super(Conv_Cat, self).__init__()
@@ -33,11 +34,10 @@ class Conv_Cat(nn.Module):
 
 class TestTorchMethod(TestCase):
     def test_cat_array_quint8(self, dtype=torch.float):
-        zp_vec = [0] if platform.system() == 'Windows' else [0, 2]
+        zp_vec = [0] if platform.system() == "Windows" else [0, 2]
         for dtype in [torch.quint8, torch.qint8]:
             for zp in zp_vec:
-
-                zp_out = 0 if platform.system() == 'Windows' else 4
+                zp_out = 0 if platform.system() == "Windows" else 4
                 input1 = torch.randn(1, 1, 5, 5)
                 input2 = torch.randn(1, 1, 5, 5)
                 input3 = torch.randn(1, 1, 5, 5)
@@ -50,22 +50,30 @@ class TestTorchMethod(TestCase):
                 q_input2 = torch.quantize_per_tensor(input2, 0.5, zp, dtype)
                 q_input3 = torch.quantize_per_tensor(input3, 0.6, zp, dtype)
 
-                output_int8 = torch.ops.quantized.cat([q_input1, q_input2, q_input3], dim=1, scale=0.02, zero_point=zp_out)
+                output_int8 = torch.ops.quantized.cat(
+                    [q_input1, q_input2, q_input3], dim=1, scale=0.02, zero_point=zp_out
+                )
 
                 q_input1_gpu = torch.quantize_per_tensor(input1_gpu, 0.4, zp, dtype)
                 q_input2_gpu = torch.quantize_per_tensor(input2_gpu, 0.5, zp, dtype)
                 q_input3_gpu = torch.quantize_per_tensor(input3_gpu, 0.6, zp, dtype)
 
                 output_gpu_int8 = torch.ops.quantized.cat(
-                    [q_input1_gpu, q_input2_gpu, q_input3_gpu], dim=1, scale=0.02, zero_point=zp_out)
+                    [q_input1_gpu, q_input2_gpu, q_input3_gpu],
+                    dim=1,
+                    scale=0.02,
+                    zero_point=zp_out,
+                )
 
                 print("output_input\n", output_int8.dequantize()[0][1])
                 print("output_input\n", output_gpu_int8.dequantize()[0][1])
 
                 self.assertEqual(output_int8, output_gpu_int8)
 
-    @pytest.mark.skipif(platform.system() == 'Windows', 
-                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
+    @pytest.mark.skipif(
+        platform.system() == "Windows",
+        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current",
+    )
     def test_conv_cat(self):
         torch._C._jit_set_profiling_mode(True)
         torch._C._jit_set_profiling_executor(True)
@@ -78,4 +86,6 @@ class TestTorchMethod(TestCase):
                 # cpu_res = trace_int8_model(model1, "cpu", test_input)
                 xpu_res = trace_int8_model(model, "xpu", test_input)
                 ref_res = model1(test_input)
-                np.testing.assert_almost_equal(xpu_res.cpu().numpy(), ref_res.cpu().numpy(), decimal=1)
+                np.testing.assert_almost_equal(
+                    xpu_res.cpu().numpy(), ref_res.cpu().numpy(), decimal=1
+                )

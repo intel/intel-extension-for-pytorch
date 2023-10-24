@@ -134,8 +134,11 @@ class TestTorchMethod(TestCase):
         model1 = copy.deepcopy(model)
         model = torch.quantization.QuantWrapper(model)
         qconfig = torch.quantization.QConfig(
-            activation=torch.quantization.observer.MinMaxObserver.with_args(qscheme=torch.per_tensor_symmetric),
-            weight=torch.quantization.default_weight_observer)
+            activation=torch.quantization.observer.MinMaxObserver.with_args(
+                qscheme=torch.per_tensor_symmetric
+            ),
+            weight=torch.quantization.default_weight_observer,
+        )
         model.qconfig = qconfig
 
         torch.quantization.prepare(model, inplace=True)

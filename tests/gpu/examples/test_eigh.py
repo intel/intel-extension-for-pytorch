@@ -3,7 +3,7 @@ from torch.testing._internal.common_utils import (
     TestCase,
     random_symmetric_matrix,
 )
-from torch.testing._internal.common_device_type import (dtypes, precisionOverride)
+from torch.testing._internal.common_device_type import dtypes, precisionOverride
 from torch.testing import make_tensor
 
 import torch
@@ -24,8 +24,14 @@ class TestTorchMethod(TestCase):
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     @dtypes(torch.float32, torch.float64, torch.complex32, torch.complex64)
-    @precisionOverride({torch.float32: 1e-4, torch.complex32: 1e-4,
-                        torch.float64: 1e-4, torch.complex64: 1e-4})
+    @precisionOverride(
+        {
+            torch.float32: 1e-4,
+            torch.complex32: 1e-4,
+            torch.float64: 1e-4,
+            torch.complex64: 1e-4,
+        }
+    )
     def test_linalg_eigh(self, dtype=torch.float64):
         matrix_cpu = random_hermitian_matrix(3, 1, dtype=dtype, device=cpu_device)
         matrix_gpu = matrix_cpu.clone().detach().to(dpcpp_device)
@@ -40,8 +46,14 @@ class TestTorchMethod(TestCase):
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     @dtypes(torch.float32, torch.float64, torch.complex32, torch.complex64)
-    @precisionOverride({torch.float32: 1e-4, torch.complex32: 1e-4,
-                        torch.float64: 1e-4, torch.complex64: 1e-4})
+    @precisionOverride(
+        {
+            torch.float32: 1e-4,
+            torch.complex32: 1e-4,
+            torch.float64: 1e-4,
+            torch.complex64: 1e-4,
+        }
+    )
     def test_eigvalsh(self, dtype=torch.float64, device=dpcpp_device):
         def run_test(shape, batch, uplo):
             matrix = random_hermitian_matrix(shape, *batch, dtype=dtype, device=device)
@@ -66,8 +78,14 @@ class TestTorchMethod(TestCase):
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     @dtypes(torch.float32, torch.float64, torch.complex32, torch.complex64)
-    @precisionOverride({torch.float32: 1e-4, torch.complex32: 1e-4,
-                        torch.float64: 1e-4, torch.complex64: 1e-4})
+    @precisionOverride(
+        {
+            torch.float32: 1e-4,
+            torch.complex32: 1e-4,
+            torch.float64: 1e-4,
+            torch.complex64: 1e-4,
+        }
+    )
     def test_eigh_lower_uplo(self, device=dpcpp_device, dtype=torch.float64):
         def run_test(shape, batch, uplo):
             # check lower case uplo
@@ -96,9 +114,9 @@ class TestTorchMethod(TestCase):
         # eigh requires 'uplo' parameter to be 'U' or 'L'
         t = torch.randn(3, 3, device=device, dtype=dtype)
         for uplo in ["a", "wrong"]:
-            with self.assertRaisesRegex(RuntimeError, "be \'L\' or \'U\'"):
+            with self.assertRaisesRegex(RuntimeError, "be 'L' or 'U'"):
                 torch.linalg.eigh(t, UPLO=uplo)
-            with self.assertRaisesRegex(ValueError, "be \'L\' or \'U\'"):
+            with self.assertRaisesRegex(ValueError, "be 'L' or 'U'"):
                 np.linalg.eigh(t.cpu().numpy(), UPLO=uplo)
 
         # if non-empty out tensor with wrong shape is passed a warning is given
@@ -152,8 +170,14 @@ class TestTorchMethod(TestCase):
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     @dtypes(torch.float32, torch.float64, torch.complex32, torch.complex64)
-    @precisionOverride({torch.float32: 1e-4, torch.complex32: 1e-4,
-                        torch.float64: 1e-4, torch.complex64: 1e-4})
+    @precisionOverride(
+        {
+            torch.float32: 1e-4,
+            torch.complex32: 1e-4,
+            torch.float64: 1e-4,
+            torch.complex64: 1e-4,
+        }
+    )
     def test_eigh_non_contiguous(self, dtype=torch.float64, device=dpcpp_device):
         def run_test(matrix, uplo):
             self.assertFalse(matrix.is_contiguous())
@@ -184,8 +208,14 @@ class TestTorchMethod(TestCase):
 
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     @dtypes(torch.float32, torch.float64, torch.complex32, torch.complex64)
-    @precisionOverride({torch.float32: 1e-4, torch.complex32: 1e-4,
-                        torch.float64: 1e-4, torch.complex64: 1e-4})
+    @precisionOverride(
+        {
+            torch.float32: 1e-4,
+            torch.complex32: 1e-4,
+            torch.float64: 1e-4,
+            torch.complex64: 1e-4,
+        }
+    )
     def test_eigh_hermitian_grad(self, dtype=torch.float64, device=dpcpp_device):
         def run_test(dims, uplo):
             x = random_hermitian_matrix(dims[-1], *dims[:-2]).requires_grad_()
@@ -203,8 +233,14 @@ class TestTorchMethod(TestCase):
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     @dtypes(torch.float32, torch.float64, torch.complex32, torch.complex64)
-    @precisionOverride({torch.float32: 1e-4, torch.complex32: 1e-4,
-                        torch.float64: 1e-4, torch.complex64: 1e-4})
+    @precisionOverride(
+        {
+            torch.float32: 1e-4,
+            torch.complex32: 1e-4,
+            torch.float64: 1e-4,
+            torch.complex64: 1e-4,
+        }
+    )
     def test_eigvalsh_non_contiguous(self, device=dpcpp_device, dtype=torch.float64):
         def run_test(matrix, uplo):
             self.assertFalse(matrix.is_contiguous())
@@ -294,9 +330,9 @@ class TestTorchMethod(TestCase):
         # eigvalsh requires 'uplo' parameter to be 'U' or 'L'
         t = torch.randn(3, 3, device=device, dtype=dtype)
         for uplo in ["a", "wrong"]:
-            with self.assertRaisesRegex(RuntimeError, "be \'L\' or \'U\'"):
+            with self.assertRaisesRegex(RuntimeError, "be 'L' or 'U'"):
                 torch.linalg.eigvalsh(t, UPLO=uplo)
-            with self.assertRaisesRegex(ValueError, "be \'L\' or \'U\'"):
+            with self.assertRaisesRegex(ValueError, "be 'L' or 'U'"):
                 np.linalg.eigvalsh(t.cpu().numpy(), UPLO=uplo)
 
         # if non-empty out tensor with wrong shape is passed a warning is given

@@ -103,10 +103,11 @@ def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
         torch.nn.ParameterList,
     ]
 
-    # extend the cast scope for bert training performance because 
+    # extend the cast scope for bert training performance because
     # the BertLMPredictionHead has shared parameters
     try:
         from transformers.models.bert.modeling_bert import BertLMPredictionHead
+
         module_convert_list_bf16_training.append(BertLMPredictionHead)
     except ImportError:
         pass
@@ -158,6 +159,7 @@ def IPEX_WEIGHT_CONVERT_MODULE_XPU(inference: bool, dtype: torch.bfloat16):
         return module_convert_list_inference
     else:
         return module_convert_list_training
+
 
 def _should_prepack(module, is_training, is_xpu=False):
     if is_xpu:
@@ -315,7 +317,7 @@ class ParameterWrapper(object):
         # whether we should pack state in optimizers
         self.plain_format_shape: torch.Size = None
 
-    def can_cast_inference(self, dtype, device_type='cpu'):
+    def can_cast_inference(self, dtype, device_type="cpu"):
         if self.casted_dtype is not None:
             # already casted
             assert dtype == self.casted_dtype
@@ -328,9 +330,9 @@ class ParameterWrapper(object):
             return False
 
         module_cls = []
-        if device_type == 'cpu':
+        if device_type == "cpu":
             module_cls = IPEX_WEIGHT_CONVERT_MODULE_CPU(inference=True, dtype=dtype)
-        elif device_type == 'xpu':
+        elif device_type == "xpu":
             module_cls = IPEX_WEIGHT_CONVERT_MODULE_XPU(inference=True, dtype=dtype)
         else:
             raise AssertionError("Unsupported device, only support CPU and XPU for now")
@@ -346,7 +348,7 @@ class ParameterWrapper(object):
         with torch.no_grad():
             self.parameter.data = casted_param
 
-    def can_cast_training(self, dtype, device_type='cpu'):
+    def can_cast_training(self, dtype, device_type="cpu"):
         if self.casted_dtype is not None:
             # already casted
             assert dtype == self.casted_dtype
@@ -362,9 +364,9 @@ class ParameterWrapper(object):
             return False
 
         module_cls = []
-        if device_type == 'cpu':
+        if device_type == "cpu":
             module_cls = IPEX_WEIGHT_CONVERT_MODULE_CPU(inference=False, dtype=dtype)
-        elif device_type == 'xpu':
+        elif device_type == "xpu":
             module_cls = IPEX_WEIGHT_CONVERT_MODULE_XPU(inference=False, dtype=dtype)
         else:
             raise AssertionError("Unsupported device, only support CPU and XPU for now")

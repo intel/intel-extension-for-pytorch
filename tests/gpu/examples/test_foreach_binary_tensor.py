@@ -18,6 +18,7 @@ class ForeachBinaryTensorTest:
             input_other_for_func.append(other[i].clone().to(device))
         return self.func(input_tensor_for_func, input_other_for_func)
 
+
 class ForeachBinaryTensorTestInplace:
     def __init__(self, func):
         self.func = func

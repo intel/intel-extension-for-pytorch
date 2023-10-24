@@ -203,8 +203,10 @@ def trace_int8_model(model, device, test_input):
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(platform.system() == 'Windows',
-                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
+    @pytest.mark.skipif(
+        platform.system() == "Windows",
+        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current",
+    )
     def test_qConv2d_sigmoid(self, dtype=torch.float):
         model = ConvSigmoid()
         model1 = copy.deepcopy(model)
@@ -233,8 +235,10 @@ class TestTorchMethod(TestCase):
             decimal=1,
         )
 
-    @pytest.mark.skipif(platform.system() == 'Windows',
-                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
+    @pytest.mark.skipif(
+        platform.system() == "Windows",
+        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current",
+    )
     def test_qConv2d_leakyrelu(self, dtype=torch.float):
         model = ConvLeakyRelu()
         model1 = copy.deepcopy(model)
@@ -247,8 +251,10 @@ class TestTorchMethod(TestCase):
             xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol
         )
 
-    @pytest.mark.skipif(platform.system() == 'Windows',
-                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
+    @pytest.mark.skipif(
+        platform.system() == "Windows",
+        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current",
+    )
     def test_qConv2d_mish(self, dtype=torch.float):
         model = ConvMish()
         model1 = copy.deepcopy(model)
@@ -261,8 +267,10 @@ class TestTorchMethod(TestCase):
             xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol
         )
 
-    @pytest.mark.skipif(platform.system() == 'Windows',
-                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
+    @pytest.mark.skipif(
+        platform.system() == "Windows",
+        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current",
+    )
     def test_qConv2d_mish_add(self, dtype=torch.float):
         model = ConvMishAdd()
         model1 = copy.deepcopy(model)
@@ -275,15 +283,19 @@ class TestTorchMethod(TestCase):
             xpu_res.cpu(), xpu_ref.cpu(), atol=checking_atol, rtol=checking_rtol
         )
 
-    @pytest.mark.skipif(platform.system() == 'Windows',
-                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
+    @pytest.mark.skipif(
+        platform.system() == "Windows",
+        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current",
+    )
     def test_conv_binary_bias(self, dtype=torch.float):
         model = ConvBinaryBias()
         test_input = torch.rand([1, 256, 1, 1])
         xpu_res = trace_int8_model(model, "xpu", test_input.clone())
 
-    @pytest.mark.skipif(platform.system() == 'Windows',
-                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
+    @pytest.mark.skipif(
+        platform.system() == "Windows",
+        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current",
+    )
     def test_conv_silu(self, dtype=torch.float):
         model = ConvSiLU()
         model1 = copy.deepcopy(model)

@@ -12,12 +12,13 @@ from torch._inductor.ir import (
     OptionalString,
     OptionalList,
     OptionalScalar,
-    TensorBox
+    TensorBox,
 )
 from torch._prims_common import (
     make_channels_last_strides_for,
 )
 from torch._inductor.virtualized import V
+
 
 def _prepare_convolution_fusion_create(
     cls,
@@ -215,11 +216,11 @@ class ConvolutionUnary(ExternKernelAlloc):
             may_convert_to_optional(optional_string, algorithm),
         ]
         return ConvolutionUnary(
-
             layout=kernel_layout,
             inputs=inputs,
             constant_args=constant_args,
         )
+
 
 class LinearUnary(ExternKernelAlloc):
     def __init__(
@@ -284,6 +285,7 @@ class LinearUnary(ExternKernelAlloc):
 
     def apply_constraint(self):
         pass
+
 
 class LinearBinary(ExternKernelAlloc):
     kernel = "torch.ops.torch_ipex._linear_pointwise.binary"
@@ -353,6 +355,7 @@ class LinearBinary(ExternKernelAlloc):
 
     def apply_constraint(self):
         pass
+
 
 class ConvolutionBinary(ExternKernelAlloc):
     def __init__(
@@ -443,6 +446,7 @@ class ConvolutionBinary(ExternKernelAlloc):
             inputs=inputs,
             constant_args=constant_args,
         )
+
 
 class ConvolutionBinaryInplace(ExternKernelAlloc):
     def __init__(

@@ -28,6 +28,7 @@ from torch._inductor.utils import DeferredLineBase, sympy_symbol, unique
 
 pexpr = PythonPrinter().doprint
 
+
 class XPUTritonOverrides(TritonOverrides):
     """
     Map element-wise ops to Triton. This is a WA solution to mute tl.device_assert, which
@@ -52,6 +53,7 @@ class XPUTritonOverrides(TritonOverrides):
                 f"unrecognized config triton.inject_relu_bug_TESTING_ONLY = {bug!r}"
             )
 
+
 class XPUTritonKernel(TritonKernel):
     overrides = XPUTritonOverrides
 
@@ -75,6 +77,7 @@ class XPUTritonKernel(TritonKernel):
         """
         Override this method to mute tl.device_assert which is not supported on Triton XPU backend.
         """
+
         # TODO: This code should be lifted to codegen/common.py.
         # This should be easy, as now CSE variables carry bounds info
         class IndirectAssertLine(DeferredLineBase):
@@ -137,9 +140,8 @@ class XPUTritonKernel(TritonKernel):
             var = new_var
 
         generate_assert = (
-            (check or config.debug_index_asserts)
-            and config.triton.assert_indirect_indexing
-        )
+            check or config.debug_index_asserts
+        ) and config.triton.assert_indirect_indexing
         if generate_assert:
             mask_vars = set(var.mask_vars)
             if self._load_mask:
@@ -247,7 +249,9 @@ class XPUTritonKernel(TritonKernel):
         result.writelines(["\n", "\n", "if __name__ == '__main__':"])
         with result.indent():
             result.writeline("from torch._inductor.utils import get_num_bytes")
-            result.writeline("from intel_extension_for_pytorch._inductor.xpu.utils import do_bench")
+            result.writeline(
+                "from intel_extension_for_pytorch._inductor.xpu.utils import do_bench"
+            )
             result.writeline("")
 
             result.writeline("args = get_args()")

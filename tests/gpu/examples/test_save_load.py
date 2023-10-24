@@ -104,7 +104,9 @@ class TestTorchMethod(TestCase):
 
                 # create model
                 model_xpu = (
-                    models.__dict__["resnet18"](pretrained=True).to(device=device).train()
+                    models.__dict__["resnet18"](pretrained=True)
+                    .to(device=device)
+                    .train()
                 )
                 optimizer_xpu = torch.optim.SGD(model_xpu.parameters(), lr=lr)
                 criterion = nn.CrossEntropyLoss()
@@ -114,8 +116,10 @@ class TestTorchMethod(TestCase):
 
                 # process torch.xpu.optimize
                 model_xpu, optimizer_xpu = torch.xpu.optimize(
-                    model=model_xpu, dtype=dtype, optimizer=optimizer_xpu,
-                    split_master_weight_for_bf16=split_master_weight_for_bf16
+                    model=model_xpu,
+                    dtype=dtype,
+                    optimizer=optimizer_xpu,
+                    split_master_weight_for_bf16=split_master_weight_for_bf16,
                 )
 
                 # mimic model train, then eval
@@ -162,7 +166,10 @@ class TestTorchMethod(TestCase):
                     # check
                     print("checking...")
                     self.assertEqual(
-                        model_xpu.state_dict(), new_model.state_dict(), atol=1e-6, rtol=1e-6
+                        model_xpu.state_dict(),
+                        new_model.state_dict(),
+                        atol=1e-6,
+                        rtol=1e-6,
                     )
                     self.assertEqual(
                         optimizer_xpu.state_dict(),

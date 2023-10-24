@@ -10,6 +10,7 @@ from torch.quantization.quantize_jit import (
     prepare_jit,
 )
 
+
 class Net(torch.nn.Module):
     def __init__(self):
         super(Net, self).__init__()

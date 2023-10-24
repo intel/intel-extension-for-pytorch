@@ -117,12 +117,10 @@ class TestNNMethod(TestCase):
         # print("y_dpcpp backward", x_dpcpp.grad.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
-
     def test_channels_last_simple_fwd(self, dtype=torch.float):
         size_list = [[8, 8, 24, 24, 24], [1, 8, 24, 24, 24]]
         kernel_list = [[3, 1, 1], [12, 3, 4]]
         for size, kernel in zip(size_list, kernel_list):
-
             x_cpu = torch.ones(size, device=cpu_device)
             x_dpcpp = torch.ones(size, device=dpcpp_device).to(
                 memory_format=torch.channels_last_3d
@@ -136,7 +134,6 @@ class TestNNMethod(TestCase):
             y_dpcpp = avg_pool(x_dpcpp)
             # print("y_dpcpp", y_dpcpp.cpu())
             self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
-
 
     def test_channels_last_simple_bwd(self, dtype=torch.float):
         x_cpu = torch.ones([8, 8, 8, 8, 8], device=cpu_device)

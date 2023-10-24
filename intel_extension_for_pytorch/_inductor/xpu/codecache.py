@@ -72,4 +72,5 @@ class XPUAsyncCompile(AsyncCompile):
         else:
             return _load_kernel(kernel_name, source_code)
 
+
 XPUAsyncCompile.warm_pool()

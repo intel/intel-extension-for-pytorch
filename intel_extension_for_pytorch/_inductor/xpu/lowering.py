@@ -3,6 +3,7 @@ import torch._inductor.ir as torch_ir
 from torch._inductor.lowering import register_lowering
 from . import ir as xpu_ir
 
+
 def register_onednn_fusion_ops():
     @register_lowering(torch.ops.torch_ipex._convolution_pointwise)
     def convolution_unary(
@@ -28,7 +29,7 @@ def register_onednn_fusion_ops():
                 groups,
                 attr,
                 scalars,
-                algorithm
+                algorithm,
             )
         )
 
@@ -102,14 +103,25 @@ def register_onednn_fusion_ops():
 
     @register_lowering(torch.ops.torch_ipex._linear_pointwise)
     def linear_unary(
-        x: torch_ir.TensorBox, w: torch_ir.TensorBox, b: torch_ir.TensorBox, attr, scalars, algorithm
+        x: torch_ir.TensorBox,
+        w: torch_ir.TensorBox,
+        b: torch_ir.TensorBox,
+        attr,
+        scalars,
+        algorithm,
     ):
         return torch_ir.TensorBox.create(
             xpu_ir.LinearUnary.create(x, w, b, attr, scalars, algorithm)
         )
 
     @register_lowering(torch.ops.torch_ipex._linear_pointwise.binary)
-    def linear_binary(x: torch_ir.TensorBox, y: torch_ir.TensorBox, w: torch_ir.TensorBox, b: torch_ir.TensorBox, attr):
+    def linear_binary(
+        x: torch_ir.TensorBox,
+        y: torch_ir.TensorBox,
+        w: torch_ir.TensorBox,
+        b: torch_ir.TensorBox,
+        attr,
+    ):
         return torch_ir.TensorBox.create(xpu_ir.LinearBinary.create(x, y, w, b, attr))
 
 

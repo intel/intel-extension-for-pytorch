@@ -11,6 +11,7 @@ from ..fusions.linear_fusion import (
     _IPEXConcatLinearRef,
 )
 
+
 def _GPTJAttention_forward(
     self,
     hidden_states: torch.FloatTensor,
@@ -24,7 +25,7 @@ def _GPTJAttention_forward(
     Tuple[torch.Tensor, Tuple[torch.Tensor]],
     Optional[Tuple[torch.Tensor, Tuple[torch.Tensor], Tuple[torch.Tensor, ...]]],
 ]:
-    if hasattr(self, 'concat_qkv'):
+    if hasattr(self, "concat_qkv"):
         query, key, value = self.concat_qkv(hidden_states)
     else:
         query = self.q_proj(hidden_states)
@@ -111,19 +112,15 @@ def _LlamaAttention_forward(
     use_cache: bool = False,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
     bsz, q_len, _ = hidden_states.size()
-    if hasattr(self, 'concat_qkv'):
+    if hasattr(self, "concat_qkv"):
         query, key, value = self.concat_qkv(hidden_states)
     else:
         query = self.q_proj(hidden_states)
         key = self.k_proj(hidden_states)
         value = self.v_proj(hidden_states)
     query = query.view(bsz, q_len, self.num_heads, self.head_dim)
-    key = key.view(
-        bsz, q_len, self.num_key_value_heads, self.head_dim
-    )
-    value = value.view(
-        bsz, q_len, self.num_key_value_heads, self.head_dim
-    )
+    key = key.view(bsz, q_len, self.num_key_value_heads, self.head_dim)
+    value = value.view(bsz, q_len, self.num_key_value_heads, self.head_dim)
     kv_seq_len = (
         q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
     )
@@ -591,20 +588,32 @@ class _IPEXAttentionRef(nn.Module):
                 self.model_backbone,
             )
 
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or \
-                re.search("LLAMA", self.model_backbone, re.IGNORECASE):
-            if hasattr(module, 'q_proj') and hasattr(module, 'k_proj') and hasattr(module, 'v_proj'):
+        if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or re.search(
+            "LLAMA", self.model_backbone, re.IGNORECASE
+        ):
+            if (
+                hasattr(module, "q_proj")
+                and hasattr(module, "k_proj")
+                and hasattr(module, "v_proj")
+            ):
+
                 def get_weight_shape(mod):
-                    if hasattr(mod, 'in_features') and hasattr(mod, 'out_features'):
+                    if hasattr(mod, "in_features") and hasattr(mod, "out_features"):
                         return [mod.in_features, mod.out_features]
-                    elif hasattr(mod, 'weight') and hasattr(mod.weight, 'shape'):
+                    elif hasattr(mod, "weight") and hasattr(mod.weight, "shape"):
                         return list(mod.weight.shape)
                     return None
-                weight_shapes = [get_weight_shape(mod)
-                                 for mod in [module.q_proj, module.k_proj, module.v_proj]]
-                if weight_shapes[0] is not None and \
-                        all(weight_shapes[0] == shape for shape in weight_shapes[1:]):
-                    self.concat_qkv = _IPEXConcatLinearRef([module.q_proj, module.k_proj, module.v_proj])
+
+                weight_shapes = [
+                    get_weight_shape(mod)
+                    for mod in [module.q_proj, module.k_proj, module.v_proj]
+                ]
+                if weight_shapes[0] is not None and all(
+                    weight_shapes[0] == shape for shape in weight_shapes[1:]
+                ):
+                    self.concat_qkv = _IPEXConcatLinearRef(
+                        [module.q_proj, module.k_proj, module.v_proj]
+                    )
                     del module.q_proj, module.k_proj, module.v_proj
 
         self._IPEXScaleDotProduct = _IPEXScaleDotProductRef(module, config)

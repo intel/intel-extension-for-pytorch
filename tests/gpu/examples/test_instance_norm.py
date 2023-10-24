@@ -143,10 +143,28 @@ class TestNNMethod(TestCase):
         momentum = 0.1
         eps = 1e-5
 
-        y_cpu = torch.instance_norm(i, weight, bias, running_mean, running_var, use_input_stats,
-                                    momentum, eps, torch.backends.cudnn.enabled)
-        y_xpu = torch.instance_norm(i.xpu(), weight, bias, running_mean, running_var, use_input_stats,
-                                    momentum, eps, torch.backends.cudnn.enabled)
+        y_cpu = torch.instance_norm(
+            i,
+            weight,
+            bias,
+            running_mean,
+            running_var,
+            use_input_stats,
+            momentum,
+            eps,
+            torch.backends.cudnn.enabled,
+        )
+        y_xpu = torch.instance_norm(
+            i.xpu(),
+            weight,
+            bias,
+            running_mean,
+            running_var,
+            use_input_stats,
+            momentum,
+            eps,
+            torch.backends.cudnn.enabled,
+        )
         self.assertEqual(y_cpu, y_xpu.cpu())
 
     def test_instance_norm_with_optimize(self):

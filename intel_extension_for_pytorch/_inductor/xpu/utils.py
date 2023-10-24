@@ -10,7 +10,7 @@ def triton_do_bench(
     grad_to_none=None,
     quantiles=None,
     fast_flush=True,
-    return_mode="mean"
+    return_mode="mean",
 ):
     assert return_mode in ["min", "max", "mean", "median"]
     """
@@ -38,9 +38,9 @@ def triton_do_bench(
     # before each kernel call to make sure that the L2
     # doesn't contain any input data before the run
     if fast_flush:
-        cache = torch.empty(int(256e6 // 4), dtype=torch.int, device='xpu')
+        cache = torch.empty(int(256e6 // 4), dtype=torch.int, device="xpu")
     else:
-        cache = torch.empty(int(256e6), dtype=torch.int8, device='xpu')
+        cache = torch.empty(int(256e6), dtype=torch.int8, device="xpu")
 
     # Estimate the runtime of the function
     start_event = torch.xpu.Event(enable_timing=True)
@@ -54,12 +54,12 @@ def triton_do_bench(
     estimate_ms = start_event.elapsed_time(end_event) / 5
     assert (
         estimate_ms > 0
-    ), f'''
+    ), f"""
     'estimate_ms' should be larger than 0, but got {estimate_ms}.
     This is a driver bug, please run your script with UR_L0_IN_ORDER_BARRIER_BY_SIGNAL=0 to work around it,
     like this:
     UR_L0_IN_ORDER_BARRIER_BY_SIGNAL=0 python script.py
-    '''
+    """
 
     # compute number of warmup and repeat
     n_warmup = max(1, int(warmup / estimate_ms))
@@ -85,7 +85,9 @@ def triton_do_bench(
         end_event[i].record()
     # Record clocks
     torch.xpu.synchronize()
-    times = torch.tensor([s.elapsed_time(e) for s, e in zip(start_event, end_event)], dtype=torch.float)
+    times = torch.tensor(
+        [s.elapsed_time(e) for s, e in zip(start_event, end_event)], dtype=torch.float
+    )
     if quantiles is not None:
         ret = torch.quantile(times, torch.tensor(quantiles, dtype=torch.float)).tolist()
         if len(ret) == 1:

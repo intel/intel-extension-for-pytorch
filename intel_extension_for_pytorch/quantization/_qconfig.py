@@ -83,11 +83,13 @@ class WoqLowpMode(IntEnum):
     BF16 = 2
     INT8 = 3
 
-QConfigWoq = namedtuple('QConfigWoq', [*QConfig._fields, 'lowp_mode'])
+
+QConfigWoq = namedtuple("QConfigWoq", [*QConfig._fields, "lowp_mode"])
+
+
 def get_weight_only_quant_qconfig_mapping(
-        *,
-        weight_dtype: torch.dtype = torch.qint8,
-        lowp_mode: int = WoqLowpMode.NONE):
+    *, weight_dtype: torch.dtype = torch.qint8, lowp_mode: int = WoqLowpMode.NONE
+):
     dtype_to_qscheme = {
         torch.qint8: torch.per_channel_affine,
         torch.quint8: torch.per_channel_affine,

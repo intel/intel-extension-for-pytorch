@@ -12,7 +12,9 @@ class ForeachTest:
     def __init__(self, func):
         self.func = func
 
-    def __call__(self, input1, input2, device, is_inplace=False, scalar=None, non_blocking=None):
+    def __call__(
+        self, input1, input2, device, is_inplace=False, scalar=None, non_blocking=None
+    ):
         input1_for_func = []
         input2_for_func = []
         for i in input1:
@@ -31,7 +33,9 @@ class ForeachTest:
             if scalar is not None:
                 return self.func(input1_for_func, input2_for_func, alpha=scalar)
             elif non_blocking is not None:
-                return self.func(input1_for_func, input2_for_func, non_blocking=non_blocking)
+                return self.func(
+                    input1_for_func, input2_for_func, non_blocking=non_blocking
+                )
             else:
                 return self.func(input1_for_func, input2_for_func)
 

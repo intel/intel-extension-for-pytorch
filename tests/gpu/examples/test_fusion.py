@@ -113,6 +113,7 @@ class Mish(torch.nn.Module):
         x = x * (torch.tanh(torch.nn.functional.softplus(x)))
         return x
 
+
 class AddSoftmax(torch.nn.Module):
     def __init__(self, dtype):
         super().__init__()
@@ -122,6 +123,7 @@ class AddSoftmax(torch.nn.Module):
         x = torch.softmax(x + y, dim=-1, dtype=self.dtype)
         return x
 
+
 class AddViewSoftmax(torch.nn.Module):
     def __init__(self):
         super().__init__()
@@ -129,6 +131,7 @@ class AddViewSoftmax(torch.nn.Module):
     def forward(self, x, y):
         x = torch.softmax((x + y).view(-1, x.size(2), x.size(3), x.size(4)), dim=-1)
         return x
+
 
 class MatmulSum(torch.nn.Module):
     def __init__(self):
@@ -475,6 +478,7 @@ class TransMatmulAddAdd(torch.nn.Module):
     def forward(self, m1, m2, add1, add2):
         return torch.add(torch.matmul(m1, m2.t()), add1, alpha=2.0) + add2
 
+
 class TransMatmulDivScalar(torch.nn.Module):
     def __init__(self) -> None:
         super(TransMatmulDivScalar, self).__init__()
@@ -482,12 +486,14 @@ class TransMatmulDivScalar(torch.nn.Module):
     def forward(self, m1, m2):
         return torch.div(torch.matmul(m1, m2.t()), 3.0)
 
+
 class TransMatmulDivTensor(torch.nn.Module):
     def __init__(self) -> None:
         super(TransMatmulDivTensor, self).__init__()
 
     def forward(self, m1, m2, div):
         return torch.div(torch.matmul(m1, m2.t()), div)
+
 
 class TransMatmulAdd(torch.nn.Module):
     def __init__(self):
@@ -2537,7 +2543,9 @@ class TestNNMethod(TestCase):
                 output = modelJit(input_xpu)
                 torch.xpu.synchronize()
             output_impe = model(input_xpu)
-        np.testing.assert_almost_equal(output.cpu().numpy(), output_impe.cpu().numpy(), decimal=1)
+        np.testing.assert_almost_equal(
+            output.cpu().numpy(), output_impe.cpu().numpy(), decimal=1
+        )
 
     def test_linear_relu_fusion(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)
@@ -3147,7 +3155,6 @@ class TestNNMethod(TestCase):
         del modelJit
 
     def test_add_softmax_fusion(self, dtype=torch.float16):
-
         m1 = torch.randn([4, 2, 4, 4], device=dpcpp_device, dtype=dtype)
         m2 = torch.randn([4, 2, 1, 1], device=dpcpp_device, dtype=dtype)
 

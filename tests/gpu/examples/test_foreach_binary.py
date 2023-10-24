@@ -47,22 +47,35 @@ class TestForeachBinary(TestCase):
             torch._foreach_minimum_((x1_xpu,), (x2_xpu,)),
         )
 
-        self.assertEqual(torch._foreach_minimum((x1_cpu, ), 3), torch._foreach_minimum((x1_xpu, ), 3))
-        self.assertEqual(torch._foreach_minimum_((x1_cpu, ), 3), torch._foreach_minimum_((x1_xpu, ), 3))
+        self.assertEqual(
+            torch._foreach_minimum((x1_cpu,), 3), torch._foreach_minimum((x1_xpu,), 3)
+        )
+        self.assertEqual(
+            torch._foreach_minimum_((x1_cpu,), 3), torch._foreach_minimum_((x1_xpu,), 3)
+        )
 
-        self.assertEqual(torch._foreach_minimum((x1_cpu, ), (3, )), torch._foreach_minimum((x1_xpu, ), (3, )))
-        self.assertEqual(torch._foreach_minimum_((x1_cpu, ), (3, )), torch._foreach_minimum_((x1_xpu, ), (3, )))
+        self.assertEqual(
+            torch._foreach_minimum((x1_cpu,), (3,)),
+            torch._foreach_minimum((x1_xpu,), (3,)),
+        )
+        self.assertEqual(
+            torch._foreach_minimum_((x1_cpu,), (3,)),
+            torch._foreach_minimum_((x1_xpu,), (3,)),
+        )
 
     def test_foreach_norm(self, dtype=torch.float):
         shape = [1024, 1024]
         x1 = [torch.randn(shape, dtype=torch.float) for _ in range(18)]
-        x1_xpu = [x1[i].clone().to('xpu') for i in range(len(x1))]
+        x1_xpu = [x1[i].clone().to("xpu") for i in range(len(x1))]
 
         for scalar in [1, 2]:
             out_x1_xpu = torch._foreach_norm(x1_xpu, scalar)
             for j in range(len(x1)):
                 out_x1_ref = torch.norm(x1_xpu[j], scalar)
-                self.assertEqual(out_x1_ref.to('cpu'), out_x1_xpu[j].to('cpu'), atol=1e-6, rtol=1e-5)
+                self.assertEqual(
+                    out_x1_ref.to("cpu"), out_x1_xpu[j].to("cpu"), atol=1e-6, rtol=1e-5
+                )
+
 
 if __name__ == "__main__":
     x1_cpu = torch.tensor([1, 3, 9, 6]).to(cpu_device)

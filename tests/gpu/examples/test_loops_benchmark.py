@@ -449,8 +449,10 @@ def run_tests():
 
 
 class TestTensorMethod(TestCase):
-    @pytest.mark.skipif(platform.system() == 'Windows', 
-                        reason="torch.autograd.profiler_legacy not available on Windows.")
+    @pytest.mark.skipif(
+        platform.system() == "Windows",
+        reason="torch.autograd.profiler_legacy not available on Windows.",
+    )
     def test_loops_backbone(self):
         run_tests()
 

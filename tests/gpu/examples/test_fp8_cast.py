@@ -10,7 +10,11 @@ class TestFP8Cast(TestCase):
         fp8_dtype = ipex._isa_help.Float8Format.kFloat8_E4M3
 
         a = torch.ones([2, 5]).xpu()
-        a_scale, a_amax, a_scale_inv = torch.ones([]).xpu(), torch.zeros([]).xpu(), torch.ones([]).xpu()
+        a_scale, a_amax, a_scale_inv = (
+            torch.ones([]).xpu(),
+            torch.zeros([]).xpu(),
+            torch.ones([]).xpu(),
+        )
 
         fp8_meta = {}
         fp8_meta["test"] = ipex._isa_help.FP8TensorMeta()
@@ -27,7 +31,9 @@ class TestFP8Cast(TestCase):
         print("scale = ", fp8_meta["test"].scale)
         print("scale_iv = ", fp8_meta["test"].scale_inv)
 
-        a_dequtized = cast_from_fp8(a_quantized, fp8_meta["test"], fp8_tensor, fp8_dtype, torch.float)
+        a_dequtized = cast_from_fp8(
+            a_quantized, fp8_meta["test"], fp8_tensor, fp8_dtype, torch.float
+        )
         print("a_dequtized = ", a_dequtized)
 
         self.assertEqual(a, a_dequtized)
@@ -37,7 +43,11 @@ class TestFP8Cast(TestCase):
         fp8_dtype = ipex._isa_help.Float8Format.kFloat8_E5M2
 
         a = torch.ones([2, 5]).xpu()
-        a_scale, a_amax, a_scale_inv = torch.ones([]).xpu(), torch.zeros([]).xpu(), torch.ones([]).xpu()
+        a_scale, a_amax, a_scale_inv = (
+            torch.ones([]).xpu(),
+            torch.zeros([]).xpu(),
+            torch.ones([]).xpu(),
+        )
 
         fp8_meta = {}
         fp8_meta["test"] = ipex._isa_help.FP8TensorMeta()
@@ -54,7 +64,9 @@ class TestFP8Cast(TestCase):
         print("scale = ", fp8_meta["test"].scale)
         print("scale_iv = ", fp8_meta["test"].scale_inv)
 
-        a_dequtized = cast_from_fp8(a_quantized, fp8_meta["test"], fp8_tensor, fp8_dtype, torch.float)
+        a_dequtized = cast_from_fp8(
+            a_quantized, fp8_meta["test"], fp8_tensor, fp8_dtype, torch.float
+        )
         print("a_dequtized = ", a_dequtized)
 
         self.assertEqual(a, a_dequtized)

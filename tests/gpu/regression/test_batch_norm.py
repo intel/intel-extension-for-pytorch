@@ -10,7 +10,6 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
-
     def test_batch_norm_with_none_running_stats(self, dtype=torch.float):
         x = torch.randn(4, 2, 3, 3, dtype=torch.float)
         grad_x = torch.randn(4, 2, 3, 3, dtype=torch.float)
@@ -26,7 +25,6 @@ class TestNNMethod(TestCase):
         bn.to("xpu")
         ref_cf_xpu = bn(x_xpu)
         ref_cf_xpu.backward(grad_xpu)
-
 
         self.assertEqual(ref_cf, ref_cf_xpu.to("cpu"))
         self.assertEqual(x.grad, x_xpu.grad.to("cpu"))
@@ -44,17 +42,34 @@ class TestNNMethod(TestCase):
         momentum = 0.1
         eps = 1e-5
 
-
         # instance norm is implemented by batch norm
-        y_cpu = torch.instance_norm(i, weight, bias, running_mean, running_var, use_input_stats,
-                                    momentum, eps, torch.backends.cudnn.enabled)
+        y_cpu = torch.instance_norm(
+            i,
+            weight,
+            bias,
+            running_mean,
+            running_var,
+            use_input_stats,
+            momentum,
+            eps,
+            torch.backends.cudnn.enabled,
+        )
         y_cpu.backward(grad_i)
 
         i_xpu = i.to("xpu")
         i_xpu = Variable(i_xpu, requires_grad=True)
         grad_xpu = grad_i.to("xpu")
-        y_xpu = torch.instance_norm(i_xpu, weight, bias, running_mean, running_var, use_input_stats,
-                                    momentum, eps, torch.backends.cudnn.enabled)
+        y_xpu = torch.instance_norm(
+            i_xpu,
+            weight,
+            bias,
+            running_mean,
+            running_var,
+            use_input_stats,
+            momentum,
+            eps,
+            torch.backends.cudnn.enabled,
+        )
         y_xpu.backward(grad_xpu)
         self.assertEqual(y_cpu, y_xpu.cpu())
         self.assertEqual(i.grad, i_xpu.grad.cpu())

@@ -21,7 +21,9 @@ def gen_conditions(_wbits, _groupsize):
 
 
 # copy from https://github.com/openppl-public/ppq/blob/master/ppq/quantization/measure/norm.py
-def torch_snr_error(y_pred: torch.Tensor, y_real: torch.Tensor, reduction: str = 'mean') -> torch.Tensor:
+def torch_snr_error(
+    y_pred: torch.Tensor, y_real: torch.Tensor, reduction: str = "mean"
+) -> torch.Tensor:
     """
     Compute SNR between y_pred(tensor) and y_real(tensor)
 
@@ -46,8 +48,10 @@ def torch_snr_error(y_pred: torch.Tensor, y_real: torch.Tensor, reduction: str =
     y_real = y_real.type(torch.float32)
 
     if y_pred.shape != y_real.shape:
-        raise ValueError(f'Can not compute snr loss for tensors with different shape. '
-                         f'({y_pred.shape} and {y_real.shape})')
+        raise ValueError(
+            f"Can not compute snr loss for tensors with different shape. "
+            f"({y_pred.shape} and {y_real.shape})"
+        )
     reduction = str(reduction).lower()
 
     if y_pred.ndim == 1:
@@ -61,11 +65,11 @@ def torch_snr_error(y_pred: torch.Tensor, y_real: torch.Tensor, reduction: str =
     signal_power = torch.pow(y_real, 2).sum(dim=-1)
     snr = (noise_power) / (signal_power + 1e-7)
 
-    if reduction == 'mean':
+    if reduction == "mean":
         return torch.mean(snr)
-    elif reduction == 'sum':
+    elif reduction == "sum":
         return torch.sum(snr)
-    elif reduction == 'none':
+    elif reduction == "none":
         return snr
     else:
-        raise ValueError('Unsupported reduction method.')
+        raise ValueError("Unsupported reduction method.")

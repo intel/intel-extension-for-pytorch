@@ -8,14 +8,13 @@ DTYPE_BIT_SIZE = {
     torch.int32: 32,
 }
 
-def find_layers(module, name=''):
+
+def find_layers(module, name=""):
     if type(module) in [nn.Linear]:
         return {name: module}
     res = {}
     for name1, child in module.named_children():
-        res.update(find_layers(
-            child, name=name + '.' + name1 if name != '' else name1
-        ))
+        res.update(find_layers(child, name=name + "." + name1 if name != "" else name1))
     # We assume the module which contains a specific number of linear is transformer block.
     if len(res) in NUMBER_OF_LINEAR_PER_TRANSFORMER:
         res = {name: res}
@@ -44,19 +43,26 @@ def pack_weight(
         begin = idx
         end = min(begin + group_size, in_features)
         g_id = begin // group_size
-        intweight.append(torch.round(
-            (weight[begin:end, :] + scale_zeros[g_id:g_id + 1, :]) / scales[g_id:g_id + 1, :]).to(torch.int))
+        intweight.append(
+            torch.round(
+                (weight[begin:end, :] + scale_zeros[g_id : g_id + 1, :])
+                / scales[g_id : g_id + 1, :]
+            ).to(torch.int)
+        )
     intweight = torch.cat(intweight, dim=0)
 
     pack_bits = DTYPE_BIT_SIZE[pack_dtype]
     pack_factor = pack_bits // wbits
     qweight = torch.zeros(
-        [in_features, (out_features + pack_factor - 1) // pack_factor], dtype=pack_dtype)
+        [in_features, (out_features + pack_factor - 1) // pack_factor], dtype=pack_dtype
+    )
 
     zeros -= 1
     zeros = zeros.to(torch.int)
     qzeros = torch.zeros(
-        [zeros.shape[0], (out_features + pack_factor - 1) // pack_factor], dtype=pack_dtype)
+        [zeros.shape[0], (out_features + pack_factor - 1) // pack_factor],
+        dtype=pack_dtype,
+    )
 
     i = 0
     col = 0

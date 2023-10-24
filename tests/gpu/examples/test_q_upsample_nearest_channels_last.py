@@ -5,13 +5,14 @@ import intel_extension_for_pytorch  # noqa
 import pytest
 import platform
 
+
 class TestNNMethod(TestCase):
     @pytest.mark.skipif(
         torch.xpu.using_onednn_layout(),
         reason="channels last does not support onednn block format",
     )
     def test_q_upsamle_nearest_channels_last(self, dtype=torch.float):
-        zp_vec = [0] if platform.system() == 'Windows' else [0, 2]
+        zp_vec = [0] if platform.system() == "Windows" else [0, 2]
         for dtype_inputs in [torch.quint8, torch.qint8]:
             for zp in zp_vec:
                 x_cpu = torch.randn(
@@ -31,10 +32,16 @@ class TestNNMethod(TestCase):
                 )
 
                 output_cpu = torch.nn.functional.interpolate(
-                    q_cpu, scale_factor=scales, mode="nearest", recompute_scale_factor=rsf
+                    q_cpu,
+                    scale_factor=scales,
+                    mode="nearest",
+                    recompute_scale_factor=rsf,
                 )
                 output_gpu = torch.nn.functional.interpolate(
-                    q_gpu, scale_factor=scales, mode="nearest", recompute_scale_factor=rsf
+                    q_gpu,
+                    scale_factor=scales,
+                    mode="nearest",
+                    recompute_scale_factor=rsf,
                 )
 
                 self.assertEqual(output_cpu, output_gpu)

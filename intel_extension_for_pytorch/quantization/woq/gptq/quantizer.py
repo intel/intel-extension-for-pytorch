@@ -3,15 +3,23 @@ import torch.nn as nn
 
 
 class Quantizer(nn.Module):
-
     def __init__(self, shape=1):
         super(Quantizer, self).__init__()
-        self.register_buffer('maxq', torch.tensor(0))
-        self.register_buffer('scale', torch.zeros(shape))
-        self.register_buffer('zero', torch.zeros(shape))
+        self.register_buffer("maxq", torch.tensor(0))
+        self.register_buffer("scale", torch.zeros(shape))
+        self.register_buffer("zero", torch.zeros(shape))
 
-    def configure(self, bits, perchannel=False, sym=True, mse=False, norm=2.4, grid=100, maxshrink=.8, trits=False):
-
+    def configure(
+        self,
+        bits,
+        perchannel=False,
+        sym=True,
+        mse=False,
+        norm=2.4,
+        grid=100,
+        maxshrink=0.8,
+        trits=False,
+    ):
         self.maxq = torch.tensor(2**bits - 1)
         self.perchannel = perchannel
         self.sym = sym
@@ -72,14 +80,16 @@ class Quantizer(nn.Module):
                 self.zero = torch.round(-xmin / self.scale)
 
         if self.mse:
-            best = torch.full([x.shape[0]], float('inf'), device=dev)
+            best = torch.full([x.shape[0]], float("inf"), device=dev)
             for i in range(int(self.maxshrink * self.grid)):
                 p = 1 - i / self.grid
                 xmin1 = p * xmin
                 xmax1 = p * xmax
                 scale1 = (xmax1 - xmin1) / self.maxq
                 zero1 = torch.round(-xmin1 / scale1) if not self.sym else self.zero
-                q = self._quantize(x, scale1.unsqueeze(1), zero1.unsqueeze(1), self.maxq)
+                q = self._quantize(
+                    x, scale1.unsqueeze(1), zero1.unsqueeze(1), self.maxq
+                )
                 q -= x
                 q.abs_()
                 q.pow_(self.norm)

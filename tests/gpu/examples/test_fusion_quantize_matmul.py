@@ -66,10 +66,7 @@ class LinearHardswish(nn.Module):
     def __init__(self):
         super().__init__()
         self.block = nn.Sequential(
-            nn.Linear(512, 128),
-            nn.Hardswish(),
-            nn.Linear(128, 128),
-            nn.Hardswish()
+            nn.Linear(512, 128), nn.Hardswish(), nn.Linear(128, 128), nn.Hardswish()
         )
 
     def forward(self, x):
@@ -80,17 +77,11 @@ class LinearBinaryBias(nn.Module):
     def __init__(self):
         super().__init__()
         self.block = nn.Sequential(
-            nn.Linear(
-                512, 128
-            ),
+            nn.Linear(512, 128),
             nn.ReLU(),
-            nn.Linear(
-                128, 128
-            ),
+            nn.Linear(128, 128),
             nn.ReLU(),
-            nn.Linear2d(
-                128, 128
-            ),
+            nn.Linear2d(128, 128),
         )
 
     def forward(self, x):
@@ -101,9 +92,7 @@ class LinearBinaryBias(nn.Module):
 class LinearBinaryAdd(nn.Module):
     def __init__(self):
         super().__init__()
-        self.block = nn.Sequential(
-            nn.Linear(5, 5)
-        )
+        self.block = nn.Sequential(nn.Linear(5, 5))
         self.relu = nn.ReLU()
 
     def forward(self, x):
@@ -195,10 +184,14 @@ class TestTorchMethod(TestCase):
         with torch.no_grad():
             xpu_impe = model(test_input)
         xpu_res = trace_int8_model(model, "xpu", test_input.clone())
-        np.testing.assert_almost_equal(xpu_res.cpu().numpy(), xpu_impe.cpu().numpy(), decimal=0)
+        np.testing.assert_almost_equal(
+            xpu_res.cpu().numpy(), xpu_impe.cpu().numpy(), decimal=0
+        )
 
-    @pytest.mark.skipif(platform.system() == 'Windows', 
-                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
+    @pytest.mark.skipif(
+        platform.system() == "Windows",
+        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current",
+    )
     def test_qlinear_sigmoid(self, dtype=torch.float):
         model = LinearSigmoid()
         model1 = copy.deepcopy(model)
@@ -227,13 +220,17 @@ class TestTorchMethod(TestCase):
             decimal=1,
         )
 
-    @pytest.mark.skipif(platform.system() == 'Windows', 
-                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
+    @pytest.mark.skipif(
+        platform.system() == "Windows",
+        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current",
+    )
     def test_qlinear_abs(self):
         self.qlinear_act(torch.abs)
 
-    @pytest.mark.skipif(platform.system() == 'Windows', 
-                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
+    @pytest.mark.skipif(
+        platform.system() == "Windows",
+        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current",
+    )
     def test_qlinear_relu(self):
         act = torch.nn.ReLU()
         self.qlinear_act(act)

@@ -59,13 +59,13 @@ class TestNNMethod(TestCase):
         f_real = torch.randn(2, 72, 72)
         f_imag = torch.randn(2, 72, 72)
         axes = (1, 2)
-        var = f_real + + 1j * f_imag
+        var = f_real + +1j * f_imag
 
         dst_cpu = torch.fft.ifft2(var, dim=axes)
 
         f_real_dpcpp = f_real.to("xpu")
         f_imag_dpcpp = f_imag.to("xpu")
-        var_dpcpp = f_real_dpcpp + + 1j * f_imag_dpcpp
+        var_dpcpp = f_real_dpcpp + +1j * f_imag_dpcpp
 
         dst_dpcpp = torch.fft.ifft2(var_dpcpp, dim=axes)
 

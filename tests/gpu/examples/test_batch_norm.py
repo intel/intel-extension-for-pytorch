@@ -61,7 +61,6 @@ class TestNNMethod(TestCase):
 
         y_cpu.backward(grad_cpu)
 
-
         x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
         grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
         bn.to(dtype).to(dpcpp_device)
@@ -69,8 +68,7 @@ class TestNNMethod(TestCase):
         y_dpcpp.backward(grad_dpcpp)
 
         self.assertEqual(y_cpu, y_dpcpp.to(cpu_device), rtol=1e-3, atol=1e-1)
-        self.assertEqual(
-            x_cpu.grad, x_dpcpp.grad.to(cpu_device), rtol=1e-3, atol=1e-1)
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device), rtol=1e-3, atol=1e-1)
 
     def test_batch_norm(self, dtype=torch.float):
         shapes = [
@@ -109,7 +107,6 @@ class TestNNMethod(TestCase):
 
             y_cpu.backward(grad_cpu)
 
-
             x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
             grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
             bn1.to(dpcpp_device)
@@ -141,7 +138,6 @@ class TestNNMethod(TestCase):
         y_cpu1 = conv(x_cpu)
         y_cpu = bn(y_cpu1)
         y_cpu.backward(grad_cpu)
-
 
         x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
         grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
@@ -190,7 +186,6 @@ class TestNNMethod(TestCase):
         y_cpu = bn(y_cpu1)
 
         y_cpu.backward(grad_cpu)
-
 
         x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
         grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
@@ -309,14 +304,22 @@ class TestNNMethod(TestCase):
                 atol = 1e-5
 
             for shape in shapes:
-                print("\n================== test shape: ", shape, ", dtype:", dtype, "==================")
+                print(
+                    "\n================== test shape: ",
+                    shape,
+                    ", dtype:",
+                    dtype,
+                    "==================",
+                )
                 N, C, H, W = shape[0], shape[1], shape[2], shape[3]
                 bn = nn.BatchNorm2d(C)
                 x_i = torch.randn([N, C, H, W], dtype=dtype, device=cpu_device)
                 grad_i = torch.randn([N, C, H, W], dtype=dtype, device=cpu_device)
 
                 x_dpcpp_i = x_i.to(dpcpp_device).to(memory_format=torch.channels_last)
-                grad_dpcpp_i = grad_i.to(dpcpp_device).to(memory_format=torch.channels_last)
+                grad_dpcpp_i = grad_i.to(dpcpp_device).to(
+                    memory_format=torch.channels_last
+                )
 
                 x_cpu = Variable(x_i, requires_grad=True)
                 grad_cpu = Variable(grad_i, requires_grad=True)
@@ -364,19 +367,25 @@ class TestNNMethod(TestCase):
                 ):
                     self.assertEqual(x_dpcpp.grad.is_contiguous(), True)
                     self.assertEqual(
-                        x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last), True
+                        x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last),
+                        True,
                     )
                 else:
                     self.assertEqual(x_dpcpp.grad.is_contiguous(), False)
                     self.assertEqual(
-                        x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last), True
+                        x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last),
+                        True,
                     )
 
                 self.assertEqual(y_cpu, y_dpcpp.to(cpu_device), rtol=rtol, atol=atol)
-                self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device), rtol=rtol, atol=atol)
+                self.assertEqual(
+                    x_cpu.grad, x_dpcpp.grad.to(cpu_device), rtol=rtol, atol=atol
+                )
 
     def test_batch_norm_gather_stats(self):
-        input = torch.randn(1, 3, 3, 3, device="xpu").to(memory_format=torch.channels_last)
+        input = torch.randn(1, 3, 3, 3, device="xpu").to(
+            memory_format=torch.channels_last
+        )
         mean, invstd = torch.batch_norm_gather_stats(
             input,
             mean=torch.ones(64, 3, device="xpu"),
@@ -411,12 +420,31 @@ class TestNNMethod(TestCase):
                               n_wgroups_feature_dim = not evenly divisible by wgroup_size_feature_dim
 
     """
+
     def test_batch_norm_gather_stats_comprehensive(self):
-        input = torch.randn(1, 3, 3, 3, device="xpu").to(memory_format=torch.channels_last)
-        for [batch_size, feature_size] in itertools.product([1, 256, 3072, 3073, 2, 3], [1, 4, 7, 32, 63, 64]):
-            print("\n================== batch_size: ", batch_size, ", feature_size:", feature_size, "==================")
-            mean_in = torch.arange(1, batch_size + 1, dtype=torch.float, device='xpu').view(-1, 1).repeat(1, feature_size)
-            invstd_in = torch.arange(1, batch_size + 1, dtype=torch.float, device='xpu').view(-1, 1).repeat(1, feature_size)
+        input = torch.randn(1, 3, 3, 3, device="xpu").to(
+            memory_format=torch.channels_last
+        )
+        for [batch_size, feature_size] in itertools.product(
+            [1, 256, 3072, 3073, 2, 3], [1, 4, 7, 32, 63, 64]
+        ):
+            print(
+                "\n================== batch_size: ",
+                batch_size,
+                ", feature_size:",
+                feature_size,
+                "==================",
+            )
+            mean_in = (
+                torch.arange(1, batch_size + 1, dtype=torch.float, device="xpu")
+                .view(-1, 1)
+                .repeat(1, feature_size)
+            )
+            invstd_in = (
+                torch.arange(1, batch_size + 1, dtype=torch.float, device="xpu")
+                .view(-1, 1)
+                .repeat(1, feature_size)
+            )
             mean_out, invstd_out = torch.batch_norm_gather_stats(
                 input,
                 mean_in,
@@ -428,32 +456,52 @@ class TestNNMethod(TestCase):
                 count=2,
             )
             if batch_size == 1:
-                mean_correct = torch.tensor([1.], device='xpu').repeat(feature_size)
-                invstd_correct = torch.tensor([1.], device='xpu').repeat(feature_size)
+                mean_correct = torch.tensor([1.0], device="xpu").repeat(feature_size)
+                invstd_correct = torch.tensor([1.0], device="xpu").repeat(feature_size)
             elif batch_size == 256:
-                mean_correct = torch.tensor([128.5000], device='xpu').repeat(feature_size)
-                invstd_correct = torch.tensor([0.0135], device='xpu').repeat(feature_size)
+                mean_correct = torch.tensor([128.5000], device="xpu").repeat(
+                    feature_size
+                )
+                invstd_correct = torch.tensor([0.0135], device="xpu").repeat(
+                    feature_size
+                )
             elif batch_size == 3072:
-                mean_correct = torch.tensor([1536.5000], device='xpu').repeat(feature_size)
-                invstd_correct = torch.tensor([0.0011], device='xpu').repeat(feature_size)
+                mean_correct = torch.tensor([1536.5000], device="xpu").repeat(
+                    feature_size
+                )
+                invstd_correct = torch.tensor([0.0011], device="xpu").repeat(
+                    feature_size
+                )
             elif batch_size == 3073:
-                mean_correct = torch.tensor([1537.], device='xpu').repeat(feature_size)
-                invstd_correct = torch.tensor([0.0011], device='xpu').repeat(feature_size)
+                mean_correct = torch.tensor([1537.0], device="xpu").repeat(feature_size)
+                invstd_correct = torch.tensor([0.0011], device="xpu").repeat(
+                    feature_size
+                )
             elif batch_size == 2:
-                mean_correct = torch.tensor([1.5000], device='xpu').repeat(feature_size)
-                invstd_correct = torch.tensor([1.0690], device='xpu').repeat(feature_size)
+                mean_correct = torch.tensor([1.5000], device="xpu").repeat(feature_size)
+                invstd_correct = torch.tensor([1.0690], device="xpu").repeat(
+                    feature_size
+                )
             elif batch_size == 3:
-                mean_correct = torch.tensor([2.], device='xpu').repeat(feature_size)
-                invstd_correct = torch.tensor([0.9448], device='xpu').repeat(feature_size)
+                mean_correct = torch.tensor([2.0], device="xpu").repeat(feature_size)
+                invstd_correct = torch.tensor([0.9448], device="xpu").repeat(
+                    feature_size
+                )
 
             self.assertTrue(torch.allclose(mean_out, mean_correct))
             self.assertTrue(torch.allclose(invstd_out, invstd_correct, atol=1e-4))
 
     def test_batch_norm_gather_stats_running_mean_and_running_var(self):
-        input = torch.randn(1, 3, 3, 3, device="xpu").to(memory_format=torch.channels_last)
+        input = torch.randn(1, 3, 3, 3, device="xpu").to(
+            memory_format=torch.channels_last
+        )
 
-        running_mean_ptr = torch.tensor([1., 2., 3., 4., 5., 6., 7., 8.], device='xpu')
-        running_var_ptr = torch.tensor([1., 2., 3., 4., 5., 6., 7., 8.], device='xpu')
+        running_mean_ptr = torch.tensor(
+            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], device="xpu"
+        )
+        running_var_ptr = torch.tensor(
+            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], device="xpu"
+        )
 
         torch.batch_norm_gather_stats(
             input,
@@ -465,8 +513,13 @@ class TestNNMethod(TestCase):
             eps=1e-5,
             count=2,
         )
-        running_mean_correct = torch.tensor([1., 1.9, 2.8, 3.7, 4.6, 5.5, 6.4, 7.3], device='xpu')
-        running_var_correct = torch.tensor([1.0008, 1.9008, 2.8008, 3.7008, 4.6008, 5.5008, 6.4008, 7.3008], device='xpu')
+        running_mean_correct = torch.tensor(
+            [1.0, 1.9, 2.8, 3.7, 4.6, 5.5, 6.4, 7.3], device="xpu"
+        )
+        running_var_correct = torch.tensor(
+            [1.0008, 1.9008, 2.8008, 3.7008, 4.6008, 5.5008, 6.4008, 7.3008],
+            device="xpu",
+        )
         self.assertTrue(torch.allclose(running_mean_ptr, running_mean_correct))
         self.assertTrue(torch.allclose(running_var_ptr, running_var_correct, atol=1e-4))
 
@@ -474,10 +527,11 @@ class TestNNMethod(TestCase):
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_sync_batchnorm_accuracy(self):
-
         def _batch_norm_stats(data, memory_format, mean_axes):
             mean1, _ = torch.batch_norm_stats(data, 1e-5)
-            mean2, _ = torch.batch_norm_stats(data.to(memory_format=memory_format), 1e-5)
+            mean2, _ = torch.batch_norm_stats(
+                data.to(memory_format=memory_format), 1e-5
+            )
             print("mean2:", mean2)
             mean_ref = torch.mean(data, mean_axes, keepdim=False)
             print("mean ref end")
@@ -485,8 +539,16 @@ class TestNNMethod(TestCase):
             self.assertEqual(mean_ref, mean1)
             self.assertEqual(mean_ref, mean2)
 
-        _batch_norm_stats(torch.randn(1, 96, 112, 112, dtype=torch.float, device='xpu'), torch.channels_last, (0, 2, 3))
-        _batch_norm_stats(torch.randn(1, 96, 112, 112, 112, dtype=torch.float, device='xpu'), torch.channels_last_3d, (0, 2, 3, 4))
+        _batch_norm_stats(
+            torch.randn(1, 96, 112, 112, dtype=torch.float, device="xpu"),
+            torch.channels_last,
+            (0, 2, 3),
+        )
+        _batch_norm_stats(
+            torch.randn(1, 96, 112, 112, 112, dtype=torch.float, device="xpu"),
+            torch.channels_last_3d,
+            (0, 2, 3, 4),
+        )
 
     def test_batch_norm_update_stats_simple(self):
         input_cpu = torch.randn(1, 2, 3, 3, dtype=torch.float, device=cpu_device)
@@ -500,9 +562,11 @@ class TestNNMethod(TestCase):
         running_var_dpcpp = running_var_cpu.to(dpcpp_device)
 
         save_mean_cpu, save_var_cpu = torch.batch_norm_update_stats(
-            input_cpu, running_mean_cpu, running_var_cpu, momentum)
+            input_cpu, running_mean_cpu, running_var_cpu, momentum
+        )
         save_mean_dpcpp, save_var_dpcpp = torch.batch_norm_update_stats(
-            input_dpcpp, running_mean_dpcpp, running_var_dpcpp, momentum)
+            input_dpcpp, running_mean_dpcpp, running_var_dpcpp, momentum
+        )
 
         self.assertEqual(save_mean_cpu, save_mean_dpcpp.to(cpu_device))
         self.assertEqual(save_var_cpu, save_var_dpcpp.to(cpu_device))
@@ -522,21 +586,59 @@ class TestNNMethod(TestCase):
 
         def _batch_norm_legit_simple(track_stats):
             if track_stats:
-                running_mean_cpu = torch.randn(n_input, dtype=torch.float, device=cpu_device)
-                running_var_cpu = torch.randn(n_input, dtype=torch.float, device=cpu_device)
+                running_mean_cpu = torch.randn(
+                    n_input, dtype=torch.float, device=cpu_device
+                )
+                running_var_cpu = torch.randn(
+                    n_input, dtype=torch.float, device=cpu_device
+                )
 
                 running_mean_dpcpp = running_mean_cpu.to(dpcpp_device)
                 running_var_dpcpp = running_var_cpu.to(dpcpp_device)
 
-                out_cpu, save_mean_cpu, save_invstd_cpu = torch._native_batch_norm_legit(
-                    input_cpu, weight_cpu, bias_cpu, running_mean_cpu, running_var_cpu, train, momentum, epsilon)
-                out_dpcpp, save_mean_dpcpp, save_invstd_dpcpp = torch._native_batch_norm_legit(
-                    input_dpcpp, weight_dpcpp, bias_dpcpp, running_mean_dpcpp, running_var_dpcpp, train, momentum, epsilon)
+                (
+                    out_cpu,
+                    save_mean_cpu,
+                    save_invstd_cpu,
+                ) = torch._native_batch_norm_legit(
+                    input_cpu,
+                    weight_cpu,
+                    bias_cpu,
+                    running_mean_cpu,
+                    running_var_cpu,
+                    train,
+                    momentum,
+                    epsilon,
+                )
+                (
+                    out_dpcpp,
+                    save_mean_dpcpp,
+                    save_invstd_dpcpp,
+                ) = torch._native_batch_norm_legit(
+                    input_dpcpp,
+                    weight_dpcpp,
+                    bias_dpcpp,
+                    running_mean_dpcpp,
+                    running_var_dpcpp,
+                    train,
+                    momentum,
+                    epsilon,
+                )
             else:
-                out_cpu, save_mean_cpu, save_invstd_cpu = torch._native_batch_norm_legit(
-                    input_cpu, weight_cpu, bias_cpu, train, momentum, epsilon)
-                out_dpcpp, save_mean_dpcpp, save_invstd_dpcpp = torch._native_batch_norm_legit(
-                    input_dpcpp, weight_dpcpp, bias_dpcpp, train, momentum, epsilon)
+                (
+                    out_cpu,
+                    save_mean_cpu,
+                    save_invstd_cpu,
+                ) = torch._native_batch_norm_legit(
+                    input_cpu, weight_cpu, bias_cpu, train, momentum, epsilon
+                )
+                (
+                    out_dpcpp,
+                    save_mean_dpcpp,
+                    save_invstd_dpcpp,
+                ) = torch._native_batch_norm_legit(
+                    input_dpcpp, weight_dpcpp, bias_dpcpp, train, momentum, epsilon
+                )
 
             self.assertEqual(out_cpu, out_dpcpp.to(cpu_device))
             self.assertEqual(save_mean_cpu, save_mean_dpcpp.to(cpu_device))
@@ -553,16 +655,27 @@ class TestNNMethod(TestCase):
         invstd = torch.tensor([1, 2, 3, 4], dtype=torch.float, device=dpcpp_device)
         eps = 1e-5
 
-        cuda_result = torch.tensor([[[[0., 0.], [0., 0.]], 
-                                     [[-2., -2.], [-2., -2.]],
-                                     [[-6., -6.], [-6., -6.]], 
-                                     [[-12., -12.], [-12., -12.]]]])
+        cuda_result = torch.tensor(
+            [
+                [
+                    [[0.0, 0.0], [0.0, 0.0]],
+                    [[-2.0, -2.0], [-2.0, -2.0]],
+                    [[-6.0, -6.0], [-6.0, -6.0]],
+                    [[-12.0, -12.0], [-12.0, -12.0]],
+                ]
+            ]
+        )
 
         for memory_format in [torch.contiguous_format, torch.channels_last]:
-            result = torch.batch_norm_elemt(input.contiguous(memory_format=memory_format), 
-                                            weight, bias, mean, invstd, eps)
+            result = torch.batch_norm_elemt(
+                input.contiguous(memory_format=memory_format),
+                weight,
+                bias,
+                mean,
+                invstd,
+                eps,
+            )
             self.assertEqual(result.to(cpu_device), cuda_result)
-
 
     def test_sync_batch_norm_backward_elemt(self):
         grad_output = torch.ones(1, 4, 2, 2, device=dpcpp_device)
@@ -574,10 +687,16 @@ class TestNNMethod(TestCase):
         sum_dy_xmu = torch.zeros(4, device=dpcpp_device)
         count = torch.tensor([[2], [2]], dtype=torch.int, device=dpcpp_device)
 
-        cuda_result = torch.tensor([[[[0.75, 0.75], [0.75, 0.75]],
-                                     [[1.50, 1.50], [1.50, 1.50]],
-                                     [[2.25, 2.25], [2.25, 2.25]],
-                                     [[3.00, 3.00], [3.00, 3.00]]]])
+        cuda_result = torch.tensor(
+            [
+                [
+                    [[0.75, 0.75], [0.75, 0.75]],
+                    [[1.50, 1.50], [1.50, 1.50]],
+                    [[2.25, 2.25], [2.25, 2.25]],
+                    [[3.00, 3.00], [3.00, 3.00]],
+                ]
+            ]
+        )
 
         for memory_format in [torch.contiguous_format, torch.channels_last]:
             result = torch.batch_norm_backward_elemt(
@@ -588,6 +707,6 @@ class TestNNMethod(TestCase):
                 weight,
                 sum_dy,
                 sum_dy_xmu,
-                count
+                count,
             )
         self.assertEqual(result.to(cpu_device), cuda_result)

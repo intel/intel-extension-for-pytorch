@@ -7,12 +7,12 @@ from .modules import TransducerLoss
 import intel_extension_for_pytorch
 
 __all__ = [
-    'TransducerLoss',
-    'nms',
-    'locations_to_boxes',
-    'roi_align',
-    'IpexSDP',
-    'IpexSDP_Index',
+    "TransducerLoss",
+    "nms",
+    "locations_to_boxes",
+    "roi_align",
+    "IpexSDP",
+    "IpexSDP_Index",
 ]
 
 
@@ -81,6 +81,7 @@ def roi_align(
         aligned,
     )
 
+
 def IpexSDP(
     query,
     key,
@@ -92,7 +93,7 @@ def IpexSDP(
     beta=1.0,
     dropout_p=0.0,
     is_causal=False,
-    seq_last=False
+    seq_last=False,
 ) -> Tensor:
     return torch.ops.torch_ipex.xetla_fsdp_forward_atten_mask_alibi_strided(
         query,
@@ -105,8 +106,9 @@ def IpexSDP(
         beta,
         dropout_p,
         is_causal,
-        seq_last
+        seq_last,
     )
+
 
 def IpexSDP_Index(
     query,
@@ -122,7 +124,7 @@ def IpexSDP_Index(
     alpha,
     beta,
     dropout_p=0.0,
-    is_causal=False
+    is_causal=False,
 ) -> Tensor:
     return torch.ops.torch_ipex.xetla_fsdp_index_forward(
         query,
@@ -138,5 +140,5 @@ def IpexSDP_Index(
         alpha,
         beta,
         dropout_p,
-        is_causal
+        is_causal,
     )

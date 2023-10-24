@@ -22,7 +22,6 @@ class TestTorchMethod(TestCase):
         self.assertEqual(b, b_dpcpp.to(cpu_device))
         self.assertEqual(a.cross(b), a_dpcpp.cross(b_dpcpp).to(cpu_device))
 
-
     def test_linalg_cross(self, dtype=torch.float32):
         x = torch.rand(100, 3, 100, dtype=dtype, device=cpu_device)
         y = torch.rand(100, 3, 100, dtype=dtype, device=cpu_device)

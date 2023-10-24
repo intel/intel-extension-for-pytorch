@@ -8,7 +8,9 @@ def replace_transformer_with_ipex_transformer(model):
         import transformers
         from ._transformers import IPEXGPTJBlock
     except ImportError as e:
-        warnings.warn("Can not find transformers in your environment, disable ipex transformer optimize")
+        warnings.warn(
+            "Can not find transformers in your environment, disable ipex transformer optimize"
+        )
         return model
 
     def replace_transformer_with_ipex_transformer_util(model):
@@ -19,6 +21,7 @@ def replace_transformer_with_ipex_transformer(model):
                 setattr(model, child_name, ipex_block)
             else:
                 replace_transformer_with_ipex_transformer_util(child)
+
     replace_transformer_with_ipex_transformer_util(model)
 
 
@@ -57,7 +60,7 @@ def replace_dropout_with_identity(model):
                 replace_dropout_with_identity(child)
 
 
-def convert_model_data_type(model, dtype, device_type='cpu'):
+def convert_model_data_type(model, dtype, device_type="cpu"):
     # convert weights(bias) of model to dtype to reduce dtype reorder
     assert dtype in [
         torch.bfloat16,

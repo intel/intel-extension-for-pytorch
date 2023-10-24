@@ -21,7 +21,7 @@ class ForeachBinaryScalarListTest:
         if is_inplace:
             self.func(input_tensor_for_func, input_scalar_for_func)
             return input_tensor_for_func
-        else :
+        else:
             return self.func(input_tensor_for_func, input_scalar_for_func)
 
 
@@ -96,7 +96,6 @@ class TestTorchMethod(TestCase):
         xpu_ = test_(x1, scalarlist, "xpu", True)
         self.result_compare(cpu_, xpu_)
 
-
     def test_foreach_clamp_max_scalarlist(self, dtype=torch.float):
         x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
         scalarlist = torch.randn(250)
@@ -124,7 +123,6 @@ class TestTorchMethod(TestCase):
         cpu_ = test_(x1, scalarlist, "cpu", True)
         xpu_ = test_(x1, scalarlist, "xpu", True)
         self.result_compare(cpu_, xpu_)
-
 
     def result_compare(self, x1, x2):
         for i in range(len(x1)):

@@ -2,8 +2,7 @@ import ctypes
 
 
 def get_pointer_from_capsule(capsule):
-    r"""Retrieve the pointer stored in the capsule.
-    """
+    r"""Retrieve the pointer stored in the capsule."""
     ctypes.pythonapi.PyCapsule_GetName.restype = ctypes.c_char_p
     ctypes.pythonapi.PyCapsule_GetName.argtypes = [ctypes.py_object]
     name = ctypes.pythonapi.PyCapsule_GetName(capsule)

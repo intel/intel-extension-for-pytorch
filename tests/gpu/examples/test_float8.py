@@ -4,7 +4,6 @@ from torch.testing._internal.common_utils import run_tests, TestCase
 
 
 class TestFloat8(TestCase):
-
     def test_creation_with_zeros(self):
         x = torch.zeros(8, dtype=torch.float8_e4m3fn).xpu()
 
@@ -25,18 +24,19 @@ class TestFloat8(TestCase):
             ref_tensor_fp32 = torch.tensor([expected_fp32], dtype=torch.float).xpu()
             self.assertTrue(
                 torch.allclose(tensor_fp32, ref_tensor_fp32),
-                f"{comp_name} failed: expected {expected_fp32}, got {tensor_fp32.item()}")
+                f"{comp_name} failed: expected {expected_fp32}, got {tensor_fp32.item()}",
+            )
 
         _compare("00000000", 0.0, "zero")
         _compare("10000000", -0.0, "neg_zero")
         _compare("01111110", 448.0, "max_normal")
         _compare("11111110", -448.0, "neg_max_normal")
-        _compare("00001000", 2 ** -6, "min_normal")
-        _compare("10001000", -1 * (2 ** -6), "neg_min_normal")
-        _compare("00000111", 0.875 * (2 ** -6), "max_subnorm")
-        _compare("10000111", -0.875 * (2 ** -6), "neg_max_subnorm")
-        _compare("00000001", 2 ** -9, "min_subnorm")
-        _compare("10000001", -1 * (2 ** -9), "neg_min_subnorm")
+        _compare("00001000", 2**-6, "min_normal")
+        _compare("10001000", -1 * (2**-6), "neg_min_normal")
+        _compare("00000111", 0.875 * (2**-6), "max_subnorm")
+        _compare("10000111", -0.875 * (2**-6), "neg_max_subnorm")
+        _compare("00000001", 2**-9, "min_subnorm")
+        _compare("10000001", -1 * (2**-9), "neg_min_subnorm")
 
     def test_e5m2fn_casts(self):
         for dtype in (torch.float32, torch.float16):
@@ -55,19 +55,20 @@ class TestFloat8(TestCase):
             ref_tensor_fp32 = torch.tensor([expected_fp32], dtype=torch.float).xpu()
             self.assertTrue(
                 torch.allclose(tensor_fp32, ref_tensor_fp32),
-                f"{comp_name} failed: expected {expected_fp32}, got {tensor_fp32.item()}")
+                f"{comp_name} failed: expected {expected_fp32}, got {tensor_fp32.item()}",
+            )
 
         _compare("00000000", 0.0, "zero")
         _compare("10000000", -0.0, "neg_zero")
         _compare("01111011", 57344.0, "max_normal")
         _compare("11111011", -57344.0, "neg_max_normal")
-        _compare("00000100", 2 ** -14, "min_normal")
-        _compare("10000100", -1 * (2 ** -14), "neg_min_normal")
-        _compare("00000011", 0.75 * (2 ** -14), "max_subnorm")
-        _compare("10000011", -0.75 * (2 ** -14), "neg_max_subnorm")
-        _compare("00000001", 2 ** -16, "min_subnorm")
-        _compare("10000001", -1 * (2 ** -16), "neg_min_subnorm")
+        _compare("00000100", 2**-14, "min_normal")
+        _compare("10000100", -1 * (2**-14), "neg_min_normal")
+        _compare("00000011", 0.75 * (2**-14), "max_subnorm")
+        _compare("10000011", -0.75 * (2**-14), "neg_max_subnorm")
+        _compare("00000001", 2**-16, "min_subnorm")
+        _compare("10000001", -1 * (2**-16), "neg_min_subnorm")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_tests()

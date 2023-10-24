@@ -14,7 +14,7 @@ from torch._inductor.pattern_matcher import (
 from torch._inductor.virtualized import ops
 from ..pattern_matcher import _register_lowering_pattern_post_grad_pre_pass
 
-''' conv_relu_fusion
+""" conv_relu_fusion
 aten = torch.ops.aten
 # input, weight, bias, padding, stride, dilation, groups
 _conv_args = (Arg(), Arg(), Arg(), Arg(), Arg(), Arg(), Arg(), Arg(), Arg())
@@ -31,7 +31,7 @@ def conv_relu(match: Match, input, weight, bias, stride, padding, dilation, tran
     print("fuse conv2d with relu in pattern matcher")
     return xpu_ir.ConvolutionReLU.create(input, weight, bias, padding, stride, dilation, groups)
     # return torch.ops.torch_ipex.conv2d_relu(input, weight, bias, padding, stride, dilation, groups)
-'''
+"""
 
 aten = torch.ops.aten
 torch_ipex = torch.ops.torch_ipex
@@ -40,15 +40,18 @@ prims = torch.ops.prims
 _conv_args = [Arg() for _ in range(10)]
 _linear_args = [Arg() for _ in range(6)]
 
+
 def _conv_call(users=1):
     return CallFunction(
         torch_ipex._convolution_pointwise.default, *_conv_args, _users=users
     )
 
+
 def _linear_call(users=1):
     return CallFunction(
         torch_ipex._linear_pointwise.default, *_linear_args, _users=users
     )
+
 
 def _to_float(input_call, users=1):
     return CallFunction(
@@ -58,6 +61,7 @@ def _to_float(input_call, users=1):
         _users=users,
     )
 
+
 def _to_bf16(input_call):
     return CallFunction(
         prims.convert_element_type.default,
@@ -66,13 +70,13 @@ def _to_bf16(input_call):
         _users=1,
     )
 
+
 def _unary_fusion_pattern(unary_fusion, call_fn, users):
     # only insert to_dtype if is_bf16 is True
-    computation_call = (
-        call_fn(users=users)
-    )
+    computation_call = call_fn(users=users)
     out = unary_fusion(computation_call)
     return out
+
 
 def _gelu_fusion_1(computation_call):
     return CallFunction(
@@ -87,6 +91,7 @@ def _gelu_fusion_1(computation_call):
             1,
         ),
     )
+
 
 def _gelu_fusion_2(computation_call):
     return CallFunction(
@@ -120,6 +125,7 @@ def _gelu_fusion_2(computation_call):
         ),
     )
 
+
 def _hardswish_fusion(computation_call):
     return CallFunction(
         aten.div,
@@ -137,10 +143,12 @@ def _hardswish_fusion(computation_call):
         6,
     )
 
+
 def _silu_fusion(computation_call):
     return CallFunction(
         aten.mul, computation_call, CallFunction(aten.sigmoid, computation_call)
     )
+
 
 def _hardsigmoid_fusion(computation_call):
     return CallFunction(
@@ -155,6 +163,7 @@ def _hardsigmoid_fusion(computation_call):
         6,
     )
 
+
 def _leaky_relu_fusion(computation_call):
     return CallFunction(
         aten.where,
@@ -163,6 +172,7 @@ def _leaky_relu_fusion(computation_call):
         CallFunction(aten.mul, computation_call, KeywordArg("negative_slope")),
     )
 
+
 def _hardtanh_fusion(computation_call):
     return CallFunction(
         aten.clamp_max,
@@ -170,16 +180,20 @@ def _hardtanh_fusion(computation_call):
         KeywordArg("max_value"),
     )
 
+
 def _combined_fusion(computation_call, elementwise_op):
     return CallFunction(elementwise_op, computation_call)
+
 
 # binary_op(other, computation_op)
 def _binary_fusion_v1(computation_call, binary_fn):
     return CallFunction(binary_fn, KeywordArg("other"), computation_call)
 
+
 # binary_op(computation_op, other)
 def _binary_fusion_v2(computation_call, binary_fn):
     return CallFunction(binary_fn, computation_call, KeywordArg("other"))
+
 
 def _is_single_computation_op(computation_op):
     def fn(match):
@@ -192,6 +206,7 @@ def _is_single_computation_op(computation_op):
 
     return fn
 
+
 def _is_valid_computation_unary_fusion(computation_op):
     def fn(match):
         matched = _is_single_computation_op(computation_op)(match)
@@ -200,12 +215,10 @@ def _is_valid_computation_unary_fusion(computation_op):
 
     return fn
 
-def _register_unary_fusion_lowering(
-    pattern, unary_attr, computation_op
-):
+
+def _register_unary_fusion_lowering(pattern, unary_attr, computation_op):
     @_register_lowering_pattern_post_grad_pre_pass(
-        pattern,
-        extra_check=_is_valid_computation_unary_fusion(computation_op)
+        pattern, extra_check=_is_valid_computation_unary_fusion(computation_op)
     )
     def fn(match, *args, **kwargs):
         computation_args = list(args)[:-3] + [
@@ -216,6 +229,7 @@ def _register_unary_fusion_lowering(
         return L[computation_op](*computation_args)
 
     return fn
+
 
 def _register_leaky_relu_fusion_lowering(pattern, computation_op):
     @_register_lowering_pattern_post_grad_pre_pass(
@@ -247,6 +261,7 @@ def _register_leaky_relu_fusion_lowering(pattern, computation_op):
 
     return fn
 
+
 def _register_hardtanh_fusion_lowering(pattern, computation_op):
     @_register_lowering_pattern_post_grad_pre_pass(
         pattern, extra_check=_is_single_computation_op(computation_op)
@@ -276,12 +291,14 @@ def _register_hardtanh_fusion_lowering(pattern, computation_op):
 
     return fn
 
+
 _binary_attr = {
     aten.add: "add",
     ops.add: "add",
     aten.sub: "sub",
     ops.sub: "sub",
 }
+
 
 def _is_valid_binary(match, fn):
     binary_nodes = filter_nodes(match.nodes, fn)
@@ -318,6 +335,7 @@ def _is_valid_binary(match, fn):
         return False
     return True
 
+
 def _is_valid_computation_binary(computation_op, binary_op, other_index=None):
     def fn(match):
         if not _is_single_computation_op(computation_op)(match):
@@ -328,6 +346,7 @@ def _is_valid_computation_binary(computation_op, binary_op, other_index=None):
 
     return fn
 
+
 def _is_valid_computation_binary_inplace(computation_op, binary_op, other_index):
     def fn(match):
         if not _is_valid_computation_binary(computation_op, binary_op)(match):
@@ -336,13 +355,13 @@ def _is_valid_computation_binary_inplace(computation_op, binary_op, other_index)
         if any(len(n.args[other_index].users) > 1 for n in binary_nodes):
             return False
         if any(
-            n.args[other_index].op in ["placeholder", "output"]
-            for n in binary_nodes
+            n.args[other_index].op in ["placeholder", "output"] for n in binary_nodes
         ):
             return False
         return True
 
     return fn
+
 
 def _register_binary_unary_fusion_lowering(
     pattern,
@@ -374,16 +393,19 @@ def _register_binary_unary_fusion_lowering(
 
     return fn
 
+
 computation_ops = [
     torch_ipex._convolution_pointwise.default,
     torch_ipex._linear_pointwise.default,
 ]
+
 
 class UnaryAttr:
     def __init__(self, op_name: str, scalars_attr=None, algorithm_attr=None):
         self.op_name = op_name
         self.scalars_attr = scalars_attr if scalars_attr else []
         self.algorithm_attr = algorithm_attr if algorithm_attr else ""
+
 
 def _register_unary_fusion():
     computation_call_fns = [_conv_call, _linear_call]
@@ -414,15 +436,11 @@ def _register_unary_fusion():
         call_user1 = [call_fn(users=1) for call_fn in computation_call_fns]
         replacement_unary_fusion_patterns.update(
             {
-                UnaryAttr("relu"): [
-                    _combined_fusion(u, aten.relu) for u in call_user1
-                ],
+                UnaryAttr("relu"): [_combined_fusion(u, aten.relu) for u in call_user1],
                 UnaryAttr("sigmoid"): [
                     _combined_fusion(u, aten.sigmoid.default) for u in call_user1
                 ],
-                UnaryAttr("tanh"): [
-                    _combined_fusion(u, aten.tanh) for u in call_user1
-                ],
+                UnaryAttr("tanh"): [_combined_fusion(u, aten.tanh) for u in call_user1],
             }
         )
 
@@ -430,12 +448,8 @@ def _register_unary_fusion():
 
     replace_patterns = _unary_fusion_patterns()
     for unary_attr, patterns in replace_patterns.items():
-        _register_unary_fusion_lowering(
-            patterns[0], unary_attr, computation_ops[0]
-        )
-        _register_unary_fusion_lowering(
-            patterns[1], unary_attr, computation_ops[1]
-        )
+        _register_unary_fusion_lowering(patterns[0], unary_attr, computation_ops[0])
+        _register_unary_fusion_lowering(patterns[1], unary_attr, computation_ops[1])
     _leaky_relu_patterns = [
         _unary_fusion_pattern(_leaky_relu_fusion, call_fn, 3)
         for call_fn in computation_call_fns
@@ -449,6 +463,7 @@ def _register_unary_fusion():
     for pattern, computation_op in zip(hardtanh_patterns, computation_ops):
         _register_hardtanh_fusion_lowering(pattern, computation_op)
 
+
 def _register_binary_unary_maybe_inplace_fusion_lowering(
     pattern,
     computation_op,
@@ -457,7 +472,7 @@ def _register_binary_unary_maybe_inplace_fusion_lowering(
     outplace_fusion_op,
     unary_attr=None,
     other_index=None,
-):  
+):
     @_register_lowering_pattern_post_grad_pre_pass(
         pattern,
         extra_check=_is_valid_computation_binary_inplace(
@@ -484,13 +499,16 @@ def _register_binary_unary_maybe_inplace_fusion_lowering(
         other.realize()
         can_be_inplace = not (
             isinstance(other.data, torch_ir.ReinterpretView)
-            or isinstance(other.get_layout(), (torch_ir.MutationLayout, torch_ir.AliasedLayout))
+            or isinstance(
+                other.get_layout(), (torch_ir.MutationLayout, torch_ir.AliasedLayout)
+            )
         )
         if not can_be_inplace:
             return L[outplace_fusion_op](*computation_args)
         return L[inplace_fusion_op](*computation_args)
 
     return fn
+
 
 def _register_inplace_fusion():
     binary_ops = [aten.add, ops.add]
@@ -538,6 +556,7 @@ def _register_inplace_fusion():
             other_index=1,
         )
 
+
 def _register_binary_fusion():
     binary_ops = [aten.add, ops.add, aten.sub, ops.sub]
     fusion_ops = [
@@ -565,6 +584,7 @@ def _register_binary_fusion():
             _register_binary_unary_fusion_lowering(
                 pattern, computation_op, binary_op, fusion_op
             )
+
 
 def _is_packable_convolution(match):
     """
@@ -605,6 +625,7 @@ def _is_packable_convolution(match):
             return False
     return True
 
+
 def _is_packable_linear(match):
     """
     Check if the node is supported for MKLDNN linear.
@@ -641,6 +662,7 @@ def _is_packable_linear(match):
 
     return True
 
+
 _aten_conv_args = (
     Arg(),
     Arg(),
@@ -652,6 +674,7 @@ _aten_conv_args = (
     Arg(),
     Arg(),
 )
+
 
 def _register_weight_pack_pass():
     @register_freezing_graph_pattern(
@@ -672,9 +695,7 @@ def _register_weight_pack_pass():
                 packed_conv_op = torch_ipex._convolution_transpose_pointwise.default
             weight = args[1]
             packed_conv_inputs = (
-                (args[0], weight, args[2])
-                + tuple(constant_args)
-                + ("none", [], "")
+                (args[0], weight, args[2]) + tuple(constant_args) + ("none", [], "")
             )
             packed_conv_node = graph.create_node(
                 "call_function", packed_conv_op, tuple(packed_conv_inputs)
@@ -710,15 +731,18 @@ def _register_weight_pack_pass():
             packed_linear_node.meta.update(linear_node.meta)
             graph.erase_node(linear_node)
 
+
 @functools.lru_cache(None)
 def _ipex_fusion_init():
     _register_unary_fusion()
     _register_inplace_fusion()
     _register_binary_fusion()
 
+
 @functools.lru_cache(None)
 def _ipex_weight_pack_init():
     _register_weight_pack_pass()
+
 
 _ipex_fusion_init()
 _ipex_weight_pack_init()

@@ -7,6 +7,7 @@ from torch.testing._internal.common_utils import TestCase
 checking_atol = 1e-2
 checking_rtol = 1e-2
 
+
 class TestTorchMethod(TestCase):
     def dequantize(self, weight, scales, zero_points, group_size, gemm_num=1):
         k = weight.size()[-2]
@@ -19,10 +20,10 @@ class TestTorchMethod(TestCase):
         scales = scales.reshape([gemm_num, group_num, n])
         zero_points = zero_points.reshape([gemm_num, group_num, int(n / 2)])
 
-        weight_even = (weight & 0x0f).to(torch.int8)
+        weight_even = (weight & 0x0F).to(torch.int8)
         weight_odd = (weight >> 4).to(torch.int8)
 
-        zp_even = (zero_points & 0x0f).to(torch.int8)
+        zp_even = (zero_points & 0x0F).to(torch.int8)
         zp_even += 1
         zp_odd = (zero_points >> 4).to(torch.int8)
         zp_odd += 1
@@ -31,11 +32,19 @@ class TestTorchMethod(TestCase):
         zp_fp16 = []
         for ind in range(0, n):
             if ind % 2 == 0:
-                weight_fp16.append(weight_even[:, :, int(ind / 2)].reshape([gemm_num, k, 1]))
-                zp_fp16.append(zp_even[:, :, int(ind / 2)].reshape([gemm_num, group_num, 1]))
+                weight_fp16.append(
+                    weight_even[:, :, int(ind / 2)].reshape([gemm_num, k, 1])
+                )
+                zp_fp16.append(
+                    zp_even[:, :, int(ind / 2)].reshape([gemm_num, group_num, 1])
+                )
             else:
-                weight_fp16.append(weight_odd[:, :, int(ind / 2)].reshape([gemm_num, k, 1]))
-                zp_fp16.append(zp_odd[:, :, int(ind / 2)].reshape([gemm_num, group_num, 1]))
+                weight_fp16.append(
+                    weight_odd[:, :, int(ind / 2)].reshape([gemm_num, k, 1])
+                )
+                zp_fp16.append(
+                    zp_odd[:, :, int(ind / 2)].reshape([gemm_num, group_num, 1])
+                )
 
         weight_fp16 = torch.concat(weight_fp16, dim=2)
         zp_fp16 = torch.concat(zp_fp16, dim=2)
@@ -67,9 +76,13 @@ class TestTorchMethod(TestCase):
         scales = torch.ones([3, group_num, 16384], device="xpu", dtype=torch.float16)
         zero_points = (torch.zeros([3, group_num, 8192], device="xpu")).byte()
 
-        out_int4 = torch.ops.torch_ipex.mm_qkv_int4(input, weight, bias, scales, zero_points, group_size)
+        out_int4 = torch.ops.torch_ipex.mm_qkv_int4(
+            input, weight, bias, scales, zero_points, group_size
+        )
 
-        weight_fp16 = self.dequantize(weight, scales, zero_points, group_size, gemm_num=3)
+        weight_fp16 = self.dequantize(
+            weight, scales, zero_points, group_size, gemm_num=3
+        )
         out_fp16 = torch.ops.torch_ipex.mm_qkv(input, weight_fp16, bias)
 
         self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
@@ -91,17 +104,23 @@ class TestTorchMethod(TestCase):
         weight_fp16 = self.dequantize(weight, scales, zero_points, group_size)
 
         # check gemm
-        out_int4 = torch.ops.torch_ipex.mm_int4(input, weight, scales, zero_points, group_size)
+        out_int4 = torch.ops.torch_ipex.mm_int4(
+            input, weight, scales, zero_points, group_size
+        )
         out_fp16 = torch.matmul(input, weight_fp16)
         self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
 
         # check gemm + bias
-        out_int4 = torch.ops.torch_ipex.mm_bias_int4(input, weight, bias, scales, zero_points, group_size)
+        out_int4 = torch.ops.torch_ipex.mm_bias_int4(
+            input, weight, bias, scales, zero_points, group_size
+        )
         out_fp16 = out_fp16 + bias
         self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
 
         # check gemm + bias + gelu
-        out_int4 = torch.ops.torch_ipex.mm_bias_gelu_int4(input, weight, scales, zero_points, bias, group_size, "tanh")
+        out_int4 = torch.ops.torch_ipex.mm_bias_gelu_int4(
+            input, weight, scales, zero_points, bias, group_size, "tanh"
+        )
         gelu_op = torch.nn.GELU(approximate="tanh")
         gelu_out = gelu_op(out_fp16)
         self.assertEqual(out_int4, gelu_out, atol=checking_atol, rtol=checking_rtol)
@@ -109,7 +128,9 @@ class TestTorchMethod(TestCase):
         # check gemm + bias + residual + residual
         res0 = torch.rand([1, 16384], device="xpu", dtype=torch.float16)
         res1 = torch.rand([1, 16384], device="xpu", dtype=torch.float16)
-        out_int4 = torch.ops.torch_ipex.mm_bias_resadd_resadd_int4(input, weight, bias, res0, res1, scales, zero_points, group_size)
+        out_int4 = torch.ops.torch_ipex.mm_bias_resadd_resadd_int4(
+            input, weight, bias, res0, res1, scales, zero_points, group_size
+        )
         out_fp16 = out_fp16 + res0 + res1
         self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
 
@@ -128,9 +149,13 @@ class TestTorchMethod(TestCase):
         scales = torch.ones([3, group_num, 16384], device="xpu", dtype=torch.float16)
         zero_points = (torch.zeros([3, group_num, 8192], device="xpu")).byte()
 
-        out_int4 = torch.ops.torch_ipex.mm_qkv_int4(input, weight, bias, scales, zero_points, group_size)
+        out_int4 = torch.ops.torch_ipex.mm_qkv_int4(
+            input, weight, bias, scales, zero_points, group_size
+        )
 
-        weight_fp16 = self.dequantize(weight, scales, zero_points, group_size, gemm_num=3)
+        weight_fp16 = self.dequantize(
+            weight, scales, zero_points, group_size, gemm_num=3
+        )
         out_fp16 = torch.ops.torch_ipex.mm_qkv(input, weight_fp16, bias)
 
         self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
@@ -152,17 +177,23 @@ class TestTorchMethod(TestCase):
         weight_fp16 = self.dequantize(weight, scales, zero_points, group_size)
 
         # check gemm
-        out_int4 = torch.ops.torch_ipex.mm_int4(input, weight, scales, zero_points, group_size)
+        out_int4 = torch.ops.torch_ipex.mm_int4(
+            input, weight, scales, zero_points, group_size
+        )
         out_fp16 = torch.matmul(input, weight_fp16)
         self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
 
         # check gemm + bias
-        out_int4 = torch.ops.torch_ipex.mm_bias_int4(input, weight, bias, scales, zero_points, group_size)
+        out_int4 = torch.ops.torch_ipex.mm_bias_int4(
+            input, weight, bias, scales, zero_points, group_size
+        )
         out_fp16 = out_fp16 + bias
         self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
 
         # check gemm + bias + gelu
-        out_int4 = torch.ops.torch_ipex.mm_bias_gelu_int4(input, weight, scales, zero_points, bias, group_size, "tanh")
+        out_int4 = torch.ops.torch_ipex.mm_bias_gelu_int4(
+            input, weight, scales, zero_points, bias, group_size, "tanh"
+        )
         gelu_op = torch.nn.GELU(approximate="tanh")
         gelu_out = gelu_op(out_fp16)
         self.assertEqual(out_int4, gelu_out, atol=checking_atol, rtol=checking_rtol)
@@ -170,6 +201,8 @@ class TestTorchMethod(TestCase):
         # check gemm + bias + residual + residual
         res0 = torch.rand([1, 16384], device="xpu", dtype=torch.float16)
         res1 = torch.rand([1, 16384], device="xpu", dtype=torch.float16)
-        out_int4 = torch.ops.torch_ipex.mm_bias_resadd_resadd_int4(input, weight, bias, res0, res1, scales, zero_points, group_size)
+        out_int4 = torch.ops.torch_ipex.mm_bias_resadd_resadd_int4(
+            input, weight, bias, res0, res1, scales, zero_points, group_size
+        )
         out_fp16 = out_fp16 + res0 + res1
         self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)

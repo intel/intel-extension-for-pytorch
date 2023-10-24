@@ -22,7 +22,7 @@ class RMSNormRef(nn.Module):
 class TestNNMethod(TestCase):
     def test_rms_norm(self):
         def test_rms_norm_fw_xpu(dtype):
-            print('test_rms_norm_fw_xpu', dtype)
+            print("test_rms_norm_fw_xpu", dtype)
             modelb = RMSNormRef(64)
             model0 = RMSNormRef(768)
             model1 = RMSNormRef(2048)
@@ -43,5 +43,6 @@ class TestNNMethod(TestCase):
                 # print('diff', diff)
                 # assert diff < 1e-2
                 self.assertEqual(output[0].cpu(), output_ref, atol=1e-2, rtol=1e-2)
+
         test_rms_norm_fw_xpu(torch.float)
         test_rms_norm_fw_xpu(torch.bfloat16)

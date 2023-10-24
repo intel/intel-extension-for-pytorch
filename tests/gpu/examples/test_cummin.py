@@ -67,7 +67,6 @@ test_3d_shapes = [
 
 
 class TestTorchMethod(TestCase):
-
     def test_cummin_1d(self):
         print(
             "\n-----------------------1D---------------------------------------------"
@@ -207,6 +206,4 @@ class TestTorchMethod(TestCase):
         self.assertEqual(
             res_cpu[0], res_xpu[0].to(cpu_device).to(torch.float), rtol=10e-4, atol=atol
         )
-        self.assertEqual(
-            res_cpu[1], res_xpu[1].to(cpu_device), rtol=10e-4, atol=atol
-        )
+        self.assertEqual(res_cpu[1], res_xpu[1].to(cpu_device), rtol=10e-4, atol=atol)

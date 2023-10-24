@@ -1,4 +1,5 @@
 from intel_extension_for_pytorch.utils.utils import has_cpu
+
 if has_cpu():
     from ...cpu.nn.frozen_batch_norm import FrozenBatchNorm2d
     from ...cpu.nn import _roi_align

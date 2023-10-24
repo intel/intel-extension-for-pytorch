@@ -102,7 +102,7 @@ class TestTorchMethod(TestCase):
         output_plain, output_plain_xpu, output_block, output_block_xpu = invoke_unary(
             fn, input_plain, input_plain_xpu, input_block, input_block_xpu, param
         )
-        if not torch.xpu.utils.has_2d_block_array(): 
+        if not torch.xpu.utils.has_2d_block_array():
             # Only ATSM would use marco IPEX_XPU_ONEDNN_LAYOUT to produce block tensor
             self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
             self.assertEqual(torch.xpu.is_onednn_layout(output_block_xpu), True)
@@ -116,7 +116,7 @@ class TestTorchMethod(TestCase):
         output_plain, output_plain_xpu, output_block, output_block_xpu = invoke_unary(
             fn, input_plain, input_plain_xpu, input_block, input_block_xpu, param
         )
-        if not torch.xpu.utils.has_2d_block_array(): 
+        if not torch.xpu.utils.has_2d_block_array():
             # Only ATSM would use marco IPEX_XPU_ONEDNN_LAYOUT to produce block tensor
             self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
             self.assertEqual(torch.xpu.is_onednn_layout(output_block_xpu), True)
@@ -133,7 +133,7 @@ class TestTorchMethod(TestCase):
         output_plain, output_plain_xpu, output_block, output_block_xpu = invoke_unary(
             fn, input_plain, input_plain_xpu, input_block, input_block_xpu, param
         )
-        if not torch.xpu.utils.has_2d_block_array(): 
+        if not torch.xpu.utils.has_2d_block_array():
             # Only ATSM would use marco IPEX_XPU_ONEDNN_LAYOUT to produce block tensor
             self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
             self.assertEqual(torch.xpu.is_onednn_layout(output_block_xpu), True)
@@ -158,7 +158,7 @@ class TestTorchMethod(TestCase):
             ) = invoke_unary(
                 fn, input_plain, input_plain_xpu, input_block, input_block_xpu, param
             )
-            if not torch.xpu.utils.has_2d_block_array(): 
+            if not torch.xpu.utils.has_2d_block_array():
                 # Only ATSM would use marco IPEX_XPU_ONEDNN_LAYOUT to produce block tensor
                 self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
                 if not fn == torch.round:
@@ -178,7 +178,7 @@ class TestTorchMethod(TestCase):
         output_plain, output_plain_xpu, output_block, output_block_xpu = invoke_unary(
             fn, input_plain, input_plain_xpu, input_block, input_block_xpu, param
         )
-        if not torch.xpu.utils.has_2d_block_array(): 
+        if not torch.xpu.utils.has_2d_block_array():
             # Only ATSM would use marco IPEX_XPU_ONEDNN_LAYOUT to produce block tensor
             self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
             self.assertEqual(torch.xpu.is_onednn_layout(output_block_xpu), False)
@@ -258,7 +258,9 @@ class TestTorchMethod(TestCase):
         loss.backward()
         inputs_gxpu = inputs.grad
 
-        expect_blocked = False if to_channels_last or torch.xpu.has_2d_block_array() else True
+        expect_blocked = (
+            False if to_channels_last or torch.xpu.has_2d_block_array() else True
+        )
         self.assertEqual(torch.xpu.is_onednn_layout(inputs_gxpu), expect_blocked)
         self.assertEqual(inputs_gcpu, inputs_gxpu.cpu())
         if to_channels_last:
@@ -273,7 +275,7 @@ class TestTorchMethod(TestCase):
             outputs = fn(to_block_dpcpp(inputs))
             outputs.mean().backward()
             inputs_gxpu_block = inputs.grad
-            if not torch.xpu.utils.has_2d_block_array(): 
+            if not torch.xpu.utils.has_2d_block_array():
                 # Only ATSM would use marco IPEX_XPU_ONEDNN_LAYOUT to produce block tensor
                 self.assertEqual(torch.xpu.is_onednn_layout(inputs_gxpu_block), True)
         self.assertEqual(inputs_gcpu, inputs_gxpu_block.cpu())
@@ -322,7 +324,7 @@ class TestNNMethod(TestCase):
         ) = invoke_unary_nn(
             fn, input_plain, input_plain_xpu, input_block, input_block_xpu
         )
-        if not torch.xpu.utils.has_2d_block_array(): 
+        if not torch.xpu.utils.has_2d_block_array():
             # Only ATSM would use marco IPEX_XPU_ONEDNN_LAYOUT to produce block tensor
             self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
             self.assertEqual(torch.xpu.is_onednn_layout(output_block_xpu), True)
@@ -341,7 +343,7 @@ class TestNNMethod(TestCase):
         ) = invoke_unary_nn(
             fn, input_plain, input_plain_xpu, input_block, input_block_xpu
         )
-        if not torch.xpu.utils.has_2d_block_array(): 
+        if not torch.xpu.utils.has_2d_block_array():
             # Only ATSM would use marco IPEX_XPU_ONEDNN_LAYOUT to produce block tensor
             self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
             self.assertEqual(torch.xpu.is_onednn_layout(output_block_xpu), True)
@@ -363,7 +365,7 @@ class TestNNMethod(TestCase):
         ) = invoke_unary_nn(
             fn, input_plain, input_plain_xpu, input_block, input_block_xpu
         )
-        if not torch.xpu.utils.has_2d_block_array(): 
+        if not torch.xpu.utils.has_2d_block_array():
             # Only ATSM would use marco IPEX_XPU_ONEDNN_LAYOUT to produce block tensor
             self.assertEqual(torch.xpu.is_onednn_layout(output_plain_xpu), False)
             self.assertEqual(torch.xpu.is_onednn_layout(output_block_xpu), True)

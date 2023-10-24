@@ -8,12 +8,8 @@ from intel_extension_for_pytorch.xpu.fp8.utils import cast_to_fp8, cast_if_neede
 
 import intel_extension_for_pytorch._isa_help as ipex
 
-from .fp8 import (
-    is_fp8_enabled,
-    get_fp8_recipe,
-    get_fp8_dtype,
-    amax_and_scale_update
-)
+from .fp8 import is_fp8_enabled, get_fp8_recipe, get_fp8_dtype, amax_and_scale_update
+
 
 class Fp8BaseModule(torch.nn.Module):
     def __init__(self, **kwargs) -> None:
@@ -37,8 +33,7 @@ class Fp8BaseModule(torch.nn.Module):
             num_fp8_tensors, dtype=torch.float32, device="xpu"
         )
         self.fp8_meta[fp8_meta_tensor_key].amax_history = torch.zeros(
-            [self.fp8_meta["recipe"].amax_history_len,
-             num_fp8_tensors],
+            [self.fp8_meta["recipe"].amax_history_len, num_fp8_tensors],
             dtype=torch.float32,
             device="xpu",
         )
@@ -88,13 +83,7 @@ class Fp8BaseModule(torch.nn.Module):
 class _Linear(torch.autograd.Function):
     @staticmethod
     def forward(
-        ctx,
-        input_,
-        weight_,
-        bias_,
-        fp8_meta,
-        use_bias,
-        activation_dtype
+        ctx, input_, weight_, bias_, fp8_meta, use_bias, activation_dtype
     ) -> torch.Tensor:
         input = cast_if_needed(input_, activation_dtype)
         weight = cast_if_needed(weight_, activation_dtype)
@@ -125,7 +114,8 @@ class _Linear(torch.autograd.Function):
             bias,
             fp8_meta["scaling_fwd"].scale,
             fp8_meta["scaling_fwd"].scale_inv,
-            fp8_meta["scaling_fwd"].amax_history)
+            fp8_meta["scaling_fwd"].amax_history,
+        )
         ctx.save_for_backward(
             input,
             input_fp8,
@@ -139,8 +129,9 @@ class _Linear(torch.autograd.Function):
         return output
 
     @staticmethod
-    def backward(ctx, grad_output: torch.Tensor
-                 ) -> Tuple[Union[torch.Tensor, None], ...]:
+    def backward(
+        ctx, grad_output: torch.Tensor
+    ) -> Tuple[Union[torch.Tensor, None], ...]:
         (
             input,
             input_fp8,
@@ -162,10 +153,13 @@ class _Linear(torch.autograd.Function):
             ipex.FP8FwdTensors.GEMM1_WEIGHT,
             ctx.fp8_meta["scaling_bwd"].scale,
             ctx.fp8_meta["scaling_bwd"].scale_inv,
-            ctx.fp8_meta["scaling_bwd"].amax_history)
+            ctx.fp8_meta["scaling_bwd"].amax_history,
+        )
 
         grad_weight = torch.ops.torch_ipex.fp8_gemm_backward(
-            torch.permute(grad_output, (0, 2, 1)) if grad_output.dim() == 3 else torch.transpose(grad_output, 0, 1),
+            torch.permute(grad_output, (0, 2, 1))
+            if grad_output.dim() == 3
+            else torch.transpose(grad_output, 0, 1),
             fp8_dtype_backward,
             ipex.FP8BwdTensors.GRAD_OUTPUT1,
             input,
@@ -173,7 +167,8 @@ class _Linear(torch.autograd.Function):
             ipex.FP8FwdTensors.GEMM1_INPUT,
             ctx.fp8_meta["scaling_bwd"].scale,
             ctx.fp8_meta["scaling_bwd"].scale_inv,
-            ctx.fp8_meta["scaling_bwd"].amax_history)
+            ctx.fp8_meta["scaling_bwd"].amax_history,
+        )
 
         return (grad_input, grad_weight, None, None, None, None)
 
@@ -196,8 +191,7 @@ class Linear(Fp8BaseModule):
 
         self.weight = Parameter(
             torch.empty(
-                (self.out_features,
-                 self.in_features),
+                (self.out_features, self.in_features),
                 device=torch.device("xpu"),
                 dtype=params_dtype,
             )
@@ -235,7 +229,6 @@ class Linear(Fp8BaseModule):
         weight: Optional[torch.Tensor] = None,
         bias: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
-
         self.prepare_forward_backward()
 
         if torch.is_grad_enabled():
@@ -258,7 +251,7 @@ class Linear(Fp8BaseModule):
             self.bias,
             self.fp8_meta,
             self.use_bias,
-            activation_dtype
+            activation_dtype,
         )
 
         out = linear_fn(*args)

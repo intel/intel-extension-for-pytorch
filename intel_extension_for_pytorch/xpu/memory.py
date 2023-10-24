@@ -164,9 +164,9 @@ def reset_max_memory_allocated(device: Union[Device, int] = None) -> None:
     warnings.warn(
         "torch.xpu.reset_max_memory_allocated now calls torch.xpu.reset_peak_memory_stats, "
         "which resets /all/ peak memory stats.",
-        FutureWarning)
+        FutureWarning,
+    )
     return reset_peak_memory_stats(device=device)
-
 
 
 def reset_max_memory_cached(device: Union[Device, int] = None) -> None:
@@ -191,7 +191,8 @@ def reset_max_memory_cached(device: Union[Device, int] = None) -> None:
     warnings.warn(
         "torch.xpu.reset_max_memory_cached now calls torch.xpu.reset_peak_memory_stats, "
         "which resets /all/ peak memory stats.",
-        FutureWarning)
+        FutureWarning,
+    )
     return reset_peak_memory_stats(device=device)
 
 
@@ -277,7 +278,8 @@ def memory_cached(device: Union[Device, int] = None) -> int:
     r"""Deprecated; see :func:`~torch.xpu.memory_reserved`."""
     warnings.warn(
         "torch.xpu.memory_cached has been renamed to torch.xpu.memory_reserved",
-        FutureWarning)
+        FutureWarning,
+    )
     return memory_reserved(device=device)
 
 
@@ -285,7 +287,8 @@ def max_memory_cached(device: Union[Device, int] = None) -> int:
     r"""Deprecated; see :func:`~torch.xpu.max_memory_reserved`."""
     warnings.warn(
         "torch.xpu.max_memory_cached has been renamed to torch.xpu.max_memory_reserved",
-        FutureWarning)
+        FutureWarning,
+    )
     return max_memory_reserved(device=device)
 
 

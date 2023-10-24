@@ -18,7 +18,13 @@ from torch.storage import _StorageBase
 from torch import device as _device
 from torch._utils import classproperty, _get_device_index
 
-from .lazy_init import _lazy_init, _lazy_call, _is_initialized, is_initialized, _is_in_bad_fork
+from .lazy_init import (
+    _lazy_init,
+    _lazy_call,
+    _is_initialized,
+    is_initialized,
+    _is_in_bad_fork,
+)
 from .streams import Stream, Event
 from .intrinsic import *
 from .cpp_extension import *
@@ -46,17 +52,23 @@ from intel_extension_for_pytorch._version import (
 default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]
 
+
 def _is_compiled() -> bool:
     r"""Returns true if compile with XPU support."""
-    return hasattr(intel_extension_for_pytorch._C, '_getDeviceCount')
+    return hasattr(intel_extension_for_pytorch._C, "_getDeviceCount")
+
 
 if _is_compiled():
     _exchange_device = intel_extension_for_pytorch._C._exchangeDevice
 else:
+
     def _exchange_device(device: int) -> int:
         if device < 0:
             return -1
-        raise RuntimeError("Intel® Extension for PyTorch* was compiled without XPU support")
+        raise RuntimeError(
+            "Intel® Extension for PyTorch* was compiled without XPU support"
+        )
+
 
 _maybe_exchange_device = _exchange_device
 
@@ -140,7 +152,11 @@ class device(object):
         r"""Return the sycl device void pointer address. Make it be easily used in
         C/C++ code.
         """
-        return ctypes.c_void_p(get_pointer_from_capsule(intel_extension_for_pytorch._C.sycl_device(self.idx)))
+        return ctypes.c_void_p(
+            get_pointer_from_capsule(
+                intel_extension_for_pytorch._C.sycl_device(self.idx)
+            )
+        )
 
 
 class device_of(device):
@@ -355,8 +371,11 @@ def current_stream(device: Optional[_device_t] = None) -> Stream:
     """
     _lazy_init()
     streamdata = intel_extension_for_pytorch._C._getCurrentStream(
-        _get_device_index(device, optional=True))
-    return Stream(stream_id=streamdata[0], device_index=streamdata[1], device_type=streamdata[2])
+        _get_device_index(device, optional=True)
+    )
+    return Stream(
+        stream_id=streamdata[0], device_index=streamdata[1], device_type=streamdata[2]
+    )
 
 
 def _get_device(device: Union[int, str, torch.device]) -> torch.device:

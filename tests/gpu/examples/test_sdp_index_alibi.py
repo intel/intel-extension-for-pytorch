@@ -34,16 +34,24 @@ head_mask = None
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="ipex build without xetla")
     def test_fsdp_index_alibi(self, dtype=torch.float16):
-        q = torch.randn([b, f, n, h], dtype=dtype, device=torch.device('xpu'))
-        k_in_proj = torch.randn([bs, t_in, n, h], dtype=dtype, device=torch.device('xpu'))
-        v_in_proj = torch.randn([bs, t_in, n, h], dtype=dtype, device=torch.device('xpu'))
-        k = torch.randn([b, t, n, h], dtype=dtype, device=torch.device('xpu'))
-        v = torch.randn([b, t, n, h], dtype=dtype, device=torch.device('xpu'))
-        k_cache = torch.randn([t_max, b, n, h], dtype=dtype, device=torch.device('xpu'))
-        v_cache = torch.randn([t_max, b, n, h], dtype=dtype, device=torch.device('xpu'))
-        attn_mask = torch.randn([b, 1, f, t], dtype=dtype, device=torch.device('xpu'))
-        attn_mask_padded = torch.zeros([b, 1, f, t_max], dtype=dtype, device=torch.device('xpu'))
-        index = torch.randint(0, beam, [t_out, bs, beam], dtype=torch.int, device=torch.device('xpu'))
+        q = torch.randn([b, f, n, h], dtype=dtype, device=torch.device("xpu"))
+        k_in_proj = torch.randn(
+            [bs, t_in, n, h], dtype=dtype, device=torch.device("xpu")
+        )
+        v_in_proj = torch.randn(
+            [bs, t_in, n, h], dtype=dtype, device=torch.device("xpu")
+        )
+        k = torch.randn([b, t, n, h], dtype=dtype, device=torch.device("xpu"))
+        v = torch.randn([b, t, n, h], dtype=dtype, device=torch.device("xpu"))
+        k_cache = torch.randn([t_max, b, n, h], dtype=dtype, device=torch.device("xpu"))
+        v_cache = torch.randn([t_max, b, n, h], dtype=dtype, device=torch.device("xpu"))
+        attn_mask = torch.randn([b, 1, f, t], dtype=dtype, device=torch.device("xpu"))
+        attn_mask_padded = torch.zeros(
+            [b, 1, f, t_max], dtype=dtype, device=torch.device("xpu")
+        )
+        index = torch.randint(
+            0, beam, [t_out, bs, beam], dtype=torch.int, device=torch.device("xpu")
+        )
 
         # Reference init
         # 1. Init k, v 1st half, input prompt projection
@@ -94,8 +102,10 @@ class TestTorchMethod(TestCase):
         attn_weights = attn_scores
         attn_probs = torch.nn.functional.softmax(attn_weights, dim=-1)
         attn_probs_reshaped = attn_probs.view(b * n, f, t)
-        ref_cpu = torch.bmm(attn_probs_reshaped, v.cpu().float().permute(
-            0, 2, 1, 3).contiguous().view(-1, t, h)).view(b, n, f, h)
+        ref_cpu = torch.bmm(
+            attn_probs_reshaped,
+            v.cpu().float().permute(0, 2, 1, 3).contiguous().view(-1, t, h),
+        ).view(b, n, f, h)
         # print(context_layer.cpu().view(-1, f, h))
 
         print("XPU sdp ...")
@@ -105,20 +115,55 @@ class TestTorchMethod(TestCase):
         # alibi_sdp = None
 
         ref = torch.xpu.IpexSDP(
-            q.permute(
-                0, 2, 1, 3), k.permute(
-                0, 2, 1, 3), v.permute(
-                0, 2, 1, 3), alibi_sdp, attn_mask_padded, head_mask, alpha, beta, dropout, is_causal, seq_last)
-        ref_no_alibi = torch.xpu.IpexSDP(q.permute(0, 2, 1, 3), k.permute(0, 2, 1, 3), v.permute(
-            0, 2, 1, 3), None, attn_mask_padded, head_mask, alpha, beta, dropout, is_causal, seq_last)
+            q.permute(0, 2, 1, 3),
+            k.permute(0, 2, 1, 3),
+            v.permute(0, 2, 1, 3),
+            alibi_sdp,
+            attn_mask_padded,
+            head_mask,
+            alpha,
+            beta,
+            dropout,
+            is_causal,
+            seq_last,
+        )
+        ref_no_alibi = torch.xpu.IpexSDP(
+            q.permute(0, 2, 1, 3),
+            k.permute(0, 2, 1, 3),
+            v.permute(0, 2, 1, 3),
+            None,
+            attn_mask_padded,
+            head_mask,
+            alpha,
+            beta,
+            dropout,
+            is_causal,
+            seq_last,
+        )
         # sdp index fusion op is on SequenceLast by default
-        res = torch.xpu.IpexSDP_Index(q.permute(0, 2, 1, 3), k_in_proj.permute(0, 2, 1, 3), v_in_proj.permute(0, 2, 1, 3),
-                                      k_cache[0:t_out, :, :, :].permute(1, 2, 0, 3), v_cache[0:t_out, :, :, :].permute(1, 2, 0, 3),
-                                      index, alibi_sdp, attn_mask_padded, head_mask, t_out, alpha, beta, dropout, is_causal)
+        res = torch.xpu.IpexSDP_Index(
+            q.permute(0, 2, 1, 3),
+            k_in_proj.permute(0, 2, 1, 3),
+            v_in_proj.permute(0, 2, 1, 3),
+            k_cache[0:t_out, :, :, :].permute(1, 2, 0, 3),
+            v_cache[0:t_out, :, :, :].permute(1, 2, 0, 3),
+            index,
+            alibi_sdp,
+            attn_mask_padded,
+            head_mask,
+            t_out,
+            alpha,
+            beta,
+            dropout,
+            is_causal,
+        )
         # print(context_layer_sdp.cpu().view(-1, f, h))
         print("sdp vs sdp idx:", (ref.cpu() - res.cpu()).abs().max().item())
         print("cpu vs sdp idx:", (ref_cpu - res.cpu()).abs().max().item())
         print("cpu vs sdp:", (ref_cpu - ref.cpu()).abs().max().item())
-        print("sdp no alibi vs sdp idx:", (ref_no_alibi.cpu() - res.cpu()).abs().max().item())
+        print(
+            "sdp no alibi vs sdp idx:",
+            (ref_no_alibi.cpu() - res.cpu()).abs().max().item(),
+        )
         self.assertEqual(ref_cpu, ref.cpu().float(), atol=1e-2, rtol=1e-3)
         self.assertEqual(ref_cpu, res.cpu().float(), atol=1e-2, rtol=1e-3)

@@ -5,6 +5,7 @@ import intel_extension_for_pytorch as ipex  # noqa
 from torch.testing._internal.common_utils import TestCase
 import pytest
 
+
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="ipex build without xetla")
     def test_fsdp_atten_mask_alibi_stride(self, dtype=torch.float16):
@@ -44,10 +45,13 @@ class TestTorchMethod(TestCase):
         attn_weights = attn_scores
         attn_probs = torch.nn.functional.softmax(attn_weights, dim=-1)
         attn_probs_reshaped = attn_probs.view(beam_width * num_heads, q_len, kv_len)
-        context_layer = torch.bmm(attn_probs_reshaped,
-                                  value_layer.float().permute(0, 2, 1, 3)
-                                  .view(-1, kv_len, head_dim)
-                                  .view(beam_width, num_heads, q_len, head_dim))
+        context_layer = torch.bmm(
+            attn_probs_reshaped,
+            value_layer.float()
+            .permute(0, 2, 1, 3)
+            .view(-1, kv_len, head_dim)
+            .view(beam_width, num_heads, q_len, head_dim),
+        )
         # print(context_layer.cpu().view(-1, q_len, head_dim))
 
         print("XPU sdp ...")
@@ -61,12 +65,22 @@ class TestTorchMethod(TestCase):
         beta = 1.0
         dropout = 0.0
         is_causal = False
-        context_layer_sdp = torch.xpu.IpexSDP(query_layer.to('xpu').permute(0, 2, 1, 3),
-                                              key_layer.to('xpu').permute(0, 2, 1, 3),
-                                              value_layer.to('xpu').permute(0, 2, 1, 3),
-                                              alibi_sdp.to('xpu'), attn_mask, head_mask, alpha, beta, dropout, is_causal)
+        context_layer_sdp = torch.xpu.IpexSDP(
+            query_layer.to("xpu").permute(0, 2, 1, 3),
+            key_layer.to("xpu").permute(0, 2, 1, 3),
+            value_layer.to("xpu").permute(0, 2, 1, 3),
+            alibi_sdp.to("xpu"),
+            attn_mask,
+            head_mask,
+            alpha,
+            beta,
+            dropout,
+            is_causal,
+        )
         print(context_layer_sdp.shape)
         print(context_layer_sdp.cpu().float())
         print(context_layer.shape)
         print(context_layer.cpu())
-        self.assertEqual(context_layer.cpu(), context_layer_sdp.cpu().float(), atol=1e-3, rtol=1e-4)
+        self.assertEqual(
+            context_layer.cpu(), context_layer_sdp.cpu().float(), atol=1e-3, rtol=1e-4
+        )

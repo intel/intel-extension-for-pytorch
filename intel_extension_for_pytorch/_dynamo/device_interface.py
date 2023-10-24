@@ -4,11 +4,12 @@ import torch
 from torch._dynamo.device_interface import (
     DeviceInterface,
     caching_worker_current_devices,
-    caching_worker_device_properties
+    caching_worker_device_properties,
 )
 from intel_extension_for_pytorch._C import _getCurrentRawStream as get_xpu_stream
 
 _device_t = Union[torch.device, str, int, None]
+
 
 class XPUInterface(DeviceInterface):
     device = torch.xpu.device

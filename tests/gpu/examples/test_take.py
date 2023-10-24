@@ -6,6 +6,7 @@ import intel_extension_for_pytorch  # noqa
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
+
 class TestNNMethod(TestCase):
     def test_take(self, dtype=torch.float):
         src = torch.rand(2, 3)

@@ -50,6 +50,7 @@ class ForeachPointWiseScalarTest:
             scalar,
         )
 
+
 class ForeachTernaryListTest:
     def __init__(self, func):
         self.func = func
@@ -64,16 +65,14 @@ class ForeachTernaryListTest:
             input_tensor2_for_func.append(input2[i].clone().to(device))
         if inplace:
             self.func(
-                input_tensor_for_func,
-                input_tensor1_for_func,
-                input_tensor2_for_func)
+                input_tensor_for_func, input_tensor1_for_func, input_tensor2_for_func
+            )
             return input_tensor_for_func
         else:
             return self.func(
-                input_tensor_for_func,
-                input_tensor1_for_func,
-                input_tensor2_for_func
+                input_tensor_for_func, input_tensor1_for_func, input_tensor2_for_func
             )
+
 
 class ForeachTernaryScalarTest:
     def __init__(self, func):
@@ -86,17 +85,11 @@ class ForeachTernaryScalarTest:
             input_tensor_for_func.append(input[i].clone().to(device))
             input_tensor1_for_func.append(input1[i].clone().to(device))
         if inplace:
-            self.func(
-                input_tensor_for_func,
-                input_tensor1_for_func,
-                scalar)
+            self.func(input_tensor_for_func, input_tensor1_for_func, scalar)
             return input_tensor_for_func
         else:
-            return self.func(
-                input_tensor_for_func,
-                input_tensor1_for_func,
-                scalar
-            )
+            return self.func(input_tensor_for_func, input_tensor1_for_func, scalar)
+
 
 class TestTorchMethod(TestCase):
     def test_foreach_addcmul_scalar(self, dtype=torch.float):

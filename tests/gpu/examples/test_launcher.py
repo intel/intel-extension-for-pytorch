@@ -97,8 +97,9 @@ print("All check passed.")
 
         return generate_file
 
-    @pytest.mark.skipif(platform.system() == 'Windows', 
-                        reason="Launcher is not supported on Windows.")
+    @pytest.mark.skipif(
+        platform.system() == "Windows", reason="Launcher is not supported on Windows."
+    )
     def test_convert_fp64_to_fp32(self):
         dev_prod = product(device_pool, device_pool)
         dtype_prod = product(dtype_pool, dtype_pool)

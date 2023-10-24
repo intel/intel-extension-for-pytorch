@@ -3,6 +3,7 @@ import sys
 
 import torch
 
+
 def override_size_asserts():
     """
     We have to mute assert_size_stride here because conv1D in IPEX has the
@@ -15,6 +16,7 @@ def override_size_asserts():
         return
 
     from torch._inductor import config
+
     config.size_asserts = False
 
     if "torch._inductor.ir" not in sys.modules:

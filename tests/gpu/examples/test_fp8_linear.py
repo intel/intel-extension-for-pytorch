@@ -8,8 +8,12 @@ from torch.testing._internal.common_utils import TestCase
 class TestFP8GEMM(TestCase):
     def test_fp8_gemm(self):
         dtype = torch.bfloat16
-        input = torch.ones([8, 2], requires_grad=True, dtype=dtype, device=torch.device("xpu"))
-        input_ref = torch.ones([8, 2], requires_grad=True, dtype=dtype, device=torch.device("xpu"))
+        input = torch.ones(
+            [8, 2], requires_grad=True, dtype=dtype, device=torch.device("xpu")
+        )
+        input_ref = torch.ones(
+            [8, 2], requires_grad=True, dtype=dtype, device=torch.device("xpu")
+        )
         grad_out = torch.rand([8, 3], dtype=dtype).xpu()
         grad_out_ref = grad_out.clone()
 

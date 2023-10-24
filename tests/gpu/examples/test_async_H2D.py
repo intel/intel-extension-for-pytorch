@@ -9,10 +9,9 @@ import pytest
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
+
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(
-        IS_WINDOWS, reason="not applicable on Windows"
-    )
+    @pytest.mark.skipif(IS_WINDOWS, reason="not applicable on Windows")
     def test_non_blocking_H2D_copy(self):
         def dummy_compute(tensor):
             return (tensor + 1.0) * 0.1
@@ -27,11 +26,11 @@ class TestTorchMethod(TestCase):
             memory_maps = psutil.Process(PID).memory_maps()
             for map in memory_maps:
                 map = str(map)
-                if '[heap]' in map:
-                    anon_str = 'anonymous'
+                if "[heap]" in map:
+                    anon_str = "anonymous"
                     anon_index = map.find(anon_str) + len(anon_str) + 1
                     sub_str = map[anon_index:]
-                    value_str = sub_str[0:sub_str.find(',')]
+                    value_str = sub_str[0 : sub_str.find(",")]
             return int(value_str)
 
         for i in range(H2D_CNT):

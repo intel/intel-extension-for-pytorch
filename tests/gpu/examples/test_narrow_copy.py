@@ -5,7 +5,6 @@ from torch.testing._internal.common_utils import TestCase
 
 
 class TestTorchMethod(TestCase):
-
     def test_narrow_copy(self, dtype=torch.float):
         dtype = torch.float
 

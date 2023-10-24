@@ -38,7 +38,9 @@ class Stream(intel_extension_for_pytorch._C._XPUStreamBase, _StreamBase):
         return hash((self.sycl_queue, self.device))
 
     def __repr__(self):
-        return ("<torch.xpu.Stream device={0} sycl_queue={1}>".format(self.device, self.sycl_queue))
+        return "<torch.xpu.Stream device={0} sycl_queue={1}>".format(
+            self.device, self.sycl_queue
+        )
 
     def wait_event(self, event):
         r"""Makes all future work submitted to the stream wait for an event.

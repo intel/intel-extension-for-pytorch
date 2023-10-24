@@ -186,7 +186,7 @@ def optimize(
     sample_input=None,
     graph_mode=None,
     concat_linear=None,
-    optimize_transformers=None
+    optimize_transformers=None,
 ):
     r"""
     Apply optimizations at Python frontend to the given model (nn.Module), as
@@ -557,7 +557,7 @@ def optimize(
                 params_attr,
                 opt_properties.split_master_weight_for_bf16,
                 dtype,
-                device_type
+                device_type,
             )
 
     # Since TorchDynamo cannot handle custom operations yet, for the case of inference graph mode,

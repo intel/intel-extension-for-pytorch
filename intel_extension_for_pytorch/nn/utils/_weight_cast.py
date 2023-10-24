@@ -6,7 +6,12 @@ from ._parameter_wrapper import get_shared_parameter_status, patch_state_dict
 
 
 def weight_dtype_convert_with_ipex(
-    model, optimizer, params_attr, master_weight_split, dtype=torch.bfloat16, device_type='cpu'
+    model,
+    optimizer,
+    params_attr,
+    master_weight_split,
+    dtype=torch.bfloat16,
+    device_type="cpu",
 ):
     assert dtype in [
         torch.bfloat16,
@@ -69,7 +74,9 @@ def weight_dtype_convert_with_ipex(
     def convert_rec(module):
         for sub_module in module.children():
             convert_rec(sub_module)
-        if device_type == 'xpu' or (not isCLIPTextEmbeddings(module) and device_type == 'cpu'):
+        if device_type == "xpu" or (
+            not isCLIPTextEmbeddings(module) and device_type == "cpu"
+        ):
             convert(module)
 
     convert_rec(model)

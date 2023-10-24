@@ -120,7 +120,9 @@ class TestNNMethod(TestCase):
         print("SYCL: ", output_dpcpp.to("cpu"))
         print("SYCL: ", input_dpcpp.grad.to("cpu"))
         self.assertEqual(output, output_dpcpp.cpu().float(), rtol=1e-03, atol=1e-03)
-        self.assertEqual(input.grad, input_dpcpp.grad.cpu().float(), rtol=1e-03, atol=1e-03)
+        self.assertEqual(
+            input.grad, input_dpcpp.grad.cpu().float(), rtol=1e-03, atol=1e-03
+        )
 
         input = torch.randn(3, 5, 4)
         # each element in target has to have 0 <= value < C
@@ -143,7 +145,9 @@ class TestNNMethod(TestCase):
         print("none SYCL grad: ", input_dpcpp.grad.to("cpu"))
 
         self.assertEqual(output, output_dpcpp.cpu().float(), rtol=1e-03, atol=1e-03)
-        self.assertEqual(input.grad, input_dpcpp.grad.cpu().float(), rtol=1e-03, atol=1e-03)
+        self.assertEqual(
+            input.grad, input_dpcpp.grad.cpu().float(), rtol=1e-03, atol=1e-03
+        )
         input.grad.detach_()
         input.grad.zero_()
         input_dpcpp.grad.detach_()
@@ -162,7 +166,9 @@ class TestNNMethod(TestCase):
         print("sum SYCL grad: ", input_dpcpp.grad.to("cpu"))
 
         self.assertEqual(output, output_dpcpp.cpu().float(), rtol=1e-03, atol=1e-03)
-        self.assertEqual(input.grad, input_dpcpp.grad.cpu().float(), rtol=1e-03, atol=1e-03)
+        self.assertEqual(
+            input.grad, input_dpcpp.grad.cpu().float(), rtol=1e-03, atol=1e-03
+        )
         input.grad.detach_()
         input.grad.zero_()
         input_dpcpp.grad.detach_()
@@ -179,7 +185,9 @@ class TestNNMethod(TestCase):
         print("mean SYCL grad: ", input_dpcpp.grad.to("cpu"))
 
         self.assertEqual(output, output_dpcpp.cpu().float(), rtol=1e-03, atol=1e-03)
-        self.assertEqual(input.grad, input_dpcpp.grad.cpu().float(), rtol=1e-03, atol=1e-03)
+        self.assertEqual(
+            input.grad, input_dpcpp.grad.cpu().float(), rtol=1e-03, atol=1e-03
+        )
         input.grad.detach_()
         input.grad.zero_()
         input_dpcpp.grad.detach_()

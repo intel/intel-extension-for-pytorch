@@ -99,7 +99,7 @@ class TestNNMethod(TestCase):
         # 2D, CF
         x = torch.rand(1, 3, 18, 32)
         shape = (36, 48)
-        dummy_img = (x - x.min()) / (x.max() - x.min()) * 255.
+        dummy_img = (x - x.min()) / (x.max() - x.min()) * 255.0
         dummy_img_xpu = dummy_img.to("xpu")
         dummy_img.requires_grad = True
         dummy_img_xpu.requires_grad = True
@@ -122,7 +122,7 @@ class TestNNMethod(TestCase):
         # 2D, CL
         x = torch.rand(1, 3, 18, 32).to(memory_format=torch.channels_last)
         shape = (36, 48)
-        dummy_img = (x - x.min()) / (x.max() - x.min()) * 255.
+        dummy_img = (x - x.min()) / (x.max() - x.min()) * 255.0
         dummy_img_xpu = dummy_img.to("xpu")
         dummy_img.requires_grad = True
         dummy_img_xpu.requires_grad = True
@@ -144,17 +144,15 @@ class TestNNMethod(TestCase):
 
         # 1D, CF
         x = torch.rand(3, 18, 32)
-        shape = (48)
-        dummy_img = (x - x.min()) / (x.max() - x.min()) * 255.
+        shape = 48
+        dummy_img = (x - x.min()) / (x.max() - x.min()) * 255.0
         dummy_img_xpu = dummy_img.to("xpu")
         dummy_img.requires_grad = True
         dummy_img_xpu.requires_grad = True
         y_cpu = torch.functional.F.interpolate(dummy_img, shape)
         y_xpu = torch.functional.F.interpolate(dummy_img_xpu, shape)
         self.assertEqual(y_cpu, y_xpu.cpu())
-        grad_out_cpu = torch.randn(
-            (3, 18, 48), dtype=torch.float32, device=cpu_device
-        )
+        grad_out_cpu = torch.randn((3, 18, 48), dtype=torch.float32, device=cpu_device)
         grad_out_dpcpp = grad_out_cpu.to("xpu")
         grad_out_cpu = Variable(grad_out_cpu, requires_grad=True)
         grad_out_dpcpp = Variable(grad_out_dpcpp, requires_grad=True)
@@ -168,7 +166,7 @@ class TestNNMethod(TestCase):
         # 3D, CF
         x = torch.rand(1, 3, 18, 32, 32)
         shape = (36, 48, 48)
-        dummy_img = (x - x.min()) / (x.max() - x.min()) * 255.
+        dummy_img = (x - x.min()) / (x.max() - x.min()) * 255.0
         dummy_img_xpu = dummy_img.to("xpu")
         dummy_img.requires_grad = True
         dummy_img_xpu.requires_grad = True
@@ -191,7 +189,7 @@ class TestNNMethod(TestCase):
         # 3D, CL
         x = torch.rand(1, 3, 18, 32, 32).to(memory_format=torch.channels_last_3d)
         shape = (36, 48, 48)
-        dummy_img = (x - x.min()) / (x.max() - x.min()) * 255.
+        dummy_img = (x - x.min()) / (x.max() - x.min()) * 255.0
         dummy_img_xpu = dummy_img.to("xpu")
         dummy_img.requires_grad = True
         dummy_img_xpu.requires_grad = True

@@ -14,18 +14,22 @@ class TestTorchMethod(TestCase):
             A = torch.arange(-128, 130, dtype=torch.float)
             B = torch.arange(-128, 130, dtype=torch.float)
             scale = 2.0
-            zero_point = 0 if platform.system() == 'Windows' else 127
-            qA = torch.quantize_per_tensor(A, scale=scale, zero_point=zero_point,
-                                           dtype=dtype)
-            qB = torch.quantize_per_tensor(B, scale=scale, zero_point=zero_point,
-                                           dtype=dtype)
+            zero_point = 0 if platform.system() == "Windows" else 127
+            qA = torch.quantize_per_tensor(
+                A, scale=scale, zero_point=zero_point, dtype=dtype
+            )
+            qB = torch.quantize_per_tensor(
+                B, scale=scale, zero_point=zero_point, dtype=dtype
+            )
 
             A_xpu = A.to("xpu")
             B_xpu = B.to("xpu")
-            qA_xpu = torch.quantize_per_tensor(A, scale=scale, zero_point=zero_point,
-                                               dtype=dtype)
-            qB_xpu = torch.quantize_per_tensor(B, scale=scale, zero_point=zero_point,
-                                               dtype=dtype)
+            qA_xpu = torch.quantize_per_tensor(
+                A, scale=scale, zero_point=zero_point, dtype=dtype
+            )
+            qB_xpu = torch.quantize_per_tensor(
+                B, scale=scale, zero_point=zero_point, dtype=dtype
+            )
 
             qC = add(qA, qB, scale, zero_point)
             qC_relu = add_relu(qA, qB, scale, zero_point)

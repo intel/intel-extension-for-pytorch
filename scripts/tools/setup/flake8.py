@@ -9,18 +9,45 @@ def check_flake8_errors(base_dir, filepath):
         print(
             "WARNING: Please install flake8 by pip install -r requirements-flake8.txt to check format!"
         )
+        return 1
     flak8_cmd = ["flake8"]  # '--quiet'
+
+    if shutil.which("black") is None:
+        print(
+            "WARNING: Please install black by pip install -r requirements-flake8.txt to auto format!"
+        )
+        return 1
+    black_cmd = ["black"]
+
     if os.path.isdir(filepath):
         for root, dirs, files in os.walk(filepath):
             for file in files:
                 if file.endswith(".py"):
+                    black_cmd.append(os.path.join(root, file))
                     flak8_cmd.append(os.path.join(root, file))
     elif os.path.isfile(filepath):
+        black_cmd.append(filepath)
         flak8_cmd.append(filepath)
+
+    # Auto format python code.
+    blk_output = subprocess.check_output(
+        black_cmd,
+        cwd=base_dir,
+        stderr=subprocess.STDOUT,
+    )
+    output_string = blk_output.decode("utf-8")
+    print(output_string)
+    if output_string.find("reformatted") == -1:
+        ret_blk = 0
     else:
-        raise FileNotFoundError(f"Can not found {filepath}")
-    ret = subprocess.call(flak8_cmd, cwd=base_dir)
-    return ret
+        ret_blk = 1
+
+    # Check code style.
+    ret_flak8 = subprocess.call(flak8_cmd, cwd=base_dir)
+    status_code = ret_flak8 + ret_blk
+    print("status code: ", status_code)
+
+    return status_code
 
 
 if __name__ == "__main__":

@@ -5,12 +5,16 @@ from typing import Optional, Tuple, Union
 
 def create_sinusoidal_positions(num_pos: int, dim: int) -> torch.Tensor:
     inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2) / dim))
-    sinusoid_inp = torch.einsum("i , j -> i j", torch.arange(num_pos, dtype=torch.float), inv_freq).float()
+    sinusoid_inp = torch.einsum(
+        "i , j -> i j", torch.arange(num_pos, dtype=torch.float), inv_freq
+    ).float()
     return torch.cat((torch.sin(sinusoid_inp), torch.cos(sinusoid_inp)), dim=1)
+
 
 @torch.fx.wrap
 def get_embed_positions(embed_positions, position_ids):
     return embed_positions.to(position_ids.device).repeat(position_ids.shape[0], 1, 1)
+
 
 def fixed_pos_embedding(x, seq_dim=1, seq_len=None):
     dim = x.shape[-1]
@@ -18,7 +22,9 @@ def fixed_pos_embedding(x, seq_dim=1, seq_len=None):
         seq_len = x.shape[seq_dim]
     inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2) / dim))
     sinusoid_inp = (
-        torch.einsum("i , j -> i j", torch.arange(seq_len, dtype=torch.float), inv_freq).to(x.device).float()
+        torch.einsum("i , j -> i j", torch.arange(seq_len, dtype=torch.float), inv_freq)
+        .to(x.device)
+        .float()
     )
     return torch.sin(sinusoid_inp), torch.cos(sinusoid_inp)
 
@@ -30,15 +36,16 @@ def rotate_every_two(x):
     return x.flatten(-2)  # in einsum notation: rearrange(x, '... d j -> ... (d j)')
 
 
-def apply_rotary_pos_emb(tensor: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor) -> torch.Tensor:
+def apply_rotary_pos_emb(
+    tensor: torch.Tensor, sin: torch.Tensor, cos: torch.Tensor
+) -> torch.Tensor:
     torch.ops.torch_ipex.apply_rotary_embedding(tensor, sin, cos, tensor)
+
 
 def activation_replace(module):
     from transformers.activations import NewGELUActivation
 
-    replace_dict = {
-        NewGELUActivation: torch.nn.GELU(approximate="tanh")
-    }
+    replace_dict = {NewGELUActivation: torch.nn.GELU(approximate="tanh")}
     for m in replace_dict.keys():
         if isinstance(module, m):
             return replace_dict[m]
@@ -86,7 +93,6 @@ class IPEXGPTJAttention(nn.Module):
         self.total_value = None
         self.prompt_len = None
 
-
     def _split_heads(self, tensor, num_attention_heads, attn_head_size, rotary):
         """
         Splits hidden dim into attn_head_size and num_attention_heads
@@ -96,11 +102,17 @@ class IPEXGPTJAttention(nn.Module):
         if rotary:
             return tensor
         if len(tensor.shape) == 5:
-            return tensor.permute(0, 1, 3, 2, 4)  # (batch, blocks, head, block_length, head_features)
+            return tensor.permute(
+                0, 1, 3, 2, 4
+            )  # (batch, blocks, head, block_length, head_features)
         elif len(tensor.shape) == 4:
-            return tensor.permute(0, 2, 1, 3)  # (batch, head, seq_length, head_features)
+            return tensor.permute(
+                0, 2, 1, 3
+            )  # (batch, head, seq_length, head_features)
         else:
-            raise ValueError(f"Input tensor rank should be one of [4, 5], but is: {len(tensor.shape)}")
+            raise ValueError(
+                f"Input tensor rank should be one of [4, 5], but is: {len(tensor.shape)}"
+            )
 
     def _merge_heads(self, tensor, num_attention_heads, attn_head_size):
         """
@@ -111,7 +123,9 @@ class IPEXGPTJAttention(nn.Module):
         elif len(tensor.shape) == 4:
             tensor = tensor.permute(0, 2, 1, 3).contiguous()
         else:
-            raise ValueError(f"Input tensor rank should be one of [4, 5], but is: {len(tensor.shape)}")
+            raise ValueError(
+                f"Input tensor rank should be one of [4, 5], but is: {len(tensor.shape)}"
+            )
         new_shape = tensor.size()[:-2] + (num_attention_heads * attn_head_size,)
         return tensor.view(new_shape)
 
@@ -123,10 +137,11 @@ class IPEXGPTJAttention(nn.Module):
         attention_mask=None,
         head_mask=None,
     ):
-
         # compute causal mask from causal mask buffer
         query_length, key_length = query.size(-2), key.size(-2)
-        causal_mask = self.bias[:, :, key_length - query_length : key_length, :key_length]
+        causal_mask = self.bias[
+            :, :, key_length - query_length : key_length, :key_length
+        ]
 
         # Keep the attention weights computation in fp32 to avoid overflow issues
         attn_weights = torch.matmul(query, key.transpose(-1, -2))
@@ -156,12 +171,21 @@ class IPEXGPTJAttention(nn.Module):
         return embed_positions.repeat(position_ids.shape[0], 1, 1)
 
     def get_rotary_emb(self, position_ids, embed_positions, dtype):
-        if IPEXGPTJAttention.position_ids is None or IPEXGPTJAttention.position_ids is not position_ids:
-            repeated_position_ids = position_ids.unsqueeze(-1).repeat(1, 1, embed_positions.shape[-1])
+        if (
+            IPEXGPTJAttention.position_ids is None
+            or IPEXGPTJAttention.position_ids is not position_ids
+        ):
+            repeated_position_ids = position_ids.unsqueeze(-1).repeat(
+                1, 1, embed_positions.shape[-1]
+            )
             sincos = torch.gather(embed_positions, 1, repeated_position_ids)
             sin, cos = torch.split(sincos, sincos.shape[-1] // 2, dim=-1)
-            IPEXGPTJAttention.sin_embedding = torch.repeat_interleave(sin[:, :, None, :], 2, 3).to(dtype)
-            IPEXGPTJAttention.cos_embedding = torch.repeat_interleave(cos[:, :, None, :], 2, 3).to(dtype)
+            IPEXGPTJAttention.sin_embedding = torch.repeat_interleave(
+                sin[:, :, None, :], 2, 3
+            ).to(dtype)
+            IPEXGPTJAttention.cos_embedding = torch.repeat_interleave(
+                cos[:, :, None, :], 2, 3
+            ).to(dtype)
             IPEXGPTJAttention.position_ids = position_ids
         return IPEXGPTJAttention.sin_embedding, IPEXGPTJAttention.cos_embedding
 
@@ -187,17 +211,14 @@ class IPEXGPTJAttention(nn.Module):
         key = key.view(new_shape)
         value = value.view(new_shape)
 
-
         embed_positions = self._get_embed_positions(position_ids)
 
         sin, cos = self.get_rotary_emb(position_ids, embed_positions, key.dtype)
 
         if self.rotary_dim is not None:
-
             apply_rotary_pos_emb(key[:, :, :, : self.rotary_dim], sin, cos)
             apply_rotary_pos_emb(query[:, :, :, : self.rotary_dim], sin, cos)
         else:
-
             apply_rotary_pos_emb(key, sin, cos)
             apply_rotary_pos_emb(query, sin, cos)
 
@@ -216,9 +237,13 @@ class IPEXGPTJAttention(nn.Module):
         else:
             present = None
 
-        attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask)
+        attn_output, attn_weights = self._attn(
+            query, key, value, attention_mask, head_mask
+        )
 
-        attn_output = self._merge_heads(attn_output, self.num_attention_heads, self.head_dim)
+        attn_output = self._merge_heads(
+            attn_output, self.num_attention_heads, self.head_dim
+        )
         attn_output = self.out_proj(attn_output)
         attn_output = self.resid_dropout(attn_output)
 
@@ -263,7 +288,10 @@ class IPEXGPTJBlock(nn.Module):
         head_mask: Optional[torch.FloatTensor] = None,
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
-    ) -> Union[Tuple[torch.Tensor], Optional[Tuple[torch.Tensor, Tuple[torch.FloatTensor, ...]]]]:
+    ) -> Union[
+        Tuple[torch.Tensor],
+        Optional[Tuple[torch.Tensor, Tuple[torch.FloatTensor, ...]]],
+    ]:
         residual = hidden_states
         hidden_states = self.ln_1(hidden_states)
         attn_outputs = self.attn(

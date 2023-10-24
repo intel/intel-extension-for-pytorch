@@ -7,6 +7,7 @@ import intel_extension_for_pytorch  # noqa
 import pytest
 import platform
 
+
 def _calculate_dynamic_qparams(X, dtype, reduce_range=False):
     """Calculate the dynamic quantization parameters (scale, zero_point)
     according to the min and max element of the tensor"""
@@ -48,14 +49,14 @@ def _calculate_dynamic_qparams(X, dtype, reduce_range=False):
 
 class TestTorchMethod(TestCase):
     def test_quantize_per_tensor(self, dtype=torch.float):
-        zp_vec = [0] if platform.system() == 'Windows' else [0, 2]
+        zp_vec = [0] if platform.system() == "Windows" else [0, 2]
         for data_type in [torch.qint8, torch.quint8]:
             for zp in zp_vec:
                 src_cpu = torch.randn(1, 3, 2, 2)
                 src_gpu = src_cpu.to("xpu")
 
                 tensor_scale = 0.3
-                print(f'\ndtpye: {data_type} sc: {tensor_scale}, zp: {zp}')
+                print(f"\ndtpye: {data_type} sc: {tensor_scale}, zp: {zp}")
 
                 dst_cpu = torch.quantize_per_tensor(
                     src_cpu, scale=tensor_scale, zero_point=zp, dtype=data_type
@@ -102,7 +103,7 @@ class TestTorchMethod(TestCase):
             self.assertEqual(result_non_dynam.cpu(), result.cpu())
 
     def test_quantize_tensor_channels_last(self, dtype=torch.float):
-        zp_vec = [0] if platform.system() == 'Windows' else [0, 2]
+        zp_vec = [0] if platform.system() == "Windows" else [0, 2]
         for data_type in [torch.qint8, torch.quint8]:
             for tensor_zero_point in zp_vec:
                 src_cpu = torch.randn(1, 3, 2, 2)
@@ -110,13 +111,21 @@ class TestTorchMethod(TestCase):
                 tensor_scale = 0.3
 
                 dst_cpu = torch.quantize_per_tensor(
-                    src_cpu, scale=tensor_scale, zero_point=tensor_zero_point, dtype=data_type
+                    src_cpu,
+                    scale=tensor_scale,
+                    zero_point=tensor_zero_point,
+                    dtype=data_type,
                 )
                 dst_gpu = torch.quantize_per_tensor(
-                    src_gpu, scale=tensor_scale, zero_point=tensor_zero_point, dtype=data_type
+                    src_gpu,
+                    scale=tensor_scale,
+                    zero_point=tensor_zero_point,
+                    dtype=data_type,
                 ).to(memory_format=torch.channels_last)
 
-                self.assertEqual(True, dst_gpu.is_contiguous(memory_format=torch.channels_last))
+                self.assertEqual(
+                    True, dst_gpu.is_contiguous(memory_format=torch.channels_last)
+                )
                 self.assertEqual(dst_cpu, dst_gpu)
 
     @pytest.mark.skipif(

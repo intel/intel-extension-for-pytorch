@@ -5,10 +5,11 @@ import intel_extension_for_pytorch  # noqa
 import pytest
 import platform
 
+
 class TestTorchMethod(TestCase):
     def test_dequantize_per_tensor(self, dtype=torch.float):
         # oneDNN asymm quant has undefined behaviour on Windows currently.
-        zp_vec = [0] if platform.system() == 'Windows' else [0, 2]
+        zp_vec = [0] if platform.system() == "Windows" else [0, 2]
         for dtype in [torch.qint8, torch.quint8]:
             for zp in zp_vec:
                 src = torch.randn(1, 3, 2, 2)
@@ -32,7 +33,7 @@ class TestTorchMethod(TestCase):
     )
     def test_dequantize_per_channel(self, dtype=torch.float):
         # oneDNN asymm quant has undefined behaviour on Windows currently.
-        zp_vec = [0] if platform.system() == 'Windows' else [0, 2]
+        zp_vec = [0] if platform.system() == "Windows" else [0, 2]
         print("zp vec:", zp_vec)
         for dtype in [torch.qint8, torch.quint8]:
             for zp in zp_vec:

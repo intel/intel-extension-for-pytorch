@@ -24,7 +24,12 @@ class TestAddcdivAddcmul(TestCase):
         res_tensor = torch._foreach_addcdiv([t, t, t], [t1, t1, t1], [t2, t2, t2], t_s)
         print("res_tensor", res_tensor)
 
-        res_tensor_xpu = torch._foreach_addcdiv([t_xpu, t_xpu, t_xpu], [t1_xpu, t1_xpu, t1_xpu], [t2_xpu, t2_xpu, t2_xpu], t_s)
+        res_tensor_xpu = torch._foreach_addcdiv(
+            [t_xpu, t_xpu, t_xpu],
+            [t1_xpu, t1_xpu, t1_xpu],
+            [t2_xpu, t2_xpu, t2_xpu],
+            t_s,
+        )
         print("res_tensor_xpu", res_tensor_xpu)
         self.assertEqual(res_tensor, res_tensor_xpu)
 
@@ -46,6 +51,11 @@ class TestAddcdivAddcmul(TestCase):
         res_tensor = torch._foreach_addcmul([t, t, t], [t1, t1, t1], [t2, t2, t2], t_s)
         print("res_tensor", res_tensor)
 
-        res_tensor_xpu = torch._foreach_addcmul([t_xpu, t_xpu, t_xpu], [t1_xpu, t1_xpu, t1_xpu], [t2_xpu, t2_xpu, t2_xpu], t_s)
+        res_tensor_xpu = torch._foreach_addcmul(
+            [t_xpu, t_xpu, t_xpu],
+            [t1_xpu, t1_xpu, t1_xpu],
+            [t2_xpu, t2_xpu, t2_xpu],
+            t_s,
+        )
         print("res_tensor_xpu", res_tensor_xpu)
         self.assertEqual(res_tensor, res_tensor_xpu)

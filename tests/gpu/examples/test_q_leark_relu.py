@@ -8,7 +8,7 @@ import platform
 
 class TestNNMethod(TestCase):
     def test_QLeakReLU(self, dtype=torch.float):
-        zp_vec = [0] if platform.system() == 'Windows' else [0, 2]
+        zp_vec = [0] if platform.system() == "Windows" else [0, 2]
         for dtype in [torch.quint8, torch.qint8]:
             for zp in zp_vec:
                 scale = 0.04

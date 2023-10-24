@@ -1,4 +1,5 @@
 import torch
+
 # Note: import order is significant here due to the defect of triton.compile
 # in XPU backend. Here codecache is a temp WA.
 from torch._inductor import codecache  # noqa

@@ -4,9 +4,10 @@ from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
 import platform
 
+
 class TestTorchMethod(TestCase):
     def test_qhardtanh(self, dtype=torch.float):
-        zp_vec = [0] if platform.system() == 'Windows' else [0, 2]
+        zp_vec = [0] if platform.system() == "Windows" else [0, 2]
         for dtype in [torch.qint8, torch.quint8]:
             for zp in zp_vec:
                 inputs = torch.randn(5, 5)
@@ -18,9 +19,7 @@ class TestTorchMethod(TestCase):
                 print("start xpu")
                 inputs_gpu = inputs.to("xpu")
 
-                q_inputs_gpu = torch.quantize_per_tensor(
-                    inputs_gpu, 0.4, zp, dtype
-                )
+                q_inputs_gpu = torch.quantize_per_tensor(inputs_gpu, 0.4, zp, dtype)
 
                 output_gpu_int8 = torch.nn.quantized.functional.hardtanh(q_inputs_gpu)
 

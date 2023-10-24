@@ -15,9 +15,7 @@ def get_default_fp8_recipe() -> DelayedScaling:
     return DelayedScaling()
 
 
-def get_fp8_dtype(
-    fp8_recipe: DelayedScaling, fprop_tensor: bool = True
-) -> str:
+def get_fp8_dtype(fp8_recipe: DelayedScaling, fprop_tensor: bool = True) -> str:
     if fp8_recipe.fp8_format == Format.E4M3 or (
         fp8_recipe.fp8_format == Format.HYBRID and fprop_tensor
     ):

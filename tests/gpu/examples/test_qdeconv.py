@@ -35,7 +35,7 @@ class TestTorchMethod(TestCase):
             W_scale = 0.2
             Y_scale = 4.2
             Y_zero_point = 0
-            X_zero_point = 0 if platform.system() == 'Windows' else 128
+            X_zero_point = 0 if platform.system() == "Windows" else 128
 
             (X_value_min, X_valu_max) = (32, 64)
             X_init = torch.randint(X_value_min, X_valu_max, (1, 1, 5, 5, 5))

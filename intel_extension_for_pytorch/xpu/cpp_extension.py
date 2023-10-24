@@ -197,7 +197,7 @@ class DpcppBuildExtension(build_ext, object):
         super(DpcppBuildExtension, self).__init__(*args, **kwargs)
         self.no_python_abi_suffix = kwargs.get("no_python_abi_suffix", False)
 
-        self.use_ninja = kwargs.get('use_ninja', True)
+        self.use_ninja = kwargs.get("use_ninja", True)
         if self.use_ninja:
             # Test if we can use ninja. Fallback otherwise.
             msg = (
@@ -281,14 +281,14 @@ class DpcppBuildExtension(build_ext, object):
                     _cxxbin = get_dpcpp_complier()
                     self.compiler.set_executable("compiler_so", _cxxbin)
                     if isinstance(cflags, dict):
-                        cflags = cflags['cxx'] + COMMON_DPCPP_FLAGS
+                        cflags = cflags["cxx"] + COMMON_DPCPP_FLAGS
                     else:
                         cflags = unix_dpcpp_flags(cflags)
                 elif _is_c_file(src):
                     _ccbin = get_icx_complier()
                     self.compiler.set_executable("compiler_so", _ccbin)
                     if isinstance(cflags, dict):
-                        cflags = cflags['cxx'] + COMMON_DPCPP_FLAGS
+                        cflags = cflags["cxx"] + COMMON_DPCPP_FLAGS
                     else:
                         cflags = unix_dpcpp_flags(cflags)
                 elif isinstance(cflags, dict):
@@ -456,38 +456,38 @@ class DpcppBuildExtension(build_ext, object):
             ldflags += extra_postargs
             ldflags += [f"-l{x}" for x in libraries]
 
-            _write_ninja_file_and_link_library(objects, output_libname, build_directory, ldflags, verbose=True)
+            _write_ninja_file_and_link_library(
+                objects, output_libname, build_directory, ldflags, verbose=True
+            )
 
-        def win_wrap_single_compile(sources,
-                                    output_dir=None,
-                                    macros=None,
-                                    include_dirs=None,
-                                    debug=0,
-                                    extra_preargs=None,
-                                    extra_postargs=None,
-                                    depends=None):
-
+        def win_wrap_single_compile(
+            sources,
+            output_dir=None,
+            macros=None,
+            include_dirs=None,
+            debug=0,
+            extra_preargs=None,
+            extra_postargs=None,
+            depends=None,
+        ):
             self.cflags = copy.deepcopy(extra_postargs)
             extra_postargs = None
 
             def spawn(cmd):
                 # Using regex to match src, obj and include files
-                src_regex = re.compile('/T(p|c)(.*)')
+                src_regex = re.compile("/T(p|c)(.*)")
                 src_list = [
-                    m.group(2) for m in (src_regex.match(elem) for elem in cmd)
-                    if m
+                    m.group(2) for m in (src_regex.match(elem) for elem in cmd) if m
                 ]
 
-                obj_regex = re.compile('/Fo(.*)')
+                obj_regex = re.compile("/Fo(.*)")
                 obj_list = [
-                    m.group(1) for m in (obj_regex.match(elem) for elem in cmd)
-                    if m
+                    m.group(1) for m in (obj_regex.match(elem) for elem in cmd) if m
                 ]
 
-                include_regex = re.compile(r'((\-|\/)I.*)')
+                include_regex = re.compile(r"((\-|\/)I.*)")
                 include_list = [
-                    m.group(1)
-                    for m in (include_regex.match(elem) for elem in cmd) if m
+                    m.group(1) for m in (include_regex.match(elem) for elem in cmd) if m
                 ]
 
                 if len(src_list) >= 1 and len(obj_list) >= 1:
@@ -500,19 +500,19 @@ class DpcppBuildExtension(build_ext, object):
                             _bin = get_icx_complier()
 
                         if isinstance(self.cflags, dict):
-                            cflags = self.cflags['cxx'] + COMMON_DPCPP_FLAGS
+                            cflags = self.cflags["cxx"] + COMMON_DPCPP_FLAGS
                         elif isinstance(self.cflags, list):
                             cflags = self.cflags + COMMON_DPCPP_FLAGS
                         else:
                             cflags = COMMON_DPCPP_FLAGS
 
-                        if "-fPIC" in cflags:   # Windows does not support this argument
+                        if "-fPIC" in cflags:  # Windows does not support this argument
                             cflags.remove("-fPIC")
-                        cflags = cflags + ['-std=c++17', SYCL_FLAG]
+                        cflags = cflags + ["-std=c++17", SYCL_FLAG]
 
-                        cmd = [_bin, '-c', src, '-o', obj] + include_list + cflags
+                        cmd = [_bin, "-c", src, "-o", obj] + include_list + cflags
                     elif isinstance(self.cflags, dict):
-                        cflags = COMMON_DPCPP_FLAGS + self.cflags['cxx']
+                        cflags = COMMON_DPCPP_FLAGS + self.cflags["cxx"]
                         append_std17_if_no_std_present(cflags)
                         cmd += cflags
                     elif isinstance(self.cflags, list):
@@ -524,9 +524,16 @@ class DpcppBuildExtension(build_ext, object):
 
             try:
                 self.compiler.spawn = spawn
-                return original_compile(sources, output_dir, macros,
-                                        include_dirs, debug, extra_preargs,
-                                        extra_postargs, depends)
+                return original_compile(
+                    sources,
+                    output_dir,
+                    macros,
+                    include_dirs,
+                    debug,
+                    extra_preargs,
+                    extra_postargs,
+                    depends,
+                )
             finally:
                 self.compiler.spawn = original_spawn
 
@@ -875,11 +882,7 @@ def _write_ninja_file_and_compile_objects(
 
 
 def _write_ninja_file_and_link_library(
-    objects,
-    output_libname,
-    build_directory,
-    ldflags,
-    verbose: bool
+    objects, output_libname, build_directory, ldflags, verbose: bool
 ) -> None:
     build_file_path = os.path.join(build_directory, "build.ninja")
     if verbose:
@@ -999,17 +1002,17 @@ def _prepare_ldflags(extra_ldflags, verbose, is_standalone):
         python_path = os.path.dirname(sys.executable)
         python_lib_path = os.path.join(python_path, "libs")
 
-        extra_ldflags.append('c10.lib')
-        extra_ldflags.append('torch_cpu.lib')
-        extra_ldflags.append('torch.lib')
+        extra_ldflags.append("c10.lib")
+        extra_ldflags.append("torch_cpu.lib")
+        extra_ldflags.append("torch.lib")
         if not is_standalone:
             extra_ldflags.append("torch_python.lib")
             extra_ldflags.append(f"/LIBPATH:{python_lib_path}")
 
     else:
-        extra_ldflags.append('-lc10')
-        extra_ldflags.append('-ltorch_cpu')
-        extra_ldflags.append('-ltorch')
+        extra_ldflags.append("-lc10")
+        extra_ldflags.append("-ltorch_cpu")
+        extra_ldflags.append("-ltorch")
         if not is_standalone:
             extra_ldflags.append("-ltorch_python")
 
@@ -1032,7 +1035,7 @@ def _prepare_ldflags(extra_ldflags, verbose, is_standalone):
     oneapi_link_args += ["-ldnnl"]
 
     # Append IPEX link parameters.
-    oneapi_link_args += ['-lintel-ext-pt-gpu']
+    oneapi_link_args += ["-lintel-ext-pt-gpu"]
 
     extra_ldflags += oneapi_link_args
 
@@ -1686,6 +1689,7 @@ def DPCPPExtension(name, sources, *args, **kwargs):
 
     return setuptools.Extension(name, sources, *args, **kwargs)
 
+
 # for FP8
 def cast_to_fp8(
     inp,
@@ -1694,6 +1698,7 @@ def cast_to_fp8(
     otype,
 ) -> torch.Tensor:
     return fp8.utils.cast_to_fp8
+
 
 def cast_from_fp8(
     inp,

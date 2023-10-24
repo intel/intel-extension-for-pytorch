@@ -65,7 +65,7 @@ def trace_int8_model(model, device, test_input):
 
 class TestNNMethod(TestCase):
     def test_q_upsamle_nearest(self, dtype=torch.float):
-        zp_vec = [0] if platform.system() == 'Windows' else [0, 2]
+        zp_vec = [0] if platform.system() == "Windows" else [0, 2]
         for dtype_inputs in [torch.qint8, torch.quint8]:
             for zp in zp_vec:
                 x_cpu = torch.randn(
@@ -80,16 +80,24 @@ class TestNNMethod(TestCase):
                 q_gpu = torch.quantize_per_tensor(x_gpu, q_scale, zp, dtype_inputs)
 
                 output_cpu = torch.nn.functional.interpolate(
-                    q_cpu, scale_factor=scales, mode="nearest", recompute_scale_factor=rsf
+                    q_cpu,
+                    scale_factor=scales,
+                    mode="nearest",
+                    recompute_scale_factor=rsf,
                 )
                 output_gpu = torch.nn.functional.interpolate(
-                    q_gpu, scale_factor=scales, mode="nearest", recompute_scale_factor=rsf
+                    q_gpu,
+                    scale_factor=scales,
+                    mode="nearest",
+                    recompute_scale_factor=rsf,
                 )
 
                 self.assertEqual(output_cpu, output_gpu)
 
-    @pytest.mark.skipif(platform.system() == 'Windows', 
-                        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current")
+    @pytest.mark.skipif(
+        platform.system() == "Windows",
+        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current",
+    )
     def test_q_upsample_nearest2(self, dtype=torch.float):
         M = ConvUpsample()
         x_input = torch.randn([8, 8, 1, 1]).to("xpu")

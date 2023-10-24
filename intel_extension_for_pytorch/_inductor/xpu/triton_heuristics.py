@@ -37,6 +37,7 @@ from torch._inductor.triton_heuristics import (
     triton_config_reduction,
 )
 
+
 class XPUCachingAutotuner(CachingAutotuner):
 
     """
@@ -169,7 +170,6 @@ class XPUCachingAutotuner(CachingAutotuner):
                 grid=grid,
                 stream=stream,
             )
-
 
         return do_bench(kernel_call, rep=40, fast_flush=True)
 
@@ -491,6 +491,7 @@ def template(num_stages, num_warps, meta, filename=None):
         heuristic_type=HeuristicType.TEMPLATE,
         filename=filename,
     )
+
 
 def foreach(meta, num_warps, filename=None):
     """

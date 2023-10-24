@@ -17,7 +17,6 @@ class M(torch.nn.Module):
 
 class TestJITMethod(TestCase):
     def test_fusion(self, dtype=torch.float):
-
         a = torch.randn((1, 2, 3, 3), dtype=torch.float, device=dpcpp_device)
         b = torch.randn((1, 2, 3, 3), dtype=torch.float, device=dpcpp_device)
         c = torch.randn((1, 2, 3, 3), dtype=torch.float, device=dpcpp_device)

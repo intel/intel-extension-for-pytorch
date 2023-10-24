@@ -36,7 +36,7 @@ unary_list = {
 # See pytorch/test/inductor/test_mkldnn_pattern_matcher.py
 binary_list = {
     lambda x, y: torch.add(x, y): (1, 2, False),  # call_function
-    lambda x, y: torch.add(y, x): (1, 2, False), 
+    lambda x, y: torch.add(y, x): (1, 2, False),
     lambda x, y: x.add(y): (1, 2, False),  # call_method
     lambda x, y: x.add_(y): (1, 2, False),
     lambda x, y: torch.sub(x, y): (1, 2, False),  # call_function
@@ -44,14 +44,11 @@ binary_list = {
     lambda x, y: x.sub_(y): (1, 2, True),  # call_method
 }
 
+
 class M(nn.Module):
     def __init__(self, in_channels, out_channels, unary_fn, **kwargs):
         super(M, self).__init__()
-        self.conv = torch.nn.Conv2d(
-            in_channels,
-            out_channels,
-            **kwargs
-        )
+        self.conv = torch.nn.Conv2d(in_channels, out_channels, **kwargs)
         self.unary_fn = unary_fn
 
     def forward(self, x):
@@ -59,14 +56,11 @@ class M(nn.Module):
         x = self.unary_fn(x)
         return x
 
+
 class N(nn.Module):
     def __init__(self, in_channels, out_channels, unary_fn, **kwargs):
         super(N, self).__init__()
-        self.linear = torch.nn.Linear(
-            in_channels,
-            out_channels,
-            **kwargs
-        )
+        self.linear = torch.nn.Linear(in_channels, out_channels, **kwargs)
         self.unary_fn = unary_fn
 
     def forward(self, x):
@@ -74,28 +68,35 @@ class N(nn.Module):
         x = self.unary_fn(x)
         return x
 
+
 class TestTorchMethod(TestCase):
-    @pytest.mark.skip("Need fix driver issue for avoid dived by zero, See intel_extension_for_pytorch/_inductor/xpu/utils.py")
+    @pytest.mark.skip(
+        "Need fix driver issue for avoid dived by zero, See intel_extension_for_pytorch/_inductor/xpu/utils.py"
+    )
     @config.patch({"freezing": True})
     def test_inductor_fusion_conv(self):
         called = False
         device = dpcpp_device
         for unary_fn in unary_list:
             # device=cpu_device
-            model = M(3, 3, unary_fn, kernel_size=3, stride=1, padding=1, bias=False).to(device)
+            model = M(
+                3, 3, unary_fn, kernel_size=3, stride=1, padding=1, bias=False
+            ).to(device)
 
             model.eval()
             with torch.no_grad():
                 # with torch.xpu.onednn_verbose(2):
                 run = torch.compile(model, backend="inductor")
                 torch.manual_seed(0)
-                example_input = torch.randn(1, 3, 72, 72).to(device)    
+                example_input = torch.randn(1, 3, 72, 72).to(device)
                 actual = run(example_input)
 
                 ref = model(example_input)
                 self.assertEqual(ref, actual)
 
-    @pytest.mark.skip("Need fix driver issue for avoid dived by zero, See intel_extension_for_pytorch/_inductor/xpu/utils.py")
+    @pytest.mark.skip(
+        "Need fix driver issue for avoid dived by zero, See intel_extension_for_pytorch/_inductor/xpu/utils.py"
+    )
     @config.patch({"freezing": True})
     def test_inductor_fusion_linear(self):
         called = False
@@ -108,13 +109,15 @@ class TestTorchMethod(TestCase):
                 # with torch.xpu.onednn_verbose(2):
                 run = torch.compile(model, backend="inductor")
                 torch.manual_seed(0)
-                example_input = torch.randn(3, 3).to(device)    
+                example_input = torch.randn(3, 3).to(device)
                 actual = run(example_input)
 
                 ref = model(example_input)
                 self.assertEqual(ref, actual)
 
-    @pytest.mark.skip("Need fix driver issue for avoid dived by zero, See intel_extension_for_pytorch/_inductor/xpu/utils.py")
+    @pytest.mark.skip(
+        "Need fix driver issue for avoid dived by zero, See intel_extension_for_pytorch/_inductor/xpu/utils.py"
+    )
     @config.patch({"freezing": True})
     def test_conv_binary_fusion(self):
         class M(torch.nn.Module):
@@ -132,6 +135,7 @@ class TestTorchMethod(TestCase):
                     return self.binary_fn(x1, x2).relu()
                 else:
                     return self.binary_fn(x1, x2)
+
         with torch.no_grad():
             for binary_fn in binary_list:
                 model = M(binary_fn, False).to("xpu")
@@ -143,20 +147,26 @@ class TestTorchMethod(TestCase):
                 ref = model(x)
                 self.assertEqual(actual, ref)
 
-    @pytest.mark.skip("Need fix driver issue for avoid dived by zero, See intel_extension_for_pytorch/_inductor/xpu/utils.py")
+    @pytest.mark.skip(
+        "Need fix driver issue for avoid dived by zero, See intel_extension_for_pytorch/_inductor/xpu/utils.py"
+    )
     @config.patch({"freezing": True})
     def test_conv_binary_inplace_fusion(self):
         class M(torch.nn.Module):
             def __init__(self):
                 super().__init__()
-                self.conv = torch.nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, stride=1, padding=1)
+                self.conv = torch.nn.Conv2d(
+                    in_channels=3, out_channels=32, kernel_size=3, stride=1, padding=1
+                )
 
             def forward(self, x, other):
                 conv_out = self.conv(x)
                 return torch.add(conv_out, other).relu()
 
-        inputs = [torch.randn(1, 3, 28, 28).to("xpu"),
-                  torch.randn(1, 32, 28, 28).to("xpu")]
+        inputs = [
+            torch.randn(1, 3, 28, 28).to("xpu"),
+            torch.randn(1, 32, 28, 28).to("xpu"),
+        ]
         model = M().to("xpu")
         with torch.no_grad():
             run = torch.compile(model, backend="inductor")
@@ -164,13 +174,17 @@ class TestTorchMethod(TestCase):
             ref = model(inputs[0], inputs[1])
             self.assertEqual(actual, ref)
 
-    @pytest.mark.skip("Need fix driver issue for avoid dived by zero, See intel_extension_for_pytorch/_inductor/xpu/utils.py")
+    @pytest.mark.skip(
+        "Need fix driver issue for avoid dived by zero, See intel_extension_for_pytorch/_inductor/xpu/utils.py"
+    )
     @config.patch({"freezing": True})
     def test_linear_binary_fusion(self):
         class M(torch.nn.Module):
             def __init__(self, binary_fn, in_channels, out_channels, bias, **kwargs):
                 super().__init__()
-                self.linear = torch.nn.Linear(in_channels, out_channels, bias=bias, **kwargs)
+                self.linear = torch.nn.Linear(
+                    in_channels, out_channels, bias=bias, **kwargs
+                )
                 self.binary_fn = binary_fn
 
             def forward(self, x, y):

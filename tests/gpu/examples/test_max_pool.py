@@ -12,14 +12,19 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_max_pool(self, dtype=torch.float):
-        x_cpu = torch.randn([16, 2, 32, 32], device='cpu', dtype=dtype)
-        grad_cpu = torch.randn([16, 2, 17, 30], device='cpu', dtype=dtype)
+        x_cpu = torch.randn([16, 2, 32, 32], device="cpu", dtype=dtype)
+        grad_cpu = torch.randn([16, 2, 17, 30], device="cpu", dtype=dtype)
         x_dpcpp = x_cpu.to("xpu")
         grad_dpcpp = grad_cpu.to("xpu")
 
         conv1 = nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=True)
-        max_pool = nn.MaxPool2d(kernel_size=(2, 3), stride=(2, 1),
-                                padding=1, dilation=(1, 2), return_indices=True)
+        max_pool = nn.MaxPool2d(
+            kernel_size=(2, 3),
+            stride=(2, 1),
+            padding=1,
+            dilation=(1, 2),
+            return_indices=True,
+        )
 
         x_cpu.requires_grad_(True)
         y_cpu1 = conv1(x_cpu)
@@ -44,14 +49,19 @@ class TestNNMethod(TestCase):
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_max_pool_empty_stride(self, dtype=torch.float):
-        x_cpu = torch.randn([16, 2, 32, 32], device='cpu', dtype=dtype)
-        grad_cpu = torch.randn([16, 2, 17, 10], device='cpu', dtype=dtype)
+        x_cpu = torch.randn([16, 2, 32, 32], device="cpu", dtype=dtype)
+        grad_cpu = torch.randn([16, 2, 17, 10], device="cpu", dtype=dtype)
         x_dpcpp = x_cpu.to("xpu")
         grad_dpcpp = grad_cpu.to("xpu")
 
         conv1 = nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=True)
-        max_pool = nn.MaxPool2d(kernel_size=(2, 3), stride=[],
-                                padding=1, dilation=(1, 2), return_indices=True)
+        max_pool = nn.MaxPool2d(
+            kernel_size=(2, 3),
+            stride=[],
+            padding=1,
+            dilation=(1, 2),
+            return_indices=True,
+        )
 
         x_cpu.requires_grad_(True)
         y_cpu1 = conv1(x_cpu)
@@ -76,14 +86,15 @@ class TestNNMethod(TestCase):
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_channels_last_global_max_pool(self, dtype=torch.float):
-        x_cpu = torch.randn([16, 1024, 1, 1500], device='cpu', dtype=dtype)
-        grad_cpu = torch.randn([16, 1024, 1, 1], device='cpu', dtype=dtype)
+        x_cpu = torch.randn([16, 1024, 1, 1500], device="cpu", dtype=dtype)
+        grad_cpu = torch.randn([16, 1024, 1, 1], device="cpu", dtype=dtype)
         x_dpcpp = x_cpu.to("xpu").to(memory_format=torch.channels_last)
         grad_dpcpp = grad_cpu.to("xpu")
 
         for stride in [(1, 1500), []]:
-            max_pool = nn.MaxPool2d(kernel_size=(1, 1500), stride=stride,
-                                    padding=0, return_indices=True)
+            max_pool = nn.MaxPool2d(
+                kernel_size=(1, 1500), stride=stride, padding=0, return_indices=True
+            )
 
             x_cpu.requires_grad_(True)
             y_cpu = max_pool(x_cpu)
@@ -381,7 +392,9 @@ class TestNNMethod(TestCase):
         self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
 
     def test_max_pool2d_ceil_mode_3d_input(self):
-        pool2d = nn.MaxPool2d((3, 3), stride=(2, 2), padding=0, dilation=1, ceil_mode=True)
+        pool2d = nn.MaxPool2d(
+            (3, 3), stride=(2, 2), padding=0, dilation=1, ceil_mode=True
+        )
         input_cpu = torch.randn((2, 3, 6), dtype=torch.float32).requires_grad_(True)
         output_cpu = pool2d(input_cpu)
         pool2d = pool2d.to(dpcpp_device)

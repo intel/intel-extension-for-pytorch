@@ -1,6 +1,7 @@
 """Utility functions for IPEX FP8 modules"""
 import torch
 
+
 def cast_if_needed(tensor: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
     """Cast tensor to dtype"""
     return tensor if tensor is None or tensor.dtype == dtype else tensor.to(dtype)
