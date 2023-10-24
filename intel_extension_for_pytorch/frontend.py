@@ -549,12 +549,14 @@ def optimize(
         if dtype == torch.bfloat16:
             assert core.onednn_has_bf16_support(), (
                 "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, "
-                + "please set dtype to torch.float or set weights_prepack to False."
+                + "but the desired instruction sets are not available. "
+                + "Please set dtype to torch.float or set weights_prepack to False."
             )
         if dtype == torch.half:
             assert core.onednn_has_fp16_support(), (
                 "FP16 weight prepack needs the cpu support avx512_core_fp16, "
-                + "please set dtype to torch.float or set weights_prepack to False."
+                + "but the desired instruction sets are not available. "
+                + "Please set dtype to torch.float or set weights_prepack to False."
             )
         (
             optimized_model,
