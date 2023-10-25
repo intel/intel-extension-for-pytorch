@@ -84,21 +84,20 @@ class IPEXEmptyINT4LinearWithPadding(nn.Module):
             return torch.ops.torch_ipex.mm_bias_int4(input, self.qweight, self.bias, self.scales, self.qzeros, self.group_size)[:,:,:self.n_dim]
 
 class IPEXLmHeadLinearAllreduceWithPadding(nn.Module):
+    mp_group = None
     def __init__(
         self,
         n_dim,
         weight,
         rank,
         world_size,
-        bias=None,
-        mp_group=None,
+        bias=None
         ):
         super(IPEXLmHeadLinearAllreduceWithPadding, self).__init__()
         self.n_dim = n_dim
         self.rank = rank
         self.world_size = world_size
         self.bias = bias
-        self.mp_group = mp_group
 
         self.weight = weight.data.split(weight.shape[1] // self.world_size, dim=1)
         self.weight = self.weight[self.rank].to("xpu:{}".format(torch.xpu.current_device()))

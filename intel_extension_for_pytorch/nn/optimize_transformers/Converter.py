@@ -9,6 +9,7 @@ from .modules.Layers import EnvParam
 from .modules._transformers import IPEXTransformerConverter
 from .transformers_model_capture import TransformersModelCapture
 import torch.distributed as dist
+from .modules._transformers import IPEXLmHeadLinearAllreduceWithPadding
 
 
 import torch
@@ -109,6 +110,7 @@ class Converter:
             config = model._config
             self.module_replacer.tp_size = config.tensor_parallel.tp_size
             self.module_replacer.tp_group = config.tensor_parallel.tp_group
+            IPEXLmHeadLinearAllreduceWithPadding.mp_group = config.tensor_parallel.tp_group
             if self.module_replacer.tp_size > 1 and self.module_replacer.tp_size is not None:
                 return True
         return False
