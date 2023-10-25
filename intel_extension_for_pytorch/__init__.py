@@ -99,6 +99,7 @@ from . import jit
 from . import optim
 from . import fx
 from . import _meta_registrations
+from ._init_on_device import OnDevice
 
 try:
     from .cpu import tpp
