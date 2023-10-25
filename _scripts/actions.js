@@ -609,7 +609,7 @@ $(document).ready(function() {
           var num_elem = 0;
           if(ret.stage == "Version") {
             num_elem = 3;
-            if(ret["data"][0].indexOf("Master") == -1)
+            if(ret["data"][0].indexOf("Main") == -1)
               num_elem -= 1;
           }
           $.row_append($.merge([ret.stage], ret.data), num_elem);
