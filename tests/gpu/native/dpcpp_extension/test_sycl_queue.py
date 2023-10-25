@@ -24,6 +24,7 @@ if dnnl_path is not None:
 
             if IS_LINUX:
                 import ctypes
+
                 path = os.path.join(os.path.expanduser("~/.cache"), "torch_extensions")
                 for root, dirs, files in os.walk(path):
                     if "mod_test_sycl_queue.so" in files:

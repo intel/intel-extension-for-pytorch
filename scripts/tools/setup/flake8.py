@@ -58,9 +58,10 @@ if __name__ == "__main__":
     base_pydir = os.path.join(base_dir, "intel_extension_for_pytorch")
     base_scripts = os.path.join(base_dir, "scripts")
     base_examples = os.path.join(base_dir, "tests/gpu/examples")
+    base_native = os.path.join(base_dir, "tests/gpu/native")
     base_regression = os.path.join(base_dir, "tests/gpu/regression")
 
-    Check_dir = [setupfile, base_pydir, base_examples, base_regression]
+    Check_dir = [setupfile, base_pydir, base_examples, base_native, base_regression]
     ret = sum([check_flake8_errors(base_dir, path) for path in Check_dir])
     if ret != 0:
         print("ERROR: flake8 found format errors!")
