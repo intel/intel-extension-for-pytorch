@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import logging
 import os
-import pkg_resources
 from intel_extension_for_pytorch import optim
 from intel_extension_for_pytorch.cpu.tpp.utils.blocked_layout import (
     BlockedParameter,
@@ -88,22 +87,6 @@ def may_import_deepspeed_modules():
             return ds_layers
     except ImportError:
         return None
-
-
-installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
-if "deepspeed" in installed_pkg:
-    from deepspeed import comm
-
-    def _all_reduce(self, reduceOp, tag, ranks, group_size):
-        comm.inference_all_reduce(self, async_op=False)
-        return self
-
-    ds_comm = torch.library.Library("deepspeed_comm", "DEF")
-    ds_comm.define(
-        "all_reduce(Tensor self, str reduceOp, str tag, int[] ranks, int group_size) -> Tensor"
-    )
-    ds_comm_lib_cpu = torch.library.Library("deepspeed_comm", "IMPL", "CPU")
-    ds_comm_lib_cpu.impl("all_reduce", _all_reduce)
 
 
 def _all_reduce_and_bias_add(mp_group, original_bias, output):

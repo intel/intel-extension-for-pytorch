@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch  # noqa
+import intel_extension_for_pytorch as ipex  # noqa
 import pytest
 
 
@@ -198,7 +198,10 @@ def ipex_mm_qkv(m, n, k, dtype, with_bias):
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="ipex build without xetla")
+    @pytest.mark.skipif(
+        not (torch.xpu.has_xetla() and not ipex._C._has_2d_block_array(0)),
+        reason="ipex build without xetla or is atsm",
+    )
     def test_gemm_xetla(self):
         shapes = [
             # m, n, k
@@ -212,7 +215,6 @@ class TestNNMethod(TestCase):
             print(shape)
             out, ref = ipex_addmm(shape[0], shape[1], shape[2], torch.half)
             self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
-
             out, ref = ipex_mm_common(shape[0], shape[1], shape[2], torch.half)
             self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
             out, ref = ipex_mm_resadd(shape[0], shape[1], shape[2], torch.half)
@@ -241,3 +243,54 @@ class TestNNMethod(TestCase):
             self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
             out, ref = ipex_mm_qkv(shape[0], shape[1], shape[2], torch.half, False)
             self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+
+    @pytest.mark.skipif(
+        not (torch.xpu.has_xetla() and not ipex._C._has_2d_block_array(0)),
+        reason="ipex build without xetla or is atsm",
+    )
+    def test_gemm_xetla_onednn(self):
+        shapes = [
+            # m, n, k
+            [3, 4096, 4096],
+            [3, 4096, 16384],
+            [3, 16384, 4096],
+            [3, 32000, 4096],
+            [1008, 8200, 512],
+        ]
+        for shape in shapes:
+            print(shape)
+
+            # test gemm with onednn compute engine
+            with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.ONEDNN):
+                out, ref = ipex_addmm(shape[0], shape[1], shape[2], torch.half)
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+                out, ref = ipex_mm_common(shape[0], shape[1], shape[2], torch.half)
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+                out, ref = ipex_mm_resadd(shape[0], shape[1], shape[2], torch.half)
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+                out, ref = ipex_mm_resadd_resadd(
+                    shape[0], shape[1], shape[2], torch.half
+                )
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+                out, ref = ipex_mm_bias(shape[0], shape[1], shape[2], torch.half)
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+                out, ref = ipex_mm_bias_resadd(shape[0], shape[1], shape[2], torch.half)
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+                out, ref = ipex_mm_bias_resadd_resadd(
+                    shape[0], shape[1], shape[2], torch.half
+                )
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+
+                out, ref = ipex_mm_resmul(shape[0], shape[1], shape[2], torch.half)
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+                out, ref = ipex_mm_silu(shape[0], shape[1], shape[2], torch.half)
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+                out, ref = ipex_mm_gelu(shape[0], shape[1], shape[2], torch.half)
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+                out, ref = ipex_mm_bias_gelu(shape[0], shape[1], shape[2], torch.half)
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+
+                out, ref = ipex_mm_qkv(shape[0], shape[1], shape[2], torch.half, True)
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+                out, ref = ipex_mm_qkv(shape[0], shape[1], shape[2], torch.half, False)
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)

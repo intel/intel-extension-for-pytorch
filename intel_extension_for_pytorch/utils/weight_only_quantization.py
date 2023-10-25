@@ -12,6 +12,7 @@ DEFAULT_LOWP_CHECKPOINT_CONFIG = {
     "scale_key": "scale",
     "zero_point_key": "packed_zp",
     "bias_key": "bias",
+    "groups": -1,
 }
 
 

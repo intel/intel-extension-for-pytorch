@@ -433,7 +433,42 @@ def model_convert_lowering(
                 _model = _set_optimized_model_for_generation(
                     _model, optimized_model=trace_model
                 )
+    elif device == "xpu":
+        print("xpu optimize_transformers function is activated")
+        from .models.xpu.optimize_transformers.Converter import Converter
+        from .models.xpu.optimize_transformers.modules.gptj import NewIPEXGPTJBlock
+        from .models.xpu.optimize_transformers.modules.llama import NewIPEXLLAMABlock
+        from .models.xpu.optimize_transformers.modules.opt import NewIPEXOPTBlock
+        from .models.xpu.optimize_transformers.modules.bloom import NewIPEXBloomBlock
 
+        def ref_replace_module_for_xpu(
+            module, config, dtype, device, module_name, tp_size, tp_group
+        ):
+            replace_block = None
+            if re.search("GPTJ", _model.config.architectures[0], re.IGNORECASE):
+                replace_block = NewIPEXGPTJBlock
+            elif re.search("LLAMA", _model.config.architecture[0], re.IGNORECASE):
+                replace_block = NewIPEXLLAMABlock
+            elif re.search("OPT", _model.config.architecture[0], re.IGNORECASE):
+                replace_block = NewIPEXOPTBlock
+            elif re.search("BLOOM", _model.config.architecture[0], re.IGNORECASE):
+                replace_block = NewIPEXBloomBlock
+            if replace_block is not None:
+                out_block = replace_block(
+                    module,
+                    config,
+                    dtype=dtype,
+                    device=device,
+                    module_name=module_name,
+                    tp_size=tp_size,
+                    tp_group=tp_group,
+                )
+            return out_block
+
+        replaced_modules = {_IPEXAttentionRef: ref_replace_module_for_xpu}
+        converter = Converter(replaced_module=replaced_modules)
+        dtype = "int4" if woq else dtype
+        _model = converter.convert_model(_model, dtype)
     return _model
 
 
@@ -473,7 +508,7 @@ def optimize_transformers(
             where `checkpoint` is the state_dict and `checkpoint config` is dict specifying
             keys of weight/scale/zero point/bias in the state_dict.
             The default config is {'weight_key': 'packed_weight', 'scale_key': 'scale',
-            'zero_point_key': 'packed_zp', bias_key: 'bias'}. Change the values of the dict to make a custom config.
+            'zero_point_key': 'packed_zp', bias_key: 'bias', groups: '-1'}. Change the values of the dict to make a custom config.
             Weights shape should be N by K and they are quantized to UINT4 and compressed along K, then stored as
             `torch.int32`. Zero points are also UINT4 and stored as INT32. Scales and bias are floating point values.
             Bias is optional. If bias is not in state dict, bias of the original model is used.
@@ -547,10 +582,18 @@ def optimize_transformers(
             or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
             or re.search("falcon", model.config.architectures[0], re.IGNORECASE)
             or re.search("rw", model.config.architectures[0], re.IGNORECASE)
-        )
-        if not well_supported_model:
+        ) and device == "cpu"
+        # bypass_ref_model = (re.search("Bloom", model.config.architectures[0], re.IGNORECASE)) or device == "xpu"
+        xpu_supported_model = (
+            re.search("GPTJ", model.config.architectures[0], re.IGNORECASE)
+            or re.search("llama", model.config.architectures[0], re.IGNORECASE)
+            or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
+            or re.search("Bloom", model.config.architectures[0], re.IGNORECASE)
+        ) and device == "xpu"
+        if not (well_supported_model or xpu_supported_model):
             warnings.warn(
-                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, and OPT, fallback to origin model"
+                "optimize_transformers supports GPT-J/Llama/OPT/Bloom in XPU and Llama/GPT-J/GPT-Neox/Falcon/OPT"
+                " in CPU, fallback to origin model"
             )
             return model
 
@@ -586,11 +629,34 @@ def optimize_transformers(
                 _model, quantization_config, lowp_checkpoint
             )
 
+        xpu_woq = False
+        if device == "xpu" and low_precision_checkpoint is not None:
+            from ..nn.utils._quantize_convert import convert_qmodel
+            from ..utils.weight_only_quantization import DEFAULT_LOWP_CHECKPOINT_CONFIG
+
+            checkpoint_config = DEFAULT_LOWP_CHECKPOINT_CONFIG
+            if isinstance(low_precision_checkpoint, tuple):
+                assert (
+                    len(low_precision_checkpoint) == 2
+                    and isinstance(low_precision_checkpoint[0], dict)
+                    and isinstance(low_precision_checkpoint[1], dict)
+                ), "Invalid low_precision_checkpoint argument"
+                state_dict, checkpoint_config = low_precision_checkpoint
+            else:
+                assert isinstance(
+                    low_precision_checkpoint, dict
+                ), "Invalid low_precision_checkpoint argument"
+                state_dict = low_precision_checkpoint
+            convert_qmodel(_model, dtype, checkpoint_config["groups"])
+            _model.load_state_dict(state_dict)
+            xpu_woq = True
+
         # model reference conversion
-        _model = model_convert_reference(_model)
+        if not (xpu_supported_model or xpu_woq):
+            _model = model_convert_reference(_model)
 
         # model quantization if needed
-        if is_quantization:
+        if is_quantization and (not xpu_woq):
             if not is_woq:  # static quantization
                 deployment_mode = False
 
@@ -657,7 +723,7 @@ def optimize_transformers(
             sample_inputs,
             deployment_mode,
             is_quantization,
-            is_woq,
+            is_woq if device == "cpu" else xpu_woq,
         )
 
         return _model

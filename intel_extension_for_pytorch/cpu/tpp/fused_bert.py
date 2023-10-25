@@ -12,11 +12,6 @@ from .optim import AdamW, SGD
 import intel_extension_for_pytorch._C as torch_ipex_cpp
 import copy
 
-try:
-    from transformers.modeling_utils import apply_chunking_to_forward
-    from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions
-except ImportError:
-    pass
 USE_BF16_PARAMS = True
 layer_use_bf16 = False
 unpad = True
@@ -921,6 +916,10 @@ class BertLayer(nn.Module):
         seq_offsets=None,
         seq_sqr_offsets=None,
     ):
+        try:
+            from transformers.modeling_utils import apply_chunking_to_forward
+        except ImportError:
+            pass
         # decoder uni-directional self-attention cached key/values tuple is at positions 1,2
         self_attn_past_key_value = (
             past_key_value[:2] if past_key_value is not None else None
@@ -1020,6 +1019,12 @@ class BertEncoder(nn.Module):
         output_hidden_states=False,
         return_dict=True,
     ):
+        try:
+            from transformers.modeling_outputs import (
+                BaseModelOutputWithPastAndCrossAttentions,
+            )
+        except ImportError:
+            pass
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
         all_cross_attentions = (

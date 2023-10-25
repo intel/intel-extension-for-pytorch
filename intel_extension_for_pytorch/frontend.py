@@ -127,7 +127,6 @@ class _Properties(object):
         self.fuse_update_step = None
         self.auto_kernel_selection = None
         self.graph_mode = None
-        self.optimize_transformers = None
 
 
 # O0 properties
@@ -144,7 +143,6 @@ class _O0:
         properties.auto_kernel_selection = False
         properties.graph_mode = False
         properties.concat_linear = False
-        properties.optimize_transformers = False
         return properties
 
 
@@ -162,7 +160,6 @@ class _O1:
         properties.auto_kernel_selection = False
         properties.graph_mode = False
         properties.concat_linear = False
-        properties.optimize_transformers = True
         return properties
 
 
@@ -186,7 +183,6 @@ def optimize(
     sample_input=None,
     graph_mode=None,
     concat_linear=None,
-    optimize_transformers=None,
 ):
     r"""
     Apply optimizations at Python frontend to the given model (nn.Module), as
@@ -401,18 +397,10 @@ def optimize(
         opt_properties.graph_mode = graph_mode
     if concat_linear is not None:
         opt_properties.concat_linear = concat_linear
-    if optimize_transformers is not None:
-        opt_properties.optimize_transformers = optimize_transformers
 
     _disable_dnnl()
     if opt_properties.auto_kernel_selection:
         _enable_dnnl()
-
-    if device_type == "cpu":
-        if opt_properties.optimize_transformers:
-            warnings.warn("Transformer opitmization is only support on XPU now.")
-            opt_properties.optimize_transformers = False
-
     # when on xpu, parts of features are not supported
     if device_type == "xpu":
         if opt_properties.split_master_weight_for_bf16:
@@ -499,8 +487,6 @@ def optimize(
     if opt_properties.optimize_lstm:
         replace_lstm_with_ipex_lstm(optimized_model, optimized_optimizer)
         torch._dynamo.allow_in_graph(_LSTM)
-    if opt_properties.optimize_transformers:
-        utils._model_convert.replace_transformer_with_ipex_transformer(optimized_model)
     if (
         model.training
         and opt_properties.split_master_weight_for_bf16
