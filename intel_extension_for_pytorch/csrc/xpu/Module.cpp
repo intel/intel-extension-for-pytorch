@@ -92,7 +92,13 @@ PyObject* THPModule_getDeviceCount_wrap(PyObject* self, PyObject* noargs) {
 
 PyObject* THPModule_prefetchDeviceCount_wrap(PyObject* self, PyObject* noargs) {
   HANDLE_TH_ERRORS
-  return THPUtils_packUInt64(xpu::dpcpp::prefetch_device_count());
+  int device_count = 0;
+  auto status = xpu::dpcpp::prefetch_device_count(device_count);
+  PyObject* output_tuple = PyTuple_New(2);
+  PyTuple_SetItem(output_tuple, 0, THPUtils_packInt32(status));
+  PyTuple_SetItem(
+      output_tuple, 1, THPUtils_packUInt64(static_cast<int64_t>(device_count)));
+  return output_tuple;
   END_HANDLE_TH_ERRORS
 }
 
@@ -639,6 +645,12 @@ void init_xpu_module(pybind11::module& m) {
 
   m.def("_has_fp64_dtype", [](int device) {
     return Settings::I().has_fp64_dtype(device);
+  });
+
+  m.def("_preftech_has_fp64_dtype", [](int device) {
+    bool has_fp64 = false;
+    auto status = xpu::dpcpp::prefetch_device_has_fp64_dtype(device, has_fp64);
+    return std::make_tuple(status, has_fp64);
   });
 
   m.def("_has_2d_block_array", [](int device) {

@@ -28,11 +28,6 @@ void set_pre_init_hook_fn(InitFnPtr fn) {
   pre_init_hook = fn;
 }
 
-DeviceIndex prefetch_device_count() noexcept {
-  int count = dpcppPrefetchDeviceCount();
-  return static_cast<DeviceIndex>(count);
-}
-
 DeviceIndex device_count_impl() {
   int count;
   int err = dpcppGetDeviceCount(&count);
@@ -42,15 +37,7 @@ DeviceIndex device_count_impl() {
 DeviceIndex device_count() noexcept {
   do_pre_init_hook();
   // initialize number of devices only once
-  static DeviceIndex count = []() {
-    try {
-      return device_count_impl();
-    } catch (std::runtime_error& err) {
-      // such as "Failed to apply tile partition"
-      TORCH_WARN("XPU initialization: ", err.what());
-      return static_cast<DeviceIndex>(0);
-    }
-  }();
+  static DeviceIndex count = []() { return device_count_impl(); }();
   return count;
 }
 
@@ -86,6 +73,17 @@ DeviceInfo* getCurrentDeviceInfo() {
 DeviceInfo* getDeviceInfo(DeviceIndex device) {
   do_pre_init_hook();
   return dpcppGetDeviceInfo(device);
+}
+
+int prefetch_device_count(int& device_count) noexcept {
+  return xpu::dpcpp::dpcppPrefetchDeviceCount(device_count);
+}
+
+// This function can be used to get if fp64 data type is supported and no
+// execption. It is used in device_count() and is_available() such that both two
+// functions can be called before forking process.
+int prefetch_device_has_fp64_dtype(int device_id, bool& has_fp64) noexcept {
+  return xpu::dpcpp::dpcppPrefetchDeviceHasFP64Dtype(device_id, has_fp64);
 }
 
 } // namespace dpcpp

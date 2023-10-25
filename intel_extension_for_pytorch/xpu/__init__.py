@@ -2,19 +2,16 @@
 r"""
 This package is lazily initialized, so you can always import it.
 """
-
-from torch.storage import _LegacyStorage, _warn_typed_storage_removal
-import sys
-import warnings
-from functools import lru_cache
-from typing import List, Optional, Tuple, Union, Dict
 import ctypes
+from functools import lru_cache
+import sys
+from typing import List, Optional, Tuple, Union, Dict
 
 import torch
 import intel_extension_for_pytorch
 
 from torch import serialization
-from torch.storage import _StorageBase
+from torch.storage import _StorageBase, _LegacyStorage, _warn_typed_storage_removal
 from torch import device as _device
 from torch._utils import classproperty, _get_device_index
 
@@ -84,8 +81,15 @@ def init():
     _lazy_init()
 
 
-# This API call _prefetchDeviceCount() if _lazy_init() has not been called such that
-# this API can be used before forking proces.
+def _raw_device_count() -> int:
+    status, count = intel_extension_for_pytorch._C._prefetchDeviceCount()
+    if status != 0:
+        return -1
+    return count
+
+
+# This API call _raw_device_count() if _lazy_init() has not been called such
+# that this API can be used before forking a child process.
 @lru_cache(maxsize=1)
 def device_count() -> int:
     r"""Returns the number of XPUs device available."""
@@ -94,7 +98,8 @@ def device_count() -> int:
     if _is_initialized():
         return intel_extension_for_pytorch._C._getDeviceCount()
     else:
-        return intel_extension_for_pytorch._C._prefetchDeviceCount()
+        count = _raw_device_count()
+        return intel_extension_for_pytorch._C._getDeviceCount() if count < 0 else count
 
 
 # This API can be used before forking process if _lazy_init() has not been called.

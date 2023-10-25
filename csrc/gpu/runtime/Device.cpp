@@ -4,6 +4,10 @@
 #include <utils/Macros.h>
 #include <utils/Settings.h>
 
+#ifndef _WIN32
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 #include <cmath>
 #include <deque>
 #include <mutex>
@@ -313,13 +317,133 @@ DeviceInfo* dpcppGetDeviceInfo(DeviceId device_id) {
   return &device_info[init_device_prop(device_id)];
 }
 
-// This function can be used to prefetch device count and no execption. It is
-// used in device_count() and is_available() such that both two functions can be
-// called before forking process.
-int dpcppPrefetchDeviceCount() noexcept {
+/*
+ * Runtime in multiprocessing note
+ *
+ * We have known the limitation of fork support in SYCL runtime and LevelZero
+ * runtime. If we call runtime APIs in parent process, then fork a child
+ * process, there will be an error in runtime if submit any kernel in parent
+ * process or child process.
+ *
+ * In general, `zeInit` must be called after fork, not before. That's because if
+ * it is called before fork some structs are inherited by the child process,
+ * which means both child and parent are referring to the same internal
+ * structures, producing problems, like on SYCL kernel's submission.
+ *
+ * So we have to call runtime APIs using another fork, pipe the result back
+ * to the parent, and then fork the actual child process. For example, we would
+ * like to get device count before fork process to check if XPU device is
+ * available.
+ *
+ * We have to fork another child process before calling `zeInit` API in parent
+ * process. Then query device count using SYCL runtime APIs. Finally pipe the
+ * result to parent process. Now we can check if XPU device is available and
+ * fork the actual child process to do the calculation.
+ *
+ */
+
+int dpcppGetDeviceCountImpl() noexcept {
   std::vector<std::unique_ptr<sycl::device>> devices;
   enumDevices(devices);
   return devices.size();
+}
+
+// Return the number of device in `device_count` with a forking processing.
+int dpcppGetDeviceCountFork(int& device_count) noexcept {
+#ifndef _WIN32
+  std::array<int, 1> buffer;
+  std::array<int, 2> pipefd;
+  if (pipe(pipefd.data()) != 0) {
+    return -1;
+  }
+
+  int pid = fork();
+  if (pid < 0) {
+    return -1;
+  } else if (pid == 0) { // child process
+    buffer[0] = dpcppGetDeviceCountImpl();
+    close(pipefd[0]);
+    write(pipefd[1], buffer.data(), sizeof(buffer));
+    close(pipefd[1]);
+    _exit(0);
+  } else { // parent process
+    wait(NULL);
+    close(pipefd[1]);
+    read(pipefd[0], buffer.data(), sizeof(buffer));
+    close(pipefd[0]);
+  }
+
+  device_count = buffer[0];
+  return 0;
+#else
+  return -1;
+#endif
+}
+
+int dpcppGetDeviceHasFP64DtypeImpl(
+    DeviceId device_id,
+    bool& has_fp64) noexcept {
+  std::vector<std::unique_ptr<sycl::device>> devices;
+  enumDevices(devices);
+  auto device_count = devices.size();
+  if (device_id == -1) {
+    device_id = 0;
+  }
+  if (device_id < 0 || device_id >= device_count) {
+    return -1;
+  }
+  auto& device = *devices[device_id];
+  has_fp64 = device.has(dpcpp_dev_aspect_fp64);
+  return 0;
+}
+
+// Returns in `has_fp64` if support FP64 data type on device `device_id`
+// with a forking processing.
+int dpcppGetDeviceHasFP64DtypeFork(int device_id, bool& has_fp64) noexcept {
+#ifndef _WIN32
+  std::array<int, 2> buffer;
+  std::array<int, 2> pipefd;
+  if (pipe(pipefd.data()) != 0) {
+    return -1;
+  }
+
+  int pid = fork();
+  if (pid < 0) {
+    return -1;
+  } else if (pid == 0) { // child process
+    bool has_fp64 = false;
+    buffer[1] = dpcppGetDeviceHasFP64DtypeImpl(device_id, has_fp64);
+    buffer[0] = (int)has_fp64;
+    close(pipefd[0]);
+    write(pipefd[1], buffer.data(), sizeof(buffer));
+    close(pipefd[1]);
+    _exit(0);
+  } else { // parent process
+    wait(NULL);
+    close(pipefd[1]);
+    read(pipefd[0], buffer.data(), sizeof(buffer));
+    close(pipefd[0]);
+  }
+
+  has_fp64 = (bool)buffer[0];
+  return buffer[1];
+#else
+  return -1;
+#endif
+}
+
+// This function can be used to get device count and no execption. It is used in
+// device_count() and is_available() such that both two functions can be called
+// before forking process.
+int dpcppPrefetchDeviceCount(int& device_count) noexcept {
+  return xpu::dpcpp::dpcppGetDeviceCountFork(device_count);
+}
+
+// This function can be used to get if fp64 data type is supported and no
+// execption. It is used in device_count() and is_available() such that both two
+// functions can be called before forking process.
+int dpcppPrefetchDeviceHasFP64Dtype(int device_id, bool& has_fp64) noexcept {
+  return xpu::dpcpp::dpcppGetDeviceHasFP64DtypeFork(device_id, has_fp64);
 }
 
 } // namespace dpcpp

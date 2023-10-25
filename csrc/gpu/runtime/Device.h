@@ -11,8 +11,6 @@ namespace dpcpp {
 
 using DeviceId = at::DeviceIndex;
 
-int dpcppPrefetchDeviceCount() noexcept;
-
 int dpcppGetDeviceCount(int* deviceCount);
 
 int dpcppGetDevice(DeviceId* pDI);
@@ -36,6 +34,10 @@ DeviceInfo* dpcppGetDeviceInfo(DeviceId device_id = -1);
 sycl::context& dpcppGetDeviceContext(DeviceId device_id = -1);
 
 DeviceId dpcppGetDeviceIndex(sycl::device device);
+
+int dpcppPrefetchDeviceCount(int& device_count) noexcept;
+
+int dpcppPrefetchDeviceHasFP64Dtype(int device_id, bool& has_fp64) noexcept;
 
 } // namespace dpcpp
 } // namespace xpu

@@ -12,8 +12,6 @@ using namespace at;
 namespace xpu {
 namespace dpcpp {
 
-IPEX_API DeviceIndex prefetch_device_count() noexcept;
-
 IPEX_API DeviceIndex device_count() noexcept;
 
 IPEX_API DeviceIndex current_device();
@@ -78,5 +76,12 @@ static inline bool isOnSameDevice(const at::TensorList& tensor_list) {
   }
   return true;
 }
+
+IPEX_API int prefetch_device_count(int& device_count) noexcept;
+
+IPEX_API int prefetch_device_has_fp64_dtype(
+    int device_id,
+    bool& has_fp64) noexcept;
+
 } // namespace dpcpp
 } // namespace xpu

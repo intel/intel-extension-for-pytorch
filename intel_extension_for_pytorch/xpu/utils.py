@@ -1,12 +1,15 @@
 # coding: utf-8
 from enum import Enum
 import os
+from typing import Tuple
 import warnings
+from functools import lru_cache
 
 import torch
 from .. import _C
 from .. import frontend
 import intel_extension_for_pytorch  # noqa F401
+from .lazy_init import _is_initialized
 
 
 def from_usm(src, dtype, shape, stride=None, device_id: int = -1) -> torch.Tensor:
@@ -64,9 +67,21 @@ def has_channels_last_1d():
     return _C._is_channels_last_1d_enabled()
 
 
+def _raw_has_fp64_dtype(device: int = -1) -> Tuple[bool, bool]:
+    status, has_fp64 = _C._preftech_has_fp64_dtype(device)
+    return (status == 0), has_fp64
+
+
+# This API call _raw_has_fp64_dtype() if _lazy_init() has not been called
+# such that this API can be used before forking a child process.
+@lru_cache(None)
 def has_fp64_dtype(device: int = -1) -> bool:
     r"""Returns a bool indicating if the current XPU device supports dtype float64"""
-    return _C._has_fp64_dtype(device)
+    if _is_initialized():
+        return _C._has_fp64_dtype(device)
+    else:
+        is_valid, has_fp64 = _raw_has_fp64_dtype(device)
+        return has_fp64 if is_valid else _C._has_fp64_dtype(device)
 
 
 def has_2d_block_array(device: int = -1) -> bool:
