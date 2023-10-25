@@ -445,7 +445,10 @@ docker pull intel/intel-extension-for-pytorch:xpu-max-2.0.110-xpu
 <section id="run-docker-image">
 <h3>Run a Docker Image<a class="headerlink" href="#run-docker-image" title="Permalink to this heading"></a></h3>
 <div class="highlight-shell notranslate">
-<div class="highlight"><pre>docker run --rm -it --privileged --device=/dev/dri --ipc=host &lt;image_name&gt;:&lt;tag&gt; bash
+<div class="highlight"><pre>VIDEO=$(getent group video | sed -E 's,^video:[^:]*:([^:]*):.*$,\1,')
+RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,')
+test -z "$RENDER" || RENDER_GROUP="--group-add ${RENDER}"
+docker run --rm -it --privileged --group-add ${VIDEO} ${RENDER_GROUP} --device=/dev/dri --ipc=host &lt;image_name&gt;:&lt;tag&gt; bash
 </pre></div>
 </div>
 </section>
