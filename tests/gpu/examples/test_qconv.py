@@ -4,7 +4,6 @@ import pytest
 import numpy as np
 import intel_extension_for_pytorch  # noqa
 from torch.testing._internal.common_utils import TestCase
-import platform
 
 
 class TestTorchMethod(TestCase):
@@ -20,7 +19,7 @@ class TestTorchMethod(TestCase):
         )
         dtype_inputs = torch.quint8
         dtype_filters = torch.qint8
-        zp_vec = [0] if platform.system() == "Windows" else [128, 2, 0]
+        zp_vec = [128, 2, 0]
         for with_relu in [False, True]:
             for scale_in in [1.2, 1.6]:
                 for zero_point_in in zp_vec:  # torch u8, random zp, 0
@@ -30,11 +29,7 @@ class TestTorchMethod(TestCase):
                     bias = torch.randn(4)
 
                     scale_out = 4.2
-                    zp_out = (
-                        0
-                        if platform.system() == "Windows"
-                        else np.random.randint(0, 255)
-                    )
+                    zp_out = np.random.randint(0, 255)
                     print(
                         f"with_relu:{with_relu}, scale:{scale_in}, zero_point:{zero_point_in}, zp_out:{zp_out}"
                     )
@@ -89,7 +84,7 @@ class TestTorchMethod(TestCase):
 
         dtype_inputs = torch.quint8
         dtype_filters = torch.qint8
-        zp_vec = [0] if platform.system() == "Windows" else [128, 2, 0]
+        zp_vec = [128, 2, 0]
         for with_relu in [True, False]:
             for scale_in in [1.2, 1.6]:
                 for zero_point_in in zp_vec:  # torch u8, random zp, 0
@@ -98,11 +93,7 @@ class TestTorchMethod(TestCase):
                     bias = torch.randn(4)
 
                     scale_weight = 0.5
-                    zp_out = (
-                        0
-                        if platform.system() == "Windows"
-                        else np.random.randint(0, 255)
-                    )
+                    zp_out = np.random.randint(0, 255)
                     scale_out = 0.35
                     print(
                         f"with_relu:{with_relu}, scale_in:{scale_in}, \
@@ -161,7 +152,7 @@ class TestTorchMethod(TestCase):
         dtype_inputs = torch.quint8
         dtype_filters = torch.qint8
 
-        zp_vec = [0] if platform.system() == "Windows" else [128, 2, 0]
+        zp_vec = [128, 2, 0]
         for with_relu in [True, False]:
             for scale_in in [1.2, 1.6]:
                 for zero_point_in in zp_vec:  # torch u8, random zp, 0
@@ -176,11 +167,7 @@ class TestTorchMethod(TestCase):
                     else:
                         qconv_fn = torch.ops.quantized.conv2d
 
-                    zp_out = (
-                        0
-                        if platform.system() == "Windows"
-                        else np.random.randint(0, 255)
-                    )
+                    zp_out = np.random.randint(0, 255)
                     scale_out = 0.35
 
                     q_inputs = torch.quantize_per_tensor(

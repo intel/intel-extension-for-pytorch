@@ -6,8 +6,6 @@ from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
 from test_fusion_quantize import trace_int8_model
 import numpy as np
-import platform
-import pytest
 
 
 class Conv_Cat(nn.Module):
@@ -34,10 +32,10 @@ class Conv_Cat(nn.Module):
 
 class TestTorchMethod(TestCase):
     def test_cat_array_quint8(self, dtype=torch.float):
-        zp_vec = [0] if platform.system() == "Windows" else [0, 2]
+        zp_vec = [0, 2]
         for dtype in [torch.quint8, torch.qint8]:
             for zp in zp_vec:
-                zp_out = 0 if platform.system() == "Windows" else 4
+                zp_out = 4
                 input1 = torch.randn(1, 1, 5, 5)
                 input2 = torch.randn(1, 1, 5, 5)
                 input3 = torch.randn(1, 1, 5, 5)
@@ -70,10 +68,6 @@ class TestTorchMethod(TestCase):
 
                 self.assertEqual(output_int8, output_gpu_int8)
 
-    @pytest.mark.skipif(
-        platform.system() == "Windows",
-        reason="Asymm quantization has undefined behaviour(hang, CL) on Windows current",
-    )
     def test_conv_cat(self):
         torch._C._jit_set_profiling_mode(True)
         torch._C._jit_set_profiling_executor(True)

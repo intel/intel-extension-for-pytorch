@@ -279,13 +279,10 @@ static Tensor quantized_deconvolution(
   // See: [Note: Use symmetric quant implementation when zp is 0]
   bool src_need_zp = requires_runtime_zp(src);
   bool dst_need_zp = requires_runtime_zp(dst);
-  bool wgh_need_zp = requires_runtime_zp(wgh);
   if (src_need_zp)
     pattr.set_zero_points_mask(DNNL_ARG_SRC, mask_ac);
   if (dst_need_zp)
     pattr.set_zero_points_mask(DNNL_ARG_DST, mask_ac);
-  if (wgh_need_zp)
-    pattr.set_zero_points_mask(DNNL_ARG_WEIGHTS, mask_wgh);
 
   auto deconv_fwd_pd = deconvolution_forward::primitive_desc(
       engine,

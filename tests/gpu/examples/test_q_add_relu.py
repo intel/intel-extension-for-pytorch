@@ -1,7 +1,6 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
-import platform
 
 
 class TestTorchMethod(TestCase):
@@ -14,7 +13,7 @@ class TestTorchMethod(TestCase):
             A = torch.arange(-128, 130, dtype=torch.float)
             B = torch.arange(-128, 130, dtype=torch.float)
             scale = 2.0
-            zero_point = 0 if platform.system() == "Windows" else 127
+            zero_point = 127
             qA = torch.quantize_per_tensor(
                 A, scale=scale, zero_point=zero_point, dtype=dtype
             )

@@ -1,16 +1,15 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
-import platform
 
 
 class TestNNMethod(TestCase):
     def test_instance_norm(self):
         for dtype in [torch.quint8, torch.qint8]:
             x_scale = 10.0 / 256
-            x_zero_point = 0 if platform.system() == "Windows" else 2
+            x_zero_point = 2
             y_scale = 5.0 / 256
-            y_zero_point = 0 if platform.system() == "Windows" else 2
+            y_zero_point = 2
             dims = (1, 4, 8, 1, 1)
 
             float_cls = torch.nn.InstanceNorm3d

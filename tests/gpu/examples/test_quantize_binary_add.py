@@ -2,8 +2,6 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
-import platform
-
 
 cpu_device = torch.device("cpu")
 xpu_device = torch.device("xpu")
@@ -11,7 +9,7 @@ xpu_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_qbinary(self, dtype=torch.float):
-        zp_vec = [0] if platform.system() == "Windows" else [0, 2]
+        zp_vec = [0, 2]
         for dtype in [torch.quint8, torch.qint8]:
             for zp in zp_vec:
                 x_cpu = torch.randn([1, 1, 3, 3], device=cpu_device)
@@ -21,7 +19,7 @@ class TestNNMethod(TestCase):
                 scale_in_2 = 2.04386
 
                 scale_out = 0.2
-                zp_out = 0 if platform.system() == "Windows" else 3
+                zp_out = 3
 
                 q_x_cpu = torch.quantize_per_tensor(x_cpu, scale_in_1, zp, dtype)
                 q_y_cpu = torch.quantize_per_tensor(y_cpu, scale_in_2, zp, dtype)

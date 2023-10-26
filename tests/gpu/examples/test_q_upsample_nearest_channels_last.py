@@ -3,7 +3,6 @@ from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
 import pytest
-import platform
 
 
 class TestNNMethod(TestCase):
@@ -12,7 +11,7 @@ class TestNNMethod(TestCase):
         reason="channels last does not support onednn block format",
     )
     def test_q_upsamle_nearest_channels_last(self, dtype=torch.float):
-        zp_vec = [0] if platform.system() == "Windows" else [0, 2]
+        zp_vec = [0, 2]
         for dtype_inputs in [torch.quint8, torch.qint8]:
             for zp in zp_vec:
                 x_cpu = torch.randn(

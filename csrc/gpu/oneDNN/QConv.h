@@ -270,6 +270,21 @@ static at::Tensor quantized_convolution(
   mask_wgh = (wgh.qscheme() == kPerTensorAffine) ? 0 : 1;
   primitive_attr pattr;
 
+  // [Note: Use symmetric quant implementation when zp is 0]
+  // (JIRA: https://jira.devtools.intel.com/browse/MFDNN-9633)
+  // Due to asymmetric quant has perf gap compared to symm quant, we need to
+  // avoid dnn kernel goes into asymm path if tensor zp is 0. We expect
+  // following behaviour:
+  // 1. IF IPEX is Symmetric only: Alwasy refuse to use runtime zp. Use
+  // symmetric kernel.
+  // 2. IF IPEX is Asymmetric supported:
+  //      a. Check src&dzp&wgh zp, if all are zero, we go into symmetric path
+  //      for perf. With this WA, operate like conv_relu fusion would maintin
+  //      high perf even the overall config is asymm.
+  //      b. If zp is not zero, using asymmetric kernel. Perf regression
+  //      should then happen
+  bool src_need_zp = requires_runtime_zp(src);
+
 #ifdef USE_PRIMITIVE_CACHE
   create_key(
       key_primitive,
@@ -284,6 +299,7 @@ static at::Tensor quantized_convolution(
       _padding_back_bottom_right,
       is_onednn_layout_suggested,
       is_channels_last_suggested,
+      src_need_zp,
       attr);
 #endif
 
@@ -295,22 +311,6 @@ static at::Tensor quantized_convolution(
 #else
   bool load_from_cache = false;
 #endif
-
-  // [Note: Use symmetric quant implementation when zp is 0]
-  // (JIRA: https://jira.devtools.intel.com/browse/MFDNN-9633)
-  // Due to asymmetric quant has perf gap compared to symm quant, we need to
-  // avoid dnn kernel goes into asymm path if tensor zp is 0. We expect
-  // following behaviour:
-  // 1. IF IPEX is Symmetric only: Alwasy refuse to use runtime zp. Use
-  // symmetric kernel.
-  // 2. IF IPEX is Asymmetric supported:
-  //      a. Check src&dzp&wgh zp, if all are zero, we go into symmetric path
-  //      for perf. With this WA, operate like conv_relu fusion would maintin
-  //      high perf even the overall config is asymm.
-  //      b. If zp is not zero, using asymmetric kernel. Perf regression
-  //      should then happen.
-  bool src_need_zp = requires_runtime_zp(src);
-  bool dst_need_zp = requires_runtime_zp(dst);
 
   std::tie(src_usr_md, wgh_usr_md, dst_usr_md) =
       qconv_get_usr_md(src, wgh, dst, groups, memory_layout_for_conv);

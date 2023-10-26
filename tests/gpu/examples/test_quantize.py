@@ -5,7 +5,6 @@ import math
 import numpy as np
 import intel_extension_for_pytorch  # noqa
 import pytest
-import platform
 
 
 def _calculate_dynamic_qparams(X, dtype, reduce_range=False):
@@ -49,7 +48,7 @@ def _calculate_dynamic_qparams(X, dtype, reduce_range=False):
 
 class TestTorchMethod(TestCase):
     def test_quantize_per_tensor(self, dtype=torch.float):
-        zp_vec = [0] if platform.system() == "Windows" else [0, 2]
+        zp_vec = [0, 2]
         for data_type in [torch.qint8, torch.quint8]:
             for zp in zp_vec:
                 src_cpu = torch.randn(1, 3, 2, 2)
@@ -103,7 +102,7 @@ class TestTorchMethod(TestCase):
             self.assertEqual(result_non_dynam.cpu(), result.cpu())
 
     def test_quantize_tensor_channels_last(self, dtype=torch.float):
-        zp_vec = [0] if platform.system() == "Windows" else [0, 2]
+        zp_vec = [0, 2]
         for data_type in [torch.qint8, torch.quint8]:
             for tensor_zero_point in zp_vec:
                 src_cpu = torch.randn(1, 3, 2, 2)

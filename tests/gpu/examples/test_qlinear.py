@@ -4,7 +4,6 @@ from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
 
 import pytest
-import platform
 
 
 class TestTorchMethod(TestCase):
@@ -26,7 +25,7 @@ class TestTorchMethod(TestCase):
         zp_filter = 0
         input_shape = [[5, 5], [3, 5, 5], [2, 3, 5, 5]]
 
-        zp_vec = [0] if platform.system() == "Windows" else [0, 2]
+        zp_vec = [0, 2]
         for shape in input_shape:
             for zp_in in zp_vec:
                 inputs = torch.randn(shape)
@@ -34,7 +33,7 @@ class TestTorchMethod(TestCase):
                 # bias = torch.randn(5)
                 bias = None
                 output_sc = 0.5
-                output_zp = 0 if platform.system() == "Windows" else 2
+                output_zp = 2
                 q_inputs = torch.quantize_per_tensor(inputs, 0.4, zp_in, dtype_inputs)
                 q_filters = torch.quantize_per_tensor(
                     filters, 0.5, zp_filter, dtype_filters
