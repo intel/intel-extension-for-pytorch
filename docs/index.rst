@@ -24,7 +24,7 @@ Optimizations for both eager mode and graph mode contribute to extra performance
 
 .. note:: GPU features are not included in CPU only packages.
 
-Intel® Extension for PyTorch* has been released as an open–source project at `Github <https://github.com/intel/intel-extension-for-pytorch>`_. Source code is available at `xpu-master branch <https://github.com/intel/intel-extension-for-pytorch/tree/xpu-master>`_. Check `the tutorial <https://intel.github.io/intel-extension-for-pytorch/xpu/latest/>`_ for detailed information. Due to different development schedule, optimizations for CPU only might have a newer code base. Source code is available at `master branch <https://github.com/intel/intel-extension-for-pytorch/tree/master>`_. Check `the CPU tutorial <https://intel.github.io/intel-extension-for-pytorch/cpu/latest/>`_ for detailed information on the CPU side.
+Intel® Extension for PyTorch* has been released as an open–source project at `Github <https://github.com/intel/intel-extension-for-pytorch>`_. Source code is available at `xpu-main branch <https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main>`_. Check `the tutorial <https://intel.github.io/intel-extension-for-pytorch/xpu/latest/>`_ for detailed information. Due to different development schedule, optimizations for CPU only might have a newer code base. Source code is available at `main branch <https://github.com/intel/intel-extension-for-pytorch/tree/main>`_. Check `the CPU tutorial <https://intel.github.io/intel-extension-for-pytorch/cpu/latest/>`_ for detailed information on the CPU side.
 
 .. toctree::
    :hidden:

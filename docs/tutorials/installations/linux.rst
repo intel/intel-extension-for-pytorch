@@ -222,7 +222,7 @@ To ensure a smooth compilation of the bundle, including PyTorch*, torchvision, t
 
 .. code:: shell
 
-  $ wget https://raw.githubusercontent.com/intel/intel-extension-for-pytorch/xpu-master/scripts/compile_bundle.sh
+  $ wget https://raw.githubusercontent.com/intel/intel-extension-for-pytorch/xpu-main/scripts/compile_bundle.sh
   $ bash compile_bundle.sh <DPCPPROOT> <MKLROOT> [AOT]
     DPCPPROOT and MKLROOT are mandatory, should be absolute or relative path to the root directory of DPC++ compiler and oneMKL respectively.
     AOT is optional, should be the text string for environment variable USE_AOT_DEVLIST.

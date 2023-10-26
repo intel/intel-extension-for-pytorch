@@ -132,7 +132,7 @@ To ensure a smooth compilation of the bundle, including PyTorch*, torchvision, I
 
 .. code:: shell
 
-  Download https://github.com/intel/intel-extension-for-pytorch/blob/xpu-master/scripts/compile_bundle.bat
+  Download https://github.com/intel/intel-extension-for-pytorch/blob/xpu-main/scripts/compile_bundle.bat
   $ compile_bundle.bat "<DPCPPROOT>" "<MKLROOT>"
     DPCPPROOT and MKLROOT are mandatory, should be absolute or relative path to the root directory of DPC++ compiler and oneMKL respectively.
 
