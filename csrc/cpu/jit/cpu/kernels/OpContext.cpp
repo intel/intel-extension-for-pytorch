@@ -376,7 +376,7 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
     if (qtype == c10::kPerTensorAffine) {
       weight_scales_float[0] = weight.q_scale();
     } else if (qtype == c10::kPerChannelAffine) {
-      weight_scales_float.resize(N, 0.0);
+      weight_scales_float.resize(N);
       for (const auto i : c10::irange(N)) {
         weight_scales_float[i] = weight.q_per_channel_scales()[i].item<float>();
       }
@@ -395,7 +395,7 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
     if (qtype == c10::kPerTensorAffine) {
       weight_zero_points_int32[0] = weight.q_zero_point();
     } else if (qtype == c10::kPerChannelAffine) {
-      weight_zero_points_int32.resize(N, 0);
+      weight_zero_points_int32.resize(N);
       for (const auto i : c10::irange(N)) {
         weight_zero_points_int32[i] =
             weight.q_per_channel_zero_points()[i].item<int32_t>();
@@ -414,7 +414,7 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
     if (qtype == c10::kPerTensorAffine) {
       weight_zero_points_float[0] = (float)weight.q_zero_point();
     } else if (qtype == c10::kPerChannelAffine) {
-      weight_zero_points_float.resize(N, 0);
+      weight_zero_points_float.resize(N);
       for (const auto i : c10::irange(N)) {
         weight_zero_points_float[i] =
             (float)weight.q_per_channel_zero_points()[i].item<int32_t>();
@@ -443,7 +443,7 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
     // extract scales from weight
     std::vector<float> weight_scales_float(1, 0.0);
     if (qtype == c10::kPerChannelAffineFloatQParams) {
-      weight_scales_float.resize(N, 0.0);
+      weight_scales_float.resize(N);
       for (const auto i : c10::irange(N)) {
         weight_scales_float[i] = weight.q_per_channel_scales()[i].item<float>();
       }
@@ -460,7 +460,7 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
     // extract zero_points from weight
     std::vector<float> weight_zero_points_float(1, 0);
     if (qtype == c10::kPerChannelAffineFloatQParams) {
-      weight_zero_points_float.resize(N, 0);
+      weight_zero_points_float.resize(N);
       for (const auto i : c10::irange(N)) {
         weight_zero_points_float[i] =
             weight.q_per_channel_zero_points()[i].item<float>();
