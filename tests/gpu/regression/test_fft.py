@@ -35,3 +35,10 @@ class TestTorchMethod(TestCase):
         var_dpcpp = f_real_dpcpp + +1j * f_imag_dpcpp
         var_dpcpp = torch.fft.fft(var_dpcpp, dim=axis, norm="ortho")
         self.assertEqual(var, var_dpcpp)
+
+    def test_fftn(self):
+        x4D_cpu = torch.rand(1, 1, 1, 1, 1, device="cpu", dtype=torch.cfloat)
+        out_cpu = torch.fft.fftn(x4D_cpu)
+        x4D_xpu = x4D_cpu.to(device="xpu")
+        out_xpu = torch.fft.fftn(x4D_xpu)
+        self.assertEqual(out_cpu, out_xpu.cpu())

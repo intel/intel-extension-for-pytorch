@@ -681,6 +681,14 @@ Tensor& _fft_r2c_out(
     int64_t normalization,
     bool onesided,
     Tensor& out) {
+  // TODO: n-dimension (n>3) support, fallback to CPU temporarily
+  if (dim.size() > 3) {
+    Tensor out_cpu = out.to(Device(at::kCPU));
+    at::_fft_r2c_out(
+        out_cpu, self.to(Device(at::kCPU)), dim, normalization, onesided);
+    out.copy_(out_cpu);
+    return out;
+  }
   auto result = at::AtenIpexTypeXPU::_fft_r2c(
       self, dim, normalization, /*onesided=*/true);
   if (onesided) {
@@ -727,6 +735,12 @@ Tensor _fft_c2r(
     IntArrayRef dim,
     int64_t normalization,
     int64_t last_dim_size) {
+  // TODO: n-dimension (n>3) support, fallback to CPU temporarily
+  if (dim.size() > 3) {
+    Tensor out_cpu = at::_fft_c2r(
+        self.to(Device(at::kCPU)), dim, normalization, last_dim_size);
+    return out_cpu.to(Device(at::kXPU));
+  }
   TORCH_CHECK(self.is_complex());
   auto input = self;
   if (dim.size() > 1) {
@@ -757,6 +771,13 @@ Tensor _fft_r2c(
     IntArrayRef dim,
     int64_t normalization,
     bool onesided) {
+  // TODO: n-dimension (n>3) support, fallback to CPU temporarily
+  if (dim.size() > 3) {
+    Tensor out_cpu =
+        at::_fft_r2c(self.to(Device(at::kCPU)), dim, normalization, onesided);
+    return out_cpu.to(Device(at::kXPU));
+  }
+
   TORCH_CHECK(self.is_floating_point());
   auto input_sizes = self.sizes();
   DimVector out_sizes(input_sizes.begin(), input_sizes.end());
@@ -797,6 +818,12 @@ Tensor _fft_c2c(
     IntArrayRef dim,
     int64_t normalization,
     bool forward) {
+  // TODO: n-dimension (n>3) support, fallback to CPU temporarily
+  if (dim.size() > 3) {
+    Tensor out_cpu =
+        at::_fft_c2c(self.to(Device(at::kCPU)), dim, normalization, forward);
+    return out_cpu.to(Device(at::kXPU));
+  }
   TORCH_CHECK(self.is_complex());
   const auto sorted_dims = impl::_sort_dims(self, dim);
   auto out = at::empty(self.sizes(), self.options());
