@@ -1,13 +1,17 @@
 # Intel® Extension for PyTorch\*
 
+**NOTE:** `xpu-master` branch has been deprecated. Visit [`xpu-main`](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main) branch for the latest code.
+
+===================================================
+
 Intel® Extension for PyTorch\* extends PyTorch\* with up-to-date features optimizations for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel X<sup>e</sup> Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch\* `xpu` device, Intel® Extension for PyTorch\* provides easy GPU acceleration for Intel discrete GPUs with PyTorch\*.
 
 Intel® Extension for PyTorch\* provides optimizations for both eager mode and graph mode, however, compared to eager mode, graph mode in PyTorch\* normally yields better performance from optimization techniques, such as operation fusion. Intel® Extension for PyTorch\* amplifies them with more comprehensive graph optimizations. Therefore we recommend you to take advantage of Intel® Extension for PyTorch\* with [TorchScript](https://pytorch.org/docs/stable/jit.html) whenever your workload supports it. You could choose to run with `torch.jit.trace()` function or `torch.jit.script()` function, but based on our evaluation, `torch.jit.trace()` supports more workloads so we recommend you to use `torch.jit.trace()` as your first choice.
 
 The extension can be loaded as a Python module for Python programs or linked as a C++ library for C++ programs. In Python scripts users can enable it dynamically by importing `intel_extension_for_pytorch`.
 
-* Check [CPU tutorial](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® CPUs. Source code is available at the [master branch](https://github.com/intel/intel-extension-for-pytorch/tree/master).
-* Check [GPU tutorial](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® GPUs. Source code is available at the [xpu-master branch](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-master).
+* Check [CPU tutorial](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® CPUs. Source code is available at the [main branch](https://github.com/intel/intel-extension-for-pytorch/tree/main).
+* Check [GPU tutorial](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® GPUs. Source code is available at the [xpu-main branch](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main).
 
 ## Installation
 
@@ -24,7 +28,7 @@ python -m pip install intel_extension_for_pytorch -f https://developer.intel.com
 
 More installation methods can be found at [CPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/installation.html).
 
-Compilation instruction of the latest CPU code base `master` branch can be found at [Installation Guide](https://github.com/intel/intel-extension-for-pytorch/blob/master/docs/tutorials/installation.md#install-via-compiling-from-source).
+Compilation instruction of the latest CPU code base `main` branch can be found at [Installation Guide](https://github.com/intel/intel-extension-for-pytorch/blob/main/docs/tutorials/installation.md#install-via-compiling-from-source).
 
 ### GPU version
 
@@ -38,7 +42,7 @@ python -m pip install torch==2.0.1a0 torchvision==0.15.2a0 intel_extension_for_p
 
 More installation methods can be found at [GPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/installation.html).
 
-Compilation instruction of the latest GPU code base `xpu-master` branch can be found at [Installation Guide For Linux/WSL2](https://github.com/intel/intel-extension-for-pytorch/blob/xpu-master/docs/tutorials/installations/linux.rst#install-via-compiling-from-source) and [Installation Guide For Windows](https://github.com/intel/intel-extension-for-pytorch/blob/xpu-master/docs/tutorials/installations/windows.rst#install-via-compiling-from-source).
+Compilation instruction of the latest GPU code base `xpu-main` branch can be found at [Installation Guide For Linux/WSL2](https://github.com/intel/intel-extension-for-pytorch/blob/xpu-main/docs/tutorials/installations/linux.rst#install-via-compiling-from-source) and [Installation Guide For Windows](https://github.com/intel/intel-extension-for-pytorch/blob/xpu-main/docs/tutorials/installations/windows.rst#install-via-compiling-from-source).
 
 ## Getting Started
 
@@ -84,7 +88,7 @@ with torch.no_grad():
 
 ## License
 
-_Apache License_, Version _2.0_. As found in [LICENSE](https://github.com/intel/intel-extension-for-pytorch/blob/master/LICENSE) file.
+_Apache License_, Version _2.0_. As found in [LICENSE](https://github.com/intel/intel-extension-for-pytorch/blob/main/LICENSE) file.
 
 ## Security
 
