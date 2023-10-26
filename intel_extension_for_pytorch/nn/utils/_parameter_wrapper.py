@@ -103,15 +103,6 @@ def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
         torch.nn.ParameterList,
     ]
 
-    # extend the cast scope for bert training performance because
-    # the BertLMPredictionHead has shared parameters
-    try:
-        from transformers.models.bert.modeling_bert import BertLMPredictionHead
-
-        module_convert_list_bf16_training.append(BertLMPredictionHead)
-    except ImportError:
-        pass
-
     module_convert_list_fp16 = [
         torch.nn.Conv1d,
         torch.nn.Conv2d,
