@@ -20,8 +20,8 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 
 Intel® Extension for PyTorch* has been released as an open–source project at `Github <https://github.com/intel/intel-extension-for-pytorch>`_. You can find the source code and instructions on how to get started at:
 
-- **CPU**: `CPU master branch <https://github.com/intel/intel-extension-for-pytorch/tree/master>`_ |  `Get Started <https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/getting_started>`_ 
-- **XPU**: `XPU master branch <https://github.com/intel/intel-extension-for-pytorch/tree/xpu-master>`_ | `Get Started <https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/getting_started>`_
+- **CPU**: `CPU main branch <https://github.com/intel/intel-extension-for-pytorch/tree/main>`_ |  `Get Started <https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/getting_started>`_ 
+- **XPU**: `XPU main branch <https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main>`_ | `Get Started <https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/getting_started>`_
 
 
 Architecture
