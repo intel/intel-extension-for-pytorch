@@ -1,11 +1,9 @@
 #include <ATen/ATen.h>
-#include <utils/DPCPP.h>
-
 #include <ATen/record_function.h>
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 #include "../comm/ATDispatch.h"
-#include "NaiveScaledDotProduct.h"
 #include "sdp_utils.h"
-#include "sdp_utils_cpp.h"
 #include "utils/CustomOperatorRegistration.h"
 
 #include "../xetla/mha.h"
@@ -13,7 +11,7 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-inline Tensor _scaled_dot_product_efficient_attention(
+inline Tensor _scaled_dot_product_efficient_attention_impl(
     const Tensor& _query,
     const Tensor& _key,
     const Tensor& _value,
@@ -47,7 +45,6 @@ inline Tensor _scaled_dot_product_efficient_attention(
     key = _key.transpose(1, 2).contiguous().transpose(1, 2);
     value = _value.transpose(1, 2).contiguous().transpose(1, 2);
   }
-
   const double softmax_scale =
       scale.has_value() ? scale.value() : (1.0 / std::sqrt(query.size(-1)));
 
@@ -82,17 +79,62 @@ inline Tensor _scaled_dot_product_efficient_attention(
 #endif
 }
 
+std::tuple<Tensor, Tensor, Tensor, Tensor>
+_scaled_dot_product_efficient_attention(
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const c10::optional<at::Tensor>& attn_bias,
+    bool compute_log_sumexp,
+    double dropout_p,
+    bool is_causal,
+    c10::optional<double> scale) {
+  auto out = _scaled_dot_product_efficient_attention_impl(
+      query, key, value, attn_bias, is_causal, dropout_p, scale);
+  auto softmax_lse = at::empty(
+      {query.size(0), query.size(1), query.size(2)},
+      query.options().dtype(at::kFloat));
+  Tensor seed_t = at::empty({}, at::dtype(at::kLong).device(at::kXPU));
+  Tensor offset_t = at::empty({}, at::dtype(at::kLong).device(at::kXPU));
+  return std::make_tuple(
+      std::move(out),
+      std::move(softmax_lse),
+      std::move(seed_t),
+      std::move(offset_t));
+}
+
+inline bool xetla_supported(Tensor q, Tensor k, Tensor v, bool is_training) {
+  bool is_supported = false;
+#if defined(USE_XETLA)
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  if (q.dtype() == at::kHalf && k.dtype() == at::kHalf &&
+      v.dtype() == at::kHalf && !is_training &&
+      Settings::I().has_2d_block_array(curDevID)) {
+    if ((q.size(-1) * sizeof(at::Half) % 128 == 0) &&
+        (v.size(-1) * sizeof(at::Half) % 128 == 0))
+      is_supported = true;
+  }
+#endif
+  return is_supported;
+}
+
 int64_t _fused_sdp_choice(
-    const Tensor& query_,
+    const Tensor& query,
     const Tensor& key,
     const Tensor& value,
     const c10::optional<Tensor>& attn_mask_,
     double dropout_p,
     bool is_causal,
     c10::optional<double> scale) {
-  sdp::sdp_params kernel_params{
-      query_, key, value, attn_mask_.has_value(), dropout_p, is_causal};
-  auto backend = select_sdp_backend(kernel_params);
+  bool is_training =
+      (query.requires_grad() || key.requires_grad() || value.requires_grad());
+  // We have implemented efficient_attention backend with xetla, flash_attention
+  // backend is not supported now, which will be implemented in the future. So
+  // we provide two backends here.
+  sdp::SDPBackend backend = xetla_supported(query, key, value, is_training)
+      ? sdp::SDPBackend::efficient_attention
+      : sdp::SDPBackend::math;
   if (backend == sdp::SDPBackend::error) {
     TORCH_CHECK(
         false,
@@ -148,88 +190,6 @@ inline void validate_sdpa_input(
         " instead.");
   }
   return;
-}
-
-inline bool xetla_supported(Tensor q, Tensor k, Tensor v, bool is_training) {
-#if defined(USE_XETLA)
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  if (q.dtype() == at::kHalf && k.dtype() == at::kHalf &&
-      v.dtype() == at::kHalf && !is_training &&
-      Settings::I().has_2d_block_array(curDevID))
-    return true;
-  else
-    return false;
-#else
-  return false;
-#endif
-}
-
-Tensor scaled_dot_product_attention(
-    const Tensor& query_,
-    const Tensor& key,
-    const Tensor& value,
-    const c10::optional<Tensor>& attn_mask_,
-    double dropout_p,
-    bool is_causal,
-    c10::optional<double> scale) {
-  validate_sdpa_input(
-      query_, key, value, attn_mask_, dropout_p, is_causal, scale);
-  int64_t choice_int = static_cast<int64_t>(sdp::SDPBackend::math);
-  choice_int = at::_fused_sdp_choice(
-      query_, key, value, attn_mask_, dropout_p, is_causal);
-  sdp::SDPBackend backend = static_cast<sdp::SDPBackend>(choice_int);
-  switch (backend) {
-    case sdp::SDPBackend::flash_attention: {
-      TORCH_WARN(
-          "flash_attention algorithm hasn't been implemented, we will fall back to the math path.")
-      return std::get<0>(at::_scaled_dot_product_attention_math(
-          query_,
-          key,
-          value,
-          attn_mask_,
-          dropout_p,
-          is_causal,
-          c10::nullopt,
-          scale));
-    }
-    case sdp::SDPBackend::efficient_attention: {
-      bool compute_logsumexp =
-          (query_.requires_grad() || key.requires_grad() ||
-           value.requires_grad());
-      if (xetla_supported(query_, key, value, compute_logsumexp)) {
-        auto out_and_lse = _scaled_dot_product_efficient_attention(
-            query_, key, value, attn_mask_, is_causal, dropout_p, scale);
-        return out_and_lse;
-      } else {
-        auto out_and_lse = at::_scaled_dot_product_attention_math(
-            query_,
-            key,
-            value,
-            attn_mask_,
-            dropout_p,
-            is_causal,
-            c10::nullopt,
-            scale);
-        return std::get<0>(out_and_lse);
-      }
-    }
-    case sdp::SDPBackend::math:
-      return std::get<0>(at::_scaled_dot_product_attention_math(
-          query_,
-          key,
-          value,
-          attn_mask_,
-          dropout_p,
-          is_causal,
-          c10::nullopt,
-          scale));
-    default:
-      TORCH_CHECK(
-          false,
-          "No viable backend for scaled_dot_product_attention was found.");
-      return Tensor();
-  }
 }
 
 Tensor xetla_fsdp_forward_atten_mask_alibi_strided(

@@ -867,8 +867,8 @@ supported:
   - _validate_compressed_sparse_indices
   - index.Tensor_out
   - pad_sequence
-  - scaled_dot_product_attention
   - _fused_sdp_choice
+  - _scaled_dot_product_efficient_attention
 autograd:
   - cdist
   - lstm.input
