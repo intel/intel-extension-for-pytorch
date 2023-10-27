@@ -37,7 +37,15 @@ DeviceIndex device_count_impl() {
 DeviceIndex device_count() noexcept {
   do_pre_init_hook();
   // initialize number of devices only once
-  static DeviceIndex count = []() { return device_count_impl(); }();
+  static DeviceIndex count = []() {
+    try {
+      return device_count_impl();
+    } catch (std::runtime_error& err) {
+      // such as "Failed to apply tile partition"
+      TORCH_WARN("XPU initialization: ", err.what());
+      return static_cast<DeviceIndex>(0);
+    }
+  }();
   return count;
 }
 

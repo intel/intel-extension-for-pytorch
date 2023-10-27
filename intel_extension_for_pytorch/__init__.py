@@ -113,7 +113,7 @@ if has_xpu():
     # This code used to check the deprecated tile partition feature option. Should remove this check in next release.
     if "IPEX_TILE_AS_DEVICE" in os.environ:
         warnings.warn(
-            "IPEX_TILE_AS_DEVICE is deprecated since version 2.1.10 and now is being removed. By default, tile partition feature is enabled. Please set ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE if you would like to disable it."  # noqa: B950
+            "IPEX_TILE_AS_DEVICE will be deprecated, please use `ZE_FLAT_DEVICE_HIERARCHY` instead, refering to https://spec.oneapi.io/level-zero/latest/core/PROG.html#device-hierarchy."  # noqa: B950
         )
 
 from . import nn

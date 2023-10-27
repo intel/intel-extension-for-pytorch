@@ -27,6 +27,9 @@ namespace dpcpp {
  *      Default = 0 | Set verbose level with synchronization execution mode
  *   IPEX_XPU_SYNC_MODE:
  *      Default = 0 | Set 1 to enforce synchronization execution mode
+ *   IPEX_TILE_AS_DEVICE:
+ *      Default = 1 | Set 0 to disable tile partition and map per root device
+ *      Only works when `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE`
  * ==========GPU==========
  *
  * EXPERIMENTAL options:
@@ -36,7 +39,7 @@ namespace dpcpp {
  *   IPEX_ZE_TRACING:
  *      Default = 0 | Set 1 to enable kineto profiling based-on level zero tracing
  * ==========EXP==========
-
+ *
  * Internal options:
  * ==========INT==========
  *   IPEX_SHOW_OPTION:
@@ -46,9 +49,11 @@ namespace dpcpp {
  *   IPEX_XPU_BACKEND:
  *      Default = 0 (GPU) | Set XPU_BACKEND as global IPEX backend
  *   IPEX_COMPUTE_ENG:
- *      Default = 0 (RECOMMEND) | Set RECOMMEND to select recommended compute
- engine
+ *      Default = 0 (RECOMMEND) | Set RECOMMEND to select recommended compute engine
  *      operators: RECOMMEND, BASIC, ONEDNN, ONEMKL, XETLA
+ *   ZE_FLAT_DEVICE_HIERARCHY:
+ *      Default = 1 (FLAT) | All sub-devices are exposed, root-devices can be accessed.
+ *      It is a driver environment variable, only used for backward compatibility.
  * ==========INT==========
  */
 // clang-format on
@@ -62,11 +67,9 @@ Settings& Settings::I() {
 }
 
 Settings::Settings() {
-#define _(name) "IPEX_" #name
-
 #define DPCPP_INIT_ENV_VAL(name, var, etype, show)    \
   do {                                                \
-    auto env = std::getenv(_(name));                  \
+    auto env = std::getenv(name);                     \
     if (env) {                                        \
       try {                                           \
         int _ival = std::stoi(env, 0, 10);            \
@@ -87,7 +90,7 @@ Settings::Settings() {
       }                                               \
     }                                                 \
     if (show) {                                       \
-      std::cerr << " ** " << _(name) << ": ";         \
+      std::cerr << " ** " << name << ": ";            \
       if (var <= etype##_MAX && var >= 0) {           \
         std::cerr << etype##_STR[var];                \
       } else {                                        \
@@ -98,7 +101,7 @@ Settings::Settings() {
   } while (0)
 
   ENV_VAL show_opt = ENV_VAL::OFF;
-  DPCPP_INIT_ENV_VAL(SHOW_OPTION, show_opt, ENV_VAL, false);
+  DPCPP_INIT_ENV_VAL("IPEX_SHOW_OPTION", show_opt, ENV_VAL, false);
   if (show_opt) {
     std::cerr << std::endl
               << " *********************************************************"
@@ -110,27 +113,41 @@ Settings::Settings() {
   }
 
   verbose_level = VERBOSE_LEVEL::DISABLE;
-  DPCPP_INIT_ENV_VAL(VERBOSE, verbose_level, VERBOSE_LEVEL, show_opt);
+  DPCPP_INIT_ENV_VAL("IPEX_VERBOSE", verbose_level, VERBOSE_LEVEL, show_opt);
 
   xpu_backend = XPU_BACKEND::GPU;
-  DPCPP_INIT_ENV_VAL(XPU_BACKEND, xpu_backend, XPU_BACKEND, show_opt);
+  DPCPP_INIT_ENV_VAL("IPEX_XPU_BACKEND", xpu_backend, XPU_BACKEND, show_opt);
 
   sync_mode_enabled = ENV_VAL::OFF;
-  DPCPP_INIT_ENV_VAL(XPU_SYNC_MODE, sync_mode_enabled, ENV_VAL, show_opt);
+  DPCPP_INIT_ENV_VAL(
+      "IPEX_XPU_SYNC_MODE", sync_mode_enabled, ENV_VAL, show_opt);
 
   onednn_layout_enabled = ENV_VAL::OFF;
   DPCPP_INIT_ENV_VAL(
-      XPU_ONEDNN_LAYOUT, onednn_layout_enabled, ENV_VAL, show_opt);
+      "IPEX_XPU_ONEDNN_LAYOUT", onednn_layout_enabled, ENV_VAL, show_opt);
 
   compute_eng = COMPUTE_ENG::RECOMMEND;
-  DPCPP_INIT_ENV_VAL(COMPUTE_ENG, compute_eng, COMPUTE_ENG, show_opt);
+  DPCPP_INIT_ENV_VAL("IPEX_COMPUTE_ENG", compute_eng, COMPUTE_ENG, show_opt);
 
   fp32_math_mode = FP32_MATH_MODE::FP32;
-  DPCPP_INIT_ENV_VAL(FP32_MATH_MODE, fp32_math_mode, FP32_MATH_MODE, show_opt);
+  DPCPP_INIT_ENV_VAL(
+      "IPEX_FP32_MATH_MODE", fp32_math_mode, FP32_MATH_MODE, show_opt);
+
+  tile_as_device_enabled = ENV_VAL::ON;
+  DPCPP_INIT_ENV_VAL(
+      "IPEX_TILE_AS_DEVICE", tile_as_device_enabled, ENV_VAL, show_opt);
+
+  device_hierarchy_mode = DEVICE_HIERARCHY::FLAT;
+  DPCPP_INIT_ENV_VAL(
+      "ZE_FLAT_DEVICE_HIERARCHY",
+      device_hierarchy_mode,
+      DEVICE_HIERARCHY,
+      show_opt);
 
 #ifdef BUILD_SIMPLE_TRACE
   simple_trace_enabled = ENV_VAL::OFF;
-  DPCPP_INIT_ENV_VAL(SIMPLE_TRACE, simple_trace_enabled, ENV_VAL, show_opt);
+  DPCPP_INIT_ENV_VAL(
+      "IPEX_SIMPLE_TRACE", simple_trace_enabled, ENV_VAL, show_opt);
 #endif
 
 #ifdef USE_KINETO
@@ -218,6 +235,30 @@ void Settings::disable_sync_mode() {
 bool Settings::is_onednn_layout_enabled() const {
   std::lock_guard<std::mutex> lock(s_mutex);
   return onednn_layout_enabled == ENV_VAL::ON;
+}
+
+bool Settings::is_tile_as_device_enabled() const {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  return tile_as_device_enabled == ENV_VAL::ON;
+}
+
+void Settings::enable_tile_as_device() {
+  if (!dpcppIsDevPoolInit()) {
+    std::lock_guard<std::mutex> lock(s_mutex);
+    tile_as_device_enabled = ENV_VAL::ON;
+  }
+}
+
+void Settings::disable_tile_as_device() {
+  if (!dpcppIsDevPoolInit()) {
+    std::lock_guard<std::mutex> lock(s_mutex);
+    tile_as_device_enabled = ENV_VAL::OFF;
+  }
+}
+
+bool Settings::is_device_hierarchy_composite_enabled() const {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  return device_hierarchy_mode == DEVICE_HIERARCHY::COMPOSITE;
 }
 
 void Settings::enable_onednn_layout() {

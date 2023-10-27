@@ -11,6 +11,7 @@
 #include <core/detail/Hooks.h>
 #include <runtime/Device.h>
 #include <runtime/Exception.h>
+#include <utils/Settings.h>
 
 #include <cstddef>
 #include <functional>
@@ -44,16 +45,39 @@ DLDevice_& XPUHooks::getDLPackDeviceFromATenDevice(
     void* data) const {
   TORCH_CHECK(aten_device.is_xpu(), "Only the XPU device type is expected.");
   sycl::device& xpu_device = xpu::dpcpp::dpcppGetRawDevice(aten_device.index());
+  sycl::device target_device;
 
-  // After device hierarchy is controled by driver, all the components use the
-  // same device partition mode. So we don't need to find the parent device
-  // anymore and directly find position of sycl device `xpu_device` in
-  // sycl::device::get_devices()
+  if (!Settings::I().is_device_hierarchy_composite_enabled()) {
+    // In `COMPOSITE` mode, we need to check if the tile partition feature is
+    // enabled. If yes, we have to find its parent device.
+    if (Settings::I().is_tile_as_device_enabled()) {
+      try {
+        target_device =
+            xpu_device.get_info<sycl::info::device::parent_device>();
+      } catch (sycl::exception& e) {
+        if (e.code() == sycl::errc::invalid) {
+          // Tile partition is not supported.
+          target_device = xpu_device;
+        } else {
+          throw e;
+        }
+      }
+    } else {
+      // In `COMPOSITE` mode, here is a root-device if tile partition feature is
+      // disabled.
+      target_device = xpu_device;
+    }
+  } else {
+    // With `FLAT` and `COMBINED` mode, all sub-devices are exposed. So we don't
+    // need to find the parent device anymore and directly find position of sycl
+    // device `xpu_device` in sycl::device::get_devices()
+    target_device = xpu_device;
+  }
   auto device_list = sycl::device::get_devices();
   auto beg = std::begin(device_list);
   auto end = std::end(device_list);
-  auto selector_fn = [xpu_device](const sycl::device& device) -> bool {
-    return xpu_device == device;
+  auto selector_fn = [target_device](const sycl::device& device) -> bool {
+    return target_device == device;
   };
   auto pos = find_if(beg, end, selector_fn);
 

@@ -45,6 +45,12 @@ at::Device getATenDeviceFromUSM(void* src, const DeviceIndex device_id) {
 // We should minimize the number of calling dpcpp runtime APIs as much as
 // possible, because dpcpp's runtime overhead may neutralize the benefits of
 // zero copy when the data need to convert is little.
+// NOTE: If the root device can be partitioned into two sub-devices, like PVC,
+// in `COMPOSITE` mode. The users have to use disable_tile_as_device() to
+// disable the partition feature when the src pointer is not allocated in the
+// sub-device. Otherwise, the users have to allocate the src pointer with a
+// specified tile supplied by the IPEX device. Parameter device_id is a root
+// device index in sycl::get_devices. It is unused but a reserved parameter.
 // Parameter `device_id` is a device index in sycl::device::get_devices(). It is
 // unused but a reserved parameter.
 Tensor fromUSM(

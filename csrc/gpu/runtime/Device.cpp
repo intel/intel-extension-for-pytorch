@@ -24,6 +24,27 @@ static std::vector<DeviceInfo> device_info;
 static std::vector<DeviceProp> device_properties;
 static thread_local DeviceId cur_dev_index = 0;
 
+/*
+ * Device hierarchy note.
+ *
+ * `ZE_FLAT_DEVICE_HIERARCHY`, a driver environment variable, allows users to
+ * select the device hierarchy model with which the underlying hardware is
+ * exposed and the types of devices returned with SYCL runtime.
+ *
+ * When setting to `COMPOSITE`, all root-devices are returned and traversing the
+ * device hierarchy is possible, each containing sub-devices and implicit
+ * scaling support.
+ *
+ * When setting to `FLAT`, all sub-devices are returned and traversing the
+ * device hierarchy is NOT possible. So we can NOT access the their root
+ * devices.
+ *
+ * When setting to `COMBINED`, it combined `COMPOSITE` and `FLAT` mode. All
+ * sub-devices are returned and traversing the device hierarchy is possible. By
+ * default, driver selects `FLAT` mode, where all sub-devices are exposed.
+ *
+ */
+
 struct DPCPPDevicePool {
   std::vector<std::unique_ptr<sycl::device>> devices;
   // If macro USE_MULTI_CONTEXT is enabled, contexts will be constructed by SYCL
@@ -34,6 +55,7 @@ struct DPCPPDevicePool {
 } gDevPool;
 
 static void enumDevices(std::vector<std::unique_ptr<sycl::device>>& devices) {
+  std::vector<sycl::device> root_devices;
   auto platform_list = sycl::platform::get_platforms();
   // Enumerated GPU devices from GPU platform firstly.
   for (const auto& platform : platform_list) {
@@ -43,8 +65,55 @@ static void enumDevices(std::vector<std::unique_ptr<sycl::device>>& devices) {
     auto device_list = platform.get_devices();
     for (const auto& device : device_list) {
       if (device.is_gpu()) {
-        devices.push_back(std::make_unique<sycl::device>(device));
+        root_devices.push_back(device);
       }
+    }
+  }
+
+  if (!Settings::I().is_device_hierarchy_composite_enabled()) {
+    // With `FLAT` and `COMBINED` mode, all sub-devices are retured.
+    for (const auto& sub_device : root_devices) {
+      devices.push_back(std::make_unique<sycl::device>(sub_device));
+    }
+    return;
+  }
+
+  // For `COMPOSITE` mode, all root-devices are returned. Implicit scaling
+  // is allowed. If IPEX_TILE_AS_DEVICE is ON, tile partition is enabled.
+  if (Settings::I().is_tile_as_device_enabled()) {
+    constexpr sycl::info::partition_property partition_by_affinity =
+        sycl::info::partition_property::partition_by_affinity_domain;
+    constexpr sycl::info::partition_affinity_domain next_partitionable =
+        sycl::info::partition_affinity_domain::next_partitionable;
+    for (const auto& root_device : root_devices) {
+      try {
+        auto sub_devices =
+            root_device.create_sub_devices<partition_by_affinity>(
+                next_partitionable);
+        for (auto& sub_device : sub_devices) {
+          devices.push_back(std::make_unique<sycl::device>(sub_device));
+        }
+      } catch (sycl::exception& e) {
+        // FIXME: should only check feature_not_supported here.
+        // But for now we got invalid here if partition is not supported.
+        if (e.code() != sycl::errc::feature_not_supported &&
+            e.code() != sycl::errc::invalid) {
+          throw std::runtime_error(
+              std::string("Failed to apply tile partition: ") + e.what());
+        }
+        static auto verbose = Settings::I().get_verbose_level();
+        if (verbose) {
+          TORCH_WARN_ONCE(
+              "Tile partition is UNSUPPORTED : ",
+              root_device.get_info<dpcpp_dev_name>());
+        }
+        devices.push_back(std::make_unique<sycl::device>(root_device));
+      }
+    }
+  } else {
+    for (const auto& root_device : root_devices) {
+      // Tile partition is disabled, all root-devices are returned.
+      devices.push_back(std::make_unique<sycl::device>(root_device));
     }
   }
 }

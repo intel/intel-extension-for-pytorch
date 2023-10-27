@@ -1,6 +1,5 @@
 # coding: utf-8
 from enum import Enum
-import os
 from typing import Tuple
 import warnings
 from functools import lru_cache
@@ -306,42 +305,24 @@ class sync_mode(OnOff):
 
 
 def using_tile_as_device():
-    r"""Device Hierarchy Note.
-
-    `ZE_FLAT_DEVICE_HIERARCHY` allows users to select the device hierarchy model
-    with which the underlying hardware is exposed and the types of devices
-    returned with SYCL runtime.
-
-    When setting to `COMPOSITE`, all root-devices are returned and traversing
-    the device hierarchy is possible.
-
-    When setting to `FLAT`, all sub-devices are returned and traversing the
-    device hierarchy is NOT possible. So we can NOT access the their root
-    devices.
-
-    When setting to `COMBINED`, it combined `COMPOSITE` and `FLAT` mode. All
-    sub-devices are returned and traversing the device hierarchy is possible.
-
-    By default, driver selects `FLAT` mode, where all sub-devices are exposed.
-    """
-    warnings.warn("using_tile_as_device was deprecated.")
-    if "ZE_FLAT_DEVICE_HIERARCHY" not in os.environ:
-        return True
-    if os.environ["ZE_FLAT_DEVICE_HIERARCHY"] == "COMPOSITE":
-        return False
-    return True
+    warnings.warn(
+        "using_tile_as_device will be deprecated. It is vaild only when `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE`"
+    )
+    return _C._is_tile_as_device_enabled()
 
 
 def enable_tile_as_device():
     warnings.warn(
-        "enable_tile_as_device is deprecated. Currently, enabling tile as device is a feature that are enabled by default."  # noqa: B950
+        "enable_tile_as_device will be deprecated, please use `ZE_FLAT_DEVICE_HIERARCHY` instead, refering to https://spec.oneapi.io/level-zero/latest/core/PROG.html#device-hierarchy. Currently, it works only when `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE`"  # noqa: B950
     )
+    _C._enable_tile_as_device()
 
 
 def disable_tile_as_device():
     warnings.warn(
-        "disable_tile_as_device is deprecated. Please re-run your script with enviroment variable `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE` to disable tile as device feature."  # noqa: B950
+        "disable_tile_as_device will be deprecated, please use `ZE_FLAT_DEVICE_HIERARCHY` instead, refering to https://spec.oneapi.io/level-zero/latest/core/PROG.html#device-hierarchy. Currently, it works only when `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE`"  # noqa: B950
     )
+    _C._disable_tile_as_device()
 
 
 ################################################################

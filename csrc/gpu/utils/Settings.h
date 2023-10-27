@@ -29,6 +29,14 @@ static const char* COMPUTE_ENG_STR[]{
     "ONEMKL",
     "XETLA"};
 
+enum DEVICE_HIERARCHY {
+  COMPOSITE = 0,
+  FLAT = 1,
+  COMBINED = 2,
+  DEVICE_HIERARCHY_MAX = COMBINED
+};
+static const char* DEVICE_HIERARCHY_STR[]{"COMPOSITE", "FLAT", "COMBINED"};
+
 namespace dpcpp {
 
 class IPEX_API Settings final {
@@ -53,6 +61,12 @@ class IPEX_API Settings final {
   bool is_sync_mode_enabled() const;
   void enable_sync_mode();
   void disable_sync_mode();
+
+  bool is_tile_as_device_enabled() const;
+  void enable_tile_as_device();
+  void disable_tile_as_device();
+
+  bool is_device_hierarchy_composite_enabled() const;
 
   bool is_onednn_layout_enabled() const;
   void enable_onednn_layout();
@@ -82,8 +96,10 @@ class IPEX_API Settings final {
   XPU_BACKEND xpu_backend;
   COMPUTE_ENG compute_eng;
   FP32_MATH_MODE fp32_math_mode;
+  DEVICE_HIERARCHY device_hierarchy_mode;
 
   ENV_VAL sync_mode_enabled;
+  ENV_VAL tile_as_device_enabled;
   ENV_VAL onednn_layout_enabled;
 
 #ifdef BUILD_SIMPLE_TRACE

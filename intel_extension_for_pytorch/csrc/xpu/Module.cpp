@@ -684,6 +684,18 @@ void init_xpu_module(pybind11::module& m) {
 
   m.def("_disable_sync_mode", []() { Settings::I().disable_sync_mode(); });
 
+  m.def("_is_tile_as_device_enabled", []() {
+    return Settings::I().is_tile_as_device_enabled();
+  });
+
+  m.def("_enable_tile_as_device", []() {
+    Settings::I().enable_tile_as_device();
+  });
+
+  m.def("_disable_tile_as_device", []() {
+    Settings::I().disable_tile_as_device();
+  });
+
   m.def("_is_onednn_layout_enabled", []() {
     return Settings::I().is_onednn_layout_enabled();
   });
