@@ -74,6 +74,9 @@ class IPEX_API Settings final {
   void enable_simple_trace();
   void disable_simple_trace();
 
+  bool is_kineto_enabled() const;
+  bool is_onetrace_enabled() const;
+
  private:
   VERBOSE_LEVEL verbose_level;
   XPU_BACKEND xpu_backend;
@@ -85,6 +88,10 @@ class IPEX_API Settings final {
 
 #ifdef BUILD_SIMPLE_TRACE
   ENV_VAL simple_trace_enabled;
+#endif
+
+#ifdef USE_KINETO
+  ENV_VAL onetrace_enabled;
 #endif
 };
 

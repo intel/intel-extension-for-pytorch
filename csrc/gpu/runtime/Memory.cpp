@@ -50,7 +50,6 @@ void memcpyHostToDevice(
     }
   }
 
-  dpcpp_log("dpcpp_kernel", e);
   DPCPP_E_SYNC_FOR_DEBUG(e);
 }
 
@@ -71,7 +70,6 @@ void memcpyDeviceToHost(
     CachingHostAllocator::Instance()->recordEvent(const_cast<void*>(dst), e);
   }
 
-  dpcpp_log("dpcpp_kernel", e);
   DPCPP_E_SYNC_FOR_DEBUG(e);
 }
 
@@ -90,7 +88,6 @@ void memcpyDeviceToDevice(
     e.wait();
   }
 
-  dpcpp_log("dpcpp_kernel", e);
   DPCPP_E_SYNC_FOR_DEBUG(e);
 }
 
@@ -102,7 +99,6 @@ void memsetDevice(void* dst, int value, size_t n_bytes, bool async) {
     e.wait();
   }
 
-  dpcpp_log("dpcpp_kernel", e);
   DPCPP_E_SYNC_FOR_DEBUG(e);
 }
 

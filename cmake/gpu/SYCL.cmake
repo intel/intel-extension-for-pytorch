@@ -60,7 +60,7 @@ if(OCLOC_EXEC)
   execute_process(COMMAND ${OCLOC_EXEC} query OCL_DRIVER_VERSION WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
   if(EXISTS ${drv_ver_file})
     file(READ ${drv_ver_file} drv_ver_contents)
-    string(STRIP ${drv_ver_contents} IGC_OCLOC_VERSION)
+    string(STRIP "${drv_ver_contents}" IGC_OCLOC_VERSION)
   endif()
 endif()
 
@@ -77,7 +77,7 @@ if(LevelZero_LIBRARY)
   get_filename_component(level_zero_lib ${LevelZero_LIBRARY} REALPATH)
   string(REGEX MATCHALL "so(\.[0-9]+)+$" lz_lib_str "${level_zero_lib}")
   string(REGEX MATCHALL "[0-9]+.*$" lz_lib_ver "${lz_lib_str}")
-  string(STRIP ${lz_lib_ver} LEVEL_ZERO_VERSION)
+  string(STRIP "${lz_lib_ver}" LEVEL_ZERO_VERSION)
 endif()
 
 # Find the OpenCL library from the SYCL distribution

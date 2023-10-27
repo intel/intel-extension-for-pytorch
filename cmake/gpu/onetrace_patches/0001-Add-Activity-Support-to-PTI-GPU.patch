@@ -1,0 +1,556 @@
+From 990a7547893550213bac5aeb076d4e6fe62ac2dc Mon Sep 17 00:00:00 2001
+From: "Xunsong, Huang" <xunsong.huang@intel.com>
+Date: Wed, 2 Aug 2023 13:42:23 +0800
+Subject: [PATCH 1/3] Add Activity Support to PTI-GPU
+
+Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
+---
+ tools/onetrace/CMakeLists.txt     |  26 ++-
+ tools/onetrace/unified_tracer.h   | 273 +++++++++++++++++++++++++++++-
+ tools/utils/onepti_activity_api.h | 111 ++++++++++++
+ tools/utils/trace_options.h       |   5 +-
+ 4 files changed, 403 insertions(+), 12 deletions(-)
+ create mode 100644 tools/utils/onepti_activity_api.h
+
+diff --git a/tools/onetrace/CMakeLists.txt b/tools/onetrace/CMakeLists.txt
+index 47ab2da..c023b7c 100644
+--- a/tools/onetrace/CMakeLists.txt
++++ b/tools/onetrace/CMakeLists.txt
+@@ -6,14 +6,22 @@ project(PTI_Tools_OneTrace CXX)
+ SetCompilerFlags()
+ SetBuildType()
+ 
+-# Tool Library
+-
+-add_library(onetrace_tool SHARED
+-  "${PROJECT_SOURCE_DIR}/../../loader/init.cc"
+-  "${PROJECT_SOURCE_DIR}/../cl_tracer/cl_ext_collector.cc"
+-  "${PROJECT_SOURCE_DIR}/../utils/correlator.cc"
+-  "${PROJECT_SOURCE_DIR}/../../utils/trace_guard.cc"
+-  tool.cc)
++if(BUILD_FOR_IPEX)
++  # Static Tool Library
++  add_library(onetrace_tool STATIC
++    "${PROJECT_SOURCE_DIR}/../cl_tracer/cl_ext_collector.cc"
++    "${PROJECT_SOURCE_DIR}/../utils/correlator.cc"
++    "${PROJECT_SOURCE_DIR}/../../utils/trace_guard.cc")
++else()
++  # Tool Library
++  add_library(onetrace_tool SHARED
++    "${PROJECT_SOURCE_DIR}/../../loader/init.cc"
++    "${PROJECT_SOURCE_DIR}/../cl_tracer/cl_ext_collector.cc"
++    "${PROJECT_SOURCE_DIR}/../utils/correlator.cc"
++    "${PROJECT_SOURCE_DIR}/../../utils/trace_guard.cc"
++    tool.cc)
++endif()
++
+ target_include_directories(onetrace_tool
+   PRIVATE "${PROJECT_SOURCE_DIR}"
+   PRIVATE "${PROJECT_SOURCE_DIR}/../utils"
+@@ -49,4 +57,4 @@ endif()
+ 
+ # Installation
+ 
+-install(TARGETS onetrace onetrace_tool DESTINATION bin)
+\ No newline at end of file
++install(TARGETS onetrace onetrace_tool DESTINATION bin)
+diff --git a/tools/onetrace/unified_tracer.h b/tools/onetrace/unified_tracer.h
+index b50f51c..c7f749b 100644
+--- a/tools/onetrace/unified_tracer.h
++++ b/tools/onetrace/unified_tracer.h
+@@ -25,6 +25,11 @@
+ #include "ze_api_collector.h"
+ #include "ze_kernel_collector.h"
+ 
++#include <cmath>
++#include <memory>
++#include <stack>
++#include "onepti_activity_api.h"
++
+ const char* kChromeTraceFileName = "onetrace";
+ 
+ class UnifiedTracer {
+@@ -44,12 +49,16 @@ class UnifiedTracer {
+         tracer->CheckOption(TRACE_DEVICE_TIMELINE) ||
+         tracer->CheckOption(TRACE_CHROME_DEVICE_TIMELINE) ||
+         tracer->CheckOption(TRACE_CHROME_KERNEL_TIMELINE) ||
+-        tracer->CheckOption(TRACE_CHROME_DEVICE_STAGES)) {
++        tracer->CheckOption(TRACE_CHROME_DEVICE_STAGES) ||
++        tracer->CheckOption(TRACE_IPEX_DEVICE_TIMELINE) ||
++        tracer->CheckOption(TRACE_IPEX_DEVICE_STAGES)) {
+ 
+       PTI_ASSERT(!(tracer->CheckOption(TRACE_CHROME_DEVICE_TIMELINE) &&
+                    tracer->CheckOption(TRACE_CHROME_DEVICE_STAGES)));
+       PTI_ASSERT(!(tracer->CheckOption(TRACE_CHROME_DEVICE_TIMELINE) &&
+                    tracer->CheckOption(TRACE_CHROME_KERNEL_TIMELINE)));
++      PTI_ASSERT(!(tracer->CheckOption(TRACE_IPEX_DEVICE_TIMELINE) &&
++                   tracer->CheckOption(TRACE_IPEX_DEVICE_STAGES)));
+ 
+       ZeKernelCollector* ze_kernel_collector = nullptr;
+       ClKernelCollector* cl_cpu_kernel_collector = nullptr;
+@@ -90,6 +99,9 @@ class UnifiedTracer {
+       } else if (tracer->CheckOption(TRACE_CHROME_DEVICE_STAGES)) {
+         ze_callback = ZeChromeStagesCallback;
+         cl_callback = ClChromeStagesCallback;
++      } else if (tracer->CheckOption(TRACE_IPEX_DEVICE_STAGES)) {
++        ze_callback = ZeIpexStagesCallback;
++        cl_callback = ClIpexStagesCallback;
+       }
+ 
+       KernelCollectorOptions kernel_options;
+@@ -144,6 +156,7 @@ class UnifiedTracer {
+ 
+     if (tracer->CheckOption(TRACE_CALL_LOGGING) ||
+         tracer->CheckOption(TRACE_CHROME_CALL_LOGGING) ||
++        tracer->CheckOption(TRACE_IPEX_CALL_LOGGING) ||
+         tracer->CheckOption(TRACE_HOST_TIMING)) {
+ 
+       ZeApiCollector* ze_api_collector = nullptr;
+@@ -155,6 +168,9 @@ class UnifiedTracer {
+       if (tracer->CheckOption(TRACE_CHROME_CALL_LOGGING)) {
+         ze_callback = ZeChromeLoggingCallback;
+         cl_callback = ClChromeLoggingCallback;
++      } else if (tracer->CheckOption(TRACE_IPEX_CALL_LOGGING)) {
++        ze_callback = ZeIpexLoggingCallback;
++        cl_callback = ClIpexLoggingCallback;
+       }
+ 
+       ApiCollectorOptions api_options;
+@@ -210,6 +226,15 @@ class UnifiedTracer {
+       }
+     }
+ 
++    // for global external id stack initialize
++    while (!tracer->external_id_stack.empty())
++      tracer->external_id_stack.pop();
++    while (!tracer->user_external_id_stack.empty())
++      tracer->user_external_id_stack.pop();
++    while (!tracer->external_type_stack.empty())
++      tracer->external_type_stack.pop();
++    tracer->ipex_buf_.clear();
++
+     return tracer;
+   }
+ 
+@@ -281,6 +306,57 @@ class UnifiedTracer {
+   UnifiedTracer(const UnifiedTracer& copy) = delete;
+   UnifiedTracer& operator=(const UnifiedTracer& copy) = delete;
+ 
++  void push_external_correlation_id(Onepti_ExternalActivityType type, int id) {
++    switch (type) {
++      case ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0:
++        external_id_stack.push(id);
++        external_type_stack.push(type);
++        break;
++      case ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM1:
++        user_external_id_stack.push(id);
++        external_type_stack.push(type);
++        break;
++      default:
++        break;
++    }
++  }
++
++  void pop_external_correlation_id(Onepti_ExternalActivityType type) {
++    switch (type) {
++      case ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0:
++        external_id_stack.pop();
++        external_type_stack.pop();
++        break;
++      case ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM1:
++        user_external_id_stack.pop();
++        external_type_stack.pop();
++        break;
++      default:
++        break;
++    }
++  }
++
++  void set_active_flag(bool activate) {
++    lock_.lock();
++    if(active == false && activate == true) {
++        while (!external_id_stack.empty())
++          external_id_stack.pop();
++        while (!user_external_id_stack.empty())
++          user_external_id_stack.pop();
++        while (!external_type_stack.empty())
++          external_type_stack.pop();
++        ipex_buf_.clear();
++        ipex_devices_.clear();
++        ipex_fake_queues_.clear();
++    }
++    active = activate;
++    lock_.unlock();
++  }
++
++  std::vector<uint8_t>* get_buffer() {
++    return &ipex_buf_;
++  }
++
+  private:
+   UnifiedTracer(const TraceOptions& options)
+       : options_(options),
+@@ -289,6 +365,7 @@ class UnifiedTracer {
+ #if !defined(_WIN32)
+     uint64_t monotonic_time = utils::GetTime(CLOCK_MONOTONIC);
+     uint64_t real_time = utils::GetTime(CLOCK_REALTIME);
++    start_point_ = real_time;
+ #endif
+ 
+     if (CheckOption(TRACE_CHROME_CALL_LOGGING) ||
+@@ -918,6 +995,86 @@ class UnifiedTracer {
+     tracer->chrome_logger_->Log(stream.str());
+   }
+ 
++  static void ZeIpexStagesCallback(
++      void* data,
++      const std::string& queue,
++      const std::string& id,
++      const std::string& name,
++      uint64_t appended,
++      uint64_t submitted,
++      uint64_t started,
++      uint64_t ended) {
++    UnifiedTracer* tracer = reinterpret_cast<UnifiedTracer*>(data);
++    PTI_ASSERT(tracer != nullptr);
++
++    if (!tracer->active)
++        return;
++
++    double double_id;
++    std::stringstream ss;
++    ss << id;
++    ss >> double_id;
++    int int_id;
++    if (std::fmod(double_id, 1.0) == 0.0) {
++      int_id = int(double_id);
++    } else {
++      int_id = std::floor(double_id);
++    }
++    Onepti_ActivityKernel act;
++    strcpy(act.name, name.c_str());
++    act.correlationId = int_id;
++    act.kind = ONEPTI_ACTIVITY_KIND_CONCURRENT_KERNEL;
++    act.start = started + tracer->start_point_;
++    act.end = ended + tracer->start_point_;
++    act.deviceId = 0;
++    act.queueId = strtol(queue.c_str(), 0, 16);
++    act.appended = appended + tracer->start_point_;
++    act.submitted = submitted + tracer->start_point_;
++    tracer->lock_.lock();
++    serialize(act, tracer->ipex_buf_);
++    tracer->lock_.unlock();
++  }
++
++  static void ClIpexStagesCallback(
++      void* data,
++      const std::string& queue,
++      const std::string& id,
++      const std::string& name,
++      uint64_t queued,
++      uint64_t submitted,
++      uint64_t started,
++      uint64_t ended) {
++    UnifiedTracer* tracer = reinterpret_cast<UnifiedTracer*>(data);
++    PTI_ASSERT(tracer != nullptr);
++
++    if (!tracer->active)
++        return;
++
++    double double_id;
++    std::stringstream ss;
++    ss << id;
++    ss >> double_id;
++    int int_id;
++    if (std::fmod(double_id, 1.0) == 0.0) {
++      int_id = int(double_id);
++    } else {
++      int_id = std::floor(double_id);
++    }
++    Onepti_ActivityKernel act;
++    strcpy(act.name, name.c_str());
++    act.correlationId = int_id;
++    act.kind = ONEPTI_ACTIVITY_KIND_CONCURRENT_KERNEL;
++    act.start = started + tracer->start_point_;
++    act.end = ended + tracer->start_point_;
++    act.deviceId = 0;
++    act.queueId = strtol(queue.c_str(), 0, 16);
++    act.appended = queued + tracer->start_point_;
++    act.submitted = submitted + tracer->start_point_;
++    tracer->lock_.lock();
++    serialize(act, tracer->ipex_buf_);
++    tracer->lock_.unlock();
++  }
++
+   static void ZeChromeKernelStagesCallback(
+       void* data,
+       const std::string& queue,
+@@ -1176,6 +1333,110 @@ class UnifiedTracer {
+     tracer->chrome_logger_->Log(stream.str());
+   }
+ 
++  static void ZeIpexLoggingCallback(
++      void* data, const std::string& id, const std::string& name,
++      uint64_t started, uint64_t ended) {
++    UnifiedTracer* tracer = reinterpret_cast<UnifiedTracer*>(data);
++    PTI_ASSERT(tracer != nullptr);
++
++    if (!tracer->active)
++        return;
++
++    double double_id;
++    std::stringstream ss;
++    ss << id;
++    ss >> double_id;
++    int int_id;
++    if (std::fmod(double_id, 1.0) == 0.0) {
++      int_id = int(double_id);
++    } else {
++      int_id = std::floor(double_id);
++    }
++    if (int_id == 0 || int_id != double_id)
++      int_id = -1;
++    if (int_id > 0 && int_id == double_id && !tracer->external_type_stack.empty()) {
++      Onepti_ActivityExternalCorrelation corr_act;
++      corr_act.correlationId = int_id;
++      corr_act.kind = ONEPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION;
++      corr_act.externalKind = tracer->external_type_stack.top();
++      switch (corr_act.externalKind) {
++        case ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0:
++          corr_act.externalId = tracer->external_id_stack.top();
++          break;
++        case ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM1:
++          corr_act.externalId = tracer->user_external_id_stack.top();
++          break;
++      }
++      tracer->lock_.lock();
++      serialize(corr_act, tracer->ipex_buf_);
++      tracer->lock_.unlock();
++    }
++
++    Onepti_ActivityAPI act;
++    strcpy(act.name, name.c_str());
++    act.correlationId = int_id;
++    act.kind = ONEPTI_ACTIVITY_KIND_RUNTIME;
++    act.start = started + tracer->start_point_;
++    act.end = ended + tracer->start_point_;
++    act.processId = utils::GetPid();
++    act.threadId = utils::GetTid();
++    tracer->lock_.lock();
++    serialize(act, tracer->ipex_buf_);
++    tracer->lock_.unlock();
++  }
++
++  static void ClIpexLoggingCallback(
++      void* data, uint64_t id, const std::string& name,
++      uint64_t started, uint64_t ended) {
++    UnifiedTracer* tracer = reinterpret_cast<UnifiedTracer*>(data);
++    PTI_ASSERT(tracer != nullptr);
++
++    if (!tracer->active)
++        return;
++
++    double double_id;
++    std::stringstream ss;
++    ss << id;
++    ss >> double_id;
++    int int_id;
++    if (std::fmod(double_id, 1.0) == 0.0) {
++      int_id = int(double_id);
++    } else {
++      int_id = std::floor(double_id);
++    }
++    if (int_id == 0 || int_id != double_id)
++      int_id = -1;
++    if (int_id > 0 && int_id == double_id && !tracer->external_type_stack.empty()) {
++      Onepti_ActivityExternalCorrelation corr_act;
++      corr_act.kind = ONEPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION;
++      corr_act.correlationId = int_id;
++      corr_act.externalKind = tracer->external_type_stack.top();
++      switch (corr_act.externalKind) {
++        case ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0:
++          corr_act.externalId = tracer->external_id_stack.top();
++          break;
++        case ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM1:
++          corr_act.externalId = tracer->user_external_id_stack.top();
++          break;
++      }
++      tracer->lock_.lock();
++      serialize(corr_act, tracer->ipex_buf_);
++      tracer->lock_.unlock();
++    }
++
++    Onepti_ActivityAPI act;
++    act.kind = ONEPTI_ACTIVITY_KIND_RUNTIME;
++    act.correlationId = int_id;
++    act.start = started + tracer->start_point_;
++    act.end = ended + tracer->start_point_;
++    strcpy(act.name, name.c_str());
++    act.processId = utils::GetPid();
++    act.threadId = utils::GetTid();
++    tracer->lock_.lock();
++    serialize(act, tracer->ipex_buf_);
++    tracer->lock_.unlock();
++  }
++
+  private:
+   TraceOptions options_;
+ 
+@@ -1192,6 +1453,14 @@ class UnifiedTracer {
+ 
+   std::string chrome_trace_file_name_;
+   Logger* chrome_logger_ = nullptr;
++
++  uint64_t start_point_ = 0;
++  bool active = false;
++  std::mutex lock_;
++  std::stack<int> external_id_stack;
++  std::stack<int> user_external_id_stack;
++  std::stack<Onepti_ExternalActivityType> external_type_stack;
++  std::vector<uint8_t> ipex_buf_;
+ };
+ 
+-#endif // PTI_TOOLS_ONETRACE_UNIFIED_TRACER_H_
+\ No newline at end of file
++#endif // PTI_TOOLS_ONETRACE_UNIFIED_TRACER_H_
+diff --git a/tools/utils/onepti_activity_api.h b/tools/utils/onepti_activity_api.h
+new file mode 100644
+index 0000000..bdf2ba8
+--- /dev/null
++++ b/tools/utils/onepti_activity_api.h
+@@ -0,0 +1,111 @@
++#pragma once
++
++#include <cstdint>
++#include <string>
++#include <vector>
++#include <iostream>
++
++/* ===== enums ===== */
++enum Onepti_ActivityType {
++  ONEPTI_ACTIVITY_KIND_UNKNOWN = 0,
++  ONEPTI_ACTIVITY_KIND_CONCURRENT_KERNEL = 1,
++  ONEPTI_ACTIVITY_KIND_RUNTIME = 2,
++  ONEPTI_ACTIVITY_KIND_MEMCPY = 3,
++  ONEPTI_ACTIVITY_KIND_MEMCPY2 = 4,
++  ONEPTI_ACTIVITY_KIND_MEMSET = 5,
++  ONEPTI_ACTIVITY_KIND_OVERHEAD = 6,
++  ONEPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION = 7,
++  ENUM_MAX_ONEPTI_ACTIVITYTYPE,
++};
++
++enum Onepti_ExternalActivityType {
++  ONEPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN = 10,
++  ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0 = 11,
++  ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM1 = 12,
++  ENUM_MAX_ONEPTI_EXTERNALACTIVITYTYPE,
++};
++
++enum Onepti_Runtime_Trace_CBID {
++  ONEPTI_RUNTIME_TRACE_CBID_UNKNOWN = 100,
++  ENUM_MAX_ONEPTI_RUNTIME_TRACE_CBID,
++};
++
++
++/* ===== base ===== */
++struct Onepti_Activity {
++  enum Onepti_ActivityType kind;
++  int correlationId;
++  uint64_t start;
++  uint64_t end;
++  char name[16384];
++};
++
++/* ===== activities ===== */
++struct Onepti_ActivityKernel : Onepti_Activity {
++  uint64_t appended;
++  uint64_t submitted;
++  uint64_t deviceId; /* cannot capture but used */
++  uint64_t queueId;
++};
++
++struct Onepti_ActivityAPI : Onepti_Activity {
++  int processId;
++  int threadId;
++  enum Onepti_Runtime_Trace_CBID cbid; /* not used for now */
++};
++
++struct Onepti_ActivityExternalCorrelation : Onepti_Activity {
++  int externalId;
++  enum Onepti_ExternalActivityType externalKind;
++};
++
++
++/* ===== methods ===== */
++template<class T>
++static void serialize(T& act, std::vector<uint8_t>& ipex_buf) {
++  int len = sizeof(act) / sizeof(uint8_t);
++  uint8_t* ptr = reinterpret_cast<uint8_t*>(reinterpret_cast<Onepti_Activity*>(&act));
++  for (int i = 0; i < len; i++) {
++    ipex_buf.push_back(*(ptr+i));
++  }
++}
++
++static Onepti_Activity* getNextRecord(uint8_t* buf, size_t ValidSize, Onepti_Activity*& record) {
++  if (record == nullptr && ValidSize > 0) {
++    record = reinterpret_cast<Onepti_Activity*>(buf);
++  } else {
++    auto offset = reinterpret_cast<uint8_t*>(record) - buf;
++    auto cur_record_size = 0;
++    switch (record->kind) {
++      case ONEPTI_ACTIVITY_KIND_CONCURRENT_KERNEL:
++        cur_record_size = sizeof(*(reinterpret_cast<Onepti_ActivityKernel*>(record))) / sizeof(uint8_t);
++        break;
++      case ONEPTI_ACTIVITY_KIND_RUNTIME:
++        cur_record_size = sizeof(*(reinterpret_cast<Onepti_ActivityAPI*>(record))) / sizeof(uint8_t);
++        break;
++      //case ONEPTI_ACTIVITY_KIND_MEMCPY:
++      //  cur_record_size = reinterpret_cast<Onepti_ActivityMemcpy*>(record)->size() / sizeof(uint8_t);
++      //  break;
++      //case ONEPTI_ACTIVITY_KIND_MEMCPY2:
++      //  cur_record_size = reinterpret_cast<Onepti_ActivityMemcpy2*>(record)->size() / sizeof(uint8_t);
++      //  break;
++      //case ONEPTI_ACTIVITY_KIND_MEMSET:
++      //  cur_record_size = reinterpret_cast<Onepti_ActivityMemset*>(record)->size() / sizeof(uint8_t);
++      //  break;
++      //case ONEPTI_ACTIVITY_KIND_OVERHEAD:
++      //  cur_record_size = reinterpret_cast<Onepti_ActivityOverhead*>(record)->size() / sizeof(uint8_t);
++      //  break;
++      case ONEPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION:
++        cur_record_size = sizeof(*(reinterpret_cast<Onepti_ActivityExternalCorrelation*>(record))) / sizeof(uint8_t);
++        break;
++      default:
++        cur_record_size = ValidSize;
++        break;
++    }
++    if (offset + cur_record_size >= ValidSize)
++      return nullptr;
++
++    record = reinterpret_cast<Onepti_Activity*>(buf + offset + cur_record_size);
++  }
++  return record;
++}
+diff --git a/tools/utils/trace_options.h b/tools/utils/trace_options.h
+index 40fb230..2ef5e37 100644
+--- a/tools/utils/trace_options.h
++++ b/tools/utils/trace_options.h
+@@ -29,6 +29,9 @@
+ #define TRACE_PID                    13
+ #define TRACE_LOG_TO_FILE            14
+ #define TRACE_CONDITIONAL_COLLECTION 15
++#define TRACE_IPEX_CALL_LOGGING      16
++#define TRACE_IPEX_DEVICE_TIMELINE   17
++#define TRACE_IPEX_DEVICE_STAGES     18
+ 
+ const char* kChromeTraceFileExt = "json";
+ 
+@@ -99,4 +102,4 @@ class TraceOptions {
+   std::string log_file_;
+ };
+ 
+-#endif // PTI_TOOLS_UTILS_TRACE_OPTIONS_H_
+\ No newline at end of file
++#endif // PTI_TOOLS_UTILS_TRACE_OPTIONS_H_
+-- 
+2.34.1
+

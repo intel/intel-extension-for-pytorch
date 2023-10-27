@@ -11,6 +11,7 @@
 #include <core/Device.h>
 #include <core/Generator.h>
 #include <include/xpu/Settings.h>
+#include <profiler/profiler_kineto.h>
 #include <pybind11/stl.h>
 #include <utils/Settings.h>
 #include "Event.h"
@@ -740,6 +741,16 @@ void init_xpu_module(pybind11::module& m) {
   m.def("_is_simple_trace_enabled", []() {
     return Settings::I().is_simple_trace_enabled();
   });
+
+  m.def(
+      "_is_kineto_enabled", []() { return Settings::I().is_kineto_enabled(); });
+
+  m.def("_is_onetrace_enabled", []() {
+    return Settings::I().is_onetrace_enabled();
+  });
+
+  m.def("_prepare_profiler", xpu::dpcpp::profiler::prepareProfiler);
+  m.def("_enable_tracing_layer", xpu::dpcpp::profiler::enableTracingLayer);
 
   auto module = m.ptr();
   THDPStream_init(module);
