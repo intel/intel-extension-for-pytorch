@@ -10,12 +10,7 @@ from .transformer_modules.BaseAttention import IPEXTransformerAttn
 from .transformer_modules.Attention import IPEXTransformerAttnOptimizedFp16
 from .transformer_modules.NaiveAttention import IPEXTransformerAttnNaive
 import time
-# from .llama import IPEXLlamaForCausalLMForward
-from .gptj import IPEXGPTJForCausalLMForward
-from .bloom import IPEXBloomForCausalLMForward
 from .utils import pad_for_gptj_lm_head, is_int4
-from .llama import IPEXLlamaForCausalLMForward
-from .opt import IPEXOPTForCausalLMForward
 
 
 class IPEXLLMResourceContrainer:
@@ -35,29 +30,21 @@ def gptj_forward_hook(model):
     import transformers
     if type(model) == transformers.models.gptj.modeling_gptj.GPTJForCausalLM:
         pad_for_gptj_lm_head(model, is_int4(model))
-        if hasattr(model, "forward"):
-            setattr(model, "forward", partial(IPEXGPTJForCausalLMForward, model))
 
 def llama_forward_hook(model):
     import transformers
     if type(model) == transformers.models.llama.modeling_llama.LlamaForCausalLM:
         pad_for_gptj_lm_head(model, is_int4(model))
-        if hasattr(model, "forward"):
-            setattr(model, "forward", partial(IPEXLlamaForCausalLMForward, model))
 
 def opt_forward_hook(model):
     import transformers
     if type(model) ==  transformers.models.opt.modeling_opt.OPTForCausalLM:
         pad_for_gptj_lm_head(model, is_int4(model))
-        if hasattr(model, "forward"):
-            setattr(model, "forward", partial(IPEXOPTForCausalLMForward, model))
 
 def bloom_forward_hook(model):
     import transformers
     if type(model) == transformers.models.bloom.modeling_bloom.BloomForCausalLM:
         pad_for_gptj_lm_head(model, is_int4(model))
-        if hasattr(model, "forward"):
-            setattr(model, "forward", partial(IPEXBloomForCausalLMForward, model))
 
 def _convert_to_bloom_cache_ipex(
         past_key_value: Tuple[Tuple[torch.Tensor, torch.Tensor]]

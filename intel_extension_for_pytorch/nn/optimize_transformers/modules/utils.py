@@ -1,6 +1,6 @@
 import torch 
 import torch.distributed as dist
-from ._transformers import IPEXEmptyLinearWithPadding, IPEXEmptyINT4Linear, IPEXEmptyINT4LinearWithPadding, IPEXTransformerConverter, IPEXLmHeadLinearAllreduceWithPadding
+from ._transformers import IPEXEmptyINT4Linear, IPEXEmptyINT4LinearWithPadding, IPEXTransformerConverter
 import os
 from ..modules._transformer_configuration import IPEXTransformerConfig
 
@@ -82,20 +82,6 @@ def pad_for_gptj_lm_head(model, is_int4=False):
             model.lm_head.bias.data = int4_gemm_bias_padding(model.lm_head.bias)
 
     else:
-        n = model.lm_head.weight.shape[0] #[n, k]
-
-        # tensor parallel for the last linear
-        # TOTO: update IPEXEmptyLinearWithPadding after DeepSpeed PR (https://github.com/microsoft/DeepSpeed/pull/3962) merge or Ipex auto TP
-        if hasattr(model, "lm_head") and dist.is_initialized():
-            lm_head_new = IPEXLmHeadLinearAllreduceWithPadding(
-                n, torch.nn.parameter.Parameter(model.lm_head.weight, requires_grad=False), dist.get_rank(), dist.get_world_size(),
-                model.lm_head.bias if model.lm_head.bias is None else torch.nn.parameter.Parameter(model.lm_head.bias))
-            model.lm_head = lm_head_new
-        else:
-            lm_head_new = IPEXEmptyLinearWithPadding(n)
-            lm_head_new.weight = model.lm_head.weight
-            lm_head_new.bias = model.lm_head.bias
-
         if model.lm_head.bias is not None:
             model.lm_head.weight.data, model.lm_head.bias.data = gemm_padding(model.lm_head.weight, model.lm_head.bias)
         else:

@@ -9,7 +9,6 @@ from .modules.Layers import EnvParam
 from .modules._transformers import IPEXTransformerConverter
 from .transformers_model_capture import TransformersModelCapture
 import torch.distributed as dist
-from .modules._transformers import IPEXLmHeadLinearAllreduceWithPadding
 
 
 import torch
@@ -97,7 +96,6 @@ class Converter:
         if distributed:
             self.tp_size = dist.get_world_size()
         self.create_model_parallel_group()
-        # IPEXTransformerConverter.update_tp_data(self.tp_size, self.tp_group)
         self.tensor_slicer = TensorSlicer(self.tp_size, self.tp_group, tp_fn)
         self.module_replacer = ModuleReplacer(replaced_module, replaced_layer, replace_fn, self.tp_size, self.tp_group)
         self.weight_loader = WeightLoader(ckpt, self.tp_group, self.tp_size)
@@ -110,7 +108,6 @@ class Converter:
             config = model._config
             self.module_replacer.tp_size = config.tensor_parallel.tp_size
             self.module_replacer.tp_group = config.tensor_parallel.tp_group
-            IPEXLmHeadLinearAllreduceWithPadding.mp_group = config.tensor_parallel.tp_group
             if self.module_replacer.tp_size > 1 and self.module_replacer.tp_size is not None:
                 return True
         return False

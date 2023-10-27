@@ -3,7 +3,7 @@ from typing import List
 import torch
 import torch.nn as nn
 from .modules._transformer_configuration import ImplementMode
-from .modules.Layers import IpexFastLinear, IpexFastAllReduceLinear, IpexFastLayerNorm
+from .modules.Layers import IpexFastLinear, IpexFastAllReduceLinear, IpexFastLayerNorm, IPEXLmHeadLinearAllreduceWithPadding
 from .modules.gptj import NewIPEXGPTJBlock
 from .modules.bloom import NewIPEXBloomBlock
 from .modules.llama import NewIPEXLLAMABlock
@@ -80,7 +80,9 @@ class ModuleReplacer:
 
     def replace_op(self, model):
         for name, child in model.named_children():
-            if type(child) in self.layer_dict.keys():
+            if name == 'lm_head':
+                setattr(model, name, IPEXLmHeadLinearAllreduceWithPadding(child))
+            elif type(child) in self.layer_dict.keys():
                 new_layer = self.layer_dict[type(child)](child)
                 setattr(model, name, new_layer)
             else:
@@ -98,5 +100,6 @@ class ModuleReplacer:
         import deepspeed
         self.layer_dict.update({
             deepspeed.module_inject.layers.LinearLayer: IpexFastLinear,
-            deepspeed.module_inject.layers.LinearAllreduce: IpexFastAllReduceLinear
+            deepspeed.module_inject.layers.LinearAllreduce: IpexFastAllReduceLinear,
+            deepspeed.module_inject.layers.LmHeadLinearAllreduce: IPEXLmHeadLinearAllreduceWithPadding
         })
