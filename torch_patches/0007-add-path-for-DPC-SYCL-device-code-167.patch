@@ -1,7 +1,7 @@
 From adbcccaa2248aa881ff5282ddf34e4eede6cb25d Mon Sep 17 00:00:00 2001
 From: min-jean-cho <min.jean.cho@intel.com>
 Date: Fri, 22 Sep 2023 03:09:51 -0700
-Subject: [PATCH 07/13] add path for DPC++ SYCL device code (#167)
+Subject: [PATCH 07/14] add path for DPC++ SYCL device code (#167)
 
 ---
  c10/util/Float8_e4m3fn.h | 4 ++++
