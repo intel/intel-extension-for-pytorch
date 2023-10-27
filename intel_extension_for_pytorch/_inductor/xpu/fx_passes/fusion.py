@@ -586,6 +586,42 @@ def _register_binary_fusion():
             )
 
 
+def _register_binary_unary_fusion():
+    binary_ops = [aten.add, ops.add, aten.sub, ops.sub]
+    fusion_ops = [torch_ipex._convolution_pointwise.binary]
+    computation_ops = [
+        torch_ipex._convolution_pointwise.default,
+        torch_ipex._linear_pointwise.default,
+        None,  # placeholder, override global computation_ops
+    ]
+    _computation_user_1 = [_conv_call(users=1)]
+    for computation_call, computation_op, fusion_op in zip(
+        _computation_user_1, computation_ops[:-1], fusion_ops
+    ):
+        for binary_op in binary_ops:
+            pattern_v1 = _combined_fusion(
+                _binary_fusion_v2(computation_call, binary_op), aten.relu
+            )
+            _register_binary_unary_fusion_lowering(
+                pattern_v1,
+                computation_op,
+                binary_op,
+                fusion_op,
+                unary_attr=UnaryAttr("relu"),
+            )
+        for binary_op in [aten.add, ops.add]:
+            pattern_v2 = _combined_fusion(
+                _binary_fusion_v1(computation_call, binary_op), aten.relu
+            )
+            _register_binary_unary_fusion_lowering(
+                pattern_v2,
+                computation_op,
+                binary_op,
+                fusion_op,
+                unary_attr=UnaryAttr("relu"),
+            )
+
+
 def _is_packable_convolution(match):
     """
     Check if the node is supported for MKLDNN convolution.
@@ -736,6 +772,7 @@ def _register_weight_pack_pass():
 def _ipex_fusion_init():
     _register_unary_fusion()
     _register_inplace_fusion()
+    _register_binary_unary_fusion()
     _register_binary_fusion()
 
 
