@@ -3,7 +3,7 @@ set -x
 set -e
 
 VER_LLVM="llvmorg-16.0.6"
-VER_IPEX="master"
+VER_IPEX="main"
 
 # Check existance of required Linux commands
 for CMD in conda git nproc make; do
