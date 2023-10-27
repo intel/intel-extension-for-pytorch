@@ -4,6 +4,7 @@ import math
 import torch
 from torch.nn.parameter import Parameter
 from torch.nn import init
+from torch import Tensor
 from intel_extension_for_pytorch.xpu.fp8.utils import cast_to_fp8, cast_if_needed
 
 import intel_extension_for_pytorch._isa_help as ipex
@@ -173,7 +174,12 @@ class _Linear(torch.autograd.Function):
         return (grad_input, grad_weight, None, None, None, None)
 
 
-class Linear(Fp8BaseModule):
+class FP8Linear(Fp8BaseModule):
+    __constants__ = ["in_features", "out_features"]
+    in_features: int
+    out_features: int
+    weight: Tensor
+
     def __init__(
         self,
         in_features: int,
@@ -257,3 +263,6 @@ class Linear(Fp8BaseModule):
         out = linear_fn(*args)
 
         return out
+
+    def extra_repr(self) -> str:
+        return f"in_features={self.in_features}, out_features={self.out_features}, bias={self.bias is not None}"

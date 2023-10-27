@@ -1,12 +1,12 @@
 import torch
-from intel_extension_for_pytorch.xpu.fp8.module import Linear
+from intel_extension_for_pytorch.xpu.fp8.module import FP8Linear
 from intel_extension_for_pytorch.xpu.fp8.fp8 import fp8_autocast
 from intel_extension_for_pytorch.xpu.fp8.recipe import DelayedScaling
 from torch.testing._internal.common_utils import TestCase
 
 
 class TestFP8GEMM(TestCase):
-    def test_fp8_gemm(self):
+    def test_fp8_linear(self):
         dtype = torch.bfloat16
         input = torch.ones(
             [8, 2], requires_grad=True, dtype=dtype, device=torch.device("xpu")
@@ -28,7 +28,7 @@ class TestFP8GEMM(TestCase):
         gw_ref = gemm_ref.weight.grad
 
         with fp8_autocast(enabled=True, fp8_recipe=DelayedScaling()):
-            gemm = Linear(2, 3).xpu()
+            gemm = FP8Linear(2, 3).xpu()
             gemm.weight.data = gemm_ref.weight.data.clone()
             gemm.bias.data = gemm_ref.bias.data.clone()
             output = gemm(input)
