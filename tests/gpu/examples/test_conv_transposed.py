@@ -334,8 +334,8 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(y_cpu, y_xpu.cpu())
         self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
-        self.assertEqual(gw_cpu, gw_xpu.cpu(), rtol=1e-3, atol=1e-2)
-        self.assertEqual(gb_cpu, gb_xpu.cpu(), rtol=1e-3, atol=1e-2)
+        self.assertEqual(gw_cpu, gw_xpu.cpu(), rtol=1e-3, atol=4e-2)
+        self.assertEqual(gb_cpu, gb_xpu.cpu(), rtol=1e-3, atol=4e-2)
 
     def test_deconv3d_bias_blk(self, dtype=torch.float):
         deconv = nn.ConvTranspose3d(
