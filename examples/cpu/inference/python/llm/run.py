@@ -151,7 +151,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
             if args.prompt is not None:
                 infer_cmd.extend(["--prompt", str(args.prompt)])
-            if args.prompt is not None:
+            if args.config_file is not None:
                 infer_cmd.extend(["--config-file", str(args.config_file)])
 
             print("running model geneartion...")
@@ -188,7 +188,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 quant_cmd = ["python", qpath]
                 quant_cmd.extend(["-m", str(args.model_name_or_path)])
                 quant_cmd.extend(["--output-dir", str(args.output_dir)])
-
+                if re.search("falcon", config.architectures[0], re.IGNORECASE) or re.search(
+                    "rw", config.architectures[0], re.IGNORECASE
+                ):
+                    if args.config_file is not None:
+                        quant_cmd.extend(["--config-file", str(args.config_file)])
                 if args.int8_bf16_mixed:
                     quant_cmd.extend(["--int8-bf16-mixed"])
                 if args.int8:
@@ -256,8 +260,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
             if args.prompt is not None:
                 infer_cmd.extend(["--prompt", str(args.prompt)])
-            if args.prompt is not None:
-                infer_cmd.extend(["--config-file", str(args.config_file)])
+            if re.search("falcon", config.architectures[0], re.IGNORECASE) or re.search(
+                "rw", config.architectures[0], re.IGNORECASE
+            ):
+                if args.config_file is not None:
+                    infer_cmd.extend(["--config-file", str(args.config_file)])
 
             print("running model geneartion...")
             subprocess.run(infer_cmd)
