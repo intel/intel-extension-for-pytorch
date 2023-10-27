@@ -63,7 +63,7 @@ class ModuleReplacer:
             config.device = "xpu"
         module_name = "" if prefix == "" else prefix + "."
         is_replace_success = False
-        enable_naive_path = not ipex._C._has_2d_block_array(0) or os.environ.get("ENABLE_NAIVE_PATH", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
+        enable_naive_path = os.environ.get("ENABLE_NAIVE_PATH", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
         impl_mode = ImplementMode.naive if enable_naive_path else ImplementMode.optimized
         for name, child in model.named_children():
             if type(child) in self.module_dict.keys():

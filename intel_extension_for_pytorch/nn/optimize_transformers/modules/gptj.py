@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn import CrossEntropyLoss
+import intel_extension_for_pytorch as ipex
 from typing import Optional, Tuple, Union
 
 from .transformer_modules.Activation import ACT2FN
@@ -184,7 +185,7 @@ class NewIPEXGPTJBlock(IPEXTransformerBlock):
             # for 1st token, expand the result with beam
             hidden_states = hidden_states.view(bs, 1, seq, hidden_size)
             hidden_states = hidden_states.expand([bs, beam, seq, hidden_size])
-        elif ipex._C._has_2d_block_array(0) and not enable_naive_path or beam > 1:
+        elif not enable_naive_path or beam > 1:
         #     # for 2nd to last token, we convert the layout back
         #     # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
             hidden_states = hidden_states.transpose(0, 1)

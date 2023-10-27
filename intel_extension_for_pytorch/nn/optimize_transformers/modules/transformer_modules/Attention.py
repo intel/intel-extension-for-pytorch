@@ -11,6 +11,8 @@ from .NaiveAttention import IPEXTransformerAttnNaive
 from .BaseAttention import IPEXTransformerAttn, IPEXRuntimeAttnCache
 from .Linear import matmul_add_add
 
+import intel_extension_for_pytorch as ipex
+
 
 
 class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
@@ -104,8 +106,15 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         return query, key, value
 
 # ################################# compute_qkv #################################################
-
+    def compute_qkv_gemm_naive(self, hidden_states, query, key, value):
+        query = self.q_proj(hidden_states)
+        key   = self.k_proj(hidden_states)
+        value = self.v_proj(hidden_states)
+        return query, key, value
+    
     def compute_qkv_gemm(self, hidden_states, query, key, value):
+        # if not ipex._C._has_2d_block_array(0):
+        #     return self.compute_qkv_gemm_naive(hidden_states, query, key, value)
         torch.ops.torch_ipex.mm_qkv_out(hidden_states, self.qkv_proj.weight, self.qkv_proj.bias, query, key, value)
         return query, key, value
 
@@ -178,6 +187,9 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
 
 # ################################################################ sdp #######################################################################################
     def sdp(self, query, key, value, attention_mask, head_mask, alibi):
+        # for ATS-M machine
+        if not ipex._C._has_2d_block_array(0):
+            return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
         key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
         dropout, alpha, beta, is_casual, blocked_attn_mask, blocked_alibi = self.prepare_sdp_input(query, key, value, attention_mask, alibi)
         attention_output, attn_weight = self.compute_sdp(query, key, value, key_prompt, value_prompt, blocked_attn_mask, blocked_alibi, head_mask, alpha, beta, dropout, is_casual)
@@ -185,6 +197,83 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         attention_output = self.process_sdp_output(attention_output)
         attention_output = attention_output.reshape(attention_output.size()[:-2] + (self.head_dim * self.num_attn_head,))
         return attention_output, attn_weight
+
+    def naive_sdp(self, query, key, value, attention_mask, head_mask, alibi):
+        if self.is_beam_search():
+            key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
+            if not self.is_1st_token():
+                key, value = self.reorder_cache(key_prompt, value_prompt, key, value, self.beam_idx)
+            attn_output, attn_weights = self.compute_sdp_onednn(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi, first_token=self.is_1st_token())
+            attn_output = self.process_sdp_output(attn_output)
+            attn_output = attn_output.reshape(attn_output.size()[:-2] + (self.head_dim * self.num_attn_head,))
+        else:
+            attn_output, attn_weights = self.compute_sdp_onednn(query, key, value, attention_mask=attention_mask, head_mask=head_mask, alibi=alibi, first_token=self.is_1st_token())
+
+            # if self.is_1st_token_beam_search():
+            #     attn_output = attn_output.permute(0, 2, 1, 3)
+            # else:
+            #     attn_output = attn_output.permute(2, 0, 1, 3)
+            attn_output = attn_output.permute(0, 2, 1, 3)
+            attn_output = attn_output.reshape(attn_output.size()[:-2] + (self.embed_dim // self.tp_size, ))
+        return attn_output, attn_weights
+
+    def compute_sdp_onednn(self, query, key, value, attention_mask, head_mask, alibi, first_token=False):
+        # FIXME, should support op fusion with onednn later 
+        if alibi is not None:
+            bs_beam, num_heads, q_length, dim = query.shape
+            _, _, kv_length, _ = key.shape
+            # query, key result [bs*beam, num_head, q_len, kv_len]
+            # alibi: [bs_beam*num_head, q_len, kv_len]
+            if first_token and IPEXTransformerAttn.beam_size > 1:
+                shape = [IPEXTransformerAttn.batch_size, IPEXTransformerAttn.beam_size, num_heads, -1, kv_length]
+                alibi = alibi.view(shape)[:, 0, :, :, :].reshape([IPEXTransformerAttn.batch_size*num_heads, -1, kv_length])
+            batch1 = query.view(-1, q_length, dim)
+            batch2 = key.view(-1, kv_length, dim).transpose(1, 2)
+            matmul_result = alibi.baddbmm(
+                batch1=batch1,
+                batch2=batch2,
+                beta=self.beta,
+                alpha=self.inv_norm_factor,
+            )
+
+            # change view to [bs_beam, num_heads, q_length, kv_length]
+            attention_scores = matmul_result.view(bs_beam, num_heads, q_length, kv_length)
+            attn_weights = torch.masked_fill(attention_scores, attention_mask, torch.finfo(attention_scores.dtype).min)
+            attention_probs = nn.functional.softmax(attn_weights, dim=-1)
+
+            # [bs_beam, num_heads, q_length, kv_length]
+            attention_probs = self.attn_drop(attention_probs)
+
+            if head_mask is not None:
+                attention_probs = attention_probs * head_mask
+
+            # matmul: [bs_beam * num_heads, q_length, head_dim]
+            attn_output = torch.matmul(attention_probs, value)
+        else:
+            attn_weights = torch.matmul(query, key.transpose(-1, -2))
+
+            if self.use_casual_mask:
+                # convert the casual mask dtype to target dtype, this should only happen once
+                IPEXTransformerAttnNaive.attention_mask.to(attn_weights.dtype)
+                query_length, key_length = query.size(-2), key.size(-2)
+                casual_mask = IPEXTransformerAttnNaive.attention_mask[:, :, key_length - query_length : key_length, :key_length]
+                # # TODO: Maybe we can move this line to the initializer
+                # casual_mask *= -66504.0
+                # replace torch.where as torch.add might helps with the host overhead
+                attn_weights += casual_mask
+            if self.scale_attn:
+                attn_weights /= self.scale_attn
+            if attention_mask is not None:
+                attn_weights += attention_mask
+                # the attn_weights should anyway bigger than dtype.min, I wonder if this is necessary
+                attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min))
+            attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float).to(query.dtype)
+            attn_weights = self.attn_drop(attn_weights)
+            if head_mask is not None:
+                attn_weights = attn_weights * head_mask
+            attn_output = torch.matmul(attn_weights, value)
+
+        return attn_output, attn_weights
 
     def prepare_sdp_input(self, query, key, value, attention_mask, alibi):
         dropout = 0.0

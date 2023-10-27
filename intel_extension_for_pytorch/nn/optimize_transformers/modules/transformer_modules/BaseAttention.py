@@ -8,8 +8,6 @@ import os
 import math
 from dataclasses import dataclass
 
-
-
 @dataclass
 class IPEXRuntimeAttnCache:
     key_cache:   torch.Tensor = None
@@ -22,7 +20,6 @@ class IPEXRuntimeAttnCache:
         self.value_cache  = None
         self.key_prompt   = None
         self.value_prompt = None
-
 
 class IPEXTransformerAttn(nn.Module):
     layer_id_static = 0
