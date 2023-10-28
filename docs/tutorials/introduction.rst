@@ -11,7 +11,7 @@ Optimizations take advantage of Intel® Advanced Vector Extensions 512 (Intel® 
   ``intel_extension_for_pytorch`` (for versions 1.10.0 and later). Use the
   correct package name depending on the version you are using.
 
-For the detailed list of supported features and usage instructions, refer to `Features <features>`_. 
+For the detailed list of supported features and usage instructions, refer to `Features <features.html>`_. 
 
 Get Started
 -----------
