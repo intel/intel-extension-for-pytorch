@@ -393,7 +393,7 @@ def optimize(
 
     if device_type == "cpu":
         if opt_properties.optimize_transformers:
-            warnings.warn("Transformer opitmization is only support on XPU now.")
+            warnings.warn("Transformer optimization is now supported on XPU only.")
             opt_properties.optimize_transformers = False
 
     # when on xpu, parts of features are not supported
