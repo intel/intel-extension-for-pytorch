@@ -10,11 +10,17 @@ from .modules.Functions import (
 )
 from typing import List
 import torch
-from .modules.Layers import IpexFastLinear, IpexFastAllReduceLinear  # IpexFastLayerNorm
+from .modules._transformer_configuration import ImplementMode
+from .modules.Layers import (
+    IpexFastLinear,
+    IpexFastAllReduceLinear,
+    IPEXLmHeadLinearAllreduceWithPadding,
+)
 from .modules.gptj import NewIPEXGPTJBlock
 from .modules.bloom import NewIPEXBloomBlock
 from .modules.llama import NewIPEXLLAMABlock
 from .modules.opt import NewIPEXOPTBlock
+import os
 
 
 def default_replaced_module_dict():
@@ -83,6 +89,16 @@ class ModuleReplacer:
             config.device = "xpu"
         module_name = "" if prefix == "" else prefix + "."
         is_replace_success = False
+        enable_naive_path = os.environ.get("ENABLE_NAIVE_PATH", "OFF").upper() in [
+            "1",
+            "Y",
+            "ON",
+            "YES",
+            "TRUE",
+        ]
+        impl_mode = (
+            ImplementMode.naive if enable_naive_path else ImplementMode.optimized
+        )
         for name, child in model.named_children():
             if type(child) in self.module_dict.keys():
                 new_module = self.module_dict[type(child)](
@@ -91,6 +107,7 @@ class ModuleReplacer:
                     dtype=dtype,
                     device="xpu",
                     module_name=module_name + name,
+                    impl_mode=impl_mode,
                     tp_size=self.tp_size,
                     tp_group=self.tp_group,
                 )
@@ -106,7 +123,9 @@ class ModuleReplacer:
 
     def replace_op(self, model):
         for name, child in model.named_children():
-            if type(child) in self.layer_dict.keys():
+            if name == "lm_head":
+                setattr(model, name, IPEXLmHeadLinearAllreduceWithPadding(child))
+            elif type(child) in self.layer_dict.keys():
                 new_layer = self.layer_dict[type(child)](child)
                 setattr(model, name, new_layer)
             else:
@@ -127,5 +146,6 @@ class ModuleReplacer:
             {
                 deepspeed.module_inject.layers.LinearLayer: IpexFastLinear,
                 deepspeed.module_inject.layers.LinearAllreduce: IpexFastAllReduceLinear,
+                deepspeed.module_inject.layers.LmHeadLinearAllreduce: IPEXLmHeadLinearAllreduceWithPadding,
             }
         )

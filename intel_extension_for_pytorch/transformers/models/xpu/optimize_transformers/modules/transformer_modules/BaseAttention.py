@@ -1,6 +1,21 @@
 import torch
 import torch.nn as nn
 from typing import Optional, Tuple
+from dataclasses import dataclass
+
+
+@dataclass
+class IPEXRuntimeAttnCache:
+    key_cache: torch.Tensor = None
+    value_cache: torch.Tensor = None
+    key_prompt: torch.Tensor = None
+    value_prompt: torch.Tensor = None
+
+    def clear_cache(self):
+        self.key_cache = None
+        self.value_cache = None
+        self.key_prompt = None
+        self.value_prompt = None
 
 
 class IPEXTransformerAttn(nn.Module):

@@ -103,7 +103,6 @@ class Converter:
         if distributed:
             self.tp_size = dist.get_world_size()
         self.create_model_parallel_group()
-        # IPEXTransformerConverter.update_tp_data(self.tp_size, self.tp_group)
         self.tensor_slicer = TensorSlicer(self.tp_size, self.tp_group, tp_fn)
         self.module_replacer = ModuleReplacer(
             replaced_module, replaced_layer, replace_fn, self.tp_size, self.tp_group

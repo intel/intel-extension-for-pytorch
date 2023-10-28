@@ -8,7 +8,7 @@ import torch.distributed as dist
 class EnvParam:
     @classmethod
     def collect_all_env_param(cls):
-        flag_list = {"COL_MAJOR": "col_major"}
+        flag_list = {"COL_MAJOR": "col_major", "LLM_ACC_TEST": "acc_test"}
         number_list = {"TP_SIZE": "tp_size"}
         for flag, flag_name in flag_list.items():
             flag = os.environ.get(flag, "OFF").upper() in [
@@ -36,6 +36,7 @@ class IPEXOpForInference(nn.Module):
         super().__init__()
         self.module = module
         self.row_major = EnvParam.col_major
+        self.acc_test = EnvParam.acc_test
 
     def port_data(self):
         raise NotImplementedError
@@ -120,3 +121,55 @@ class IpexFastAllReduceLinear(IPEXOpForInference):
         if self.bias is not None:
             output += self.bias
         return output
+
+
+class IPEXLmHeadLinearAllreduceWithPadding(IPEXOpForInference):
+    def __init__(self, module):
+        super().__init__(module)
+        self.weight = None
+        self.bias = None
+        self.mp_group = None
+        self.rank = None
+        self.world_size = None
+        self.port_data()
+
+    def port_data(self):
+        self.n_dim = self.module.weight.shape[0]
+        self.bias = self.module.bias
+        if dist.is_initialized():
+            if self.row_major:
+                self.weight = self.module.weight.transpose(-1, -2).contiguous()
+            else:
+                self.weight = self.module.weight.transpose(-1, -2)
+            self.mp_group = self.module.mp_group
+            self.rank = self.module.rank
+            self.world_size = self.module.world_size
+        else:
+            self.weight = self.module.weight
+
+    def forward(self, input):
+        if input.dim() > 3:
+            input = input.reshape([-1, input.shape[-2], input.shape[-1]])
+        if not self.acc_test:
+            shape = list(input.size())
+            shape[1] = 1
+            input = input[:, -1, :].view(shape)
+        if dist.is_initialized():
+            assert (
+                input.shape[-1] % self.world_size == 0
+            ), "Please ensure that self.world_size is divisible by input.shape[-1]"
+            input_shard = input.shape[-1] // self.world_size
+            output = torch.matmul(
+                input[:, :, self.rank * input_shard : (self.rank + 1) * input_shard],
+                self.weight,
+            )
+            if self.mp_group is not None:
+                dist.all_reduce(output, group=self.mp_group)
+            if self.bias is not None:
+                output += self.bias
+            output = output[:, :, : self.n_dim]
+            return output
+        else:
+            return torch.nn.functional.linear(input, self.weight, bias=self.bias)[
+                :, :, : self.n_dim
+            ]

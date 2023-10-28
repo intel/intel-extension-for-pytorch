@@ -12,6 +12,13 @@ import math
 
 MAX_SEQ_LEN = int(os.environ.get("MAX_SEQ_LEN", "0"))
 MAX_OUT_SEQ_LEN = max(128, int(os.environ.get("MAX_OUT_SEQ_LEN", "0")))
+acc_test = os.environ.get("LLM_ACC_TEST", "OFF").upper() in [
+    "1",
+    "ON",
+    "Y",
+    "YES",
+    "TRUE",
+]
 
 
 def activation_replace(module):
@@ -61,20 +68,6 @@ class IPEXEmptyINT4Linear(nn.Module):
             )
 
 
-class IPEXEmptyLinearWithPadding(nn.Module):
-    def __init__(self, n_dim):
-        super(IPEXEmptyLinearWithPadding, self).__init__()
-        # we set the weight and bias to None to avoid any possible memory presure
-        self.weight = None
-        self.bias = None
-        self.n_dim = n_dim
-
-    def forward(self, input):
-        return torch.nn.functional.linear(input, self.weight, bias=self.bias)[
-            :, :, : self.n_dim
-        ]
-
-
 class IPEXEmptyINT4LinearWithPadding(nn.Module):
     def __init__(self, n_dim):
         super(IPEXEmptyINT4LinearWithPadding, self).__init__()
@@ -100,57 +93,6 @@ class IPEXEmptyINT4LinearWithPadding(nn.Module):
                 self.qzeros,
                 self.group_size,
             )[:, :, : self.n_dim]
-
-
-class IPEXLmHeadLinearAllreduceWithPadding(nn.Module):
-    def __init__(
-        self,
-        n_dim,
-        weight,
-        rank,
-        world_size,
-        bias=None,
-        mp_group=None,
-    ):
-        super(IPEXLmHeadLinearAllreduceWithPadding, self).__init__()
-        self.n_dim = n_dim
-        self.rank = rank
-        self.world_size = world_size
-        self.bias = bias
-        self.mp_group = mp_group
-
-        self.weight = weight.data.split(weight.shape[1] // self.world_size, dim=1)
-        self.weight = self.weight[self.rank].to(
-            "xpu:{}".format(torch.xpu.current_device())
-        )
-        col_major = os.environ.get("COL_MAJOR", "OFF").upper() in [
-            "1",
-            "Y",
-            "ON",
-            "YES",
-            "TRUE",
-        ]
-        self.row_major = not col_major
-        if self.row_major:
-            self.weight = self.weight.transpose(-1, -2).contiguous()
-        else:
-            self.weight = self.weight.transpose(-1, -2)
-
-    def forward(self, input):
-        assert (
-            input.shape[-1] % self.world_size == 0
-        ), "Please ensure that self.world_size is divisible by input.shape[-1]"
-        input_shard = input.shape[-1] // self.world_size
-        output = torch.matmul(
-            input[:, :, self.rank * input_shard : (self.rank + 1) * input_shard],
-            self.weight,
-        )
-        if self.mp_group is not None:
-            dist.all_reduce(output, group=self.mp_group)
-        if self.bias is not None:
-            output += self.bias
-        output = output[:, :, : self.n_dim]
-        return output
 
 
 class IPEXTransformerAtten(nn.Module):

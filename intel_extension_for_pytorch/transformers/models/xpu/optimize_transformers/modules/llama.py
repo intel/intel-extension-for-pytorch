@@ -1,6 +1,5 @@
 import torch
-from torch.nn import CrossEntropyLoss
-from typing import Optional, Tuple, Union, List
+from typing import Optional, Tuple
 from .transformer_modules.RoPE import LlamaRotaryEmbedding
 from .transformer_modules.Norm import LlamaRMSNorm
 
@@ -20,7 +19,6 @@ from .transformer_modules.NaiveAttention import IPEXTransformerAttnNaive  # noqa
 from .transformer_modules.GroupedAttention import (  # noqa F401
     IPEXTransformerAttnOptimizedFp16Grouped,
 )
-from transformers.modeling_outputs import CausalLMOutputWithPast
 from .transformer_modules.Decoderblock import IPEXTransformerBlock
 from .transformer_modules.Mlp import *  # noqa
 import sys
@@ -44,12 +42,13 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
         dtype="fp16",
         device="xpu",
         module_name="",
+        impl_mode=None,
         tp_size=1,
         tp_group=None,
     ):
         super().__init__(module, config, dtype, device, module_name)
         self.ipex_config = self.build_ipex_transformer_config(
-            config, device, dtype, tp_size, tp_group
+            config, device, dtype, impl_mode, tp_size, tp_group
         )
         self.attn = self.build_attention_from_config()
         self.mlp = self.build_mlp_from_config()
@@ -85,7 +84,7 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
         return mlp_type(self.ipex_config)
 
     def build_ipex_transformer_config(
-        self, config, device, dtype, tp_size, tp_group
+        self, config, device, dtype, impl_mode, tp_size, tp_group
     ) -> IPEXTransformerConfig:
         activation_function = self.config.hidden_act
         ipex_activation = None
@@ -132,6 +131,7 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
             positional_embedding_base=10000,
             device=self.device,
             dtype=dtype,
+            impl=impl_mode,
             tp_size=tp_size,
             tp_group=tp_group,
         )
@@ -260,105 +260,3 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
         if use_cache:
             outputs += (present_key_value,)
         return outputs
-
-
-def IPEXLlamaForCausalLMForward(
-    self,
-    input_ids: torch.LongTensor = None,
-    attention_mask: Optional[torch.Tensor] = None,
-    position_ids: Optional[torch.LongTensor] = None,
-    past_key_values: Optional[List[torch.FloatTensor]] = None,
-    inputs_embeds: Optional[torch.FloatTensor] = None,
-    labels: Optional[torch.LongTensor] = None,
-    use_cache: Optional[bool] = None,
-    output_attentions: Optional[bool] = None,
-    output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
-) -> Union[Tuple, CausalLMOutputWithPast]:
-    r"""
-    Args:
-        labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
-            Labels for computing the masked language modeling loss. Indices should either be in `[0, ...,
-            config.vocab_size]` or -100 (see `input_ids` docstring). Tokens with indices set to `-100` are ignored
-            (masked), the loss is only computed for the tokens with labels in `[0, ..., config.vocab_size]`.
-
-    Returns:
-
-    Example:
-
-    ```python
-    >>> from transformers import AutoTokenizer, LlamaForCausalLM
-
-    >>> model = LlamaForCausalLM.from_pretrained(PATH_TO_CONVERTED_WEIGHTS)
-    >>> tokenizer = AutoTokenizer.from_pretrained(PATH_TO_CONVERTED_TOKENIZER)
-
-    >>> prompt = "Hey, are you conscious? Can you talk to me?"
-    >>> inputs = tokenizer(prompt, return_tensors="pt")
-
-    >>> # Generate
-    >>> generate_ids = model.generate(inputs.input_ids, max_length=30)
-    >>> tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
-    "Hey, are you conscious? Can you talk to me?\nI'm not conscious, but I can talk to you."
-    ```"""
-
-    output_attentions = (
-        output_attentions
-        if output_attentions is not None
-        else self.config.output_attentions
-    )
-    output_hidden_states = (
-        output_hidden_states
-        if output_hidden_states is not None
-        else self.config.output_hidden_states
-    )
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
-    )
-
-    # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
-    outputs = self.model(
-        input_ids=input_ids,
-        attention_mask=attention_mask,
-        position_ids=position_ids,
-        past_key_values=past_key_values,
-        inputs_embeds=inputs_embeds,
-        use_cache=use_cache,
-        output_attentions=output_attentions,
-        output_hidden_states=output_hidden_states,
-        return_dict=return_dict,
-    )
-    hidden_states = outputs[0]
-    if hidden_states.dim() > 3:
-        hidden_states = hidden_states.reshape(
-            [-1, hidden_states.shape[-2], hidden_states.shape[-1]]
-        )
-    if not acc_test:
-        shape = list(hidden_states.size())
-        shape[1] = 1
-        hidden_states = hidden_states[:, -1, :].view(shape)
-    logits = self.lm_head(hidden_states)
-    logits = logits.float()
-
-    loss = None
-    if labels is not None:
-        # Shift so that tokens < n predict n
-        shift_logits = logits[..., :-1, :].contiguous()
-        shift_labels = labels[..., 1:].contiguous()
-        # Flatten the tokens
-        loss_fct = CrossEntropyLoss()
-        shift_logits = shift_logits.view(-1, self.config.vocab_size)
-        shift_labels = shift_labels.view(-1)
-        # Enable model parallelism
-        shift_labels = shift_labels.to(shift_logits.device)
-        loss = loss_fct(shift_logits, shift_labels)
-
-    if not return_dict:
-        output = (logits,) + outputs[1:]
-        return (loss,) + output if loss is not None else output
-    return CausalLMOutputWithPast(
-        loss=loss,
-        logits=logits,
-        past_key_values=outputs.past_key_values,
-        hidden_states=outputs.hidden_states,
-        attentions=outputs.attentions,
-    )

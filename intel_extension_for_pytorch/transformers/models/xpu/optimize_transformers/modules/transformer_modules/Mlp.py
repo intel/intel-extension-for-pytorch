@@ -7,6 +7,8 @@ from .Linear import IPEXTransformerLinear, IPEXTransformerQLinear, matmul_add_ad
 
 
 class IPEXTransformerBaseMLP(nn.Module):
+    beam_size = 1
+
     def __init__(self, config) -> None:
         super().__init__()
         self.config = config
@@ -72,10 +74,27 @@ class IPEXTransformerMLP(IPEXTransformerBaseMLP):
     def out_mm(self, hidden_states, residual=None):
         hidden_states = self.fc_out(hidden_states)
         hidden_states = self.all_reduce_if_necessary(hidden_states)
-        if self.fc_out.bias:
+        if self.fc_out.bias is not None:
             hidden_states += self.fc_out.bias
-        if residual:
+        if residual is not None:
             hidden_states += residual
+        return hidden_states
+
+
+class IPEXTransformerMLPNaiveFp16GeluGptj(IPEXTransformerMLP):
+    def __init__(self, config) -> None:
+        super().__init__(config)
+        self.dropout = nn.Dropout(config.residual_dropout)
+
+    def forward(self, hidden_states, attn_output=None, residual=None):
+        if self.beam_size == 1:
+            residual = residual.transpose(0, 1).contiguous()
+            hidden_states = hidden_states.transpose(0, 1).contiguous()
+        hidden_states = self.fc_in(hidden_states)
+        hidden_states = self.act(hidden_states)
+        hidden_states = self.fc_out(hidden_states)
+        feed_forward_hidden_states = self.dropout(hidden_states)
+        hidden_states = attn_output + feed_forward_hidden_states + residual
         return hidden_states
 
 
@@ -282,6 +301,8 @@ class IPEXTransformerMLPOptimizedFp16SiluLlama(IPEXTransformerMLPOptimizedFp16Si
     def transpose_parameter(self):
         super().transpose_parameter()
         self.up_proj.weight.data = self.up_proj.weight.transpose(0, 1).contiguous()
+        # Note: synchronize to ensure the completion of contiguous
+        torch.xpu.synchronize()
         self.origin_up_proj.data = self.up_proj.weight.data
 
     def inter_mm(self, hidden_states):
