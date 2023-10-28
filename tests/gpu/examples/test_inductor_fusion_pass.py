@@ -8,6 +8,7 @@ from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
 import numpy as np
 import pytest
+import platform
 
 np.set_printoptions(threshold=np.inf)
 
@@ -70,8 +71,9 @@ class N(nn.Module):
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skip(
-        "Need fix driver issue for avoid dived by zero, See intel_extension_for_pytorch/_inductor/xpu/utils.py"
+    @pytest.mark.skipif(
+        platform.system() == "Windows" or "WSL2" in platform.uname().release,
+        reason="Windows not yet supported for torch.compile",
     )
     @config.patch({"freezing": True})
     def test_inductor_fusion_conv(self):
@@ -94,8 +96,9 @@ class TestTorchMethod(TestCase):
                 ref = model(example_input)
                 self.assertEqual(ref, actual)
 
-    @pytest.mark.skip(
-        "Need fix driver issue for avoid dived by zero, See intel_extension_for_pytorch/_inductor/xpu/utils.py"
+    @pytest.mark.skipif(
+        platform.system() == "Windows" or "WSL2" in platform.uname().release,
+        reason="Windows not yet supported for torch.compile",
     )
     @config.patch({"freezing": True})
     def test_inductor_fusion_linear(self):
@@ -115,8 +118,9 @@ class TestTorchMethod(TestCase):
                 ref = model(example_input)
                 self.assertEqual(ref, actual)
 
-    @pytest.mark.skip(
-        "Need fix driver issue for avoid dived by zero, See intel_extension_for_pytorch/_inductor/xpu/utils.py"
+    @pytest.mark.skipif(
+        platform.system() == "Windows" or "WSL2" in platform.uname().release,
+        reason="Windows not yet supported for torch.compile",
     )
     @config.patch({"freezing": True})
     def test_conv_binary_fusion(self):
@@ -147,8 +151,9 @@ class TestTorchMethod(TestCase):
                 ref = model(x)
                 self.assertEqual(actual, ref)
 
-    @pytest.mark.skip(
-        "Need fix driver issue for avoid dived by zero, See intel_extension_for_pytorch/_inductor/xpu/utils.py"
+    @pytest.mark.skipif(
+        platform.system() == "Windows" or "WSL2" in platform.uname().release,
+        reason="Windows not yet supported for torch.compile",
     )
     @config.patch({"freezing": True})
     def test_conv_binary_inplace_fusion(self):
@@ -174,8 +179,9 @@ class TestTorchMethod(TestCase):
             ref = model(inputs[0], inputs[1])
             self.assertEqual(actual, ref)
 
-    @pytest.mark.skip(
-        "Need fix driver issue for avoid dived by zero, See intel_extension_for_pytorch/_inductor/xpu/utils.py"
+    @pytest.mark.skipif(
+        platform.system() == "Windows" or "WSL2" in platform.uname().release,
+        reason="Windows not yet supported for torch.compile",
     )
     @config.patch({"freezing": True})
     def test_linear_binary_fusion(self):
