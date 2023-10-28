@@ -152,7 +152,7 @@ Settings::Settings() {
 
 #ifdef USE_KINETO
   onetrace_enabled = ENV_VAL::OFF;
-  DPCPP_INIT_ENV_VAL(ZE_TRACING, onetrace_enabled, ENV_VAL, show_opt);
+  DPCPP_INIT_ENV_VAL("IPEX_ZE_TRACING", onetrace_enabled, ENV_VAL, show_opt);
 #endif
 
   if (show_opt) {
