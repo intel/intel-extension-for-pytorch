@@ -1,7 +1,7 @@
 From 0d61b020088d65064072b1cb4d64d249120a88fe Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Tue, 26 Sep 2023 20:49:36 +0800
-Subject: [PATCH 08/14] generalize inductor triton backend device agnostic
+Subject: [PATCH 08/15] generalize inductor triton backend device agnostic
  (#168)
 
 ---
