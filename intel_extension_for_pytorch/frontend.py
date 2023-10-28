@@ -157,7 +157,13 @@ class _O1:
 
 opt_levels = {"O0": _O0(), "O1": _O1()}
 
-def optimize_transformers(model, dtype=None, optimizer=None, is_int4=False, ckpt=None, distributed=False, group_size=-1, weight_path="./"):
+def optimize_transformers(model, dtype=None, optimizer=None, is_int4=False, ckpt=None, distributed=False, group_size=-1, weight_path="./",
+                          use_llm_allreduce=True):
+    # Enable llm allreduce path for torch-ccl.
+    if use_llm_allreduce:
+        import os
+        os.environ["TORCH_LLM_ALLREDUCE"] = "1"
+
     if is_int4:
         print("original model:\n", model)
         convert_qmodel(model, dtype, group_size)
