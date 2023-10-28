@@ -197,4 +197,4 @@ To build the documentation:
 
 #### Tips
 
-The `.rst` source files live in [docs/tutorials](https://github.com/intel/intel-extension-for-pytorch/tree/master/docs/tutorials). Some of the `.rst` files pull in docstrings from Intel® Extension for PyTorch\* Python code (for example, via the `autofunction` or `autoclass` directives). To shorten doc build times, it is helpful to remove the files you are not working on, only keeping the base `index.rst` file and the files you are editing. The Sphinx build will produce missing file warnings but will still complete.
+The `.rst` source files live in [docs/tutorials](https://github.com/intel/intel-extension-for-pytorch/tree/main/docs/tutorials). Some of the `.rst` files pull in docstrings from Intel® Extension for PyTorch\* Python code (for example, via the `autofunction` or `autoclass` directives). To shorten doc build times, it is helpful to remove the files you are not working on, only keeping the base `index.rst` file and the files you are editing. The Sphinx build will produce missing file warnings but will still complete.
