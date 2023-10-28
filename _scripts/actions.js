@@ -185,7 +185,8 @@ $(document).ready(function() {
         ret += "</div>";
         indexb += 1;
       }
-      if(data.system_requirements.software != null) {
+      if(data.system_requirements.software != null &&
+         !$.pkgInArray(data.package, ["docker"])) {
         ret += "<div class=\"simple\">";
         ret += "<h3>" + $.secid_gen([indexa, indexb]) + "Software</h3>";
 
@@ -193,41 +194,39 @@ $(document).ready(function() {
           ret += $.table_2d_gen(data.system_requirements.software.driver);
         }
 
-        if(!$.pkgInArray(data.package, ["docker"])) {
-          var items = [];
-          if(data.system_requirements.software.os != null) {
-            var item = {};
-            item["Software"] = "OS";
-            item["Version"] = data.system_requirements.software.os.join(", ");
-            items.push(item);
-          }
-          if(data.system_requirements.software.basekit != null) {
-            var item = {};
-            item["Software"] = "Intel® oneAPI Base Toolkit";
-            item["Version"] = data.system_requirements.software.basekit;
-            items.push(item);
-          }
-          if(data.system_requirements.software.basekit_hotfix != null) {
-            var item = {};
-            item["Software"] = "Intel® oneAPI Base Toolkit Hotfix";
-            item["Version"] = data.system_requirements.software.basekit_hotfix;
-            items.push(item);
-          }
-          if(data.system_requirements.software.python != null) {
-            var item = {};
-            item["Software"] = "Python";
-            item["Version"] = data.system_requirements.software.python.join(", ");
-            items.push(item);
-          }
-          if(data.system_requirements.software.compiler != null &&
-             $.pkgInArray(data.package, ["source", "cppsdk"])) {
-            var item = {};
-            item["Software"] = "Compiler";
-            item["Version"] = data.system_requirements.software.compiler;
-            items.push(item);
-          }
-          ret += $.table_2d_gen(items);
+        var items = [];
+        if(data.system_requirements.software.os != null) {
+          var item = {};
+          item["Software"] = "OS";
+          item["Version"] = data.system_requirements.software.os.join(", ");
+          items.push(item);
         }
+        if(data.system_requirements.software.basekit != null) {
+          var item = {};
+          item["Software"] = "Intel® oneAPI Base Toolkit";
+          item["Version"] = data.system_requirements.software.basekit;
+          items.push(item);
+        }
+        if(data.system_requirements.software.basekit_hotfix != null) {
+          var item = {};
+          item["Software"] = "Intel® oneAPI Base Toolkit Hotfix";
+          item["Version"] = data.system_requirements.software.basekit_hotfix;
+          items.push(item);
+        }
+        if(data.system_requirements.software.python != null) {
+          var item = {};
+          item["Software"] = "Python";
+          item["Version"] = data.system_requirements.software.python.join(", ");
+          items.push(item);
+        }
+        if(data.system_requirements.software.compiler != null &&
+           $.pkgInArray(data.package, ["source", "cppsdk"])) {
+          var item = {};
+          item["Software"] = "Compiler";
+          item["Version"] = data.system_requirements.software.compiler;
+          items.push(item);
+        }
+        ret += $.table_2d_gen(items);
 
         ret += "</div>";
         indexb += 1;
