@@ -124,7 +124,7 @@ void beam_search_topk_stage1(
     int64_t beam_size,
     int64_t batch_size,
     int32_t num_wg_per_beam) {
-  int32_t wg_size = 128;
+  int32_t wg_size = dpcppGpuHWThreadsPerEU() * dpcppMaxSubGroupSize();
   int slm_size = (sizeof(int) + sizeof(scalar_t)) * MAX_K * (wg_size);
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();

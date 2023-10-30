@@ -65,9 +65,9 @@ class testBeamsearch(TestCase):
             -1
         )
         next_tokens = (next_tokens % vocab_size).view(-1)
-        # print(next_token_scores.cpu())
-        # print(next_tokens.cpu())
-        # print(next_indices.cpu())
+        print(next_token_scores.cpu())
+        print(next_tokens.cpu())
+        print(next_indices.cpu())
 
         beam_hyps_normed_scores = torch.empty(
             (2 * batch_size * beam_size),
@@ -104,9 +104,9 @@ class testBeamsearch(TestCase):
             beam_hyps_sequence_lengths_tgt,
             beam_hyps_score,
         )
-        # print(score.cpu())
-        # print(token_idx.cpu())
-        # print(beam_idx.cpu())
+        print(score.cpu())
+        print(token_idx.cpu())
+        print(beam_idx.cpu())
         self.assertEqual(next_indices.cpu(), beam_idx.cpu())
         self.assertEqual(next_tokens.cpu(), token_idx.cpu())
 

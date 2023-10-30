@@ -243,7 +243,19 @@ std::tuple<Tensor, Tensor, Tensor> beam_search_topk(
     Tensor& candidate_output_ids, // sentences with eos (decode done)
     Tensor& candidate_sequence_lengths,
     Tensor& candidate_score) {
-  const int32_t num_wg_per_beam = 4;
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  int32_t eu_count = dpcppGpuEuCount();
+  int32_t num_wg_per_beam;
+  if (!Settings::I().has_2d_block_array(curDevID)) {
+    // In case of OOM in some platforms
+    num_wg_per_beam =
+        std::min(CeilDiv(eu_count, (int32_t)(batch_size * beam_size)), 4);
+  } else {
+    num_wg_per_beam = CeilDiv(eu_count, (int32_t)(batch_size * beam_size));
+  }
+
   const int32_t tmp_output_len =
       2 * beam_size * num_wg_per_beam * beam_size * batch_size;
   const int32_t topk_len = 2 * beam_size * beam_size * batch_size;
