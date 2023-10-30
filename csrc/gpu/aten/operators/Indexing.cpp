@@ -253,9 +253,14 @@ void _index_add(
 
   // See Note [Enabling Deterministic Operations]
   if (globalContext().deterministicAlgorithms()) {
-    // TODO: enable deterministic algorithm
-    TORCH_CHECK(
-        false, "index_add is not implemented with deterministic algorithm.")
+    torch::List<c10::optional<Tensor>> indices_list;
+    indices_list.reserve(dim + 1);
+    for (const auto i : c10::irange(dim)) {
+      indices_list.emplace_back();
+    }
+    indices_list.emplace_back(indices.to(at::kLong));
+    dst.index_put_(indices_list, src * alpha, true);
+    return;
   }
 
   // Scalars are treated as 1-d tensor
