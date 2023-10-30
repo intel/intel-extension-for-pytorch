@@ -9,10 +9,13 @@ from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
     _using_tpp,
 )
 import intel_extension_for_pytorch as ipex
-from ..utils.weight_only_quantization import (
-    _is_woq_qconfig,
-    _convert_woq_with_low_precision_checkpoint,
-)
+from ..utils.utils import has_cpu
+
+if has_cpu():
+    from ..utils.weight_only_quantization import (
+        _is_woq_qconfig,
+        _convert_woq_with_low_precision_checkpoint,
+    )
 
 
 def convert_functions(m, target_m, new_function_name, new_function):
