@@ -52,23 +52,23 @@ execute_process(
   WORKING_DIRECTORY ${THIRD_PARTY_DIR}
   COMMAND_ERROR_IS_FATAL ANY)
 foreach (PTI_PATCH ${PTI_PATCHES})
-  message(STATUS "Git am patch on oneTrace: ${PTI_PATCH}")
+  message(STATUS "Git apply patch on oneTrace: ${PTI_PATCH}")
   execute_process(
-    COMMAND ${GIT_EXECUTABLE} am ${PTI_PATCH}
+    COMMAND ${GIT_EXECUTABLE} apply ${PTI_PATCH}
     WORKING_DIRECTORY ${PTI_ROOT}
     RESULT_VARIABLE git_am_result 
     ERROR_VARIABLE git_am_error)
   if (NOT ${git_am_result} EQUAL 0)
-    message(STATUS "Git am failed with error: ${git_am_error}")
-    message(STATUS "Run $git am --abort automatically due to failure.")
+    message(STATUS "Git apply failed with error: ${git_am_error}")
+    message(STATUS "Run $git apply --abort automatically due to failure.")
     execute_process(
-      COMMAND ${GIT_EXECUTABLE} am --abort
+      COMMAND ${GIT_EXECUTABLE} apply --abort
       WORKING_DIRECTORY ${PTI_ROOT}
       COMMAND_ERROR_IS_FATAL ANY)
-    message(FATAL_ERROR "Git am has been aborted. Please check repository status of ./third_party/pti-gpu/")
+    message(FATAL_ERROR "Git apply has been aborted. Please check repository status of ./third_party/pti-gpu/")
   endif ()
 endforeach()
-message(STATUS "Git am patches on oneTrace ... SUCCESS")
+message(STATUS "Git apply patches on oneTrace ... SUCCESS")
 
 add_subdirectory(${ONETRACE_ROOT} oneTrace EXCLUDE_FROM_ALL)
 set(ONETRACE_LIBRARY onetrace_tool)
