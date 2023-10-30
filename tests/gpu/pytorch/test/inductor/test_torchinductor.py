@@ -1,3 +1,10 @@
+
+import os
+import sys
+test_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+sys.path.append(test_root)
+
+import common.xpu_test_base
 # Owner(s): ["module: inductor"]
 import contextlib
 import copy
@@ -7678,6 +7685,7 @@ if HAS_CPU:
 
 
 if __name__ == "__main__":
+    common.xpu_test_base.customized_skipper()
     from torch._dynamo.test_case import run_tests
 
     if HAS_CPU or HAS_CUDA:

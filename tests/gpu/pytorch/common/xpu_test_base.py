@@ -280,6 +280,23 @@ except KeyError as e_key:
     print("[ERROR] Failed to pre-load torch.testing._internal.jit_utils", file=sys.stderr)
     exit(1)
 
+# Workaround to avoid cuda checking its versions
+try:
+    import torch.testing._internal.inductor_utils
+    mod = sys.modules['torch.testing._internal.inductor_utils']
+    from intel_extension_for_pytorch._inductor.xpu import utils
+    mod.HAS_CUDA = utils.has_triton()
+    print("[INFO] Pre-load torch.testing._internal.inductor_utils to bypass some global check")
+    import torch._inductor.utils
+    mod = sys.modules['torch._inductor.utils']
+    mod.has_triton = utils.has_triton
+    print("[INFO] Pre-load torch._inductor.utils to bypass some global check")
+except KeyError as e_key:
+    print(e_key, file=sys.stderr)
+    print("[ERROR] Failed to pre-load torch.testing._internal.inductor_utils", file=sys.stderr)
+    print("[ERROR] Failed to pre-load torch._inductor.utils", file=sys.stderr)
+    exit(1)
+
 # Workaround to avoid involving nvfuser by pre-load torch._prim
 try:
     import torch._prims
