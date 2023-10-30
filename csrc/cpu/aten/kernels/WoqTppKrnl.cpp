@@ -1483,7 +1483,7 @@ void qlinear_woq_affine_impl(
     const at::Tensor& scales, // dtype is TComp
     const at::Tensor& zps, // dtype is TComp
     const at::Tensor& b, // dtype is TComp
-    at::Tensor y,
+    at::Tensor& y,
     bool is_int4,
     int k_splits,
     int num_concats,

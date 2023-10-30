@@ -2659,6 +2659,16 @@ void woq_gemm_kernel_impl(
               zero_points_float_ptr);
         }
       }
+    } else {
+      auto qw = woq_linear_unpackB_impl(weight);
+      auto w = qw.dequantize().to(self_.scalar_type()).to(c10::kFloat);
+      auto x = self.to(c10::ScalarType::Float);
+      auto out = at::linear(x, w);
+      if (bias.defined()) {
+        auto b = bias.to(self_.scalar_type()).to(c10::kFloat);
+        out = at::add(out, b);
+      }
+      output = out.to(self.scalar_type());
     }
   } else { // kPerChannelAffineFloatQParams
 
@@ -2806,7 +2816,7 @@ void woq_gemm_kernel_impl(
     } else {
       at::linear_out(output, self, w);
     }
-  } else {
+  } else if (self_.scalar_type() == at::kBFloat16) {
     auto w = weight.dequantize();
     auto x = self.to(c10::ScalarType::Float);
     // This is to align with the AVX512 kernel
@@ -2817,6 +2827,15 @@ void woq_gemm_kernel_impl(
     auto out = at::linear(x, w);
     if (bias.defined()) {
       out = at::add(out, bias);
+    }
+    output = out.to(self.scalar_type());
+  } else {
+    auto w = weight.dequantize().to(self_.scalar_type()).to(c10::kFloat);
+    auto x = self.to(c10::ScalarType::Float);
+    auto out = at::linear(x, w);
+    if (bias.defined()) {
+      auto b = bias.to(self_.scalar_type()).to(c10::kFloat);
+      out = at::add(out, b);
     }
     output = out.to(self.scalar_type());
   }

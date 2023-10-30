@@ -370,11 +370,7 @@ at::Tensor woq_linear_pack_weight(
   // For TPP kernel, we only consider even K
   if (K % 2 == 0) {
     bool is_int4 = weight.scalar_type() == c10::kQUInt4x2;
-    // int num_threads = at::get_num_threads();
     size_t block_n = 32;
-    if (lowp_mode == 0) {
-      block_n = 16;
-    }
     size_t block_k = 64;
     while (K % block_k != 0) {
       block_k /= 2;

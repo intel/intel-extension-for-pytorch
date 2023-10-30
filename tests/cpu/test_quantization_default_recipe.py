@@ -10,6 +10,8 @@ from torch.ao.quantization import (
     QConfigMapping,
 )
 import copy
+import unittest
+from common_utils import TestCase
 
 import intel_extension_for_pytorch as ipex
 from test_ao_jit_llga_utils import JitLlgaTestCase, LLGA_FUSION_GROUP
@@ -478,6 +480,8 @@ class TestDefaultRecipe(JitLlgaTestCase):
         with self.assertRaises(AssertionError):
             prepared_model = ipex.quantization.prepare(m, qconfig_mapping)
 
+
+class WeightOnlyQuantizationTester(TestCase):
     def test_weight_only_quantization(self):
         class M(nn.Module):
             def __init__(self, input_channel, output_channel, has_bias):
@@ -846,7 +850,7 @@ class TestDefaultRecipe(JitLlgaTestCase):
                         output1, output2.to(output1.dtype), atol=1.5e-2, rtol=1e-3
                     )
 
-    def test_weight_only_quantization_lowp_compute(self):
+    def test_weight_only_quantization_lowp_mode_functionality(self):
         from intel_extension_for_pytorch.quantization import WoqLowpMode
 
         class M(nn.Module):
@@ -859,7 +863,12 @@ class TestDefaultRecipe(JitLlgaTestCase):
 
         data = torch.rand(4, 64)
         m = M()
-        for mode in [WoqLowpMode.FP16, WoqLowpMode.BF16, WoqLowpMode.INT8]:
+        for mode in [
+            WoqLowpMode.NONE,
+            WoqLowpMode.FP16,
+            WoqLowpMode.BF16,
+            WoqLowpMode.INT8,
+        ]:
             kwargs = {"lowp_mode": mode}
             if mode == WoqLowpMode.INT8:
                 kwargs["weight_dtype"] = torch.quint4x2
@@ -872,6 +881,52 @@ class TestDefaultRecipe(JitLlgaTestCase):
                     hasattr(woq_model.linear, "_lowp_mode")
                     and woq_model.linear._lowp_mode == mode
                 ), "Weight-only quantization: low precision gemm flag is not correctly set"
+
+    def test_weight_only_quantization_int8_lowp_mode_correctness(self):
+        from intel_extension_for_pytorch.quantization import WoqLowpMode
+
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = torch.nn.Linear(64, 128)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        # When lowp_mode=BF16, only case of batch size >= 32 uses BF16.
+        data = torch.rand(32, 64)
+        m = M()
+
+        lowp_mode_list = [WoqLowpMode.NONE, WoqLowpMode.FP16, WoqLowpMode.BF16]
+        act_dtype_list = [torch.bfloat16, torch.half]
+        compute_dtype_list = [None, torch.half, torch.bfloat16]
+        cases = itertools.product(lowp_mode_list, act_dtype_list)
+        # lowp_mode does not affect weight observer for int8
+        qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
+        weight = copy.deepcopy(m.linear.weight)
+        weight_observer = qconfig.global_qconfig.weight()
+        weight_observer(weight)
+        weight_int8 = _quantize_weight(weight, weight_observer)
+        weight_fp32 = weight_int8.dequantize()
+        bias_fp32 = copy.deepcopy(m.linear.bias)
+        for lowp_mode, act_dtype in cases:
+            if lowp_mode == WoqLowpMode.NONE:
+                compute_dtype_list[0] = act_dtype
+            compute_dtype = compute_dtype_list[int(lowp_mode)]
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                lowp_mode=lowp_mode,
+                weight_dtype=torch.qint8,
+            )
+            prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
+            with torch.no_grad():
+                woq_model = convert(prepared_model)
+                y = woq_model(data.to(act_dtype))
+                weight_for_compute = weight_fp32.to(compute_dtype).float()
+                act_for_compute = data.to(act_dtype).to(compute_dtype).float()
+                bias_for_compute = bias_fp32.to(compute_dtype).float()
+                y_ref = act_for_compute @ weight_for_compute.T + bias_for_compute
+                y_ref = y_ref.to(act_dtype)
+                torch.testing.assert_close(y, y_ref, atol=0.005, rtol=0.01)
 
     def test_weight_only_quantization_num_concats(self):
         class Mod(nn.Module):
@@ -1047,4 +1102,5 @@ class TestDefaultRecipe(JitLlgaTestCase):
 
 
 if __name__ == "__main__":
+    test = unittest.main()
     run_tests()
