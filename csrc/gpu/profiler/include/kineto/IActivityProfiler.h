@@ -12,8 +12,8 @@
 #include <set>
 #include <vector>
 
-#include "Config.h"
-#include "GenericTraceActivity.h"
+#include <profiler/include/kineto/Config.h>
+#include <profiler/include/kineto/GenericTraceActivity.h>
 
 /* This file includes an abstract base class for an activity profiler
  * that can be implemented by multiple tracing agents in the application.

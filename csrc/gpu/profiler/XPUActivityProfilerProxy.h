@@ -2,14 +2,13 @@
 
 #ifdef USE_KINETO
 
-#include "kineto/ActivityProfilerInterface.h"
-
 #include <memory>
 #include <set>
 #include <vector>
 
-#include "kineto/ActivityType.h"
-#include "kineto/ITraceActivity.h"
+#include <profiler/include/kineto/ActivityProfilerInterface.h>
+#include <profiler/include/kineto/ActivityType.h>
+#include <profiler/include/kineto/ITraceActivity.h>
 
 namespace libkineto {
 struct CpuTraceBuffer;

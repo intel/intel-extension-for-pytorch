@@ -13,9 +13,9 @@
 #include <thread>
 #include <vector>
 
-#include "ITraceActivity.h"
-#include "ThreadUtil.h"
-#include "TraceSpan.h"
+#include <profiler/include/kineto/ITraceActivity.h>
+#include <profiler/include/kineto/ThreadUtil.h>
+#include <profiler/include/kineto/TraceSpan.h>
 
 namespace libkineto {
 

@@ -1,10 +1,10 @@
-#include "kineto/AbstractConfig.h"
+#include <profiler/include/kineto/AbstractConfig.h>
 
 #include <fmt/format.h>
 #include <array>
 #include <sstream>
 
-#include "Logger.h"
+#include <profiler/Logger.h>
 
 using namespace std::chrono;
 

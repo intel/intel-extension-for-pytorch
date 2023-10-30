@@ -15,7 +15,7 @@
 #include <string>
 #include <vector>
 
-#include "kineto/ILoggerObserver.h"
+#include <profiler/include/kineto/ILoggerObserver.h>
 
 #ifdef _MSC_VER
 #undef ERROR

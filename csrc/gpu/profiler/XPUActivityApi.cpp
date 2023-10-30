@@ -1,6 +1,6 @@
 #ifdef USE_KINETO
 
-#include "XPUActivityApi.h"
+#include <profiler/XPUActivityApi.h>
 
 #include <assert.h>
 #include <chrono>
@@ -8,8 +8,9 @@
 #include <mutex>
 #include <thread>
 
-#include "Logger.h"
-#include "kineto/Config.h"
+#include <profiler/Logger.h>
+#include <profiler/include/kineto/Config.h>
+
 #include "onepti_activity_api.h"
 
 #if defined(USE_ONETRACE)

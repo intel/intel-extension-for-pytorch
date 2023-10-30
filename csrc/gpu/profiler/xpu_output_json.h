@@ -6,8 +6,8 @@
 #include <thread>
 #include <unordered_map>
 
-#include "kineto/GenericTraceActivity.h"
-#include "xpu_output_base.h"
+#include <profiler/include/kineto/GenericTraceActivity.h>
+#include <profiler/xpu_output_base.h>
 
 namespace KINETO_NAMESPACE {
 struct TraceSpan;

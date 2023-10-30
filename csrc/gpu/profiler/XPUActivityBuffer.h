@@ -8,7 +8,7 @@
 #include <memory>
 #include <vector>
 
-#include "kineto/ITraceActivity.h"
+#include <profiler/include/kineto/ITraceActivity.h>
 #include "onepti_activity_api.h"
 
 namespace KINETO_NAMESPACE {

@@ -1,6 +1,3 @@
-#include "Logger.h"
-#include "kineto/ILoggerObserver.h"
-
 // !USE_GOOGLE_LOG
 #include <time.h>
 #include <chrono>
@@ -11,7 +8,9 @@
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 
-#include "kineto/ThreadUtil.h"
+#include <profiler/Logger.h>
+#include <profiler/include/kineto/ILoggerObserver.h>
+#include <profiler/include/kineto/ThreadUtil.h>
 
 namespace KINETO_NAMESPACE {
 

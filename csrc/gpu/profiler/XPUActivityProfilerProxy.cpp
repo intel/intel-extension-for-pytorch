@@ -1,12 +1,13 @@
 #ifdef USE_KINETO
 
-#include "XPUActivityProfilerProxy.h"
+#include <profiler/XPUActivityProfilerProxy.h>
 
 #include <chrono>
-#include "Logger.h"
-#include "XPUActivityApi.h"
-#include "XPUActivityProfilerController.h"
-#include "kineto/Config.h"
+
+#include <profiler/Logger.h>
+#include <profiler/XPUActivityApi.h>
+#include <profiler/XPUActivityProfilerController.h>
+#include <profiler/include/kineto/Config.h>
 
 namespace KINETO_NAMESPACE {
 

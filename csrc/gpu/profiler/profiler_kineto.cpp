@@ -1,12 +1,13 @@
+#include <profiler/profiler_kineto.h>
+
 #include <ATen/Context.h>
 #include <torch/csrc/profiler/events.h>
 
-#include "kineto_shim.h"
-#include "profiler_kineto.h"
+#include <profiler/kineto_shim.h>
 
 #ifdef USE_ONETRACE
+#include <profiler/XPUActivityApi.h>
 #include <runtime/Device.h>
-#include "XPUActivityApi.h"
 #endif
 
 namespace xpu {

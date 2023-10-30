@@ -1,4 +1,4 @@
-#include "XPUActivityProfiler.h"
+#include <profiler/XPUActivityProfiler.h>
 
 #include <fmt/format.h>
 #include <time.h>
@@ -10,16 +10,16 @@
 #include <type_traits>
 #include <vector>
 
-#include "XPUActivity.cpp"
-#include "XPUActivity.h"
-#include "XPUActivityApi.h"
-#include "kineto/Config.h"
-#include "kineto/time_since_epoch.h"
-#include "onepti_activity_api.h"
-#include "xpu_output_base.h"
+#include <profiler/Logger.h>
+#include <profiler/XPUActivity.h>
+#include <profiler/XPUActivityApi.h>
+#include <profiler/include/kineto/Config.h>
+#include <profiler/include/kineto/ThreadUtil.h>
+#include <profiler/include/kineto/time_since_epoch.h>
+#include <profiler/xpu_output_base.h>
+#include <profiler/XPUActivity.cpp>
 
-#include "Logger.h"
-#include "kineto/ThreadUtil.h"
+#include "onepti_activity_api.h"
 
 using namespace std::chrono;
 using std::string;

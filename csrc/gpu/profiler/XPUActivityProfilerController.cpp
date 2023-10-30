@@ -1,19 +1,18 @@
 #ifdef USE_KINETO
 
-#include "XPUActivityProfilerController.h"
+#include <profiler/XPUActivityProfilerController.h>
 
 #include <chrono>
 #include <functional>
 #include <thread>
 
-#include "ActivityLoggerFactory.h"
-#include "XPUActivityApi.h"
-#include "XPUActivityTrace.h"
-#include "kineto/ThreadUtil.h"
-#include "xpu_output_json.h"
-#include "xpu_output_membuf.h"
-
-#include "Logger.h"
+#include <profiler/ActivityLoggerFactory.h>
+#include <profiler/Logger.h>
+#include <profiler/XPUActivityApi.h>
+#include <profiler/XPUActivityTrace.h>
+#include <profiler/include/kineto/ThreadUtil.h>
+#include <profiler/xpu_output_json.h>
+#include <profiler/xpu_output_membuf.h>
 
 using namespace std::chrono;
 

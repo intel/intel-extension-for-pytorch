@@ -1,11 +1,10 @@
-#include "kineto_shim.h"
+#include <profiler/kineto_shim.h>
 
 #include <torch/csrc/profiler/api.h>
 
 #ifdef USE_KINETO
-#include "XPUActivityProfilerProxy.h"
-
-#include "kineto/libkineto.h"
+#include <profiler/XPUActivityProfilerProxy.h>
+#include <profiler/include/kineto/libkineto.h>
 
 namespace KINETO_NAMESPACE {
 class XPUActivityProfilerProxy;

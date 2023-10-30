@@ -5,8 +5,8 @@
 #include <list>
 #include <memory>
 
-#include "XPUActivityBuffer.h"
-#include "kineto/libkineto.h"
+#include <profiler/XPUActivityBuffer.h>
+#include <profiler/include/kineto/libkineto.h>
 
 namespace KINETO_NAMESPACE {
 

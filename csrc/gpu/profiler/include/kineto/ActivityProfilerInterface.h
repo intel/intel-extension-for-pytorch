@@ -13,9 +13,9 @@
 #include <thread>
 #include <vector>
 
-#include "ActivityTraceInterface.h"
-#include "ActivityType.h"
-#include "IActivityProfiler.h"
+#include <profiler/include/kineto/ActivityTraceInterface.h>
+#include <profiler/include/kineto/ActivityType.h>
+#include <profiler/include/kineto/IActivityProfiler.h>
 
 namespace libkineto {
 

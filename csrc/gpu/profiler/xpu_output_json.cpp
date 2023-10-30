@@ -1,14 +1,13 @@
-#include "xpu_output_json.h"
+#include <profiler/xpu_output_json.h>
 
 #include <fmt/format.h>
 #include <time.h>
 #include <fstream>
 #include <map>
 
-#include "kineto/Config.h"
-#include "kineto/TraceSpan.h"
-
-#include "Logger.h"
+#include <profiler/Logger.h>
+#include <profiler/include/kineto/Config.h>
+#include <profiler/include/kineto/TraceSpan.h>
 
 namespace KINETO_NAMESPACE {
 

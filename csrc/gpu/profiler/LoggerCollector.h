@@ -6,7 +6,7 @@
 #include <set>
 #include <vector>
 
-#include "kineto/ILoggerObserver.h"
+#include <profiler/include/kineto/ILoggerObserver.h>
 
 namespace KINETO_NAMESPACE {
 

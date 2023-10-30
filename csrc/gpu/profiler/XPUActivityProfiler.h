@@ -14,16 +14,17 @@
 #include <unordered_set>
 #include <vector>
 
-#include "XPUActivity.h"
+#include <profiler/XPUActivity.h>
 
-#include "LoggerCollector.h"
-#include "kineto/GenericTraceActivity.h"
-#include "kineto/IActivityProfiler.h"
-#include "kineto/ThreadUtil.h"
-#include "kineto/TraceSpan.h"
-#include "kineto/libkineto.h"
+#include <profiler/LoggerCollector.h>
+#include <profiler/include/kineto/GenericTraceActivity.h>
+#include <profiler/include/kineto/IActivityProfiler.h>
+#include <profiler/include/kineto/ThreadUtil.h>
+#include <profiler/include/kineto/TraceSpan.h>
+#include <profiler/include/kineto/libkineto.h>
+#include <profiler/xpu_output_base.h>
+
 #include "onepti_activity_api.h"
-#include "xpu_output_base.h"
 
 namespace KINETO_NAMESPACE {
 

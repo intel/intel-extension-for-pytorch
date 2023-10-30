@@ -21,17 +21,17 @@
 #include <thread>
 #include <vector>
 
-#include "ActivityProfilerInterface.h"
-#include "ActivityTraceInterface.h"
-#include "ActivityType.h"
-#include "ClientInterface.h"
-#include "GenericTraceActivity.h"
-#include "IActivityProfiler.h"
-#include "ILoggerObserver.h"
-#include "LoggingAPI.h"
-#include "TraceSpan.h"
+#include <profiler/include/kineto/ActivityProfilerInterface.h>
+#include <profiler/include/kineto/ActivityTraceInterface.h>
+#include <profiler/include/kineto/ActivityType.h>
+#include <profiler/include/kineto/ClientInterface.h>
+#include <profiler/include/kineto/GenericTraceActivity.h>
+#include <profiler/include/kineto/IActivityProfiler.h>
+#include <profiler/include/kineto/ILoggerObserver.h>
+#include <profiler/include/kineto/LoggingAPI.h>
+#include <profiler/include/kineto/TraceSpan.h>
 
-#include "ThreadUtil.h"
+#include <profiler/include/kineto/ThreadUtil.h>
 
 extern "C" {
 void suppressLibkinetoLogMessages();

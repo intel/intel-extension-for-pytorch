@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include "AbstractConfig.h"
-#include "ActivityType.h"
+#include <profiler/include/kineto/AbstractConfig.h>
+#include <profiler/include/kineto/ActivityType.h>
 
 #include <assert.h>
 #include <chrono>

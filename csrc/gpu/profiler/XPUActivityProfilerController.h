@@ -10,14 +10,13 @@
 #include <mutex>
 #include <thread>
 
-#include "ActivityLoggerFactory.h"
-#include "XPUActivityProfiler.h"
-#include "kineto/ActivityProfilerInterface.h"
-#include "kineto/ActivityTraceInterface.h"
-// #include "ConfigLoader.h"
-#include "InvariantViolations.h"
-#include "LoggerCollector.h"
-#include "XPUActivityApi.h"
+#include <profiler/ActivityLoggerFactory.h>
+#include <profiler/InvariantViolations.h>
+#include <profiler/LoggerCollector.h>
+#include <profiler/XPUActivityApi.h>
+#include <profiler/XPUActivityProfiler.h>
+#include <profiler/include/kineto/ActivityProfilerInterface.h>
+#include <profiler/include/kineto/ActivityTraceInterface.h>
 
 namespace KINETO_NAMESPACE {
 

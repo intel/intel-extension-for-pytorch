@@ -10,7 +10,7 @@
 
 #include <string>
 
-#include "ActivityType.h"
+#include <profiler/include/kineto/ActivityType.h>
 
 namespace libkineto {
 

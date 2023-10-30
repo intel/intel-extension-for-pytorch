@@ -1,10 +1,11 @@
-#include "XPUActivity.h"
+#include <profiler/XPUActivity.h>
 
 #include <fmt/format.h>
 #include <iostream>
 
+#include <profiler/xpu_output_base.h>
+
 #include "onepti_activity_api.h"
-#include "xpu_output_base.h"
 
 namespace KINETO_NAMESPACE {
 

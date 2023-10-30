@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "kineto/Config.h"
+#include <profiler/include/kineto/Config.h>
 
 #include <stdlib.h>
 
@@ -22,8 +22,8 @@
 #include <ostream>
 #include <sstream>
 
-#include "Logger.h"
-#include "kineto/ThreadUtil.h"
+#include <profiler/Logger.h>
+#include <profiler/include/kineto/ThreadUtil.h>
 
 using namespace std::chrono;
 

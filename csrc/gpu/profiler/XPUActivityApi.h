@@ -7,8 +7,8 @@
 #include <mutex>
 #include <set>
 
-#include "XPUActivityBuffer.h"
-#include "kineto/ActivityType.h"
+#include <profiler/XPUActivityBuffer.h>
+#include <profiler/include/kineto/ActivityType.h>
 
 // struct onepti_Activity;
 class UnifiedTracer;

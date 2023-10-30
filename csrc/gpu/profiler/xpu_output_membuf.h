@@ -5,9 +5,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "kineto/Config.h"
-#include "kineto/GenericTraceActivity.h"
-#include "xpu_output_base.h"
+#include <profiler/include/kineto/Config.h>
+#include <profiler/include/kineto/GenericTraceActivity.h>
+#include <profiler/xpu_output_base.h>
 
 namespace KINETO_NAMESPACE {
 

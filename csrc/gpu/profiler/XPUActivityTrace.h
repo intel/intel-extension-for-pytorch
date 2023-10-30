@@ -3,10 +3,10 @@
 #include <memory>
 #include <string>
 
-#include "ActivityLoggerFactory.h"
-#include "kineto/ActivityTraceInterface.h"
-#include "xpu_output_json.h"
-#include "xpu_output_membuf.h"
+#include <profiler/ActivityLoggerFactory.h>
+#include <profiler/include/kineto/ActivityTraceInterface.h>
+#include <profiler/xpu_output_json.h>
+#include <profiler/xpu_output_membuf.h>
 
 namespace libkineto {
 

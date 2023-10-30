@@ -1,9 +1,9 @@
 #pragma once
 
-#include "XPUActivityPlatform.h"
-#include "kineto/GenericTraceActivity.h"
-#include "kineto/ITraceActivity.h"
-#include "kineto/ThreadUtil.h"
+#include <profiler/XPUActivityPlatform.h>
+#include <profiler/include/kineto/GenericTraceActivity.h>
+#include <profiler/include/kineto/ITraceActivity.h>
+#include <profiler/include/kineto/ThreadUtil.h>
 #include "onepti_activity_api.h"
 
 #include <string>

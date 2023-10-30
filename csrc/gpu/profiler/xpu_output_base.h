@@ -6,10 +6,10 @@
 #include <thread>
 #include <unordered_map>
 
-#include "XPUActivityBuffers.h"
-#include "kineto/GenericTraceActivity.h"
-#include "kineto/ThreadUtil.h"
-#include "kineto/TraceSpan.h"
+#include <profiler/XPUActivityBuffers.h>
+#include <profiler/include/kineto/GenericTraceActivity.h>
+#include <profiler/include/kineto/ThreadUtil.h>
+#include <profiler/include/kineto/TraceSpan.h>
 
 namespace KINETO_NAMESPACE {
 class Config;
