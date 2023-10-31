@@ -5,9 +5,9 @@
 #       For reference:
 #           https://docs.docker.com/develop/develop-images/build_enhancements/
 
-ARG UBUNTU_VERSION=20.04
+ARG UBUNTU_VERSION=22.04
 
-FROM ubuntu:${UBUNTU_VERSION} as base
+FROM ubuntu:${UBUNTU_VERSION}
 
 # See http://bugs.python.org/issue19846
 ENV LANG C.UTF-8
@@ -27,10 +27,10 @@ RUN ${PYTHON} -m pip --no-cache-dir install --upgrade \
 # Some TF tools expect a "python" binary
 RUN ln -s $(which ${PYTHON}) /usr/local/bin/python
 
-ARG IPEX_VERSION=2.0.100
-ARG PYTORCH_VERSION=2.0.1
-ARG TORCHAUDIO_VERSION=2.0.2
-ARG TORCHVISION_VERSION=0.15.2
+ARG IPEX_VERSION=2.1.0
+ARG PYTORCH_VERSION=2.1.0
+ARG TORCHAUDIO_VERSION=2.1.0
+ARG TORCHVISION_VERSION=0.16.0
 ARG TORCH_CPU_URL=https://download.pytorch.org/whl/cpu/torch_stable.html
 
 RUN \
@@ -38,3 +38,8 @@ RUN \
     torch==${PYTORCH_VERSION}+cpu torchvision==${TORCHVISION_VERSION}+cpu torchaudio==${TORCHAUDIO_VERSION}+cpu -f ${TORCH_CPU_URL} && \
     python -m pip install --no-cache-dir \
     intel_extension_for_pytorch==${IPEX_VERSION}
+
+RUN useradd -m ubuntu
+RUN echo 'ubuntu ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+USER ubuntu
+WORKDIR /home/ubuntu
