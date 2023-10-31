@@ -167,20 +167,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 )
             import re
 
-            if re.search("falcon", config.architectures[0], re.IGNORECASE) or re.search(
-                "rw", config.architectures[0], re.IGNORECASE
-            ):
-                qpath = Path(parent_path, "single_instance/run_falcon_quantization.py")
-            elif re.search("GPTJ", config.architectures[0], re.IGNORECASE):
-                qpath = Path(parent_path, "single_instance/run_gpt-j_quantization.py")
-            elif re.search("llama", config.architectures[0], re.IGNORECASE):
-                qpath = Path(parent_path, "single_instance/run_llama_quantization.py")
-            elif re.search("gptneox", config.architectures[0], re.IGNORECASE):
-                qpath = Path(
-                    parent_path, "single_instance/run_gpt-neox_quantization.py"
-                )
-            elif re.search("OPT", config.architectures[0], re.IGNORECASE):
-                qpath = Path(parent_path, "single_instance/run_opt_quantization.py")
+            qpath = Path(parent_path, "single_instance/run_quantization.py")
 
             infer_cmd = ["python", qpath]
             # 1) quantization
@@ -232,7 +219,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 print("quantizing model ...")
                 subprocess.run(quant_cmd)
                 infer_cmd.extend(
-                    ["--quantized-model-path", str(args.output_dir) + "/best_model.pt"]
+                    ["--quantized-model-path", str(args.output_dir)+"/"+str(args.quant_model_name)]
                 )
             else:
                 infer_cmd.extend(
