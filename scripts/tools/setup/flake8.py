@@ -6,17 +6,11 @@ import sys
 
 def check_flake8_errors(base_dir, filepath):
     if shutil.which("flake8") is None:
-        print(
-            "WARNING: Please install flake8 by pip install -r requirements-flake8.txt to check format!"
-        )
-        return 1
+        return -1
     flak8_cmd = ["flake8"]  # '--quiet'
 
     if shutil.which("black") is None:
-        print(
-            "WARNING: Please install black by pip install -r requirements-flake8.txt to auto format!"
-        )
-        return 1
+        return -1
     black_cmd = ["black"]
 
     if os.path.isdir(filepath):
@@ -63,8 +57,12 @@ if __name__ == "__main__":
 
     Check_dir = [setupfile, base_pydir, base_examples, base_native, base_regression]
     ret = sum([check_flake8_errors(base_dir, path) for path in Check_dir])
-    if ret != 0:
+    if ret > 0:
         print("ERROR: flake8 found format errors!")
         sys.exit(1)
+    elif ret < 0:
+        print(
+            "WARNING: Please install flake8 by pip install -r requirements-flake8.txt to check format!"
+        )        
     else:
         print("Pass!")
