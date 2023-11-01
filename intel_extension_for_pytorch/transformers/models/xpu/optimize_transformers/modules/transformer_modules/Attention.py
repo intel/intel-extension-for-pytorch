@@ -5,6 +5,7 @@ import math
 from .NaiveAttention import IPEXTransformerAttnNaive
 from .BaseAttention import IPEXTransformerAttn, IPEXRuntimeAttnCache
 from .Linear import matmul_add_add
+import intel_extension_for_pytorch as ipex
 
 
 class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
