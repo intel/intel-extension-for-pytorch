@@ -19,7 +19,6 @@ def woq(
     symmetric=False,
     group_size=-1,
     pack_dtype=torch.uint8,
-    mixed_weight=False,
     param_dtype=torch.float,
 ):
     r"""
@@ -35,7 +34,6 @@ def woq(
       symmetric (bool): Control quantization scheme. Default value is ``False``.
       group_size (int): Group as a block along k dimension. Default value is ``-1``.
       pack_dtype (torch.dtype): Pack int2/int4/int3 to the type. Default value is ``torch.uint8``.
-      mixed_weight (bool): Whether mix original weight and quantized weight.
       param_dtype (torch.dtype): Determines the other weight's accuracy except quantized weight.
 
     .. warning::
@@ -69,15 +67,22 @@ def woq(
 
     full = find_layers(model)
     sequential = list(full.keys())
-    # Valid transformer block name should ends with numeric string.
-    valid = [re.search("[0-9]+", s.split(".")[-1]) is not None for s in sequential]
-    names = [s for (s, v) in zip(sequential, valid) if v]
+    transformer_blocks = {}
+    for s in sequential:
+        sub_names = s.split(".")
+        # Valid transformer block name should ends with numeric string.
+        if (
+            s.startswith("transformer.h")
+            and re.search("[0-9]+", sub_names[2]) is not None
+        ):
+            prefix = ".".join(sub_names[0:3])
+            if not (prefix in transformer_blocks):
+                transformer_blocks[prefix] = {s: full[s]}
+            else:
+                transformer_blocks[prefix][s] = full[s]
+    names = list(transformer_blocks.keys())
     # Sequential calibration need sort transformer block.
     names.sort(key=lambda x: int(x.split(".")[-1]))
-    transformer_blocks = {}
-    for name in names:
-        transformer_blocks[name] = full[name]
-
     if len(names) == 0:
         raise ValueError("The model may has no transformer block")
 
@@ -117,9 +122,6 @@ def woq(
 
     for i in range(len(layers)):
         print(f"Quantizing layer {i+1}/{len(layers)}..")
-        print("+------------------+--------------+------------+-----------+-------+")
-        print("|       name       | weight_error | fp_inp_SNR | q_inp_SNR | time  |")
-        print("+==================+==============+============+===========+=======+")
 
         layer = layers[i]
         layer_name = names[i]
@@ -167,14 +169,9 @@ def woq(
         del gptq
 
         inps, outs = outs, inps
-        print("+------------------+--------------+------------+-----------+-------+")
-        print("\n")
 
     # Quantize lm head.
-    print("Quantizing lm head")
-    print("+------------------+--------------+------------+-----------+-------+")
-    print("|       name       | weight_error | fp_inp_SNR | q_inp_SNR | time  |")
-    print("+==================+==============+============+===========+=======+")
+    print("Quantizing lm head..")
 
     lm_head = model.lm_head
     gptq_lmhead = GPTQ(lm_head)
@@ -195,9 +192,6 @@ def woq(
     scales, zeros, _, _ = gptq_lmhead.fasterquant(groupsize=group_size, name="lm_head")
     quant_meta["lm_head"] = QUANT_META(scales, zeros)
 
-    print("+------------------+--------------+------------+-----------+-------+")
-    print("\n")
-
     model.config.use_cache = use_cache
     for block in transformer_blocks:
         for name in transformer_blocks[block]:
@@ -210,8 +204,7 @@ def woq(
                 group_size=group_size,
                 pack_dtype=pack_dtype,
             )
-            if not mixed_weight:
-                del model_state[name + ".weight"]
+            del model_state[name + ".weight"]
             # Set model state.
             model_state[name + ".qweight"] = qweight
             model_state[name + ".scales"] = scales.to(param_dtype)
@@ -225,11 +218,11 @@ def woq(
         group_size=group_size,
         pack_dtype=pack_dtype,
     )
-    if not mixed_weight:
-        del model_state["lm_head.weight"]
+    del model_state["lm_head.weight"]
     model_state["lm_head.qweight"] = qweight
     model_state["lm_head.scales"] = scales.to(param_dtype)
     model_state["lm_head.qzeros"] = qzeros
 
     # Save checkpoint.
+    print("Saving checkpoint..")
     torch.save(model_state, quantized_ckpt)

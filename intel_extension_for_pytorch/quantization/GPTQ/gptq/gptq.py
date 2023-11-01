@@ -8,9 +8,6 @@ import torch.nn as nn
 from .quantizer import Quantizer
 from .model_utils import torch_snr_error
 
-# torch.backends.cuda.matmul.allow_tf32 = False
-# torch.backends.cudnn.allow_tf32 = False
-
 
 class Observer:
     def __init__(self, topk=32):
@@ -131,7 +128,6 @@ class GPTQ:
             fp_SNR = "-"
 
         table.add_row([name, weight_error, fp_SNR, q_SNR, timecost])
-        print(table.draw().split("\n")[-2])
 
     def fasterquant(
         self, blocksize=128, percdamp=0.01, groupsize=-1, actorder=False, name=""

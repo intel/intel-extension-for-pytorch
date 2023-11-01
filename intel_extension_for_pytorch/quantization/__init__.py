@@ -9,4 +9,4 @@ from ._qconfig import (
     WoqLowpMode,
 )
 from ._autotune import autotune
-from .woq import woq
+from .GPTQ import woq
