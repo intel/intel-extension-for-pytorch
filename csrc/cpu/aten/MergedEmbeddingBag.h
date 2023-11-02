@@ -2,101 +2,118 @@
 #include <ATen/Tensor.h>
 #include <dyndisp/DispatchStub.h>
 #include <torch/all.h>
-#include "utils/csr2csc.h"
 
 namespace torch_ipex {
 namespace cpu {
 
 namespace {
+using namespace at;
+enum PoolingMode { SUM = 0, MEAN = 1 };
+template <class T>
+class EMBROW {
+ public:
+  T* data = nullptr;
+  int32_t length;
+  EMBROW(int32_t len) {
+    length = len;
+    Allocator* allocator = c10::GetAllocator(c10::DeviceType::CPU);
+    data = (T*)allocator->raw_allocate(len * sizeof(T));
+    memset(data, 0, len * sizeof(T));
+  }
+  ~EMBROW() {
+    Allocator* allocator = c10::GetAllocator(c10::DeviceType::CPU);
+    allocator->raw_deallocate(data);
+  }
+};
+
+template <class T>
+class EmbeddingGradCache {
+ public:
+  std::unordered_map<int32_t, EMBROW<T>> cache;
+};
 
 struct SGDArgs {
-  SGDArgs(
-      const std::vector<Tensor>& bf16_trail_,
-      float weight_decay_,
-      float lr_)
+  SGDArgs(const TensorList& bf16_trail_, float weight_decay_, float lr_)
       : bf16_trail(bf16_trail_), weight_decay(weight_decay_), lr(lr_) {}
 
-  std::vector<Tensor> bf16_trail;
+  TensorList bf16_trail;
   float weight_decay;
   float lr;
 };
 
-template <typename T, typename optimizer_args_t>
-class AccGradUpdate {};
+template <typename data_t, typename acc_t, typename optimizer_args_t>
+class EmbeddingGradUpdate {};
 
-template <typename T>
-class AccGradUpdate<T, SGDArgs> {
+template <typename data_t, typename acc_t>
+class EmbeddingGradUpdate<data_t, acc_t, SGDArgs> {
  public:
   static void update(
-      T* weight,
-      T* grad,
-      const BatchedHyperCompressedSparseColumn& batched_csc,
-      int64_t uniq_index_id,
-      int64_t weight_offsets,
-      int vector_size,
-      int table_id,
-      const SGDArgs& args);
+      data_t* weight,
+      const EmbeddingGradCache<acc_t>& egc,
+      const SGDArgs& args,
+      const int32_t table_id,
+      const int64_t emb_dim);
 };
 
 std::vector<Tensor> merged_embeddingbag_forward_cpu_kernel_impl(
-    const Tensor& indices,
-    const Tensor& offsets,
     const std::vector<Tensor>& weights,
-    const std::vector<int64_t> pooling_modes);
+    const TensorList& indices,
+    const TensorList& offsets,
+    const int64_t pooling_mode,
+    const bool include_last_offsets);
 
 std::vector<Tensor> merged_embeddingbag_backward_cpu_kernel_impl(
-    const std::vector<Tensor>& grad_outs_,
-    const Tensor& offsets,
-    const std::vector<Tensor>& weights,
-    const Tensor& indices_with_row_offset,
-    const Tensor& row_offsets,
-    const std::vector<int64_t> pooling_modes);
+    const TensorList& grad_outs_,
+    const TensorList& weights,
+    const TensorList& indices,
+    const TensorList& offsets,
+    const int64_t pooling_mode,
+    const bool include_last_offsets);
 
 void merged_embeddingbag_backward_sgd_cpu_kernel_impl(
-    const std::vector<Tensor>& grads_y_,
-    const Tensor& indices,
-    const Tensor& offsets,
-    const std::vector<Tensor>& weights,
-    const Tensor& indices_with_row_offset,
-    const Tensor& row_offsets,
-    std::vector<int64_t> pooling_modes,
-    const std::vector<Tensor>& bf16_trail,
-    double weight_decay,
-    double lr);
+    const TensorList& grad_outs_,
+    TensorList weights,
+    const TensorList& indices,
+    const TensorList& offsets,
+    const int64_t pooling_mode,
+    const bool include_last_offsets,
+    const TensorList& bf16_trail,
+    const double weight_decay,
+    const double lr);
 
 } // namespace
 
 using merged_embeddingbag_forward_cpu_kernel_fn = std::vector<Tensor> (*)(
-    const Tensor&,
-    const Tensor&,
     const std::vector<Tensor>&,
-    const std::vector<int64_t>);
+    const TensorList&,
+    const TensorList&,
+    const int64_t,
+    const bool);
 DECLARE_DISPATCH(
     merged_embeddingbag_forward_cpu_kernel_fn,
     merged_embeddingbag_forward_cpu_kernel_stub);
 
 using merged_embeddingbag_backward_cpu_kernel_fn = std::vector<Tensor> (*)(
-    const std::vector<Tensor>&,
-    const Tensor&,
-    const std::vector<Tensor>&,
-    const Tensor&,
-    const Tensor&,
-    const std::vector<int64_t>);
+    const TensorList&,
+    const TensorList&,
+    const TensorList&,
+    const TensorList&,
+    const int64_t,
+    const bool);
 DECLARE_DISPATCH(
     merged_embeddingbag_backward_cpu_kernel_fn,
     merged_embeddingbag_backward_cpu_kernel_stub);
 
 using merged_embeddingbag_backward_sgd_cpu_kernel_fn = void (*)(
-    const std::vector<Tensor>&,
-    const Tensor&,
-    const Tensor&,
-    const std::vector<Tensor>&,
-    const Tensor&,
-    const Tensor&,
-    std::vector<int64_t>,
-    const std::vector<Tensor>&,
-    double,
-    double);
+    const TensorList&,
+    TensorList,
+    const TensorList&,
+    const TensorList&,
+    const int64_t,
+    const bool,
+    const TensorList&,
+    const double,
+    const double);
 DECLARE_DISPATCH(
     merged_embeddingbag_backward_sgd_cpu_kernel_fn,
     merged_embeddingbag_backward_sgd_cpu_kernel_stub);

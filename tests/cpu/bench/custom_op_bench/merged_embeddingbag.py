@@ -10,6 +10,7 @@ r"""
 
 a = torch.ones(256 * 1024 * 1024 // 4, dtype=torch.float)
 b = torch.ones(256 * 1024 * 1024 // 4, dtype=torch.float)
+NUM_TABLE = 26
 
 
 def cache_flush():
@@ -22,46 +23,80 @@ def cache_flush():
 
 
 class EmbeddingBagList(torch.nn.Module):
-    def __init__(self, max_rows, vector_size):
+    def __init__(
+        self,
+        ntables,
+        num_dim,
+        dtype,
+        include_last_offset=False,
+        sparse=False,
+        mode="sum",
+    ):
         super(EmbeddingBagList, self).__init__()
-        self.emb_list = torch.nn.ModuleList()
-        for n_f in max_rows:
-            self.emb_list.append(
-                torch.nn.EmbeddingBag(n_f, vector_size, mode="sum", sparse=True)
+        self.list = torch.nn.ModuleList()
+        for _ in range(ntables):
+            self.list.append(
+                torch.nn.EmbeddingBag(
+                    1000,
+                    num_dim,
+                    dtype=dtype,
+                    mode=mode,
+                    include_last_offset=include_last_offset,
+                    sparse=sparse,
+                )
             )
 
     def forward(self, indices, offsets):
         ly = []
-        for k, sparse_index_group_batch in enumerate(indices):
-            sparse_offset_group_batch = offsets[k]
-            E = self.emb_list[k]
-            V = E(sparse_index_group_batch, sparse_offset_group_batch)
-            ly.append(V)
+        for i, emb in enumerate(self.list):
+            ly.append(emb(indices[i], offsets[i]))
         return ly
 
 
-class EmbCatDense(torch.nn.Module):
-    def __init__(self, NUM_TABLE, NUM_DIM, dtype):
-        super(EmbCatDense, self).__init__()
-        self.emblist = torch.nn.ModuleList()
-        for _ in range(NUM_TABLE):
-            self.emblist.append(
-                torch.nn.EmbeddingBag(1000, NUM_DIM, mode="sum", dtype=dtype)
-            )
+class EmbeddingBagListCatDense(torch.nn.Module):
+    def __init__(self, emb_list):
+        super(EmbeddingBagListCatDense, self).__init__()
+        self.emb_list = emb_list
+
+    def forward(self, indices, offsets, dense):
+        return torch.cat([dense] + self.emb_list(indices, offsets), dim=1)
+
+
+class MergedEmbCatDense(torch.nn.Module):
+    def __init__(self, emblist):
+        super(MergedEmbCatDense, self).__init__()
         self.merged_emb = (
             ipex.nn.modules.MergedEmbeddingBagWithCat.from_embeddingbag_list(
-                self.emblist
+                emblist.list
             )
         )
 
-    def ref_forward(self, indices, offsets, to_cat):
-        sparse_out = []
-        for i, emb in enumerate(self.emblist):
-            sparse_out.append(emb(indices[i], offsets[i]))
-        return torch.cat([to_cat] + sparse_out, dim=1)
+    def forward(self, indices, offsets, dense):
+        return self.merged_emb(indices, offsets, dense)
 
-    def forward(self, indices, offsets, to_cat):
-        return self.merged_emb(indices, offsets, to_cat)
+
+class MergedEmb(torch.nn.Module):
+    def __init__(self, emblist):
+        super(MergedEmb, self).__init__()
+        self.merged_emb = ipex.nn.modules.MergedEmbeddingBag.from_embeddingbag_list(
+            emblist.list
+        )
+
+    def forward(self, indices, offsets):
+        return self.merged_emb(indices, offsets)
+
+
+class MergedEmbSGD(torch.nn.Module):
+    def __init__(self, emblist, lr=0.01, weight_decay=0):
+        super(MergedEmbSGD, self).__init__()
+        self.merged_emb = (
+            ipex.nn.modules.MergedEmbeddingBagWithSGD.from_embeddingbag_list(
+                emblist.list, lr=lr, weight_decay=weight_decay
+            )
+        )
+
+    def forward(self, indices, offsets):
+        return self.merged_emb(indices, offsets)
 
 
 def run_bench(bench_name, module, input_data, optimizer=None, training=False):
@@ -121,10 +156,71 @@ def training_bench(dataset, emb_list, merged_emb, optimizer):
     )
 
 
-def merged_emb_cat_bench(args):
+def merged_emb_cat_bench(args, input):
     assert args.inference
-    NUM_TABLE = 26
-    index_type = torch.int64
+    indices, offsets = input
+    for dtype in [torch.float32, torch.bfloat16, torch.float16]:
+        emblist = EmbeddingBagList(NUM_TABLE, args.vector_size, dtype)
+        ref_m = EmbeddingBagListCatDense(emblist)
+        m = MergedEmbCatDense(emblist)
+        dense = torch.randn(args.batch_size, args.vector_size, dtype=dtype)
+        with torch.no_grad():
+            run_bench(
+                f"MergedEmbeddingBagWithCat: value_dtype:{dtype}",
+                m,
+                (indices, offsets, dense),
+            )
+            run_bench(
+                f"EmbeddingBagList+Cat: value_dtype:{dtype}",
+                ref_m,
+                (indices, offsets, dense),
+            )
+
+
+def merged_emb_with_sgd(args, input):
+    for dtype in [torch.float32, torch.bfloat16]:
+        if dtype == torch.bfloat16:
+            # for bf16, only support split sgd
+            emblist = EmbeddingBagList(NUM_TABLE, args.vector_size, torch.float32)
+        else:
+            emblist = EmbeddingBagList(NUM_TABLE, args.vector_size, dtype)
+        m = MergedEmbSGD(copy.deepcopy(emblist), lr=0.1)
+        ref_m = copy.deepcopy(emblist)
+        opt = torch.optim.SGD(ref_m.parameters(), lr=0.1)
+        if dtype == torch.bfloat16:
+            m.merged_emb.to_bfloat16_train()
+            ref_m, opt = ipex.optimize(ref_m, dtype=torch.bfloat16, optimizer=opt)
+        if args.inference:
+            with torch.no_grad():
+                run_bench(
+                    f"MergedEmbeddingBagWithSGD: value_dtype:{dtype}",
+                    m,
+                    input,
+                )
+                run_bench(
+                    f"EmbeddingBagList: value_dtype:{dtype}",
+                    ref_m,
+                    input,
+                )
+        else:
+            run_bench(
+                f"MergedEmbeddingBagWithSGD: value_dtype:{dtype}",
+                m,
+                input,
+                training=True,
+            )
+            run_bench(
+                f"EmbeddingBagList: value_dtype:{dtype}",
+                ref_m,
+                input,
+                optimizer=opt,
+                training=True,
+            )
+
+
+def get_data(batch_size):
+    indices = []
+    offsets = []
     multi_hot = [
         3,
         2,
@@ -153,89 +249,46 @@ def merged_emb_cat_bench(args):
         1,
         1,
     ]
-    for index_type in [torch.int32, torch.int64]:
-        indices = [
-            torch.randint(1000, (args.batch_size * multi_hot[i],)).to(index_type)
-            for i in range(NUM_TABLE)
-        ]
-        offsets = [
-            torch.arange(0, args.batch_size * multi_hot[i], multi_hot[i]).to(index_type)
-            for i in range(NUM_TABLE)
-        ]
-        for dtype in [torch.float32, torch.bfloat16, torch.float16]:
-            m = EmbCatDense(NUM_TABLE, args.vector_size, dtype)
-            dense = torch.randn(args.batch_size, args.vector_size, dtype=dtype)
-            with torch.no_grad():
-                run_bench(
-                    f"MergedEmbeddingBagWithCat: value_dtype:{dtype}, index_dtype:{index_type}",
-                    m,
-                    (indices, offsets, dense),
-                )
-                m.forward = m.ref_forward
-                run_bench(
-                    f"EmbeddingBagList+Cat: value_dtype:{dtype}, index_dtype:{index_type}",
-                    m,
-                    (indices, offsets, dense),
-                )
 
+    def unbalance_indices(i):
+        a = torch.normal(0, 0.1, (batch_size * multi_hot[i],))
+        a = a - a.min()
+        a = a * 100 / a.max()
+        a = a.floor().int()
+        return a
 
-def get_data(distribution, merged_emb, max_rows, batch_size):
-    indices = []
-    offsets = []
-    include_last = [False for i in range(len(max_rows))]
-    for i in range(len(max_rows)):
-        idx = torch.empty(batch_size, dtype=torch.int64)
-        if batch_size <= max_rows[i]:
-            j = int(max_rows[i] / batch_size)
-            for k in range(batch_size):
-                value = k * j if (distribution == "balance" or k % 2 == 0) else 0
-                idx[k] = value
-        else:
-            for k in range(batch_size):
-                value = (
-                    k % max_rows[i] if (distribution == "balance" or k % 2 == 0) else 0
-                )
-                idx[k] = value
-        indices.append(idx)
-        offsets.append(torch.arange(batch_size))
+    indices = [unbalance_indices(i) for i in range(26)]
+    offsets = [
+        torch.arange(0, batch_size * multi_hot[i], multi_hot[i]).int()
+        for i in range(26)
+    ]
 
-    merged_input = merged_emb.linearize_indices_and_offsets(
-        indices, offsets, include_last
-    )
-    return (indices, offsets), (merged_input, torch.BoolTensor([False]))
+    return (indices, offsets)
 
 
 def run():
     import argparse
 
     parser = argparse.ArgumentParser(description="benchmark for ipex embeddingbag")
-    parser.add_argument(
-        "--data-distribution", type=str, choices=["balance", "unbalance"]
-    )
     parser.add_argument("--inference", action="store_true", default=False)
     parser.add_argument("--batch-size", type=int, default=7168)
     parser.add_argument("--vector-size", type=int, default=128)
     parser.add_argument("--with-cat", action="store_true", default=False)
-
+    parser.add_argument(
+        "--optimizer",
+        type=str,
+        default="sgd",
+        choices=["sgd"],
+    )
     args = parser.parse_args()
+    input_data = get_data(args.batch_size)
     if args.with_cat:
-        merged_emb_cat_bench(args)
+        assert args.inference
+        merged_emb_cat_bench(args, input_data)
         exit()
 
-    max_rows = [args.batch_size for i in range(26)]
-    emb_list = EmbeddingBagList(max_rows, args.vector_size)
-    sgd = torch.optim.SGD(emb_list.parameters(), lr=0.01)
-    emb_list, sgd = ipex.optimize(model=emb_list, optimizer=sgd, dtype=torch.float)
-
-    merged_emb = ipex.nn.modules.MergedEmbeddingBagWithSGD.from_embeddingbag_list(
-        copy.deepcopy(emb_list.emb_list)
-    )
-
-    input_data = get_data(args.data_distribution, merged_emb, max_rows, args.batch_size)
-    if args.inference:
-        inference_bench(input_data, emb_list, merged_emb)
-    else:
-        training_bench(input_data, emb_list, merged_emb, sgd)
+    if args.optimizer == "sgd":
+        merged_emb_with_sgd(args, input_data)
 
 
 if __name__ == "__main__":

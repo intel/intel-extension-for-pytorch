@@ -1,9 +1,9 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 #include "aten/Interaction.h"
-#include "aten/utils/utils.h"
 #include "autocast/autocast_mode.h"
 #include "cpu/kernels/Interaction.h"
 #include "ideep/IDeepConversions.h"
+#include "vec/unroll_helper.hpp"
 #include "vec/vec.h"
 
 #include <ATen/Parallel.h>
@@ -36,67 +36,6 @@ static inline void cat(
   }
 }
 
-#if defined(CPU_CAPABILITY_AVX512)
-auto set_zero_inner = [](auto i, __m512* vset) {
-  vset[i] = _mm512_setzero_ps();
-};
-auto set_zero = [set_zero_inner](auto i, __m512** vset) {
-  compile_time_for<4>::op(set_zero_inner, vset[i]);
-};
-auto fma = [](auto i, __m512* inout_vset, __m512 m1_vset, __m512* m2_vset) {
-  inout_vset[i] = _mm512_fmadd_ps(m1_vset, m2_vset[i], inout_vset[i]);
-};
-auto bcast_fma = [fma](
-                     auto i,
-                     __m512** inout_vset,
-                     __m512* m2_vset,
-                     __m512 bcast,
-                     auto* basic_ptr,
-                     int32_t* offset) {
-  *offset += 27;
-  bcast = _mm512_set1_ps(*(basic_ptr + *offset));
-  compile_time_for<4>::op(fma, inout_vset[i], bcast, m2_vset);
-};
-auto acc_with_fma = [](auto i, __m512* dst, __m512* vset_1, __m512* vset_2) {
-  *dst = _mm512_fmadd_ps(vset_1[i], vset_2[i], *dst);
-};
-auto load = [](auto i, __m512* in_vset, auto* basic_ptr) {
-  in_vset[i] = _mm512_loadu_ps(basic_ptr + 16 * i);
-};
-auto load_bf16_cast_fp32 = [](auto i,
-                              __m512i* bf16_vset,
-                              __m512* fp32_vset,
-                              auto* basic_ptr) {
-  bf16_vset[i] = _mm512_loadu_si512(basic_ptr + 32 * i);
-  fp32_vset[i * 2] = _mm512_castsi512_ps(_mm512_slli_epi32(
-      _mm512_cvtepu16_epi32(_mm512_extracti32x8_epi32(bf16_vset[i], 0)), 16));
-  fp32_vset[i * 2 + 1] = _mm512_castsi512_ps(_mm512_slli_epi32(
-      _mm512_cvtepu16_epi32(_mm512_extracti32x8_epi32(bf16_vset[i], 1)), 16));
-};
-auto store_inner = [](auto i, __m512* out_vset, auto* basic_ptr) {
-  _mm512_storeu_ps(basic_ptr + 16 * i, out_vset[i]);
-};
-auto store =
-    [store_inner](auto i, __m512** out_vset, auto* basic_ptr, int32_t* offset) {
-      *offset += 128;
-      compile_time_for<4>::op(store_inner, out_vset[i], basic_ptr + *offset);
-    };
-auto cast_bf16_and_store_inner = [](auto i, __m512* out_vset, auto* basic_ptr) {
-  _mm256_storeu_si256(
-      reinterpret_cast<__m256i*>(basic_ptr + 16 * i),
-      reinterpret_cast<__m256i>(_mm512_cvtneps_pbh(out_vset[i])));
-};
-auto cast_bf16_and_store = [cast_bf16_and_store_inner](
-                               auto i,
-                               __m512** out_vset,
-                               auto* basic_ptr,
-                               int32_t* offset) {
-  *offset += 128;
-  compile_time_for<4>::op(
-      cast_bf16_and_store_inner, out_vset[i], basic_ptr + *offset);
-};
-#endif
-
 template <typename T>
 inline void mm(T* out, T* mat1, T* mat2, uint32_t M, uint32_t K, uint32_t N) {
 #if defined(CPU_CAPABILITY_AVX512)
@@ -116,32 +55,34 @@ inline void mm(T* out, T* mat1, T* mat2, uint32_t M, uint32_t K, uint32_t N) {
     // Bcast A
     __m512 bcast;
     for (int n = 0; n < N; n += ld_block) {
-      int32_t mat1_m_off = -189; // 27 * (bd_block + 1)
-      int32_t out_m_off = -128;
+      int32_t mat1_m_off = -162; // 27 * bd_block
+      int32_t out_m_off = 0;
       for (int m = 0; m < 27; m += bd_block) {
         mat1_m_off += 162; // 27 * bd_block
         int32_t mat2_k_off = -128;
         // set zeros
-        compile_time_for<6>::op(set_zero, v_c);
+        compile_time_for<6>::op(set_zero_2d, v_c);
         for (int k = 0; k < 27; k++) {
           mat2_k_off += 128;
           // load mat2 value
-          compile_time_for<4>::op(load, v_b, mat2 + mat2_k_off + n);
+          compile_time_for<4>::op(load_fp32, v_b, mat2 + mat2_k_off + n);
           if (m == 24) {
             compile_time_for<3>::op(
-                bcast_fma, v_c, v_b, bcast, mat1 + k, &mat1_m_off);
-            mat1_m_off -= 81;
+                bcast_fma, v_c, v_b, bcast, mat1 + k + mat1_m_off, 27);
           } else {
             compile_time_for<6>::op(
-                bcast_fma, v_c, v_b, bcast, mat1 + k, &mat1_m_off);
-            mat1_m_off -= 162;
+                bcast_fma, v_c, v_b, bcast, mat1 + k + mat1_m_off, 27);
           }
         }
         // reduce end, write c buffer to out
         if (m == 24) {
-          compile_time_for<3>::op(store, v_c, out + n, &out_m_off);
+          compile_time_for<3>::op(
+              store_2d_with_offset, v_c, out + n + out_m_off, 128);
+          out_m_off += 384;
         } else {
-          compile_time_for<6>::op(store, v_c, out + n, &out_m_off);
+          compile_time_for<6>::op(
+              store_2d_with_offset, v_c, out + n + out_m_off, 128);
+          out_m_off += 768;
         }
       }
     }
@@ -193,13 +134,13 @@ inline void mm<BFloat16>(
     __m512 bcast;
 
     for (int n = 0; n < N; n += ld_block) {
-      int32_t mat1_m_off = -189; // 27 * (bd_block + 1)
-      int32_t out_m_off = -128;
+      int32_t mat1_m_off = -162; // 27 * bd_block
+      int32_t out_m_off = 0;
       for (int m = 0; m < 27; m += bd_block) {
         mat1_m_off += 162; // 27 * bd_block
         int32_t mat2_k_off = -128;
         // set zeros
-        compile_time_for<6>::op(set_zero, v_c);
+        compile_time_for<6>::op(set_zero_2d, v_c);
         for (int k = 0; k < 27; k++) {
           mat2_k_off += 128;
           // load mat2 value
@@ -207,21 +148,27 @@ inline void mm<BFloat16>(
               load_bf16_cast_fp32, bf16_v_b, v_b, mat2 + mat2_k_off + n);
           if (m == 24) {
             compile_time_for<3>::op(
-                bcast_fma, v_c, v_b, bcast, mat1 + k, &mat1_m_off);
-            mat1_m_off -= 81;
+                bcast_fma, v_c, v_b, bcast, mat1 + k + mat1_m_off, 27);
           } else {
             compile_time_for<6>::op(
-                bcast_fma, v_c, v_b, bcast, mat1 + k, &mat1_m_off);
-            mat1_m_off -= 162;
+                bcast_fma, v_c, v_b, bcast, mat1 + k + mat1_m_off, 27);
           }
         }
         // reduce end, write c buffer to out
         if (m == 24) {
           compile_time_for<3>::op(
-              cast_bf16_and_store, v_c, out + n, &out_m_off);
+              cast_bf16_and_store_2d_with_offset,
+              v_c,
+              out + n + out_m_off,
+              128);
+          out_m_off += 382;
         } else {
           compile_time_for<6>::op(
-              cast_bf16_and_store, v_c, out + n, &out_m_off);
+              cast_bf16_and_store_2d_with_offset,
+              v_c,
+              out + n + out_m_off,
+              128);
+          out_m_off += 768;
         }
       }
     }
@@ -255,8 +202,8 @@ inline void dot_product(T* out, T* v1, T* v2, uint32_t len) {
     __m512 v_y[8];
     __m512 sum = _mm512_set1_ps(0.f);
     // load v1, v2
-    compile_time_for<8>::op(load, v_x, v1);
-    compile_time_for<8>::op(load, v_y, v2);
+    compile_time_for<8>::op(load_fp32, v_x, v1);
+    compile_time_for<8>::op(load_fp32, v_y, v2);
     // fma
     compile_time_for<8>::op(acc_with_fma, &sum, v_x, v_y);
     // vertical sum

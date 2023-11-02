@@ -40,9 +40,12 @@ class TestModule(torch.nn.Module):
         self.bn = torch.nn.BatchNorm2d(num_features=10)
         self.embeddingbag = torch.nn.EmbeddingBag(10, 3, mode="sum")
         self.embedding = torch.nn.Embedding(10, 3)
-        table0 = torch.nn.EmbeddingBag(100, 16, mode="mean", sparse=False)
+        table0 = torch.nn.EmbeddingBag(100, 32, mode="sum", sparse=False)
         table1 = torch.nn.EmbeddingBag(50, 32, mode="sum", sparse=False)
         self.merged = MergedEmbeddingBag.from_embeddingbag_list([table0, table1])
+        table2 = torch.nn.EmbeddingBag(100, 32, mode="mean", sparse=False)
+        table3 = torch.nn.EmbeddingBag(50, 32, mode="mean", sparse=False)
+        self.merged2 = MergedEmbeddingBag.from_embeddingbag_list([table0, table1])
 
     def forward(self, x):
         x = self.conv2d(x)

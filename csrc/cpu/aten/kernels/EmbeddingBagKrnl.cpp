@@ -10,7 +10,7 @@
 #include <torch/csrc/autograd/variable.h>
 #include <torch/script.h>
 #include <algorithm>
-#include "aten/utils/csr2csc.h"
+
 #include "autocast/autocast_mode.h"
 #include "cpu/kernels/Embeddingbag.h"
 #include "vec/vec.h"
@@ -21,32 +21,33 @@ namespace cpu {
 namespace {
 
 using namespace torch_ipex::cpu::kernel;
+using namespace at;
 
 static inline void make_offset2bag(
-    const at::Tensor& offsets,
-    const at::Tensor& indices,
-    at::Tensor& offset2bag) {
+    const Tensor& offsets,
+    const Tensor& indices,
+    Tensor& offset2bag) {
   offset2bag.index_add_(
       0,
       offsets,
-      at::ones_like(offsets, offsets.options())); // offset2bag = [1 0 1 0 1]
+      ones_like(offsets, offsets.options())); // offset2bag = [1 0 1 0 1]
   offset2bag[0] -= 1; // offset2bag = [0 0 1 0 1]
   offset2bag = offset2bag.cumsum(0); // offset2bag = [0 0 1 1 2]
 }
 
 // To save compute, if we are going to go down the fast path case for the 'sum'
 // mode, we skip calculating offset2bag, since it is not going to be used.
-static inline bool is_bfloat16_tensor(const at::Tensor tensor_) {
-  if (tensor_.scalar_type() == at::kBFloat16)
+static inline bool is_bfloat16_tensor(const Tensor tensor_) {
+  if (tensor_.scalar_type() == kBFloat16)
     return true;
   return false;
 }
 
 template <typename T>
-static inline at::Tensor _embedding_bag_index_add_select_fast(
-    const at::Tensor indices,
-    const at::Tensor src,
-    const at::Tensor offsets,
+static inline Tensor _embedding_bag_index_add_select_fast(
+    const Tensor indices,
+    const Tensor src,
+    const Tensor offsets,
     bool include_last_offset) {
   int64_t ddim = src.size(1);
   T* src_data = src.data_ptr<T>();
@@ -59,9 +60,9 @@ static inline at::Tensor _embedding_bag_index_add_select_fast(
   int64_t last_index = indices.numel();
   int64_t last_offset = output_size - 1;
 
-  at::Tensor output = at::empty({output_size, src.size(1)}, src.options());
+  Tensor output = empty({output_size, src.size(1)}, src.options());
   auto* output_data = output.data_ptr<T>();
-  at::parallel_for(0, output_size, 16, [&](int64_t start, int64_t end) {
+  parallel_for(0, output_size, 16, [&](int64_t start, int64_t end) {
     for (int64_t i = start; i < end; i++) {
       auto* out_data_ptr = &output_data[i * ddim];
       auto inputs_start = offsets_data[i];
@@ -85,17 +86,16 @@ static inline at::Tensor _embedding_bag_index_add_select_fast(
   return output;
 }
 
-at::Tensor embedding_bag_kernel_impl(
-    const at::Tensor& weight,
-    const at::Tensor& indices,
-    const at::Tensor& offsets,
+Tensor embedding_bag_kernel_impl(
+    const Tensor& weight,
+    const Tensor& indices,
+    const Tensor& offsets,
     bool include_last_offset) {
-  at::Tensor offsets_ =
-      offsets.is_contiguous() ? offsets : offsets.contiguous();
+  Tensor offsets_ = offsets.is_contiguous() ? offsets : offsets.contiguous();
 
-  at::Tensor output;
+  Tensor output;
   if (is_bfloat16_tensor(weight)) {
-    output = _embedding_bag_index_add_select_fast<at::BFloat16>(
+    output = _embedding_bag_index_add_select_fast<BFloat16>(
         indices, weight, offsets_, include_last_offset);
   } else {
     output = _embedding_bag_index_add_select_fast<float>(
@@ -104,7 +104,7 @@ at::Tensor embedding_bag_kernel_impl(
   return output;
 }
 
-static inline at::Tensor expand_values_if_needed(const at::Tensor& values) {
+static inline Tensor expand_values_if_needed(const Tensor& values) {
   // expand
   if (values.dim() == 0) {
     // Mimic Numpy behavior here and treat it as a 1D tensor
@@ -115,16 +115,16 @@ static inline at::Tensor expand_values_if_needed(const at::Tensor& values) {
 }
 
 template <typename T>
-static inline at::Tensor embedding_bag_sparse_backward_sum_fast(
-    const at::Tensor grad,
-    const at::Tensor indices,
-    const at::Tensor offsets,
+static inline Tensor embedding_bag_sparse_backward_sum_fast(
+    const Tensor grad,
+    const Tensor indices,
+    const Tensor offsets,
     int num_weights) {
   assert(grad.stride(1) == 1);
 
   int64_t indices_size0 = indices.size(0);
   int64_t ddim = grad.size(1);
-  at::Tensor index_grad = at::empty({indices_size0, ddim}, grad.options());
+  Tensor index_grad = empty({indices_size0, ddim}, grad.options());
   int grad_stride0 = grad.stride(0);
 
   auto offsets_accessor = offsets.accessor<int64_t, 1>();
@@ -132,7 +132,7 @@ static inline at::Tensor embedding_bag_sparse_backward_sum_fast(
 
   T* gradout_data = index_grad.data_ptr<T>();
   T* grad_data = grad.data_ptr<T>();
-  at::parallel_for(0, offset_numel, 16, [&](int64_t start, int64_t end) {
+  parallel_for(0, offset_numel, 16, [&](int64_t start, int64_t end) {
     for (auto mb = start; mb < end; mb++) {
       int64_t select_off_start = offsets_accessor[mb];
       int64_t select_off_end =
@@ -149,10 +149,9 @@ static inline at::Tensor embedding_bag_sparse_backward_sum_fast(
   auto dense_options = index_grad.options();
 
   if (index_grad.numel() == 0) {
-    return at::_sparse_coo_tensor_unsafe_symint(
-        at::empty({1, 0}, indices.options()),
-        at::empty_symint(
-            {c10::SymInt(0), std::move(num_features)}, dense_options),
+    return _sparse_coo_tensor_unsafe_symint(
+        empty({1, 0}, indices.options()),
+        empty_symint({c10::SymInt(0), std::move(num_features)}, dense_options),
         weight_size);
   }
 
@@ -160,12 +159,12 @@ static inline at::Tensor embedding_bag_sparse_backward_sum_fast(
   auto values =
       index_grad.reshape_symint({c10::SymInt(-1), std::move(num_features)});
 
-  return at::_sparse_coo_tensor_unsafe_symint(
+  return _sparse_coo_tensor_unsafe_symint(
       index, values, weight_size, values.scalar_type());
 }
 
 static inline int64_t count_and_map_uniq(
-    const at::TensorAccessor<int64_t, 1>& indices_accessor,
+    const TensorAccessor<int64_t, 1>& indices_accessor,
     int64_t indices_length,
     std::vector<int64_t>& indices_to_index,
     std::vector<int64_t>& index_to_indices) {
@@ -182,23 +181,22 @@ static inline int64_t count_and_map_uniq(
 }
 
 template <typename T>
-static inline at::Tensor embedding_bag_dense_backward_sum_fast(
-    const at::Tensor grad,
-    const at::Tensor indices,
-    const at::Tensor offsets,
+static inline Tensor embedding_bag_dense_backward_sum_fast(
+    const Tensor grad_,
+    const Tensor indices,
+    const Tensor offsets,
     int num_weights) {
   int64_t indices_numel = indices.numel();
-  assert(grad.stride(1) == 1 && indices_numel > 0);
+  auto grad = grad_.contiguous();
+  assert(indices_numel > 0);
   auto offset_numel = offsets.numel();
-  at::Tensor offset2bag_;
-  if (offset_numel != indices_numel) {
-    offset2bag_ =
-        at::native::full({indices.sizes()[0] + 1}, 0, indices.scalar_type());
-    make_offset2bag(offsets, indices, offset2bag_);
-    offset2bag_.resize_({indices.sizes()[0]});
-  } else {
-    offset2bag_ = offsets;
-  }
+  Tensor offset2bag_;
+
+  offset2bag_ =
+      native::full({indices.sizes()[0] + 1}, 0, indices.scalar_type());
+  make_offset2bag(offsets, indices, offset2bag_);
+  offset2bag_.resize_({indices.sizes()[0]});
+
   auto indices_accessor = indices.accessor<int64_t, 1>();
   std::vector<int64_t> indices_to_index(num_weights, -1ull);
   std::vector<int64_t> index_to_indices;
@@ -206,7 +204,7 @@ static inline at::Tensor embedding_bag_dense_backward_sum_fast(
   int64_t unique_indices = count_and_map_uniq(
       indices_accessor, indices_numel, indices_to_index, index_to_indices);
 
-  int max_threads = at::get_num_threads();
+  int max_threads = get_num_threads();
   max_threads = (unique_indices < max_threads) ? unique_indices : max_threads;
   int64_t avg_chunk_down = unique_indices / max_threads;
   std::vector<int64_t> chuck_size(max_threads);
@@ -226,7 +224,7 @@ static inline at::Tensor embedding_bag_dense_backward_sum_fast(
 
   int64_t ddim = grad.size(1);
 
-  at::Tensor index_grad_weight = at::empty({num_weights, ddim}, grad.options());
+  Tensor index_grad_weight = empty({num_weights, ddim}, grad.options());
   T* gradout_data = index_grad_weight.data_ptr<T>();
   zero_ker((T*)gradout_data, num_weights * ddim);
 
@@ -236,7 +234,7 @@ static inline at::Tensor embedding_bag_dense_backward_sum_fast(
 
   auto offset2bag_accessor = offset2bag_.accessor<int64_t, 1>();
   T* grad_data = grad.data_ptr<T>();
-  at::parallel_for(0, max_threads, 0, [&](int64_t start, int64_t end) {
+  parallel_for(0, max_threads, 0, [&](int64_t start, int64_t end) {
     for (int k = start; k < end; k++) {
       int64_t chunk_start = chuck_sum_size[k];
       int64_t chunk_end = chuck_sum_size[k + 1];
@@ -264,15 +262,15 @@ static inline at::Tensor embedding_bag_dense_backward_sum_fast(
   return index_grad_weight;
 }
 
-at::Tensor embedding_bag_backward_kernel_impl(
-    const at::Tensor& grad,
-    const at::Tensor& indices,
-    const at::Tensor& offsets,
+Tensor embedding_bag_backward_kernel_impl(
+    const Tensor& grad,
+    const Tensor& indices,
+    const Tensor& offsets,
     int64_t num_weights,
     bool sparse) {
   if (sparse) {
     if (is_bfloat16_tensor(grad)) {
-      return embedding_bag_sparse_backward_sum_fast<at::BFloat16>(
+      return embedding_bag_sparse_backward_sum_fast<BFloat16>(
           grad, indices, offsets, num_weights);
     } else {
       return embedding_bag_sparse_backward_sum_fast<float>(
@@ -280,7 +278,7 @@ at::Tensor embedding_bag_backward_kernel_impl(
     }
   } else {
     if (is_bfloat16_tensor(grad)) {
-      return embedding_bag_dense_backward_sum_fast<at::BFloat16>(
+      return embedding_bag_dense_backward_sum_fast<BFloat16>(
           grad, indices, offsets, num_weights);
     } else {
       return embedding_bag_dense_backward_sum_fast<float>(
@@ -289,17 +287,16 @@ at::Tensor embedding_bag_backward_kernel_impl(
   }
 }
 
-at::Tensor embedding_bag_int8_kernel_impl(
-    const at::Tensor& qweight,
-    const at::Tensor& indices,
-    const at::Tensor& offsets,
+Tensor embedding_bag_int8_kernel_impl(
+    const Tensor& qweight,
+    const Tensor& indices,
+    const Tensor& offsets,
     double output_scale,
     bool include_last_offset) {
   int64_t ddim = qweight.size(1);
-  double weight_scale = at::native::q_scale_quant(qweight);
+  double weight_scale = native::q_scale_quant(qweight);
   double inv_o_scale = 1.0 / output_scale;
-  int8_t* qweight_data =
-      reinterpret_cast<int8_t*>(qweight.data_ptr<at::qint8>());
+  int8_t* qweight_data = reinterpret_cast<int8_t*>(qweight.data_ptr<qint8>());
   int64_t output_size = offsets.numel();
   if (include_last_offset) {
     output_size -= 1;
@@ -310,15 +307,15 @@ at::Tensor embedding_bag_int8_kernel_impl(
   int64_t last_offset = output_size - 1;
 
   // init output tensor
-  at::QuantizerPtr output_quantizer =
-      at::make_per_tensor_affine_quantizer(output_scale, /*zp=*/0, at::kQInt8);
-  at::Tensor output = at::new_qtensor(
+  QuantizerPtr output_quantizer =
+      make_per_tensor_affine_quantizer(output_scale, /*zp=*/0, kQInt8);
+  Tensor output = new_qtensor(
       /*sizes=*/{output_size, qweight.size(1)},
       qweight.options(),
       output_quantizer);
-  int8_t* output_data = reinterpret_cast<int8_t*>(output.data_ptr<at::qint8>());
+  int8_t* output_data = reinterpret_cast<int8_t*>(output.data_ptr<qint8>());
   bool need_requantize = (output_scale - weight_scale) > 0.0001;
-  at::parallel_for(0, output_size, 16, [&](int64_t start, int64_t end) {
+  parallel_for(0, output_size, 16, [&](int64_t start, int64_t end) {
     // float fp32_buffer[ddim] __attribute__((aligned(64)));
     std::unique_ptr<float, decltype(ipex_free_aligned)*> fp32_buffer_uq_ptr(
         (float*)ipex_alloc_aligned(sizeof(float) * ddim, 64),
@@ -345,14 +342,14 @@ at::Tensor embedding_bag_int8_kernel_impl(
               &fp32_buffer[0], select_data_ptr, weight_scale, ddim);
         }
 #ifdef CPU_CAPABILITY_AVX2
-        at::vec::QuantizeAvx2<c10::qint8::underlying>(
+        vec::QuantizeAvx2<c10::qint8::underlying>(
             &fp32_buffer[0],
             out_data_ptr,
             ddim,
             inv_o_scale,
             /*zp=*/0);
 #else
-        at::vec::QuantizeAvx512<c10::qint8::underlying>(
+        vec::QuantizeAvx512<c10::qint8::underlying>(
             &fp32_buffer[0],
             out_data_ptr,
             ddim,
