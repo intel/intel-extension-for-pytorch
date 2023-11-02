@@ -141,8 +141,8 @@ struct ConvCommonOperations {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(inputs.size() == 2);
     constexpr int act_idx = 0; // Activation tenstor index
     constexpr int ctx_idx = 1; // Context index
-    res.push_back(c10::get<pytnnc::BufHandle>(inputs[act_idx]));
-    res.push_back(c10::get<pytnnc::BufHandle>(inputs[ctx_idx]));
+    res.push_back(std::get<pytnnc::BufHandle>(inputs[act_idx]));
+    res.push_back(std::get<pytnnc::BufHandle>(inputs[ctx_idx]));
     return res;
   }
 
@@ -167,9 +167,9 @@ struct ConvCommonOperations {
   static void insert_scalar_arg(
       const pytnnc::ArgValue& arg_data,
       std::vector<pytnnc::ExprHandle>& extra_args) {
-    if (auto i = c10::get_if<int64_t>(&arg_data)) {
+    if (auto i = std::get_if<int64_t>(&arg_data)) {
       extra_args.push_back(static_cast<int64_t>(*i));
-    } else if (auto i = c10::get_if<double>(&arg_data)) {
+    } else if (auto i = std::get_if<double>(&arg_data)) {
       extra_args.push_back(static_cast<double>(*i));
     } else {
       throw pytnnc::unsupported_dtype(

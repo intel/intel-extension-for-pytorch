@@ -18,8 +18,8 @@ sys.path.insert(0, os.path.abspath('.'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'intel_extension_for_pytorch'
-copyright = 'Intel(R)'
+project = 'Intel® Extension for PyTorch*'
+copyright = 'Intel Corporation'
 author = ''
 
 # The full version, including alpha/beta/rc tags
@@ -62,6 +62,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 #
 #html_theme = 'alabaster'
 html_theme = 'sphinx_rtd_theme'
+html_show_sphinx = False
 html_theme_options = {
     'logo_only': False,
     'display_version': True,

@@ -20,6 +20,7 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     LlamaTokenizer,
+    T5ForConditionalGeneration,
 )
 
 
@@ -33,6 +34,9 @@ MODEL_CLASSES = {
     "bloom": (AutoModelForCausalLM, AutoTokenizer),
     "chatglm": (AutoModelForCausalLM, AutoTokenizer),
     "codegen": (AutoModelForCausalLM, AutoTokenizer),
+    "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
+    "t5": (T5ForConditionalGeneration, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -116,6 +120,13 @@ parser.add_argument(
 )
 parser.add_argument(
     "--config-file", default=None, type=str, help="specific configuration file"
+)
+parser.add_argument(
+    "--kv-cache-dtype",
+    type=str,
+    choices=["float8_e5m2", "None"],
+    default="None",
+    help="Specify the kv_cache data type, you can use float8_e5m2 to reduce kv_cache memory footprint but may slightly drop the accuracy.",
 )
 args = parser.parse_args()
 
@@ -248,6 +259,11 @@ else:
     config = AutoConfig.from_pretrained(
         args.config_file, torchscript=args.jit, trust_remote_code=True
     )
+if args.kv_cache_dtype != "None":
+    args.kv_cache_dtype = getattr(torch, args.kv_cache_dtype)
+    print("kv_cache_dtype:", args.kv_cache_dtype)
+    config.kv_cache_dtype = args.kv_cache_dtype
+
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 
@@ -266,7 +282,7 @@ if args.benchmark:
     deepspeed.runtime.utils.see_memory_usage("pre-from-pretrained", force=True)
 
 # Construct model with fake meta tensors, later will be replaced during ds-inference ckpt load
-if world_size == 1 or model_type == "falcon":
+if world_size == 1 or model_type in ["falcon", "t5"]:
     model = model_class[0].from_pretrained(
         model_name,
         config=config,
@@ -285,6 +301,9 @@ if args.benchmark:
 
 model = model.eval()
 model = model.to(memory_format=torch.channels_last)
+
+if re.search("gptbigcode", model.config.architectures[0], re.IGNORECASE):
+    model_type = "gptbigcode"
 
 if args.benchmark:
     get_accelerator().empty_cache()
@@ -411,8 +430,12 @@ if args.batch_size > len(input_sentences):
     # dynamically extend to support larger bs by repetition
     input_sentences *= math.ceil(args.batch_size / len(input_sentences))
 num_beams = 1 if args.greedy else 4
-generate_kwargs = dict(do_sample=False, num_beams=num_beams,
-                       max_new_tokens=num_tokens, min_new_tokens=num_tokens)
+generate_kwargs = dict(
+    do_sample=False,
+    num_beams=num_beams,
+    max_new_tokens=num_tokens,
+    min_new_tokens=num_tokens,
+)
 if args.token_latency:
     if not hasattr(model.config, "token_latency"):
         model.config.token_latency = True
@@ -421,8 +444,10 @@ if args.jit:
     torch._C._jit_set_texpr_fuser_enabled(False)
     past_key_values = None
 
-    if re.search("GPTJ", model.config.architectures[0]) or re.search(
-        "codegen", model.config.architectures[0], re.IGNORECASE
+    if (
+        re.search("GPTJ", model.config.architectures[0])
+        or re.search("codegen", model.config.architectures[0], re.IGNORECASE)
+        or re.search("gptbigcode", model.config.architectures[0], re.IGNORECASE)
     ):
         beam_idx_tmp = torch.zeros(
             (2048, int(args.batch_size * num_beams)), dtype=torch.long
@@ -430,23 +455,41 @@ if args.jit:
         past_key_values = tuple(
             [
                 (
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous()
+                    if args.kv_cache_dtype == "None"
+                    else torch.zeros(
+                        [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                    ).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous()
+                    if args.kv_cache_dtype == "None"
+                    else torch.zeros(
+                        [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                    ).contiguous(),
                     beam_idx_tmp,
                     torch.zeros(1, dtype=torch.long).contiguous(),
                 )
                 for i in range(model.config.n_layer)
             ]
         )
-    elif re.search("llama", model.config.architectures[0], re.IGNORECASE):
+    elif re.search("llama", model.config.architectures[0], re.IGNORECASE) or re.search(
+        "baichuan", model.config.architectures[0], re.IGNORECASE
+    ):
         beam_idx_tmp = torch.zeros(
             (2048, int(args.batch_size * num_beams)), dtype=torch.long
         ).contiguous()
         past_key_values = tuple(
             [
                 (
-                    torch.zeros([1, 32, 1, 128]).contiguous(),
-                    torch.zeros([1, 32, 1, 128]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous()
+                    if args.kv_cache_dtype == "None"
+                    else torch.zeros(
+                        [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                    ).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous()
+                    if args.kv_cache_dtype == "None"
+                    else torch.zeros(
+                        [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                    ).contiguous(),
                     beam_idx_tmp,
                     torch.zeros(1, dtype=torch.long).contiguous(),
                 )
@@ -460,8 +503,16 @@ if args.jit:
         past_key_values = tuple(
             [
                 (
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous()
+                    if args.kv_cache_dtype == "None"
+                    else torch.zeros(
+                        [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                    ).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous()
+                    if args.kv_cache_dtype == "None"
+                    else torch.zeros(
+                        [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                    ).contiguous(),
                     beam_idx_tmp,
                     torch.zeros(1, dtype=torch.long).contiguous(),
                 )
@@ -475,8 +526,16 @@ if args.jit:
         past_key_values = tuple(
             [
                 (
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous()
+                    if args.kv_cache_dtype == "None"
+                    else torch.zeros(
+                        [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                    ).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous()
+                    if args.kv_cache_dtype == "None"
+                    else torch.zeros(
+                        [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                    ).contiguous(),
                     beam_idx_tmp,
                     torch.zeros(1, dtype=torch.long).contiguous(),
                 )
@@ -505,8 +564,16 @@ if args.jit:
         past_key_values = tuple(
             [
                 (
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous()
+                    if args.kv_cache_dtype == "None"
+                    else torch.zeros(
+                        [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                    ).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous()
+                    if args.kv_cache_dtype == "None"
+                    else torch.zeros(
+                        [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                    ).contiguous(),
                     beam_idx_tmp,
                     torch.zeros(1, dtype=torch.long).contiguous(),
                 )
@@ -520,8 +587,16 @@ if args.jit:
         past_key_values = tuple(
             [
                 (
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous()
+                    if args.kv_cache_dtype == "None"
+                    else torch.zeros(
+                        [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                    ).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous()
+                    if args.kv_cache_dtype == "None"
+                    else torch.zeros(
+                        [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                    ).contiguous(),
                     beam_idx_tmp,
                     torch.zeros(1, dtype=torch.long).contiguous(),
                 )
@@ -535,8 +610,60 @@ if args.jit:
         past_key_values = tuple(
             [
                 (
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous()
+                    if args.kv_cache_dtype == "None"
+                    else torch.zeros(
+                        [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                    ).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous()
+                    if args.kv_cache_dtype == "None"
+                    else torch.zeros(
+                        [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                    ).contiguous(),
+                    beam_idx_tmp,
+                    torch.zeros(1, dtype=torch.long).contiguous(),
+                )
+                for i in range(model.config.num_layers)
+            ]
+        )
+    elif re.search("t5", model.config.architectures[0], re.IGNORECASE):
+        generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
+        generate_kwargs.pop("max_new_tokens")
+        beam_idx_tmp = torch.zeros(
+            (2048, int(args.batch_size * num_beams)), dtype=torch.long
+        ).contiguous()
+        kv_cache_dtype = (
+            infer_dtype if args.kv_cache_dtype == "None" else args.kv_cache_dtype
+        )
+        past_key_values = tuple(
+            [
+                (
+                    torch.zeros([1, 1, 1, 1], dtype=kv_cache_dtype).contiguous(),
+                    torch.zeros([1, 1, 1, 1], dtype=kv_cache_dtype).contiguous(),
+                    beam_idx_tmp,
+                    torch.zeros(1, dtype=torch.long).contiguous(),
+                    torch.zeros(
+                        [
+                            int(args.input_tokens),
+                            int(args.batch_size * num_beams),
+                            model.decoder.block[i].layer[1].EncDecAttention.n_heads,
+                            model.decoder.block[i]
+                            .layer[1]
+                            .EncDecAttention.key_value_proj_dim,
+                        ],
+                        dtype=kv_cache_dtype,
+                    ).contiguous(),
+                    torch.zeros(
+                        [
+                            int(args.input_tokens),
+                            int(args.batch_size * num_beams),
+                            model.decoder.block[i].layer[1].EncDecAttention.n_heads,
+                            model.decoder.block[i]
+                            .layer[1]
+                            .EncDecAttention.key_value_proj_dim,
+                        ],
+                        dtype=kv_cache_dtype,
+                    ).contiguous(),
                     beam_idx_tmp,
                     torch.zeros(1, dtype=torch.long).contiguous(),
                 )
@@ -555,11 +682,26 @@ if args.jit:
         or re.search("falcon", model.config.architectures[0], re.IGNORECASE)
         or re.search("rw", model.config.architectures[0], re.IGNORECASE)
         or re.search("bloom", model.config.architectures[0], re.IGNORECASE)
+        or re.search("baichuan", model.config.architectures[0], re.IGNORECASE)
     ):
         example_inputs = {
             "input_ids": input_ids.unsqueeze(0),
             "attention_mask": attention_mask.unsqueeze(0),
             "past_key_values": past_key_values,
+        }
+    elif re.search("t5", model.config.architectures[0], re.IGNORECASE):
+        example_inputs = {
+            "decoder_input_ids": torch.zeros(int(args.batch_size * num_beams))
+            .to(torch.long)
+            .unsqueeze(1),
+            "attention_mask": torch.ones(int(args.input_tokens)).unsqueeze(0),
+            "past_key_values": past_key_values,
+            "encoder_outputs": (
+                torch.rand(
+                    [int(args.batch_size * num_beams), int(args.input_tokens), 2048],
+                    dtype=infer_dtype,
+                ),
+            ),
         }
     else:
         example_inputs = {

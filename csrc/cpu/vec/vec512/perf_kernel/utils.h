@@ -76,3 +76,39 @@ inline void _mask_storeu(at::BFloat16* data_base, __m512 a, __mmask16 mask) {
   auto vec_bf16_out = cvt_fp32_to_bf16(a);
   _mm256_mask_storeu_epi16(data_base, mask, vec_bf16_out);
 }
+
+#if defined(CPU_CAPABILITY_AVX512_FP16)
+inline __m512 _loadu(const at::Float8_e5m2* data_base) {
+  return _mm512_cvtfp8e5m2_ps(_mm_loadu_si128((__m128i*)data_base));
+}
+
+inline __m512 _maskz_loadu(const at::Float8_e5m2* data_base, __mmask16 mask) {
+  return _mm512_cvtfp8e5m2_ps(_mm_maskz_loadu_epi16(mask, (__m128i*)data_base));
+}
+
+inline void _storeu(at::Float8_e5m2* data_base, __m512 a) {
+  auto vec_fp8_out = _mm512_cvtps_fp8e5m2(a);
+  _mm_storeu_si128((__m128i*)data_base, vec_fp8_out);
+}
+
+inline void _mask_storeu(at::Float8_e5m2* data_base, __m512 a, __mmask16 mask) {
+  auto vec_fp8_out = _mm512_cvtps_fp8e5m2(a);
+  _mm_mask_storeu_epi8(data_base, mask, vec_fp8_out);
+}
+#else
+inline __m512 _loadu(const at::Float8_e5m2* data_base) {
+  TORCH_INTERNAL_ASSERT(false, "fp8_e5m2 is not supported on this platform");
+}
+
+inline __m512 _maskz_loadu(const at::Float8_e5m2* data_base, __mmask16 mask) {
+  TORCH_INTERNAL_ASSERT(false, "fp8_e5m2 is not supported on this platform");
+}
+
+inline void _storeu(at::Float8_e5m2* data_base, __m512 a) {
+  TORCH_INTERNAL_ASSERT(false, "fp8_e5m2 is not supported on this platform");
+}
+
+inline void _mask_storeu(at::Float8_e5m2* data_base, __m512 a, __mmask16 mask) {
+  TORCH_INTERNAL_ASSERT(false, "fp8_e5m2 is not supported on this platform");
+}
+#endif

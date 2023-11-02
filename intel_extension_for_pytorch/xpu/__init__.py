@@ -8,7 +8,7 @@ import sys
 from typing import List, Optional, Tuple, Union, Dict
 import torch
 import intel_extension_for_pytorch
-from .lazy_init import _lazy_init, _lazy_call
+from .lazy_init import _lazy_init, _lazy_call, _is_in_bad_fork
 from torch import device as _device
 from torch._utils import classproperty
 

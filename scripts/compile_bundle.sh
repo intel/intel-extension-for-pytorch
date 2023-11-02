@@ -46,7 +46,7 @@ cd ..
 conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
 conda update -y sysroot_linux-64
 python -m pip install cmake
-python -m pip install torch==2.2.0.dev20230911+cpu torchvision==0.17.0.dev20230911+cpu torchaudio==2.2.0.dev20230911+cpu --index-url https://download.pytorch.org/whl/nightly/cpu
+python -m pip install torch==2.2.0.dev20231006+cpu torchvision==0.17.0.dev20231006+cpu torchaudio==2.2.0.dev20231006+cpu --index-url https://download.pytorch.org/whl/nightly/cpu
 ABI=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")
 
 # Compile individual component

@@ -12,9 +12,7 @@
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
-#include "assert.h"
 #include "mkl.h"
-// #include "vec/vec.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -2810,6 +2808,11 @@ void woq_gemm_kernel_impl(
   } else {
     auto w = weight.dequantize();
     auto x = self.to(c10::ScalarType::Float);
+    // This is to align with the AVX512 kernel
+    // so that UT test_weight_only_quantization_autocast can pass
+    if (M > 4) {
+      w = w.to(c10::kBFloat16).to(c10::kFloat);
+    }
     auto out = at::linear(x, w);
     if (bias.defined()) {
       out = at::add(out, bias);

@@ -26,6 +26,8 @@ MODEL_CLASSES = {
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
     "chatglm": (AutoModelForCausalLM, AutoTokenizer),
     "codegen": (AutoModelForCausalLM, AutoTokenizer),
+    "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -164,12 +166,18 @@ if args.accuracy_only:
                 for text in inputs:
                     input_ids = text.to(self._device)
                     input_bs = inputs.shape[0] * self.num_beams
-                    if re.search(
-                        "GPTJ", self.base_model.config.architectures[0]
-                    ) or re.search(
-                        "codegen",
-                        self.base_model.config.architectures[0],
-                        re.IGNORECASE,
+                    if (
+                        re.search("GPTJ", self.base_model.config.architectures[0])
+                        or re.search(
+                            "codegen",
+                            self.base_model.config.architectures[0],
+                            re.IGNORECASE,
+                        )
+                        or re.search(
+                            "gptbigcode",
+                            self.base_model.config.architectures[0],
+                            re.IGNORECASE,
+                        )
                     ):
                         beam_idx_tmp = torch.zeros(
                             (2048, int(input_bs)), dtype=torch.long
@@ -213,6 +221,10 @@ if args.accuracy_only:
                         )
                     elif re.search(
                         "llama", self.base_model.config.architectures[0], re.IGNORECASE
+                    ) or re.search(
+                        "baichuan",
+                        self.base_model.config.architectures[0],
+                        re.IGNORECASE,
                     ):
                         beam_idx_tmp = torch.zeros(
                             (2048, int(input_bs)), dtype=torch.long
@@ -518,6 +530,11 @@ if args.accuracy_only:
                                 self.base_model.config.architectures[0],
                                 re.IGNORECASE,
                             )
+                            or re.search(
+                                "baichuan",
+                                self.base_model.config.architectures[0],
+                                re.IGNORECASE,
+                            )
                         ):
                             example_dict = {
                                 "input_ids": inputs,
@@ -561,6 +578,11 @@ if args.accuracy_only:
                         or re.search(
                             "rw", self.base_model.config.architectures[0], re.IGNORECASE
                         )
+                        or re.search(
+                            "baichuan",
+                            self.base_model.config.architectures[0],
+                            re.IGNORECASE,
+                        )
                     ):
                         self.model(
                             inputs,
@@ -600,6 +622,9 @@ if args.accuracy_only:
                 )
                 or re.search(
                     "rw", self.base_model.config.architectures[0], re.IGNORECASE
+                )
+                or re.search(
+                    "baichuan", self.base_model.config.architectures[0], re.IGNORECASE
                 )
             ):
                 with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(

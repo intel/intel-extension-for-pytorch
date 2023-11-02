@@ -75,6 +75,13 @@ parser.add_argument(
     help="weight data type for weight only quantization. "
          "Unrelated to activation data type or lowp-mode."
 )
+parser.add_argument(
+    "--kv-cache-dtype",
+    type=str,
+    choices=["float8_e5m2", "None"],
+    default="None",
+    help="Specify the kv_cache data type, you can use float8_e5m2 to reduce kv_cache memory footprint but may slightly drop the accuracy.",
+)
 args = parser.parse_args()
 
 
@@ -102,6 +109,11 @@ generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams,
 
 # load model
 config = AutoConfig.from_pretrained(args.model_id, torchscript=args.jit)
+if args.kv_cache_dtype != "None":
+    args.kv_cache_dtype = getattr(torch, args.kv_cache_dtype)
+    print("kv_cache_dtype:", args.kv_cache_dtype)
+    config.kv_cache_dtype = args.kv_cache_dtype 
+
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 
@@ -130,28 +142,8 @@ beam_idx_tmp = torch.zeros(
 ).contiguous()
 global_past_key_value = [
     (
-        torch.zeros(
-            [
-                1,
-                user_model.config.num_attention_heads,
-                1,
-                int(
-                    user_model.config.hidden_size
-                    / user_model.config.num_attention_heads
-                ),
-            ]
-        ).contiguous(),
-        torch.zeros(
-            [
-                1,
-                user_model.config.num_attention_heads,
-                1,
-                int(
-                    user_model.config.hidden_size
-                    / user_model.config.num_attention_heads
-                ),
-            ]
-        ).contiguous(),
+        torch.zeros([1, 1, 1, 1]).contiguous() if args.kv_cache_dtype == "None" else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
+        torch.zeros([1, 1, 1, 1]).contiguous() if args.kv_cache_dtype == "None" else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
         beam_idx_tmp,
         torch.zeros(1, dtype=torch.long).contiguous(),
     )
@@ -487,7 +479,7 @@ if args.benchmark:
 
     print("\n", "-" * 10, "Summary:", "-" * 10)
     latency = total_time / (num_iter - num_warmup)
-    print("Inference latency: %.3f sec." % latency)
+    print("Inference latency: %.4f sec." % latency)
     if args.token_latency:
         import numpy as np
         from itertools import chain
@@ -498,7 +490,7 @@ if args.benchmark:
         average_2n_latency = np.mean(average_2n)
         p90_latency = average_2n[int(len(average_2n) * 0.9)]
         p99_latency = average_2n[int(len(average_2n) * 0.99)]
-        print("First token average latency: %.3f sec." % first_latency)
-        print("Average 2... latency: %.3f sec." % average_2n_latency)
-        print("P90 2... latency: %.3f sec." % p90_latency)
-        print("P99 2... latency: %.3f sec." % p99_latency)
+        print("First token average latency: %.4f sec." % first_latency)
+        print("Average 2... latency: %.4f sec." % average_2n_latency)
+        print("P90 2... latency: %.4f sec." % p90_latency)
+        print("P99 2... latency: %.4f sec." % p99_latency)

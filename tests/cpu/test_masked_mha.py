@@ -66,6 +66,7 @@ class MaskedMHA(torch.nn.Module):
         beam_idx,
         indirect_access_kv_cache=False,
         offset=0,
+        cache_dtype=torch.float32,
     ):
         head_size = self.head_dim
         query, key, value = self._split_heads(self.query_key_value(input_t))
@@ -89,6 +90,9 @@ class MaskedMHA(torch.nn.Module):
         else:
             # Get the concatenated key and value
             if key_cache is not None:
+                if key_cache.dtype == torch.float8_e5m2:
+                    key_cache = key_cache.to(torch.float32)
+                    value_cache = value_cache.to(torch.float32)
                 key = torch.cat([key_cache, key], dim=1)
                 value = torch.cat([value_cache, value], dim=1)
             key_cache = key
@@ -111,6 +115,9 @@ class MaskedMHA(torch.nn.Module):
             attention_probs = attention_scores.softmax(dim=-1)
             # matmul the attention score and value to get the context
             attention_output = torch.matmul(attention_probs, value)
+            print("########key_cache.dtype:", cache_dtype)
+            key_cache = key_cache.to(cache_dtype)
+            value_cache = value_cache.to(cache_dtype)
             return attention_output, None, key_cache, value_cache, None
 
 
@@ -170,7 +177,14 @@ class MaskedMHATest(TestCase):
                     )  # combine the attention mask and causal mask
                     # UT for first token with fp32
                     naive_output, _, key_cache, value_cache, _ = mha(
-                        input_t, None, None, max_seq_len, attention_mask, None, None
+                        input_t,
+                        None,
+                        None,
+                        max_seq_len,
+                        attention_mask,
+                        None,
+                        None,
+                        cache_dtype=torch.float32,
                     )
                     (
                         indirect_access_kv_cache_output,
@@ -187,8 +201,9 @@ class MaskedMHATest(TestCase):
                         beam_idx,
                         True,
                         torch.tensor(offset),
+                        cache_dtype=torch.float32,
                     )
-                    # self.assertEqual(naive_output, indirect_access_kv_cache_output)
+                    self.assertEqual(naive_output, indirect_access_kv_cache_output)
                     key_cache = key_cache.repeat_interleave(beam_size, dim=0)
                     value_cache = value_cache.repeat_interleave(beam_size, dim=0)
                     for i in range(batch_size):
@@ -234,6 +249,7 @@ class MaskedMHATest(TestCase):
                             attention_mask_bf16,
                             None,
                             None,
+                            input_t_bf16.dtype,
                         )
                         (
                             indirect_access_kv_cache_output_bf16,
@@ -250,6 +266,7 @@ class MaskedMHATest(TestCase):
                             beam_idx,
                             True,
                             torch.tensor(offset),
+                            input_t_bf16.dtype,
                         )
                         self.assertEqual(
                             naive_output_bf16,
@@ -283,6 +300,65 @@ class MaskedMHATest(TestCase):
                         value_cache_bf16 = torch.index_select(
                             value_cache_bf16, 0, beam_idx_t
                         )
+                    # UT for first token with fp8 cache
+                    key_cache_iakv_fp8 = key_cache_iakv.to(torch.float8_e5m2)
+                    value_cache_iakv_fp8 = value_cache_iakv.to(torch.float8_e5m2)
+                    naive_output, _, key_cache_fp8, value_cache_fp8, _ = mha(
+                        input_t,
+                        None,
+                        None,
+                        max_seq_len,
+                        attention_mask,
+                        None,
+                        None,
+                        cache_dtype=torch.float8_e5m2,
+                    )
+                    (
+                        indirect_access_kv_cache_output,
+                        _,
+                        key_cache_iakv_fp8,
+                        value_cache_iakv_fp8,
+                        beam_idx,
+                    ) = mha(
+                        input_t,
+                        key_cache_iakv_fp8,
+                        value_cache_iakv_fp8,
+                        max_seq_len,
+                        attention_mask,
+                        beam_idx,
+                        True,
+                        torch.tensor(offset),
+                        cache_dtype=torch.float8_e5m2,
+                    )
+                    self.assertEqual(naive_output, indirect_access_kv_cache_output)
+                    key_cache_fp8 = key_cache_fp8.repeat_interleave(beam_size, dim=0)
+                    value_cache_fp8 = value_cache_fp8.repeat_interleave(
+                        beam_size, dim=0
+                    )
+
+                    # for i in range(batch_size):
+                    #     self.assertEqual(
+                    #         key_cache_fp8.transpose(0, 1)[:, i * beam_size, :, :].to(torch.float32),
+                    #         key_cache_iakv_fp8[
+                    #             0:first_seq_len, i * beam_size, :, :
+                    #         ].to(torch.float32),
+                    #         prec=3e-1
+                    #     )
+                    #     self.assertEqual(
+                    #         value_cache_fp8.transpose(0, 1)[
+                    #             :, i * beam_size, :, :
+                    #         ].to(torch.float32),
+                    #         value_cache_iakv_fp8[
+                    #             0:first_seq_len, i * beam_size, :, :
+                    #         ].to(torch.float32),
+                    #         prec=3e-1
+                    #     )
+                    #     key_cache_fp8 = torch.index_select(
+                    #         key_cache_bf16, 0, beam_idx_t
+                    #     )
+                    #     value_cache_fp8 = torch.index_select(
+                    #         value_cache_bf16, 0, beam_idx_t
+                    #     )
 
                     offset = offset + first_seq_len
                     # UT for next token with fp32
@@ -328,6 +404,46 @@ class MaskedMHATest(TestCase):
                     self.assertEqual(
                         value_cache.transpose(0, 1)[offset],
                         value_cache_iakv[offset, :, :, :],
+                    )
+                    # UT for next token with fp8
+                    naive_output, _, key_cache_fp8, value_cache_fp8, _ = mha(
+                        input_t,
+                        key_cache_fp8,
+                        value_cache_fp8,
+                        max_seq_len,
+                        attention_mask,
+                        None,
+                        None,
+                        cache_dtype=torch.float8_e5m2,
+                    )
+                    (
+                        indirect_access_kv_cache_output,
+                        _,
+                        key_cache_iakv_fp8,
+                        value_cache_iakv_fp8,
+                        beam_idx,
+                    ) = mha(
+                        input_t,
+                        key_cache_iakv_fp8,
+                        value_cache_iakv_fp8,
+                        max_seq_len,
+                        attention_mask,
+                        beam_idx,
+                        True,
+                        torch.tensor(offset),
+                        cache_dtype=torch.float8_e5m2,
+                    )
+                    import pdb
+
+                    pdb.set_trace()
+                    self.assertEqual(naive_output, indirect_access_kv_cache_output)
+                    self.assertEqual(
+                        key_cache_fp8.transpose(0, 1)[offset],
+                        key_cache_iakv_fp8[offset, :, :, :],
+                    )
+                    self.assertEqual(
+                        value_cache_fp8.transpose(0, 1)[offset],
+                        value_cache_iakv_fp8[offset, :, :, :],
                     )
                     # #UT for next token with bf16
                     input_t_bf16 = input_t.bfloat16()

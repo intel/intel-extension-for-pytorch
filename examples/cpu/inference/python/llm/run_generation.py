@@ -3,6 +3,8 @@ import time
 import json
 import pathlib
 import argparse
+import psutil
+import re
 
 from torch.nn.functional import pad
 from datasets import load_dataset
@@ -12,6 +14,7 @@ from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     LlamaForCausalLM,
+    T5ForConditionalGeneration,
     AutoTokenizer,
     LlamaTokenizer,
 )
@@ -27,6 +30,9 @@ MODEL_CLASSES = {
     "bloom": (AutoModelForCausalLM, AutoTokenizer),
     "chatglm": (AutoModelForCausalLM, AutoTokenizer),
     "codegen": (AutoModelForCausalLM, AutoTokenizer),
+    "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
+    "t5": (T5ForConditionalGeneration, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -82,6 +88,14 @@ parser.add_argument("--batch-size", default=1, type=int, help="batch size")
 parser.add_argument(
     "--token-latency", action="store_true", help="get token latency breakdown"
 )
+parser.add_argument(
+    "--kv-cache-dtype",
+    type=str,
+    choices=["float8_e5m2", "None"],
+    default="None",
+    help="Specify the kv_cache data type, you can use float8_e5m2 to reduce kv_cache memory footprint but may slightly drop the accuracy.",
+)
+parser.add_argument("--print-memory-usage", action="store_true")
 args = parser.parse_args()
 print(args)
 
@@ -89,9 +103,14 @@ print(args)
 device = torch.device(args.device)
 
 
-if not args.ipex or not args.jit:
-    print("Please use --ipex and --jit to re-run this script, aborting...")
-    exit(0)
+def print_memory_usage(message):
+    process = psutil.Process()
+    print(
+        "{} Memory usage: {:.3f} GB".format(
+            message, process.memory_info().rss / 1024 / 1024 / 1024
+        )
+    )
+
 
 # import ipex
 if args.ipex:
@@ -122,6 +141,12 @@ else:
     config = AutoConfig.from_pretrained(
         args.config_file, torchscript=args.jit, trust_remote_code=True
     )
+
+if args.kv_cache_dtype != "None":
+    args.kv_cache_dtype = getattr(torch, args.kv_cache_dtype)
+    print("kv_cache_dtype:", args.kv_cache_dtype)
+    config.kv_cache_dtype = args.kv_cache_dtype
+
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 model = model_class[0].from_pretrained(
@@ -135,21 +160,35 @@ tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True
 model = model.eval().to(device)
 model = model.to(memory_format=torch.channels_last)
 
+
+if not args.ipex or not args.jit:
+    print("Please use --ipex and --jit to re-run this script, aborting...")
+    exit(0)
+
+if re.search("gptbigcode", model.config.architectures[0], re.IGNORECASE):
+    model_type = "gptbigcode"
+
 # to ipex
 if args.ipex:
     model = ipex._optimize_transformers(model.eval(), dtype=amp_dtype, inplace=True)
 
 num_beams = 1 if args.greedy else 4
 # generate args
-generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams,
-                       max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens)
+generate_kwargs = dict(
+    do_sample=False,
+    temperature=0.9,
+    num_beams=num_beams,
+    max_new_tokens=args.max_new_tokens,
+    min_new_tokens=args.max_new_tokens,
+)
 
 # dummy past key values
 past_key_values = None
-import re
 
-if re.search("GPTJ", model.config.architectures[0]) or re.search(
-    "codegen", model.config.architectures[0], re.IGNORECASE
+if (
+    re.search("GPTJ", model.config.architectures[0])
+    or re.search("codegen", model.config.architectures[0], re.IGNORECASE)
+    or re.search("gptbigcode", model.config.architectures[0], re.IGNORECASE)
 ):
     beam_idx_tmp = torch.zeros(
         (2048, int(args.batch_size * num_beams)), dtype=torch.long
@@ -157,23 +196,33 @@ if re.search("GPTJ", model.config.architectures[0]) or re.search(
     past_key_values = tuple(
         [
             (
-                torch.zeros([1, 1, 1, 1]).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous()
+                if args.kv_cache_dtype == "None"
+                else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous()
+                if args.kv_cache_dtype == "None"
+                else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
                 beam_idx_tmp,
                 torch.zeros(1, dtype=torch.long).contiguous(),
             )
             for i in range(model.config.n_layer)
         ]
     )
-elif re.search("llama", model.config.architectures[0], re.IGNORECASE):
+elif re.search("llama", model.config.architectures[0], re.IGNORECASE) or re.search(
+    "baichuan", model.config.architectures[0], re.IGNORECASE
+):
     beam_idx_tmp = torch.zeros(
         (2048, int(args.batch_size * num_beams)), dtype=torch.long
     ).contiguous()
     past_key_values = tuple(
         [
             (
-                torch.zeros([1, 1, 1, 1]).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous()
+                if args.kv_cache_dtype == "None"
+                else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous()
+                if args.kv_cache_dtype == "None"
+                else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
                 beam_idx_tmp,
                 torch.zeros(1, dtype=torch.long).contiguous(),
             )
@@ -187,8 +236,12 @@ elif re.search("gptneox", model.config.architectures[0], re.IGNORECASE):
     past_key_values = tuple(
         [
             (
-                torch.zeros([1, 1, 1, 1]).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous()
+                if args.kv_cache_dtype == "None"
+                else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous()
+                if args.kv_cache_dtype == "None"
+                else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
                 beam_idx_tmp,
                 torch.zeros(1, dtype=torch.long).contiguous(),
             )
@@ -202,8 +255,12 @@ elif re.search("opt", model.config.architectures[0], re.IGNORECASE):
     past_key_values = tuple(
         [
             (
-                torch.zeros([1, 1, 1, 1]).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous()
+                if args.kv_cache_dtype == "None"
+                else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous()
+                if args.kv_cache_dtype == "None"
+                else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
                 beam_idx_tmp,
                 torch.zeros(1, dtype=torch.long).contiguous(),
             )
@@ -230,8 +287,12 @@ elif re.search("falcon", model.config.architectures[0], re.IGNORECASE) or re.sea
     past_key_values = tuple(
         [
             (
-                torch.zeros([1, 1, 1, 1]).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous()
+                if args.kv_cache_dtype == "None"
+                else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous()
+                if args.kv_cache_dtype == "None"
+                else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
                 beam_idx_tmp,
                 torch.zeros(1, dtype=torch.long).contiguous(),
             )
@@ -245,8 +306,12 @@ elif re.search("bloom", model.config.architectures[0], re.IGNORECASE):
     past_key_values = tuple(
         [
             (
-                torch.zeros([1, 1, 1, 1]).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous()
+                if args.kv_cache_dtype == "None"
+                else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous()
+                if args.kv_cache_dtype == "None"
+                else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
                 beam_idx_tmp,
                 torch.zeros(1, dtype=torch.long).contiguous(),
             )
@@ -260,8 +325,50 @@ elif re.search("chatglm", model.config.architectures[0], re.IGNORECASE):
     past_key_values = tuple(
         [
             (
-                torch.zeros([1, 1, 1, 1]).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous()
+                if args.kv_cache_dtype == "None"
+                else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous()
+                if args.kv_cache_dtype == "None"
+                else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
+                beam_idx_tmp,
+                torch.zeros(1, dtype=torch.long).contiguous(),
+            )
+            for i in range(model.config.num_layers)
+        ]
+    )
+elif re.search("t5", model.config.architectures[0], re.IGNORECASE):
+    generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
+    generate_kwargs.pop("max_new_tokens")
+    beam_idx_tmp = torch.zeros(
+        (2048, int(args.batch_size * num_beams)), dtype=torch.long
+    ).contiguous()
+    kv_cache_dtype = amp_dtype if args.kv_cache_dtype == "None" else args.kv_cache_dtype
+    past_key_values = tuple(
+        [
+            (
+                torch.zeros([1, 1, 1, 1], dtype=kv_cache_dtype).contiguous(),
+                torch.zeros([1, 1, 1, 1], dtype=kv_cache_dtype).contiguous(),
+                beam_idx_tmp,
+                torch.zeros(1, dtype=torch.long).contiguous(),
+                torch.zeros(
+                    [
+                        int(args.input_tokens),
+                        int(args.batch_size * num_beams),
+                        model.config.num_heads,
+                        model.config.d_kv,
+                    ],
+                    dtype=kv_cache_dtype,
+                ).contiguous(),
+                torch.zeros(
+                    [
+                        int(args.input_tokens),
+                        int(args.batch_size * num_beams),
+                        model.config.num_heads,
+                        model.config.d_kv,
+                    ],
+                    dtype=kv_cache_dtype,
+                ).contiguous(),
                 beam_idx_tmp,
                 torch.zeros(1, dtype=torch.long).contiguous(),
             )
@@ -270,7 +377,7 @@ elif re.search("chatglm", model.config.architectures[0], re.IGNORECASE):
     )
 else:
     print(
-        "Currently we only support jit path on GPTJ, llama, gpt_neox, OPT, falcon, Bloom, chatGLM and Codegen models for IPEX new API ipex._optimize_transformers(), please re-run without jit "
+        "Currently we only support jit path on GPTJ, llama, gpt_neox, OPT, falcon, Bloom, chatGLM, Codegen, GPTBigCode, BaiChuan, and T5 models for IPEX new API ipex._optimize_transformers(), please re-run without jit "
     )
     exit(0)
 
@@ -284,11 +391,26 @@ if not hasattr(model, "trace_graph") and args.jit and args.benchmark and args.ip
         or re.search("falcon", model.config.architectures[0], re.IGNORECASE)
         or re.search("rw", model.config.architectures[0], re.IGNORECASE)
         or re.search("bloom", model.config.architectures[0], re.IGNORECASE)
+        or re.search("baichuan", model.config.architectures[0], re.IGNORECASE)
     ):
         example_inputs = {
             "input_ids": input_ids.unsqueeze(0),
             "attention_mask": attention_mask.unsqueeze(0),
             "past_key_values": past_key_values,
+        }
+    elif re.search("t5", model.config.architectures[0], re.IGNORECASE):
+        example_inputs = {
+            "decoder_input_ids": torch.zeros(int(args.batch_size * num_beams))
+            .to(torch.long)
+            .unsqueeze(1),
+            "attention_mask": torch.ones(int(args.input_tokens)).unsqueeze(0),
+            "past_key_values": past_key_values,
+            "encoder_outputs": (
+                torch.rand(
+                    [int(args.batch_size * num_beams), int(args.input_tokens), 2048],
+                    dtype=amp_dtype,
+                ),
+            ),
         }
     else:
         example_inputs = {
@@ -306,7 +428,10 @@ if not hasattr(model, "trace_graph") and args.jit and args.benchmark and args.ip
         dtype=amp_dtype if amp_enabled else None,
     ):
         trace_model = torch.jit.trace(
-            model, example_kwarg_inputs=example_inputs, strict=False, check_trace=False
+            model,
+            example_kwarg_inputs=example_inputs,
+            strict=False,
+            check_trace=False,
         )
         trace_model = torch.jit.freeze(trace_model)
         setattr(model, "trace_graph", trace_model)
@@ -461,6 +586,9 @@ def trace_handler(prof):
     print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=-1))
 
 
+if args.print_memory_usage:
+    print_memory_usage("Before Benchmark")
+
 if args.benchmark:
     if args.token_latency:
         if not hasattr(model.config, "token_latency"):
@@ -504,13 +632,17 @@ if args.benchmark:
                 on_trace_ready=trace_handler,
             ) as prof:
                 for i in range(5):
-                    input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+                    input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(
+                        device
+                    )
                     output = model.generate(input_ids, **generate_kwargs)
                     prof.step()
         for i in range(num_iter):
             tic = time.time()
             input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
             output = model.generate(input_ids, **generate_kwargs)
+            if args.print_memory_usage:
+                print_memory_usage("After iteration {} ".format(i))
             gen_ids = output[0] if args.token_latency else output
             gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
             toc = time.time()
@@ -541,7 +673,7 @@ if args.benchmark:
         average_2n_latency = np.mean(average_2n)
         p90_latency = average_2n[int(len(average_2n) * 0.9)]
         p99_latency = average_2n[int(len(average_2n) * 0.99)]
-        print("First token average latency: %.3f sec." % first_latency)
-        print("Average 2... latency: %.3f sec." % average_2n_latency)
-        print("P90 2... latency: %.3f sec." % p90_latency)
-        print("P99 2... latency: %.3f sec." % p99_latency)
+        print("First token average latency: %.4f sec." % first_latency)
+        print("Average 2... latency: %.4f sec." % average_2n_latency)
+        print("P90 2... latency: %.4f sec." % p90_latency)
+        print("P99 2... latency: %.4f sec." % p99_latency)

@@ -11,7 +11,7 @@ inline __attribute__((always_inline)) void move_ker(
     int64_t len) {
 #pragma omp simd
   for (int64_t i = 0; i < len; i++) {
-    *(inout + i) = *(in + i);
+    *(inout + i) = (float)*(in + i);
   }
 }
 

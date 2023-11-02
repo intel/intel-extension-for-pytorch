@@ -607,6 +607,309 @@ def GLMBlock_forward(
     return output, kv_cache
 
 
+def GPTBigCodeMLP_forward(
+    self, hidden_states: Optional[Tuple[torch.Tensor]]
+) -> torch.Tensor:
+    hidden_states = torch.ops.torch_ipex.tpp_linear_gelu(
+        hidden_states, self.c_fc.weight, self.c_fc.bias
+    )
+    # hidden_states = self.c_proj(hidden_states)
+    # hidden_states = self.dropout(hidden_states)
+    return hidden_states
+
+
+def GPTBigCodeMLP_forward_distributed(
+    self, hidden_states: Optional[Tuple[torch.Tensor]]
+) -> torch.Tensor:
+    hidden_states = torch.ops.torch_ipex.tpp_linear_gelu(
+        hidden_states, self.c_fc.weight, self.c_fc.bias
+    )
+    hidden_states = self.c_proj(hidden_states)
+    hidden_states = self.dropout(hidden_states)
+    return hidden_states
+
+
+def GPTBigCodeBlock_forward(
+    self,
+    hidden_states: Optional[Tuple[torch.Tensor]],
+    layer_past: Optional[torch.Tensor] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    head_mask: Optional[torch.Tensor] = None,
+    encoder_hidden_states: Optional[torch.Tensor] = None,
+    encoder_attention_mask: Optional[torch.Tensor] = None,
+    use_cache: Optional[bool] = False,
+    output_attentions: Optional[bool] = False,
+) -> Union[
+    Tuple[torch.Tensor],
+    Tuple[torch.Tensor, torch.Tensor],
+    Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+]:
+    residual = hidden_states
+    hidden_states = self.ln_1(hidden_states)
+    attn_outputs = self.attn(
+        hidden_states,
+        layer_past=layer_past,
+        attention_mask=attention_mask,
+        head_mask=head_mask,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+    )
+    attn_output = attn_outputs[0]  # output_attn: a, present, (attentions)
+    outputs = attn_outputs[1:]
+    # residual connection
+    hidden_states = attn_output + residual
+
+    if encoder_hidden_states is not None:
+        # add one self-attention block for cross-attention
+        if not hasattr(self, "crossattention"):
+            raise ValueError(
+                f"If `encoder_hidden_states` are passed, {self} has to be instantiated with "
+                "cross-attention layers by setting `config.add_cross_attention=True`"
+            )
+        residual = hidden_states
+        hidden_states = self.ln_cross_attn(hidden_states)
+        cross_attn_outputs = self.crossattention(
+            hidden_states,
+            attention_mask=attention_mask,
+            head_mask=head_mask,
+            encoder_hidden_states=encoder_hidden_states,
+            encoder_attention_mask=encoder_attention_mask,
+            output_attentions=output_attentions,
+        )
+        attn_output = cross_attn_outputs[0]
+        # residual connection
+        hidden_states = residual + attn_output
+        outputs = (
+            outputs + cross_attn_outputs[2:]
+        )  # add cross attentions if we output attention weights
+
+    residual = hidden_states
+    hidden_states = self.ln_2(hidden_states)
+    feed_forward_hidden_states = self.mlp(hidden_states)
+    # residual connection
+    # hidden_states = residual + feed_forward_hidden_states
+    hidden_states = torch.ops.torch_ipex.tpp_linear_add(
+        feed_forward_hidden_states,
+        residual,
+        self.mlp.c_proj.weight,
+        self.mlp.c_proj.bias,
+        1.0,
+    )
+
+    if use_cache:
+        outputs = (hidden_states,) + outputs
+    else:
+        outputs = (hidden_states,) + outputs[1:]
+
+    return outputs  # hidden_states, present, (attentions, cross_attentions)
+
+
+def GPTBigCodeBlock_forward_distributed(
+    self,
+    hidden_states: Optional[Tuple[torch.Tensor]],
+    layer_past: Optional[torch.Tensor] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    head_mask: Optional[torch.Tensor] = None,
+    encoder_hidden_states: Optional[torch.Tensor] = None,
+    encoder_attention_mask: Optional[torch.Tensor] = None,
+    use_cache: Optional[bool] = False,
+    output_attentions: Optional[bool] = False,
+) -> Union[
+    Tuple[torch.Tensor],
+    Tuple[torch.Tensor, torch.Tensor],
+    Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+]:
+    residual = hidden_states
+    hidden_states = self.ln_1(hidden_states)
+    attn_outputs = self.attn(
+        hidden_states,
+        layer_past=layer_past,
+        attention_mask=attention_mask,
+        head_mask=head_mask,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+    )
+    attn_output = attn_outputs[0]  # output_attn: a, present, (attentions)
+    outputs = attn_outputs[1:]
+    # residual connection
+    hidden_states = attn_output + residual
+
+    if encoder_hidden_states is not None:
+        # add one self-attention block for cross-attention
+        if not hasattr(self, "crossattention"):
+            raise ValueError(
+                f"If `encoder_hidden_states` are passed, {self} has to be instantiated with "
+                "cross-attention layers by setting `config.add_cross_attention=True`"
+            )
+        residual = hidden_states
+        hidden_states = self.ln_cross_attn(hidden_states)
+        cross_attn_outputs = self.crossattention(
+            hidden_states,
+            attention_mask=attention_mask,
+            head_mask=head_mask,
+            encoder_hidden_states=encoder_hidden_states,
+            encoder_attention_mask=encoder_attention_mask,
+            output_attentions=output_attentions,
+        )
+        attn_output = cross_attn_outputs[0]
+        # residual connection
+        hidden_states = residual + attn_output
+        outputs = (
+            outputs + cross_attn_outputs[2:]
+        )  # add cross attentions if we output attention weights
+
+    residual = hidden_states
+    hidden_states = self.ln_2(hidden_states)
+    feed_forward_hidden_states = self.mlp(hidden_states)
+    # residual connection
+    hidden_states = residual + feed_forward_hidden_states
+
+    if use_cache:
+        outputs = (hidden_states,) + outputs
+    else:
+        outputs = (hidden_states,) + outputs[1:]
+
+    return outputs  # hidden_states, present, (attentions, cross_attentions)
+
+
+def BaichuanMLP_forward(self, x):
+    gate = torch.ops.torch_ipex.tpp_linear_silu(
+        x, self.gate_proj.weight, x.new_empty(0)
+    )
+    up = torch.ops.torch_ipex.tpp_linear_mul(
+        x, gate, self.up_proj.weight, x.new_empty(0)
+    )
+    return up
+
+
+def BaichuanMLP_forward_distributed(self, x):
+    gate = torch.ops.torch_ipex.tpp_linear_silu(
+        x, self.gate_proj.weight, x.new_empty(0)
+    )
+    up = torch.ops.torch_ipex.tpp_linear_mul(
+        x, gate, self.up_proj.weight, x.new_empty(0)
+    )
+    return self.down_proj(up)
+
+
+def BaichuanLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    residual = hidden_states
+
+    hidden_states = self.input_layernorm(hidden_states)
+
+    # Self Attention
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        past_key_value=past_key_value,
+        output_attentions=output_attentions,
+        use_cache=use_cache,
+    )
+    hidden_states = residual + hidden_states
+
+    # Fully Connected
+    residual = hidden_states
+    hidden_states = self.post_attention_layernorm(hidden_states)
+    hidden_states = torch.ops.torch_ipex.tpp_linear_add(
+        self.mlp(hidden_states),
+        residual,
+        self.mlp.down_proj.weight,
+        hidden_states.new_empty(0),
+        1.0,
+    )
+
+    outputs = (hidden_states,)
+
+    if use_cache:
+        outputs += (present_key_value,)
+
+    return outputs
+
+
+def BaichuanLayer_forward_distributed(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    residual = hidden_states
+
+    hidden_states = self.input_layernorm(hidden_states)
+
+    # Self Attention
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        past_key_value=past_key_value,
+        output_attentions=output_attentions,
+        use_cache=use_cache,
+    )
+    hidden_states = residual + hidden_states
+
+    # Fully Connected
+    residual = hidden_states
+    hidden_states = self.post_attention_layernorm(hidden_states)
+    hidden_states = self.mlp(hidden_states)
+    hidden_states = residual + hidden_states
+
+    outputs = (hidden_states,)
+
+    if use_cache:
+        outputs += (present_key_value,)
+
+    return outputs
+
+
+def T5DenseGatedActDense_forward(self, hidden_states):
+    # hidden_gelu = self.act(self.wi_0(hidden_states))
+    hidden_gelu = torch.ops.torch_ipex.tpp_linear_gelu(
+        hidden_states,
+        self.wi_0.weight,
+        torch.zeros(self.wi_0.out_features, dtype=hidden_states.dtype),
+    )
+    # hidden_linear = self.wi_1(hidden_states)
+    # hidden_states = hidden_gelu * hidden_linear
+    # hidden_states = self.dropout(hidden_states)
+    hidden_states = torch.ops.torch_ipex.tpp_linear_mul(
+        hidden_states,
+        hidden_gelu,
+        self.wi_1.weight,
+        torch.zeros(self.wi_1.out_features, dtype=hidden_states.dtype),
+    )
+
+    if (
+        isinstance(self.wo.weight, torch.Tensor)
+        and hidden_states.dtype != self.wo.weight.dtype
+    ):
+        hidden_states = hidden_states.to(self.wo.weight.dtype)
+
+    # hidden_states = self.wo(hidden_states)
+    return hidden_states
+
+
+def T5LayerFF_forward(self, hidden_states):
+    forwarded_states = self.layer_norm(hidden_states)
+    forwarded_states = self.DenseReluDense(forwarded_states)
+    # hidden_states = hidden_states + self.dropout(forwarded_states)
+    hidden_states = torch.ops.torch_ipex.tpp_linear_add(
+        forwarded_states,
+        hidden_states,
+        self.DenseReluDense.wo.weight,
+        torch.zeros(self.DenseReluDense.wo.out_features, dtype=hidden_states.dtype),
+        1.0,
+    )
+    return hidden_states
+
+
 def Apply_TPP_optimization(model, dtype, distributed=False):
     def convert_forward(m, target_m, new_forward):
         for _, sub_m in m.named_children():

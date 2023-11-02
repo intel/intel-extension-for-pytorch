@@ -223,15 +223,85 @@ def _beam_search(
             or re.search("bloom", self.config.architectures[0], re.IGNORECASE)
             or re.search("chatglm", self.config.architectures[0], re.IGNORECASE)
             or re.search("codegen", self.config.architectures[0], re.IGNORECASE)
+            or re.search("GPTBigCode", self.config.architectures[0], re.IGNORECASE)
+            or re.search("baichuan", self.config.architectures[0], re.IGNORECASE)
+            or re.search("t5", self.config.architectures[0], re.IGNORECASE)
         ):
             first_token = False
             input_bs = input_ids.size()[0]
             has_position_id = True
             if model_inputs["past_key_values"] is None:
                 first_token = True
+                if re.search("t5", self.config.architectures[0], re.IGNORECASE):
+                    first_token = False
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(batch_size * num_beams)), dtype=torch.long
+                    ).contiguous()
+                    kv_cache_dtype = (
+                        model_inputs["encoder_outputs"]["last_hidden_state"].dtype
+                        if not hasattr(self.config, "kv_cache_dtype")
+                        else self.config.kv_cache_dtype
+                    )
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(
+                                    [1, 1, 1, 1],
+                                    dtype=kv_cache_dtype,
+                                ).contiguous(),
+                                torch.zeros(
+                                    [1, 1, 1, 1],
+                                    dtype=kv_cache_dtype,
+                                ).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, dtype=torch.long).contiguous(),
+                                self.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.k(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .to(dtype=kv_cache_dtype)
+                                .view(
+                                    int(batch_size * num_beams),
+                                    -1,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.n_heads,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.key_value_proj_dim,
+                                )
+                                .transpose(0, 1),
+                                self.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.v(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .to(dtype=kv_cache_dtype)
+                                .view(
+                                    int(batch_size * num_beams),
+                                    -1,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.n_heads,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.key_value_proj_dim,
+                                )
+                                .transpose(0, 1),
+                                beam_idx_tmp,
+                                torch.zeros(1, dtype=torch.long).contiguous(),
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
             if first_token:
-                if re.search("GPTJ", self.config.architectures[0]) or re.search(
-                    "codegen", self.config.architectures[0], re.IGNORECASE
+                if (
+                    re.search("GPTJ", self.config.architectures[0])
+                    or re.search("codegen", self.config.architectures[0], re.IGNORECASE)
+                    or re.search(
+                        "GPTBigCode", self.config.architectures[0], re.IGNORECASE
+                    )
                 ):
                     beam_idx_tmp = torch.zeros(
                         (2048, int(batch_size * num_beams)), dtype=torch.long
@@ -239,8 +309,16 @@ def _beam_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
                                 beam_idx_tmp,
                                 torch.zeros(1, dtype=torch.long).contiguous(),
                             )
@@ -254,8 +332,16 @@ def _beam_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
                                 beam_idx_tmp,
                                 torch.zeros(1, dtype=torch.long).contiguous(),
                             )
@@ -269,8 +355,16 @@ def _beam_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
                                 beam_idx_tmp,
                                 torch.zeros(1, dtype=torch.long).contiguous(),
                             )
@@ -284,8 +378,16 @@ def _beam_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
                                 beam_idx_tmp,
                                 torch.zeros(1, dtype=torch.long).contiguous(),
                             )
@@ -302,8 +404,16 @@ def _beam_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
                                 beam_idx_tmp,
                                 torch.zeros(1, dtype=torch.long).contiguous(),
                             )
@@ -318,8 +428,16 @@ def _beam_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
                                 beam_idx_tmp,
                                 torch.zeros(1, dtype=torch.long).contiguous(),
                             )
@@ -334,8 +452,16 @@ def _beam_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
                                 beam_idx_tmp,
                                 torch.zeros(1, dtype=torch.long).contiguous(),
                             )
@@ -343,7 +469,30 @@ def _beam_search(
                         ]
                     )
                     has_position_id = True
-                    # model_inputs["attention_mask"] = torch.zeros(model_inputs["input_ids"].shape)
+                elif re.search("baichuan", self.config.architectures[0], re.IGNORECASE):
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(batch_size * num_beams)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, dtype=torch.long).contiguous(),
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
+                    has_position_id = False
 
             if hasattr(self, "trace_graph"):
                 if first_token:
@@ -370,10 +519,19 @@ def _beam_search(
                         model_inputs["position_ids"] = new_position_ids
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
+                if re.search("t5", self.config.architectures[0], re.IGNORECASE):
+                    model_inputs.pop("head_mask", None)
+                    model_inputs.pop("decoder_head_mask", None)
+                    model_inputs.pop("decoder_attention_mask", None)
+                    model_inputs.pop("cross_attn_head_mask", None)
+                    model_inputs["encoder_outputs"] = (
+                        model_inputs["encoder_outputs"]["last_hidden_state"],
+                    )
                 if "return_last_logit" in model_inputs:
                     model_inputs["return_last_logit"] = torch.tensor(
                         model_inputs["return_last_logit"]
                     )
+
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
                 else:
@@ -670,14 +828,84 @@ def _greedy_search(
             or re.search("bloom", self.config.architectures[0], re.IGNORECASE)
             or re.search("chatglm", self.config.architectures[0], re.IGNORECASE)
             or re.search("codegen", self.config.architectures[0], re.IGNORECASE)
+            or re.search("GPTBigCode", self.config.architectures[0], re.IGNORECASE)
+            or re.search("baichuan", self.config.architectures[0], re.IGNORECASE)
+            or re.search("t5", self.config.architectures[0], re.IGNORECASE)
         ):
             first_token = False
             input_bs = input_ids.size()[0]
             if model_inputs["past_key_values"] is None:
                 first_token = True
+                if re.search("t5", self.config.architectures[0], re.IGNORECASE):
+                    first_token = False
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(input_bs)), dtype=torch.long
+                    ).contiguous()
+                    kv_cache_dtype = (
+                        model_inputs["encoder_outputs"]["last_hidden_state"].dtype
+                        if not hasattr(self.config, "kv_cache_dtype")
+                        else self.config.kv_cache_dtype
+                    )
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(
+                                    [1, 1, 1, 1],
+                                    dtype=kv_cache_dtype,
+                                ).contiguous(),
+                                torch.zeros(
+                                    [1, 1, 1, 1],
+                                    dtype=kv_cache_dtype,
+                                ).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, dtype=torch.long).contiguous(),
+                                self.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.k(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .to(dtype=kv_cache_dtype)
+                                .view(
+                                    int(input_bs),
+                                    -1,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.n_heads,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.key_value_proj_dim,
+                                )
+                                .transpose(0, 1),
+                                self.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.v(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .to(dtype=kv_cache_dtype)
+                                .view(
+                                    int(input_bs),
+                                    -1,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.n_heads,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.key_value_proj_dim,
+                                )
+                                .transpose(0, 1),
+                                beam_idx_tmp,
+                                torch.zeros(1, dtype=torch.long).contiguous(),
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
             if first_token:
-                if re.search("GPTJ", self.config.architectures[0]) or re.search(
-                    "codegen", self.config.architectures[0], re.IGNORECASE
+                if (
+                    re.search("GPTJ", self.config.architectures[0])
+                    or re.search("codegen", self.config.architectures[0], re.IGNORECASE)
+                    or re.search(
+                        "GPTBigCode", self.config.architectures[0], re.IGNORECASE
+                    )
                 ):
                     beam_idx_tmp = torch.zeros(
                         (2048, int(input_bs)), dtype=torch.long
@@ -685,8 +913,16 @@ def _greedy_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
                                 beam_idx_tmp,
                                 torch.zeros(1, dtype=torch.long).contiguous(),
                             )
@@ -700,8 +936,16 @@ def _greedy_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
                                 beam_idx_tmp,
                                 torch.zeros(1, dtype=torch.long).contiguous(),
                             )
@@ -715,8 +959,16 @@ def _greedy_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
                                 beam_idx_tmp,
                                 torch.zeros(1, dtype=torch.long).contiguous(),
                             )
@@ -730,8 +982,16 @@ def _greedy_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
                                 beam_idx_tmp,
                                 torch.zeros(1, dtype=torch.long).contiguous(),
                             )
@@ -747,8 +1007,16 @@ def _greedy_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
                                 beam_idx_tmp,
                                 torch.zeros(1, dtype=torch.long).contiguous(),
                             )
@@ -762,8 +1030,16 @@ def _greedy_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
                                 beam_idx_tmp,
                                 torch.zeros(1, dtype=torch.long).contiguous(),
                             )
@@ -777,18 +1053,57 @@ def _greedy_search(
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
                                 beam_idx_tmp,
                                 torch.zeros(1, dtype=torch.long).contiguous(),
                             )
                             for i in range(self.config.num_layers)
                         ]
                     )
+                elif re.search("baichuan", self.config.architectures[0], re.IGNORECASE):
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(input_bs)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous()
+                                if not hasattr(self.config, "kv_cache_dtype")
+                                else torch.zeros(
+                                    [1, 1, 1, 1], dtype=self.config.kv_cache_dtype
+                                ).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, dtype=torch.long).contiguous(),
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
 
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
+                if re.search("t5", self.config.architectures[0], re.IGNORECASE):
+                    model_inputs.pop("head_mask", None)
+                    model_inputs.pop("decoder_head_mask", None)
+                    model_inputs.pop("decoder_attention_mask", None)
+                    model_inputs.pop("cross_attn_head_mask", None)
+                    model_inputs["encoder_outputs"] = (
+                        model_inputs["encoder_outputs"]["last_hidden_state"],
+                    )
                 if "return_last_logit" in model_inputs:
                     model_inputs["return_last_logit"] = torch.tensor(
                         model_inputs["return_last_logit"]

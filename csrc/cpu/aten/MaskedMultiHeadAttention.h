@@ -20,7 +20,8 @@ masked_multihead_self_attention(
     const double scale_attn,
     int64_t max_positions,
     const c10::optional<at::Tensor>& head_mask /* optional */,
-    const c10::optional<at::Tensor>& attention_mask /* optional */);
+    const c10::optional<at::Tensor>& attention_mask /* optional */,
+    c10::optional<bool> add_casual_mask /* optional */);
 }
 
 using masked_multihead_self_attention_kernel_fn =
@@ -35,7 +36,8 @@ using masked_multihead_self_attention_kernel_fn =
         const double scale_attn,
         int64_t max_positions,
         const c10::optional<at::Tensor>& head_mask /* optional */,
-        const c10::optional<at::Tensor>& attention_mask /* optional */);
+        const c10::optional<at::Tensor>& attention_mask /* optional */,
+        c10::optional<bool> add_casual_mask /* optional */);
 
 DECLARE_DISPATCH(
     masked_multihead_self_attention_kernel_fn,

@@ -85,7 +85,10 @@ at::Tensor woq_linear_pack_weight(
     const at::Tensor& zero_points,
     int64_t lowp_mode);
 
-at::Tensor woq_linear_unpack_weight(const at::Tensor& weight, bool is_int4, int64_t lowp_mode);
+at::Tensor woq_linear_unpack_weight(
+    const at::Tensor& weight,
+    bool is_int4,
+    int64_t lowp_mode);
 
 void woq_linear_kernel_output(
     const at::Tensor& self,
@@ -242,22 +245,17 @@ using woq_tpp_gemm_kernel_fn = at::Tensor (*)(
 using woq_tpp_gemm_packB_fn =
     at::Tensor (*)(const at::Tensor&, bool, size_t, size_t, int64_t);
 
-using woq_tpp_gemm_unpackB_fn = at::Tensor (*)(const at::Tensor&, bool, int64_t);
+using woq_tpp_gemm_unpackB_fn =
+    at::Tensor (*)(const at::Tensor&, bool, int64_t);
 
 DECLARE_DISPATCH(woq_tpp_gemm_kernel_fn, woq_tpp_gemm_kernel_stub);
 DECLARE_DISPATCH(woq_tpp_gemm_packB_fn, woq_tpp_gemm_packB_stub);
 DECLARE_DISPATCH(woq_tpp_gemm_unpackB_fn, woq_tpp_gemm_unpackB_stub);
 
-#ifdef __GNUC__
-#  include <features.h>
-#  if __GNUC_PREREQ(12,3)
-#  define WOQ_TPP_KERNEL
-#  define FUSE_NONE 0
-#  define FUSE_GELU 1
-#  define FUSE_ADD 2
-#  define FUSE_ADD_ADD 3
-#  endif
-#endif
+#define WOQ_FUSE_NONE 0
+#define WOQ_FUSE_GELU 1
+#define WOQ_FUSE_ADD 2
+#define WOQ_FUSE_ADD_ADD 3
 
 } // namespace cpu
 } // namespace torch_ipex

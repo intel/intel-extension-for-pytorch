@@ -58,6 +58,13 @@ parser.add_argument("--token-latency", action="store_true")
 parser.add_argument("--greedy", action="store_true")
 parser.add_argument("--profile", action="store_true")
 parser.add_argument(
+    "--kv-cache-dtype",
+    type=str,
+    choices=["float8_e5m2", "None"],
+    default="None",
+    help="Specify the kv_cache data type, you can use float8_e5m2 to reduce kv_cache memory footprint but may slightly drop the accuracy.",
+)
+parser.add_argument(
     "--lowp-mode",
     choices=["BF16", "FP32", "INT8", "FP16"],
     default="BF16",
@@ -82,13 +89,23 @@ except Exception:
 
 # beam search = 4
 num_beams = 1 if args.greedy else 4
-generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams,
-                       max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens)
+generate_kwargs = dict(
+    do_sample=False,
+    temperature=0.9,
+    num_beams=num_beams,
+    max_new_tokens=args.max_new_tokens,
+    min_new_tokens=args.max_new_tokens,
+)
 
 # load model
 config = AutoConfig.from_pretrained(
     args.model_id, torchscript=args.jit, trust_remote_code=True
 )
+if args.kv_cache_dtype != "None":
+    args.kv_cache_dtype = getattr(torch, args.kv_cache_dtype)
+    print("kv_cache_dtype:", args.kv_cache_dtype)
+    config.kv_cache_dtype = args.kv_cache_dtype
+
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 
@@ -127,28 +144,12 @@ beam_idx_tmp = torch.zeros(
 ).contiguous()
 global_past_key_value = [
     (
-        torch.zeros(
-            [
-                1,
-                user_model.config.num_attention_heads,
-                1,
-                int(
-                    user_model.config.hidden_size
-                    / user_model.config.num_attention_heads
-                ),
-            ]
-        ).contiguous(),
-        torch.zeros(
-            [
-                1,
-                user_model.config.num_attention_heads,
-                1,
-                int(
-                    user_model.config.hidden_size
-                    / user_model.config.num_attention_heads
-                ),
-            ]
-        ).contiguous(),
+        torch.zeros([1, 1, 1, 1]).contiguous()
+        if args.kv_cache_dtype == "None"
+        else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
+        torch.zeros([1, 1, 1, 1]).contiguous()
+        if args.kv_cache_dtype == "None"
+        else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
         beam_idx_tmp,
         torch.zeros(1, dtype=torch.long).contiguous(),
     )
@@ -220,7 +221,7 @@ if args.lambada:
                         beam_idx_tmp,
                         torch.zeros(1, dtype=torch.long).contiguous(),
                     )
-                    for i in range(28)
+                    for i in range(user_model.config.num_layers)
                 ]
 
             return (
@@ -526,7 +527,9 @@ if args.benchmark:
             on_trace_ready=trace_handler,
         ) as prof:
             for i in range(5):
-                input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(args.device)
+                input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(
+                    args.device
+                )
                 output = user_model.generate(input_ids, **generate_kwargs)
                 gen_ids = output[0] if args.token_latency else output
                 gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)

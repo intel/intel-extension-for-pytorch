@@ -72,7 +72,7 @@ def _optimize_transformers(
     r"""
     Apply optimizations at Python frontend to the given transformers model (nn.Module) for inference only.
     This API focus on transformers models, especially for generation tasks inference.
-    Well supported model list: Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, ChatGLM2, CodeGen.
+    Well supported model list: Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, ChatGLM2, CodeGen, GPTBigCode, BaiChuan.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations on.
@@ -147,8 +147,12 @@ def _optimize_transformers(
                 _BloomAttention,
                 _GLM2Attention,
                 _CodeGenAttention,
+                _GPTBigCodeAttention,
+                _BaichuanAttention,
+                _T5Attention,
                 _reorder_cache,
                 GLM2_get_masks,
+                _gen_baichuan_alibi_mask,
             )
             from intel_extension_for_pytorch.cpu.tpp.fused_llm import (
                 GPTJBlock_forward,
@@ -167,6 +171,16 @@ def _optimize_transformers(
                 BloomMLP_forward_distributed,
                 GLMMLP_forward,
                 GLMBlock_forward,
+                GPTBigCodeMLP_forward,
+                GPTBigCodeMLP_forward_distributed,
+                GPTBigCodeBlock_forward,
+                GPTBigCodeBlock_forward_distributed,
+                BaichuanMLP_forward,
+                BaichuanLayer_forward,
+                BaichuanMLP_forward_distributed,
+                BaichuanLayer_forward_distributed,
+                T5LayerFF_forward,
+                T5DenseGatedActDense_forward,
             )
             from intel_extension_for_pytorch.cpu.woq.fused_llm import (
                 GPTJMLP_woq_forward,
@@ -180,11 +194,18 @@ def _optimize_transformers(
                 FalconModel_forward,
                 BloomModel_forward,
                 CodeGenModel_forward,
+                GPTBigCodeModel_forward,
+                BaichuanModel_forward,
                 GPTJForCausalLM_forward,
                 LlamaForCausalLM_forward,
                 GPTNeoXForCausalLM_forward,
                 OPTForCausalLM_forward,
                 CodeGenForCausalLM_forward,
+                GPTBigCodeForCausalLM_forward,
+                BaichuanForCausalLM_forward,
+                T5Stack_forward,
+                T5Block_forward,
+                T5DenseGatedActDense_forward_int8,
                 prepare_inputs_for_generation,
             )
 
@@ -198,10 +219,14 @@ def _optimize_transformers(
                 or re.search("bloom", model.config.architectures[0], re.IGNORECASE)
                 or re.search("chatglm", model.config.architectures[0], re.IGNORECASE)
                 or re.search("codegen", model.config.architectures[0], re.IGNORECASE)
+                or re.search("GPTBigCode", model.config.architectures[0], re.IGNORECASE)
+                or re.search("baichuan", model.config.architectures[0], re.IGNORECASE)
+                or re.search("t5", model.config.architectures[0], re.IGNORECASE)
             )
             if not well_supported_model:
                 warnings.warn(
-                    "optimize_transformers currently well supports Llama, GPT-J, GPT-Neox, OPT, falcon, bloom, ChatGLM2, CodeGen"
+                    "optimize_transformers currently well supports Llama, GPT-J, GPT-Neox, OPT, \
+                        falcon, bloom, ChatGLM2, CodeGen, GPTBigCode, BaiChuan, and T5"
                 )
 
             if not inplace:
@@ -290,6 +315,25 @@ def _optimize_transformers(
                         "forward",
                         CodeGenForCausalLM_forward,
                     )
+                elif re.search(
+                    "GPTBigCode", model.config.architectures[0], re.IGNORECASE
+                ):
+                    convert_function(_model, "forward", GPTBigCodeForCausalLM_forward)
+                elif re.search(
+                    "baichuan", model.config.architectures[0], re.IGNORECASE
+                ):
+                    convert_function(_model, "forward", BaichuanForCausalLM_forward)
+                    convert_class(
+                        _model,
+                        type(_model.model.layers[0].self_attn),
+                        _BaichuanAttention,
+                        _model.config,
+                    )
+                    convert_forward(_model, type(_model.model), BaichuanModel_forward)
+                    _model.model.future_mask = _gen_baichuan_alibi_mask(
+                        _model.model.layers[0].self_attn.num_heads,
+                        _model.model.layers[0].self_attn.max_position_embeddings,
+                    )
 
                 convert_forward(
                     _model,
@@ -320,6 +364,21 @@ def _optimize_transformers(
                     _model,
                     transformers.models.codegen.modeling_codegen.CodeGenModel,
                     CodeGenModel_forward,
+                )
+                convert_forward(
+                    _model,
+                    transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeModel,
+                    GPTBigCodeModel_forward,
+                )
+                convert_forward(
+                    _model,
+                    transformers.models.t5.modeling_t5.T5Stack,
+                    T5Stack_forward,
+                )
+                convert_forward(
+                    _model,
+                    transformers.models.t5.modeling_t5.T5Block,
+                    T5Block_forward,
                 )
                 convert_function(
                     transformers.models.bloom.modeling_bloom.BloomModel,
@@ -370,6 +429,18 @@ def _optimize_transformers(
                     _CodeGenAttention,
                     _model.config,
                 )
+                convert_class(
+                    _model,
+                    transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeAttention,
+                    _GPTBigCodeAttention,
+                    _model.config,
+                )
+                convert_class(
+                    _model,
+                    transformers.models.t5.modeling_t5.T5Attention,
+                    _T5Attention,
+                    _model.config,
+                )
 
                 if dtype == torch.int8:
                     convert_functions(
@@ -382,6 +453,11 @@ def _optimize_transformers(
                         _model,
                         transformers.models.llama.modeling_llama.LlamaRMSNorm,
                         _LlamaRMSNorm_forward_v2,
+                    )
+                    convert_forward(
+                        _model,
+                        transformers.models.t5.modeling_t5.T5DenseGatedActDense,
+                        T5DenseGatedActDense_forward_int8,
                     )
                     if getattr(_model.config, "weight_only_quantization", False):
                         convert_forward(
@@ -480,6 +556,40 @@ def _optimize_transformers(
                                 type(_model.transformer.encoder.layers[0]),
                                 GLMBlock_forward,
                             )
+                        convert_forward(
+                            _model,
+                            transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeMLP,
+                            GPTBigCodeMLP_forward,
+                        )
+                        convert_forward(
+                            _model,
+                            transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeBlock,
+                            GPTBigCodeBlock_forward,
+                        )
+                        if re.search(
+                            "baichuan", model.config.architectures[0], re.IGNORECASE
+                        ):
+                            convert_forward(
+                                _model,
+                                type(_model.model.layers[0].mlp),
+                                BaichuanMLP_forward,
+                            )
+                            convert_forward(
+                                _model,
+                                type(_model.model.layers[0]),
+                                BaichuanLayer_forward,
+                            )
+
+                        convert_forward(
+                            _model,
+                            transformers.models.t5.modeling_t5.T5DenseGatedActDense,
+                            T5DenseGatedActDense_forward,
+                        )
+                        convert_forward(
+                            _model,
+                            transformers.models.t5.modeling_t5.T5LayerFF,
+                            T5LayerFF_forward,
+                        )
                     else:
                         convert_forward(
                             _model,
@@ -521,6 +631,30 @@ def _optimize_transformers(
                             transformers.models.bloom.modeling_bloom.BloomMLP,
                             BloomMLP_forward_distributed,
                         )
+                        convert_forward(
+                            _model,
+                            transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeMLP,
+                            GPTBigCodeMLP_forward_distributed,
+                        )
+                        convert_forward(
+                            _model,
+                            transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeBlock,
+                            GPTBigCodeBlock_forward_distributed,
+                        )
+
+                        if re.search(
+                            "baichuan", model.config.architectures[0], re.IGNORECASE
+                        ):
+                            convert_forward(
+                                _model,
+                                type(_model.model.layers[0].mlp),
+                                BaichuanMLP_forward_distributed,
+                            )
+                            convert_forward(
+                                _model,
+                                type(_model.model.layers[0]),
+                                BaichuanLayer_forward_distributed,
+                            )
             else:
                 raise RuntimeError(
                     "optimize_transformers optimization currently supports dtype: \

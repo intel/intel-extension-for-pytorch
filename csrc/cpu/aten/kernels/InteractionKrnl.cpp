@@ -1,5 +1,6 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 #include "aten/Interaction.h"
+#include "aten/utils/utils.h"
 #include "autocast/autocast_mode.h"
 #include "cpu/kernels/Interaction.h"
 #include "ideep/IDeepConversions.h"

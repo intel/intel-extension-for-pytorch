@@ -70,6 +70,13 @@ parser.add_argument(
     help="weight data type for weight only quantization. "
          "Unrelated to activation data type or lowp-mode."
 )
+parser.add_argument(
+    "--kv-cache-dtype",
+    type=str,
+    choices=["float8_e5m2", "None"],
+    default="None",
+    help="Specify the kv_cache data type, you can use float8_e5m2 to reduce kv_cache memory footprint but may slightly drop the accuracy.",
+)
 args = parser.parse_args()
 
 
@@ -86,6 +93,11 @@ generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams,
 
 # load model
 config = AutoConfig.from_pretrained(args.model_id, torchscript=args.jit)
+if args.kv_cache_dtype != "None":
+    args.kv_cache_dtype = getattr(torch, args.kv_cache_dtype)
+    print("kv_cache_dtype:", args.kv_cache_dtype)
+    config.kv_cache_dtype = args.kv_cache_dtype 
+
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 
@@ -177,8 +189,8 @@ if args.lambada:
                 ).contiguous()
                 past_key_value = [
                     (
-                        torch.zeros([1, 16, 1, 256]).contiguous(),
-                        torch.zeros([1, 16, 1, 256]).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous() if args.kv_cache_dtype == "None" else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous() if args.kv_cache_dtype == "None" else torch.zeros([1, 1, 1, 1], dtype=args.kv_cache_dtype).contiguous(),
                         beam_idx_tmp,
                         torch.zeros(1, dtype=torch.long).contiguous(),
                     )

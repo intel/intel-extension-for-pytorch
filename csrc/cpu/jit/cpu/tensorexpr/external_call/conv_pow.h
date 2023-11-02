@@ -36,8 +36,8 @@ struct LoweringFuncTrait<ConvFusedOp::kConvPow> : public ConvCommonOperations {
     //     2: conv op context
     constexpr int input_idx = 0; // input tensor
     constexpr int ctx_idx = 2; // Conv context
-    res.push_back(c10::get<pytnnc::BufHandle>(inputs[input_idx]));
-    res.push_back(c10::get<pytnnc::BufHandle>(inputs[ctx_idx]));
+    res.push_back(std::get<pytnnc::BufHandle>(inputs[input_idx]));
+    res.push_back(std::get<pytnnc::BufHandle>(inputs[ctx_idx]));
     return res;
   }
 

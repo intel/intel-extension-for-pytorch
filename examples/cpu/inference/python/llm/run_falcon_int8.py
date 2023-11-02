@@ -55,16 +55,23 @@ parser.add_argument("--token-latency", action="store_true")
 parser.add_argument("--greedy", action="store_true")
 parser.add_argument("--profile", action="store_true")
 parser.add_argument(
+    "--kv-cache-dtype",
+    type=str,
+    choices=["float8_e5m2", "None"],
+    default="None",
+    help="Specify the kv_cache data type, you can use float8_e5m2 to reduce kv_cache memory footprint but may slightly drop the accuracy.",
+)
+parser.add_argument(
     "--config-file", default=None, type=str, help="specific configuration file"
 )
 parser.add_argument(
     "--lowp-mode",
-    choices=["BF16","FP32","INT8","FP16"],
+    choices=["BF16", "FP32", "INT8", "FP16"],
     default="BF16",
     type=str,
     help="low precision mode for weight only quantization. "
-         "It indicates data type for computation for speedup, "
-         "unrelated to activation or weight data type."
+    "It indicates data type for computation for speedup, "
+    "unrelated to activation or weight data type.",
 )
 parser.add_argument(
     "--weight-dtype",
@@ -72,7 +79,7 @@ parser.add_argument(
     default="INT8",
     type=str,
     help="weight data type for weight only quantization. "
-         "Unrelated to activation data type or lowp-mode."
+    "Unrelated to activation data type or lowp-mode.",
 )
 args = parser.parse_args()
 
@@ -85,14 +92,28 @@ except Exception:
 
 # beam search = 4
 num_beams = 1 if args.greedy else 4
-generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams,
-                       max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens)
+generate_kwargs = dict(
+    do_sample=False,
+    temperature=0.9,
+    num_beams=num_beams,
+    max_new_tokens=args.max_new_tokens,
+    min_new_tokens=args.max_new_tokens,
+)
 
 # load model
 if args.config_file is None:
-    config = AutoConfig.from_pretrained(args.model_id, torchscript=args.jit, trust_remote_code=True)
+    config = AutoConfig.from_pretrained(
+        args.model_id, torchscript=args.jit, trust_remote_code=True
+    )
 else:
-    config = AutoConfig.from_pretrained(args.config_file, torchscript=args.jit, trust_remote_code=True)
+    config = AutoConfig.from_pretrained(
+        args.config_file, torchscript=args.jit, trust_remote_code=True
+    )
+if args.kv_cache_dtype != "None":
+    args.kv_cache_dtype = getattr(torch, args.kv_cache_dtype)
+    print("kv_cache_dtype:", args.kv_cache_dtype)
+    config.kv_cache_dtype = args.kv_cache_dtype
+
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 
@@ -104,10 +125,16 @@ if not hasattr(config, "text_max_length") and args.prompt is None:
 #         user_model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
 # else:
 user_model = AutoModelForCausalLM.from_pretrained(
-    args.model_id, torch_dtype=torch.float, config=config, low_cpu_mem_usage=True, trust_remote_code=True
+    args.model_id,
+    torch_dtype=torch.float,
+    config=config,
+    low_cpu_mem_usage=True,
+    trust_remote_code=True,
 )
 if not isinstance(user_model, FalconForCausalLM) and not args.benchmark:
-    print("You're using a model from remote hub. To successfully save/load quantized model, please pass configuration file (example: --config-file=model_config/tiiuae_falcon-40b_config.json).")
+    print(
+        "You're using a model from remote hub. To successfully save/load quantized model, please pass configuration file (example: --config-file=model_config/tiiuae_falcon-40b_config.json)."
+    )
     exit(0)
 tokenizer = AutoTokenizer.from_pretrained(args.model_id, trust_remote_code=True)
 print("Data type of the model:", user_model.dtype)
@@ -122,9 +149,38 @@ user_model = ipex._optimize_transformers(
     user_model.eval(), dtype=torch.int8, inplace=True
 )
 
-beam_idx_tmp = torch.zeros((2048, int(args.batch_size * num_beams)), dtype=torch.long).contiguous()
-global_past_key_value = [(torch.zeros([1,user_model.config.num_attention_heads,1,int(user_model.config.hidden_size/user_model.config.num_attention_heads)]).contiguous(),
-                           torch.zeros([1,user_model.config.num_attention_heads,1,int(user_model.config.hidden_size/user_model.config.num_attention_heads)]).contiguous(), beam_idx_tmp, torch.zeros(1, dtype=torch.long).contiguous()) for i in range(user_model.config.num_hidden_layers)]
+beam_idx_tmp = torch.zeros(
+    (2048, int(args.batch_size * num_beams)), dtype=torch.long
+).contiguous()
+global_past_key_value = [
+    (
+        torch.zeros(
+            [
+                1,
+                user_model.config.num_attention_heads,
+                1,
+                int(
+                    user_model.config.hidden_size
+                    / user_model.config.num_attention_heads
+                ),
+            ]
+        ).contiguous(),
+        torch.zeros(
+            [
+                1,
+                user_model.config.num_attention_heads,
+                1,
+                int(
+                    user_model.config.hidden_size
+                    / user_model.config.num_attention_heads
+                ),
+            ]
+        ).contiguous(),
+        beam_idx_tmp,
+        torch.zeros(1, dtype=torch.long).contiguous(),
+    )
+    for i in range(user_model.config.num_hidden_layers)
+]
 
 # amp autocast
 if args.int8_bf16_mixed:
@@ -181,12 +237,20 @@ if args.lambada:
                 ).contiguous()
                 past_key_value = [
                     (
-                        torch.zeros([1, 16, 1, 256]).contiguous(),
-                        torch.zeros([1, 16, 1, 256]).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous()
+                        if args.kv_cache_dtype == "None"
+                        else torch.zeros(
+                            [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                        ).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous()
+                        if args.kv_cache_dtype == "None"
+                        else torch.zeros(
+                            [1, 1, 1, 1], dtype=args.kv_cache_dtype
+                        ).contiguous(),
                         beam_idx_tmp,
                         torch.zeros(1, dtype=torch.long).contiguous(),
                     )
-                    for i in range(28)
+                    for i in range(user_model.config.num_hidden_layers)
                 ]
 
             return (
@@ -274,6 +338,7 @@ def eval_func(traced_model):
     print("Accuracy:", acc)
     print("Latency (sec):", latency)
     return acc
+
 
 quant_model = user_model
 
@@ -366,17 +431,20 @@ if args.ipex_weight_only_quantization:
         lowp_mode = ipex.quantization.WoqLowpMode.BF16
 
     qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
-        weight_dtype=weight_dtype,
-        lowp_mode=lowp_mode
+        weight_dtype=weight_dtype, lowp_mode=lowp_mode
     )
     with torch.no_grad():
-        ipex.nn.utils._model_convert.replace_customized_linear_with_linear(user_model.eval())
+        ipex.nn.utils._model_convert.replace_customized_linear_with_linear(
+            user_model.eval()
+        )
     with torch.no_grad(), torch.autocast(
         device_type=args.device,
         enabled=amp_enabled,
         dtype=amp_dtype if amp_enabled else None,
     ):
         convert_model = convert_woq(user_model.eval(), qconfig)
+        if amp_enabled:
+            convert_model = convert_model.to(torch.bfloat16)
         self_jit = torch.jit.trace(convert_model.eval(), example_inputs, strict=False)
         self_jit = torch.jit.freeze(self_jit.eval())
         self_jit.save(args.output_dir + "/best_model.pt")
@@ -466,19 +534,21 @@ if args.benchmark:
                     total_list.append(output[1])
 
     if args.profile:
+
         def trace_handler(prof):
-            print(prof.key_averages().table(
-                sort_by="self_cpu_time_total", row_limit=-1))
+            print(
+                prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=-1)
+            )
+
         with torch.profiler.profile(
             activities=[torch.profiler.ProfilerActivity.CPU],
-            schedule=torch.profiler.schedule(
-                wait=1,
-                warmup=3,
-                active=1),
-            on_trace_ready=trace_handler
+            schedule=torch.profiler.schedule(wait=1, warmup=3, active=1),
+            on_trace_ready=trace_handler,
         ) as prof:
             for i in range(5):
-                input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(args.device)
+                input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(
+                    args.device
+                )
                 output = user_model.generate(input_ids, **generate_kwargs)
                 gen_ids = output[0] if args.token_latency else output
                 gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)

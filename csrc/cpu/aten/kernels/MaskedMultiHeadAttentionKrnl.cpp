@@ -11,16 +11,25 @@ namespace cpu {
 
 namespace {
 
-template <typename T>
+template <typename DST_T, typename SRC_T>
+void move_kernel(
+  DST_T* inout ,
+  const SRC_T* in,
+  int64_t len) {
+  torch_ipex::cpu::kernel::move_ker<DST_T, SRC_T>(inout, in, len);
+}
+
+template <typename QT, typename KT, typename CT>
 void reduce_head(
-    const T* q_ptr_start,
-    const T* k_ptr_start,
+    const QT* q_ptr_start,
+    const KT* k_ptr_start,
     float* attn_w_pos,
     int64_t head_size,
     bool store_key,
-    T* k_cache_start) {
+    CT* k_cache_start) {
+  attn_w_pos[0] = 0;
 #if defined(CPU_CAPABILITY_AVX512)
-  torch_ipex::cpu::kernel::_reduce_head<T>(
+  torch_ipex::cpu::kernel::_reduce_head<QT, KT, CT>(
       q_ptr_start,
       k_ptr_start,
       attn_w_pos,
@@ -30,26 +39,26 @@ void reduce_head(
 #else
   for (auto hsi = 0; hsi < head_size; hsi++) {
     if (store_key) {
-      k_cache_start[hsi] = k_ptr_start[hsi]; // cat the key into the key_cache.
+      k_cache_start[hsi] = (float)k_ptr_start[hsi]; // cat the key into the key_cache.
     }
-    attn_w_pos[0] += q_ptr_start[hsi] * k_ptr_start[hsi];
+    attn_w_pos[0] += (float)q_ptr_start[hsi] * (float)k_ptr_start[hsi];
   }
 #endif
 }
 
-template <typename T, typename T1>
+template <typename VT, typename OT, typename CT>
 inline void mul_attenion_weights_and_value_of_head(
     float& attn_w,
-    const T* v_ptr_start,
-    T1* attn_out_start,
+    const VT* v_ptr_start,
+    OT* attn_out_start,
     int64_t head_size,
     bool store_value,
-    T* v_cache_start,
+    CT* v_cache_start,
     int accumulated) {
   auto vec_size = 16; // 512/32
   auto hsi = 0;
 #if defined(CPU_CAPABILITY_AVX512)
-  torch_ipex::cpu::kernel::_mul_and_accumulate<T, T1>(
+  torch_ipex::cpu::kernel::_mul_and_accumulate<VT, OT, CT>(
       attn_w,
       v_ptr_start,
       attn_out_start,
@@ -60,33 +69,34 @@ inline void mul_attenion_weights_and_value_of_head(
 #else
   for (hsi = 0; hsi < head_size; hsi++) {
     if (accumulated) {
-      attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+      attn_out_start[hsi] += attn_w * (float)v_ptr_start[hsi];
     } else {
-      attn_out_start[hsi] = attn_w * v_ptr_start[hsi];
+      attn_out_start[hsi] = attn_w * (float)v_ptr_start[hsi];
     }
     if (store_value) {
-      v_cache_start[hsi] = v_ptr_start[hsi];
+      v_cache_start[hsi] = (float)v_ptr_start[hsi];
     }
   }
 #endif
 }
-template <typename T>
-void copy_key_value(
+
+template <typename DST_T, typename SRC_T>
+void copy_key_value_impl(
     at::Tensor key_cache,
     const at::Tensor key,
     at::Tensor value_cache,
     const at::Tensor value,
     int beam_batch) {
-  RECORD_FUNCTION("ipex::copy_key_value", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("ipex::copy_key_value_impl", c10::ArrayRef<c10::IValue>({}));
   auto bs = key.size(0);
   auto seq_len = key.size(1); // only process cur_len==1
   auto head_num = key.size(2);
   auto head_size = key.size(3);
   auto hidden_size = head_num * head_size;
-  auto key_cache_ptr = key_cache.data_ptr<T>();
-  auto key_ptr = key.data_ptr<T>();
-  auto value_cache_ptr = value_cache.data_ptr<T>();
-  auto value_ptr = value.data_ptr<T>();
+  auto key_cache_ptr = key_cache.data_ptr<DST_T>();
+  auto key_ptr = key.data_ptr<SRC_T>();
+  auto value_cache_ptr = value_cache.data_ptr<DST_T>();
+  auto value_ptr = value.data_ptr<SRC_T>();
   auto token_stride = beam_batch * hidden_size;
   auto beam_size = beam_batch / bs;
 #pragma omp parallel for collapse(2)
@@ -96,15 +106,41 @@ void copy_key_value(
       auto state_stride = (bi * seq_len + si) * hidden_size;
       auto key_cache_start = key_cache_ptr + cache_stride;
       auto key_ptr_start = key_ptr + state_stride;
-      torch_ipex::cpu::kernel::move_ker<T, T>(
-          key_cache_start, key_ptr_start, hidden_size);
+      move_kernel<DST_T, SRC_T>(
+        key_cache_start, key_ptr_start, hidden_size);
       auto value_cache_ptr_start = value_cache_ptr + cache_stride;
       auto value_ptr_start = value_ptr + state_stride;
-      torch_ipex::cpu::kernel::move_ker<T, T>(
-          value_cache_ptr_start, value_ptr_start, hidden_size);
+      move_kernel<DST_T, SRC_T>(
+          value_cache_ptr_start, value_ptr_start, hidden_size);     
+     
     }
   }
 }
+
+
+void copy_key_value(
+    at::Tensor key_cache,
+    const at::Tensor key,
+    at::Tensor value_cache,
+    const at::Tensor value,
+    int beam_batch){
+    
+    if(key.scalar_type() == at::kFloat ){
+        if(key_cache.scalar_type() == at::kFloat){
+            copy_key_value_impl<float, float>(key_cache, key, value_cache, value, beam_batch);
+        }else if(key_cache.scalar_type() == at::kFloat8_e5m2){
+            copy_key_value_impl<at::Float8_e5m2, float>(key_cache, key, value_cache, value, beam_batch);
+        }
+    }else if(key.scalar_type() == at::kBFloat16){
+        if(key_cache.scalar_type() == at::kBFloat16){
+            copy_key_value_impl<at::BFloat16, at::BFloat16>(key_cache, key, value_cache, value, beam_batch);
+        }else if(key_cache.scalar_type() == at::kFloat8_e5m2){
+            copy_key_value_impl<at::Float8_e5m2, at::BFloat16>(key_cache, key, value_cache, value, beam_batch);
+        }
+    }
+}
+
+
 
 /*
  *The scale-dot product for indirect access kv chache and fuse
@@ -127,7 +163,7 @@ void copy_key_value(
  *mask.
  *@return attn_outs, None, key_cache, value_cache, beam_idx
  */
-template <typename QT, typename VT>
+template <typename QT, typename VT, typename CT>
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 scale_dot_product_for_indirect_access_kv_cache(
     at::Tensor query,
@@ -156,7 +192,7 @@ scale_dot_product_for_indirect_access_kv_cache(
   key = key.contiguous();
   auto q_ptr = query.data_ptr<QT>();
   auto k_ptr = key.data_ptr<QT>();
-  auto k_cache_ptr = key_cache.data_ptr<QT>();
+  auto k_cache_ptr = key_cache.data_ptr<CT>();
   auto mask_ptr = attention_mask.data_ptr<QT>();
   auto mask_head_num = attention_mask.size(1);
   auto mask_dim2 = attention_mask.size(2);
@@ -166,7 +202,7 @@ scale_dot_product_for_indirect_access_kv_cache(
   auto attn_outs =
       at::empty({bs, head_num, cur_len, head_size}, value.options());
   auto v_ptr = value.data_ptr<VT>();
-  auto v_cache_ptr = value_cache.data_ptr<VT>();
+  auto v_cache_ptr = value_cache.data_ptr<CT>();
   auto attn_out_ptr = attn_outs.data_ptr<VT>();
   // torch_ipex::cpu::kernel::zero_ker(attn_out_ptr, attn_outs.numel());
   auto attn_w_ptr = attn_weights.data_ptr<float>();
@@ -221,7 +257,7 @@ scale_dot_product_for_indirect_access_kv_cache(
               auto k_ptr_start = k_ptr +
                   (bi * cur_len + ti - offset) * kv_head * head_size +
                   kv_hi * head_size;
-              reduce_head<QT>(
+              reduce_head<QT, QT, CT>(
                   q_ptr_start,
                   k_ptr_start,
                   attn_w_pos,
@@ -233,7 +269,7 @@ scale_dot_product_for_indirect_access_kv_cache(
                 auto k_ptr_start = k_ptr +
                     (bi * cur_len + ti - offset) * kv_head * head_size +
                     kv_hi * head_size;
-                reduce_head<QT>(
+                reduce_head<QT, QT, CT>(
                     q_ptr_start,
                     k_ptr_start,
                     attn_w_pos,
@@ -250,7 +286,7 @@ scale_dot_product_for_indirect_access_kv_cache(
                 }
                 auto kc_head_start =
                     k_cache_ptr + kc_t_beam_start + kv_hi * head_size;
-                reduce_head<QT>(
+                reduce_head<QT, CT, CT>(
                     q_ptr_start,
                     kc_head_start,
                     attn_w_pos,
@@ -373,7 +409,7 @@ scale_dot_product_for_indirect_access_kv_cache(
               auto v_ptr_start = v_ptr +
                   (bi * cur_len + vi - offset) * kv_head * head_size +
                   kv_hi * head_size;
-              mul_attenion_weights_and_value_of_head<VT, float>(
+              mul_attenion_weights_and_value_of_head<VT, float, CT>(
                   attn_w_query_start[vi],
                   v_ptr_start,
                   attn_out_start,
@@ -388,7 +424,7 @@ scale_dot_product_for_indirect_access_kv_cache(
                 auto v_ptr_start = v_ptr +
                     (bi * cur_len + vi - offset) * kv_head * head_size +
                     kv_hi * head_size;
-                mul_attenion_weights_and_value_of_head<VT, float>(
+                mul_attenion_weights_and_value_of_head<VT, float, CT>(
                     attn_w_query_start[vi],
                     v_ptr_start,
                     attn_out_start,
@@ -406,7 +442,7 @@ scale_dot_product_for_indirect_access_kv_cache(
                 }
                 auto v_cache_head_start =
                     v_cache_ptr + vc_t_beam_start + kv_hi * head_size;
-                mul_attenion_weights_and_value_of_head<VT, float>(
+                mul_attenion_weights_and_value_of_head<CT, float, CT>(
                     attn_w_query_start[vi],
                     v_cache_head_start,
                     attn_out_start,
@@ -471,55 +507,80 @@ zero_copy_kv_cache_masked_multihead_self_attention_kernel_impl(
     const double scale_attn,
     at::Tensor& attention_mask) {
   assert(key.scalar_type() == at::kBFloat16 || key.scalar_type() == at::kFloat);
-  if (query.scalar_type() == at::kFloat && value.scalar_type() == at::kFloat) {
-    return scale_dot_product_for_indirect_access_kv_cache<float, float>(
-        query,
-        key,
-        value,
-        key_cache,
-        value_cache,
-        beam_idx,
-        offset,
-        scale_attn,
-        attention_mask);
-  } else if (
-      query.scalar_type() == at::kFloat &&
-      value.scalar_type() == at::kBFloat16) {
-    return scale_dot_product_for_indirect_access_kv_cache<float, at::BFloat16>(
-        query,
-        key,
-        value,
-        key_cache,
-        value_cache,
-        beam_idx,
-        offset,
-        scale_attn,
-        attention_mask);
-  } else if (
-      key.scalar_type() == at::kBFloat16 && value.scalar_type() == at::kFloat) {
-    return scale_dot_product_for_indirect_access_kv_cache<at::BFloat16, float>(
-        query,
-        key,
-        value,
-        key_cache,
-        value_cache,
-        beam_idx,
-        offset,
-        scale_attn,
-        attention_mask);
+  if (key.scalar_type() == at::kFloat && value.scalar_type() == at::kFloat) {
+    if(key_cache.scalar_type() ==  at::kFloat){
+        return scale_dot_product_for_indirect_access_kv_cache<float, float, float>(
+            query,
+            key,
+            value,
+            key_cache,
+            value_cache,
+            beam_idx,
+            offset,
+            scale_attn,
+            attention_mask);
+    }else if(key_cache.scalar_type() == at::kFloat8_e5m2){
+        return scale_dot_product_for_indirect_access_kv_cache<float, float, at::Float8_e5m2>(
+            query,
+            key,
+            value,
+            key_cache,
+            value_cache,
+            beam_idx,
+            offset,
+            scale_attn,
+            attention_mask);
+    }else if(key_cache.scalar_type() == at::kBFloat16){
+        return scale_dot_product_for_indirect_access_kv_cache<float, float, at::BFloat16>(
+            query,
+            key,
+            value,
+            key_cache,
+            value_cache,
+            beam_idx,
+            offset,
+            scale_attn,
+            attention_mask);
+    }
+  }else if (key.scalar_type() == at::kBFloat16 && value.scalar_type() == at::kBFloat16){
+    if(key_cache.scalar_type() ==  at::kBFloat16){
+        return scale_dot_product_for_indirect_access_kv_cache<at::BFloat16, at::BFloat16, at::BFloat16>(
+            query,
+            key,
+            value,
+            key_cache,
+            value_cache,
+            beam_idx,
+            offset,
+            scale_attn,
+            attention_mask);
+    }else if(key_cache.scalar_type() == at::kFloat8_e5m2){
+        return scale_dot_product_for_indirect_access_kv_cache<at::BFloat16, at::BFloat16, at::Float8_e5m2>(
+            query,
+            key,
+            value,
+            key_cache,
+            value_cache,
+            beam_idx,
+            offset,
+            scale_attn,
+            attention_mask);
+    }else if(key_cache.scalar_type() == at::kFloat){
+        return scale_dot_product_for_indirect_access_kv_cache<at::BFloat16, at::BFloat16, float>(
+            query,
+            key,
+            value,
+            key_cache,
+            value_cache,
+            beam_idx,
+            offset,
+            scale_attn,
+            attention_mask);
+    }
   }
-  return scale_dot_product_for_indirect_access_kv_cache<
-      at::BFloat16,
-      at::BFloat16>(
-      query,
-      key,
-      value,
-      key_cache,
-      value_cache,
-      beam_idx,
-      offset,
-      scale_attn,
-      attention_mask);
+  TORCH_CHECK(
+      false,
+      "key and value must be float or bfloat16 to use ipex::zero_copy_kv_cache_masked_multihead_self_attention_kernel_impl");
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
@@ -532,28 +593,26 @@ first_token_masked_mha(
     at::Tensor& beam_idx,
     const int64_t beam_batch,
     const double scale_attn,
-    at::Tensor attention_mask) {
+    at::Tensor attention_mask,
+    bool add_casual_mask = true) {
   auto bs = query.size(0);
   auto query_length = query.size(1);
   auto key_lenght = key.size(1);
   auto kv_head_num = key.size(2);
   auto head_size = key.size(3);
-  auto casual_mask =
-      at::full({query_length, key_lenght}, -1e6, query.options());
-  casual_mask = at::triu(casual_mask, 1);
-  casual_mask = casual_mask.unsqueeze(0).unsqueeze(0);
-  attention_mask = attention_mask + casual_mask;
+  if (add_casual_mask){
+    auto casual_mask =
+        at::full({query_length, key_lenght}, -1e6, query.options());
+    casual_mask = at::triu(casual_mask, 1);
+    casual_mask = casual_mask.unsqueeze(0).unsqueeze(0);
+    attention_mask = attention_mask + casual_mask;
+  }
   if (key.scalar_type() != at::kBFloat16 && key.scalar_type() != at::kFloat) {
     TORCH_CHECK(
         false,
         "key and value must be float or bfloat16 to use ipex::masked_multihead_self_attention_kernel_impl");
   }
-  if (key.scalar_type() == at::kFloat) {
-    copy_key_value<float>(key_cache, key, value_cache, value, beam_batch);
-  } else {
-    copy_key_value<at::BFloat16>(
-        key_cache, key, value_cache, value, beam_batch);
-  }
+  copy_key_value(key_cache, key, value_cache, value, beam_batch);
   // support MGQ/MQA
   // expand the head dimensiopn of key/value to be same to the query
   if (query.size(2) != key.size(2)) {
@@ -593,7 +652,8 @@ masked_multihead_self_attention_kernel_impl(
     const double scale_attn,
     int64_t max_positions,
     const c10::optional<at::Tensor>& head_mask /* optional */,
-    const c10::optional<at::Tensor>& attention_mask /* optional */) {
+    const c10::optional<at::Tensor>& attention_mask /* optional */,
+    c10::optional<bool> add_casual_mask /* optional */) {
   TORCH_CHECK(
       attention_mask.has_value(),
       "Attention mask is necessary for ipex::masked_multihead_self_attention_kernel_impl");
@@ -611,21 +671,31 @@ masked_multihead_self_attention_kernel_impl(
   query = query.contiguous();
   key = key.contiguous();
   value = value.contiguous();
+  if(key.scalar_type()!=value.scalar_type()) {
+    value = value.to(key.scalar_type());
+  }
   auto attention_mask_v = attention_mask.value().contiguous();
   attention_mask_v = attention_mask_v.to(query.dtype());
   auto beam_batch = beam_idx.size(1); // need to prepare the fake beam_idx as
                                       // (max_position, bs) for the first token
   auto offset = seq_info.data_ptr<long>()[0];
   auto cache_size = key_cache.size(0);
+  auto key_cache_options = key.options();
+  auto value_cache_options = value.options();
+  if(key_cache.scalar_type() == at::kFloat8_e5m2){
+    key_cache_options = key_cache.options();
+    value_cache_options = value_cache.options();
+  }
   auto cur_len = query.size(1);
   if (offset == 0) {
+    TORCH_CHECK(key_cache.scalar_type() == value_cache.scalar_type());
     max_positions =
         max_positions > cur_len ? max_positions : max_positions + cur_len;
     key_cache = at::empty(
-        {max_positions, beam_batch, key.size(2), key.size(3)}, key.options());
+        {max_positions, beam_batch, key.size(2), key.size(3)}, key_cache_options);
     value_cache = at::empty(
         {max_positions, beam_batch, value.size(2), value.size(3)},
-        value.options());
+        value_cache_options);
     beam_idx = at::empty({max_positions, beam_batch}, beam_idx.options());
     auto beam_idx_access = beam_idx.accessor<long, 2>();
     for (auto i = 0; i < max_positions; i++) {
@@ -641,9 +711,9 @@ masked_multihead_self_attention_kernel_impl(
   } else if (offset > 0 && offset + cur_len > cache_size) {
     auto new_cache_size = cache_size * 2;
     auto new_key_cache = at::empty(
-        {new_cache_size, beam_batch, key.size(2), key.size(3)}, key.options());
+        {new_cache_size, beam_batch, key.size(2), key.size(3)}, key_cache.options());
     auto new_value_cache = at::empty(
-        {new_cache_size, beam_batch, value.size(2), value.size(3)},
+        {new_cache_size, beam_batch, value.size(2), value_cache.size(3)},
         value.options());
     auto new_beam_idx =
         at::empty({new_cache_size, beam_batch}, beam_idx.options());
@@ -682,7 +752,8 @@ masked_multihead_self_attention_kernel_impl(
         beam_idx,
         beam_batch,
         scale_attn,
-        attention_mask_v);
+        attention_mask_v,
+        add_casual_mask.value_or(true));
   }
 }
 } // anonymous namespace

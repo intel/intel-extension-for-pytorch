@@ -78,7 +78,7 @@ struct VecOps<__m512h> {
 };
 
 template <>
-struct VecType<tpp::half> {
+struct VecType<torch_ipex::tpp::half> {
   using type = __m512h;
 };
 
@@ -91,7 +91,8 @@ struct VecType<_Float16> {
 
 #ifdef __AVX512F__
 // load 32 bfloat16 values as 1 tuple of 2 float32 __m512 registers: (low, high)
-inline std::tuple<__m512, __m512> _vec_load_bfloat16_as_two_floats(const tpp::bfloat16* addr) {
+inline std::tuple<__m512, __m512> _vec_load_bfloat16_as_two_floats(
+    const torch_ipex::tpp::bfloat16* addr) {
   auto cvt_bf16_to_fp32 = [](__m256i src) -> __m512 {
     auto y = _mm512_cvtepu16_epi32(src);
     return _mm512_castsi512_ps(_mm512_bslli_epi128(y, 2));
@@ -106,7 +107,10 @@ inline std::tuple<__m512, __m512> _vec_load_bfloat16_as_two_floats(const tpp::bf
 };
 
 // store 32 bfloat16 values from 2 float32 __m512 registers: v0: low, v1: high
-inline void _vec_store_two_floats_as_bfloat16(tpp::bfloat16* addr, __m512 v0, __m512 v1) {
+inline void _vec_store_two_floats_as_bfloat16(
+    torch_ipex::tpp::bfloat16* addr,
+    __m512 v0,
+    __m512 v1) {
 #ifdef __AVX512BF16__
   // convert lower 16 float32 values to bfloat16
   auto v0_bf16 = reinterpret_cast<__m256i>(_mm512_cvtneps_pbh(v0));
@@ -144,13 +148,13 @@ struct VecArray {
 };
 
 template <long N>
-struct VecArray<N, tpp::bfloat16> {
+struct VecArray<N, torch_ipex::tpp::bfloat16> {
   using vec_type = typename VecType<float>::type;
   using vec_ops = VecOps<vec_type>;
   static constexpr long num_vec = N / vec_ops::VLEN;
   using type = typename std::array<typename VecType<float>::type, num_vec>;
 
-  static inline type load1d(tpp::bfloat16* p) {
+  static inline type load1d(torch_ipex::tpp::bfloat16* p) {
     type result;
     compile_time_for<num_vec/2>::op(
       [&](auto i) {
