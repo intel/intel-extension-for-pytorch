@@ -99,6 +99,19 @@ class MergedEmbSGD(torch.nn.Module):
         return self.merged_emb(indices, offsets)
 
 
+class MergedEmbAdaGrad(torch.nn.Module):
+    def __init__(self, emblist, lr=0.01, eps=1e-8):
+        super(MergedEmbAdaGrad, self).__init__()
+        self.merged_emb = (
+            ipex.nn.modules.MergedEmbeddingBagWithAdaGrad.from_embeddingbag_list(
+                emblist.list, lr=lr, eps=eps
+            )
+        )
+
+    def forward(self, indices, offsets):
+        return self.merged_emb(indices, offsets)
+
+
 def run_bench(bench_name, module, input_data, optimizer=None, training=False):
     iters = 100 if training else 1000
     for i in range(iters):
@@ -184,16 +197,16 @@ def merged_emb_with_sgd(args, input):
             emblist = EmbeddingBagList(NUM_TABLE, args.vector_size, torch.float32)
         else:
             emblist = EmbeddingBagList(NUM_TABLE, args.vector_size, dtype)
-        m = MergedEmbSGD(copy.deepcopy(emblist), lr=0.1)
+        m = MergedEmbAdaGrad(copy.deepcopy(emblist), lr=0.1)
         ref_m = copy.deepcopy(emblist)
-        opt = torch.optim.SGD(ref_m.parameters(), lr=0.1)
+        opt = torch.optim.Adagrad(ref_m.parameters(), lr=0.1)
         if dtype == torch.bfloat16:
             m.merged_emb.to_bfloat16_train()
             ref_m, opt = ipex.optimize(ref_m, dtype=torch.bfloat16, optimizer=opt)
         if args.inference:
             with torch.no_grad():
                 run_bench(
-                    f"MergedEmbeddingBagWithSGD: value_dtype:{dtype}",
+                    f"MergedEmbeddingBagWithAdagrad: value_dtype:{dtype}",
                     m,
                     input,
                 )
@@ -205,6 +218,47 @@ def merged_emb_with_sgd(args, input):
         else:
             run_bench(
                 f"MergedEmbeddingBagWithSGD: value_dtype:{dtype}",
+                m,
+                input,
+                training=True,
+            )
+            run_bench(
+                f"EmbeddingBagList: value_dtype:{dtype}",
+                ref_m,
+                input,
+                optimizer=opt,
+                training=True,
+            )
+
+
+def merged_emb_with_adagrad(args, input):
+    for dtype in [torch.float32, torch.bfloat16]:
+        if dtype == torch.bfloat16:
+            # for bf16, only support split sgd
+            emblist = EmbeddingBagList(NUM_TABLE, args.vector_size, torch.float32)
+        else:
+            emblist = EmbeddingBagList(NUM_TABLE, args.vector_size, dtype)
+        m = MergedEmbAdaGrad(copy.deepcopy(emblist), lr=0.1)
+        ref_m = copy.deepcopy(emblist)
+        opt = torch.optim.Adagrad(ref_m.parameters(), lr=0.1)
+        if dtype == torch.bfloat16:
+            m.merged_emb.to_bfloat16_train()
+            ref_m, opt = ipex.optimize(ref_m, dtype=torch.bfloat16, optimizer=opt)
+        if args.inference:
+            with torch.no_grad():
+                run_bench(
+                    f"MergedEmbeddingBagWithAdaGrad: value_dtype:{dtype}",
+                    m,
+                    input,
+                )
+                run_bench(
+                    f"EmbeddingBagList: value_dtype:{dtype}",
+                    ref_m,
+                    input,
+                )
+        else:
+            run_bench(
+                f"MergedEmbeddingBagWithAdaGrad: value_dtype:{dtype}",
                 m,
                 input,
                 training=True,
@@ -278,7 +332,7 @@ def run():
         "--optimizer",
         type=str,
         default="sgd",
-        choices=["sgd"],
+        choices=["sgd", "adagrad"],
     )
     args = parser.parse_args()
     input_data = get_data(args.batch_size)
@@ -289,6 +343,8 @@ def run():
 
     if args.optimizer == "sgd":
         merged_emb_with_sgd(args, input_data)
+    else:
+        merged_emb_with_adagrad(args, input_data)
 
 
 if __name__ == "__main__":

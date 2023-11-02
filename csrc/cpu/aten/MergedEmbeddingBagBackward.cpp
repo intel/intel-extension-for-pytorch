@@ -5,6 +5,7 @@ namespace cpu {
 
 DEFINE_DISPATCH(merged_embeddingbag_backward_cpu_kernel_stub);
 DEFINE_DISPATCH(merged_embeddingbag_backward_sgd_cpu_kernel_stub);
+DEFINE_DISPATCH(merged_embeddingbag_backward_adagrad_cpu_kernel_stub);
 
 std::vector<Tensor> merged_embeddingbag_backward_cpu(
     const TensorList& grad_outs_,
@@ -30,7 +31,7 @@ std::vector<Tensor> merged_embeddingbag_backward_cpu(
 
 void merged_embeddingbag_backward_sgd_cpu(
     const TensorList& grad_outs_,
-    TensorList weights,
+    const TensorList& weights,
     const TensorList& indices,
     const TensorList& offsets,
     const int64_t pooling_mode,
@@ -63,6 +64,44 @@ void merged_embeddingbag_backward_sgd_cpu(
       lr);
 }
 
+void merged_embeddingbag_backward_adagrad_cpu(
+    const TensorList& grad_outs_,
+    const TensorList& weights,
+    const TensorList& indices,
+    const TensorList& offsets,
+    const int64_t pooling_mode,
+    const bool include_last_offsets,
+    const TensorList& hessian,
+    const TensorList& bf16_trail,
+    const double eps,
+    const double lr) {
+  /*
+  pointer to merged_embeddingbag_backward_adagrad_cpu_kernel_impl(
+      grad_outs_,
+      weights,
+      indices,
+      offsets,
+      pooling_mode,
+      include_last_offsets,
+      hessian,
+      bf16_trail,
+      eps,
+      lr);
+  */
+  return merged_embeddingbag_backward_adagrad_cpu_kernel_stub(
+      kCPU,
+      grad_outs_,
+      weights,
+      indices,
+      offsets,
+      pooling_mode,
+      include_last_offsets,
+      hessian,
+      bf16_trail,
+      eps,
+      lr);
+}
+
 } // namespace cpu
 } // namespace torch_ipex
 
@@ -81,6 +120,12 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "merged_embeddingbag_backward_sgd",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::merged_embeddingbag_backward_sgd_cpu);
+  m.def(
+      "merged_embeddingbag_backward_adagrad(Tensor[] grad, Tensor[] weight, Tensor[] index, Tensor[] offsets, int pooling_mode, bool include_last, Tensor[] hessian, Tensor[] bf16_trail, float eps, float lr) -> ()");
+  m.impl(
+      "merged_embeddingbag_backward_adagrad",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::merged_embeddingbag_backward_adagrad_cpu);
 }
 
 } // namespace

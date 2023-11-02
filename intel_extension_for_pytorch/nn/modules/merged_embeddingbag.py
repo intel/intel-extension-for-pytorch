@@ -16,6 +16,13 @@ class SGDArgs(NamedTuple):
     lr: float
 
 
+class AdaGradArgs(NamedTuple):
+    hessian: List[torch.Tensor]
+    bf16_trail: List[Optional[torch.Tensor]]
+    eps: float
+    lr: float
+
+
 class EmbeddingSpec(NamedTuple):
     num_embeddings: int
     embedding_dim: int
@@ -61,6 +68,23 @@ def merged_embeddingbag_sgd(
             pooling_mode,
             include_last_offset,
             sgd_args,
+            *weights,
+        )
+    return torch.ops.torch_ipex.merged_embeddingbag_forward(
+        weights, indices, offsets, pooling_mode, include_last_offset
+    )
+
+
+def merged_embeddingbag_adagrad(
+    weights, indices, offsets, pooling_mode, include_last_offset, adagrad_args
+):
+    if torch.is_grad_enabled():
+        return MergedEmbeddingBagAdaGradFunc.apply(
+            indices,
+            offsets,
+            pooling_mode,
+            include_last_offset,
+            adagrad_args,
             *weights,
         )
     return torch.ops.torch_ipex.merged_embeddingbag_forward(
@@ -142,6 +166,56 @@ class MergedEmbeddingBagSGDFunc(Function):
             include_last_offset,
             bf16_trail,
             weight_decay,
+            lr,
+        )
+        output = [None] * (5 + len(weights))
+        return tuple(output)
+
+
+class MergedEmbeddingBagAdaGradFunc(Function):
+    @staticmethod
+    def forward(
+        ctx,
+        indices,
+        offsets,
+        pooling_mode,
+        include_last_offset,
+        adagrad_args,
+        *weights,
+    ):
+        output = torch.ops.torch_ipex.merged_embeddingbag_forward(
+            weights, indices, offsets, pooling_mode, include_last_offset
+        )
+        ctx.indices = indices
+        ctx.offsets = offsets
+        ctx.weights = weights
+        ctx.pooling_mode = pooling_mode
+        ctx.include_last_offset = include_last_offset
+        ctx.adagrad_args = adagrad_args
+        return tuple(output)
+
+    @staticmethod
+    def backward(ctx, *grad_out):
+        indices = ctx.indices
+        offsets = ctx.offsets
+        weights = ctx.weights
+        pooling_mode = ctx.pooling_mode
+        include_last_offset = ctx.include_last_offset
+        adagrad_args = ctx.adagrad_args
+        bf16_trail = adagrad_args.bf16_trail
+        hessian = adagrad_args.hessian
+        eps = adagrad_args.eps
+        lr = adagrad_args.lr
+        grad_list = torch.ops.torch_ipex.merged_embeddingbag_backward_adagrad(
+            grad_out,
+            weights,
+            indices,
+            offsets,
+            pooling_mode,
+            include_last_offset,
+            hessian,
+            bf16_trail,
+            eps,
             lr,
         )
         output = [None] * (5 + len(weights))
@@ -422,6 +496,111 @@ class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
                 )
             )
         return cls(embedding_specs, lr, weight_decay)
+
+
+class MergedEmbeddingBagWithAdaGrad(MergedEmbeddingBag):
+    embedding_specs: List[EmbeddingSpec]
+
+    def __init__(
+        self,
+        embedding_specs: List[EmbeddingSpec],
+        lr: float = 0.01,
+        eps: float = 1e-10,
+    ):
+        super(MergedEmbeddingBagWithAdaGrad, self).__init__(embedding_specs)
+        self.adagrad_args = self.init_adagrad_args(lr, eps)
+        for i in range(self.n_tables):
+            weight = self.weights[i]
+            if weight.dtype == torch.bfloat16:
+                self.adagrad_args.bf16_trail.append(
+                    torch.zeros_like(weight, dtype=torch.bfloat16)
+                )
+                self.adagrad_args.hessian.append(
+                    torch.zeros_like(weight, dtype=torch.float)
+                )
+            else:
+                self.adagrad_args.bf16_trail.append(
+                    torch.empty(0, dtype=torch.bfloat16)
+                )
+                self.adagrad_args.hessian.append(torch.zeros_like(weight))
+
+    def init_adagrad_args(self, lr, eps, bf16_trail=None, hessian=None):
+        if bf16_trail is None:
+            bf16_trail = []
+        if hessian is None:
+            hessian = []
+        if lr < 0.0:
+            raise ValueError("Invalid learning rate: {}".format(lr))
+        if eps < 0.0:
+            raise ValueError("Invalid eps value: {}".format(eps))
+        return AdaGradArgs(eps=eps, lr=lr, bf16_trail=bf16_trail, hessian=hessian)
+
+    def to_bfloat16_train(self):
+        r"""
+        Cast weight to bf16 and it's trail part for training
+        """
+        trails = []
+        for i in range(len(self.weights)):
+            if self.weights[i].dtype == torch.float:
+                bf16_w, trail = torch.ops.torch_ipex.split_float_bfloat16(
+                    self.weights[i]
+                )
+            elif self.weights[i].dtype == torch.bfloat16:
+                bf16_w = self.weights[i]
+                trail = torch.zeros_like(bf16_w, dtype=torch.bfloat16)
+            elif self.weights[i].dtype == torch.double:
+                bf16_w, trail = torch.ops.torch_ipex.split_float_bfloat16(
+                    self.weights[i].float()
+                )
+            else:
+                AssertionError(
+                    False
+                ), r"MergedEmbeddingBag only support dtypes with bfloat, float and double"
+            trails.append(trail)
+            self.weights[i] = torch.nn.Parameter(bf16_w)
+        self.adagrad_args = self.adagrad_args._replace(bf16_trail=trails)
+
+    def forward(self, indices, offsets):
+        r"""
+        Args:
+            indices (List[Tensor]): See
+                https://pytorch.org/docs/stable/generated/torch.nn.EmbeddingBag.html#torch.nn.EmbeddingBag.forward
+            offsets (List[Tensor]): See
+                https://pytorch.org/docs/stable/generated/torch.nn.EmbeddingBag.html#torch.nn.EmbeddingBag.forward
+        Returns:
+            List[Tensor] output shape of `(batch_size, embedding_dim)` which length = num of tables.
+        """
+        return merged_embeddingbag_adagrad(
+            self.weights,
+            indices,
+            offsets,
+            self.pooling_mode,
+            self.include_last_offset,
+            self.adagrad_args,
+        )
+
+    @classmethod
+    def from_embeddingbag_list(
+        cls,
+        tables: List[torch.nn.EmbeddingBag],
+        lr: float = 0.01,
+        eps: float = 1e-10,
+    ):
+        embedding_specs = []
+        for emb in tables:
+            emb_shape = emb.weight.shape
+            embedding_specs.append(
+                EmbeddingSpec(
+                    num_embeddings=emb_shape[0],
+                    embedding_dim=emb_shape[1],
+                    pooling_mode=emb.mode,
+                    dtype=emb.weight.dtype,
+                    weight=emb.weight.detach(),
+                    sparse=emb.sparse,
+                    include_last_offset=emb.include_last_offset,
+                )
+            )
+        return cls(embedding_specs, lr, eps)
 
 
 class MergedEmbeddingBagWithCat(MergedEmbeddingBag):

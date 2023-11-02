@@ -41,6 +41,20 @@ struct SGDArgs {
   float lr;
 };
 
+struct AdaGradArgs {
+  AdaGradArgs(
+      const TensorList& bf16_trail_,
+      const TensorList& hessian_,
+      float eps_,
+      float lr_)
+      : bf16_trail(bf16_trail_), hessian(hessian_), eps(eps_), lr(lr_) {}
+
+  TensorList bf16_trail;
+  TensorList hessian;
+  float eps;
+  float lr;
+};
+
 template <typename data_t, typename acc_t, typename optimizer_args_t>
 class EmbeddingGradUpdate {};
 
@@ -51,6 +65,17 @@ class EmbeddingGradUpdate<data_t, acc_t, SGDArgs> {
       data_t* weight,
       const EmbeddingGradCache<acc_t>& egc,
       const SGDArgs& args,
+      const int32_t table_id,
+      const int64_t emb_dim);
+};
+
+template <typename data_t, typename acc_t>
+class EmbeddingGradUpdate<data_t, acc_t, AdaGradArgs> {
+ public:
+  static void update(
+      data_t* weight,
+      const EmbeddingGradCache<acc_t>& egc,
+      const AdaGradArgs& args,
       const int32_t table_id,
       const int64_t emb_dim);
 };
@@ -72,13 +97,25 @@ std::vector<Tensor> merged_embeddingbag_backward_cpu_kernel_impl(
 
 void merged_embeddingbag_backward_sgd_cpu_kernel_impl(
     const TensorList& grad_outs_,
-    TensorList weights,
+    const TensorList& weights,
     const TensorList& indices,
     const TensorList& offsets,
     const int64_t pooling_mode,
     const bool include_last_offsets,
     const TensorList& bf16_trail,
     const double weight_decay,
+    const double lr);
+
+void merged_embeddingbag_backward_adagrad_cpu_kernel_impl(
+    const TensorList& grad_outs_,
+    const TensorList& weights,
+    const TensorList& indices,
+    const TensorList& offsets,
+    const int64_t pooling_mode,
+    const bool include_last_offsets,
+    const TensorList& hessian,
+    const TensorList& bf16_trail,
+    const double eps,
     const double lr);
 
 } // namespace
@@ -106,7 +143,7 @@ DECLARE_DISPATCH(
 
 using merged_embeddingbag_backward_sgd_cpu_kernel_fn = void (*)(
     const TensorList&,
-    TensorList,
+    const TensorList&,
     const TensorList&,
     const TensorList&,
     const int64_t,
@@ -117,6 +154,21 @@ using merged_embeddingbag_backward_sgd_cpu_kernel_fn = void (*)(
 DECLARE_DISPATCH(
     merged_embeddingbag_backward_sgd_cpu_kernel_fn,
     merged_embeddingbag_backward_sgd_cpu_kernel_stub);
+
+using merged_embeddingbag_backward_adagrad_cpu_kernel_fn = void (*)(
+    const TensorList&,
+    const TensorList&,
+    const TensorList&,
+    const TensorList&,
+    const int64_t,
+    const bool,
+    const TensorList&,
+    const TensorList&,
+    const double,
+    const double);
+DECLARE_DISPATCH(
+    merged_embeddingbag_backward_adagrad_cpu_kernel_fn,
+    merged_embeddingbag_backward_adagrad_cpu_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

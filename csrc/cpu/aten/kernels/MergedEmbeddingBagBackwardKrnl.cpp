@@ -464,6 +464,109 @@ inline void sgd_update<at::BFloat16, float>(
   }
 }
 
+template <typename param_t, typename acc_t>
+inline void adagrad_update(
+    param_t* param_ptr,
+    at::BFloat16* trail_ptr,
+    acc_t* hessian_ptr,
+    acc_t* grad_ptr,
+    float eps,
+    float lr,
+    int size) {
+  // hessian += grad**2
+  // weight += grad * lr / (sqrt(hessian) + eps)
+  // lr < 0
+  using Vec = at::vec::Vectorized<param_t>;
+  Vec lr_vec = Vec(param_t(lr));
+  Vec eps_vec = Vec(param_t(eps));
+  int64_t d = 0;
+  for (; d < size - (size % Vec::size()); d += Vec::size()) {
+    Vec param_vec = Vec::loadu(param_ptr + d);
+    Vec hessian_vec = Vec::loadu(hessian_ptr + d);
+    Vec grad_vec = Vec::loadu(grad_ptr + d);
+    hessian_vec += (grad_vec * grad_vec);
+    hessian_vec.store(hessian_ptr + d);
+    param_vec -= ((grad_vec * lr_vec) / (hessian_vec.sqrt() + eps_vec));
+    param_vec.store(param_ptr + d);
+  }
+  for (; d < size; d++) {
+    hessian_ptr[d] += (grad_ptr[d] * grad_ptr[d]);
+    param_ptr[d] -= ((grad_ptr[d] * lr) / (std::sqrt(hessian_ptr[d] + eps)));
+  }
+}
+
+template <>
+inline void adagrad_update<at::BFloat16, float>(
+    at::BFloat16* param_ptr,
+    at::BFloat16* trail_ptr,
+    float* hessian_ptr,
+    float* grad_ptr,
+    float eps,
+    float lr,
+    int size) {
+  // hessian += grad**2
+  // weight += grad * lr / (sqrt(hessian) + eps)
+  // lr > 0
+#if defined(CPU_CAPABILITY_AVX512)
+  if (size == 128) {
+    __m512i bf16_top[4], trail[4];
+    __m512 fp32_param[8], fp32_grad[8], fp32_hessian[8];
+    __m512 eps_v = _mm512_set1_ps(eps);
+    __m512 lr_v = _mm512_set1_ps(-lr);
+    compile_time_for<8>::op(load_lp, bf16_top, param_ptr);
+    compile_time_for<8>::op(load_lp, trail, trail_ptr);
+    compile_time_for<4>::op(pack_to_fp32, bf16_top, trail, fp32_param);
+    compile_time_for<8>::op(load_fp32, fp32_grad, grad_ptr);
+    compile_time_for<8>::op(load_fp32, fp32_hessian, hessian_ptr);
+    compile_time_for<8>::op(fma, fp32_hessian, fp32_grad, fp32_grad);
+    compile_time_for<8>::op(store_fp32, fp32_hessian, hessian_ptr);
+    // re-use fp32_hessian set
+    compile_time_for<8>::op(sqrt_fp32, fp32_hessian, fp32_hessian);
+    compile_time_for<8>::op(add_fp32_const_b, fp32_hessian, eps_v);
+    compile_time_for<8>::op(
+        div_fp32_constant_a, fp32_hessian, lr_v, fp32_hessian);
+    compile_time_for<8>::op(fma, fp32_param, fp32_hessian, fp32_grad);
+    compile_time_for<4>::op(split_from_fp32, bf16_top, trail, fp32_param);
+    compile_time_for<4>::op(store_lp, bf16_top, param_ptr);
+    compile_time_for<4>::op(store_lp, trail, trail_ptr);
+    return;
+  }
+#endif
+  using bVec = at::vec::Vectorized<at::BFloat16>;
+  using fVec = at::vec::Vectorized<float>;
+  fVec lr_vec = fVec(lr);
+  fVec eps_vec = fVec(eps);
+  int64_t d = 0;
+  for (; d < size - (size % bVec::size()); d += bVec::size()) {
+    bVec param_bvec = bVec::loadu(param_ptr + d);
+    bVec trail_bvec = bVec::loadu(trail_ptr + d);
+    fVec param_fvec, param_fvec2;
+    std::tie(param_fvec, param_fvec2) =
+        at::vec::pack_bfloat16_float(param_bvec, trail_bvec);
+    fVec hessian_fvec = fVec::loadu(hessian_ptr + d);
+    fVec hessian_fvec2 = fVec::loadu(hessian_ptr + d + fVec::size());
+    fVec grad_fvec = fVec::loadu(grad_ptr + d);
+    fVec grad_fvec2 = fVec::loadu(grad_ptr + d + fVec::size());
+    hessian_fvec += (grad_fvec * grad_fvec);
+    hessian_fvec2 += (grad_fvec2 * grad_fvec2);
+    hessian_fvec.store(hessian_ptr + d);
+    hessian_fvec2.store(hessian_ptr + d + fVec::size());
+    param_fvec -= ((grad_fvec * lr_vec) / (hessian_fvec.sqrt() + eps_vec));
+    param_fvec2 -= ((grad_fvec2 * lr_vec) / (hessian_fvec2.sqrt() + eps_vec));
+    std::tie(param_bvec, trail_bvec) =
+        at::vec::unpack_float_bfloat16(param_fvec, param_fvec2);
+    param_bvec.store(param_ptr + d);
+    trail_bvec.store(trail_ptr + d);
+  }
+  for (; d < size; d++) {
+    float param_val = at::vec::pack_bfloat16_float(param_ptr[d], trail_ptr[d]);
+    hessian_ptr[d] += (grad_ptr[d] * grad_ptr[d]);
+    param_val -= ((grad_ptr[d] * lr) / (std::sqrt(hessian_ptr[d] + eps)));
+    std::tie(param_ptr[d], trail_ptr[d]) =
+        at::vec::unpack_float_bfloat16(param_val);
+  }
+}
+
 template <typename data_t, typename acc_t>
 void inline EmbeddingGradUpdate<data_t, acc_t, SGDArgs>::update(
     data_t* weight,
@@ -480,6 +583,29 @@ void inline EmbeddingGradUpdate<data_t, acc_t, SGDArgs>::update(
         &bf16_trail_ptr[idx * emb_dim],
         grad,
         args.weight_decay,
+        args.lr,
+        emb_dim);
+  }
+}
+
+template <typename data_t, typename acc_t>
+void inline EmbeddingGradUpdate<data_t, acc_t, AdaGradArgs>::update(
+    data_t* weight,
+    const EmbeddingGradCache<acc_t>& egc,
+    const AdaGradArgs& args,
+    const int32_t table_id,
+    const int64_t emb_dim) {
+  BFloat16* bf16_trail_ptr = args.bf16_trail[table_id].data_ptr<BFloat16>();
+  acc_t* hessian_ptr = args.hessian[table_id].data_ptr<acc_t>();
+  for (auto& it : egc.cache) {
+    size_t idx = it.first;
+    auto& grad = it.second.data;
+    adagrad_update<data_t, acc_t>(
+        &weight[idx * emb_dim],
+        &bf16_trail_ptr[idx * emb_dim],
+        &hessian_ptr[idx * emb_dim],
+        grad,
+        args.eps,
         args.lr,
         emb_dim);
   }
@@ -524,7 +650,7 @@ void merged_embeddingbag_backward_update(
 
 void merged_embeddingbag_backward_sgd_cpu_kernel_impl(
     const TensorList& grad_outs_,
-    TensorList weights,
+    const TensorList& weights,
     const TensorList& indices,
     const TensorList& offsets,
     const int64_t pooling_mode,
@@ -597,6 +723,85 @@ void merged_embeddingbag_backward_sgd_cpu_kernel_impl(
       });
 }
 
+void merged_embeddingbag_backward_adagrad_cpu_kernel_impl(
+    const TensorList& grad_outs_,
+    const TensorList& weights,
+    const TensorList& indices,
+    const TensorList& offsets,
+    const int64_t pooling_mode,
+    const bool include_last_offsets,
+    const TensorList& hessian,
+    const TensorList& bf16_trail,
+    const double eps,
+    const double lr) {
+  RECORD_FUNCTION(__FUNCTION__, c10::ArrayRef<c10::IValue>({}));
+
+  int64_t num_emb = weights.size();
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(num_emb > 0);
+  int64_t batch_size = grad_outs_[0].size(0);
+  int64_t emb_dim = weights[0].size(1);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(num_emb == indices.size());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(num_emb == offsets.size());
+
+  auto index_type = indices[0].scalar_type();
+  auto data_type = weights[0].scalar_type();
+
+  std::vector<int64_t> last_offsets(num_emb, -1);
+  std::vector<Tensor> contiguous_grad;
+  std::vector<Tensor> outputs;
+
+  for (int i = 0; i < num_emb; i++) {
+    contiguous_grad.emplace_back(grad_outs_[i].contiguous());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+        indices[i].is_contiguous() && indices[i].scalar_type() == index_type);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+        offsets[i].is_contiguous() && offsets[i].scalar_type() == index_type);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+        contiguous_grad[i].is_contiguous() &&
+        contiguous_grad[i].scalar_type() == data_type);
+    // handle last offsets
+    last_offsets[i] = indices[i].numel();
+  }
+
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::kBFloat16,
+      weights[0].scalar_type(),
+      "merged_embeddingbag_backward_update",
+      [&] {
+        AT_DISPATCH_INDEX_TYPES(
+            indices[0].scalar_type(),
+            "merged_embeddingbag_backward_update",
+            [&] {
+              scalar_t* grads_ptr[num_emb];
+              scalar_t* weights_ptr[num_emb];
+              index_t* indices_ptr[num_emb];
+              index_t* offsets_ptr[num_emb];
+              for (int i = 0; i < num_emb; i++) {
+                weights_ptr[i] = weights[i].data_ptr<scalar_t>();
+                grads_ptr[i] = contiguous_grad[i].data_ptr<scalar_t>();
+                indices_ptr[i] = indices[i].data_ptr<index_t>();
+                offsets_ptr[i] = offsets[i].data_ptr<index_t>();
+              }
+              AdaGradArgs args = AdaGradArgs(bf16_trail, hessian, eps, lr);
+              merged_embeddingbag_backward_update<
+                  scalar_t,
+                  index_t,
+                  AdaGradArgs>(
+                  weights_ptr,
+                  grads_ptr,
+                  indices_ptr,
+                  offsets_ptr,
+                  batch_size,
+                  num_emb,
+                  emb_dim,
+                  last_offsets,
+                  pooling_mode,
+                  args);
+            });
+      });
+}
+
 } // anonymous namespace
 
 REGISTER_DISPATCH(
@@ -606,6 +811,10 @@ REGISTER_DISPATCH(
 REGISTER_DISPATCH(
     merged_embeddingbag_backward_sgd_cpu_kernel_stub,
     &merged_embeddingbag_backward_sgd_cpu_kernel_impl);
+
+REGISTER_DISPATCH(
+    merged_embeddingbag_backward_adagrad_cpu_kernel_stub,
+    &merged_embeddingbag_backward_adagrad_cpu_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

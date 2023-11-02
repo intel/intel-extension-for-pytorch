@@ -7,6 +7,7 @@ from bench.custom_op_bench.merged_embeddingbag import (
     EmbeddingBagListCatDense,
     MergedEmbCatDense,
     MergedEmbSGD,
+    MergedEmbAdaGrad,
 )
 import intel_extension_for_pytorch as ipex
 import copy
@@ -211,6 +212,17 @@ class TestMergedEmbedding(TestCase):
                             m = MergedEmbSGD(copy.deepcopy(emb_list), lr=0.1)
                             ref_m = copy.deepcopy(emb_list)
                             opt = torch.optim.SGD(ref_m.parameters(), lr=0.1)
+                            if dtype == torch.bfloat16:
+                                m.merged_emb.to_bfloat16_train()
+                                ref_m, opt = ipex.optimize(
+                                    ref_m, dtype=torch.bfloat16, optimizer=opt
+                                )
+                            self._test_training(m, ref_m, (indices, offsets), opt=opt)
+
+                            # test merged emb fused update with adagrad
+                            m = MergedEmbAdaGrad(copy.deepcopy(emb_list), lr=0.01)
+                            ref_m = copy.deepcopy(emb_list)
+                            opt = torch.optim.Adagrad(ref_m.parameters(), lr=0.01)
                             if dtype == torch.bfloat16:
                                 m.merged_emb.to_bfloat16_train()
                                 ref_m, opt = ipex.optimize(
