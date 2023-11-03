@@ -150,11 +150,24 @@ class WrapAPI:
         @wraps(api)
         def new_api(*args, **kwargs):
             new_args = list(args)
+            assert len(args) > 0, "Current api {api} has 0 arguments"
+            try:
+                # For some API such as `asarray`, it can accept a numpy object
+                # as the input. But we need to safely import numpy within IPEX.
+                # Also, after we detected a numpy object we need to change it
+                # to a CPU tensor for getting meta information such as torch.dtype
+                # and torch.device.
+                import numpy as np
+
+                if isinstance(args[0], (np.ndarray, np.generic)):
+                    new_args[0] = torch.from_numpy(args[0])
+            except ImportError:
+                pass
             assert len(args) > 0 and isinstance(
-                args[0], torch.Tensor
+                new_args[0], torch.Tensor
             ), f"Current api {api} got non-Tensor for the 1st arguement"
-            dst_device = args[0].device
-            dst_dtype = args[0].dtype
+            dst_device = new_args[0].device
+            dst_dtype = new_args[0].dtype
             resign_dtype = kwargs.get("dtype")
             resign_dev = kwargs.get("device")
             dst_device = resign_dev if resign_dev is not None else dst_device
@@ -163,6 +176,10 @@ class WrapAPI:
                 return api(*args, **kwargs)
             if dst_dtype == cls.user_defined_src_dtype:
                 kwargs["dtype"] = cls.user_defined_dst_dtype
+            # We need to restore the first argument especially if it was a numpy
+            # object. Although it may be not a numpy object, we can also restore
+            # it once with very small effort.
+            new_args[0] = args[0]
             new_args = tuple(new_args)
             return api(*new_args, **kwargs)
 
