@@ -2728,6 +2728,7 @@ at::Tensor batch_norm_backward_elemt_channels_last_template(
               scalar_t,
               accscalar_t,
               accscalar_t,
+              1,
               true>(
               grad_output.data_ptr<scalar_t>(),
               input.data_ptr<scalar_t>(),
@@ -2762,6 +2763,7 @@ at::Tensor batch_norm_backward_elemt_channels_last_template(
               scalar_t,
               accscalar_t,
               scalar_t,
+              1,
               true>(
               grad_output.data_ptr<scalar_t>(),
               input.data_ptr<scalar_t>(),
