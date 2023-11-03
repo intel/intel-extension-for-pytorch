@@ -95,8 +95,12 @@ static void col2im_out_template(
   output.resize_({batch_size, n_output_plane, output_height, output_width});
   output.zero_();
 
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND1(
-      kHalf, input.scalar_type(), "col2im_out_dpcpp", [&] {
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      input.scalar_type(),
+      "col2im_out_dpcpp",
+      [&] {
         Tensor input_n = Tensor();
         Tensor output_n = Tensor();
 
