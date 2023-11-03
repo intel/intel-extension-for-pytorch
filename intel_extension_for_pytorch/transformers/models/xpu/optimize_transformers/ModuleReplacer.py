@@ -8,6 +8,7 @@ from .modules.Functions import (
     opt_forward_hook,
     ipex_build_bloom_alibi_tensor,
 )
+from .modules.utils import is_int4
 from typing import List
 import torch
 from .modules._transformer_configuration import ImplementMode
@@ -123,7 +124,7 @@ class ModuleReplacer:
 
     def replace_op(self, model):
         for name, child in model.named_children():
-            if name == "lm_head":
+            if name == "lm_head" and (not is_int4(model)):
                 setattr(model, name, IPEXLmHeadLinearAllreduceWithPadding(child))
             elif type(child) in self.layer_dict.keys():
                 new_layer = self.layer_dict[type(child)](child)

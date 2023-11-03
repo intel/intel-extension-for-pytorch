@@ -16,7 +16,6 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         self.qkv_proj_quant = IPEXTransformerQLinear()
 
     def load_parameter(self, q_proj, k_proj, v_proj, out_proj):
-        super().load_parameter(q_proj, k_proj, v_proj, out_proj)
         self.q_proj_quant.weight = q_proj.qweight
         self.k_proj_quant.weight = k_proj.qweight
         self.v_proj_quant.weight = v_proj.qweight
@@ -37,8 +36,12 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         self.v_proj_quant.gs = v_proj.group_size
         self.out_proj_quant.gs = out_proj.group_size
 
+        self.position_embed = self.config.rotary_embedding_class(
+            self.config, torch.float16
+        )
+
     def transpose_parameter(self):
-        super().transpose_parameter()
+        pass
 
     def cat_qkv(self):
         shape = [3, -1, self.q_proj_quant.weight.shape[-1]]

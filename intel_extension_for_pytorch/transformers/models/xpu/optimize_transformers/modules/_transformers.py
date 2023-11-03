@@ -46,7 +46,6 @@ class IPEXEmptyINT4Linear(nn.Module):
     def __init__(self):
         super(IPEXEmptyINT4Linear, self).__init__()
         self.qweight = None
-        self.weight = None
         self.bias = None
         self.scales = None
         self.qzeros = None
@@ -72,7 +71,6 @@ class IPEXEmptyINT4LinearWithPadding(nn.Module):
     def __init__(self, n_dim):
         super(IPEXEmptyINT4LinearWithPadding, self).__init__()
         self.qweight = None
-        self.weight = None
         self.scales = None
         self.qzeros = None
         self.group_size = 1
@@ -140,11 +138,6 @@ class IPEXTransformerAtten(nn.Module):
         self.out_proj = IPEXEmptyLinear() if not is_int4 else IPEXEmptyINT4Linear()
 
         self.qkv_fused = True
-        self.q_wei = None
-        self.k_wei = None
-        self.v_wei = None
-        self.out_wei = None
-        self.qkv_wei = None
         self.qkv_bias = None
         self.out_bias = None
 
@@ -169,6 +162,12 @@ class IPEXTransformerAtten(nn.Module):
             self.k_gs = 1
             self.v_gs = 1
             self.out_gs = 1
+        else:
+            self.q_wei = None
+            self.k_wei = None
+            self.v_wei = None
+            self.out_wei = None
+            self.qkv_wei = None
 
         col_major = os.environ.get("COL_MAJOR", "OFF").upper() in [
             "1",
@@ -1306,8 +1305,6 @@ class IPEXTransformerMLP(nn.Module):
             "TRUE",
         ]
         self.row_major = not col_major
-        self.fc_in_wei = None
-        self.fc_out_wei = None
         self.fc_in_bias = None
         self.fc_out_bias = None
         self.is_int4 = is_int4
@@ -1319,6 +1316,9 @@ class IPEXTransformerMLP(nn.Module):
             self.fc_in_zp = None
             self.fc_out_scl = None
             self.fc_out_zp = None
+        else:
+            self.fc_in_wei = None
+            self.fc_out_wei = None
 
     @staticmethod
     def release_resources():

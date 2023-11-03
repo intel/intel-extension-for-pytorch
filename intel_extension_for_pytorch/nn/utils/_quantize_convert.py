@@ -11,7 +11,6 @@ class INT4Linear(nn.Module):
     in_features: int
     out_features: int
     group_size: int
-    weight: Tensor
     scales: Tensor
     qzeros: Tensor
 
@@ -28,7 +27,7 @@ class INT4Linear(nn.Module):
         super().__init__()
         q_out_features = math.ceil(out_features / 8 * 4)
         self.in_features = in_features
-        self.out_features = q_out_features
+        self.out_features = out_features
         self.group_size = in_features if group_size == -1 else group_size
 
         self.qweight = Parameter(
@@ -47,9 +46,6 @@ class INT4Linear(nn.Module):
             )
         )
 
-        self.weight = Parameter(
-            torch.empty((out_features, in_features), **factory_kwargs)
-        )
         if bias:
             self.bias = Parameter(torch.empty(out_features, **factory_kwargs))
         else:
