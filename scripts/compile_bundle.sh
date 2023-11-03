@@ -1,14 +1,51 @@
 #!/bin/bash
-set -x
 set -e
 
 VER_LLVM="llvmorg-16.0.6"
 VER_IPEX="llm_feature_branch"
+VER_GCC=12.3.0
 
 # Check existance of required Linux commands
-for CMD in conda git nproc make; do
-    command -v ${CMD} || (echo "Error: Command \"${CMD}\" not found." ; exit 4)
+for CMD in conda git nproc gcc g++ make; do
+    command -v ${CMD} > /dev/null || (echo "Error: Command \"${CMD}\" not found." ; exit 1)
 done
+
+function ver_compare() {
+    VER_MAJOR_CUR=$(echo $1 | cut -d "." -f 1)
+    VER_MINOR_CUR=$(echo $1 | cut -d "." -f 2)
+    VER_PATCH_CUR=$(echo $1 | cut -d "." -f 3)
+    VER_MAJOR_REQ=$(echo $2 | cut -d "." -f 1)
+    VER_MINOR_REQ=$(echo $2 | cut -d "." -f 2)
+    VER_PATCH_REQ=$(echo $2 | cut -d "." -f 3)
+    RET=0
+    if [[ ${VER_MAJOR_CUR} -lt ${VER_MAJOR_REQ} ]]; then
+        RET=1
+    else
+        if [[ ${VER_MAJOR_CUR} -eq ${VER_MAJOR_REQ} ]] &&
+           [[ ${VER_MINOR_CUR} -lt ${VER_MINOR_REQ} ]]; then
+            RET=2
+        else
+            if [[ ${VER_MAJOR_CUR} -eq ${VER_MAJOR_REQ} ]] &&
+               [[ ${VER_MINOR_CUR} -eq ${VER_MINOR_REQ} ]] &&
+               [[ ${VER_PATCH_CUR} -lt ${VER_PATCH_REQ} ]]; then
+                RET=3
+            fi
+        fi
+    fi
+    echo ${RET}
+}
+VER_COMP=$(ver_compare $(gcc -dumpfullversion) ${VER_GCC})
+GCC_CONDA=0
+if [ ${VER_COMP} -ne 0 ]; then
+    echo -e '\a'
+    echo "Warning: GCC version equal to or newer than ${VER_GCC} is required."
+    echo "         Found GCC version $(gcc -dumpfullversion)"
+    echo "         Installing gcc and g++ 12.3 with conda"
+    echo ""
+    GCC_CONDA=1
+    conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
+    conda update -y sysroot_linux-64
+fi
 
 MAX_JOBS_VAR=$(nproc)
 if [ ! -z "${MAX_JOBS}" ]; then
@@ -43,16 +80,16 @@ git submodule update --init --recursive
 cd ..
 
 # Install dependencies
-conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
-conda update -y sysroot_linux-64
 python -m pip install cmake
 python -m pip install torch==2.2.0.dev20231006+cpu torchvision==0.17.0.dev20231006+cpu torchaudio==2.2.0.dev20231006+cpu --index-url https://download.pytorch.org/whl/nightly/cpu
 ABI=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")
 
 # Compile individual component
-export CC=${CONDA_PREFIX}/bin/gcc
-export CXX=${CONDA_PREFIX}/bin/g++
-export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
+if [[ ${GCC_CONDA} -eq 1 ]]; then
+    export CC=${CONDA_PREFIX}/bin/gcc
+    export CXX=${CONDA_PREFIX}/bin/g++
+    export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
+fi
 
 #  LLVM
 cd llvm-project
@@ -95,7 +132,8 @@ python -m pip install --force-reinstall dist/*.whl
 cd ..
 
 # Sanity Test
-set +x
-export LD_PRELOAD=${CONDA_PREFIX}/lib/libstdc++.so
-echo "Note: Should you experience \"version \`GLIBCXX_N.N.NN' not found\" error, run command \"export LD_PRELOAD=${CONDA_PREFIX}/lib/libstdc++.so\" and try again."
+if [[ ${GCC_CONDA} -eq 1 ]]; then
+    export LD_PRELOAD=${CONDA_PREFIX}/lib/libstdc++.so
+    echo "Note: Should you experience \"version \`GLIBCXX_N.N.NN' not found\" error, run command \"export LD_PRELOAD=${CONDA_PREFIX}/lib/libstdc++.so\" and try again."
+fi
 python -c "import torch; import torchvision; import torchaudio; import intel_extension_for_pytorch as ipex; print(f'torch_cxx11_abi:     {torch._C._GLIBCXX_USE_CXX11_ABI}'); print(f'torch_version:       {torch.__version__}'); print(f'torchvision_version: {torchvision.__version__}'); print(f'torchaudio_version:  {torchaudio.__version__}'); print(f'ipex_version:        {ipex.__version__}');"
