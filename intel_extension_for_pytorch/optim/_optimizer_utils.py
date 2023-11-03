@@ -127,7 +127,7 @@ def patch_step_for_master_weight_training(optimizer):
             assert (
                 _param.dtype != torch.bfloat16
             ), "GradScaler is not recommended for bf16 training"
-            if _param.requires_grad:
+            if _param.requires_grad and _param.grad is not None:
                 k.grad = _param.grad.detach().float()
 
     def step_sync_weight(self, closure=None):
