@@ -11,15 +11,15 @@ Optimizations take advantage of Intel® Advanced Vector Extensions 512 (Intel® 
   ``intel_extension_for_pytorch`` (for versions 1.10.0 and later). Use the
   correct package name depending on the version you are using.
 
-For the detailed list of supported features and usage instructions, refer to `Features <features.html>`_. 
+For the detailed list of supported features and usage instructions, refer to `Features <features.html>`_. For overview of Large Language Models (LLM) optimizations and usage instructions, refer to 
+the `Large Language Models (LLM) <llm.html>`_ section.
 
 Get Started
 -----------
 - `Installation <../../../index.html#installation?platform=cpu&version=v2.1.0%2Bcpu>`_
-- `Get Started <getting_started.md>`_
+- `Quick Start <getting_started.md>`_
 - `Examples <examples.md>`_
-- `Large Language Models (LLM) <llm.html>`_
 
-API Reference
--------------
-For detailed description of the Intel® Extension for PyTorch* APIs, refer to the `API Reference <api_doc.html>`_ section.
+API Documentation
+-----------------
+For detailed description of the Intel® Extension for PyTorch* APIs, refer to the `API Documentation <api_doc.html>`_ section.

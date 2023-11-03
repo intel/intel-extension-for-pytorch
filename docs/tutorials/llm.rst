@@ -1,9 +1,11 @@
 Large Language Models (LLM) Optimizations Overview
 ==================================================
 
-In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. As you know, most of LLMs are GPT like architecture which is consist of multiple Decoder layers and the MultiHeadAttention and FeedForward layer are two key components of every Decoder layer. The generation task is memory bound due to iterative decode and kv_cache is also need to special management to reduce memory overheads. Intel® Extension for PyTorch* provide a lot of specific optimizations for these LLMs. In operator level, we provide highly efficient GEMM kernel to speedup Linear layer and customized operators to reduce the memory footprint. To better trade-off the performance and accuracy, different low-precision solutions e.g., smoothQuant and weight-only-quantization are also enabled. Besides, tensor parallel can also adopt to get lower latency for LLMs.
+In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Most of LLMs are GPT-like architectures that consist of multiple Decoder layers. 
+The MultiHeadAttention and FeedForward layer are two key components of every Decoder layer. The generation task is memory bound because iterative decode and kv_cache require special management to reduce memory overheads. Intel® Extension for PyTorch* provides a lot of specific optimizations for these LLMs. 
+On the operator level, the extension provides highly efficient GEMM kernel to speed up Linear layer and customized operators to reduce the memory footprint. To better trade-off the performance and accuracy, different low-precision solutions e.g., smoothQuant and weight-only-quantization are also enabled. Besides, tensor parallel can also adopt to get lower latency for LLMs.
 
-These LLM-specific optimizations can be automatically applied with a single frontend API function in python interface, `ipex.optimize_transformers()`. Check `optimize_transformers <./llm/llm_optimize_transformers.md>`_ for more details.
+These LLM-specific optimizations can be automatically applied with a single frontend API function in Python interface, `ipex.optimize_transformers()`. Check `optimize_transformers <./llm/llm_optimize_transformers.md>`_ for more details.
 
 .. toctree::
    :hidden:
@@ -57,7 +59,7 @@ Supported Models
 
 \* For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for FP32/BF16 but needed for quantizations.
 
-\*\* For GPT-NEOX/FALCON/OPT models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.
+\*\* For GPT-NEOX/FALCON/OPT models, the accuracy recipes of static quantization INT8 are not ready, thus, they will be skipped in our coverage.
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM model families, we are working in progress to cover those optimizations, which will expand the model list above.
 
@@ -66,7 +68,7 @@ Check `LLM best known practice <https://github.com/intel/intel-extension-for-pyt
 Demos
 -----
 
-Intel® Extension for PyTorch* LLM optimizations could be integrated into a typical LLM Q&A web service.
+Intel® Extension for PyTorch* LLM optimizations can be integrated into a typical LLM Q&A web service.
 
 .. list-table::
 
@@ -130,12 +132,12 @@ f. Llama 2 model Distributed Inference with DeepSpeed with AutoTP feature with W
 Optimization Methodologies
 --------------------------
 
-The brief introduction of these optimizations are as following:
+The section below provides a brief introduction to LLM optimization methodologies:
 
 Linear Operator Optimization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Linear operator is the most obvious hotspot in LLMs inference. There are three backend to speedup linear GEMM kernels in Intel® Extension for PyTorch*. They are oneDNN, Tensor Processing Primitives(TPP) which has been used by `Fast BERT feature <./fast_bert.md>`_ and customized linear kernels for weight only quantization. All of them use specific block format to utilize hardware resources in a highly efficient way. 
+Linear operator is the most obvious hotspot in LLMs inference. There are three backend to speedup linear GEMM kernels in Intel® Extension for PyTorch*. They are oneDNN, Tensor Processing Primitives (TPP), which are used by `Fast BERT feature <./fast_bert.md>`_, and customized linear kernels for weight only quantization. All of them use specific block format to utilize hardware resources in a highly efficient way. 
 
 Low Precision Data Types
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -153,7 +155,7 @@ Intel® Extension for PyTorch* also delivers INT4 optimizations via 4-bit weight
 Indirect Access KV Cache 
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-kv_cache is used to reduce computation for decoder layer but it also bring memory overheads, for example, when we use beam search, the kv_cache should be reordered according to latest beam idx and the current key/value should also be concat with kv_cache in the attention layer to get entire context to do scale dot product. When the sequence is very long, memory overheads caused by the reorder_cache and concat will be performance bottleneck. Indirect Access KV_cache (IAKV) is provided to reduce these overheads. Firstly, IAKV pre-allocates buffers (key and value use different buffer) to store all key/value hidden states and beam index information, the data format is shown in the following left figure (beam_width=4 in this case) and token state of key (value) in every timestamp will be store in this pre-allocated buffer. Secondly, we can use beam index history which is shown in the following right figure to decide which beam should be used by a timestamp and this information will generate a offset to access the kv_cache buffer which means that the reorder_cache and concat overheads will be eliminated by this way.
+kv_cache is used to reduce computation for decoder layer but it also brings memory overheads. For example, when we use beam search, the kv_cache should be reordered according to latest beam idx and the current key/value should also be concat with kv_cache in the attention layer to get entire context to do scale dot product. When the sequence is very long, memory overheads caused by the reorder_cache and concat will be performance bottleneck. Indirect Access KV_cache (IAKV) is provided to reduce these overheads. Firstly, IAKV pre-allocates buffers (key and value use different buffer) to store all key/value hidden states and beam index information, the data format is shown in the following left figure (beam_width=4 in this case) and token state of key (value) in every timestamp will be store in this pre-allocated buffer. Secondly, we can use beam index history which is shown in the following right figure to decide which beam should be used by a timestamp and this information will generate a offset to access the kv_cache buffer which means that the reorder_cache and concat overheads will be eliminated by this way.
 
 
 .. image:: ../../images/llm/llm_iakv_1.png
@@ -168,7 +170,7 @@ kv_cache is used to reduce computation for decoder layer but it also bring memor
 Graph Optimization
 ~~~~~~~~~~~~~~~~~~
 
-Operators fusion is generally use to enable sub-graph fusion to reduce the memory footprint. Except for linear post ops fusion, e.g, linear + activation function, a lot of customized operators are also provided in Intel® Extension for PyTorch* for further performance improvement, For example, Rotary Position Embedding (ROPE) and Root Mean Square Layer Normalization (RMSNorm).
+Operators fusion is generally used to enable sub-graph fusion to reduce the memory footprint. Except for linear post ops fusion, e.g, linear + activation function, a lot of customized operators are also provided in Intel® Extension for PyTorch* for further performance improvement. For example, Rotary Position Embedding (ROPE) and Root Mean Square Layer Normalization (RMSNorm).
 
 Distributed Inference
 ~~~~~~~~~~~~~~~~~~~~~
