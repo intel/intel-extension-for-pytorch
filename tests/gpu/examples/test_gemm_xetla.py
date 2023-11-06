@@ -199,7 +199,7 @@ def ipex_mm_qkv(m, n, k, dtype, with_bias):
 
 class TestNNMethod(TestCase):
     @pytest.mark.skipif(
-        not (torch.xpu.has_xetla() and not ipex._C._has_2d_block_array(0)),
+        (not torch.xpu.has_xetla()) or (not ipex._C._has_2d_block_array(0)),
         reason="ipex build without xetla or is atsm",
     )
     def test_gemm_xetla(self):
@@ -245,7 +245,7 @@ class TestNNMethod(TestCase):
             self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
 
     @pytest.mark.skipif(
-        not (torch.xpu.has_xetla() and not ipex._C._has_2d_block_array(0)),
+        (not torch.xpu.has_xetla()) or (not ipex._C._has_2d_block_array(0)),
         reason="ipex build without xetla or is atsm",
     )
     def test_gemm_xetla_onednn(self):
