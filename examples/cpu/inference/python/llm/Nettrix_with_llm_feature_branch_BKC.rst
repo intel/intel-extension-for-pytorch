@@ -162,7 +162,7 @@ Distributed Performance with DeepSpeed (autoTP)
   mv PATH/TO/prompt.json WORK_DIR
 
   # Run LLAMA with bfloat16 DeepSpeed
-  deepspeed --bind_cores_to_rank test_multiple_instance_generation.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --jit --request-number xxx --instance-number xxx --token-latency
+  deepspeed --bind_cores_to_rank test_multiple_instance_with_deepspeed.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --jit --request-number xxx --instance-number xxx --token-latency
 
 Run scripts with multiple process to enable concrrent request 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
