@@ -124,7 +124,10 @@ def _all_reduce_and_bias_add(mp_group, original_bias, output):
 
 def _pre_ipex_gemm(input, world_size, rank):
     assert "deepspeed" in installed_pkg, "_pre_ipex_gemm requires deepspeed installed"
-    from deepspeed.utils.tp_shard import get_shard_size, get_shard_size_list
+    try:
+        from deepspeed.module_inject.tp_shard import get_shard_size, get_shard_size_list
+    except ImportError:
+        from deepspeed.utils.tp_shard import get_shard_size, get_shard_size_list
 
     input_shard_size = get_shard_size(input.shape[-1], world_size)
     input_shard_offset = sum(get_shard_size_list(input.shape[-1], world_size)[0:rank])
