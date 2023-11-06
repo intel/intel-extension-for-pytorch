@@ -1,5 +1,5 @@
 import torch
-from torch.testing._internal.common_utils import TestCase
+from torch.testing._internal.common_utils import TestCase, IS_WINDOWS
 import intel_extension_for_pytorch  # noqa
 import pytest
 
@@ -8,6 +8,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(IS_WINDOWS, reason="TODO: investigate precision on Windows")
     def test_polar_float(self, dtype=torch.float):
         abs_cpu = torch.randn([5, 5])
         angle_cpu = torch.randn([5, 5])

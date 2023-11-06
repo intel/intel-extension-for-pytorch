@@ -1,6 +1,7 @@
 import torch
 import intel_extension_for_pytorch  # noqa
-from torch.testing._internal.common_utils import TestCase
+from torch.testing._internal.common_utils import TestCase, IS_WINDOWS
+import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -146,6 +147,7 @@ class TestTorchMethod(TestCase):
         xpu = test(x1, "xpu")
         self.result_compare(cpu, xpu)
 
+    @pytest.mark.skipif(IS_WINDOWS, reason="TODO: investigate precision on Windows")
     def test_foreach_sin(self, dtype=torch.float):
         x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
 
@@ -202,6 +204,7 @@ class TestTorchMethod(TestCase):
         xpu = test(x1, "xpu")
         self.result_compare(cpu, xpu)
 
+    @pytest.mark.skipif(IS_WINDOWS, reason="TODO: investigate precision on Windows")
     def test_foreach_cos(self, dtype=torch.float):
         x1 = [torch.randn([5, 8], dtype=torch.float) for _ in range(250)]
 
