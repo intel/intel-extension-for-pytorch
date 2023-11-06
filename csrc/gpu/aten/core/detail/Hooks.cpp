@@ -47,7 +47,7 @@ DLDevice_& XPUHooks::getDLPackDeviceFromATenDevice(
   sycl::device& xpu_device = xpu::dpcpp::dpcppGetRawDevice(aten_device.index());
   sycl::device target_device;
 
-  if (!Settings::I().is_device_hierarchy_composite_enabled()) {
+  if (Settings::I().is_device_hierarchy_composite_enabled()) {
     // In `COMPOSITE` mode, we need to check if the tile partition feature is
     // enabled. If yes, we have to find its parent device.
     if (Settings::I().is_tile_as_device_enabled()) {
