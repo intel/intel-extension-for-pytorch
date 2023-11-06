@@ -1,6 +1,7 @@
 #pragma once
 
 #include <utils/DPCPP.h>
+#include "../../GEMM_INT4.h"
 #include "../xetla.h"
 
 namespace xpu {
@@ -116,16 +117,16 @@ struct hgemm_wint4_func {
 
 template <
     typename scalar_t,
-    int WG_M = 8,
-    int WG_N = 32,
-    int SG_M = 8,
-    int SG_N = 16,
-    int SG_K = 64,
-    int DQUANT_S = 1,
-    int SLM_KS = 8,
-    int L3_KS = 1,
-    int SYNC_FREQ = 1,
-    int STAGES = 3>
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES>
 inline void hgemm_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -176,16 +177,16 @@ inline void hgemm_wint4(
 
 template <
     typename scalar_t,
-    int WG_M = 8,
-    int WG_N = 32,
-    int SG_M = 8,
-    int SG_N = 16,
-    int SG_K = 64,
-    int DQUANT_S = 1,
-    int SLM_KS = 8,
-    int L3_KS = 1,
-    int SYNC_FREQ = 1,
-    int STAGES = 3>
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES>
 inline void hgemm_bias_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -241,16 +242,16 @@ inline void hgemm_bias_wint4(
 
 template <
     typename scalar_t,
-    int WG_M = 8,
-    int WG_N = 32,
-    int SG_M = 8,
-    int SG_N = 16,
-    int SG_K = 64,
-    int DQUANT_S = 1,
-    int SLM_KS = 8,
-    int L3_KS = 1,
-    int SYNC_FREQ = 1,
-    int STAGES = 3>
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES>
 inline void hgemm_bias_gelu_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -308,16 +309,16 @@ inline void hgemm_bias_gelu_wint4(
 
 template <
     typename scalar_t,
-    int WG_M = 8,
-    int WG_N = 32,
-    int SG_M = 8,
-    int SG_N = 16,
-    int SG_K = 64,
-    int DQUANT_S = 1,
-    int SLM_KS = 8,
-    int L3_KS = 1,
-    int SYNC_FREQ = 1,
-    int STAGES = 3>
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES>
 inline void hgemm_res_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -376,16 +377,84 @@ inline void hgemm_res_wint4(
 
 template <
     typename scalar_t,
-    int WG_M = 8,
-    int WG_N = 32,
-    int SG_M = 8,
-    int SG_N = 16,
-    int SG_K = 64,
-    int DQUANT_S = 1,
-    int SLM_KS = 8,
-    int L3_KS = 1,
-    int SYNC_FREQ = 1,
-    int STAGES = 3>
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES>
+inline void hgemm_mul_wint4(
+    sycl::queue& queue,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint8_t* b,
+    const uint8_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* mul,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  static_assert(L3_KS == 1, "for fused op, L3_KS should be 1");
+
+  using data_type_a = scalar_t;
+  using data_type_b = int4x2;
+  using data_type_c = scalar_t;
+  using data_type_zp = int4x2;
+  using data_type_scale = scalar_t;
+  using data_type_acc = float;
+  using data_type_mul = scalar_t;
+  using post_op = subgroup::chained_tile_op_t<
+      subgroup::
+          elemwise_reduce_op_t<reduce_op::prod, data_type_mul, gpu_arch::Xe>>;
+  using hgemm_wint4_functor = hgemm_wint4_func<
+      data_type_a,
+      data_type_b,
+      data_type_c,
+      data_type_zp,
+      data_type_scale,
+      data_type_acc,
+      WG_M,
+      WG_N,
+      SG_M,
+      SG_N,
+      SG_K,
+      L3_KS,
+      SLM_KS,
+      DQUANT_S,
+      post_op>;
+
+  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
+
+  hgemm_wint4_functor::run(
+      queue,
+      const_cast<scalar_t*>(a),
+      const_cast<data_type_b*>(b_alias),
+      out,
+      m,
+      n,
+      k,
+      const_cast<data_type_zp*>(b_zp_alias),
+      const_cast<scalar_t*>(b_scale),
+      {{{const_cast<scalar_t*>(mul), {n, m, n}}}});
+}
+
+template <
+    typename scalar_t,
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES>
 inline void hgemm_bias_res_res_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -451,16 +520,16 @@ inline void hgemm_bias_res_res_wint4(
 
 template <
     typename scalar_t,
-    int WG_M = 8,
-    int WG_N = 32,
-    int SG_M = 8,
-    int SG_N = 16,
-    int SG_K = 64,
-    int DQUANT_S = 1,
-    int SLM_KS = 8,
-    int L3_KS = 1,
-    int SYNC_FREQ = 1,
-    int STAGES = 3>
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES>
 inline void hgemm_qkv_wint4(
     sycl::queue& queue,
     scalar_t* out0,
@@ -545,16 +614,16 @@ inline void hgemm_qkv_wint4(
 
 template <
     typename scalar_t,
-    int WG_M = 8,
-    int WG_N = 32,
-    int SG_M = 8,
-    int SG_N = 16,
-    int SG_K = 64,
-    int DQUANT_S = 1,
-    int SLM_KS = 8,
-    int L3_KS = 1,
-    int SYNC_FREQ = 1,
-    int STAGES = 3>
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES>
 inline void hgemm_qkv_bias_wint4(
     sycl::queue& queue,
     scalar_t* out0,

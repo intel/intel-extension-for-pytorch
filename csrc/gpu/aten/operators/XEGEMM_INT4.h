@@ -11,213 +11,349 @@
 
 using namespace xpu::xetla;
 
-#define RECORD_FUNCTION_IMPL(F)                        \
-  char str__[100];                                     \
-  sprintf(str__, "%s(%d, %d, %d)", "" #F, m_, n_, k_); \
+#define RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
+  char str__[100];                                                        \
+  sprintf(                                                                \
+      str__,                                                              \
+      "%s(%d, %d, %d, %d, %d, %d, %d, %d, %d, %d)",                       \
+      "" #F,                                                              \
+      WG_M,                                                               \
+      WG_N,                                                               \
+      SG_M,                                                               \
+      SG_N,                                                               \
+      SG_K,                                                               \
+      GZ,                                                                 \
+      SLM_KS,                                                             \
+      m_,                                                                 \
+      n_,                                                                 \
+      k_);                                                                \
   RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
 
-#define HGEMM_INT4_DISPATCH(F)                                          \
-  {                                                                     \
-    RECORD_FUNCTION_IMPL(F)                                             \
-    F(q,                                                                \
-      reinterpret_cast<sycl::half*>(output_->data_ptr<scalar_t>()),     \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),      \
-      weight_->data_ptr<uint8_t>(),                                     \
-      weight_zp_->data_ptr<uint8_t>(),                                  \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()), \
-      m_,                                                               \
-      n_,                                                               \
-      k_);                                                              \
-  }
-
-#define HGEMM_INT4_BIAS_DISPATCH(F)                                       \
+#define HGEMM_INT4_DISPATCH(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)  \
   {                                                                       \
-    RECORD_FUNCTION_IMPL(F)                                               \
-    F(q,                                                                  \
-      reinterpret_cast<sycl::half*>(output_->data_ptr<scalar_t>()),       \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      weight_->data_ptr<uint8_t>(),                                       \
-      weight_zp_->data_ptr<uint8_t>(),                                    \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
-      m_,                                                                 \
-      n_,                                                                 \
-      k_);                                                                \
+    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)     \
+    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(              \
+        q,                                                                \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()), \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),      \
+        weight_->data_ptr<uint8_t>(),                                     \
+        weight_zp_->data_ptr<uint8_t>(),                                  \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()), \
+        m_,                                                               \
+        n_,                                                               \
+        k_);                                                              \
   }
 
-#define HGEMM_INT4_BIAS_RES_RES_DISPATCH(F)                               \
-  {                                                                       \
-    RECORD_FUNCTION_IMPL(F)                                               \
-    F(q,                                                                  \
-      reinterpret_cast<sycl::half*>(output_->data_ptr<scalar_t>()),       \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      weight_->data_ptr<uint8_t>(),                                       \
-      weight_zp_->data_ptr<uint8_t>(),                                    \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
-      reinterpret_cast<sycl::half*>(epilogues_[1]->data_ptr<scalar_t>()), \
-      reinterpret_cast<sycl::half*>(epilogues_[2]->data_ptr<scalar_t>()), \
-      m_,                                                                 \
-      n_,                                                                 \
-      k_);                                                                \
+#define HGEMM_INT4_BIAS_DISPATCH(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
+  {                                                                           \
+    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)         \
+    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                  \
+        q,                                                                    \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),     \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),          \
+        weight_->data_ptr<uint8_t>(),                                         \
+        weight_zp_->data_ptr<uint8_t>(),                                      \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),     \
+        reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()),   \
+        m_,                                                                   \
+        n_,                                                                   \
+        k_);                                                                  \
   }
 
-#define HGEMM_INT4_BIAS_GELU_DISPATCH(F)                                  \
-  {                                                                       \
-    RECORD_FUNCTION_IMPL(F)                                               \
-    F(q,                                                                  \
-      reinterpret_cast<sycl::half*>(output_->data_ptr<scalar_t>()),       \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      weight_->data_ptr<uint8_t>(),                                       \
-      weight_zp_->data_ptr<uint8_t>(),                                    \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
-      m_,                                                                 \
-      n_,                                                                 \
-      k_);                                                                \
+#define HGEMM_INT4_BIAS_RES_RES_DISPATCH(                                   \
+    F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
+  {                                                                         \
+    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
+    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                \
+        q,                                                                  \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
+        weight_->data_ptr<uint8_t>(),                                       \
+        weight_zp_->data_ptr<uint8_t>(),                                    \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+        reinterpret_cast<sycl::half*>(epilogues_[1]->data_ptr<scalar_t>()), \
+        reinterpret_cast<sycl::half*>(epilogues_[2]->data_ptr<scalar_t>()), \
+        m_,                                                                 \
+        n_,                                                                 \
+        k_);                                                                \
   }
 
-#define HGEMM_INT4_RES_DISPATCH(F)                                        \
-  {                                                                       \
-    RECORD_FUNCTION_IMPL(F)                                               \
-    F(q,                                                                  \
-      reinterpret_cast<sycl::half*>(output_->data_ptr<scalar_t>()),       \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      weight_->data_ptr<uint8_t>(),                                       \
-      weight_zp_->data_ptr<uint8_t>(),                                    \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
-      m_,                                                                 \
-      n_,                                                                 \
-      k_);                                                                \
+#define HGEMM_INT4_BIAS_GELU_DISPATCH(                                      \
+    F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
+  {                                                                         \
+    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
+    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                \
+        q,                                                                  \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
+        weight_->data_ptr<uint8_t>(),                                       \
+        weight_zp_->data_ptr<uint8_t>(),                                    \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+        m_,                                                                 \
+        n_,                                                                 \
+        k_);                                                                \
   }
 
-#define HGEMM_INT4_COMMON_DISPATCH_IMPL(DISPATCHER, F) DISPATCHER(F)
-#define HGEMM_INT4_COMMON_DISPATCH(F)                                      \
-  {                                                                        \
-    if (num_epilogues_ == 0)                                               \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(HGEMM_INT4_DISPATCH, hgemm_wint4##F) \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS)             \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                     \
-          HGEMM_INT4_BIAS_DISPATCH, hgemm_bias_wint4##F)                   \
-    else if (                                                              \
-        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                \
-        epilogue_type_[1] == RES_ADD && epilogue_type_[2] == RES_ADD)      \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                     \
-          HGEMM_INT4_BIAS_RES_RES_DISPATCH, hgemm_bias_res_res_wint4##F)   \
-    else if (                                                              \
-        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                \
-        epilogue_type_[1] == GELU)                                         \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                     \
-          HGEMM_INT4_BIAS_GELU_DISPATCH, hgemm_bias_gelu_wint4##F)         \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD)          \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                     \
-          HGEMM_INT4_RES_DISPATCH, hgemm_res_wint4##F)                     \
+#define HGEMM_INT4_RES_DISPATCH(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
+  {                                                                          \
+    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)        \
+    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                 \
+        q,                                                                   \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),    \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),         \
+        weight_->data_ptr<uint8_t>(),                                        \
+        weight_zp_->data_ptr<uint8_t>(),                                     \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),    \
+        reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()),  \
+        m_,                                                                  \
+        n_,                                                                  \
+        k_);                                                                 \
   }
 
-#define HGEMM_INT4_8M_16384N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##8x256_8x16x32##_##gz##_2_)
-#define HGEMM_INT4_8M_4096N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##8x64_8x16x64##_##gz##_8_)
-#define HGEMM_INT4_8M_4096N_16384K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##8x64_8x16x64##_##gz##_8_)
-#define HGEMM_INT4_8M_50400N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##8x512_8x16x32##_##gz##_1_)
-#define HGEMM_INT4_8M_50416N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##8x512_8x16x32##_##gz##_1_)
-
-#define HGEMM_INT4_16M_16384N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##16x256_16x16x32##_##gz##_2_)
-#define HGEMM_INT4_16M_4096N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##16x64_16x16x32##_##gz##_8_)
-#define HGEMM_INT4_16M_4096N_16384K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##16x64_16x16x32##_##gz##_8_)
-#define HGEMM_INT4_16M_50400N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##16x512_16x16x32##_##gz##_1_)
-#define HGEMM_INT4_16M_50416N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##16x512_16x16x32##_##gz##_1_)
-
-#define HGEMM_INT4_32M_16384N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##32x256_32x16x32##_##gz##_2_)
-#define HGEMM_INT4_32M_4096N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##32x64_32x16x32##_##gz##_8_)
-#define HGEMM_INT4_32M_4096N_16384K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##32x64_32x16x32##_##gz##_8_)
-#define HGEMM_INT4_32M_50400N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##32x512_32x16x32##_##gz##_1_)
-#define HGEMM_INT4_32M_50416N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##32x512_32x16x32##_##gz##_1_)
-
-#define HGEMM_INT4_64M_16384N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##64x256_64x16x32##_##gz##_2_)
-#define HGEMM_INT4_64M_4096N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##32x128_32x16x32##_##gz##_4_)
-#define HGEMM_INT4_64M_4096N_16384K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##32x128_32x16x32##_##gz##_4_)
-#define HGEMM_INT4_64M_50400N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##64x512_64x16x32##_##gz##_1_)
-#define HGEMM_INT4_64M_50416N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##64x512_64x16x32##_##gz##_1_)
-
-#define HGEMM_INT4_384M_16384N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
-#define HGEMM_INT4_384M_4096N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
-#define HGEMM_INT4_384M_4096N_16384K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
-#define HGEMM_INT4_384M_50400N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
-#define HGEMM_INT4_384M_50416N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##64x128_64x16x32##_##gz##_4_)
-
-#define HGEMM_INT4_1024M_16384N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##128x256_64x16x32##_##gz##_1_)
-#define HGEMM_INT4_1024M_4096N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##128x256_64x16x32##_##gz##_1_)
-#define HGEMM_INT4_1024M_4096N_16384K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##128x256_64x16x32##_##gz##_1_)
-#define HGEMM_INT4_1024M_50400N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##128x512_64x32x32##_##gz##_1_)
-#define HGEMM_INT4_1024M_50416N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##128x512_64x32x32##_##gz##_1_)
-
-#define HGEMM_INT4_INFM_16384N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
-#define HGEMM_INT4_INFM_4096N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
-#define HGEMM_INT4_INFM_4096N_16384K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
-#define HGEMM_INT4_INFM_50400N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
-#define HGEMM_INT4_INFM_50416N_4096K_IMPL(gz) \
-  HGEMM_INT4_COMMON_DISPATCH(_##256x256_64x32x32##_##gz##_1_)
-
-#define HGEMM_INT4_M_N_K_DISPATCH(m, n, k, gz) \
-  HGEMM_INT4_##m##M_##n##N_##k##K_IMPL(gz)
-
-#define HGEMM_INT4_N_K_DISPATCH(m, gz)             \
-  if (n_ == 16384 && k_ == 4096) {                 \
-    HGEMM_INT4_M_N_K_DISPATCH(m, 16384, 4096, gz); \
-  } else if (n_ == 4096 && k_ == 4096) {           \
-    HGEMM_INT4_M_N_K_DISPATCH(m, 4096, 4096, gz);  \
-  } else if (n_ == 4096 && k_ == 16384) {          \
-    HGEMM_INT4_M_N_K_DISPATCH(m, 4096, 16384, gz); \
-  } else if (n_ == 50400 && k_ == 4096) {          \
-    HGEMM_INT4_M_N_K_DISPATCH(m, 50400, 4096, gz); \
-  } else if (n_ == 50416 && k_ == 4096) {          \
-    HGEMM_INT4_M_N_K_DISPATCH(m, 50416, 4096, gz); \
-  } else {                                         \
-    HGEMM_INT4_M_N_K_DISPATCH(m, 4096, 4096, gz);  \
+#define HGEMM_INT4_RESMUL_DISPATCH(                                         \
+    F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
+  {                                                                         \
+    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
+    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                \
+        q,                                                                  \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
+        weight_->data_ptr<uint8_t>(),                                       \
+        weight_zp_->data_ptr<uint8_t>(),                                    \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+        m_,                                                                 \
+        n_,                                                                 \
+        k_);                                                                \
   }
 
-#define HGEMM_INT4_M_DISPATCH(m)            \
-  if (calib_gz_ == k_ || calib_gz_ == -1) { \
-    HGEMM_INT4_N_K_DISPATCH(m, 0);          \
-  } else if (calib_gz_ == 128) {            \
-    HGEMM_INT4_N_K_DISPATCH(m, 128);        \
-  } else {                                  \
-    TORCH_CHECK(false);                     \
+#define HGEMM_INT4_QKV_DISPATCH(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
+  {                                                                          \
+    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)        \
+    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                 \
+        q,                                                                   \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),    \
+        reinterpret_cast<sycl::half*>(outputs_[1]->data_ptr<scalar_t>()),    \
+        reinterpret_cast<sycl::half*>(outputs_[2]->data_ptr<scalar_t>()),    \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),         \
+        weight_->data_ptr<uint8_t>(),                                        \
+        weight_zp_->data_ptr<uint8_t>(),                                     \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),    \
+        m_,                                                                  \
+        n_,                                                                  \
+        k_);                                                                 \
   }
+
+#define HGEMM_INT4_QKV_BIAS_DISPATCH(                                       \
+    F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
+  {                                                                         \
+    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
+    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                \
+        q,                                                                  \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(outputs_[1]->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(outputs_[2]->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
+        weight_->data_ptr<uint8_t>(),                                       \
+        weight_zp_->data_ptr<uint8_t>(),                                    \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+        m_,                                                                 \
+        n_,                                                                 \
+        k_);                                                                \
+  }
+
+#define HGEMM_INT4_COMMON_DISPATCH_IMPL(                     \
+    DISPATCHER, F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
+  DISPATCHER(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)
+
+#define HGEMM_INT4_COMMON_DISPATCH(WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
+  {                                                                          \
+    if (num_epilogues_ == 0)                                                 \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_DISPATCH,                                               \
+          hgemm_wint4,                                                       \
+          WG_M,                                                              \
+          WG_N,                                                              \
+          SG_M,                                                              \
+          SG_N,                                                              \
+          SG_K,                                                              \
+          GZ,                                                                \
+          SLM_KS)                                                            \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS)               \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_BIAS_DISPATCH,                                          \
+          hgemm_bias_wint4,                                                  \
+          WG_M,                                                              \
+          WG_N,                                                              \
+          SG_M,                                                              \
+          SG_N,                                                              \
+          SG_K,                                                              \
+          GZ,                                                                \
+          SLM_KS)                                                            \
+    else if (                                                                \
+        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                  \
+        epilogue_type_[1] == RES_ADD && epilogue_type_[2] == RES_ADD)        \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_BIAS_RES_RES_DISPATCH,                                  \
+          hgemm_bias_res_res_wint4,                                          \
+          WG_M,                                                              \
+          WG_N,                                                              \
+          SG_M,                                                              \
+          SG_N,                                                              \
+          SG_K,                                                              \
+          GZ,                                                                \
+          SLM_KS)                                                            \
+    else if (                                                                \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                  \
+        epilogue_type_[1] == GELU)                                           \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_BIAS_GELU_DISPATCH,                                     \
+          hgemm_bias_gelu_wint4,                                             \
+          WG_M,                                                              \
+          WG_N,                                                              \
+          SG_M,                                                              \
+          SG_N,                                                              \
+          SG_K,                                                              \
+          GZ,                                                                \
+          SLM_KS)                                                            \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD)            \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_RES_DISPATCH,                                           \
+          hgemm_res_wint4,                                                   \
+          WG_M,                                                              \
+          WG_N,                                                              \
+          SG_M,                                                              \
+          SG_N,                                                              \
+          SG_K,                                                              \
+          GZ,                                                                \
+          SLM_KS)                                                            \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL)            \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_RESMUL_DISPATCH,                                        \
+          hgemm_mul_wint4,                                                   \
+          WG_M,                                                              \
+          WG_N,                                                              \
+          SG_M,                                                              \
+          SG_N,                                                              \
+          SG_K,                                                              \
+          GZ,                                                                \
+          SLM_KS)                                                            \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == SPLIT3)             \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_QKV_DISPATCH,                                           \
+          hgemm_qkv_wint4,                                                   \
+          WG_M,                                                              \
+          WG_N,                                                              \
+          SG_M,                                                              \
+          SG_N,                                                              \
+          SG_K,                                                              \
+          GZ,                                                                \
+          SLM_KS)                                                            \
+    else if (                                                                \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                  \
+        epilogue_type_[1] == SPLIT3)                                         \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_QKV_BIAS_DISPATCH,                                      \
+          hgemm_qkv_bias_wint4,                                              \
+          WG_M,                                                              \
+          WG_N,                                                              \
+          SG_M,                                                              \
+          SG_N,                                                              \
+          SG_K,                                                              \
+          GZ,                                                                \
+          SLM_KS)                                                            \
+  }
+
+template <
+    int wg_m_,
+    int wg_n_,
+    int sg_m_,
+    int sg_n_,
+    int sg_k_,
+    int gz_,
+    int slm_ks_,
+    int max_m_,
+    int max_n_,
+    int max_k_>
+struct GemmWint4Config {
+  static constexpr int wg_m = wg_m_;
+  static constexpr int wg_n = wg_n_;
+  static constexpr int sg_m = sg_m_;
+  static constexpr int sg_n = sg_n_;
+  static constexpr int sg_k = sg_k_;
+  static constexpr int gz = gz_;
+  static constexpr int slm_ks = slm_ks_;
+  static constexpr int max_m = max_m_;
+  static constexpr int max_n = max_n_;
+  static constexpr int max_k = max_k_;
+
+  static bool less_than(int m, int n, int k, int group_size) {
+    if (gz < group_size)
+      return true;
+    if (gz == group_size && max_n < n)
+      return true;
+    if (gz == group_size && max_n == n && max_k < k)
+      return true;
+    if (gz == group_size && max_n == n && max_k == k && max_m < m)
+      return true;
+    return false;
+  }
+};
+
+#define MAX_INT std::numeric_limits<int>::max()
+
+// clang-format off
+#define ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ(gz)                        \
+  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, 4096>,               \
+  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, 4096>,            \
+  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, 4096>,            \
+  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, 4096>,           \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, 4096>,          \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, 4096>,     \
+  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, 16384>,              \
+  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, 16384>,           \
+  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, 16384>,           \
+  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, 16384>,          \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, 16384>,         \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, 16384>,    \
+  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, MAX_INT>,            \
+  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, MAX_INT>,         \
+  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, MAX_INT>,         \
+  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, MAX_INT>,        \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, MAX_INT>,       \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, MAX_INT>,  \
+  GemmWint4Config<8, 256, 8, 16, 32, gz, 2, 8, 16384, 4096>,             \
+  GemmWint4Config<16, 256, 16, 16, 32, gz, 2, 16, 16384, 4096>,          \
+  GemmWint4Config<32, 256, 32, 16, 32, gz, 2, 32, 16384, 4096>,          \
+  GemmWint4Config<64, 256, 64, 16, 32, gz, 2, 64, 16384, 4096>,          \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 16384, 4096>,         \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 16384, 4096>,    \
+  GemmWint4Config<8, 256, 8, 16, 32, gz, 2, 8, 16384, MAX_INT>,          \
+  GemmWint4Config<16, 256, 16, 16, 32, gz, 2, 16, 16384, MAX_INT>,       \
+  GemmWint4Config<32, 256, 32, 16, 32, gz, 2, 32, 16384, MAX_INT>,       \
+  GemmWint4Config<64, 256, 64, 16, 32, gz, 2, 64, 16384, MAX_INT>,       \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 16384, MAX_INT>,      \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 16384, MAX_INT>, \
+  GemmWint4Config<8, 512, 8, 16, 32, gz, 1, 8, 50416, 4096>,             \
+  GemmWint4Config<16, 512, 16, 16, 32, gz, 1, 16, 50416, 4096>,          \
+  GemmWint4Config<32, 512, 32, 16, 32, gz, 1, 32, 50416, 4096>,          \
+  GemmWint4Config<64, 512, 64, 16, 32, gz, 1, 64, 50416, 4096>,          \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 50416, 4096>,         \
+  GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, 50416, 4096>,    \
+  GemmWint4Config<8, 512, 8, 16, 32, gz, 1, 8, MAX_INT, MAX_INT>,        \
+  GemmWint4Config<16, 512, 16, 16, 32, gz, 1, 16, MAX_INT, MAX_INT>,     \
+  GemmWint4Config<32, 512, 32, 16, 32, gz, 1, 32, MAX_INT, MAX_INT>,     \
+  GemmWint4Config<64, 512, 64, 16, 32, gz, 1, 64, MAX_INT, MAX_INT>,     \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, MAX_INT, MAX_INT>,    \
+  GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, MAX_INT, MAX_INT>
+// clang-format on
+
+#define ORDERED_GEMM_WINT4_CONFIG_SET       \
+  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ(0), \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ(128)
 
 inline Tensor resize_as_mat1(const Tensor& mat1, const Tensor& output) {
   auto output_ = output.flatten(0, -2);
@@ -235,13 +371,16 @@ class HGEMMXetla_INT4 final {
     GELU,
     RES_MUL,
     SILU,
+    SCALED_RES_ADD,
+    SPLIT3,
   };
 
  private:
   enum {
     MAX_EPILOGUES = 4,
   };
-  Tensor *input_, *weight_, *output_, *weight_scl_, *weight_zp_;
+  Tensor *input_, *weight_, *weight_scl_, *weight_zp_;
+  std::vector<Tensor*> outputs_;
   Tensor* epilogues_[MAX_EPILOGUES];
   EpilogueType epilogue_type_[MAX_EPILOGUES];
   float pf32[MAX_EPILOGUES];
@@ -260,7 +399,7 @@ class HGEMMXetla_INT4 final {
     return fallback_;
   }
   HGEMMXetla_INT4& add_matrix_out(const Tensor& output) {
-    output_ = const_cast<Tensor*>(&output);
+    outputs_.emplace_back(const_cast<Tensor*>(&output));
     return *this;
   }
   HGEMMXetla_INT4& add_matrix_inp(const Tensor& input) {
@@ -303,9 +442,16 @@ class HGEMMXetla_INT4 final {
     if (input_->scalar_type() != kHalf ||
         (weight_->scalar_type() != kByte &&
          weight_->scalar_type() != kQUInt8) ||
-        output_->scalar_type() != kHalf)
+        std::any_of(outputs_.begin(), outputs_.end(), [](Tensor* out) {
+          return out->scalar_type() != kHalf;
+        }))
       return *this;
-    if (!(input_->dim() == 2 && weight_->dim() == 2 && output_->dim() == 2))
+    if (!(input_->dim() == 2 &&
+          (weight_->dim() == 2 ||
+           (epilogue_type_[0] == SPLIT3 && weight_->dim() == 3)) &&
+          std::all_of(outputs_.begin(), outputs_.end(), [](Tensor* out) {
+            return out->dim() == 2;
+          })))
       return *this;
     is_a_row_major_ = input_->is_contiguous();
     is_a_col_major_ = input_->transpose(0, 1).is_contiguous();
@@ -313,13 +459,19 @@ class HGEMMXetla_INT4 final {
     is_b_col_major_ = weight_->transpose(0, 1).is_contiguous();
     auto a_sizes = input_->sizes();
     auto b_sizes = weight_->sizes();
-    auto c_sizes = output_->sizes();
     m_ = a_sizes[0];
     k_ = a_sizes[1];
-    n_ = b_sizes[1] * 2;
-    bool ck0 = b_sizes[0] == k_;
-    bool ck1 = c_sizes[0] == m_ && c_sizes[1] == n_;
-    bool ck2 = is_a_row_major_;
+    // Normalize calibration group size.
+    if (calib_gz_ == -1 || calib_gz_ == k_)
+      calib_gz_ = 0;
+    // Check if calibration group size is valid.
+    if (calib_gz_ != 0 && calib_gz_ != 128)
+      return *this;
+    // Set correct n dim.
+    if (epilogue_type_[0] == SPLIT3)
+      n_ = b_sizes[2] * 2;
+    else
+      n_ = b_sizes[1] * 2;
     for (int i = 0; i < num_epilogues_; i++) {
       switch (epilogue_type_[i]) {
         case BIAS: {
@@ -339,8 +491,7 @@ class HGEMMXetla_INT4 final {
           if (!ck)
             return *this;
         } break;
-        case GELU:
-        case SILU: {
+        default: {
         } break;
       }
     }
@@ -348,24 +499,83 @@ class HGEMMXetla_INT4 final {
     return *this;
   }
 
+  using DispatchResult = std::pair<std::function<void()>, bool>;
+
+  template <int begin, int end, typename T>
+  struct TupleExtractor {
+    using type = std::tuple<T>;
+  };
+
+  template <int begin, typename FirstConfig, typename... OtherConfigs>
+  struct TupleExtractor<
+      begin,
+      begin,
+      std::tuple<FirstConfig, OtherConfigs...>> {
+    using type = std::tuple<FirstConfig>;
+  };
+
+  template <int begin, int end, typename FirstConfig, typename... OtherConfigs>
+  struct TupleExtractor<begin, end, std::tuple<FirstConfig, OtherConfigs...>> {
+    template <typename AppendConfig, typename T>
+    struct TupleAppender {
+      using type = std::tuple<AppendConfig>;
+    };
+
+    template <typename AppendConfig, typename... RemainedConfigs>
+    struct TupleAppender<AppendConfig, std::tuple<RemainedConfigs...>> {
+      using type = std::tuple<AppendConfig, RemainedConfigs...>;
+    };
+
+    using type = typename TupleAppender<
+        std::tuple_element_t<begin, std::tuple<FirstConfig, OtherConfigs...>>,
+        typename TupleExtractor<
+            begin + 1,
+            end,
+            std::tuple<FirstConfig, OtherConfigs...>>::type>::type;
+  };
+
+  template <typename scalar_t, typename ConfigsTuple>
+  std::function<void()> binary_search(sycl::queue& q) {
+    static constexpr int configs_size = std::tuple_size<ConfigsTuple>::value;
+    if constexpr (configs_size == 1) {
+      auto execute_function = [&]() {
+        using Config = std::tuple_element_t<0, ConfigsTuple>;
+        static constexpr int wg_m = Config::wg_m;
+        static constexpr int wg_n = Config::wg_n;
+        static constexpr int sg_m = Config::sg_m;
+        static constexpr int sg_n = Config::sg_n;
+        static constexpr int sg_k = Config::sg_k;
+        static constexpr int gz = Config::gz;
+        static constexpr int slm_ks = Config::slm_ks;
+        HGEMM_INT4_COMMON_DISPATCH(wg_m, wg_n, sg_m, sg_n, sg_k, gz, slm_ks);
+      };
+      return execute_function;
+    } else {
+      static constexpr int mid = (configs_size - 1) / 2;
+      using MiddleConfig = std::tuple_element_t<mid, ConfigsTuple>;
+      if (MiddleConfig::less_than(m_, n_, k_, calib_gz_)) {
+        return binary_search<
+            scalar_t,
+            typename TupleExtractor<mid + 1, configs_size - 1, ConfigsTuple>::
+                type>(q);
+      } else {
+        return binary_search<
+            scalar_t,
+            typename TupleExtractor<0, mid, ConfigsTuple>::type>(q);
+      }
+    }
+  }
+  template <typename scalar_t, typename... configs>
+  void dispatch(sycl::queue& q) {
+    using ConfigsTuple = std::tuple<configs...>;
+    auto gemm_caller = binary_search<scalar_t, ConfigsTuple>(q);
+    gemm_caller();
+  }
+
   void run() {
     using scalar_t =
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
     auto& q = dpcppGetCurrentQueue();
-    if (m_ <= 8) {
-      HGEMM_INT4_M_DISPATCH(8);
-    } else if (m_ <= 16) {
-      HGEMM_INT4_M_DISPATCH(16);
-    } else if (m_ <= 32) {
-      HGEMM_INT4_M_DISPATCH(32);
-    } else if (m_ <= 64) {
-      HGEMM_INT4_M_DISPATCH(64);
-    } else if (m_ <= 384 && n_ == 4096 && (k_ == 4096 || k_ == 16384)) {
-      HGEMM_INT4_M_DISPATCH(384);
-    } else if (m_ <= 1024) {
-      HGEMM_INT4_M_DISPATCH(1024);
-    } else {
-      HGEMM_INT4_M_DISPATCH(INF);
-    }
+    dispatch<scalar_t, ORDERED_GEMM_WINT4_CONFIG_SET>(q);
   }
 };
