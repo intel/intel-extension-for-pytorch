@@ -27,7 +27,7 @@ class _IPEXlinearSiluCPU(_IPEXlinearFusionCPU):
         self.linear = module
 
     def forward(self, x):
-        if self.tpp:
+        if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
             return torch.ops.torch_ipex.tpp_linear_silu(
                 x,
@@ -45,7 +45,7 @@ class _IPEXlinearReluCPU(_IPEXlinearFusionCPU):
         self.linear = module
 
     def forward(self, x):
-        if self.tpp:
+        if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
             return torch.ops.torch_ipex.tpp_linear_relu(
                 x,
@@ -63,7 +63,7 @@ class _IPEXlinearMulCPU(_IPEXlinearFusionCPU):
         self.linear = module
 
     def forward(self, x, y):
-        if self.tpp:
+        if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
             y = y.to(self.dtype).contiguous()
             return torch.ops.torch_ipex.tpp_linear_mul(
@@ -83,7 +83,7 @@ class _IPEXlinearAddCPU(_IPEXlinearFusionCPU):
         self.linear = module
 
     def forward(self, x, y):
-        if self.tpp:
+        if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
             y = y.to(self.dtype).contiguous()
             return torch.ops.torch_ipex.tpp_linear_add(
@@ -114,7 +114,7 @@ class _IPEXlinearAddAddCPU(_IPEXlinearFusionCPU):
         self.linear = module
 
     def forward(self, x, y, z):
-        if self.tpp:
+        if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
             y = y.to(self.dtype).contiguous()
             z = z.to(self.dtype).contiguous()
@@ -147,7 +147,7 @@ class _IPEXlinearNewGeluCPU(_IPEXlinearFusionCPU):
         self.linear = module
 
     def forward(self, x):
-        if self.tpp:
+        if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
             return torch.ops.torch_ipex.tpp_linear_gelu(
                 x,
@@ -186,7 +186,7 @@ class _IPEXlinearGeluCPU(_IPEXlinearFusionCPU):
         self.gelu = nn.GELU()
 
     def forward(self, x):
-        if self.tpp:
+        if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
             return torch.ops.torch_ipex.tpp_linear_gelu(
                 x,
@@ -323,7 +323,11 @@ class _IPEXlinearSiluMulCPU(nn.Module):
         self.dtype = module_s.weight.dtype if self.tpp else None
 
     def forward(self, x):
-        if self.tpp:
+        if (
+            self.tpp
+            and not self.linear_s.tpp_fallback
+            and not self.linear_m.tpp_fallback
+        ):
             x = x.to(self.dtype).contiguous()
             x1 = torch.ops.torch_ipex.tpp_linear_silu(
                 x,
