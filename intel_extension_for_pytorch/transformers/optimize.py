@@ -3,6 +3,7 @@ import copy
 import re
 import warnings
 import pkg_resources
+import os
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
     _enable_tpp,
     _disable_tpp,
@@ -486,6 +487,7 @@ def optimize_transformers(
     low_precision_checkpoint=None,
     sample_inputs=None,
     deployment_mode=True,
+    use_llm_allreduce=True,
 ):
     r"""
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
@@ -546,6 +548,10 @@ def optimize_transformers(
             "fail to apply optimize_transformers, this API supports inference for now, fallback to default path"
         )
         return model, optimizer
+
+    # Enable llm allreduce path for torch-ccl.
+    if use_llm_allreduce:
+        os.environ["TORCH_LLM_ALLREDUCE"] = "1"
 
     try:
         installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
