@@ -146,8 +146,12 @@ at::Tensor nms_kernel(
       at::empty({dets_num * col_blocks}, dets.options().dtype(at::kLong));
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-      dets_sorted.scalar_type(), "nms_kernel", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      dets_sorted.scalar_type(),
+      "nms_kernel",
+      [&] {
         auto cgf = DPCPP_Q_CGF(cgh) {
           auto dets_sorted_ptr = (scalar_t*)dets_sorted.data_ptr();
           auto mask_ptr = (unsigned long long*)mask.data_ptr();
