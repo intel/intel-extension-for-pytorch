@@ -55,6 +55,10 @@ parser.add_argument('-m', '--model-id',
     default='bigscience/bloom',
     help="the huggingface mdoel id"
 )
+parser.add_argument('--sub-model-name',
+    type=str,
+    help="the sub model name for accuracy check"
+)
 parser.add_argument('--device',
     type=str,
     choices=["cpu", "cuda", "xpu"],
@@ -281,7 +285,10 @@ if args.benchmark:
 
 # to ipex
 if args.ipex:
-    model = ipex.optimize_transformers(model.eval().to("xpu"), dtype=infer_dtype)
+    if "low_precision_checkpoint" in ipex.optimize_transformers.__code__.co_varnames:
+        model = ipex.optimize_transformers(model.eval(), dtype=infer_dtype, device="xpu", inplace=True)
+    else:
+        model = ipex.optimize_transformers(model.eval().to("xpu"), dtype=infer_dtype)
 
 # bypass assertion for beam4
 if isinstance(model, deepspeed.InferenceEngine):
@@ -289,6 +296,8 @@ if isinstance(model, deepspeed.InferenceEngine):
 
 if args.num_beams is None:
     args.num_beams = 1 if args.greedy else 4
+
+######################## run lm eval accuracy check ########################
 
 def run_accuracy():
     import lm_eval
@@ -414,6 +423,7 @@ if args.accuracy_only:
     run_accuracy()
     sys.exit(0)
 
+######################## run generation benchmark ########################
 ### Generate
 current_path = pathlib.Path(__file__).parent.resolve()
 with open(str(current_path) + '/prompt.json') as f:
@@ -468,6 +478,20 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
 
         return zip(inputs, gen_text, total_new_tokens), outputs
 
+# Accuracy check, take the ref_prompt as reference for check
+    f1 = open(os.path.join(os.path.dirname(__file__), "ref_prompt.json"))
+    prompt_json = json.load(f1)
+    f1.close()
+    ref_prompt=None
+    ref_prompt_cuda=None
+    token_support = [(32, 32), (1024, 128)]
+    if (int(num_input_tokens), num_tokens) in token_support:
+        ref_prompt = prompt_json[args.sub_model_name][f"{num_input_tokens}-{num_tokens}"][f"{num_beams}"]
+        try:
+            ref_prompt_cuda = prompt_json[args.sub_model_name][f"{num_input_tokens}-{num_tokens}"][f"cuda-result: {num_beams}"]
+        except Exception:
+            pass
+    acc_pass = 0
 
     # warmup is a must if measuring speed as it's when all the optimizations are performed
     # e.g. on 8x80 a100 the first pass of 100 tokens takes 23sec, and the next one is 4secs
@@ -519,6 +543,10 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
                     total_time += (t1 - t0)
                     if args.token_latency:
                         total_list.append(outputs[1])
+                if ref_prompt is not None and ref_prompt in gen_ids[0][1:]:
+                    acc_pass += 1
+                elif ref_prompt_cuda is not None and ref_prompt_cuda in gen_ids[0][1:]:
+                    acc_pass += 1
 
         latency = total_time / (cycles - warmup)
         print_rank0("\n", "-"*10, "Summary:", "-"*10)
@@ -565,6 +593,12 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
         Start to ready to generate: {t_ready - t_start:.3f} secs.
         """
             )
+        if ref_prompt is None:
+            print_rank0(f"""Accuracy check skip""")
+        elif acc_pass==args.num_iter:
+            print_rank0(f"""Accuracy check pass""")
+        else:
+            print_rank0(f"""Accuracy check fail, the wrong iteration number is: {args.num_iter - acc_pass}""")
 
 
 def to_list(obj):
