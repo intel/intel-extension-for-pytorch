@@ -1086,6 +1086,10 @@ struct Numerics<float> {
       return a;
     } else if (b != b) {
       return b;
+    } else if (std::isnan(a)) {
+      return a;
+    } else if (std::isnan(b)) {
+      return b;
     } else {
       return std::fmin(a, b);
     }
@@ -1094,6 +1098,10 @@ struct Numerics<float> {
     if (a != a) {
       return a;
     } else if (b != b) {
+      return b;
+    } else if (std::isnan(a)) {
+      return a;
+    } else if (std::isnan(b)) {
       return b;
     } else {
       return std::fmax(a, b);

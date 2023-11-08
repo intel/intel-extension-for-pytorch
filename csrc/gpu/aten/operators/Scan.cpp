@@ -136,7 +136,7 @@ void _cummax_helper(
       "cummax",
       [&]() {
         scalar_t init = self.is_floating_point()
-            ? (-1 * std::numeric_limits<scalar_t>::infinity())
+            ? -std::numeric_limits<scalar_t>::infinity()
             : std::numeric_limits<scalar_t>::lowest();
         scan_with_indices<INCLUSIVE_TYPE, scalar_t, scalar_t>(
             self, values, indices, dim, init, GreaterEqOp<scalar_t>());
