@@ -356,5 +356,17 @@ static inline double2 rand_normal2_double(randStatePhilox4_32_10_t* state) {
   return result;
 }
 
+static inline double rand_normal_double(randStatePhilox4_32_10_t* state) {
+  if (state->boxmuller_flag_double != EXTRA_FLAG_NORMAL) {
+    uint4 _x;
+    _x = rand4(state);
+    double2 v = _rand_box_muller_double(_x.x, _x.y, _x.z, _x.w);
+    state->boxmuller_extra = v.y;
+    state->boxmuller_flag_double = EXTRA_FLAG_NORMAL;
+    return v.x;
+  }
+  state->boxmuller_flag_double = 0;
+  return state->boxmuller_extra;
+}
 } // namespace AtenIpexTypeXPU
 } // namespace at

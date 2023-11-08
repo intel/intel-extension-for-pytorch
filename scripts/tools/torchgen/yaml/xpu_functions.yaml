@@ -860,6 +860,7 @@ supported:
   - logit_backward.grad_input
   - binomial
   - _standard_gamma
+  - poisson
   - where.self_out
   - where.self
   - _weight_norm_interface_backward

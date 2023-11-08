@@ -33,6 +33,7 @@ from torch.distributions import (
     Normal,
     Uniform,
     Dirichlet,
+    Poisson,
 )
 from torch.testing._internal.common_utils import TestCase, load_tests, set_rng_seed
 
@@ -484,3 +485,32 @@ class TestDistributions(TestCase):
         grad_cpu = torch._dirichlet_grad(x_cpu, concentration_cpu, total_cpu)
         grad_xpu = torch._dirichlet_grad(x_xpu, concentration_xpu, total_xpu)
         self.assertEqual(grad_xpu.to("cpu"), grad_cpu)
+
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
+    def test_poisson_shape(self):
+        set_rng_seed(1)
+        rate = torch.randn(2, 3).abs().requires_grad_().to("xpu")
+        rate_1d = torch.randn(1).abs().requires_grad_().to("xpu")
+        self.assertEqual(Poisson(rate).sample().size(), (2, 3))
+        self.assertEqual(Poisson(rate).sample((7,)).size(), (7, 2, 3))
+        self.assertEqual(Poisson(rate_1d).sample().size(), (1,))
+        self.assertEqual(Poisson(rate_1d).sample((1,)).size(), (1, 1))
+        self.assertEqual(Poisson(2.0).sample((2,)).size(), (2,))
+
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
+    def test_poisson_mean_var(self):
+        set_rng_seed(1)
+        lamb = torch.randint(0, 5, [1]).float()
+        lamb_arr = lamb.repeat(1000000000).to("xpu")
+        dist = torch.distributions.Poisson(lamb_arr)
+        sample_ret = dist.sample()
+        self.assertEqual(
+            torch.mean(sample_ret).cpu(), torch.mean(lamb).cpu(), atol=5e-4, rtol=5e-4
+        )
+        self.assertEqual(
+            torch.var(sample_ret).cpu(), torch.mean(lamb).cpu(), atol=5e-4, rtol=5e-4
+        )
