@@ -165,7 +165,7 @@ class WrapAPI:
                 pass
             assert len(args) > 0 and isinstance(
                 new_args[0], torch.Tensor
-            ), f"Current api {api} got non-Tensor for the 1st arguement"
+            ), f"Current api {api} got non-Tensor for the 1st argument"
             dst_device = new_args[0].device
             dst_dtype = new_args[0].dtype
             resign_dtype = kwargs.get("dtype")
