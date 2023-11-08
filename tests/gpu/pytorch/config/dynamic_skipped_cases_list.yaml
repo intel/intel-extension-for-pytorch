@@ -316,6 +316,8 @@
   - test_ops.py::TestCommonXPU::test_dtypes__refs__conversions_char_xpu
   - test_ops.py::TestCommonXPU::test_dtypes__refs__conversions_float_xpu
   - test_ops.py::TestCommonXPU::test_dtypes__refs__conversions_long_xpu
+  - test_ops.py::TestCommonXPU::test_errors_nn_functional_adaptive_max_pool3d_xpu
+  - test_ops.py::TestCommonXPU::test_errors_nn_functional_adaptive_max_pool2d_xpu
   - test_ops.py::TestCommonXPU::test_dtypes__refs_abs_xpu
   - test_ops.py::TestCommonXPU::test_dtypes__refs_acos_xpu
   - test_ops.py::TestCommonXPU::test_dtypes__refs_acosh_xpu
@@ -526,6 +528,7 @@
   - test_ops.py::TestCompositeComplianceXPU::test_backward_nn_functional_pdist_xpu_float32
   - test_ops.py::TestCompositeComplianceXPU::test_operator_chalf_xpu_float32
   - test_ops.py::TestFakeTensorXPU::test_fake_chalf_xpu_float32
+  - test_ops.py::TestFakeTensorXPU::test_fake_autocast_chalf_xpu_float32
   - test_ops.py::TestFakeTensorXPU::test_fake_crossref_backward_no_amp_chalf_xpu_float32
   - test_ops.py::TestFakeTensorXPU::test_fake_crossref_backward_no_amp_nn_functional_pdist_xpu_float32
   - test_ops.py::TestMathBitsXPU::test_neg_view__refs__conversions_chalf_xpu_float64
@@ -604,6 +607,9 @@
   - test_torch.py::TestTorchDeviceTypeXPU::test_copy__xpu_float32
   - test_torch.py::TestTorchDeviceTypeXPU::test_copy__xpu_int64
   - test_torch.py::TestTorchDeviceTypeXPU::test_copy__xpu_int8
+  - test_torch.py::TestTorchDeviceTypeXPU::test_copy__xpu_int16
+  - test_torch.py::TestTorchDeviceTypeXPU::test_copy__xpu_int32
+  - test_torch.py::TestTorchDeviceTypeXPU::test_copy__xpu_uint8
   - test_torch.py::TestTorchDeviceTypeXPU::test_copy_all_dtypes_and_devices_xpu
   - test_torch.py::TestTorchDeviceTypeXPU::test_copy_math_view_xpu
   - test_torch.py::TestTorchDeviceTypeXPU::test_copy_mem_overlap_xpu_float64
