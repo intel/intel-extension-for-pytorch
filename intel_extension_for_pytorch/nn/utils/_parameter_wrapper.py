@@ -561,11 +561,25 @@ class ParameterWrapper(object):
                     torch.float32,
                     torch.bfloat16,
                 ], "Only float, bf16 and fp16 are supported"
-                use_dnnl = True if not _using_tpp() else False
+                use_dnnl = True
+
         module.use_tpp = _using_tpp()
-        module.use_dnnl = use_dnnl
         if not hasattr(module, "out_features"):
             setattr(module, "out_features", module.weight.shape[0])  # noqa: B010
+
+        if module.use_tpp:
+            from intel_extension_for_pytorch.nn.utils import (
+                Apply_TPPLinear_weight_prepack,
+            )
+
+            Apply_TPPLinear_weight_prepack(module, dtype=module.weight.dtype)
+            if module.tpp_fallback:
+                module.use_tpp = False
+            else:
+                self.parameter.data = module.weight.data
+                self.parameter = module.weight
+
+        module.use_dnnl = use_dnnl if not module.use_tpp else False
         if not module.use_tpp:
             # prepare batch size
             module.batch_size_collapsed = None
@@ -583,14 +597,6 @@ class ParameterWrapper(object):
                     module.weight, module.bias, module.batch_size_collapsed
                 )
             self.pack_weight(use_dnnl)
-        else:
-            from intel_extension_for_pytorch.nn.utils import (
-                Apply_TPPLinear_weight_prepack,
-            )
-
-            Apply_TPPLinear_weight_prepack(module, dtype=module.weight.dtype)
-            self.parameter.data = module.weight.data
-            self.parameter = module.weight
 
     def load_cast_and_prepack(self, module, param):
         # load from state dict

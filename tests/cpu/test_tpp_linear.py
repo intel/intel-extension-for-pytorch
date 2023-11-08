@@ -82,7 +82,36 @@ class Linear_add_add(torch.nn.Module):
         return self.mlp(x) + x + x
 
 
+class Linear_tpp_fallback_dnnl(torch.nn.Module):
+    def __init__(self):
+        super(Linear_tpp_fallback_dnnl, self).__init__()
+        self.mlp = torch.nn.Linear(4097, 4097)
+
+    def forward(self, x):
+        return self.mlp(x)
+
+
 class TestTPPlinear(TestCase):
+    def test_tpp_linear_fallback(self):
+        x1 = torch.rand(1, 1, 4097)
+        x2 = copy.deepcopy(x1)
+        for dtype in [torch.float, torch.bfloat16]:
+            model = Linear_tpp_fallback_dnnl().eval()
+
+            with torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True if dtype is torch.bfloat16 else False
+            ):
+                ref_out = model(x1)
+
+            _enable_tpp()
+            model = ipex.optimize(model, dtype=dtype)
+            with torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True if dtype is torch.bfloat16 else False
+            ):
+                out = model(x2)
+            self.assertEqual(out, ref_out)
+            _disable_tpp()
+
     def test_tpp_linear(self):
         x1 = torch.rand(1, 1, 4096)
         x2 = copy.deepcopy(x1)

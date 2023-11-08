@@ -171,6 +171,7 @@ inline void tpp_linear_no_bias(
   auto BS = in_sizes[0] * in_sizes[1];
   if (BS > FT_OPT_SIZE) { // first token compute
     t_wt = wt_tensor_for_first_token<T>(t_wt);
+    large_cache_opt = true;
   }
   auto wt_sizes = t_wt.sizes();
   auto C = in_sizes[2];
@@ -238,6 +239,7 @@ inline void tpp_linear_mul(
   auto BS = in_sizes[0] * in_sizes[1];
   if (BS > FT_OPT_SIZE) { // first token compute
     t_wt = wt_tensor_for_first_token<T>(t_wt);
+    large_cache_opt = true;
   }
   auto wt_sizes = t_wt.sizes();
   auto C = in_sizes[2];
@@ -330,7 +332,9 @@ inline void tpp_linear_add_add(
   auto BS = in_sizes[0] * in_sizes[1];
   if (BS > FT_OPT_SIZE) { // first token compute
     t_wt = wt_tensor_for_first_token<T>(t_wt);
+    large_cache_opt = true;
   }
+
   auto wt_sizes = t_wt.sizes();
   auto C = in_sizes[2];
 
@@ -423,6 +427,7 @@ inline void tpp_linear_gelu(
   auto BS = in_sizes[0] * in_sizes[1];
   if (BS > FT_OPT_SIZE) { // first token compute
     t_wt = wt_tensor_for_first_token<T>(t_wt);
+    large_cache_opt = true;
   }
   auto wt_sizes = t_wt.sizes();
   auto C = in_sizes[2];
@@ -512,6 +517,7 @@ inline void tpp_linear_add(
   auto BS = in_sizes[0] * in_sizes[1];
   if (BS > FT_OPT_SIZE) { // first token compute
     t_wt = wt_tensor_for_first_token<T>(t_wt);
+    large_cache_opt = true;
   }
   auto wt_sizes = t_wt.sizes();
   auto C = in_sizes[2];
@@ -601,6 +607,7 @@ inline void tpp_linear_silu(
   auto BS = in_sizes[0] * in_sizes[1];
   if (BS > FT_OPT_SIZE) { // first token compute
     t_wt = wt_tensor_for_first_token<T>(t_wt);
+    large_cache_opt = true;
   }
   auto wt_sizes = t_wt.sizes();
   auto C = in_sizes[2];
@@ -689,6 +696,7 @@ inline void tpp_linear_relu(
   auto BS = in_sizes[0] * in_sizes[1];
   if (BS > FT_OPT_SIZE) { // first token compute
     t_wt = wt_tensor_for_first_token<T>(t_wt);
+    large_cache_opt = true;
   }
   auto wt_sizes = t_wt.sizes();
   auto C = in_sizes[2];
