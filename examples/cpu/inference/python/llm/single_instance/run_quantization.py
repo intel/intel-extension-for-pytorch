@@ -2,6 +2,7 @@ import argparse
 import time
 import json
 import pathlib
+import re
 
 from datasets import load_dataset
 
@@ -13,13 +14,13 @@ from transformers import AutoConfig
 import intel_extension_for_pytorch as ipex
 
 import sys
-sys.path.append('../')
-from utils.model_class.llm import EXAMPLE_INPUTS_MODE
-from utils.model_class.llama import LLAMAConfig
-from utils.model_class.gptj import GPTJConfig
-from utils.model_class.gptneox import GPTNEOXConfig
-from utils.model_class.falcon import FALCONConfig
-from utils.model_class.opt import OPTConfig
+sys.path.append(sys.path[0] + '/../../')
+from llm.utils.model_class.llm import EXAMPLE_INPUTS_MODE
+from llm.utils.model_class.llama import LLAMAConfig
+from llm.utils.model_class.gptj import GPTJConfig
+from llm.utils.model_class.gptneox import GPTNEOXConfig
+from llm.utils.model_class.falcon import FALCONConfig
+from llm.utils.model_class.opt import OPTConfig
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -126,28 +127,29 @@ generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams)
 
 
 # load model
-if args.model_id in ["meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf"]:
-    model = LLAMAConfig(args.model_id)
-elif args.model_id in ["EleutherAI/gpt-j-6b"]:
-    model = GPTJConfig(args.model_id)
-elif args.model_id in "EleutherAI/gpt-neox-20b":
-    model = GPTNEOXConfig(args.model_id)
-elif args.model_id in ["tiiuae/falcon-40b"]:
-    model = FALCONConfig(args.model_id)
-elif args.model_id in ["facebook/opt-30b", "facebook/opt-1.3b"]:
-    model = OPTConfig(args.model_id)
-else:
-    raise AssertionError("Not support %s" % (args.model_id))
-
-# load model
 if args.config_file is None:
     config = AutoConfig.from_pretrained(
-        args.model_id, torchscript=True, trust_remote_code=model.trust_remote_code
+        args.model_id, torchscript=True, trust_remote_code=True
     )
 else:
     config = AutoConfig.from_pretrained(
-        args.config_file, torchscript=True, trust_remote_code=model.trust_remote_code
+        args.config_file, torchscript=True, trust_remote_code=True
     )
+if re.search("falcon", config.architectures[0], re.IGNORECASE) or re.search(
+    "rw", config.architectures[0], re.IGNORECASE
+):
+    model = FALCONConfig(args.model_id)
+elif re.search("GPTJ", config.architectures[0], re.IGNORECASE):
+    model = GPTJConfig(args.model_id)
+elif re.search("llama", config.architectures[0], re.IGNORECASE):
+    model = LLAMAConfig(args.model_id)
+elif re.search("gptneox", config.architectures[0], re.IGNORECASE):
+    model = GPTNEOXConfig(args.model_id)
+elif re.search("OPT", config.architectures[0], re.IGNORECASE):
+    model = OPTConfig(args.model_id)
+else:
+    raise AssertionError("Not support %s." % (args.model_id))
+
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 

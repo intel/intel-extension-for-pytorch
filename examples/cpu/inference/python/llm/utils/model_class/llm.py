@@ -18,8 +18,6 @@ class LLMConfig(ABC):
             self.name: model name
             self.model_id: model id
             self.to_channels_last: channels last model
-            self.trust_remote_code:
-                trust_remote_code in AutoConfig.from_pretrained
             self.example_inputs_mode:
                 MASK_KV: input_ids+attn_mask+past_kv
                 KV_MASK: input_ids+past_kv+attn_mask
