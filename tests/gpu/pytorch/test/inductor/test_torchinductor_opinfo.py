@@ -1,10 +1,3 @@
-
-import os
-import sys
-test_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
-sys.path.append(test_root)
-
-import common.xpu_test_base
 # Owner(s): ["module: inductor"]
 import atexit
 import functools
@@ -52,9 +45,9 @@ from torch.utils._pytree import tree_map
 
 try:
     try:
-        from .test_torchinductor import check_model, check_model_cuda
+        from .test_torchinductor import check_model, check_model_xpu, HAS_XPU, skipXPUIf
     except ImportError:
-        from test_torchinductor import check_model, check_model_cuda
+        from test_torchinductor import check_model, check_model_xpu, HAS_XPU, skipXPUIf
 except (unittest.SkipTest, ImportError) as e:
     sys.stderr.write(f"{type(e)}: {e}\n")
     if __name__ == "__main__":
@@ -143,7 +136,7 @@ def print_seen():
                 f"    {format_op(op)}: {fmt_dtypes(failed_dtypes)},{reasons}"
             )
 
-    for device_type in ("cpu", "cuda"):
+    for device_type in ("cpu", "xpu"):
         expected_failures[device_type]
         nl = "\n"
         print(
@@ -182,7 +175,7 @@ if IS_MACOS and IS_X86:
         i64,
     }
 
-inductor_skips["cuda"] = {
+inductor_skips["xpu"] = {
     # Jiterator kernel is not expected to work with inductor
     "jiterator_2inputs_2outputs": {b8, f16, f32, f64, i32, i64},
     "jiterator_4inputs_with_extra_args": {b8, f16, f32, f64, i32, i64},
@@ -196,11 +189,11 @@ inductor_skips["cuda"] = {
 }
 
 if not SM80OrLater:
-    inductor_skips["cuda"]["bfloat16"] = {b8, f16, f32, f64, i32, i64}
+    inductor_skips["xpu"]["bfloat16"] = {b8, f16, f32, f64, i32, i64}
 
 if TEST_WITH_ROCM:
     # Tensors are not alike
-    inductor_skips["cuda"]["logcumsumexp"] = {f32}
+    inductor_skips["xpu"]["logcumsumexp"] = {f32}
 
 inductor_expected_failures_single_sample = defaultdict(dict)
 
@@ -241,7 +234,7 @@ inductor_expected_failures_single_sample["cpu"] = {
 }
 
 
-inductor_expected_failures_single_sample["cuda"] = {
+inductor_expected_failures_single_sample["xpu"] = {
     "__rdiv__": {b8, f16, f32, f64, i32, i64},
     ("_segment_reduce", "lengths"): {f16, f32, f64},
     "_upsample_bilinear2d_aa": {f16, f32, f64},
@@ -298,7 +291,7 @@ inductor_expected_failures_single_sample["cuda"] = {
 
 inductor_gradient_expected_failures_single_sample = defaultdict(dict)
 
-inductor_gradient_expected_failures_single_sample["cuda"] = {
+inductor_gradient_expected_failures_single_sample["xpu"] = {
     "asin": {f16},
     "atanh": {f16, f32},
     "cumprod": {f16},
@@ -315,7 +308,7 @@ inductor_gradient_expected_failures_single_sample["cuda"] = {
 }
 
 if not TEST_WITH_ROCM:
-    inductor_gradient_expected_failures_single_sample["cuda"]["tanh"] = {f16}
+    inductor_gradient_expected_failures_single_sample["xpu"]["tanh"] = {f16}
 
 if not TEST_MKL:
     inductor_expected_failures_single_sample["cpu"].update(
@@ -329,7 +322,7 @@ if not TEST_MKL:
 
 inductor_should_fail_with_exception = defaultdict(dict)
 inductor_should_fail_with_exception["cpu"] = {}
-inductor_should_fail_with_exception["cuda"] = {}
+inductor_should_fail_with_exception["xpu"] = {}
 
 
 def get_skips_and_xfails(from_dict, xfails=True):
@@ -381,14 +374,14 @@ inductor_override_kwargs = {
     "empty_strided": {"assert_equal": False},
     "new_empty_strided": {"assert_equal": False},
     "randn": {"assert_equal": False},
-    ("masked.softmin", "cuda", f16): {"atol": 1e-4, "rtol": 0.01},
-    ("nn.functional.tanhshrink", "cuda", f16): {"atol": 3e-4, "rtol": 0.001},
-    ("nn.functional.softmin", "cuda", f16): {"atol": 1e-4, "rtol": 0.01},
-    ("special.log_ndtr", "cuda", f64): {"atol": 1e-6, "rtol": 1e-5},
-    ("cummax", "cuda", f16): {"atol": 5e-4, "rtol": 0.002},
-    ("softmax", "cuda", f16): {"atol": 1e-4, "rtol": 0.02},
+    ("masked.softmin", "xpu", f16): {"atol": 1e-4, "rtol": 0.01},
+    ("nn.functional.tanhshrink", "xpu", f16): {"atol": 3e-4, "rtol": 0.001},
+    ("nn.functional.softmin", "xpu", f16): {"atol": 1e-4, "rtol": 0.01},
+    ("special.log_ndtr", "xpu", f64): {"atol": 1e-6, "rtol": 1e-5},
+    ("cummax", "xpu", f16): {"atol": 5e-4, "rtol": 0.002},
+    ("softmax", "xpu", f16): {"atol": 1e-4, "rtol": 0.02},
     ("softmax", "cpu", f16): {"atol": 1e-4, "rtol": 0.02},
-    ("_softmax_backward_data", "cuda", f16): {"atol": 0.008, "rtol": 0.002},
+    ("_softmax_backward_data", "xpu", f16): {"atol": 0.008, "rtol": 0.002},
     "gradient": {"check_gradient": False},  # segfault on check_gradient
     # Following tests failed, and causing subsequent tests failing with unrecoverable CUDA error
     "linalg.solve_triangular": {"check_gradient": False},
@@ -446,14 +439,14 @@ def collection_decorator(fn):
 
 class TestInductorOpInfo(TestCase):
     check_model = check_model
-    check_model_cuda = check_model_cuda
+    check_model_xpu = check_model_xpu
 
     @onlyNativeDeviceTypes
     @suppress_warnings
     @skipCUDAMemoryLeakCheckIf(
         True
     )  # inductor kernels failing this test intermittently
-    @skipCUDAIf(not HAS_CUDA, "Skipped! Triton not found")
+    @skipXPUIf(not HAS_XPU, "Skipped! Triton not found")
     @skipCPUIf(not HAS_CPU, "Skipped! Supported CPU compiler not found")
     @unittest.skipIf(TEST_WITH_ASAN, "Skipped under ASAN")
     @skipIfTorchDynamo("Test uses dynamo already")
@@ -468,14 +461,14 @@ class TestInductorOpInfo(TestCase):
     def test_comprehensive(self, device, dtype, op):
         torch._dynamo.reset()
         with torch.no_grad():
-            torch.cuda.empty_cache()
+            torch.xpu.empty_cache()
         op_name = op.name
         if op.variant_test_name:
             op_name += f".{op.variant_test_name}"
 
         device_type = torch.device(device).type
 
-        assert device_type in ("cuda", "cpu")
+        assert device_type in ("xpu", "cpu")
 
         # with open("test_output.txt", "a") as f:
         #     print(f"CONSIDERING OP {op_name} on {device_type} with {dtype} |
@@ -555,21 +548,21 @@ class TestInductorOpInfo(TestCase):
                 # with open("test_output.txt", "a") as f:
                 #     print(f"RUNNING OP {op_name} on {device_type} with {dtype}", flush=True, file=f)
                 #     print(f"RUNNING OP {op_name} on {device_type} with {dtype}", flush=True)
-                if device_type == "cuda":
+                if device_type == "xpu":
                     # opinfo test case have already place the input on the correct device
-                    # so we don't need do additional copy by setting copy_to_cuda=False
+                    # so we don't need do additional copy by setting copy_to_xpu=False
 
                     no_python = do_nopython(fn, args, kwargs)
                     adjusted_kwargs = {
                         "check_lowp": False,
                         "nopython": no_python,
-                        "copy_to_cuda": False,
+                        "copy_to_xpu": False,
                         "reference_in_float": False,
                         "check_gradient": requires_grad,
                         "check_has_compiled": no_python,
                     }
                     adjusted_kwargs.update(overridden_kwargs)
-                    self.check_model_cuda(
+                    self.check_model_xpu(
                         fn,
                         args,
                         kwargs,
@@ -613,5 +606,4 @@ class TestInductorOpInfo(TestCase):
 instantiate_device_type_tests(TestInductorOpInfo, globals())
 
 if __name__ == "__main__":
-    common.xpu_test_base.customized_skipper()
     run_tests()

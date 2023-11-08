@@ -1,10 +1,3 @@
-
-import os
-import sys
-test_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
-sys.path.append(test_root)
-
-import common.xpu_test_base
 # Owner(s): ["module: inductor"]
 import contextlib
 import importlib
@@ -42,10 +35,12 @@ pytorch_test_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(pytorch_test_dir)
 from inductor.test_torchinductor import (
     check_model,
-    check_model_cuda,
+    check_model_xpu,
     CommonTemplate,
     copy_tests,
     TestFailure,
+    HAS_XPU,
+    onlyXPU,
 )
 
 importlib.import_module("filelock")
@@ -54,19 +49,25 @@ importlib.import_module("filelock")
 test_failures = {
     "test_kwargs_dynamic_shapes": TestFailure(("cpu",)),
     # calling div on only symint args
-    "test_AllenaiLongformerBase_repro_dynamic_shapes": TestFailure(("cpu", "cuda")),
+    "test_AllenaiLongformerBase_repro_dynamic_shapes": TestFailure(("cpu", "xpu")),
+    #
+    # The following tests do not work on XPU yet: 
+    #
+    "test_adaptive_avg_pool_with_output_size_0_dynamic_shapes": TestFailure(("xpu"), is_skip=True),
+    "test_fmin_fmax_dynamic_shapes": TestFailure(("xpu"), is_skip=True),
+    "test_unspec_inputs_dynamic_shapes": TestFailure(("xpu"), is_skip=True),
 }
 
 if TEST_WITH_ROCM:
     # Tensor-likes are not close
     test_failures["test_convolution1_dynamic_shapes"] = TestFailure(
-        ("cpu", "cuda"), is_skip=True
+        ("cpu", "xpu"), is_skip=True
     )
     test_failures["test_convolution3_dynamic_shapes"] = TestFailure(
-        ("cuda"), is_skip=True
+        ("xpu"), is_skip=True
     )
     test_failures["test_expanded_reduction_dynamic_shapes"] = TestFailure(
-        ("cuda"), is_skip=True
+        ("xpu"), is_skip=True
     )
 
 
@@ -92,14 +93,14 @@ if HAS_CPU:
     copy_tests(DynamicShapesCommonTemplate, DynamicShapesCpuTests, "cpu", test_failures)
 
 
-if HAS_CUDA and not TEST_WITH_ASAN:
+if HAS_XPU and not TEST_WITH_ASAN:
 
-    class DynamicShapesCudaTests(TestCase):
-        common = check_model_cuda
-        device = "cuda"
+    class DynamicShapesXpuTests(TestCase):
+        common = check_model_xpu
+        device = "xpu"
 
     copy_tests(
-        DynamicShapesCommonTemplate, DynamicShapesCudaTests, "cuda", test_failures
+        DynamicShapesCommonTemplate, DynamicShapesXpuTests, "xpu", test_failures
     )
 
 
@@ -109,7 +110,7 @@ class TestInductorDynamic(TestCase):
     def setUp(self):
         # HAS_CUDA also checks compute capability to skip tests
         # on older devices
-        if self.device_type == "cuda" and not HAS_CUDA:
+        if self.device_type == "xpu" and not HAS_XPU:
             self.skipTest("Triton not available")
         torch._dynamo.reset()
         super(TestCase, self).setUp()
@@ -182,7 +183,7 @@ class TestInductorDynamic(TestCase):
         res1 = opt(x1)
         self.assertEqual(ref1, res1)
 
-    @onlyCUDA
+    @onlyXPU
     def test_pad_dynamic(self, device):
         def get_same_padding(x: int, k: int, s: int, d: int):
             return max((math.ceil(x / s) - 1) * s + (k - 1) * d + 1 - x, 0)
@@ -243,9 +244,8 @@ class TestInductorDynamic(TestCase):
 instantiate_device_type_tests(TestInductorDynamic, globals())
 
 if __name__ == "__main__":
-    common.xpu_test_base.customized_skipper()
     from torch._dynamo.test_case import run_tests
 
     # Slow on ASAN after https://github.com/pytorch/pytorch/pull/94068
-    if (HAS_CPU or HAS_CUDA) and not TEST_WITH_ASAN:
+    if (HAS_CPU or HAS_XPU) and not TEST_WITH_ASAN:
         run_tests(needs="filelock")
