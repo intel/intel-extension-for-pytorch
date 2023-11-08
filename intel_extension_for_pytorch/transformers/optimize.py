@@ -189,6 +189,7 @@ def model_convert_reference(_model):
         transformers.models.llama.modeling_llama.LlamaAttention,
         transformers.models.gptj.modeling_gptj.GPTJAttention,
         transformers.models.opt.modeling_opt.OPTAttention,
+        transformers.models.bloom.modeling_bloom.BloomAttention,
     ]:
         convert_class(
             _model,
@@ -202,6 +203,7 @@ def model_convert_reference(_model):
         transformers.models.llama.modeling_llama.LlamaDecoderLayer,
         transformers.models.gptj.modeling_gptj.GPTJBlock,
         transformers.models.opt.modeling_opt.OPTDecoderLayer,
+        transformers.models.bloom.modeling_bloom.BloomBlock,
     ]:
         convert_class(
             _model,
@@ -212,6 +214,17 @@ def model_convert_reference(_model):
         )
 
     # special list that has not official transformers design
+    if re.search("bloom", _model.config.architectures[0], re.IGNORECASE):
+        convert_function(
+            transformers.models.bloom.modeling_bloom.BloomModel,
+            "_prepare_attn_mask",
+            _prepare_attn_mask_falcon,
+        )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation,
+        )
     if re.search("falcon", _model.config.architectures[0], re.IGNORECASE) or re.search(
         "rw", _model.config.architectures[0], re.IGNORECASE
     ):
@@ -300,9 +313,11 @@ def get_dummy_input(_model, return_dict=False):
             if return_dict
             else (input_ids.unsqueeze(0), attention_mask.unsqueeze(0), past_key_values)
         )
-    elif re.search(
-        "falcon", _model.config.architectures[0], re.IGNORECASE
-    ) or re.search("rw", _model.config.architectures[0], re.IGNORECASE):
+    elif (
+        re.search("falcon", _model.config.architectures[0], re.IGNORECASE)
+        or re.search("rw", _model.config.architectures[0], re.IGNORECASE)
+        or re.search("bloom", _model.config.architectures[0], re.IGNORECASE)
+    ):
         sample_inputs = (
             {
                 "input_ids": input_ids.unsqueeze(0),
@@ -452,7 +467,7 @@ def optimize_transformers(
     r"""
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
     This API focus on transformers models, especially for generation tasks inference.
-    Well supported model family: Llama, GPT-J, GPT-Neox, OPT, Falcon.
+    Well supported model family: Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
@@ -547,10 +562,11 @@ def optimize_transformers(
             or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
             or re.search("falcon", model.config.architectures[0], re.IGNORECASE)
             or re.search("rw", model.config.architectures[0], re.IGNORECASE)
+            or re.search("bloom", model.config.architectures[0], re.IGNORECASE)
         )
         if not well_supported_model:
             warnings.warn(
-                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, and OPT, fallback to origin model"
+                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, OPT, and Bloom, fallback to origin model"
             )
             return model
 

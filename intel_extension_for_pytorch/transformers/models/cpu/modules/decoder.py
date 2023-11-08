@@ -67,5 +67,13 @@ class _IPEXDecoderLayerCPU(nn.Module):
                     self.linear_add = _IPEXlinearAddCPU(
                         module.linear_add.linear, tpp=tpp, woq=woq
                     )
+        elif re.search("bloom", self.model_backbone, re.IGNORECASE):
+            self.linear_gelu = _IPEXlinearGeluCPU(
+                module.linear_gelu.linear, tpp=tpp, woq=woq
+            )
+            if not self.distributed:
+                self.linear_add = _IPEXlinearAddCPU(
+                    module.linear_add.linear, tpp=tpp, woq=woq
+                )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

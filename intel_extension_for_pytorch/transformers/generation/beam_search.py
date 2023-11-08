@@ -176,6 +176,7 @@ def _beam_search(
             or re.search("OPT", self.config.architectures[0], re.IGNORECASE)
             or re.search("falcon", self.config.architectures[0], re.IGNORECASE)
             or re.search("rw", self.config.architectures[0], re.IGNORECASE)
+            or re.search("bloom", self.config.architectures[0], re.IGNORECASE)
         ):
             first_token = False
             input_bs = input_ids.size()[0]
@@ -259,6 +260,22 @@ def _beam_search(
                                 beam_idx_tmp,
                             )
                             for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
+                    has_position_id = False
+                elif re.search("bloom", self.config.architectures[0], re.IGNORECASE):
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(batch_size * num_beams)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(self.config.n_layer)
                         ]
                     )
                     has_position_id = False

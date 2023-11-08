@@ -19,7 +19,9 @@ class _IPEXAttentionCPU(nn.Module):
                 continue
             setattr(self.__class__, k, getattr(module.__class__, k))
 
-        if not re.search("OPT", self.model_backbone, re.IGNORECASE):
+        if not re.search("OPT", self.model_backbone, re.IGNORECASE) and not re.search(
+            "bloom", self.model_backbone, re.IGNORECASE
+        ):
             self._IPEXROPE = _IPEXRopeCPU(
                 self.max_position_embeddings,
                 self.pos_embd_dim,

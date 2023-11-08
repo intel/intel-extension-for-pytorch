@@ -10,6 +10,7 @@ from ...reference.fusions.mha_fusion import (
 from ..fusions.linear_fusion import (
     _IPEXConcatLinearRef,
 )
+from torch.nn import functional as F
 
 
 def _GPTJAttention_forward(
@@ -530,6 +531,70 @@ def _FalconAttention_forward(
         return output_tensor, present
 
 
+def _BloomAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    residual: torch.Tensor,
+    alibi: torch.Tensor,
+    attention_mask: torch.Tensor,
+    layer_past: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+    head_mask: Optional[torch.Tensor] = None,
+    use_cache: bool = False,
+    output_attentions: bool = False,
+):
+    fused_qkv = self.query_key_value(
+        hidden_states
+    )  # [batch_size, seq_length, 3 x hidden_size]
+
+    # 3 x [batch_size, seq_length, num_heads, head_dim]
+    (query_layer, key_layer, value_layer) = self._split_heads(fused_qkv)
+
+    batch_size, q_length, _, _ = query_layer.shape
+    query_layer = query_layer.contiguous()
+    key_layer = key_layer.contiguous()
+    value_layer = value_layer.contiguous()
+    alibi = (
+        alibi.repeat(1, q_length, 1)
+        .view(batch_size, self.num_heads, q_length, -1)
+        .contiguous()
+    )
+    (context_layer, attention_probs, present) = self._IPEXScaleDotProduct(
+        query_layer,
+        key_layer,
+        value_layer,
+        1 / self.inv_norm_factor,
+        layer_past,
+        head_mask,
+        attention_mask + alibi if attention_mask is not None else alibi,
+    )
+
+    if not use_cache:
+        present = None
+    # change view [batch_size, q_length, num_heads * head_dim]
+    context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+    context_layer = context_layer.view(batch_size, q_length, -1)
+
+    # aggregate results across tp ranks. See here: https://github.com/pytorch/pytorch/issues/76232
+    if self.pretraining_tp > 1 and self.slow_but_exact:
+        slices = self.hidden_size / self.pretraining_tp
+        output_tensor = torch.zeros_like(context_layer)
+        for i in range(self.pretraining_tp):
+            output_tensor = output_tensor + F.linear(
+                context_layer[:, :, int(i * slices) : int((i + 1) * slices)],
+                self.dense.weight[:, int(i * slices) : int((i + 1) * slices)],
+            )
+    else:
+        output_tensor = self.dense(context_layer)
+
+    output_tensor = output_tensor + residual
+
+    outputs = (output_tensor, present)
+    if output_attentions:
+        outputs += (attention_probs,)
+
+    return outputs
+
+
 class _IPEXAttentionRef(nn.Module):
     def __init__(self, module, config, sdp_module_ref, distributed=False):
         super().__init__()
@@ -571,7 +636,9 @@ class _IPEXAttentionRef(nn.Module):
             else 2048
         )
 
-        if not re.search("OPT", self.model_backbone, re.IGNORECASE):
+        if not re.search("OPT", self.model_backbone, re.IGNORECASE) and not re.search(
+            "bloom", self.model_backbone, re.IGNORECASE
+        ):
             if hasattr(module, "rotary_dim"):
                 self.pos_embd_dim = module.rotary_dim
             elif hasattr(module, "rotary_ndims"):
@@ -677,6 +744,7 @@ class _IPEXAttentionRef(nn.Module):
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
         alibi: Optional[torch.Tensor] = None,
+        residual: Optional[torch.Tensor] = None,
     ):
         if re.search("GPTJ", self.model_backbone, re.IGNORECASE):
             return _GPTJAttention_forward(
@@ -726,6 +794,18 @@ class _IPEXAttentionRef(nn.Module):
             return _FalconAttention_forward(
                 self,
                 hidden_states,
+                alibi,
+                attention_mask,
+                layer_past,
+                head_mask,
+                use_cache,
+                output_attentions,
+            )
+        elif re.search("bloom", self.model_backbone, re.IGNORECASE):
+            return _BloomAttention_forward(
+                self,
+                hidden_states,
+                residual,
                 alibi,
                 attention_mask,
                 layer_past,

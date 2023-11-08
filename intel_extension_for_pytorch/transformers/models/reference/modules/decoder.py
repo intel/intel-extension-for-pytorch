@@ -247,6 +247,66 @@ def FalconDecoderLayer_forward(
     return outputs  # hidden_states, present, attentions
 
 
+def BloomBlock_forward(
+    self,
+    hidden_states: torch.Tensor,
+    alibi: torch.Tensor,
+    attention_mask: torch.Tensor,
+    layer_past: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+    head_mask: Optional[torch.Tensor] = None,
+    use_cache: bool = False,
+    output_attentions: bool = False,
+):
+    # hidden_states: [batch_size, seq_length, hidden_size]
+
+    # Layer norm at the beginning of the transformer layer.
+    layernorm_output = self.input_layernorm(hidden_states)
+
+    # Layer norm post the self attention.
+    if self.apply_residual_connection_post_layernorm:
+        residual = layernorm_output
+    else:
+        residual = hidden_states
+
+    # Self attention.
+    attn_outputs = self.self_attention(
+        layernorm_output,
+        residual=residual,
+        layer_past=layer_past,
+        attention_mask=attention_mask,
+        alibi=alibi,
+        head_mask=head_mask,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+    )
+
+    attention_output = attn_outputs[0]
+
+    outputs = attn_outputs[1:]
+
+    layernorm_output = self.post_attention_layernorm(attention_output)
+
+    # Get residual
+    if self.apply_residual_connection_post_layernorm:
+        residual = layernorm_output
+    else:
+        residual = attention_output
+
+    feed_forward_hidden_states = self.linear_gelu(layernorm_output)
+    if not self.distributed:
+        output = self.linear_add(feed_forward_hidden_states, residual)
+    else:
+        intermediate_output = self.mlp.dense_4h_to_h(feed_forward_hidden_states)
+        output = intermediate_output + residual
+
+    if use_cache:
+        outputs = (output,) + outputs
+    else:
+        outputs = (output,) + outputs[1:]
+
+    return outputs  # hidden_states, present, attentions
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -300,6 +360,12 @@ class _IPEXDecoderLayerRef(nn.Module):
                 else:
                     self.linear_add = _IPEXlinearAddRef(self.mlp.dense_4h_to_h)
                 del self.__dict__["_modules"]["mlp"].dense_4h_to_h
+        elif re.search("bloom", self.model_backbone, re.IGNORECASE):
+            self.linear_gelu = _IPEXlinearGeluRef(module.mlp.dense_h_to_4h)
+            del self.__dict__["_modules"]["mlp"].dense_h_to_4h
+            if not self.distributed:
+                self.linear_add = _IPEXlinearAddRef(self.mlp.dense_4h_to_h)
+                del self.__dict__["_modules"]["mlp"].dense_4h_to_h
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -351,6 +417,17 @@ class _IPEXDecoderLayerRef(nn.Module):
             "rw", self.model_backbone, re.IGNORECASE
         ):
             return FalconDecoderLayer_forward(
+                self,
+                hidden_states,
+                alibi,
+                attention_mask,
+                layer_past,
+                head_mask,
+                use_cache,
+                output_attentions,
+            )
+        elif re.search("bloom", self.model_backbone, re.IGNORECASE):
+            return BloomBlock_forward(
                 self,
                 hidden_states,
                 alibi,

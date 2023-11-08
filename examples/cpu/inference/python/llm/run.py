@@ -56,6 +56,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         help="by default it is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
     )
     parser.add_argument("--quantized-model-path", default="")
+    parser.add_argument("--quant-model-name", default="best_model.pt")
 
     parser.add_argument("--dataset", nargs="?", default="NeelNanda/pile-10k")
     parser.add_argument("--ipex-smooth-quant", action="store_true")

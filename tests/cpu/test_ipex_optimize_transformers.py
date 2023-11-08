@@ -136,6 +136,8 @@ class OptimizeTransformersTester(TestCase):
                         )
                     elif re.search(
                         "falcon", model.config.architectures[0], re.IGNORECASE
+                    ) or re.search(
+                        "bloom", model.config.architectures[0], re.IGNORECASE
                     ):
                         assert (
                             type(ipex_m.transformer.h[0].self_attention)
@@ -226,6 +228,21 @@ class OptimizeTransformersTester(TestCase):
         m = transformers.models.falcon.modeling_falcon.FalconForCausalLM(config).eval()
         with torch.no_grad():
             ipex.nn.utils._model_convert.replace_customized_linear_with_linear(m.eval())
+        self.model_replacement_check(m, False, torchcompile=True)
+
+    def test_model_replacement_bloom(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/bloom", return_dict=False
+        )
+
+        m = transformers.models.bloom.modeling_bloom.BloomForCausalLM(config).eval()
+        self.model_replacement_check(m, False)
+
+    def test_model_replacement_bloom_torchcompile(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/bloom", return_dict=False
+        )
+        m = transformers.models.bloom.modeling_bloom.BloomForCausalLM(config).eval()
         self.model_replacement_check(m, False, torchcompile=True)
 
     def _model_replacement_check_woq(self, model):

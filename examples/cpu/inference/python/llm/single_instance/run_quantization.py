@@ -14,6 +14,7 @@ from transformers import AutoConfig
 import intel_extension_for_pytorch as ipex
 
 import sys
+
 sys.path.append(sys.path[0] + '/../../')
 from llm.utils.model_class.llm import EXAMPLE_INPUTS_MODE
 from llm.utils.model_class.llama import LLAMAConfig
@@ -21,6 +22,7 @@ from llm.utils.model_class.gptj import GPTJConfig
 from llm.utils.model_class.gptneox import GPTNEOXConfig
 from llm.utils.model_class.falcon import FALCONConfig
 from llm.utils.model_class.opt import OPTConfig
+from llm.utils.model_class.bloom import BloomConfig
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -125,8 +127,6 @@ else:
 num_beams = 1 if args.greedy else 4
 generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams)
 
-
-# load model
 if args.config_file is None:
     config = AutoConfig.from_pretrained(
         args.model_id, torchscript=True, trust_remote_code=True
@@ -147,6 +147,8 @@ elif re.search("gptneox", config.architectures[0], re.IGNORECASE):
     model = GPTNEOXConfig(args.model_id)
 elif re.search("OPT", config.architectures[0], re.IGNORECASE):
     model = OPTConfig(args.model_id)
+elif re.search("bloom", config.architectures[0], re.IGNORECASE):
+    model = BloomConfig(args.model_id)
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 

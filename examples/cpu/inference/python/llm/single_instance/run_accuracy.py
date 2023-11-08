@@ -17,6 +17,7 @@ MODEL_CLASSES = {
     "opt": (AutoModelForCausalLM, AutoTokenizer),
     "llama": (AutoModelForCausalLM, LlamaTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
+    "bloom": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -356,7 +357,7 @@ if args.accuracy_only:
                         "falcon", self.base_model.config.architectures[0], re.IGNORECASE
                     ) or re.search(
                         "rw", self.base_model.config.architectures[0], re.IGNORECASE
-                    ):
+                    ) or re.search("bloom", self.base_model.config.architectures[0], re.IGNORECASE):
                         beam_idx_tmp = torch.zeros(
                             (2048, int(input_bs)), dtype=torch.long
                         ).contiguous()
@@ -437,6 +438,11 @@ if args.accuracy_only:
                                 self.base_model.config.architectures[0],
                                 re.IGNORECASE,
                             )
+                            or re.search(
+                                "bloom",
+                                self.base_model.config.architectures[0],
+                                re.IGNORECASE,
+                            )
                         ):
                             example_dict = {
                                 "input_ids": inputs,
@@ -476,6 +482,9 @@ if args.accuracy_only:
                         or re.search(
                             "rw", self.base_model.config.architectures[0], re.IGNORECASE
                         )
+                        or re.search(
+                            "bloom", self.base_model.config.architectures[0], re.IGNORECASE
+                        )
                     ):
                         self.model(
                             inputs,
@@ -510,6 +519,9 @@ if args.accuracy_only:
                 )
                 or re.search(
                     "rw", self.base_model.config.architectures[0], re.IGNORECASE
+                )
+                or re.search(
+                    "bloom", self.base_model.config.architectures[0], re.IGNORECASE
                 )
             ):
                 with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
