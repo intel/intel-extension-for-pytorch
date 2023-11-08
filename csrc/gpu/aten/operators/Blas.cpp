@@ -1037,6 +1037,64 @@ at::Tensor trans_matmul_div_add(
       result, tensor1, tensor2, false, attr, is_fused);
 }
 
+// res = (m1 * m2.transpose() + accumul) / oscale
+at::Tensor trans_matmul_add_div(
+    const at::Tensor& tensor2,
+    int64_t dim1,
+    int64_t dim2,
+    const at::Tensor& tensor1,
+    Scalar oscale,
+    Tensor& accumul,
+    Scalar alpha) {
+  RECORD_FUNCTION(
+      "trans_matmul_add_div",
+      std::vector<c10::IValue>({tensor1, tensor2, accumul}));
+  TORCH_CHECK(oscale.to<float>() != 0, "expected non-zero value of oscale");
+  Attr attr;
+  attr.append_scale_binary(
+      attr.kind_with_binary_add, accumul, alpha.to<float>());
+  attr.append_post_eltwise( // append post linear
+      /* scale */ 1.f,
+      /* alpha */ 1.f / oscale.to<float>(),
+      /* beta */ 0.f,
+      attr.kind_with_linear);
+  bool is_fused;
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
+}
+
+// res = ((m1 * m2.transpose() + accumul1) / oscale) + accumul2
+at::Tensor trans_matmul_add_div_add(
+    const at::Tensor& tensor2,
+    int64_t dim1,
+    int64_t dim2,
+    const at::Tensor& tensor1,
+    Scalar oscale,
+    Tensor& accumul1,
+    Scalar alpha1,
+    Tensor& accumul2,
+    Scalar alpha2) {
+  RECORD_FUNCTION(
+      "trans_matmul_add_div",
+      std::vector<c10::IValue>({tensor1, tensor2, accumul1, accumul2}));
+  TORCH_CHECK(oscale.to<float>() != 0, "expected non-zero value of oscale");
+  Attr attr;
+  attr.append_scale_binary(
+      attr.kind_with_binary_add, accumul1, alpha1.to<float>());
+  attr.append_post_eltwise( // append post linear
+      /* scale */ 1.f,
+      /* alpha */ 1.f / oscale.to<float>(),
+      /* beta */ 0.f,
+      attr.kind_with_linear);
+  attr.append_scale_binary(
+      attr.kind_with_binary_add, accumul2, alpha2.to<float>());
+  bool is_fused;
+  Tensor result;
+  return matmul_fusion_variants(
+      result, tensor1, tensor2, false, attr, is_fused);
+}
+
 at::Tensor t_matmul_silu(const at::Tensor& tensor2, const at::Tensor& tensor1) {
   RECORD_FUNCTION(
       "t_matmul_silu", std::vector<c10::IValue>({tensor1, tensor2}));
@@ -1256,8 +1314,10 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("t_matmul_add_gelu", t_matmul_add_gelu);
   IPEX_OP_REGISTER("t_matmul_add_add", t_matmul_add_add);
   IPEX_OP_REGISTER("trans_matmul_div", trans_matmul_div_scalar);
-  IPEX_OP_REGISTER("trans_matmul_div.Tensor", trans_matmul_div_tensor)
+  IPEX_OP_REGISTER("trans_matmul_div.Tensor", trans_matmul_div_tensor);
   IPEX_OP_REGISTER("trans_matmul_div_add", trans_matmul_div_add);
+  IPEX_OP_REGISTER("trans_matmul_add_div", trans_matmul_add_div);
+  IPEX_OP_REGISTER("trans_matmul_add_div_add", trans_matmul_add_div_add);
   IPEX_OP_REGISTER_MATMUL(sqrt);
   IPEX_OP_REGISTER_MATMUL(abs);
   IPEX_OP_REGISTER_MATMUL(tanh);

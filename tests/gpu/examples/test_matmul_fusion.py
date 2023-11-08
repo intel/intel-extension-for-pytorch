@@ -55,6 +55,24 @@ class TransMatmulAddAdd(torch.nn.Module):
         return torch.add(torch.matmul(m1, m2.t()), add1, alpha=2.0) + add2
 
 
+class TransMatmulAddDiv(torch.nn.Module):
+    def __init__(self):
+        super(TransMatmulAddDiv, self).__init__()
+
+    def forward(self, m1, m2, add):
+        return torch.div(torch.add(torch.matmul(m1, m2.t()), add), 2.0)
+
+
+class TransMatmulAddDivAdd(torch.nn.Module):
+    def __init__(self):
+        super(TransMatmulAddDivAdd, self).__init__()
+
+    def forward(self, m1, m2, add1, add2):
+        return torch.add(
+            torch.div(torch.add(torch.matmul(m1, m2.t()), add1), 2.0), add2
+        )
+
+
 class LinearReLU(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearReLU, self).__init__()
@@ -312,6 +330,50 @@ class TestNNMethod(TestCase):
             add2 = torch.randn(shape[2], device=cpu_device)
 
             model = TransMatmulAddAdd()
+            raw = model(m1, m2, add1, add2)
+            print("raw: ", raw)
+
+            m1_dpcpp = m1.to(dpcpp_device)
+            m2_dpcpp = m2.to(dpcpp_device)
+            add1_dpcpp = add1.to(dpcpp_device)
+            add2_dpcpp = add2.to(dpcpp_device)
+
+            modelJit = torch.jit.script(model)
+            with torch.no_grad():
+                real = modelJit(m1_dpcpp, m2_dpcpp, add1_dpcpp, add2_dpcpp)
+                print("real:", real.to(cpu_device))
+            self.assertEqual(raw, real.to(cpu_device))
+            del modelJit
+
+    def test_trans_matmul_add_div(self, dtype=torch.float):
+        for shape in linear_binary_shapes:
+            m1 = torch.randn(shape[0], device=cpu_device)
+            m2 = torch.randn(shape[1], device=cpu_device)
+            add = torch.randn(shape[2], device=cpu_device)
+
+            model = TransMatmulAddDiv()
+            raw = model(m1, m2, add)
+            print("raw: ", raw)
+
+            m1_dpcpp = m1.to(dpcpp_device)
+            m2_dpcpp = m2.to(dpcpp_device)
+            add_dpcpp = add.to(dpcpp_device)
+
+            modelJit = torch.jit.script(model)
+            with torch.no_grad():
+                real = modelJit(m1_dpcpp, m2_dpcpp, add_dpcpp)
+                print("real:", real.to(cpu_device))
+            self.assertEqual(raw, real.to(cpu_device))
+            del modelJit
+
+    def test_trans_matmul_add_div_add(self, dtype=torch.float):
+        for shape in linear_binary_shapes:
+            m1 = torch.randn(shape[0], device=cpu_device)
+            m2 = torch.randn(shape[1], device=cpu_device)
+            add1 = torch.randn(shape[2], device=cpu_device)
+            add2 = torch.randn(shape[2], device=cpu_device)
+
+            model = TransMatmulAddDivAdd()
             raw = model(m1, m2, add1, add2)
             print("raw: ", raw)
 

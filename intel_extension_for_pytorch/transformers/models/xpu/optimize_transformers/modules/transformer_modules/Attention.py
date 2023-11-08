@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import torch.distributed as dist
 from .._transformer_configuration import IPEXTransformerConfig
 import math
@@ -134,15 +135,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         return query, key, value
 
     # ################################# compute_qkv #################################################
-    def compute_qkv_gemm_naive(self, hidden_states, query, key, value):
-        query = self.q_proj(hidden_states)
-        key = self.k_proj(hidden_states)
-        value = self.v_proj(hidden_states)
-        return query, key, value
-
     def compute_qkv_gemm(self, hidden_states, query, key, value):
-        # if not ipex._C._has_2d_block_array(0):
-        #     return self.compute_qkv_gemm_naive(hidden_states, query, key, value)
         torch.ops.torch_ipex.mm_qkv_out(
             hidden_states, self.qkv_proj.weight, self.qkv_proj.bias, query, key, value
         )
@@ -307,7 +300,6 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     def compute_sdp_onednn(
         self, query, key, value, attention_mask, head_mask, alibi, first_token=False
     ):
-        # FIXME, should support op fusion with onednn later
         if alibi is not None:
             bs_beam, num_heads, q_length, dim = query.shape
             _, _, kv_length, _ = key.shape
@@ -353,30 +345,62 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
             # matmul: [bs_beam * num_heads, q_length, head_dim]
             attn_output = torch.matmul(attention_probs, value)
         else:
-            attn_weights = torch.matmul(query, key.transpose(-1, -2))
-
             if self.use_casual_mask:
-                # convert the casual mask dtype to target dtype, this should only happen once
-                IPEXTransformerAttnNaive.attention_mask.to(attn_weights.dtype)
                 query_length, key_length = query.size(-2), key.size(-2)
                 casual_mask = IPEXTransformerAttnNaive.attention_mask[
                     :, :, key_length - query_length : key_length, :key_length
                 ]
-                # # TODO: Maybe we can move this line to the initializer
-                # casual_mask *= -66504.0
-                # replace torch.where as torch.add might helps with the host overhead
-                attn_weights += casual_mask
-            if self.scale_attn:
-                attn_weights /= self.scale_attn
-            if attention_mask is not None:
-                attn_weights += attention_mask
-                # the attn_weights should anyway bigger than dtype.min, I wonder if this is necessary
-                attn_weights = torch.max(
-                    attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min)
-                )
-            attn_weights = nn.functional.softmax(
-                attn_weights, dim=-1, dtype=torch.float
-            ).to(query.dtype)
+                casual_mask = casual_mask.contiguous()
+                if self.scale_attn is not None:
+                    if attention_mask is not None:
+                        attn_weights = torch.ops.torch_ipex.trans_matmul_add_div_add(
+                            key,
+                            0,
+                            0,
+                            query,
+                            self.scale_attn_scalar,
+                            casual_mask,
+                            1.0,
+                            attention_mask,
+                            1.0,
+                        )
+                    else:
+                        attn_weights = torch.ops.torch_ipex.trans_matmul_add_div(
+                            key, 0, 0, query, self.scale_attn_scalar, casual_mask, 1.0
+                        )
+                else:
+                    if attention_mask is not None:
+                        attn_weights = torch.ops.torch_ipex.t_matmul_add_add(
+                            key, query, casual_mask, 1.0, attention_mask, 1.0
+                        )
+                    else:
+                        attn_weights = torch.ops.torch_ipex.t_matmul_add(
+                            key, query, casual_mask, 1.0
+                        )
+            else:
+                if self.scale_attn is not None:
+                    if attention_mask is not None:
+                        attn_weights = torch.ops.torch_ipex.trans_matmul_div_add(
+                            key,
+                            0,
+                            0,
+                            query,
+                            self.scale_attn_scalar,
+                            attention_mask,
+                            1.0,
+                        )
+                    else:
+                        attn_weights = torch.ops.torch_ipex.trans_matmul_div(
+                            key, 0, 0, query, self.scale_attn_scalar
+                        )
+                else:
+                    if attention_mask is not None:
+                        attn_weights = torch.ops.torch_ipex.t_matmul_add(
+                            key, query, attention_mask, 1.0
+                        )
+                    else:
+                        attn_weights = torch.ops.torch_ipex.trans_matmul(key, query)
+            attn_weights = nn.functional.softmax(attn_weights, dim=-1).to(query.dtype)
             attn_weights = self.attn_drop(attn_weights)
             if head_mask is not None:
                 attn_weights = attn_weights * head_mask

@@ -41,6 +41,7 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
             self.scale_attn = torch.sqrt(
                 torch.tensor(self.head_dim, device=self.config.device)
             )
+            self.scale_attn_scalar = self.scale_attn.item()
         else:
             self.scale_attn = None
 
