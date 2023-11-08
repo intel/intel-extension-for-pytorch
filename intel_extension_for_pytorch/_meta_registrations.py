@@ -649,3 +649,12 @@ def meta_rotary_position_embedding_out(
     rotary_ndims,
 ):
     return t_in
+
+
+@register_meta("rmsnorm")
+def meta_rmsnorm(
+    input,
+    weight,
+    eps,
+):
+    return input.new_empty(input.shape)
