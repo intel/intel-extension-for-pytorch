@@ -498,8 +498,8 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
                     new_m.tpp_fallback = True
                 else:
                     new_m.tpp_fallback = False
-                params_attr[m.weight] = params_attr.pop(weight_key)
-                del weight_key
+                    params_attr[m.weight] = params_attr.pop(weight_key)
+                    del weight_key
 
             else:
                 param_wrapper.prepack(m, is_training)
