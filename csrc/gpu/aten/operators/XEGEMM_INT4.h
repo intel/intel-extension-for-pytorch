@@ -446,9 +446,12 @@ class HGEMMXetla_INT4 final {
           return out->scalar_type() != kHalf;
         }))
       return *this;
+    bool has_split3 =
+        (epilogue_type_[0] == SPLIT3 ||
+         (epilogue_type_[0] == BIAS && epilogue_type_[1] == SPLIT3));
     if (!(input_->dim() == 2 &&
-          (weight_->dim() == 2 ||
-           (epilogue_type_[0] == SPLIT3 && weight_->dim() == 3)) &&
+          ((!has_split3 && weight_->dim() == 2) ||
+           (has_split3 && weight_->dim() == 3)) &&
           std::all_of(outputs_.begin(), outputs_.end(), [](Tensor* out) {
             return out->dim() == 2;
           })))
@@ -468,15 +471,19 @@ class HGEMMXetla_INT4 final {
     if (calib_gz_ != 0 && calib_gz_ != 128)
       return *this;
     // Set correct n dim.
-    if (epilogue_type_[0] == SPLIT3)
+    if (has_split3)
       n_ = b_sizes[2] * 2;
     else
       n_ = b_sizes[1] * 2;
     for (int i = 0; i < num_epilogues_; i++) {
       switch (epilogue_type_[i]) {
         case BIAS: {
-          bool ck = epilogues_[i]->dim() == 1 && epilogues_[i]->is_contiguous();
-          ck = ck && epilogues_[i]->sizes()[0] == n_;
+          bool ck = ((!has_split3 && epilogues_[i]->dim() == 1) ||
+                     (has_split3 && epilogues_[i]->dim() == 2)) &&
+              epilogues_[i]->is_contiguous();
+          ck = ck &&
+              ((!has_split3 && epilogues_[i]->sizes()[0] == n_) ||
+               (has_split3 && epilogues_[i]->sizes()[1] == n_));
           ck = ck && epilogues_[i]->scalar_type() == kHalf;
           if (!ck)
             return *this;
