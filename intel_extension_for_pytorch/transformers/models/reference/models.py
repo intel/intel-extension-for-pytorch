@@ -47,6 +47,14 @@ def GPTJForCausalLM_forward(
         torch.cuda.set_device(self.transformer.first_device)
         hidden_states = hidden_states.to(self.lm_head.weight.device)
 
+    if (
+        hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and hidden_states.size(1) != 1
+    ):
+        hidden_states = hidden_states[:, -1:, :]
+
     # make sure sampling in fp16 works correctly and
     # compute loss in fp32 to match with mesh-tf version
     # https://github.com/EleutherAI/gpt-neo/blob/89ce74164da2fb16179106f54e2269b5da8db333/models/gpt2/gpt2.py#L179
@@ -119,6 +127,14 @@ def LlamaForCausalLM_forward(
     )
 
     hidden_states = outputs[0]
+    if (
+        hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and hidden_states.size(1) != 1
+    ):
+        hidden_states = hidden_states[:, -1:, :]
+
     logits = self.lm_head(hidden_states)
 
     loss = None
@@ -178,6 +194,13 @@ def GPTNeoXForCausalLM_forward(
     )
 
     hidden_states = outputs[0]
+    if (
+        hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and hidden_states.size(1) != 1
+    ):
+        hidden_states = hidden_states[:, -1:, :]
     lm_logits = self.embed_out(hidden_states)
 
     lm_loss = None
@@ -244,8 +267,15 @@ def OPTForCausalLM_forward(
         output_hidden_states=output_hidden_states,
         return_dict=return_dict,
     )
-
-    logits = self.lm_head(outputs[0]).contiguous()
+    hidden_states = outputs[0]
+    if (
+        hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and hidden_states.size(1) != 1
+    ):
+        hidden_states = hidden_states[:, -1:, :]
+    logits = self.lm_head(hidden_states).contiguous()
 
     loss = None
     if labels is not None:

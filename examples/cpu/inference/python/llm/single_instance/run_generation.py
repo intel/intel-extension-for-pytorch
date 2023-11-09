@@ -98,6 +98,10 @@ else:
     )
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
+
+if not hasattr(config, "lm_head_generation"):
+    config.lm_head_generation = True
+
 model = model_class[0].from_pretrained(
     args.model_id,
     torch_dtype=amp_dtype,
