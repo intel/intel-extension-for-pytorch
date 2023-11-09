@@ -19,7 +19,7 @@ System Requirements
    * - Hardware
      - 4th Gen Intel® Xeon® Scalable processors
    * - OS
-     - CentOS/RHEL 8
+     - CentOS/RHEL 8, Ubuntu 22.04 (Docker)
    * - Linux Kernel
      - Intel® 4th Gen Xeon® Platinum: 5.15.0; Intel® 4th Gen Xeon® Max: 5.19.0
    * - Python
@@ -27,35 +27,8 @@ System Requirements
    * - Compiler
      - Preset in the compilation script below, if compile from source
 
-Installation
-============
-
-Prebuilt wheel file are available for Python 3.9. Alternatively, a script is provided to compile from source.
-
-Install From Prebuilt Wheel Files
----------------------------------
-
-.. code:: shell
-
-  python -m pip install torch==2.2.0.dev20231006+cpu torchvision==0.17.0.dev20231006+cpu torchaudio==2.2.0.dev20231006+cpu --index-url https://download.pytorch.org/whl/nightly/cpu
-  python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.2.0.dev0%2Bcpu.llm-cp39-cp39-linux_x86_64.whl
-  conda install -y libstdcxx-ng=12 -c conda-forge
-
-Compile From Source
--------------------
-
-.. code:: shell
-
-  wget https://github.com/intel/intel-extension-for-pytorch/raw/llm_feature_branch/scripts/compile_bundle.sh
-  bash compile_bundle.sh
-
-It is recommended to build a docker image with `dockerfile <https://github.com/intel/intel-extension-for-pytorch/tree/llm_feature_branch/docker/>`_.
-
-Launch Examples
-===============
-
 Supported Models
-----------------
+================
 
 The following models are supported. When running the example scripts, it is needed to replace the place holder *<MODEL_ID>* in example launch commands with:
 
@@ -76,61 +49,10 @@ The following models are supported. When running the example scripts, it is need
 
    The ``config.json`` file needs to be modified to work with the ``modeling_falcon.py`` script. In the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for BF16, but must for INT8.
 
-Install Dependencies
---------------------
+Environment Setup
+=================
 
-.. code:: shell
-
-  conda install -y gperftools -c conda-forge
-  conda install -y intel-openmp
-  python -m pip install transformers==4.31.0 cpuid accelerate datasets sentencepiece protobuf==3.20.3
-
-  # Used for accuracy test only
-  git clone https://github.com/EleutherAI/lm-evaluation-harness
-  cd lm-evaluation-harness
-  pip install -e .
-
-  # [Optional] install neural-compressor for GPT-J INT8 only
-  python -m pip install neural-compressor==2.3.1
-
-  # [Optional] The following is only for DeepSpeed case
-  #Install oneccl-bind-pt(also named torch-ccl)
-  git clone https://github.com/intel/torch-ccl.git
-  cd torch-ccl && git checkout ccl_torch_dev_0905
-  git submodule sync && git submodule update --init --recursive
-  python setup.py install
-  cd ../
-  #Install DeepSpeed
-  git clone https://github.com/delock/DeepSpeedSYCLSupport
-  cd DeepSpeedSYCLSupport
-  git checkout gma/run-opt-branch
-  python -m pip install -r requirements/requirements.txt
-  python setup.py install
-  cd ../
-  git clone https://github.com/oneapi-src/oneCCL.git
-  cd oneCCL
-  mkdir build
-  cd build
-  cmake ..
-  make -j install
-  source _install/env/setvars.sh
-  cd ../..
-
-.. note::
-
-  If an error complaining *ninja* is not found when compiling deepspeed, please use conda and pip command to uninstall all ninja packages, and reinstall it with pip.
-
-Run Examples
-------------
-
-Example python scripts are provided in Github repo `example directory <https://github.com/intel/intel-extension-for-pytorch/tree/llm_feature_branch/examples/cpu/inference/python/llm/>`_ to launch inference workloads with supported models.
-
-Preparations
-^^^^^^^^^^^^
-
-A *prompt.json* file is required to run performance benchmarks. You can use the command below to download a sample file. For simple testing, an argument *\-\-prompt* is provided by the scripts to take a text for processing.
-
-To get these Python scripts, you can either get the entire Github repository down with git command, or use the following wget commands to get individual scripts.
+1. Get Intel® Extension for PyTorch* source code
 
 .. code:: shell
 
@@ -140,27 +62,43 @@ To get these Python scripts, you can either get the entire Github repository dow
   git checkout llm_feature_branch
   cd examples/cpu/inference/python/llm
 
-  # Get the sample prompt.json
-  # Make sure the downloaded prompt.json file is under the same directory as that of the example python scripts.
-  wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
-
-The following environment variables are required to achieve a good performance on 4th Gen Intel® Xeon® Scalable processors.
+1.a Use provided `Dockerfile` to build a docker image.
 
 .. code:: shell
 
-  export LD_PRELOAD=${CONDA_PREFIX}/lib/libstdc++.so.6
+  docker build -t ipex-llm:dev .
+  
+  # Run the container with command below
+  docker run --rm -it --privileged ipex-llm:dev bash
+  
+  # In docker environment, make sure you are in the llm examples directory.
+  cd llm
 
-  # Setup environment variables for performance on Xeon
-  export KMP_BLOCKTIME=INF
-  export KMP_TPAUSE=0
-  export KMP_SETTINGS=1
-  export KMP_FORJOIN_BARRIER_PATTERN=dist,dist
-  export KMP_PLAIN_BARRIER_PATTERN=dist,dist
-  export KMP_REDUCTION_BARRIER_PATTERN=dist,dist
-  export LD_PRELOAD=${LD_PRELOAD}:${CONDA_PREFIX}/lib/libiomp5.so # Intel OpenMP
+1.b Alternatively, you can take advantage of an environment configuration script to setup the environment.
 
-  # Tcmalloc is a recommended malloc implementation that emphasizes fragmentation avoidance and scalable concurrency support.
-  export LD_PRELOAD=${LD_PRELOAD}:${CONDA_PREFIX}/lib/libtcmalloc.so
+.. code:: shell
+
+  # GCC 12.3 is required
+  # Create environment
+  conda create -n llm python=3.9 -y
+  conda activate llm
+  
+  bash ./tools/env_setup.sh
+
+2. Once an environment is configured with either method above, set necessary environment variables with an environment variables activation script and download the sample `prompt.json`.
+
+The *prompt.json* file is required to run performance benchmarks. You can use the command below to download a sample file. For simple testing, an argument *\-\-prompt* is provided by the scripts to take a text for processing.
+
+.. code:: shell
+
+  # Activate environment variables
+  source ./tools/env_activate.sh
+  wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
+
+Run Examples
+============
+
+Example python scripts are provided in Github repo `example directory <https://github.com/intel/intel-extension-for-pytorch/tree/llm_feature_branch/examples/cpu/inference/python/llm/>`_ to launch inference workloads with supported models.
 
 Single Instance
 ^^^^^^^^^^^^^^^
