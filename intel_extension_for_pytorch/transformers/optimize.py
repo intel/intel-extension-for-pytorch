@@ -1,6 +1,5 @@
 import torch
 import copy
-import re
 import warnings
 import pkg_resources
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
@@ -214,7 +213,7 @@ def model_convert_reference(_model):
         )
 
     # special list that has not official transformers design
-    if re.search("bloom", _model.config.architectures[0], re.IGNORECASE):
+    if _model.config.architectures[0] == "BloomForCausalLM":
         convert_function(
             transformers.models.bloom.modeling_bloom.BloomModel,
             "_prepare_attn_mask",
@@ -225,8 +224,9 @@ def model_convert_reference(_model):
             "prepare_inputs_for_generation",
             prepare_inputs_for_generation,
         )
-    if re.search("falcon", _model.config.architectures[0], re.IGNORECASE) or re.search(
-        "rw", _model.config.architectures[0], re.IGNORECASE
+    if (
+        _model.config.architectures[0] == "FalconForCausalLM"
+        or _model.config.architectures[0] == "RWForCausalLM"
     ):
         with torch.no_grad():
             ipex.nn.utils._model_convert.replace_customized_linear_with_linear(
@@ -303,7 +303,7 @@ def get_dummy_input(_model, return_dict=False):
     input_ids = torch.ones(32).to(torch.long)
     attention_mask = torch.ones(len(input_ids))
     position_ids = torch.arange(len(input_ids))
-    if re.search("opt", _model.config.architectures[0], re.IGNORECASE):
+    if _model.config.architectures[0] == "OPTForCausalLM":
         sample_inputs = (
             {
                 "input_ids": input_ids.unsqueeze(0),
@@ -314,9 +314,9 @@ def get_dummy_input(_model, return_dict=False):
             else (input_ids.unsqueeze(0), attention_mask.unsqueeze(0), past_key_values)
         )
     elif (
-        re.search("falcon", _model.config.architectures[0], re.IGNORECASE)
-        or re.search("rw", _model.config.architectures[0], re.IGNORECASE)
-        or re.search("bloom", _model.config.architectures[0], re.IGNORECASE)
+        _model.config.architectures[0] == "FalconForCausalLM"
+        or _model.config.architectures[0] == "RWForCausalLM"
+        or _model.config.architectures[0] == "BloomForCausalLM"
     ):
         sample_inputs = (
             {
@@ -556,13 +556,13 @@ def optimize_transformers(
             return model
 
         well_supported_model = (
-            re.search("GPTJ", model.config.architectures[0], re.IGNORECASE)
-            or re.search("llama", model.config.architectures[0], re.IGNORECASE)
-            or re.search("gptneox", model.config.architectures[0], re.IGNORECASE)
-            or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
-            or re.search("falcon", model.config.architectures[0], re.IGNORECASE)
-            or re.search("rw", model.config.architectures[0], re.IGNORECASE)
-            or re.search("bloom", model.config.architectures[0], re.IGNORECASE)
+            model.config.architectures[0] == "GPTJForCausalLM"
+            or model.config.architectures[0] == "LlamaForCausalLM"
+            or model.config.architectures[0] == "GPTNeoXForCausalLM"
+            or model.config.architectures[0] == "OPTForCausalLM"
+            or model.config.architectures[0] == "FalconForCausalLM"
+            or model.config.architectures[0] == "RWForCausalLM"
+            or model.config.architectures[0] == "BloomForCausalLM"
         )
         if not well_supported_model:
             warnings.warn(

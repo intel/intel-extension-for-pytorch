@@ -10,7 +10,6 @@ from transformers.generation.logits_process import LogitsProcessorList
 from transformers.generation.streamers import BaseStreamer
 from transformers.utils import ModelOutput
 import time
-import re
 
 
 class GreedySearchDecoderOnlyOutput(ModelOutput):
@@ -150,21 +149,23 @@ def _greedy_search(
 
         # prepare model inputs
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
+
+        self.model_backbone = self.config.architectures[0]
         if (
-            re.search("GPTJ", self.config.architectures[0])
-            or re.search("llama", self.config.architectures[0], re.IGNORECASE)
-            or re.search("gptneox", self.config.architectures[0], re.IGNORECASE)
-            or re.search("OPT", self.config.architectures[0], re.IGNORECASE)
-            or re.search("falcon", self.config.architectures[0], re.IGNORECASE)
-            or re.search("rw", self.config.architectures[0], re.IGNORECASE)
-            or re.search("bloom", self.config.architectures[0], re.IGNORECASE)
+            self.model_backbone == "GPTJForCausalLM"
+            or self.model_backbone == "LlamaForCausalLM"
+            or self.model_backbone == "GPTNeoXForCausalLM"
+            or self.model_backbone == "OPTForCausalLM"
+            or self.model_backbone == "FalconForCausalLM"
+            or self.model_backbone == "RWForCausalLM"
+            or self.model_backbone == "BloomForCausalLM"
         ):
             first_token = False
             input_bs = input_ids.size()[0]
             if model_inputs["past_key_values"] is None:
                 first_token = True
             if first_token:
-                if re.search("GPTJ", self.config.architectures[0]):
+                if self.model_backbone == "GPTJForCausalLM":
                     beam_idx_tmp = torch.zeros(
                         (2048, int(input_bs)), dtype=torch.long
                     ).contiguous()
@@ -179,7 +180,7 @@ def _greedy_search(
                             for i in range(self.config.n_layer)
                         ]
                     )
-                elif re.search("llama", self.config.architectures[0], re.IGNORECASE):
+                elif self.model_backbone == "LlamaForCausalLM":
                     beam_idx_tmp = torch.zeros(
                         (2048, int(input_bs)), dtype=torch.long
                     ).contiguous()
@@ -194,7 +195,7 @@ def _greedy_search(
                             for i in range(self.config.num_hidden_layers)
                         ]
                     )
-                elif re.search("gptneox", self.config.architectures[0], re.IGNORECASE):
+                elif self.model_backbone == "GPTNeoXForCausalLM":
                     beam_idx_tmp = torch.zeros(
                         (2048, int(input_bs)), dtype=torch.long
                     ).contiguous()
@@ -209,7 +210,7 @@ def _greedy_search(
                             for i in range(self.config.num_hidden_layers)
                         ]
                     )
-                elif re.search("OPT", self.config.architectures[0], re.IGNORECASE):
+                elif self.model_backbone == "OPTForCausalLM":
                     beam_idx_tmp = torch.zeros(
                         (2048, int(input_bs)), dtype=torch.long
                     ).contiguous()
@@ -224,9 +225,10 @@ def _greedy_search(
                             for i in range(self.config.num_hidden_layers)
                         ]
                     )
-                elif re.search(
-                    "falcon", self.config.architectures[0], re.IGNORECASE
-                ) or re.search("rw", self.config.architectures[0], re.IGNORECASE):
+                elif (
+                    self.model_backbone == "FalconForCausalLM"
+                    or self.model_backbone == "RWForCausalLM"
+                ):
                     beam_idx_tmp = torch.zeros(
                         (2048, int(input_bs)), dtype=torch.long
                     ).contiguous()
@@ -241,7 +243,7 @@ def _greedy_search(
                             for i in range(self.config.num_hidden_layers)
                         ]
                     )
-                elif re.search("bloom", self.config.architectures[0], re.IGNORECASE):
+                elif self.model_backbone == "BloomForCausalLM":
                     beam_idx_tmp = torch.zeros(
                         (2048, int(input_bs)), dtype=torch.long
                     ).contiguous()

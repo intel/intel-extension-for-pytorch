@@ -2,7 +2,6 @@ import torch
 from torch import nn
 from typing import Optional, Tuple, Union
 import math
-import re
 from ...reference.fusions.mha_fusion import (
     _IPEXRopeRef,
     _IPEXScaleDotProductRef,
@@ -636,8 +635,9 @@ class _IPEXAttentionRef(nn.Module):
             else 2048
         )
 
-        if not re.search("OPT", self.model_backbone, re.IGNORECASE) and not re.search(
-            "bloom", self.model_backbone, re.IGNORECASE
+        if (
+            self.model_backbone != "OPTForCausalLM"
+            and self.model_backbone != "BloomForCausalLM"
         ):
             if hasattr(module, "rotary_dim"):
                 self.pos_embd_dim = module.rotary_dim
@@ -655,8 +655,9 @@ class _IPEXAttentionRef(nn.Module):
                 self.model_backbone,
             )
 
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or re.search(
-            "LLAMA", self.model_backbone, re.IGNORECASE
+        if (
+            self.model_backbone == "GPTJForCausalLM"
+            or self.model_backbone == "LlamaForCausalLM"
         ):
             if (
                 hasattr(module, "q_proj")
@@ -685,8 +686,9 @@ class _IPEXAttentionRef(nn.Module):
 
         self._IPEXScaleDotProduct = _IPEXScaleDotProductRef(module, config)
 
-        if re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
-            "rw", self.model_backbone, re.IGNORECASE
+        if (
+            self.model_backbone == "FalconForCausalLM"
+            or self.model_backbone == "RWForCausalLM"
         ):
             self.split_size = self.hidden_size
             self.hidden_dropout = config.hidden_dropout
@@ -746,7 +748,7 @@ class _IPEXAttentionRef(nn.Module):
         alibi: Optional[torch.Tensor] = None,
         residual: Optional[torch.Tensor] = None,
     ):
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE):
+        if self.model_backbone == "GPTJForCausalLM":
             return _GPTJAttention_forward(
                 self,
                 hidden_states,
@@ -757,7 +759,7 @@ class _IPEXAttentionRef(nn.Module):
                 use_cache,
                 output_attentions,
             )
-        elif re.search("llama", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "LlamaForCausalLM":
             return _LlamaAttention_forward(
                 self,
                 hidden_states,
@@ -767,7 +769,7 @@ class _IPEXAttentionRef(nn.Module):
                 output_attentions,
                 use_cache,
             )
-        elif re.search("gptneox", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "GPTNeoXForCausalLM":
             return _GPTNeoXAttention_forward(
                 self,
                 hidden_states,
@@ -778,7 +780,7 @@ class _IPEXAttentionRef(nn.Module):
                 use_cache,
                 output_attentions,
             )
-        elif re.search("OPT", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "OPTForCausalLM":
             return _OPTAttention_forward(
                 self,
                 hidden_states,
@@ -788,8 +790,9 @@ class _IPEXAttentionRef(nn.Module):
                 layer_head_mask,
                 output_attentions,
             )
-        elif re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
-            "rw", self.model_backbone, re.IGNORECASE
+        elif (
+            self.model_backbone == "FalconForCausalLM"
+            or self.model_backbone == "RWForCausalLM"
         ):
             return _FalconAttention_forward(
                 self,
@@ -801,7 +804,7 @@ class _IPEXAttentionRef(nn.Module):
                 use_cache,
                 output_attentions,
             )
-        elif re.search("bloom", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "BloomForCausalLM":
             return _BloomAttention_forward(
                 self,
                 hidden_states,

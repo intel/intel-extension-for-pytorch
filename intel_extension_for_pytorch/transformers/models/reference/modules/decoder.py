@@ -1,7 +1,6 @@
 import torch
 from torch import nn
 from typing import Optional, Tuple, Union
-import re
 from ...reference.fusions.linear_fusion import (
     _IPEXlinearAddRef,
     _IPEXlinearAddAddRef,
@@ -319,13 +318,13 @@ class _IPEXDecoderLayerRef(nn.Module):
         self.distributed = distributed
         self.model_backbone = config.architectures[0]
 
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE):
+        if self.model_backbone == "GPTJForCausalLM":
             if not self.distributed:
                 self.linear_add_add = _IPEXlinearAddAddRef(module.mlp.fc_out)
                 del self.__dict__["_modules"]["mlp"].fc_out
             self.linear_gelu = _IPEXlinearNewGeluRef(module.mlp.fc_in)
             del self.__dict__["_modules"]["mlp"].fc_in
-        elif re.search("llama", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "LlamaForCausalLM":
             if not self.distributed:
                 self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
                 self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.down_proj)
@@ -337,7 +336,7 @@ class _IPEXDecoderLayerRef(nn.Module):
             del self.__dict__["_modules"]["mlp"].gate_proj
             del self.__dict__["_modules"]["mlp"].up_proj
 
-        elif re.search("OPT", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "OPTForCausalLM":
             if not self.distributed:
                 self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.out_proj)
                 self.mlp_linear_add = _IPEXlinearAddRef(module.fc2)
@@ -345,8 +344,9 @@ class _IPEXDecoderLayerRef(nn.Module):
                 del self.__dict__["_modules"]["fc2"]
             self.linear_relu = _IPEXlinearReluRef(module.fc1)
             del self.__dict__["_modules"]["fc1"]
-        elif re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
-            "rw", self.model_backbone, re.IGNORECASE
+        elif (
+            self.model_backbone == "FalconForCausalLM"
+            or self.model_backbone == "RWForCausalLM"
         ):
             self.linear_gelu = _IPEXlinearGeluRef(module.mlp.dense_h_to_4h)
             del self.__dict__["_modules"]["mlp"].dense_h_to_4h
@@ -360,7 +360,7 @@ class _IPEXDecoderLayerRef(nn.Module):
                 else:
                     self.linear_add = _IPEXlinearAddRef(self.mlp.dense_4h_to_h)
                 del self.__dict__["_modules"]["mlp"].dense_4h_to_h
-        elif re.search("bloom", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "BloomForCausalLM":
             self.linear_gelu = _IPEXlinearGeluRef(module.mlp.dense_h_to_4h)
             del self.__dict__["_modules"]["mlp"].dense_h_to_4h
             if not self.distributed:
@@ -382,7 +382,7 @@ class _IPEXDecoderLayerRef(nn.Module):
         past_key_value: Optional[Tuple[torch.Tensor]] = None,
         alibi: Optional[torch.Tensor] = None,
     ):
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE):
+        if self.model_backbone == "GPTJForCausalLM":
             return GPTJBlock_forward(
                 self,
                 hidden_states,
@@ -393,7 +393,7 @@ class _IPEXDecoderLayerRef(nn.Module):
                 use_cache,
                 output_attentions,
             )
-        elif re.search("llama", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "LlamaForCausalLM":
             return LlamaDecoderLayer_forward(
                 self,
                 hidden_states,
@@ -403,7 +403,7 @@ class _IPEXDecoderLayerRef(nn.Module):
                 output_attentions,
                 use_cache,
             )
-        elif re.search("OPT", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "OPTForCausalLM":
             return OPTDecoderLayer_forward(
                 self,
                 hidden_states,
@@ -413,8 +413,9 @@ class _IPEXDecoderLayerRef(nn.Module):
                 use_cache,
                 past_key_value,
             )
-        elif re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
-            "rw", self.model_backbone, re.IGNORECASE
+        elif (
+            self.model_backbone == "FalconForCausalLM"
+            or self.model_backbone == "RWForCausalLM"
         ):
             return FalconDecoderLayer_forward(
                 self,
@@ -426,7 +427,7 @@ class _IPEXDecoderLayerRef(nn.Module):
                 use_cache,
                 output_attentions,
             )
-        elif re.search("bloom", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "BloomForCausalLM":
             return BloomBlock_forward(
                 self,
                 hidden_states,

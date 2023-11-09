@@ -1,5 +1,4 @@
 from torch import nn
-import re
 from ...cpu.fusions.mha_fusion import (
     _IPEXRopeCPU,
     _IPEXScaleDotProductCPU,
@@ -19,8 +18,9 @@ class _IPEXAttentionCPU(nn.Module):
                 continue
             setattr(self.__class__, k, getattr(module.__class__, k))
 
-        if not re.search("OPT", self.model_backbone, re.IGNORECASE) and not re.search(
-            "bloom", self.model_backbone, re.IGNORECASE
+        if (
+            self.model_backbone != "OPTForCausalLM"
+            and self.model_backbone != "BloomForCausalLM"
         ):
             self._IPEXROPE = _IPEXRopeCPU(
                 self.max_position_embeddings,
@@ -28,8 +28,9 @@ class _IPEXAttentionCPU(nn.Module):
                 self.rope_base,
                 self.model_backbone,
             )
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or re.search(
-            "LLAMA", self.model_backbone, re.IGNORECASE
+        if (
+            self.model_backbone == "GPTJForCausalLM"
+            or self.model_backbone == "LlamaForCausalLM"
         ):
             if hasattr(module, "concat_qkv"):
                 self.concat_qkv = _IPEXConcatLinearCPU(

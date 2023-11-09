@@ -1,7 +1,6 @@
 import torch
 from torch import nn
 from typing import Optional, Tuple
-import re
 import math
 
 
@@ -17,8 +16,9 @@ class RotaryEmbedding(torch.nn.Module):
         )
         self.model_backbone = str(backbone)
         freqs = torch.einsum("i,j->ij", t, self.inv_freq)
-        if re.search("falcon", str(backbone), re.IGNORECASE) or re.search(
-            "rw", str(backbone), re.IGNORECASE
+        if (
+            self.model_backbone == "FalconForCausalLM"
+            or self.model_backbone == "RWForCausalLM"
         ):
             self.sin_cos = torch.cat(
                 (freqs.sin().repeat(1, 2), freqs.cos().repeat(1, 2)), dim=-1
@@ -41,8 +41,9 @@ class RotaryEmbedding(torch.nn.Module):
             self.max_seq_len_cached = seq_len
             t = torch.arange(self.max_seq_len_cached, dtype=self.inv_freq.dtype)
             freqs = torch.einsum("i,j->ij", t, self.inv_freq)
-            if re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
-                "rw", self.model_backbone, re.IGNORECASE
+            if (
+                self.model_backbone == "FalconForCausalLM"
+                or self.model_backbone == "RWForCausalLM"
             ):
                 self.sin_cos = torch.cat(
                     (freqs.sin().repeat(1, 2), freqs.cos().repeat(1, 2)), dim=-1
@@ -125,7 +126,7 @@ class _IPEXRopeRef(nn.Module):
         seq_len: Optional[int] = None,
     ):
         _sin_cos, _sin, _cos = self.embed_positions(seq_len)
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE):
+        if self.model_backbone == "GPTJForCausalLM":
             embed_positions = _sin_cos.repeat(position_ids.shape[0], 1, 1)
             repeated_position_ids = position_ids.unsqueeze(-1).repeat(
                 1, 1, embed_positions.shape[-1]
@@ -139,10 +140,10 @@ class _IPEXRopeRef(nn.Module):
                 x = torch.cat([x_rot, x_pass], dim=-1)
             else:
                 x = self.apply_rotary_pos_emb_gptj(x, sin, cos)
-        elif re.search("llama", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "LlamaForCausalLM":
             x = x.transpose(1, 2)
             x = self.apply_rotary_pos_emb_llama(x, _cos, _sin, position_ids)
-        elif re.search("gptneox", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "GPTNeoXForCausalLM":
             x = x.transpose(1, 2)
             x_rot = x[..., :rotary_ndims]
             x_pass = x[..., rotary_ndims:]
@@ -153,8 +154,9 @@ class _IPEXRopeRef(nn.Module):
                 ),
                 dim=-1,
             )
-        elif re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
-            "rw", self.model_backbone, re.IGNORECASE
+        elif (
+            self.model_backbone == "FalconForCausalLM"
+            or self.model_backbone == "RWForCausalLM"
         ):
             batch_size, x_length, _, _ = x.shape
             x = x.transpose(1, 2).reshape(batch_size * num_head, x_length, head_dim)
@@ -170,20 +172,20 @@ class _IPEXScaleDotProductRef(nn.Module):
     def __init__(self, module, config):
         super().__init__()
         self.model_backbone = config.architectures[0]
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE):
+        if self.model_backbone == "GPTJForCausalLM":
             self.bias = module.bias
             self.scale_attn = module.scale_attn
             self.attn_dropout = module.attn_dropout
-        elif re.search("llama", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "LlamaForCausalLM":
             self.num_key_value_groups = (
                 module.num_key_value_groups
                 if hasattr(module, "num_key_value_groups")
                 else None
             )
-        elif re.search("OPT", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "OPTForCausalLM":
             self.num_heads = module.num_heads
             self.head_dim = module.head_dim
-        elif re.search("gptneox", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "GPTNeoXForCausalLM":
             self.bias = module.bias
             self.norm_factor = module.norm_factor
             self.attention_dropout = (
@@ -191,8 +193,9 @@ class _IPEXScaleDotProductRef(nn.Module):
                 if hasattr(module, "attention_dropout")
                 else None
             )
-        elif re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
-            "rw", self.model_backbone, re.IGNORECASE
+        elif (
+            self.model_backbone == "FalconForCausalLM"
+            or self.model_backbone == "RWForCausalLM"
         ):
             self.num_heads = module.num_heads
             self.head_dim = module.head_dim
@@ -231,8 +234,9 @@ class _IPEXScaleDotProductRef(nn.Module):
         attention_mask: Optional[Tuple[torch.Tensor]] = None,
         alibi: Optional[torch.Tensor] = None,
     ):
-        if re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
-            "rw", self.model_backbone, re.IGNORECASE
+        if (
+            self.model_backbone == "FalconForCausalLM"
+            or self.model_backbone == "RWForCausalLM"
         ):
             num_kv_heads = (
                 self.num_heads if self.new_decoder_architecture else self.num_kv_heads
@@ -245,14 +249,14 @@ class _IPEXScaleDotProductRef(nn.Module):
         else:
             key = (
                 key.permute(0, 2, 1, 3)
-                if re.search("GPTJ", self.model_backbone, re.IGNORECASE)
-                or re.search("OPT", self.model_backbone, re.IGNORECASE)
+                if self.model_backbone == "GPTJForCausalLM"
+                or self.model_backbone == "OPTForCausalLM"
                 else key
             )
             query = (
                 query.permute(0, 2, 1, 3)
-                if re.search("GPTJ", self.model_backbone, re.IGNORECASE)
-                or re.search("OPT", self.model_backbone, re.IGNORECASE)
+                if self.model_backbone == "GPTJForCausalLM"
+                or self.model_backbone == "OPTForCausalLM"
                 else query
             )
             value = value.permute(0, 2, 1, 3)
@@ -263,11 +267,11 @@ class _IPEXScaleDotProductRef(nn.Module):
             value = torch.cat((past_value, value), dim=-2)
         present = (key, value)
 
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE):
+        if self.model_backbone == "GPTJForCausalLM":
             attn_output, attn_weights = self._attn(
                 query, key, value, attention_mask, head_mask
             )
-        elif re.search("llama", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "LlamaForCausalLM":
             # repeat k/v heads if n_kv_heads < n_heads
             key = self._repeat_kv(key, self.num_key_value_groups)
             value = self._repeat_kv(value, self.num_key_value_groups)
@@ -283,12 +287,12 @@ class _IPEXScaleDotProductRef(nn.Module):
             ).to(query.dtype)
             attn_output = torch.matmul(attn_weights, value)
 
-        elif re.search("gptneox", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "GPTNeoXForCausalLM":
             # Compute attention
             attn_output, attn_weights = self._attn(
                 query, key, value, attention_mask, head_mask
             )
-        elif re.search("OPT", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "OPTForCausalLM":
             bsz, _, tgt_len, _ = query.size()
             proj_shape = (bsz * self.num_heads, -1, self.head_dim)
             query_states = query.view(*proj_shape) / scale_attn
@@ -324,8 +328,9 @@ class _IPEXScaleDotProductRef(nn.Module):
                 )
                 attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
             attn_output = torch.bmm(attn_weights, value_states)
-        elif re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
-            "rw", self.model_backbone, re.IGNORECASE
+        elif (
+            self.model_backbone == "FalconForCausalLM"
+            or self.model_backbone == "RWForCausalLM"
         ):
             _, kv_length, _ = key.shape
             attention_mask_float = attention_mask
