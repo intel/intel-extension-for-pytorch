@@ -84,12 +84,12 @@ class TestTorchMethod(TestCase):
         # Reference init
         # 1. Init k, v 1st half, input prompt projection
         # broadcast bs -> bs*beam
-        print("before bc k", k[:, 0:t_in, :, :])
+        # print("before bc k", k[:, 0:t_in, :, :])
         k_ = k[:, 0:t_in, :, :].view(bs, beam, t_in, n, h)
         k_.copy_(k_in_proj.view(bs, 1, t_in, n, h))
         v_ = v[:, 0:t_in, :, :].view(bs, beam, t_in, n, h)
         v_.copy_(v_in_proj.view(bs, 1, t_in, n, h))
-        print("after bc k", k[:, 0:t_in, :, :])
+        # print("after bc k", k[:, 0:t_in, :, :])
 
         # 2. Init k, v 2nd half, inference output tokens projection till last timestep
         # index select according to beam record index

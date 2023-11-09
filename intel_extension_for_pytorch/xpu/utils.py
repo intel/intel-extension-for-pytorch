@@ -333,7 +333,7 @@ def disable_tile_as_device():
 
 
 def has_xetla():
-    return _C._is_xetla_enabled()
+    return _C._is_xetla_enabled() and has_2d_block_array()
 
 
 # oneDNN Layout

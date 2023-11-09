@@ -50,7 +50,7 @@ class TestTorchMethod(TestCase):
             value_layer.float()
             .permute(0, 2, 1, 3)
             .view(-1, kv_len, head_dim)
-            .view(beam_width, num_heads, q_len, head_dim),
+            .view(beam_width * num_heads, kv_len, head_dim),
         )
         # print(context_layer.cpu().view(-1, q_len, head_dim))
 
@@ -82,5 +82,8 @@ class TestTorchMethod(TestCase):
         print(context_layer.shape)
         print(context_layer.cpu())
         self.assertEqual(
-            context_layer.cpu(), context_layer_sdp.cpu().float(), atol=1e-3, rtol=1e-4
+            context_layer.unsqueeze(0).cpu(),
+            context_layer_sdp.cpu().float(),
+            atol=1e-3,
+            rtol=1e-4,
         )

@@ -30,22 +30,17 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
         "XeTLA SDP Attention mask needs 8bytes aligned on leading dimension ...");
   }
 
-  auto output = at::empty_like(_query);
-  auto dpcpp_queue = dpcppGetCurrentQueue();
-  bool is_strided = (_key.strides()[1] == _key.sizes()[3] &&
-                     _key.strides()[2] == (_key.sizes()[1] * _key.sizes()[3]))
-      ? true
-      : false;
-  auto query = _query;
-  auto key = _key;
-  auto value = _value;
-
   // make q, k, v strided
-  if (!is_strided) {
-    query = _query.transpose(1, 2).contiguous().transpose(1, 2);
-    key = _key.transpose(1, 2).contiguous().transpose(1, 2);
-    value = _value.transpose(1, 2).contiguous().transpose(1, 2);
-  }
+  auto query = _query.transpose(1, 2).contiguous().transpose(1, 2);
+  auto key = _key.transpose(1, 2).contiguous().transpose(1, 2);
+  auto value = _value.transpose(1, 2).contiguous().transpose(1, 2);
+
+  // create strided output
+  // size [bs, num_head, qsize, head_size]
+  // layout [bs, qsize, num_head, head_size]
+  auto output = at::empty_like(query);
+  auto dpcpp_queue = dpcppGetCurrentQueue();
+
   const double softmax_scale =
       scale.has_value() ? scale.value() : (1.0 / std::sqrt(query.size(-1)));
 
