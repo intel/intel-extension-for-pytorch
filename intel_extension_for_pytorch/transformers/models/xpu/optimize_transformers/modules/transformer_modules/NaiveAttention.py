@@ -77,11 +77,6 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
         IPEXTransformerAttnNaive.beam_idx = beam_idx
 
     def load_parameter(self, q_proj, k_proj, v_proj, out_proj):
-        self.origin_q_proj = q_proj
-        self.origin_k_proj = k_proj
-        self.origin_v_proj = v_proj
-        self.origin_out_proj = out_proj
-
         self.q_proj.weight = q_proj.weight
         self.k_proj.weight = k_proj.weight
         self.v_proj.weight = v_proj.weight
@@ -102,11 +97,6 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
         self.out_proj.weight.data = self.out_proj.weight.transpose(0, 1).contiguous()
         # Note: synchronize to ensure the completion of contiguous
         torch.xpu.synchronize()
-
-        self.origin_q_proj.weight.data = self.q_proj.weight.data
-        self.origin_k_proj.weight.data = self.k_proj.weight.data
-        self.origin_v_proj.weight.data = self.v_proj.weight.data
-        self.origin_out_proj.weight.data = self.out_proj.weight.data
 
     def cat_qkv(self):
         shape = [3, -1, self.q_proj.weight.shape[-1]]

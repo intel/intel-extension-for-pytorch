@@ -441,8 +441,8 @@ class LlamaRotaryEmbedding(torch.nn.Module):
         cos: torch.Tensor,
     ):
         if query.shape == key.shape:
-            cos = cos.expand(query.shape).contiguous()
-            sin = sin.expand(query.shape).contiguous()
+            cos = cos.expand(query.shape)
+            sin = sin.expand(query.shape)
             torch.ops.torch_ipex.apply_rotary_embedding_half_qk(
                 query, key, sin, cos, query, key
             )

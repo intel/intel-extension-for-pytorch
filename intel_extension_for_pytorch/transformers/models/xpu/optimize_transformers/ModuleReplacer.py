@@ -124,6 +124,8 @@ class ModuleReplacer:
 
     def replace_op(self, model):
         for name, child in model.named_children():
+            if type(child) in self.module_dict.keys():
+                continue
             if name == "lm_head" and (not is_int4(model)):
                 setattr(model, name, IPEXLmHeadLinearAllreduceWithPadding(child))
             elif type(child) in self.layer_dict.keys():

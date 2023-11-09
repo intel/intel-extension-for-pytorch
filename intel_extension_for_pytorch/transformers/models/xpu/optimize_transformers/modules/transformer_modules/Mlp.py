@@ -51,9 +51,6 @@ class IPEXTransformerMLP(IPEXTransformerBaseMLP):
         self.act = ACT2FN[config.activation_function]
 
     def load_parameter(self, fc_in, fc_out):
-        self.origin_fc_in = fc_in
-        self.origin_fc_out = fc_out
-
         self.fc_in.weight = fc_in.weight
         self.fc_out.weight = fc_out.weight
 
@@ -63,9 +60,6 @@ class IPEXTransformerMLP(IPEXTransformerBaseMLP):
     def transpose_parameter(self):
         self.fc_in.weight.data = self.fc_in.weight.transpose(0, 1).contiguous()
         self.fc_out.weight.data = self.fc_out.weight.transpose(0, 1).contiguous()
-
-        self.origin_fc_in.weight.data = self.fc_in.weight
-        self.origin_fc_out.weight.data = self.fc_out.weight
 
     def inter_mm(self, hidden_states):
         hidden_states = self.fc_in(hidden_states)
@@ -296,7 +290,6 @@ class IPEXTransformerMLPOptimizedFp16SiluLlama(IPEXTransformerMLPOptimizedFp16Si
 
     def load_parameter(self, fc_in, fc_out, up_proj):
         super().load_parameter(fc_in, fc_out)
-        self.origin_up_proj = up_proj
         self.up_proj.weight = up_proj.weight
         self.up_proj.bias = up_proj.bias
 
@@ -305,7 +298,6 @@ class IPEXTransformerMLPOptimizedFp16SiluLlama(IPEXTransformerMLPOptimizedFp16Si
         self.up_proj.weight.data = self.up_proj.weight.transpose(0, 1).contiguous()
         # Note: synchronize to ensure the completion of contiguous
         torch.xpu.synchronize()
-        self.origin_up_proj.data = self.up_proj.weight.data
 
     def inter_mm(self, hidden_states):
         hidden_states1 = torch.ops.torch_ipex.mm_silu(hidden_states, self.fc_in.weight)

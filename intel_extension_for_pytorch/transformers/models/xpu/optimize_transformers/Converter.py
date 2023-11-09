@@ -219,11 +219,11 @@ class Converter:
                 device = "xpu"
             model = model.to(device).to(dtype)
         self.module_replacer.replace_func(model)
-        self.module_replacer.replace_op(model)
         if model.config.torchscript is not True:
             is_replace_success = self.module_replacer.replace_module(
                 model, dtype_tag, config=None
             )
+            self.module_replacer.replace_op(model)
             if not is_replace_success:
                 setattr(  # noqa B010
                     model,
@@ -231,6 +231,7 @@ class Converter:
                     {"model_capture": TransformersModelCapture(model, dtype)},
                 )
         else:
+            self.module_replacer.replace_op(model)
             setattr(  # noqa B010
                 model,
                 "model_capture",

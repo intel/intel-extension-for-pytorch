@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import os
 import torch.distributed as dist
 
@@ -8,7 +7,7 @@ import torch.distributed as dist
 class EnvParam:
     @classmethod
     def collect_all_env_param(cls):
-        flag_list = {"COL_MAJOR": "col_major", "LLM_ACC_TEST": "acc_test"}
+        flag_list = {"LLM_ACC_TEST": "acc_test"}
         number_list = {"TP_SIZE": "tp_size"}
         for flag, flag_name in flag_list.items():
             flag = os.environ.get(flag, "OFF").upper() in [
@@ -35,7 +34,6 @@ class IPEXOpForInference(nn.Module):
     def __init__(self, module):
         super().__init__()
         self.module = module
-        self.row_major = EnvParam.col_major
         self.acc_test = EnvParam.acc_test
 
     def port_data(self):
@@ -72,26 +70,18 @@ class IpexFastLinear(IPEXOpForInference):
         self.port_data()
 
     def port_data(self):
-        if self.row_major:
-            self.weight = self.module.weight.transpose(0, 1).contiguous()
-            self.module.weight.data = self.weight.data
-        else:
-            self.weight = self.module.weight
+        self.weight = self.module.weight.transpose(0, 1).contiguous()
+        self.module.weight.data = self.weight.data
         self.bias = self.module.bias
 
     def forward(self, input_tensor):
-        if self.row_major:
-            shape = [input_tensor.shape[0], input_tensor.shape[1], self.weight.shape[1]]
-            if self.bias is not None:
-                return torch.addmm(
-                    self.bias, input_tensor.flatten(0, -2), self.weight
-                ).view(shape)
-            else:
-                return torch.matmul(input_tensor.flatten(0, -2), self.weight).view(
-                    shape
-                )
+        shape = [input_tensor.shape[0], input_tensor.shape[1], self.weight.shape[1]]
+        if self.bias is not None:
+            return torch.addmm(
+                self.bias, input_tensor.flatten(0, -2), self.weight
+            ).view(shape)
         else:
-            return F.linear(input_tensor, self.weight, self.bias)
+            return torch.matmul(input_tensor.flatten(0, -2), self.weight).view(shape)
 
 
 class IpexFastAllReduceLinear(IPEXOpForInference):
@@ -103,19 +93,13 @@ class IpexFastAllReduceLinear(IPEXOpForInference):
         self.port_data()
 
     def port_data(self):
-        if self.row_major:
-            self.weight = self.module.weight.transpose(0, 1).contiguous()
-            self.module.weight.data = self.weight.data
-        else:
-            self.weight = self.module.weight
+        self.weight = self.module.weight.transpose(0, 1).contiguous()
+        self.module.weight.data = self.weight.data
         self.bias = self.module.bias
         self.mp_group = self.module.mp_group
 
     def forward(self, input):
-        if self.row_major:
-            output = torch.matmul(input, self.weight)
-        else:
-            output = F.linear(input, self.weight)
+        output = torch.matmul(input, self.weight)
         if self.mp_group is not None:
             dist.all_reduce(output, group=self.mp_group)
         if self.bias is not None:
@@ -137,10 +121,7 @@ class IPEXLmHeadLinearAllreduceWithPadding(IPEXOpForInference):
         self.n_dim = self.module.weight.shape[0]
         self.bias = self.module.bias
         if dist.is_initialized():
-            if self.row_major:
-                self.weight = self.module.weight.transpose(-1, -2).contiguous()
-            else:
-                self.weight = self.module.weight.transpose(-1, -2)
+            self.weight = self.module.weight.transpose(-1, -2).contiguous()
             self.mp_group = self.module.mp_group
             self.rank = self.module.rank
             self.world_size = self.module.world_size
