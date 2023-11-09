@@ -391,7 +391,9 @@ class AutoQuantizationState(torch.nn.Module):
         act_key = str(self.idx)
         if act_key in self.idx_to_smooth_quant_scaling_factor:
             act_scaling_factors = self.idx_to_smooth_quant_scaling_factor[act_key]
-            if act_scaling_factors is not None:
+            # if users modifies qconf.json and cancals quantization of the linear,
+            # then any_arg_quant_or_dequant_needed[0] is False. Don't insert mul in this case.
+            if act_scaling_factors is not None and any_arg_quant_or_dequant_needed[0]:
                 w_key = str(self.idx) + "_0"
                 act_scaling_factors = (
                     act_scaling_factors[w_key]

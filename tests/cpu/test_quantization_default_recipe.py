@@ -418,6 +418,54 @@ class TestDefaultRecipe(JitLlgaTestCase):
                     observer_info_dict == observer_info_dict_2
                 ), "Error: SmoothQuant observer info lost after saving/loading qconf JSON"
 
+    def test_smooth_quant_cancel_by_qconf_summary(self):
+        class Mod(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.dense = nn.Linear(4, 4)
+                self.relu = nn.ReLU()
+
+            def forward(self, x):
+                return self.relu(self.dense(x))
+
+        m = Mod().eval()
+        x = torch.rand(1, 4)
+        calib_dataset = [torch.rand(1, 4) for _ in range(5)]
+        qconfig_mapping = ipex.quantization.get_smooth_quant_qconfig_mapping()
+        prepared_model = ipex.quantization.prepare(
+            m, qconfig_mapping, example_inputs=x, inplace=False
+        )
+        for data in calib_dataset:
+            prepared_model(data)
+
+        with tempfile.NamedTemporaryFile() as fp:
+            qconf_filename = fp.name
+            prepared_model.save_qconf_summary(qconf_summary=qconf_filename)
+            import json
+
+            with open(qconf_filename, "r") as qconf_file:
+                parsed = json.load(qconf_file)
+                parsed[" "]["q_op_infos"]["0"]["input_tensor_infos"][0][
+                    "force_dtype"
+                ] = "torch.float32"
+
+            with open(qconf_filename, "w") as qconf_file:
+                json.dump(parsed, qconf_file, indent=4)
+
+            prepared_model_2 = ipex.quantization.prepare(
+                m, qconfig_mapping, example_inputs=x, inplace=False
+            )
+            prepared_model_2.load_qconf_summary(qconf_summary=qconf_filename)
+            converted_model = ipex.quantization.convert(prepared_model_2)
+            with torch.no_grad():
+                jit_model = torch.jit.trace(converted_model, x)
+                jit_model = torch.jit.freeze(jit_model)
+                for _ in range(2):
+                    jit_model(x)
+                graph = jit_model.graph_for(x)
+                for n in graph.nodes():
+                    assert n.kind() != "aten::mul"
+
     def test_smooth_quant_share_weight_observers(self):
         class Mod(nn.Module):
             def __init__(self):
