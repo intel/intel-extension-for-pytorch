@@ -157,6 +157,13 @@ else()
   message(FATAL_ERROR "ERROR: Cannot find oneMKL!")
 endif()
 
+find_package(OMP QUIET)
+if(${OpenMP_FOUND})
+  # It will use openmp lib of current compiler.
+  # message("!!!!!OpenMP_CXX_LIBRARIES: ${OpenMP_CXX_LIBRARIES}")
+  target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC "${OpenMP_CXX_LIBRARIES}")
+endif()
+
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${TORCH_INCLUDE_DIRS})
 
 target_link_directories(${PLUGIN_NAME_CPU} PRIVATE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
