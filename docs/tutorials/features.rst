@@ -1,25 +1,22 @@
 Features
 ========
 
-Device-Agnostics
-****************
+Device-Agnostic
+***************
 
-Ease-of-use Python API
+Easy-to-use Python API
 ----------------------
 
 Intel® Extension for PyTorch\* provides simple frontend Python APIs and utilities to get performance optimizations such as operator optimization.
 
-Check the `API Documentation <api_doc.html>`_ for details of API functions and `Examples <examples.md>`_ for helpful usage tips.
-
-Here are detailed discussions of specific feature topics, summarized in the rest of this document:
-
+Check the `API Documentation <api_doc.html>`_ for API functions description and `Examples <examples.md>`_ for usage guidance.
 
 Channels Last
 -------------
 
 Compared with the default NCHW memory format, using channels_last (NHWC) memory format can further accelerate convolutional neural networks. In Intel® Extension for PyTorch\*, NHWC memory format has been enabled for most key CPU and GPU operators. More detailed information is available at `Channels Last <features/nhwc.md>`_.
 
-Intel® Extension for PyTorch* automatically converts a model to channels last memory format when users optimize the model with `ipex.optimize(model)`. With this feature users won't need to manually apply `model=model.to(memory_format=torch.channels_last)` any more. However, models running on Intel® Data Center GPU Flex Series will choose oneDNN layout, so users still need to manually convert the model and data to channels last format. More detailed information is available at `Auto Channels Last <features/auto_channels_last.md>`_.
+Intel® Extension for PyTorch* automatically converts a model to channels last memory format when users optimize the model with ``ipex.optimize(model)``. With this feature, users do not need to manually apply ``model=model.to(memory_format=torch.channels_last)`` anymore. However, models running on Intel® Data Center GPU Flex Series will choose oneDNN layout, so users still need to manually convert the model and data to channels last format. More detailed information is available at `Auto Channels Last <features/auto_channels_last.md>`_.
 
 .. toctree::
    :hidden:
@@ -84,7 +81,7 @@ GPU-Specific
 DLPack Solution
 ---------------
 
-DLPack defines a stable in-memory data structure for sharing tensors among frameworks. It allows to share tensor data without copy when interoparate with other libraries. Intel® Extension for PyTorch* extends DLPack support in PyTorch* for XPU device particularly.
+DLPack defines a stable in-memory data structure for sharing tensors among frameworks. It enables sharing of tensor data without copying when interoparating with other libraries. Intel® Extension for PyTorch* extends DLPack support in PyTorch* for XPU device particularly.
 
 For more detailed information, check `DLPack Solution <features/DLPack.md>`_.
 
@@ -111,7 +108,7 @@ Check the `API Documentation`_ for the details of API functions. `DPC++ Extensio
 Advanced Configuration
 ----------------------
 
-The default settings for Intel® Extension for PyTorch* are sufficient for most use cases. However, if users want to customize Intel® Extension for PyTorch*, advanced configuration is available at build time and runtime.
+The default settings for Intel® Extension for PyTorch* are sufficient for most use cases. However, if you need to customize Intel® Extension for PyTorch*, advanced configuration is available at build time and runtime.
 
 For more detailed information, check `Advanced Configuration <features/advanced_configuration.md>`_.
 
@@ -125,7 +122,7 @@ For more detailed information, check `Advanced Configuration <features/advanced_
 Legacy Profiler Tool (Experimental)
 -----------------------------------
 
-The legacy profiler tool is an extension of PyTorch* legacy profiler for profiling operators' overhead on XPU devices. With this tool, users can get the information in many fields of the run models or code scripts. User should build Intel® Extension for PyTorch* with profiler support as default and enable this tool by a `with` statement before the code segment.
+The legacy profiler tool is an extension of PyTorch* legacy profiler for profiling operators' overhead on XPU devices. With this tool, you can get the information in many fields of the run models or code scripts. Build Intel® Extension for PyTorch* with profiler support as default and enable this tool by adding a `with` statement before the code segment.
 
 For more detailed information, check `Legacy Profiler Tool <features/profiler_legacy.md>`_.
 

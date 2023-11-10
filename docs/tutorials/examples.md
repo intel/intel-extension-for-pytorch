@@ -4,9 +4,19 @@ Examples
 These examples will help you get started using Intel® Extension for PyTorch\*
 with Intel GPUs.
 
-**Note:** For examples on Intel CPUs, check these [CPU examples](../../../cpu/latest/tutorials/examples.html).
+For examples on Intel CPUs, check the [CPU examples](../../../cpu/latest/tutorials/examples.html).
 
-**Note:** You need to install torchvision and transformers to run with the examples.
+**Prerequisites**:
+Before running these examples, install the `torchvision` and `transformers` Python packages.
+
+- [Python](#python) examples demonstrate usage of Python APIs:
+
+  - [Training](#training)
+  - [Inference](#inference)
+
+- [C++](#c) examples demonstrate usage of C++ APIs
+- [Intel® AI Reference Models](#intel-ai-reference-models) provide out-of-the-box use cases, demonstrating the performance benefits achievable with Intel Extension for PyTorch\*
+
 
 ## Python
 
@@ -14,15 +24,12 @@ with Intel GPUs.
 
 #### Single-Instance Training
 
-##### Code Changes Highlight
+To use Intel® Extension for PyTorch\* on training, you need to make the following changes in your code:
 
-You'll only need to change a few lines of codes use Intel® Extension for PyTorch\* on training, as shown:
-
-1. Use the `ipex.optimize` function, which applies optimizations against the model object, as well as an optimizer object.
-2. Use Auto Mixed Precision (AMP) with BFloat16 data type.
-3. Convert input tensors, loss criterion and model to XPU.
-
-The complete examples for Float32 and BFloat16 training on single-instance are illustrated in the sections.
+1. Import `intel_extension_for_pytorch` as `ipex`.
+2. Use the `ipex.optimize` function, which applies optimizations against the model object, as well as an optimizer object.
+3. Use Auto Mixed Precision (AMP) with BFloat16 data type.
+4. Convert input tensors, loss criterion and model to XPU, as shown below:
 
 ```
 ...
@@ -47,12 +54,14 @@ with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
 ...
 ```
 
-##### Complete - Float32 Example
+Below you can find complete code examples demonstrating how to use the extension on training for different data types:
+
+##### Float32
 
 [//]: # (marker_train_single_fp32_complete)
 [//]: # (marker_train_single_fp32_complete)
 
-##### Complete - BFloat16 Example
+##### BFloat16
 
 [//]: # (marker_train_single_bf16_complete)
 [//]: # (marker_train_single_bf16_complete)
@@ -156,7 +165,7 @@ We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://py
 
 #### INT8
 
-We recommend you use TorchScript for INT8 model because it has wider support for models. TorchScript mode also auto-enables our optimizations. For TorchScript INT8 model, inserting observer and model quantization is achieved through `prepare_jit` and `convert_jit` separately. Calibration process is required for collecting statistics from real data. After conversion, optimizations such as operator fusion would be auto-enabled.
+We recommend using TorchScript for INT8 model because it has wider support for models. TorchScript mode also auto-enables our optimizations. For TorchScript INT8 model, inserting observer and model quantization is achieved through `prepare_jit` and `convert_jit` separately. Calibration process is required for collecting statistics from real data. After conversion, optimizations such as operator fusion would be auto-enabled.
 
 [//]: # (marker_int8_static)
 [//]: # (marker_int8_static)
@@ -246,9 +255,9 @@ $ ldd example-app
         ...
 ```
 
-### Use SYCL codes
+### Use SYCL code
 
-Using SYCL codes in an C++ application is also possible. The example below shows how to invoke SYCL codes. You need to explicitly pass `-fsycl` into `CMAKE_CXX_FLAGS`.
+Using SYCL code in an C++ application is also possible. The example below shows how to invoke SYCL codes. You need to explicitly pass `-fsycl` into `CMAKE_CXX_FLAGS`.
 
 **example-usm.cpp**
 
@@ -264,6 +273,7 @@ Using SYCL codes in an C++ application is also possible. The example below shows
 
 Intel® Extension for PyTorch\* provides its C++ dynamic library to allow users to implement custom DPC++ kernels to run on the XPU device. Refer to the [DPC++ extension](./features/DPC++_Extension.md) for details.
 
-## Model Zoo
 
-Use cases that have already been optimized by Intel engineers are available at [Model Zoo for Intel® Architecture](https://github.com/IntelAI/models/tree/v2.12.0). A number of PyTorch use cases for benchmarking are also available on the [GitHub page](https://github.com/IntelAI/models/tree/v2.12.0#use-cases). Models verified on Intel GPUs are marked in the `Model Documentation` Column. You can get performance benefits out-of-box by simply running scripts in the Model Zoo.
+## Intel® AI Reference Models
+
+Use cases that have already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/v2.12.0) (former Model Zoo). A number of PyTorch use cases for benchmarking are also available in the [Use Cases](https://github.com/IntelAI/models/tree/v2.12.0#use-cases) section. Models verified on Intel GPUs are marked in the `Model Documentation` column. You can get performance benefits out-of-the-box by simply running scripts in the Intel® AI Reference Models.

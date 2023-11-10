@@ -1,11 +1,6 @@
 Installation
 ============
 
-Installation guides are available for `Linux/WSL2 <./installations/linux.html>`_ and `Windows <./installations/windows.html>`_.
+Select your preferences and follow the installation instructions provided on the `Installation page <../../../index.html#installation?platform=gpu&version=v2.1.0%2Bxpu>`_.
 
-.. toctree::
-   :hidden:
-   :maxdepth: 1
-
-   installations/linux
-   installations/windows
+After successful installation, refer to the `Quick Start <getting_started.md>`_ and `Examples <examples.md>`_ sections to start using the extension in your code.

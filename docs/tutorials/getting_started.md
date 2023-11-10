@@ -1,21 +1,17 @@
-# Getting Started
+# Quick Start
 
-## Installation
+The following instructions assume you have installed the Intel® Extension for PyTorch\*. For installation instructions, refer to [Installation](../../../index.html#installation?platform=gpu&version=v2.1.0%2Bxpu).
 
-Follow instructions at [Installation Guide](./installation.rst).
+To start using the Intel® Extension for PyTorch\* in your code, you need to make the following changes:
 
-## Coding
-
-Intel® Extension for PyTorch\* doesn't require complex code changes to get it working. Usage is as simple as several-line code change.
-
-In general, APIs invocation should follow orders below.
-
-1. `import intel_extension_for_pytorch as ipex`
+1. Import the extension with `import intel_extension_for_pytorch as ipex`.
 2. Move model and data to GPU with `to('xpu')`, if you want to run on GPU.
-3. Invoke `optimize()` function to apply optimizations.
-4. For Torchscript, invoke `torch.jit.trace()` and `torch.jit.freeze()`.
+3. Invoke the `optimize()` function to apply optimizations.
+3. For TorchScript, invoke `torch.jit.trace()` and `torch.jit.freeze()`.
 
-**Note:** Please `import intel_extension_for_pytorch` right after `import torch`, prior to importing other packages.
+**Important:** It is highly recommended to `import intel_extension_for_pytorch` right after `import torch`, prior to importing other packages.
+
+The example below demostrates how to use the Intel® Extension for PyTorch\*:
 
 ```python
 import torch
