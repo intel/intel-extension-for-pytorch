@@ -428,21 +428,23 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
         value_prompt = (
             value_prompt.reshape(prompt_shape).expand(expand_shape).reshape(shape)
         )
-        key_list = [key_prompt]
-        value_list = [value_prompt]
 
-        beam_idx_cache = self.expand_beam_idx()
-        for idx in range(beam_idx_cache.shape[0]):
-            beam_idx = beam_idx_cache[idx]
-            current_key = key[:, :, idx, :].view(bs * beam, num_head, 1, head_dim)
-            current_key = current_key.index_select(0, beam_idx.to(key.device))
-            key_list.append(current_key)
-            current_value = value[:, :, idx, :].view(bs * beam, num_head, 1, head_dim)
-            current_value = current_value.index_select(0, beam_idx.to(value.device))
-            value_list.append(current_value)
+        beam_idx_cache = self.expand_beam_idx().transpose(0, 1)
+        timestep = beam_idx_cache.shape[1]
+        expanded_beam_idx_cache = (
+            beam_idx_cache.repeat_interleave(head_dim, dim=1)
+            .reshape((-1, timestep, head_dim))
+            .unsqueeze(1)
+        )
+        # gather only supports LongTensor as index
+        expanded_beam_idx_cache = torch.cat(
+            [expanded_beam_idx_cache] * num_head, dim=1
+        ).long()
+        reordered_past_key = torch.gather(key, dim=0, index=expanded_beam_idx_cache)
+        reordered_past_value = torch.gather(value, dim=0, index=expanded_beam_idx_cache)
 
-        key = torch.cat(key_list, dim=2)
-        value = torch.cat(value_list, dim=2)
+        key = torch.cat([key_prompt, reordered_past_key], dim=2)
+        value = torch.cat([value_prompt, reordered_past_value], dim=2)
         return key, value
 
     def naive_self_attention(
