@@ -61,7 +61,7 @@ def _GPTJAttention_forward(
             query,
             key,
             value,
-            self.scale_attn,
+            self.scale_attn_value,
             layer_past,
             head_mask,
             attention_mask,
@@ -248,7 +248,7 @@ def _GPTNeoXAttention_forward(
             query,
             key,
             value,
-            self.norm_factor,
+            self.norm_factor_value,
             layer_past,
             head_mask,
             attention_mask,
@@ -732,6 +732,11 @@ class _IPEXAttentionRef(nn.Module):
             else:
                 self.num_kv_heads = 1
             self.new_decoder_architecture = is_new_decoder_architecture
+
+        if self.model_backbone == "GPTJForCausalLM":
+            self.scale_attn_value = self.scale_attn.item()
+        if self.model_backbone == "GPTNeoXForCausalLM":
+            self.norm_factor_value = self.norm_factor.item()
 
     def forward(
         self,

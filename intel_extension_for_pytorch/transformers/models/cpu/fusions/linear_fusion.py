@@ -192,6 +192,7 @@ class _IPEXlinearGeluCPU(_IPEXlinearFusionCPU):
                 x,
                 self.linear.weight,
                 self.linear.bias if self.linear.bias is not None else x.new_empty(0),
+                self.linear.out_features,
             )
         else:  # fallback path
             x = self.gelu(self.linear(x))
