@@ -35,6 +35,21 @@ option(BUILD_SEPARATE_OPS "Build each operator in separate library" OFF)
 option(BUILD_SIMPLE_TRACE "Build simple trace for each registered operator" ON)
 set(BUILD_OPT_LEVEL "" CACHE STRING "Add build option -Ox, accept values: 0/1")
 
+set(EXTRA_BUILD_OPTION)
+if (DEFINED ENV{IPEX_GPU_EXTRA_BUILD_OPTION})
+  # An interface to setup extra build option. 
+  # Example, set env var: IPEX_GPU_EXTRA_BUILD_OPTION="gcc-install-dir=[path]"
+  include(CheckCXXCompilerFlag)
+  check_cxx_compiler_flag($ENV{IPEX_GPU_EXTRA_BUILD_OPTION} OPT_CHECK_PASS)
+  if(OPT_CHECK_PASS)
+    set(EXTRA_BUILD_OPTION "$ENV{IPEX_GPU_EXTRA_BUILD_OPTION}")
+  else()
+    message(WARNING
+    "Invalid build options: $ENV{IPEX_GPU_EXTRA_BUILD_OPTION}")
+  endif()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${EXTRA_BUILD_OPTION}")
+endif()
+
 function (print_xpu_config_summary)
   # Fetch configurations of intel-ext-pt-gpu
   get_target_property(GPU_NATIVE_DEFINITIONS intel-ext-pt-gpu COMPILE_DEFINITIONS)
@@ -55,6 +70,7 @@ function (print_xpu_config_summary)
 
     message(STATUS "  CXX flags             : ${CMAKE_CXX_FLAGS}")
     message(STATUS "  Compile definitions   : ${GPU_NATIVE_DEFINITIONS}")
+    message(STATUS "  Extra build options   : ${EXTRA_BUILD_OPTION}")
     message(STATUS "  CXX Linker options    : ${CMAKE_SHARED_LINKER_FLAGS}")
     message(STATUS "  Link libraries        : ${GPU_LINK_LIBRARIES}")
 
