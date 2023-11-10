@@ -75,5 +75,14 @@ class _IPEXDecoderLayerCPU(nn.Module):
                 self.linear_add = _IPEXlinearAddCPU(
                     module.linear_add.linear, tpp=tpp, woq=woq
                 )
+        elif self.model_backbone == "CodeGenForCausalLM":
+            if not self.distributed:
+                self.linear_add_add = _IPEXlinearAddAddCPU(
+                    module.linear_add_add.linear, tpp=tpp, woq=woq
+                )
+            # woq_linear_gelu has accuracy issues on codegen, disable it
+            self.linear_gelu = _IPEXlinearNewGeluCPU(
+                module.linear_gelu.linear, tpp=tpp and not woq, woq=False
+            )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

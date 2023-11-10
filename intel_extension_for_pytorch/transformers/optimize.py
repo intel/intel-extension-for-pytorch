@@ -107,6 +107,7 @@ def model_convert_reference(_model):
         LlamaForCausalLM_forward,
         GPTNeoXForCausalLM_forward,
         OPTForCausalLM_forward,
+        CodeGenForCausalLM_forward,
         prepare_inputs_for_generation,
     )
 
@@ -171,6 +172,16 @@ def model_convert_reference(_model):
             "forward",
             OPTForCausalLM_forward,
         )
+    elif (
+        hasattr(_model, "__class__")
+        and _model.__class__
+        == transformers.models.codegen.modeling_codegen.CodeGenForCausalLM
+    ):
+        convert_function(
+            _model,
+            "forward",
+            CodeGenForCausalLM_forward,
+        )
 
     # checking if model has been wrapped by deepspeed (distributed or not)
     try:
@@ -189,6 +200,7 @@ def model_convert_reference(_model):
         transformers.models.gptj.modeling_gptj.GPTJAttention,
         transformers.models.opt.modeling_opt.OPTAttention,
         transformers.models.bloom.modeling_bloom.BloomAttention,
+        transformers.models.codegen.modeling_codegen.CodeGenAttention,
     ]:
         convert_class(
             _model,
@@ -201,6 +213,7 @@ def model_convert_reference(_model):
     for supported_decoder_class in [
         transformers.models.llama.modeling_llama.LlamaDecoderLayer,
         transformers.models.gptj.modeling_gptj.GPTJBlock,
+        transformers.models.codegen.modeling_codegen.CodeGenBlock,
         transformers.models.opt.modeling_opt.OPTDecoderLayer,
         transformers.models.bloom.modeling_bloom.BloomBlock,
     ]:
@@ -467,7 +480,7 @@ def optimize_transformers(
     r"""
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
     This API focus on transformers models, especially for generation tasks inference.
-    Well supported model family: Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom.
+    Well supported model family: Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
@@ -555,18 +568,19 @@ def optimize_transformers(
             )
             return model
 
-        well_supported_model = (
-            model.config.architectures[0] == "GPTJForCausalLM"
-            or model.config.architectures[0] == "LlamaForCausalLM"
-            or model.config.architectures[0] == "GPTNeoXForCausalLM"
-            or model.config.architectures[0] == "OPTForCausalLM"
-            or model.config.architectures[0] == "FalconForCausalLM"
-            or model.config.architectures[0] == "RWForCausalLM"
-            or model.config.architectures[0] == "BloomForCausalLM"
-        )
+        well_supported_model = model.config.architectures[0] in [
+            "GPTJForCausalLM",
+            "LlamaForCausalLM",
+            "GPTNeoXForCausalLM",
+            "OPTForCausalLM",
+            "FalconForCausalLM",
+            "RWForCausalLM",
+            "BloomForCausalLM",
+            "CodeGenForCausalLM",
+        ]
         if not well_supported_model:
             warnings.warn(
-                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, OPT, and Bloom, fallback to origin model"
+                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, and CodeGen, fallback to origin model"
             )
             return model
 

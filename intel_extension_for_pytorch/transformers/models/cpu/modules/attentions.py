@@ -37,6 +37,8 @@ class _IPEXAttentionCPU(nn.Module):
                     module.concat_qkv, tpp=tpp, woq=woq
                 )
 
+        if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
+            self._IPEXROPE.embed_positions.sin_cos = self.embed_positions
         self.text_max_length = (
             config.text_max_length if hasattr(config, "text_max_length") else 2048
         )

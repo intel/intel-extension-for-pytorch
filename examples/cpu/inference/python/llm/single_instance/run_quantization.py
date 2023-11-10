@@ -23,6 +23,7 @@ from llm.utils.model_class.gptneox import GPTNEOXConfig
 from llm.utils.model_class.falcon import FALCONConfig
 from llm.utils.model_class.opt import OPTConfig
 from llm.utils.model_class.bloom import BloomConfig
+from llm.utils.model_class.codegen import CodeGenConfig
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -149,6 +150,8 @@ elif re.search("OPT", config.architectures[0], re.IGNORECASE):
     model = OPTConfig(args.model_id)
 elif re.search("bloom", config.architectures[0], re.IGNORECASE):
     model = BloomConfig(args.model_id)
+elif re.search("codegen", config.architectures[0], re.IGNORECASE):
+    model = CodeGenConfig(args.model_id)
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 

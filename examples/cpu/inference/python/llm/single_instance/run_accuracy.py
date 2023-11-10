@@ -18,6 +18,7 @@ MODEL_CLASSES = {
     "llama": (AutoModelForCausalLM, LlamaTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
     "bloom": (AutoModelForCausalLM, AutoTokenizer),
+    "codegen": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -173,7 +174,7 @@ if args.accuracy_only:
                 for text in inputs:
                     input_ids = text.to(self._device)
                     input_bs = inputs.shape[0] * self.num_beams
-                    if re.search("GPTJ", self.base_model.config.architectures[0]):
+                    if re.search("GPTJ", self.base_model.config.architectures[0]) or re.search("codegen", self.base_model.config.architectures[0], re.IGNORECASE):
                         beam_idx_tmp = torch.zeros(
                             (2048, int(input_bs)), dtype=torch.long
                         ).contiguous()

@@ -170,22 +170,23 @@ def _beam_search(
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
         self.model_backbone = self.config.architectures[0]
-        if (
-            self.model_backbone == "GPTJForCausalLM"
-            or self.model_backbone == "LlamaForCausalLM"
-            or self.model_backbone == "GPTNeoXForCausalLM"
-            or self.model_backbone == "OPTForCausalLM"
-            or self.model_backbone == "FalconForCausalLM"
-            or self.model_backbone == "RWForCausalLM"
-            or self.model_backbone == "BloomForCausalLM"
-        ):
+        if self.model_backbone in [
+            "GPTJForCausalLM",
+            "LlamaForCausalLM",
+            "GPTNeoXForCausalLM",
+            "OPTForCausalLM",
+            "FalconForCausalLM",
+            "RWForCausalLM",
+            "BloomForCausalLM",
+            "CodeGenForCausalLM",
+        ]:
             first_token = False
             input_bs = input_ids.size()[0]
             has_position_id = True
             if model_inputs["past_key_values"] is None:
                 first_token = True
             if first_token:
-                if self.model_backbone == "GPTJForCausalLM":
+                if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
                     beam_idx_tmp = torch.zeros(
                         (2048, int(batch_size * num_beams)), dtype=torch.long
                     ).contiguous()
