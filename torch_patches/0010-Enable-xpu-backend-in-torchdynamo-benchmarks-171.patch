@@ -1,7 +1,7 @@
 From 58392a58c207ab03600c7abd6e7b3baa21262c3a Mon Sep 17 00:00:00 2001
 From: "Wang, Chuanqi" <chuanqi.wang@intel.com>
 Date: Thu, 12 Oct 2023 14:29:35 +0800
-Subject: [PATCH 10/17] Enable xpu backend in torchdynamo benchmarks (#171)
+Subject: [PATCH 10/16] Enable xpu backend in torchdynamo benchmarks (#171)
 
 ---
  benchmarks/dynamo/common.py      | 29 ++++++++++++++++++++++-------
@@ -11,7 +11,7 @@ Subject: [PATCH 10/17] Enable xpu backend in torchdynamo benchmarks (#171)
  4 files changed, 28 insertions(+), 13 deletions(-)
 
 diff --git a/benchmarks/dynamo/common.py b/benchmarks/dynamo/common.py
-index 521618a9b3..e733f41052 100644
+index 521618a9b35..e733f410525 100644
 --- a/benchmarks/dynamo/common.py
 +++ b/benchmarks/dynamo/common.py
 @@ -1689,7 +1689,7 @@ class BenchmarkRunner:
@@ -85,7 +85,7 @@ index 521618a9b3..e733f41052 100644
          # OOM errors on an RTX 3090 with 24gb RAM
          runner.skip_models.update(
 diff --git a/benchmarks/dynamo/huggingface.py b/benchmarks/dynamo/huggingface.py
-index bd22cbff65..a95c34e023 100755
+index bd22cbff659..a95c34e023a 100755
 --- a/benchmarks/dynamo/huggingface.py
 +++ b/benchmarks/dynamo/huggingface.py
 @@ -546,13 +546,13 @@ class HuggingfaceRunner(BenchmarkRunner):
@@ -105,7 +105,7 @@ index bd22cbff65..a95c34e023 100755
              loss = self.compute_loss(pred)
          self.grad_scaler.scale(loss).backward()
 diff --git a/benchmarks/dynamo/timm_models.py b/benchmarks/dynamo/timm_models.py
-index 59fb18c70c..76abb30e6a 100755
+index 59fb18c70cc..76abb30e6a2 100755
 --- a/benchmarks/dynamo/timm_models.py
 +++ b/benchmarks/dynamo/timm_models.py
 @@ -318,13 +318,13 @@ class TimmRunner(BenchmarkRunner):
@@ -125,7 +125,7 @@ index 59fb18c70c..76abb30e6a 100755
              if isinstance(pred, tuple):
                  pred = pred[0]
 diff --git a/benchmarks/dynamo/torchbench.py b/benchmarks/dynamo/torchbench.py
-index 8ffecb56af..4c32e0667c 100755
+index 8ffecb56aff..4c32e0667c7 100755
 --- a/benchmarks/dynamo/torchbench.py
 +++ b/benchmarks/dynamo/torchbench.py
 @@ -454,13 +454,13 @@ class TorchBenchmarkRunner(BenchmarkRunner):

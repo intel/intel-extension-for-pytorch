@@ -1,7 +1,7 @@
-From 1af783e03f8e7c223b2fbb0e60117d1ea64001bd Mon Sep 17 00:00:00 2001
+From b43f1ba7bb099f8e04d1670ada70440b05149e0e Mon Sep 17 00:00:00 2001
 From: "Xunsong, Huang" <xunsong.huang@intel.com>
 Date: Fri, 27 Oct 2023 21:07:29 +0800
-Subject: [PATCH 15/17] [Profiler] [Kineto+Legacy] Enable Profiler with Legacy
+Subject: [PATCH 15/16] [Profiler] [Kineto+Legacy] Enable Profiler with Legacy
  & Kineto Support Together (#179)
 
 * Enable XPU profiling with Kineto support
@@ -17,14 +17,14 @@ Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
 Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
 ---
  torch/autograd/profiler.py          |  77 +++++---
- torch/autograd/profiler_legacy.py   |  70 ++++----
+ torch/autograd/profiler_legacy.py   |  68 +++----
  torch/autograd/profiler_util.py     | 265 +++++++++++++++-------------
  torch/csrc/profiler/kineto_shim.cpp |  17 +-
  torch/profiler/profiler.py          |  14 +-
- 5 files changed, 253 insertions(+), 190 deletions(-)
+ 5 files changed, 251 insertions(+), 190 deletions(-)
 
 diff --git a/torch/autograd/profiler.py b/torch/autograd/profiler.py
-index a784b09176..70dc2533f2 100644
+index a784b09176f..bced307ea51 100644
 --- a/torch/autograd/profiler.py
 +++ b/torch/autograd/profiler.py
 @@ -128,7 +128,8 @@ class profile:
@@ -196,7 +196,7 @@ index a784b09176..70dc2533f2 100644
 +        # prepare the values list for corr map to avoid duplicately appending kernel
 +        # while some CPU Kineto (e.g. CUDA/XPU Runtime ) events have a same
 +        # correlation ID as CPU events
-+        device_corr_map_values = [fe for fe_list in device_corr_map.values() for fe in fe_list] 
++        device_corr_map_values = [fe for fe_list in device_corr_map.values() for fe in fe_list]
  
 -        # associate CUDA kernels and CUDA runtime (CPU) with CPU events
 +        # associate CUDA/XPU kernels and CUDA/XPU runtime (CPU) with CPU events
@@ -245,7 +245,7 @@ index a784b09176..70dc2533f2 100644
      functions.sort(key=lambda evt: evt.time_range.start)
      return functions
 diff --git a/torch/autograd/profiler_legacy.py b/torch/autograd/profiler_legacy.py
-index 6ac237cf2b..1a28b1f84b 100644
+index 6ac237cf2b5..7e8d99c0a7e 100644
 --- a/torch/autograd/profiler_legacy.py
 +++ b/torch/autograd/profiler_legacy.py
 @@ -18,7 +18,6 @@ from torch.autograd.profiler_util import (
@@ -378,11 +378,9 @@ index 6ac237cf2b..1a28b1f84b 100644
                          is_legacy=True,
                      )
                      functions.append(fe)
-@@ -340,9 +349,9 @@ def _parse_legacy_records(thread_records):
-                 if record.has_xpu():
+@@ -341,8 +350,7 @@ def _parse_legacy_records(thread_records):
                      if len(function_stack) > 0:
                          fe = function_stack[-1]
-+                        print("DEBUG 1: ", record.xpu_elapsed_us())
                          fe.append_kernel(fe.name + "(" + record.name() + ")",
 -                                         record.device(),
 -                                         record.xpu_elapsed_us())
@@ -390,12 +388,11 @@ index 6ac237cf2b..1a28b1f84b 100644
                      else:
                          # An xpu event is recorded but no parent function was recorded.
                          fe = FunctionEvent(
-@@ -356,10 +365,9 @@ def _parse_legacy_records(thread_records):
+@@ -356,10 +364,8 @@ def _parse_legacy_records(thread_records):
                              cstack=tuple(calling_stack),
                              input_shapes=record.shapes(),
                              is_legacy=True)
 -                        fe.stack = []
-+                        print("DEBUG 2: ", record.xpu_elapsed_us())
                          fe.append_kernel(fe.name + "(" + record.name() + ")",
 -                                         record.device(),
 -                                         record.xpu_elapsed_us())
@@ -404,7 +401,7 @@ index 6ac237cf2b..1a28b1f84b 100644
              prev_record = record
  
 diff --git a/torch/autograd/profiler_util.py b/torch/autograd/profiler_util.py
-index 3a88f72ab4..f2ca2d8107 100644
+index 3a88f72ab4e..f2ca2d81076 100644
 --- a/torch/autograd/profiler_util.py
 +++ b/torch/autograd/profiler_util.py
 @@ -26,16 +26,16 @@ class EventList(list):
@@ -984,7 +981,7 @@ index 3a88f72ab4..f2ca2d8107 100644
 -        append(f"Self XPU time total: {_format_time(sum_self_xpu_time_total)}")
      return "".join(result)
 diff --git a/torch/csrc/profiler/kineto_shim.cpp b/torch/csrc/profiler/kineto_shim.cpp
-index 59e721eec4..3138e56065 100644
+index 59e721eec41..3138e56065f 100644
 --- a/torch/csrc/profiler/kineto_shim.cpp
 +++ b/torch/csrc/profiler/kineto_shim.cpp
 @@ -1,6 +1,8 @@
@@ -1032,7 +1029,7 @@ index 59e721eec4..3138e56065 100644
      case libkineto::ActivityType::PYTHON_FUNCTION:
      case libkineto::ActivityType::CUDA_DRIVER:
 diff --git a/torch/profiler/profiler.py b/torch/profiler/profiler.py
-index fce2e98847..16950ba504 100644
+index fce2e988471..16950ba5040 100644
 --- a/torch/profiler/profiler.py
 +++ b/torch/profiler/profiler.py
 @@ -51,7 +51,8 @@ class _KinetoProfile:

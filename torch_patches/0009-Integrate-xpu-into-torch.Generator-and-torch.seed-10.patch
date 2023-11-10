@@ -1,7 +1,7 @@
 From 6c5a85526546347ae39d66fca5beb31af09d1c16 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Thu, 28 Sep 2023 10:07:40 +0800
-Subject: [PATCH 09/17] Integrate xpu into torch.Generator and torch.seed
+Subject: [PATCH 09/16] Integrate xpu into torch.Generator and torch.seed
  (#109866) (#110220) (#110376) (#169)
 
 Integrate torch.xpu.Generator into torch.Generator
@@ -30,7 +30,7 @@ Co-authored-by: Lei, Zhenyuan <zhenyuan.lei@intel.com>
  4 files changed, 43 insertions(+), 5 deletions(-)
 
 diff --git a/aten/src/ATen/Context.h b/aten/src/ATen/Context.h
-index 285c6f7f1f..2ce33b77c4 100644
+index 285c6f7f1f3..2ce33b77c4d 100644
 --- a/aten/src/ATen/Context.h
 +++ b/aten/src/ATen/Context.h
 @@ -44,6 +44,8 @@ class TORCH_API Context {
@@ -76,7 +76,7 @@ index 285c6f7f1f..2ce33b77c4 100644
      auto mps_gen = globalContext().defaultGenerator(c10::DeviceType::MPS);
      // See Note [Acquire lock when using random generators]
 diff --git a/aten/src/ATen/detail/XPUHooksInterface.h b/aten/src/ATen/detail/XPUHooksInterface.h
-index 34f3a10fed..bc40baebf1 100644
+index 34f3a10fed6..bc40baebf1c 100644
 --- a/aten/src/ATen/detail/XPUHooksInterface.h
 +++ b/aten/src/ATen/detail/XPUHooksInterface.h
 @@ -2,7 +2,7 @@
@@ -110,7 +110,7 @@ index 34f3a10fed..bc40baebf1 100644
  
  struct TORCH_API XPUHooksArgs {};
 diff --git a/torch/csrc/Generator.cpp b/torch/csrc/Generator.cpp
-index 9f86f3e837..065564c577 100644
+index 9f86f3e837c..065564c577c 100644
 --- a/torch/csrc/Generator.cpp
 +++ b/torch/csrc/Generator.cpp
 @@ -5,6 +5,7 @@
@@ -133,7 +133,7 @@ index 9f86f3e837..065564c577 100644
    } else {
      AT_ERROR(
 diff --git a/torch/random.py b/torch/random.py
-index 86a9a304d9..668443a2b2 100644
+index 86a9a304d98..668443a2b2d 100644
 --- a/torch/random.py
 +++ b/torch/random.py
 @@ -43,6 +43,9 @@ def manual_seed(seed) -> torch._C.Generator:

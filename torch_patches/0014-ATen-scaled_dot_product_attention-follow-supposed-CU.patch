@@ -1,7 +1,7 @@
 From a2a7717a2d25ab71869a33600a28b4728fb8b70d Mon Sep 17 00:00:00 2001
 From: majing <jing1.ma@intel.com>
 Date: Mon, 23 Oct 2023 11:33:05 +0800
-Subject: [PATCH 14/17] ATen scaled_dot_product_attention: follow supposed
+Subject: [PATCH 14/16] ATen scaled_dot_product_attention: follow supposed
  (CUDA/CPU) operators registration strategy (#177)
 
 * Enable XPU backend implementation for scaled_dot_product_attention
@@ -20,7 +20,7 @@ Signed-off-by: majing <Jing1.Ma@intel.com>
  1 file changed, 17 insertions(+)
 
 diff --git a/aten/src/ATen/native/transformers/attention.cpp b/aten/src/ATen/native/transformers/attention.cpp
-index 81498f97ff..131999d604 100644
+index 81498f97ffa..131999d6040 100644
 --- a/aten/src/ATen/native/transformers/attention.cpp
 +++ b/aten/src/ATen/native/transformers/attention.cpp
 @@ -526,6 +526,21 @@ int64_t _fused_sdp_choice_meta(

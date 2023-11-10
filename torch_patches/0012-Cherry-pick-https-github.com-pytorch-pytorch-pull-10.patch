@@ -1,7 +1,7 @@
 From 56978c02bd83816bc92f4dbc34c93e2f3169e5b7 Mon Sep 17 00:00:00 2001
 From: zejun <zejun.chen@intel.com>
 Date: Wed, 18 Oct 2023 15:19:50 +0800
-Subject: [PATCH 12/17] Cherry-pick:
+Subject: [PATCH 12/16] Cherry-pick:
  https://github.com/pytorch/pytorch/pull/108312 (#175)
 
 Signed-off-by: Chen, Zejun <zejun.chen@intel.com>
@@ -20,7 +20,7 @@ Signed-off-by: Chen, Zejun <zejun.chen@intel.com>
  create mode 100644 torch/_streambase.py
 
 diff --git a/test/dynamo/test_ctx_manager.py b/test/dynamo/test_ctx_manager.py
-index b05fea1c55..d06a45a179 100644
+index b05fea1c558..d06a45a1795 100644
 --- a/test/dynamo/test_ctx_manager.py
 +++ b/test/dynamo/test_ctx_manager.py
 @@ -162,7 +162,7 @@ class CtxManagerTests(torch._dynamo.test_case.TestCase):
@@ -145,7 +145,7 @@ index b05fea1c55..d06a45a179 100644
      def test_autograd_profiler_enabled(self):
          def fn(x):
 diff --git a/torch/_dynamo/device_interface.py b/torch/_dynamo/device_interface.py
-index 8d19cb92d5..184637b56a 100644
+index 8d19cb92d51..184637b56aa 100644
 --- a/torch/_dynamo/device_interface.py
 +++ b/torch/_dynamo/device_interface.py
 @@ -1,6 +1,8 @@
@@ -245,7 +245,7 @@ index 8d19cb92d5..184637b56a 100644
 +register_interface_for_device("cuda", CudaInterface)
 \ No newline at end of file
 diff --git a/torch/_dynamo/variables/__init__.py b/torch/_dynamo/variables/__init__.py
-index b4b09e6110..193ff30f90 100644
+index b4b09e6110c..193ff30f90e 100644
 --- a/torch/_dynamo/variables/__init__.py
 +++ b/torch/_dynamo/variables/__init__.py
 @@ -3,11 +3,11 @@ from .builtin import BuiltinVariable
@@ -263,7 +263,7 @@ index b4b09e6110..193ff30f90 100644
  )
  from .dicts import ConstDictVariable, DataClassVariable, DefaultDictVariable
 diff --git a/torch/_dynamo/variables/builder.py b/torch/_dynamo/variables/builder.py
-index 3dfc8545c2..0fa92d3e63 100644
+index 3dfc8545c20..0fa92d3e63d 100644
 --- a/torch/_dynamo/variables/builder.py
 +++ b/torch/_dynamo/variables/builder.py
 @@ -21,6 +21,7 @@ import torch
@@ -368,7 +368,7 @@ index 3dfc8545c2..0fa92d3e63 100644
          torch.sym_int,
          getattr,
 diff --git a/torch/_dynamo/variables/builtin.py b/torch/_dynamo/variables/builtin.py
-index ba5b476933..602ffb7cb9 100644
+index ba5b4769331..602ffb7cb9c 100644
 --- a/torch/_dynamo/variables/builtin.py
 +++ b/torch/_dynamo/variables/builtin.py
 @@ -37,6 +37,7 @@ from ..utils import (
@@ -392,7 +392,7 @@ index ba5b476933..602ffb7cb9 100644
              # If the two objects are of different type, we can safely return False
              if type(left) is not type(right):
 diff --git a/torch/_dynamo/variables/ctx_manager.py b/torch/_dynamo/variables/ctx_manager.py
-index d68f6410db..284f745396 100644
+index d68f6410db9..284f7453960 100644
 --- a/torch/_dynamo/variables/ctx_manager.py
 +++ b/torch/_dynamo/variables/ctx_manager.py
 @@ -6,6 +6,7 @@ from torch._guards import Guard
@@ -586,7 +586,7 @@ index d68f6410db..284f745396 100644
      def as_proxy(self):
          return self.proxy
 diff --git a/torch/_dynamo/variables/torch.py b/torch/_dynamo/variables/torch.py
-index 704153bc50..3f74ed3335 100644
+index 704153bc50f..3f74ed3335a 100644
 --- a/torch/_dynamo/variables/torch.py
 +++ b/torch/_dynamo/variables/torch.py
 @@ -1,4 +1,5 @@
@@ -658,7 +658,7 @@ index 704153bc50..3f74ed3335 100644
                  ),
 diff --git a/torch/_streambase.py b/torch/_streambase.py
 new file mode 100644
-index 0000000000..689ea7d9b6
+index 00000000000..689ea7d9b6a
 --- /dev/null
 +++ b/torch/_streambase.py
 @@ -0,0 +1,45 @@
@@ -709,7 +709,7 @@ index 0000000000..689ea7d9b6
 +        raise NotImplementedError()
 \ No newline at end of file
 diff --git a/torch/cuda/__init__.py b/torch/cuda/__init__.py
-index 9849848ffe..40074bef6f 100644
+index 9849848ffec..40074bef6f8 100644
 --- a/torch/cuda/__init__.py
 +++ b/torch/cuda/__init__.py
 @@ -534,6 +534,20 @@ def stream(stream: Optional["torch.cuda.Stream"]) -> StreamContext:
@@ -743,7 +743,7 @@ index 9849848ffe..40074bef6f 100644
          device_index=stream.device_index,
          device_type=stream.device_type,
 diff --git a/torch/cuda/streams.py b/torch/cuda/streams.py
-index 87269189e0..d4b71b6ce6 100644
+index 87269189e0d..d4b71b6ce65 100644
 --- a/torch/cuda/streams.py
 +++ b/torch/cuda/streams.py
 @@ -1,7 +1,7 @@

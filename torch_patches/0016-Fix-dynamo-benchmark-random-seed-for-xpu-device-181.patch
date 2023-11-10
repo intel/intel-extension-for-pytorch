@@ -1,7 +1,7 @@
-From 602734510615ec93a5e05364aa5995eb4e624ef9 Mon Sep 17 00:00:00 2001
+From 96a7a8a2a953ab44aea30a774042b432b7b132df Mon Sep 17 00:00:00 2001
 From: "Wang, Chuanqi" <chuanqi.wang@intel.com>
 Date: Fri, 10 Nov 2023 16:40:18 +0800
-Subject: [PATCH 16/17] Fix dynamo benchmark random seed for xpu device (#181)
+Subject: [PATCH 16/16] Fix dynamo benchmark random seed for xpu device (#181)
 
 * Fix dynamo benchmark random seed for xpu device
 
@@ -15,7 +15,7 @@ Co-authored-by: Yu, Guangye <106960996+guangyey@users.noreply.github.com>
  1 file changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/benchmarks/dynamo/common.py b/benchmarks/dynamo/common.py
-index e733f41052..9539e45c2d 100644
+index e733f410525..9539e45c2de 100644
 --- a/benchmarks/dynamo/common.py
 +++ b/benchmarks/dynamo/common.py
 @@ -3096,6 +3096,12 @@ def run(runner, args, original_dir=None):

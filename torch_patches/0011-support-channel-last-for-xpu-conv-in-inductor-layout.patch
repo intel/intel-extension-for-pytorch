@@ -1,7 +1,7 @@
 From 4400b4896a315a7c9009b141b6e8f9f737cfeb7e Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Thu, 12 Oct 2023 23:40:03 +0800
-Subject: [PATCH 11/17] support channel last for xpu conv in inductor layout
+Subject: [PATCH 11/16] support channel last for xpu conv in inductor layout
  opt path (#174)
 
 ---
@@ -11,7 +11,7 @@ Subject: [PATCH 11/17] support channel last for xpu conv in inductor layout
  3 files changed, 34 insertions(+), 1 deletion(-)
 
 diff --git a/aten/src/ATen/native/ConvUtils.h b/aten/src/ATen/native/ConvUtils.h
-index fd526282cd..2d81cd5703 100644
+index fd526282cd3..2d81cd5703b 100644
 --- a/aten/src/ATen/native/ConvUtils.h
 +++ b/aten/src/ATen/native/ConvUtils.h
 @@ -408,4 +408,31 @@ static inline bool thnn_conv_use_channels_last(const at::Tensor& input, const at
@@ -47,7 +47,7 @@ index fd526282cd..2d81cd5703 100644
 +
  } // namespace at::native
 diff --git a/aten/src/ATen/native/Convolution.cpp b/aten/src/ATen/native/Convolution.cpp
-index 7af281a7cd..30f416357f 100644
+index 7af281a7cd9..30f416357fa 100644
 --- a/aten/src/ATen/native/Convolution.cpp
 +++ b/aten/src/ATen/native/Convolution.cpp
 @@ -1432,6 +1432,11 @@ static inline at::MemoryFormat determine_backend_memory_format(
@@ -63,7 +63,7 @@ index 7af281a7cd..30f416357f 100644
        backend_memory_format = at::MemoryFormat::Contiguous;
    }
 diff --git a/torch/_subclasses/fake_tensor.py b/torch/_subclasses/fake_tensor.py
-index f4d1f3e07c..90a74f9ed3 100644
+index f4d1f3e07c0..90a74f9ed33 100644
 --- a/torch/_subclasses/fake_tensor.py
 +++ b/torch/_subclasses/fake_tensor.py
 @@ -1013,7 +1013,8 @@ class FakeTensor(torch.Tensor):
