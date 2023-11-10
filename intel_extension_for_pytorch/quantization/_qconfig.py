@@ -60,16 +60,22 @@ def get_smooth_quant_qconfig_mapping(
             HistogramObserver by default. For nn.Linear with SmoothQuant
             enabled, q-param is calculated based on act_ic_observer's and
             wei_ic_observer's min/max. It is not affected by this argument.
+            Example: ``torch.ao.quantization.MinMaxObserver``
         act_ic_observer: Per-input-channel Observer for activation.
             For nn.Linear with SmoothQuant enabled only.
             PerChannelMinMaxObserver by default.
+            Example: ``torch.ao.quantization.PerChannelMinMaxObserver.with_args(ch_axis=1)``
         wei_observer: Observer for weight of all weighted ops.
             For nn.Linear with SmoothQuant enabled, it calculates q-params
             after applying scaling factors. PerChannelMinMaxObserver by
             default.
+            Example: ``torch.ao.quantization.PerChannelMinMaxObserver.with_args(
+                dtype=torch.qint8, qscheme=torch.per_channel_symmetric
+            )``
         wei_ic_observer: Per-input-channel Observer for weight.
             For nn.Linear with SmoothQuant enabled only.
             PerChannelMinMaxObserver by default.
+            Example: ``torch.ao.quantization.PerChannelMinMaxObserver.with_args(ch_axis=1)``
 
     Returns:
         torch.ao.quantization.QConfig

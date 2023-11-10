@@ -308,9 +308,10 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 super().__init__()
                 self.dense = nn.Linear(4, 4)
                 self.relu = nn.ReLU()
+                self.dense2 = nn.Linear(4, 4)
 
             def forward(self, x):
-                return self.relu(self.dense(x))
+                return self.dense2(self.relu(self.dense(x)))
 
         m = Mod().eval()
         x = torch.rand(1, 4)
@@ -320,12 +321,12 @@ class TestDefaultRecipe(JitLlgaTestCase):
         )
         custom_config = {
             "alpha": 0.75,
-            "act_observer": torch.ao.quantization.MinMaxObserver(),
-            "act_ic_observer": per_channel_observer(ch_axis=-1),
-            "wei_observer": per_channel_observer(
+            "act_observer": torch.ao.quantization.MinMaxObserver,
+            "act_ic_observer": per_channel_observer.with_args(ch_axis=-1),
+            "wei_observer": per_channel_observer.with_args(
                 dtype=torch.qint8, qscheme=torch.per_channel_symmetric
             ),
-            "wei_ic_observer": per_channel_observer(ch_axis=1),
+            "wei_ic_observer": per_channel_observer.with_args(ch_axis=1),
             "share_weight_observers": False,
         }
         for use_custom_config in [False, True]:
@@ -353,6 +354,12 @@ class TestDefaultRecipe(JitLlgaTestCase):
                     .idx_to_seen_q_op_infos[0]
                     .qconfig.share_weight_observers
                 )
+                sub_observer_ids = {
+                    "act_ic_obs": [],
+                    "act_obs": [],
+                    "wei_oc_obs": [],
+                    "wei_ic_obs": [],
+                }
                 for key, obs in observer_info.items():
                     observer_info_dict[key] = {
                         "smooth_quant_enabled": obs.smooth_quant_enabled,
@@ -360,6 +367,17 @@ class TestDefaultRecipe(JitLlgaTestCase):
                         "ic_obs": type(obs.ic_obs),
                         "act_obs": type(obs.act_obs),
                     }
+                    if isinstance(
+                        obs,
+                        ipex.quantization._smooth_quant.SmoothQuantActivationObserver,
+                    ):
+                        sub_observer_ids["act_ic_obs"].append(id(obs.ic_obs))
+                        sub_observer_ids["act_obs"].append(id(obs.act_obs))
+                    else:
+                        sub_observer_ids["wei_oc_obs"].append(id(obs.oc_obs))
+                        sub_observer_ids["wei_ic_obs"].append(id(obs.ic_obs))
+                for _, id_list in sub_observer_ids.items():
+                    assert all([id_list[0] != id for id in id_list[1:]])
 
             for data in calib_dataset:
                 prepared_model(data)
@@ -395,6 +413,12 @@ class TestDefaultRecipe(JitLlgaTestCase):
                         .idx_to_seen_q_op_infos[0]
                         .qconfig.share_weight_observers
                     )
+                    sub_observer_ids = {
+                        "act_ic_obs": [],
+                        "act_obs": [],
+                        "wei_oc_obs": [],
+                        "wei_ic_obs": [],
+                    }
                     for key, obs in observer_info_2.items():
                         observer_info_dict_2[key] = {
                             "smooth_quant_enabled": obs.smooth_quant_enabled,
@@ -402,6 +426,17 @@ class TestDefaultRecipe(JitLlgaTestCase):
                             "ic_obs": type(obs.ic_obs),
                             "act_obs": type(obs.act_obs),
                         }
+                        if isinstance(
+                            obs,
+                            ipex.quantization._smooth_quant.SmoothQuantActivationObserver,
+                        ):
+                            sub_observer_ids["act_ic_obs"].append(id(obs.ic_obs))
+                            sub_observer_ids["act_obs"].append(id(obs.act_obs))
+                        else:
+                            sub_observer_ids["wei_oc_obs"].append(id(obs.oc_obs))
+                            sub_observer_ids["wei_ic_obs"].append(id(obs.ic_obs))
+                    for _, id_list in sub_observer_ids.items():
+                        assert all([id_list[0] != id for id in id_list[1:]])
 
                 q_model_2 = ipex.quantization.convert(prepared_model_2)
 

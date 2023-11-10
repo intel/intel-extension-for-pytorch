@@ -660,7 +660,7 @@ def _create_observer(setting):
         ]
         for key in smooth_quant_sub_obs_keys:
             if key in setting:
-                setting[key] = _create_observer(setting[key])()
+                setting[key] = _create_observer(setting[key])
         return observer.with_args(**setting)
     else:
         raise NameError("torch.quantization.observer %s not found" % setting["name"])
@@ -1019,8 +1019,25 @@ def load_qconf_summary_to_model(model, qconf_summary):
                     )
                     insert_fake_quant_after_outputs.append(False)
                     if "scale" in tensor_info:
-                        scale = torch.FloatTensor(tensor_info["scale"])
-                        zp = torch.LongTensor(tensor_info["zero_point"])
+                        if isinstance(tensor_info["scale"], list):
+                            scale = torch.FloatTensor(tensor_info["scale"])
+                            zp = torch.LongTensor(tensor_info["zero_point"])
+                        else:
+                            scale, zp = {}, {}
+                            scale_to_load = tensor_info["scale"]
+                            zp_to_load = tensor_info["zero_point"]
+                            assert isinstance(scale_to_load, dict) and isinstance(
+                                zp_to_load, dict
+                            ), (
+                                "Expect scales and zero points to load are dicts but "
+                                f"found types {type(scale_to_load)} and {type(zp_to_load)}"
+                            )
+                            for key, val in scale_to_load.items():
+                                s = torch.FloatTensor(val)
+                                scale.update({key: s})
+                            for key, val in zp_to_load.items():
+                                z = torch.LongTensor(val)
+                                zp.update({key: z})
                         v.tensor_id_to_scale_zp[tensor_info["id"]] = (scale, zp)
                 else:
                     output_tensor_infos.append(None)
