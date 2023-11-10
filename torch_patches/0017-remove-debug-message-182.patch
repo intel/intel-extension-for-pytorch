@@ -1,0 +1,32 @@
+From dd9913ff2d889dd9dac05929c5a4aa7713dc741a Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
+Date: Fri, 10 Nov 2023 16:43:43 +0800
+Subject: [PATCH 17/17] remove debug message (#182)
+
+---
+ torch/autograd/profiler_legacy.py | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/torch/autograd/profiler_legacy.py b/torch/autograd/profiler_legacy.py
+index 1a28b1f84b..7e8d99c0a7 100644
+--- a/torch/autograd/profiler_legacy.py
++++ b/torch/autograd/profiler_legacy.py
+@@ -349,7 +349,6 @@ def _parse_legacy_records(thread_records):
+                 if record.has_xpu():
+                     if len(function_stack) > 0:
+                         fe = function_stack[-1]
+-                        print("DEBUG 1: ", record.xpu_elapsed_us())
+                         fe.append_kernel(fe.name + "(" + record.name() + ")",
+                                          0, "xpu", record.xpu_elapsed_us())
+                     else:
+@@ -365,7 +364,6 @@ def _parse_legacy_records(thread_records):
+                             cstack=tuple(calling_stack),
+                             input_shapes=record.shapes(),
+                             is_legacy=True)
+-                        print("DEBUG 2: ", record.xpu_elapsed_us())
+                         fe.append_kernel(fe.name + "(" + record.name() + ")",
+                                          0, "xpu", record.xpu_elapsed_us())
+                         functions.append(fe)
+-- 
+2.34.1
+

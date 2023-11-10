@@ -1,7 +1,7 @@
 From 1af783e03f8e7c223b2fbb0e60117d1ea64001bd Mon Sep 17 00:00:00 2001
 From: "Xunsong, Huang" <xunsong.huang@intel.com>
 Date: Fri, 27 Oct 2023 21:07:29 +0800
-Subject: [PATCH 15/15] [Profiler] [Kineto+Legacy] Enable Profiler with Legacy
+Subject: [PATCH 15/17] [Profiler] [Kineto+Legacy] Enable Profiler with Legacy
  & Kineto Support Together (#179)
 
 * Enable XPU profiling with Kineto support
@@ -24,7 +24,7 @@ Signed-off-by: Xunsong, Huang <xunsong.huang@intel.com>
  5 files changed, 253 insertions(+), 190 deletions(-)
 
 diff --git a/torch/autograd/profiler.py b/torch/autograd/profiler.py
-index a784b09176f..70dc2533f23 100644
+index a784b09176..70dc2533f2 100644
 --- a/torch/autograd/profiler.py
 +++ b/torch/autograd/profiler.py
 @@ -128,7 +128,8 @@ class profile:
@@ -245,7 +245,7 @@ index a784b09176f..70dc2533f23 100644
      functions.sort(key=lambda evt: evt.time_range.start)
      return functions
 diff --git a/torch/autograd/profiler_legacy.py b/torch/autograd/profiler_legacy.py
-index 6ac237cf2b5..1a28b1f84bd 100644
+index 6ac237cf2b..1a28b1f84b 100644
 --- a/torch/autograd/profiler_legacy.py
 +++ b/torch/autograd/profiler_legacy.py
 @@ -18,7 +18,6 @@ from torch.autograd.profiler_util import (
@@ -404,7 +404,7 @@ index 6ac237cf2b5..1a28b1f84bd 100644
              prev_record = record
  
 diff --git a/torch/autograd/profiler_util.py b/torch/autograd/profiler_util.py
-index 3a88f72ab4e..f2ca2d81076 100644
+index 3a88f72ab4..f2ca2d8107 100644
 --- a/torch/autograd/profiler_util.py
 +++ b/torch/autograd/profiler_util.py
 @@ -26,16 +26,16 @@ class EventList(list):
@@ -984,7 +984,7 @@ index 3a88f72ab4e..f2ca2d81076 100644
 -        append(f"Self XPU time total: {_format_time(sum_self_xpu_time_total)}")
      return "".join(result)
 diff --git a/torch/csrc/profiler/kineto_shim.cpp b/torch/csrc/profiler/kineto_shim.cpp
-index 59e721eec41..3138e56065f 100644
+index 59e721eec4..3138e56065 100644
 --- a/torch/csrc/profiler/kineto_shim.cpp
 +++ b/torch/csrc/profiler/kineto_shim.cpp
 @@ -1,6 +1,8 @@
@@ -1032,7 +1032,7 @@ index 59e721eec41..3138e56065f 100644
      case libkineto::ActivityType::PYTHON_FUNCTION:
      case libkineto::ActivityType::CUDA_DRIVER:
 diff --git a/torch/profiler/profiler.py b/torch/profiler/profiler.py
-index fce2e988471..16950ba5040 100644
+index fce2e98847..16950ba504 100644
 --- a/torch/profiler/profiler.py
 +++ b/torch/profiler/profiler.py
 @@ -51,7 +51,8 @@ class _KinetoProfile:
