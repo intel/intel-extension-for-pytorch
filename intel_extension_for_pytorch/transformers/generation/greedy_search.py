@@ -157,13 +157,16 @@ def _greedy_search(
             or re.search("OPT", self.config.architectures[0], re.IGNORECASE)
             or re.search("falcon", self.config.architectures[0], re.IGNORECASE)
             or re.search("rw", self.config.architectures[0], re.IGNORECASE)
+            or re.search("codegen", self.config.architectures[0], re.IGNORECASE)
         ):
             first_token = False
             input_bs = input_ids.size()[0]
             if model_inputs["past_key_values"] is None:
                 first_token = True
             if first_token:
-                if re.search("GPTJ", self.config.architectures[0]):
+                if re.search("GPTJ", self.config.architectures[0]) or re.search(
+                    "codegen", self.config.architectures[0], re.IGNORECASE
+                ):
                     beam_idx_tmp = torch.zeros(
                         (2048, int(input_bs)), dtype=torch.long
                     ).contiguous()

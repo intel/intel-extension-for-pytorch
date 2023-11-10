@@ -26,6 +26,11 @@ class _IPEXAttentionCPU(nn.Module):
                 self.rope_base,
                 self.model_backbone,
             )
+
+        if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or re.search(
+            "codegen", self.model_backbone, re.IGNORECASE
+        ):
+            self._IPEXROPE.embed_positions.sin_cos = self.embed_positions
         if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or re.search(
             "LLAMA", self.model_backbone, re.IGNORECASE
         ):

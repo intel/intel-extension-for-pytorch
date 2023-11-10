@@ -98,7 +98,9 @@ class OptimizeTransformersTester(TestCase):
                         )
                     self.assertEqual(key_hf[0], key_ipex[0], prec=0.1)
 
-                    if re.search("GPTJ", model.config.architectures[0]):
+                    if re.search("GPTJ", model.config.architectures[0]) or re.search(
+                        "codegen", model.config.architectures[0]
+                    ):
                         assert (
                             ipex_m.transformer.h[0].attn.__class__
                             is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
@@ -227,6 +229,24 @@ class OptimizeTransformersTester(TestCase):
         with torch.no_grad():
             ipex.nn.utils._model_convert.replace_customized_linear_with_linear(m.eval())
         self.model_replacement_check(m, False, torchcompile=True)
+
+    def test_model_replacement_codegen(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/codegen", return_dict=False
+        )
+        m = transformers.models.codegen.modeling_codegen.CodeGenForCausalLM(
+            config
+        ).eval()
+        self.model_replacement_check(m, True)
+
+    def test_model_replacement_codegen_torchcompile(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/codegen", return_dict=False
+        )
+        m = transformers.models.codegen.modeling_codegen.CodeGenForCausalLM(
+            config
+        ).eval()
+        self.model_replacement_check(m, True, torchcompile=True)
 
     def _model_replacement_check_woq(self, model):
         qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()

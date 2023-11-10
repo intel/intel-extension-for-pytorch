@@ -530,6 +530,91 @@ def _FalconAttention_forward(
         return output_tensor, present
 
 
+def _CodeGenAttention_forward(
+    self,
+    hidden_states: Optional[torch.FloatTensor],
+    layer_past: Optional[Tuple[torch.Tensor]] = None,
+    attention_mask: Optional[torch.FloatTensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    head_mask: Optional[torch.FloatTensor] = None,
+    use_cache: Optional[bool] = False,
+    output_attentions: Optional[bool] = False,
+) -> Union[
+    Tuple[torch.Tensor, Tuple[torch.Tensor]],
+    Optional[Tuple[torch.Tensor, Tuple[torch.Tensor], Tuple[torch.Tensor, ...]]],
+]:
+    qkv = self.qkv_proj(hidden_states)
+    # TODO(enijkamp): factor out number of logical TPU-v4 cores or make forward pass agnostic
+    mp_num = 4
+    qkv_split = qkv.reshape(qkv.shape[:-1] + (mp_num, -1))
+
+    local_dim = self.head_dim * self.num_attention_heads // mp_num
+    query, value, key = torch.split(qkv_split, local_dim, dim=-1)
+    query = self._split_heads(
+        query, self.num_attention_heads, self.head_dim, mp_num=mp_num
+    ).contiguous()
+    key = self._split_heads(
+        key, self.num_attention_heads, self.head_dim, mp_num=mp_num
+    ).contiguous()
+    value = self._split_heads(
+        value, self.num_attention_heads, self.head_dim, mp_num=mp_num
+    ).contiguous()
+
+    key = self._IPEXROPE(
+        key,
+        position_ids.contiguous(),
+        self.num_attention_heads,
+        self.head_dim,
+        1,  # neighbor elements
+        64,
+    )
+    query = self._IPEXROPE(
+        query,
+        position_ids.contiguous(),
+        self.num_attention_heads,
+        self.head_dim,
+        1,
+        64,
+    )
+
+    if use_cache:
+        (
+            attn_output,
+            attn_weights,
+            present,
+        ) = self._IPEXScaleDotProduct(
+            query,
+            key,
+            value,
+            self.scale_attn,
+            layer_past,
+            head_mask,
+            attention_mask,
+        )
+    else:
+        key = key.permute(0, 2, 1, 3)
+        query = query.permute(0, 2, 1, 3)
+        value = value.permute(0, 2, 1, 3)
+        present = None
+
+        # compute self-attention: V x Softmax(QK^T)
+        attn_output, attn_weights = self._attn(
+            query, key, value, attention_mask, head_mask
+        )
+
+    attn_output = self._merge_heads(
+        attn_output, self.num_attention_heads, self.head_dim
+    )
+    attn_output = self.out_proj(attn_output)
+    attn_output = self.resid_dropout(attn_output)
+
+    outputs = (attn_output, present)
+    if output_attentions:
+        outputs += (attn_weights,)
+
+    return outputs  # a, present, (attentions)
+
+
 class _IPEXAttentionRef(nn.Module):
     def __init__(self, module, config, sdp_module_ref, distributed=False):
         super().__init__()
@@ -729,6 +814,17 @@ class _IPEXAttentionRef(nn.Module):
                 alibi,
                 attention_mask,
                 layer_past,
+                head_mask,
+                use_cache,
+                output_attentions,
+            )
+        elif re.search("codegen", self.model_backbone, re.IGNORECASE):
+            return _CodeGenAttention_forward(
+                self,
+                hidden_states,
+                layer_past,
+                attention_mask,
+                position_ids,
                 head_mask,
                 use_cache,
                 output_attentions,

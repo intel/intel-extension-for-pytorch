@@ -259,7 +259,9 @@ class _IPEXDecoderLayerRef(nn.Module):
         self.distributed = distributed
         self.model_backbone = config.architectures[0]
 
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE):
+        if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or re.search(
+            "CodeGen", self.model_backbone, re.IGNORECASE
+        ):
             if not self.distributed:
                 self.linear_add_add = _IPEXlinearAddAddRef(module.mlp.fc_out)
                 del self.__dict__["_modules"]["mlp"].fc_out
@@ -316,7 +318,9 @@ class _IPEXDecoderLayerRef(nn.Module):
         past_key_value: Optional[Tuple[torch.Tensor]] = None,
         alibi: Optional[torch.Tensor] = None,
     ):
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE):
+        if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or re.search(
+            "CodeGen", self.model_backbone, re.IGNORECASE
+        ):
             return GPTJBlock_forward(
                 self,
                 hidden_states,

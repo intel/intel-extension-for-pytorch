@@ -181,6 +181,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 )
             elif re.search("OPT", config.architectures[0], re.IGNORECASE):
                 qpath = Path(parent_path, "single_instance/run_opt_quantization.py")
+            elif re.search("codegen", config.architectures[0], re.IGNORECASE):
+                qpath = Path(parent_path, "single_instance/run_codegen_quantization.py")
 
             infer_cmd = ["python", qpath]
             # 1) quantization

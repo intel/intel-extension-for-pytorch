@@ -161,6 +161,17 @@ class _IPEXRopeRef(nn.Module):
             _cos = _cos.type(x.dtype)[:, 0:seq_len]
             _sin = _sin.type(x.dtype)[:, 0:seq_len]
             x = (x * _cos) + (self.rotate_half(x) * _sin)
+        elif re.search("codegen", self.model_backbone, re.IGNORECASE):
+            sincos = _sin_cos[position_ids]
+            sin, cos = torch.split(sincos, sincos.shape[-1] // 2, dim=-1)
+            if rotary_ndims is not None:
+                x_rot = x[:, :, :, :rotary_ndims]
+                x_pass = x[:, :, :, rotary_ndims:]
+
+                x_rot = self.apply_rotary_pos_emb_gptj(x_rot, sin, cos)
+                x = torch.cat([x_rot, x_pass], dim=-1)
+            else:
+                x = self.apply_rotary_pos_emb_gptj(x, sin, cos)
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
         return x
@@ -201,6 +212,12 @@ class _IPEXScaleDotProductRef(nn.Module):
                 if hasattr(module, "new_decoder_architecture")
                 else None
             )
+        elif re.search("codegen", self.model_backbone, re.IGNORECASE):
+            self.num_heads = module.num_attention_heads
+            self.head_dim = module.head_dim
+            self.scale_attn = module.scale_attn
+            self.attn_dropout = module.attn_dropout
+            self.causal_mask = module.causal_mask
 
         for k, v in module.__class__.__dict__.items():
             if k.startswith("__") or k.startswith("forward"):
@@ -247,12 +264,14 @@ class _IPEXScaleDotProductRef(nn.Module):
                 key.permute(0, 2, 1, 3)
                 if re.search("GPTJ", self.model_backbone, re.IGNORECASE)
                 or re.search("OPT", self.model_backbone, re.IGNORECASE)
+                or re.search("codegen", self.model_backbone, re.IGNORECASE)
                 else key
             )
             query = (
                 query.permute(0, 2, 1, 3)
                 if re.search("GPTJ", self.model_backbone, re.IGNORECASE)
                 or re.search("OPT", self.model_backbone, re.IGNORECASE)
+                or re.search("codegen", self.model_backbone, re.IGNORECASE)
                 else query
             )
             value = value.permute(0, 2, 1, 3)
@@ -263,7 +282,9 @@ class _IPEXScaleDotProductRef(nn.Module):
             value = torch.cat((past_value, value), dim=-2)
         present = (key, value)
 
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE):
+        if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or re.search(
+            "codegen", self.model_backbone, re.IGNORECASE
+        ):
             attn_output, attn_weights = self._attn(
                 query, key, value, attention_mask, head_mask
             )

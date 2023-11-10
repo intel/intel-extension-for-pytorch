@@ -108,6 +108,7 @@ def model_convert_reference(_model):
         LlamaForCausalLM_forward,
         GPTNeoXForCausalLM_forward,
         OPTForCausalLM_forward,
+        CodeGenForCausalLM_forward,
         prepare_inputs_for_generation,
     )
 
@@ -172,6 +173,16 @@ def model_convert_reference(_model):
             "forward",
             OPTForCausalLM_forward,
         )
+    elif (
+        hasattr(_model, "__class__")
+        and _model.__class__
+        == transformers.models.codegen.modeling_codegen.CodeGenForCausalLM
+    ):
+        convert_function(
+            _model,
+            "forward",
+            CodeGenForCausalLM_forward,
+        )
 
     # checking if model has been wrapped by deepspeed (distributed or not)
     try:
@@ -189,6 +200,7 @@ def model_convert_reference(_model):
         transformers.models.llama.modeling_llama.LlamaAttention,
         transformers.models.gptj.modeling_gptj.GPTJAttention,
         transformers.models.opt.modeling_opt.OPTAttention,
+        transformers.models.codegen.modeling_codegen.CodeGenAttention,
     ]:
         convert_class(
             _model,
@@ -201,6 +213,7 @@ def model_convert_reference(_model):
     for supported_decoder_class in [
         transformers.models.llama.modeling_llama.LlamaDecoderLayer,
         transformers.models.gptj.modeling_gptj.GPTJBlock,
+        transformers.models.codegen.modeling_codegen.CodeGenBlock,
         transformers.models.opt.modeling_opt.OPTDecoderLayer,
     ]:
         convert_class(
@@ -452,7 +465,7 @@ def optimize_transformers(
     r"""
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
     This API focus on transformers models, especially for generation tasks inference.
-    Well supported model family: Llama, GPT-J, GPT-Neox, OPT, Falcon.
+    Well supported model family: Llama, GPT-J, GPT-Neox, OPT, Falcon, CodeGen.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
@@ -547,10 +560,11 @@ def optimize_transformers(
             or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
             or re.search("falcon", model.config.architectures[0], re.IGNORECASE)
             or re.search("rw", model.config.architectures[0], re.IGNORECASE)
+            or re.search("codegen", model.config.architectures[0], re.IGNORECASE)
         )
         if not well_supported_model:
             warnings.warn(
-                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, and OPT, fallback to origin model"
+                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, OPT, and CodeGen, fallback to origin model"
             )
             return model
 

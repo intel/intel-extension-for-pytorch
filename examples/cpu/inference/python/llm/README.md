@@ -1,6 +1,6 @@
 # Text Generation
 We provide the inference benchmarking scripts for large language models text generation.<br/>
-Support large language model families, including GPT-J, LLaMA, GPT-Neox, OPT, Falcon.<br/>
+Support large language model families, including GPT-J, LLaMA, GPT-Neox, OPT, Falcon, CodeGen.<br/>
 The scripts include both single instance and distributed (DeepSpeed) use cases.<br/>
 The scripts cover model generation inference with low precions cases for different models with best perf and accuracy (bf16 AMP，static quantization and weight only quantization).<br/>
 
@@ -84,10 +84,11 @@ wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prom
 |GPT-NEOX| "EleutherAI/gpt-neox-20b" | ✅ | ✅ | ✅ | ❎ ** | 
 |FALCON*|"tiiuae/falcon-40b" | ✅ | ✅ |  ✅ | ❎ **| 
 |OPT|"facebook/opt-30b", "facebook/opt-1.3b"| ✅ | ✅ |  ✅ | ❎ **| 
+|CodeGen|"Salesforce/codegen-2B-multi"| ✅ | ✅ |  ✅ | ❎ **|
 
 *For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for FP32/BF16 but needed for quantizations.
 
-** For GPT-NEOX/FALCON/OPT models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.
+** For GPT-NEOX/FALCON/OPT/CodeGen models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM model families, we are working in progress to cover those optimizations, which will expand the model list above.
 
@@ -180,6 +181,8 @@ python run_gpt-neox_quantization.py --ipex-weight-only-quantization --output-dir
 python run_falcon_quantization.py --ipex-weight-only-quantization --output-dir "saved_results"  --int8-bf16-mixed -m <FALCON MODEL_ID> --config-file <CONFIG_FILE>
 ## OPT quantization
 python run_opt_quantization.py --ipex-weight-only-quantization --output-dir "saved_results"  --int8-bf16-mixed -m <OPT MODEL_ID> 
+## CodeGen quantization
+python run_codegen_quantization.py --ipex-weight-only-quantization --output-dir "saved_results"  --int8-bf16-mixed -m <CODEGEN MODEL_ID>
 
 ## (2) Run quantization performance test (note that GPT-NEOX uses --int8 instead of --int8-bf16-mixed)
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run_<MODEL>_quantization.py -m <MODEL_ID> --quantized-model-path "./saved_results/best_model.pt" --benchmark --int8-bf16-mixed
@@ -277,7 +280,7 @@ export WORK_DIR=./
 cd distributed
 mv PATH/TO/prompt.json ./
 
-# Run GPTJ/LLAMA/OPT/Falcon with bfloat16 DeepSpeed
+# Run GPTJ/LLAMA/OPT/Falcon/CodeGen with bfloat16 DeepSpeed
 deepspeed --bind_cores_to_rank run_generation_with_deepspeed.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --deployment-mode
 
 # Run GPT-NeoX with ipex weight only quantization

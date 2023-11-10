@@ -176,6 +176,7 @@ def _beam_search(
             or re.search("OPT", self.config.architectures[0], re.IGNORECASE)
             or re.search("falcon", self.config.architectures[0], re.IGNORECASE)
             or re.search("rw", self.config.architectures[0], re.IGNORECASE)
+            or re.search("codegen", self.config.architectures[0], re.IGNORECASE)
         ):
             first_token = False
             input_bs = input_ids.size()[0]
@@ -183,7 +184,9 @@ def _beam_search(
             if model_inputs["past_key_values"] is None:
                 first_token = True
             if first_token:
-                if re.search("GPTJ", self.config.architectures[0]):
+                if re.search("GPTJ", self.config.architectures[0]) or re.search(
+                    "codegen", self.config.architectures[0], re.IGNORECASE
+                ):
                     beam_idx_tmp = torch.zeros(
                         (2048, int(batch_size * num_beams)), dtype=torch.long
                     ).contiguous()
