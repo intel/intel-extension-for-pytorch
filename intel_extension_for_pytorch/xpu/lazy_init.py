@@ -74,6 +74,7 @@ def _lazy_init():
             )
         if not hasattr(_C, "_getDeviceCount"):
             raise AssertionError("IPEX not compiled with XPU enabled")
+
         # This function detects bad fork processing and throws if there's a device
         # initialization error, no XPUs are found or any other error occurs
         _C._initExtension()
