@@ -119,7 +119,7 @@ def collect_pytorch_cases(data, test_file_name):
     global re_flags
     collected_cases = {"PASSED": [], "FAILED": [], "ERROR": [], "SKIPPED": [], "XFAIL": [], "XPASS": [], "NO_RESULT": []}
 
-    pattern_case = r"^(test_\S+)\s\([^\.]*\.([^\.]*)[^\)]*\)\s+\.\.\..+?(ok|FAIL|ERROR|skipped|expected failure|Command)\s"
+    pattern_case = r"^(test_\S+)\s\([^\.]*\.([^\.\)]*)[^\)]*\)\s+\.\.\..+?(ok|FAIL|ERROR|skipped|expected failure|Command)\s"
     # pattern_xpass_case = # haven't found related cases while using pytorch test run.
 
     matched_cases = re.findall(pattern_case, data, re_flags)
