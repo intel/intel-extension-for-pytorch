@@ -1,7 +1,7 @@
 # Serving BERT models with Triton Server and Intel® Extension for PyTorch optimizations
 
 ## Description
-This sample provide code to integrate Intel® Extension for PyTorch (IPEX) with Triton Inference Server framework. This project provides custom python backend for IPEX and additional dynamic batching algorithm to improve the performance. This code can be used as performance benchmark for Bert-Base and Bert-Large models.
+This sample provide code to integrate Intel® Extension for PyTorch with Triton Inference Server framework. This project provides custom Python backend for Intel® Extension for PyTorch and additional dynamic batching algorithm to improve the performance. This code can be used as performance benchmark for Bert-Base and Bert-Large models.
 
 ![graph](./graph.jpg)
 
@@ -10,8 +10,8 @@ Make sure that Docker is installed on both host and client instance.
 In case of running on two separate instances edit config.properties and provide required variables.
 ## Supported models
 Currently AI Inference samples support following Bert models finetuned on Squad dataset:
-- bert_base        - PyTorch+IPEX [Bert Base uncased](https://huggingface.co/csarron/bert-base-uncased-squad-v1 "Bert Base uncased")
-- bert_large        - PyTorch+IPEX [Bert Large uncased](https://huggingface.co/bert-large-uncased-whole-word-masking-finetuned-squad "Bert Large uncased")
+- bert_base        - PyTorch+Intel® Extension for PyTorch [Bert Base uncased](https://huggingface.co/csarron/bert-base-uncased-squad-v1 "Bert Base uncased")
+- bert_large        - PyTorch+Intel® Extension for PyTorch [Bert Large uncased](https://huggingface.co/bert-large-uncased-whole-word-masking-finetuned-squad "Bert Large uncased")
 
 ## Possible run scenarios
 AI Inference samples allow user to run inference on localhost or on remote Triton Server Host. 
@@ -58,7 +58,7 @@ AI Inference samples project is licensed under Apache License Version 2.0. Refer
 This distribution includes third party software governed by separate license terms.
 
 3-clause BSD license:
-- [model.py](./model_utils/bert_common/1/model.py) -  for PyTorch (IPEX)
+- [model.py](./model_utils/bert_common/1/model.py) -  for Intel® Extension for PyTorch optimized workload
 
 This third party software, even if included with the distribution of the Intel software, may be governed by separate license terms, including without limitation, third party license terms, other Intel software license terms, and open source software license terms. These separate license terms govern your use of the third party programs as set forth in the [THIRD-PARTY-PROGRAMS](./THIRD-PARTY-PROGRAMS) file.
 
