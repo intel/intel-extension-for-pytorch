@@ -19,6 +19,8 @@ enable_naive_path = os.environ.get("ENABLE_NAIVE_PATH", "OFF").upper() in [
 
 class IPEXTransformerAttnNaive(IPEXTransformerAttn):
     beam_idx = None
+    expanded_beam_idx_cache = None
+    timestep = 0
     attention_mask = None
 
     def __init__(self, config: IPEXTransformerConfig) -> None:
@@ -429,19 +431,29 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
             value_prompt.reshape(prompt_shape).expand(expand_shape).reshape(shape)
         )
 
-        beam_idx_cache = self.expand_beam_idx().transpose(0, 1)
-        timestep = beam_idx_cache.shape[1]
-        expanded_beam_idx_cache = (
-            beam_idx_cache.repeat_interleave(head_dim, dim=1)
-            .reshape((-1, timestep, head_dim))
-            .unsqueeze(1)
+        beam_idx_cache = self.expand_beam_idx()
+        current_timestep = beam_idx_cache.shape[0]
+
+        if current_timestep != IPEXTransformerAttnNaive.timestep:
+            # update expanded_beam_idx_cache
+            IPEXTransformerAttnNaive.timestep = current_timestep
+            beam_idx_cache = beam_idx_cache.transpose(0, 1)
+            expanded_beam_idx_cache = (
+                beam_idx_cache.repeat_interleave(head_dim, dim=1)
+                .reshape((-1, current_timestep, head_dim))
+                .unsqueeze(1)
+            )
+            # gather only support LongTensor as index
+            expanded_beam_idx_cache = torch.cat(
+                [expanded_beam_idx_cache] * num_head, dim=1
+            ).long()
+            IPEXTransformerAttnNaive.expanded_beam_idx_cache = expanded_beam_idx_cache
+        reordered_past_key = torch.gather(
+            key, dim=0, index=IPEXTransformerAttnNaive.expanded_beam_idx_cache
         )
-        # gather only supports LongTensor as index
-        expanded_beam_idx_cache = torch.cat(
-            [expanded_beam_idx_cache] * num_head, dim=1
-        ).long()
-        reordered_past_key = torch.gather(key, dim=0, index=expanded_beam_idx_cache)
-        reordered_past_value = torch.gather(value, dim=0, index=expanded_beam_idx_cache)
+        reordered_past_value = torch.gather(
+            value, dim=0, index=IPEXTransformerAttnNaive.expanded_beam_idx_cache
+        )
 
         key = torch.cat([key_prompt, reordered_past_key], dim=2)
         value = torch.cat([value_prompt, reordered_past_value], dim=2)
