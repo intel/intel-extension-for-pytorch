@@ -447,6 +447,19 @@ class TestDefaultRecipe(JitLlgaTestCase):
 
                 assert torch.allclose(out_ref, out_2)
 
+                # Scales and zero points should be updated after rerunning calibration
+                scale_zp_0 = prepared_model_2._fqn_to_auto_quant_state_map[
+                    " "
+                ].tensor_id_to_scale_zp
+                scale_zp_0 = copy.deepcopy(scale_zp_0)
+                for data in calib_dataset:
+                    prepared_model_2(data + 1)
+                prepared_model_2.save_qconf_summary(qconf_summary=qconf_filename)
+                scale_zp_1 = prepared_model_2._fqn_to_auto_quant_state_map[
+                    " "
+                ].tensor_id_to_scale_zp
+                assert scale_zp_0 != scale_zp_1
+
             # Check observers
             if use_custom_config:
                 assert (

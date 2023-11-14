@@ -87,6 +87,8 @@ class SmoothQuantActivationObserver(UniformQuantizationObserverBase):
     def forward(self, x_orig):
         if not self.smooth_quant_enabled:
             return self.act_obs.forward(x_orig)
+        # Run act_obs to indicate the observer has run
+        self.act_obs.forward(x_orig)
         # Call per-channel observer on IC to find scaling factor
         return self.ic_obs.forward(x_orig)
 
