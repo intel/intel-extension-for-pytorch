@@ -8,7 +8,10 @@ from torch.ao.quantization import (
     QConfig,
     QConfigMapping,
 )
-from ._smooth_quant import SmoothQuantActivationObserver, SmoothQuantWeightObserver
+from ._smooth_quant import (
+    SmoothQuantActivationObserver,
+    SmoothQuantWeightObserver,
+)
 
 
 _default_weight_observer = PerChannelMinMaxObserver.with_args(
@@ -115,19 +118,23 @@ class WoqActQuantMode(IntEnum):
     PER_BATCH_IC_BLOCK = 3
 
 
-QConfigWoq = namedtuple("QConfigWoq", [*QConfig._fields, "lowp_mode", "act_quant_mode"])
+QConfigWoq = namedtuple(
+    "QConfigWoq",
+    [*QConfig._fields, "lowp_mode", "act_quant_mode", "weight_dtype", "group_size"],
+)
 
 
 def get_weight_only_quant_qconfig_mapping(
     *,
     weight_dtype: torch.dtype = torch.qint8,
     lowp_mode: int = WoqLowpMode.NONE,
-    act_quant_mode: int = WoqActQuantMode.PER_IC_BLOCK
+    act_quant_mode: int = WoqActQuantMode.PER_IC_BLOCK,
+    group_size: int = -1
 ):
     """
     Configuration for weight-only quantization (WOQ) for LLM.
     Arguments:
-        weight_dtype:   Data type for weight, torch.qint8 or torch.quint4x2.
+        weight_dtype:   Data type for weight, torch.qint8 (INT8) or torch.quint4x2 (INT4)
         lowp_mode:      specify the lowest precision data type for computation. Data types
                         that has even lower precision won't be used.
                         Not necessarily related to activation or weight dtype.
@@ -146,11 +153,26 @@ def get_weight_only_quant_qconfig_mapping(
                         - PER_IC_BLOCK(1): Tensor is divided along IC with group size = IC_BLOCK.
                         - PER_BATCH(2): Tensor is divided along batch_size with group size = 1.
                         - PER_BATCH_IC_BLOCK(3): Tenosr is divided into blocks of 1 x IC_BLOCK.
-                        Note that IC_BLOCK is determined by IC automatically, not configurable.
+                        Note that IC_BLOCK is determined by group_size automatically.
+        group_size:     Control quantization granularity along input channel (IC) dimension of weight.
+                        Must be a positive power of 2 (i.e., 2^k, k > 0) or -1.
+                        If group_size = -1:
+                            If act_quant_mode = PER_TENSOR ro PER_BATCH:
+                                No grouping along IC for both activation and weight
+                            If act_quant_mode = PER_IC_BLOCK or PER_BATCH_IC_BLOCK:
+                                No grouping along IC for weight. For activation,
+                                IC_BLOCK is determined automatically by IC.
+                        If group_size > 0:
+                            act_quant_mode can be any. If act_quant_mode is PER_IC_BLOCK
+                            or PER_BATCH_IC_BLOCK, weight is grouped along IC by group_size.
+                            The IC_BLOCK for activation is determined by group_size automatically.
+                            Each group has its own quantization parameters.
     """
+    assert group_size == -1 or (
+        group_size > 0 and (group_size & (group_size - 1)) == 0
+    ), "Group size must be -1 or a positive power of 2, but got {}".format(group_size)
     dtype_to_qscheme = {
         torch.qint8: torch.per_channel_affine,
-        torch.quint8: torch.per_channel_affine,
         # It is required to use per_channel_affine_float_qparams for quint4x2 by PyTorch
         torch.quint4x2: torch.per_channel_affine_float_qparams,
     }
@@ -162,6 +184,8 @@ def get_weight_only_quant_qconfig_mapping(
         ),
         lowp_mode=lowp_mode,
         act_quant_mode=act_quant_mode,
+        weight_dtype=weight_dtype,
+        group_size=group_size,
     )
     weight_only_quant_qconfig_mapping = QConfigMapping().set_global(
         _weight_only_quant_qconfig

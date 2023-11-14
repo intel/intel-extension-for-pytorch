@@ -86,6 +86,17 @@ parser.add_argument(
          " data type is always INT4 and this argument is not needed.",
 )
 parser.add_argument(
+    "--group-size",
+    default=-1,
+    type=int,
+    help="For weight-only quantization only. Specifies the group size along"
+         " input channel for block-wise quantization of weight. It must be a"
+         " positive power of 2 or -1. If it is -1, weight is quantized per"
+         " output channel. Otherwise, weight is quantized per block with block size"
+         " = [1, group_size]. If `--low-precision-checkpoint` is given, group"
+         " size is determined automatically and this argument has no effect.",
+)
+parser.add_argument(
     "--low-precision-checkpoint",
     default="",
     type=str,
@@ -416,7 +427,8 @@ elif args.ipex_weight_only_quantization:
     qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
         weight_dtype=weight_dtype,
         lowp_mode=lowp_mode,
-        act_quant_mode=act_quant_mode_dict[args.act_quant_mode]
+        act_quant_mode=act_quant_mode_dict[args.act_quant_mode],
+        group_size=args.group_size
     )
     if args.low_precision_checkpoint != "":
         low_precision_checkpoint = torch.load(args.low_precision_checkpoint)

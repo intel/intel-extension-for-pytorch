@@ -6,6 +6,8 @@ import copy
 from intel_extension_for_pytorch.nn.modules import IpexWoqLinear
 from intel_extension_for_pytorch.quantization import (
     get_weight_only_quant_qconfig_mapping,
+    dequantize_per_channel,
+    dequantize_per_block,
 )
 
 
@@ -215,14 +217,7 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
             isinstance(linear, IpexWoqLinear) for linear in self.linear_list
         ):
             # Quantization is done before lowering to CPU.
-            # We assume weights are all in shape [N, K] and per-channel quantized, axis = 0.
-            # And it must be one of the two cases below.
-            # Case 1:
-            #   - weight dtype = qint8, qscheme = torch.per_channel_affine,
-            #   - scales dtype = float, zero points dtype = int
-            # Case 2:
-            #   - weight dtype = quint4x2, qscheme = torch.per_channel_affine_float_qparams,
-            #   - scales dtype = float, zero points dtype = float
+            # We assume weights are all in shape [N, K].
             # We need to unpack weights then concat them
             weights_list = []
             scales_list = []
@@ -231,10 +226,12 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
             w_dtype = self.linear_list[0].dtype
             lowp_mode = self.linear_list[0]._lowp_mode
             act_quant_mode = self.linear_list[0]._act_quant_mode
+            group_size = self.linear_list[0]._group_size
             qconfig_mapping = get_weight_only_quant_qconfig_mapping(
                 weight_dtype=w_dtype,
                 lowp_mode=lowp_mode,
                 act_quant_mode=act_quant_mode,
+                group_size=group_size,
             )
             qconfig = qconfig_mapping.global_qconfig
             for i in range(self.num_concat):
@@ -248,32 +245,41 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                     weights_list = []
                     break
                 qw = linear._op_context.to_public(linear._op_context.get_weight())
-                if (
-                    qw.qscheme()
-                    not in [
-                        torch.per_channel_affine,
-                        torch.per_channel_affine_float_qparams,
-                    ]
-                    or qw.q_per_channel_axis() != 0
-                ):
-                    warnings.warn(
-                        "Concat linear fusion for CPU WOQ failed "
-                        "because quantization type of weight is not supported. "
-                        "Falling back to separate linears."
+                scales = linear._op_context.get_scales()
+                zero_points = linear._op_context.get_zero_points()
+                is_int4 = w_dtype == torch.quint4x2
+                weight_shape = linear._op_context.get_weight_shape()
+                if group_size > 0:
+                    weights_list.append(
+                        dequantize_per_block(
+                            qw, scales, zero_points, is_int4, group_size, weight_shape
+                        )
                     )
-                    weights_list = []
-                    break
-                s = qw.q_per_channel_scales().float()
-                z = qw.q_per_channel_zero_points().float()
-                weights_list.append(qw.dequantize().float())
-                scales_list.append(s)
-                zeros_list.append(z)
-                bias_list.append(linear._op_context.get_bias())
+                else:
+                    weights_list.append(
+                        dequantize_per_channel(
+                            qw, scales, zero_points, is_int4, weight_shape
+                        )
+                    )
+                # OC of Weight may be padded to a multiple of block_n. So are scales and zero points.
+                bias = linear._op_context.get_bias()
+                assert scales.shape == zero_points.shape
+                assert bias is None or bias.shape[0] == scales.shape[0]
+                if weight_shape[0] < scales.shape[0]:
+                    original_n = weight_shape[0]
+                    scales_list.append(scales.narrow(0, 0, original_n).contiguous())
+                    zeros_list.append(zero_points.narrow(0, 0, original_n).contiguous())
+                    bias_list.append(bias.narrow(0, 0, original_n).contiguous())
+                else:
+                    assert weight_shape[0] == scales.shape[0]
+                    scales_list.append(scales)
+                    zeros_list.append(zero_points)
+                    bias_list.append(bias)
                 w_dtype = linear.dtype
             if weights_list:
                 concat_weight = torch.concat(weights_list, 0)
-                concat_scales = torch.concat(scales_list, -1)
-                concat_zeros = torch.concat(zeros_list, -1)
+                concat_scales = torch.concat(scales_list, 0)
+                concat_zeros = torch.concat(zeros_list, 0)
                 use_bias = all(bias_list)
                 concat_bias = torch.concat(bias_list, 0) if use_bias else None
                 mod = nn.Linear(
@@ -285,7 +291,11 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                 mod._num_concats = len(weights_list)
                 if w_dtype == torch.quint4x2:
                     self.concat_linear = IpexWoqLinear.from_float_and_int4_weight(
-                        mod, concat_weight, concat_scales, concat_zeros
+                        mod,
+                        concat_weight,
+                        concat_scales,
+                        concat_zeros,
+                        group_size=group_size,
                     )
                 else:  # qint8
                     assert w_dtype == torch.qint8

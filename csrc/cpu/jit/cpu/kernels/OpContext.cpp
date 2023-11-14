@@ -363,128 +363,30 @@ void IpexConvTransposeOpContext::load_from_ctx(
 // For weight-only quantization
 c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
     at::Tensor&& weight,
+    std::vector<int64_t>&& weight_shape,
+    at::Tensor&& scales_fp32,
+    at::Tensor&& zp_fp32,
     c10::optional<at::Tensor>&& bias,
     c10::optional<int64_t> batch_size,
+    bool is_int4,
+    int64_t group_size,
     int64_t lowp_mode,
     int64_t num_concats,
     int64_t act_quant_mode) {
-  auto N = weight.size(0);
-  const auto qtype = weight.qscheme();
-  if (weight.scalar_type() == c10::ScalarType::QInt8) {
-    // extract scales from weight
-    std::vector<float> weight_scales_float(1, 0.0);
-    if (qtype == c10::kPerTensorAffine) {
-      weight_scales_float[0] = weight.q_scale();
-    } else if (qtype == c10::kPerChannelAffine) {
-      weight_scales_float.resize(N);
-      for (const auto i : c10::irange(N)) {
-        weight_scales_float[i] = weight.q_per_channel_scales()[i].item<float>();
-      }
-    }
-
-    at::Tensor scales = at::empty(
-        {static_cast<long>(weight_scales_float.size())},
-        at::device(c10::kCPU).dtype(c10::kFloat));
-    std::copy(
-        weight_scales_float.begin(),
-        weight_scales_float.end(),
-        scales.data_ptr<float>());
-
-    // extract zero_points from weight
-    std::vector<int32_t> weight_zero_points_int32(1, 0);
-    if (qtype == c10::kPerTensorAffine) {
-      weight_zero_points_int32[0] = weight.q_zero_point();
-    } else if (qtype == c10::kPerChannelAffine) {
-      weight_zero_points_int32.resize(N);
-      for (const auto i : c10::irange(N)) {
-        weight_zero_points_int32[i] =
-            weight.q_per_channel_zero_points()[i].item<int32_t>();
-      }
-    }
-    at::Tensor zero_points_int32 = at::empty(
-        {static_cast<long>(weight_zero_points_int32.size())},
-        at::device(c10::kCPU).dtype(c10::kInt));
-    std::copy(
-        weight_zero_points_int32.begin(),
-        weight_zero_points_int32.end(),
-        zero_points_int32.data_ptr<int32_t>());
-
-    // convert zero_points from int32_t to float
-    std::vector<float> weight_zero_points_float(1, 0);
-    if (qtype == c10::kPerTensorAffine) {
-      weight_zero_points_float[0] = (float)weight.q_zero_point();
-    } else if (qtype == c10::kPerChannelAffine) {
-      weight_zero_points_float.resize(N);
-      for (const auto i : c10::irange(N)) {
-        weight_zero_points_float[i] =
-            (float)weight.q_per_channel_zero_points()[i].item<int32_t>();
-      }
-    }
-    at::Tensor zero_points_float = at::empty(
-        {static_cast<long>(weight_zero_points_float.size())},
-        at::device(c10::kCPU).dtype(c10::kFloat));
-    std::copy(
-        weight_zero_points_float.begin(),
-        weight_zero_points_float.end(),
-        zero_points_float.data_ptr<float>());
-
-    auto op_context = torch_ipex::cpu::detail::woq_linear::create(
-        weight,
-        scales,
-        zero_points_int32,
-        bias,
-        batch_size,
-        lowp_mode,
-        num_concats,
-        act_quant_mode);
-    return c10::make_intrusive<IpexWoqLinearOpContext>(
-        batch_size, std::move(op_context));
-  } else {
-    // extract scales from weight
-    std::vector<float> weight_scales_float(1, 0.0);
-    if (qtype == c10::kPerChannelAffineFloatQParams) {
-      weight_scales_float.resize(N);
-      for (const auto i : c10::irange(N)) {
-        weight_scales_float[i] = weight.q_per_channel_scales()[i].item<float>();
-      }
-    }
-
-    at::Tensor scales = at::empty(
-        {static_cast<long>(weight_scales_float.size())},
-        at::device(c10::kCPU).dtype(c10::kFloat));
-    std::copy(
-        weight_scales_float.begin(),
-        weight_scales_float.end(),
-        scales.data_ptr<float>());
-
-    // extract zero_points from weight
-    std::vector<float> weight_zero_points_float(1, 0);
-    if (qtype == c10::kPerChannelAffineFloatQParams) {
-      weight_zero_points_float.resize(N);
-      for (const auto i : c10::irange(N)) {
-        weight_zero_points_float[i] =
-            weight.q_per_channel_zero_points()[i].item<float>();
-      }
-    }
-    at::Tensor zero_points_float = at::empty(
-        {static_cast<long>(weight_zero_points_float.size())},
-        at::device(c10::kCPU).dtype(c10::kFloat));
-    std::copy(
-        weight_zero_points_float.begin(),
-        weight_zero_points_float.end(),
-        zero_points_float.data_ptr<float>());
-    auto op_context = torch_ipex::cpu::detail::woq_linear::create(
-        weight,
-        scales,
-        zero_points_float,
-        bias,
-        batch_size,
-        lowp_mode,
-        num_concats,
-        act_quant_mode);
-    return c10::make_intrusive<IpexWoqLinearOpContext>(
-        batch_size, std::move(op_context));
-  }
+  auto op_context = torch_ipex::cpu::detail::woq_linear::create(
+      weight,
+      weight_shape,
+      scales_fp32,
+      zp_fp32,
+      bias,
+      batch_size,
+      is_int4,
+      group_size,
+      lowp_mode,
+      num_concats,
+      act_quant_mode);
+  return c10::make_intrusive<IpexWoqLinearOpContext>(
+      batch_size, std::move(op_context));
 }
 
 at::Tensor IpexWoqLinearOpContext::get_data_handle() {
@@ -504,22 +406,6 @@ at::Tensor IpexWoqLinearOpContext::run_eltwise(
     const c10::optional<c10::string_view>& algorithm) {
   return torch_ipex::cpu::detail::woq_linear::run_eltwise(
       op_context_, input, post_op, scalars, algorithm);
-}
-
-at::Tensor IpexWoqLinearOpContext::run_add(
-    const at::Tensor& input,
-    at::Tensor& accumu,
-    const c10::optional<at::Scalar>& alpha) {
-  return torch_ipex::cpu::detail::woq_linear::run_add(
-      op_context_, input, accumu, alpha);
-}
-
-at::Tensor IpexWoqLinearOpContext::run_add_relu(
-    const at::Tensor& input,
-    at::Tensor& accumu,
-    const c10::optional<at::Scalar>& alpha) {
-  return torch_ipex::cpu::detail::woq_linear::run_add_relu(
-      op_context_, input, accumu, alpha);
 }
 
 at::Tensor IpexWoqLinearOpContext::run_add(
@@ -546,6 +432,46 @@ at::Tensor IpexWoqLinearOpContext::get_at_packed_weight() {
 
 c10::optional<at::Tensor> IpexWoqLinearOpContext::get_at_bias() {
   return op_context_.at_bias_;
+}
+
+at::Tensor IpexWoqLinearOpContext::get_scales() {
+  if (op_context_.group_size_ > 0 && op_context_.at_weight_.dim() == 4) {
+    // [#block_n, #block_k, n_block_size] -> [#block_n, n_block_size, #block_k]
+    // -> [N, #block_k]
+    auto scales = op_context_.scales_list_[0].permute({0, 2, 1}).contiguous();
+    scales = scales.view({-1, scales.size(-1)});
+    if (scales.size(0) > op_context_.weight_shape_[0]) {
+      return scales.narrow(0, 0, op_context_.weight_shape_[0]);
+    }
+    return scales;
+  }
+  if (op_context_.scales_list_[0].size(0) > op_context_.weight_shape_[0]) {
+    return op_context_.scales_list_[0].narrow(
+        0, 0, op_context_.weight_shape_[0]);
+  }
+  return op_context_.scales_list_[0];
+}
+
+at::Tensor IpexWoqLinearOpContext::get_zero_points() {
+  if (op_context_.group_size_ > 0 && op_context_.at_weight_.dim() == 4) {
+    // [#block_n, #block_k, n_block_size] -> [#block_n, n_block_size, #block_k]
+    // -> [N, #block_k]
+    auto zp = op_context_.zero_points_list_[0].permute({0, 2, 1}).contiguous();
+    zp = zp.view({-1, zp.size(-1)});
+    if (zp.size(0) > op_context_.weight_shape_[0]) {
+      return zp.narrow(0, 0, op_context_.weight_shape_[0]);
+    }
+    return zp;
+  }
+  if (op_context_.zero_points_list_[0].size(0) > op_context_.weight_shape_[0]) {
+    return op_context_.zero_points_list_[0].narrow(
+        0, 0, op_context_.weight_shape_[0]);
+  }
+  return op_context_.zero_points_list_[0];
+}
+
+std::vector<int64_t> IpexWoqLinearOpContext::get_weight_shape() {
+  return op_context_.weight_shape_;
 }
 
 detail::ContextLinearWoq& IpexWoqLinearOpContext::get_context() {
