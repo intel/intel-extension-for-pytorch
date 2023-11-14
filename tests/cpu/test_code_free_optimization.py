@@ -3,7 +3,7 @@ from common_utils import TestCase
 import os
 import subprocess
 import itertools
-
+import torch
 import logging
 
 logging.getLogger().setLevel(logging.DEBUG)
@@ -13,7 +13,11 @@ class TestCodeFreeOptimization(TestCase):
     def test_conv_bn(self):
         loc = os.path.dirname(os.path.abspath(__file__))
         disable_ipex_graph_modes = [False, True]
-        dtypes = ["float32", "bfloat16"]
+        dtypes = (
+            ["float32", "bfloat16"]
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported()
+            else ["float32"]
+        )
         for disable_ipex_graph_mode, dtype in itertools.product(
             disable_ipex_graph_modes, dtypes
         ):
@@ -51,7 +55,11 @@ class TestCodeFreeOptimization(TestCase):
     def test_conv_bn_with_module_created_in_forward(self):
         loc = os.path.dirname(os.path.abspath(__file__))
         disable_ipex_graph_modes = [False, True]
-        dtypes = ["float32", "bfloat16"]
+        dtypes = (
+            ["float32", "bfloat16"]
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported()
+            else ["float32"]
+        )
         for disable_ipex_graph_mode, dtype in itertools.product(
             disable_ipex_graph_modes, dtypes
         ):
@@ -88,7 +96,11 @@ class TestCodeFreeOptimization(TestCase):
     def test_auto_ipex_module(self):
         loc = os.path.dirname(os.path.abspath(__file__))
         disable_ipex_graph_modes = [False, True]
-        dtypes = ["float32", "bfloat16"]
+        dtypes = (
+            ["float32", "bfloat16"]
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported()
+            else ["float32"]
+        )
         for disable_ipex_graph_mode, dtype in itertools.product(
             disable_ipex_graph_modes, dtypes
         ):
