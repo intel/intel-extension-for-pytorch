@@ -1699,6 +1699,18 @@ class Tester(TestCase):
         use_channels_last=None,
         use_te=None,
     ):
+        def _graph_check_helper(kind_in_graph, kind_not_in_graph):
+            # ipex will not prepack for BF16 if onednn not support it
+            # use this helper function to update kind_in_graph, kind_not_in_graph if onednn do not support bf16
+            if not ipex._C.onednn_has_bf16_support():
+                if "ipex_prepack::" in kind_in_graph:
+                    kind_in_graph, kind_not_in_graph = None, None
+            return kind_in_graph, kind_not_in_graph
+
+        kind_in_graph, kind_not_in_graph = _graph_check_helper(
+            kind_in_graph, kind_not_in_graph
+        )
+
         if levels is None:
             levels = ["O0", "O1"]
         if use_channels_last is None:
@@ -4228,13 +4240,14 @@ class Tester(TestCase):
                 trace_graph = traced_model.graph_for(x)
 
                 # for bfloat16 path, we will use ipex linear for 'O0' and 'O1'
-                self.assertTrue(
-                    any(
-                        "prim::If" in n.kind()
-                        or n.kind() == "ipex_prepack::linear_relu_run"
-                        for n in trace_graph.nodes()
+                if ipex._C.onednn_has_bf16_support():
+                    self.assertTrue(
+                        any(
+                            "prim::If" in n.kind()
+                            or n.kind() == "ipex_prepack::linear_relu_run"
+                            for n in trace_graph.nodes()
+                        )
                     )
-                )
 
     def test_output_linear_scalar_binary(self):
         for bias in [True, False]:
