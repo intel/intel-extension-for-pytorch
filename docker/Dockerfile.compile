@@ -17,10 +17,17 @@ RUN apt update && \
     vim \
     ccache \
     numactl \
+    gcc-12 \
+    g++-12 \
     make \
     libjpeg-dev \
     libpng-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* && \
+    update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 && \
+    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 && \
+    update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100 && \
+    update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 100
+
 RUN useradd -m ubuntu
 RUN echo 'ubuntu ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 USER ubuntu
@@ -31,7 +38,7 @@ RUN curl -fsSL -v -o miniconda.sh -O https://repo.anaconda.com/miniconda/Minicon
     rm miniconda.sh && \
     echo "source ~/miniconda3/bin/activate" >> ~/.bashrc
 
-RUN curl -fsSL -v -o compile_bundle.sh -O https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.0%2Bcpu/scripts/compile_bundle.sh && \
+RUN curl -fsSL -v -o compile_bundle.sh -O https://github.com/intel/intel-extension-for-pytorch/raw/v2.1.100%2Bcpu/scripts/compile_bundle.sh && \
     . ~/miniconda3/bin/activate && \
     conda create -y -n py310 python=3.10 && \
     conda activate py310 && \

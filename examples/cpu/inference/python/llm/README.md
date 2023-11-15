@@ -1,103 +1,80 @@
 # Text Generation
+
 We provide the inference benchmarking scripts for large language models text generation.<br/>
 Support large language model families, including GPT-J, LLaMA, GPT-Neox, OPT, Falcon, CodeGen.<br/>
 The scripts include both single instance and distributed (DeepSpeed) use cases.<br/>
 The scripts cover model generation inference with low precions cases for different models with best perf and accuracy (bf16 AMP，static quantization and weight only quantization).<br/>
 
-# Setup
+# Supported Model List
+
+| MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP32/BF16 | Weight only quantzation INT8 | Weight only quantization INT4| Static quantization INT8 |
+|---|:---:|:---:|:---:|:---:|:---:|
+|LLAMA| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" | ✅ | ✅ | ✅ | ✅ |
+|GPT-J| "EleutherAI/gpt-j-6b" | ✅ | ✅ | ✅ | ✅ |
+|GPT-NEOX| "EleutherAI/gpt-neox-20b" | ✅ | ✅ | ✅ | ❎ \*\* |
+|FALCON\*|"tiiuae/falcon-40b" | ✅ | ✅ |  ✅ | ❎ \*\*|
+|OPT|"facebook/opt-30b", "facebook/opt-1.3b"| ✅ | ✅ |  ✅ | ❎ \*\*|
+|CodeGen|"Salesforce/codegen-2B-multi"| ✅ | ✅ |  ✅ | ❎ \*\*|
+
+\* For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for FP32/BF16 but needed for quantizations.
+
+\*\* For GPT-NEOX/FALCON/OPT/CodeGen models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.
+
+*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM model families, we are working in progress to cover those optimizations, which will expand the model list above.
+
+# Environment Setup
+
+1. Get the Intel® Extension for PyTorch\* source code
+
 ```bash
-WORK_DIR=$PWD
-# GCC 12.3 is required, please set it firstly
-# Create environment (conda recommended)
+git clone https://github.com/intel/intel-extension-for-pytorch.git
+cd intel-extension-for-pytorch
+git checkout v2.1.100+cpu
+cd examples/cpu/inference/python/llm
+```
+
+2.a. It is highly recommended to build a Docker container from the provided `Dockerfile`.
+
+```bash
+# Build an image with the provided Dockerfile
+docker build -t ipex-llm:2.1.100 .
+
+# Run the container with command below
+docker run --rm -it --privileged ipex-llm:2.1.100 bash
+
+# When the command prompt shows inside the docker container, enter llm examples directory
+cd llm
+```
+
+2.b. Alternatively, you can take advantage of a provided environment configuration script to setup an environment without using a docker container.
+
+```bash
+# GCC 12.3 is required. Installation can be taken care of by the environment configuration script.
+# Create a conda environment
 conda create -n llm python=3.9 -y
-# install deps
-conda install cmake ninja mkl mkl-include -y
-conda install gperftools -c conda-forge -y
+conda activate llm
 
-# Install PyTorch 2.1 release
-python -m pip install torch==2.1 --index-url https://download.pytorch.org/whl/cpu
+# Setup the environment with the provided script
+bash ./tools/env_setup.sh
+```
 
-# Install IPEX 2.1 release
-python -m pip install intel_extension_for_pytorch
+3. Once an environment is configured with either method above, set necessary environment variables with an environment variables activation script and download the sample `prompt.json`.
 
-# Used for accuracy test only
-git clone https://github.com/EleutherAI/lm-evaluation-harness
-cd lm-evaluation-harness
-pip install -e .
-
-# Install transformers
-pip install transformers==4.31.0
-# Install others deps
-pip install cpuid accelerate datasets sentencepiece protobuf==3.20.3
-
-# Setup environment variables for performance on Xeon
-export LD_PRELOAD=${CONDA_PREFIX}/lib/libstdc++.so.6
-export KMP_BLOCKTIME=INF
-export KMP_TPAUSE=0
-export KMP_SETTINGS=1
-export KMP_FORJOIN_BARRIER_PATTERN=dist,dist
-export KMP_PLAIN_BARRIER_PATTERN=dist,dist
-export KMP_REDUCTION_BARRIER_PATTERN=dist,dist
-export LD_PRELOAD=${LD_PRELOAD}:${CONDA_PREFIX}/lib/libiomp5.so # Intel OpenMP
-# Tcmalloc is a recommended malloc implementation that emphasizes fragmentation avoidance and scalable concurrency support.
-export LD_PRELOAD=${LD_PRELOAD}:${CONDA_PREFIX}/lib/libtcmalloc.so
-
-# [Optional] install neural-compressor for GPT-J static quantization and running GPTQ (see below)
-pip install neural-compressor==2.3.1
-
-# [Optional] The following is only for DeepSpeed case
-#Install oneccl-bind-pt(also named torch-ccl)
-git clone https://github.com/intel/torch-ccl.git
-cd torch-ccl && git checkout v2.1.0+cpu
-git submodule sync && git submodule update --init --recursive
-python setup.py install
-cd ../
-#Install DeepSpeed
-git clone https://github.com/delock/DeepSpeedSYCLSupport
-cd DeepSpeedSYCLSupport
-git checkout gma/run-opt-branch
-python -m pip install -r requirements/requirements.txt
-python setup.py install
-cd ../
-#Install OneCCL
-git clone https://github.com/oneapi-src/oneCCL.git
-cd oneCCL
-mkdir build
-cd build
-cmake ..
-make -j install
-source _install/env/setvars.sh
-cd ../..
+```bash
+# Activate environment variables
+source ./tools/env_activate.sh
 
 # Get the sample prompt.json
-# Make sure the downloaded prompt.json file is under the same directory as that of the python scripts mentioned above.
 wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
 
 ```
 
-# Supported Model List
-
-| MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP32/BF16 | Weight only quantzation INT8 | Weight only quantization INT4| Static quantization INT8 | 
-|---|:---:|:---:|:---:|:---:|:---:|
-|LLAMA| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" | ✅ | ✅ | ✅ | ✅ | 
-|GPT-J| "EleutherAI/gpt-j-6b" | ✅ | ✅ | ✅ | ✅ | 
-|GPT-NEOX| "EleutherAI/gpt-neox-20b" | ✅ | ✅ | ✅ | ❎ ** | 
-|FALCON*|"tiiuae/falcon-40b" | ✅ | ✅ |  ✅ | ❎ **| 
-|OPT|"facebook/opt-30b", "facebook/opt-1.3b"| ✅ | ✅ |  ✅ | ❎ **| 
-|CodeGen|"Salesforce/codegen-2B-multi"| ✅ | ✅ |  ✅ | ❎ **|
-
-*For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for FP32/BF16 but needed for quantizations.
-
-** For GPT-NEOX/FALCON/OPT/CodeGen models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.
-
-*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM model families, we are working in progress to cover those optimizations, which will expand the model list above.
-
 # Run Models Generations
 
-| Benchmark mode | FP32/BF16 | Weight only quantzation INT8 | Weight only quantization INT4 | Static quantization INT8 | 
+| Benchmark mode | FP32/BF16 | Weight only quantzation INT8 | Weight only quantization INT4 | Static quantization INT8 |
 |---|:---:|:---:|:---:|:---:|
-|Single instance | ✅ | ✅ | ✅ | ✅ | 
-| Distributed (autotp) |  ✅ | ✅ | ❎ | ❎ | 
+|Single instance | ✅ | ✅ | ✅ | ✅ |
+| Distributed (autotp) |  ✅ | ✅ | ❎ | ❎ |
 
 You can run LLM with a one-click Python script "run.py" for all inference cases.
 ```
@@ -107,7 +84,7 @@ python run.py --help # for more detailed usages
 ### Single Instance Performance
 ```bash
 # Get prompt file to the path of scripts
-mv PATH/TO/prompt.json ./single_instance
+cp prompt.json ./single_instance
 export WORK_DIR=./
 
 # bf16 benchmark
@@ -134,7 +111,7 @@ Notes:
 ### Distributed Performance with DeepSpeed (autoTP)
 ```bash
 # Get prompt file to the path of scripts
-mv PATH/TO/prompt.json ./distributed
+cp prompt.json ./distributed
 export WORK_DIR=./
 unset KMP_AFFINITY
 
@@ -158,13 +135,13 @@ Notes:
 # Get prompt file to the path of scripts
 export WORK_DIR=./
 cd single_instance
-mv PATH/TO/prompt.json ./
+cp PATH/TO/prompt.json ./
 # bfloat16 benchmark
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run_generation.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --deployment-mode
 
 # quantization benchmark
 #To run quantization performance, you need to firstly get the quantized model with the following step (1) and then run the performance benchmark with the following step (2)
-## (1) Do quantization to get the quantized model 
+## (1) Do quantization to get the quantized model
 ## note: llama/gptj we have both IPEX smooth quant and weight-only-quantization, while for rest models, we recommend weight-only-quantization
 mkdir saved_results
 
@@ -180,7 +157,7 @@ python run_gpt-neox_quantization.py --ipex-weight-only-quantization --output-dir
 ## Falcon quantization (example of config-file: utils/model_config/tiiuae_falcon-40b_config.json)
 python run_falcon_quantization.py --ipex-weight-only-quantization --output-dir "saved_results"  --int8-bf16-mixed -m <FALCON MODEL_ID> --config-file <CONFIG_FILE>
 ## OPT quantization
-python run_opt_quantization.py --ipex-weight-only-quantization --output-dir "saved_results"  --int8-bf16-mixed -m <OPT MODEL_ID> 
+python run_opt_quantization.py --ipex-weight-only-quantization --output-dir "saved_results"  --int8-bf16-mixed -m <OPT MODEL_ID>
 ## CodeGen quantization
 python run_codegen_quantization.py --ipex-weight-only-quantization --output-dir "saved_results"  --int8-bf16-mixed -m <CODEGEN MODEL_ID>
 
@@ -289,7 +266,7 @@ deepspeed --bind_cores_to_rank run_generation_with_deepspeed.py --benchmark -m E
 
 ## Distributed Accuracy with DeepSpeed (autoTP)
 ```bash
-# Run distributed accuracy with 2 ranks of one node for bfloat16 with ipex and jit 
+# Run distributed accuracy with 2 ranks of one node for bfloat16 with ipex and jit
 source ${ONECCL_DIR}/build/_install/env/setvars.sh
 
 export LD_PRELOAD=${CONDA_PREFIX}/lib/libiomp5.so:${CONDA_PREFIX}/lib/libtcmalloc.so
