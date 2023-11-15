@@ -724,6 +724,12 @@ class IPEXCPPLibBuild(build_clib, object):
 
             cmake_args_gpu = []
             define_build_options(cmake_args_gpu, **build_option_gpu)
+            if "IPEX_GPU_EXTRA_BUILD_OPTION" in os.environ:
+                exist_ldflags = "LDFLAGS" in my_env
+                ldflags = ""
+                if exist_ldflags:
+                    ldflags = my_env["LDFLAGS"]
+                my_env["LDFLAGS"] = f"{my_env['IPEX_GPU_EXTRA_BUILD_OPTION']} {ldflags}"
             _gen_build_cfg_from_cmake(
                 cmake_exec,
                 project_root_dir,
@@ -732,6 +738,11 @@ class IPEXCPPLibBuild(build_clib, object):
                 my_env,
                 use_ninja,
             )
+            if "IPEX_GPU_EXTRA_BUILD_OPTION" in os.environ:
+                if exist_ldflags:
+                    ldflags = my_env["LDFLAGS"]
+                else:
+                    del my_env["LDFLAGS"]
 
         if build_with_cpu:
             # Generate cmake for CPU module:

@@ -37,7 +37,7 @@ set(BUILD_OPT_LEVEL "" CACHE STRING "Add build option -Ox, accept values: 0/1")
 
 set(EXTRA_BUILD_OPTION)
 if (DEFINED ENV{IPEX_GPU_EXTRA_BUILD_OPTION})
-  # An interface to setup extra build option. 
+  # An interface to setup extra build option.
   # Example, set env var: IPEX_GPU_EXTRA_BUILD_OPTION="gcc-install-dir=[path]"
   include(CheckCXXCompilerFlag)
   check_cxx_compiler_flag($ENV{IPEX_GPU_EXTRA_BUILD_OPTION} OPT_CHECK_PASS)
