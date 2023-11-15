@@ -1296,6 +1296,24 @@ class WeightOnlyQuantizationTester(TestCase):
             test(shape, has_bias, act_quant_mode, group_size)
 
 
+class QuantizedOpsTester(TestCase):
+    def test_matmul_i8i8i32(self):
+        x = torch.randn(4, 8)
+        w = torch.randn(4, 8)
+        x_min, x_max = x.aminmax()
+        x_scale = torch.max(x_max, x_min.neg()) / 127
+        qx = torch.round(x / x_scale).to(torch.int8)
+        w_min, w_max = w.aminmax(dim=1)
+        w_scale = torch.max(w_max, w_min.neg()) / 127
+        qw = torch.round(w / w_scale.unsqueeze(-1)).to(torch.int8)
+        for use_bf16 in [False, True]:
+            dtype = torch.bfloat16 if use_bf16 else torch.float32
+            with torch.cpu.amp.autocast(enabled=use_bf16, dtype=dtype):
+                qy = torch.ops.torch_ipex.matmul_i8i8i32(qx, qw)
+                qy_ref = torch.nn.functional.linear(qx.to(dtype), qw.to(dtype))
+                self.assertEqual(qy.to(dtype), qy_ref)
+
+
 if __name__ == "__main__":
     test = unittest.main()
     run_tests()

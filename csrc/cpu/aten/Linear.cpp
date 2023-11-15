@@ -584,6 +584,74 @@ at::Tensor woq_linear_add_add_forward(
 }
 #endif
 
+at::Tensor matmul_i8i8i32(const at::Tensor& input, const at::Tensor& weight) {
+  // x:s8 * w:s8 -> y:s32
+  // No bias
+  TORCH_CHECK(
+      input.scalar_type() == c10::kChar,
+      "matmul_i8i8i32: input dtype should be signed int8 but found ",
+      input.scalar_type());
+  TORCH_CHECK(
+      weight.scalar_type() == c10::kChar,
+      "matmul_i8i8i32: weight dtype should be signed int8 but found ",
+      weight.scalar_type());
+  TORCH_CHECK(
+      input.dim() == 2 && weight.dim() == 2,
+      "matmul_i8i8i32: Expect Input and weight are 2d but got ",
+      input.dim(),
+      " and ",
+      weight.dim());
+  TORCH_CHECK(
+      input.size(1) == weight.size(1),
+      "matmul_i8i8i32: Input shape and weight shape do not match, got ",
+      input.sizes(),
+      " and ",
+      weight.sizes());
+  auto output_shape = input.sizes().vec();
+  output_shape.back() = weight.size(0);
+  auto output = at::empty(output_shape, input.options().dtype(c10::kInt));
+  auto input_contig = input.contiguous();
+  auto weight_contig = weight.t().contiguous();
+  // Create ideep tensors for oneDNN computation
+  auto src = ideep::tensor(
+      {input_contig.sizes().vec(),
+       ideep::tensor::data_type::s8,
+       input_contig.strides().vec()},
+      input_contig.data_ptr());
+  auto wei = ideep::tensor(
+      {weight_contig.sizes().vec(),
+       ideep::tensor::data_type::s8,
+       weight_contig.strides().vec()},
+      weight_contig.data_ptr());
+  auto dst = ideep::tensor(
+      {output.sizes().vec(),
+       ideep::tensor::data_type::s32,
+       output.strides().vec()},
+      output.data_ptr());
+  // Create primitive desc
+  auto engine = ideep::engine::cpu_engine();
+  ideep::attr_t op_attr;
+  op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+  auto src_desc = src.get_desc();
+  auto wei_desc = wei.get_desc();
+  auto dst_desc = dst.get_desc();
+  auto prim_desc = dnnl::matmul::primitive_desc(
+      engine, src_desc, wei_desc, dst_desc, op_attr);
+  // Reorder weight
+  auto expected_weight = wei.reorder_if_differ_in(prim_desc.weights_desc());
+  // Prepare args for primitive
+  ideep::tensor scratchpad(prim_desc.scratchpad_desc());
+  ideep::exec_args args;
+  args.insert({DNNL_ARG_SRC, src});
+  args.insert({DNNL_ARG_WEIGHTS, expected_weight});
+  args.insert({DNNL_ARG_DST, dst});
+  args.insert({DNNL_ARG_SCRATCHPAD, scratchpad});
+  // Create primitve and execute
+  auto primitive = dnnl::matmul(prim_desc);
+  primitive.execute(ideep::stream::default_stream(), args);
+  return output;
+}
+
 } // namespace cpu
 } // namespace torch_ipex
 
@@ -696,6 +764,16 @@ at::Tensor woq_linear_add_add_forward(
       cpu_cached_cast(target_type, others));
 }
 #endif
+
+at::Tensor matmul_i8i8i32(const at::Tensor& input, const at::Tensor& weight) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::matmul_i8i8i32", "")
+                       .typed<decltype(matmul_i8i8i32)>();
+  // input is int8. Don't cast to autocast dtype
+  return op.call(input, weight);
+}
+
 } // namespace autocast
 } // namespace torch_ipex
 
@@ -783,6 +861,14 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "linear_eltwise_backward",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::linear_eltwise_backward);
+  // bnb
+  m.def("matmul_i8i8i32(Tensor input, Tensor weight) -> Tensor");
+  m.impl(
+      "matmul_i8i8i32", c10::DispatchKey::CPU, torch_ipex::cpu::matmul_i8i8i32);
+  m.impl(
+      "matmul_i8i8i32",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::matmul_i8i8i32);
 }
 
 } // namespace
