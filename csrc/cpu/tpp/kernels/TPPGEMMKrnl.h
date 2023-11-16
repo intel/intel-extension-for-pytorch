@@ -92,6 +92,14 @@ inline void tpp_linear_bias(
   auto in_sizes = t_in.sizes();
   auto wt_sizes = t_wt.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
+  if (BS > FT_OPT_SIZE) { // first token compute
+    if (wt_sizes[3] != 100) {
+      t_wt = wt_tensor_for_first_token<T>(t_wt);
+      wt_sizes = t_wt.sizes();
+    }
+    large_cache_opt = true;
+  }
+
   auto C = in_sizes[2];
 
   auto Nc = wt_sizes[1];
@@ -169,11 +177,14 @@ inline void tpp_linear_no_bias(
     at::Tensor& t_out) {
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
+  auto wt_sizes = t_wt.sizes();
   if (BS > FT_OPT_SIZE) { // first token compute
-    t_wt = wt_tensor_for_first_token<T>(t_wt);
+    if (wt_sizes[3] != 100) {
+      t_wt = wt_tensor_for_first_token<T>(t_wt);
+      wt_sizes = t_wt.sizes();
+    }
     large_cache_opt = true;
   }
-  auto wt_sizes = t_wt.sizes();
   auto C = in_sizes[2];
 
   auto Nc = wt_sizes[1];
