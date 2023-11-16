@@ -157,15 +157,6 @@ class _IPEXlinearNewGeluCPU(_IPEXlinearFusionCPU):
                 self.linear.bias if self.linear.bias is not None else x.new_empty(0),
                 self.linear.out_features,
             )
-        if (
-            self.woq
-            and hasattr(self.linear, "_op_context")
-            and self.linear._op_context is not None
-        ):
-            return torch.ops.torch_ipex.woq_linear_gelu(
-                x,
-                self.linear._op_context.get_data_handle(),
-            )
 
         else:  # fallback path
             x = self.linear(x)
@@ -195,6 +186,15 @@ class _IPEXlinearGeluCPU(_IPEXlinearFusionCPU):
                 self.linear.weight,
                 self.linear.bias if self.linear.bias is not None else x.new_empty(0),
                 self.linear.out_features,
+            )
+        if (
+            self.woq
+            and hasattr(self.linear, "_op_context")
+            and self.linear._op_context is not None
+        ):
+            return torch.ops.torch_ipex.woq_linear_gelu(
+                x,
+                self.linear._op_context.get_data_handle(),
             )
         else:  # fallback path
             x = self.gelu(self.linear(x))
@@ -299,7 +299,9 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                     )
                 else:  # qint8
                     assert w_dtype == torch.qint8
-                    self.concat_linear = IpexWoqLinear.from_float(mod)
+                    self.concat_linear = IpexWoqLinear.from_float(
+                        mod, concat_scales, concat_zeros
+                    )
         else:
             for i in range(self.num_concat):
                 attr_name = f"linear_{i}"

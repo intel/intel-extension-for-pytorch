@@ -364,22 +364,25 @@ def ipex_quantization_flow(
 ):
     from intel_extension_for_pytorch.quantization import prepare, convert
 
-    if not _is_woq_qconfig(qconfig) and sample_inputs is None:
+    is_woq = _is_woq_qconfig(qconfig)
+    if not is_woq and sample_inputs is None:
         sample_inputs = get_dummy_input(_model)
 
     prepared_model = prepare(
         _model.eval(), qconfig, example_inputs=sample_inputs, inplace=True
     )
+
     if static_qconfig_file is not None:
         prepared_model.load_qconf_summary(qconf_summary=static_qconfig_file)
         print("ipex.optimize_transformers is doing the static quantization")
     else:
         print("ipex.optimize_transformers is doing the weight only quantization")
+
     with torch.no_grad(), torch.cpu.amp.autocast(
         enabled=True if dtype is torch.bfloat16 else False
     ):
         convert_model = convert(prepared_model.eval(), inplace=True).eval()
-        if _is_woq_qconfig(qconfig) and dtype is torch.bfloat16:
+        if is_woq and dtype is torch.bfloat16:
             convert_model = convert_model.to(dtype)
     return convert_model
 

@@ -60,11 +60,15 @@ class IpexWoqLinear(nn.Module):
         return extra_repr_str
 
     @classmethod
-    def from_float(cls, mod):
+    def from_float(cls, mod, scales=None, zero_points=None):
         r"""Create a weight-only quantized module from a float module or qparams_dict
 
         Args:
             mod (Module): an instance of nn.Linear or its subclasses.
+            scales: the scales Tensor for quantizing weight. If it is None,
+                scales are found by min/max of the weight.
+            zero_points: the zero points Tensor for quantizing weight. If it is None,
+                zero points are found by min/max of the weight.
         """
         float_modules = [torch.nn.Linear]
         deepspeed_modules = may_import_deepspeed_modules()
@@ -102,10 +106,12 @@ class IpexWoqLinear(nn.Module):
         group_size = qconfig.group_size
 
         if group_size == -1:
-            qweight, scales, zero_points = quantize_per_channel(mod.weight, is_int4)
+            qweight, scales, zero_points = quantize_per_channel(
+                mod.weight, is_int4, scales, zero_points
+            )
         else:
             qweight, scales, zero_points = quantize_per_block(
-                mod.weight, is_int4, group_size
+                mod.weight, is_int4, group_size, scales, zero_points
             )
         if not hasattr(mod, "in_features"):
             mod.in_features = mod.weight.size()[1]

@@ -7,6 +7,7 @@ import os
 import copy
 import re
 import tempfile
+from intel_extension_for_pytorch.quantization import prepare, convert
 
 try:
     import transformers
@@ -266,9 +267,16 @@ class OptimizeTransformersTester(TestCase):
         self.model_replacement_check(m, True, torchcompile=True)
 
     def _model_replacement_check_woq(self, model):
-        qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
+        qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping()
+        orig_model = copy.deepcopy(model)
+        orig_woq_model = prepare(orig_model, qconfig_mapping, inplace=True)
+        orig_woq_model = convert(orig_woq_model, inplace=True)
+
         model = ipex.optimize_transformers(
-            model, dtype=torch.float, quantization_config=qconfig, deployment_mode=True
+            model,
+            dtype=torch.float,
+            quantization_config=qconfig_mapping,
+            deployment_mode=True,
         )
         if not hasattr(model, "trace_graph"):
             AssertionError(False)
@@ -307,7 +315,14 @@ class OptimizeTransformersTester(TestCase):
         # Ensure model can run without errors
         with torch.no_grad():
             example_inputs = _get_gptj_example_inputs()
-            model(*example_inputs)
+            y = model(*example_inputs)
+            y_ref = orig_woq_model(
+                input_ids=example_inputs[0],
+                attention_mask=example_inputs[1],
+                position_ids=example_inputs[2],
+                use_cache=True,
+            )
+            self.assertEqual(y[0], y_ref[0], prec=1e-4)
 
     def test_weight_only_quant_flow_for_gptj(self):
         config = AutoConfig.from_pretrained(
