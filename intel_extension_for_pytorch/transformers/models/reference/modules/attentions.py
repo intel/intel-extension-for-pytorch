@@ -650,7 +650,7 @@ def _CodeGenAttention_forward(
             query,
             key,
             value,
-            self.scale_attn,
+            self.scale_attn_value,
             layer_past,
             head_mask,
             attention_mask,
@@ -818,7 +818,7 @@ class _IPEXAttentionRef(nn.Module):
                 self.num_kv_heads = 1
             self.new_decoder_architecture = is_new_decoder_architecture
 
-        if self.model_backbone == "GPTJForCausalLM":
+        if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
             self.scale_attn_value = self.scale_attn.item()
         if self.model_backbone == "GPTNeoXForCausalLM":
             self.norm_factor_value = self.norm_factor.item()
