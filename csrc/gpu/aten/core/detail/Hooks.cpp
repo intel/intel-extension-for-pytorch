@@ -20,31 +20,23 @@
 namespace xpu {
 namespace dpcpp {
 namespace detail {
+namespace {
 
-void XPUHooks::initXPU() const {
-  // TODO:
+// Cache the global id of each aten device to avoid the SYCL runtime overhead
+// for better performance.
+static std::vector<int32_t> aten_device_global_ids;
+static std::once_flag init_global_id_pool_flag;
+static std::deque<std::once_flag> init_aten_device_flag;
+
+static void initGlobalIdPoolState() {
+  auto num_gpus = xpu::dpcpp::device_count();
+  aten_device_global_ids.resize(num_gpus);
+  init_aten_device_flag.resize(num_gpus);
 }
 
-bool XPUHooks::hasXPU() const {
-  return true;
-}
-
-std::string XPUHooks::showConfig() const {
-  return "XPU backend version: 1.0";
-}
-
-at::Device XPUHooks::getATenDeviceFromDLPackDevice(
-    const DLDevice_& dl_device,
-    void* data) const {
-  return getATenDeviceFromUSM(data, dl_device.device_id);
-}
-
-DLDevice_& XPUHooks::getDLPackDeviceFromATenDevice(
-    DLDevice_& dl_device,
-    const at::Device& aten_device,
-    void* data) const {
-  TORCH_CHECK(aten_device.is_xpu(), "Only the XPU device type is expected.");
-  sycl::device& xpu_device = xpu::dpcpp::dpcppGetRawDevice(aten_device.index());
+// Get gpu device id from all SYCL devices associated with the SYCL platform.
+static void initGlobalIdFromATenDeviceId(const DeviceId aten_device_id) {
+  sycl::device& xpu_device = xpu::dpcpp::dpcppGetRawDevice(aten_device_id);
   sycl::device target_device;
 
   if (Settings::I().is_device_hierarchy_composite_enabled()) {
@@ -73,18 +65,56 @@ DLDevice_& XPUHooks::getDLPackDeviceFromATenDevice(
     // device `xpu_device` in sycl::device::get_devices()
     target_device = xpu_device;
   }
+  // Get all SYCL devices associated with the SYCL platform.
   auto device_list = sycl::device::get_devices();
   auto beg = std::begin(device_list);
   auto end = std::end(device_list);
   auto selector_fn = [target_device](const sycl::device& device) -> bool {
     return target_device == device;
   };
+
   auto pos = find_if(beg, end, selector_fn);
+  TORCH_CHECK(pos != end, "Failed to find the global id of this aten device.");
 
-  TORCH_CHECK(pos != end, "Could not produce DLPack: failed finding device_id");
-  std::ptrdiff_t dev_idx = std::distance(beg, pos);
+  aten_device_global_ids[aten_device_id] =
+      static_cast<int32_t>(std::distance(beg, pos));
+}
+} // anonymous namespace
 
-  dl_device = {kDLOneAPI, dev_idx};
+void XPUHooks::initXPU() const {
+  // TODO:
+}
+
+bool XPUHooks::hasXPU() const {
+  return true;
+}
+
+std::string XPUHooks::showConfig() const {
+  return "XPU backend version: 1.0";
+}
+
+at::Device XPUHooks::getATenDeviceFromDLPackDevice(
+    const DLDevice_& dl_device,
+    void* data) const {
+  return getATenDeviceFromUSM(data, dl_device.device_id);
+}
+
+DLDevice_& XPUHooks::getDLPackDeviceFromATenDevice(
+    DLDevice_& dl_device,
+    const at::Device& aten_device,
+    void* data) const {
+  TORCH_CHECK(aten_device.is_xpu(), "Only the XPU device type is expected.");
+
+  auto aten_device_id = aten_device.index();
+  // This is a thread-safe implementation via std::call_once.
+  std::call_once(init_global_id_pool_flag, initGlobalIdPoolState);
+  std::call_once(
+      init_aten_device_flag[aten_device_id],
+      initGlobalIdFromATenDeviceId,
+      aten_device_id);
+
+  auto device_global_id = aten_device_global_ids[aten_device_id];
+  dl_device = {kDLOneAPI, device_global_id};
 
   return dl_device;
 }
