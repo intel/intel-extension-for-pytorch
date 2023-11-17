@@ -28,11 +28,12 @@ class IPEXTransformerAttn(nn.Module):
         super().__init__()
         self.config = config
         self.layer_id = IPEXTransformerAttn.layer_id_static
+        self.runtime_cache_size = 16
         IPEXTransformerAttn.layer_id_static += 1
 
     @staticmethod
     def release_resources():
-        raise NotImplementedError
+        pass
 
     def forward(
         self,
@@ -109,6 +110,12 @@ class IPEXTransformerAttn(nn.Module):
 
     def end_of_attention(self):
         if self.layer_id + 1 == self.layer_id_static:
+            if (
+                not self.is_beam_search()
+                and IPEXTransformerAttn.timestamp % self.runtime_cache_size == 0
+            ):
+                torch.xpu.synchronize()
+                torch.xpu.empty_cache()
             IPEXTransformerAttn.timestamp += 1
 
     def is_beam_search(self):

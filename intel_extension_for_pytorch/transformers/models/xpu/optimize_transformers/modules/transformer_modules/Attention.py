@@ -60,6 +60,13 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
                 out_shape, device=hidden_states.device, dtype=hidden_states.dtype
             )
 
+    def ready_for_runtime_cache_update(self):
+        if self.runtime_cache.key_cache is None:
+            return False
+        prompt_len = 0 if self.is_beam_search() else self.prompt_len
+        response_cache_len = self.runtime_cache.key_cache.size(0) - prompt_len
+        return response_cache_len == IPEXTransformerAttn.timestamp
+
     def prepare_kv_cache(self, hidden_states):
         bs_beam, seq_len, embed_dim = self.get_runtime_shape(hidden_states)
         batch_size = bs_beam // self.beam_size
@@ -68,20 +75,13 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
             or self.runtime_cache.value_cache is None
             or batch_size != self.batch_size
         ):
-            if self.is_beam_search():
-                cache_shape = [
-                    self.max_out_position,
-                    bs_beam,
-                    self.num_attn_head,
-                    self.head_dim,
-                ]
-            else:
-                cache_shape = [
-                    self.max_position,
-                    bs_beam,
-                    self.num_attn_head,
-                    self.head_dim,
-                ]
+            self.prompt_len = seq_len
+            cache_len = (
+                self.runtime_cache_size
+                if self.is_beam_search()
+                else self.runtime_cache_size + seq_len
+            )
+            cache_shape = [cache_len, bs_beam, self.num_attn_head, self.head_dim]
             self.runtime_cache.key_cache = torch.empty(
                 cache_shape, device=hidden_states.device, dtype=hidden_states.dtype
             )
@@ -89,6 +89,21 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
                 cache_shape, device=hidden_states.device, dtype=hidden_states.dtype
             )
             self.batch_size = batch_size
+
+        elif self.ready_for_runtime_cache_update():
+            old_cache_len = self.runtime_cache.key_cache.size(0)
+            cache_len = old_cache_len + self.runtime_cache_size
+            cache_shape = [cache_len, bs_beam, self.num_attn_head, self.head_dim]
+            key_cache_tmp = torch.empty(
+                cache_shape, device=hidden_states.device, dtype=hidden_states.dtype
+            )
+            val_cache_tmp = torch.empty(
+                cache_shape, device=hidden_states.device, dtype=hidden_states.dtype
+            )
+            key_cache_tmp[:old_cache_len, :, :, :] = self.runtime_cache.key_cache
+            self.runtime_cache.key_cache = key_cache_tmp
+            val_cache_tmp[:old_cache_len, :, :, :] = self.runtime_cache.value_cache
+            self.runtime_cache.value_cache = val_cache_tmp
 
     # ##############################################################################################
 
