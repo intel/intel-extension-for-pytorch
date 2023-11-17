@@ -42,8 +42,17 @@ add_library(${TARGET} SHARED ${kernels_src})
 target_compile_definitions(${TARGET} PUBLIC XETPP_NEW_XMAIN)
 message(STATUS "XETPP_NEW_XMAIN is set to " $ENV{NEW_XMAIN})
 
-set(THIRD_PARTY_XETLA_INCLUDE_DIR "${IPEX_THIRD_PARTY_ROOT}/xetla/include")
-target_include_directories(${TARGET} PUBLIC ${THIRD_PARTY_XETLA_INCLUDE_DIR} )
+set(XETLA_INCLUDE_DIR "${IPEX_THIRD_PARTY_ROOT}/xetla/include")
+if (USE_XETLA_SRC)
+  set(XETLA_INCLUDE_DIR "${USE_XETLA_SRC}/include")
+endif()
+
+find_file(XETLA_HEADER NAMES xetla.hpp PATHS ${XETLA_INCLUDE_DIR} PATH_SUFFIXES NO_DEFAULT_PATH)
+if(NOT XETLA_HEADER)
+  message(FATAL_ERROR "XeTLA header ${XETLA_HEADER} not found in ${XETLA_INCLUDE_DIR}")
+endif()
+
+target_include_directories(${TARGET} PUBLIC ${XETLA_INCLUDE_DIR} )
 target_include_directories(${TARGET} PUBLIC ${IPEX_INCLUDE_DIRS} )
 
 target_link_options(${TARGET} PRIVATE ${XETLA_KERNEL_FLAGS})
