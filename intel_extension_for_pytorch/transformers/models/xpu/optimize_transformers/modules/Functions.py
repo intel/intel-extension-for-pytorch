@@ -145,6 +145,8 @@ def _ipex_prepare_model_inputs(
 
     bs = inputs.shape[0]
     IPEXTransformerAttn.batch_size = bs
+    IPEXTransformerAttn.reset_timestamp()
+    IPEXTransformerAttn.release_resources()
     return inputs, input_name, model_kwargs
 
 
@@ -625,6 +627,7 @@ def _ipex_beam_search(
                 break
             else:
                 this_peer_finished = True
+        torch.xpu.empty_cache()
 
     IPEXLLMResourceContrainer.release_resources()
     out = torch.ops.torch_ipex.beam_search_finalize(
