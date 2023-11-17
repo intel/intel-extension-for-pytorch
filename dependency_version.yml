@@ -1,0 +1,21 @@
+deepspeed:
+  branch: gma/run-opt-branch
+  repo: https://github.com/delock/DeepSpeedSYCLSupport.git
+  version: 0.11.2+57ff508
+gcc:
+  max_version: 12.3.1
+  min_version: 7.3.0
+llvm:
+  version: 16.0.6
+pytorch:
+  version: 2.2.0.dev20231113+cpu
+torch-ccl:
+  repo: https://github.com/intel/torch-ccl.git
+  tag: ccl_torch_dev_1115
+  version: 2.2.0+cpu
+torchaudio:
+  version: 2.2.0.dev20231113+cpu
+torchvision:
+  version: 0.17.0.dev20231113+cpu
+transformers:
+  version: 4.31.0
