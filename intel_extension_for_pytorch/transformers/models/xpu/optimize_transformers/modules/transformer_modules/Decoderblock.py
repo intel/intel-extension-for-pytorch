@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 
@@ -38,6 +39,8 @@ class IPEXTransformerBlock(nn.Module):
         self.port_mlp_parameter()
         self.port_norm_parameter()
         self.port_module_specific_parameter()
+        torch.xpu.synchronize()
+        torch.xpu.empty_cache()
         # for debug
         # self.print_all_paramter_with_name
 
