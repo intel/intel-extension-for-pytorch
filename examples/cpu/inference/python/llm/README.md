@@ -174,7 +174,7 @@ Here is how to use it:
 # Step 1: Generate modified weights and quantization info
 python utils/run_gptq.py --model <MODEL_ID> --output-dir ./saved_results
 ```
-It may take a few hours to finish. Modified weights and their quantization info are stored in `gptq_checkpoint.pt`.
+It may take a few hours to finish. Modified weights and their quantization info are stored in `gptq_checkpoint_g128.pt`, where g128 means group size for input channel is 128 by default.
 Then generate model for weight only quantization with INT4 weights and run tasks.
 ```bash
 # Step 2: Generate quantized model with INT4 weights

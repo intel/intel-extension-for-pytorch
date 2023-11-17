@@ -52,7 +52,13 @@ def _get_linear_parameters(attr_name, state_dict, checkpoint_config):
     scales = state_dict.get(s_key, None)
     qzeros = state_dict.get(z_key, None)
     bias = state_dict.get(b_key, None)
-    return qweight, scales, qzeros, bias
+    group_size = -1
+    if qweight is not None and scales is not None:
+        assert scales.dim() == 2, "Unexpected scales tensor dimension"
+        if scales.size(-1) != 1:
+            # qweight is compressed along the last dim int4 * 8 -> int32
+            group_size = qweight.size(-1) * 8 // scales.size(-1)
+    return qweight, scales, qzeros, bias, group_size
 
 
 def _convert_woq_with_low_precision_checkpoint(
@@ -108,13 +114,13 @@ def _convert_woq_with_low_precision_checkpoint(
     def _convert(mod, attr_name):
         if isinstance(mod, torch.nn.Linear):
             mod.qconfig = qconfig_mapping.global_qconfig
-            qweight, scales, qzeros, bias = _get_linear_parameters(
+            qweight, scales, qzeros, bias, group_size = _get_linear_parameters(
                 attr_name, state_dict, checkpoint_config
             )
             if any(i is None for i in [qweight, scales, qzeros]):
                 return mod
             mod_new = IpexWoqLinear.from_float_and_int4_weight(
-                mod, qweight, scales, qzeros, bias
+                mod, qweight, scales, qzeros, bias, group_size=group_size
             )
             return mod_new
 

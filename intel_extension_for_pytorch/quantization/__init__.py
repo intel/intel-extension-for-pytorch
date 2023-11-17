@@ -7,5 +7,13 @@ from ._qconfig import (
     get_smooth_quant_qconfig_mapping,
     get_weight_only_quant_qconfig_mapping,
     WoqLowpMode,
+    WoqActQuantMode,
+    QConfigWoq,
 )
 from ._autotune import autotune
+from ._quantize_utils import (
+    quantize_per_channel,
+    dequantize_per_channel,
+    quantize_per_block,
+    dequantize_per_block,
+)

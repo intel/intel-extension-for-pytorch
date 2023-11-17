@@ -14,6 +14,7 @@ from intel_extension_for_pytorch.nn.functional import interaction
 
 from ._quantization_state_utils import QTensorInfo
 from ._smooth_quant import SmoothQuantActivationObserver, SmoothQuantWeightObserver
+from ._qconfig import QConfigSmoothQuant
 from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
 
 add_and_mul_ops = set(
@@ -659,7 +660,7 @@ def _create_observer(setting):
         ]
         for key in smooth_quant_sub_obs_keys:
             if key in setting:
-                setting[key] = _create_observer(setting[key])()
+                setting[key] = _create_observer(setting[key])
         return observer.with_args(**setting)
     else:
         raise NameError("torch.quantization.observer %s not found" % setting["name"])
@@ -692,12 +693,29 @@ def save_quant_state(quant_state_map, configure_file):
                         cur_tensor_infos["inf_dtype"] = str(tensor_info.inf_dtype)
                         cur_tensor_infos["force_dtype"] = str(force_dtype)
                         if tensor_info.id in v.tensor_id_to_scale_zp:
-                            cur_tensor_infos["scale"] = v.tensor_id_to_scale_zp[
-                                tensor_info.id
-                            ][0].tolist()
-                            cur_tensor_infos["zero_point"] = v.tensor_id_to_scale_zp[
-                                tensor_info.id
-                            ][1].tolist()
+                            if isinstance(
+                                v.tensor_id_to_scale_zp[tensor_info.id][0], torch.Tensor
+                            ):
+                                cur_tensor_infos["scale"] = v.tensor_id_to_scale_zp[
+                                    tensor_info.id
+                                ][0].tolist()
+                                cur_tensor_infos[
+                                    "zero_point"
+                                ] = v.tensor_id_to_scale_zp[tensor_info.id][1].tolist()
+                            else:
+                                scales_dict = v.tensor_id_to_scale_zp[tensor_info.id][0]
+                                zp_dict = v.tensor_id_to_scale_zp[tensor_info.id][1]
+                                assert isinstance(scales_dict, dict) and isinstance(
+                                    zp_dict, dict
+                                )
+                                scales_to_save = {}
+                                zp_to_save = {}
+                                for key, val in scales_dict.items():
+                                    scales_to_save.update({key: val.tolist()})
+                                for key, val in zp_dict.items():
+                                    zp_to_save.update({key: val.tolist()})
+                                cur_tensor_infos["scale"] = scales_to_save
+                                cur_tensor_infos["zero_point"] = zp_to_save
                         if (
                             str(tensor_info.id)
                             in v.tensor_id_to_smooth_quant_scaling_factor
@@ -706,11 +724,18 @@ def save_quant_state(quant_state_map, configure_file):
                             ]
                             is not None
                         ):
+                            scaling_factor_dict = (
+                                v.tensor_id_to_smooth_quant_scaling_factor[
+                                    str(tensor_info.id)
+                                ]
+                            )
+                            assert isinstance(scaling_factor_dict, dict)
+                            scaling_factors_to_save = {}
+                            for key, val in scaling_factor_dict.items():
+                                scaling_factors_to_save.update({key: val.tolist()})
                             cur_tensor_infos[
                                 "smooth_quant_scaling_factor"
-                            ] = v.tensor_id_to_smooth_quant_scaling_factor[
-                                str(tensor_info.id)
-                            ].tolist()
+                            ] = scaling_factors_to_save
                             smooth_quant_enabled = True
                     input_tensor_infos.append(cur_tensor_infos)
                 info["input_tensor_infos"] = input_tensor_infos
@@ -749,18 +774,49 @@ def save_quant_state(quant_state_map, configure_file):
                         cur_tensor_infos["orig_dtype"] = str(tensor_info.orig_dtype)
                         cur_tensor_infos["inf_dtype"] = str(tensor_info.inf_dtype)
                         if tensor_info.id in v.tensor_id_to_scale_zp:
-                            cur_tensor_infos["scale"] = v.tensor_id_to_scale_zp[
-                                tensor_info.id
-                            ][0].tolist()
-                            cur_tensor_infos["zero_point"] = v.tensor_id_to_scale_zp[
-                                tensor_info.id
-                            ][1].tolist()
-                        if tensor_info.id in v.tensor_id_to_smooth_quant_scaling_factor:
+                            if isinstance(
+                                v.tensor_id_to_scale_zp[tensor_info.id][0], torch.Tensor
+                            ):
+                                cur_tensor_infos["scale"] = v.tensor_id_to_scale_zp[
+                                    tensor_info.id
+                                ][0].tolist()
+                                cur_tensor_infos[
+                                    "zero_point"
+                                ] = v.tensor_id_to_scale_zp[tensor_info.id][1].tolist()
+                            else:
+                                scales_dict = v.tensor_id_to_scale_zp[tensor_info.id][0]
+                                zp_dict = v.tensor_id_to_scale_zp[tensor_info.id][1]
+                                assert isinstance(scales_dict, dict) and isinstance(
+                                    zp_dict, dict
+                                )
+                                scales_to_save = {}
+                                zp_to_save = {}
+                                for key, val in scales_dict.items():
+                                    scales_to_save.update({key: val.tolist()})
+                                for key, val in zp_dict.items():
+                                    zp_to_save.update({key: val.tolist()})
+                                cur_tensor_infos["scale"] = scales_to_save
+                                cur_tensor_infos["zero_point"] = zp_to_save
+                        if (
+                            str(tensor_info.id)
+                            in v.tensor_id_to_smooth_quant_scaling_factor
+                        ):
+                            scaling_factors = (
+                                v.tensor_id_to_smooth_quant_scaling_factor[
+                                    str(tensor_info.id)
+                                ]
+                            )
+                            scaling_factors_to_save = None
+                            if scaling_factors is not None:
+                                assert isinstance(
+                                    scaling_factors, dict
+                                ), f"Expect scaling factors is a dict but found {type(scaling_factors)}"
+                                scaling_factors_to_save = {}
+                                for key, val in scaling_factors.items():
+                                    scaling_factors_to_save.update({key: val.tolist()})
                             cur_tensor_infos[
                                 "smooth_quant_scaling_factor"
-                            ] = v.tensor_id_to_smooth_quant_scaling_factor[
-                                tensor_info.id
-                            ].tolist()
+                            ] = scaling_factors_to_save
                     output_tensor_infos.append(cur_tensor_infos)
                 info["output_tensor_infos"] = output_tensor_infos
                 # qconfig
@@ -779,6 +835,9 @@ def save_quant_state(quant_state_map, configure_file):
                     info["activation_observer"][
                         "act_ic_observer"
                     ] = _get_observer_setting(op_info.qconfig.activation().ic_obs)
+                    info["share_weight_observers"] = getattr(
+                        op_info.qconfig, "share_weight_observers", True
+                    )
                 info["weight_observer"] = _get_observer_setting(
                     op_info.qconfig.weight()
                 )
@@ -876,16 +935,41 @@ def load_qconf_summary_to_model(model, qconf_summary):
                         dtype_dict[tensor_info["force_dtype"]]
                     )
                     if "scale" in tensor_info:
-                        scale = torch.FloatTensor(tensor_info["scale"])
-                        zp = torch.LongTensor(tensor_info["zero_point"])
+                        if isinstance(tensor_info["scale"], list):
+                            scale = torch.FloatTensor(tensor_info["scale"])
+                            zp = torch.LongTensor(tensor_info["zero_point"])
+                        else:
+                            scale, zp = {}, {}
+                            scale_to_load = tensor_info["scale"]
+                            zp_to_load = tensor_info["zero_point"]
+                            assert isinstance(scale_to_load, dict) and isinstance(
+                                zp_to_load, dict
+                            ), (
+                                "Expect scales and zero points to load are dicts but "
+                                f"found types {type(scale_to_load)} and {type(zp_to_load)}"
+                            )
+                            for key, val in scale_to_load.items():
+                                s = torch.FloatTensor(val)
+                                scale.update({key: s})
+                            for key, val in zp_to_load.items():
+                                z = torch.LongTensor(val)
+                                zp.update({key: z})
                         v.tensor_id_to_scale_zp[tensor_info["id"]] = (scale, zp)
                     if "smooth_quant_scaling_factor" in tensor_info:
-                        scaling_factor = torch.FloatTensor(
-                            tensor_info["smooth_quant_scaling_factor"]
+                        scaling_factors = {}
+                        scaling_factors_to_load = tensor_info[
+                            "smooth_quant_scaling_factor"
+                        ]
+                        assert isinstance(scaling_factors_to_load, dict), (
+                            f"Expect scaling factors to load are a dict but found type "
+                            f"{type(scaling_factors_to_load)}"
                         )
+                        for key, val in scaling_factors_to_load.items():
+                            scaling_factor = torch.FloatTensor(val)
+                            scaling_factors.update({key: scaling_factor})
                         v.tensor_id_to_smooth_quant_scaling_factor[
                             str(tensor_info["id"])
-                        ] = scaling_factor
+                        ] = scaling_factors
                 else:
                     input_tensor_infos.append(None)
                     input_force_dtype_infos.append(None)
@@ -929,17 +1013,43 @@ def load_qconf_summary_to_model(model, qconf_summary):
                     )
                     insert_fake_quant_after_outputs.append(False)
                     if "scale" in tensor_info:
-                        scale = torch.FloatTensor(tensor_info["scale"])
-                        zp = torch.LongTensor(tensor_info["zero_point"])
+                        if isinstance(tensor_info["scale"], list):
+                            scale = torch.FloatTensor(tensor_info["scale"])
+                            zp = torch.LongTensor(tensor_info["zero_point"])
+                        else:
+                            scale, zp = {}, {}
+                            scale_to_load = tensor_info["scale"]
+                            zp_to_load = tensor_info["zero_point"]
+                            assert isinstance(scale_to_load, dict) and isinstance(
+                                zp_to_load, dict
+                            ), (
+                                "Expect scales and zero points to load are dicts but "
+                                f"found types {type(scale_to_load)} and {type(zp_to_load)}"
+                            )
+                            for key, val in scale_to_load.items():
+                                s = torch.FloatTensor(val)
+                                scale.update({key: s})
+                            for key, val in zp_to_load.items():
+                                z = torch.LongTensor(val)
+                                zp.update({key: z})
                         v.tensor_id_to_scale_zp[tensor_info["id"]] = (scale, zp)
                 else:
                     output_tensor_infos.append(None)
             activation_observer = q_op_info["activation_observer"]
             weight_observer = q_op_info["weight_observer"]
-            qconfig = QConfig(
-                activation=_create_observer(activation_observer),
-                weight=_create_observer(weight_observer),
-            )
+            activation_obs = _create_observer(activation_observer)
+            if isinstance(activation_obs(), SmoothQuantActivationObserver):
+                share_weight_observers = q_op_info.get("share_weight_observers", True)
+                qconfig = QConfigSmoothQuant(
+                    activation=activation_obs,
+                    weight=_create_observer(weight_observer),
+                    share_weight_observers=share_weight_observers,
+                )
+            else:
+                qconfig = QConfig(
+                    activation=activation_obs,
+                    weight=_create_observer(weight_observer),
+                )
             # overide the cur model's info
             v.idx_to_seen_q_op_infos[int(i)].input_tensor_infos = input_tensor_infos
             v.idx_to_seen_q_op_infos[

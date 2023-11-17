@@ -368,7 +368,6 @@ class DeepspeedTester(JitTestCase):
             inplace=True,
             deployment_mode=True,
         )
-        print(model)
         if not hasattr(model, "trace_graph"):
             AssertionError(False)
         _IPEXAttentionCPU = (

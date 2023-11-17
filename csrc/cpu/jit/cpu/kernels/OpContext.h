@@ -361,11 +361,17 @@ class IpexLinearMKLOpContext final : public MKLOpContext {
 
 // Weight-only quantization
 using SerializationTypeWoqLinearPrePack = std::tuple<
-    at::Tensor,
-    c10::optional<at::Tensor>,
-    c10::optional<int64_t>,
-    int64_t,
-    int64_t>;
+    at::Tensor, // weight
+    std::vector<int64_t>, // weight shape
+    at::Tensor, // scales
+    at::Tensor, // zero points
+    c10::optional<at::Tensor>, // bias
+    c10::optional<int64_t>, // batch size
+    bool, // is_int4
+    int64_t, // group size
+    int64_t, // lowp_mode
+    int64_t, // num_concats
+    int64_t>; // act_quant_mode
 
 class WoqLinearOpContext : public torch::jit::CustomClassHolder {
  protected:
@@ -374,13 +380,22 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
  public:
   SerializationTypeWoqLinearPrePack unpack() {
     auto orig_weight_ = this->to_public(this->get_at_packed_weight());
+    auto weight_shape_ = this->get_weight_shape();
     auto orig_bias_ = this->get_context().at_bias_;
+    auto scales = this->get_scales();
+    auto zero_points = this->get_zero_points();
     return std::make_tuple(
         orig_weight_,
+        weight_shape_,
+        scales,
+        zero_points,
         orig_bias_,
         batch_size_,
+        this->get_context().is_int4_,
+        this->get_context().group_size_,
         this->get_context().lowp_mode_,
-        this->get_context().num_concats_);
+        this->get_context().num_concats_,
+        this->get_context().act_quant_mode_);
   }
 
   virtual at::Tensor get_data_handle() = 0;
@@ -395,16 +410,6 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
 
   virtual at::Tensor run_add(
       const at::Tensor& input,
-      at::Tensor& accumu,
-      const c10::optional<at::Scalar>& alpha) = 0;
-
-  virtual at::Tensor run_add_relu(
-      const at::Tensor& input,
-      at::Tensor& accumu,
-      const c10::optional<at::Scalar>& alpha) = 0;
-
-  virtual at::Tensor run_add(
-      const at::Tensor& input,
       const std::vector<at::Tensor>& others) = 0;
 
   virtual at::Tensor run_add_add(
@@ -416,6 +421,12 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
   virtual at::Tensor get_at_packed_weight() = 0;
 
   virtual c10::optional<at::Tensor> get_at_bias() = 0;
+
+  virtual at::Tensor get_scales() = 0;
+
+  virtual at::Tensor get_zero_points() = 0;
+
+  virtual std::vector<int64_t> get_weight_shape() = 0;
 
   virtual at::Tensor pack(const at::Tensor& tensor) = 0;
 
@@ -455,16 +466,6 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
 
   virtual at::Tensor run_add(
       const at::Tensor& input,
-      at::Tensor& accumu,
-      const c10::optional<at::Scalar>& alpha) override;
-
-  virtual at::Tensor run_add_relu(
-      const at::Tensor& input,
-      at::Tensor& accumu,
-      const c10::optional<at::Scalar>& alpha) override;
-
-  virtual at::Tensor run_add(
-      const at::Tensor& input,
       const std::vector<at::Tensor>& others) override;
 
   virtual at::Tensor run_add_add(
@@ -477,16 +478,28 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
 
   virtual c10::optional<at::Tensor> get_at_bias() override;
 
+  virtual at::Tensor get_scales() override;
+
+  virtual at::Tensor get_zero_points() override;
+
+  virtual std::vector<int64_t> get_weight_shape() override;
+
   virtual at::Tensor pack(const at::Tensor& tensor) override;
 
   virtual detail::ContextLinearWoq& get_context() override;
 
   static c10::intrusive_ptr<WoqLinearOpContext> create_context(
       at::Tensor&& weight,
+      std::vector<int64_t>&& weight_shape,
+      at::Tensor&& scales_fp32,
+      at::Tensor&& zp_fp32,
       c10::optional<at::Tensor>&& bias,
       c10::optional<int64_t> batch_size,
+      bool is_int4,
+      int64_t group_size,
       int64_t lowp_mode,
-      int64_t num_concats);
+      int64_t num_concats,
+      int64_t act_quant_mode);
 
   virtual void load_from_ctx(
       c10::intrusive_ptr<WoqLinearOpContext> other) override;

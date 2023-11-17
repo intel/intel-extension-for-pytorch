@@ -10,12 +10,21 @@ from torch.ao.quantization import (
     QConfigMapping,
 )
 import copy
+import unittest
+from common_utils import TestCase
 
 import intel_extension_for_pytorch as ipex
 from test_ao_jit_llga_utils import JitLlgaTestCase, LLGA_FUSION_GROUP
 from torch.testing._internal.common_utils import run_tests
 from torch.ao.nn.quantized.modules.utils import _quantize_weight
-from intel_extension_for_pytorch.quantization import prepare, convert
+from intel_extension_for_pytorch.quantization import (
+    prepare,
+    convert,
+    dequantize_per_channel,
+    dequantize_per_block,
+    quantize_per_channel,
+    quantize_per_block,
+)
 
 
 class TestDefaultRecipe(JitLlgaTestCase):
@@ -306,9 +315,10 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 super().__init__()
                 self.dense = nn.Linear(4, 4)
                 self.relu = nn.ReLU()
+                self.dense2 = nn.Linear(4, 4)
 
             def forward(self, x):
-                return self.relu(self.dense(x))
+                return self.dense2(self.relu(self.dense(x)))
 
         m = Mod().eval()
         x = torch.rand(1, 4)
@@ -318,12 +328,13 @@ class TestDefaultRecipe(JitLlgaTestCase):
         )
         custom_config = {
             "alpha": 0.75,
-            "act_observer": torch.ao.quantization.MinMaxObserver(),
-            "act_ic_observer": per_channel_observer(ch_axis=-1),
-            "wei_observer": per_channel_observer(
+            "act_observer": torch.ao.quantization.MinMaxObserver,
+            "act_ic_observer": per_channel_observer.with_args(ch_axis=-1),
+            "wei_observer": per_channel_observer.with_args(
                 dtype=torch.qint8, qscheme=torch.per_channel_symmetric
             ),
-            "wei_ic_observer": per_channel_observer(ch_axis=1),
+            "wei_ic_observer": per_channel_observer.with_args(ch_axis=1),
+            "share_weight_observers": False,
         }
         for use_custom_config in [False, True]:
             kwargs = custom_config if use_custom_config else {}
@@ -345,6 +356,17 @@ class TestDefaultRecipe(JitLlgaTestCase):
                     ].weight_tensor_id_to_observer,
                 }
                 observer_info_dict = {}
+                observer_info_dict["share_weight_observers"] = (
+                    prepared_model._fqn_to_auto_quant_state_map[" "]
+                    .idx_to_seen_q_op_infos[0]
+                    .qconfig.share_weight_observers
+                )
+                sub_observer_ids = {
+                    "act_ic_obs": [],
+                    "act_obs": [],
+                    "wei_oc_obs": [],
+                    "wei_ic_obs": [],
+                }
                 for key, obs in observer_info.items():
                     observer_info_dict[key] = {
                         "smooth_quant_enabled": obs.smooth_quant_enabled,
@@ -352,6 +374,17 @@ class TestDefaultRecipe(JitLlgaTestCase):
                         "ic_obs": type(obs.ic_obs),
                         "act_obs": type(obs.act_obs),
                     }
+                    if isinstance(
+                        obs,
+                        ipex.quantization._smooth_quant.SmoothQuantActivationObserver,
+                    ):
+                        sub_observer_ids["act_ic_obs"].append(id(obs.ic_obs))
+                        sub_observer_ids["act_obs"].append(id(obs.act_obs))
+                    else:
+                        sub_observer_ids["wei_oc_obs"].append(id(obs.oc_obs))
+                        sub_observer_ids["wei_ic_obs"].append(id(obs.ic_obs))
+                for _, id_list in sub_observer_ids.items():
+                    assert all([id_list[0] != id for id in id_list[1:]])
 
             for data in calib_dataset:
                 prepared_model(data)
@@ -382,6 +415,17 @@ class TestDefaultRecipe(JitLlgaTestCase):
                         ].weight_tensor_id_to_observer,
                     }
                     observer_info_dict_2 = {}
+                    observer_info_dict_2["share_weight_observers"] = (
+                        prepared_model_2._fqn_to_auto_quant_state_map[" "]
+                        .idx_to_seen_q_op_infos[0]
+                        .qconfig.share_weight_observers
+                    )
+                    sub_observer_ids = {
+                        "act_ic_obs": [],
+                        "act_obs": [],
+                        "wei_oc_obs": [],
+                        "wei_ic_obs": [],
+                    }
                     for key, obs in observer_info_2.items():
                         observer_info_dict_2[key] = {
                             "smooth_quant_enabled": obs.smooth_quant_enabled,
@@ -389,6 +433,17 @@ class TestDefaultRecipe(JitLlgaTestCase):
                             "ic_obs": type(obs.ic_obs),
                             "act_obs": type(obs.act_obs),
                         }
+                        if isinstance(
+                            obs,
+                            ipex.quantization._smooth_quant.SmoothQuantActivationObserver,
+                        ):
+                            sub_observer_ids["act_ic_obs"].append(id(obs.ic_obs))
+                            sub_observer_ids["act_obs"].append(id(obs.act_obs))
+                        else:
+                            sub_observer_ids["wei_oc_obs"].append(id(obs.oc_obs))
+                            sub_observer_ids["wei_ic_obs"].append(id(obs.ic_obs))
+                    for _, id_list in sub_observer_ids.items():
+                        assert all([id_list[0] != id for id in id_list[1:]])
 
                 q_model_2 = ipex.quantization.convert(prepared_model_2)
 
@@ -399,11 +454,108 @@ class TestDefaultRecipe(JitLlgaTestCase):
 
                 assert torch.allclose(out_ref, out_2)
 
+                # Scales and zero points should be updated after rerunning calibration
+                scale_zp_0 = prepared_model_2._fqn_to_auto_quant_state_map[
+                    " "
+                ].tensor_id_to_scale_zp
+                scale_zp_0 = copy.deepcopy(scale_zp_0)
+                for data in calib_dataset:
+                    prepared_model_2(data + 1)
+                prepared_model_2.save_qconf_summary(qconf_summary=qconf_filename)
+                scale_zp_1 = prepared_model_2._fqn_to_auto_quant_state_map[
+                    " "
+                ].tensor_id_to_scale_zp
+                assert scale_zp_0 != scale_zp_1
+
             # Check observers
             if use_custom_config:
                 assert (
                     observer_info_dict == observer_info_dict_2
                 ), "Error: SmoothQuant observer info lost after saving/loading qconf JSON"
+
+    def test_smooth_quant_cancel_by_qconf_summary(self):
+        class Mod(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.dense = nn.Linear(4, 4)
+                self.relu = nn.ReLU()
+
+            def forward(self, x):
+                return self.relu(self.dense(x))
+
+        m = Mod().eval()
+        x = torch.rand(1, 4)
+        calib_dataset = [torch.rand(1, 4) for _ in range(5)]
+        qconfig_mapping = ipex.quantization.get_smooth_quant_qconfig_mapping()
+        prepared_model = ipex.quantization.prepare(
+            m, qconfig_mapping, example_inputs=x, inplace=False
+        )
+        for data in calib_dataset:
+            prepared_model(data)
+
+        with tempfile.NamedTemporaryFile() as fp:
+            qconf_filename = fp.name
+            prepared_model.save_qconf_summary(qconf_summary=qconf_filename)
+            import json
+
+            with open(qconf_filename, "r") as qconf_file:
+                parsed = json.load(qconf_file)
+                parsed[" "]["q_op_infos"]["0"]["input_tensor_infos"][0][
+                    "force_dtype"
+                ] = "torch.float32"
+
+            with open(qconf_filename, "w") as qconf_file:
+                json.dump(parsed, qconf_file, indent=4)
+
+            prepared_model_2 = ipex.quantization.prepare(
+                m, qconfig_mapping, example_inputs=x, inplace=False
+            )
+            prepared_model_2.load_qconf_summary(qconf_summary=qconf_filename)
+            converted_model = ipex.quantization.convert(prepared_model_2)
+            with torch.no_grad():
+                jit_model = torch.jit.trace(converted_model, x)
+                jit_model = torch.jit.freeze(jit_model)
+                for _ in range(2):
+                    jit_model(x)
+                graph = jit_model.graph_for(x)
+                for n in graph.nodes():
+                    assert n.kind() != "aten::mul"
+
+    def test_smooth_quant_share_weight_observers(self):
+        class Mod(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.q_proj = nn.Linear(4, 4)
+                self.k_proj = nn.Linear(4, 4)
+                self.v_proj = nn.Linear(4, 4)
+                self.relu = nn.ReLU()
+
+            def forward(self, x):
+                q = self.q_proj(x)
+                k = self.k_proj(x)
+                v = self.v_proj(x)
+                return self.relu(torch.concat([q, k, v], axis=1))
+
+        m = Mod().eval()
+        x = torch.rand(1, 4)
+        calib_dataset = [torch.rand(1, 4) for _ in range(5)]
+        for share_weight_observers in [True, False]:
+            qconfig_mapping = ipex.quantization.get_smooth_quant_qconfig_mapping(
+                share_weight_observers=share_weight_observers
+            )
+            prepared_model = ipex.quantization.prepare(
+                m, qconfig_mapping, example_inputs=x, inplace=True
+            )
+            for data in calib_dataset:
+                prepared_model(data)
+            q_model = ipex.quantization.convert(prepared_model)
+            with torch.no_grad():
+                q_model = torch.jit.trace(q_model, x)
+                q_model = torch.jit.freeze(q_model)
+                graph = q_model.graph_for(x)
+                num_mul = [n.kind() for n in graph.nodes()].count("aten::mul")
+                assert num_mul == 1 if share_weight_observers else 3
+                q_model(x)
 
     def test_none_example_input_for_quantization(self):
         class M(nn.Module):
@@ -431,6 +583,8 @@ class TestDefaultRecipe(JitLlgaTestCase):
         with self.assertRaises(AssertionError):
             prepared_model = ipex.quantization.prepare(m, qconfig_mapping)
 
+
+class WeightOnlyQuantizationTester(TestCase):
     def test_weight_only_quantization(self):
         class M(nn.Module):
             def __init__(self, input_channel, output_channel, has_bias):
@@ -445,12 +599,11 @@ class TestDefaultRecipe(JitLlgaTestCase):
             m = model.eval()
             data = torch.rand(1, feature[0], feature[1])
             weight = model.linear.weight
-            weight_observer = (
-                ipex.quantization.get_weight_only_quant_qconfig_mapping().global_qconfig.weight()
+            is_int4 = False
+            weight_int8, w_scales, w_zero_points = quantize_per_channel(weight, is_int4)
+            weight_fp32 = dequantize_per_channel(
+                weight_int8, w_scales, w_zero_points.int(), is_int4, weight.shape
             )
-            weight_observer(weight)
-            weight_int8 = _quantize_weight(weight, weight_observer)
-            weight_fp32 = weight_int8.dequantize()
             if has_bias:
                 bias = model.linear.bias
                 output1 = torch.matmul(data, weight_fp32.T) + bias
@@ -510,46 +663,39 @@ class TestDefaultRecipe(JitLlgaTestCase):
             )
             prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
 
+            is_int4 = w_dtype == torch.quint4x2
             with torch.no_grad():
                 weight = m.linear.weight
-                weight_observer = qconfig.global_qconfig.weight()
-                weight_observer(weight)
-                weight_int8 = _quantize_weight(weight, weight_observer)
-                weight_fp32 = weight_int8.dequantize()
+                weight_int8, w_scales, w_zero_points = quantize_per_channel(
+                    weight, is_int4
+                )
+                weight_fp32 = dequantize_per_channel(
+                    weight_int8, w_scales, w_zero_points.int(), is_int4, weight.shape
+                )
                 weight_bf16 = weight_fp32.bfloat16()
                 weight_fp16 = weight_fp32.half()
                 data_bf16 = data.bfloat16()
                 data_fp16 = data_bf16.half()
                 bias_fp32 = m.linear.bias
-                use_tpp = tpp_is_used(feature[2], feature[1])
-                if use_tpp:
-                    # if M >= 32, compute in bf16
-                    # if M < 32, compute in fp32 or fp16. Depends on fp16 support.
-                    if feature[0] >= 32:
-                        output1 = torch.matmul(
-                            data_bf16.float(), weight_bf16.float().T
-                        ).bfloat16()
-                        if has_bias:
-                            output1 = output1 + bias_fp32.bfloat16()
-                    else:
-                        output1_fp32 = torch.matmul(
-                            data_bf16.float(), weight_bf16.float().T
-                        )
-                        if has_bias:
-                            output1_fp32 = output1_fp32 + bias_fp32
-                        output1_fp16 = torch.matmul(
-                            data_fp16.float(), weight_fp16.float().T
-                        ).half()
-                        if has_bias:
-                            output1_fp16 = output1_fp16 + bias_fp32.half()
-                else:
-                    if feature[0] <= 4:
-                        output1 = torch.matmul(data_bf16.float(), weight_fp32.T)
-                    else:
-                        output1 = torch.matmul(data_bf16.float(), weight_bf16.float().T)
+                # if M >= 32, compute in bf16
+                # if M < 32, compute in fp32 or fp16. Depends on fp16 support.
+                if feature[0] >= 32:
+                    output1 = torch.matmul(
+                        data_bf16.float(), weight_bf16.float().T
+                    ).bfloat16()
                     if has_bias:
-                        output1 = output1 + bias_fp32
-                    output1 = output1.bfloat16()
+                        output1 = output1 + bias_fp32.bfloat16()
+                else:
+                    output1_fp32 = torch.matmul(
+                        data_bf16.float(), weight_bf16.float().T
+                    )
+                    if has_bias:
+                        output1_fp32 = output1_fp32 + bias_fp32
+                    output1_fp16 = torch.matmul(
+                        data_fp16.float(), weight_fp16.float().T
+                    ).half()
+                    if has_bias:
+                        output1_fp16 = output1_fp16 + bias_fp32.half()
                 with torch.autocast(
                     device_type="cpu", enabled=True, dtype=torch.bfloat16
                 ):
@@ -563,7 +709,7 @@ class TestDefaultRecipe(JitLlgaTestCase):
                     woq_model = torch.jit.freeze(woq_model)
                     output2 = woq_model(data)
                     output2 = output2.bfloat16()
-                if use_tpp and feature[0] < 32:
+                if feature[0] < 32:
                     try:
                         torch.testing.assert_close(
                             output1_fp32.bfloat16(), output2, atol=0.01, rtol=0.1
@@ -577,9 +723,9 @@ class TestDefaultRecipe(JitLlgaTestCase):
 
         shape_list = [
             [3, 31, 31],
-            # [4, 4096, 4096], # not supported by TPP yet (block_n = 16 issue)
-            [9, 4095, 4095],
-            [196, 4095, 16383],
+            [4, 64, 64],
+            [9, 128, 128],
+            [196, 63, 255],
         ]
         use_bias_list = [True, False]
         w_dtype_list = [torch.qint8, torch.quint4x2]
@@ -686,8 +832,11 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 weight_dtype=torch.quint4x2
             ).global_qconfig.weight()
             weight_observer(weight)
-            weight_int4 = _quantize_weight(weight, weight_observer)
-            weight_fp32 = weight_int4.dequantize()
+            is_int4 = True
+            weight_int4, w_scales, w_zero_points = quantize_per_channel(weight, is_int4)
+            weight_fp32 = dequantize_per_channel(
+                weight_int4, w_scales, w_zero_points, is_int4, weight.shape
+            )
             if has_bias:
                 bias = model.linear.bias
                 output1 = torch.matmul(data, weight_fp32.T) + bias
@@ -799,7 +948,7 @@ class TestDefaultRecipe(JitLlgaTestCase):
                         output1, output2.to(output1.dtype), atol=1.5e-2, rtol=1e-3
                     )
 
-    def test_weight_only_quantization_lowp_compute(self):
+    def test_weight_only_quantization_lowp_mode_functionality(self):
         from intel_extension_for_pytorch.quantization import WoqLowpMode
 
         class M(nn.Module):
@@ -812,7 +961,12 @@ class TestDefaultRecipe(JitLlgaTestCase):
 
         data = torch.rand(4, 64)
         m = M()
-        for mode in [WoqLowpMode.FP16, WoqLowpMode.BF16, WoqLowpMode.INT8]:
+        for mode in [
+            WoqLowpMode.NONE,
+            WoqLowpMode.FP16,
+            WoqLowpMode.BF16,
+            WoqLowpMode.INT8,
+        ]:
             kwargs = {"lowp_mode": mode}
             if mode == WoqLowpMode.INT8:
                 kwargs["weight_dtype"] = torch.quint4x2
@@ -825,6 +979,52 @@ class TestDefaultRecipe(JitLlgaTestCase):
                     hasattr(woq_model.linear, "_lowp_mode")
                     and woq_model.linear._lowp_mode == mode
                 ), "Weight-only quantization: low precision gemm flag is not correctly set"
+
+    def test_weight_only_quantization_int8_lowp_mode_correctness(self):
+        from intel_extension_for_pytorch.quantization import WoqLowpMode
+
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = torch.nn.Linear(64, 128)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        # When lowp_mode=BF16, only case of batch size >= 32 uses BF16.
+        data = torch.rand(32, 64)
+        m = M()
+
+        lowp_mode_list = [WoqLowpMode.NONE, WoqLowpMode.FP16, WoqLowpMode.BF16]
+        act_dtype_list = [torch.bfloat16, torch.half]
+        compute_dtype_list = [None, torch.half, torch.bfloat16]
+        cases = itertools.product(lowp_mode_list, act_dtype_list)
+        # lowp_mode does not affect weight observer for int8
+        qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
+        weight = copy.deepcopy(m.linear.weight)
+        weight_observer = qconfig.global_qconfig.weight()
+        weight_observer(weight)
+        weight_int8 = _quantize_weight(weight, weight_observer)
+        weight_fp32 = weight_int8.dequantize()
+        bias_fp32 = copy.deepcopy(m.linear.bias)
+        for lowp_mode, act_dtype in cases:
+            if lowp_mode == WoqLowpMode.NONE:
+                compute_dtype_list[0] = act_dtype
+            compute_dtype = compute_dtype_list[int(lowp_mode)]
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                lowp_mode=lowp_mode,
+                weight_dtype=torch.qint8,
+            )
+            prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
+            with torch.no_grad():
+                woq_model = convert(prepared_model)
+                y = woq_model(data.to(act_dtype))
+                weight_for_compute = weight_fp32.to(compute_dtype).float()
+                act_for_compute = data.to(act_dtype).to(compute_dtype).float()
+                bias_for_compute = bias_fp32.to(compute_dtype).float()
+                y_ref = act_for_compute @ weight_for_compute.T + bias_for_compute
+                y_ref = y_ref.to(act_dtype)
+                torch.testing.assert_close(y, y_ref, atol=0.005, rtol=0.01)
 
     def test_weight_only_quantization_num_concats(self):
         class Mod(nn.Module):
@@ -870,6 +1070,250 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 output2 = qm2(data)
                 torch.testing.assert_close(output1, output2, atol=1e-2, rtol=1e-4)
 
+    def _fakequant_by_group(self, t, quant_a_mode, groupsize):
+        assert quant_a_mode >= 0 and quant_a_mode <= 3
+        if quant_a_mode == 0:
+            obs = torch.ao.quantization.MinMaxObserver(torch.quint8)
+            obs(t)
+            scale, zero_point = obs.calculate_qparams()
+            return (
+                torch.quantize_per_tensor(
+                    t.to(torch.float), scale, zero_point, torch.quint8
+                )
+                .dequantize()
+                .to(t.dtype)
+            )
+        orig_shape = t.shape
+        if t.shape[-1] % groupsize:
+            pad_len = t.shape[-1] // groupsize * groupsize + groupsize - t.shape[-1]
+            t = torch.nn.functional.pad(t, (0, pad_len), value=0)
+        grouped = t.view(-1, t.shape[-1] // groupsize, groupsize)
+        if quant_a_mode == 1:
+            grouped_min = grouped.min(dim=-1)[0].min(dim=0)[0]
+            grouped_max = grouped.max(dim=-1)[0].max(dim=0)[0]
+        elif quant_a_mode == 2:
+            grouped_min = grouped.min(dim=-1)[0].min(dim=1)[0]
+            grouped_max = grouped.max(dim=-1)[0].max(dim=1)[0]
+        else:
+            grouped_min = grouped.min(dim=-1)[0]
+            grouped_max = grouped.max(dim=-1)[0]
+        zeros = torch.zeros_like(grouped_min)
+        min = torch.minimum(grouped_min, zeros)
+        max = torch.maximum(grouped_max, zeros)
+        eps = torch.tensor([torch.finfo(torch.float32).eps])
+        scales = (max - min) / 255
+        scales = torch.max(scales, eps)
+        zps = -torch.round(min / scales)
+        if quant_a_mode == 1:
+            qt = torch.clamp(
+                torch.round(grouped / scales.unsqueeze(1)) + zps.unsqueeze(1),
+                min=0,
+                max=255,
+            )
+            out = (
+                ((qt - zps.unsqueeze(1)) * scales.unsqueeze(1))
+                .to(t.dtype)
+                .view(t.shape)
+            )
+            if orig_shape != out.shape:
+                out = out[: orig_shape[0], : orig_shape[1]].contiguous()
+            return out
+        elif quant_a_mode == 2:
+            qt = torch.clamp(
+                torch.round(grouped / scales.unsqueeze(1).unsqueeze(2))
+                + zps.unsqueeze(1).unsqueeze(2),
+                min=0,
+                max=255,
+            )
+            out = (
+                (
+                    (qt - zps.unsqueeze(1).unsqueeze(2))
+                    * scales.unsqueeze(1).unsqueeze(2)
+                )
+                .to(t.dtype)
+                .view(t.shape)
+            )
+            if orig_shape != out.shape:
+                out = out[: orig_shape[0], : orig_shape[1]].contiguous()
+            return out
+        else:
+            qt = torch.clamp(
+                torch.round(grouped / scales.unsqueeze(-1)) + zps.unsqueeze(-1),
+                min=0,
+                max=255,
+            )
+            out = (
+                ((qt - zps.unsqueeze(-1)) * scales.unsqueeze(-1))
+                .to(t.dtype)
+                .view(t.shape)
+            )
+            if orig_shape != out.shape:
+                out = out[: orig_shape[0], : orig_shape[1]].contiguous()
+            return out
+
+    def test_weight_only_quantization_act_quant_mode(self):
+        M, N, K = 4, 64, 128
+        groupsize = 64
+
+        class Mod(nn.Module):
+            def __init__(self, has_bias):
+                super(Mod, self).__init__()
+                self.linear = torch.nn.Linear(K, N, has_bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        def test(has_bias, act_quant_mode):
+            dtype = torch.bfloat16
+            model = Mod(has_bias)
+            m = model.eval()
+            m2 = copy.deepcopy(m)
+            data = torch.rand(M, K) * 0.5
+            qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=torch.quint4x2,
+                lowp_mode=ipex.quantization.WoqLowpMode.INT8,
+                act_quant_mode=act_quant_mode,
+            )
+            fake_quant_x = self._fakequant_by_group(data, act_quant_mode, groupsize)
+            prepared_model = prepare(m2, qconfig_mapping, inplace=True)
+            with torch.no_grad(), torch.autocast(
+                device_type="cpu", enabled=True, dtype=dtype
+            ):
+                woq_model = convert(prepared_model)
+                # Behavior of WOQ Linear to simulate:
+                # Quantize weight to int4 by float qparams at quantization time
+                # Quantize activation to int8 at runtime
+                # Convert weight and its zero points to INT8 for computation
+                qw = woq_model.linear._op_context.to_public(
+                    woq_model.linear._op_context.get_weight()
+                )
+                w_scales = woq_model.linear._op_context.get_scales()
+                w_zero_points = woq_model.linear._op_context.get_zero_points()
+                w = copy.deepcopy(m.linear.weight.data)
+                is_int4 = True
+                qw, _, _ = quantize_per_channel(w, is_int4, w_scales, w_zero_points)
+                fake_quant_w = dequantize_per_channel(
+                    qw, w_scales, w_zero_points.int(), is_int4, w.shape
+                )
+                m.linear.weight.data = fake_quant_w
+                y_ref = m(fake_quant_x).to(dtype)
+                y = woq_model(data)
+                try:
+                    torch.testing.assert_close(y, y_ref, atol=1e-2 * 5, rtol=1e-1 * 2)
+                except Exception:
+                    # The fallback kernel does not support act quant mode
+                    # It computes in fp32 by dequantizing weight.
+                    fake_quant_w = qw.dequantize()
+                    y_ref = data @ fake_quant_w.T + (m.linear.bias if has_bias else 0)
+                    y_ref = y_ref.to(dtype)
+                    torch.testing.assert_close(y, y_ref, atol=1e-2, rtol=1e-1)
+
+        has_bias_list = [False, True]
+        quant_mode_list = [0, 1, 2, 3]
+        cases = itertools.product(has_bias_list, quant_mode_list)
+        for has_bias, quant_mode in cases:
+            test(has_bias, quant_mode)
+
+    def test_weight_only_quantization_group_size(self):
+        # M, N, K = 4, 64, 128
+
+        class Mod(nn.Module):
+            def __init__(self, ic, oc, has_bias):
+                super(Mod, self).__init__()
+                self.linear = torch.nn.Linear(ic, oc, has_bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        def test(shape, has_bias, act_quant_mode, group_size):
+            M, N, K = shape
+            dtype = torch.bfloat16
+            model = Mod(K, N, has_bias)
+            m = model.eval()
+            m2 = copy.deepcopy(m)
+            data = torch.rand(M, K) * 0.5
+            if group_size == -1 and act_quant_mode != 0:
+                # these cases are covered by another test case for act_quant_mode
+                return
+            qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=torch.quint4x2,
+                lowp_mode=ipex.quantization.WoqLowpMode.INT8,
+                act_quant_mode=act_quant_mode,
+                group_size=group_size,
+            )
+            fake_quant_x = self._fakequant_by_group(data, act_quant_mode, group_size)
+            prepared_model = prepare(m2, qconfig_mapping, inplace=True)
+            with torch.no_grad(), torch.autocast(
+                device_type="cpu", enabled=True, dtype=dtype
+            ):
+                woq_model = convert(prepared_model)
+                # Behavior of WOQ Linear to simulate:
+                # Quantize weight to int4 by float qparams at quantization time
+                # Quantize activation to int8 at runtime
+                # Convert weight and its zero points to INT8 for computation
+                w = copy.deepcopy(m.linear.weight.data)
+                is_int4 = True
+                if group_size == -1:
+                    qw, w_scales, w_zero_points = quantize_per_channel(
+                        w, is_int4, None, None
+                    )
+                    fake_quant_w = dequantize_per_channel(
+                        qw, w_scales, w_zero_points.int(), is_int4, w.shape
+                    )
+                else:
+                    qw, w_scales, w_zero_points = quantize_per_block(
+                        w, is_int4, group_size, None, None
+                    )
+                    fake_quant_w = dequantize_per_block(
+                        qw,
+                        w_scales,
+                        w_zero_points,
+                        is_int4,
+                        group_size,
+                        weight_shape=w.shape,
+                    )
+                m.linear.weight.data = fake_quant_w
+                y_ref = m(fake_quant_x).to(dtype)
+                y = woq_model(data)
+                try:
+                    torch.testing.assert_close(y, y_ref, atol=1e-2 * 5, rtol=1e-1 * 2)
+                except Exception:
+                    # The fallback kernel does not support act quant mode
+                    # It computes in fp32 by dequantizing weight.
+                    # fake_quant_w = qw.dequantize()
+                    y_ref = data @ fake_quant_w.T + (m.linear.bias if has_bias else 0)
+                    y_ref = y_ref.to(dtype)
+                    torch.testing.assert_close(y, y_ref, atol=1e-2, rtol=1e-1)
+
+        MNK_list = [(4, 64, 128), (4, 32, 127), (9, 31, 256)]
+        has_bias_list = [False, True]
+        quant_mode_list = [0, 1, 2, 3]
+        group_size_list = [-1, 32, 64, 128]
+        cases = itertools.product(
+            MNK_list, has_bias_list, quant_mode_list, group_size_list
+        )
+        for shape, has_bias, act_quant_mode, group_size in cases:
+            test(shape, has_bias, act_quant_mode, group_size)
+
+
+class QuantizedOpsTester(TestCase):
+    def test_matmul_i8i8i32(self):
+        x = torch.randn(4, 8)
+        w = torch.randn(4, 8)
+        x_min, x_max = x.aminmax()
+        x_scale = torch.max(x_max, x_min.neg()) / 127
+        qx = torch.round(x / x_scale).to(torch.int8)
+        w_min, w_max = w.aminmax(dim=1)
+        w_scale = torch.max(w_max, w_min.neg()) / 127
+        qw = torch.round(w / w_scale.unsqueeze(-1)).to(torch.int8)
+        for use_bf16 in [False, True]:
+            dtype = torch.bfloat16 if use_bf16 else torch.float32
+            with torch.cpu.amp.autocast(enabled=use_bf16, dtype=dtype):
+                qy = torch.ops.torch_ipex.matmul_i8i8i32(qx, qw)
+                qy_ref = torch.nn.functional.linear(qx.to(dtype), qw.to(dtype))
+                self.assertEqual(qy.to(dtype), qy_ref)
+
 
 if __name__ == "__main__":
+    test = unittest.main()
     run_tests()

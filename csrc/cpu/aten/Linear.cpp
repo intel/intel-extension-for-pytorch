@@ -356,38 +356,38 @@ at::Tensor ipex_linear_eltwise(
       input, weight, bias, eltwise, op_context, out_features);
 }
 
-DEFINE_DISPATCH(woq_linear_packB_stub);
 DEFINE_DISPATCH(woq_tpp_gemm_packB_stub);
 at::Tensor woq_linear_pack_weight(
     const at::Tensor& weight,
-    const at::Tensor& scales,
-    const at::Tensor& zero_points,
+    std::vector<int64_t>& weight_shape,
+    bool is_int4,
+    int64_t group_size,
     int64_t lowp_mode) {
   // TPP kernel does not support edge cases
   // It generates packed weight in 4d (Nc, Kc, block_k, block_n)
-  auto N = weight.size(0), K = weight.size(1);
+  auto N = weight_shape[0], K = weight_shape[1];
   // For TPP kernel, we only consider even K
   if (K % 2 == 0) {
-    bool is_int4 = weight.scalar_type() == c10::kQUInt4x2;
-    // int num_threads = at::get_num_threads();
     size_t block_n = 32;
-    if (lowp_mode == 0) {
-      block_n = 16;
-    }
-    size_t block_k = 64;
+    size_t block_k = group_size > 0 ? std::min(group_size, (int64_t)64) : 64;
     while (K % block_k != 0) {
       block_k /= 2;
     }
     assert(block_k > 0);
     if (is_int4) {
+      if (block_k % 4 && lowp_mode == 3) {
+        // This case is not supported by kernel
+        return weight;
+      }
       // Create a new non-quantized tensor in data type uint8 (Byte)
       // One uint8 holds two int4 values. Compressed along K.
       // N is padded to the nearest multiple of block_n.
+      // Note that weight is already compressed
       int64_t K_int4_compressed = K / 2;
       int64_t N_int4 = N % block_n ? N / block_n * block_n + block_n : N;
       at::Tensor weight_int4 = at::empty(
           {N_int4, K_int4_compressed}, device(c10::kCPU).dtype(c10::kByte));
-      int64_t weight_size_bytes = weight.numel() / 2;
+      int64_t weight_size_bytes = weight.numel();
       int64_t weight_int4_size_bytes = weight_int4.numel();
       int64_t pad_size_bytes = weight_int4_size_bytes - weight_size_bytes;
       std::memcpy(weight_int4.data_ptr(), weight.data_ptr(), weight_size_bytes);
@@ -395,57 +395,25 @@ at::Tensor woq_linear_pack_weight(
           (uint8_t*)weight_int4.data_ptr() + weight_size_bytes,
           0,
           pad_size_bytes);
-      auto packed_b = woq_tpp_gemm_packB_stub(
+      return woq_tpp_gemm_packB_stub(
           kCPU, weight_int4, is_int4, block_n, block_k, lowp_mode);
-      if (packed_b.defined()) {
-        return packed_b;
-      }
     }
-    if (!(N % block_n) && !(K % block_k)) {
-      auto packed_b = woq_tpp_gemm_packB_stub(
+    if (N % block_n) {
+      return weight;
+    } else {
+      return woq_tpp_gemm_packB_stub(
           kCPU, weight, is_int4, block_n, block_k, lowp_mode);
-      if (packed_b.defined()) {
-        return packed_b;
-      }
     }
   }
-  return woq_linear_packB_stub(kCPU, weight, scales, zero_points);
+  return weight;
 }
 
-DEFINE_DISPATCH(woq_linear_unpackB_stub);
 DEFINE_DISPATCH(woq_tpp_gemm_unpackB_stub);
 at::Tensor woq_linear_unpack_weight(
     const at::Tensor& weight,
     bool is_int4,
     int64_t lowp_mode) {
-  if (weight.dim() > 2) {
-    auto unpacked_b =
-        woq_tpp_gemm_unpackB_stub(kCPU, weight, is_int4, lowp_mode);
-    if (unpacked_b.defined()) {
-      return unpacked_b;
-    }
-  }
-  return woq_linear_unpackB_stub(kCPU, weight);
-}
-
-DEFINE_DISPATCH(woq_gemm_kernel_stub);
-void woq_linear_kernel_output(
-    const at::Tensor& self,
-    const at::Tensor& weight,
-    const at::Tensor& scales_float,
-    const at::Tensor& zero_points_float,
-    const at::Tensor& bias,
-    int64_t lowp_mode,
-    at::Tensor& output) {
-  woq_gemm_kernel_stub(
-      kCPU,
-      self,
-      weight,
-      scales_float,
-      zero_points_float,
-      bias,
-      lowp_mode,
-      output);
+  return woq_tpp_gemm_unpackB_stub(kCPU, weight, is_int4, lowp_mode);
 }
 
 DEFINE_DISPATCH(woq_tpp_gemm_kernel_stub);
@@ -456,48 +424,26 @@ at::Tensor woq_linear_kernel(
     const std::vector<at::Tensor>& zps_list,
     const std::vector<at::Tensor>& bias_list,
     bool is_int4,
+    int64_t group_size,
     int64_t lowp_mode,
-    int64_t num_concats) {
-  if (weight.dim() > 2) {
-    auto out = woq_tpp_gemm_kernel_stub(
-        kCPU,
-        self,
-        weight,
-        scales_list,
-        zps_list,
-        bias_list,
-        is_int4,
-        lowp_mode,
-        num_concats,
-        WOQ_FUSE_NONE, // no post op fusion
-        std::vector<at::Tensor>());
-    if (out.defined()) {
-      return out;
-    }
-  }
-  auto input_size = self.sizes();
-  std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
-  output_size.push_back(weight.size(0));
-  auto output = at::empty(output_size, self.options());
-  output.set_requires_grad(self.requires_grad());
-  woq_linear_kernel_output(
+    int64_t num_concats,
+    int64_t act_quant_mode) {
+  int64_t quant_w_mode = group_size > 0 ? 1 : 0;
+  return woq_tpp_gemm_kernel_stub(
+      kCPU,
       self,
       weight,
-      scales_list[0],
-      zps_list[0],
-      bias_list[0],
+      scales_list,
+      zps_list,
+      bias_list,
+      is_int4,
       lowp_mode,
-      output);
-  if (num_concats > 1) {
-    // View as [..., num_concats, N/num_concats], transpose then make contiguous
-    // Finally view back as output shape
-    auto out_shape = output.sizes().vec();
-    out_shape.insert(out_shape.end() - 1, num_concats);
-    out_shape.back() /= num_concats;
-    return output.view(out_shape).transpose(0, -2).contiguous().view(
-        output.sizes().vec());
-  }
-  return output;
+      num_concats,
+      WOQ_FUSE_NONE, // no post op fusion
+      std::vector<at::Tensor>(),
+      act_quant_mode,
+      quant_w_mode,
+      group_size);
 }
 
 at::Tensor woq_linear_forward(
@@ -510,32 +456,6 @@ at::Tensor woq_linear_forward(
       ->run(input);
 }
 
-DEFINE_DISPATCH(woq_gemm_eltwise_kernel_stub);
-void woq_linear_eltwise_kernel_output(
-    const at::Tensor& self,
-    const at::Tensor& weight,
-    const at::Tensor& scales_float,
-    const at::Tensor& zero_points_float,
-    const at::Tensor& bias,
-    const c10::string_view& post_op,
-    const torch::List<c10::optional<at::Scalar>>& scalars,
-    const c10::optional<c10::string_view>& algorithm,
-    int64_t lowp_mode,
-    at::Tensor& output) {
-  woq_gemm_eltwise_kernel_stub(
-      kCPU,
-      self,
-      weight,
-      scales_float,
-      zero_points_float,
-      bias,
-      post_op,
-      scalars,
-      algorithm,
-      lowp_mode,
-      output);
-}
-
 at::Tensor woq_linear_eltwise_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
@@ -546,44 +466,28 @@ at::Tensor woq_linear_eltwise_kernel(
     const torch::List<c10::optional<at::Scalar>>& scalars,
     const c10::optional<c10::string_view>& algorithm,
     bool is_int4,
+    int64_t group_size,
     int64_t lowp_mode,
-    int64_t num_concats) {
+    int64_t num_concats,
+    int64_t act_quant_mode) {
   int64_t post_op_fusion_type =
       post_op == "gelu" ? WOQ_FUSE_GELU : WOQ_FUSE_NONE;
-  if (weight.dim() > 2) {
-    auto out = woq_tpp_gemm_kernel_stub(
-        kCPU,
-        self,
-        weight,
-        scales_list,
-        zps_list,
-        bias_list,
-        is_int4,
-        lowp_mode,
-        num_concats,
-        post_op_fusion_type,
-        std::vector<at::Tensor>());
-    if (out.defined()) {
-      return out;
-    }
-  }
-  auto input_size = self.sizes();
-  std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
-  output_size.push_back(weight.size(0));
-  auto output = at::empty(output_size, self.options());
-  output.set_requires_grad(self.requires_grad());
-  woq_linear_eltwise_kernel_output(
+  int64_t quant_w_mode = group_size > 0 ? 1 : 0;
+  return woq_tpp_gemm_kernel_stub(
+      kCPU,
       self,
       weight,
-      scales_list[0],
-      zps_list[0],
-      bias_list[0],
-      post_op,
-      scalars,
-      algorithm,
+      scales_list,
+      zps_list,
+      bias_list,
+      is_int4,
       lowp_mode,
-      output);
-  return output;
+      num_concats,
+      post_op_fusion_type,
+      std::vector<at::Tensor>(),
+      act_quant_mode,
+      quant_w_mode,
+      group_size);
 }
 
 at::Tensor woq_linear_gelu_forward(
@@ -604,87 +508,27 @@ at::Tensor woq_linear_add_kernel(
     const std::vector<at::Tensor>& zps_list,
     const std::vector<at::Tensor>& bias_list,
     bool is_int4,
+    int64_t group_size,
     int64_t lowp_mode,
     int64_t num_concats,
-    at::Tensor& accumu,
-    const c10::optional<at::Scalar>& alpha) {
-  c10::Scalar a = alpha.has_value() ? alpha.value() : 1.0f;
-  if (weight.dim() > 2) {
-    auto output = woq_tpp_gemm_kernel_stub(
-        kCPU,
-        self,
-        weight,
-        scales_list,
-        zps_list,
-        bias_list,
-        is_int4,
-        lowp_mode,
-        num_concats,
-        WOQ_FUSE_NONE, // no eltwise post op
-        std::vector<at::Tensor>());
-    if (output.defined()) {
-      at::add_out(accumu, output, accumu, a);
-      return accumu;
-    }
-  }
-  auto input_size = self.sizes();
-  std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
-  output_size.push_back(weight.size(0));
-  auto output = at::empty(output_size, self.options());
-  output.set_requires_grad(self.requires_grad());
-  woq_linear_kernel_output(
+    const std::vector<at::Tensor>& others,
+    int64_t act_quant_mode) {
+  int64_t quant_w_mode = group_size > 0 ? 1 : 0;
+  return woq_tpp_gemm_kernel_stub(
+      kCPU,
       self,
       weight,
-      scales_list[0],
-      zps_list[0],
-      bias_list[0],
+      scales_list,
+      zps_list,
+      bias_list,
+      is_int4,
       lowp_mode,
-      output);
-  at::add_out(accumu, output, accumu, a);
-  return accumu;
-}
-
-at::Tensor woq_linear_add_kernel(
-    const at::Tensor& self,
-    const at::Tensor& weight,
-    const std::vector<at::Tensor>& scales_list,
-    const std::vector<at::Tensor>& zps_list,
-    const std::vector<at::Tensor>& bias_list,
-    bool is_int4,
-    int64_t lowp_mode,
-    int64_t num_concats,
-    const std::vector<at::Tensor>& others) {
-  if (weight.dim() > 2) {
-    auto out = woq_tpp_gemm_kernel_stub(
-        kCPU,
-        self,
-        weight,
-        scales_list,
-        zps_list,
-        bias_list,
-        is_int4,
-        lowp_mode,
-        num_concats,
-        WOQ_FUSE_ADD, // post op add
-        others);
-    if (out.defined()) {
-      return out;
-    }
-  }
-  auto input_size = self.sizes();
-  std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
-  output_size.push_back(weight.size(0));
-  auto output = at::empty(output_size, self.options());
-  output.set_requires_grad(self.requires_grad());
-  woq_linear_kernel_output(
-      self,
-      weight,
-      scales_list[0],
-      zps_list[0],
-      bias_list[0],
-      lowp_mode,
-      output);
-  return at::add(output, others[0]);
+      num_concats,
+      WOQ_FUSE_ADD, // post op add
+      others,
+      act_quant_mode,
+      quant_w_mode,
+      group_size);
 }
 
 at::Tensor woq_linear_add_add_kernel(
@@ -694,41 +538,27 @@ at::Tensor woq_linear_add_add_kernel(
     const std::vector<at::Tensor>& zps_list,
     const std::vector<at::Tensor>& bias_list,
     bool is_int4,
+    int64_t group_size,
     int64_t lowp_mode,
     int64_t num_concats,
-    const std::vector<at::Tensor>& others) {
-  if (weight.dim() > 2) {
-    auto out = woq_tpp_gemm_kernel_stub(
-        kCPU,
-        self,
-        weight,
-        scales_list,
-        zps_list,
-        bias_list,
-        is_int4,
-        lowp_mode,
-        num_concats,
-        WOQ_FUSE_ADD_ADD, // post op add-add
-        others);
-    if (out.defined()) {
-      return out;
-    }
-  }
-  auto input_size = self.sizes();
-  std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
-  output_size.push_back(weight.size(0));
-  auto output = at::empty(output_size, self.options());
-  output.set_requires_grad(self.requires_grad());
-  woq_linear_kernel_output(
+    const std::vector<at::Tensor>& others,
+    int64_t act_quant_mode) {
+  int64_t quant_w_mode = group_size > 0 ? 1 : 0;
+  return woq_tpp_gemm_kernel_stub(
+      kCPU,
       self,
       weight,
-      scales_list[0],
-      zps_list[0],
-      bias_list[0],
+      scales_list,
+      zps_list,
+      bias_list,
+      is_int4,
       lowp_mode,
-      output);
-  auto y = at::add(output, others[0]);
-  return at::add(y, others[1]);
+      num_concats,
+      WOQ_FUSE_ADD_ADD, // post op add-add
+      others,
+      act_quant_mode,
+      quant_w_mode,
+      group_size);
 }
 
 at::Tensor woq_linear_add_forward(
@@ -750,6 +580,74 @@ at::Tensor woq_linear_add_add_forward(
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
       ->run_add_add(input, others);
+}
+
+at::Tensor matmul_i8i8i32(const at::Tensor& input, const at::Tensor& weight) {
+  // x:s8 * w:s8 -> y:s32
+  // No bias
+  TORCH_CHECK(
+      input.scalar_type() == c10::kChar,
+      "matmul_i8i8i32: input dtype should be signed int8 but found ",
+      input.scalar_type());
+  TORCH_CHECK(
+      weight.scalar_type() == c10::kChar,
+      "matmul_i8i8i32: weight dtype should be signed int8 but found ",
+      weight.scalar_type());
+  TORCH_CHECK(
+      input.dim() == 2 && weight.dim() == 2,
+      "matmul_i8i8i32: Expect Input and weight are 2d but got ",
+      input.dim(),
+      " and ",
+      weight.dim());
+  TORCH_CHECK(
+      input.size(1) == weight.size(1),
+      "matmul_i8i8i32: Input shape and weight shape do not match, got ",
+      input.sizes(),
+      " and ",
+      weight.sizes());
+  auto output_shape = input.sizes().vec();
+  output_shape.back() = weight.size(0);
+  auto output = at::empty(output_shape, input.options().dtype(c10::kInt));
+  auto input_contig = input.contiguous();
+  auto weight_contig = weight.t().contiguous();
+  // Create ideep tensors for oneDNN computation
+  auto src = ideep::tensor(
+      {input_contig.sizes().vec(),
+       ideep::tensor::data_type::s8,
+       input_contig.strides().vec()},
+      input_contig.data_ptr());
+  auto wei = ideep::tensor(
+      {weight_contig.sizes().vec(),
+       ideep::tensor::data_type::s8,
+       weight_contig.strides().vec()},
+      weight_contig.data_ptr());
+  auto dst = ideep::tensor(
+      {output.sizes().vec(),
+       ideep::tensor::data_type::s32,
+       output.strides().vec()},
+      output.data_ptr());
+  // Create primitive desc
+  auto engine = ideep::engine::cpu_engine();
+  ideep::attr_t op_attr;
+  op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+  auto src_desc = src.get_desc();
+  auto wei_desc = wei.get_desc();
+  auto dst_desc = dst.get_desc();
+  auto prim_desc = dnnl::matmul::primitive_desc(
+      engine, src_desc, wei_desc, dst_desc, op_attr);
+  // Reorder weight
+  auto expected_weight = wei.reorder_if_differ_in(prim_desc.weights_desc());
+  // Prepare args for primitive
+  ideep::tensor scratchpad(prim_desc.scratchpad_desc());
+  ideep::exec_args args;
+  args.insert({DNNL_ARG_SRC, src});
+  args.insert({DNNL_ARG_WEIGHTS, expected_weight});
+  args.insert({DNNL_ARG_DST, dst});
+  args.insert({DNNL_ARG_SCRATCHPAD, scratchpad});
+  // Create primitve and execute
+  auto primitive = dnnl::matmul(prim_desc);
+  primitive.execute(ideep::stream::default_stream(), args);
+  return output;
 }
 
 } // namespace cpu
@@ -863,6 +761,15 @@ at::Tensor woq_linear_add_add_forward(
       cpu_cached_cast(target_type, others));
 }
 
+at::Tensor matmul_i8i8i32(const at::Tensor& input, const at::Tensor& weight) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::matmul_i8i8i32", "")
+                       .typed<decltype(matmul_i8i8i32)>();
+  // input is int8. Don't cast to autocast dtype
+  return op.call(input, weight);
+}
+
 } // namespace autocast
 } // namespace torch_ipex
 
@@ -948,6 +855,14 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "linear_eltwise_backward",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::linear_eltwise_backward);
+  // bnb
+  m.def("matmul_i8i8i32(Tensor input, Tensor weight) -> Tensor");
+  m.impl(
+      "matmul_i8i8i32", c10::DispatchKey::CPU, torch_ipex::cpu::matmul_i8i8i32);
+  m.impl(
+      "matmul_i8i8i32",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::matmul_i8i8i32);
 }
 
 } // namespace
