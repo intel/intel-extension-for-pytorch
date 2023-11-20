@@ -42,8 +42,8 @@ class MyAttention(nn.Module):
     def __init__(self):
         super().__init__()
         # For deepspeed support, please do not change the name of the attribute.
-        self.q_proj = nn.Linear(4, 4)
-        self.out_proj = nn.Linear(4, 2)
+        self.q_proj = nn.Linear(64, 128)
+        self.out_proj = nn.Linear(128, 128)
 
     def forward(self, x):
         x = self.q_proj(x)
@@ -92,7 +92,7 @@ class DeepSpeedTestM(nn.Module):
     def __init__(self, module_type):
         super().__init__()
         self.linear = module_type()
-        self.lm_head = nn.Linear(2, 2)
+        self.lm_head = nn.Linear(128, 100)
 
     def forward(self, x):
         x = self.linear(x)
@@ -197,7 +197,7 @@ class DeepspeedTester(JitTestCase):
                 check_lm_head = True
                 LmHeadLinearAllreduce = deepspeed_modules[2]
 
-            x = torch.randn(2, 3, 4)
+            x = torch.randn(2, 3, 64)
             m_linear = DeepSpeedTestM(MyLmHeadModel).eval()
             y = m_linear(x)
 
@@ -244,7 +244,7 @@ class DeepspeedTester(JitTestCase):
                 check_lm_head = True
                 LmHeadLinearAllreduce = deepspeed_modules[2]
 
-            x = torch.randn(2, 3, 4)
+            x = torch.randn(2, 3, 64)
             m_linear = DeepSpeedTestM(MyLmHeadModel).eval()
             y = m_linear(x)
 
@@ -308,7 +308,7 @@ class DeepspeedTester(JitTestCase):
             [DynamicQuantizedLinearLayer, DynamicQuantizedLinearAllreduce],
             [DynamicQuantizedLmHeadLinearAllreduce],
             ["quantized::linear_dynamic", "deepspeed_comm::all_reduce"],
-            atol=0.009,
+            atol=0.02,
             rtol=1.3e-6,
         )
 

@@ -119,8 +119,10 @@ def _pre_ipex_gemm(input, world_size, rank):
     except ImportError:
         from deepspeed.utils.tp_shard import get_shard_size, get_shard_size_list
 
-    input_shard_size = get_shard_size(input.shape[-1], world_size)
-    input_shard_offset = sum(get_shard_size_list(input.shape[-1], world_size)[0:rank])
+    input_shard_size = get_shard_size(input.shape[-1], world_size, "lm_head")
+    input_shard_offset = sum(
+        get_shard_size_list(input.shape[-1], world_size, "lm_head")[0:rank]
+    )
     return input[:, :, input_shard_offset : input_shard_offset + input_shard_size]
 
 
