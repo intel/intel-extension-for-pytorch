@@ -502,6 +502,11 @@ def post_clean_third_party_patches(base_dir, submodule_dir):
         .decode("ascii")
         .strip()
     )
+    print(
+        subprocess.check_output(["git", "clean", "-fd"], cwd=submodule_dir)
+        .decode("ascii")
+        .strip()
+    )
 
 
 # global setup modules
