@@ -134,9 +134,9 @@ fi
 
 # Checkout required branch/commit and update submodules
 cd pytorch
+rm -rf * > /dev/null
+git checkout . > /dev/null
 if [ ! -z ${VER_PYTORCH} ]; then
-    rm -rf * > /dev/null
-    git checkout . > /dev/null
     git checkout main > /dev/null
     git pull > /dev/null
     git checkout ${VER_PYTORCH}
@@ -199,8 +199,8 @@ fi
 
 # Compile individual component
 conda install -y make -c conda-forge
+conda install -y sysroot_linux-64
 conda install -y gcc==11.4 gxx==11.4 cxx-compiler -c conda-forge
-conda update -y sysroot_linux-64
 export CC=${CONDA_PREFIX}/bin/gcc
 export CXX=${CONDA_PREFIX}/bin/g++
 export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
@@ -266,7 +266,6 @@ fi
 
 # Set compiler env
 conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
-conda update -y sysroot_linux-64
 
 #  LLVM
 LLVM_ROOT="$(pwd)/llvm-release"
