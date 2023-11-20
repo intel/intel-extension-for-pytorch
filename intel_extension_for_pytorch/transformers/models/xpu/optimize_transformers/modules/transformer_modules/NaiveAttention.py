@@ -559,36 +559,6 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
             dist.all_reduce(reduce_target, group=self.tp_group)
         return reduce_target
 
-    def get_blocked_alibi(self, alibi):
-        if self.layer_id == 0:
-            shape = [
-                alibi.shape[0],
-                alibi.shape[1],
-                self.max_positions,
-            ]  # [beam*num_head, q_len, kv_len]
-            self.blocked_alibi = torch.empty(
-                shape, device=alibi.device, dtype=alibi.dtype
-            )
-            kv_len = alibi.shape[2]
-            self.blocked_alibi[:, :, 0:kv_len] = alibi
-        return self.blocked_alibi
-
-    def get_blocked_attn_mask(self, attn_mask):
-        if self.layer_id == 0:
-            self.blocked_attn_mask = torch.empty(
-                (
-                    attn_mask.shape[0],
-                    attn_mask.shape[1],
-                    attn_mask.shape[2],
-                    self.max_positions,
-                ),
-                device=attn_mask.device,
-                dtype=attn_mask.dtype,
-            )
-            self.blocked_attn_mask.fill_(-65504.0)
-            self.blocked_attn_mask[:, :, :, 0 : attn_mask.shape[3]] = attn_mask
-        return self.blocked_attn_mask
-
     def repeat_kv(self, kv, n_rep):
         if n_rep == 1:
             return kv

@@ -50,3 +50,4 @@ class IPEXTransformerConfig:
     tp_size: int = 1
     tp_group: object = None
     transpose: bool = True
+    dynamic_cache_stride: int = 16

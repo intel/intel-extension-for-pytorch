@@ -176,6 +176,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     # ################################## post_qkv ##########################################################################
     def post_qkv(self, query, key, value, position_ids, layer_past, **kwargs):
         bs_beam, seq, _ = self.get_runtime_shape(query)
+        seq = seq if layer_past is None else layer_past[0].size(2) + 1
         query, key = self.position_embed(
             query, key, position_ids, self.layer_id, self.beam_size, seq
         )
@@ -431,16 +432,21 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         if self.use_casual_mask is True and query.shape[2] != 1:
             is_causal = True
         blocked_attn_mask = None
+        seq_len = (
+            key.size(2) + self.prompt_len if self.is_beam_search() else key.size(2)
+        )
         if attention_mask is not None:
             if attention_mask.dtype == torch.bool:
                 blocked_attn_mask = None
                 if query.shape[2] != 1:
                     is_causal = True
             else:
-                blocked_attn_mask = self.get_blocked_attn_mask(attention_mask)
+                blocked_attn_mask = self.get_blocked_attn_mask(attention_mask, seq_len)
         blocked_alibi = None
         if alibi is not None:
-            blocked_alibi = self.get_blocked_alibi(alibi)
+            blocked_alibi = self.get_blocked_alibi(alibi, seq_len)
+        if seq_len >= self.max_position:
+            self.max_position = seq_len + self.runtime_cache_size
 
         return dropout, alpha, beta, is_causal, blocked_attn_mask, blocked_alibi
 
@@ -655,12 +661,17 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
             dist.all_reduce(reduce_target, group=self.tp_group)
         return reduce_target
 
-    def get_blocked_alibi(self, alibi):
+    def get_blocked_alibi(self, alibi, seq_len):
         if self.layer_id == 0:
+            cache_len = (
+                self.max_position
+                if self.max_position > seq_len
+                else seq_len + self.runtime_cache_size
+            )
             shape = [
                 alibi.shape[0],
                 alibi.shape[1],
-                self.max_position,
+                cache_len,
             ]  # [beam*num_head, q_len, kv_len]
             IPEXTransformerAttnOptimizedFp16.blocked_alibi = torch.empty(
                 shape, device=alibi.device, dtype=alibi.dtype
@@ -669,14 +680,19 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
             IPEXTransformerAttnOptimizedFp16.blocked_alibi[:, :, 0:kv_len] = alibi
         return IPEXTransformerAttnOptimizedFp16.blocked_alibi
 
-    def get_blocked_attn_mask(self, attn_mask):
+    def get_blocked_attn_mask(self, attn_mask, seq_len):
         if self.layer_id == 0:
+            cache_len = (
+                self.max_position
+                if self.max_position > seq_len
+                else seq_len + self.runtime_cache_size
+            )
             IPEXTransformerAttnOptimizedFp16.blocked_attn_mask = torch.empty(
                 (
                     attn_mask.shape[0],
                     attn_mask.shape[1],
                     attn_mask.shape[2],
-                    self.max_position,
+                    cache_len,
                 ),
                 device=attn_mask.device,
                 dtype=attn_mask.dtype,
