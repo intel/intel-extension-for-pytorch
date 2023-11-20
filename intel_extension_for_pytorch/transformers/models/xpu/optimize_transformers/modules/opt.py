@@ -215,7 +215,13 @@ class NewIPEXOPTBlock(IPEXTransformerBlock):
 
         residual = hidden_states
         if self.do_layer_norm_before:
-            hidden_states = self.self_attn_layer_norm(hidden_states)
+            hidden_states = torch.ops.torch_ipex.fast_layer_norm(
+                hidden_states,
+                self.self_attn_layer_norm.normalized_shape,
+                self.self_attn_layer_norm.weight,
+                self.self_attn_layer_norm.bias,
+                self.self_attn_layer_norm.eps,
+            )
 
         hidden_states, present_key_value, self_attn_weights = self.attn(
             hidden_states=hidden_states,
@@ -228,14 +234,32 @@ class NewIPEXOPTBlock(IPEXTransformerBlock):
         )
 
         if not self.do_layer_norm_before:
-            hidden_states = self.self_attn_layer_norm(hidden_states)
+            hidden_states = torch.ops.torch_ipex.fast_layer_norm(
+                hidden_states,
+                self.self_attn_layer_norm.normalized_shape,
+                self.self_attn_layer_norm.weight,
+                self.self_attn_layer_norm.bias,
+                self.self_attn_layer_norm.eps,
+            )
 
         residual = hidden_states
         if self.do_layer_norm_before:
-            hidden_states = self.final_layer_norm(hidden_states)
+            hidden_states = torch.ops.torch_ipex.fast_layer_norm(
+                hidden_states,
+                self.final_layer_norm.normalized_shape,
+                self.final_layer_norm.weight,
+                self.final_layer_norm.bias,
+                self.final_layer_norm.eps,
+            )
         hidden_states = self.mlp(hidden_states, residual)
         if not self.do_layer_norm_before:
-            hidden_states = self.final_layer_norm(hidden_states)
+            hidden_states = torch.ops.torch_ipex.fast_layer_norm(
+                hidden_states,
+                self.final_layer_norm.normalized_shape,
+                self.final_layer_norm.weight,
+                self.final_layer_norm.bias,
+                self.final_layer_norm.eps,
+            )
 
         if first_token and beam > 1:
             # for 1st token, expand the result with beam
