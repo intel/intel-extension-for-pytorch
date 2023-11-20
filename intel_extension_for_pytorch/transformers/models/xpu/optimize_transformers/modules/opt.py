@@ -80,7 +80,7 @@ class NewIPEXOPTBlock(IPEXTransformerBlock):
         activation = self.ipex_config.ipex_act
         mlp_type = IPEXTransformerMLP
         mlp_type_str = "IPEXTransformerMLP"
-        for elem in [impl.name, dtype, activation.name]:
+        for elem in [impl.name, dtype, activation.name, "Opt"]:
             mlp_type_str = mlp_type_str + elem.capitalize()
             if hasattr(sys.modules[__name__], mlp_type_str):
                 mlp_type = getattr(sys.modules[__name__], mlp_type_str)

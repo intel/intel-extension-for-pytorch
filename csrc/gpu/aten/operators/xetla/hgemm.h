@@ -98,6 +98,18 @@ GemmStatus hgemm_bias_res_res(
     const float res1_factor,
     const bool is_b_row_major);
 
+GemmStatus hgemm_bias_relu(
+    sycl::queue& queue,
+    sycl::half* out,
+    const sycl::half* a,
+    const sycl::half* b,
+    const sycl::half* bias,
+    const int m,
+    const int n,
+    const int k,
+    const float bias_factor,
+    const bool is_b_row_major);
+
 GemmStatus hgemm_bias_gelu(
     sycl::queue& queue,
     sycl::half* out,

@@ -138,6 +138,19 @@ def ipex_mm_silu(m, n, k, dtype):
     return c_, c_cpu_
 
 
+def ipex_mm_relu(m, n, k, dtype):
+    a = torch.rand(2, m, k).type(dtype).xpu()
+    b = torch.rand(k, n).type(dtype).xpu()
+    bias = torch.rand(n).type(dtype).xpu()
+    a_cpu = a.cpu().float()
+    b_cpu = b.cpu().float()
+    c = torch.ops.torch_ipex.matmul_relu(a, b, bias, 1.0)
+    c_cpu = F.relu(a_cpu @ b_cpu)
+    c_, c_cpu_ = c.cpu().float(), c_cpu
+    print("ipex_mm_relu:", (c_ - c_cpu_).abs().max().item())
+    return c_, c_cpu_
+
+
 def ipex_mm_gelu(m, n, k, dtype):
     a = torch.rand(2, m, k).type(dtype).xpu()
     b = torch.rand(k, n).type(dtype).xpu()
@@ -234,6 +247,8 @@ class TestNNMethod(TestCase):
             self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
             out, ref = ipex_mm_silu(shape[0], shape[1], shape[2], torch.half)
             self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+            out, ref = ipex_mm_relu(shape[0], shape[1], shape[2], torch.half)
+            self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
             out, ref = ipex_mm_gelu(shape[0], shape[1], shape[2], torch.half)
             self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
             out, ref = ipex_mm_bias_gelu(shape[0], shape[1], shape[2], torch.half)
@@ -284,6 +299,8 @@ class TestNNMethod(TestCase):
                 out, ref = ipex_mm_resmul(shape[0], shape[1], shape[2], torch.half)
                 self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
                 out, ref = ipex_mm_silu(shape[0], shape[1], shape[2], torch.half)
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+                out, ref = ipex_mm_relu(shape[0], shape[1], shape[2], torch.half)
                 self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
                 out, ref = ipex_mm_gelu(shape[0], shape[1], shape[2], torch.half)
                 self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)

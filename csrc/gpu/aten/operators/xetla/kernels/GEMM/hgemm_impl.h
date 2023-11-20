@@ -457,6 +457,54 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
+inline void hgemm_bias_relu(
+    sycl::queue& queue,
+    scalar_t* out,
+    const scalar_t* a,
+    const scalar_t* b,
+    const scalar_t* bias,
+    const int m,
+    const int n,
+    const int k,
+    const float bias_factor) {
+  using tile_op_t =
+      chained_tile_op_t<epilogue_impl::bias_op_t<scalar_t>, relu_op_t>;
+  auto caller = hgemm_caller<
+      scalar_t,
+      WG_M,
+      WG_N,
+      SG_M,
+      SG_N,
+      SG_K,
+      SLM_KS,
+      L3_KS,
+      SYNC_FREQ,
+      STAGES,
+      B_ROW_MAJOR,
+      tile_op_t>();
+  caller(
+      queue,
+      out,
+      a,
+      b,
+      m,
+      n,
+      k,
+      {{{const_cast<scalar_t*>(bias), {n, 1, n}, bias_factor}, {}}});
+}
+
+template <
+    typename scalar_t,
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES,
+    bool B_ROW_MAJOR>
 inline void hgemm_bias_gelu(
     sycl::queue& queue,
     scalar_t* out,
