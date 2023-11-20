@@ -22,6 +22,7 @@ class HGEMM_XETLA final {
   enum EpilogueType {
     BIAS = 0,
     RES_ADD,
+    RELU,
     GELU,
     RES_MUL,
     SILU,
@@ -138,6 +139,7 @@ class HGEMM_XETLA final {
           auto epsizes = eptensor_for_gemm.sizes();
           __CHECK(epsizes[0] == m_ && epsizes[1] == n_);
         } break;
+        case RELU:
         case GELU:
         case SILU: {
         } break;
@@ -275,6 +277,23 @@ class HGEMM_XETLA final {
           epilogue_params_[0],
           epilogue_params_[1],
           epilogue_params_[2],
+          is_b_row_major_);
+    } else if (
+        num_epilogues_ == 2 && epilogue_types_[0] == BIAS &&
+        epilogue_types_[1] == RELU) {
+      RECORD_FUNCTION_IMPL(hgemm_bias_relu, m_, n_, k_)
+      TORCH_CHECK(alpha_ == 1.0f);
+      status = hgemm_bias_relu(
+          q,
+          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+          reinterpret_cast<sycl::half*>(
+              epilogue_tensors_[0]->data_ptr<scalar_t>()),
+          m_,
+          n_,
+          k_,
+          epilogue_params_[0],
           is_b_row_major_);
     } else if (
         num_epilogues_ == 2 && epilogue_types_[0] == BIAS &&

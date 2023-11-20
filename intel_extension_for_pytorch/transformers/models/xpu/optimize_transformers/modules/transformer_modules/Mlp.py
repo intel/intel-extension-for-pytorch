@@ -110,6 +110,17 @@ class IPEXTransformerMLPOptimizedFp16(IPEXTransformerMLP):
         return hidden_states
 
 
+class IPEXTransformerMLPOptimizedFp16ReluOpt(IPEXTransformerMLPOptimizedFp16):
+    def __init__(self, config) -> None:
+        super().__init__(config)
+
+    def inter_mm(self, hidden_states):
+        hidden_states = torch.ops.torch_ipex.matmul_relu(
+            hidden_states, self.fc_in.weight, self.fc_in.bias, 1.0
+        )
+        return hidden_states
+
+
 class IPEXTransformerMLPOptimizedFp16Gelu(IPEXTransformerMLPOptimizedFp16):
     def __init__(self, config) -> None:
         super().__init__(config)

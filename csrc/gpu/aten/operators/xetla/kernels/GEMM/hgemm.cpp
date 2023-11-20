@@ -1,7 +1,7 @@
 #include "../../hgemm.h"
+#include <iostream>
 #include "hgemm_impl.h"
 #include "hgemm_policy.h"
-
 namespace xpu {
 namespace xetla {
 
@@ -17,6 +17,7 @@ namespace xetla {
 #define HGEMM_BIAS_RES_IMPL_NAME(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR) HGEMM_IMPL_NAME(hgemm_bias_res, WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)
 #define HGEMM_BIAS_RES_RES_IMPL_NAME(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR) HGEMM_IMPL_NAME(hgemm_bias_res_res, WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)
 
+#define HGEMM_BIAS_RELU_IMPL_NAME(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR) HGEMM_IMPL_NAME(hgemm_bias_relu, WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)
 #define HGEMM_BIAS_GELU_IMPL_NAME(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR) HGEMM_IMPL_NAME(hgemm_bias_gelu, WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)
 #define HGEMM_RESMUL_IMPL_NAME(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR) HGEMM_IMPL_NAME(hgemm_resmul, WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)
 #define HGEMM_SILU_IMPL_NAME(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR) HGEMM_IMPL_NAME(hgemm_silu, WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)
@@ -216,6 +217,30 @@ namespace xetla {
         bias_factor,                                                           \
         res0_factor,                                                           \
         res1_factor);                                                          \
+  }                                                                            \
+  void HGEMM_BIAS_RELU_IMPL_NAME(                                              \
+      WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
+      sycl::queue & queue,                                                     \
+      sycl::half * out,                                                        \
+      const sycl::half* a,                                                     \
+      const sycl::half* b,                                                     \
+      const sycl::half* bias,                                                  \
+      const int m,                                                             \
+      const int n,                                                             \
+      const int k,                                                             \
+      const float bias_factor) {                                               \
+    hgemm_bias_relu<                                                           \
+        sycl::half,                                                            \
+        WG_M,                                                                  \
+        WG_N,                                                                  \
+        SG_M,                                                                  \
+        SG_N,                                                                  \
+        SG_K,                                                                  \
+        SLM_KS,                                                                \
+        1,                                                                     \
+        1,                                                                     \
+        3,                                                                     \
+        B_ROW_MAJOR>(queue, out, a, b, bias, m, n, k, bias_factor);            \
   }                                                                            \
   void HGEMM_BIAS_GELU_IMPL_NAME(                                              \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
@@ -422,6 +447,17 @@ void (*hgemm_bias_res_res_policies[HGEMM_NUM_POLICIES])(
     const float) = {
     HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_BIAS_RES_RES_IMPL_NAME)};
 
+void (*hgemm_bias_relu_policies[HGEMM_NUM_POLICIES])(
+    sycl::queue&,
+    sycl::half*,
+    const sycl::half*,
+    const sycl::half*,
+    const sycl::half*,
+    const int,
+    const int,
+    const int,
+    const float) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_BIAS_RELU_IMPL_NAME)};
+
 void (*hgemm_bias_gelu_policies[HGEMM_NUM_POLICIES])(
     sycl::queue&,
     sycl::half*,
@@ -620,6 +656,25 @@ GemmStatus hgemm_bias_res_res(
       bias_factor,
       res0_factor,
       res1_factor);
+  return GemmStatus::kSuccess;
+}
+
+GemmStatus hgemm_bias_relu(
+    sycl::queue& queue,
+    sycl::half* out,
+    const sycl::half* a,
+    const sycl::half* b,
+    const sycl::half* bias,
+    const int m,
+    const int n,
+    const int k,
+    const float bias_factor,
+    const bool is_b_row_major) {
+  int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
+  if (policy_id < 0)
+    return GemmStatus::kError;
+  hgemm_bias_relu_policies[policy_id](
+      queue, out, a, b, bias, m, n, k, bias_factor);
   return GemmStatus::kSuccess;
 }
 

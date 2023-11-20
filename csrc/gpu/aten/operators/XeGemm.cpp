@@ -291,6 +291,48 @@ static Tensor mm_silu(const Tensor& a, const Tensor& b) {
   return matmul_resize(a, output);
 }
 
+Tensor matmul_relu(
+    const Tensor& input,
+    const Tensor& weight,
+    const c10::optional<Tensor>& bias,
+    const double bias_factor) {
+  int m = input.flatten(0, -2).sizes()[0];
+  int n = weight.sizes()[1];
+  int k = weight.sizes()[0];
+  auto output = at::empty({m, n}, input.options());
+  GemmStatus status = GemmStatus::kError;
+  if (bias.has_value()) {
+    auto policy =
+        HGEMM_XETLA()
+            .add_matrix_c(output)
+            .add_matrix_a(input)
+            .add_matrix_b(weight)
+            .add_epilogue(
+                bias.value(), HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
+            .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::RELU)
+            .build();
+    if (policy.valid()) {
+      status = policy.run();
+      if (status == GemmStatus::kSuccess) {
+        return matmul_resize(input, output);
+      }
+    }
+  }
+
+  RECORD_ONEDNN_FUNCTION_IMPL(matmul_relu)
+  auto weight_ = weight.transpose(0, 1);
+  auto linear_wrapper = LinearConverter();
+  auto post_op = [=]() {
+    Attr attr;
+    attr.append_post_eltwise(1.f, 0.f, 0.f, attr.kind_with_relu);
+    return attr;
+  };
+  auto input_flatten = input.flatten(0, -2);
+  linear_wrapper.call(output, input_flatten, weight_, bias, post_op);
+
+  return matmul_resize(input, output);
+}
+
 Tensor matmul_gelu(
     const Tensor& input,
     const Tensor& weight,
@@ -517,6 +559,7 @@ IPEX_LIBRARY_FRAGMENT() {
 
   IPEX_OP_REGISTER("mm_resmul.xpu", at::AtenIpexTypeXPU::mm_resmul);
   IPEX_OP_REGISTER("mm_silu.xpu", at::AtenIpexTypeXPU::mm_silu);
+  IPEX_OP_REGISTER("matmul_relu.xpu", at::AtenIpexTypeXPU::matmul_relu);
   IPEX_OP_REGISTER("matmul_gelu.xpu", at::AtenIpexTypeXPU::matmul_gelu);
 
   IPEX_OP_REGISTER("mm_qkv_out.xpu", at::AtenIpexTypeXPU::mm_qkv_out);
