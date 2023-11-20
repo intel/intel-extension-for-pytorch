@@ -1,8 +1,9 @@
 @echo off
 
-set "VER_PYTORCH=v2.0.1"
-set "VER_TORCHVISION=v0.15.2"
-set "VER_IPEX=xpu-master"
+set "VER_PYTORCH=v2.1.0"
+set "VER_TORCHVISION=v0.16.0"
+set "VER_TORCHAUDIO=v2.1.0"
+set "VER_IPEX=v2.1.10+xpu"
 
 if "%~2"=="" (
     echo Usage: %~nx0 ^<DPCPPROOT^> ^<MKLROOT^> [AOT]
@@ -23,17 +24,15 @@ if NOT EXIST "%DPCPP_ENV%" (
     echo DPC++ compiler environment "%DPCPP_ENV%" doesn't seem to exist.
     exit /b 2
 )
-call "%DPCPP_ENV%"
 
 set "ONEMKL_ENV=%ONEMKL_ROOT%\env\vars.bat"
 if NOT EXIST "%ONEMKL_ENV%" (
     echo oneMKL environment "%ONEMKL_ENV%" doesn't seem to exist.
     exit /b 3
 )
-call "%ONEMKL_ENV%"
 
 rem Check existence of required Windows commands
-for %%A in (python git cl) do (
+for %%A in (python git curl 7z) do (
     where %%A >nul 2>&1 || (
         echo Error: Command "%%A" not found.
         exit /b 4
@@ -48,17 +47,18 @@ rem Be verbose now
 echo on
 
 rem Install Python dependencies
-python -m pip install cmake astunparse numpy ninja pyyaml mkl-static mkl-include setuptools cffi typing_extensions future six requests dataclasses Pillow
+python -m pip install cmake astunparse numpy ninja pyyaml mkl-include setuptools cffi typing_extensions future six requests dataclasses Pillow
 
 rem Checkout individual components
 if NOT EXIST pytorch (
     git clone https://github.com/pytorch/pytorch.git
 )
-
 if NOT EXIST vision (
     git clone https://github.com/pytorch/vision.git
 )
-
+if NOT EXIST audio (
+    git clone https://github.com/pytorch/audio.git
+)
 if NOT EXIST intel-extension-for-pytorch (
     git clone https://github.com/intel/intel-extension-for-pytorch.git
 )
@@ -66,6 +66,12 @@ if NOT EXIST intel-extension-for-pytorch (
 rem Checkout required branch/commit and update submodules
 cd pytorch
 if not "%VER_PYTORCH%"=="" (
+    git rm -rf .
+    git clean -fxd
+    git reset
+    git checkout .
+    git checkout main
+    git pull
     git checkout %VER_PYTORCH%
 )
 git submodule sync
@@ -74,7 +80,27 @@ cd ..
 
 cd vision
 if not "%VER_TORCHVISION%"=="" (
+    git rm -rf .
+    git clean -fxd
+    git reset
+    git checkout .
+    git checkout main
+    git pull
     git checkout %VER_TORCHVISION%
+)
+git submodule sync
+git submodule update --init --recursive
+cd ..
+
+cd audio
+if not "%VER_TORCHAUDIO%"=="" (
+    git rm -rf .
+    git clean -fxd
+    git reset
+    git checkout .
+    git checkout main
+    git pull
+    git checkout %VER_TORCHAUDIO%
 )
 git submodule sync
 git submodule update --init --recursive
@@ -82,6 +108,12 @@ cd ..
 
 cd intel-extension-for-pytorch
 if not "%VER_IPEX%"=="" (
+    git rm -rf .
+    git clean -fxd
+    git reset
+    git checkout .
+    git checkout main
+    git pull
     git checkout %VER_IPEX%
 )
 git submodule sync
@@ -91,38 +123,59 @@ rem Compile individual component
 
 rem PyTorch
 cd ..\pytorch
-git stash
-git clean -f
+
+rem Download MKL files
+echo :: NOTE: Downloading MKL file from https://s3.amazonaws.com/ossci-windows/mkl_2020.2.254.7z
+curl https://s3.amazonaws.com/ossci-windows/mkl_2020.2.254.7z -k -O
+7z x -aoa mkl_2020.2.254.7z -omkl
+
 for %%f in ("..\intel-extension-for-pytorch\torch_patches\*.patch") do git apply "%%f"
 python -m pip install -r requirements.txt
 call conda install -q --yes -c conda-forge libuv=1.39
 rem Ensure cmake can find python packages when using conda or virtualenv
 if defined CONDA_PREFIX (
-    set "CMAKE_PREFIX_PATH=%CONDA_PREFIX:~1,-1%"
+    set "CMAKE_PREFIX_PATH=%CONDA_PREFIX%"
 ) else if defined VIRTUAL_ENV (
-     set "CMAKE_PREFIX_PATH=%VIRTUAL_ENV:~1,-1%"
+     set "CMAKE_PREFIX_PATH=%VIRTUAL_ENV%"
 )
-set "USE_STATIC_MKL=1"
+set "CMAKE_INCLUDE_PATH=%cd%\mkl\include"
+set "LIB=%cd%\mkl\lib;%LIB%"
 set "USE_NUMA=0"
 set "USE_CUDA=0"
 python setup.py clean
 python setup.py bdist_wheel
+
 set "USE_CUDA="
 set "USE_NUMA="
-set "USE_STATIC_MKL="
+set "LIB="
+set "CMAKE_INCLUDE_PATH="
 set "CMAKE_PREFIX_PATH="
-python -m pip uninstall -y mkl-static mkl-include
+python -m pip uninstall -y mkl-include
 for %%f in ("dist\*.whl") do python -m pip install --force-reinstall --no-deps "%%f"
+
+call "%DPCPP_ENV%"
+call "%ONEMKL_ENV%"
 
 rem TorchVision 
 cd ..\vision
 set "DISTUTILS_USE_SDK=1"
 python setup.py clean
 python setup.py bdist_wheel
+
 set "DISTUTILS_USE_SDK="
 for %%f in ("dist\*.whl") do python -m pip install --force-reinstall --no-deps "%%f"
 
-rem Intel® Extension for PyTorch*
+rem TorchAudio 
+cd ..\audio
+python -m pip install -r requirements.txt
+set "DISTUTILS_USE_SDK=1"
+python setup.py clean
+python setup.py bdist_wheel
+
+set "DISTUTILS_USE_SDK="
+for %%f in ("dist\*.whl") do python -m pip install --force-reinstall --no-deps "%%f"
+
+rem IntelÂ® Extension for PyTorch*
 cd ..\intel-extension-for-pytorch
 python -m pip install -r requirements.txt
 if NOT "%AOT%"=="" (
@@ -134,6 +187,7 @@ set "DISTUTILS_USE_SDK=1"
 set "CMAKE_CXX_COMPILER=icx"
 python setup.py clean
 python setup.py bdist_wheel
+
 set "CMAKE_CXX_COMPILER="
 set "DISTUTILS_USE_SDK="
 set "USE_MULTI_CONTEXT="
@@ -142,4 +196,4 @@ for %%f in ("dist\*.whl") do python -m pip install --force-reinstall --no-deps "
 
 rem Sanity Test
 cd ..
-python -c "import torch; import torchvision; import intel_extension_for_pytorch as ipex; print(f'torch_version:       {torch.__version__}'); print(f'torchvision_version: {torchvision.__version__}'); print(f'ipex_version:        {ipex.__version__}');"
+python -c "import torch; import torchvision; import torchaudio; import intel_extension_for_pytorch as ipex; print(f'torch_version:       {torch.__version__}'); print(f'torchvision_version: {torchvision.__version__}'); print(f'torchaudio_version:  {torchaudio.__version__}'); print(f'ipex_version:        {ipex.__version__}');"
