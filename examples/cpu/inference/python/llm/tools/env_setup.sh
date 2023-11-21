@@ -133,7 +133,7 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     conda install -y mkl
     conda install -y gperftools -c conda-forge
     bash ${AUX_INSTALL_SCRIPT}
-    python -m pip install cpuid accelerate datasets sentencepiece protobuf==3.20.3 transformers==4.31.0 neural-compressor==2.3.1
+    python -m pip install cpuid accelerate datasets sentencepiece protobuf==3.20.3 transformers==4.31.0
     python -m pip install lm-evaluation-harness/dist/*.whl
     python -m pip install DeepSpeedSYCLSupport/dist/*.whl
 

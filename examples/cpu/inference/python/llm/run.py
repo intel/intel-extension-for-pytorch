@@ -49,16 +49,16 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument("--output-dir", nargs="?", default="./saved_results")
 
     # quantization related arguments.
-    parser.add_argument("--int8", action="store_true")
+    parser.add_argument("--int8", action="store_true", help="default static int8 path (fp32 mixed)")
     parser.add_argument(
         "--int8-bf16-mixed",
         action="store_true",
-        help="by default it is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
+        help="by default static quant is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
     )
-    parser.add_argument("--quantized-model-path", default="")
-
+    parser.add_argument("--quantized-model-path", default="", help="path to the quantized model file")
+    parser.add_argument("--qconfig-summary-file", default="", help="qconfig for static quantization")
     parser.add_argument("--dataset", nargs="?", default="NeelNanda/pile-10k")
-    parser.add_argument("--ipex-smooth-quant", action="store_true")
+    parser.add_argument("--ipex-smooth-quant", action="store_true", help="smoothquant forstatic quantization")
     parser.add_argument("--alpha", default=0.5, type=float, help="alpha value for smoothquant")
     parser.add_argument(
         "--ipex-weight-only-quantization",
@@ -154,8 +154,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
             if args.config_file is not None:
                 infer_cmd.extend(["--config-file", str(args.config_file)])
 
-            print("running model geneartion...")
+            print("LLM RUNTIME INFO: running model geneartion...")
             subprocess.run(infer_cmd)
+            print("LLM RUNTIME INFO: finishing for geneartion process , exiting...")
         else:
             if args.config_file is None:
                 config = AutoConfig.from_pretrained(
@@ -231,7 +232,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     quant_cmd.extend(["--ipex-smooth-quant"])
                     quant_cmd.extend(["--alpha", str(args.alpha)])
                     quant_cmd.extend(["--dataset", str(args.dataset)])
-                print("quantizing model ...")
+                    quant_cmd.extend(["--qconfig-summary-file", str(args.qconfig_summary_file)])
+                print("LLM RUNTIME INFO: quantizing model ...")
                 subprocess.run(quant_cmd)
                 infer_cmd.extend(
                     ["--quantized-model-path", str(args.output_dir) + "/best_model.pt"]
@@ -268,8 +270,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 if args.config_file is not None:
                     infer_cmd.extend(["--config-file", str(args.config_file)])
 
-            print("running model geneartion...")
+            print("LLM RUNTIME INFO: running model geneartion...")
             subprocess.run(infer_cmd)
+            print("LLM RUNTIME INFO: finishing for geneartion process , exiting...")
 
     else:
         path = Path(parent_path, "distributed/run_generation_with_deepspeed.py")
@@ -296,6 +299,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     Path.mkdir(model_path)
             shard_cmd.extend(["--save-path", str(args.output_dir)+str(MODEL_CLASSES[model_type])])
             shard_cmd.extend(["--local_rank", str(args.local_rank)])
+            print("LLM RUNTIME INFO: sharding model...")
             subprocess.run(shard_cmd)
             infer_cmd.extend(["-m", str(args.output_dir)+str(MODEL_CLASSES[model_type])])
         else:
@@ -333,8 +337,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
             if args.int8_bf16_mixed:
                 infer_cmd.extend(["--int8-bf16-mixed"])
 
-        print("running model geneartion with deepspeed (autotp)...")
+        print("LLM RUNTIME INFO: running model geneartion with deepspeed (autotp)...")
         subprocess.run(infer_cmd)
+        print("LLM RUNTIME INFO: finishing for geneartion process , exiting...")
 
 
 if __name__ == "__main__":

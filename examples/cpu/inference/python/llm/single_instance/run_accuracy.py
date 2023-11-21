@@ -419,7 +419,6 @@ if args.accuracy_only:
                     enabled=True
                     if args.int8_bf16_mixed or self._dtype == torch.bfloat16
                     else False,
-                    dtype=torch.bfloat16,
                 ):
                     if self._dtype != "int8":
                         if (
@@ -517,7 +516,6 @@ if args.accuracy_only:
                     enabled=True
                     if args.int8_bf16_mixed or self._dtype == torch.bfloat16
                     else False,
-                    dtype=torch.bfloat16,
                 ):
                     if self._with_jit:
                         output = self.model(
@@ -534,7 +532,6 @@ if args.accuracy_only:
                     enabled=True
                     if args.int8_bf16_mixed or self._dtype == torch.bfloat16
                     else False,
-                    dtype=torch.bfloat16,
                 ):
                     if self._with_jit:
                         output = self.model(

@@ -124,17 +124,18 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama
 #### Static quantization (int8):
 ```bash
 # general command:
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-smooth-quant --alpha <Tuned alpha for specific models> --output-dir "saved_results" --int8
-# For the best alpha values (range [0, 1.0], float) tuned for specific models, we verified good accuracy: "EleutherAI/gpt-j-6b" with alpha=1.0, "meta-llama/Llama-2-7b-chat-hf" with alpha=0.8.
-# For more recipes, please refer to https://github.com/intel/neural-compressor/blob/master/docs/source/smooth_quant.md#validated-models
-# Note: by default, we use "--int8" to run int8 mixed fp32 mode, while for peak performance of static quantization, please use "--int8-bf16-mixed" instead (may impact accuracy).
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-smooth-quant --qconfig-summary-file <path to specific model qconfig> --output-dir "saved_results" --int8
+# We provide tuned qconfig recipes files for "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-7b-chat-hf" and "EleutherAI/gpt-j-6b"
+# For the qconfig recipes of more models, you can just run your model_id and try with IPEX default recipes by removing "--qconfig-summary-file <path to specific model qconfig>"
+# If IPEX default recipes are not good enough for accuracy requirements, please refer to https://github.com/intel/neural-compressor/blob/master/docs/source/smooth_quant.md#validated-models for tuning more recipes.
+# Note: by default, we use "--int8" to run int8 mixed fp32 inference, while for the peak performance of static quantization, please use "--int8-bf16-mixed" instead (may impact accuracy).
 
 # An example of llama2 7b model:
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-chat-hf --ipex-smooth-quant --alpha 0.8 --output-dir "saved_results" --int8
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-smooth-quant --qconfig-summary-file <path to meta-llama/Llama-2-7b-hf model qconfig> --output-dir "saved_results" --int8
 ```
 *Notes for all quantizations:*
 
-(1) for quantization benchmarks, the first runs will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, you can reuse these quantized models for inference-only benchmarks by adding "--quantized-model-path <output_dir + "best_model.pt">".
+(1) <a name="generation_sq">for all quantization benchmarks</a>, the first runs will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, you can reuse these quantized models for inference-only benchmarks by adding "--quantized-model-path <output_dir + "best_model.pt">". Specific for static quantization, if not using "--qconfig-summary-file", a qconfig recipe will also been generated in the "--output-dir" path.
 
 (2) for Falcon quantizations, "--config-file <CONFIG_FILE>" is needed and example of <CONFIG_FILE>: "utils/model_config/tiiuae_falcon-40b_config.json".
 
@@ -245,11 +246,11 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py --accuracy-only -m meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex --jit --tasks lambada_openai
 ```
 ### Quantizations:
+For the quantized models to be used in accuracy tests, we can reuse the model files that are named "best_model.pt" in the "--output-dir" path ([generated during inference performance tests](#generation_sq)).
 ```bash
 # general command:
-# For the quantized models to be used in accuracy tests, we can reuse the model files that are named "best_model.pt" in the "--output-dir" path (generated during inference performance tests).
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run_accuracy.py --model <MODEL ID> --quantized-model-path "./saved_results/best_model.pt" --dtype int8 --accuracy-only --jit --tasks {TASK_NAME}
-# please also add  "--int8-bf16-mixed" if your model is quantized with this flag
+# Please also add  "--int8-bf16-mixed" if your model is quantized with this flag
 
 # An example of llama2 7b model:
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Llama-2-7b-hf --quantized-model-path "./saved_results/best_model.pt" --dtype int8 --accuracy-only --jit --int8 --tasks lambada_openai
