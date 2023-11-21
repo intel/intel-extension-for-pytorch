@@ -220,21 +220,34 @@ endif()
 # XXX: Please make sure to find oneMKL before oneDNN
 find_package(oneDNN QUIET)
 if(ONEDNN_FOUND)
+  if(ONEDNN_EXTERNAL_LIB)
+    target_link_libraries(intel-ext-pt-gpu PRIVATE ${ONEDNN_EXTERNAL_LIB})
+  else()
     target_link_libraries(intel-ext-pt-gpu PRIVATE ${ONEDNN_LIBRARY})
-    target_include_directories(intel-ext-pt-gpu BEFORE PUBLIC ${ONEDNN_INCLUDE_DIR})
-    set_target_properties(intel-ext-pt-gpu PROPERTIES ONEDNN_INCLUDE_DIR "${ONEDNN_INCLUDE_DIR}")
-    if(BUILD_SEPARATE_OPS)
-      # Use same lib path with op libs to avoid link errors
-      set(ONEDNN_LIB_DIR "${CMAKE_BINARY_DIR}/csrc/gpu")
-      # Suppress soname to prevent from creating symbolic link
-      set_target_properties(${ONEDNN_LIBRARY} PROPERTIES NO_SONAME ON
-        LIBRARY_OUTPUT_DIRECTORY ${ONEDNN_LIB_DIR}
-        RUNTIME_OUTPUT_DIRECTORY ${ONEDNN_LIB_DIR})
-        foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
-            target_link_libraries(${op_lib} PRIVATE ${ONEDNN_LIBRARY})
-            target_include_directories(${op_lib} BEFORE PUBLIC ${ONEDNN_INCLUDE_DIR})
-        endforeach()
-    endif()
+  endif()
+  target_include_directories(intel-ext-pt-gpu BEFORE PUBLIC ${ONEDNN_INCLUDE_DIR})
+  set_target_properties(intel-ext-pt-gpu PROPERTIES ONEDNN_INCLUDE_DIR "${ONEDNN_INCLUDE_DIR}")
+  if(ONEDNN_EXTERNAL_LIB)
+    set_target_properties(intel-ext-pt-gpu PROPERTIES ONEDNN_LIBRARY "${ONEDNN_EXTERNAL_LIB}")
+  else()
+    set_target_properties(intel-ext-pt-gpu PROPERTIES ONEDNN_LIBRARY "${ONEDNN_LIBRARY}")
+  endif()
+  if(BUILD_SEPARATE_OPS)
+    # Use same lib path with op libs to avoid link errors
+    set(ONEDNN_LIB_DIR "${CMAKE_BINARY_DIR}/csrc/gpu")
+    # Suppress soname to prevent from creating symbolic link
+    set_target_properties(${ONEDNN_LIBRARY} PROPERTIES NO_SONAME ON
+      LIBRARY_OUTPUT_DIRECTORY ${ONEDNN_LIB_DIR}
+      RUNTIME_OUTPUT_DIRECTORY ${ONEDNN_LIB_DIR})
+    foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
+      if(ONEDNN_EXTERNAL_LIB)
+        target_link_libraries(${op_lib} PRIVATE ${ONEDNN_EXTERNAL_LIB})
+      else()
+        target_link_libraries(${op_lib} PRIVATE ${ONEDNN_LIBRARY})
+      endif()
+      target_include_directories(${op_lib} BEFORE PUBLIC ${ONEDNN_INCLUDE_DIR})
+    endforeach()
+  endif()
 else()
     message(FATAL_ERROR "Cannot find oneDNN")
 endif()
