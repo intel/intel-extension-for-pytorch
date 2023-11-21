@@ -105,10 +105,23 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list
 # An example of llama2 7b model:
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex --deployment-mode
 ```
+#### Static quantization (int8):
+```bash
+# general command:
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-smooth-quant --qconfig-summary-file <path to the qconfig of the model_id> --output-dir "saved_results" --int8
+# Note: by default, we use "--int8" to run int8 mixed fp32 inference, while for the peak performance of static quantization, please use "--int8-bf16-mixed" instead (may impact accuracy).
+
+# An example of llama2 7b model:
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-smooth-quant --qconfig-summary-file <path to "llama-2-7b_qconfig.json"> --output-dir "saved_results" --int8
+```
+- We provide the downloading links of tuned static quantization qconfig summary files with good quality: ["meta-llama/Llama-2-7b-hf"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/llama-2-7b_qconfig.json), ["meta-llama/Llama-2-7b-chat-hf"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/llama-2-7b-chat_qconfig.json), ["meta-llama/Llama-2-13b-hf"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/llama-2-13b_qconfig.json) and ["EleutherAI/gpt-j-6b"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/gpt-j-6b_qconfig.json).
+- For other models' qconfig recipes, you can just try to run your model_id and use IPEX default recipes by removing "--qconfig-summary-file <path to specific model qconfig>". If IPEX default recipes are not good enough for accuracy requirements, please refer to the [Intel® Neural Compressor tutorial](https://github.com/intel/neural-compressor/blob/master/docs/source/smooth_quant.md#validated-models) for more tuned recipes.
+
 #### Weight-only quantization:
 ```bash
 # int8 general command:
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-weight-only-quantization  --output-dir "saved_results" --int8-bf16-mixed
+# for GPT-NEOX Weight-only quantizations, using "--int8" instead of "--int8-bf16-mixed" for accuracy concerns.
 
 # An example of llama2 7b model:
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization  --output-dir "saved_results" --int8-bf16-mixed
@@ -121,23 +134,12 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list
 # An example of llama2 7b model:
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization  --output-dir "saved_results" --int8-bf16-mixed --gptq
 ```
-#### Static quantization (int8):
-```bash
-# general command:
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-smooth-quant --qconfig-summary-file <path to specific model qconfig> --output-dir "saved_results" --int8
-# We provide tuned qconfig recipes files for "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-7b-chat-hf" and "EleutherAI/gpt-j-6b"
-# For the qconfig recipes of more models, you can just run your model_id and try with IPEX default recipes by removing "--qconfig-summary-file <path to specific model qconfig>"
-# If IPEX default recipes are not good enough for accuracy requirements, please refer to https://github.com/intel/neural-compressor/blob/master/docs/source/smooth_quant.md#validated-models for tuning more recipes.
-# Note: by default, we use "--int8" to run int8 mixed fp32 inference, while for the peak performance of static quantization, please use "--int8-bf16-mixed" instead (may impact accuracy).
 
-# An example of llama2 7b model:
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-smooth-quant --qconfig-summary-file <path to meta-llama/Llama-2-7b-hf model qconfig> --output-dir "saved_results" --int8
-```
 *Notes for all quantizations:*
 
-(1) <a name="generation_sq">for all quantization benchmarks</a>, the first runs will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, you can reuse these quantized models for inference-only benchmarks by adding "--quantized-model-path <output_dir + "best_model.pt">". Specific for static quantization, if not using "--qconfig-summary-file", a qconfig recipe will also been generated in the "--output-dir" path.
+(1) <a name="generation_sq">for all quantization benchmarks</a>, the first runs will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, you can reuse these quantized models for inference-only benchmarks by adding "--quantized-model-path <output_dir + "best_model.pt">". Specific for static quantization, if not using "--qconfig-summary-file", a qconfig recipe will also be generated in the "--output-dir" path, which could be reused as well.
 
-(2) for Falcon quantizations, "--config-file <CONFIG_FILE>" is needed and example of <CONFIG_FILE>: "utils/model_config/tiiuae_falcon-40b_config.json".
+(2) for Falcon quantizations, "--config-file <CONFIG_FILE>" is needed in the command and the example of <CONFIG_FILE> is provided here: "utils/model_config/tiiuae_falcon-40b_config.json".
 
 ### Distributed inference with DeepSpeed (autoTP)
 #### Prepare:
