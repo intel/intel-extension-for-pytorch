@@ -49,14 +49,6 @@ from intel_extension_for_pytorch._version import (
 default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]
 
-# for kineto profiler with onetrace
-# we must add environmental variable before trigger
-# any enumDevice (c++) in device_count (python)
-# called by is_available (python)
-if intel_extension_for_pytorch._C._is_kineto_enabled():
-    if intel_extension_for_pytorch._C._is_onetrace_enabled():
-        intel_extension_for_pytorch._C._enable_tracing_layer()
-
 
 def _is_compiled() -> bool:
     r"""Returns true if compile with XPU support."""
@@ -740,6 +732,8 @@ if intel_extension_for_pytorch._C._has_xpu():
 
 
 def _prepare_profiler(config, activities):
+    # global profiler need to trigger lazy init
+    _lazy_init()
     return intel_extension_for_pytorch._C._prepare_profiler(config, activities)
 
 

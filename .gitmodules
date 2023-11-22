@@ -16,7 +16,6 @@
 [submodule "third_party/pti-gpu"]
 	path = third_party/pti-gpu
 	url = https://github.com/intel/pti-gpu.git
-        ignore = all
 [submodule "third_party/oneDNN"]
 	path = third_party/oneDNN
 	url = https://github.com/oneapi-src/oneDNN.git

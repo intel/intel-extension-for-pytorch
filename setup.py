@@ -487,6 +487,28 @@ def auto_format_python_code():
     )
 
 
+def post_clean_third_party_patches(base_dir, submodule_dir):
+    print(
+        subprocess.check_output(
+            ["git", "submodule", "sync", submodule_dir], cwd=base_dir
+        )
+        .decode("ascii")
+        .strip()
+    )
+    print(
+        subprocess.check_output(
+            ["git", "submodule", "update", "--init", submodule_dir], cwd=base_dir
+        )
+        .decode("ascii")
+        .strip()
+    )
+    print(
+        subprocess.check_output(["git", "clean", "-fd"], cwd=submodule_dir)
+        .decode("ascii")
+        .strip()
+    )
+
+
 # global setup modules
 class IPEXClean(distutils.command.clean.clean, object):
     def run(self):
@@ -1168,3 +1190,6 @@ setup(
         "License :: OSI Approved :: Apache Software License",
     ],
 )
+
+# post clean
+post_clean_third_party_patches(base_dir, "third_party/pti-gpu")

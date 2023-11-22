@@ -255,11 +255,6 @@ def compiled_module_main(benchmark_name, benchmark_compiled_module_fn):
                 "Level Zero Tracer is disabled. Please set environment variable `IPEX_ZE_TRACING=1` to profile on XPU device."  # noqa: B950
             )
             return
-        if torch._inductor.config.compile_threads != 1:
-            warnings.warn(
-                "Currently Level Zero Tracer is NOT supported on multi procssing. Please set torch._inductor.config.compile_threads=1 to work around it."  # noqa: B950
-            )
-            return
 
         with torch.profiler.profile(record_shapes=True) as p:
             benchmark_compiled_module_fn(times=times, repeat=repeat)
