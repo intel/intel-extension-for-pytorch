@@ -4,7 +4,7 @@
 export KMP_BLOCKTIME=INF
 export KMP_TPAUSE=0
 export KMP_SETTINGS=1
-export KMP_FORJOIN_BARRIER_PATTERN=dist,dist
+export KMP_FORKJOIN_BARRIER_PATTERN=dist,dist
 export KMP_PLAIN_BARRIER_PATTERN=dist,dist
 export KMP_REDUCTION_BARRIER_PATTERN=dist,dist
 
@@ -18,7 +18,8 @@ else
     echo "Conda environment is not available. You need to set environment variable LD_PRELOAD to dynamic libraries of Intel OpenMP and TcMalloc manually."
 fi
 
-ONECCL_PATH=./oneCCL/build/_install
+BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+ONECCL_PATH=${BASEFOLDER}/../oneCCL_release
 if [ ! -d ${ONECCL_PATH} ]; then
     echo "oneCCL is not available."
 else

@@ -7,58 +7,59 @@
 
 ARG BASE_IMAGE=ubuntu:22.04
 FROM ${BASE_IMAGE} AS base
+RUN if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then rm /etc/apt/apt.conf.d/proxy.conf; fi && \
+    if [ ! -z ${HTTP_PROXY} ]; then echo "Acquire::http::Proxy \"${HTTP_PROXY}\";" >> /etc/apt/apt.conf.d/proxy.conf; fi && \
+    if [ ! -z ${HTTPS_PROXY} ]; then echo "Acquire::http::Proxy \"${HTTPS_PROXY}\";" >> /etc/apt/apt.conf.d/proxy.conf; fi
 RUN apt update && \
     apt full-upgrade -y && \
-    DEBIAN_FRONTEND=noninteractive apt install -y \
+    DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y \
     sudo \
-    numactl \
+    ca-certificates \
+    git \
+    curl \
     wget \
     vim \
-    git \
+    numactl \
     gcc-12 \
     g++-12 \
-    make \
-    curl && \
-    rm -rf /var/lib/apt/lists/* && \
-    update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 && \
+    make
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 && \
     update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 && \
     update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100 && \
     update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 100
+RUN apt clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then rm /etc/apt/apt.conf.d/proxy.conf; fi
+
 RUN useradd -m ubuntu && \
     echo 'ubuntu ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+USER ubuntu
 WORKDIR /home/ubuntu
 
-FROM base AS dev
-COPY . /home/ubuntu/llm
-RUN chown -R ubuntu:ubuntu /home/ubuntu/llm && \
-    rm /home/ubuntu/llm/Dockerfile
-
-USER ubuntu
-
 RUN curl -fsSL -v -o miniconda.sh -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh  && \
-    bash miniconda.sh -b -p ~/miniconda3 && \
+    bash miniconda.sh -b -p ./miniconda3 && \
     rm miniconda.sh && \
-    echo "source ~/miniconda3/bin/activate" >> ~/.bashrc
+    echo "\nsource ~/miniconda3/bin/activate" >> ./.bashrc
 
-RUN . ~/miniconda3/bin/activate && \
-    conda create -y -n compile_py310 python=3.10 && \
-    conda activate compile_py310 && \
-    cd llm && \
-    bash tools/env_setup.sh 2 && \
-    conda deactivate && \
-    conda remove -y -n compile_py310 --all && \
-    conda create -y -n py310 python=3.10 && \
-    conda activate py310 && \
-    bash tools/env_setup.sh 1 && \
-    echo "conda activate py310" >> ~/.bashrc
+# --build-arg COMPILE=ON to compile from source
+ARG COMPILE
+FROM base AS dev
+COPY --chown=ubuntu:ubuntu . ./intel-extension-for-pytorch
+RUN . ./miniconda3/bin/activate && \
+    conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
+    cd intel-extension-for-pytorch/examples/cpu/inference/python/llm && \
+    if [ -z ${COMPILE} ]; then bash tools/env_setup.sh 6; else bash tools/env_setup.sh 2; fi
 
 FROM base AS deploy
-USER ubuntu
-COPY --from=dev /home/ubuntu/miniconda3 /home/ubuntu/miniconda3
-COPY --from=dev /home/ubuntu/llm /home/ubuntu/llm
-COPY --from=dev /home/ubuntu/.bashrc /home/ubuntu/.bashrc
-RUN sudo chown -R ubuntu:ubuntu ~/miniconda3 ~/llm ~/.bashrc && \
-    sudo mv ~/llm/oneCCL/build/_install /opt/oneCCL && \
+COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/examples/cpu/inference/python/llm ./llm
+RUN . ./miniconda3/bin/activate && \
+    conda create -y -n py310 python=3.10 && conda activate py310 && \
+    echo "conda activate py310" >> ./.bashrc && \
+    echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ./.bashrc && \
+    cd ./llm && \
+    bash tools/env_setup.sh 1 && \
+    python -m pip cache purge && \
+    conda clean -a -y && \
+    sudo mv ./oneCCL_release /opt/oneCCL && \
     sudo chown -R root:root /opt/oneCCL && \
-    rm -rf ~/llm/oneCCL && \
-    sed -i "s|ONECCL_PATH=.*|ONECCL_PATH=/opt/oneCCL|" ~/llm/tools/env_activate.sh
+    sed -i "s|ONECCL_PATH=.*|ONECCL_PATH=/opt/oneCCL|" ./tools/env_activate.sh
