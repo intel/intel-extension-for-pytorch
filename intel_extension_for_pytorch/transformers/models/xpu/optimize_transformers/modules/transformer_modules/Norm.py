@@ -16,7 +16,6 @@ class LlamaRMSNorm(nn.Module):
         output = torch.ops.torch_ipex.rms_norm(
             hidden_states, [self.hidden_size], self.weight, self.variance_epsilon
         )
-        return output[0]
 
         """
         # Reference path in huggingface
@@ -26,3 +25,5 @@ class LlamaRMSNorm(nn.Module):
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
         return self.weight * hidden_states.to(input_dtype)
         """
+
+        return output[0]
