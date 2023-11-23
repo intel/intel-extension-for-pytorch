@@ -138,7 +138,7 @@ class TransformerFallbackController:
                     running_func = getattr(running_cls, func.__name__)
                     return running_func(*args, **kwargs)
                 elif (
-                    not (can_fallback or can_fallback)
+                    not (can_fallback or is_fallback_func)
                     and TransformerFallbackController.fallback_flag
                 ):
                     print(
