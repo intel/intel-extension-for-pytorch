@@ -31,28 +31,28 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
 
     def prepare_cache_for_greedy_search(self, hidden_states, layer_past):
         bs_beam, seq_len, _ = self.get_runtime_shape(hidden_states)
-        self.prepare_kv_cache(hidden_states)
+        self.prepare_kv_cache(hidden_states, self.num_attn_head)
 
         self.prev_seq_len = layer_past[0].size(2) if layer_past is not None else 0
         self.seq_len = self.prev_seq_len + 1 if self.prev_seq_len != 0 else seq_len
 
     def prepare_cache_for_beam_search(self, hidden_states, layer_past):
-        self.prepare_kv_prompt(hidden_states)
-        self.prepare_kv_cache(hidden_states)
+        self.prepare_kv_prompt(hidden_states, self.num_attn_head)
+        self.prepare_kv_cache(hidden_states, self.num_attn_head)
         if self.is_1st_token_beam_search():
             self.prev_seq_len = 0
             self.seq_len = 0
         else:
             self.seq_len = self.prev_seq_len + 1
 
-    def prepare_kv_prompt(self, hidden_states):
+    def prepare_kv_prompt(self, hidden_states, kv_head):
         bs_beam, seq_len, embed_dim = self.get_runtime_shape(hidden_states)
         if (
             self.runtime_cache.key_prompt is None
             or self.runtime_cache.value_prompt is None
             or IPEXTransformerAttn.timestamp == 0
         ):
-            out_shape = [bs_beam, seq_len, self.head_dim * self.num_attn_head]
+            out_shape = [bs_beam, seq_len, self.head_dim * kv_head]
             self.runtime_cache.key_prompt = torch.empty(
                 out_shape, device=hidden_states.device, dtype=hidden_states.dtype
             )
@@ -67,7 +67,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         response_cache_len = self.runtime_cache.key_cache.size(0) - prompt_len
         return response_cache_len == IPEXTransformerAttn.timestamp
 
-    def prepare_kv_cache(self, hidden_states):
+    def prepare_kv_cache(self, hidden_states, kv_head):
         bs_beam, seq_len, embed_dim = self.get_runtime_shape(hidden_states)
         batch_size = bs_beam // self.beam_size
         if (
@@ -81,7 +81,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
                 if self.is_beam_search()
                 else self.runtime_cache_size + seq_len
             )
-            cache_shape = [cache_len, bs_beam, self.num_attn_head, self.head_dim]
+            cache_shape = [cache_len, bs_beam, kv_head, self.head_dim]
             self.runtime_cache.key_cache = torch.empty(
                 cache_shape, device=hidden_states.device, dtype=hidden_states.dtype
             )
@@ -93,7 +93,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         elif self.ready_for_runtime_cache_update():
             old_cache_len = self.runtime_cache.key_cache.size(0)
             cache_len = old_cache_len + self.runtime_cache_size
-            cache_shape = [cache_len, bs_beam, self.num_attn_head, self.head_dim]
+            cache_shape = [cache_len, bs_beam, kv_head, self.head_dim]
             key_cache_tmp = torch.empty(
                 cache_shape, device=hidden_states.device, dtype=hidden_states.dtype
             )

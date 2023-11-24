@@ -2,7 +2,6 @@ import torch
 
 from .._transformer_configuration import IPEXTransformerConfig
 from .Attention import IPEXTransformerAttnOptimizedFp16
-from .BaseAttention import IPEXTransformerAttn
 
 
 class IPEXTransformerAttnOptimizedFp16Grouped(IPEXTransformerAttnOptimizedFp16):
@@ -19,54 +18,11 @@ class IPEXTransformerAttnOptimizedFp16Grouped(IPEXTransformerAttnOptimizedFp16):
         else:
             pass
 
-    def prepare_kv_prompt(self, hidden_states):
-        if self.num_kv_group <= 1:
-            return super().prepare_kv_prompt(hidden_states)
-        bs_beam, seq_len, embed_dim = self.get_runtime_shape(hidden_states)
-        if (
-            self.runtime_cache.key_prompt is None
-            or self.runtime_cache.value_prompt is None
-            or IPEXTransformerAttn.timestamp == 0
-        ):
-            out_shape = [bs_beam, seq_len, self.head_dim * self.num_kv_head]
-            self.runtime_cache.key_prompt = torch.empty(
-                out_shape, device=hidden_states.device, dtype=hidden_states.dtype
-            )
-            self.runtime_cache.value_prompt = torch.empty(
-                out_shape, device=hidden_states.device, dtype=hidden_states.dtype
-            )
+    def prepare_kv_prompt(self, hidden_states, kv_head):
+        return super().prepare_kv_prompt(hidden_states, self.num_kv_head)
 
-    def prepare_kv_cache(self, hidden_states):
-        if self.num_kv_group <= 1:
-            return super().prepare_kv_cache(hidden_states)
-        bs_beam, seq_len, embed_dim = self.get_runtime_shape(hidden_states)
-        batch_size = bs_beam // self.beam_size
-        if (
-            self.runtime_cache.key_cache is None
-            or self.runtime_cache.value_cache is None
-            or batch_size != self.batch_size
-        ):
-            if self.is_beam_search():
-                cache_shape = [
-                    self.max_out_position,
-                    bs_beam,
-                    self.num_kv_head,
-                    self.head_dim,
-                ]
-            else:
-                cache_shape = [
-                    self.max_position,
-                    bs_beam,
-                    self.num_kv_head,
-                    self.head_dim,
-                ]
-            self.runtime_cache.key_cache = torch.empty(
-                cache_shape, device=hidden_states.device, dtype=hidden_states.dtype
-            )
-            self.runtime_cache.value_cache = torch.empty(
-                cache_shape, device=hidden_states.device, dtype=hidden_states.dtype
-            )
-            self.batch_size = batch_size
+    def prepare_kv_cache(self, hidden_states, kv_head):
+        return super().prepare_kv_cache(hidden_states, self.num_kv_head)
 
     def prepare_qkv_input_1st_token_beam_search(self, hidden_states, **kwargs):
         if self.num_kv_group <= 1:
