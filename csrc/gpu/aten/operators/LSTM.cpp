@@ -148,9 +148,10 @@ std::tuple<Tensor, Tensor, Tensor> lstm(
     bool batch_first) {
   // Use oneDNN as recommend engine after big memory issues fixed.
   xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+      choose_compute_eng(xpu::COMPUTE_ENG::RECOMMEND, input);
 
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng ||
+      xpu::COMPUTE_ENG::RECOMMEND == real_eng) {
     Variable input_v = input;
     if (batch_first) {
       input_v = input_v.transpose(0, 1).contiguous();
