@@ -157,11 +157,9 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
 
     def prepare_kv_cache(self, hidden_states):
         bs_beam, seq_len, embed_dim = self.get_runtime_shape(hidden_states)
-        batch_size = bs_beam // self.beam_size
         if (
             self.runtime_cache.key_cache is None
-            or self.runtime_cache.value_cache is None
-            or batch_size != self.batch_size
+            or self.runtime_cache.key_cache.shape[1] != bs_beam
         ):
             cache_shape = [
                 self.max_position,
@@ -175,7 +173,6 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
             self.runtime_cache.value_cache = torch.empty(
                 cache_shape, device=hidden_states.device, dtype=hidden_states.dtype
             )
-            self.batch_size = batch_size
 
     # ################################ qkv_gemm ################################################
     def qkv_gemm(self, hidden_states, key_value_states, layer_past, **kwargs):
