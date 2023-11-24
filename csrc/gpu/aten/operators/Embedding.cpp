@@ -172,14 +172,15 @@ void renorm_kernel(
 
 Tensor embedding_dense_backward(
     const Tensor& grad_output,
-    const Tensor& indices,
+    const Tensor& indices_,
     int64_t num_weights,
     int64_t padding_idx,
     bool scale_grad_by_freq) {
   auto grad_arg = TensorArg(grad_output, "grad", 1);
-  auto indices_arg = TensorArg(indices, "indices", 1);
+  auto indices_arg = TensorArg(indices_, "indices", 1);
   checkScalarTypes("embedding_backward", indices_arg, {kLong, kInt});
   isOnSameDevice("embedding_backward", grad_arg, indices_arg);
+  auto indices = indices_.contiguous();
 
   auto num_indices = indices.numel();
   auto grad_output_cont =
