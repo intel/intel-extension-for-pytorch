@@ -145,13 +145,14 @@ class ETKernelIndex:
     def get_kernels(
         self, g: Union[NativeFunction, NativeFunctionsGroup]
     ) -> Dict[ETKernelKey, BackendMetadata]:
+        f = None
         if isinstance(g, NativeFunction):
             f = g
         elif isinstance(g, NativeFunctionsGroup):
             f = g.functional
         else:
             assert_never(g)
-        if f.func.name not in self.index:
+        if f and f.func.name not in self.index:
             return {}
         return self.index[f.func.name]
 

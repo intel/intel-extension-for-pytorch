@@ -724,8 +724,6 @@ def extract_schema(path):
     for line in open(path, "r"):
         line = line.strip()
         m = re.match(r"\s*([^\s].*);\s*//\s*([^\s].*)", line)
-        if not m:
-            continue
         if m:
             schema = m.group(2)
             if schema.startswith("{"):
@@ -754,7 +752,6 @@ def get_lazy_reorder(schema_name, argument):
                     LAZY_REORDER_OPTIONAL_TENSOR.substitute(change_dict),
                     change_dict["temp_name"],
                 )
-                option["actuals"][i] = change_dict["temp_name"]
             elif not argument["type"].startswith("const"):
                 return LAZY_REORDER_TENSOR.substitute(change_dict), change_dict["name"]
             else:

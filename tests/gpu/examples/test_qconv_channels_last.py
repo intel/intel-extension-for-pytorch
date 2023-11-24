@@ -15,12 +15,11 @@ class TestTorchMethod(TestCase):
         dtype_filters = torch.qint8
         zp_vec = [128, 2, 0]
         for with_relu in [True, False]:
+            qconf_fn = torch.ops.quantized.conv2d
+            if with_relu:
+                qconv_fn = torch.ops.quantized.conv2d_relu
             for scale_in in [1.2, 1.6]:
                 for zero_point_in in zp_vec:  # torch u8, random zp, 0
-                    if with_relu:
-                        qconv_fn = torch.ops.quantized.conv2d_relu
-                    else:
-                        qconf_fn = torch.ops.quantized.conv2d
                     scale_weight = 0.5
                     scale_out = 0.5
                     zero_point_out = 2
@@ -83,12 +82,11 @@ class TestTorchMethod(TestCase):
         dtype_filters = torch.qint8
         zp_vec = [128, 2, 0]
         for with_relu in [True, False]:
+            qconf_fn = torch.ops.quantized.conv3d
+            if with_relu:
+                qconv_fn = torch.ops.quantized.conv3d_relu
             for scale_in in [1.2, 1.6]:
                 for zero_point_in in zp_vec:  # torch u8, random zp, 0
-                    if with_relu:
-                        qconv_fn = torch.ops.quantized.conv3d_relu
-                    else:
-                        qconf_fn = torch.ops.quantized.conv3d
                     scale_weight = 0.5
                     scale_out = 4.0
                     zero_point_out = 2
