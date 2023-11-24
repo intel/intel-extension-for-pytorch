@@ -23,10 +23,26 @@ namespace oneDNN {
 static inline void matmul(
     Tensor& result,
     const Tensor& mat1,
-    const Tensor& mat2,
+    const Tensor& mat2_,
     const Tensor& b_raw,
     bool m2_trans,
     Attr attr) {
+  // FIXME: There is a onednn bug causes broadcast post fusion to be
+  // accuracy error when t2 is column major
+  Tensor mat2;
+  DeviceId curDevID;
+  dpcppGetDevice(&curDevID);
+  bool mat2_wa_flag =
+      (!Settings::I().has_2d_block_array(curDevID)) && (mat2_.dim() == 2);
+  if (mat2_wa_flag && m2_trans == false && mat2_.size(0) < 16) {
+    mat2 = mat2_.transpose(0, 1).contiguous();
+    m2_trans = true;
+  } else if (mat2_wa_flag && m2_trans == true && mat2_.size(1) < 16) {
+    mat2 = mat2_.contiguous();
+  } else {
+    mat2 = mat2_;
+  }
+
   size_t dims = result.dim();
   TORCH_CHECK(
       dims == 2 || dims == 3,
