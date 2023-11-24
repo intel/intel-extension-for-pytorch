@@ -2343,11 +2343,15 @@ class TestAutograd(TestCase):
 
         @torch.no_grad()
         def coro_no_grad(n=10):
-            has_raised = False
+            # Security Scan: has_raised is not needed for this case
+            # because in except it will raise SecondaryException directly
+            # has_raised = False
             for i in range(n):
                 try:
                     self.assertFalse(torch.is_grad_enabled())
-                    yield (-i if has_raised else i)
+                    # Security Scan: has_raised is no need here
+                    # yield (-i if has_raised else i)
+                    yield i
 
                 except UnrecoverableException:
                     self.assertFalse(torch.is_grad_enabled())
@@ -2355,11 +2359,15 @@ class TestAutograd(TestCase):
 
         @torch.enable_grad()
         def coro_enable_grad(n=10):
-            has_raised = False
+            # Security Scan: has_raised is not needed for this case
+            # because in except it will raise SecondaryException directly
+            # has_raised = False
             for i in range(n):
                 try:
                     self.assertTrue(torch.is_grad_enabled())
-                    yield (-i if has_raised else i)
+                    # Security Scan: has_raised is no need here
+                    # yield (-i if has_raised else i)
+                    yield i
 
                 except UnrecoverableException :
                     self.assertTrue(torch.is_grad_enabled())
@@ -9406,7 +9414,6 @@ class TestAutogradDeviceType(TestCase):
             f[0] = sys.float_info.max
             self.assertEqual(integral_conv(f), sys.float_info.max)
 
-            # bool, nonzero
             def test_nonzero(tensor, value, expected):
                 tensor[0] = value
                 self.assertEqual(expected, bool(tensor))

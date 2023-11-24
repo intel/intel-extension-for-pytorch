@@ -3248,7 +3248,7 @@ class TestFX(JitTestCase):
                 self.called = True
                 self.calling = True
                 return super(type(self), self).__call__(*args)
-                self.calling = False
+                # self.calling = False
 
         class M(torch.nn.Module):
             def __init__(self, a, b):

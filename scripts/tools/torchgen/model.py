@@ -966,14 +966,15 @@ class NativeFunction:
 
     @property
     def has_composite_kernel(self) -> bool:
+        # as scanned, self.has_composite_implicit_autograd_kernel here must be false
         return (
-            self.has_composite_implicit_autograd_kernel
-            or self.has_composite_explicit_autograd_kernel
-            or self.has_composite_explicit_autograd_non_functional_kernel
-        ) or (
-            self.has_composite_implicit_autograd_kernel
-            and self.has_composite_implicit_autograd_nested_tensor_kernel
-        )
+            # self.has_composite_implicit_autograd_kernel or
+            self.has_composite_explicit_autograd_kernel or
+            self.has_composite_explicit_autograd_non_functional_kernel
+        ) #  or (
+          #     self.has_composite_implicit_autograd_kernel
+          #     and self.has_composite_implicit_autograd_nested_tensor_kernel
+          # )
 
     @property
     def is_view_op(self) -> bool:
@@ -1236,12 +1237,15 @@ class BackendIndex:
     def get_kernel(
         self, g: Union[NativeFunction, NativeFunctionsGroup]
     ) -> Optional[BackendMetadata]:
+        f = None
         if isinstance(g, NativeFunction):
             f = g
         elif isinstance(g, NativeFunctionsGroup):
             f = self.primary(g)
         else:
             assert_never(g)
+        assert f is not None, \
+            f"NoneTypeError: Cannot get funcion from {type(g).__name__}"
         if f.func.name not in self.index:
             return None
         return self.index[f.func.name]

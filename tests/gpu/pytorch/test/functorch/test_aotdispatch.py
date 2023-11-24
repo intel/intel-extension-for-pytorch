@@ -168,17 +168,18 @@ class TestPythonKey(AOTTestCase):
         # FIXME
         return self.skipTest("error: maximum recursion reached")
 
-        def f(x):
-            return torch.tanh(x).sum()
+        # Security Scan: dead code due to skipTest(), need to reopen in future
+        # def f(x):
+        #     return torch.tanh(x).sum()
 
-        fx_f = make_fx(grad(f))(torch.randn(5))
-        ops = {i.target for i in fx_f.graph.nodes}
+        # fx_f = make_fx(grad(f))(torch.randn(5))
+        # ops = {i.target for i in fx_f.graph.nodes}
 
-        self.assertEqual(torch.ops.aten.tanh_backward in ops, True)
+        # self.assertEqual(torch.ops.aten.tanh_backward in ops, True)
 
-        fx_f = make_fx(grad(f), decomposition_table)(torch.randn(5))
-        ops = {i.target for i in fx_f.graph.nodes}
-        self.assertEqual(torch.ops.aten.tanh_backward in ops, False)
+        # fx_f = make_fx(grad(f), decomposition_table)(torch.randn(5))
+        # ops = {i.target for i in fx_f.graph.nodes}
+        # self.assertEqual(torch.ops.aten.tanh_backward in ops, False)
 
     def test_nnc_jit(self, device):
         def f(x):

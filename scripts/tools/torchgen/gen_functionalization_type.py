@@ -782,4 +782,3 @@ def gen_functionalization_definition(
         if g.mutable is not None:
             mutation_defs.append(emit_inplace_functionalization_body(g.mutable, g))
         return mutation_defs
-    return []

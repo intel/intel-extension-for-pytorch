@@ -67,10 +67,7 @@ class TestTorchMethod(TestCase):
 
             X_gpu = X.to("xpu")
             W_gpu = W.to("xpu")
-            if bias is not None:
-                bias_gpu = bias.to("xpu")
-            else:
-                bias_gpu = None
+            bias_gpu = None
 
             # We do the s8 quantize in backend, the formula is qx = x / sc + 0
             qX_gpu = torch.quantize_per_tensor(

@@ -35,8 +35,6 @@ class TestNNMethod(TestCase):
             print(input1.grad)
             print(input2.grad)
             return input1, input2
-            input1.grad.zero_()
-            input2.grad.zero_()
 
         def _test_dpcpp(input1, input2, target, reduc):
             loss = nn.MarginRankingLoss(reduction=reduc)

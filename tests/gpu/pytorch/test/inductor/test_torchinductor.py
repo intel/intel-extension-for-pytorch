@@ -6266,7 +6266,6 @@ class CommonTemplate:
             r = 1 / math.sqrt(a.size(1))
             return torch.bmm(a, b) / r
 
-
         self.common(
             fn,
             [
