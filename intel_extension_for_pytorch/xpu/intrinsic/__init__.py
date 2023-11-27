@@ -3,7 +3,7 @@ from torch.nn.modules.utils import _pair
 from torch import nn, Tensor
 from torch.jit.annotations import BroadcastingList2
 from typing import List, Union
-from .modules import TransducerLoss
+from .modules import TransducerLoss, clip_grad_norm_, clip_grad_norm
 import intel_extension_for_pytorch
 
 __all__ = [
@@ -13,6 +13,8 @@ __all__ = [
     "roi_align",
     "IpexSDP",
     "IpexSDP_Index",
+    "clip_grad_norm_",
+    "clip_grad_norm",
 ]
 
 

@@ -9,6 +9,7 @@ from .. import _C
 from .. import frontend
 import intel_extension_for_pytorch  # noqa F401
 from .lazy_init import _is_initialized
+from .intrinsic import clip_grad_norm_  # noqa F401
 
 
 def from_usm(src, dtype, shape, stride=None, device_id: int = -1) -> torch.Tensor:
