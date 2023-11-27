@@ -63,6 +63,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     VER_IPEX_MINOR=$(grep "VERSION_MINOR" version.txt | cut -d " " -f 2)
     VER_IPEX_PATCH=$(grep "VERSION_PATCH" version.txt | cut -d " " -f 2)
     VER_IPEX="${VER_IPEX_MAJOR}.${VER_IPEX_MINOR}.${VER_IPEX_PATCH}+cpu"
+    VER_INC=$(python tools/yaml_utils.py -f dependency_version.yml -d inc -k version)
     python -m pip uninstall -y pyyaml
     # Enter IPEX parent dir
     cd ..
@@ -173,7 +174,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         rm -rf torch-ccl
     fi
 
-    echo "python -m pip install cpuid accelerate datasets sentencepiece protobuf==${VER_PROTOBUF} transformers==${VER_TRANSFORMERS}" >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install cpuid accelerate datasets sentencepiece protobuf==${VER_PROTOBUF} transformers==${VER_TRANSFORMERS} neural-compressor==${VER_INC}" >> ${AUX_INSTALL_SCRIPT}
 
     # Used for accuracy test only
     if [ -d lm-evaluation-harness ]; then

@@ -2909,7 +2909,9 @@ at::Tensor qlinear_woq_affine(
                       scale_a_t,
                       zp_a_t);
                 } else {
-                  auto block_k = w_sizes[2];
+                  if (quant_block_k <= 0) {
+                    quant_block_k = w_sizes[2]; // block_k for weight packing
+                  }
                   auto x_reshape_contig = x_reshape.contiguous();
                   auto [scale_a, zp_a] =
                       compute_int8_qparams_per_block<act_type>(

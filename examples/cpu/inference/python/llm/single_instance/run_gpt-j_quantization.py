@@ -239,7 +239,7 @@ if args.ipex_weight_only_quantization:
         self_jit.save(args.output_dir + "/best_model.pt")
 
 elif args.ipex_smooth_quant:
-    if args.qconfig_summary_file is not "":
+    if args.qconfig_summary_file != "":
         qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=args.alpha)
         user_model = ipex.optimize_transformers(
             user_model.eval(),

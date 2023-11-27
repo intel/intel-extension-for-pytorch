@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "--model", nargs="?", default="EleutherAI/gpt-j-6b"
 )
-parser.add_argument("--dataset", nargs="?", default="lambada", const="lambada")
+parser.add_argument("--dataset", nargs="?", default="NeelNanda/pile-10k")
 parser.add_argument("--output-dir", nargs="?", default="./saved_results")
 parser.add_argument("--group-size", default=128, type=int)
 parser.add_argument("--calib-iters", default=512, type=int,
@@ -101,6 +101,7 @@ class Evaluator:
 def get_user_model():
     from transformers import AutoModelForCausalLM, AutoModel, AutoTokenizer
     torchscript = False
+    model_config = None
     if re.search("llama", args.model.lower()):
         from transformers import LlamaForCausalLM, LlamaTokenizer
         user_model = LlamaForCausalLM.from_pretrained(
@@ -133,6 +134,8 @@ def get_user_model():
             trust_remote_code=True,
         )
         tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    elif re.search("falcon", args.model.lower()):
+        assert False, "falcon is not supported yet"
     else:
         user_model = AutoModelForCausalLM.from_pretrained(
             args.model,
