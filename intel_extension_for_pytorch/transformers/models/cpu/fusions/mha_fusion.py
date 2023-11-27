@@ -109,7 +109,11 @@ class _IPEXRMSNorm(nn.Module):
     def __init__(self, module, config=None, tpp=False, woq=False):
         super().__init__()
         self.weight = module.weight
-        self.variance_epsilon = module.variance_epsilon
+        self.variance_epsilon = (
+            module.variance_epsilon
+            if hasattr(module, "variance_epsilon")
+            else module.epsilon
+        )
 
     def forward(self, hidden_states):
         return torch.ops.torch_ipex.rmsnorm(

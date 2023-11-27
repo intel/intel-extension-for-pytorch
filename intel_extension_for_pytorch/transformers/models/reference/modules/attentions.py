@@ -538,7 +538,7 @@ def _BloomAttention_forward(
     attention_mask: torch.Tensor,
     layer_past: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
     head_mask: Optional[torch.Tensor] = None,
-    use_cache: bool = False,
+    use_cache: bool = True,
     output_attentions: bool = False,
 ):
     fused_qkv = self.query_key_value(
@@ -552,7 +552,7 @@ def _BloomAttention_forward(
     query_layer = query_layer.contiguous()
     key_layer = key_layer.contiguous()
     value_layer = value_layer.contiguous()
-    alibi = (
+    new_alibi = (
         alibi.repeat(1, q_length, 1)
         .view(batch_size, self.num_heads, q_length, -1)
         .contiguous()
@@ -564,7 +564,8 @@ def _BloomAttention_forward(
         1 / self.inv_norm_factor,
         layer_past,
         head_mask,
-        attention_mask + alibi if attention_mask is not None else alibi,
+        attention_mask + new_alibi if attention_mask is not None else new_alibi,
+        alibi,
     )
 
     if not use_cache:
@@ -679,6 +680,79 @@ def _CodeGenAttention_forward(
     return outputs  # a, present, (attentions)
 
 
+def _BaichuanAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    output_attentions: bool = False,
+    use_cache: bool = True,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    bsz, q_len, _ = hidden_states.size()
+
+    proj = self.W_pack(hidden_states)
+    proj = proj.split([self.hidden_size, self.hidden_size, self.hidden_size], dim=-1)
+
+    query = proj[0].view(bsz, q_len, self.num_heads, self.head_dim)
+    key = proj[1].view(bsz, q_len, self.num_heads, self.head_dim)
+    value = proj[2].view(bsz, q_len, self.num_heads, self.head_dim)
+    if attention_mask is not None:
+        if len(attention_mask.size()) == 4:
+            attention_mask = attention_mask[:, :, -q_len:, :]
+        else:
+            attention_mask = attention_mask[:, -q_len:, :]
+
+    kv_seq_len = key.shape[-2]
+    if past_key_value is not None:
+        kv_seq_len += past_key_value[0].shape[-2]
+
+    if hasattr(self, "rotary_emb"):
+        key = self._IPEXROPE(
+            key,
+            position_ids,
+            self.num_heads,
+            self.head_dim,
+            self.head_dim // 2,
+            self.head_dim,
+            kv_seq_len,
+        )
+        query = self._IPEXROPE(
+            query,
+            position_ids,
+            self.num_heads,
+            self.head_dim,
+            self.head_dim // 2,
+            self.head_dim,
+            kv_seq_len,
+        )
+
+    (
+        attn_output,
+        attn_weights,
+        present,
+    ) = self._IPEXScaleDotProduct(
+        query,
+        key,
+        value,
+        math.sqrt(self.head_dim),
+        past_key_value,
+        None,
+        attention_mask,
+    )
+
+    if not use_cache:
+        present = None
+    attn_output = attn_output.transpose(1, 2)
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+    # attn_output = self.o_proj(attn_output)
+
+    if not output_attentions:
+        attn_weights = None
+
+    return attn_output, attn_weights, present
+
+
 class _IPEXAttentionRef(nn.Module):
     def __init__(self, module, config, sdp_module_ref, distributed=False):
         super().__init__()
@@ -721,8 +795,13 @@ class _IPEXAttentionRef(nn.Module):
         )
 
         if (
-            self.model_backbone != "OPTForCausalLM"
-            and self.model_backbone != "BloomForCausalLM"
+            self.model_backbone
+            not in [
+                "OPTForCausalLM",
+                "BloomForCausalLM",
+            ]
+            or self.model_backbone == "BaichuanForCausalLM"
+            and hasattr(module, "rotary_emb")
         ):
             if hasattr(module, "rotary_dim"):
                 self.pos_embd_dim = module.rotary_dim
@@ -913,6 +992,16 @@ class _IPEXAttentionRef(nn.Module):
                 head_mask,
                 use_cache,
                 output_attentions,
+            )
+        elif self.model_backbone == "BaichuanForCausalLM":
+            return _BaichuanAttention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                past_key_value,
+                position_ids,
+                output_attentions,
+                use_cache,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
@@ -1128,3 +1217,33 @@ def _prepare_attn_mask_falcon(
     )
 
     return combined_attention_mask
+
+
+def _get_interleave(n):
+    def _get_interleave_power_of_2(n):
+        start = 2 ** (-(2 ** -(math.log2(n) - 3)))
+        ratio = start
+        return [start * ratio**i for i in range(n)]
+
+    if math.log2(n).is_integer():
+        return _get_interleave_power_of_2(n)
+    else:
+        closest_power_of_2 = 2 ** math.floor(math.log2(n))
+        return (
+            _get_interleave_power_of_2(closest_power_of_2)
+            + _get_interleave(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
+        )
+
+
+def _gen_baichuan_alibi_mask(n_head, max_pos):
+    """used in inference only"""
+    slopes = torch.Tensor(_get_interleave(n_head))
+    alibi = slopes.unsqueeze(1).unsqueeze(1) * torch.arange(max_pos).unsqueeze(
+        0
+    ).unsqueeze(0).expand(n_head, -1, -1)
+    alibi = alibi.view(n_head, 1, max_pos)
+    alibi_mask = torch.triu(
+        torch.zeros([max_pos, max_pos]).float().fill_(float("-inf")).type_as(alibi), 1
+    )
+    alibi_mask = alibi_mask.unsqueeze(0) + alibi
+    return alibi_mask

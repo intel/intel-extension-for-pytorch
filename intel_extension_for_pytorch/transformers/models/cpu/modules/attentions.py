@@ -19,8 +19,13 @@ class _IPEXAttentionCPU(nn.Module):
             setattr(self.__class__, k, getattr(module.__class__, k))
 
         if (
-            self.model_backbone != "OPTForCausalLM"
-            and self.model_backbone != "BloomForCausalLM"
+            self.model_backbone
+            not in [
+                "OPTForCausalLM",
+                "BloomForCausalLM",
+            ]
+            or self.model_backbone == "BaichuanForCausalLM"
+            and hasattr(module, "rotary_emb")
         ):
             self._IPEXROPE = _IPEXRopeCPU(
                 self.max_position_embeddings,
@@ -28,10 +33,7 @@ class _IPEXAttentionCPU(nn.Module):
                 self.rope_base,
                 self.model_backbone,
             )
-        if (
-            self.model_backbone == "GPTJForCausalLM"
-            or self.model_backbone == "LlamaForCausalLM"
-        ):
+        if self.model_backbone in ["GPTJForCausalLM", "LlamaForCausalLM"]:
             if hasattr(module, "concat_qkv"):
                 self.concat_qkv = _IPEXConcatLinearCPU(
                     module.concat_qkv, tpp=tpp, woq=woq

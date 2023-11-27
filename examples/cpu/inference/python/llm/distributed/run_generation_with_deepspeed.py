@@ -21,6 +21,9 @@ from transformers import (
     LlamaTokenizer,
 )
 
+import sys
+
+sys.path.append(sys.path[0] + '/../../')
 
 # supported models now
 MODEL_CLASSES = {
@@ -34,6 +37,8 @@ MODEL_CLASSES = {
     "chatglm": (AutoModelForCausalLM, AutoTokenizer),
     "bloom": (AutoModelForCausalLM, AutoTokenizer),
     "codegen": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan2": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -235,6 +240,10 @@ if model_type == "auto":
 if model_type == "falcon":
     model_input_names = ["input_ids", "attention_mask"]
     tokenizer.model_input_names = model_input_names
+if model_type == "baichuan2":
+    from llm.utils.utils import _get_relative_imports
+    import transformers
+    transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
 
 if args.config_file is None:
     config = AutoConfig.from_pretrained(

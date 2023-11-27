@@ -26,7 +26,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
             self.linear_gelu = _IPEXlinearNewGeluCPU(
                 module.linear_gelu.linear, tpp=tpp, woq=woq
             )
-        elif self.model_backbone == "LlamaForCausalLM":
+        elif self.model_backbone in ["LlamaForCausalLM", "BaichuanForCausalLM"]:
             if not self.distributed:
                 self.mha_linear_add = _IPEXlinearAddCPU(
                     module.mha_linear_add.linear, tpp=tpp, woq=woq

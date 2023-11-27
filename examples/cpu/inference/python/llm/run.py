@@ -20,6 +20,7 @@ from transformers import (
     AutoConfig,
 )
 import subprocess
+import re
 
 
 def main(args_in: Optional[List[str]] = None) -> None:
@@ -157,6 +158,67 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
             print("running model geneartion...")
             subprocess.run(infer_cmd)
+        elif re.search("baichuan", str(args.model_name_or_path), re.IGNORECASE):
+            qpath = Path(parent_path, "single_instance/run_quantization.py")
+            infer_cmd = ["python", qpath]
+            infer_cmd.extend(["-m", str(args.model_name_or_path)])
+            infer_cmd.extend(["--input-tokens", str(args.input_tokens)])
+            infer_cmd.extend(["--max-new-tokens", str(args.max_new_tokens)])
+            infer_cmd.extend(["--num-iter", str(args.num_iter)])
+            infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
+            infer_cmd.extend(["--batch-size", str(args.batch_size)])
+            if args.int8_bf16_mixed:
+                infer_cmd.extend(["--int8-bf16-mixed"])
+            if args.int8:
+                infer_cmd.extend(["--int8"])
+            if args.greedy:
+                infer_cmd.extend(["--greedy"])
+            if args.ipex_weight_only_quantization:
+                infer_cmd.extend(["--ipex-weight-only-quantization"])
+                infer_cmd.extend(["--weight-dtype", str(args.weight_dtype)])
+                infer_cmd.extend(["--lowp-mode", str(args.lowp_mode)])
+                if args.gptq:
+                    if args.low_precision_checkpoint == "":
+                        gptq_cmd = [
+                            "python",
+                            Path(parent_path, "utils/run_gptq.py"),
+                        ]
+                        gptq_cmd.extend(["--model", str(args.model_name_or_path)])
+                        gptq_cmd.extend(["--output-dir", str(args.output_dir)])
+                        subprocess.run(gptq_cmd)
+                        infer_cmd.extend(
+                            [
+                                "--low-precision-checkpoint",
+                                str(args.output_dir) + "/gptq_checkpoint.pt",
+                            ]
+                        )
+                    else:
+                        infer_cmd.extend(
+                            [
+                                "--low-precision-checkpoint",
+                                str(args.low_precision_checkpoint),
+                            ]
+                        )
+            else:
+                infer_cmd.extend(["--ipex-smooth-quant"])
+                infer_cmd.extend(["--alpha", str(args.alpha)])
+                infer_cmd.extend(["--dataset", str(args.dataset)])
+            if args.int8_bf16_mixed:
+                infer_cmd.extend(["--int8-bf16-mixed"])
+            if args.greedy:
+                infer_cmd.extend(["--greedy"])
+            if args.profile:
+                infer_cmd.extend(["--profile"])
+            if args.benchmark:
+                infer_cmd.extend(["--benchmark"])
+            if args.token_latency:
+                infer_cmd.extend(["--token-latency"])
+
+            if args.prompt is not None:
+                infer_cmd.extend(["--prompt", str(args.prompt)])
+
+            print("running model quantization and geneartion...")
+            subprocess.run(infer_cmd)
         else:
             if args.config_file is None:
                 config = AutoConfig.from_pretrained(
@@ -166,8 +228,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 config = AutoConfig.from_pretrained(
                     args.config_file, trust_remote_code=True
                 )
-            import re
-
             qpath = Path(parent_path, "single_instance/run_quantization.py")
 
             infer_cmd = ["python", qpath]
@@ -270,6 +330,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "llama": ("/llama_local_shard"),
                 "opt": ("/opt_local_shard"),
                 "falcon": ("/falcon_local_shard"),
+                "bloom": ("/bloom_local_shard"),
+                "codegen": ("/codegen_local_shard"),
+                "baichuan": ("/baichuan_local_shard"),
             }
             model_type = next(
                 (x for x in MODEL_CLASSES.keys() if x in args.model_name_or_path.lower()), "auto"

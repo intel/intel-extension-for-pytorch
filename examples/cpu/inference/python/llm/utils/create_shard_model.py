@@ -10,6 +10,9 @@ MODEL_CLASSES = {
     "llama": (AutoModelForCausalLM, LlamaTokenizer),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
+    "bloom": (AutoModelForCausalLM, AutoTokenizer),
+    "codegen": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -50,6 +53,10 @@ if args.local_rank == 0 :
         (x for x in MODEL_CLASSES.keys() if x in args.model_id.lower()), "auto"
     )
     model_class = MODEL_CLASSES[model_type]
+    if model_type == "baichuan":
+        from utils import _get_relative_imports
+        import transformers
+        transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
 
     load_dtype = torch.float32
     if args.dtype == "float16":

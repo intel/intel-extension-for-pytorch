@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from typing import Optional, Tuple
 import math
+from torch.nn import functional as F
 
 
 class RotaryEmbedding(torch.nn.Module):
@@ -115,6 +116,14 @@ class _IPEXRopeRef(nn.Module):
         x_embed = (x * cos) + (self.rotate_half(x) * sin)
         return x_embed
 
+    def apply_rotary_pos_emb_baichuan(self, x, cos, sin, position_ids):
+        cos = cos.squeeze(1).squeeze(0)  # [seq_len, dim]
+        sin = sin.squeeze(1).squeeze(0)  # [seq_len, dim]
+        cos = cos[position_ids].unsqueeze(1)  # [bs, 1, seq_len, dim]
+        sin = sin[position_ids].unsqueeze(1)  # [bs, 1, seq_len, dim]
+        x_embed = (x.float() * cos) + (self.rotate_half(x.float()) * sin)
+        return x_embed.to(x.dtype)
+
     def forward(
         self,
         x: torch.Tensor,
@@ -143,6 +152,8 @@ class _IPEXRopeRef(nn.Module):
         elif self.model_backbone == "LlamaForCausalLM":
             x = x.transpose(1, 2)
             x = self.apply_rotary_pos_emb_llama(x, _cos, _sin, position_ids)
+        elif self.model_backbone == "BaichuanForCausalLM":
+            x = self.apply_rotary_pos_emb_baichuan(x, _cos, _sin, position_ids)
         elif self.model_backbone == "GPTNeoXForCausalLM":
             x = x.transpose(1, 2)
             x_rot = x[..., :rotary_ndims]
@@ -215,12 +226,24 @@ class _IPEXScaleDotProductRef(nn.Module):
                 if hasattr(module, "new_decoder_architecture")
                 else None
             )
+        elif self.model_backbone == "BloomForCausalLM":
+            self.head_dim = module.head_dim
+            self.num_heads = module.num_heads
+            self.inv_norm_factor = module.inv_norm_factor
+            self.beta = module.beta
+            self.attention_dropout = module.attention_dropout
         elif self.model_backbone == "CodeGenForCausalLM":
             self.num_heads = module.num_attention_heads
             self.head_dim = module.head_dim
             self.scale_attn = module.scale_attn
             self.attn_dropout = module.attn_dropout
             self.causal_mask = module.causal_mask
+        elif self.model_backbone == "BaichuanForCausalLM":
+            self.head_dim = module.head_dim
+            self.num_heads = module.num_heads
+            self.hidden_size = module.hidden_size
+            if hasattr(self, "rotary_emb"):
+                self.rotary_emb = module.rotary_emb
 
         for k, v in module.__class__.__dict__.items():
             if k.startswith("__") or k.startswith("forward"):
@@ -267,16 +290,29 @@ class _IPEXScaleDotProductRef(nn.Module):
             key = (
                 key.permute(0, 2, 1, 3)
                 if self.model_backbone
-                in ["GPTJForCausalLM", "OPTForCausalLM", "CodeGenForCausalLM"]
+                in [
+                    "GPTJForCausalLM",
+                    "OPTForCausalLM",
+                    "BloomForCausalLM",
+                    "CodeGenForCausalLM",
+                    "BaichuanForCausalLM",
+                ]
                 else key
             )
             query = (
                 query.permute(0, 2, 1, 3)
                 if self.model_backbone
-                in ["GPTJForCausalLM", "OPTForCausalLM", "CodeGenForCausalLM"]
+                in [
+                    "GPTJForCausalLM",
+                    "OPTForCausalLM",
+                    "BloomForCausalLM",
+                    "CodeGenForCausalLM",
+                    "BaichuanForCausalLM",
+                ]
                 else query
             )
             value = value.permute(0, 2, 1, 3)
+
         if layer_past is not None:
             past_key = layer_past[0]
             past_value = layer_past[1]
@@ -397,6 +433,57 @@ class _IPEXScaleDotProductRef(nn.Module):
                 context_layer = (attention_probs_reshaped @ value_layer_).flatten(0, 1)
 
             attn_weights = attention_scores if alibi is None else attention_probs
+        elif self.model_backbone == "BloomForCausalLM":
+            batch_size, _, q_length, _ = query.shape
+            query = query.reshape(batch_size * self.num_heads, q_length, self.head_dim)
+            key = key.reshape(batch_size * self.num_heads, -1, self.head_dim)
+            value = value.reshape(batch_size * self.num_heads, -1, self.head_dim)
+            matmul_result = alibi.baddbmm(
+                batch1=query,
+                batch2=key.transpose(-1, -2),
+                beta=self.beta,
+                alpha=self.inv_norm_factor,
+            )
+            attention_scores = matmul_result.view(
+                batch_size, self.num_heads, q_length, -1
+            )
+            input_dtype = attention_scores.dtype
+            if input_dtype == torch.float16:
+                attention_scores = attention_scores.to(torch.float)
+            new_alibi = (
+                alibi.repeat(1, q_length, 1)
+                .view(batch_size, self.num_heads, q_length, -1)
+                .contiguous()
+            )
+            attn_weights = torch.masked_fill(
+                attention_scores,
+                (attention_mask - new_alibi).to(torch.bool),
+                torch.finfo(attention_scores.dtype).min,
+            )
+            attention_probs = F.softmax(attn_weights, dim=-1, dtype=torch.float32).to(
+                input_dtype
+            )
+            attention_probs = self.attention_dropout(attention_probs)
+            if head_mask is not None:
+                attention_probs = attention_probs * head_mask
+            attention_probs_reshaped = attention_probs.view(
+                batch_size * self.num_heads, q_length, -1
+            )
+            attn_output = torch.bmm(attention_probs_reshaped, value)
+            attn_output = attn_output.view(
+                batch_size, self.num_heads, q_length, self.head_dim
+            )
+        elif self.model_backbone == "BaichuanForCausalLM":
+            attn_weights = torch.matmul(query, key.transpose(2, 3)) / math.sqrt(
+                self.head_dim
+            )
+            if attention_mask is not None:
+                attn_weights = attn_weights + attention_mask
+                attn_weights = torch.max(
+                    attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min)
+                )
+            attn_weights = torch.nn.functional.softmax(attn_weights, dim=-1)
+            attn_output = torch.matmul(attn_weights, value)
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
         return attn_output, attn_weights, present

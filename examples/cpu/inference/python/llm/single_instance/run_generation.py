@@ -12,6 +12,10 @@ from transformers import (
 )
 
 
+import sys
+
+sys.path.append(sys.path[0] + '/../../')
+
 # supported models
 MODEL_CLASSES = {
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
@@ -21,6 +25,8 @@ MODEL_CLASSES = {
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
     "bloom": (AutoModelForCausalLM, AutoTokenizer),
     "codegen": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan2": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -103,6 +109,11 @@ if not hasattr(config, "text_max_length") and args.prompt is None:
 
 if not hasattr(config, "lm_head_generation"):
     config.lm_head_generation = True
+
+if model_type == "baichuan2":
+    from llm.utils.utils import _get_relative_imports
+    import transformers
+    transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
 
 model = model_class[0].from_pretrained(
     args.model_id,

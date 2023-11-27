@@ -179,109 +179,33 @@ def _beam_search(
             "RWForCausalLM",
             "BloomForCausalLM",
             "CodeGenForCausalLM",
+            "BaichuanForCausalLM",
         ]:
             first_token = False
-            input_bs = input_ids.size()[0]
-            has_position_id = True
+            has_position_id = "position_ids" in model_inputs
             if model_inputs["past_key_values"] is None:
                 first_token = True
             if first_token:
-                if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.n_layer)
-                        ]
-                    )
-                elif self.model_backbone == "LlamaForCausalLM":
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
-                elif self.model_backbone == "GPTNeoXForCausalLM":
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
-                elif self.model_backbone == "OPTForCausalLM":
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
-                    has_position_id = False
-                elif (
-                    self.model_backbone == "FalconForCausalLM"
-                    or self.model_backbone == "RWForCausalLM"
-                ):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
-                    has_position_id = False
-                elif self.model_backbone == "BloomForCausalLM":
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.n_layer)
-                        ]
-                    )
-                    has_position_id = False
+                if hasattr(self.config, "n_layer"):
+                    num_hidden_layers = self.config.n_layer
+                elif hasattr(self.config, "num_hidden_layers"):
+                    num_hidden_layers = self.config.num_hidden_layers
+                elif hasattr(self.config, "num_layers"):
+                    num_hidden_layers = self.config.num_layers
+                beam_idx_tmp = torch.zeros(
+                    (2048, int(batch_size * num_beams)), dtype=torch.long
+                ).contiguous()
+                model_inputs["past_key_values"] = tuple(
+                    [
+                        (
+                            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                            torch.zeros([1, 1, 1, 1]).contiguous(),
+                            torch.zeros([1, 1, 1, 1]).contiguous(),
+                            beam_idx_tmp,
+                        )
+                        for i in range(num_hidden_layers)
+                    ]
+                )
 
             if hasattr(self, "trace_graph"):
                 if first_token:

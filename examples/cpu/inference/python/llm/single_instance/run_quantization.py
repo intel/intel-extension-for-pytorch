@@ -9,6 +9,7 @@ from datasets import load_dataset
 import torch
 from torch.nn.functional import pad
 from torch.utils.data import DataLoader
+import transformers
 from transformers import AutoConfig
 
 import intel_extension_for_pytorch as ipex
@@ -16,6 +17,8 @@ import intel_extension_for_pytorch as ipex
 import sys
 
 sys.path.append(sys.path[0] + '/../../')
+
+from llm.utils.utils import _get_relative_imports
 from llm.utils.model_class.llm import EXAMPLE_INPUTS_MODE
 from llm.utils.model_class.llama import LLAMAConfig
 from llm.utils.model_class.gptj import GPTJConfig
@@ -24,6 +27,9 @@ from llm.utils.model_class.falcon import FALCONConfig
 from llm.utils.model_class.opt import OPTConfig
 from llm.utils.model_class.bloom import BloomConfig
 from llm.utils.model_class.codegen import CodeGenConfig
+from llm.utils.model_class.baichuan import BaichuanConfig
+
+transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -163,6 +169,8 @@ elif re.search("bloom", config.architectures[0], re.IGNORECASE):
     model = BloomConfig(args.model_id)
 elif re.search("codegen", config.architectures[0], re.IGNORECASE):
     model = CodeGenConfig(args.model_id)
+elif re.search("baichuan", config.architectures[0], re.IGNORECASE):
+    model = BaichuanConfig(args.model_id)
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 
@@ -396,10 +404,11 @@ if args.ipex_smooth_quant:
             enabled=amp_enabled,
         ):
             convert_model = convert(prepared_model.eval(), inplace=True).eval()
-            self_jit = torch.jit.trace(convert_model.eval(), example_inputs, strict=False)
+            self_jit = torch.jit.trace(convert_model.eval(), example_inputs, strict=False, check_trace=False)
             self_jit = torch.jit.freeze(self_jit.eval())
             pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
             self_jit.save(args.output_dir + '/' + args.quant_model_name)
+            quant_model = self_jit
 
 elif args.ipex_weight_only_quantization:
     weight_dtype = torch.quint4x2 if args.weight_dtype == "INT4" else torch.qint8
@@ -445,7 +454,6 @@ elif args.ipex_weight_only_quantization:
     example_inputs = None
     input_ids = torch.ones(32).to(torch.long)
     attention_mask = torch.ones(len(input_ids))
-    
     if model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_POS_KV:
         position_ids = torch.arange(len(input_ids))
         example_inputs = (
@@ -453,6 +461,14 @@ elif args.ipex_weight_only_quantization:
             attention_mask.unsqueeze(0),
             position_ids.unsqueeze(0),
             tuple(global_past_key_value),
+        )
+    elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_KV_POS:
+        position_ids = torch.arange(len(input_ids))
+        example_inputs = (
+            input_ids.unsqueeze(0),
+            attention_mask.unsqueeze(0),
+            tuple(global_past_key_value),
+            position_ids.unsqueeze(0),
         )
     elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.KV_MASK:
         example_inputs = (
@@ -469,7 +485,7 @@ elif args.ipex_weight_only_quantization:
     with torch.no_grad(), torch.cpu.amp.autocast(
         enabled=amp_enabled,
     ):
-        self_jit = torch.jit.trace(user_model.eval(), example_inputs, strict=False)
+        self_jit = torch.jit.trace(user_model.eval(), example_inputs, strict=False, check_trace=False)
         self_jit = torch.jit.freeze(self_jit.eval())
         pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
         self_jit.save(args.output_dir + '/' + args.quant_model_name)
@@ -478,14 +494,15 @@ elif args.ipex_weight_only_quantization:
 
 if args.benchmark:
     torch._C._jit_set_texpr_fuser_enabled(False)
-    qconfig = ipex.quantization.default_static_qconfig_mapping
-    user_model = ipex.optimize_transformers(
-        user_model.eval(),
-        dtype=torch.float,
-        inplace=True,
-        quantization_config=qconfig,
-        deployment_mode=False,
-    )
+    if not re.search("baichuan", config.architectures[0], re.IGNORECASE):
+        qconfig = ipex.quantization.default_static_qconfig_mapping
+        user_model = ipex.optimize_transformers(
+            user_model.eval(),
+            dtype=torch.float,
+            inplace=True,
+            quantization_config=qconfig,
+            deployment_mode=False,
+        )
     if not hasattr(user_model, "trace_graph"):
         print("load_quantized_model")
         try:

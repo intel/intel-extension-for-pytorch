@@ -96,6 +96,7 @@ def model_convert_reference(_model):
         _convert_to_rw_cache,
         _prepare_decoder_attention_mask,
         _prepare_attn_mask_falcon,
+        _gen_baichuan_alibi_mask,
     )
 
     # model wise optimization for Feedforward and Decoder layer modules
@@ -108,6 +109,8 @@ def model_convert_reference(_model):
         GPTNeoXForCausalLM_forward,
         OPTForCausalLM_forward,
         CodeGenForCausalLM_forward,
+        BaichuanForCausalLM_forward,
+        BaichuanModel_forward,
         prepare_inputs_for_generation,
     )
 
@@ -228,7 +231,7 @@ def model_convert_reference(_model):
     # special list that has not official transformers design
     if _model.config.architectures[0] == "BloomForCausalLM":
         convert_function(
-            transformers.models.bloom.modeling_bloom.BloomModel,
+            _model.transformer,
             "_prepare_attn_mask",
             _prepare_attn_mask_falcon,
         )
@@ -283,7 +286,27 @@ def model_convert_reference(_model):
             _model.transformer.alibi = _model.transformer.use_alibi
         elif hasattr(_model.transformer, "alibi"):
             _model.transformer.use_alibi = _model.transformer.alibi
-
+    elif _model.config.architectures[0] == "BaichuanForCausalLM":
+        convert_function(_model, "forward", BaichuanForCausalLM_forward)
+        convert_class(
+            _model,
+            type(_model.model.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_function(_model.model, "forward", BaichuanModel_forward)
+        _model.model.future_mask = _gen_baichuan_alibi_mask(
+            _model.model.layers[0].self_attn.num_heads,
+            _model.model.layers[0].self_attn.max_position_embeddings,
+        )
     return _model
 
 
@@ -314,33 +337,11 @@ def get_dummy_input(_model, return_dict=False):
     )
 
     input_ids = torch.ones(32).to(torch.long)
+    model_inputs = _model.prepare_inputs_for_generation(input_ids)
+    has_position_ids = "position_ids" in model_inputs
     attention_mask = torch.ones(len(input_ids))
     position_ids = torch.arange(len(input_ids))
-    if _model.config.architectures[0] == "OPTForCausalLM":
-        sample_inputs = (
-            {
-                "input_ids": input_ids.unsqueeze(0),
-                "attention_mask": attention_mask.unsqueeze(0),
-                "past_key_values": past_key_values,
-            }
-            if return_dict
-            else (input_ids.unsqueeze(0), attention_mask.unsqueeze(0), past_key_values)
-        )
-    elif (
-        _model.config.architectures[0] == "FalconForCausalLM"
-        or _model.config.architectures[0] == "RWForCausalLM"
-        or _model.config.architectures[0] == "BloomForCausalLM"
-    ):
-        sample_inputs = (
-            {
-                "input_ids": input_ids.unsqueeze(0),
-                "past_key_values": past_key_values,
-                "attention_mask": attention_mask.unsqueeze(0),
-            }
-            if return_dict
-            else (input_ids.unsqueeze(0), past_key_values, attention_mask.unsqueeze(0))
-        )
-    else:
+    if has_position_ids:
         sample_inputs = (
             {
                 "input_ids": input_ids.unsqueeze(0),
@@ -355,6 +356,16 @@ def get_dummy_input(_model, return_dict=False):
                 position_ids.unsqueeze(0),
                 past_key_values,
             )
+        )
+    else:
+        sample_inputs = (
+            {
+                "input_ids": input_ids.unsqueeze(0),
+                "past_key_values": past_key_values,
+                "attention_mask": attention_mask.unsqueeze(0),
+            }
+            if return_dict
+            else (input_ids.unsqueeze(0), past_key_values, attention_mask.unsqueeze(0))
         )
     return sample_inputs
 
@@ -413,9 +424,13 @@ def model_convert_lowering(
         if not is_quantization or woq:
             import transformers
 
-            for supported_class in [
-                transformers.models.llama.modeling_llama.LlamaRMSNorm
-            ]:
+            supported_classes = [transformers.models.llama.modeling_llama.LlamaRMSNorm]
+            import transformers
+
+            if _model.config.architectures[0] == "BaichuanForCausalLM":
+                supported_classes.append(type(_model.model.layers[0].input_layernorm))
+
+            for supported_class in supported_classes:
                 lowering_class_cpu(
                     _model,
                     supported_class,
@@ -483,7 +498,7 @@ def optimize_transformers(
     r"""
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
     This API focus on transformers models, especially for generation tasks inference.
-    Well supported model family: Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen.
+    Well supported model family: Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
@@ -580,10 +595,12 @@ def optimize_transformers(
             "RWForCausalLM",
             "BloomForCausalLM",
             "CodeGenForCausalLM",
+            "BaichuanForCausalLM",
         ]
         if not well_supported_model:
             warnings.warn(
-                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, and CodeGen, fallback to origin model"
+                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, and Baichuan, \
+                    fallback to origin model"
             )
             return model
 

@@ -10,6 +10,7 @@ class EXAMPLE_INPUTS_MODE(IntEnum):
     MASK_KV = 1
     KV_MASK = 2
     MASK_POS_KV = 3
+    MASK_KV_POS = 4
 
 class LLMConfig(ABC):
     @abstractmethod
@@ -22,6 +23,7 @@ class LLMConfig(ABC):
                 MASK_KV: input_ids+attn_mask+past_kv
                 KV_MASK: input_ids+past_kv+attn_mask
                 MASK_POS_KV: input_ids+attn_mask+position_ids+past_kv
+                MASK_KV_POS: input_ids+attn_mask+past_kv+position_ids
 
             # if support smooth quant
             self.default_dataset: default dataset

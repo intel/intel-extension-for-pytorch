@@ -150,6 +150,17 @@ class OptimizeTransformersTester(TestCase):
                             type(ipex_m.transformer.h[0])
                             is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
                         )
+                    elif re.search(
+                        "baichuan", model.config.architectures[0], re.IGNORECASE
+                    ):
+                        assert (
+                            type(ipex_m.model.layers[0].self_attn)
+                            is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
+                        )
+                        assert (
+                            type(ipex_m.model.layers[0])
+                            is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
+                        )
 
     def test_model_replacement_gptj(self):
         config = AutoConfig.from_pretrained(
@@ -266,6 +277,24 @@ class OptimizeTransformersTester(TestCase):
             config
         ).eval()
         self.model_replacement_check(m, True, torchcompile=True)
+
+    def test_model_replacement_baichuan(self):
+        from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
+
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/baichuan", return_dict=False, trust_remote_code=True
+        )
+        m = BaichuanForCausalLM(config).eval()
+        self.model_replacement_check(m, False)
+
+    def test_model_replacement_baichuan_torchcompile(self):
+        from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
+
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/baichuan", return_dict=False, trust_remote_code=True
+        )
+        m = BaichuanForCausalLM(config).eval()
+        self.model_replacement_check(m, False, torchcompile=True)
 
     def _model_replacement_check_woq(self, model):
         qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping()

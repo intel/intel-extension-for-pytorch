@@ -306,6 +306,55 @@ def BloomBlock_forward(
     return outputs  # hidden_states, present, attentions
 
 
+def BaichuanDecoder_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    residual = hidden_states
+
+    hidden_states = self.input_layernorm(hidden_states)
+
+    # Self Attention
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        position_ids=position_ids,
+        past_key_value=past_key_value,
+        output_attentions=output_attentions,
+        use_cache=use_cache,
+    )
+    if not self.distributed:
+        hidden_states = self.mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.self_attn.o_proj(hidden_states)
+        hidden_states = residual + hidden_states
+
+    # Fully Connected
+    residual = hidden_states
+    hidden_states = self.post_attention_layernorm(hidden_states)
+
+    mlp_gate = self.linear_silu_mul(hidden_states)
+    if not self.distributed:
+        hidden_states = self.mlp_linear_add(mlp_gate, residual)
+    else:
+        hidden_states = self.mlp.down_proj(mlp_gate)
+        hidden_states = residual + hidden_states
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (self_attn_weights,)
+
+    if use_cache:
+        outputs += (present_key_value,)
+
+    return outputs
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -323,7 +372,7 @@ class _IPEXDecoderLayerRef(nn.Module):
                 del self.__dict__["_modules"]["mlp"].fc_out
             self.linear_gelu = _IPEXlinearNewGeluRef(module.mlp.fc_in)
             del self.__dict__["_modules"]["mlp"].fc_in
-        elif self.model_backbone == "LlamaForCausalLM":
+        elif self.model_backbone in ["LlamaForCausalLM", "BaichuanForCausalLM"]:
             if not self.distributed:
                 self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
                 self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.down_proj)
@@ -436,6 +485,16 @@ class _IPEXDecoderLayerRef(nn.Module):
                 head_mask,
                 use_cache,
                 output_attentions,
+            )
+        elif self.model_backbone == "BaichuanForCausalLM":
+            return BaichuanDecoder_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
