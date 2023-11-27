@@ -141,7 +141,11 @@ void renorm_kernel(
       }
 
       v = GroupReduceSumSGSizeEqualstoNumSG(
-          item, v, static_cast<accscalar_t*>(IPEXGetLocalAccPointer(smem)));
+          item,
+          v,
+          static_cast<accscalar_t*>(
+              smem.template get_multi_ptr<sycl::access::decorated::no>()
+                  .get()));
 
       if (tid == 0) {
         smem[0] = std::pow(v, static_cast<accscalar_t>(1.0 / norm_type));

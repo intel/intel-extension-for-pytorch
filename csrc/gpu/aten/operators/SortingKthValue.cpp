@@ -170,7 +170,10 @@ void gatherMedian(
       item.barrier(dpcpp_local_fence);
       if (nan_count > 0) {
         atomicAdd(
-            (dpcpp_local_ptr_pt<index_t>)(IPEXGetLocalAccPointer(num_nan)),
+            (dpcpp_local_ptr_pt<index_t>)(num_nan
+                                              .template get_multi_ptr<
+                                                  sycl::access::decorated::no>()
+                                              .get()),
             nan_count);
       }
       item.barrier(dpcpp_local_fence);

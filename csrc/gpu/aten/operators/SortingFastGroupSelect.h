@@ -65,10 +65,10 @@ inline void fast_group_radix_select_impl_(
       PrivateValueT values[SelectMethod::REG_LEN];
 
       KeyT* keys_temp = reinterpret_cast<KeyT*>(
-          IPEXGetLocalAccPointer(slm) +
+          slm.template get_multi_ptr<sycl::access::decorated::no>().get() +
           SelectMethod::GetSharedLocalMemorySize());
       PrivateValueT* values_temp = reinterpret_cast<PrivateValueT*>(
-          IPEXGetLocalAccPointer(slm) +
+          slm.template get_multi_ptr<sycl::access::decorated::no>().get() +
           SelectMethod::GetSharedLocalMemorySize() + ntopk * sizeof(KeyT));
 
 #pragma unroll

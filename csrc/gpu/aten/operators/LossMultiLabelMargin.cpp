@@ -101,7 +101,9 @@ void multilabel_margin_loss_forward_kernel(
       total_sum = GroupReduceSumSGSizeEqualstoNumSG(
           item_id,
           static_cast<acc_t>(sum),
-          static_cast<acc_t*>(IPEXGetLocalAccPointer(smem)));
+          static_cast<acc_t*>(
+              smem.template get_multi_ptr<sycl::access::decorated::no>()
+                  .get()));
 
       if (local_item_id == 0) {
         if (size_average) {
@@ -190,7 +192,9 @@ void multilabel_margin_loss_backward_kernel(
         total_sum = GroupReduceSumSGSizeEqualstoNumSG(
             item,
             static_cast<acc_t>(sum),
-            static_cast<acc_t*>(IPEXGetLocalAccPointer(smem)));
+            static_cast<acc_t*>(
+                smem.template get_multi_ptr<sycl::access::decorated::no>()
+                    .get()));
         if (local_id == 0) {
           grad_input_k[target_idx] += static_cast<scalar_t>(total_sum);
         }

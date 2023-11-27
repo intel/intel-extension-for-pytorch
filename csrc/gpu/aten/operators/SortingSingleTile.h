@@ -75,8 +75,8 @@ class RadixSortUpsweep {
         current_bit(current_bit),
         num_bits(num_bits),
         item(item),
-        local_storage(
-            reinterpret_cast<LocalStorage&>(*(IPEXGetLocalAccPointer(slm)))) {
+        local_storage(reinterpret_cast<LocalStorage&>(*(
+            slm.template get_multi_ptr<sycl::access::decorated::no>().get()))) {
     wi_id = item.get_local_id(0);
     wg_id = item.get_group(0);
   }
@@ -490,7 +490,9 @@ void RadixSortScanBins(
             item,
             wg_offset,
             running_prefix,
-            static_cast<int32_t*>(IPEXGetLocalAccPointer(slm)));
+            static_cast<int32_t*>(
+                slm.template get_multi_ptr<sycl::access::decorated::no>()
+                    .get()));
         wg_offset += TILE_ITEMS;
       }
 
@@ -501,7 +503,9 @@ void RadixSortScanBins(
             wg_offset,
             num_counts - wg_offset,
             running_prefix,
-            static_cast<int32_t*>(IPEXGetLocalAccPointer(slm)));
+            static_cast<int32_t*>(
+                slm.template get_multi_ptr<sycl::access::decorated::no>()
+                    .get()));
       }
     };
 
@@ -595,8 +599,8 @@ class RadixSortDownsweep {
         current_bit(current_bit),
         num_bits(num_bits),
         item(item),
-        local_storage(
-            reinterpret_cast<LocalStorage&>(*(IPEXGetLocalAccPointer(slm)))) {
+        local_storage(reinterpret_cast<LocalStorage&>(*(
+            slm.template get_multi_ptr<sycl::access::decorated::no>().get()))) {
     wi_id = item.get_local_id(0);
     wg_id = item.get_group(0);
     int32_t bin_idx = wi_id;

@@ -154,7 +154,8 @@ class GroupRadixProcesser {
       : item_(item),
         lid_(item.get_local_id(0)),
         local_storage_(reinterpret_cast<LocalStorage&>(
-            *(IPEXGetLocalAccPointer(buffer)))) {}
+            *(buffer.template get_multi_ptr<sycl::access::decorated::no>()
+                  .get()))) {}
 
   inline void exchange_keys(
       KeyTraitsT (&ukeys)[KEYS_PER_ITEM],
