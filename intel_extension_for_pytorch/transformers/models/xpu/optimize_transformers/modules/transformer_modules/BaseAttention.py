@@ -114,7 +114,6 @@ class IPEXTransformerAttn(nn.Module):
                 not self.is_beam_search()
                 and IPEXTransformerAttn.timestamp % self.runtime_cache_size == 0
             ):
-                torch.xpu.synchronize()
                 torch.xpu.empty_cache()
             IPEXTransformerAttn.timestamp += 1
 

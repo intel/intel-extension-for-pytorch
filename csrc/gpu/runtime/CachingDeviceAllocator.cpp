@@ -380,6 +380,20 @@ void CachingDeviceAllocator::recordQueue(void* buffer, sycl::queue* queue) {
 void CachingDeviceAllocator::emptyCache() {
   std::lock_guard<std::recursive_mutex> lock(mutex);
   synchronize_and_free_events(std::nullopt);
+
+  /*
+   * See Note [Safe to Free Blocks on BlockPool]
+   *
+   * torch.xpu.empty_cache will release all unoccupied cached memory currently
+   * held on all the GPUs. So we have to do a device-level synchronization on
+   * all GPUs.
+   */
+  int count = 0;
+  AT_DPCPP_CHECK(dpcppGetDeviceCount(&count));
+  for (auto i = 0; i < count; i++) {
+    xpu::dpcpp::deviceSynchronize(i);
+  }
+
   free_blocks(large_blocks, large_blocks.begin(), large_blocks.end());
   free_blocks(small_blocks, small_blocks.begin(), small_blocks.end());
 }
@@ -545,6 +559,15 @@ size_t CachingDeviceAllocator::try_merge_blocks(
   return subsumed_size;
 }
 
+/**
+ * Note [Safe to Free Blocks on BlockPool]
+ *
+ * Callers must ensure that all accesses to the block, whose raw pointer is
+ * allocated by SYCL APIs, have been completed before invoking sycl::free.
+ *
+ * We have to do a device-level synchronization before free these blocks to
+ * guarantee that all kernels can access to the blocks have finished.
+ */
 void CachingDeviceAllocator::free_blocks(
     BlockPool& blocks,
     BlockPool::iterator it,
@@ -578,6 +601,11 @@ void CachingDeviceAllocator::free_cached_blocks(DeviceId di) {
 
   Block lower_bound(di, nullptr, 0);
   Block upper_bound(di + 1, nullptr, 0);
+
+  /*
+   * See Note [Safe to Free Blocks on BlockPool]
+   */
+  xpu::dpcpp::deviceSynchronize(di);
 
   free_blocks(
       large_blocks,
