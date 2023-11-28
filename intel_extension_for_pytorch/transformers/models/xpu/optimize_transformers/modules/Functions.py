@@ -655,7 +655,6 @@ def _ipex_beam_search(
     # IPEXTransformerAtten.release_all_static_cached_resources()
     reserved_mem = round(torch.xpu.memory_reserved() / 1024**3, 3)
     if reserved_mem > 50:
-        torch.xpu.synchronize()
         torch.xpu.empty_cache()
     if hasattr(self, "token_latency") and self.token_latency:
         return out, latency_list

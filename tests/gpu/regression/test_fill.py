@@ -9,7 +9,6 @@ class TestFill(TestCase):
         Regression desc:
           fill_ may set values to part of large-size tensor.
         """
-        torch.xpu.synchronize()
         torch.xpu.empty_cache()
 
         output_cpu = torch.zeros([2, 8, 256, 512, 224])
