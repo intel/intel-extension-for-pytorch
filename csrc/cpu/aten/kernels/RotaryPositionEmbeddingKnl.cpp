@@ -196,7 +196,20 @@ void ApplyROPEKernel(
     for (int b = 0; b < B; b++) {
       for (int s = 0; s < S; s++) {
         for (int n = 0; n < N; n++) {
-          if (1 == offset) { // used by GPT-J 6B
+          if (1 == offset && t_pos.numel() == 1) { // used by chatGLM
+            for (int h = 0, h2 = 0; h < HR; h += 2, h2++) {
+              auto in_offset = b * in_stride_b + s * in_stride_s + n * H + h;
+              float in0 = in_ptr[in_offset];
+              float in1 = in_ptr[in_offset + 1];
+              long p = pos_ptr[0];
+              float sin = emb_pos_ptr[(p + s) * HR + h2];
+              float cos = emb_pos_ptr[(p + s) * HR + COFF + h2];
+              float out0 = in0 * cos - in1 * sin;
+              float out1 = in1 * cos + in0 * sin;
+              in_ptr[in_offset] = out0;
+              in_ptr[in_offset + 1] = out1;
+            }
+          } else if (1 == offset) { // used by GPT-J 6B
             for (int h = 0, h2 = 0; h < HR; h += 2, h2++) {
               auto in_offset = b * in_stride_b + s * in_stride_s + n * H + h;
               float in0 = in_ptr[in_offset];

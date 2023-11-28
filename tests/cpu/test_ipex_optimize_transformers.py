@@ -161,6 +161,17 @@ class OptimizeTransformersTester(TestCase):
                             type(ipex_m.model.layers[0])
                             is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
                         )
+                    elif re.search(
+                        "chatglm", model.config.architectures[0], re.IGNORECASE
+                    ):
+                        assert (
+                            type(ipex_m.transformer.encoder.layers[0].self_attention)
+                            is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
+                        )
+                        assert (
+                            type(ipex_m.transformer.encoder.layers[0])
+                            is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
+                        )
 
     def test_model_replacement_gptj(self):
         config = AutoConfig.from_pretrained(
@@ -294,6 +305,24 @@ class OptimizeTransformersTester(TestCase):
             f"{curpath}/hf_configs/baichuan", return_dict=False, trust_remote_code=True
         )
         m = BaichuanForCausalLM(config).eval()
+        self.model_replacement_check(m, False, torchcompile=True)
+
+    def test_model_replacement_chatglm(self):
+        from hf_configs.chatglm.modeling_chatglm import ChatGLMForConditionalGeneration
+
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/chatglm", return_dict=False, trust_remote_code=True
+        )
+        m = ChatGLMForConditionalGeneration(config).eval()
+        self.model_replacement_check(m, False)
+
+    def test_model_replacement_chatglm_torchcompile(self):
+        from hf_configs.chatglm.modeling_chatglm import ChatGLMForConditionalGeneration
+
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/chatglm", return_dict=False, trust_remote_code=True
+        )
+        m = ChatGLMForConditionalGeneration(config).eval()
         self.model_replacement_check(m, False, torchcompile=True)
 
     def _model_replacement_check_woq(self, model):

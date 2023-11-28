@@ -355,6 +355,61 @@ def BaichuanDecoder_forward(
     return outputs
 
 
+def GLMBlock_forward(
+    self,
+    hidden_states,
+    attention_mask,
+    rotary_pos_emb,
+    kv_caches=None,
+    use_cache=True,
+):
+    # hidden_states: [s, b, h]
+
+    # Layer norm at the beginning of the transformer layer.
+    layernorm_output = self.input_layernorm(hidden_states)
+    # Self attention.
+    attention_output, kv_cache = self.self_attention(
+        hidden_states=layernorm_output,
+        attention_mask=attention_mask,
+        rotary_pos_emb=rotary_pos_emb,
+        kv_caches=kv_caches,
+        use_cache=use_cache,
+    )
+
+    # Residual connection.
+    if self.apply_residual_connection_post_layernorm:
+        residual = layernorm_output
+    else:
+        residual = hidden_states
+
+    if not self.distributed:
+        layernorm_input = self.mha_linear_add(attention_output, residual)
+    else:
+        hidden_states = self.self_attention.dense(attention_output)
+        layernorm_input = residual + hidden_states
+
+    # Layer norm post the self attention.
+    layernorm_output = self.post_attention_layernorm(layernorm_input)
+
+    # MLP.
+    intermediate_parallel = self.mlp.dense_h_to_4h(layernorm_output)
+    intermediate_parallel = self.mlp.activation_func(intermediate_parallel)
+
+    # Second residual connection.
+    if self.apply_residual_connection_post_layernorm:
+        residual = layernorm_output
+    else:
+        residual = layernorm_input
+
+    if not self.distributed:
+        output = self.mlp_linear_add(intermediate_parallel, residual)
+    else:
+        hidden_states = self.mlp.dense_4h_to_h(intermediate_parallel)
+        output = residual + hidden_states
+
+    return output, kv_cache
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -414,6 +469,12 @@ class _IPEXDecoderLayerRef(nn.Module):
             if not self.distributed:
                 self.linear_add = _IPEXlinearAddRef(self.mlp.dense_4h_to_h)
                 del self.__dict__["_modules"]["mlp"].dense_4h_to_h
+        elif self.model_backbone == "ChatGLMModel":
+            if not self.distributed:
+                self.mha_linear_add = _IPEXlinearAddRef(module.self_attention.dense)
+                self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.dense_4h_to_h)
+                del self.__dict__["_modules"]["self_attention"].dense
+                del self.__dict__["_modules"]["mlp"].dense_4h_to_h
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -423,12 +484,14 @@ class _IPEXDecoderLayerRef(nn.Module):
         layer_past: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[torch.FloatTensor] = None,
         layer_head_mask: Optional[torch.Tensor] = None,
+        kv_cache: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
         past_key_value: Optional[Tuple[torch.Tensor]] = None,
         alibi: Optional[torch.Tensor] = None,
+        rotary_pos_emb: Optional[torch.Tensor] = None,
     ):
         if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
             return GPTJBlock_forward(
@@ -495,6 +558,10 @@ class _IPEXDecoderLayerRef(nn.Module):
                 past_key_value,
                 output_attentions,
                 use_cache,
+            )
+        elif self.model_backbone == "ChatGLMModel":
+            return GLMBlock_forward(
+                self, hidden_states, attention_mask, rotary_pos_emb, kv_cache, use_cache
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

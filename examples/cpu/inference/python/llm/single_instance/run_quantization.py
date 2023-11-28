@@ -28,6 +28,7 @@ from llm.utils.model_class.opt import OPTConfig
 from llm.utils.model_class.bloom import BloomConfig
 from llm.utils.model_class.codegen import CodeGenConfig
 from llm.utils.model_class.baichuan import BaichuanConfig
+from llm.utils.model_class.chatglm import ChatGLMConfig
 
 transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
 
@@ -171,6 +172,8 @@ elif re.search("codegen", config.architectures[0], re.IGNORECASE):
     model = CodeGenConfig(args.model_id)
 elif re.search("baichuan", config.architectures[0], re.IGNORECASE):
     model = BaichuanConfig(args.model_id)
+elif re.search("chatglm", config.architectures[0], re.IGNORECASE):
+    model = ChatGLMConfig(args.model_id)
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 
@@ -482,6 +485,8 @@ elif args.ipex_weight_only_quantization:
             attention_mask.unsqueeze(0),
             tuple(global_past_key_value),
         )
+    if hasattr(model, "extra_inputs"):
+        example_inputs = example_inputs + model.extra_inputs
     with torch.no_grad(), torch.cpu.amp.autocast(
         enabled=amp_enabled,
     ):
@@ -494,7 +499,7 @@ elif args.ipex_weight_only_quantization:
 
 if args.benchmark:
     torch._C._jit_set_texpr_fuser_enabled(False)
-    if not re.search("baichuan", config.architectures[0], re.IGNORECASE):
+    if not re.search("baichuan", config.architectures[0], re.IGNORECASE) and not re.search("chatglm", config.architectures[0], re.IGNORECASE):
         qconfig = ipex.quantization.default_static_qconfig_mapping
         user_model = ipex.optimize_transformers(
             user_model.eval(),

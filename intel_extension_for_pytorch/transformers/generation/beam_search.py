@@ -180,6 +180,7 @@ def _beam_search(
             "BloomForCausalLM",
             "CodeGenForCausalLM",
             "BaichuanForCausalLM",
+            "ChatGLMModel",
         ]:
             first_token = False
             has_position_id = "position_ids" in model_inputs
@@ -232,6 +233,10 @@ def _beam_search(
                         model_inputs["position_ids"] = new_position_ids
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
+                if "return_last_logit" in model_inputs:
+                    model_inputs["return_last_logit"] = torch.tensor(
+                        model_inputs["return_last_logit"]
+                    )
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
                 else:

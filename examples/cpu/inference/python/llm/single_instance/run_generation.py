@@ -27,6 +27,7 @@ MODEL_CLASSES = {
     "codegen": (AutoModelForCausalLM, AutoTokenizer),
     "baichuan2": (AutoModelForCausalLM, AutoTokenizer),
     "baichuan": (AutoModelForCausalLM, AutoTokenizer),
+    "chatglm": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 

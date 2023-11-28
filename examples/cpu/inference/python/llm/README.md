@@ -1,6 +1,6 @@
 # Text Generation
 We provide the inference benchmarking scripts for large language models text generation.<br/>
-Support large language model families, including GPT-J, LLaMA, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan.<br/>
+Support large language model families, including GPT-J, LLaMA, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM.<br/>
 The scripts include both single instance and distributed (DeepSpeed) use cases.<br/>
 The scripts cover model generation inference with low precions cases for different models with best perf and accuracy (bf16 AMP，static quantization and weight only quantization).<br/>
 
@@ -88,8 +88,11 @@ wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prom
 |Bloom|"bigscience/bloom", "bigscience/bloom-1b7"| ✅ | ✅ |  ✅ | ❎ **|
 |CodeGen|"Salesforce/codegen-2B-multi"| ✅ | ✅ |  ✅ | ❎ **|
 |Baichuan|"baichuan-inc/Baichuan2-13B-Chat", "baichuan-inc/Baichuan2-7B-Chat", "Baichuan-inc/Baichuan-13B-Chat"| ✅ | ✅ |  ✅ | ❎ **|
+|ChatGLM|"THUDM/chatglm3-6b", "THUDM/chatglm2-6b"| ✅ | ✅ |  ✅ | ❎ **|
 
 *For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for FP32/BF16 but needed for quantizations.
+
+*For ChatGLM models, the default torch_dtype is float16 in config.json. We need to replace the "float16" with "float32" in config.json.
 
 ** For GPT-NEOX/FALCON/OPT/Bloom/CodeGen/Baichuan models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.
 
@@ -277,7 +280,7 @@ export WORK_DIR=./
 cd distributed
 mv PATH/TO/prompt.json ./
 
-# Run GPTJ/LLAMA/OPT/Falcon/Bloom/CodeGen/Baichuan with bfloat16 DeepSpeed
+# Run GPTJ/LLAMA/OPT/Falcon/Bloom/CodeGen/Baichuan/ChatGLM with bfloat16 DeepSpeed
 deepspeed --bind_cores_to_rank run_generation_with_deepspeed.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --deployment-mode
 
 # Run GPT-NeoX with ipex weight only quantization

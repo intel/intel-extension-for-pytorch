@@ -84,5 +84,13 @@ class _IPEXDecoderLayerCPU(nn.Module):
             self.linear_gelu = _IPEXlinearNewGeluCPU(
                 module.linear_gelu.linear, tpp=tpp and not woq, woq=False
             )
+        elif self.model_backbone == "ChatGLMModel":
+            if not self.distributed:
+                self.mha_linear_add = _IPEXlinearAddCPU(
+                    module.mha_linear_add.linear, tpp=tpp, woq=woq
+                )
+                self.mlp_linear_add = _IPEXlinearAddCPU(
+                    module.mlp_linear_add.linear, tpp=tpp, woq=woq
+                )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

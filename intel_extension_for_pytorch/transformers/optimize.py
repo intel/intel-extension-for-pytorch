@@ -97,6 +97,7 @@ def model_convert_reference(_model):
         _prepare_decoder_attention_mask,
         _prepare_attn_mask_falcon,
         _gen_baichuan_alibi_mask,
+        GLM2_get_masks,
     )
 
     # model wise optimization for Feedforward and Decoder layer modules
@@ -111,6 +112,9 @@ def model_convert_reference(_model):
         CodeGenForCausalLM_forward,
         BaichuanForCausalLM_forward,
         BaichuanModel_forward,
+        ChatGLMModel_forward,
+        GLMTransformer_forward,
+        ChatGLMForConditionalGeneration_forward,
         prepare_inputs_for_generation,
     )
 
@@ -302,11 +306,32 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
-        convert_function(_model.model, "forward", BaichuanModel_forward)
-        _model.model.future_mask = _gen_baichuan_alibi_mask(
-            _model.model.layers[0].self_attn.num_heads,
-            _model.model.layers[0].self_attn.max_position_embeddings,
+        if not distributed:
+            convert_function(_model.model, "forward", BaichuanModel_forward)
+            _model.model.future_mask = _gen_baichuan_alibi_mask(
+                _model.model.layers[0].self_attn.num_heads,
+                _model.model.layers[0].self_attn.max_position_embeddings,
+            )
+    elif _model.config.architectures[0] == "ChatGLMModel":
+        convert_function(_model, "forward", ChatGLMForConditionalGeneration_forward)
+        convert_function(_model.transformer, "forward", ChatGLMModel_forward)
+        convert_function(_model.transformer.encoder, "forward", GLMTransformer_forward)
+        convert_class(
+            _model,
+            type(_model.transformer.encoder.layers[0].self_attention),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
         )
+        convert_class(
+            _model,
+            type(_model.transformer.encoder.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_function(_model.transformer, "get_masks", GLM2_get_masks)
+
     return _model
 
 
@@ -337,7 +362,7 @@ def get_dummy_input(_model, return_dict=False):
     )
 
     input_ids = torch.ones(32).to(torch.long)
-    model_inputs = _model.prepare_inputs_for_generation(input_ids)
+    model_inputs = _model.prepare_inputs_for_generation(input_ids.unsqueeze(0))
     has_position_ids = "position_ids" in model_inputs
     attention_mask = torch.ones(len(input_ids))
     position_ids = torch.arange(len(input_ids))
@@ -367,6 +392,8 @@ def get_dummy_input(_model, return_dict=False):
             if return_dict
             else (input_ids.unsqueeze(0), past_key_values, attention_mask.unsqueeze(0))
         )
+    if "return_last_logit" in model_inputs:
+        sample_inputs["return_last_logit"] = torch.tensor(True)
     return sample_inputs
 
 
@@ -425,10 +452,15 @@ def model_convert_lowering(
             import transformers
 
             supported_classes = [transformers.models.llama.modeling_llama.LlamaRMSNorm]
-            import transformers
-
             if _model.config.architectures[0] == "BaichuanForCausalLM":
                 supported_classes.append(type(_model.model.layers[0].input_layernorm))
+            if (
+                _model.config.architectures[0] == "ChatGLMModel"
+                and _model.config.rmsnorm
+            ):
+                supported_classes.append(
+                    type(_model.transformer.encoder.layers[0].input_layernorm)
+                )
 
             for supported_class in supported_classes:
                 lowering_class_cpu(
@@ -596,10 +628,11 @@ def optimize_transformers(
             "BloomForCausalLM",
             "CodeGenForCausalLM",
             "BaichuanForCausalLM",
+            "ChatGLMModel",
         ]
         if not well_supported_model:
             warnings.warn(
-                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, and Baichuan, \
+                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, Baichuan, and ChatGLM \
                     fallback to origin model"
             )
             return model

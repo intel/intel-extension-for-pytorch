@@ -289,6 +289,148 @@ class TPPOPsTester(TestCase):
             self.assertEqual(query_compile, query)
             self.assertEqual(key_compile, key)
 
+    def test_tpp_chatglm_attention_rope(self):
+        def apply_rotary_pos_emb(
+            x: torch.Tensor, rope_cache: torch.Tensor
+        ) -> torch.Tensor:
+            sq, b, np, hn = x.size(0), x.size(1), x.size(2), x.size(3)
+            rot_dim = rope_cache.shape[-2] * 2
+            x, x_pass = x[..., :rot_dim], x[..., rot_dim:]
+            rope_cache = rope_cache[:sq]
+            xshaped = x.reshape(sq, -1, np, rot_dim // 2, 2)
+            rope_cache = rope_cache.view(sq, -1, 1, xshaped.size(3), 2)
+            x_out2 = torch.stack(
+                [
+                    xshaped[..., 0] * rope_cache[..., 0]
+                    - xshaped[..., 1] * rope_cache[..., 1],
+                    xshaped[..., 1] * rope_cache[..., 0]
+                    + xshaped[..., 0] * rope_cache[..., 1],
+                ],
+                -1,
+            )
+            x_out2 = x_out2.flatten(3)
+            return torch.cat((x_out2, x_pass), dim=-1)
+
+        class RotaryEmbedding(torch.nn.Module):
+            def __init__(self, dim, dtype=torch.float32):
+                super().__init__()
+                inv_freq = 1.0 / (
+                    10000 ** (torch.arange(0, dim, 2).to(dtype=dtype) / dim)
+                )
+                self.register_buffer("inv_freq", inv_freq)
+                self.dim = dim
+
+            def forward_impl(
+                self,
+                seq_len: int,
+                n_elem: int,
+                dtype: torch.dtype,
+                device: torch.device,
+                base: int = 10000,
+            ):
+                theta = 1.0 / (
+                    base
+                    ** (
+                        torch.arange(0, n_elem, 2, dtype=torch.float, device=device)
+                        / n_elem
+                    )
+                )
+                seq_idx = torch.arange(seq_len, dtype=torch.float, device=device)
+                idx_theta = torch.outer(seq_idx, theta).float()
+                cache = torch.stack(
+                    [torch.cos(idx_theta), torch.sin(idx_theta)], dim=-1
+                )
+                if dtype in (torch.float16, torch.bfloat16, torch.int8):
+                    cache = (
+                        cache.bfloat16() if dtype == torch.bfloat16 else cache.half()
+                    )
+                return cache
+
+            def forward(self, max_seq_len, offset=0):
+                return self.forward_impl(
+                    max_seq_len,
+                    self.dim,
+                    dtype=self.inv_freq.dtype,
+                    device=self.inv_freq.device,
+                )
+
+        def hf_forward(query, key, position_ids, seq_length):
+            rotary_emb = RotaryEmbedding(64)
+            rotary_pos_emb = rotary_emb(seq_length)
+            if position_ids is not None:
+                rotary_pos_emb = rotary_pos_emb[position_ids]
+            else:
+                rotary_pos_emb = rotary_pos_emb[None, :seq_length]
+            rotary_pos_emb = rotary_pos_emb.transpose(0, 1).contiguous()
+            query = apply_rotary_pos_emb(query, rotary_pos_emb)
+            key = apply_rotary_pos_emb(key, rotary_pos_emb)
+            return query, key
+
+        query = torch.rand(32, 1, 32, 128)
+        key = torch.rand(32, 1, 2, 128)
+        query_tpp = copy.deepcopy(query).transpose(0, 1)
+        key_tpp = copy.deepcopy(key).transpose(0, 1)
+        position_ids = torch.arange(32).unsqueeze(0)
+
+        embed_positions = self.create_sinusoidal_positions(2048, 64)
+        query_hf, key_hf = hf_forward(query, key, position_ids, 32)
+        past_len = 0
+        torch.ops.torch_ipex.rotary_position_embedding(
+            key_tpp,
+            embed_positions,
+            torch.tensor(past_len),
+            key_tpp.size(-2),
+            key_tpp.size(-1),
+            1,
+            64,
+        )
+        torch.ops.torch_ipex.rotary_position_embedding(
+            query_tpp,
+            embed_positions,
+            torch.tensor(past_len),
+            query_tpp.size(-2),
+            query_tpp.size(-1),
+            1,
+            64,
+        )
+
+        self.assertEqual(query_hf, query_tpp.transpose(0, 1))
+        self.assertEqual(key_hf, key_tpp.transpose(0, 1))
+
+    def test_tpp_chatglm_attention_rope_torchcompile(self):
+        def func(input, embed_positions, position_ids):
+            return torch.ops.torch_ipex.rotary_position_embedding(
+                input,
+                embed_positions,
+                position_ids,
+                input.size(-2),
+                input.size(-1),
+                1,
+                64,
+            )
+
+        query = torch.rand(1, 32, 32, 128)
+        key = torch.rand(1, 32, 2, 128)
+        query_compile = copy.deepcopy(query)
+        key_compile = copy.deepcopy(key)
+        past_len = 0
+        position_ids = torch.tensor(past_len)
+
+        embed_positions = self.create_sinusoidal_positions(2048, 64)
+        func(query, embed_positions, position_ids)
+        func(key, embed_positions, position_ids)
+
+        # torch compile with IPEX backend.
+        torch._dynamo.reset()
+        ipex._set_compiler_backend("inductor")
+        func_compile = torch.compile(func, backend="ipex")
+
+        func_compile(query_compile, embed_positions, position_ids)
+        func_compile(key_compile, embed_positions, position_ids)
+
+        self.assertEqual(query_compile, query)
+        self.assertEqual(key_compile, key)
+
 
 if __name__ == "__main__":
     test = unittest.main()

@@ -161,6 +161,7 @@ def _greedy_search(
             "BloomForCausalLM",
             "CodeGenForCausalLM",
             "BaichuanForCausalLM",
+            "ChatGLMModel",
         ]:
             first_token = False
             input_bs = input_ids.size()[0]
@@ -190,6 +191,10 @@ def _greedy_search(
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
+                if "return_last_logit" in model_inputs:
+                    model_inputs["return_last_logit"] = torch.tensor(
+                        model_inputs["return_last_logit"]
+                    )
                 outputs = self.trace_graph(**model_inputs)
                 if synced_gpus and this_peer_finished:
                     cur_len = cur_len + 1

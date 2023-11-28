@@ -185,6 +185,20 @@ class _IPEXRopeRef(nn.Module):
                 x = torch.cat([x_rot, x_pass], dim=-1)
             else:
                 x = self.apply_rotary_pos_emb_gptj(x, sin, cos)
+        elif self.model_backbone == "ChatGLMModel":
+            b, sq, np, hn = x.size(0), x.size(1), x.size(2), x.size(3)
+            x, x_pass = x[..., :rotary_ndims], x[..., rotary_ndims:]
+            sincos = _sin_cos[None, None, position_ids : position_ids + sq, :]
+            sin, cos = torch.split(sincos, sincos.shape[-1] // 2, dim=-1)
+            x = x.reshape(b, -1, np, rotary_ndims // 2, 2)
+            x0 = x[..., 0].transpose(1, 2)
+            x1 = x[..., 1].transpose(1, 2)
+            x_rot = (
+                torch.stack((x0 * cos - x1 * sin, x0 * sin + x1 * cos), dim=-1)
+                .flatten(3)
+                .transpose(1, 2)
+            )
+            x = torch.cat([x_rot, x_pass], dim=-1)
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
         return x
@@ -244,6 +258,15 @@ class _IPEXScaleDotProductRef(nn.Module):
             self.hidden_size = module.hidden_size
             if hasattr(self, "rotary_emb"):
                 self.rotary_emb = module.rotary_emb
+        elif self.model_backbone == "ChatGLMModel":
+            self.multi_query_attention = module.multi_query_attention
+            self.num_attention_heads_per_partition = (
+                module.num_attention_heads_per_partition
+            )
+            self.num_multi_query_groups_per_partition = (
+                module.num_multi_query_groups_per_partition
+            )
+            self.hidden_size_per_attention_head = module.hidden_size_per_attention_head
 
         for k, v in module.__class__.__dict__.items():
             if k.startswith("__") or k.startswith("forward"):
@@ -296,6 +319,7 @@ class _IPEXScaleDotProductRef(nn.Module):
                     "BloomForCausalLM",
                     "CodeGenForCausalLM",
                     "BaichuanForCausalLM",
+                    "ChatGLMModel",
                 ]
                 else key
             )
@@ -308,6 +332,7 @@ class _IPEXScaleDotProductRef(nn.Module):
                     "BloomForCausalLM",
                     "CodeGenForCausalLM",
                     "BaichuanForCausalLM",
+                    "ChatGLMModel",
                 ]
                 else query
             )
@@ -484,6 +509,54 @@ class _IPEXScaleDotProductRef(nn.Module):
                 )
             attn_weights = torch.nn.functional.softmax(attn_weights, dim=-1)
             attn_output = torch.matmul(attn_weights, value)
+        elif self.model_backbone == "ChatGLMModel":
+            key = key.permute(2, 0, 1, 3)
+            value = value.permute(2, 0, 1, 3)
+            query = query.permute(2, 0, 1, 3)
+            if self.multi_query_attention:
+                key = key.unsqueeze(-2)
+                key = key.expand(
+                    -1,
+                    -1,
+                    -1,
+                    self.num_attention_heads_per_partition
+                    // self.num_multi_query_groups_per_partition,
+                    -1,
+                )
+                key = key.contiguous().view(
+                    key.size()[:2]
+                    + (
+                        self.num_attention_heads_per_partition,
+                        self.hidden_size_per_attention_head,
+                    )
+                )
+                value = value.unsqueeze(-2)
+                value = value.expand(
+                    -1,
+                    -1,
+                    -1,
+                    self.num_attention_heads_per_partition
+                    // self.num_multi_query_groups_per_partition,
+                    -1,
+                )
+                value = value.contiguous().view(
+                    value.size()[:2]
+                    + (
+                        self.num_attention_heads_per_partition,
+                        self.hidden_size_per_attention_head,
+                    )
+                )
+            attention_mask = None
+            query, key, value = [k.permute(1, 2, 0, 3) for k in [query, key, value]]
+            if query.shape[2] == key.shape[2]:
+                attn_output = torch.nn.functional.scaled_dot_product_attention(
+                    query, key, value, is_causal=True
+                )
+            else:
+                attn_output = torch.nn.functional.scaled_dot_product_attention(
+                    query, key, value, attention_mask
+                )
+            attn_weights = None
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
         return attn_output, attn_weights, present

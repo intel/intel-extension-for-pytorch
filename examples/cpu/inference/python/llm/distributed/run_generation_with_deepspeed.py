@@ -39,6 +39,7 @@ MODEL_CLASSES = {
     "codegen": (AutoModelForCausalLM, AutoTokenizer),
     "baichuan2": (AutoModelForCausalLM, AutoTokenizer),
     "baichuan": (AutoModelForCausalLM, AutoTokenizer),
+    "chatglm": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -274,7 +275,7 @@ if args.benchmark:
     deepspeed.runtime.utils.see_memory_usage("pre-from-pretrained", force=True)
 
 # Construct model with fake meta tensors, later will be replaced during ds-inference ckpt load
-if world_size == 1 or model_type == "falcon":
+if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2"]:
     model = model_class[0].from_pretrained(
         model_name,
         config=config,

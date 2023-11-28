@@ -22,6 +22,7 @@ MODEL_CLASSES = {
     "bloom": (AutoModelForCausalLM, AutoTokenizer),
     "codegen": (AutoModelForCausalLM, AutoTokenizer),
     "baichuan": (AutoModelForCausalLM, AutoTokenizer),
+    "chatglm": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -178,7 +179,7 @@ if args.accuracy_only:
             _attention_mask = []
             _position_ids = []
 
-            model_inputs = self.base_model.prepare_inputs_for_generation(torch.ones(32).to(torch.long))
+            model_inputs = self.base_model.prepare_inputs_for_generation(torch.ones(32).to(torch.long).unsqueeze(0))
             has_position_ids = "position_ids" in model_inputs
             if self._with_jit:
                 for text in inputs:
@@ -196,6 +197,8 @@ if args.accuracy_only:
                         num_hidden_layers = self.base_model.config.num_hidden_layers
                     elif hasattr(self.base_model.config, "n_layer"):
                         num_hidden_layers = self.base_model.config.n_layer
+                    elif hasattr(self.base_model.config, "num_layers"):
+                        num_hidden_layers = self.base_model.config.num_layers
 
                     if hasattr(self.base_model.config, "n_embd"):
                         hidden_size = self.base_model.config.n_embd

@@ -158,7 +158,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
             print("running model geneartion...")
             subprocess.run(infer_cmd)
-        elif re.search("baichuan", str(args.model_name_or_path), re.IGNORECASE):
+        elif re.search("baichuan", str(args.model_name_or_path), re.IGNORECASE) or re.search("chatglm", str(args.model_name_or_path), re.IGNORECASE):
             qpath = Path(parent_path, "single_instance/run_quantization.py")
             infer_cmd = ["python", qpath]
             infer_cmd.extend(["-m", str(args.model_name_or_path)])
@@ -333,6 +333,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "bloom": ("/bloom_local_shard"),
                 "codegen": ("/codegen_local_shard"),
                 "baichuan": ("/baichuan_local_shard"),
+                "chatglm": ("/chatglm_local_shard"),
             }
             model_type = next(
                 (x for x in MODEL_CLASSES.keys() if x in args.model_name_or_path.lower()), "auto"
