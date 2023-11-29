@@ -187,7 +187,7 @@ if args.accuracy_only:
 
             if world_size == 1 or model_type == "falcon":
                 model = model_class[0].from_pretrained(
-                    model_name,
+                    model_id,
                     config=config,
                     low_cpu_mem_usage=True,
                     torch_dtype=load_dtype,
