@@ -1,7 +1,7 @@
 From 6c5a85526546347ae39d66fca5beb31af09d1c16 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Thu, 28 Sep 2023 10:07:40 +0800
-Subject: [PATCH 09/16] Integrate xpu into torch.Generator and torch.seed
+Subject: [PATCH 09/17] Integrate xpu into torch.Generator and torch.seed
  (#109866) (#110220) (#110376) (#169)
 
 Integrate torch.xpu.Generator into torch.Generator

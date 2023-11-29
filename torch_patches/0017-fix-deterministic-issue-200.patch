@@ -1,0 +1,26 @@
+From f70b8a2042b308b2d1ab243701c9b5debc2d8a6d Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
+Date: Wed, 29 Nov 2023 18:09:10 +0800
+Subject: [PATCH 17/17] fix deterministic issue (#200)
+
+(cherry picked from commit 5d228837f9e49b310fd37e09f8393718590661d8)
+---
+ benchmarks/dynamo/common.py | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/benchmarks/dynamo/common.py b/benchmarks/dynamo/common.py
+index 9539e45c2d..8a8cb86331 100644
+--- a/benchmarks/dynamo/common.py
++++ b/benchmarks/dynamo/common.py
+@@ -380,6 +380,8 @@ def patch_torch_manual_seed():
+ 
+         if not torch.cuda._is_in_bad_fork():
+             torch.cuda.manual_seed_all(seed)
++        if not torch.xpu._is_in_bad_fork():
++            torch.xpu.manual_seed_all(seed)
+         return default_generator.manual_seed(seed)
+ 
+     torch.manual_seed = deterministic_torch_manual_seed
+-- 
+2.34.1
+

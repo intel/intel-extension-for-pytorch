@@ -1,7 +1,7 @@
 From b43f1ba7bb099f8e04d1670ada70440b05149e0e Mon Sep 17 00:00:00 2001
 From: "Xunsong, Huang" <xunsong.huang@intel.com>
 Date: Fri, 27 Oct 2023 21:07:29 +0800
-Subject: [PATCH 15/16] [Profiler] [Kineto+Legacy] Enable Profiler with Legacy
+Subject: [PATCH 15/17] [Profiler] [Kineto+Legacy] Enable Profiler with Legacy
  & Kineto Support Together (#179)
 
 * Enable XPU profiling with Kineto support
