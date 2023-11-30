@@ -10,7 +10,7 @@ QUANT_META = namedtuple("QUANT_META", ["scales", "zeros"])
 
 
 @torch.no_grad()
-def woq(
+def _gptq(
     model,
     dataset,
     quantized_ckpt,
@@ -47,7 +47,7 @@ def woq(
       >>> dataset = ...
       >>> model = GPTJForCausalLM.from_pretrained(model_path)
       >>> model.eval()
-      >>> ipex.woq(model, dataset, 'quantized_weight.pt', wbits=4)
+      >>> ipex.quantization._gptq(model, dataset, 'quantized_weight.pt', wbits=4)
     """
     print("Starting ...")
 

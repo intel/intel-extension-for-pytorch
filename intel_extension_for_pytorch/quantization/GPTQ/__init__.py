@@ -1,1 +1,1 @@
-from .api import woq
+from .api import _gptq
