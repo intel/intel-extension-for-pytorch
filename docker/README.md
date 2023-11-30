@@ -45,15 +45,8 @@ IMAGE_NAME=intel/intel-extension-for-pytorch:xpu
 ```
 ```bash
 
-VIDEO=$(getent group video | sed -E 's,^video:[^:]*:([^:]*):.*$,\1,')
-RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,')
-
-test -z "$RENDER" || RENDER_GROUP="--group-add ${RENDER}"
-
 docker run --rm \
     -v <your-local-dir>:/workspace \
-    --group-add ${VIDEO} \
-    ${RENDER_GROUP} \
     --device=/dev/dri \
     --ipc=host \
     -e http_proxy=$http_proxy \
