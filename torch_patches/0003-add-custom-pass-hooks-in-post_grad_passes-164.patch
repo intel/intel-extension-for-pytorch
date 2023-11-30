@@ -1,7 +1,7 @@
 From e2c83750f5761cd527941e134ba791b21ee58ad6 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Fri, 15 Sep 2023 00:39:22 +0800
-Subject: [PATCH 03/17] add custom pass hooks in post_grad_passes (#164)
+Subject: [PATCH 03/20] add custom pass hooks in post_grad_passes (#164)
 
 ---
  test/inductor/test_custom_post_grad_passes.py | 172 ++++++++++++++++++
