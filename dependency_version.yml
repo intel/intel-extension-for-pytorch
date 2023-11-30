@@ -19,3 +19,5 @@ torchvision:
   version: 0.17.0.dev20231113+cpu
 transformers:
   version: 4.31.0
+inc:
+  version: 2.3.1

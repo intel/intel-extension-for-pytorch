@@ -230,8 +230,8 @@ if args.accuracy_only:
                 print(*msg)
 
             def get_repo_root(model_name_or_path):
-                local_prefix = ("/", "./", "../")
-                if model_name_or_path.startswith(local_prefix):
+                if os.path.exists(model_name_or_path):
+                    # local path
                     return model_name_or_path
                 # checks if online or not
                 if is_offline_mode():

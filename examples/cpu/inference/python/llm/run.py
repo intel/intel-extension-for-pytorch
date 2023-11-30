@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 from pathlib import Path
 import argparse
 from typing import List, Optional
@@ -59,7 +60,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument("--quantized-model-path", default="")
     parser.add_argument("--quant-model-name", default="best_model.pt")
 
-    parser.add_argument("--dataset", nargs="?", default="NeelNanda/pile-10k")
+    parser.add_argument(
+        "--dataset",
+        nargs="?",
+        default="NeelNanda/pile-10k",
+        help="Calibration dataset for static quantization and GPTQ")
     parser.add_argument("--ipex-smooth-quant", action="store_true")
     parser.add_argument("--alpha", default=0.5, type=float, help="alpha value for smoothquant")
     parser.add_argument(
@@ -88,7 +93,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         default="INT8",
         type=str,
         help="weight data type for weight only quantization. Unrelated to activation"
-        " data type or lowp-mode. If `--low-precision-checkpoint` is given, weight"
+        " data type or lowp-mode. If `--gptq` is given, weight"
         " data type is always INT4 and this argument is not needed.",
     )
     parser.add_argument(
@@ -99,7 +104,21 @@ def main(args_in: Optional[List[str]] = None) -> None:
         " modified weights, scales, zero points, etc. For better accuracy of weight only"
         " quantization with INT4 weight.",
     )
-    parser.add_argument("--gptq", action="store_true")
+    parser.add_argument(
+        "--gptq",
+        action="store_true",
+        help="Run GPTQ calibration to generate optimized INT4 weight for weight-only quantization."
+        "This is recommended for INT4 to minimize accuracy drop after quantization."
+    )
+    parser.add_argument(
+        "--group-size",
+        default=0,
+        type=int,
+        help="For GPTQ and weight-only quantization only. Group size defines granularity of quantization the along input channel of weight. "
+        "The input channel size must be a multiple of the group size. It is effective for both INT8 and INT4 weight dtype. "
+        "It must be -1, 0 or a positive power of 2. -1 means group-size equals the input channel size (i.e., per-channel quantization). "
+        "0 means group-size is selected automatically, -1 for INT8 and 128 for INT4. "
+        "If --low-precision-checkpoint is given, this parameter is overwritten by data in the checkpoint file.")
 
     # inference related arguments.
     parser.add_argument(
@@ -156,8 +175,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
             if args.config_file is not None:
                 infer_cmd.extend(["--config-file", str(args.config_file)])
 
-            print("running model geneartion...")
-            subprocess.run(infer_cmd)
+            print("LLM RUNTIME INFO: running model geneartion...")
+            result = subprocess.run(infer_cmd)
+            if result.returncode != 0:
+                print("LLM RUNTIME ERROR: Running generation task failed. Quit.")
+                quit()
+            print("LLM RUNTIME INFO: Finished successfully.")
         elif re.search("baichuan", str(args.model_name_or_path), re.IGNORECASE) or re.search("chatglm", str(args.model_name_or_path), re.IGNORECASE):
             qpath = Path(parent_path, "single_instance/run_quantization.py")
             infer_cmd = ["python", qpath]
@@ -177,7 +200,19 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--ipex-weight-only-quantization"])
                 infer_cmd.extend(["--weight-dtype", str(args.weight_dtype)])
                 infer_cmd.extend(["--lowp-mode", str(args.lowp_mode)])
+                group_size = args.group_size
+                if group_size == 0:
+                    # weight dtype is ignored if gptq is true
+                    if args.weight_dtype == "INT4" or args.gptq:
+                        group_size = 128
+                    else:
+                        group_size = -1
+                assert group_size == -1 or (
+                    group_size > 0 and
+                    (group_size & (group_size-1) == 0)
+                ), f"Invalid GPTQ group size: {group_size}"
                 if args.gptq:
+                    print("LLM RUNTIME INFO: Weight dtype set to INT4 since `--gptq` is sepcified and `--weight-dtype` is ignored.")
                     if args.low_precision_checkpoint == "":
                         gptq_cmd = [
                             "python",
@@ -185,7 +220,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         ]
                         gptq_cmd.extend(["--model", str(args.model_name_or_path)])
                         gptq_cmd.extend(["--output-dir", str(args.output_dir)])
-                        subprocess.run(gptq_cmd)
+                        print("LLM RUNTIME INFO: Running GPTQ calibration with group_size {}...".format(group_size))
+                        result = subprocess.run(gptq_cmd)
+                        if result.returncode != 0:
+                            print("LLM RUNTIME ERROR: Running GPTQ calibration failed. Quit.")
+                            quit()
+                        print("LLM RUNTIME INFO: Running GPTQ calibration finished.")
                         infer_cmd.extend(
                             [
                                 "--low-precision-checkpoint",
@@ -199,6 +239,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
                                 str(args.low_precision_checkpoint),
                             ]
                         )
+                else:
+                    # No need to set group size if args.gptq is true
+                    # Group size is read from the checkpoint
+                    quant_cmd.extend(["--group-size", str(group_size)])
             else:
                 infer_cmd.extend(["--ipex-smooth-quant"])
                 infer_cmd.extend(["--alpha", str(args.alpha)])
@@ -217,8 +261,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
             if args.prompt is not None:
                 infer_cmd.extend(["--prompt", str(args.prompt)])
 
-            print("running model quantization and geneartion...")
-            subprocess.run(infer_cmd)
+            print("LLM RUNTIME INFO: quantizing model ...")
+            result = subprocess.run(quant_cmd)
+            if result.returncode != 0:
+                print("LLM RUNTIME ERROR: Quantizing model failed. Quit.")
+                quit()
+            print("LLM RUNTIME INFO: Model quantized successfully, saved to {}.".format(str(args.output_dir) + "/best_model.pt"))
         else:
             if args.config_file is None:
                 config = AutoConfig.from_pretrained(
@@ -251,19 +299,38 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     quant_cmd.extend(["--ipex-weight-only-quantization"])
                     quant_cmd.extend(["--weight-dtype", str(args.weight_dtype)])
                     quant_cmd.extend(["--lowp-mode", str(args.lowp_mode)])
+                    group_size = args.group_size
+                    if group_size == 0:
+                        # weight dtype is ignored if gptq is true
+                        if args.weight_dtype == "INT4" or args.gptq:
+                            group_size = 128
+                        else:
+                            group_size = -1
+                    assert group_size == -1 or (
+                        group_size > 0 and
+                        (group_size & (group_size-1) == 0)
+                    ), f"Invalid GPTQ group size: {group_size}"
                     if args.gptq:
+                        print("LLM RUNTIME INFO: Weight dtype set to INT4 since `--gptq` is sepcified and `--weight-dtype` is ignored.")
                         if args.low_precision_checkpoint == "":
                             gptq_cmd = [
                                 "python",
                                 Path(parent_path, "utils/run_gptq.py"),
                             ]
                             gptq_cmd.extend(["--model", str(args.model_name_or_path)])
+                            gptq_cmd.extend(["--dataset", str(args.dataset)])
+                            gptq_cmd.extend(["--group-size", str(group_size)])
                             gptq_cmd.extend(["--output-dir", str(args.output_dir)])
-                            subprocess.run(gptq_cmd)
+                            print("LLM RUNTIME INFO: Running GPTQ calibration with group_size {}...".format(group_size))
+                            result = subprocess.run(gptq_cmd)
+                            if result.returncode != 0:
+                                print("LLM RUNTIME ERROR: Running GPTQ calibration failed. Quit.")
+                                quit()
+                            print("LLM RUNTIME INFO: Running GPTQ calibration finished.")
                             quant_cmd.extend(
                                 [
                                     "--low-precision-checkpoint",
-                                    str(args.output_dir) + "/gptq_checkpoint.pt",
+                                    str(args.output_dir) + f"/gptq_checkpoint_g{group_size}.pt",
                                 ]
                             )
                         else:
@@ -273,12 +340,20 @@ def main(args_in: Optional[List[str]] = None) -> None:
                                     str(args.low_precision_checkpoint),
                                 ]
                             )
+                    else:
+                        # No need to set group size if args.gptq is true
+                        # Group size is read from the checkpoint
+                        quant_cmd.extend(["--group-size", str(group_size)])
                 else:
                     quant_cmd.extend(["--ipex-smooth-quant"])
                     quant_cmd.extend(["--alpha", str(args.alpha)])
                     quant_cmd.extend(["--dataset", str(args.dataset)])
-                print("quantizing model ...")
-                subprocess.run(quant_cmd)
+                print("LLM RUNTIME INFO: quantizing model ...")
+                result = subprocess.run(quant_cmd)
+                if result.returncode != 0:
+                    print("LLM RUNTIME ERROR: Quantizing model failed. Quit.")
+                    quit()
+                print("LLM RUNTIME INFO: Model quantized successfully, saved to {}.".format(str(args.output_dir) + "/best_model.pt"))
                 infer_cmd.extend(
                     ["--quantized-model-path", str(args.output_dir)+"/"+str(args.quant_model_name)]
                 )
@@ -314,8 +389,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 if args.config_file is not None:
                     infer_cmd.extend(["--config-file", str(args.config_file)])
 
-            print("running model geneartion...")
-            subprocess.run(infer_cmd)
+            print("LLM RUNTIME INFO: running model geneartion...")
+            result = subprocess.run(infer_cmd)
+            if result.returncode != 0:
+                print("LLM RUNTIME ERROR: Running generation task failed. Quit.")
+                quit()
+            print("LLM RUNTIME INFO: Finished successfully.")
 
     else:
         path = Path(parent_path, "distributed/run_generation_with_deepspeed.py")
@@ -346,10 +425,20 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     Path.mkdir(model_path)
             shard_cmd.extend(["--save-path", str(args.output_dir)+str(MODEL_CLASSES[model_type])])
             shard_cmd.extend(["--local_rank", str(args.local_rank)])
-            subprocess.run(shard_cmd)
-            infer_cmd.extend(["-m", str(args.output_dir)+str(MODEL_CLASSES[model_type])])
+            print("LLM RUNTIME INFO: sharding model...")
+            result = subprocess.run(shard_cmd)
+            if result.returncode != 0:
+                print("LLM RUNTIME ERROR: Sharding model failed. Quit.")
+                quit()
+            print("LLM RUNTIME INFO: Model sharded successfully.")
+            # use absolute path here to avoid path error in deepspeed
+            infer_cmd.extend(["-m", str(os.path.abspath(args.output_dir))+str(MODEL_CLASSES[model_type])])
         else:
-            infer_cmd.extend(["-m", str(args.model_name_or_path)])
+            model_name_or_path = args.model_name_or_path
+            if os.path.exists(model_name_or_path):
+                # use absolute path here to avoid path error in deepspeed
+                model_name_or_path = os.path.abspath(model_name_or_path)
+            infer_cmd.extend(["-m", str(model_name_or_path)])
 
         infer_cmd.extend(["--dtype", str(args.dtype)])
         infer_cmd.extend(["--input-tokens", str(args.input_tokens)])
@@ -383,8 +472,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
             if args.int8_bf16_mixed:
                 infer_cmd.extend(["--int8-bf16-mixed"])
 
-        print("running model geneartion with deepspeed (autotp)...")
-        subprocess.run(infer_cmd)
+        print("LLM RUNTIME INFO: running model geneartion with deepspeed (autotp)...")
+        result = subprocess.run(infer_cmd)
+        if result.returncode != 0:
+            print("LLM RUNTIME ERROR: Running generation task failed. Quit.")
+            quit()
+        print("LLM RUNTIME INFO: Finished successfully.")
 
 
 if __name__ == "__main__":

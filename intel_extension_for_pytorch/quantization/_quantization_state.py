@@ -401,16 +401,22 @@ class AutoQuantizationState(torch.nn.Module):
                     else next(iter(act_scaling_factors.values()))
                 )
                 # update arg_quant_infos
-                scale = (
-                    arg_quant_infos[0][0][w_key]
-                    if len(arg_quant_infos[0][0]) > 1
-                    else next(iter(arg_quant_infos[0][0].values()))
-                )
-                zp = (
-                    arg_quant_infos[0][1][w_key]
-                    if len(arg_quant_infos[0][1]) > 1
-                    else next(iter(arg_quant_infos[0][1].values()))
-                )
+                if isinstance(arg_quant_infos[0][0], dict):
+                    scale = (
+                        arg_quant_infos[0][0][w_key]
+                        if len(arg_quant_infos[0][0]) > 1
+                        else next(iter(arg_quant_infos[0][0].values()))
+                    )
+                    zp = (
+                        arg_quant_infos[0][1][w_key]
+                        if len(arg_quant_infos[0][1]) > 1
+                        else next(iter(arg_quant_infos[0][1].values()))
+                    )
+                else:
+                    # For backward compatibility
+                    assert isinstance(arg_quant_infos[0][0], torch.Tensor)
+                    scale = arg_quant_infos[0][0]
+                    zp = arg_quant_infos[0][1]
                 arg_quant_infos = [(scale, zp, arg_quant_infos[0][2])]
                 args = list(args)
                 new_act = torch.mul(args[0], act_scaling_factors)

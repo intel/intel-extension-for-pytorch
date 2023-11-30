@@ -131,7 +131,7 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list
 # For other variant models, suggest using default alpha=0.5, and could be further tuned in the range [0, 1.0]. (suggest step_size of 0.05)
 
 Notes:
-(1) for quantization benchmarks, the first runs will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, you can reuse these quantized models for inference-only benchmarks by using "--quantized-model-path <output_dir + "best_model.pt">".
+(1) <a name="generation_sq">for all quantization benchmarks</a>, both quantization and inference stages will be triggered by default. For quantization stage, it will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, and for inference stage, it will launch the inference with the quantized model "best_model.pt".  For inference-only benchmarks (avoid the repeating quantization stage), you can also reuse these quantized models for by adding "--quantized-model-path <output_dir + "best_model.pt">" . Besides, specific for static quantization, if not using "--qconfig-summary-file", a qconfig recipe will also be generated in the "--output-dir" path, which could be reused as well (to generate the quantized model "best_model.pt").
 (2) for Falcon quantizations, "--config-file <CONFIG_FILE>" is needed and example of <CONFIG_FILE>: "utils/model_config/tiiuae_falcon-40b_config.json".
 (3) for GPT-NEOX quantizations, using "--int8" instead of "--int8-bf16-mixed" for accuracy concerns.
 (4) By default, generations are based on "beam search", and beam size = 4. For beam size = 1, please add "--greedy"
@@ -148,7 +148,8 @@ unset KMP_AFFINITY
 deepspeed --bind_cores_to_rank  run.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --deployment-mode --autotp --shard-model
 
 # weight only quantization int8 benchmark
-deepspeed --bind_cores_to_rank run.py  --benchmark -m <MODEL_ID> --ipex --ipex-weight-only-quantization --output-dir "saved_results" --int8-bf16-mixed --autotp --shard-model
+deepspeed --bind_cores_to_rank run.py  --benchmark -m <MODEL_ID> --ipex --ipex-weight-only-quantization --output-dir "./saved_results" --int8-bf16-mixed --autotp --shard-model
+# The command will shard the model, quantize the model by weight-only quantization then run the benchmark. The quantized model won't be saved.
 
 Notes:
 (1) for Falcon quantizations, "--config-file <CONFIG_FILE>" is needed and example of <CONFIG_FILE>: "utils/model_config/tiiuae_falcon-40b_config.json".
@@ -190,19 +191,20 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python ru
 ```
 
 ## Weight only quantization with low precision checkpoint (Experimental)
-Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 probably results in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a some dataset by such algorithms. The results are saved as a `state_dict` in a `.pt` file. We provided a script here to run GPTQ (Intel(R) Neural Compressor 2.3.1 is required).
+Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 probably results in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a dataset by such algorithms. The results are saved as a `state_dict` in a `.pt` file. We provided a script here to run GPTQ (Intel(R) Neural Compressor 2.3.1 is required).
 
 Here is how to use it:
 ```bash
 # Step 1: Generate modified weights and quantization info
 python utils/run_gptq.py --model <MODEL_ID> --output-dir ./saved_results
+# Please note that tiiuae/falcon-40b is not supported yet
 ```
-It may take a few hours to finish. Modified weights and their quantization info are stored in `gptq_checkpoint_g128.pt`, where g128 means group size for input channel is 128 by default.
+It may take a few hours to finish. Modified weights and their quantization info are stored in `gptq_checkpoint_g128.pt`, where g128 means group size for input channel is 128 by default. Group size controls the granularity of quantization of weight along input channel. The dataset for calibration is NeelNanda/pile-10k by default. To use other dataset, such as lambada, you may use `--dataset <dataset id>` to specify.
 Then generate model for weight only quantization with INT4 weights and run tasks.
 ```bash
 # Step 2: Generate quantized model with INT4 weights
 # Provide checkpoint file name by --low-precision-checkpoint <file name>
-python single_instance/run_quantization.py --ipex-weight-only-quantization --output-dir "saved_results" --int8-bf16-mixed -m <MODEL_ID> --low-precision-checkpoint "saved_results/gptq_checkpoint.pt"
+python single_instance/run_quantization.py --ipex-weight-only-quantization --output-dir "saved_results" --int8-bf16-mixed -m <MODEL_ID> --low-precision-checkpoint "saved_results/gptq_checkpoint_g128.pt"
 
 # Step 3: Run quantized model for latency benchmark
 # For GPT-NEOX, use --int8 instead of --int8-bf16-mixed

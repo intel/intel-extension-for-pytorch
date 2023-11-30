@@ -966,13 +966,19 @@ def load_qconf_summary_to_model(model, qconf_summary):
                         scaling_factors_to_load = tensor_info[
                             "smooth_quant_scaling_factor"
                         ]
-                        assert isinstance(scaling_factors_to_load, dict), (
-                            f"Expect scaling factors to load are a dict but found type "
-                            f"{type(scaling_factors_to_load)}"
-                        )
-                        for key, val in scaling_factors_to_load.items():
-                            scaling_factor = torch.FloatTensor(val)
-                            scaling_factors.update({key: scaling_factor})
+                        if isinstance(scaling_factors_to_load, dict):
+                            for key, val in scaling_factors_to_load.items():
+                                scaling_factor = torch.FloatTensor(val)
+                                scaling_factors.update({key: scaling_factor})
+                        else:
+                            # for backward compatibility
+                            assert isinstance(scaling_factors_to_load, list), (
+                                f"Expect scaling factors to load to be a dict or list "
+                                f"but found type {type(scaling_factors_to_load)}"
+                            )
+                            scaling_factor = torch.FloatTensor(scaling_factors_to_load)
+                            dummy_weight_key = "0_0"
+                            scaling_factors.update({dummy_weight_key: scaling_factor})
                         v.tensor_id_to_smooth_quant_scaling_factor[
                             str(tensor_info["id"])
                         ] = scaling_factors
