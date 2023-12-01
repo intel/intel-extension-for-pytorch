@@ -444,11 +444,11 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       torch_ipex::cpu::instance_norm_backward);
 }
 
-IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
-  m.impl(
-      TORCH_SELECTIVE_NAME("aten::instance_norm"),
-      TORCH_FN((&torch_ipex::cpu::instance_norm)));
-}
+// IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
+//   m.impl(
+//       TORCH_SELECTIVE_NAME("aten::instance_norm"),
+//       TORCH_FN((&torch_ipex::cpu::instance_norm)));
+// }
 
 } // namespace cpu
 } // namespace torch_ipex
