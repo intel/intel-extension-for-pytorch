@@ -3,14 +3,9 @@
 # Please review the system requirements before running this script
 # https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/installation.html
 #
-set -exo pipefail
+set -eo pipefail
 
-VER_PYTORCH=v2.1.0
-VER_TORCHVISION=v0.16.0
-VER_TORCHAUDIO=v2.1.0
-VER_LLVM=llvmorg-16.0.6
 VER_IPEX=v2.1.10+xpu
-#VER_GCC=12.0.0
 
 if [[ $# -lt 3 ]]; then
     echo "Usage: bash $0 <DPCPPROOT> <MKLROOT> <AOT>"
@@ -112,6 +107,29 @@ BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd ${BASEFOLDER}
 
 # Checkout individual components
+if [ ! -d intel-extension-for-pytorch ]; then
+    git clone https://github.com/intel/intel-extension-for-pytorch.git
+fi
+cd intel-extension-for-pytorch
+if [ ! -z ${VER_IPEX} ]; then
+    rm -rf * > /dev/null
+    git checkout . > /dev/null
+    git checkout main > /dev/null
+    git pull > /dev/null
+    git checkout ${VER_IPEX}
+fi
+git submodule sync
+git submodule update --init --recursive
+
+python -m pip install pyyaml
+VER_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k commit)
+VER_TORCHVISION=$(python tools/yaml_utils.py -f dependency_version.yml -d torchvision -k commit)
+VER_TORCHAUDIO=$(python tools/yaml_utils.py -f dependency_version.yml -d torchaudio -k commit)
+VER_LLVM=llvmorg-$(python tools/yaml_utils.py -f dependency_version.yml -d llvm -k version)
+#VER_GCC=$(python tools/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
+python -m pip uninstall -y pyyaml
+cd ..
+
 if [ ! -d pytorch ]; then
     git clone https://github.com/pytorch/pytorch.git
 fi
@@ -128,23 +146,21 @@ fi
 if [ ! -d llvm-project ]; then
     git clone https://github.com/llvm/llvm-project.git
 fi
-if [ ! -d intel-extension-for-pytorch ]; then
-    git clone https://github.com/intel/intel-extension-for-pytorch.git
-fi
 
 # Checkout required branch/commit and update submodules
 cd pytorch
 rm -rf * > /dev/null
 git checkout . > /dev/null
-if [ ! -z ${VER_PYTORCH} ]; then
+if [ ! -z ${VER_TORCH} ]; then
     git checkout main > /dev/null
     git pull > /dev/null
-    git checkout ${VER_PYTORCH}
+    git checkout ${VER_TORCH}
 fi
 git submodule sync
 git submodule update --init --recursive
+cd ..
 if [ $((${MODE} & 0x02)) -ne 0 ]; then
-    cd ../vision
+    cd vision
     if [ ! -z ${VER_TORCHVISION} ]; then
         rm -rf * > /dev/null
         git checkout . > /dev/null
@@ -154,9 +170,10 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     fi
     git submodule sync
     git submodule update --init --recursive
+	cd ..
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
-    cd ../audio
+    cd audio
     if [ ! -z ${VER_TORCHAUDIO} ]; then
         rm -rf * > /dev/null
         git checkout . > /dev/null
@@ -166,24 +183,15 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     fi
     git submodule sync
     git submodule update --init --recursive
+	cd ..
 fi
-cd ../llvm-project
+cd llvm-project
 if [ ! -z ${VER_LLVM} ]; then
     rm -rf * > /dev/null
     git checkout . > /dev/null
     git checkout main > /dev/null
     git pull > /dev/null
     git checkout ${VER_LLVM}
-fi
-git submodule sync
-git submodule update --init --recursive
-cd ../intel-extension-for-pytorch
-if [ ! -z ${VER_IPEX} ]; then
-    rm -rf * > /dev/null
-    git checkout . > /dev/null
-    git checkout main > /dev/null
-    git pull > /dev/null
-    git checkout ${VER_IPEX}
 fi
 git submodule sync
 git submodule update --init --recursive
@@ -201,8 +209,6 @@ fi
 conda install -y make -c conda-forge
 conda install -y sysroot_linux-64
 conda install -y gcc==11.4 gxx==11.4 cxx-compiler -c conda-forge
-export CC=${CONDA_PREFIX}/bin/gcc
-export CXX=${CONDA_PREFIX}/bin/g++
 export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
 ABI=1
 
@@ -212,7 +218,7 @@ git apply ../intel-extension-for-pytorch/torch_patches/*.patch
 python -m pip install -r requirements.txt
 python -m pip install mkl-static mkl-include
 mv version.txt version.txt.bk
-echo "${VER_PYTORCH:1}a0" > version.txt
+echo "${VER_TORCH:1}a0" > version.txt
 # Ensure cmake can find python packages when using conda or virtualenv
 if [ -n "${CONDA_PREFIX-}" ]; then
     export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(command -v conda))/../"}
@@ -265,7 +271,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 fi
 
 # Set compiler env
-conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
+conda install -y gcc==12.3.0 gxx==12.3.0 cxx-compiler -c conda-forge
 
 #  LLVM
 LLVM_ROOT="$(pwd)/llvm-release"
@@ -319,11 +325,13 @@ if [[ ! ${AOT} == "" ]]; then
     unset USE_AOT_DEVLIST
 fi
 python -m pip install dist/*.whl
+export LD_PRELOAD=$(bash ./tools/get_libstdcpp_lib.sh)
 cd ..
 
 # Sanity Test
-export LD_PRELOAD=${CONDA_PREFIX}/lib/libstdc++.so
-echo "Note: Should you experience \"version \`GLIBCXX_N.N.NN' not found\" error, run command \"export LD_PRELOAD=${CONDA_PREFIX}/lib/libstdc++.so\" and try again."
+echo "======================================================"
+echo "Note: Set environment variable \"export LD_PRELOAD=${LD_PRELOAD}\" to avoid the \"version \`GLIBCXX_N.N.NN' not found\" error."
+echo "======================================================"
 CMD="import torch; print(f'torch_cxx11_abi:     {torch._C._GLIBCXX_USE_CXX11_ABI}'); print(f'torch_version:       {torch.__version__}');"
 if [ $((${MODE} & 0x02)) -ne 0 ]; then
     CMD="${CMD} import torchvision; print(f'torchvision_version: {torchvision.__version__}');"

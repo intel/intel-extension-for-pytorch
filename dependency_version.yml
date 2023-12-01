@@ -1,0 +1,30 @@
+gcc:
+  max-version: 
+  min-version: 12.3.0
+llvm:
+  version: 16.0.6
+pytorch:
+  version: 2.0.1a0
+  commit: v2.1.0
+torchaudio:
+  version: 2.0.1a0
+  commit: v2.1.0
+torchvision:
+  version: 0.16.0a0
+  commit: v0.16.0
+torch-ccl:
+  repo: https://github.com/intel/torch-ccl.git
+  commit: c8f89db1639558c1149c4d0eecf90c980064f609
+  version: 2.1.100+xpu
+deepspeed:
+  repo: https://github.com/microsoft/DeepSpeed.git
+  version: 
+  commit: 4fc181b01077521ba42379013ce91a1c294e5d8e
+intel-extension-for-deepspeed:
+  repo: https://github.com/intel/intel-extension-for-deepspeed.git
+  commit: ec332772d8bb71c6d89804a862f039fc91ae96b5
+transformers:
+  version: 4.31.0
+  commit: v4.31.0
+protobuf:
+  version: 3.20.3

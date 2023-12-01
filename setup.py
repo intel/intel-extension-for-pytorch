@@ -747,7 +747,7 @@ class IPEXCPPLibBuild(build_clib, object):
 
             cmake_args_gpu = []
             define_build_options(cmake_args_gpu, **build_option_gpu)
-            if "IPEX_GPU_EXTRA_BUILD_OPTION" in os.environ:
+            if "IPEX_GPU_EXTRA_BUILD_OPTION" in my_env:
                 exist_ldflags = "LDFLAGS" in my_env
                 ldflags = ""
                 if exist_ldflags:
@@ -761,9 +761,9 @@ class IPEXCPPLibBuild(build_clib, object):
                 my_env,
                 use_ninja,
             )
-            if "IPEX_GPU_EXTRA_BUILD_OPTION" in os.environ:
+            if "IPEX_GPU_EXTRA_BUILD_OPTION" in my_env:
                 if exist_ldflags:
-                    ldflags = my_env["LDFLAGS"]
+                    my_env["LDFLAGS"] = ldflags
                 else:
                     del my_env["LDFLAGS"]
 
