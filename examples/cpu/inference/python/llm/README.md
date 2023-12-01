@@ -166,13 +166,13 @@ deepspeed --bind_cores_to_rank  run.py --benchmark -m meta-llama/Llama-2-7b-hf -
 #### Weight-only quantization:
 ```bash
 # int8 general command:
-deepspeed --bind_cores_to_rank run.py  --benchmark -m <MODEL_ID> --ipex --ipex-weight-only-quantization --output-dir "./saved_results" --int8-bf16-mixed --autotp --shard-model
+deepspeed --bind_cores_to_rank run.py  --benchmark -m <MODEL_ID> --ipex --ipex-weight-only-quantization --output-dir "./saved_results" --int8-bf16-mixed --autotp --shard-model --deployment-mode
 # The command will shard the model, quantize the model by weight-only quantization then run the benchmark. The quantized model won't be saved.
 # for Falcon quantizations, "--config-file <CONFIG_FILE>" is needed and example of <CONFIG_FILE>: "utils/model_config/tiiuae_falcon-40b_config.json".
 # for GPT-NEOX weight-only quantizations, using "--int8" instead of "--int8-bf16-mixed", and add "--dtype float32" for accuracy concerns.
 
 # An example of llama2 7b model:
-deepspeed --bind_cores_to_rank  run.py --benchmark -m meta-llama/Llama-2-7b-hf --ipex --ipex-weight-only-quantization --output-dir "saved_results" --int8-bf16-mixed --autotp --shard-model
+deepspeed --bind_cores_to_rank  run.py --benchmark -m meta-llama/Llama-2-7b-hf --ipex --ipex-weight-only-quantization --output-dir "saved_results" --int8-bf16-mixed --autotp --shard-model --deployment-mode
 ```
 
 # Advanced Usage
