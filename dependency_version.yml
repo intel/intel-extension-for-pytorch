@@ -7,16 +7,19 @@ gcc:
   min_version: 7.3.0
 llvm:
   version: 16.0.6
+oneCCL:
+  repo: https://github.com/oneapi-src/oneCCL.git
+  branch: 2021.10
 pytorch:
-  version: 2.2.0.dev20231113+cpu
+  version: 2.2.0.dev20231129+cpu
 torch-ccl:
   repo: https://github.com/intel/torch-ccl.git
   tag: ccl_torch_dev_1115
   version: 2.2.0+cpu
 torchaudio:
-  version: 2.2.0.dev20231113+cpu
+  version: 2.2.0.dev20231129+cpu
 torchvision:
-  version: 0.17.0.dev20231113+cpu
+  version: 0.17.0.dev20231129+cpu
 transformers:
   version: 4.31.0
 inc:
