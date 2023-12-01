@@ -186,7 +186,7 @@ if args.accuracy_only:
                 )
 
             if world_size == 1 or model_type == "falcon":
-                model = model_class[0].from_pretrained(
+                self.model = model_class[0].from_pretrained(
                     model_id,
                     config=config,
                     low_cpu_mem_usage=True,
