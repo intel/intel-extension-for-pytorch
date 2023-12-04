@@ -580,7 +580,7 @@ if args.accuracy_only:
             if self._with_jit and self.iter == 0:
                 with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
                     enabled=True
-                    if args.int8_bf16_mixed or self._dtype == torch.bfloat16
+                    if args.int8_bf16_mixed or self._dtype == "bfloat16"
                     else False,
                 ):
                     if self._dtype != "int8":
@@ -677,7 +677,7 @@ if args.accuracy_only:
             ):
                 with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
                     enabled=True
-                    if args.int8_bf16_mixed or self._dtype == torch.bfloat16
+                    if args.int8_bf16_mixed or self._dtype == "bfloat16"
                     else False,
                 ):
                     if self._with_jit:
@@ -693,7 +693,7 @@ if args.accuracy_only:
             else:
                 with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
                     enabled=True
-                    if args.int8_bf16_mixed or self._dtype == torch.bfloat16
+                    if args.int8_bf16_mixed or self._dtype == "bfloat16"
                     else False,
                 ):
                     if self._with_jit:
