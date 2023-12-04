@@ -144,7 +144,7 @@ at::Tensor pooling_impl(
   } else {
     return mkldnn_to_dense(new_with_itensor_mkldnn(
         std::move(mkldnn_output),
-        optTypeMetaToScalarType(input.options().dtype_opt()),
+        c10::optTypeMetaToScalarType(input.options().dtype_opt()),
         input.options().device_opt()));
   }
 }
