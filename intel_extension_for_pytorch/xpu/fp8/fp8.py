@@ -115,6 +115,21 @@ def fp8_autocast(
     enabled: bool = False,
     fp8_recipe: Optional[DelayedScaling] = None,
 ) -> None:
+    """
+    Context manager for FP8 usage.
+
+    .. code-block:: python
+
+        with fp8_autocast(enabled=True):
+            out = model(inp)
+
+    Parameters
+    ----------
+    enabled: bool, default = `False`
+             whether or not to enable fp8
+    fp8_recipe: recipe.DelayedScaling, default = `None`
+                recipe used for FP8 training.
+    """
     global _FP8_ENABLED, _FP8_RECIPE
     fp8_state = (_FP8_ENABLED, _FP8_RECIPE)
     try:
