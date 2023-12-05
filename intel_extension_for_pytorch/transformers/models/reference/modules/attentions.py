@@ -663,9 +663,11 @@ class _IPEXAttentionRef(nn.Module):
                 self.pos_embd_dim = module.rotary_ndims
             else:
                 self.pos_embd_dim = self.head_dim
-            self.rope_base = (
-                config.rotary_emb_base if hasattr(config, "rotary_emb_base") else 10000
-            )
+            self.rope_base = 10000
+            if hasattr(config, "rotary_emb_base"):
+                self.rope_base = config.rotary_emb_base
+            elif hasattr(config, "rope_theta"):
+                self.rope_base = config.rope_theta
             self._IPEXROPE = _IPEXRopeRef(
                 self.max_position_embeddings,
                 self.pos_embd_dim,
