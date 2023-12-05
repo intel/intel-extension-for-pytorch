@@ -66,7 +66,8 @@ parser.add_argument('--device',
     default='xpu',
 )
 parser.add_argument(
-    "--dtype", type=str, help="float16 or bfloat16 or int8", choices=["int8", "float16", "bfloat16", "float32"], default="float16"
+    "--dtype", type=str, help="ipex.optimize_transformers only supports float16 for now",
+    choices=["float16"], default="float16"
 )
 parser.add_argument("--local_rank", required=False, type=int, help="used by dist launchers")
 parser.add_argument("--batch_size", "--batch-size", default=1, type=int, help="batch size")
@@ -485,7 +486,7 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
     ref_prompt=None
     ref_prompt_cuda=None
     token_support = [(32, 32), (1024, 128)]
-    if (int(num_input_tokens), num_tokens) in token_support:
+    if (int(num_input_tokens), num_tokens) in token_support and args.sub_model_name is not None:
         ref_prompt = prompt_json[args.sub_model_name][f"{num_input_tokens}-{num_tokens}"][f"{num_beams}"]
         try:
             ref_prompt_cuda = prompt_json[args.sub_model_name][f"{num_input_tokens}-{num_tokens}"][f"cuda-result: {num_beams}"]

@@ -52,9 +52,9 @@ parser.add_argument(
 parser.add_argument(
     "--dtype",
     type=str,
-    choices=["float32", "bfloat16", "float16"],
-    default="bfloat16",
-    help="float16, bfloat16, float32",
+    choices=["float16"],
+    default="float16",
+    help="ipex.optimize_transformers only supports float16 for now",
 )
 parser.add_argument(
     "--input-tokens",
@@ -319,6 +319,7 @@ def run_accuracy():
     results = evaluator.evaluate(
         hfmodel,
         task_dict,
+        limit=2
     )
 
     print(evaluator.make_table(results))
@@ -362,7 +363,7 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
     ref_prompt=None
     ref_prompt_cuda=None
     token_support = [(32, 32), (1024, 128)]
-    if (int(num_input_tokens), num_tokens) in token_support:
+    if (int(num_input_tokens), num_tokens) in token_support and args.sub_model_name is not None:
         ref_prompt = prompt_json[args.sub_model_name][f"{num_input_tokens}-{num_tokens}"][f"{num_beams}"]
         try:
             ref_prompt_cuda = prompt_json[args.sub_model_name][f"{num_input_tokens}-{num_tokens}"][f"cuda-result: {num_beams}"]
