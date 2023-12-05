@@ -489,25 +489,21 @@ def auto_format_python_code():
 
 
 def post_clean_third_party_patches(base_dir, submodule_dir):
-    print(
-        subprocess.check_output(
-            ["git", "submodule", "sync", submodule_dir], cwd=base_dir
+    try:
+        subprocess.run(
+            ["git", "submodule", "sync", submodule_dir],
+            cwd=base_dir,
+            capture_output=True,
         )
-        .decode("ascii")
-        .strip()
-    )
-    print(
-        subprocess.check_output(
-            ["git", "submodule", "update", "--init", submodule_dir], cwd=base_dir
+        subprocess.run(
+            ["git", "submodule", "update", "--init", submodule_dir],
+            cwd=base_dir,
+            capture_output=True,
         )
-        .decode("ascii")
-        .strip()
-    )
-    print(
-        subprocess.check_output(["git", "clean", "-fd"], cwd=submodule_dir)
-        .decode("ascii")
-        .strip()
-    )
+        subprocess.run(["git", "clean", "-fd"], cwd=submodule_dir, capture_output=True)
+    except Exception as e:
+        print(e)
+        sys.exit(1)
 
 
 # global setup modules
