@@ -818,10 +818,11 @@ def quantize_per_channel(t: torch.Tensor, is_int4, scales=None, zero_points=None
         return scales, zps
 
     scales, zps = get_qparams(scales, zero_points)
-    qmin = 0 if is_int4 else -127
+    qmin = 0 if is_int4 else -128
     qmax = 15 if is_int4 else 127
+    inv_scales = 1 / scales.unsqueeze(1)
     qt = torch.clamp(
-        torch.round(t / scales.unsqueeze(1)) + zps.unsqueeze(1), min=qmin, max=qmax
+        torch.round(t * inv_scales) + zps.unsqueeze(1), min=qmin, max=qmax
     )
     qt = qt.to(torch.uint8) if is_int4 else qt.to(torch.int8)
     if is_int4:
@@ -926,14 +927,15 @@ def quantize_per_block(
         return scales, zps
 
     scales, zps = get_qparams(scales, zero_points)
-    qmin = 0 if is_int4 else -127
+    qmin = 0 if is_int4 else -128
     qmax = 15 if is_int4 else 127
     Kc = (K + group_size - 1) // group_size
     t_com = input[:, : K - k_rem].view(N, K // group_size, group_size)
     scales_com = scales[:, : Kc - has_rem]
     zps_com = zps[:, : Kc - has_rem]
+    inv_scales_com = 1 / scales_com.unsqueeze(-1)
     qt = torch.clamp(
-        torch.round(t_com / scales_com.unsqueeze(-1)) + zps_com.unsqueeze(-1),
+        torch.round(t_com * inv_scales_com) + zps_com.unsqueeze(-1),
         min=qmin,
         max=qmax,
     )
@@ -942,8 +944,9 @@ def quantize_per_block(
         t_rem = input[:, K - k_rem :].view(N, 1, k_rem)
         scales_rem = scales[:, Kc - has_rem :]
         zps_rem = zps[:, Kc - has_rem :]
+        inv_scales_rem = 1 / scales_rem.unsqueeze(-1)
         qt_rem = torch.clamp(
-            torch.round(t_rem / scales_rem.unsqueeze(-1)) + zps_rem.unsqueeze(-1),
+            torch.round(t_rem * inv_scales_rem) + zps_rem.unsqueeze(-1),
             min=qmin,
             max=qmax,
         )
