@@ -16,6 +16,28 @@ DTYPE_BITS_MAPPING = {
 }
 
 
+class ParamsGBits(torch.nn.Parameter):
+    def __new__(
+            cls,
+            data=None,
+            requires_grad=True,
+            quant_state=None,
+            blocksize=32,
+            compress_statistics=True,
+            quant_dtype='int8'
+    ):
+        if data is None:
+            data = torch.empty(0)
+
+        self = torch.Tensor._make_subclass(cls, data, requires_grad)
+        self.blocksize = blocksize
+        self.compress_statistics = compress_statistics
+        self.quant_dtype = quant_dtype
+        self.quant_state = quant_state
+        self.data = data
+        return self
+
+
 class ParamsLowBits(torch.nn.Parameter):
     def __new__(
             cls,
@@ -60,6 +82,7 @@ class WeightOnlyLinear(nn.Module):
         compression_dim=1,
         g_idx=False,
         device=None,
+        use_hf_format=False,
     ) -> None:
         super().__init__()
         self.in_features = in_features
@@ -79,7 +102,8 @@ class WeightOnlyLinear(nn.Module):
             torch.int32,
             torch.int64,
         ], "Only support torch.int8|16|32|64 as compressed dtype."
-        dtype_bits_mapping = {torch.int8: 8, torch.int16: 16, torch.int32: 32, torch.int64: 64}
+        dtype_bits_mapping = {torch.int8: 8,
+                              torch.int16: 16, torch.int32: 32, torch.int64: 64}
         self.bits = DTYPE_BITS_MAPPING[weight_dtype]
         self.compress_bits = dtype_bits_mapping[compression_dtype]
         self.n_pack = self.compress_bits // self.bits
@@ -87,8 +111,10 @@ class WeightOnlyLinear(nn.Module):
         self.float_type = scale_dtype
         # K is input channel, N is output channel
         assert compression_dim in [0, 1], (
-            "Only support 0 or 1 as compression dimension, " + "0 is output channel, 1 is input channel."
+            "Only support 0 or 1 as compression dimension, " +
+            "0 is output channel, 1 is input channel."
         )
+        self.use_hf_format = use_hf_format
         if self.use_hf_format:
             self.register_buffer(
                 "scales",
@@ -105,13 +131,14 @@ class WeightOnlyLinear(nn.Module):
             self.register_parameter(
                 "weight",
                 ParamsLowBits(weight, requires_grad=False, quant_state={"scheme": self.scheme}, blocksize=self.blocksize,
-                    compress_statistics=self.compress_statistics, quant_dtype=self.weight_dtype),
+                              compress_statistics=self.compress_statistics, quant_dtype=self.weight_dtype),
             )
             self.weight = self.weight.T
             self.register_buffer(
                 "qzeros",
                 torch.empty(
-                    (math.ceil(self.in_features / self.groupsize), math.ceil(self.out_features / self.n_pack)),
+                    (math.ceil(self.in_features / self.groupsize),
+                     math.ceil(self.out_features / self.n_pack)),
                     dtype=self.compressed_dtype, device=device
                 ),
             )
@@ -132,13 +159,14 @@ class WeightOnlyLinear(nn.Module):
                 self.register_parameter(
                     "weight",
                     ParamsLowBits(weight, requires_grad=False, quant_state={"scheme": self.scheme}, blocksize=self.blocksize,
-                        compress_statistics=self.compress_statistics, quant_dtype=self.weight_dtype),
+                                  compress_statistics=self.compress_statistics, quant_dtype=self.weight_dtype),
                 ),
                 if zp:
                     self.register_buffer(
                         "qzeros",
                         torch.empty(
-                            (self.out_features, math.ceil(self.in_features / self.groupsize / self.n_pack)),
+                            (self.out_features, math.ceil(
+                                self.in_features / self.groupsize / self.n_pack)),
                             dtype=self.compressed_dtype, device=device
                         ),
                     )
@@ -150,41 +178,33 @@ class WeightOnlyLinear(nn.Module):
                 self.register_buffer(
                     "weight",
                     ParamsLowBits(weight, requires_grad=False, quant_state={"scheme": self.scheme}, blocksize=self.blocksize,
-                        compress_statistics=self.compress_statistics, quant_dtype=self.weight_dtype),
+                                  compress_statistics=self.compress_statistics, quant_dtype=self.weight_dtype),
                 )
                 if zp:
                     self.register_buffer(
                         "qzeros",
                         torch.empty(
-                            (math.ceil(self.out_features / self.n_pack), math.ceil(self.in_features / self.groupsize)),
+                            (math.ceil(self.out_features / self.n_pack),
+                             math.ceil(self.in_features / self.groupsize)),
                             dtype=self.compressed_dtype, device=device
                         ),
                     )
         if g_idx:
-            self.register_buffer("g_idx", torch.empty(in_features, dtype=torch.int32, device=device)
+            self.register_buffer("g_idx", torch.empty(
+                in_features, dtype=torch.int32, device=device))
         else:
             self.g_idx = None
         if bias:
-            bias = torch.empty(self.out_features, dtype=self.float_type, device=device)
-            self.register_parameter("bias", torch.nn.Parameter(bias, requires_grad=False))
+            bias = torch.empty(self.out_features,
+                               dtype=self.float_type, device=device)
+            self.register_parameter(
+                "bias", torch.nn.Parameter(bias, requires_grad=False))
         else:
             self.bias = None
 
     def forward(self, input: Tensor) -> Tensor:
-        if self.bias is None:
-            return torch.ops.torch_ipex.mm_low_bits(
-                input, self.weight, self.scales, self.qzeros, self.compute_dtype, self.weight_dtype, self.blocksize
-            )
-        else:
-            return torch.ops.torch_ipex.mm_low_bits(
-                input,
-                self.weight,
-                self.bias,
-                self.scales,
-                self.qzeros,
-                self.compute_dtype,
-                self.weight_dtype,
-                self.blocksize,
+        return torch.ops.torch_ipex.mm_low_bits(
+                input, self.weight, self.scales, self.qzeros, self.bias, self.bias is not None, self.compute_dtype, self.weight_dtype, self.blocksize
             )
 
     def init_weights_bias(self, weight_data, bias=None):

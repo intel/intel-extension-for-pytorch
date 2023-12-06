@@ -310,6 +310,63 @@ static Tensor mm_bias_resadd_resadd_int4(
   return resize_as_mat1(input_, output);
 }
 
+static Tensor mm_low_bits_arc(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    bool has_bias,
+    const std::string& compute_dtype,
+    const std::string& weight_dtype,
+    int64_t calib_gz) {
+  auto input_flat = input.flatten(0, -2);
+  auto weight_flat = weight.flatten(0, -2);
+
+  int m = input_flat.sizes()[0];
+  int k = input_flat.sizes()[1];
+  int n = weight.sizes()[1] * 2;
+  auto output = at::empty({m, n}, input.options());
+
+  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
+  // TODO: add implementation for mm_low_bits on arc
+
+  return output;
+}
+
+static Tensor mm_low_bits(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    const Tensor& bias,
+    bool has_bias,
+    const std::string& compute_dtype,
+    const std::string& weight_dtype,
+    int64_t calib_gz) {
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
+  if (fp64_valid) {
+    // on PVC
+    return has_bias
+        ? mm_bias_int4(input, weight, bias, weight_scl, weight_zp, calib_gz)
+        : mm_int4(input, weight, weight_scl, weight_zp, calib_gz);
+  } else {
+    // on ATS-M or arc
+    return mm_low_bits_arc(
+        input,
+        weight,
+        bias,
+        weight_scl,
+        weight_zp,
+        has_bias,
+        compute_dtype,
+        weight_dtype,
+        calib_gz);
+  }
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
@@ -327,6 +384,7 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER(
       "mm_bias_resadd_resadd_int4.xpu",
       at::AtenIpexTypeXPU::mm_bias_resadd_resadd_int4);
+  IPEX_OP_REGISTER("mm_low_bits.xpu", at::AtenIpexTypeXPU::mm_low_bits);
 }
 } // namespace
 #endif
