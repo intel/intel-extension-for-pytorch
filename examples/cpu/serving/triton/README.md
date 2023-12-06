@@ -28,6 +28,8 @@ To build, start Docker containers, run tests, stop and do cleanup on localhost e
 `$ sudo bash stop.sh`  - stops Docker containers for Triton Server Client and Host for model, and removes temporary files. 
 
 ### Execution on two separate instances
+
+##### DISCLAIMER: This deployment is designed to be carried out on two distinct machines.
 Make sure that IP address for Triton Server Host instance is provided in config.properties on instance with Triton Server Client.
 
 Scripts to run on client Triton Server Host instance:
