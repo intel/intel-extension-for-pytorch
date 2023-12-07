@@ -1,13 +1,13 @@
-Float8 datatype support [GPU] (Experimental)
+Float8 Data Type Support [GPU] (Experimental)
 ============================================
 
-## Float8 DataType
+## Float8 Data Type
 
-Float8 (FP8) is 8-bit floating point which is used to reduce memory footprint, improve the computation efficiency and save power in Deep Learning domain.
+Float8 (FP8) is a 8-bit floating point data type, which is used to reduce memory footprint, improve the computation efficiency and save power in Deep Learning domain.
 
 Two formats are used in FP8 training and inference, in order to meet the required value range and precision of activation, weight and gradient in Deep Neural Network (DNN). One is E4M3 (sign-exponent-mantissa) for activation and weight, the other is E5M2 for gradients. These two formats are defined in [FP8 FORMATS FOR DEEP LEARNING](https://arxiv.org/pdf/2209.05433.pdf).
 
-FP8 data type is used for memory storage only in current stage. It will be converted to BFloat16 data type for computation.
+FP8 data type is used for memory storage only in current stage. It will be converted to the BFloat16 data type for computation.
 
 ## FP8 Quantization
 
@@ -15,7 +15,7 @@ On GPU, online Dynamic Quantization is used for FP8 data compression and decompr
 
 ## Supported running mode
 
-Both DNN Training and Inference are supported with FP8 data type.
+Both DNN Training and Inference are supported with the FP8 data type.
 
 ## Supported operators
 

@@ -3,7 +3,7 @@ Kineto Supported Profiler Tool (Experimental)
 
 ## Introduction
 
-The Kineto supported profiler tool is an extension of PyTorch\* profiler for profiling operators' executing time cost on GPU devices. With this tool, users can get information in many fields of the run models or code scripts. User should build Intel® Extension for PyTorch\* with Kineto support as default and enable this tool by a `with` statement before the code segment.
+The Kineto supported profiler tool is an extension of PyTorch\* profiler for profiling operators' executing time cost on GPU devices. With this tool, you can get information in many fields of the run models or code scripts. Build Intel® Extension for PyTorch\* with Kineto support as default and enable this tool using the `with` statement before the code segment.
 
 ## Use Case
 
@@ -11,7 +11,7 @@ To use the Kineto supported profiler tool, you need to build Intel® Extension f
 
 ### Build Tool
 
-The build option `USE_KINETO` is switched on as default but you can switch it off via setting `USE_KINETO=OFF` while building Intel® Extension for PyTorch\* from source. Besides, an affiliated build option `USE_ONETRACE` will be automatically switched on following the build option `USE_KINETO`. With `USE_KINETO=OFF`, no Kineto related profiler code will be compiled and all python scripts using Kineto supported profiler with XPU backend will not work. In this case, you can still keep using profiler on CPU backend.
+The build option `USE_KINETO` is switched on by default but you can switch it off via setting `USE_KINETO=OFF` while building Intel® Extension for PyTorch\* from source. Besides, an affiliated build option `USE_ONETRACE` will be automatically switched on following the build option `USE_KINETO`. With `USE_KINETO=OFF`, no Kineto related profiler code will be compiled and all python scripts using Kineto supported profiler with XPU backend will not work. In this case, you can still keep using profiler on CPU backend.
 
 Some affiliated build options are defined for choosing different tracing tools. Currently, only onetrace tool is supported. Configure `USE_KINETO=ON` and `USE_ONETRACE=OFF` will not enable Kineto support in Intel® Extension for PyTorch\* on GPU.
 

@@ -1,9 +1,9 @@
-Intel® Extension for PyTorch\* optimizations for quantization [GPU]
+Intel® Extension for PyTorch\* Optimizations for Quantization [GPU]
 ===================================================================
 
-Intel® Extension for PyTorch\* currently supports imperative mode and TorchScript mode for post-training static quantization on GPU. This tutorial illustrates the work flow of quantization on Intel GPUs.
+Intel® Extension for PyTorch\* currently supports imperative mode and TorchScript mode for post-training static quantization on GPU. This section illustrates the quantization workflow on Intel GPUs.
 
-The overall view is that our usage follows the API defined in official PyTorch. Therefore, only small modification like moving model and data to GPU with to('xpu') is required. We highly recommend using the TorchScript for quantizing models. With graph model created via TorchScript, optimization like operator fusion (e.g. `conv_relu`) would be enabled automatically. This would deliver the best performance for int8 workloads.
+The overall view is that our usage follows the API defined in official PyTorch. Therefore, only small modification like moving model and data to GPU with `to('xpu')` is required. We highly recommend using the TorchScript for quantizing models. With graph model created via TorchScript, optimization like operator fusion (e.g. `conv_relu`) is enabled automatically. This delivers the best performance for int8 workloads.
 
 ## Imperative Mode
 ```python
@@ -91,11 +91,11 @@ modelJit(inference_data)
 print(modelJit.graph_for(inference_dta))
 ```
 
-We need define QConfig for TorchScript module, use `prepare_jit` for inserting observer and use `convert_jit` for replacing FP32 modules.
+We need to define `QConfig`` for TorchScript module, use `prepare_jit` for inserting observer and use `convert_jit` for replacing FP32 modules.
 
 Before `prepare_jit`, create a ScriptModule using `torch.jit.script` or `torch.jit.trace`. `jit.trace` is recommended for capable of catching the whole graph in most scenarios.
 
-Fusion ops like conv_unary, conv_binary, linear_unary (e.g. `conv_relu`, `conv_sum_relu`) are automatically enabled after model conversion (`convert_jit`). A warmup stage is required for bringing the fusion into effect. With the benefit from fusion, ScriptModule can deliver better performance than eager mode. Hence, we recommend using ScriptModule as for performance consideration.
+Fusion operations like `conv_unary`, `conv_binary`, `linear_unary` (e.g. `conv_relu`, `conv_sum_relu`) are automatically enabled after model conversion (`convert_jit`). A warmup stage is required for bringing the fusion into effect. With the benefit from fusion, ScriptModule can deliver better performance than eager mode. Hence, we recommend using ScriptModule as for performance consideration.
 
 `modelJit.graph_for(input)` is useful to dump the inference graph and other graph related information for performance analysis.
 

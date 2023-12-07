@@ -3,14 +3,14 @@ Fully Sharded Data Parallel (FSDP)
 
 ## Introduction
 
-`Fully Sharded Data Parallel (FSDP)` is a PyTorch\* module that provide industry-grade solution for large model training. FSDP is a type of data parallel training, unlike DDP, where each process/worker maintains a replica of the model, FSDP shards model parameters, optimizer states and gradients across DDP ranks to reduce the GPU memory footprint used in training, this makes the training of some large-scale models feasible. Please refer to [FSDP Tutorial](https://pytorch.org/tutorials/intermediate/FSDP_tutorial.html) for an introduction to FSDP.
+`Fully Sharded Data Parallel (FSDP)` is a PyTorch\* module that provides industry-grade solution for large model training. FSDP is a type of data parallel training, unlike DDP, where each process/worker maintains a replica of the model, FSDP shards model parameters, optimizer states and gradients across DDP ranks to reduce the GPU memory footprint used in training. This makes the training of some large-scale models feasible. Please refer to [FSDP Tutorial](https://pytorch.org/tutorials/intermediate/FSDP_tutorial.html) for an introduction to FSDP.
 
-To run FSDP on GPU, similar to DDP, we use Intel® oneCCL Bindings for Pytorch\* (formerly known as torch-ccl) to implement the PyTorch c10d ProcessGroup API (https://github.com/intel/torch-ccl). It holds PyTorch bindings maintained by Intel for the Intel® oneAPI Collective Communications Library\* (oneCCL), a library for efficient distributed deep learning training implementing collectives as `AllGather`, `ReduceScatter` etc. needed by FSDP. Refer to [oneCCL Github page](https://github.com/oneapi-src/oneCCL) for more information about oneCCL.
-The Installation steps of Intel® oneCCL Bindings for Pytorch\* follows the same steps as DDP. 
+To run FSDP on GPU, similar to DDP, we use Intel® oneCCL Bindings for Pytorch\* (formerly known as torch-ccl) to implement the PyTorch c10d ProcessGroup API (https://github.com/intel/torch-ccl). It holds PyTorch bindings maintained by Intel for the Intel® oneAPI Collective Communications Library\* (oneCCL), a library for efficient distributed deep learning training implementing collectives such as `AllGather`, `ReduceScatter`, and other needed by FSDP. Refer to [oneCCL Github page](https://github.com/oneapi-src/oneCCL) for more information about oneCCL.
+To install Intel® oneCCL Bindings for Pytorch\*, follow the same installation steps as for DDP. 
 
 ## FSDP Usage (GPU only)
 
-FSDP follows its usage in PyTorch. To use FSDP with Intel® Extension for PyTorch\*, make the following modifications to your model script:
+FSDP is designed to align with PyTorch conventions. To use FSDP with Intel® Extension for PyTorch\*, make the following modifications to your model script:
 
 1. Import the necessary packages.
 ```python
@@ -25,7 +25,7 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 dist.init_process_group(backend='ccl')
 ``` 
 
-3. For FSDP with each process exclusively works on a single GPU, set the device ID as `local rank`.
+3. For FSDP with each process exclusively working on a single GPU, set the device ID as `local rank`.
 ```python
 torch.xpu.set_device("xpu:{}".format(rank))
 # or
@@ -39,13 +39,13 @@ model = model.to(device)
 model = FSDP(model, device_id=device)
 ```
 
-Note: for FSDP with XPU, you need to specify `device_ids` with XPU device, otherwise it will trigger the CUDA path and throw error.
+**Note**: for FSDP with XPU, you need to specify `device_ids` with XPU device; otherwise, it will trigger the CUDA path and throw an error.
 
-## Example Usage:
+## Example
 
-Here's an example based on [PyTorch FSDP Tutorial](https://pytorch.org/tutorials/intermediate/FSDP_tutorial.html) to illustrate the usage of FSDP on XPU and the necessary changes from a CUDA case to XPU case.
+Here's an example based on [PyTorch FSDP Tutorial](https://pytorch.org/tutorials/intermediate/FSDP_tutorial.html) to illustrate the usage of FSDP on XPU and the necessary changes to switch from CUDA to an XPU case.
 
-1. Import necessary packages
+1. Import necessary packages:
 
 ```python
 """
@@ -82,7 +82,7 @@ from torch.distributed.fsdp.wrap import (
 )
 ```
 
-2. Distributed training setup
+2. Set up distributed training:
 
 ```python
 """
@@ -99,7 +99,7 @@ def cleanup():
     dist.destroy_process_group()
 ```
 
-3. Define the toy model for handwritten digit classification.
+3. Define the toy model for handwritten digit classification:
 
 ```python
 class Net(nn.Module):
@@ -129,7 +129,7 @@ class Net(nn.Module):
         return output
 ```
 
-4. Define a train function
+4. Define a training function:
 
 ```python
 """
@@ -156,7 +156,7 @@ def train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler
         print('Train Epoch: {} \tLoss: {:.6f}'.format(epoch, ddp_loss[0] / ddp_loss[1]))
 ```
 
-5. Define a validation function
+5. Define a validation function:
 
 ```python
 """
@@ -185,7 +185,7 @@ def test(model, rank, world_size, test_loader):
             100. * ddp_loss[1] / ddp_loss[2]))
 ```
 
-6. Define a distributed train function that wraps the model in FSDP
+6. Define a distributed training function that wraps the model in FSDP:
 
 ```python
 """
@@ -256,7 +256,7 @@ def fsdp_main(rank, world_size, args):
     cleanup()
 ```
 
-7. Finally parse the arguments and set the main function
+7. Finally, parse the arguments and set the main function:
 
 ```python
 """
@@ -292,9 +292,7 @@ if __name__ == '__main__':
         join=True)
 ```
 
-8. Running command
-
-Put the above code snippets to a python script “FSDP_mnist_xpu.py”, and run:
+8. Put the above code snippets to a python script `FSDP_mnist_xpu.py`, and run:
 
 ```bash
 python FSDP_mnist_xpu.py

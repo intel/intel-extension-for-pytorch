@@ -1,9 +1,9 @@
-INT4 inference [GPU] (Experimentatal)
+INT4 inference [GPU] (Experimental)
 =====================================
 
-## INT4 DataType
+## INT4 Data Type
 
-INT4 is 4-bit fixed point which is used to reduce memory footprint, improve the computation efficiency and save power in Deep Learning domain.
+INT4 is a 4-bit fixed point data type, which is used to reduce memory footprint, improve the computation efficiency, and save power in Deep Learning domain.
 
 INT4 data type is being used in weight only quantization in current stage. It will be converted to Float16 data type for computation.
 
