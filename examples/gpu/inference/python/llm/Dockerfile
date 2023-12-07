@@ -27,8 +27,7 @@ RUN apt update && \
     gnupg \
     gpg-agent
 COPY ./tools/basekit_driver_install_helper.sh .
-RUN bash ./basekit_driver_install_helper.sh add-apt-repo && \
-    bash ./basekit_driver_install_helper.sh driver
+RUN bash ./basekit_driver_install_helper.sh driver
 
 ARG GID_RENDER=109
 RUN useradd -m -s /bin/bash ubuntu && \
@@ -52,7 +51,7 @@ RUN . ./miniconda3/bin/activate && \
     conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
     cd intel-extension-for-pytorch/examples/gpu/inference/python/llm && \
     if [ -z ${COMPILE} ]; then MODE=6; else MODE=2; fi && \
-    bash tools/env_setup.sh ${MODE} /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest pvc,ats-m150,acm-g11
+    bash tools/env_setup.sh ${MODE} /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest /opt/intel/oneapi/ccl/latest pvc,ats-m150,acm-g11
 
 FROM base AS deploy
 RUN bash /basekit_driver_install_helper.sh runtime && \

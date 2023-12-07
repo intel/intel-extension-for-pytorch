@@ -25,8 +25,8 @@ function ver_compare() {
     echo ${RET}
 }
 
-LIBSTDCPP_ACTIVE=""
 LIBSTDCPP_SYS=$(find /usr -regextype sed -regex ".*libstdc++\.so\.[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*")
+LIBSTDCPP_ACTIVE=${LIBSTDCPP_SYS}
 if [ ! -z ${CONDA_PREFIX} ]; then
     LIBSTDCPP_CONDA=$(find ${CONDA_PREFIX}/lib -regextype sed -regex ".*libstdc++\.so\.[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*")
     LIBSTDCPP_VER_SYS=$(echo ${LIBSTDCPP_SYS} | sed "s/.*libstdc++.so.//")

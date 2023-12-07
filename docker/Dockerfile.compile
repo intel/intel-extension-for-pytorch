@@ -27,8 +27,7 @@ RUN apt update && \
     gnupg \
     gpg-agent
 COPY ./tools/basekit_driver_install_helper.sh .
-RUN bash ./basekit_driver_install_helper.sh add-apt-repo && \
-    bash ./basekit_driver_install_helper.sh driver
+RUN bash ./basekit_driver_install_helper.sh driver
 
 ARG GID_RENDER=109
 RUN useradd -m -s /bin/bash ubuntu && \

@@ -14,11 +14,12 @@ set -e
 MODE=0x03
 DPCPP_ROOT=
 ONEMKL_ROOT=
+ONECCL_ROOT=
 AOT=
 if [[ $# -eq 0 ]]; then
-    echo "Usage: bash $0 <MODE> [DPCPPROOT] [MKLROOT] [AOT]"
+    echo "Usage: bash $0 <MODE> [DPCPPROOT] [MKLROOT] [CCLROOT] [AOT]"
     echo "Set MODE to 7 to install from wheel files. Set it to 3 to compile from source. When compiling from source, you need to set arguments below."
-    echo "DPCPPROOT, MKLROOT should be absolute or relative path to the root directory of DPC++ compiler, oneMKL in oneAPI Base Toolkit respectively."
+    echo "DPCPPROOT, MKLROOT and CCLROOT should be absolute or relative path to the root directory of DPC++ compiler, oneMKL and oneCCL in oneAPI Base Toolkit respectively."
     echo "AOT should be set to the text string for environment variable USE_AOT_DEVLIST. Setting it to \"none\" to disable AOT."
     exit 1
 fi
@@ -38,6 +39,10 @@ if [[ $# -gt 0 ]]; then
     shift
 fi
 if [[ $# -gt 0 ]]; then
+    ONECCL_ROOT=$1
+    shift
+fi
+if [[ $# -gt 0 ]]; then
     AOT=$1
     shift
 fi
@@ -52,37 +57,26 @@ if [ ! -f ${WHEELFOLDER}/transformers*.whl ] ||
    [ ! -f ${WHEELFOLDER}/deepspeed*.whl ] ||
    [ ! -f ${WHEELFOLDER}/intel_extension_for_deepspeed*.whl ]; then
     (( MODE |= 0x02 ))
+    echo "Expected wheel files are not found. Swith to source code compilation."
 fi
 
 if [ $((${MODE} & 0x06)) -eq 2 ] &&
    ([ -z ${DPCPP_ROOT} ] ||
    [ -z ${ONEMKL_ROOT} ] ||
+   [ -z ${ONECCL_ROOT} ] ||
    [ -z ${AOT} ]); then
-    echo "Source code compilation is needed. Please set arguments DPCPP_ROOT, ONEMKL_ROOT and AOT."
-    echo "DPCPPROOT, MKLROOT should be absolute or relative path to the root directory of DPC++ compiler, oneMKL in oneAPI Base Toolkit respectively."
+    echo "Source code compilation is needed. Please set arguments DPCPP_ROOT, ONEMKL_ROOT, ONECCL_ROOT and AOT."
+    echo "DPCPPROOT, MKLROOT and CCLROOT should be absolute or relative path to the root directory of DPC++ compiler, oneMKL and oneCCL in oneAPI Base Toolkit respectively."
     echo "AOT should be set to the text string for environment variable USE_AOT_DEVLIST. Setting it to \"none\" to disable AOT."
     exit 2
 fi
 
 # Check existance of required Linux commands
 for CMD in conda; do
-    command -v ${CMD} > /dev/null || (echo "Error: Command \"${CMD}\" is required."; exit 1;)
+    command -v ${CMD} > /dev/null || (echo "Error: Command \"${CMD}\" is required."; exit 3;)
 done
-
-set +e
-command -v gcc > /dev/null
-EXIST_CC=$?
-command -v g++ > /dev/null
-EXIST_CXX=$?
-set -e
-EXIST_COMPILER=$((${EXIST_CC} + ${EXIST_CXX}))
-if [ ${EXIST_COMPILER} -gt 0 ]; then
-    conda install -y sysroot_linux-64
-    conda install -y gcc==12.3.0 gxx==12.3.0 cxx-compiler -c conda-forge
-    export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
-else
-    export LIBRARY_PATH=${CONDA_PREFIX}/lib:${LIBRARY_PATH}
-fi
+export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
+export LIBRARY_PATH=${CONDA_PREFIX}/lib:${LIBRARY_PATH}
 
 if [ $((${MODE} & 0x02)) -ne 0 ]; then
     # Enter IPEX root dir
@@ -90,7 +84,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 
     if [ ! -f dependency_version.yml ]; then
         echo "Please check if `pwd` is a valid Intel® Extension for PyTorch* source code directory."
-        exit 2
+        exit 4
     fi
     python -m pip install pyyaml
     DS_REPO=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k repo)
@@ -114,7 +108,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 
     # Check existance of required Linux commands
     for CMD in git; do
-        command -v ${CMD} > /dev/null || (echo "Error: Command \"${CMD}\" is required."; exit 3;)
+        command -v ${CMD} > /dev/null || (echo "Error: Command \"${CMD}\" is required."; exit 5;)
     done
 
     # Clear previous compilation output
@@ -131,6 +125,12 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         echo "python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/" >> ${AUX_INSTALL_SCRIPT}
         python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
     else
+        if [ ! -f ${ONECCL_ROOT}/env/vars.sh ]; then
+            echo "oneCCL environment ${ONECCL_ROOT} doesn't seem to exist."
+            exit 6
+        fi
+        ONEAPIROOT=${ONEMKL_ROOT}/../..
+
         # Install PyTorch and Intel® Extension for PyTorch*
         cp intel-extension-for-pytorch/scripts/compile_bundle.sh .
         sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
@@ -138,6 +138,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         cp pytorch/dist/*.whl ${WHEELFOLDER}
         cp intel-extension-for-pytorch/dist/*.whl ${WHEELFOLDER}
         rm -rf compile_bundle.sh llvm-project llvm-release pytorch
+        export LD_PRELOAD=$(bash intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh)
 
         # The following is only for DeepSpeed case
         #Install oneccl-bind-pt(also named torch-ccl)
@@ -190,9 +191,15 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         git checkout ${TORCHCCL_COMMIT}
         git submodule sync
         git submodule update --init --recursive
-        export DPCPP_GCC_INSTALL_DIR="${CONDA_PREFIX}/lib/gcc/x86_64-conda-linux-gnu/12.3.0"
+        if [ -d ${CONDA_PREFIX}/lib/gcc/x86_64-conda-linux-gnu ]; then
+            export DPCPP_GCC_INSTALL_DIR="${CONDA_PREFIX}/lib/gcc/x86_64-conda-linux-gnu/12.3.0"
+        fi
+        export INTELONEAPIROOT=${ONEAPIROOT}
         COMPUTE_BACKEND=dpcpp python setup.py bdist_wheel
-        unset DPCPP_GCC_INSTALL_DIR
+        unset INTELONEAPIROOT
+        if [ -d ${CONDA_PREFIX}/lib/gcc/x86_64-conda-linux-gnu ]; then
+            unset DPCPP_GCC_INSTALL_DIR
+        fi
         cp dist/*.whl ${WHEELFOLDER}
         python -m pip install dist/*.whl
         cd ..
@@ -219,7 +226,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     fi
 
     echo "python -m pip install impi-devel" >> ${AUX_INSTALL_SCRIPT}
-    echo "python -m pip install cpuid accelerate datasets sentencepiece protobuf==${VER_PROTOBUF} huggingface_hub mpi4py" >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install cpuid accelerate datasets sentencepiece protobuf==${VER_PROTOBUF} huggingface_hub mpi4py mkl" >> ${AUX_INSTALL_SCRIPT}
 
     # Install Transformers
     if [ -d transformers ]; then
@@ -259,6 +266,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     rm -rf intel-extension-for-deepspeed
 
     cd DeepSpeed
+    python -m pip install mkl
     python setup.py bdist_wheel
     cp dist/*.whl ${WHEELFOLDER}
     cd ..

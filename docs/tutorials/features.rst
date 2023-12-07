@@ -43,14 +43,16 @@ Detailed information of AMP for GPU and CPU are available at `Auto Mixed Precisi
    features/amp_gpu
 
 
-INT8 Quantization
------------------
+Quantization
+------------
 
-Intel® Extension for PyTorch* provides built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models on CPU side. On top of that, if users would like to tune for a higher accuracy than what the default recipe provides, a recipe tuning API powered by Intel® Neural Compressor is provided for users to try.
+Intel® Extension for PyTorch* provides built-in INT8 quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models on CPU side. On top of that, if users would like to tune for a higher accuracy than what the default recipe provides, a recipe tuning API powered by Intel® Neural Compressor is provided for users to try.
 
 Check more detailed information for `INT8 Quantization [CPU] <features/int8_overview.md>`_ and `INT8 recipe tuning API guide (Experimental, *NEW feature in 1.13.0* on CPU) <features/int8_recipe_tuning_api.md>`_ on CPU side.
 
 On Intel® GPUs, quantization usages follow PyTorch default quantization APIs. Check sample codes at `Examples <./examples.html#int8>`_ page.
+
+Intel® Extension for PyTorch* also provides INT4 and FP8 Quantization.  Check more detailed information for `FP8 Quantization <./features/float8.md>`_ and `INT4 Quantization <./features/int4.md>`_ 
 
 .. toctree::
    :hidden:
@@ -58,6 +60,8 @@ On Intel® GPUs, quantization usages follow PyTorch default quantization APIs. C
 
    features/int8_overview
    features/int8_recipe_tuning_api
+   features/int4
+   features/float8
 
 
 Distributed Training

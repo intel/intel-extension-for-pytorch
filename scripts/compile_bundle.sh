@@ -272,6 +272,7 @@ fi
 
 # Set compiler env
 conda install -y gcc==12.3.0 gxx==12.3.0 cxx-compiler -c conda-forge
+export PATH=${CONDA_PREFIX}/bin:${PATH}
 
 #  LLVM
 LLVM_ROOT="$(pwd)/llvm-release"

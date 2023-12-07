@@ -98,6 +98,7 @@ import shutil
 import subprocess
 import sys
 import re
+import yaml
 import errno
 
 
@@ -203,12 +204,20 @@ def get_pytorch_install_dir():
 pytorch_install_dir = get_pytorch_install_dir()
 
 
+def _get_basekit_rt():
+    with open('dependency_version.yml', 'r') as f:
+        result = yaml.load(f.read(), Loader=yaml.FullLoader)
+        return result['basekit']
+
+
 def _build_installation_dependency():
     install_requires = []
     install_requires.append("psutil")
     install_requires.append("numpy")
     install_requires.append("packaging")
     install_requires.append("pydantic")
+    #for key, value in _get_basekit_rt().items():
+    #    install_requires.append(f"{key}=={value['version']}")
     return install_requires
 
 

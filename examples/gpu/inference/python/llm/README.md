@@ -52,9 +52,9 @@ cd llm
 2.b. Alternatively, you can take advantage of a provided environment configuration script to setup an environment without using a docker container.
 
 ```bash
-# GCC 12.3 is required. Installation can be taken care of by the environment configuration script.
+# Make sure you have GCC >= 11 is installed on your system.
 # Create a conda environment
-conda create -n llm python=3.9 -y
+conda create -n llm python=3.10 -y
 conda activate llm
 
 # Setup the environment with the provided script
@@ -64,6 +64,7 @@ bash ./tools/env_setup.sh 7
 # If you want to install Intel® Extension for PyTorch\* from source, use the commands below:
 bash ./tools/env_setup.sh 3 <DPCPP_ROOT> <ONEMKL_ROOT> <AOT>
 export LD_PRELOAD=$(bash ../../../../../tools/get_libstdcpp_lib.sh)
+export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
 ```
 
 \* `DPCPP_ROOT` is the placeholder for path where DPC++ compile was installed to. By default, it is `/opt/intel/oneapi/compiler/latest`.<br />
@@ -73,10 +74,6 @@ export LD_PRELOAD=$(bash ../../../../../tools/get_libstdcpp_lib.sh)
 3. Once an environment is configured with either method above, set necessary environment variables with an environment variables activation script.
 
 ```bash
-# If you use docker images built from the provided Dockerfile, you do NOT need to run the following 2 commands.
-source <DPCPP_ROOT>/env/vars.sh
-source <ONEMKL_ROOT>/env/vars.sh
-
 # Activate environment variables
 source ./tools/env_activate.sh
 ```
@@ -97,9 +94,11 @@ bash run_benchmark.sh
 
 ### Single Instance Performance
 
+Note: We only support LLM optimizations with datatype float16, so please don't change datatype to float32 or bfloat16.
+
 ```bash
 # fp16 benchmark
-python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
+python -u run_generation.py --benchmark -m ${model} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
 ```
 
 Notes:
@@ -117,7 +116,7 @@ bash run_benchmark_ds.sh
 # distributed env setting
 source ${ONECCL_DIR}/build/_install/env/setvars.sh
 # fp16 benchmark
-mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
+mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
 ```
 
 Notes:
@@ -140,14 +139,14 @@ download link: https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneou
 export weight_path = path-to-your-weight
 
 ## (2) Run quantization performance test
-python -u run_generation.py --device xpu --ipex --dtype float16 --input-tokens ${input} --max-new-tokens ${out}  --token-latency --benchmark  --num-beams ${beam}  -m ${model} --sub-model-name ${sub_model_name}  --woq --woq_checkpoint_path ${weight_path}
+python -u run_generation.py --device xpu --ipex --dtype float16 --input-tokens ${input} --max-new-tokens ${out}  --token-latency --benchmark  --num-beams ${beam}  -m ${model} --woq --woq_checkpoint_path ${weight_path}
 ```
 
 ### Single Instance GPT-J Weight only quantization INT4 Accuracy
 
 ```bash
 # we use "lambada_standard" task to check accuracy
-LLM_ACC_TEST=1 python -u run_generation.py -m ${model} --sub-model-name ${sub_model_name} --ipex --dtype float16 --accuracy-only --acc-tasks ${task} --woq --woq_checkpoint_path ${weight_path}
+LLM_ACC_TEST=1 python -u run_generation.py -m ${model} --ipex --dtype float16 --accuracy-only --acc-tasks ${task} --woq --woq_checkpoint_path ${weight_path}
 ```
 
 ## Single Instance Accuracy
@@ -159,7 +158,7 @@ Accuracy test {TASK_NAME}, choice in this [link](https://github.com/EleutherAI/l
 bash run_accuracy.sh
 
 # float16
-LLM_ACC_TEST=1 python -u run_generation.py -m ${model} --sub-model-name ${sub_model_name} --ipex --dtype float16 --accuracy-only --acc-tasks ${task}
+LLM_ACC_TEST=1 python -u run_generation.py -m ${model} --ipex --dtype float16 --accuracy-only --acc-tasks ${task}
 ```
 
 ## Distributed Accuracy with DeepSpeed
@@ -172,5 +171,5 @@ source ${ONECCL_DIR}/build/_install/env/setvars.sh
 bash run_accuracy_ds.sh
 
 # float16
-LLM_ACC_TEST=1 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py -m ${model} --sub-model-name ${sub_model_name} --ipex --dtype float16 --accuracy-only --acc-tasks ${task} 2>&1
+LLM_ACC_TEST=1 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py -m ${model} --ipex --dtype float16 --accuracy-only --acc-tasks ${task} 2>&1
 ```

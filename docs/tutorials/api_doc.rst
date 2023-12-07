@@ -6,6 +6,7 @@ Device-Agnostic
 
 .. currentmodule:: intel_extension_for_pytorch
 .. autofunction:: optimize
+.. autofunction:: optimize_transformers
 .. autofunction:: get_fp32_math_mode
 .. autofunction:: set_fp32_math_mode
 .. autoclass:: verbose
@@ -39,6 +40,8 @@ Miscellaneous
 .. set_stream
 .. autofunction:: stream
 .. autofunction:: synchronize
+.. autofunction:: quantization._gptq
+.. autofunction:: fp8_autocast
 
 Random Number Generator
 =======================

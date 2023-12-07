@@ -4,17 +4,17 @@ gcc:
 llvm:
   version: 16.0.6
 pytorch:
-  version: 2.0.1a0
+  version: 2.1.0a0
   commit: v2.1.0
 torchaudio:
-  version: 2.0.1a0
+  version: 2.1.0a0
   commit: v2.1.0
 torchvision:
   version: 0.16.0a0
   commit: v0.16.0
 torch-ccl:
   repo: https://github.com/intel/torch-ccl.git
-  commit: c8f89db1639558c1149c4d0eecf90c980064f609
+  commit: 5f20135ccf8f828738cb3bc5a5ae7816df8100ae
   version: 2.1.100+xpu
 deepspeed:
   repo: https://github.com/microsoft/DeepSpeed.git
@@ -28,3 +28,8 @@ transformers:
   commit: v4.31.0
 protobuf:
   version: 3.20.3
+basekit:
+  dpcpp-cpp-rt:
+    version: 2024.0.0
+  mkl-dpcpp:
+    version: 2024.0.0
