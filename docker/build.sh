@@ -21,7 +21,7 @@ if [[ ${IMAGE_NAME} != "" ]]; then
                  --build-arg TORCH_WHL_URL=https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ \
                  --build-arg IPEX_WHL_URL=https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ \
                  --build-arg TORCHVISION_WHL_URL=https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ \
-                 --build-arg CCL_VER=2021.11.0-49156 \
+                 --build-arg CCL_VER=2021.11.1-6 \
                  --build-arg ONECCL_BIND_PT_VERSION=2.1.100 \
                  --build-arg ONECCL_BIND_PT_WHL_URL=https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ \
                  -t ${IMAGE_NAME} \
