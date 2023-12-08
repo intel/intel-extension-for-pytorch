@@ -263,23 +263,7 @@ at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
       w_k,
       " respectively.");
   auto input_ = input.contiguous();
-  if (context.weight_shape_[0] != context.at_weight_.size(0)) {
-    auto res = woq_linear_kernel(
-        input_,
-        context.at_weight_,
-        context.scales_list_,
-        context.zero_points_list_,
-        context.bias_list_,
-        context.is_int4_,
-        context.group_size_,
-        context.lowp_mode_,
-        context.num_concats_,
-        context.act_quant_mode_);
-    // weight shape is [N by K], output shape is [M by N] or [batch by M by N]
-    int64_t N = context.weight_shape_[0];
-    return at::narrow(res, /*dim*/ -1, /*start*/ 0, /*end*/ N);
-  }
-  return woq_linear_kernel(
+  auto res = woq_linear_kernel(
       input_,
       context.at_weight_,
       context.scales_list_,
@@ -290,6 +274,11 @@ at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
       context.lowp_mode_,
       context.num_concats_,
       context.act_quant_mode_);
+  if (res.size(-1) != context.weight_shape_[0]) {
+    int64_t N = context.weight_shape_[0];
+    return at::narrow(res, /*dim*/ -1, /*start*/ 0, /*end*/ N);
+  }
+  return res;
 }
 
 // Called by IpexWoqLinearOpContext::run_eltwise
