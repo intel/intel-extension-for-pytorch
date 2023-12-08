@@ -22,7 +22,7 @@ python -m pip install intel_extension_for_pytorch
 ```
 
 ```python
-python -m pip install intel_extension_for_pytorch -f https://developer.intel.com/ipex-whl-stable-cpu
+python -m pip install intel_extension_for_pytorch --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
 ```
 
 **Note:** Intel® Extension for PyTorch\* has PyTorch version requirement. Please check more detailed information via the URL below.
@@ -36,7 +36,7 @@ Compilation instruction of the latest CPU code base `main` branch can be found a
 You can install Intel® Extension for PyTorch\* for GPU via command below.
 
 ```python
-python -m pip install torch==2.0.1a0 torchvision==0.15.2a0 intel_extension_for_pytorch==2.0.110+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
+python -m pip install torch==2.0.1a0 torchvision==0.15.2a0 intel_extension_for_pytorch==2.0.110+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 ```
 
 **Note:** The patched PyTorch 2.0.1a0 is required to work with Intel® Extension for PyTorch\* on Intel® graphics card for now.
@@ -89,9 +89,9 @@ with torch.no_grad():
   model(data)
 ```
 
-## Model Zoo
+## Intel® AI Reference Models
 
-Use cases that had already been optimized by Intel engineers are available at [Model Zoo for Intel® Architecture](https://github.com/IntelAI/models/tree/pytorch-r2.1-models). A bunch of PyTorch use cases for benchmarking are also available on the [Github page](https://github.com/IntelAI/models/tree/pytorch-r2.1-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running scipts in the Model Zoo.
+Use cases that had already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/pytorch-r2.1.100-models) (former Model Zoo). A bunch of PyTorch use cases for benchmarking are also available on the [Github page](https://github.com/IntelAI/models/tree/pytorch-r2.1.100-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running scipts in the Model Zoo.
 
 ## License
 

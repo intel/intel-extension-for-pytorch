@@ -215,6 +215,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     cd ../..
     cp -r oneCCL/build/_install ${CCLFOLDER}
     rm -rf oneCCL
+    cd intel-extension-for-pytorch/examples/cpu/inference/python/llm
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
     conda install -y mkl
@@ -222,4 +223,9 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     bash ${AUX_INSTALL_SCRIPT}
     python -m pip install ${WHEELFOLDER}/*.whl
     rm -rf ${WHEELFOLDER}
+    wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
+    cd single_instance
+    ln -s ../prompt.json
+    cd ../distributed
+    ln -s ../prompt.json
 fi
