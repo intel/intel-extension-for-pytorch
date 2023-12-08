@@ -494,8 +494,11 @@ class FakeTensorTest(TestCase):
                 proj_size = 2
                 num_layers = 2
                 bidir = False
-                D = 2 if bidir else 1
-                H_out = proj_size if proj_size > 0 else hidden_size
+                # Security Scan: bidir must be False, proj_size must > 0 (as 2)
+                # D = 2 if bidir else 1
+                # H_out = proj_size if proj_size > 0 else hidden_size
+                D = 1
+                H_out = proj_size
 
                 lstm = torch.nn.LSTM(input_size=H_in, hidden_size=hidden_size,
                                      num_layers=num_layers, proj_size=proj_size, batch_first=False,

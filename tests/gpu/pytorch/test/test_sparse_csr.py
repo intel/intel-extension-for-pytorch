@@ -1672,7 +1672,9 @@ class TestSparseCSR(TestCase):
             else:
                 a = self.genSparseCSRTensor((m, k), nnz, dtype=dtype, device=device, index_dtype=index_dtype)
                 a_data = make_tensor((nnz, block_size, block_size), dtype=dtype, device=device)
-                a_data = a_data.mT if noncontiguous else a_data   # Test column-major blocks
+                # Security Scan: in this branch noncontiguous must be True
+                # a_data = a_data.mT if noncontiguous else a_data   # Test column-major blocks
+                a_data = a_data.mT
                 a = torch.sparse_bsr_tensor(a.crow_indices(), a.col_indices(),
                                             a_data, (m * block_size, k * block_size), check_invariants=False)
             b = make_tensor((k * block_size,), dtype=dtype, device=device, noncontiguous=noncontiguous)

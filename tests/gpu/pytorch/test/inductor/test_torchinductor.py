@@ -1804,29 +1804,29 @@ class CommonTemplate:
     def test_mixed_mm(self):
         def fn(a, b):
             return torch.mm(a, b.to(a.dtype))
-            self.common(
-                fn,
-                (
-                    torch.randn(8, 8),
-                    torch.randint(-128, 127, (8, 8), dtype=torch.int8),
-                ),
-                check_lowp=True,
-            )
+        self.common(
+            fn,
+            (
+                torch.randn(8, 8),
+                torch.randint(-128, 127, (8, 8), dtype=torch.int8),
+            ),
+            check_lowp=True,
+        )
 
     @config.patch(force_mixed_mm=True)
     def test_mixed_mm2(self):
         def fn(a, b, scale, bias):
             return torch.mm(a, b.to(a.dtype)) * scale + bias
-            self.common(
-                fn,
-                (
-                    torch.randn(8, 8),
-                    torch.randint(-128, 127, (8, 8), dtype=torch.int8),
-                    torch.randn(8),
-                    torch.randn(8),
-                ),
-                check_lowp=True,
-            )
+        self.common(
+            fn,
+            (
+                torch.randn(8, 8),
+                torch.randint(-128, 127, (8, 8), dtype=torch.int8),
+                torch.randn(8),
+                torch.randn(8),
+            ),
+            check_lowp=True,
+        )
 
     @config.patch(use_mixed_mm=True)
     def test_uint4x2_mixed_mm(self):
@@ -1839,14 +1839,14 @@ class CommonTemplate:
                 .sub(8),
             )
 
-            self.common(
-                fn,
-                (
-                    torch.randn(8, 8),
-                    torch.randint(0, 255, (4, 8), dtype=torch.uint8),
-                ),
-                check_lowp=True,
-            )
+        self.common(
+            fn,
+            (
+                torch.randn(8, 8),
+                torch.randint(0, 255, (4, 8), dtype=torch.uint8),
+            ),
+            check_lowp=True,
+        )
 
     def test_scalar_input(self):
         def fn(x, y):
@@ -6265,7 +6265,7 @@ class CommonTemplate:
         def fn(a, b):
             r = 1 / math.sqrt(a.size(1))
             return torch.bmm(a, b) / r
-            return (r,)
+            # return (r,)
 
         self.common(
             fn,

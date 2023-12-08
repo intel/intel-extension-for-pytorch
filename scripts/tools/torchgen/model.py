@@ -1244,7 +1244,9 @@ class BackendIndex:
             f = self.primary(g)
         else:
             assert_never(g)
-        if f and f.func.name not in self.index:
+        assert f is not None, \
+            f"NoneTypeError: Cannot get funcion from {type(g).__name__}"
+        if f.func.name not in self.index:
             return None
         return self.index[f.func.name]
 
