@@ -286,6 +286,43 @@ $(document).ready(function() {
               components.push(value.name + " (Placeholder <cite>" + value.placeholder + "</cite> as its installation path)");
             });
             ret += $.ul_gen(components);
+
+            if(data.os == "Linux/WSL2") {
+              var linux_dist = [];
+              $.each(data.preparation.basekit.install, function(index0, value0) {
+                if(value0.package != null && value0.package[data.os] != null) {
+                  $.each(Object.keys(value0.package[data.os]), function(index1, value1) {
+                    if(!$.pkgInArray(value1, linux_dist)) {
+                      linux_dist.push(value1);
+                    }
+                  });
+                }
+              });
+              if(linux_dist.length > 0) {
+                ret += "<p>Recommend to use a package manager like apt, yum or dnf to install the packages above. Follow instructions at <a href=\"https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html?operatingsystem=linux\">Intel® oneAPI Base Toolkit Download page</a> to setup the package manager repository.</p>";
+                ret += "<p>Take reference to commands below to install the packages on individual Linux distributions.</p>";
+                $.each(linux_dist, function(index0, value0) {
+                  var packages = [];
+                  $.each(data.preparation.basekit.install, function(index1, value1) {
+                    if(value1.package != null && value1.package[data.os] != null && value1.package[data.os][value0] != null) {
+                      packages.push(value1.package[data.os][value0]);
+                    }
+                  });
+                  if(packages.length > 0) {
+                    ret += "<p>* " + value0 + "</p>";
+                    var command = "";
+                    if(value0 == "Ubuntu")
+                      command += "sudo apt install -y ";
+                    if(value0 == "RHEL")
+                      command += "sudo dnf install -y ";
+                    if(value0 == "SUSE")
+                      command += "sudo zypper install -y --oldpackage ";
+                    command += packages.join(" ");
+                    ret += $.code_gen([command]);
+                  }
+                });
+              }
+            }
           }
           ret += "</div>";
           indexb += 1;
@@ -380,7 +417,14 @@ $(document).ready(function() {
             indexc += 1;
           }
           ret += "<h3>" + secid + "Build Docker Image</h3>";
-          $.each(data.installation.build, function(index, value) {
+          $.each(Object.keys(data.installation.build), function(index, key) {
+            if(key == "prebuilt") {
+              ret += "<h4>* Install from prebuilt wheel files</h4>";
+            }
+            if(key == "compile") {
+              ret += "<h4>* Compile from source</h4>";
+            }
+            value = data.installation.build[key];
             if(value.desc != null)
               ret += "<p>" + value.desc + "</p>";
             if(value.commands != null)
@@ -396,7 +440,9 @@ $(document).ready(function() {
             indexc += 1;
           }
           ret += "<h3>" + secid + "Pull Docker Image</h3>";
-          $.each(data.installation.images, function(index, value) {
+          $.each(Object.keys(data.installation.images), function(index, key) {
+            ret += "<h4>* " + key + "</h4>";
+            value = data.installation.images[key];
             if(value.desc != null)
               ret += "<p>" + value.desc + "</p>";
             if(value.commands != null)
@@ -406,7 +452,9 @@ $(document).ready(function() {
         indexb += 1;
         if(data.installation.run != null) {
           ret += "<h3>" + $.secid_gen([indexa, indexb]) + "Run Docker Image</h3>";
-          ret += $.code_gen(data.installation.run);
+          if(data.installation.run.desc != null)
+            ret += "<p>" + data.installation.run.desc + "</p>";
+          ret += $.code_gen(data.installation.run.commands);
         }
       } else if(data.package == "cppsdk") {
         if(data.installation.files != null) {
