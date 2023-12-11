@@ -635,20 +635,30 @@ def meta_rotary_position_embedding(
     offset,
     rotary_ndims,
 ):
-    return t_in
-
-
-@register_meta("rotary_position_embedding_out")
-def meta_rotary_position_embedding_out(
-    t_in,
-    t_emb_pos,
-    t_pos,
-    N,
-    H,
-    offset,
-    rotary_ndims,
-):
-    return t_in.new_empty(t_in.shape)
+    ndims = t_in.dim()
+    stride_s = t_in.stride(1)
+    batch = t_in.shape[0]
+    seq_len = t_in.shape[1]
+    concat_qkv = False
+    if ndims == 3 and stride_s > N * H:
+        concat_qkv = True
+        kv_head = (t_in.shape[2] - N * H) // (2 * H)
+    if not concat_qkv:
+        return (
+            t_in.new_empty(t_in.shape).contiguous(),
+            None,
+            None,
+        )
+    else:
+        return (
+            torch.empty(batch, seq_len, N, H, dtype=t_in.dtype, device=t_in.device),
+            torch.empty(
+                batch, seq_len, kv_head, H, dtype=t_in.dtype, device=t_in.device
+            ),
+            torch.empty(
+                batch, seq_len, kv_head, H, dtype=t_in.dtype, device=t_in.device
+            ),
+        )
 
 
 @register_meta("rmsnorm")

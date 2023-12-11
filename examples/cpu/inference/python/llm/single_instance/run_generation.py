@@ -121,7 +121,7 @@ model = model_class[0].from_pretrained(
     torch_dtype=amp_dtype,
     config=config,
     low_cpu_mem_usage=True,
-    trust_remote_code=True,
+    trust_remote_code=True
 )
 tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
 model = model.eval()
