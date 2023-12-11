@@ -78,6 +78,7 @@ def _set_optimized_model_for_generation(
 
 def model_convert_reference(_model):
     import transformers
+    from packaging import version
 
     # generation wise optimization
     from .generation.utils import (
@@ -98,6 +99,8 @@ def model_convert_reference(_model):
         _prepare_attn_mask_falcon,
         _gen_baichuan_alibi_mask,
         GLM2_get_masks,
+        _relative_position_bucket,
+        _to_4d,
     )
 
     # model wise optimization for Feedforward and Decoder layer modules
@@ -109,13 +112,21 @@ def model_convert_reference(_model):
         LlamaForCausalLM_forward,
         GPTNeoXForCausalLM_forward,
         OPTForCausalLM_forward,
+        BloomForCausalLM_forward,
         CodeGenForCausalLM_forward,
         BaichuanForCausalLM_forward,
         BaichuanModel_forward,
         ChatGLMModel_forward,
         GLMTransformer_forward,
         ChatGLMForConditionalGeneration_forward,
+        GPTBigCodeForCausalLM_forward,
+        GPTBigCodeModel_forward,
+        T5ForConditionalGeneration_forward,
+        T5DenseGatedActDense_forward,
+        T5DenseActDense_forward,
+        MistralForCausalLM_forward,
         prepare_inputs_for_generation,
+        prepare_inputs_for_generation_gptbigcode,
     )
 
     if not hasattr(_model.config, "architectures"):
@@ -138,6 +149,11 @@ def model_convert_reference(_model):
         "_prepare_decoder_attention_mask",
         _prepare_decoder_attention_mask,
     )
+
+    if version.parse(transformers.__version__) > version.parse("4.34.1"):
+        from transformers.modeling_attn_mask_utils import AttentionMaskConverter
+
+        AttentionMaskConverter.to_4d = _to_4d
 
     # model-wise changes for adoption
     # forward order
@@ -182,6 +198,16 @@ def model_convert_reference(_model):
     elif (
         hasattr(_model, "__class__")
         and _model.__class__
+        == transformers.models.bloom.modeling_bloom.BloomForCausalLM
+    ):
+        convert_function(
+            _model,
+            "forward",
+            BloomForCausalLM_forward,
+        )
+    elif (
+        hasattr(_model, "__class__")
+        and _model.__class__
         == transformers.models.codegen.modeling_codegen.CodeGenForCausalLM
     ):
         convert_function(
@@ -189,6 +215,51 @@ def model_convert_reference(_model):
             "forward",
             CodeGenForCausalLM_forward,
         )
+    elif (
+        hasattr(_model, "__class__")
+        and _model.__class__
+        == transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeForCausalLM
+    ):
+        convert_function(
+            _model,
+            "forward",
+            GPTBigCodeForCausalLM_forward,
+        )
+        convert_function(_model.transformer, "forward", GPTBigCodeModel_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_gptbigcode,
+        )
+    elif (
+        hasattr(_model, "__class__")
+        and _model.__class__
+        == transformers.models.t5.modeling_t5.T5ForConditionalGeneration
+    ):
+        convert_function(_model, "forward", T5ForConditionalGeneration_forward)
+        convert_function(
+            transformers.models.t5.modeling_t5.T5Attention,
+            "_relative_position_bucket",
+            _relative_position_bucket,
+        )
+        convert_functions(
+            _model,
+            transformers.models.t5.modeling_t5.T5DenseActDense,
+            "forward",
+            T5DenseActDense_forward,
+        )
+        convert_functions(
+            _model,
+            transformers.models.t5.modeling_t5.T5DenseGatedActDense,
+            "forward",
+            T5DenseGatedActDense_forward,
+        )
+    elif (
+        hasattr(_model, "__class__")
+        and _model.__class__
+        == transformers.models.mistral.modeling_mistral.MistralForCausalLM
+    ):
+        convert_function(_model, "forward", MistralForCausalLM_forward)
 
     # checking if model has been wrapped by deepspeed (distributed or not)
     try:
@@ -208,6 +279,9 @@ def model_convert_reference(_model):
         transformers.models.opt.modeling_opt.OPTAttention,
         transformers.models.bloom.modeling_bloom.BloomAttention,
         transformers.models.codegen.modeling_codegen.CodeGenAttention,
+        transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeAttention,
+        transformers.models.t5.modeling_t5.T5Attention,
+        transformers.models.mistral.modeling_mistral.MistralAttention,
     ]:
         convert_class(
             _model,
@@ -223,6 +297,9 @@ def model_convert_reference(_model):
         transformers.models.codegen.modeling_codegen.CodeGenBlock,
         transformers.models.opt.modeling_opt.OPTDecoderLayer,
         transformers.models.bloom.modeling_bloom.BloomBlock,
+        transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeBlock,
+        transformers.models.t5.modeling_t5.T5Block,
+        transformers.models.mistral.modeling_mistral.MistralDecoderLayer,
     ]:
         convert_class(
             _model,
@@ -331,7 +408,6 @@ def model_convert_reference(_model):
             distributed=distributed,
         )
         convert_function(_model.transformer, "get_masks", GLM2_get_masks)
-
     return _model
 
 
@@ -357,6 +433,35 @@ def get_dummy_input(_model, return_dict=False):
                 torch.zeros([1, 1, 1, 1]).contiguous(),
                 torch.zeros(1, 4, dtype=torch.long),
             )
+            if _model.config.architectures[0] != "T5ForConditionalGeneration"
+            else (
+                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros(1, 4, dtype=torch.long),
+                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                torch.zeros(
+                    [
+                        32,
+                        1,
+                        _model.decoder.block[i].layer[1].EncDecAttention.n_heads,
+                        _model.decoder.block[i]
+                        .layer[1]
+                        .EncDecAttention.key_value_proj_dim,
+                    ]
+                ).contiguous(),
+                torch.zeros(
+                    [
+                        32,
+                        1,
+                        _model.decoder.block[i].layer[1].EncDecAttention.n_heads,
+                        _model.decoder.block[i]
+                        .layer[1]
+                        .EncDecAttention.key_value_proj_dim,
+                    ]
+                ).contiguous(),
+                torch.zeros(1, 4, dtype=torch.long),
+            )
             for i in range(model_num_layers)
         ]
     )
@@ -380,6 +485,25 @@ def get_dummy_input(_model, return_dict=False):
                 attention_mask.unsqueeze(0),
                 position_ids.unsqueeze(0),
                 past_key_values,
+            )
+        )
+    elif _model.config.architectures[0] == "T5ForConditionalGeneration":
+        last_hidden_state = torch.rand([1, 32, 2048])
+        sample_inputs = (
+            (
+                {
+                    "decoder_input_ids": torch.ones(1).to(torch.long).unsqueeze(0),
+                    "attention_mask": attention_mask.unsqueeze(0),
+                    "past_key_values": past_key_values,
+                    "encoder_outputs": (last_hidden_state,),
+                }
+            )
+            if return_dict
+            else (
+                torch.ones(1).to(torch.long).unsqueeze(0),
+                attention_mask.unsqueeze(0),
+                past_key_values,
+                (last_hidden_state,),
             )
         )
     else:
@@ -451,7 +575,10 @@ def model_convert_lowering(
         if not is_quantization or woq:
             import transformers
 
-            supported_classes = [transformers.models.llama.modeling_llama.LlamaRMSNorm]
+            supported_classes = [
+                transformers.models.llama.modeling_llama.LlamaRMSNorm,
+                transformers.models.mistral.modeling_mistral.MistralRMSNorm,
+            ]
             if _model.config.architectures[0] == "BaichuanForCausalLM":
                 supported_classes.append(type(_model.model.layers[0].input_layernorm))
             if (
@@ -530,7 +657,7 @@ def optimize_transformers(
     r"""
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
     This API focus on transformers models, especially for generation tasks inference.
-    Well supported model family: Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan.
+    Well supported model family: Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode, T5, Mistral.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
@@ -590,7 +717,7 @@ def optimize_transformers(
     try:
         installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
         min_version = "4.28.1"
-        validated_version = "4.31.0"
+        validated_version = "4.35.2"
         if "transformers" not in installed_pkg:
             raise RuntimeError(
                 "optimize_transformers requires transformers package with version at least {} , fallback".format(
@@ -629,11 +756,14 @@ def optimize_transformers(
             "CodeGenForCausalLM",
             "BaichuanForCausalLM",
             "ChatGLMModel",
+            "GPTBigCodeForCausalLM",
+            "T5ForConditionalGeneration",
+            "MistralForCausalLM",
         ]
         if not well_supported_model:
             warnings.warn(
-                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, Baichuan, and ChatGLM \
-                    fallback to origin model"
+                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, Baichuan, ChatGLM, \
+                    GPTBigCode, T5, and Mistral, fallback to origin model"
             )
             return model
 

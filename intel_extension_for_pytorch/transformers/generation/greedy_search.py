@@ -162,11 +162,64 @@ def _greedy_search(
             "CodeGenForCausalLM",
             "BaichuanForCausalLM",
             "ChatGLMModel",
+            "GPTBigCodeForCausalLM",
+            "T5ForConditionalGeneration",
+            "MistralForCausalLM",
         ]:
             first_token = False
             input_bs = input_ids.size()[0]
             if model_inputs["past_key_values"] is None:
                 first_token = True
+                if self.model_backbone == "T5ForConditionalGeneration":
+                    first_token = False
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(input_bs)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                self.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.k(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(input_bs),
+                                    -1,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.n_heads,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.key_value_proj_dim,
+                                )
+                                .transpose(0, 1),
+                                self.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.v(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(input_bs),
+                                    -1,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.n_heads,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.key_value_proj_dim,
+                                )
+                                .transpose(0, 1),
+                                beam_idx_tmp,
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
             if first_token:
                 if hasattr(self.config, "n_layer"):
                     num_hidden_layers = self.config.n_layer
@@ -194,6 +247,14 @@ def _greedy_search(
                 if "return_last_logit" in model_inputs:
                     model_inputs["return_last_logit"] = torch.tensor(
                         model_inputs["return_last_logit"]
+                    )
+                if self.model_backbone == "T5ForConditionalGeneration":
+                    model_inputs.pop("head_mask", None)
+                    model_inputs.pop("decoder_head_mask", None)
+                    model_inputs.pop("decoder_attention_mask", None)
+                    model_inputs.pop("cross_attn_head_mask", None)
+                    model_inputs["encoder_outputs"] = (
+                        model_inputs["encoder_outputs"]["last_hidden_state"],
                     )
                 outputs = self.trace_graph(**model_inputs)
                 if synced_gpus and this_peer_finished:

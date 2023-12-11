@@ -57,6 +57,8 @@ class _IPEXScaleDotProductCPU(nn.Module):
         head_mask: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[Tuple[torch.Tensor]] = None,
         alibi: Optional[torch.Tensor] = None,
+        add_casual_mask: Optional[bool] = True,
+        seq_info: Optional[torch.Tensor] = None,
     ):
         if layer_past is None:
             layer_past = (
@@ -68,7 +70,10 @@ class _IPEXScaleDotProductCPU(nn.Module):
         key_cache = layer_past[1].contiguous()
         value_cache = layer_past[2].contiguous()
         beam_idx = layer_past[3].contiguous()
-        seq_info = torch.tensor(layer_past[0].size(-2), dtype=torch.long).contiguous()
+        if seq_info is None:
+            seq_info = torch.tensor(
+                layer_past[0].size(-2), dtype=torch.long
+            ).contiguous()
         (
             attn_output,
             attn_weights,
@@ -87,6 +92,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
             self.text_max_length,
             head_mask,
             attention_mask,
+            add_casual_mask,
         )
 
         present = (

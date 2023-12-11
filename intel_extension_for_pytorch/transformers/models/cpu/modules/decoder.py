@@ -5,6 +5,7 @@ from ...cpu.fusions.linear_fusion import (
     _IPEXlinearNewGeluCPU,
     _IPEXlinearReluCPU,
     _IPEXlinearGeluCPU,
+    _IPEXlinearMulCPU,
     _IPEXlinearSiluMulCPU,
 )
 
@@ -26,7 +27,11 @@ class _IPEXDecoderLayerCPU(nn.Module):
             self.linear_gelu = _IPEXlinearNewGeluCPU(
                 module.linear_gelu.linear, tpp=tpp, woq=woq
             )
-        elif self.model_backbone in ["LlamaForCausalLM", "BaichuanForCausalLM"]:
+        elif self.model_backbone in [
+            "LlamaForCausalLM",
+            "BaichuanForCausalLM",
+            "MistralForCausalLM",
+        ]:
             if not self.distributed:
                 self.mha_linear_add = _IPEXlinearAddCPU(
                     module.mha_linear_add.linear, tpp=tpp, woq=woq
@@ -92,5 +97,28 @@ class _IPEXDecoderLayerCPU(nn.Module):
                 self.mlp_linear_add = _IPEXlinearAddCPU(
                     module.mlp_linear_add.linear, tpp=tpp, woq=woq
                 )
+        elif self.model_backbone == "GPTBigCodeForCausalLM":
+            self.linear_gelu = _IPEXlinearGeluCPU(
+                module.linear_gelu.linear, tpp=tpp, woq=woq
+            )
+            if not self.distributed:
+                self.mha_linear_add = _IPEXlinearAddCPU(
+                    module.mha_linear_add.linear, tpp=tpp, woq=woq
+                )
+                self.mlp_linear_add = _IPEXlinearAddCPU(
+                    module.mlp_linear_add.linear, tpp=tpp, woq=woq
+                )
+        elif self.model_backbone == "T5ForConditionalGeneration":
+            if hasattr(self, "linear_gelu"):
+                self.linear_gelu = _IPEXlinearGeluCPU(
+                    module.linear_gelu.linear, tpp=tpp, woq=woq
+                )
+                self.linear_mul = _IPEXlinearMulCPU(
+                    module.linear_mul.linear, tpp=tpp, woq=woq
+                )
+                if not self.distributed:
+                    self.linear_add = _IPEXlinearAddCPU(
+                        module.linear_add.linear, tpp=tpp, woq=woq
+                    )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

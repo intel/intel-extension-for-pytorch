@@ -21,6 +21,6 @@ torchaudio:
 torchvision:
   version: 0.17.0.dev20231129+cpu
 transformers:
-  version: 4.31.0
+  version: 4.35.2
 inc:
   version: 2.3.1

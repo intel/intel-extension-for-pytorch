@@ -11,6 +11,7 @@ class EXAMPLE_INPUTS_MODE(IntEnum):
     KV_MASK = 2
     MASK_POS_KV = 3
     MASK_KV_POS = 4
+    MASK_KV_ENC = 5
 
 class LLMConfig(ABC):
     @abstractmethod

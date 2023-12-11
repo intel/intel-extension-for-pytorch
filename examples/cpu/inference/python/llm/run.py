@@ -242,7 +242,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 else:
                     # No need to set group size if args.gptq is true
                     # Group size is read from the checkpoint
-                    quant_cmd.extend(["--group-size", str(group_size)])
+                    infer_cmd.extend(["--group-size", str(group_size)])
             else:
                 infer_cmd.extend(["--ipex-smooth-quant"])
                 infer_cmd.extend(["--alpha", str(args.alpha)])
@@ -262,7 +262,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--prompt", str(args.prompt)])
 
             print("LLM RUNTIME INFO: quantizing model ...")
-            result = subprocess.run(quant_cmd)
+            result = subprocess.run(infer_cmd)
             if result.returncode != 0:
                 print("LLM RUNTIME ERROR: Quantizing model failed. Quit.")
                 quit()
@@ -413,6 +413,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "codegen": ("/codegen_local_shard"),
                 "baichuan": ("/baichuan_local_shard"),
                 "chatglm": ("/chatglm_local_shard"),
+                "gptbigcode": ("/gptbigcode_local_shard"),
+                "t5": ("/t5_local_shard"),
+                "mistral": ("/mistral_local_shard"),
             }
             model_type = next(
                 (x for x in MODEL_CLASSES.keys() if x in args.model_name_or_path.lower()), "auto"

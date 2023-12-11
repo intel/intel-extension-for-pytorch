@@ -32,7 +32,7 @@ try:
     from transformers import AutoConfig
 except ImportError:
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.31.0"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.35.2"]
     )
     import transformers
     from transformers import AutoConfig
