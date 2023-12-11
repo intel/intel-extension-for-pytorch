@@ -10,7 +10,7 @@ Optimizations take advantage of Intel® Advanced Vector Extensions 512 (Intel® 
 Moreover, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs through the PyTorch* ``xpu`` device.
 
 In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Starting from 2.1.0, specific optimizations for certain 
-LLM models are introduced in the Intel® Extension for PyTorch*. For more information on LLM optimizations, refer to the `Large Language Models (LLM) <llm.html>`_ section.
+LLM models are introduced in the Intel® Extension for PyTorch*. For more information on LLM optimizations, refer to the `Large Language Models (LLM) <tutorials/llm.rst>`_ section.
 
 The extension can be loaded as a Python module for Python programs or linked as a C++ library for C++ programs. In Python scripts, users can enable it dynamically by importing ``intel_extension_for_pytorch``.
 

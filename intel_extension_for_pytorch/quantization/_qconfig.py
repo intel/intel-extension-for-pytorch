@@ -72,9 +72,8 @@ def get_smooth_quant_qconfig_mapping(
             For nn.Linear with SmoothQuant enabled, it calculates q-params
             after applying scaling factors. PerChannelMinMaxObserver by
             default.
-            Example: ``torch.ao.quantization.PerChannelMinMaxObserver.with_args(
-                dtype=torch.qint8, qscheme=torch.per_channel_symmetric
-            )``
+            Example: ``torch.ao.quantization.PerChannelMinMaxObserver.with_args(\
+dtype=torch.qint8, qscheme=torch.per_channel_symmetric)``
         wei_ic_observer: Per-input-channel Observer for weight.
             For nn.Linear with SmoothQuant enabled only.
             PerChannelMinMaxObserver by default.
