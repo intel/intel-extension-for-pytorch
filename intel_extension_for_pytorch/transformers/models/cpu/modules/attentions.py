@@ -1,5 +1,4 @@
 from torch import nn
-import re
 from ...cpu.fusions.mha_fusion import (
     _IPEXRopeCPU,
     _IPEXScaleDotProductCPU,
@@ -19,21 +18,29 @@ class _IPEXAttentionCPU(nn.Module):
                 continue
             setattr(self.__class__, k, getattr(module.__class__, k))
 
-        if not re.search("OPT", self.model_backbone, re.IGNORECASE):
+        if (
+            self.model_backbone
+            not in [
+                "OPTForCausalLM",
+                "BloomForCausalLM",
+            ]
+            or self.model_backbone == "BaichuanForCausalLM"
+            and hasattr(module, "rotary_emb")
+        ):
             self._IPEXROPE = _IPEXRopeCPU(
                 self.max_position_embeddings,
                 self.pos_embd_dim,
                 self.rope_base,
                 self.model_backbone,
             )
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE) or re.search(
-            "LLAMA", self.model_backbone, re.IGNORECASE
-        ):
+        if self.model_backbone in ["GPTJForCausalLM", "LlamaForCausalLM"]:
             if hasattr(module, "concat_qkv"):
                 self.concat_qkv = _IPEXConcatLinearCPU(
                     module.concat_qkv, tpp=tpp, woq=woq
                 )
 
+        if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
+            self._IPEXROPE.embed_positions.sin_cos = self.embed_positions
         self.text_max_length = (
             config.text_max_length if hasattr(config, "text_max_length") else 2048
         )

@@ -660,7 +660,7 @@ def _create_observer(setting):
         ]
         for key in smooth_quant_sub_obs_keys:
             if key in setting:
-                setting[key] = _create_observer(setting[key])()
+                setting[key] = _create_observer(setting[key])
         return observer.with_args(**setting)
     else:
         raise NameError("torch.quantization.observer %s not found" % setting["name"])
@@ -966,13 +966,19 @@ def load_qconf_summary_to_model(model, qconf_summary):
                         scaling_factors_to_load = tensor_info[
                             "smooth_quant_scaling_factor"
                         ]
-                        assert isinstance(scaling_factors_to_load, dict), (
-                            f"Expect scaling factors to load are a dict but found type "
-                            f"{type(scaling_factors_to_load)}"
-                        )
-                        for key, val in scaling_factors_to_load.items():
-                            scaling_factor = torch.FloatTensor(val)
-                            scaling_factors.update({key: scaling_factor})
+                        if isinstance(scaling_factors_to_load, dict):
+                            for key, val in scaling_factors_to_load.items():
+                                scaling_factor = torch.FloatTensor(val)
+                                scaling_factors.update({key: scaling_factor})
+                        else:
+                            # for backward compatibility
+                            assert isinstance(scaling_factors_to_load, list), (
+                                f"Expect scaling factors to load to be a dict or list "
+                                f"but found type {type(scaling_factors_to_load)}"
+                            )
+                            scaling_factor = torch.FloatTensor(scaling_factors_to_load)
+                            dummy_weight_key = "0_0"
+                            scaling_factors.update({dummy_weight_key: scaling_factor})
                         v.tensor_id_to_smooth_quant_scaling_factor[
                             str(tensor_info["id"])
                         ] = scaling_factors
@@ -1019,8 +1025,25 @@ def load_qconf_summary_to_model(model, qconf_summary):
                     )
                     insert_fake_quant_after_outputs.append(False)
                     if "scale" in tensor_info:
-                        scale = torch.FloatTensor(tensor_info["scale"])
-                        zp = torch.LongTensor(tensor_info["zero_point"])
+                        if isinstance(tensor_info["scale"], list):
+                            scale = torch.FloatTensor(tensor_info["scale"])
+                            zp = torch.LongTensor(tensor_info["zero_point"])
+                        else:
+                            scale, zp = {}, {}
+                            scale_to_load = tensor_info["scale"]
+                            zp_to_load = tensor_info["zero_point"]
+                            assert isinstance(scale_to_load, dict) and isinstance(
+                                zp_to_load, dict
+                            ), (
+                                "Expect scales and zero points to load are dicts but "
+                                f"found types {type(scale_to_load)} and {type(zp_to_load)}"
+                            )
+                            for key, val in scale_to_load.items():
+                                s = torch.FloatTensor(val)
+                                scale.update({key: s})
+                            for key, val in zp_to_load.items():
+                                z = torch.LongTensor(val)
+                                zp.update({key: z})
                         v.tensor_id_to_scale_zp[tensor_info["id"]] = (scale, zp)
                 else:
                     output_tensor_infos.append(None)

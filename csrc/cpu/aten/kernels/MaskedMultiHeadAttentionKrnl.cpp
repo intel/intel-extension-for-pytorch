@@ -154,9 +154,14 @@ void mul_attenion_weights_and_value_of_head(
     T1* attn_out_start,
     int64_t head_size,
     bool store_value,
-    T* v_cache_start) {
+    T* v_cache_start,
+    bool accumulate) {
   for (auto hsi = 0; hsi < head_size; hsi++) {
-    attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+    if (accumulate) {
+      attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+    } else {
+      attn_out_start[hsi] = attn_w * v_ptr_start[hsi];
+    }
     if (store_value) {
       v_cache_start[hsi] = v_ptr_start[hsi];
     }
@@ -171,21 +176,31 @@ void mul_attenion_weights_and_value_of_head(
     float* attn_out_start,
     int64_t head_size,
     bool store_value,
-    float* v_cache_start) {
+    float* v_cache_start,
+    bool accumulate) {
   auto hsi = 0;
   auto vec_size = 16; // 512/32
   for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
     auto attn_w_vec = _mm512_set1_ps(attn_w);
     auto v_vec = _mm512_loadu_ps(v_ptr_start + hsi);
-    auto attn_out_vec = _mm512_loadu_ps(attn_out_start + hsi);
-    auto attn_out_vec_new = _mm512_fmadd_ps(attn_w_vec, v_vec, attn_out_vec);
-    _mm512_storeu_ps(attn_out_start + hsi, attn_out_vec_new);
+    if (accumulate) {
+      auto attn_out_vec = _mm512_loadu_ps(attn_out_start + hsi);
+      auto attn_out_vec_new = _mm512_fmadd_ps(attn_w_vec, v_vec, attn_out_vec);
+      _mm512_storeu_ps(attn_out_start + hsi, attn_out_vec_new);
+    } else {
+      auto attn_out_vec_new = _mm512_mul_ps(attn_w_vec, v_vec);
+      _mm512_storeu_ps(attn_out_start + hsi, attn_out_vec_new);
+    }
     if (store_value) {
       _mm512_storeu_ps(v_cache_start + hsi, v_vec);
     }
   }
   for (; hsi < head_size; hsi++) {
-    attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+    if (accumulate) {
+      attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+    } else {
+      attn_out_start[hsi] = attn_w * v_ptr_start[hsi];
+    }
     if (store_value) {
       v_cache_start[hsi] = v_ptr_start[hsi];
     }
@@ -200,7 +215,8 @@ void mul_attenion_weights_and_value_of_head(
     at::BFloat16* attn_out_start,
     int64_t head_size,
     bool store_value,
-    at::BFloat16* v_cache_start) {
+    at::BFloat16* v_cache_start,
+    bool accumulate) {
   auto hsi = 0;
   auto vec_size = 16; // 512/32
   for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
@@ -210,24 +226,37 @@ void mul_attenion_weights_and_value_of_head(
     // load 16 bfloat16 values from v_ptr_start and convert to 16 float32 values
     auto v_vec_bf16 = _mm256_loadu_si256((__m256i*)(v_ptr_start + hsi));
     auto v_vec_fp32 = torch_ipex::cpu::kernel::convert_bf16_to_fp32(v_vec_bf16);
-    // load 16 bfloat16 values from attn_out_start and convert to 16 float32
-    // values
-    auto attn_out_vec_fp32 = torch_ipex::cpu::kernel::convert_bf16_to_fp32(
-        _mm256_loadu_si256((__m256i*)(attn_out_start + hsi)));
-    // calculate the new attn_out_vec_fp32 and convert to bfloat16
-    auto attn_out_vec_new =
-        _mm512_fmadd_ps(attn_w_vec_fp32, v_vec_fp32, attn_out_vec_fp32);
-    auto attn_out_vec_new_bf16 = cvt_fp32_to_bf16(attn_out_vec_new); //_m256i
-    // store the new attn_out_vec_new_bf16 to attn_outs
-    _mm256_storeu_si256(
-        (__m256i*)(attn_out_start + hsi), attn_out_vec_new_bf16);
+    if (accumulate) {
+      // load 16 bfloat16 values from attn_out_start and convert to 16 float32
+      // values
+      auto attn_out_vec_fp32 = torch_ipex::cpu::kernel::convert_bf16_to_fp32(
+          _mm256_loadu_si256((__m256i*)(attn_out_start + hsi)));
+      // calculate the new attn_out_vec_fp32 and convert to bfloat16
+      auto attn_out_vec_new =
+          _mm512_fmadd_ps(attn_w_vec_fp32, v_vec_fp32, attn_out_vec_fp32);
+      auto attn_out_vec_new_bf16 = cvt_fp32_to_bf16(attn_out_vec_new); //_m256i
+      // store the new attn_out_vec_new_bf16 to attn_outs
+      _mm256_storeu_si256(
+          (__m256i*)(attn_out_start + hsi), attn_out_vec_new_bf16);
+    } else {
+      // calculate the new attn_out_vec_fp32 and convert to bfloat16
+      auto attn_out_vec_new = _mm512_mul_ps(attn_w_vec_fp32, v_vec_fp32);
+      auto attn_out_vec_new_bf16 = cvt_fp32_to_bf16(attn_out_vec_new); //_m256i
+      // store the new attn_out_vec_new_bf16 to attn_outs
+      _mm256_storeu_si256(
+          (__m256i*)(attn_out_start + hsi), attn_out_vec_new_bf16);
+    }
     // store the v_vec_bf16 to v_cache
     if (store_value) {
       _mm256_storeu_si256((__m256i*)(v_cache_start + hsi), v_vec_bf16);
     }
   }
   for (; hsi < head_size; hsi++) {
-    attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+    if (accumulate) {
+      attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+    } else {
+      attn_out_start[hsi] = attn_w * v_ptr_start[hsi];
+    }
     if (store_value) {
       v_cache_start[hsi] = v_ptr_start[hsi];
     }
@@ -241,7 +270,8 @@ void mul_attenion_weights_and_value_of_head(
     float* attn_out_start,
     int64_t head_size,
     bool store_value,
-    at::BFloat16* v_cache_start) {
+    at::BFloat16* v_cache_start,
+    bool accumulate) {
   auto hsi = 0;
   auto vec_size = 16; // 512/32
   for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
@@ -251,18 +281,28 @@ void mul_attenion_weights_and_value_of_head(
     // load 16 bfloat16 values from v_ptr_start and convert to 16 float32 values
     auto v_vec_bf16 = _mm256_loadu_si256((__m256i*)(v_ptr_start + hsi));
     auto v_vec_fp32 = torch_ipex::cpu::kernel::convert_bf16_to_fp32(v_vec_bf16);
-    auto attn_out_vec_fp32 = _mm512_loadu_ps(attn_out_start + hsi);
-    // calculate the new attn_out_vec_fp32 and convert to bfloat16
-    auto attn_out_vec_new =
-        _mm512_fmadd_ps(attn_w_vec_fp32, v_vec_fp32, attn_out_vec_fp32);
-    _mm512_storeu_ps(attn_out_start + hsi, attn_out_vec_new);
+    if (accumulate) {
+      auto attn_out_vec_fp32 = _mm512_loadu_ps(attn_out_start + hsi);
+      // calculate the new attn_out_vec_fp32 and convert to bfloat16
+      auto attn_out_vec_new =
+          _mm512_fmadd_ps(attn_w_vec_fp32, v_vec_fp32, attn_out_vec_fp32);
+      _mm512_storeu_ps(attn_out_start + hsi, attn_out_vec_new);
+    } else {
+      // calculate the new attn_out_vec_fp32 and convert to bfloat16
+      auto attn_out_vec_new = _mm512_mul_ps(attn_w_vec_fp32, v_vec_fp32);
+      _mm512_storeu_ps(attn_out_start + hsi, attn_out_vec_new);
+    }
     // store the v_vec_bf16 to v_cache
     if (store_value) {
       _mm256_storeu_si256((__m256i*)(v_cache_start + hsi), v_vec_bf16);
     }
   }
   for (; hsi < head_size; hsi++) {
-    attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+    if (accumulate) {
+      attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+    } else {
+      attn_out_start[hsi] = attn_w * v_ptr_start[hsi];
+    }
     if (store_value) {
       v_cache_start[hsi] = v_ptr_start[hsi];
     }
@@ -277,7 +317,8 @@ void mul_attenion_weights_and_value_of_head(
     at::Half* attn_out_start,
     int64_t head_size,
     bool store_value,
-    at::Half* v_cache_start) {
+    at::Half* v_cache_start,
+    bool accumulate) {
   auto hsi = 0;
   auto vec_size = 16; // 512/32
   for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
@@ -287,24 +328,37 @@ void mul_attenion_weights_and_value_of_head(
     // load 16 float16 values from v_ptr_start and convert to 16 float32 values
     auto v_vec_fp16 = _mm256_loadu_si256((__m256i*)(v_ptr_start + hsi));
     auto v_vec_fp32 = cvt_fp16_to_fp32(v_vec_fp16);
-    // load 16 float16 values from attn_out_start and convert to 16 float32
-    // values
-    auto attn_out_vec_fp32 =
-        cvt_fp16_to_fp32(_mm256_loadu_si256((__m256i*)(attn_out_start + hsi)));
-    // calculate the new attn_out_vec_fp32 and convert to float16
-    auto attn_out_vec_new =
-        _mm512_fmadd_ps(attn_w_vec_fp32, v_vec_fp32, attn_out_vec_fp32);
-    auto attn_out_vec_new_fp16 = cvt_fp32_to_fp16(attn_out_vec_new); //_m256i
-    // store the new attn_out_vec_new_fp16 to attn_outs
-    _mm256_storeu_si256(
-        (__m256i*)(attn_out_start + hsi), attn_out_vec_new_fp16);
+    if (accumulate) {
+      // load 16 float16 values from attn_out_start and convert to 16 float32
+      // values
+      auto attn_out_vec_fp32 = cvt_fp16_to_fp32(
+          _mm256_loadu_si256((__m256i*)(attn_out_start + hsi)));
+      // calculate the new attn_out_vec_fp32 and convert to float16
+      auto attn_out_vec_new =
+          _mm512_fmadd_ps(attn_w_vec_fp32, v_vec_fp32, attn_out_vec_fp32);
+      auto attn_out_vec_new_fp16 = cvt_fp32_to_fp16(attn_out_vec_new); //_m256i
+      // store the new attn_out_vec_new_fp16 to attn_outs
+      _mm256_storeu_si256(
+          (__m256i*)(attn_out_start + hsi), attn_out_vec_new_fp16);
+    } else {
+      // calculate the new attn_out_vec_fp32 and convert to float16
+      auto attn_out_vec_new = _mm512_mul_ps(attn_w_vec_fp32, v_vec_fp32);
+      auto attn_out_vec_new_fp16 = cvt_fp32_to_fp16(attn_out_vec_new); //_m256i
+      // store the new attn_out_vec_new_fp16 to attn_outs
+      _mm256_storeu_si256(
+          (__m256i*)(attn_out_start + hsi), attn_out_vec_new_fp16);
+    }
     // store the v_vec_fp16 to v_cache
     if (store_value) {
       _mm256_storeu_si256((__m256i*)(v_cache_start + hsi), v_vec_fp16);
     }
   }
   for (; hsi < head_size; hsi++) {
-    attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+    if (accumulate) {
+      attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+    } else {
+      attn_out_start[hsi] = attn_w * v_ptr_start[hsi];
+    }
     if (store_value) {
       v_cache_start[hsi] = v_ptr_start[hsi];
     }
@@ -318,7 +372,8 @@ void mul_attenion_weights_and_value_of_head(
     float* attn_out_start,
     int64_t head_size,
     bool store_value,
-    at::Half* v_cache_start) {
+    at::Half* v_cache_start,
+    bool accumulate) {
   auto hsi = 0;
   auto vec_size = 16; // 512/32
   for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
@@ -328,18 +383,28 @@ void mul_attenion_weights_and_value_of_head(
     // load 16 float16 values from v_ptr_start and convert to 16 float32 values
     auto v_vec_fp16 = _mm256_loadu_si256((__m256i*)(v_ptr_start + hsi));
     auto v_vec_fp32 = cvt_fp16_to_fp32(v_vec_fp16);
-    auto attn_out_vec_fp32 = _mm512_loadu_ps(attn_out_start + hsi);
-    // calculate the new attn_out_vec_fp32 and convert to float16
-    auto attn_out_vec_new =
-        _mm512_fmadd_ps(attn_w_vec_fp32, v_vec_fp32, attn_out_vec_fp32);
-    _mm512_storeu_ps(attn_out_start + hsi, attn_out_vec_new);
+    if (accumulate) {
+      auto attn_out_vec_fp32 = _mm512_loadu_ps(attn_out_start + hsi);
+      // calculate the new attn_out_vec_fp32 and convert to float16
+      auto attn_out_vec_new =
+          _mm512_fmadd_ps(attn_w_vec_fp32, v_vec_fp32, attn_out_vec_fp32);
+      _mm512_storeu_ps(attn_out_start + hsi, attn_out_vec_new);
+    } else {
+      // calculate the new attn_out_vec_fp32 and convert to float16
+      auto attn_out_vec_new = _mm512_mul_ps(attn_w_vec_fp32, v_vec_fp32);
+      _mm512_storeu_ps(attn_out_start + hsi, attn_out_vec_new);
+    }
     // store the v_vec_fp16 to v_cache
     if (store_value) {
       _mm256_storeu_si256((__m256i*)(v_cache_start + hsi), v_vec_fp16);
     }
   }
   for (; hsi < head_size; hsi++) {
-    attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+    if (accumulate) {
+      attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+    } else {
+      attn_out_start[hsi] = attn_w * v_ptr_start[hsi];
+    }
     if (store_value) {
       v_cache_start[hsi] = v_ptr_start[hsi];
     }
@@ -355,23 +420,32 @@ void mul_attenion_weights_and_value_of_head_half(
     at::Half* attn_out_start,
     int64_t head_size,
     bool store_value,
-    at::Half* v_cache_start) {
+    at::Half* v_cache_start,
+    bool accumulate) {
   auto hsi = 0;
   auto vec_size = 32; // 512/16
   for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
     auto attn_w_vec = _mm512_set1_ph(attn_w);
     auto v_vec = _mm512_loadu_ph(v_ptr_start + hsi);
-    auto attn_out_vec = _mm512_loadu_ph(attn_out_start + hsi);
-    auto attn_out_vec_new = _mm512_fmadd_ph(attn_w_vec, v_vec, attn_out_vec);
-    // store the new attn_out_vec_new to attn_outs
-    _mm512_storeu_ph(attn_out_start + hsi, attn_out_vec_new);
+    if (accumulate) {
+      auto attn_out_vec = _mm512_loadu_ph(attn_out_start + hsi);
+      auto attn_out_vec_new = _mm512_fmadd_ph(attn_w_vec, v_vec, attn_out_vec);
+      _mm512_storeu_ph(attn_out_start + hsi, attn_out_vec_new);
+    } else {
+      auto attn_out_vec_new = _mm512_mul_ph(attn_w_vec, v_vec);
+      _mm512_storeu_ph(attn_out_start + hsi, attn_out_vec_new);
+    }
     // store the v_vec to v_cache
     if (store_value) {
       _mm512_storeu_ph(v_cache_start + hsi, v_vec);
     }
   }
   for (; hsi < head_size; hsi++) {
-    attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+    if (accumulate) {
+      attn_out_start[hsi] += attn_w * v_ptr_start[hsi];
+    } else {
+      attn_out_start[hsi] = attn_w * v_ptr_start[hsi];
+    }
     if (store_value) {
       v_cache_start[hsi] = v_ptr_start[hsi];
     }
@@ -473,7 +547,7 @@ scale_dot_product_for_indirect_access_kv_cache(
   // value realted
   value = value.contiguous();
   auto attn_outs =
-      at::zeros({bs, head_num, cur_len, head_size}, value.options());
+      at::empty({bs, head_num, cur_len, head_size}, value.options());
   auto v_ptr = value.data_ptr<VT>();
   auto v_cache_ptr = value_cache.data_ptr<VT>();
   auto attn_out_ptr = attn_outs.data_ptr<VT>();
@@ -633,7 +707,7 @@ scale_dot_product_for_indirect_access_kv_cache(
   }
   auto thread_numbers = omp_get_max_threads();
   auto private_attn_outs =
-      at::zeros({thread_numbers, bs, head_num, cur_len, head_size}, at::kFloat);
+      at::empty({thread_numbers, bs, head_num, cur_len, head_size}, at::kFloat);
   auto private_attn_out_flag =
       at::zeros({thread_numbers, bs, head_num}, at::kByte);
   auto flag_access = private_attn_out_flag.accessor<uint8_t, 3>();
@@ -650,7 +724,6 @@ scale_dot_product_for_indirect_access_kv_cache(
         for (auto hi = 0; hi < head_num; hi++) {
           auto thread_id = omp_get_thread_num();
           for (auto query_ti = 0; query_ti < cur_len; query_ti++) {
-            flag_access[thread_id][bi][hi] = 1;
             auto kv_hi = hi / group_size; // maping the query head to key/value
                                           // head to support MGA/MQA
             auto attn_w_stride = (bi * head_num + hi) * cur_len * seq_len;
@@ -687,7 +760,8 @@ scale_dot_product_for_indirect_access_kv_cache(
                   attn_out_start,
                   head_size,
                   true,
-                  v_cache_head_start);
+                  v_cache_head_start,
+                  flag_access[thread_id][bi][hi]);
             } else if (vi < query_ti + offset) { // caculate attention
                                                  // values for the past
                                                  // token
@@ -701,7 +775,8 @@ scale_dot_product_for_indirect_access_kv_cache(
                     attn_out_start,
                     head_size,
                     false,
-                    nullptr);
+                    nullptr,
+                    flag_access[thread_id][bi][hi]);
               } else {
                 auto vc_t_beam_start =
                     vc_token_start + new_beam_idx[bi][vi] * kv_head * head_size;
@@ -718,10 +793,12 @@ scale_dot_product_for_indirect_access_kv_cache(
                     attn_out_start,
                     head_size,
                     false,
-                    nullptr);
+                    nullptr,
+                    flag_access[thread_id][bi][hi]);
               }
             }
           }
+          flag_access[thread_id][bi][hi] = 1;
         }
       }
     }
@@ -734,7 +811,12 @@ scale_dot_product_for_indirect_access_kv_cache(
     for (auto bi = 0; bi < bs; bi++) {
       for (auto hi = 0; hi < head_num; hi++) {
         for (auto qi = 0; qi < cur_len; qi++) {
-          for (auto thread_id = 0; thread_id < thread_numbers; thread_id++) {
+          auto thr0_head_start = private_attn_out_ptr +
+              (bi * head_num + hi) * cur_len * head_size + qi * head_size;
+          if (flag_access[0][bi][hi] == 0) {
+            torch_ipex::cpu::kernel::zero_ker(thr0_head_start, head_size);
+          }
+          for (auto thread_id = 1; thread_id < thread_numbers; thread_id++) {
             if (flag_access[thread_id][bi][hi] == 0) {
               continue;
             }
@@ -742,11 +824,13 @@ scale_dot_product_for_indirect_access_kv_cache(
                 (bi * head_num + hi) * cur_len * head_size;
             auto private_attn_out_start =
                 private_attn_out_ptr + attn_out_head_stride + qi * head_size;
-            auto attn_outs_start = attn_out_ptr +
-                (bi * head_num + hi) * cur_len * head_size + qi * head_size;
-            torch_ipex::cpu::kernel::add_ker<VT, float>(
-                attn_outs_start, private_attn_out_start, head_size);
+            torch_ipex::cpu::kernel::add_ker<float, float>(
+                thr0_head_start, private_attn_out_start, head_size);
           }
+          auto attn_outs_start = attn_out_ptr +
+              (bi * head_num + hi) * cur_len * head_size + qi * head_size;
+          torch_ipex::cpu::kernel::move_ker<VT, float>(
+              attn_outs_start, thr0_head_start, head_size);
         }
       }
     }
@@ -945,7 +1029,6 @@ scale_dot_product_for_indirect_access_kv_cache_half(
         for (auto hi = 0; hi < head_num; hi++) {
           auto thread_id = omp_get_thread_num();
           for (auto query_ti = 0; query_ti < cur_len; query_ti++) {
-            flag_access[thread_id][bi][hi] = 1;
             auto kv_hi = hi / group_size; // maping the query head to key/value
                                           // head to support MGA/MQA
             auto attn_w_stride = (bi * head_num + hi) * cur_len * seq_len;
@@ -982,7 +1065,8 @@ scale_dot_product_for_indirect_access_kv_cache_half(
                   attn_out_start,
                   head_size,
                   true,
-                  v_cache_head_start);
+                  v_cache_head_start,
+                  flag_access[thread_id][bi][hi]);
             } else if (vi < query_ti + offset) { // caculate attention
                                                  // values for the past
                                                  // token
@@ -996,7 +1080,8 @@ scale_dot_product_for_indirect_access_kv_cache_half(
                     attn_out_start,
                     head_size,
                     false,
-                    nullptr);
+                    nullptr,
+                    flag_access[thread_id][bi][hi]);
               } else {
                 auto vc_t_beam_start =
                     vc_token_start + new_beam_idx[bi][vi] * kv_head * head_size;
@@ -1013,9 +1098,11 @@ scale_dot_product_for_indirect_access_kv_cache_half(
                     attn_out_start,
                     head_size,
                     false,
-                    nullptr);
+                    nullptr,
+                    flag_access[thread_id][bi][hi]);
               }
             }
+            flag_access[thread_id][bi][hi] = 1;
           }
         }
       }
@@ -1212,31 +1299,44 @@ first_token_masked_mha(
     key = key.repeat_interleave(n_req, 2);
     value = value.repeat_interleave(n_req, 2);
   }
+  auto attn_outputs = at::Tensor();
   auto attn_weights = at::Tensor();
-  if (key.scalar_type() == at::kBFloat16 && attention_mask.size(1) == 1) {
-    auto attn_outputs = torch_ipex::cpu::flash_attention_kernel_stub(
-        kCPU, query, key, value, scale_attn, attention_mask);
-    return std::make_tuple(
-        attn_outputs, attn_weights, key_cache, value_cache, beam_idx);
+  if (key.scalar_type() == at::kFloat || key.scalar_type() == at::kBFloat16) {
+    query = query.transpose(1, 2);
+    key = key.transpose(1, 2);
+    value = value.transpose(1, 2);
+    attn_outputs =
+        std::get<0>(torch_ipex::cpu::flash_attention_mask_kernel_stub(
+            kCPU,
+            query,
+            key,
+            value,
+            /* dropout */ 0.0,
+            /* is_causal*/ false,
+            /* return_debug_mask */ false,
+            attention_mask,
+            1. / scale_attn));
   } else {
     key = key.permute({0, 2, 1, 3});
     query = query.permute({0, 2, 1, 3});
     value = value.permute({0, 2, 1, 3});
-    auto attn_weights = query.matmul(key.transpose(-1, -2));
+    attn_weights = query.matmul(key.transpose(-1, -2));
     attn_weights = attn_weights.div(scale_attn);
     attn_weights = attn_weights + attention_mask;
     attn_weights = attn_weights.softmax(-1);
     attn_weights = attn_weights.to(value.dtype());
-    auto attn_outputs = attn_weights.matmul(value);
+    attn_outputs = attn_weights.matmul(value);
     if (origin_type == at::kHalf) {
-      attn_outputs = attn_outputs.to(origin_type);
       attn_weights = attn_weights.to(origin_type);
-      key_cache = key_cache.to(origin_type);
-      value_cache = value_cache.to(origin_type);
     }
-    return std::make_tuple(
-        attn_outputs, at::Tensor(), key_cache, value_cache, beam_idx);
   }
+  if (origin_type == at::kHalf) {
+    attn_outputs = attn_outputs.to(origin_type);
+    key_cache = key_cache.to(origin_type);
+    value_cache = value_cache.to(origin_type);
+  }
+  return std::make_tuple(
+      attn_outputs, attn_weights, key_cache, value_cache, beam_idx);
 }
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 masked_multihead_self_attention_kernel_impl(

@@ -783,3 +783,242 @@ def auto_convert(
     swap_child_modules(module)
     module.__class__ = QuantizationDispatchModule
     return module
+
+
+def quantize_per_channel(t: torch.Tensor, is_int4, scales=None, zero_points=None):
+    r"""
+    Quantize a weight tensor of Linear modules per channel.
+    Assume the tensor shape is [output channel, input channel],
+    each output channel has its own quantization parameters.
+
+    Args:
+        input: The tensor to be quantized
+        is_int4: int4 or int8
+
+    Returns:
+        A tuple of
+        - The quantized tensor
+        - Scales
+        - Zero points
+    """
+    assert t.ndim == 2
+
+    def get_qparams(scales, zps):
+        if scales is not None and zps is not None:
+            return scales, zps
+        eps = torch.tensor([torch.finfo(torch.float32).eps])
+        zeros = torch.zeros(t.shape[0], dtype=t.dtype, device=t.device)
+        mins = torch.minimum(t.min(dim=1)[0], zeros)
+        maxs = torch.maximum(t.max(dim=1)[0], zeros)
+        scales = (maxs - mins) / 15 if is_int4 else (maxs - mins) / 255
+        scales = torch.max(scales, eps)
+        zps = -torch.round(mins / scales)
+        if not is_int4:
+            zps -= 128
+        return scales, zps
+
+    scales, zps = get_qparams(scales, zero_points)
+    qmin = 0 if is_int4 else -128
+    qmax = 15 if is_int4 else 127
+    inv_scales = 1 / scales.unsqueeze(1)
+    qt = torch.clamp(torch.round(t * inv_scales) + zps.unsqueeze(1), min=qmin, max=qmax)
+    qt = qt.to(torch.uint8) if is_int4 else qt.to(torch.int8)
+    if is_int4:
+        if qt.size(-1) % 2:
+            qt = torch.nn.functional.pad(qt, (0, 1), value=0)
+        qt = qt[:, 1::2].bitwise_left_shift(4).bitwise_or_(qt[:, ::2])
+    return qt.contiguous(), scales, zps
+
+
+def dequantize_per_channel(
+    qt: torch.Tensor,
+    scales: torch.Tensor,
+    zps: torch.Tensor,
+    is_int4,
+    weight_shape=None,
+):
+    r"""
+    Dequantize a weight tensor of Linear modules per channel.
+    Assume the tensor shape is [output channel, input channel],
+    each output channel has its own quantization parameters.
+
+    Args:
+        qt: The tensor to be dequantized
+        scales: Scales for dequantization
+        zps: Zero points for dequantization
+        is_int4: int4 or int8
+        weight_shape: True weight shape. INT4 tensor's input channel may
+            be padded to even, so we need this to return the correct weight.
+
+    Returns:
+        The dequantized tensor
+    """
+    assert qt.ndim == 2
+    scales = scales.squeeze()
+    zps = zps.squeeze()
+    if is_int4:
+        t = torch.empty(
+            qt.shape[0], qt.shape[1] * 2, dtype=torch.uint8, device=qt.device
+        )
+        t[:, ::2] = qt.bitwise_and(0xF)
+        t[:, 1::2] = qt.bitwise_right_shift(4)
+        t = (t.to(torch.float) - zps.unsqueeze(-1)) * scales.unsqueeze(-1)
+        if weight_shape is not None:
+            t = t[: weight_shape[0], : weight_shape[1]].contiguous()
+        return t
+    else:
+        return (qt.to(torch.float) - zps.unsqueeze(-1)) * scales.unsqueeze(-1)
+
+
+def quantize_per_block(
+    input: torch.Tensor, is_int4, group_size, scales=None, zero_points=None
+):
+    r"""
+    Quantize a weight tensor of Linear modules per block.
+    Assume the tensor shape is [output channel, input channel],
+    block shape is [1, group_size].
+
+    Args:
+        input: The tensor to be quantized
+        is_int4: int4 or int8
+        group_size: Size of group along input channel
+        scales: Scales for quantization. If None, find by min/max.
+        zero_points: zero points for quantization. If None, find by min/max.
+
+    Returns:
+        A tuple of
+        - The quantized tensor
+        - Scales in shape [N, #block_k]
+        - Zero points in shape [N, #block_k]
+    """
+    assert (
+        input.dim() == 2
+    ), f"{__name__}: Expect input has 2 dimensions but got {input.dim()}"
+    assert group_size > 0, f"{__name__}: Expect group_size > 0 but got {group_size}"
+    N = input.size(0)
+    K = input.size(1)
+    k_rem = K % group_size
+    has_rem = k_rem != 0
+
+    def get_qparams(scales, zps):
+        if scales is not None and zps is not None:
+            return scales, zps
+        eps = torch.tensor([torch.finfo(torch.float32).eps])
+        t_com = input[:, : K - k_rem].view(N, K // group_size, group_size)
+        mins = torch.minimum(t_com.min(dim=-1)[0], torch.tensor([0]))
+        maxs = torch.maximum(t_com.max(dim=-1)[0], torch.tensor([0]))
+        scales = (maxs - mins) / 15 if is_int4 else (maxs - mins) / 255
+        scales = torch.max(scales, eps)
+        zps = -torch.round(mins / scales)
+        if k_rem != 0:
+            t_rem = input[:, K - k_rem :].view(N, 1, k_rem)
+            mins_rem = torch.minimum(t_rem.min(dim=-1)[0], torch.tensor([0]))
+            maxs_rem = torch.maximum(t_rem.max(dim=-1)[0], torch.tensor([0]))
+            scales_rem = (
+                (maxs_rem - mins_rem) / 15 if is_int4 else (maxs_rem - mins_rem) / 255
+            )
+            zps_rem = -torch.round(mins_rem / scales_rem)
+            scales = torch.cat([scales, scales_rem], dim=-1)
+            zps = torch.cat([zps, zps_rem], dim=-1)
+        if not is_int4:
+            zps -= 128
+        return scales, zps
+
+    scales, zps = get_qparams(scales, zero_points)
+    qmin = 0 if is_int4 else -128
+    qmax = 15 if is_int4 else 127
+    Kc = (K + group_size - 1) // group_size
+    t_com = input[:, : K - k_rem].view(N, K // group_size, group_size)
+    scales_com = scales[:, : Kc - has_rem]
+    zps_com = zps[:, : Kc - has_rem]
+    inv_scales_com = 1 / scales_com.unsqueeze(-1)
+    qt = torch.clamp(
+        torch.round(t_com * inv_scales_com) + zps_com.unsqueeze(-1),
+        min=qmin,
+        max=qmax,
+    )
+    qt = qt.view(N, K // group_size * group_size)
+    if k_rem != 0:
+        t_rem = input[:, K - k_rem :].view(N, 1, k_rem)
+        scales_rem = scales[:, Kc - has_rem :]
+        zps_rem = zps[:, Kc - has_rem :]
+        inv_scales_rem = 1 / scales_rem.unsqueeze(-1)
+        qt_rem = torch.clamp(
+            torch.round(t_rem * inv_scales_rem) + zps_rem.unsqueeze(-1),
+            min=qmin,
+            max=qmax,
+        )
+        qt_rem = qt_rem.view(N, k_rem)
+        qt = torch.cat([qt, qt_rem], dim=1).contiguous()
+    qt = qt.to(torch.uint8) if is_int4 else qt.to(torch.int8)
+    qt = qt.view(N, K)
+    if is_int4:
+        if qt.size(-1) % 2:
+            qt = torch.nn.functional.pad(qt, (0, 1), value=0)
+        qt = qt[:, 1::2].bitwise_left_shift(4).bitwise_or_(qt[:, ::2])
+    return qt.contiguous(), scales, zps
+
+
+def dequantize_per_block(
+    qt: torch.Tensor,
+    scales: torch.Tensor,
+    zps: torch.Tensor,
+    is_int4,
+    group_size,
+    weight_shape=None,
+):
+    r"""
+    Dequantize a weight tensor of Linear modules per block.
+    Assume the tensor shape is [output channel, input channel],
+    block shape is [1, group_size].
+
+    Args:
+        qt: The tensor to be dequantized
+        scales: Scales in shape [N, #block_k]
+        zps: Zero points in shape [N, #block_k]
+        is_int4: int4 or int8
+        group_size: Size of group along input channel
+        block_oc: Block size of output channel, should be the same for weight packing
+
+    Returns:
+        The dequantized tensor
+    """
+    N = qt.size(0)
+    K = qt.size(1) * 2 if is_int4 else qt.size(1)
+    if scales.dim() > 2:
+        scales = scales.squeeze()
+        zps = zps.squeeze()
+    if is_int4:
+        t = torch.empty(
+            qt.shape[0], qt.shape[1] * 2, dtype=torch.uint8, device=qt.device
+        )
+        t[:, ::2] = qt.bitwise_and(0xF)
+        t[:, 1::2] = qt.bitwise_right_shift(4)
+        qt = t
+    k_rem = K % group_size
+    has_rem = k_rem != 0
+    Kc = (K + group_size - 1) // group_size
+    qt_com = qt[:, : K - k_rem].view(N, K // group_size, group_size)
+    scales_com = scales[:, : Kc - has_rem]
+    zps_com = zps[:, : Kc - has_rem]
+    t = (
+        ((qt_com.to(torch.float) - zps_com.unsqueeze(-1)) * scales_com.unsqueeze(-1))
+        .view(N, K - k_rem)
+        .contiguous()
+    )
+    if k_rem:
+        qt_rem = qt[:, K - k_rem :].view(N, 1, k_rem)
+        scales_rem = scales[:, Kc - has_rem :]
+        zps_rem = zps[:, Kc - has_rem :]
+        t_rem = (
+            (
+                (qt_rem.to(torch.float) - zps_rem.unsqueeze(-1))
+                * scales_rem.unsqueeze(-1)
+            )
+            .view(N, k_rem)
+            .contiguous()
+        )
+        t = torch.cat([t, t_rem], dim=1).contiguous()
+    if weight_shape is not None:
+        t = t[: weight_shape[0], : weight_shape[1]].contiguous()
+    return t

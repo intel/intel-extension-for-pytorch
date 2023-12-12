@@ -92,7 +92,7 @@ Using the default qconfig(recommended):
 ```python
 dynamic_qconfig = ipex.quantization.default_dynamic_qconfig
 # equal to 
-# QConfig(activation=PlaceholderObserver.with_args(dtype=torch.float, compute_dtype=torch.quint8),
+# QConfig(activation=PlaceholderObserver.with_args(dtype=torch.float, is_dynamic=True),
 #         weight=PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
 ```
 
@@ -100,7 +100,7 @@ or define your own qconfig as:
 
 ```python
 from torch.ao.quantization import MinMaxObserver, PlaceholderObserver, QConfig
-dynamic_qconfig = QConfig(activation = PlaceholderObserver.with_args(dtype=torch.float, compute_dtype=torch.quint8),
+dynamic_qconfig = QConfig(activation = PlaceholderObserver.with_args(dtype=torch.float, is_dynamic=True),
                           weight = MinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_tensor_symmetric))
 ```
 

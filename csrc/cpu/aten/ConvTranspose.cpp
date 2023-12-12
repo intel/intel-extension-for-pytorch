@@ -145,7 +145,7 @@ at::Tensor conv_transpose_kernel_impl(
     return mkldnn_to_dense(
                new_with_itensor_mkldnn(
                    std::move(y),
-                   optTypeMetaToScalarType(input.options().dtype_opt()),
+                   c10::optTypeMetaToScalarType(input.options().dtype_opt()),
                    input.options().device_opt()))
         .contiguous(memory_format);
   } else {
@@ -340,11 +340,11 @@ at::Tensor conv_transpose_backward_input(
       groups);
 
   if (!is_channels_last) {
-    return mkldnn_to_dense(
-               new_with_itensor_mkldnn(
-                   std::move(grad_x),
-                   optTypeMetaToScalarType(grad_output.options().dtype_opt()),
-                   grad_output.options().device_opt()))
+    return mkldnn_to_dense(new_with_itensor_mkldnn(
+                               std::move(grad_x),
+                               c10::optTypeMetaToScalarType(
+                                   grad_output.options().dtype_opt()),
+                               grad_output.options().device_opt()))
         .contiguous(memory_format);
   } else {
     return grad_input;

@@ -60,14 +60,7 @@ class SmoothQuantActivationObserver(UniformQuantizationObserverBase):
                 eps=eps,
             )
         else:
-            assert isinstance(act_ic_observer, UniformQuantizationObserverBase), (
-                f"act_ic_observer should be an instance of UniformQuantizationObserverBase "
-                f"or its subclass but got {type(act_ic_observer)}"
-            )
-            assert hasattr(
-                act_ic_observer, "ch_axis"
-            ), "act_ic_observer should be a per-channel observer and observe input channel axis"
-            self.ic_obs = act_ic_observer
+            self.ic_obs = act_ic_observer()
         if act_observer is None:
             self.act_obs = HistogramObserver(
                 dtype=dtype,
@@ -79,8 +72,7 @@ class SmoothQuantActivationObserver(UniformQuantizationObserverBase):
                 eps=eps,
             )
         else:
-            assert isinstance(act_observer, UniformQuantizationObserverBase)
-            self.act_obs = act_observer
+            self.act_obs = act_observer()
         # if smooth_quant_enabled is false, this observer acts as
         # a normal per-tensor observer
         self.smooth_quant_enabled = smooth_quant_enabled
@@ -95,6 +87,8 @@ class SmoothQuantActivationObserver(UniformQuantizationObserverBase):
     def forward(self, x_orig):
         if not self.smooth_quant_enabled:
             return self.act_obs.forward(x_orig)
+        # Run act_obs to indicate the observer has run
+        self.act_obs.forward(x_orig)
         # Call per-channel observer on IC to find scaling factor
         return self.ic_obs.forward(x_orig)
 
@@ -203,8 +197,7 @@ class SmoothQuantWeightObserver(UniformQuantizationObserverBase):
                 eps=eps,
             )
         else:
-            assert isinstance(wei_observer, UniformQuantizationObserverBase)
-            self.oc_obs = wei_observer
+            self.oc_obs = wei_observer()
         if wei_ic_observer is None:
             self.ic_obs = PerChannelMinMaxObserver(
                 ch_axis=1,
@@ -217,14 +210,7 @@ class SmoothQuantWeightObserver(UniformQuantizationObserverBase):
                 eps=eps,
             )
         else:
-            assert isinstance(wei_ic_observer, UniformQuantizationObserverBase), (
-                f"wei_ic_observer should be an instance of UniformQuantizationObserverBase "
-                f"or its subclass but got {type(wei_ic_observer)}"
-            )
-            assert hasattr(
-                wei_ic_observer, "ch_axis"
-            ), "wei_ic_observer should be a per-channel observer and observe input channel axis"
-            self.ic_obs = wei_ic_observer
+            self.ic_obs = wei_ic_observer()
         # if smooth_quant_enabled is false, this observer acts as
         # a normal observer
         self.smooth_quant_enabled = smooth_quant_enabled

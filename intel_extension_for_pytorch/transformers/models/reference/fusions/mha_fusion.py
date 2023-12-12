@@ -1,8 +1,8 @@
 import torch
 from torch import nn
 from typing import Optional, Tuple
-import re
 import math
+from torch.nn import functional as F
 
 
 class RotaryEmbedding(torch.nn.Module):
@@ -17,8 +17,9 @@ class RotaryEmbedding(torch.nn.Module):
         )
         self.model_backbone = str(backbone)
         freqs = torch.einsum("i,j->ij", t, self.inv_freq)
-        if re.search("falcon", str(backbone), re.IGNORECASE) or re.search(
-            "rw", str(backbone), re.IGNORECASE
+        if (
+            self.model_backbone == "FalconForCausalLM"
+            or self.model_backbone == "RWForCausalLM"
         ):
             self.sin_cos = torch.cat(
                 (freqs.sin().repeat(1, 2), freqs.cos().repeat(1, 2)), dim=-1
@@ -41,8 +42,9 @@ class RotaryEmbedding(torch.nn.Module):
             self.max_seq_len_cached = seq_len
             t = torch.arange(self.max_seq_len_cached, dtype=self.inv_freq.dtype)
             freqs = torch.einsum("i,j->ij", t, self.inv_freq)
-            if re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
-                "rw", self.model_backbone, re.IGNORECASE
+            if (
+                self.model_backbone == "FalconForCausalLM"
+                or self.model_backbone == "RWForCausalLM"
             ):
                 self.sin_cos = torch.cat(
                     (freqs.sin().repeat(1, 2), freqs.cos().repeat(1, 2)), dim=-1
@@ -114,6 +116,14 @@ class _IPEXRopeRef(nn.Module):
         x_embed = (x * cos) + (self.rotate_half(x) * sin)
         return x_embed
 
+    def apply_rotary_pos_emb_baichuan(self, x, cos, sin, position_ids):
+        cos = cos.squeeze(1).squeeze(0)  # [seq_len, dim]
+        sin = sin.squeeze(1).squeeze(0)  # [seq_len, dim]
+        cos = cos[position_ids].unsqueeze(1)  # [bs, 1, seq_len, dim]
+        sin = sin[position_ids].unsqueeze(1)  # [bs, 1, seq_len, dim]
+        x_embed = (x.float() * cos) + (self.rotate_half(x.float()) * sin)
+        return x_embed.to(x.dtype)
+
     def forward(
         self,
         x: torch.Tensor,
@@ -125,7 +135,7 @@ class _IPEXRopeRef(nn.Module):
         seq_len: Optional[int] = None,
     ):
         _sin_cos, _sin, _cos = self.embed_positions(seq_len)
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE):
+        if self.model_backbone == "GPTJForCausalLM":
             embed_positions = _sin_cos.repeat(position_ids.shape[0], 1, 1)
             repeated_position_ids = position_ids.unsqueeze(-1).repeat(
                 1, 1, embed_positions.shape[-1]
@@ -139,10 +149,12 @@ class _IPEXRopeRef(nn.Module):
                 x = torch.cat([x_rot, x_pass], dim=-1)
             else:
                 x = self.apply_rotary_pos_emb_gptj(x, sin, cos)
-        elif re.search("llama", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "LlamaForCausalLM":
             x = x.transpose(1, 2)
             x = self.apply_rotary_pos_emb_llama(x, _cos, _sin, position_ids)
-        elif re.search("gptneox", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "BaichuanForCausalLM":
+            x = self.apply_rotary_pos_emb_baichuan(x, _cos, _sin, position_ids)
+        elif self.model_backbone == "GPTNeoXForCausalLM":
             x = x.transpose(1, 2)
             x_rot = x[..., :rotary_ndims]
             x_pass = x[..., rotary_ndims:]
@@ -153,14 +165,40 @@ class _IPEXRopeRef(nn.Module):
                 ),
                 dim=-1,
             )
-        elif re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
-            "rw", self.model_backbone, re.IGNORECASE
+        elif (
+            self.model_backbone == "FalconForCausalLM"
+            or self.model_backbone == "RWForCausalLM"
         ):
             batch_size, x_length, _, _ = x.shape
             x = x.transpose(1, 2).reshape(batch_size * num_head, x_length, head_dim)
             _cos = _cos.type(x.dtype)[:, 0:seq_len]
             _sin = _sin.type(x.dtype)[:, 0:seq_len]
             x = (x * _cos) + (self.rotate_half(x) * _sin)
+        elif self.model_backbone == "CodeGenForCausalLM":
+            sincos = _sin_cos[position_ids]
+            sin, cos = torch.split(sincos, sincos.shape[-1] // 2, dim=-1)
+            if rotary_ndims is not None:
+                x_rot = x[:, :, :, :rotary_ndims]
+                x_pass = x[:, :, :, rotary_ndims:]
+
+                x_rot = self.apply_rotary_pos_emb_gptj(x_rot, sin, cos)
+                x = torch.cat([x_rot, x_pass], dim=-1)
+            else:
+                x = self.apply_rotary_pos_emb_gptj(x, sin, cos)
+        elif self.model_backbone == "ChatGLMModel":
+            b, sq, np, hn = x.size(0), x.size(1), x.size(2), x.size(3)
+            x, x_pass = x[..., :rotary_ndims], x[..., rotary_ndims:]
+            sincos = _sin_cos[None, None, position_ids : position_ids + sq, :]
+            sin, cos = torch.split(sincos, sincos.shape[-1] // 2, dim=-1)
+            x = x.reshape(b, -1, np, rotary_ndims // 2, 2)
+            x0 = x[..., 0].transpose(1, 2)
+            x1 = x[..., 1].transpose(1, 2)
+            x_rot = (
+                torch.stack((x0 * cos - x1 * sin, x0 * sin + x1 * cos), dim=-1)
+                .flatten(3)
+                .transpose(1, 2)
+            )
+            x = torch.cat([x_rot, x_pass], dim=-1)
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
         return x
@@ -170,20 +208,20 @@ class _IPEXScaleDotProductRef(nn.Module):
     def __init__(self, module, config):
         super().__init__()
         self.model_backbone = config.architectures[0]
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE):
+        if self.model_backbone == "GPTJForCausalLM":
             self.bias = module.bias
             self.scale_attn = module.scale_attn
             self.attn_dropout = module.attn_dropout
-        elif re.search("llama", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "LlamaForCausalLM":
             self.num_key_value_groups = (
                 module.num_key_value_groups
                 if hasattr(module, "num_key_value_groups")
                 else None
             )
-        elif re.search("OPT", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "OPTForCausalLM":
             self.num_heads = module.num_heads
             self.head_dim = module.head_dim
-        elif re.search("gptneox", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "GPTNeoXForCausalLM":
             self.bias = module.bias
             self.norm_factor = module.norm_factor
             self.attention_dropout = (
@@ -191,8 +229,9 @@ class _IPEXScaleDotProductRef(nn.Module):
                 if hasattr(module, "attention_dropout")
                 else None
             )
-        elif re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
-            "rw", self.model_backbone, re.IGNORECASE
+        elif (
+            self.model_backbone == "FalconForCausalLM"
+            or self.model_backbone == "RWForCausalLM"
         ):
             self.num_heads = module.num_heads
             self.head_dim = module.head_dim
@@ -201,6 +240,33 @@ class _IPEXScaleDotProductRef(nn.Module):
                 if hasattr(module, "new_decoder_architecture")
                 else None
             )
+        elif self.model_backbone == "BloomForCausalLM":
+            self.head_dim = module.head_dim
+            self.num_heads = module.num_heads
+            self.inv_norm_factor = module.inv_norm_factor
+            self.beta = module.beta
+            self.attention_dropout = module.attention_dropout
+        elif self.model_backbone == "CodeGenForCausalLM":
+            self.num_heads = module.num_attention_heads
+            self.head_dim = module.head_dim
+            self.scale_attn = module.scale_attn
+            self.attn_dropout = module.attn_dropout
+            self.causal_mask = module.causal_mask
+        elif self.model_backbone == "BaichuanForCausalLM":
+            self.head_dim = module.head_dim
+            self.num_heads = module.num_heads
+            self.hidden_size = module.hidden_size
+            if hasattr(self, "rotary_emb"):
+                self.rotary_emb = module.rotary_emb
+        elif self.model_backbone == "ChatGLMModel":
+            self.multi_query_attention = module.multi_query_attention
+            self.num_attention_heads_per_partition = (
+                module.num_attention_heads_per_partition
+            )
+            self.num_multi_query_groups_per_partition = (
+                module.num_multi_query_groups_per_partition
+            )
+            self.hidden_size_per_attention_head = module.hidden_size_per_attention_head
 
         for k, v in module.__class__.__dict__.items():
             if k.startswith("__") or k.startswith("forward"):
@@ -231,8 +297,9 @@ class _IPEXScaleDotProductRef(nn.Module):
         attention_mask: Optional[Tuple[torch.Tensor]] = None,
         alibi: Optional[torch.Tensor] = None,
     ):
-        if re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
-            "rw", self.model_backbone, re.IGNORECASE
+        if (
+            self.model_backbone == "FalconForCausalLM"
+            or self.model_backbone == "RWForCausalLM"
         ):
             num_kv_heads = (
                 self.num_heads if self.new_decoder_architecture else self.num_kv_heads
@@ -245,17 +312,32 @@ class _IPEXScaleDotProductRef(nn.Module):
         else:
             key = (
                 key.permute(0, 2, 1, 3)
-                if re.search("GPTJ", self.model_backbone, re.IGNORECASE)
-                or re.search("OPT", self.model_backbone, re.IGNORECASE)
+                if self.model_backbone
+                in [
+                    "GPTJForCausalLM",
+                    "OPTForCausalLM",
+                    "BloomForCausalLM",
+                    "CodeGenForCausalLM",
+                    "BaichuanForCausalLM",
+                    "ChatGLMModel",
+                ]
                 else key
             )
             query = (
                 query.permute(0, 2, 1, 3)
-                if re.search("GPTJ", self.model_backbone, re.IGNORECASE)
-                or re.search("OPT", self.model_backbone, re.IGNORECASE)
+                if self.model_backbone
+                in [
+                    "GPTJForCausalLM",
+                    "OPTForCausalLM",
+                    "BloomForCausalLM",
+                    "CodeGenForCausalLM",
+                    "BaichuanForCausalLM",
+                    "ChatGLMModel",
+                ]
                 else query
             )
             value = value.permute(0, 2, 1, 3)
+
         if layer_past is not None:
             past_key = layer_past[0]
             past_value = layer_past[1]
@@ -263,11 +345,11 @@ class _IPEXScaleDotProductRef(nn.Module):
             value = torch.cat((past_value, value), dim=-2)
         present = (key, value)
 
-        if re.search("GPTJ", self.model_backbone, re.IGNORECASE):
+        if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
             attn_output, attn_weights = self._attn(
                 query, key, value, attention_mask, head_mask
             )
-        elif re.search("llama", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "LlamaForCausalLM":
             # repeat k/v heads if n_kv_heads < n_heads
             key = self._repeat_kv(key, self.num_key_value_groups)
             value = self._repeat_kv(value, self.num_key_value_groups)
@@ -283,12 +365,12 @@ class _IPEXScaleDotProductRef(nn.Module):
             ).to(query.dtype)
             attn_output = torch.matmul(attn_weights, value)
 
-        elif re.search("gptneox", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "GPTNeoXForCausalLM":
             # Compute attention
             attn_output, attn_weights = self._attn(
                 query, key, value, attention_mask, head_mask
             )
-        elif re.search("OPT", self.model_backbone, re.IGNORECASE):
+        elif self.model_backbone == "OPTForCausalLM":
             bsz, _, tgt_len, _ = query.size()
             proj_shape = (bsz * self.num_heads, -1, self.head_dim)
             query_states = query.view(*proj_shape) / scale_attn
@@ -324,8 +406,9 @@ class _IPEXScaleDotProductRef(nn.Module):
                 )
                 attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
             attn_output = torch.bmm(attn_weights, value_states)
-        elif re.search("falcon", self.model_backbone, re.IGNORECASE) or re.search(
-            "rw", self.model_backbone, re.IGNORECASE
+        elif (
+            self.model_backbone == "FalconForCausalLM"
+            or self.model_backbone == "RWForCausalLM"
         ):
             _, kv_length, _ = key.shape
             attention_mask_float = attention_mask
@@ -375,6 +458,105 @@ class _IPEXScaleDotProductRef(nn.Module):
                 context_layer = (attention_probs_reshaped @ value_layer_).flatten(0, 1)
 
             attn_weights = attention_scores if alibi is None else attention_probs
+        elif self.model_backbone == "BloomForCausalLM":
+            batch_size, _, q_length, _ = query.shape
+            query = query.reshape(batch_size * self.num_heads, q_length, self.head_dim)
+            key = key.reshape(batch_size * self.num_heads, -1, self.head_dim)
+            value = value.reshape(batch_size * self.num_heads, -1, self.head_dim)
+            matmul_result = alibi.baddbmm(
+                batch1=query,
+                batch2=key.transpose(-1, -2),
+                beta=self.beta,
+                alpha=self.inv_norm_factor,
+            )
+            attention_scores = matmul_result.view(
+                batch_size, self.num_heads, q_length, -1
+            )
+            input_dtype = attention_scores.dtype
+            if input_dtype == torch.float16:
+                attention_scores = attention_scores.to(torch.float)
+            new_alibi = (
+                alibi.repeat(1, q_length, 1)
+                .view(batch_size, self.num_heads, q_length, -1)
+                .contiguous()
+            )
+            attn_weights = torch.masked_fill(
+                attention_scores,
+                (attention_mask - new_alibi).to(torch.bool),
+                torch.finfo(attention_scores.dtype).min,
+            )
+            attention_probs = F.softmax(attn_weights, dim=-1, dtype=torch.float32).to(
+                input_dtype
+            )
+            attention_probs = self.attention_dropout(attention_probs)
+            if head_mask is not None:
+                attention_probs = attention_probs * head_mask
+            attention_probs_reshaped = attention_probs.view(
+                batch_size * self.num_heads, q_length, -1
+            )
+            attn_output = torch.bmm(attention_probs_reshaped, value)
+            attn_output = attn_output.view(
+                batch_size, self.num_heads, q_length, self.head_dim
+            )
+        elif self.model_backbone == "BaichuanForCausalLM":
+            attn_weights = torch.matmul(query, key.transpose(2, 3)) / math.sqrt(
+                self.head_dim
+            )
+            if attention_mask is not None:
+                attn_weights = attn_weights + attention_mask
+                attn_weights = torch.max(
+                    attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min)
+                )
+            attn_weights = torch.nn.functional.softmax(attn_weights, dim=-1)
+            attn_output = torch.matmul(attn_weights, value)
+        elif self.model_backbone == "ChatGLMModel":
+            key = key.permute(2, 0, 1, 3)
+            value = value.permute(2, 0, 1, 3)
+            query = query.permute(2, 0, 1, 3)
+            if self.multi_query_attention:
+                key = key.unsqueeze(-2)
+                key = key.expand(
+                    -1,
+                    -1,
+                    -1,
+                    self.num_attention_heads_per_partition
+                    // self.num_multi_query_groups_per_partition,
+                    -1,
+                )
+                key = key.contiguous().view(
+                    key.size()[:2]
+                    + (
+                        self.num_attention_heads_per_partition,
+                        self.hidden_size_per_attention_head,
+                    )
+                )
+                value = value.unsqueeze(-2)
+                value = value.expand(
+                    -1,
+                    -1,
+                    -1,
+                    self.num_attention_heads_per_partition
+                    // self.num_multi_query_groups_per_partition,
+                    -1,
+                )
+                value = value.contiguous().view(
+                    value.size()[:2]
+                    + (
+                        self.num_attention_heads_per_partition,
+                        self.hidden_size_per_attention_head,
+                    )
+                )
+            attention_mask = None
+            query, key, value = [k.permute(1, 2, 0, 3) for k in [query, key, value]]
+            if query.shape[2] == key.shape[2]:
+                attn_output = torch.nn.functional.scaled_dot_product_attention(
+                    query, key, value, is_causal=True
+                )
+            else:
+                attn_output = torch.nn.functional.scaled_dot_product_attention(
+                    query, key, value, attention_mask
+                )
+            attn_weights = None
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
         return attn_output, attn_weights, present

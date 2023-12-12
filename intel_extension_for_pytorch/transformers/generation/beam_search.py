@@ -11,7 +11,6 @@ from transformers.generation.logits_process import LogitsProcessorList
 from transformers.generation.beam_search import BeamScorer
 from transformers.utils import ModelOutput
 import time
-import re
 
 
 class BeamSearchEncoderDecoderOutput(ModelOutput):
@@ -169,99 +168,45 @@ def _beam_search(
                 break
 
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
-        if (
-            re.search("GPTJ", self.config.architectures[0])
-            or re.search("llama", self.config.architectures[0], re.IGNORECASE)
-            or re.search("gptneox", self.config.architectures[0], re.IGNORECASE)
-            or re.search("OPT", self.config.architectures[0], re.IGNORECASE)
-            or re.search("falcon", self.config.architectures[0], re.IGNORECASE)
-            or re.search("rw", self.config.architectures[0], re.IGNORECASE)
-        ):
+
+        self.model_backbone = self.config.architectures[0]
+        if self.model_backbone in [
+            "GPTJForCausalLM",
+            "LlamaForCausalLM",
+            "GPTNeoXForCausalLM",
+            "OPTForCausalLM",
+            "FalconForCausalLM",
+            "RWForCausalLM",
+            "BloomForCausalLM",
+            "CodeGenForCausalLM",
+            "BaichuanForCausalLM",
+            "ChatGLMModel",
+        ]:
             first_token = False
-            input_bs = input_ids.size()[0]
-            has_position_id = True
+            has_position_id = "position_ids" in model_inputs
             if model_inputs["past_key_values"] is None:
                 first_token = True
             if first_token:
-                if re.search("GPTJ", self.config.architectures[0]):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.n_layer)
-                        ]
-                    )
-                elif re.search("llama", self.config.architectures[0], re.IGNORECASE):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
-                elif re.search("gptneox", self.config.architectures[0], re.IGNORECASE):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
-                elif re.search("OPT", self.config.architectures[0], re.IGNORECASE):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
-                    has_position_id = False
-                elif re.search(
-                    "falcon", self.config.architectures[0], re.IGNORECASE
-                ) or re.search("rw", self.config.architectures[0], re.IGNORECASE):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
-                    has_position_id = False
+                if hasattr(self.config, "n_layer"):
+                    num_hidden_layers = self.config.n_layer
+                elif hasattr(self.config, "num_hidden_layers"):
+                    num_hidden_layers = self.config.num_hidden_layers
+                elif hasattr(self.config, "num_layers"):
+                    num_hidden_layers = self.config.num_layers
+                beam_idx_tmp = torch.zeros(
+                    (2048, int(batch_size * num_beams)), dtype=torch.long
+                ).contiguous()
+                model_inputs["past_key_values"] = tuple(
+                    [
+                        (
+                            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                            torch.zeros([1, 1, 1, 1]).contiguous(),
+                            torch.zeros([1, 1, 1, 1]).contiguous(),
+                            beam_idx_tmp,
+                        )
+                        for i in range(num_hidden_layers)
+                    ]
+                )
 
             if hasattr(self, "trace_graph"):
                 if first_token:
@@ -288,6 +233,10 @@ def _beam_search(
                         model_inputs["position_ids"] = new_position_ids
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
+                if "return_last_logit" in model_inputs:
+                    model_inputs["return_last_logit"] = torch.tensor(
+                        model_inputs["return_last_logit"]
+                    )
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
                 else:

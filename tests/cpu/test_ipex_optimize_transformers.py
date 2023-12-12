@@ -7,6 +7,7 @@ import os
 import copy
 import re
 import tempfile
+from intel_extension_for_pytorch.quantization import prepare, convert
 
 try:
     import transformers
@@ -98,7 +99,9 @@ class OptimizeTransformersTester(TestCase):
                         )
                     self.assertEqual(key_hf[0], key_ipex[0], prec=0.1)
 
-                    if re.search("GPTJ", model.config.architectures[0]):
+                    if re.search("GPTJ", model.config.architectures[0]) or re.search(
+                        "codegen", model.config.architectures[0]
+                    ):
                         assert (
                             ipex_m.transformer.h[0].attn.__class__
                             is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
@@ -136,6 +139,8 @@ class OptimizeTransformersTester(TestCase):
                         )
                     elif re.search(
                         "falcon", model.config.architectures[0], re.IGNORECASE
+                    ) or re.search(
+                        "bloom", model.config.architectures[0], re.IGNORECASE
                     ):
                         assert (
                             type(ipex_m.transformer.h[0].self_attention)
@@ -143,6 +148,28 @@ class OptimizeTransformersTester(TestCase):
                         )
                         assert (
                             type(ipex_m.transformer.h[0])
+                            is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
+                        )
+                    elif re.search(
+                        "baichuan", model.config.architectures[0], re.IGNORECASE
+                    ):
+                        assert (
+                            type(ipex_m.model.layers[0].self_attn)
+                            is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
+                        )
+                        assert (
+                            type(ipex_m.model.layers[0])
+                            is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
+                        )
+                    elif re.search(
+                        "chatglm", model.config.architectures[0], re.IGNORECASE
+                    ):
+                        assert (
+                            type(ipex_m.transformer.encoder.layers[0].self_attention)
+                            is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
+                        )
+                        assert (
+                            type(ipex_m.transformer.encoder.layers[0])
                             is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
                         )
 
@@ -228,10 +255,87 @@ class OptimizeTransformersTester(TestCase):
             ipex.nn.utils._model_convert.replace_customized_linear_with_linear(m.eval())
         self.model_replacement_check(m, False, torchcompile=True)
 
+    def test_model_replacement_bloom(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/bloom", return_dict=False
+        )
+
+        m = transformers.models.bloom.modeling_bloom.BloomForCausalLM(config).eval()
+        self.model_replacement_check(m, False)
+
+    def test_model_replacement_bloom_torchcompile(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/bloom", return_dict=False
+        )
+        m = transformers.models.bloom.modeling_bloom.BloomForCausalLM(config).eval()
+        # TODO: fix accuracy issue
+        # self.model_replacement_check(m, False, torchcompile=True)
+
+    def test_model_replacement_codegen(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/codegen", return_dict=False
+        )
+        m = transformers.models.codegen.modeling_codegen.CodeGenForCausalLM(
+            config
+        ).eval()
+        self.model_replacement_check(m, True)
+
+    def test_model_replacement_codegen_torchcompile(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/codegen", return_dict=False
+        )
+        m = transformers.models.codegen.modeling_codegen.CodeGenForCausalLM(
+            config
+        ).eval()
+        self.model_replacement_check(m, True, torchcompile=True)
+
+    def test_model_replacement_baichuan(self):
+        from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
+
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/baichuan", return_dict=False, trust_remote_code=True
+        )
+        m = BaichuanForCausalLM(config).eval()
+        self.model_replacement_check(m, False)
+
+    def test_model_replacement_baichuan_torchcompile(self):
+        from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
+
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/baichuan", return_dict=False, trust_remote_code=True
+        )
+        m = BaichuanForCausalLM(config).eval()
+        self.model_replacement_check(m, False, torchcompile=True)
+
+    def test_model_replacement_chatglm(self):
+        from hf_configs.chatglm.modeling_chatglm import ChatGLMForConditionalGeneration
+
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/chatglm", return_dict=False, trust_remote_code=True
+        )
+        m = ChatGLMForConditionalGeneration(config).eval()
+        self.model_replacement_check(m, False)
+
+    def test_model_replacement_chatglm_torchcompile(self):
+        from hf_configs.chatglm.modeling_chatglm import ChatGLMForConditionalGeneration
+
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/chatglm", return_dict=False, trust_remote_code=True
+        )
+        m = ChatGLMForConditionalGeneration(config).eval()
+        self.model_replacement_check(m, False, torchcompile=True)
+
     def _model_replacement_check_woq(self, model):
-        qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
+        qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping()
+        orig_model = copy.deepcopy(model)
+        orig_woq_model = prepare(orig_model, qconfig_mapping, inplace=True)
+        orig_woq_model = convert(orig_woq_model, inplace=True)
+
         model = ipex.optimize_transformers(
-            model, dtype=torch.float, quantization_config=qconfig, deployment_mode=True
+            model,
+            dtype=torch.float,
+            quantization_config=qconfig_mapping,
+            deployment_mode=True,
         )
         if not hasattr(model, "trace_graph"):
             AssertionError(False)
@@ -270,7 +374,14 @@ class OptimizeTransformersTester(TestCase):
         # Ensure model can run without errors
         with torch.no_grad():
             example_inputs = _get_gptj_example_inputs()
-            model(*example_inputs)
+            y = model(*example_inputs)
+            y_ref = orig_woq_model(
+                input_ids=example_inputs[0],
+                attention_mask=example_inputs[1],
+                position_ids=example_inputs[2],
+                use_cache=True,
+            )
+            self.assertEqual(y[0], y_ref[0], prec=1e-4)
 
     def test_weight_only_quant_flow_for_gptj(self):
         config = AutoConfig.from_pretrained(

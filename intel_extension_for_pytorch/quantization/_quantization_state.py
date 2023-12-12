@@ -391,7 +391,9 @@ class AutoQuantizationState(torch.nn.Module):
         act_key = str(self.idx)
         if act_key in self.idx_to_smooth_quant_scaling_factor:
             act_scaling_factors = self.idx_to_smooth_quant_scaling_factor[act_key]
-            if act_scaling_factors is not None:
+            # if users modifies qconf.json and cancals quantization of the linear,
+            # then any_arg_quant_or_dequant_needed[0] is False. Don't insert mul in this case.
+            if act_scaling_factors is not None and any_arg_quant_or_dequant_needed[0]:
                 w_key = str(self.idx) + "_0"
                 act_scaling_factors = (
                     act_scaling_factors[w_key]
@@ -399,16 +401,22 @@ class AutoQuantizationState(torch.nn.Module):
                     else next(iter(act_scaling_factors.values()))
                 )
                 # update arg_quant_infos
-                scale = (
-                    arg_quant_infos[0][0][w_key]
-                    if len(arg_quant_infos[0][0]) > 1
-                    else next(iter(arg_quant_infos[0][0].values()))
-                )
-                zp = (
-                    arg_quant_infos[0][1][w_key]
-                    if len(arg_quant_infos[0][1]) > 1
-                    else next(iter(arg_quant_infos[0][1].values()))
-                )
+                if isinstance(arg_quant_infos[0][0], dict):
+                    scale = (
+                        arg_quant_infos[0][0][w_key]
+                        if len(arg_quant_infos[0][0]) > 1
+                        else next(iter(arg_quant_infos[0][0].values()))
+                    )
+                    zp = (
+                        arg_quant_infos[0][1][w_key]
+                        if len(arg_quant_infos[0][1]) > 1
+                        else next(iter(arg_quant_infos[0][1].values()))
+                    )
+                else:
+                    # For backward compatibility
+                    assert isinstance(arg_quant_infos[0][0], torch.Tensor)
+                    scale = arg_quant_infos[0][0]
+                    zp = arg_quant_infos[0][1]
                 arg_quant_infos = [(scale, zp, arg_quant_infos[0][2])]
                 args = list(args)
                 new_act = torch.mul(args[0], act_scaling_factors)

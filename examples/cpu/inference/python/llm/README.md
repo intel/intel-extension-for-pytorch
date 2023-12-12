@@ -1,6 +1,6 @@
 # Text Generation
 We provide the inference benchmarking scripts for large language models text generation.<br/>
-Support large language model families, including GPT-J, LLaMA, GPT-Neox, OPT, Falcon.<br/>
+Support large language model families, including GPT-J, LLaMA, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM.<br/>
 The scripts include both single instance and distributed (DeepSpeed) use cases.<br/>
 The scripts cover model generation inference with low precions cases for different models with best perf and accuracy (bf16 AMP，static quantization and weight only quantization).<br/>
 
@@ -85,10 +85,16 @@ wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prom
 |GPT-NEOX| "EleutherAI/gpt-neox-20b" | ✅ | ✅ | ✅ | ❎ ** | 
 |FALCON*|"tiiuae/falcon-40b" | ✅ | ✅ |  ✅ | ❎ **| 
 |OPT|"facebook/opt-30b", "facebook/opt-1.3b"| ✅ | ✅ |  ✅ | ❎ **| 
+|Bloom|"bigscience/bloom", "bigscience/bloom-1b7"| ✅ | ✅ |  ✅ | ❎ **|
+|CodeGen|"Salesforce/codegen-2B-multi"| ✅ | ✅ |  ✅ | ❎ **|
+|Baichuan|"baichuan-inc/Baichuan2-13B-Chat", "baichuan-inc/Baichuan2-7B-Chat", "Baichuan-inc/Baichuan-13B-Chat"| ✅ | ✅ |  ✅ | ❎ **|
+|ChatGLM|"THUDM/chatglm3-6b", "THUDM/chatglm2-6b"| ✅ | ✅ |  ✅ | ❎ **|
 
 *For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for FP32/BF16 but needed for quantizations.
 
-** For GPT-NEOX/FALCON/OPT models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.
+*For ChatGLM models, the default torch_dtype is float16 in config.json. We need to replace the "float16" with "float32" in config.json.
+
+** For GPT-NEOX/FALCON/OPT/Bloom/CodeGen/Baichuan models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM model families, we are working in progress to cover those optimizations, which will expand the model list above.
 
@@ -125,7 +131,7 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list
 # For other variant models, suggest using default alpha=0.5, and could be further tuned in the range [0, 1.0]. (suggest step_size of 0.05)
 
 Notes:
-(1) for quantization benchmarks, the first runs will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, you can reuse these quantized models for inference-only benchmarks by using "--quantized-model-path <output_dir + "best_model.pt">".
+(1) <a name="generation_sq">for all quantization benchmarks</a>, both quantization and inference stages will be triggered by default. For quantization stage, it will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, and for inference stage, it will launch the inference with the quantized model "best_model.pt".  For inference-only benchmarks (avoid the repeating quantization stage), you can also reuse these quantized models for by adding "--quantized-model-path <output_dir + "best_model.pt">" . Besides, specific for static quantization, if not using "--qconfig-summary-file", a qconfig recipe will also be generated in the "--output-dir" path, which could be reused as well (to generate the quantized model "best_model.pt").
 (2) for Falcon quantizations, "--config-file <CONFIG_FILE>" is needed and example of <CONFIG_FILE>: "utils/model_config/tiiuae_falcon-40b_config.json".
 (3) for GPT-NEOX quantizations, using "--int8" instead of "--int8-bf16-mixed" for accuracy concerns.
 (4) By default, generations are based on "beam search", and beam size = 4. For beam size = 1, please add "--greedy"
@@ -142,7 +148,8 @@ unset KMP_AFFINITY
 deepspeed --bind_cores_to_rank  run.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --deployment-mode --autotp --shard-model
 
 # weight only quantization int8 benchmark
-deepspeed --bind_cores_to_rank run.py  --benchmark -m <MODEL_ID> --ipex --ipex-weight-only-quantization --output-dir "saved_results" --int8-bf16-mixed --autotp --shard-model
+deepspeed --bind_cores_to_rank run.py  --benchmark -m <MODEL_ID> --ipex --ipex-weight-only-quantization --output-dir "./saved_results" --int8-bf16-mixed --autotp --shard-model
+# The command will shard the model, quantize the model by weight-only quantization then run the benchmark. The quantized model won't be saved.
 
 Notes:
 (1) for Falcon quantizations, "--config-file <CONFIG_FILE>" is needed and example of <CONFIG_FILE>: "utils/model_config/tiiuae_falcon-40b_config.json".
@@ -184,19 +191,20 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python ru
 ```
 
 ## Weight only quantization with low precision checkpoint (Experimental)
-Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 probably results in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a some dataset by such algorithms. The results are saved as a `state_dict` in a `.pt` file. We provided a script here to run GPTQ (Intel(R) Neural Compressor 2.3.1 is required).
+Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 probably results in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a dataset by such algorithms. The results are saved as a `state_dict` in a `.pt` file. We provided a script here to run GPTQ (Intel(R) Neural Compressor 2.3.1 is required).
 
 Here is how to use it:
 ```bash
 # Step 1: Generate modified weights and quantization info
 python utils/run_gptq.py --model <MODEL_ID> --output-dir ./saved_results
+# Please note that tiiuae/falcon-40b is not supported yet
 ```
-It may take a few hours to finish. Modified weights and their quantization info are stored in `gptq_checkpoint.pt`.
+It may take a few hours to finish. Modified weights and their quantization info are stored in `gptq_checkpoint_g128.pt`, where g128 means group size for input channel is 128 by default. Group size controls the granularity of quantization of weight along input channel. The dataset for calibration is NeelNanda/pile-10k by default. To use other dataset, such as lambada, you may use `--dataset <dataset id>` to specify.
 Then generate model for weight only quantization with INT4 weights and run tasks.
 ```bash
 # Step 2: Generate quantized model with INT4 weights
 # Provide checkpoint file name by --low-precision-checkpoint <file name>
-python single_instance/run_quantization.py --ipex-weight-only-quantization --output-dir "saved_results" --int8-bf16-mixed -m <MODEL_ID> --low-precision-checkpoint "saved_results/gptq_checkpoint.pt"
+python single_instance/run_quantization.py --ipex-weight-only-quantization --output-dir "saved_results" --int8-bf16-mixed -m <MODEL_ID> --low-precision-checkpoint "saved_results/gptq_checkpoint_g128.pt"
 
 # Step 3: Run quantized model for latency benchmark
 # For GPT-NEOX, use --int8 instead of --int8-bf16-mixed
@@ -274,7 +282,7 @@ export WORK_DIR=./
 cd distributed
 mv PATH/TO/prompt.json ./
 
-# Run GPTJ/LLAMA/OPT/Falcon with bfloat16 DeepSpeed
+# Run GPTJ/LLAMA/OPT/Falcon/Bloom/CodeGen/Baichuan/ChatGLM with bfloat16 DeepSpeed
 deepspeed --bind_cores_to_rank run_generation_with_deepspeed.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --deployment-mode
 
 # Run GPT-NeoX with ipex weight only quantization

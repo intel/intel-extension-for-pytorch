@@ -1,6 +1,5 @@
 import torch
 import copy
-import re
 import warnings
 import pkg_resources
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
@@ -97,6 +96,8 @@ def model_convert_reference(_model):
         _convert_to_rw_cache,
         _prepare_decoder_attention_mask,
         _prepare_attn_mask_falcon,
+        _gen_baichuan_alibi_mask,
+        GLM2_get_masks,
     )
 
     # model wise optimization for Feedforward and Decoder layer modules
@@ -108,6 +109,12 @@ def model_convert_reference(_model):
         LlamaForCausalLM_forward,
         GPTNeoXForCausalLM_forward,
         OPTForCausalLM_forward,
+        CodeGenForCausalLM_forward,
+        BaichuanForCausalLM_forward,
+        BaichuanModel_forward,
+        ChatGLMModel_forward,
+        GLMTransformer_forward,
+        ChatGLMForConditionalGeneration_forward,
         prepare_inputs_for_generation,
     )
 
@@ -172,6 +179,16 @@ def model_convert_reference(_model):
             "forward",
             OPTForCausalLM_forward,
         )
+    elif (
+        hasattr(_model, "__class__")
+        and _model.__class__
+        == transformers.models.codegen.modeling_codegen.CodeGenForCausalLM
+    ):
+        convert_function(
+            _model,
+            "forward",
+            CodeGenForCausalLM_forward,
+        )
 
     # checking if model has been wrapped by deepspeed (distributed or not)
     try:
@@ -189,6 +206,8 @@ def model_convert_reference(_model):
         transformers.models.llama.modeling_llama.LlamaAttention,
         transformers.models.gptj.modeling_gptj.GPTJAttention,
         transformers.models.opt.modeling_opt.OPTAttention,
+        transformers.models.bloom.modeling_bloom.BloomAttention,
+        transformers.models.codegen.modeling_codegen.CodeGenAttention,
     ]:
         convert_class(
             _model,
@@ -201,7 +220,9 @@ def model_convert_reference(_model):
     for supported_decoder_class in [
         transformers.models.llama.modeling_llama.LlamaDecoderLayer,
         transformers.models.gptj.modeling_gptj.GPTJBlock,
+        transformers.models.codegen.modeling_codegen.CodeGenBlock,
         transformers.models.opt.modeling_opt.OPTDecoderLayer,
+        transformers.models.bloom.modeling_bloom.BloomBlock,
     ]:
         convert_class(
             _model,
@@ -212,8 +233,20 @@ def model_convert_reference(_model):
         )
 
     # special list that has not official transformers design
-    if re.search("falcon", _model.config.architectures[0], re.IGNORECASE) or re.search(
-        "rw", _model.config.architectures[0], re.IGNORECASE
+    if _model.config.architectures[0] == "BloomForCausalLM":
+        convert_function(
+            _model.transformer,
+            "_prepare_attn_mask",
+            _prepare_attn_mask_falcon,
+        )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation,
+        )
+    if (
+        _model.config.architectures[0] == "FalconForCausalLM"
+        or _model.config.architectures[0] == "RWForCausalLM"
     ):
         with torch.no_grad():
             ipex.nn.utils._model_convert.replace_customized_linear_with_linear(
@@ -257,6 +290,47 @@ def model_convert_reference(_model):
             _model.transformer.alibi = _model.transformer.use_alibi
         elif hasattr(_model.transformer, "alibi"):
             _model.transformer.use_alibi = _model.transformer.alibi
+    elif _model.config.architectures[0] == "BaichuanForCausalLM":
+        convert_function(_model, "forward", BaichuanForCausalLM_forward)
+        convert_class(
+            _model,
+            type(_model.model.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        if not distributed:
+            convert_function(_model.model, "forward", BaichuanModel_forward)
+            _model.model.future_mask = _gen_baichuan_alibi_mask(
+                _model.model.layers[0].self_attn.num_heads,
+                _model.model.layers[0].self_attn.max_position_embeddings,
+            )
+    elif _model.config.architectures[0] == "ChatGLMModel":
+        convert_function(_model, "forward", ChatGLMForConditionalGeneration_forward)
+        convert_function(_model.transformer, "forward", ChatGLMModel_forward)
+        convert_function(_model.transformer.encoder, "forward", GLMTransformer_forward)
+        convert_class(
+            _model,
+            type(_model.transformer.encoder.layers[0].self_attention),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.transformer.encoder.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_function(_model.transformer, "get_masks", GLM2_get_masks)
 
     return _model
 
@@ -288,31 +362,11 @@ def get_dummy_input(_model, return_dict=False):
     )
 
     input_ids = torch.ones(32).to(torch.long)
+    model_inputs = _model.prepare_inputs_for_generation(input_ids.unsqueeze(0))
+    has_position_ids = "position_ids" in model_inputs
     attention_mask = torch.ones(len(input_ids))
     position_ids = torch.arange(len(input_ids))
-    if re.search("opt", _model.config.architectures[0], re.IGNORECASE):
-        sample_inputs = (
-            {
-                "input_ids": input_ids.unsqueeze(0),
-                "attention_mask": attention_mask.unsqueeze(0),
-                "past_key_values": past_key_values,
-            }
-            if return_dict
-            else (input_ids.unsqueeze(0), attention_mask.unsqueeze(0), past_key_values)
-        )
-    elif re.search(
-        "falcon", _model.config.architectures[0], re.IGNORECASE
-    ) or re.search("rw", _model.config.architectures[0], re.IGNORECASE):
-        sample_inputs = (
-            {
-                "input_ids": input_ids.unsqueeze(0),
-                "past_key_values": past_key_values,
-                "attention_mask": attention_mask.unsqueeze(0),
-            }
-            if return_dict
-            else (input_ids.unsqueeze(0), past_key_values, attention_mask.unsqueeze(0))
-        )
-    else:
+    if has_position_ids:
         sample_inputs = (
             {
                 "input_ids": input_ids.unsqueeze(0),
@@ -328,6 +382,18 @@ def get_dummy_input(_model, return_dict=False):
                 past_key_values,
             )
         )
+    else:
+        sample_inputs = (
+            {
+                "input_ids": input_ids.unsqueeze(0),
+                "past_key_values": past_key_values,
+                "attention_mask": attention_mask.unsqueeze(0),
+            }
+            if return_dict
+            else (input_ids.unsqueeze(0), past_key_values, attention_mask.unsqueeze(0))
+        )
+    if "return_last_logit" in model_inputs:
+        sample_inputs["return_last_logit"] = torch.tensor(True)
     return sample_inputs
 
 
@@ -336,22 +402,25 @@ def ipex_quantization_flow(
 ):
     from intel_extension_for_pytorch.quantization import prepare, convert
 
-    if not _is_woq_qconfig(qconfig) and sample_inputs is None:
+    is_woq = _is_woq_qconfig(qconfig)
+    if not is_woq and sample_inputs is None:
         sample_inputs = get_dummy_input(_model)
 
     prepared_model = prepare(
         _model.eval(), qconfig, example_inputs=sample_inputs, inplace=True
     )
+
     if static_qconfig_file is not None:
         prepared_model.load_qconf_summary(qconf_summary=static_qconfig_file)
         print("ipex.optimize_transformers is doing the static quantization")
     else:
         print("ipex.optimize_transformers is doing the weight only quantization")
+
     with torch.no_grad(), torch.cpu.amp.autocast(
         enabled=True if dtype is torch.bfloat16 else False
     ):
         convert_model = convert(prepared_model.eval(), inplace=True).eval()
-        if _is_woq_qconfig(qconfig) and dtype is torch.bfloat16:
+        if is_woq and dtype is torch.bfloat16:
             convert_model = convert_model.to(dtype)
     return convert_model
 
@@ -382,9 +451,18 @@ def model_convert_lowering(
         if not is_quantization or woq:
             import transformers
 
-            for supported_class in [
-                transformers.models.llama.modeling_llama.LlamaRMSNorm
-            ]:
+            supported_classes = [transformers.models.llama.modeling_llama.LlamaRMSNorm]
+            if _model.config.architectures[0] == "BaichuanForCausalLM":
+                supported_classes.append(type(_model.model.layers[0].input_layernorm))
+            if (
+                _model.config.architectures[0] == "ChatGLMModel"
+                and _model.config.rmsnorm
+            ):
+                supported_classes.append(
+                    type(_model.transformer.encoder.layers[0].input_layernorm)
+                )
+
+            for supported_class in supported_classes:
                 lowering_class_cpu(
                     _model,
                     supported_class,
@@ -452,7 +530,7 @@ def optimize_transformers(
     r"""
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
     This API focus on transformers models, especially for generation tasks inference.
-    Well supported model family: Llama, GPT-J, GPT-Neox, OPT, Falcon.
+    Well supported model family: Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
@@ -540,17 +618,22 @@ def optimize_transformers(
             )
             return model
 
-        well_supported_model = (
-            re.search("GPTJ", model.config.architectures[0], re.IGNORECASE)
-            or re.search("llama", model.config.architectures[0], re.IGNORECASE)
-            or re.search("gptneox", model.config.architectures[0], re.IGNORECASE)
-            or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
-            or re.search("falcon", model.config.architectures[0], re.IGNORECASE)
-            or re.search("rw", model.config.architectures[0], re.IGNORECASE)
-        )
+        well_supported_model = model.config.architectures[0] in [
+            "GPTJForCausalLM",
+            "LlamaForCausalLM",
+            "GPTNeoXForCausalLM",
+            "OPTForCausalLM",
+            "FalconForCausalLM",
+            "RWForCausalLM",
+            "BloomForCausalLM",
+            "CodeGenForCausalLM",
+            "BaichuanForCausalLM",
+            "ChatGLMModel",
+        ]
         if not well_supported_model:
             warnings.warn(
-                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, and OPT, fallback to origin model"
+                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, Baichuan, and ChatGLM \
+                    fallback to origin model"
             )
             return model
 

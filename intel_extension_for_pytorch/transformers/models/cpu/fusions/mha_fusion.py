@@ -29,8 +29,8 @@ class _IPEXRopeCPU(nn.Module):
     ):
         position_ids = position_ids.contiguous()
         sin_cos, _, _ = self.embed_positions(seq_len)
-        x = x.contiguous()
-        torch.ops.torch_ipex.rotary_position_embedding(
+        # ToDo: when the input is concat_qkv, the output will be (query, key, value)
+        query, key, value = torch.ops.torch_ipex.rotary_position_embedding(
             x,
             sin_cos,
             position_ids,
@@ -39,8 +39,7 @@ class _IPEXRopeCPU(nn.Module):
             offset,
             rotary_ndims,
         )
-
-        return x
+        return query
 
 
 class _IPEXScaleDotProductCPU(nn.Module):
@@ -109,7 +108,12 @@ class _IPEXRMSNorm(nn.Module):
     def __init__(self, module, config=None, tpp=False, woq=False):
         super().__init__()
         self.weight = module.weight
-        self.variance_epsilon = module.variance_epsilon
+        if hasattr(module, "variance_epsilon"):
+            self.variance_epsilon = module.variance_epsilon
+        elif hasattr(module, "epsilon"):
+            self.variance_epsilon = module.epsilon
+        elif hasattr(module, "eps"):
+            self.variance_epsilon = module.eps
 
     def forward(self, hidden_states):
         return torch.ops.torch_ipex.rmsnorm(

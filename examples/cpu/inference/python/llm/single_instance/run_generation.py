@@ -12,6 +12,10 @@ from transformers import (
 )
 
 
+import sys
+
+sys.path.append(sys.path[0] + '/../../')
+
 # supported models
 MODEL_CLASSES = {
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
@@ -19,6 +23,11 @@ MODEL_CLASSES = {
     "llama": (AutoModelForCausalLM, LlamaTokenizer),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
+    "bloom": (AutoModelForCausalLM, AutoTokenizer),
+    "codegen": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan2": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
+    "chatglm": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -98,12 +107,21 @@ else:
     )
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
+
+if not hasattr(config, "lm_head_generation"):
+    config.lm_head_generation = True
+
+if model_type == "baichuan2":
+    from llm.utils.utils import _get_relative_imports
+    import transformers
+    transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
+
 model = model_class[0].from_pretrained(
     args.model_id,
     torch_dtype=amp_dtype,
     config=config,
     low_cpu_mem_usage=True,
-    trust_remote_code=True,
+    trust_remote_code=True
 )
 tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
 model = model.eval()

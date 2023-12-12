@@ -2,24 +2,35 @@ import argparse
 import time
 import json
 import pathlib
+import re
 
 from datasets import load_dataset
 
 import torch
 from torch.nn.functional import pad
 from torch.utils.data import DataLoader
+import transformers
 from transformers import AutoConfig
 
 import intel_extension_for_pytorch as ipex
 
 import sys
-sys.path.append('../')
-from utils.model_class.llm import EXAMPLE_INPUTS_MODE
-from utils.model_class.llama import LLAMAConfig
-from utils.model_class.gptj import GPTJConfig
-from utils.model_class.gptneox import GPTNEOXConfig
-from utils.model_class.falcon import FALCONConfig
-from utils.model_class.opt import OPTConfig
+
+sys.path.append(sys.path[0] + '/../../')
+
+from llm.utils.utils import _get_relative_imports
+from llm.utils.model_class.llm import EXAMPLE_INPUTS_MODE
+from llm.utils.model_class.llama import LLAMAConfig
+from llm.utils.model_class.gptj import GPTJConfig
+from llm.utils.model_class.gptneox import GPTNEOXConfig
+from llm.utils.model_class.falcon import FALCONConfig
+from llm.utils.model_class.opt import OPTConfig
+from llm.utils.model_class.bloom import BloomConfig
+from llm.utils.model_class.codegen import CodeGenConfig
+from llm.utils.model_class.baichuan import BaichuanConfig
+from llm.utils.model_class.chatglm import ChatGLMConfig
+
+transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -82,6 +93,17 @@ parser.add_argument(
          " data type is always INT4 and this argument is not needed.",
 )
 parser.add_argument(
+    "--group-size",
+    default=-1,
+    type=int,
+    help="For weight-only quantization only. Specifies the group size along"
+         " input channel for block-wise quantization of weight. It must be a"
+         " positive power of 2 or -1. If it is -1, weight is quantized per"
+         " output channel. Otherwise, weight is quantized per block with block size"
+         " = [1, group_size]. If `--low-precision-checkpoint` is given, group"
+         " size is determined automatically and this argument has no effect.",
+)
+parser.add_argument(
     "--low-precision-checkpoint",
     default="",
     type=str,
@@ -124,30 +146,37 @@ else:
 num_beams = 1 if args.greedy else 4
 generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams)
 
-
-# load model
-if args.model_id in ["meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf"]:
-    model = LLAMAConfig(args.model_id)
-elif args.model_id in ["EleutherAI/gpt-j-6b"]:
-    model = GPTJConfig(args.model_id)
-elif args.model_id in "EleutherAI/gpt-neox-20b":
-    model = GPTNEOXConfig(args.model_id)
-elif args.model_id in ["tiiuae/falcon-40b"]:
-    model = FALCONConfig(args.model_id)
-elif args.model_id in ["facebook/opt-30b", "facebook/opt-1.3b"]:
-    model = OPTConfig(args.model_id)
-else:
-    raise AssertionError("Not support %s" % (args.model_id))
-
-# load model
 if args.config_file is None:
     config = AutoConfig.from_pretrained(
-        args.model_id, torchscript=True, trust_remote_code=model.trust_remote_code
+        args.model_id, torchscript=True, trust_remote_code=True
     )
 else:
     config = AutoConfig.from_pretrained(
-        args.config_file, torchscript=True, trust_remote_code=model.trust_remote_code
+        args.config_file, torchscript=True, trust_remote_code=True
     )
+if re.search("falcon", config.architectures[0], re.IGNORECASE) or re.search(
+    "rw", config.architectures[0], re.IGNORECASE
+):
+    model = FALCONConfig(args.model_id)
+elif re.search("GPTJ", config.architectures[0], re.IGNORECASE):
+    model = GPTJConfig(args.model_id)
+elif re.search("llama", config.architectures[0], re.IGNORECASE):
+    model = LLAMAConfig(args.model_id)
+elif re.search("gptneox", config.architectures[0], re.IGNORECASE):
+    model = GPTNEOXConfig(args.model_id)
+elif re.search("OPT", config.architectures[0], re.IGNORECASE):
+    model = OPTConfig(args.model_id)
+elif re.search("bloom", config.architectures[0], re.IGNORECASE):
+    model = BloomConfig(args.model_id)
+elif re.search("codegen", config.architectures[0], re.IGNORECASE):
+    model = CodeGenConfig(args.model_id)
+elif re.search("baichuan", config.architectures[0], re.IGNORECASE):
+    model = BaichuanConfig(args.model_id)
+elif re.search("chatglm", config.architectures[0], re.IGNORECASE):
+    model = ChatGLMConfig(args.model_id)
+else:
+    raise AssertionError("Not support %s." % (args.model_id))
+
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 
@@ -378,10 +407,11 @@ if args.ipex_smooth_quant:
             enabled=amp_enabled,
         ):
             convert_model = convert(prepared_model.eval(), inplace=True).eval()
-            self_jit = torch.jit.trace(convert_model.eval(), example_inputs, strict=False)
+            self_jit = torch.jit.trace(convert_model.eval(), example_inputs, strict=False, check_trace=False)
             self_jit = torch.jit.freeze(self_jit.eval())
             pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
             self_jit.save(args.output_dir + '/' + args.quant_model_name)
+            quant_model = self_jit
 
 elif args.ipex_weight_only_quantization:
     weight_dtype = torch.quint4x2 if args.weight_dtype == "INT4" else torch.qint8
@@ -409,7 +439,8 @@ elif args.ipex_weight_only_quantization:
     qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
         weight_dtype=weight_dtype,
         lowp_mode=lowp_mode,
-        act_quant_mode=act_quant_mode_dict[args.act_quant_mode]
+        act_quant_mode=act_quant_mode_dict[args.act_quant_mode],
+        group_size=args.group_size
     )
     if args.low_precision_checkpoint != "":
         low_precision_checkpoint = torch.load(args.low_precision_checkpoint)
@@ -426,7 +457,6 @@ elif args.ipex_weight_only_quantization:
     example_inputs = None
     input_ids = torch.ones(32).to(torch.long)
     attention_mask = torch.ones(len(input_ids))
-    
     if model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_POS_KV:
         position_ids = torch.arange(len(input_ids))
         example_inputs = (
@@ -434,6 +464,14 @@ elif args.ipex_weight_only_quantization:
             attention_mask.unsqueeze(0),
             position_ids.unsqueeze(0),
             tuple(global_past_key_value),
+        )
+    elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_KV_POS:
+        position_ids = torch.arange(len(input_ids))
+        example_inputs = (
+            input_ids.unsqueeze(0),
+            attention_mask.unsqueeze(0),
+            tuple(global_past_key_value),
+            position_ids.unsqueeze(0),
         )
     elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.KV_MASK:
         example_inputs = (
@@ -447,10 +485,12 @@ elif args.ipex_weight_only_quantization:
             attention_mask.unsqueeze(0),
             tuple(global_past_key_value),
         )
+    if hasattr(model, "extra_inputs"):
+        example_inputs = example_inputs + model.extra_inputs
     with torch.no_grad(), torch.cpu.amp.autocast(
         enabled=amp_enabled,
     ):
-        self_jit = torch.jit.trace(user_model.eval(), example_inputs, strict=False)
+        self_jit = torch.jit.trace(user_model.eval(), example_inputs, strict=False, check_trace=False)
         self_jit = torch.jit.freeze(self_jit.eval())
         pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
         self_jit.save(args.output_dir + '/' + args.quant_model_name)
@@ -459,14 +499,15 @@ elif args.ipex_weight_only_quantization:
 
 if args.benchmark:
     torch._C._jit_set_texpr_fuser_enabled(False)
-    qconfig = ipex.quantization.default_static_qconfig_mapping
-    user_model = ipex.optimize_transformers(
-        user_model.eval(),
-        dtype=torch.float,
-        inplace=True,
-        quantization_config=qconfig,
-        deployment_mode=False,
-    )
+    if not re.search("baichuan", config.architectures[0], re.IGNORECASE) and not re.search("chatglm", config.architectures[0], re.IGNORECASE):
+        qconfig = ipex.quantization.default_static_qconfig_mapping
+        user_model = ipex.optimize_transformers(
+            user_model.eval(),
+            dtype=torch.float,
+            inplace=True,
+            quantization_config=qconfig,
+            deployment_mode=False,
+        )
     if not hasattr(user_model, "trace_graph"):
         print("load_quantized_model")
         try:

@@ -6,15 +6,11 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import intel_extension_for_pytorch as ipex
 
-model_id_list = ["tiiuae/falcon-40b"]
-
 class FALCONConfig(LLMConfig):
     def __init__(self, model_id):
         self.name = "falcon"
-        assert model_id in model_id_list, "%s is not a %s model" % (model_id, self.name)
         self.model_id = model_id
         self.to_channels_last = True
-        self.trust_remote_code = True
         self.example_inputs_mode = EXAMPLE_INPUTS_MODE.KV_MASK
     
     def get_user_model(self, config, benchmark):

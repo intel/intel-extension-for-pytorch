@@ -21,6 +21,9 @@ from transformers import (
     LlamaTokenizer,
 )
 
+import sys
+
+sys.path.append(sys.path[0] + '/../../')
 
 # supported models now
 MODEL_CLASSES = {
@@ -31,6 +34,11 @@ MODEL_CLASSES = {
     "llama": (AutoModelForCausalLM, LlamaTokenizer),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
+    "chatglm": (AutoModelForCausalLM, AutoTokenizer),
+    "bloom": (AutoModelForCausalLM, AutoTokenizer),
+    "codegen": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan2": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
     "chatglm": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
@@ -154,8 +162,8 @@ def print_rank0(*msg):
 
 # Model loading and instantiating on GPUs
 def get_repo_root(model_name_or_path):
-    local_prefix = ("/", "./", "../")
-    if model_name_or_path.startswith(local_prefix):
+    if os.path.exists(model_name_or_path):
+        # local path
         return model_name_or_path
     # checks if online or not
     if is_offline_mode():
@@ -233,6 +241,10 @@ if model_type == "auto":
 if model_type == "falcon":
     model_input_names = ["input_ids", "attention_mask"]
     tokenizer.model_input_names = model_input_names
+if model_type == "baichuan2":
+    from llm.utils.utils import _get_relative_imports
+    import transformers
+    transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
 
 if args.config_file is None:
     config = AutoConfig.from_pretrained(
@@ -244,6 +256,9 @@ else:
     )
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
+
+if not hasattr(config, "lm_head_generation"):
+    config.lm_head_generation = True
 
 # XXX: can't automatically derive dtype via config's `from_pretrained`
 # dtype = torch.bfloat16 if model_name in ["bigscience/bloom", "bigscience/bigscience-small-testing"] else torch.float16
@@ -260,7 +275,7 @@ if args.benchmark:
     deepspeed.runtime.utils.see_memory_usage("pre-from-pretrained", force=True)
 
 # Construct model with fake meta tensors, later will be replaced during ds-inference ckpt load
-if world_size == 1 or model_type == "falcon":
+if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2"]:
     model = model_class[0].from_pretrained(
         model_name,
         config=config,

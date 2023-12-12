@@ -19,8 +19,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "--model", nargs="?", default="EleutherAI/gpt-j-6b"
 )
-parser.add_argument("--dataset", nargs="?", default="lambada", const="lambada")
+parser.add_argument("--dataset", nargs="?", default="NeelNanda/pile-10k")
 parser.add_argument("--output-dir", nargs="?", default="./saved_results")
+parser.add_argument("--group-size", default=128, type=int)
 parser.add_argument("--calib-iters", default=512, type=int,
                     help="calibration iters.")
 args = parser.parse_args()
@@ -132,6 +133,8 @@ def get_user_model():
             trust_remote_code=True,
         )
         tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    elif re.search("falcon", args.model.lower()):
+        assert False, "falcon is not supported yet"
     else:
         user_model = AutoModelForCausalLM.from_pretrained(
             args.model,
@@ -176,7 +179,7 @@ op_type_dict = {
     '.*': {  # re.match
         "weight": {
             'bits': 4,  # only support 4-bit for now
-            'group_size': -1,  # only support per-channel for now
+            'group_size': args.group_size,
             'scheme': 'asym',  # only support asym for now
             'algorithm': 'GPTQ',  # RTN/AWQ/TEQ
         },
@@ -218,5 +221,6 @@ compressed_model = q_model.export_compressed_model(
     scale_dtype=torch.float16,
 )
 Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-torch.save(compressed_model.state_dict(), args.output_dir + "/gptq_checkpoint.pt")
-print('\n Checkpoint saved to', args.output_dir + "/gptq_checkpoint.pt \n")
+output_file_name = f"gptq_checkpoint_g{args.group_size}.pt"
+torch.save(compressed_model.state_dict(), args.output_dir + "/" + output_file_name)
+print('\n Checkpoint saved to', args.output_dir + "/" + output_file_name + "\n")

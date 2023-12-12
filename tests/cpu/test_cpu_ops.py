@@ -1402,6 +1402,95 @@ class CPUOPsTester(TestCase):
             self.assertTrue(y7.size() == torch.Size([8, 2]))
             self.assertTrue(y7.dtype == datatype)
 
+    def test_flash_attention(self):
+        for dtype in [torch.float32, torch.double, torch.bfloat16]:
+            for causal, has_attention_mask in [
+                [False, False],
+                [True, False],
+                [False, True],
+            ]:
+                for batch_size, seq_len, n_head, head_dim in itertools.product(
+                    [2, 12], [267, 1030], [1, 3], [8, 16]
+                ):
+                    atol = 1e-5
+                    rtol = 5e-6
+                    if dtype is torch.bfloat16:
+                        atol = 2e-2
+                        rtol = 2e-2
+
+                    n_embd = n_head * head_dim
+                    x = torch.randn(
+                        (batch_size, seq_len, 3 * n_head * head_dim),
+                        device="cpu",
+                        dtype=dtype,
+                        requires_grad=False,
+                    )
+                    x2 = x.clone()
+
+                    q, k, v = x.split(n_embd, dim=2)
+                    q2, k2, v2 = x2.split(n_embd, dim=2)
+
+                    if dtype is torch.bfloat16:
+                        q2 = q2.float()
+                        k2 = k2.float()
+                        v2 = v2.float()
+
+                    # (B, nh, T, hs)
+                    k = k.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
+                    q = q.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
+                    v = v.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
+                    k2 = k2.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
+                    q2 = q2.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
+                    v2 = v2.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
+
+                    if has_attention_mask:
+                        mask = torch.randn(
+                            (batch_size, 1, seq_len, seq_len),
+                            device="cpu",
+                            dtype=dtype,
+                            requires_grad=False,
+                        )
+                        actual = torch.ops.torch_ipex.flash_attention_mask(
+                            q,
+                            k,
+                            v,
+                            dropout_p=0.0,
+                            is_causal=causal,
+                            return_debug_mask=False,
+                            attention_mask=mask,
+                        )[0]
+                        math_ref = (
+                            torch._scaled_dot_product_attention_math(
+                                q2,
+                                k2,
+                                v2,
+                                attn_mask=mask,
+                                dropout_p=0.0,
+                                is_causal=causal,
+                            )
+                        )[0]
+                    else:
+                        actual = torch._scaled_dot_product_flash_attention(
+                            q,
+                            k,
+                            v,
+                            dropout_p=0.0,
+                            is_causal=causal,
+                            return_debug_mask=False,
+                        )[0]
+                        math_ref = torch._scaled_dot_product_attention_math(
+                            q2,
+                            k2,
+                            v2,
+                            attn_mask=None,
+                            dropout_p=0.0,
+                            is_causal=causal,
+                        )[0]
+
+                    if dtype is torch.bfloat16:
+                        math_ref = math_ref.bfloat16()
+                    torch.testing.assert_close(actual, math_ref, atol=atol, rtol=rtol)
+
 
 if __name__ == "__main__":
     test = unittest.main()

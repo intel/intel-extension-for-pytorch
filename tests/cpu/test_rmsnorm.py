@@ -46,6 +46,27 @@ class RMSNormTester(TestCase):
                 fused_y1_bf16 = model(x_bf16, fused_rmsnorm=True)
                 self.assertEqual(y1_bf16, fused_y1_bf16, prec=1e-2)
 
+    def test_RMSNorm_torchcompile(self):
+        for dim in [2, 3, 4, 5]:
+            with torch.cpu.amp.autocast(), torch.no_grad():
+                input_size = [
+                    3,
+                ]
+                for _ in range(dim - 1):
+                    input_size.append(10)
+                x = torch.randn(input_size)
+                # RMSNorm input is fp32
+                model = RMSNorm(input_size).eval()
+                torch._dynamo.reset()
+                compiled_model = torch.compile(model, backend="ipex")
+                y1_fp32 = model(x, fused_rmsnorm=True)
+                y2_fp32 = compiled_model(x, fused_rmsnorm=True)
+                self.assertEqual(y1_fp32, y2_fp32)
+                x_bf16 = x.to(torch.bfloat16)
+                y1_bf16 = model(x_bf16, fused_rmsnorm=True)
+                y2_bf16 = compiled_model(x_bf16, fused_rmsnorm=True)
+                self.assertEqual(y1_bf16, y2_bf16)
+
 
 if __name__ == "__main__":
     test = unittest.main()

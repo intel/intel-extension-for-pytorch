@@ -227,11 +227,11 @@ at::Tensor convolution_backward_input(
   if (is_channels_last_contiguous) {
     return grad_input;
   } else {
-    return mkldnn_to_dense(
-               new_with_itensor_mkldnn(
-                   std::move(mkldnn_grad_input),
-                   optTypeMetaToScalarType(grad_output.options().dtype_opt()),
-                   grad_output.options().device_opt()))
+    return mkldnn_to_dense(new_with_itensor_mkldnn(
+                               std::move(mkldnn_grad_input),
+                               c10::optTypeMetaToScalarType(
+                                   grad_output.options().dtype_opt()),
+                               grad_output.options().device_opt()))
         .contiguous(memory_format);
   }
 }

@@ -27,7 +27,7 @@ inline auto set_zero = [](auto i, __m512* vset) {
   // set all vector to zero in vset
   vset[i] = _mm512_setzero_ps();
 };
-inline auto set_zero_2d = [set_zero](auto i, __m512** vset) {
+inline auto set_zero_2d = [](auto i, __m512** vset) {
   // set all vector to zero in 2d [i, 4] vset
   // TODO: Support arbitrary inner size than 4
   compile_time_for<4>::op(set_zero, vset[i]);
@@ -44,13 +44,12 @@ inline auto fma_constant_a =
       // inout_vset = a * b_vset + inout_vset, a is not a set
       inout_vset[i] = _mm512_fmadd_ps(a, b_vset[i], inout_vset[i]);
     };
-inline auto bcast_fma = [fma_constant_a](
-                            auto i,
-                            __m512** inout_vset,
-                            __m512* m2_vset,
-                            __m512 bcast,
-                            auto* basic_ptr,
-                            int32_t offset) {
+inline auto bcast_fma = [](auto i,
+                           __m512** inout_vset,
+                           __m512* m2_vset,
+                           __m512 bcast,
+                           auto* basic_ptr,
+                           int32_t offset) {
   // load value from according to basic_ptr and offset to broadcast
   // and do fma with broadcast vector
   bcast = _mm512_set1_ps(*(basic_ptr + offset * i));
@@ -100,7 +99,7 @@ inline auto store_fp32 = [](auto i, __m512* out_vset, auto* basic_ptr) {
   _mm512_storeu_ps(basic_ptr + 16 * i, out_vset[i]);
 };
 inline auto store_2d_with_offset =
-    [store_fp32](auto i, __m512** out_vset, auto* basic_ptr, int32_t offset) {
+    [](auto i, __m512** out_vset, auto* basic_ptr, int32_t offset) {
       // store 2d[i, 4] out_vset according to basic_ptr and offset
       // TODO: Support arbitrary inner size than 4
       compile_time_for<4>::op(store_fp32, out_vset[i], basic_ptr + offset * i);
@@ -200,17 +199,14 @@ inline auto cast_bf16_and_store =
           reinterpret_cast<__m256i*>(basic_ptr + 16 * i),
           reinterpret_cast<__m256i>(_mm512_cvtneps_pbh(out_vset[i])));
     };
-inline auto cast_bf16_and_store_2d_with_offset = [cast_bf16_and_store](
-                                                     auto i,
-                                                     __m512** out_vset,
-                                                     auto* basic_ptr,
-                                                     int32_t offset) {
-  // store 2d[i, 4] out_vset from fp32 to bf16
-  // and store according to basic_ptr and offset
-  // TODO: Support arbitrary inner size than 4
-  compile_time_for<4>::op(
-      cast_bf16_and_store, out_vset[i], basic_ptr + i * offset);
-};
+inline auto cast_bf16_and_store_2d_with_offset =
+    [](auto i, __m512** out_vset, auto* basic_ptr, int32_t offset) {
+      // store 2d[i, 4] out_vset from fp32 to bf16
+      // and store according to basic_ptr and offset
+      // TODO: Support arbitrary inner size than 4
+      compile_time_for<4>::op(
+          cast_bf16_and_store, out_vset[i], basic_ptr + i * offset);
+    };
 #endif
 } // namespace cpu
 } // namespace torch_ipex

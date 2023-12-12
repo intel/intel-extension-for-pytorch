@@ -1,8 +1,10 @@
 import argparse
-import re
 import torch
 import intel_extension_for_pytorch as ipex
 
+import sys
+
+sys.path.append(sys.path[0] + '/../../')
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -17,6 +19,10 @@ MODEL_CLASSES = {
     "opt": (AutoModelForCausalLM, AutoTokenizer),
     "llama": (AutoModelForCausalLM, LlamaTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
+    "bloom": (AutoModelForCausalLM, AutoTokenizer),
+    "codegen": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
+    "chatglm": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -123,6 +129,11 @@ if args.accuracy_only:
                 self.config = AutoConfig.from_pretrained(
                     config, torchscript=with_jit, trust_remote_code=True
                 )
+            
+            if model_type == "baichuan":
+                from llm.utils.utils import _get_relative_imports
+                import transformers
+                transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
 
             if self._dtype == "int8":
                 try:
@@ -168,241 +179,58 @@ if args.accuracy_only:
             _attention_mask = []
             _position_ids = []
 
+            model_inputs = self.base_model.prepare_inputs_for_generation(torch.ones(32).to(torch.long).unsqueeze(0))
+            has_position_ids = "position_ids" in model_inputs
             if self._with_jit:
                 for text in inputs:
                     input_ids = text.to(self._device)
                     input_bs = inputs.shape[0] * self.num_beams
-                    if re.search("GPTJ", self.base_model.config.architectures[0]):
-                        beam_idx_tmp = torch.zeros(
-                            (2048, int(input_bs)), dtype=torch.long
-                        ).contiguous()
-                        past_key_values = tuple(
-                            [
-                                (
-                                    torch.zeros(
-                                        1, 0, 0, 1, dtype=torch.long
-                                    ).contiguous(),
-                                    torch.zeros(
-                                        [
-                                            1,
-                                            int(
-                                                self.base_model.config.n_head
-                                                / self.tp_number
-                                            ),
-                                            1,
-                                            int(
-                                                self.base_model.config.n_embd
-                                                / self.base_model.config.n_head
-                                            ),
-                                        ]
-                                    ).contiguous(),
-                                    torch.zeros(
-                                        [
-                                            1,
-                                            int(
-                                                self.base_model.config.n_head
-                                                / self.tp_number
-                                            ),
-                                            1,
-                                            int(
-                                                self.base_model.config.n_embd
-                                                / self.base_model.config.n_head
-                                            ),
-                                        ]
-                                    ).contiguous(),
-                                    beam_idx_tmp,
-                                )
-                                for i in range(self.base_model.config.n_layer)
-                            ]
-                        )
-                    elif re.search(
-                        "llama", self.base_model.config.architectures[0], re.IGNORECASE
-                    ):
-                        beam_idx_tmp = torch.zeros(
-                            (2048, int(input_bs)), dtype=torch.long
-                        ).contiguous()
-                        past_key_values = tuple(
-                            [
-                                (
-                                    torch.zeros(
-                                        1, 0, 0, 1, dtype=torch.long
-                                    ).contiguous(),
-                                    torch.zeros(
-                                        [
-                                            1,
-                                            int(
-                                                self.base_model.config.num_attention_heads
-                                                / self.tp_number
-                                            ),
-                                            1,
-                                            int(
-                                                self.base_model.config.hidden_size
-                                                / self.base_model.config.num_attention_heads
-                                            ),
-                                        ]
-                                    ).contiguous(),
-                                    torch.zeros(
-                                        [
-                                            1,
-                                            int(
-                                                self.base_model.config.num_attention_heads
-                                                / self.tp_number
-                                            ),
-                                            1,
-                                            int(
-                                                self.base_model.config.hidden_size
-                                                / self.base_model.config.num_attention_heads
-                                            ),
-                                        ]
-                                    ).contiguous(),
-                                    beam_idx_tmp,
-                                )
-                                for i in range(self.base_model.config.num_hidden_layers)
-                            ]
-                        )
-                    elif re.search(
-                        "gptneox",
-                        self.base_model.config.architectures[0],
-                        re.IGNORECASE,
-                    ):
-                        beam_idx_tmp = torch.zeros(
-                            (2048, int(input_bs)), dtype=torch.long
-                        ).contiguous()
-                        past_key_values = tuple(
-                            [
-                                (
-                                    torch.zeros(
-                                        1, 0, 0, 1, dtype=torch.long
-                                    ).contiguous(),
-                                    torch.zeros(
-                                        [
-                                            1,
-                                            int(
-                                                self.base_model.config.num_attention_heads
-                                                / self.tp_number
-                                            ),
-                                            1,
-                                            int(
-                                                self.base_model.config.hidden_size
-                                                / self.base_model.config.num_attention_heads
-                                            ),
-                                        ]
-                                    ).contiguous(),
-                                    torch.zeros(
-                                        [
-                                            1,
-                                            int(
-                                                self.base_model.config.num_attention_heads
-                                                / self.tp_number
-                                            ),
-                                            1,
-                                            int(
-                                                self.base_model.config.hidden_size
-                                                / self.base_model.config.num_attention_heads
-                                            ),
-                                        ]
-                                    ).contiguous(),
-                                    beam_idx_tmp,
-                                )
-                                for i in range(self.base_model.config.num_hidden_layers)
-                            ]
-                        )
-                    elif re.search(
-                        "OPT", self.base_model.config.architectures[0], re.IGNORECASE
-                    ):
-                        beam_idx_tmp = torch.zeros(
-                            (2048, int(input_bs)), dtype=torch.long
-                        ).contiguous()
-                        past_key_values = tuple(
-                            [
-                                (
-                                    torch.zeros(
-                                        1, 0, 0, 1, dtype=torch.long
-                                    ).contiguous(),
-                                    torch.zeros(
-                                        [
-                                            1,
-                                            int(
-                                                self.base_model.config.num_attention_heads
-                                                / self.tp_number
-                                            ),
-                                            1,
-                                            int(
-                                                self.base_model.config.hidden_size
-                                                / self.base_model.config.num_attention_heads
-                                            ),
-                                        ]
-                                    ).contiguous(),
-                                    torch.zeros(
-                                        [
-                                            1,
-                                            int(
-                                                self.base_model.config.num_attention_heads
-                                                / self.tp_number
-                                            ),
-                                            1,
-                                            int(
-                                                self.base_model.config.hidden_size
-                                                / self.base_model.config.num_attention_heads
-                                            ),
-                                        ]
-                                    ).contiguous(),
-                                    beam_idx_tmp,
-                                )
-                                for i in range(self.base_model.config.num_hidden_layers)
-                            ]
-                        )
-                    elif re.search(
-                        "falcon", self.base_model.config.architectures[0], re.IGNORECASE
-                    ) or re.search(
-                        "rw", self.base_model.config.architectures[0], re.IGNORECASE
-                    ):
-                        beam_idx_tmp = torch.zeros(
-                            (2048, int(input_bs)), dtype=torch.long
-                        ).contiguous()
-                        num_hidden_layers = (
-                            self.base_model.config.num_hidden_layers
-                            if hasattr(self.base_model.config, "num_hidden_layers")
-                            else self.base_model.config.n_layer
-                        )
-                        num_attention_heads = (
-                            self.base_model.config.num_attention_heads
-                            if hasattr(self.base_model.config, "num_attention_heads")
-                            else self.base_model.config.n_head
-                        )
-                        past_key_values = tuple(
-                            [
-                                (
-                                    torch.zeros(
-                                        1, 0, 0, 1, dtype=torch.long
-                                    ).contiguous(),
-                                    torch.zeros(
-                                        [
-                                            1,
-                                            int(num_attention_heads / self.tp_number),
-                                            1,
-                                            int(
-                                                self.base_model.config.hidden_size
-                                                / num_attention_heads
-                                            ),
-                                        ]
-                                    ).contiguous(),
-                                    torch.zeros(
-                                        [
-                                            1,
-                                            int(num_attention_heads / self.tp_number),
-                                            1,
-                                            int(
-                                                self.base_model.config.hidden_size
-                                                / num_attention_heads
-                                            ),
-                                        ]
-                                    ).contiguous(),
-                                    beam_idx_tmp,
-                                )
-                                for i in range(num_hidden_layers)
-                            ]
-                        )
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(input_bs)), dtype=torch.long
+                    ).contiguous()
+                    if hasattr(self.base_model.config, "n_head"):
+                        num_attention_heads = self.base_model.config.n_head
+                    elif hasattr(self.base_model.config, "num_attention_heads"):
+                        num_attention_heads = self.base_model.config.num_attention_heads
+                    
+                    if hasattr(self.base_model.config, "num_hidden_layers"):
+                        num_hidden_layers = self.base_model.config.num_hidden_layers
+                    elif hasattr(self.base_model.config, "n_layer"):
+                        num_hidden_layers = self.base_model.config.n_layer
+                    elif hasattr(self.base_model.config, "num_layers"):
+                        num_hidden_layers = self.base_model.config.num_layers
+
+                    if hasattr(self.base_model.config, "n_embd"):
+                        hidden_size = self.base_model.config.n_embd
+                    elif hasattr(self.base_model.config, "hidden_size"):
+                        hidden_size = self.base_model.config.hidden_size
+                    past_key_values = tuple(
+                        [
+                            (
+                                torch.zeros(
+                                    1, 0, 0, 1, dtype=torch.long
+                                ).contiguous(),
+                                torch.zeros(
+                                    [
+                                        1,
+                                        int(num_attention_heads/ self.tp_number),
+                                        1,
+                                        int(hidden_size/ num_attention_heads),
+                                    ]
+                                ).contiguous(),
+                                torch.zeros(
+                                    [
+                                        1,
+                                        int(num_attention_heads / self.tp_number),
+                                        1,
+                                        int(hidden_size / num_attention_heads),
+                                    ]
+                                ).contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(num_hidden_layers)
+                        ]
+                    )
 
                     position_ids = torch.arange(len(input_ids))
                     attention_mask = torch.ones(len(input_ids))
@@ -421,23 +249,7 @@ if args.accuracy_only:
                     dtype=torch.bfloat16,
                 ):
                     if self._dtype != "int8":
-                        if (
-                            re.search(
-                                "OPT",
-                                self.base_model.config.architectures[0],
-                                re.IGNORECASE,
-                            )
-                            or re.search(
-                                "falcon",
-                                self.base_model.config.architectures[0],
-                                re.IGNORECASE,
-                            )
-                            or re.search(
-                                "rw",
-                                self.base_model.config.architectures[0],
-                                re.IGNORECASE,
-                            )
-                        ):
+                        if not has_position_ids:
                             example_dict = {
                                 "input_ids": inputs,
                                 "attention_mask": attention_mask_batched,
@@ -462,21 +274,7 @@ if args.accuracy_only:
                         self.model = torch.jit.load(args.quantized_model_path)
                         self.model = torch.jit.freeze(self.model.eval())
 
-                    if (
-                        re.search(
-                            "OPT",
-                            self.base_model.config.architectures[0],
-                            re.IGNORECASE,
-                        )
-                        or re.search(
-                            "falcon",
-                            self.base_model.config.architectures[0],
-                            re.IGNORECASE,
-                        )
-                        or re.search(
-                            "rw", self.base_model.config.architectures[0], re.IGNORECASE
-                        )
-                    ):
+                    if not has_position_ids:
                         self.model(
                             inputs,
                             past_key_values=past_key_values,
@@ -503,49 +301,30 @@ if args.accuracy_only:
 
                 self.iter = self.iter + 1
 
-            if (
-                re.search("OPT", self.base_model.config.architectures[0], re.IGNORECASE)
-                or re.search(
-                    "falcon", self.base_model.config.architectures[0], re.IGNORECASE
-                )
-                or re.search(
-                    "rw", self.base_model.config.architectures[0], re.IGNORECASE
-                )
+            with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True
+                if args.int8_bf16_mixed or self._dtype == torch.bfloat16
+                else False,
+                dtype=torch.bfloat16,
             ):
-                with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
-                    enabled=True
-                    if args.int8_bf16_mixed or self._dtype == torch.bfloat16
-                    else False,
-                    dtype=torch.bfloat16,
-                ):
-                    if self._with_jit:
+                if self._with_jit:
+                    if not has_position_ids:
                         output = self.model(
                             inputs,
                             past_key_values=past_key_values,
                             attention_mask=attention_mask_batched,
                         )
                     else:
-                        output = self.base_model(
-                            inputs,
-                        )
-            else:
-                with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
-                    enabled=True
-                    if args.int8_bf16_mixed or self._dtype == torch.bfloat16
-                    else False,
-                    dtype=torch.bfloat16,
-                ):
-                    if self._with_jit:
                         output = self.model(
                             inputs,
                             past_key_values=past_key_values,
                             attention_mask=attention_mask_batched,
                             position_ids=position_ids_batched,
                         )
-                    else:
-                        output = self.base_model(
-                            inputs,
-                        )
+                else:
+                    output = self.base_model(
+                        inputs,
+                    )
 
             if isinstance(output, tuple):
                 return output[0]

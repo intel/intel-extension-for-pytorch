@@ -21,6 +21,15 @@ namespace {
 using namespace tpp;
 using TensorList = std::vector<at::Tensor>;
 
+#define FUSE_GELU 1
+#define FUSE_ADD 2
+#define FUSE_ADD_ADD 3
+
+#define LOWP_MODE_NONE 0
+#define LOWP_MODE_FP16 1
+#define LOWP_MODE_BF16 2
+#define LOWP_MODE_INT8 3
+
 // We only build optimized kernels if AVX512_FP16 is supported and gcc>=12.3
 // Otherwise we just return empty results
 // TODO(Weiwen) Merge WoqTppKrnl.cpp and WoqLinearKrnl.cpp and put the latter in
@@ -37,6 +46,9 @@ constexpr long LOOP_K_UNROLL = 4; // TODO(jgong5): do not hard-code
 #define QUANT_A_PER_K_BLOCK 1
 #define QUANT_A_PER_M 2
 #define QUANT_A_PER_M_K_BLOCK 3
+
+#define QUANT_W_PER_CHANNEL 0
+#define QUANT_W_PER_K_BLOCK 1
 
 template <long N_GROUP_SIZE, typename VAT, typename LUT>
 inline VAT load_dequant_zp_only_int4(uint8_t* p, VAT vzps, LUT lut) {
@@ -1460,10 +1472,6 @@ class DequantGemmTPP<
   long ldc;
 };
 
-#define FUSE_GELU 1
-#define FUSE_ADD 2
-#define FUSE_ADD_ADD 3
-
 // If T != TComp
 //   T -> TComp -> GEMM -> TComp -> bias/PostOp -> Tout
 // If T == TComp (we can save intermediate output buffer and schedule M/N/K
@@ -1476,7 +1484,8 @@ template <
     typename Tout,
     typename TScale,
     typename TZero,
-    int quant_a_mode = -1>
+    int quant_a_mode = -1,
+    int quant_w_mode = 0>
 void qlinear_woq_affine_impl(
     const at::Tensor& x,
     const at::Tensor& qw_packed,
@@ -1489,6 +1498,7 @@ void qlinear_woq_affine_impl(
     int num_concats,
     int fusion_type,
     const TensorList& others_list,
+    int64_t quant_block_k,
     at::Tensor t_scale_a = at::empty({1}, at::kFloat),
     at::Tensor t_zp_a = at::empty({1}, at::kInt)) {
   auto x_sizes = x.sizes();
@@ -1500,6 +1510,10 @@ void qlinear_woq_affine_impl(
   auto Kb = w_sizes[2];
   auto N = Nc * Nb;
   auto K = Kc * Kb;
+  assert(quant_block_k % Kb == 0);
+  auto quant_block_multiple = quant_block_k == 0 ? 1 : quant_block_k / Kb;
+  auto quant_k_blocks =
+      quant_block_k == 0 ? 1 : (K + quant_block_k - 1) / quant_block_k;
 
   TLA_ASSERT(Nb % 16 == 0, "Nb must be a multiple of 16");
   TLA_ASSERT(
@@ -1545,8 +1559,10 @@ void qlinear_woq_affine_impl(
   auto py = GetVLAPtr<Tout>(y, {Nc, Nb}); /*[M, Nc, Nb]*/
   auto py_concat = GetVLAPtr<Tout>(
       y, {M, Nc / num_concats, Nb}); /*[num_concats, M, Nc/num_concats, Nb]*/
-  auto pscales = GetVLAPtr<TScale>(scales, {Nb});
-  auto pzps = GetVLAPtr<TZero>(zps, {Nb});
+  int scales_kc = quant_w_mode == QUANT_W_PER_CHANNEL ? QUANT_W_PER_K_BLOCK
+                                                      : quant_k_blocks;
+  auto pscales = GetVLAPtr<TScale>(scales, {scales_kc, Nb});
+  auto pzps = GetVLAPtr<TZero>(zps, {scales_kc, Nb});
   auto pb = GetVLAPtr<TGemmOut>(b, {Nb});
   auto tin0 = others_list.size() > 0 ? others_list[0] : at::Tensor{};
   auto pin0 = GetVLAPtr<Tout>(tin0, {Nc, Nb}); /*[M, Nc, Nb]*/
@@ -1736,23 +1752,34 @@ void qlinear_woq_affine_impl(
                     float* scale_a = nullptr;
                     int32_t* zp_a = nullptr;
                     int32_t k_groups = -1;
+                    int32_t quant_offset = kc / quant_block_multiple;
                     if constexpr (std::is_same<TComp, uint8_t>()) {
                       if constexpr (quant_a_mode == QUANT_A_PER_TENSOR) {
                         scale_a = scales_a_ptr;
                         zp_a = zps_a_ptr;
                       } else if constexpr (
                           quant_a_mode == QUANT_A_PER_K_BLOCK) {
-                        scale_a = scales_a_ptr + kc;
-                        zp_a = zps_a_ptr + kc;
+                        scale_a = scales_a_ptr + quant_offset;
+                        zp_a = zps_a_ptr + quant_offset;
                       } else if constexpr (quant_a_mode == QUANT_A_PER_M) {
                         scale_a = scales_a_ptr + m;
                         zp_a = zps_a_ptr + m;
                         k_groups = 1;
                       } else {
-                        scale_a = scales_a_ptr + m * Kc + kc;
-                        zp_a = zps_a_ptr + m * Kc + kc;
-                        k_groups = Kc;
+                        scale_a =
+                            scales_a_ptr + m * quant_k_blocks + quant_offset;
+                        zp_a = zps_a_ptr + m * quant_k_blocks + quant_offset;
+                        k_groups = quant_k_blocks;
                       }
+                    }
+                    TScale* scale_w = nullptr;
+                    TZero* zp_w = nullptr;
+                    if constexpr (quant_w_mode == QUANT_W_PER_CHANNEL) {
+                      scale_w = pscales[nc][0];
+                      zp_w = pzps[nc][0];
+                    } else {
+                      scale_w = pscales[nc][quant_offset];
+                      zp_w = pzps[nc][quant_offset];
                     }
                     bool is_rem = (m + BLOCK_M > M);
                     TGemmOut* y_ptr = num_concats <= 1
@@ -1772,8 +1799,8 @@ void qlinear_woq_affine_impl(
                         dequant_gemm_tpp(
                             x_ptr,
                             pw[nc][kc],
-                            pscales[nc],
-                            pzps[nc],
+                            scale_w,
+                            zp_w,
                             y_ptr,
                             true,
                             scale_a,
@@ -1783,8 +1810,8 @@ void qlinear_woq_affine_impl(
                         dequant_gemm_no_prefetch_tpp(
                             x_ptr,
                             pw[nc][kc],
-                            pscales[nc],
-                            pzps[nc],
+                            scale_w,
+                            zp_w,
                             y_ptr,
                             true,
                             scale_a,
@@ -1807,8 +1834,8 @@ void qlinear_woq_affine_impl(
                         dequant_gemm_rem_tpp(
                             x_ptr,
                             pw[nc][kc],
-                            pscales[nc],
-                            pzps[nc],
+                            scale_w,
+                            zp_w,
                             y_ptr,
                             false,
                             scale_a,
@@ -1819,8 +1846,8 @@ void qlinear_woq_affine_impl(
                         dequant_gemm_no_prefetch_rem_tpp(
                             x_ptr,
                             pw[nc][kc],
-                            pscales[nc],
-                            pzps[nc],
+                            scale_w,
+                            zp_w,
                             y_ptr,
                             false,
                             scale_a,
@@ -1903,23 +1930,34 @@ void qlinear_woq_affine_impl(
                       float* scale_a = nullptr;
                       int32_t* zp_a = nullptr;
                       int32_t k_groups = -1;
+                      int32_t quant_offset = kc / quant_block_multiple;
                       if constexpr (std::is_same<TComp, uint8_t>()) {
                         if constexpr (quant_a_mode == QUANT_A_PER_TENSOR) {
                           scale_a = scales_a_ptr;
                           zp_a = zps_a_ptr;
                         } else if constexpr (
                             quant_a_mode == QUANT_A_PER_K_BLOCK) {
-                          scale_a = scales_a_ptr + kc;
-                          zp_a = zps_a_ptr + kc;
+                          scale_a = scales_a_ptr + quant_offset;
+                          zp_a = zps_a_ptr + quant_offset;
                         } else if constexpr (quant_a_mode == QUANT_A_PER_M) {
                           scale_a = scales_a_ptr + m;
                           zp_a = zps_a_ptr + m;
                           k_groups = 1;
                         } else {
-                          scale_a = scales_a_ptr + m * Kc + kc;
-                          zp_a = zps_a_ptr + m * Kc + kc;
-                          k_groups = Kc;
+                          scale_a =
+                              scales_a_ptr + m * quant_k_blocks + quant_offset;
+                          zp_a = zps_a_ptr + m * quant_k_blocks + quant_offset;
+                          k_groups = quant_k_blocks;
                         }
+                      }
+                      TScale* scale_w = nullptr;
+                      TZero* zp_w = nullptr;
+                      if constexpr (quant_w_mode == QUANT_W_PER_CHANNEL) {
+                        scale_w = pscales[nc][0];
+                        zp_w = pzps[nc][0];
+                      } else {
+                        scale_w = pscales[nc][quant_offset];
+                        zp_w = pzps[nc][quant_offset];
                       }
                       if (!is_rem) {
                         alignas(64) TComp x_buf[BLOCK_M][Kb];
@@ -1931,8 +1969,8 @@ void qlinear_woq_affine_impl(
                           dequant_gemm_tpp(
                               x_ptr,
                               pw[nc][kc],
-                              pscales[nc],
-                              pzps[nc],
+                              scale_w,
+                              zp_w,
                               y_ptr,
                               true,
                               scale_a,
@@ -1942,8 +1980,8 @@ void qlinear_woq_affine_impl(
                           dequant_gemm_no_prefetch_tpp(
                               x_ptr,
                               pw[nc][kc],
-                              pscales[nc],
-                              pzps[nc],
+                              scale_w,
+                              zp_w,
                               y_ptr,
                               true,
                               scale_a,
@@ -1960,8 +1998,8 @@ void qlinear_woq_affine_impl(
                           dequant_gemm_rem_tpp(
                               x_ptr,
                               pw[nc][kc],
-                              pscales[nc],
-                              pzps[nc],
+                              scale_w,
+                              zp_w,
                               y_ptr,
                               false,
                               scale_a,
@@ -1972,8 +2010,8 @@ void qlinear_woq_affine_impl(
                           dequant_gemm_no_prefetch_rem_tpp(
                               x_ptr,
                               pw[nc][kc],
-                              pscales[nc],
-                              pzps[nc],
+                              scale_w,
+                              zp_w,
                               y_ptr,
                               false,
                               scale_a,
@@ -2032,11 +2070,6 @@ void qlinear_woq_affine_impl(
           },
           [](auto tuple) { failing_fallback(); });
 }
-
-#define LOWP_MODE_NONE 0
-#define LOWP_MODE_FP16 1
-#define LOWP_MODE_BF16 2
-#define LOWP_MODE_INT8 3
 
 /**
  * @brief pack the weight in quantized format.
@@ -2238,16 +2271,30 @@ inline scalar_t min_propagate_nan(scalar_t a, scalar_t b) {
 template <typename T>
 std::pair<at::Tensor, at::Tensor> compute_int8_qparams_per_block(
     const at::Tensor& t,
-    int block_k,
+    int quant_block_k,
     int quant_a_mode) {
-  auto grouped = t.view({-1, t.size(-1) / block_k, block_k});
+  int M = t.size(0);
+  int K = t.size(1);
+  if (quant_a_mode == QUANT_A_PER_M) {
+    auto grouped_min = std::get<0>(t.min(-1));
+    auto grouped_max = std::get<0>(t.max(-1));
+    auto zeros = at::zeros_like(grouped_min);
+    auto min = at::minimum(grouped_min, zeros);
+    auto max = at::maximum(grouped_max, zeros);
+    auto scales = (max - min) / 255;
+    auto zps = -at::round(min / scales);
+    return std::make_pair<at::Tensor&&, at::Tensor&&>(
+        std::move(scales.to(c10::kFloat)), std::move(zps.to(c10::kInt)));
+  }
+  int k_rem = K % quant_block_k;
+  int block_k = quant_block_k;
+  auto grouped =
+      t.index({at::indexing::Slice(), at::indexing::Slice(0, K - k_rem)})
+          .view({M, K / quant_block_k, quant_block_k});
   at::Tensor grouped_min, grouped_max;
-  if (quant_a_mode == 1) {
+  if (quant_a_mode == QUANT_A_PER_K_BLOCK) {
     grouped_min = std::get<0>(std::get<0>(grouped.min(-1)).min(0));
     grouped_max = std::get<0>(std::get<0>(grouped.max(-1)).max(0));
-  } else if (quant_a_mode == 2) {
-    grouped_min = std::get<0>(std::get<0>(grouped.min(-1)).min(1));
-    grouped_max = std::get<0>(std::get<0>(grouped.max(-1)).max(1));
   } else {
     grouped_min = std::get<0>(grouped.min(-1));
     grouped_max = std::get<0>(grouped.max(-1));
@@ -2257,6 +2304,25 @@ std::pair<at::Tensor, at::Tensor> compute_int8_qparams_per_block(
   auto max = at::maximum(grouped_max, zeros);
   auto scales = (max - min) / 255.0f;
   auto zps = -at::round(min / scales);
+  if (k_rem) {
+    auto grouped_rem =
+        t.index({at::indexing::Slice(), at::indexing::Slice(K - k_rem, K)})
+            .view({M, 1, k_rem});
+    at::Tensor grouped_rem_min, grouped_rem_max;
+    if (quant_a_mode == QUANT_A_PER_K_BLOCK) {
+      grouped_rem_min = std::get<0>(std::get<0>(grouped_rem.min(-1)).min(0));
+      grouped_rem_max = std::get<0>(std::get<0>(grouped_rem.max(-1)).max(0));
+    } else {
+      grouped_rem_min = std::get<0>(grouped_rem.min(-1));
+      grouped_rem_max = std::get<0>(grouped_rem.max(-1));
+    }
+    auto min_rem = at::minimum(grouped_rem_min, at::tensor({0}));
+    auto max_rem = at::maximum(grouped_rem_max, at::tensor({0}));
+    auto scales_rem = (max_rem - min_rem) / 255;
+    auto zps_rem = -at::round(min_rem / scales_rem);
+    scales = at::cat({scales, scales_rem}, 1).contiguous();
+    zps = at::cat({zps, zps_rem}, 1).contiguous();
+  }
   return std::make_pair<at::Tensor&&, at::Tensor&&>(
       std::move(scales.to(c10::kFloat)), std::move(zps.to(c10::kInt)));
 }
@@ -2264,12 +2330,12 @@ std::pair<at::Tensor, at::Tensor> compute_int8_qparams_per_block(
 template <>
 std::pair<at::Tensor, at::Tensor> compute_int8_qparams_per_block<bfloat16>(
     const at::Tensor& t,
-    int block_k,
+    int quant_block_k,
     int quant_a_mode) {
   auto in_ptr = t.data_ptr<at::BFloat16>();
   int M = t.size(0);
   int K = t.size(1);
-  int Kc = K / block_k;
+  int Kc = (K + quant_block_k - 1) / quant_block_k;
   auto vecsize = at::vec::Vectorized<float>::size();
   at::Tensor scales, zps;
   if (quant_a_mode == QUANT_A_PER_K_BLOCK) {
@@ -2337,7 +2403,8 @@ std::pair<at::Tensor, at::Tensor> compute_int8_qparams_per_block<bfloat16>(
   if (quant_a_mode == QUANT_A_PER_K_BLOCK) {
 #pragma omp parallel for
     for (int kc = 0; kc < Kc; kc++) {
-      int offset = kc * block_k;
+      int offset = kc * quant_block_k;
+      int block_k = std::min(quant_block_k, K - offset);
       compute_minmax(in_ptr + offset, M, block_k, kc, kc, K);
     }
   } else if (quant_a_mode == QUANT_A_PER_M) {
@@ -2350,9 +2417,10 @@ std::pair<at::Tensor, at::Tensor> compute_int8_qparams_per_block<bfloat16>(
 #pragma omp parallel for collapse(2)
     for (int m = 0; m < M; m++) {
       for (int kc = 0; kc < Kc; kc++) {
-        auto in_ptr0 = in_ptr + m * K + kc * block_k;
+        auto in_ptr0 = in_ptr + m * K + kc * quant_block_k;
         auto scale_offset = m * Kc + kc;
         auto zp_offset = m * Kc + kc;
+        int block_k = std::min(quant_block_k, K - kc * quant_block_k);
         compute_minmax(in_ptr0, 1, block_k, scale_offset, zp_offset, K);
       }
     }
@@ -2481,8 +2549,9 @@ at::Tensor quantize_per_block(
     const at::Tensor& t,
     const at::Tensor& scale,
     const at::Tensor& zp,
-    int block_k,
+    int quant_block_k,
     int quant_a_mode) {
+  int block_k = quant_block_k;
   auto grouped = t.view({-1, t.size(-1) / block_k, block_k});
   at::Tensor out;
   if (quant_a_mode == QUANT_A_PER_K_BLOCK) {
@@ -2506,13 +2575,13 @@ at::Tensor quantize_per_block<bfloat16>(
     const at::Tensor& t,
     const at::Tensor& scale,
     const at::Tensor& zp,
-    int block_k,
+    int quant_block_k,
     int quant_a_mode) {
   // t is shape of [M, K] and contiguous tensor
   int64_t M = t.size(0);
   int64_t K = t.size(1);
   at::Tensor out = at::empty_like(t, at::kByte);
-  int Kc = K / block_k;
+  int Kc = (K + quant_block_k - 1) / quant_block_k;
   auto scale_ptr = scale.data_ptr<float>();
   auto zp_ptr = zp.data_ptr<int32_t>();
   auto in_ptr = t.data_ptr<at::BFloat16>();
@@ -2577,10 +2646,11 @@ at::Tensor quantize_per_block<bfloat16>(
 #pragma omp parallel for collapse(2)
     for (int m = 0; m < M; m++) {
       for (int kc = 0; kc < Kc; kc++) {
-        auto in_ptr0 = in_ptr + m * K + kc * block_k;
-        auto out_ptr0 = out_ptr + m * K + kc * block_k;
+        auto in_ptr0 = in_ptr + m * K + kc * quant_block_k;
+        auto out_ptr0 = out_ptr + m * K + kc * quant_block_k;
         auto scale_ = scale_ptr[kc];
         auto zp_ = zp_ptr[kc];
+        int block_k = std::min(quant_block_k, (int)K - kc * quant_block_k);
         quantize_block(in_ptr0, out_ptr0, block_k, scale_, zp_);
       }
     }
@@ -2588,10 +2658,11 @@ at::Tensor quantize_per_block<bfloat16>(
 #pragma omp parallel for collapse(2)
     for (int m = 0; m < M; m++) {
       for (int kc = 0; kc < Kc; kc++) {
-        auto in_ptr0 = in_ptr + m * K + kc * block_k;
-        auto out_ptr0 = out_ptr + m * K + kc * block_k;
+        auto in_ptr0 = in_ptr + m * K + kc * quant_block_k;
+        auto out_ptr0 = out_ptr + m * K + kc * quant_block_k;
         auto scale_ = scale_ptr[m];
         auto zp_ = zp_ptr[m];
+        int block_k = std::min(quant_block_k, (int)K - kc * quant_block_k);
         quantize_block(in_ptr0, out_ptr0, block_k, scale_, zp_);
       }
     }
@@ -2599,10 +2670,11 @@ at::Tensor quantize_per_block<bfloat16>(
 #pragma omp parallel for collapse(2)
     for (int m = 0; m < M; m++) {
       for (int kc = 0; kc < Kc; kc++) {
-        auto in_ptr0 = in_ptr + m * K + kc * block_k;
-        auto out_ptr0 = out_ptr + m * K + kc * block_k;
+        auto in_ptr0 = in_ptr + m * K + kc * quant_block_k;
+        auto out_ptr0 = out_ptr + m * K + kc * quant_block_k;
         auto scale_ = scale_ptr[m * Kc + kc];
         auto zp_ = zp_ptr[m * Kc + kc];
+        int block_k = std::min(quant_block_k, (int)K - kc * quant_block_k);
         quantize_block(in_ptr0, out_ptr0, block_k, scale_, zp_);
       }
     }
@@ -2639,7 +2711,9 @@ at::Tensor qlinear_woq_affine(
     int64_t num_concats,
     int64_t fusion_type,
     const TensorList& others_list,
-    int64_t quant_a_mode = -1) {
+    int64_t quant_a_mode = -1,
+    int64_t quant_w_mode = 0,
+    int64_t quant_block_k = 0) {
   const int64_t k_splits = 0;
   // int8_idx is only valid with zp_list when lowp_mode == LOWP_MODE_INT8
   constexpr size_t fp32_idx = 0, fp16_idx = 1, bf16_idx = 2, int8_idx = 3;
@@ -2658,10 +2732,20 @@ at::Tensor qlinear_woq_affine(
     out_sizes.back() = N;
     auto y = at::empty(out_sizes, x.options());
     auto x_reshape = x.reshape({M, K});
-    enumerate_dispatcher<at::ScalarType, at::kFloat, at::kBFloat16, at::kHalf>::
+    product_dispatcher<
+        std::tuple<at::ScalarType, long>,
+        std::tuple<
+            enumerate_dispatcher<
+                at::ScalarType,
+                at::kFloat,
+                at::kBFloat16,
+                at::kHalf>,
+            range_dispatcher<long, 0, 1>>>::
         call(
-            x.scalar_type(),
-            [&](auto act_dtype) {
+            std::make_tuple(x.scalar_type(), quant_w_mode),
+            [&](auto tuple) {
+              auto act_dtype = std::get<0>(tuple);
+              auto quant_w_mode_ = std::get<1>(tuple);
               using act_type =
                   typename c10::impl::ScalarTypeToCPPType<act_dtype>::type;
               auto try_compute_in_half = [&]() {
@@ -2673,7 +2757,8 @@ at::Tensor qlinear_woq_affine(
                     act_type,
                     half,
                     half,
-                    UNQUANT_A>(
+                    UNQUANT_A,
+                    quant_w_mode_>(
                     x_reshape,
                     qw,
                     scales_list[fp16_idx],
@@ -2684,7 +2769,8 @@ at::Tensor qlinear_woq_affine(
                     k_splits,
                     num_concats,
                     fusion_type,
-                    others_list);
+                    others_list,
+                    quant_block_k);
 #else
                 qlinear_woq_affine_impl<
                     act_type,
@@ -2693,7 +2779,8 @@ at::Tensor qlinear_woq_affine(
                     act_type,
                     float,
                     float,
-                    UNQUANT_A>(
+                    UNQUANT_A,
+                    quant_w_mode_>(
                     x_reshape,
                     qw,
                     scales_list[fp32_idx],
@@ -2704,7 +2791,8 @@ at::Tensor qlinear_woq_affine(
                     k_splits,
                     num_concats,
                     fusion_type,
-                    others_list);
+                    others_list,
+                    quant_block_k);
 #endif
               };
               if (lowp_mode == LOWP_MODE_NONE) {
@@ -2718,7 +2806,8 @@ at::Tensor qlinear_woq_affine(
                       bfloat16,
                       bfloat16,
                       bfloat16,
-                      UNQUANT_A>(
+                      UNQUANT_A,
+                      quant_w_mode_>(
                       x_reshape,
                       qw,
                       scales_list[bf16_idx],
@@ -2729,7 +2818,8 @@ at::Tensor qlinear_woq_affine(
                       k_splits,
                       num_concats,
                       fusion_type,
-                      others_list);
+                      others_list,
+                      quant_block_k);
                 } else {
                   qlinear_woq_affine_impl<
                       float,
@@ -2738,7 +2828,8 @@ at::Tensor qlinear_woq_affine(
                       float,
                       float,
                       float,
-                      UNQUANT_A>(
+                      UNQUANT_A,
+                      quant_w_mode_>(
                       x_reshape,
                       qw,
                       scales_list[fp32_idx],
@@ -2749,7 +2840,8 @@ at::Tensor qlinear_woq_affine(
                       k_splits,
                       num_concats,
                       fusion_type,
-                      others_list);
+                      others_list,
+                      quant_block_k);
                 }
               } else if (lowp_mode == LOWP_MODE_FP16) {
                 try_compute_in_half();
@@ -2763,7 +2855,8 @@ at::Tensor qlinear_woq_affine(
                       act_type,
                       bfloat16,
                       bfloat16,
-                      UNQUANT_A>(
+                      UNQUANT_A,
+                      quant_w_mode_>(
                       x_reshape,
                       qw,
                       scales_list[bf16_idx],
@@ -2774,7 +2867,8 @@ at::Tensor qlinear_woq_affine(
                       k_splits,
                       num_concats,
                       fusion_type,
-                      others_list);
+                      others_list,
+                      quant_block_k);
                 } else {
                   try_compute_in_half();
                 }
@@ -2798,7 +2892,8 @@ at::Tensor qlinear_woq_affine(
                       act_type,
                       float,
                       int8_t,
-                      QUANT_A_PER_TENSOR>(
+                      QUANT_A_PER_TENSOR,
+                      quant_w_mode_>(
                       x_quantized,
                       qw,
                       scales_list[fp32_idx],
@@ -2810,16 +2905,23 @@ at::Tensor qlinear_woq_affine(
                       num_concats,
                       fusion_type,
                       others_list,
+                      quant_block_k,
                       scale_a_t,
                       zp_a_t);
                 } else {
-                  auto block_k = w_sizes[2];
+                  if (quant_block_k <= 0) {
+                    quant_block_k = w_sizes[2]; // block_k for weight packing
+                  }
                   auto x_reshape_contig = x_reshape.contiguous();
                   auto [scale_a, zp_a] =
                       compute_int8_qparams_per_block<act_type>(
-                          x_reshape_contig, block_k, quant_a_mode);
+                          x_reshape_contig, quant_block_k, quant_a_mode);
                   auto x_quantized = quantize_per_block<act_type>(
-                      x_reshape_contig, scale_a, zp_a, block_k, quant_a_mode);
+                      x_reshape_contig,
+                      scale_a,
+                      zp_a,
+                      quant_block_k,
+                      quant_a_mode);
                   range_dispatcher<
                       long,
                       QUANT_A_PER_K_BLOCK,
@@ -2834,7 +2936,8 @@ at::Tensor qlinear_woq_affine(
                                 act_type,
                                 float,
                                 int8_t,
-                                quant_a_mode_>(
+                                quant_a_mode_,
+                                quant_w_mode_>(
                                 x_quantized,
                                 qw,
                                 scales_list[fp32_idx],
@@ -2846,6 +2949,7 @@ at::Tensor qlinear_woq_affine(
                                 num_concats,
                                 fusion_type,
                                 others_list,
+                                quant_block_k,
                                 scale_a,
                                 zp_a);
                           },
@@ -2853,38 +2957,71 @@ at::Tensor qlinear_woq_affine(
                 }
               }
             },
-            failing_fallback<at::ScalarType>);
+            [](auto tuple) { failing_fallback(); });
     return y;
   } else {
     TLA_ASSERT(
         qw.dim() == 2,
         "weight must be in 4D blocked format or 2D plain format");
+    auto K = x.size(-1);
+    auto M = x.numel() / K;
+    auto N = qw.size(0);
     auto compute_dtype = x.scalar_type();
     if (lowp_mode == LOWP_MODE_FP16) {
       compute_dtype = at::kHalf;
     } else if (lowp_mode == LOWP_MODE_BF16) {
-      compute_dtype = at::kBFloat16;
+      compute_dtype = K >= SMALL_BATCH_THRESHOLD ? at::kBFloat16 : at::kHalf;
     }
+    at::Tensor scale, zp;
+    scale = scales_list[fp32_idx].unsqueeze(-1);
+    zp = zp_list[fp32_idx].unsqueeze(-1);
     auto w =
         [&]() {
           if (is_int4) {
             using namespace at::indexing;
-            auto w_int8 = at::empty(
-                {qw.size(0), qw.size(1) * 2}, qw.options().dtype(at::kByte));
+            auto w_int8 =
+                at::empty({N, qw.size(1) * 2}, qw.options().dtype(at::kByte));
             w_int8.index({Slice(), Slice(None, None, 2)})
                 .copy_(qw.bitwise_and(0xf));
             w_int8.index({Slice(), Slice(1, None, 2)})
                 .copy_(qw.bitwise_right_shift(4));
-            return (w_int8.to(at::kFloat) - zp_list[fp32_idx]) *
-                scales_list[fp32_idx];
+            at::Tensor dqw;
+            if (quant_w_mode == 0) {
+              dqw = (w_int8.to(at::kFloat) - zp) * scale;
+            } else {
+              int64_t num_blocks = scale.size(-2);
+              auto w_int8_view = w_int8.view({N, num_blocks, -1});
+              dqw = (w_int8_view.to(at::kFloat) - zp) * scale;
+              dqw = dqw.view({N, -1});
+            }
+            if (K != qw.size(1) * 2) {
+              TORCH_CHECK(
+                  K < qw.size(1) * 2,
+                  'WOQ Linear kernel: Unexpected weight shape');
+              auto dqw_narrowed = dqw.narrow(1, 0, K);
+              return dqw_narrowed;
+            }
+            return dqw;
           } else {
-            return (qw.to(at::kFloat) - zp_list[fp32_idx]) *
-                scales_list[fp32_idx];
+            at::Tensor dqw;
+            if (quant_w_mode == 0) {
+              dqw = (qw.to(at::kFloat) - zp) * scale;
+            } else {
+              int64_t num_blocks = scale.size(-2);
+              auto w_int8_view = qw.view({N, num_blocks, -1});
+              dqw = (w_int8_view.to(at::kFloat) - zp) * scale;
+              dqw = dqw.view({N, -1});
+            }
+            return dqw;
           }
         }()
             .to(compute_dtype);
-    auto x_fp = x.to(compute_dtype);
-    auto y = at::linear(x_fp, w);
+    auto x_reshape = x.reshape({M, K});
+    auto x_fp = x_reshape.to(compute_dtype);
+    // PyTorch does not support computing in half yet
+    auto y = compute_dtype == at::kHalf
+        ? at::linear(x_fp.to(c10::kFloat), w.to(c10::kFloat))
+        : at::linear(x_fp, w);
     if (biases[0].defined()) {
       auto b_index = compute_dtype == at::kFloat ? fp32_idx
           : compute_dtype == at::kHalf           ? fp16_idx
@@ -2895,8 +3032,11 @@ at::Tensor qlinear_woq_affine(
       y = at::gelu(y);
     } else if (fusion_type == FUSE_ADD || fusion_type == FUSE_ADD_ADD) {
       for (auto& tin : others_list)
-        y = at::add(y, tin);
+        y = at::add(y, tin.view(y.sizes()));
     }
+    auto out_sizes = x.sizes().vec();
+    out_sizes.back() = N;
+    y = y.view(out_sizes);
     if (num_concats > 1) {
       y = y.view({-1, num_concats, y.size(-1) / num_concats})
               .transpose(0, 1)
@@ -2909,7 +3049,7 @@ at::Tensor qlinear_woq_affine(
 
 #else // defined(CPU_CAPABILITY_AVX512_FP16) && defined(COMPILER_PREREQ_MET)
 
-static at::Tensor empty_tensor;
+#define SMALL_BATCH_THRESHOLD 32
 
 at::Tensor qlinear_woq_affine(
     const at::Tensor& x,
@@ -2922,8 +3062,96 @@ at::Tensor qlinear_woq_affine(
     int64_t num_concats,
     int64_t fusion_type,
     const TensorList& others_list,
-    int64_t quant_a_mode = -1) {
-  return empty_tensor;
+    int64_t quant_a_mode = -1,
+    int64_t quant_w_mode = 0,
+    int64_t quant_block_k = 0) {
+  constexpr size_t fp32_idx = 0, fp16_idx = 1, bf16_idx = 2, int8_idx = 3;
+  auto biases = bias_list.empty()
+      ? TensorList({at::Tensor(), at::Tensor(), at::Tensor()})
+      : bias_list;
+  TLA_ASSERT(
+      qw.dim() == 2, "weight must be in 4D blocked format or 2D plain format");
+  auto K = x.size(-1);
+  auto M = x.numel() / K;
+  auto N = qw.size(0);
+  auto compute_dtype = x.scalar_type();
+  if (lowp_mode == LOWP_MODE_FP16) {
+    compute_dtype = at::kHalf;
+  } else if (lowp_mode == LOWP_MODE_BF16) {
+    compute_dtype = K >= SMALL_BATCH_THRESHOLD ? at::kBFloat16 : at::kHalf;
+  }
+  at::Tensor scale, zp;
+  scale = scales_list[fp32_idx].unsqueeze(-1);
+  zp = zp_list[fp32_idx].unsqueeze(-1);
+  auto w =
+      [&]() {
+        if (is_int4) {
+          using namespace at::indexing;
+          auto w_int8 =
+              at::empty({N, qw.size(1) * 2}, qw.options().dtype(at::kByte));
+          w_int8.index({Slice(), Slice(None, None, 2)})
+              .copy_(qw.bitwise_and(0xf));
+          w_int8.index({Slice(), Slice(1, None, 2)})
+              .copy_(qw.bitwise_right_shift(4));
+          at::Tensor dqw;
+          if (quant_w_mode == 0) {
+            dqw = (w_int8.to(at::kFloat) - zp) * scale;
+          } else {
+            int64_t num_blocks = scale.size(-2);
+            auto w_int8_view = w_int8.view({N, num_blocks, -1});
+            dqw = (w_int8_view.to(at::kFloat) - zp) * scale;
+            dqw = dqw.view({N, -1});
+          }
+          if (K != qw.size(1) * 2) {
+            TORCH_CHECK(
+                K < qw.size(1) * 2,
+                'WOQ Linear kernel: Unexpected weight shape');
+            auto dqw_narrowed = dqw.narrow(1, 0, K);
+            return dqw_narrowed;
+          }
+          return dqw;
+        } else {
+          at::Tensor dqw;
+          if (quant_w_mode == 0) {
+            dqw = (qw.to(at::kFloat) - zp) * scale;
+          } else {
+            int64_t num_blocks = scale.size(-2);
+            auto w_int8_view = qw.view({N, num_blocks, -1});
+            dqw = (w_int8_view.to(at::kFloat) - zp) * scale;
+            dqw = dqw.view({N, -1});
+          }
+          return dqw;
+        }
+      }()
+          .to(compute_dtype);
+  auto x_reshape = x.reshape({M, K});
+  auto x_fp = x_reshape.to(compute_dtype);
+  // PyTorch does not support computing in half yet
+  auto y = compute_dtype == at::kHalf
+      ? at::linear(x_fp.to(c10::kFloat), w.to(c10::kFloat))
+      : at::linear(x_fp, w);
+  if (biases[0].defined()) {
+    auto b_index = compute_dtype == at::kFloat ? fp32_idx
+        : compute_dtype == at::kHalf           ? fp16_idx
+                                               : bf16_idx;
+    y = at::add(y, biases[b_index]);
+  }
+  if (fusion_type == FUSE_GELU) {
+    y = at::gelu(y);
+  } else if (fusion_type == FUSE_ADD || fusion_type == FUSE_ADD_ADD) {
+    for (auto& tin : others_list)
+      y = at::add(y, tin.view(y.sizes()));
+  }
+  auto out_sizes = x.sizes().vec();
+  out_sizes.back() = N;
+  y = y.view(out_sizes);
+  if (num_concats > 1) {
+    y = y.view({-1, num_concats, y.size(-1) / num_concats})
+            .transpose(0, 1)
+            .contiguous()
+            .view({-1, y.size(-1)});
+  }
+  return y.to(x.scalar_type());
 }
 
 at::Tensor qlinear_woq_pack(
@@ -2932,14 +3160,14 @@ at::Tensor qlinear_woq_pack(
     size_t block_n,
     size_t block_k,
     int64_t lowp_mode) {
-  return empty_tensor;
+  return qw;
 }
 
 at::Tensor qlinear_woq_unpack(
     const at::Tensor& qw_packed,
     bool is_int4,
     int64_t lowp_mode) {
-  return empty_tensor;
+  return qw_packed;
 }
 #endif // defined(CPU_CAPABILITY_AVX512_FP16) && defined(COMPILER_PREREQ_MET)
 

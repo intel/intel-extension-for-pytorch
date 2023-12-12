@@ -55,9 +55,7 @@ static_qconfig = [
 
 dynamic_qconfig = [
     QConfig(
-        activation=PlaceholderObserver.with_args(
-            dtype=torch.float, compute_dtype=torch.quint8
-        ),
+        activation=PlaceholderObserver.with_args(dtype=torch.float, is_dynamic=True),
         weight=MinMaxObserver.with_args(
             dtype=torch.qint8, qscheme=torch.per_tensor_symmetric
         ),

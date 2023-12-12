@@ -43,8 +43,14 @@ typedef at::BFloat16 bfloat16;
 typedef at::Half half;
 
 #define DECL_VLA_PTR(type, name, dims, ptr) type(*name) dims = (type(*) dims)ptr
+/*
+  Fix issue with clang build: 'cannot initialize a variable of type X with an
+  rvalue of type X'. Keep the original code as backup:
+  #define DECL_VLA_PTR_PT(type, name, dims, t) \
+    type(*name) dims = (type(*) dims)(t.data_ptr<type>())
+*/
 #define DECL_VLA_PTR_PT(type, name, dims, t) \
-  type(*name) dims = (type(*) dims)(t.data_ptr<type>())
+  auto name = (type(*) dims)(t.data_ptr<type>())
 
 // defined in init.cpp
 extern double ifreq;

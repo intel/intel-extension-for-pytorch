@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import logging
-import os
 import pkg_resources
 from intel_extension_for_pytorch import optim
 from intel_extension_for_pytorch.cpu.tpp.utils.blocked_layout import (
@@ -94,28 +93,19 @@ installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
 if "deepspeed" in installed_pkg:
     from deepspeed import comm
 
-    def _all_reduce(self, reduceOp, tag, ranks, group_size):
+    def _all_reduce(self):
         comm.inference_all_reduce(self, async_op=False)
         return self
 
     ds_comm = torch.library.Library("deepspeed_comm", "DEF")
-    ds_comm.define(
-        "all_reduce(Tensor self, str reduceOp, str tag, int[] ranks, int group_size) -> Tensor"
-    )
+    ds_comm.define("all_reduce(Tensor self) -> Tensor")
     ds_comm_lib_cpu = torch.library.Library("deepspeed_comm", "IMPL", "CPU")
     ds_comm_lib_cpu.impl("all_reduce", _all_reduce)
 
 
 def _all_reduce_and_bias_add(mp_group, original_bias, output):
     if mp_group is not None:
-        torch.ops.deepspeed_comm.all_reduce(
-            output,
-            "sum",
-            "",
-            list(torch.arange(int(os.environ["WORLD_SIZE"]))),
-            int(os.environ["WORLD_SIZE"]),
-        )
-
+        torch.ops.deepspeed_comm.all_reduce(output)
     if original_bias is not None:
         output += original_bias
 
@@ -128,8 +118,10 @@ def _pre_ipex_gemm(input, world_size, rank):
         from deepspeed.module_inject.tp_shard import get_shard_size, get_shard_size_list
     except ImportError:
         from deepspeed.utils.tp_shard import get_shard_size, get_shard_size_list
-    input_shard_size = get_shard_size(input.shape[-1], world_size)
-    input_shard_offset = sum(get_shard_size_list(input.shape[-1], world_size)[0:rank])
+    input_shard_size = get_shard_size(input.shape[-1], world_size, "lm_head")
+    input_shard_offset = sum(
+        get_shard_size_list(input.shape[-1], world_size, "lm_head")[0:rank]
+    )
     return input[:, :, input_shard_offset : input_shard_offset + input_shard_size]
 
 
@@ -497,8 +489,8 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
                     new_m.tpp_fallback = True
                 else:
                     new_m.tpp_fallback = False
-                params_attr[m.weight] = params_attr.pop(weight_key)
-                del weight_key
+                    params_attr[m.weight] = params_attr.pop(weight_key)
+                    del weight_key
 
             else:
                 param_wrapper.prepack(m, is_training)

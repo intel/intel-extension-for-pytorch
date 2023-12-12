@@ -1,3 +1,4 @@
+#include "general/general.h"
 #include "ref/ref.h"
 #if defined(CPU_CAPABILITY_AVX512)
 #include "vec512/vec512.h"
