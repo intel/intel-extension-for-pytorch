@@ -265,12 +265,7 @@ $(document).ready(function() {
           //   note += $.ul_gen(data.preparation.basekit.notinstall);
           //   notes.push(note);
           // }
-          var script_os = "";
-          if(data.os == "Linux/WSL2")
-            script_os = "setvars.sh";
-          else if(data.os == "Windows")
-            script_os = "setvars.bat";
-          var note = "<p>Avoid using environment activation script <i>" + script_os + "</i> in oneAPI root directory to activate oneAPI environment with all its components, use individual component-specific activation scripts to activate required components listed below one-by-one. Check the <i>Sanity Test</i> section below for a usage example.</p>";
+          var note = "<p>Recommend to use individual component-specific activation scripts to activate required components listed below one-by-one. Check the <i>Sanity Test</i> section below for a usage example.</p>";
           notes.push(note);
           if(data.preparation.msvc != null &&
              $.pkgInArray(data.package, ["source", "cppsdk"]))
