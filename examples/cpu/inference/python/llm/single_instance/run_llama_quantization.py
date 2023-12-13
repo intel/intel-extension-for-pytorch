@@ -329,19 +329,25 @@ elif args.ipex_weight_only_quantization:
             lowp_mode = ipex.quantization.WoqLowpMode.INT8
         else:
             lowp_mode = ipex.quantization.WoqLowpMode.BF16
+    try:
+        act_quant_mode_dict = {
+            "PER_TENSOR": ipex.quantization.WoqActQuantMode.PER_TENSOR,
+            "PER_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_IC_BLOCK,
+            "PER_BATCH": ipex.quantization.WoqActQuantMode.PER_BATCH,
+            "PER_BATCH_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_BATCH_IC_BLOCK,
+        }
+        qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+            weight_dtype=weight_dtype,
+            lowp_mode=lowp_mode,
+            act_quant_mode=act_quant_mode_dict[args.act_quant_mode],
+            group_size=args.group_size
+        )
+    except:
+        qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+            weight_dtype=weight_dtype,
+            lowp_mode=lowp_mode,
+        )
 
-    act_quant_mode_dict = {
-        "PER_TENSOR": ipex.quantization.WoqActQuantMode.PER_TENSOR,
-        "PER_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_IC_BLOCK,
-        "PER_BATCH": ipex.quantization.WoqActQuantMode.PER_BATCH,
-        "PER_BATCH_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_BATCH_IC_BLOCK,
-    }
-    qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
-        weight_dtype=weight_dtype,
-        lowp_mode=lowp_mode,
-        act_quant_mode=act_quant_mode_dict[args.act_quant_mode],
-        group_size=args.group_size
-    )
     if args.low_precision_checkpoint != "":
         low_precision_checkpoint = torch.load(args.low_precision_checkpoint)
     else:
