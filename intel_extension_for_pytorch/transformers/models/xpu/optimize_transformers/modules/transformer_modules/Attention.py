@@ -248,6 +248,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
             blocked_attn_mask,
             blocked_alibi,
         ) = self.prepare_sdp_input(query, key, value, attention_mask, alibi)
+        # q: (bs_beam, num_heads, q_len, head_dim), kv: (bs_beam, num_heads, seq_len, head_dim)
         attention_output, attn_weight = self.compute_sdp(
             query,
             key,
@@ -611,6 +612,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         return attention_output.permute(0, 2, 1, 3)
 
     def process_sdp_output_general(self, attention_output):
+        # (bs_beam, num_heads, q_len, head_dim) -> (q_len, bs_beam, num_heads, head_dim)
         return attention_output.permute(2, 0, 1, 3)
 
     # ######################################################################### post sdp ######################

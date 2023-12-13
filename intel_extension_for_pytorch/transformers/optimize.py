@@ -443,6 +443,7 @@ def model_convert_lowering(
         from .models.xpu.optimize_transformers.modules.llama import NewIPEXLLAMABlock
         from .models.xpu.optimize_transformers.modules.opt import NewIPEXOPTBlock
         from .models.xpu.optimize_transformers.modules.bloom import NewIPEXBloomBlock
+        from .models.xpu.optimize_transformers.modules.falcon import NewIPEXFalconBlock
 
         def ref_replace_module_for_xpu(
             module, config, dtype, device, module_name, tp_size, tp_group
@@ -456,6 +457,9 @@ def model_convert_lowering(
                 replace_block = NewIPEXOPTBlock
             elif re.search("BLOOM", _model.config.architecture[0], re.IGNORECASE):
                 replace_block = NewIPEXBloomBlock
+            # only support transformers version model, not in-library model
+            elif re.search("Falcon", _model.config.architecture[0], re.IGNORECASE):
+                replace_block = NewIPEXFalconBlock
             if replace_block is not None:
                 out_block = replace_block(
                     module,
@@ -592,10 +596,13 @@ def optimize_transformers(
             or re.search("llama", model.config.architectures[0], re.IGNORECASE)
             or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
             or re.search("Bloom", model.config.architectures[0], re.IGNORECASE)
+            or re.search("Falcon", model.config.architectures[0], re.IGNORECASE)
         ) and device == "xpu"
         if not (well_supported_model or xpu_supported_model):
             warnings.warn(
-                "optimize_transformers supports GPT-J/Llama/OPT/Bloom in XPU and Llama/GPT-J/GPT-Neox/Falcon/OPT"
+                "optimize_transformers supports GPT-J/Llama/OPT/Bloom/Falcon"
+                " of transformers model without `trust_remote_code=True` in XPU"
+                " and Llama/GPT-J/GPT-Neox/Falcon/OPT"
                 " in CPU, fallback to origin model"
             )
             return model

@@ -6,6 +6,7 @@ from .modules.Functions import (
     llama_forward_hook,
     bloom_forward_hook,
     opt_forward_hook,
+    falcon_forward_hook,
     ipex_build_bloom_alibi_tensor,
 )
 from .modules.utils import is_int4
@@ -21,6 +22,7 @@ from .modules.gptj import NewIPEXGPTJBlock
 from .modules.bloom import NewIPEXBloomBlock
 from .modules.llama import NewIPEXLLAMABlock
 from .modules.opt import NewIPEXOPTBlock
+from .modules.falcon import NewIPEXFalconBlock
 import os
 
 
@@ -32,6 +34,8 @@ def default_replaced_module_dict():
         transformers.models.llama.modeling_llama.LlamaDecoderLayer: NewIPEXLLAMABlock,
         transformers.models.opt.modeling_opt.OPTDecoderLayer: NewIPEXOPTBlock,
         transformers.models.bloom.modeling_bloom.BloomBlock: NewIPEXBloomBlock,
+        # only support transformers version model, not in-library model
+        transformers.models.falcon.modeling_falcon.FalconDecoderLayer: NewIPEXFalconBlock,
     }
     return default_replace_modules
 
@@ -61,6 +65,7 @@ def default_override_function_list() -> List:
         llama_forward_hook,
         bloom_forward_hook,
         opt_forward_hook,
+        falcon_forward_hook,
         ipex_build_bloom_alibi_tensor,
     ]
     return default_fn_list

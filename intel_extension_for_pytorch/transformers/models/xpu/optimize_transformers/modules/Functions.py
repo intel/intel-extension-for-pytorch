@@ -45,6 +45,13 @@ def opt_forward_hook(model):
         pad_for_gptj_lm_head(model, is_int4(model))
 
 
+def falcon_forward_hook(model):
+    import transformers
+
+    if type(model) == transformers.models.falcon.modeling_falcon.FalconForCausalLM:
+        pad_for_gptj_lm_head(model, is_int4(model))
+
+
 def bloom_forward_hook(model):
     import transformers
 
