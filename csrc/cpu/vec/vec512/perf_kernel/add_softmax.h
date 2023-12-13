@@ -578,6 +578,128 @@ inline void _mha_update_sum_max_kernel(
   }
 }
 
+template <typename scalar_a>
+inline void _dil_div_add_alibi_and_reduce_max_fusion_kernel(
+    const scalar_a* a,
+    const float& scale,
+    const int& size,
+    float* out,
+    float& max,
+    const float alibi_slope,
+    bool use_alibi) {
+  auto vec_ps_min = _mm512_set1_ps(std::numeric_limits<float>::lowest());
+  auto vec_a = vec_ps_min;
+  auto vec_out = vec_ps_min;
+
+  int i = 0;
+  auto vec_scale = _mm512_set1_ps(scale);
+  auto vec_alibi_slope = _mm512_set1_ps(alibi_slope);
+  float idx[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  auto vec_idx = _mm512_loadu_ps(idx);
+  for (; i <= size - 16; i += 16) {
+    vec_a = _loadu(a + i);
+    vec_out = _mm512_mul_ps(vec_a, vec_scale);
+    if (use_alibi) {
+      // alibi_slope * (token_idx - context_len +1)
+      auto vec_token_idx = _mm512_set1_ps(i);
+      vec_token_idx = _mm512_add_ps(vec_token_idx, vec_idx);
+      auto vec_context_len = _mm512_set1_ps(size + 1);
+      vec_token_idx = _mm512_sub_ps(vec_token_idx, vec_context_len);
+      vec_token_idx = _mm512_mul_ps(vec_token_idx, vec_alibi_slope);
+      vec_out = _mm512_add_ps(vec_out, vec_token_idx);
+    }
+    vec_ps_min = _mm512_max_ps(vec_ps_min, vec_out);
+    _mm512_storeu_ps(out + i, vec_out);
+  }
+
+  if (i < size) {
+    __mmask16 mask = (1 << (size - i)) - 1;
+    vec_a = _maskz_loadu(a + i, mask);
+    vec_out = _mm512_mul_ps(vec_a, vec_scale);
+    if (use_alibi) {
+      // alibi_slope * (token_idx - context_len +1)
+      auto vec_token_idx = _mm512_set1_ps(i);
+      vec_token_idx = _mm512_add_ps(vec_token_idx, vec_idx);
+      auto vec_context_len = _mm512_set1_ps(size + 1);
+      vec_token_idx = _mm512_sub_ps(vec_token_idx, vec_context_len);
+      vec_token_idx = _mm512_mul_ps(vec_token_idx, vec_alibi_slope);
+      vec_out = _mm512_add_ps(vec_out, vec_token_idx);
+    }
+    vec_ps_min = _mm512_mask_max_ps(vec_ps_min, mask, vec_out, vec_ps_min);
+    _mm512_mask_storeu_ps(out + i, mask, vec_out);
+  }
+
+  // NOTE: _mm512_reduce_max_ps is sequence instruction
+  max = _mm512_reduce_max_ps(vec_ps_min);
+}
+
+template <typename QT, typename KT, typename CT>
+void _reduce_head(
+    const QT* q_ptr_start,
+    const KT* k_ptr_start,
+    float* attn_w_pos,
+    int64_t head_size,
+    bool store_key,
+    CT* k_cache_start) {
+  auto hsi = 0;
+  auto vec_size = 16; // 512/32
+  auto qk_sum_vec = _mm512_setzero_ps();
+  for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
+    auto q_vec = _loadu(q_ptr_start + hsi);
+    auto k_vec = _loadu(k_ptr_start + hsi);
+    if (store_key) {
+      _storeu(k_cache_start + hsi, k_vec);
+    }
+    qk_sum_vec = _mm512_fmadd_ps(q_vec, k_vec, qk_sum_vec);
+  }
+  attn_w_pos[0] += _mm512_reduce_add_ps(qk_sum_vec);
+  for (; hsi < head_size; hsi++) {
+    if (store_key) {
+      k_cache_start[hsi] =
+          (float)k_ptr_start[hsi]; // cat the key into the key_cache.
+    }
+    attn_w_pos[0] += q_ptr_start[hsi] * (float)k_ptr_start[hsi];
+  }
+}
+
+template <typename VT, typename OT, typename CT>
+inline void _mul_and_accumulate(
+    const float& attn_w,
+    const VT* v_ptr_start,
+    OT* attn_out_start,
+    int64_t head_size,
+    bool store_value,
+    CT* v_cache_start,
+    int accumulated) {
+  auto vec_size = 16; // 512/32
+  auto hsi = 0;
+  for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
+    auto attn_w_vec = _mm512_set1_ps(attn_w);
+    auto v_vec = _loadu(v_ptr_start + hsi);
+    if (accumulated) {
+      auto attn_out_vec = _loadu(attn_out_start + hsi);
+      auto attn_out_vec_new = _mm512_fmadd_ps(attn_w_vec, v_vec, attn_out_vec);
+      _storeu(attn_out_start + hsi, attn_out_vec_new);
+    } else {
+      auto attn_out_vec_new = _mm512_mul_ps(attn_w_vec, v_vec);
+      _storeu(attn_out_start + hsi, attn_out_vec_new);
+    }
+    if (store_value) {
+      _storeu(v_cache_start + hsi, v_vec);
+    }
+  }
+  for (; hsi < head_size; hsi++) {
+    if (accumulated) {
+      attn_out_start[hsi] += attn_w * (float)v_ptr_start[hsi];
+    } else {
+      attn_out_start[hsi] = attn_w * (float)v_ptr_start[hsi];
+    }
+    if (store_value) {
+      v_cache_start[hsi] = (float)v_ptr_start[hsi];
+    }
+  }
+}
+
 } // namespace kernel
 } // namespace cpu
 } // namespace torch_ipex
