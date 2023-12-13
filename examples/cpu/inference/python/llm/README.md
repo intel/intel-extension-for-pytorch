@@ -1,7 +1,6 @@
 # Text Generation
 
-We provide the inference benchmarking scripts for large language models text generation.<br/>
-Support large language model families, including GPT-J, LLaMA, GPT-Neox, OPT, Falcon, CodeGen.<br/>
+We provide the inference benchmarking scripts for large language models (LLMs) text generation, by which several popular models in LLM family, including GPT-J, LLaMA, GPT-Neox, OPT, Falcon, CodeGen, are optimized.<br/>
 The scripts include both single instance and distributed (DeepSpeed) use cases.<br/>
 The scripts cover model generation inference with low precions cases for different models with best perf and accuracy (bf16 AMP，static quantization and weight only quantization).<br/>
 
@@ -20,15 +19,15 @@ The scripts cover model generation inference with low precions cases for differe
 
 \*\* For GPT-NEOX/FALCON/OPT/CodeGen models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.
 
-*Note:* The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked Linear (fp32/bf16). For other LLM model families, we are working in progress to cover those optimizations, which will expand the model list above.
+*Note:* The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked Linear (fp32/bf16). For other LLM families, we are working in progress to cover those optimizations, which will expand the model list above.
 
 # Models to be Optimized
 
-We are working on the optimizations of a wider range of popular LLM models. Models like BLOOM, ChatGLM2/ChatGLM3, T5, BaiChuan/BaiChuan2, StarCoder and CodeLlama are to be optimized in the next release, and more models like Dolly2, MPT, QWen, Mistral, etc. are on the way.
+We are working on the optimizations of a wider range of popular LLMs. Models like BLOOM, ChatGLM2/ChatGLM3, T5, BaiChuan/BaiChuan2, StarCoder and CodeLlama are to be optimized in the next release, and more models like Dolly2, MPT, QWen, Mistral, etc. are on the way.
 
 # Environment Setup
 
-1. Get the Intel® Extension for PyTorch\* source code
+1\. Get the Intel® Extension for PyTorch\* source code
 
 ```bash
 git clone https://github.com/intel/intel-extension-for-pytorch.git
@@ -38,7 +37,7 @@ git submodule sync
 git submodule update --init --recursive
 ```
 
-2.a. It is highly recommended to build a Docker container from the provided `Dockerfile`.
+2\.a. It is highly recommended to build a Docker container from the provided `Dockerfile`.
 
 ```bash
 # Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch\* from source
@@ -54,7 +53,7 @@ docker run --rm -it --privileged ipex-llm:2.1.100 bash
 cd llm
 ```
 
-2.b. Alternatively, you can take advantage of a provided environment configuration script to setup an environment without using a docker container.
+2\.b. Alternatively, you can take advantage of a provided environment configuration script to setup an environment without using a docker container.
 
 ```bash
 # GCC 12.3 is required. Installation can be taken care of by the environment configuration script.
@@ -67,7 +66,7 @@ cd examples/cpu/inference/python/llm
 bash ./tools/env_setup.sh
 ```
 
-3. Once an environment is configured with either method above, set necessary environment variables with an environment variables activation script and download the sample `prompt.json`.
+3\. Once an environment is configured with either method above, set necessary environment variables with an environment variables activation script and download the sample `prompt.json`.
 
 ```bash
 # Activate environment variables

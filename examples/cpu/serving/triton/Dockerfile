@@ -3,20 +3,20 @@
 
 FROM nvcr.io/nvidia/tritonserver:23.10-py3
 
-COPY requirements.txt requirements.txt
-RUN apt-get update &&                                              \
-    apt-get install --no-install-recommends -y numactl             \
-                                               google-perftools    \
-                                               python3.9 &&        \
-    ln -s /usr/bin/python3.9 /usr/bin/python &&                    \
-    apt-get clean
+RUN useradd -m tritonuser && \
+    echo 'tritonuser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
-RUN python3 -m pip --no-cache-dir install -U --upgrade pip &&      \
+USER tritonuser
+WORKDIR /home/tritonuser
+
+COPY --chown=tritonuser:tritonuser requirements.txt requirements.txt
+ENV PATH="/home/tritonuser/.local/bin":${PATH}
+RUN python3 -m pip --no-cache-dir install -U --upgrade pip && \
     python3 -m pip --no-cache-dir install -U -r requirements.txt
 
-ENV LD_PRELOAD="/usr/local/lib/libiomp5.so:/usr/lib/x86_64-linux-gnu/libtcmalloc.so":${LD_PRELOAD}
-ENV KMP_BLOCKTIME=1
-ENV KMP_SETTINGS=1
-ENV KMP_AFFINITY=granularity=fine,compact,1,0
-ENV DNNL_PRIMITIVE_CACHE_CAPACITY=1024
-ENV TOKENIZERS_PARALLELISM=true
+ENV LD_PRELOAD="/home/tritonuser/.local/lib/libiomp5.so:/usr/lib/x86_64-linux-gnu/libtcmalloc.so":${LD_PRELOAD} \
+    KMP_BLOCKTIME=1 \
+    KMP_SETTINGS=1 \
+    KMP_AFFINITY=granularity=fine,compact,1,0 \
+    DNNL_PRIMITIVE_CACHE_CAPACITY=1024 \
+    TOKENIZERS_PARALLELISM=true

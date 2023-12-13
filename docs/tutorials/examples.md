@@ -177,6 +177,8 @@ We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://py
 [//]: # (marker_inf_bert_dynamo_fp32)
 [//]: # (marker_inf_bert_dynamo_fp32)
 
+*Note:* In TorchDynamo mode, since the native PyTorch operators like `aten::convolution` and `aten::linear` are well supported and optimized in `ipex` backend, we need to disable weights prepacking by setting `weights_prepack=False` in `ipex.optimize()`.
+
 #### BFloat16
 
 The `optimize` function works for both Float32 and BFloat16 data type. For BFloat16 data type, set the `dtype` parameter to `torch.bfloat16`.
