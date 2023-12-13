@@ -375,14 +375,22 @@ Data type of scales can be any floating point types. Shape of scales should be [
 
 We leverage [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness) for the accuracy test.
 
-By default we test "lambada_standard" task, for more choice, see {TASK_NAME} in this [link](https://github.com/EleutherAI/lm-evaluation-harness/blob/master/docs/task_table.md), 
+We verify and recommend to test "lambada_openai" task, for more choice, see {TASK_NAME} in this [link](https://github.com/EleutherAI/lm-evaluation-harness/blob/master/docs/task_table.md).
 
 ### Single Instance
 
 ```bash
 cd ./single_instance
 ```
+### FP32:
 
+```bash
+# general command:
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run_accuracy.py --accuracy-only -m <MODEL_ID> --dtype float32 --ipex --jit --tasks {TASK_NAME}
+
+# An example of llama2 7b model:
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py --accuracy-only -m meta-llama/Llama-2-7b-hf --dtype float32 --ipex --jit --tasks lambada_openai
+```
 ### BF16:
 
 ```bash
@@ -415,7 +423,15 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Lla
 cd ./distributed
 unset KMP_AFFINITY
 ```
+### FP32:
 
+```bash
+# general command:
+deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model <MODEL_ID> --dtype float32 --ipex --jit --tasks <TASK_NAME> --accuracy-only
+
+# An example of llama2 7b model:
+deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --dtype float32 --ipex --jit --tasks lambada_openai --accuracy-only 
+```
 ### BF16:
 
 ```bash
@@ -434,7 +450,7 @@ deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_
 # note that GPT-NEOX please remove "--int8-bf16-mixed" and add "--dtype float32" for accuracy concerns
 
 # An example of llama2 7b model:
-deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --int8-bf16-mixed --ipex --jit --tasks <TASK_NAME> --accuracy-only --ipex-weight-only-quantization
+deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --int8-bf16-mixed --ipex --jit --tasks lambada_openai --accuracy-only --ipex-weight-only-quantization
 ```
 
 ## How to Shard model for Distributed tests with DeepSpeed (autoTP)
