@@ -499,7 +499,7 @@ def optimize_transformers(
         dtype (torch.dtype): Now it works for ``torch.bfloat16`` and ``torch.float``.
             The default value is ``torch.float``. When working with quantization, it means the mixed dtype with quantization.
         inplace (bool): Whether to perform inplace optimization. Default value is ``False``.
-        device (str): Perform optimization on which device. Curentlty only support cpu. Default value is ``cpu``.
+        device (str): Specifying the device on which the optimization will be performed-either 'CPU' or 'XPU.
         quantization_config (object): Defining the IPEX quantization recipe (Weight only quant or static quant).
             Default value is ``None``.
             Once used, meaning using IPEX quantizatization model for model.generate().(only works on CPU)

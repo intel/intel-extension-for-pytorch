@@ -9,7 +9,7 @@ For the detailed list of supported features and usage instructions, refer to `Fe
 
 Get Started
 -----------
-- `Installation <../../../index.html#installation?platform=cpu&version=v2.1.0%2Bgpu>`_
+- `Installation <../../../index.html#installation?platform=gpu&version=v2.1.10%2Bxpu>`_
 - `Quick Start <getting_started.md>`_
 - `Examples <examples.md>`_
 

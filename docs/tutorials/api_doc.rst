@@ -43,6 +43,11 @@ Miscellaneous
 .. autofunction:: quantization._gptq
 .. autofunction:: fp8_autocast
 
+.. currentmodule:: intel_extension_for_pytorch.xpu.fp8.fp8
+.. autofunction:: fp8_autocast
+.. currentmodule:: intel_extension_for_pytorch.quantization
+.. autofunction:: _gptq
+
 Random Number Generator
 =======================
 

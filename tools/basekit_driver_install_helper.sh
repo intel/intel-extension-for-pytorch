@@ -110,15 +110,15 @@ function install-driver() {
         ${SUDO} apt update
         ${SUDO} apt install -y intel-opencl-icd=23.30.26918.50-736~22.04 \
         level-zero=1.13.1-719~22.04 \
+        level-zero-dev=1.13.1-719~22.04 \
         intel-level-zero-gpu=1.3.26918.50-736~22.04 \
         xpu-smi=1.2.22-31~22.04
     fi
     if [ "${OS_ID}" = "\"rhel\"" ] || [ "${OS_ID}" = "\"centos\"" ]; then
         ${SUDO} dnf install -y intel-opencl-23.30.26918.50 \
         level-zero-1.13.1 \
-        intel-level-zero-gpu-1.3.26918.50 \
         level-zero-devel-1.13.1 \
-        intel-level-zero-gpu-devel-1.3.26918.50 \
+        intel-level-zero-gpu-1.3.26918.50 \
         intel-ocloc-23.30.26918.50 \
         xpu-smi-1.2.22
     fi
@@ -135,15 +135,13 @@ function install-dev() {
 
     if [ "${OS_ID}" = "ubuntu" ]; then
         ${SUDO} apt update
-        ${SUDO} apt install -y level-zero-dev=1.13.1-719~22.04 \
-        intel-level-zero-gpu-dev=1.3.26918.50-736~22.04 \
+        ${SUDO} apt install -y intel-level-zero-gpu-dev=1.3.26918.50-736~22.04 \
         intel-oneapi-dpcpp-cpp-2024.0 \
         intel-oneapi-mkl-devel=2024.0.0-49656 \
         intel-oneapi-ccl-devel=2021.11.1-6
     fi
     if [ "${OS_ID}" = "\"rhel\"" ] || [ "${OS_ID}" = "\"centos\"" ]; then
-        ${SUDO} dnf install -y level-zero-devel-1.13.1 \
-        intel-level-zero-gpu-devel-1.3.26918.50 \
+        ${SUDO} dnf install -y intel-level-zero-gpu-devel-1.3.26918.50 \
         intel-oneapi-dpcpp-cpp-2024.0 \
         intel-oneapi-mkl-devel-2024.0.0-49656 \
         intel-oneapi-ccl-devel-2021.11.1-6

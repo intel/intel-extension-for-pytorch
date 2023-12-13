@@ -50,9 +50,9 @@ Intel® Extension for PyTorch* provides built-in INT8 quantization recipes to de
 
 Check more detailed information for `INT8 Quantization [CPU] <features/int8_overview.md>`_ and `INT8 recipe tuning API guide (Experimental, *NEW feature in 1.13.0* on CPU) <features/int8_recipe_tuning_api.md>`_ on CPU side.
 
-On Intel® GPUs, quantization usages follow PyTorch default quantization APIs. Check sample codes at `Examples <./examples.html#int8>`_ page.
+Check more detailed information for `INT8 Quantization [XPU] <features/int8_overview_xpu.md>`_. 
 
-Intel® Extension for PyTorch* also provides INT4 and FP8 Quantization.  Check more detailed information for `FP8 Quantization <./features/float8.md>`_ and `INT4 Quantization <./features/int4.md>`_ 
+On Intel® GPUs, Intel® Extension for PyTorch* also provides INT4 and FP8 Quantization.  Check more detailed information for `FP8 Quantization <./features/float8.md>`_ and `INT4 Quantization <./features/int4.md>`_ 
 
 .. toctree::
    :hidden:
@@ -60,6 +60,7 @@ Intel® Extension for PyTorch* also provides INT4 and FP8 Quantization.  Check m
 
    features/int8_overview
    features/int8_recipe_tuning_api
+   features/int8_overview_xpu
    features/int4
    features/float8
 
@@ -108,7 +109,6 @@ Check the `API Documentation`_ for the details of API functions. `DPC++ Extensio
 
    features/DPC++_Extension
 
-
 Advanced Configuration
 ----------------------
 
@@ -116,12 +116,38 @@ The default settings for Intel® Extension for PyTorch* are sufficient for most 
 
 For more detailed information, check `Advanced Configuration <features/advanced_configuration.md>`_.
 
+A driver environment variable `ZE_FLAT_DEVICE_HIERARCHY` is currently used to select the device hierarchy model with which the underlying hardware is exposed. By default, each GPU tile is used as a device. Check the `Level Zero Specification Documentation <https://spec.oneapi.io/level-zero/latest/core/PROG.html#environment-variables>`_ for more details.
+
 .. toctree::
    :hidden:
    :maxdepth: 1
 
    features/advanced_configuration
 
+Fully Sharded Data Parallel (FSDP)
+----------------------------------
+
+`Fully Sharded Data Parallel (FSDP)` is a PyTorch\* module that provides industry-grade solution for large model training. FSDP is a type of data parallel training, unlike DDP, where each process/worker maintains a replica of the model, FSDP shards model parameters, optimizer states and gradients across DDP ranks to reduce the GPU memory footprint used in training. This makes the training of some large-scale models feasible.
+
+For more detailed information, check `FSDP <features/FSDP.md>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   features/FSDP
+
+Inductor
+--------
+Intel® Extension for PyTorch\* now empowers users to seamlessly harness graph compilation capabilities for optimal PyTorch model performance on Intel GPU via the flagship `torch.compile <https://pytorch.org/docs/stable/generated/torch.compile.html#torch-compile>`_ API through the default "inductor" backend (`TorchInductor <https://dev-discuss.pytorch.org/t/torchinductor-a-pytorch-native-compiler-with-define-by-run-ir-and-symbolic-shapes/747/1>`_ ). 
+
+For more detailed information, check `Inductor <features/torch_compile_gpu.md>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   features/torch_compile_gpu
 
 Legacy Profiler Tool (Experimental)
 -----------------------------------
@@ -149,6 +175,32 @@ For more detailed information, check `Simple Trace Tool <features/simple_trace.m
 
    features/simple_trace
 
+Kineto Supported Profiler Tool (Experimental)
+---------------------------------------------
+
+The Kineto supported profiler tool is an extension of PyTorch\* profiler for profiling operators' executing time cost on GPU devices. With this tool, you can get information in many fields of the run models or code scripts. Build Intel® Extension for PyTorch\* with Kineto support as default and enable this tool using the `with` statement before the code segment.
+
+For more detailed information, check `Profiler Kineto <features/profiler_kineto.md>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   features/profiler_kineto
+
+
+Compute Engine (Experimental feature for debug)
+-----------------------------------------------
+
+Compute engine is a experimental feature which provides the capacity to choose specific backend for operators with multiple implementations.
+
+For more detailed information, check `Compute Engine <features/compute_engine.md>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   features/compute_engine
 
 CPU-Specific
 ************

@@ -25,10 +25,23 @@ function ver_compare() {
     echo ${RET}
 }
 
-LIBSTDCPP_SYS=$(find /usr -regextype sed -regex ".*libstdc++\.so\.[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*")
+LIBSTDCPP_SYS=""
+LIBSTDCPP_ARR=()
+while read -r line; do
+    LIBSTDCPP_ARR+=($line)
+done < <(find /usr -regextype sed -regex ".*libstdc++\.so\.[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*" 2>/dev/null)
+if [ ${#LIBSTDCPP_ARR[@]} -gt 1 ]; then
+    for value in "${LIBSTDCPP_ARR[@]}"; do
+        if [[ "$value" =~ ^/usr/lib(64)*/ ]]; then
+            LIBSTDCPP_SYS=$value
+        fi
+    done
+else
+    LIBSTDCPP_SYS=${LIBSTDCPP_ARR[0]}
+fi
 LIBSTDCPP_ACTIVE=${LIBSTDCPP_SYS}
 if [ ! -z ${CONDA_PREFIX} ]; then
-    LIBSTDCPP_CONDA=$(find ${CONDA_PREFIX}/lib -regextype sed -regex ".*libstdc++\.so\.[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*")
+    LIBSTDCPP_CONDA=$(find ${CONDA_PREFIX}/lib -regextype sed -regex ".*libstdc++\.so\.[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*" 2>/dev/null)
     LIBSTDCPP_VER_SYS=$(echo ${LIBSTDCPP_SYS} | sed "s/.*libstdc++.so.//")
     LIBSTDCPP_VER_CONDA=$(echo ${LIBSTDCPP_CONDA} | sed "s/.*libstdc++.so.//")
     VER_COMP=$(ver_compare ${LIBSTDCPP_VER_CONDA} ${LIBSTDCPP_VER_SYS})

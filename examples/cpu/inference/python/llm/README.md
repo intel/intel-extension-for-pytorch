@@ -90,7 +90,7 @@ wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prom
 
 ** For GPT-NEOX/FALCON/OPT models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.
 
-*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM model families, we are working in progress to cover those optimizations, which will expand the model list above.
+*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM families, we are working in progress to cover those optimizations, which will expand the model list above.
 
 # Run Models Generations
 

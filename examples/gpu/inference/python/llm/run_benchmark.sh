@@ -60,7 +60,7 @@ Run_benchmark_llama-13b() {
 
 ## Llama2-7b
 Run_benchmark_llama2-7b() {
-    model=/mllnvme0/llama2-7b
+    model=meta-llama/Llama-2-7b-hf
     sub_model_name=llama2-7b
     dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
     mkdir -p ${dir}
@@ -74,7 +74,7 @@ Run_benchmark_llama2-7b() {
 
 ## Llama2-13b
 Run_benchmark_llama2-13b() {
-    model=/mllnvme0/llama2-13b
+    model=meta-llama/Llama-2-13b-hf
     sub_model_name=llama2-13b
     dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
     mkdir -p ${dir}
@@ -116,13 +116,7 @@ Run_benchmark_bloom-7b() {
 main() {
 
     export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2
-    export ENABLE_SDP_FUSION=1
-
-    export HF_HOME=/mllnvme0/huggingface/
-    export HF_DATASETS_OFFLINE=1
-    export TRANSFORMERS_OFFLINE=1
-    export HF_EVALUATE_OFFLINE=1
-
+    
     Run_benchmark_gpt-j-6b
     Run_benchmark_llama-7b
     Run_benchmark_llama-13b

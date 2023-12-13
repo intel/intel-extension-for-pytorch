@@ -6,7 +6,9 @@ Here you can find the inference benchmarking scripts for large language models (
 - Include both single instance and distributed (DeepSpeed) use cases
 - Cover model generation inference with low precision cases for different models with best performance and accuracy (fp16 AMP and weight only quantization)
 
-## Supported Models
+
+
+## Optimized Models
 
 | MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 |
 |---|:---:|:---:|:---:|
@@ -15,12 +17,13 @@ Here you can find the inference benchmarking scripts for large language models (
 |OPT|"facebook/opt-6.7b", "facebook/opt-30b"| ✅ | ❎ |
 |Bloom|"bigscience/bloom-7b1", "bigscience/bloom"| ✅ | ❎ |
 
-**Note**: The verified models mentioned above (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well-supported with all optimizations like indirect access KV cache and fused ROPE. For other LLM model families, we are actively working to implement these optimizations, which will be reflected in the expanded model list above.
+
+**Note**: The verified models mentioned above (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well-supported with all optimizations like indirect access KV cache and fused ROPE. For other LLM families, we are actively working to implement these optimizations, which will be reflected in the expanded model list above. 
 
 ## Supported Platforms
 
-\* PVC(1550/1100): support all the models in the model list above<br />
-\* ATS-M, Arc: support GPT-J (EleutherAI/gpt-j-6b)
+\* PVC(1550/1100): support all the models in the model list above<br /> 
+
 
 ## Environment Setup
 
@@ -35,15 +38,17 @@ git submodule update --init --recursive
 ```
 
 2. Do one of the following:
-   
-   a. (Recommended) Build a Docker container from the provided `Dockerfile` for single-instance executions.
+
+   If you are planning to use DeepSpeed for execution, please use a bare-metal environment directly and follow 2.b session for the environment setup. Otherwise, we recommend you follow 2.a session with Docker, where the environment is already configured.
     
+   a. (Recommended) Build a Docker container from the provided `Dockerfile` for single-instance executions.
+
       ```bash
       # Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch* from source
       DOCKER_BUILDKIT=1 docker build -f examples/gpu/inference/python/llm/Dockerfile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') --build-arg COMPILE=ON -t ipex-llm:2.1.10 .
 
       # Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch* prebuilt wheel files
-      DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') -t ipex-llm:2.1.10 .
+      DOCKER_BUILDKIT=1 docker build -f examples/gpu/inference/python/llm/Dockerfile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') -t ipex-llm:2.1.10 .
 
       # Run the container with command below
       docker run --rm -it --privileged --device=/dev/dri --ipc=host ipex-llm:2.1.10 bash
@@ -52,6 +57,19 @@ git submodule update --init --recursive
       cd llm
       ```
    b. Alternatively, use the provided environment configuration script to set up environment without using a docker container:
+
+      Make sure the driver and Base Toolkit are installed without using a docker container. Refer to [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/#installation?platform=gpu&version=v2.1.10%2Bxpu&os=linux%2Fwsl2&package=source).
+
+      OneCCL is also required if you run with DeepSpeed. We recommend to use apt/yum/dnf to install the oneCCL package. Refer to [Base Toolkit Installation](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html) for adding the APT/YUM/DNF key and sources for first-time users.
+
+      Example command:
+
+      ```bash
+      sudo apt install intel-oneapi-ccl-devel=2021.11.1-6
+      sudo yum install intel-oneapi-ccl-devel=2021.11.1-6
+      sudo dnf install intel-oneapi-ccl-devel=2021.11.1-6
+      ```
+
 
       ```bash
          # Make sure you have GCC >= 11 is installed on your system.
@@ -94,7 +112,11 @@ source ./tools/env_activate.sh
 |Single instance | ✅ | ✅ |
 | Distributed (autotp) |  ✅ | ❎ |
 
+
+Note: During usage, you may need to log in to your Hugging Face account to access model files. Refer to [HuggingFace Login](https://huggingface.co/docs/huggingface_hub/quick-start#login)
+
 ### Run with Bash Script
+
 For all inference cases, can run LLM with the one-click bash script `run_benchmark.sh`:
 ```
 bash run_benchmark.sh
@@ -106,7 +128,7 @@ Note: We only support LLM optimizations with datatype float16, so please don't c
 
 ```bash
 # fp16 benchmark
-python -u run_generation.py --benchmark -m ${model} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
+python -u run_generation.py --benchmark -m ${model} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${output} --device xpu --ipex --dtype float16 --token-latency
 ```
 
 **Note**: By default, generations are based on `bs = 1`, input token size = 1024, output toke size = 128, iteration num = 10 and `beam search`, and beam size = 4. For beam size = 1 and other settings, please export env settings, such as: `beam=1`, `input=32`, `output=32`, `iter=5`.
@@ -120,9 +142,9 @@ bash run_benchmark_ds.sh
 
 ```bash
 # distributed env setting
-source ${ONECCL_DIR}/build/_install/env/setvars.sh
+source ${ONECCL_ROOT}/env/setvars.sh
 # fp16 benchmark
-mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
+mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${output} --device xpu --ipex --dtype float16 --token-latency
 ```
 
 **Note**: By default, generations are based on `bs = 1`, input token size = 1024, output toke size = 128, iteration num = 10 and `beam search`, and beam size = 4. For beam size = 1 and other settings, please export env settings, such as: `beam=1`, `input=32`, `output=32`, `iter=5`.
@@ -140,17 +162,17 @@ Using INT4 weights can further improve performance by reducing memory bandwidth.
 #To run quantization performance, you need to firstly get the quantized weight with step (1) and then run the performance benchmark with step (2)
 ## (1) Get the quantized weight
 download link: https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/xpu/gptj_int4_weight_master.pt
-export weight_path = path-to-your-weight
+export weight_path=path-to-your-weight
 
 ## (2) Run quantization performance test
-python -u run_generation.py --device xpu --ipex --dtype float16 --input-tokens ${input} --max-new-tokens ${out}  --token-latency --benchmark  --num-beams ${beam}  -m ${model} --woq --woq_checkpoint_path ${weight_path}
+python -u run_generation.py --device xpu --ipex --dtype float16 --input-tokens ${input} --max-new-tokens ${output}  --token-latency --benchmark  --num-beams ${beam}  -m ${model} --woq --woq_checkpoint_path ${weight_path}
 ```
 
 #### Single Instance GPT-J Weight only quantization INT4 Accuracy
 
 ```bash
 # we use "lambada_standard" task to check accuracy
-LLM_ACC_TEST=1 python -u run_generation.py -m ${model} --ipex --dtype float16 --accuracy-only --acc-tasks ${task} --woq --woq_checkpoint_path ${weight_path}
+LLM_ACC_TEST=1 python -u run_generation.py --device xpu --ipex --dtype float16 -m ${model} --accuracy-only --acc-tasks ${task} --woq --woq_checkpoint_path ${weight_path}
 ```
 
 ### Single Instance Accuracy
@@ -169,7 +191,7 @@ LLM_ACC_TEST=1 python -u run_generation.py -m ${model} --ipex --dtype float16 --
 
 ```bash
 # Run distributed accuracy with 2 ranks of one node for float16 with ipex
-source ${ONECCL_DIR}/build/_install/env/setvars.sh
+source ${ONECCL_ROOT}/env/setvars.sh
 
 # one-click bash script
 bash run_accuracy_ds.sh

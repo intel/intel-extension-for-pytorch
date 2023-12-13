@@ -3,8 +3,38 @@ Releases
 
 ## 2.1.10+xpu
 
+Intel® Extension for PyTorch\* v2.1.10+xpu is the new Intel® Extension for PyTorch\* release supports both CPU platforms and GPU platforms (Intel® Data Center GPU Flex Series, Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics) based on PyTorch\* 2.1.0. It extends PyTorch\* 2.1.0 with up-to-date features and optimizations on `xpu` for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel Xe Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch* `xpu` device, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs with PyTorch*.
 
+### Highlights
 
+This release provides the following features:
+
+- Large Language Model (LLM) optimizations for FP16 inference on Intel® Data Center GPU Max Series (Experimental): Intel® Extension for PyTorch* provides a lot of specific optimizations for LLM workloads on Intel® Data Center GPU Max Series in this release. In operator level, we provide highly efficient GEMM kernel to speedup Linear layer and customized fused operators to reduce HBM access and kernel launch overhead. To reduce memory footprint, we define a segment KV Cache policy to save device memory and improve the throughput. To better trade-off the performance and accuracy, low-precision solution e.g., weight-only-quantization for INT4 is enabled. Besides, tensor parallel can also be adopted to get lower latency for LLMs.
+
+  - A new API function, `ipex.optimize_transformers`, is designed to optimize transformer-based models within frontend Python modules, with a particular focus on LLMs. It provides optimizations for both model-wise and content-generation-wise. You just need to invoke the `ipex.optimize_transformers` API instead of the `ipex.optimize` API to apply all optimizations transparently. More detailed information can be found at [Large Language Model optimizations overview](https://intel.github.io/intel-extension-for-pytorch/xpu/2.1.10+xpu/tutorials/llm.html).
+  - A typical usage of this new feature is quite simple as below:
+    ```            
+    import torch
+    import intel_extension_for_pytorch as ipex
+    ...
+    model = ipex.optimize_transformers(model, dtype=dtype)
+    ```
+
+- `Torch.compile` functionality on Intel® Data Center GPU Max Series (Experimental): Extends Intel® Extension for PyTorch* capabilities to support [torch.compile](https://pytorch.org/docs/stable/generated/torch.compile.html#torch-compile) APIs on Intel® Data Center GPU Max Series. And provides Intel GPU support on top of [Triton*](https://github.com/openai/triton) compiler to reach competitive performance speed-up over eager mode by default "inductor" backend of Intel® Extension for PyTorch*.
+  
+- Intel® Arc™ A-Series Graphics on WSL2, native Windows and native Linux are officially supported in this release. Intel® Arc™ A770 Graphic card has been used as primary verification vehicle for product level test.
+  
+- Other features are listed as following, more detailed information can be found in [public documentation](https://intel.github.io/intel-extension-for-pytorch/xpu/2.1.10+xpu/):
+  - FP8 datatype support (Experimental): Add basic data type and FP8 Linear operator support based on emulation kernel.
+  - Kineto Profiling (Experimental): An extension of PyTorch* profiler for profiling operators on Intel® GPU devices.
+  - Fully Sharded Data Parallel (FSDP):  Support new PyTorch* [FSDP](https://pytorch.org/docs/stable/fsdp.html) API which provides an industry-grade solution for large-scale model training.
+  - Asymmetric INT8 quantization: Support asymmetric quantization to align with stock PyTorch* and provide better accuracy in INT8.
+
+- CPU support has been merged in this release. CPU features and optimizations are equivalent to what has been released in [Intel® Extension for PyTorch* v2.1.0+cpu release](https://github.com/intel/intel-extension-for-pytorch/releases/tag/v2.1.0+cpu) that was made publicly available in Oct 2023. For customers who would like to evaluate workloads on both GPU and CPU, they can use this package. For customers who are focusing on CPU only, we still recommend them to use Intel® Extension for PyTorch* v2.1.0+cpu release for smaller footprint, less dependencies and broader OS support.
+
+### Known Issues
+
+Please refer to [Known Issues webpage](./performance_tuning/known_issues.md).
 
 ## 2.0.110+xpu
 
