@@ -9,7 +9,7 @@
  *
  * Unless required by applicable law or agreed to in wriscalar_tg, software
  * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, itemther express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
@@ -139,11 +139,11 @@ class fmha_forward_strided_t {
           fH_rcp(xetla_rsqrt<accum_t>(accum_t(head_size))) {}
 
     // Moves coords to what we should process
-    inline void init_coords(xetla_exec_item<3>& ei) {
-      uint32_t gid = ei.get_group(0); // B * N
+    inline void init_coords(nd_item<3>& item) {
+      uint32_t gid = item.get_group(0); // B * N
       uint32_t batch_id = gid / uN; // get batch idx
       uint32_t head_id = gid % uN; // get head idx
-      uint32_t block_id = ei.get_group(1); // F
+      uint32_t block_id = item.get_group(1); // F
       // query (F)
       // This start point has changed since k-dimension changed
       // TODO: If there's stride among batches, startF needs to offset more
@@ -188,7 +188,7 @@ class fmha_forward_strided_t {
     static constexpr uint32_t wg_size = wg_size_x * wg_size_y;
 
     // Using brgemm_selector to get a specific brgemm class
-    using brgemm_t = typename gpu::xetla::group::brgemm_selector_t<
+    using gemm_t = typename gpu::xetla::group::gemm_selector_t<
         scalar_t,
         scalar_t,
         mem_layout::row_major,
@@ -203,7 +203,7 @@ class fmha_forward_strided_t {
         mma_engine::xmx,
         gpu_arch::Xe,
         stages,
-        sync_freq>::brgemm;
+        sync_freq>::gemm;
 
     // Add bias if needed
     using bias_op_t =
@@ -211,17 +211,16 @@ class fmha_forward_strided_t {
 
     // Using epilogue function to save results
     using epilogue_t = gpu::xetla::group::epilogue_t<
-        gpu::xetla::group::
-            epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
+        gpu::xetla::group::epilogue_policy_default<gpu_arch::Xe>,
         tile_shape,
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>>;
 
     // Alias
-    using brgemm_args_t = typename brgemm_t::arguments_t;
-    using work_group_t = typename brgemm_t::work_group_t;
-    using mem_desc_a_t = typename brgemm_t::mem_desc_a_t;
-    using mem_desc_b_t = typename brgemm_t::mem_desc_b_t;
-    using matAcc_t = typename brgemm_t::matAcc_t;
+    using brgemm_args_t = typename gemm_t::arguments_t;
+    using work_group_t = typename gemm_t::work_group_t;
+    using mem_desc_a_t = typename gemm_t::mem_desc_a_t;
+    using mem_desc_b_t = typename gemm_t::mem_desc_b_t;
+    using matAcc_t = typename gemm_t::matAcc_t;
     using bias_args_t = typename bias_op_t::arguments_t;
     using mem_desc_c_t = typename epilogue_t::mem_desc_c_t;
 
@@ -249,7 +248,7 @@ class fmha_forward_strided_t {
           {args->startT, args->startH});
       uint32_t inner_loop_count = (args->uH + accum_step - 1) / accum_step;
 
-      brgemm_t brgemm;
+      gemm_t brgemm;
       work_group_t g(sg_id);
       matAcc_t matAcc(0);
       brgemm_args_t brgemm_args(mem_desc_a, mem_desc_b, inner_loop_count);
@@ -310,22 +309,21 @@ class fmha_forward_strided_t {
     using mem_desc_b_t =
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
 
-    using brgemm_t = gpu::xetla::group::
-        brgemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
+    using gemm_t = gpu::xetla::group::
+        gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
 
     // epilogue to store raw output, not permuted
     using mem_desc_output_c =
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
     using epilogue_t = gpu::xetla::group::epilogue_t<
-        gpu::xetla::group::
-            epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
+        gpu::xetla::group::epilogue_policy_default<gpu_arch::Xe>,
         tile_shape,
         mem_desc_output_c>;
 
     // Alias
-    using brgemm_args_t = typename brgemm_t::arguments_t;
-    using work_group_t = typename brgemm_t::work_group_t;
-    using matAcc_t = typename brgemm_t::matAcc_t;
+    using brgemm_args_t = typename gemm_t::arguments_t;
+    using work_group_t = typename gemm_t::work_group_t;
+    using matAcc_t = typename gemm_t::matAcc_t;
 
     // functor call
     inline KERNEL_FUNC void operator()(
@@ -364,17 +362,17 @@ class fmha_forward_strided_t {
       uint32_t inner_loop_count =
           (boundary_k - args->startT + accum_step - 1) / accum_step;
 
-      brgemm_t brgemm;
+      gemm_t brgemm;
       work_group_t g(sg_id);
       brgemm_args_t brgemm_args(mem_desc_a, mem_desc_b, inner_loop_count);
       brgemm(g, outAcc, brgemm_args, 0, /* nbarrier_base */ 1);
     }
 
     inline KERNEL_FUNC void raw_store(
-        xetla_exec_item<3>& ei,
+        nd_item<3>& item,
         arguments_t* args,
         matAcc_t& outAcc) {
-      uint32_t sg_id = ei.get_local_linear_id();
+      uint32_t sg_id = item.get_local_linear_id();
       if (sg_id >= wg_size)
         return;
 
@@ -392,10 +390,10 @@ class fmha_forward_strided_t {
 
     // permute store outAcc [b,n,F,H] to output [B,F,N,H]
     inline KERNEL_FUNC void permute_store(
-        xetla_exec_item<3>& ei,
+        nd_item<3>& item,
         arguments_t* args,
         matAcc_t& outAcc) {
-      uint32_t sg_id = ei.get_local_linear_id();
+      uint32_t sg_id = item.get_local_linear_id();
       if (sg_id >= wg_size)
         return;
 
@@ -403,9 +401,9 @@ class fmha_forward_strided_t {
       uint32_t sg_idx = sg_id % wg_size_x;
       uint32_t sg_idy = sg_id / wg_size_x;
 
-      uint32_t b = ei.get_group(0) / args->uN;
-      uint32_t n = ei.get_group(0) % args->uN;
-      uint32_t f = sg_idy * sg_tile_m + ei.get_group(1) * wg_tile_m;
+      uint32_t b = item.get_group(0) / args->uN;
+      uint32_t n = item.get_group(0) % args->uN;
+      uint32_t f = sg_idy * sg_tile_m + item.get_group(1) * wg_tile_m;
       uint32_t h = sg_idx * sg_tile_n;
 
       if (h >= args->uH)
@@ -497,11 +495,9 @@ class fmha_forward_strided_t {
         tile_desc_t<SIMD, kScoreHeight, SIMD, kScoreHeight, reg_layout::tiled>;
     using score_rw_t = subgroup::tile_t<accum_t, score_tile_desc_t>;
     using score_rw_payload_t = subgroup::mem_payload_t<
-        accum_t,
+        mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>,
         score_tile_desc_t,
         subgroup::msg_type_v<score_tile_desc_t, mem_space::local>,
-        mem_layout::row_major,
-        mem_space::local,
         gpu_arch::Xe>;
 
     // tiles of the acc data
@@ -592,8 +588,8 @@ class fmha_forward_strided_t {
   /// Users query and get a named_barrier id consumption count in compile time.
   /// @return The count of named barriers required.
   inline static constexpr uint32_t get_barrier_count() {
-    constexpr uint32_t barrier_count0 = gemm0_t::brgemm_t::barrier_count;
-    constexpr uint32_t barrier_count1 = gemm1_t::brgemm_t::barrier_count;
+    constexpr uint32_t barrier_count0 = gemm0_t::gemm_t::barrier_count;
+    constexpr uint32_t barrier_count1 = gemm1_t::gemm_t::barrier_count;
     constexpr uint32_t count = std::max(barrier_count0, barrier_count1) + 1;
     static_assert(
         count <= 32, "The named_barrier count should be less than 32!");
@@ -613,13 +609,11 @@ class fmha_forward_strided_t {
 
  public:
   // Entry of the fmha forward kernel
-  inline KERNEL_FUNC void operator()(
-      xetla_exec_item<3>& ei,
-      arguments_t* args) {
+  inline KERNEL_FUNC void operator()(nd_item<3>& item, arguments_t* args) {
     // RECORD_FUNCTION("fsdp_forward_no_mask_no_casual_no_stride", {});
     // Moves offsets to what we should process
-    args->init_coords(ei);
-    uint32_t sg_id = ei.get_local_linear_id();
+    args->init_coords(item);
+    uint32_t sg_id = item.get_local_linear_id();
 
     // allocate slm and nbarrier resource
     xetla_local_init<get_slm_size()>();
@@ -677,9 +671,9 @@ class fmha_forward_strided_t {
 
     // Store output to global
 #if _RAW_OUTPUT
-    gemm1_op.raw_store(ei, args, outAcc);
+    gemm1_op.raw_store(item, args, outAcc);
 #else
-    gemm1_op.permute_store(ei, args, outAcc);
+    gemm1_op.permute_store(item, args, outAcc);
 #endif
   }
 };
@@ -712,9 +706,8 @@ void fmha_forward_impl_strided(
       fmha_forward_op_t::get_nd_range(num_batches * num_heads, num_queries);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(NdRange, [=](sycl::nd_item<3> item) SYCL_ESIMD_KERNEL {
+    cgh.parallel_for(NdRange, [=](sycl::nd_item<3> item) KERNEL_MAIN {
       // exec item
-      xetla_exec_item<3> ei(item);
 
       // Init fmha forward op and arguments
       fmha_forward_op_t fmha_fwd_op;
@@ -733,7 +726,7 @@ void fmha_forward_impl_strided(
           num_keys);
 
       // call the functor
-      fmha_fwd_op(ei, &args);
+      fmha_fwd_op(item, &args);
     });
   };
 

@@ -66,11 +66,14 @@ void ifmha_forward_impl(
       ifmha_forward_op_t::get_nd_range(num_batches, beam, num_heads);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for<
-        class IfmhaForwardKernel<ifmha_policy, T, kUseAlibi, kUseBias, kIsTraining>>(
-        NdRange, [=](sycl::nd_item<2> item) SYCL_ESIMD_KERNEL {
+    cgh.parallel_for<class IfmhaForwardKernel<
+        ifmha_policy,
+        T,
+        kUseAlibi,
+        kUseBias,
+        kIsTraining>>(NdRange, [=](sycl::nd_item<2> item) KERNEL_MAIN {
       // exec item
-      xetla_exec_item<2> ei(item);
+
 
       // init ifmha forward op and arguments
       ifmha_forward_op_t ifmha_fwd_op;
@@ -97,8 +100,8 @@ void ifmha_forward_impl(
           attn_mask_padding);
 
       // call the functor
-      ifmha_fwd_op(ei, args);
-        });
+      ifmha_fwd_op(item, args);
+    });
   };
   DPCPP_Q_SUBMIT(q, cgf);
 }

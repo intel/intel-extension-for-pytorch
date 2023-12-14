@@ -152,9 +152,9 @@ struct gru_layer_bpk {
   using epilogue_args_1_t = typename epilogue1_t::arguments_t;
 
   using brgemm_t_0 =
-      brgemm_t<compute_policy, tile_shape_0, mem_desc_err_t, mem_desc_input_t>;
+      gemm_t<compute_policy, tile_shape_0, mem_desc_err_t, mem_desc_input_t>;
   using brgemm_t_1 =
-      brgemm_t<compute_policy, tile_shape_1, mem_desc_err_t, mem_desc_hidden_t>;
+      gemm_t<compute_policy, tile_shape_1, mem_desc_err_t, mem_desc_hidden_t>;
 
   using worker_scope_t = typename brgemm_t_0::work_group_t;
 
@@ -178,29 +178,25 @@ struct gru_layer_bpk {
       reg_layout::tiled>;
   using matA_load_0_t = tile_t<T, matA_tile_desc_t>;
   using matA_payload_0_t = mem_payload_t<
-      T,
+      mem_desc_t<T, mem_layout::row_major, mem_space::global>,
       matA_tile_desc_t,
       msg_type_v<matA_tile_desc_t, mem_space::global>,
-      mem_layout::row_major,
-      mem_space::global,
+
       gpu_arch::Xe>;
 
   using matA_bpi_t = tile_t<Act_T, matA_tile_desc_t>;
 
   using matC_payload_t0 = mem_payload_t<
-      T,
+      mem_desc_t<T, layout_weight, mem_loc_weight>,
       matAcc_desc_t0,
       msg_type_v<matAcc_desc_t0, mem_loc_weight>,
-      layout_weight,
-      mem_loc_weight,
+
       gpu_arch::Xe>;
   using matC_t0 = tile_t<T, matAcc_desc_t0>;
   using matC_payload_t1 = mem_payload_t<
-      T,
+      mem_desc_t<T, layout_weight, mem_loc_weight>,
       matAcc_desc_t1,
       msg_type_v<matAcc_desc_t1, mem_loc_weight>,
-      layout_weight,
-      mem_loc_weight,
       gpu_arch::Xe>;
   using matC_t1 = tile_t<T, matAcc_desc_t1>;
 
@@ -212,24 +208,22 @@ struct gru_layer_bpk {
       reg_layout::tiled>;
   using bias_t = tile_t<Act_T, bias_desc_t>;
   using bias_payload_t = mem_payload_t<
-      Act_T,
+      mem_desc_t<Act_T, layout_bias, mem_loc_bias>,
       bias_desc_t,
       msg_type_v<bias_desc_t, mem_loc_bias>,
-      layout_bias,
-      mem_loc_bias,
       gpu_arch::Xe>;
 
   using prefetch_t = prefetch_payload_t<
-      T,
+      mem_desc_t<T, mem_layout::row_major, mem_space::global>,
       tile_desc_t<matA_load_0_t::tile_size_x, matA_load_0_t::tile_size_y, 1, 1>,
-      mem_layout::row_major,
-      mem_space::global,
       1, /*tg_size_x=1*/
       gpu_arch::Xe>;
   static constexpr tdesc_update_dir load_update_config =
       tdesc_update_dir::y_dir;
 
-  static void inline call(xetla_exec_item<3> ei, bpk_config_t<T, Act_T>* args) {
+  static void inline call(
+      sycl::nd_item<3>& item,
+      bpk_config_t<T, Act_T>* args) {
     int batch_size, input_size, hidden_size;
     batch_size = args->batch_size;
     input_size = args->input_size;
@@ -267,9 +261,9 @@ struct gru_layer_bpk {
 
     int matrix_n_0, start_x_b_0, start_y_b_0;
     int matrix_n_1, start_x_b_1, start_y_b_1;
-    int start_n_0 = ei.get_group(2) * wg_tile_n_0;
-    int start_n_1 = ei.get_group(2) * wg_tile_n_1;
-    int start_m = ei.get_group(1) * wg_tile_m;
+    int start_n_0 = item.get_group(2) * wg_tile_n_0;
+    int start_n_1 = item.get_group(2) * wg_tile_n_1;
+    int start_m = item.get_group(1) * wg_tile_m;
     int start_k = 0;
     int boundary_n_0, boundary_n_1, boundary_m, boundary_k;
     int wg_tile_k;
@@ -288,7 +282,7 @@ struct gru_layer_bpk {
     int start_x_a = start_k;
     int start_y_a = start_m;
 
-    int32_t tile_offset_m = ei.get_local_id(1) * sg_tile_m;
+    int32_t tile_offset_m = item.get_local_id(1) * sg_tile_m;
     int offset_x_a = is_col_major_a ? tile_offset_m : 0;
     int offset_y_a = is_col_major_a ? 0 : tile_offset_m;
 
@@ -304,7 +298,7 @@ struct gru_layer_bpk {
     bias_1.init(0);
     matBPI_0.init(0);
     matBPI_1.init(0);
-    worker_scope_t g(ei.get_local_linear_id());
+    worker_scope_t g(item.get_local_linear_id());
 
     for (unsigned seq_id = 0; seq_id < seq_len; ++seq_id) {
       BPK_DESC_INIT(
@@ -392,7 +386,7 @@ template <
     uint32_t sg_tile_k_t>
 struct perf_kernel_xcoder_gru_bpk {
   /// @brief
-  /// @param ei
+  /// @param item
   /// @param err_ptr      err ptr
   /// @param layer_ptr    original layer_input      shape = sequence_length x
   /// batch_size x input_size
@@ -407,7 +401,7 @@ struct perf_kernel_xcoder_gru_bpk {
   /// @param sequence_length
   /// @param layer_size
   static void inline run(
-      xetla_exec_item<3> ei,
+      sycl::nd_item<3>& item,
       input_T* err0_ptr,
       input_T* err1_ptr,
       input_T* layer_ptr,
@@ -459,7 +453,7 @@ struct perf_kernel_xcoder_gru_bpk {
     int gate_nums = 3;
 
     // args.debug_ptr = debug_ptr;
-    int layer_id = ei.get_group(0);
+    int layer_id = item.get_group(0);
     args.sequence_length = sequence_length;
 
     if (layer_id != 0 && layer_id < layer_size) {
@@ -480,7 +474,7 @@ struct perf_kernel_xcoder_gru_bpk {
       args.bias0_ptr = bias0_ptr + layer_id * hidden_size * 3;
       args.bias1_ptr = bias1_ptr + layer_id * hidden_size * 3;
       SW_BARRIER();
-      fused_op_1::call(ei, &args);
+      fused_op_1::call(item, &args);
     } else {
       args.slm_addr = 0;
       args.err_ptr0 = err0_ptr;
@@ -495,7 +489,7 @@ struct perf_kernel_xcoder_gru_bpk {
       args.hidden_size = hidden_size;
       args.input_size = input_size;
       SW_BARRIER();
-      fused_op_0::call(ei, &args);
+      fused_op_0::call(item, &args);
     }
   }
 };
@@ -512,7 +506,7 @@ template <
     uint32_t sg_tile_k_t>
 struct kernel_xcoder_gru_bpk {
   /// @brief
-  /// @param ei
+  /// @param item
   /// @param err_ptr      err ptr
   /// @param layer_ptr    original layer_input      shape = sequence_length x
   /// batch_size x input_size
@@ -527,7 +521,7 @@ struct kernel_xcoder_gru_bpk {
   /// @param sequence_length
   /// @param layer_size
   static void inline run(
-      xetla_exec_item<3> ei,
+      sycl::nd_item<3>& item,
       input_T* err0_ptr,
       input_T* err1_ptr,
       input_T* layer_ptr,
@@ -596,7 +590,7 @@ struct kernel_xcoder_gru_bpk {
       args.bias0_ptr = bias0_ptr + layer_id * hidden_size * 3;
       args.bias1_ptr = bias1_ptr + layer_id * hidden_size * 3;
       SW_BARRIER();
-      fused_op_1::call(ei, &args);
+      fused_op_1::call(item, &args);
     }
     args.slm_addr = 0;
     args.err_ptr0 = err0_ptr;
@@ -611,7 +605,7 @@ struct kernel_xcoder_gru_bpk {
     args.hidden_size = hidden_size;
     args.input_size = input_size;
     SW_BARRIER();
-    fused_op_0::call(ei, &args);
+    fused_op_0::call(item, &args);
   }
 };
 // extern "C"
@@ -656,9 +650,7 @@ void gru_backward_weight_impl(
   cl::sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(Range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-      xetla_exec_item ei(item);
-
+    cgh.parallel_for(Range, [=](nd_item<3> item) KERNEL_MAIN {
       using xcoder_gru_bpk_op = perf_kernel_xcoder_gru_bpk<
           typename gru_bpk_config_t::input_T,
           typename gru_bpk_config_t::Act_T,
@@ -671,7 +663,7 @@ void gru_backward_weight_impl(
           gru_bpk_config_t::sg_tile_k>;
 
       xcoder_gru_bpk_op::run(
-          ei,
+          item,
           (input*)err0_ptr,
           (input*)err1_ptr,
           (input*)layer_ptr,

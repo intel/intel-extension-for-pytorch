@@ -186,9 +186,9 @@ class fmha_forward_causal_strided_t {
     inline context_t() = default;
 
     /// @brief Initialize invariant variables in the flash mha loop
-    inline void init_context(xetla_exec_item<3>& ei, arguments_t& args) {
+    inline void init_context(nd_item<3>& item, arguments_t& args) {
       // thread id
-      uint32_t sg_id = ei.get_local_linear_id();
+      uint32_t sg_id = item.get_local_linear_id();
       g.init(sg_id);
       sg_idx = sg_id % wg_size_x;
       sg_idy = sg_id / wg_size_x;
@@ -199,13 +199,13 @@ class fmha_forward_causal_strided_t {
       softmax_l = 0.f;
 
       // mem desc variables
-      uint32_t gid = ei.get_group(0);
+      uint32_t gid = item.get_group(0);
       uint32_t batch_id = gid / args.uN; // get batch idx
       uint32_t head_id = gid % args.uN; // get head idx
 
       if constexpr (kSeqLast) { // 2d mem: [F, BxNxH]
         // startF
-        int32_t start_y = ei.get_group(1) * kBr;
+        int32_t start_y = item.get_group(1) * kBr;
         uint32_t end_y = start_y + kBr;
         // boundaryF
         uint32_t boundary_y = args.uF;
@@ -226,7 +226,7 @@ class fmha_forward_causal_strided_t {
             {start_acc, start_y});
       } else { // 2d mem: [BxF, NxH]
         // startF
-        int32_t start_y = batch_id * args.uF + ei.get_group(1) * kBr;
+        int32_t start_y = batch_id * args.uF + item.get_group(1) * kBr;
         uint32_t end_y = start_y + kBr;
         // boundaryF
         uint32_t boundary_y = (batch_id + 1) * args.uF;
@@ -250,10 +250,10 @@ class fmha_forward_causal_strided_t {
 
     /// @brief Update variables for each flash mha loop
     inline void update_context(
-        xetla_exec_item<3>& ei,
+        nd_item<3>& item,
         arguments_t& args,
         uint32_t startT) {
-      uint32_t gid = ei.get_group(0);
+      uint32_t gid = item.get_group(0);
       uint32_t batch_id = gid / args.uN; // get batch idx
       uint32_t head_id = gid % args.uN; // get head idx
 
@@ -316,7 +316,7 @@ class fmha_forward_causal_strided_t {
         uint32_t boundary_x = args.uMT;
         end_x = end_x > boundary_x ? boundary_x : end_x;
 
-        int32_t start_y = batch_id * args.uF + ei.get_group(1) * kBr;
+        int32_t start_y = batch_id * args.uF + item.get_group(1) * kBr;
         uint32_t end_y = start_y + kBr;
         uint32_t boundary_y = (batch_id + 1) * args.uF;
         end_y = end_y > boundary_y ? boundary_y : end_y;
@@ -345,11 +345,8 @@ class fmha_forward_causal_strided_t {
 
   // ======================= // gemm_Sij // ======================= //
   // Define kernel to compute Sij = Qi x Kj.T
-  using brgemm_Sij_t = group::brgemm_t<
-      compute_policy,
-      tile_shape_BrBc,
-      mem_desc_Qi_L_t,
-      mem_desc_Kj_T_t>;
+  using brgemm_Sij_t = group::
+      gemm_t<compute_policy, tile_shape_BrBc, mem_desc_Qi_L_t, mem_desc_Kj_T_t>;
   using matAccSij_t = typename brgemm_Sij_t::matAcc_t;
 
   /// @brief gemm_Sij is used to compute Sij = Qi x Kj.T
@@ -369,7 +366,9 @@ class fmha_forward_causal_strided_t {
 
     // + beta * alibi
     if constexpr (kUseAlibi) {
-      using alibi_op_t = subgroup::bias_add_op_t<scalar_t, gpu_arch::Xe>;
+      using alibi_op_t = subgroup::bias_add_op_t<
+          mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
+          gpu_arch::Xe>;
       using alibi_args_t = typename alibi_op_t::arguments_t;
 
       int32_t tile_offset_x = ctx.sg_idx * kSgBc;
@@ -398,7 +397,9 @@ class fmha_forward_causal_strided_t {
 
     // Add attn_mask if needed
     if constexpr (kUseBias && kIsCausal) {
-      using bias_op_t = subgroup::bias_add_op_t<scalar_t, gpu_arch::Xe>;
+      using bias_op_t = subgroup::bias_add_op_t<
+          mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
+          gpu_arch::Xe>;
       using bias_args_t = typename bias_op_t::arguments_t;
 
       int32_t tile_offset_x = ctx.sg_idx * kSgBc;
@@ -412,11 +413,8 @@ class fmha_forward_causal_strided_t {
   }
   // ======================= // gemm_Oi // ======================= //
   // Define kernel to compute Oi += Pij x Vj
-  using brgemm_Oi_t = group::brgemm_t<
-      compute_policy,
-      tile_shape_BrHm,
-      mem_desc_Pij_L_t,
-      mem_desc_Vj_t>;
+  using brgemm_Oi_t = group::
+      gemm_t<compute_policy, tile_shape_BrHm, mem_desc_Pij_L_t, mem_desc_Vj_t>;
   using matAccOi_t = typename brgemm_Oi_t::matAcc_t;
 
   /// @brief gemm_Oi is used to compute Oi += Pij x Vj
@@ -523,7 +521,7 @@ class fmha_forward_causal_strided_t {
 
     // save Pij to local memory
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
+        group::epilogue_policy_default<gpu_arch::Xe>,
         tile_shape_BrBc,
         mem_desc_Pij_L_t>;
     epilogue_t epilogue;
@@ -537,7 +535,7 @@ class fmha_forward_causal_strided_t {
   /// @brief store raw Oi to global memory. [B,N,F,H]
   inline void raw_store_Oi(matAccOi_t& matAccOi, arguments_t& args) {
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
+        group::epilogue_policy_default<gpu_arch::Xe>,
         tile_shape_BrHm,
         mem_desc_Oi_t>;
     epilogue_t epilogue;
@@ -548,12 +546,12 @@ class fmha_forward_causal_strided_t {
 
   /// @brief permuted store Oi to global memory. [B,F,N,H]
   inline void permute_store_Oi(
-      xetla_exec_item<3>& ei,
+      nd_item<3>& item,
       matAccOi_t& matAccOi,
       arguments_t& args) {
-    uint32_t b = ei.get_group(0) / args.uN;
-    uint32_t n = ei.get_group(0) % args.uN;
-    uint32_t f = ctx.sg_idy * kSgBr + ei.get_group(1) * kBr;
+    uint32_t b = item.get_group(0) / args.uN;
+    uint32_t n = item.get_group(0) % args.uN;
+    uint32_t f = ctx.sg_idy * kSgBr + item.get_group(1) * kBr;
     uint32_t h = ctx.sg_idx * kSgHm;
 
     // Because Hm is greater than uH
@@ -596,18 +594,14 @@ class fmha_forward_causal_strided_t {
     using matQi_tile_desc_t = typename brgemm_Oi_t::matAcc_tile_desc_t;
     using matQi_t = subgroup::tile_t<scalar_t, matQi_tile_desc_t>;
     using matQi_load_t = subgroup::mem_payload_t<
-        scalar_t,
+        mem_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>,
         matQi_tile_desc_t,
         subgroup::msg_type_v<matQi_tile_desc_t, mem_desc_Qi_t::space>,
-        mem_desc_Qi_t::layout,
-        mem_desc_Qi_t::space,
         gpu_arch::Xe>;
     using matQi_store_t = subgroup::mem_payload_t<
-        scalar_t,
+        mem_desc_t<scalar_t, mem_desc_Qi_L_t::layout, mem_desc_Qi_L_t::space>,
         matQi_tile_desc_t,
         subgroup::msg_type_v<matQi_tile_desc_t, mem_desc_Qi_L_t::space>,
-        mem_desc_Qi_L_t::layout,
-        mem_desc_Qi_L_t::space,
         gpu_arch::Xe>;
 
     int32_t tile_offset_x = ctx.sg_idx * kSgHm;
@@ -671,21 +665,19 @@ class fmha_forward_causal_strided_t {
   };
   // ================= // Entry of the functor // ================= //
 
-  inline KERNEL_FUNC void operator()(
-      xetla_exec_item<3>& ei,
-      arguments_t& args) {
+  inline KERNEL_FUNC void operator()(nd_item<3>& item, arguments_t& args) {
     // allocate slm and nbarrier resource
     xetla_local_init<get_slm_size()>();
     xetla_nbarrier_init<get_barrier_count()>();
 
     // initialize context for flash mha loops
-    ctx.init_context(ei, args);
+    ctx.init_context(item, args);
     // preload Qi to local memory
     preload_Qi(args);
     // initialize matAccOi for accumulate the output
     matAccOi_t matAccOi(0);
 
-    uint32_t startF = ei.get_group(1) /* 0 */ * kBr /* 64 */;
+    uint32_t startF = item.get_group(1) /* 0 */ * kBr /* 64 */;
     uint32_t endF = std::min(startF + kBr, args.uF);
 
     // iterate through the keys
@@ -695,7 +687,7 @@ class fmha_forward_causal_strided_t {
           break;
       }
       // update context for current loop
-      ctx.update_context(ei, args, startT);
+      ctx.update_context(item, args, startT);
       // compute Sij
       matAccSij_t matAccSij(0);
       gemm_Sij(matAccSij, args);
@@ -711,7 +703,7 @@ class fmha_forward_causal_strided_t {
 #if _RAW_OUTPUT
     raw_store_Oi(matAccOi, args);
 #else
-    permute_store_Oi(ei, matAccOi, args);
+    permute_store_Oi(item, matAccOi, args);
 #endif
   }
 }; // fmha_forward_t
@@ -782,9 +774,8 @@ void fmha_forward_causal_strided_impl(
       fmha_forward_op_t::get_nd_range(num_batches * num_heads, num_queries);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(NdRange, [=](sycl::nd_item<3> item) SYCL_ESIMD_KERNEL {
+    cgh.parallel_for(NdRange, [=](sycl::nd_item<3> item) KERNEL_MAIN {
       // exec item
-      xetla_exec_item<3> ei(item);
 
       // init fmha forward op and arguments
       fmha_forward_op_t fmha_fwd_op;
@@ -807,7 +798,7 @@ void fmha_forward_causal_strided_impl(
           attn_mask_padded_block_size);
 
       // call the functor
-      fmha_fwd_op(ei, args);
+      fmha_fwd_op(item, args);
     });
   };
   DPCPP_Q_SUBMIT(q, cgf);

@@ -191,9 +191,10 @@ class TestBinaryUfuncs(TestCase):
                     # testing multi-outputs results
                     _helper_reference_numerics(x, y, msg, exact_dtype, equal_nan)
 
+    # Security Scan: maybe a mistype from PyTorch to write op.ref is not None twice
     # The following tests only apply to elementwise binary operators with references
     binary_ufuncs_with_references = list(
-        filter(lambda op: op.ref is not None and op.ref is not None, binary_ufuncs)
+        filter(lambda op: op.ref is not None, binary_ufuncs)
     )
 
     @ops(binary_ufuncs_with_references)

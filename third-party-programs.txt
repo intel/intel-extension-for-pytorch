@@ -11,7 +11,7 @@ govern your use of the third party programs as set forth in in the
 
 Third party programs and their corresponding required notices and/or license terms are listed
 below.
--------------------------------------------------------------
+=====================================================================================
 1. benchmark
 
    dlpack
@@ -33,6 +33,9 @@ below.
 
    tbb
    Copyright Intel Corporation
+
+   Intel® Xe Templates for Linear Algebra
+   Copyright (c) 2022-2023 Intel Corporation
 
 
 
@@ -238,11 +241,11 @@ below.
    See the License for the specific language governing permissions and
    limitations under the License.
 
--------------------------------------------------------------
+=====================================================================================
 2. llvm
    Copyright (c) 2003-2019 University of Illinois at Urbana-Champaign.
    All rights reserved.
-
+   
 ==============================================================================
 The LLVM Project is under the Apache License v2.0 with LLVM Exceptions:
 ==============================================================================
@@ -522,8 +525,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH THE
 SOFTWARE.
 
--------------------------------------------------------------
-
+=====================================================================================
 3. cpuinfo
    Copyright (c) 2019 Google LLC
    Copyright (c) 2017-2018 Facebook Inc.
@@ -535,18 +537,20 @@ SOFTWARE.
    Copyright (c) 2015-2017, Georgia Institute of Technology
    All rights reserved.
 
-   pythreadpool
+   pythreadpool    
    Copyright 2019 Google LLC
    Copyright (c) 2017 Facebook Inc.
    Copyright (c) 2015-2017 Georgia Institute of Technology
    All rights reserved.
 
    python-peachpy
-   Copyright (c) 2017, Facebook Inc.
-   Copyright (c) 2013-2017, Georgia Institute of Technology
+   Copyright (c) 2017, Facebook Inc. 
+   Copyright (c) 2013-2017, Georgia Institute of Technology 
    All rights reserved.
 
-
+   torchaudio
+   Copyright (c) 2017 Facebook Inc. (Soumith Chintala), 
+   All rights reserved.
 
 
    Redistribution and use in source and binary forms, with or without
@@ -569,7 +573,7 @@ SOFTWARE.
    CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
    OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
--------------------------------------------------------------
+=====================================================================================
 4. cutlass
    Copyright (c) 2017 - 2022 NVIDIA CORPORATION & AFFILIATES.
 
@@ -592,7 +596,7 @@ SOFTWARE.
    Copyright (C) 2010-2018 Max-Planck-Society All rights reserved.
 
    torchvision
-   Copyright (c) Soumith Chintala 2016,
+   Copyright (c) Soumith Chintala 2016, 
    All rights reserved.
 
 
@@ -622,9 +626,9 @@ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
 SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.   
 
--------------------------------------------------------------
+=====================================================================================
 5. Facebook pytorch
 
 From PyTorch:
@@ -645,23 +649,23 @@ Copyright (c) 2016-present, Facebook Inc. All rights reserved.
 
 All contributions by Facebook:
 Copyright (c) 2016 Facebook Inc.
-
+ 
 All contributions by Google:
 Copyright (c) 2015 Google Inc.
 All rights reserved.
-
+ 
 All contributions by Yangqing Jia:
 Copyright (c) 2015 Yangqing Jia
 All rights reserved.
-
+ 
 All contributions from Caffe:
 Copyright(c) 2013, 2014, 2015, the respective contributors
 All rights reserved.
-
+ 
 All other contributions:
 Copyright(c) 2015, 2016 the respective contributors
 All rights reserved.
-
+ 
 Caffe2 uses a copyright model similar to Caffe: each contributor holds
 copyright over their contributions to Caffe2. The project versioning records
 all such contribution and copyright details. If a contributor wants to further
@@ -698,7 +702,7 @@ CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 
--------------------------------------------------------------
+=====================================================================================
 6. fbgemm
    Copyright (c) Facebook, Inc. and its affiliates.
    All rights reserved.
@@ -713,14 +717,14 @@ POSSIBILITY OF SUCH DAMAGE.
    Copyright (c) Microsoft Corporation. (The Azure AI Platform team)
 
    QNNPACK
-   Copyright (c) Facebook, Inc. and its affiliates.
+   Copyright (c) Facebook, Inc. and its affiliates. 
    All rights reserved.
 
    tensorpipe
    Copyright (c) Facebook, Inc. and its affiliates. All rights reserved.
 
    XNNPACK
-   Copyright (c) Facebook, Inc. and its affiliates.
+   Copyright (c) Facebook, Inc. and its affiliates. 
    All rights reserved.
    Copyright 2019 Google LLC
 
@@ -753,7 +757,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
--------------------------------------------------------------
+=====================================================================================
 7. enum
    Copyright (c) 2013, Ethan Furman.
    All rights reserved.
@@ -788,7 +792,7 @@ CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 
--------------------------------------------------------------
+=====================================================================================
 8. googletest
    Copyright 2008, Google Inc.
    All rights reserved.
@@ -827,7 +831,7 @@ of the input file used when generating it.  This code is not
 standalone and requires a support library to be linked with it.  This
 support library is itself covered by the above license.
 
--------------------------------------------------------------
+=====================================================================================
 9. breakpad
     Copyright 2006 Google Inc.  All rights reserved.
 
@@ -964,7 +968,7 @@ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 SUCH DAMAGE.
 
--------------------------------------------------------------
+=====================================================================================
 10. eigen
     Copyright (c) 2011, Intel Corporation
     All rights reserved.
@@ -996,7 +1000,7 @@ Redistribution and use in source and binary forms, with or without modification,
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
--------------------------------------------------------------
+=====================================================================================
 11. cub
     Copyright (c) 2010-2011, Duane Merrill.  All rights reserved.
     Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
@@ -1023,7 +1027,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
--------------------------------------------------------------
+=====================================================================================
 12. nccl
     Copyright (c) 2015-2020, NVIDIA CORPORATION.
     All rights reserved.
@@ -1065,7 +1069,7 @@ See:
 
 for more information and license details.
 
--------------------------------------------------------------
+=====================================================================================
 13. pybind11
     Copyright (c) 2016 Wenzel Jakob <wenzel.jakob@epfl.ch>, All rights reserved.
 
@@ -1097,9 +1101,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Please also refer to the file .github/CONTRIBUTING.md, which clarifies licensing of
 external contributions to this project including patches, pull requests, etc.
 
--------------------------------------------------------------
+=====================================================================================
 14. neon2sse
-
+   
    created by Victoria Zhislina, the Senior Application Engineer, Intel Corporation,  victoria.zhislina@intel.com
 
    *** Copyright (C) 2012-2020 Intel Corporation.  All rights reserved.
@@ -1130,8 +1134,8 @@ external contributions to this project including patches, pull requests, etc.
    or tort (including negligence or otherwise) arising in any way out of
    the use of this software, even if advised of the possibility of such damage.
 
--------------------------------------------------------------
-15. sleef
+=====================================================================================
+15. sleef   
     Boost Software License - Version 1.0 - August 17th, 2003
 
    Permission is hereby granted, free of charge, to any person or organization
@@ -1157,7 +1161,7 @@ external contributions to this project including patches, pull requests, etc.
    DEALINGS IN THE SOFTWARE.
 
 
--------------------------------------------------------------
+=====================================================================================
 16. oneAPI Math Kernel Library (oneMKL)
     Copyright Intel Corporation
 
@@ -1177,7 +1181,7 @@ DISCLAIMER.  THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED WARRA
 
 LIMITATION OF LIABILITY. IN NO EVENT WILL INTEL BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-No support.  Intel may make changes to the Software, at any time without notice, and is not obligated to support, update or provide training for the Software.
+No support.  Intel may make changes to the Software, at any time without notice, and is not obligated to support, update or provide training for the Software. 
 
 Termination. Your right to use the Software is terminated in the event of your breach of this license.
 
@@ -1188,7 +1192,7 @@ Compliance with laws.  You agree to comply with all relevant laws and regulation
 Governing law.  All disputes will be governed by the laws of the United States of America and the State of Delaware without reference to conflict of law principles and subject to the exclusive jurisdiction of the state or federal courts sitting in the State of Delaware, and each party agrees that it submits to the personal jurisdiction and venue of those courts and waives any objections. THE UNITED NATIONS CONVENTION ON CONTRACTS FOR THE INTERNATIONAL SALE OF GOODS (1980) IS SPECIFICALLY EXCLUDED AND WILL NOT APPLY TO THE SOFTWARE.
 
 
--------------------------------------------------------------
+=====================================================================================
 17. cudnn-frontend
     Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 
@@ -1220,14 +1224,17 @@ Governing law.  All disputes will be governed by the laws of the United States o
    Copyright (c) 2014-2017 Georgia Institute of Technology
    Copyright 2019 Google LLC
 
+   pti-gpu
+   Copyright (C) Intel Corportation
+
    python-six
    Copyright (c) 2010-2020 Benjamin Peterson
 
    VulkanMemoryAllocator
-   Copyright (c) 2017-2022 Advanced Micro Devices, Inc.
+   Copyright (c) 2017-2022 Advanced Micro Devices, Inc. 
    All rights reserved.
 
-   Permission is hereby granted, free of charge, to any person obtaining a copy of
+   Permission is hereby granted, free of charge, to any person obtaining a copy of  
    this software and associated documentation files (the "Software"), to deal in
    the Software without restriction, including without limitation the rights to
    use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
@@ -1244,7 +1251,7 @@ Governing law.  All disputes will be governed by the laws of the United States o
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
--------------------------------------------------------------
+===================================================================================== 
 18. fmt
     Copyright (c) 2012 - present, Victor Zverovich
 
@@ -1258,12 +1265,13 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 As an exception, if, as a result of your compiling your source code, portions of this Software are embedded into a machine-executable object form of such source code, you may redistribute such embedded portions in such object form without including the above copyright and permission notices.
 
--------------------------------------------------------------
+=====================================================================================
 
 The following third party programs have their own third party program files. These additional third party program files are as follows:
 
-1.	mkl-dnn intel-extension-for-pytorch/third-party-programs/oneDNN
-2.	tbb intel-extension-for-pytorch/third-party-programs/oneTBB
-3.	oneMKL intel-extension-for-pytorch/third-party-programs/oneMKL
+1. mkl-dnn intel-extension-for-pytorch/third-party-programs/oneDNN
+2. tbb intel-extension-for-pytorch/third-party-programs/oneTBB
+3. oneMKL intel-extension-for-pytorch/third-party-programs/oneMKL
+4. Intel® Xe Templates for Linear Algebra intel-extension-for-pytorch/third-party-programs/xetla
 
--------------------------------------------------------------
+=====================================================================================

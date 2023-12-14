@@ -65,14 +65,14 @@ struct bpi_config_t {
   tile_store(matC_##id, matC_payload_##id);                       \
   SW_BARRIER();
 
-#define MACC_INIT_LOAD(id, ptr_c, pitch)                                    \
-  matC_base_desc.init(                                                      \
-      {ptr_c},                                                              \
-      {boundary_n_##id, boundary_m, matrix_n_##id},                         \
-      {ei.get_group(2) * wg_tile_n_0 + brgemm_t_##id::get_matC_offset_x(g), \
-       start_m + brgemm_t_##id::get_matC_offset_y(g)});                     \
-  matC_payload_0.init(matC_base_desc);                                      \
-  tile_load(matAcc_init, matC_payload_0);                                   \
+#define MACC_INIT_LOAD(id, ptr_c, pitch)                                      \
+  matC_base_desc.init(                                                        \
+      {ptr_c},                                                                \
+      {boundary_n_##id, boundary_m, matrix_n_##id},                           \
+      {item.get_group(2) * wg_tile_n_0 + brgemm_t_##id::get_matC_offset_x(g), \
+       start_m + brgemm_t_##id::get_matC_offset_y(g)});                       \
+  matC_payload_0.init(matC_base_desc);                                        \
+  tile_load(matAcc_init, matC_payload_0);                                     \
   SW_BARRIER();
 
 #define BPI_DESC_INIT(id, ptr)            \
@@ -144,9 +144,9 @@ struct gru_layer_bpi {
       mem_desc_t<Act_T, mem_layout::row_major, mem_space::global>;
 
   using brgemm_t_0 =
-      brgemm_t<compute_policy, tile_shape_0, mem_desc_err_t, mem_desc_weight_t>;
+      gemm_t<compute_policy, tile_shape_0, mem_desc_err_t, mem_desc_weight_t>;
   using brgemm_t_1 =
-      brgemm_t<compute_policy, tile_shape_1, mem_desc_err_t, mem_desc_weight_t>;
+      gemm_t<compute_policy, tile_shape_1, mem_desc_err_t, mem_desc_weight_t>;
 
   using worker_scope_t = typename brgemm_t_0::work_group_t;
 
@@ -167,20 +167,16 @@ struct gru_layer_bpi {
       reg_layout::tiled>;
 
   using matA_payload_global_t = mem_payload_t<
-      T,
+      mem_desc_t<T, layout_grad, mem_loc_grad>,
       matA_tile_desc_t,
       msg_type_v<matA_tile_desc_t, mem_loc_grad>,
-      layout_grad,
-      mem_loc_grad,
       gpu_arch::Xe>;
 
   using matA_load_0_t = tile_t<T, matA_tile_desc_t>;
 
   using prefetch_t = prefetch_payload_t<
-      T,
+      mem_desc_t<T, layout_grad, mem_loc_grad>,
       tile_desc_t<matA_load_0_t::tile_size_x, matA_load_0_t::tile_size_y, 1, 1>,
-      layout_grad,
-      mem_loc_grad,
       1, /*tg_size_x*/
       gpu_arch::Xe>;
 
@@ -189,46 +185,38 @@ struct gru_layer_bpi {
   using matAcc_init_0_t = tile_t<T, matAcc_tile_desc_t0>;
 
   using prefetch_matAcc_t = prefetch_payload_t<
-      T,
+      mem_desc_t<T, layout_grad, mem_loc_grad>,
       tile_desc_t<
           matAcc_init_0_t::tile_size_x,
           matAcc_init_0_t::tile_size_y,
           1,
           1>,
-      layout_grad,
-      mem_loc_grad,
       1, /*tg_size_x=1*/
       gpu_arch::Xe>;
 
   using matC_t0 = tile_t<T, matAcc_tile_desc_t0>;
   using matC_payload_t0 = mem_payload_t<
-      T,
+      mem_desc_t<T, layout_grad, mem_loc_grad>,
       matAcc_tile_desc_t0,
       msg_type_v<matAcc_tile_desc_t0, mem_loc_grad>,
-      layout_grad,
-      mem_loc_grad,
       gpu_arch::Xe>;
 
   using matC_t1 = tile_t<T, matAcc_tile_desc_t1>;
   using matC_payload_t1 = mem_payload_t<
-      T,
+      mem_desc_t<T, layout_grad, mem_loc_grad>,
       matAcc_tile_desc_t1,
       msg_type_v<matAcc_tile_desc_t1, mem_loc_grad>,
-      layout_grad,
-      mem_loc_grad,
       gpu_arch::Xe>;
   static constexpr tdesc_update_dir load_update_config =
       tdesc_update_dir::x_dir;
   using mask_in_t = tile_t<float, matAcc_tile_desc_t1>;
   using mask_payload_t = mem_payload_t<
-      float,
+      mem_desc_t<float, mem_layout::row_major, mem_space::global>,
       matAcc_tile_desc_t1,
       msg_type_v<matAcc_tile_desc_t1, mem_space::global>,
-      mem_layout::row_major,
-      mem_space::global,
       gpu_arch::Xe>;
 
-  static void inline call(xetla_exec_item<3>& ei, bpi_config_t<T>* args) {
+  static void inline call(nd_item<3>& item, bpi_config_t<T>* args) {
     matA_tile_desc_t matA_tile_desc;
 
     mask_in_t mask_in;
@@ -260,7 +248,7 @@ struct gru_layer_bpi {
     brgemm_arguments_input brgemm_arg_1;
     matAcc_t0 matAcc_0;
     matAcc_t1 matAcc_1;
-    int gate_id = ei.get_group(0);
+    int gate_id = item.get_group(0);
     int batch_size, input_size, hidden_size;
     batch_size = args->batch_size;
     input_size = args->input_size;
@@ -271,7 +259,7 @@ struct gru_layer_bpi {
 
     int boundary_n_0, boundary_n_1, boundary_m, boundary_k;
     int wg_tile_k;
-    int start_m = ei.get_group(1) * wg_tile_m;
+    int start_m = item.get_group(1) * wg_tile_m;
     int start_k = 0;
     int start_n_mask;
     int gate_nums = 3;
@@ -284,14 +272,14 @@ struct gru_layer_bpi {
     int loop_count = (wg_tile_k + sg_tile_k - 1) / sg_tile_k;
     int thread_count = (wg_tile_n_0 + sg_tile_n_0 - 1) / sg_tile_n_0;
     int loop_count_per_thread = (loop_count + thread_count - 1) / thread_count;
-    int lhs_start_k = ei.get_local_id(0) * loop_count_per_thread * sg_tile_k;
+    int lhs_start_k = item.get_local_id(0) * loop_count_per_thread * sg_tile_k;
 
     int matrix_m = batch_size;
     int matrix_k = hidden_size;
     int start_x_a = start_k;
     int start_y_a = start_m;
 
-    int32_t tile_offset_m = ei.get_local_id(1) * sg_tile_m;
+    int32_t tile_offset_m = item.get_local_id(1) * sg_tile_m;
     int offset_x_a = is_col_major_a ? tile_offset_m : 0;
     int offset_y_a = is_col_major_a ? 0 : tile_offset_m;
 
@@ -303,12 +291,12 @@ struct gru_layer_bpi {
     int one_layer_size = io_size * seq_len;
 
     worker_scope_t g;
-    g.init(ei.get_local_linear_id());
+    g.init(item.get_local_linear_id());
     for (unsigned seq_id = 0; seq_id < seq_len; ++seq_id) {
       for (int j = (hidden_size + wg_tile_n_0 - 1) / wg_tile_n_0 - 1; j >= 0;
            --j) {
-        int start_n_0 = (ei.get_group(2) + j) * wg_tile_n_0;
-        int start_n_1 = (ei.get_group(2) + j) * wg_tile_n_1;
+        int start_n_0 = (item.get_group(2) + j) * wg_tile_n_0;
+        int start_n_1 = (item.get_group(2) + j) * wg_tile_n_1;
 
         BPI_CONFIG_SETTING(0, batch_size, hidden_size, hidden_size);
         BPI_CONFIG_SETTING(1, batch_size, hidden_size, input_size);
@@ -611,7 +599,7 @@ template <
     uint32_t sg_tile_k_t>
 struct kernel_xcoder_gru_bpi {
   /// @brief
-  /// @param ei
+  /// @param item
   /// @param layer_err_ptr    err inputs  from last cell per layer shape =
   /// layer_size x batch_size x hidden_size
   /// @param y_err_ptr  err inputs from last layer shape = sequence x batch_size
@@ -635,7 +623,7 @@ struct kernel_xcoder_gru_bpi {
   /// @param layer_size
   /// @param dropout
   static void inline run(
-      xetla_exec_item<3> ei,
+      sycl::nd_item<3>& item,
       input_T* layer_err_ptr,
       input_T* y_err_ptr,
       input_T* x_grad_ptr,
@@ -721,7 +709,7 @@ struct kernel_xcoder_gru_bpi {
       args.w_h_ptr = h_weights + 3 * hidden_weight_size * layer_id;
       args.mask_ptr = mask_ptr + (layer_id - 1) * one_layer_size;
       SW_BARRIER();
-      fused_op_1::call(ei, &args);
+      fused_op_1::call(item, &args);
       ping = (ping + 1) % 2;
       pong = (pong + 1) % 2;
     }
@@ -746,7 +734,7 @@ struct kernel_xcoder_gru_bpi {
     args.reserve = 0;
     args.dropout = 0;
     SW_BARRIER();
-    fused_op_0::call(ei, &args);
+    fused_op_0::call(item, &args);
   }
 };
 
@@ -800,8 +788,7 @@ void gru_backward_data_impl(
   cl::sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(Range, [=](sycl::nd_item<3> item) SYCL_ESIMD_KERNEL {
-      xetla_exec_item ei(item);
+    cgh.parallel_for(Range, [=](sycl::nd_item<3> item) KERNEL_MAIN {
       using xcoder_gru_bpi_op = kernel_xcoder_gru_bpi<
           typename gru_bpi_config_t::input_T,
           typename gru_bpi_config_t::Act_T,
@@ -813,7 +800,7 @@ void gru_backward_data_impl(
           gru_bpi_config_t::sg_tile_n_1,
           gru_bpi_config_t::sg_tile_k>;
       xcoder_gru_bpi_op::run(
-          ei,
+          item,
           (input*)layer_err_ptr,
           (input*)y_err_ptr, /* inputs*/
           (input*)x_grad_ptr,

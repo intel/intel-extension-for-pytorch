@@ -60,7 +60,7 @@ struct hgemm_caller {
     static constexpr uint32_t prefetch_distance = STAGES;
 
     using tile_shape = tile_shape_t<WG_N, WG_M, SG_N, SG_M>;
-    using brgemm_t = typename brgemm_selector_t<
+    using gemm_t = typename gemm_selector_t<
         data_type_a,
         data_type_b,
         layout_a,
@@ -75,12 +75,35 @@ struct hgemm_caller {
         mma_engine::xmx,
         gpu_arch::Xe,
         prefetch_distance,
-        periodic_sync_interval>::brgemm;
+        periodic_sync_interval>::gemm;
 
-    using gemm_op_t = gemm_t<
-        dispatch_policy_kslicing<L3_KS, SLM_KS, gpu_arch::Xe>,
-        brgemm_t,
-        epilogue_t>;
+    using group_swizzle =
+        gpu::xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
+    using dispatch_policy =
+        dispatch_policy_kslicing<group_swizzle, L3_KS, SLM_KS>;
+    using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
+
+    // allocate temp buffers for global split
+    size_t size_acc = gemm_op_t::get_acc_buf_size(m, n);
+    size_t size_cnt = gemm_op_t::get_cnt_buf_size(m, n);
+    if constexpr (std::is_same_v<scalar_t, sycl::half>) {
+      using data_type_acc = float; // half * half  = float
+    } else {
+      using data_type_acc = int32_t;
+    }
+    using data_type_cnt = uint32_t;
+    auto context = queue.get_info<info::queue::context>();
+    auto device = queue.get_info<info::queue::device>();
+    data_type_acc* acc = static_cast<data_type_acc*>(aligned_alloc_device(
+        DEVICE_MEM_ALIGNMENT,
+        size_acc * sizeof(data_type_acc),
+        device,
+        context));
+    data_type_cnt* cnt = static_cast<uint32_t*>(aligned_alloc_device(
+        DEVICE_MEM_ALIGNMENT,
+        size_cnt * sizeof(data_type_cnt),
+        device,
+        context));
 
     typename gemm_op_t::arguments_t arg(
         m,
@@ -92,14 +115,14 @@ struct hgemm_caller {
         ldb,
         out,
         ldc,
+        acc,
+        cnt,
         args);
-
     auto cgf = DPCPP_Q_CGF(cgh) {
-      cgh.parallel_for(NDRange, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-        xetla_exec_item<3> ei(item);
+      cgh.parallel_for(NDRange, [=](nd_item<3> item) KERNEL_MAIN {
         slm_barrier_init<gemm_op_t>();
         gemm_op_t gemm_op;
-        gemm_op(ei, arg);
+        gemm_op(item, arg);
       });
     };
     DPCPP_Q_SUBMIT(queue, cgf);
@@ -655,44 +678,58 @@ inline void hgemm_qkv(
   cl::sycl::range<3> LocalRange{SLM_KS, thread_range_m, thread_range_n};
   cl::sycl::nd_range<3> NDRange(GroupRange * LocalRange, LocalRange);
 
+  using data_type_b = scalar_t;
+  using data_type_a = scalar_t;
+  using data_type_c = scalar_t;
+  using data_type_acc = float;
+  static constexpr uint32_t periodic_sync_interval = SYNC_FREQ;
+  static constexpr uint32_t prefetch_distance = STAGES;
+  using tile_shape = tile_shape_t<WG_N, WG_M, SG_N, SG_M>;
+
+  using gemm_t = typename gemm_selector_t<
+      data_type_a,
+      data_type_b,
+      layout_a,
+      layout_b,
+      mem_space::global,
+      mem_space::global,
+      8,
+      8,
+      data_type_acc,
+      tile_shape,
+      SG_K,
+      mma_engine::xmx,
+      gpu_arch::Xe,
+      prefetch_distance,
+      periodic_sync_interval>::gemm;
+  using epilogue_t = epilogue_t<
+      epilogue_policy_tile_op<chained_tile_op_t<>, gpu_arch::Xe>,
+      tile_shape,
+      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
+  using group_swizzle = gpu::xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
+  using dispatch_policy =
+      dispatch_policy_kslicing<group_swizzle, L3_KS, SLM_KS>;
+  using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
+
+  // allocate temp buffers for global split
+  size_t size_acc = gemm_op_t::get_acc_buf_size(m, n);
+  size_t size_cnt = gemm_op_t::get_cnt_buf_size(m, n);
+  if constexpr (std::is_same_v<scalar_t, sycl::half>) {
+    using data_type_acc = float; // half * half  = float
+  } else {
+    using data_type_acc = int32_t;
+  }
+  using data_type_cnt = uint32_t;
+  auto context = queue.get_info<info::queue::context>();
+  auto device = queue.get_info<info::queue::device>();
+  data_type_acc* acc = static_cast<data_type_acc*>(aligned_alloc_device(
+      DEVICE_MEM_ALIGNMENT, size_acc * sizeof(data_type_acc), device, context));
+  data_type_cnt* cnt = static_cast<uint32_t*>(aligned_alloc_device(
+      DEVICE_MEM_ALIGNMENT, size_cnt * sizeof(data_type_cnt), device, context));
+
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(NDRange, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-      xetla_exec_item<3> ei(item);
-
-      using data_type_b = scalar_t;
-      using data_type_a = scalar_t;
-      using data_type_c = scalar_t;
-      using data_type_acc = float;
-      static constexpr uint32_t periodic_sync_interval = SYNC_FREQ;
-      static constexpr uint32_t prefetch_distance = STAGES;
-      using tile_shape = tile_shape_t<WG_N, WG_M, SG_N, SG_M>;
-
-      using brgemm_t = typename brgemm_selector_t<
-          data_type_a,
-          data_type_b,
-          layout_a,
-          layout_b,
-          mem_space::global,
-          mem_space::global,
-          8,
-          8,
-          data_type_acc,
-          tile_shape,
-          SG_K,
-          mma_engine::xmx,
-          gpu_arch::Xe,
-          prefetch_distance,
-          periodic_sync_interval>::brgemm;
-      using epilogue_t = epilogue_t<
-          epilogue_policy_tile_op<chained_tile_op_t<>, gpu_arch::Xe>,
-          tile_shape,
-          mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
-      using gemm_op_t = gemm_t<
-          dispatch_policy_kslicing<L3_KS, SLM_KS, gpu_arch::Xe>,
-          brgemm_t,
-          epilogue_t>;
-
-      uint32_t batch_id = ei.get_group(0);
+    cgh.parallel_for(NDRange, [=](nd_item<3> item) KERNEL_MAIN {
+      uint32_t batch_id = item.get_group(0);
       slm_barrier_init<gemm_op_t>();
       scalar_t* out = (batch_id == 0) ? out0 : ((batch_id == 1) ? out1 : out2);
 
@@ -707,9 +744,11 @@ inline void hgemm_qkv(
           const_cast<scalar_t*>(b) + size_b * batch_id,
           ldb,
           out,
-          ldc);
+          ldc,
+          acc,
+          cnt);
       gemm_op_t gemm_op;
-      gemm_op(ei, arg);
+      gemm_op(item, arg);
     });
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -753,47 +792,61 @@ inline void hgemm_qkv_bias(
   cl::sycl::range<3> LocalRange{SLM_KS, thread_range_m, thread_range_n};
   cl::sycl::nd_range<3> NDRange(GroupRange * LocalRange, LocalRange);
 
+  using data_type_b = scalar_t;
+  using data_type_a = scalar_t;
+  using data_type_c = scalar_t;
+  using data_type_bias = scalar_t;
+  using data_type_acc = float;
+  static constexpr uint32_t periodic_sync_interval = SYNC_FREQ;
+  static constexpr uint32_t prefetch_distance = STAGES;
+  using tile_shape = tile_shape_t<WG_N, WG_M, SG_N, SG_M>;
+
+  using gemm_t = typename gemm_selector_t<
+      data_type_a,
+      data_type_b,
+      layout_a,
+      layout_b,
+      mem_space::global,
+      mem_space::global,
+      8,
+      8,
+      data_type_acc,
+      tile_shape,
+      SG_K,
+      mma_engine::xmx,
+      gpu_arch::Xe,
+      prefetch_distance,
+      periodic_sync_interval>::gemm;
+  using epilogue_t = epilogue_t<
+      epilogue_policy_tile_op<
+          chained_tile_op_t<epilogue_impl::bias_op_t<data_type_bias>>,
+          gpu_arch::Xe>,
+      tile_shape,
+      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
+  using group_swizzle = gpu::xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
+  using dispatch_policy =
+      dispatch_policy_kslicing<group_swizzle, L3_KS, SLM_KS>;
+  using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
+
+  // allocate temp buffers for global split
+  size_t size_acc = gemm_op_t::get_acc_buf_size(m, n);
+  size_t size_cnt = gemm_op_t::get_cnt_buf_size(m, n);
+  if constexpr (std::is_same_v<scalar_t, sycl::half>) {
+    using data_type_acc = float; // half * half  = float
+  } else {
+    using data_type_acc = int32_t;
+  }
+  using data_type_cnt = uint32_t;
+  auto context = queue.get_info<info::queue::context>();
+  auto device = queue.get_info<info::queue::device>();
+  data_type_acc* acc = static_cast<data_type_acc*>(aligned_alloc_device(
+      DEVICE_MEM_ALIGNMENT, size_acc * sizeof(data_type_acc), device, context));
+  data_type_cnt* cnt = static_cast<uint32_t*>(aligned_alloc_device(
+      DEVICE_MEM_ALIGNMENT, size_cnt * sizeof(data_type_cnt), device, context));
+
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(NDRange, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-      xetla_exec_item<3> ei(item);
-
-      using data_type_b = scalar_t;
-      using data_type_a = scalar_t;
-      using data_type_c = scalar_t;
-      using data_type_bias = scalar_t;
-      using data_type_acc = float;
-      static constexpr uint32_t periodic_sync_interval = SYNC_FREQ;
-      static constexpr uint32_t prefetch_distance = STAGES;
-      using tile_shape = tile_shape_t<WG_N, WG_M, SG_N, SG_M>;
-
-      using brgemm_t = typename brgemm_selector_t<
-          data_type_a,
-          data_type_b,
-          layout_a,
-          layout_b,
-          mem_space::global,
-          mem_space::global,
-          8,
-          8,
-          data_type_acc,
-          tile_shape,
-          SG_K,
-          mma_engine::xmx,
-          gpu_arch::Xe,
-          prefetch_distance,
-          periodic_sync_interval>::brgemm;
-      using epilogue_t = epilogue_t<
-          epilogue_policy_tile_op<
-              chained_tile_op_t<epilogue_impl::bias_op_t<data_type_bias>>,
-              gpu_arch::Xe>,
-          tile_shape,
-          mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
-      using gemm_op_t = gemm_t<
-          dispatch_policy_kslicing<L3_KS, SLM_KS, gpu_arch::Xe>,
-          brgemm_t,
-          epilogue_t>;
-
-      uint32_t batch_id = ei.get_group(0);
+    cgh.parallel_for(NDRange, [=](nd_item<3> item) KERNEL_MAIN {
+      uint32_t batch_id = item.get_group(0);
       slm_barrier_init<gemm_op_t>();
       scalar_t* out = (batch_id == 0) ? out0 : ((batch_id == 1) ? out1 : out2);
 
@@ -810,11 +863,13 @@ inline void hgemm_qkv_bias(
           ldb,
           out,
           ldc,
+          acc,
+          cnt,
           {{{const_cast<scalar_t*>(bias) + size_bias * batch_id,
              {n, 1, n},
              {1}}}});
       gemm_op_t gemm_op;
-      gemm_op(ei, arg);
+      gemm_op(item, arg);
     });
   };
   DPCPP_Q_SUBMIT(queue, cgf);

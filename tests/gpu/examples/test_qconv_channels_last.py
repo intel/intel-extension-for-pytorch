@@ -15,7 +15,7 @@ class TestTorchMethod(TestCase):
         dtype_filters = torch.qint8
         zp_vec = [128, 2, 0]
         for with_relu in [True, False]:
-            qconf_fn = torch.ops.quantized.conv2d
+            qconv_fn = torch.ops.quantized.conv2d
             if with_relu:
                 qconv_fn = torch.ops.quantized.conv2d_relu
             for scale_in in [1.2, 1.6]:
@@ -82,7 +82,7 @@ class TestTorchMethod(TestCase):
         dtype_filters = torch.qint8
         zp_vec = [128, 2, 0]
         for with_relu in [True, False]:
-            qconf_fn = torch.ops.quantized.conv3d
+            qconv_fn = torch.ops.quantized.conv3d
             if with_relu:
                 qconv_fn = torch.ops.quantized.conv3d_relu
             for scale_in in [1.2, 1.6]:

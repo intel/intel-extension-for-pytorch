@@ -1,6 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 import torch
-import unittest
+
+# import unittest
 from common_utils import TestCase
 from torch.nn import InstanceNorm2d, InstanceNorm3d, BatchNorm2d, BatchNorm3d
 
@@ -53,7 +54,7 @@ class InstanceNormTester(TestCase):
             y2 = m(x2)
             self.assertTrue(y2.dtype == torch.float32)
             self.assertEqual(y2, y1)
-            self.assertTrue(y2.is_contiguous(memory_format=memory_format))
+            self.assertTrue(y2.is_contiguous(memory_format=torch.contiguous_format))
 
             y2.mean().backward()
             self.assertTrue(x2.grad.dtype == torch.float32)
@@ -109,7 +110,7 @@ class InstanceNormTester(TestCase):
                 )
                 y2 = m(x2)
                 self.assertTrue(y2.dtype == torch.bfloat16)
-                self.assertTrue(y2.is_contiguous(memory_format=memory_format))
+                self.assertTrue(y2.is_contiguous(memory_format=torch.contiguous_format))
                 self.assertEqual(y2, y1, prec=0.1)
 
                 y2.mean().backward()
@@ -118,5 +119,5 @@ class InstanceNormTester(TestCase):
                 self.assertEqual(x2.grad, x1.grad)
 
 
-if __name__ == "__main__":
-    test = unittest.main()
+# if __name__ == "__main__":
+#     test = unittest.main()

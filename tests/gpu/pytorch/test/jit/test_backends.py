@@ -564,7 +564,7 @@ class ErrorMessagesWithCompiler(JitBackendTestCase):
         """
         def forward(self, x, h):
             return x * h
-            self._loweredmodule.forward()
+            # self._loweredmodule.forward()
 
     def test_errors(self):
         scripted_module_n = torch.jit.script(ErrorMessagesWithCompiler.ModuleNotSupported())

@@ -62,13 +62,15 @@ struct hgemm_wint4_func {
       "for l3_kslicing > 1, current we only support float or "
       "int for matC");
 
-  using gemm_op_t = gpu::xetla::kernel::gemm_t<
-      gpu::xetla::kernel::dispatch_policy_int4_dequantize_kslicing<
-          l3_kslicing,
-          slm_kslicing,
-          gpu_arch::Xe>,
-      brgemm_t,
-      epilogue_t>;
+  using group_swizzle = gpu::xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
+  using dispatch_policy = dispatch_policy_int4_dequantize_kslicing<
+      group_swizzle,
+      l3_kslicing,
+      slm_kslicing>;
+  using gemm_op_t =
+      gpu::xetla::kernel::gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
+
+  using dtype_cnt = uint32_t;
 
   static const char* func_name() {
     return "hgemm_wint4_func";
@@ -85,6 +87,19 @@ struct hgemm_wint4_func {
       dtype_zero_pt* zero_pt_ptr,
       dtype_scale* scale_ptr,
       typename epilogue_t::arguments_t epilogue_args = {}) {
+    // allocate temp buffers for global split
+    size_t size_acc = gemm_op_t::get_acc_buf_size(mat_m, mat_n);
+    size_t size_cnt = gemm_op_t::get_cnt_buf_size(mat_m, mat_n);
+
+    using data_type_acc = float; // half * half  = float
+    using data_type_cnt = uint32_t;
+    auto context = queue.get_info<info::queue::context>();
+    auto device = queue.get_info<info::queue::device>();
+    dtype_acc* acc = static_cast<data_type_acc*>(aligned_alloc_device(
+        DEVICE_MEM_ALIGNMENT, size_acc * sizeof(dtype_acc), device, context));
+    dtype_cnt* cnt = static_cast<uint32_t*>(aligned_alloc_device(
+        DEVICE_MEM_ALIGNMENT, size_cnt * sizeof(dtype_cnt), device, context));
+
     typename gemm_op_t::arguments_t gemm_arg(
         mat_m,
         mat_k,
@@ -99,16 +114,17 @@ struct hgemm_wint4_func {
         mat_n,
         zero_pt_ptr,
         mat_n,
+        acc,
+        cnt,
         epilogue_args);
 
     cl::sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
 
     auto cgf = DPCPP_Q_CGF(cgh) {
-      cgh.parallel_for(NDRange, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-        xetla_exec_item<3> ei(item);
+      cgh.parallel_for(NDRange, [=](nd_item<3> item) KERNEL_MAIN {
         slm_barrier_init<gemm_op_t>();
         gemm_op_t gemm_op;
-        gemm_op(ei, gemm_arg);
+        gemm_op(item, gemm_arg);
       });
     };
     DPCPP_Q_SUBMIT(queue, cgf);

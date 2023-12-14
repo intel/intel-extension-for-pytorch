@@ -387,11 +387,11 @@ struct bias_add_op_t<mem_desc_bias_t_, arch_tag,
     using base_t = typename mem_desc_bias_t::base_t;
 
     struct arguments_t {
-        shape_t shape;
-        base_t base;
-        inline arguments_t() = default;
-        inline arguments_t(base_t base_, shape_t shape_)
-            : base(base_), shape(shape_) {}
+      base_t base;
+      shape_t shape;
+      inline arguments_t() = default;
+      inline arguments_t(base_t base_, shape_t shape_)
+          : base(base_), shape(shape_) {}
     };
     template <typename matAcc_t>
     __XETLA_API KERNEL_FUNC void operator()(matAcc_t &matAcc,
@@ -720,11 +720,11 @@ struct elemwise_reduce_op_t<reduce_kind_, dtype_in_, arch_tag,
     static constexpr reduce_op reduce_kind = reduce_kind_;
 
     struct arguments_t {
-        shape_t shape;
-        base_t base;
-        inline arguments_t() = default;
-        inline arguments_t(base_t base_, shape_t shape_)
-            : base(base_), shape(shape_) {}
+      base_t base;
+      shape_t shape;
+      inline arguments_t() = default;
+      inline arguments_t(base_t base_, shape_t shape_)
+          : base(base_), shape(shape_) {}
     };
     template <typename matAcc_t>
     __XETLA_API KERNEL_FUNC void operator()(matAcc_t &matAcc,
