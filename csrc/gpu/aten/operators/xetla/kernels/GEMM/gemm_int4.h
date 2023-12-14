@@ -48,8 +48,8 @@ struct hgemm_wint4_func {
       dtype_zero_pt,
       dequant_s == 0 ? 131072 : dequant_s,
       gpu_arch::Xe>;
-  using brgemm_t = gpu::xetla::group::
-      brgemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
+  using gemm_t = gpu::xetla::group::
+      gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
 
   using epilogue_t = gpu::xetla::group::epilogue_t<
       gpu::xetla::group::epilogue_policy_tile_op<post_ops, gpu_arch::Xe>,
@@ -223,7 +223,7 @@ inline void hgemm_bias_wint4(
   using data_type_acc = float;
   using data_type_bias = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<data_type_bias, gpu_arch::Xe>>;
+      subgroup::bias_add_op_t<mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>, gpu_arch::Xe>>;
   using hgemm_wint4_functor = hgemm_wint4_func<
       data_type_a,
       data_type_b,
@@ -288,7 +288,7 @@ inline void hgemm_bias_gelu_wint4(
   using data_type_acc = float;
   using data_type_bias = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<data_type_bias, gpu_arch::Xe>,
+      subgroup::bias_add_op_t<mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>, gpu_arch::Xe>,
       subgroup::gelu_fwd_op_t>;
   using hgemm_wint4_functor = hgemm_wint4_func<
       data_type_a,
@@ -494,7 +494,7 @@ inline void hgemm_bias_res_res_wint4(
   using data_type_bias = scalar_t;
   using data_type_res = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<data_type_bias, gpu_arch::Xe>,
+      subgroup::bias_add_op_t<mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>, gpu_arch::Xe>,
       subgroup::
           elemwise_reduce_op_t<reduce_op::sum, data_type_res, gpu_arch::Xe>,
       subgroup::
@@ -662,7 +662,7 @@ inline void hgemm_qkv_bias_wint4(
   using data_type_acc = float;
   using data_type_bias = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<data_type_bias, gpu_arch::Xe>>;
+      subgroup::bias_add_op_t<mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>, gpu_arch::Xe>>;
   using hgemm_wint4_functor = hgemm_wint4_func<
       data_type_a,
       data_type_b,
