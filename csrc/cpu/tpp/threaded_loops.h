@@ -58,6 +58,9 @@ using loop_rt_spec_t = LoopSpecs;
 
 class LoopSpecs {
  public:
+  // Add this default constructor to fix the issue in the constructor of
+  // ThreadedLoop See the comments there for more details
+  LoopSpecs() : LoopSpecs(0L, 0L, 1L, {}) {}
   LoopSpecs(long end, std::initializer_list<long> block_sizes = {})
       : LoopSpecs(0L, end, 1L, block_sizes) {}
   LoopSpecs(
@@ -247,8 +250,24 @@ inline LoopingScheme* getLoopingScheme(std::string scheme) {
 template <int N>
 class ThreadedLoop {
  public:
+  /*
+  Originally the constructor put the bounds in the initializer list:
+  ```
   ThreadedLoop(const LoopSpecs (&bounds)[N], std::string scheme = "")
       : bounds(bounds), scheme(scheme) {
+  ```
+  But this causes error when building with clang:
+  error: array initializer must be an initializer list
+  So, now this->bounds is initialized by copy elements one by one
+  This change leads to another problem: bounds is an array of LoopSpecs,
+  but LoopSpecs does not have a default consturctor. So, we added a
+  default constructor for LoopSpecs.
+  */
+  ThreadedLoop(const LoopSpecs (&bounds)[N], std::string scheme = "")
+      : scheme(scheme) {
+    for (size_t i = 0; i < N; ++i) {
+      this->bounds[i] = bounds[i];
+    }
     if (scheme == "")
       scheme = getDefaultScheme();
     loopScheme = getLoopingScheme(scheme);
