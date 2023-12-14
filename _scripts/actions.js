@@ -561,15 +561,22 @@ $(document).ready(function() {
 
     if(num_elem == 0) {
       $.each(items, function(index, value) {
-        var elem = document.createElement("div");
-        elem.className = "values-element block-" + items.length + " install-" + stage.toLowerCase();
-        elem.setAttribute("id", stage.toLowerCase() + "-" + value.toLowerCase());
-        elem.innerHTML = value;
-        row.append(elem);
-        if(search_fields[stage.toLowerCase()] == value.toLowerCase())
-          search_id = index + 1;
+        if(!value.startsWith("comment-"))
+          num_elem += 1;
       });
-      num_elem = items.length;
+      idx = 0;
+      $.each(items, function(index, value) {
+        if(!value.startsWith("comment-")) {
+          var elem = document.createElement("div");
+          elem.className = "values-element block-" + num_elem + " install-" + stage.toLowerCase();
+          elem.setAttribute("id", stage.toLowerCase() + "-" + value.toLowerCase());
+          elem.innerHTML = value;
+          row.append(elem);
+          idx += 1;
+          if(search_fields[stage.toLowerCase()] == value.toLowerCase())
+            search_id = idx;
+        }
+      });
     } else {
       var elem_sel = document.createElement("select");
       elem_sel.className = "values-element block-" + num_elem + " install-" + stage.toLowerCase();
