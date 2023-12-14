@@ -63,7 +63,7 @@ conda activate llm
 
 # Setup the environment with the provided script
 cd examples/cpu/inference/python/llm
-bash ./tools/env_setup.sh
+bash ./tools/env_setup.sh 7
 ```
 
 3\. Once an environment is configured with either method above, set necessary environment variables with an environment variables activation script and download the sample `prompt.json`.
