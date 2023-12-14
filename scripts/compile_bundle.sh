@@ -1,9 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-VER_LLVM=llvmorg-16.0.6
 VER_IPEX=main
-VER_GCC=12.3.0
 
 # Mode: Select which components to install. PyTorch and Intel® Extension for PyTorch* are always installed.
 # High bit: 8 7 6 5 4 3 2 1 :Low bit
@@ -25,9 +23,52 @@ if [ $# -gt 0 ]; then
 fi
 
 # Check existance of required Linux commands
-for CMD in conda git nproc gcc g++ make; do
+for CMD in conda git nproc; do
     command -v ${CMD} > /dev/null || (echo "Error: Command \"${CMD}\" not found." ; exit 1)
 done
+
+# Save current directory path
+BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+cd ${BASEFOLDER}
+
+# Checkout individual components
+if [ ! -d intel-extension-for-pytorch ]; then
+    git clone https://github.com/intel/intel-extension-for-pytorch.git
+fi
+cd intel-extension-for-pytorch
+if [ ! -z "${VER_IPEX}" ]; then
+    rm -rf * > /dev/null
+    git checkout . > /dev/null
+    git checkout main > /dev/null
+    git pull > /dev/null
+    git checkout ${VER_IPEX}
+fi
+git submodule sync
+git submodule update --init --recursive
+
+python -m pip install pyyaml
+VER_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
+VER_TORCHVISION=$(python tools/yaml_utils.py -f dependency_version.yml -d torchvision -k version)
+VER_TORCHAUDIO=$(python tools/yaml_utils.py -f dependency_version.yml -d torchaudio -k version)
+VER_LLVM=llvmorg-$(python tools/yaml_utils.py -f dependency_version.yml -d llvm -k version)
+VER_GCC=$(python tools/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
+python -m pip uninstall -y pyyaml
+cd ..
+
+if [ ! -d llvm-project ]; then
+    git clone https://github.com/llvm/llvm-project.git
+fi
+cd llvm-project
+if [ ! -z "${VER_LLVM}" ]; then
+    rm -rf * > /dev/null
+    git checkout . > /dev/null
+    git checkout main > /dev/null
+    git pull > /dev/null
+    git checkout ${VER_LLVM}
+fi
+git submodule sync
+git submodule update --init --recursive
+cd ..
 
 function ver_compare() {
     VER_MAJOR_CUR=$(echo $1 | cut -d "." -f 1)
@@ -53,17 +94,29 @@ function ver_compare() {
     fi
     echo ${RET}
 }
-VER_COMP=$(ver_compare $(gcc -dumpfullversion) ${VER_GCC})
 GCC_CONDA=0
-if [ ${VER_COMP} -ne 0 ]; then
+set +e
+command -v gcc > /dev/null
+EXIST_CC=$?
+command -v g++ > /dev/null
+EXIST_CXX=$?
+set -e
+if [ ${EXIST_CC} -gt 0 ] || [ ${EXIST_CXX} -gt 0 ]; then
     echo -e '\a'
-    echo "Warning: GCC version equal to or newer than ${VER_GCC} is required."
-    echo "         Found GCC version $(gcc -dumpfullversion)"
-    echo "         Installing gcc and g++ 12.3 with conda"
+    echo "Warning: GCC not found."
+    echo "         Installing gcc and g++ 12.3 from conda..."
     echo ""
     GCC_CONDA=1
-    conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
-    conda update -y sysroot_linux-64
+else
+    VER_COMP=$(ver_compare $(gcc -dumpfullversion) ${VER_GCC})
+    if [ ${VER_COMP} -ne 0 ]; then
+        echo -e '\a'
+        echo "Warning: GCC version equal to or newer than ${VER_GCC} is required."
+        echo "         Found GCC version $(gcc -dumpfullversion)."
+        echo "         Installing gcc and g++ 12.3 from conda..."
+        echo ""
+        GCC_CONDA=1
+    fi
 fi
 
 MAX_JOBS_VAR=$(nproc)
@@ -71,59 +124,40 @@ if [ ! -z "${MAX_JOBS}" ]; then
     MAX_JOBS_VAR=${MAX_JOBS}
 fi
 
-# Save current directory path
-BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-cd ${BASEFOLDER}
-# Checkout individual components
-if [ ! -d llvm-project ]; then
-    git clone https://github.com/llvm/llvm-project.git
-fi
-if [ ! -d intel-extension-for-pytorch ]; then
-    git clone https://github.com/intel/intel-extension-for-pytorch.git
-fi
-
-# Checkout required branch/commit and update submodules
-cd llvm-project
-if [ ! -z "${VER_LLVM}" ]; then
-    git stash > /dev/null
-    git clean -fd > /dev/null
-    git checkout main > /dev/null
-    git pull > /dev/null
-    git checkout ${VER_LLVM}
-fi
-git submodule sync
-git submodule update --init --recursive
-cd ..
-cd intel-extension-for-pytorch
-if [ ! -z "${VER_IPEX}" ]; then
-    git stash > /dev/null
-    git clean -fd > /dev/null
-    git checkout main > /dev/null
-    git pull > /dev/null
-    git checkout ${VER_IPEX}
-fi
-git submodule sync
-git submodule update --init --recursive
-cd ..
-
 # Install dependencies
 python -m pip install cmake
 python -m pip uninstall -y torch torchvision torchaudio intel-extension-for-pytorch
-python -m pip install torch --index-url https://download.pytorch.org/whl/nightly/cpu
+set +e
+echo ${VER_TORCH} | grep "dev" > /dev/null
+TORCH_DEV=$?
+set -e
+URL_NIGHTLY=""
+if [ ${TORCH_DEV} -eq 0 ]; then
+    URL_NIGHTLY="nightly/"
+fi
+python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu
 if [ $((${MODE} & 0x02)) -ne 0 ]; then
-    python -m pip install torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
+    python -m pip install torchvision==${VER_TORCHVISION} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
-    python -m pip install torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
+    python -m pip install torchaudio==${VER_TORCHAUDIO} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu
 fi
 ABI=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")
 
 # Compile individual component
-if [[ ${GCC_CONDA} -eq 1 ]]; then
+if [ ${GCC_CONDA} -eq 1 ]; then
+    conda install -y sysroot_linux-64
+    conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
     export CC=${CONDA_PREFIX}/bin/gcc
     export CXX=${CONDA_PREFIX}/bin/g++
     export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
 fi
+set +e
+command -v make > /dev/null
+if [ $? -gt 0 ]; then
+    conda install -y make -c conda-forge
+fi
+set -e
 
 #  LLVM
 LLVM_ROOT="$(pwd)/llvm-release"
@@ -150,9 +184,9 @@ if [ ! -d ${LLVM_ROOT} ]; then
     rm -rf build
     ln -s ${LLVM_ROOT}/bin/llvm-config ${LLVM_ROOT}/bin/llvm-config-13
 fi
+cd ..
 export PATH=${LLVM_ROOT}/bin:$PATH
 export LD_LIBRARY_PATH=${LLVM_ROOT}/lib:$LD_LIBRARY_PATH
-cd ..
 #  Intel® Extension for PyTorch*
 cd intel-extension-for-pytorch
 python -m pip install -r requirements.txt
@@ -167,26 +201,13 @@ unset DNNL_GRAPH_BUILD_COMPILER_BACKEND
 unset LLVM_DIR
 python -m pip uninstall -y mkl-static mkl-include
 python -m pip install dist/*.whl
+export LD_PRELOAD=$(bash ./tools/get_libstdcpp_lib.sh)
 cd ..
 
 # Sanity Test
-if [ ! -z ${CONDA_PREFIX} ]; then
-    LIBSTDCPP_SYS=$(find /usr -regextype sed -regex ".*libstdc++\.so\.[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*")
-    LIBSTDCPP_CONDA=$(find ${CONDA_PREFIX}/lib -regextype sed -regex ".*libstdc++\.so\.[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*")
-    LIBSTDCPP_VER_SYS=$(echo ${LIBSTDCPP_SYS} | sed "s/.*libstdc++.so.//")
-    LIBSTDCPP_VER_CONDA=$(echo ${LIBSTDCPP_CONDA} | sed "s/.*libstdc++.so.//")
-    VER_COMP=$(ver_compare ${LIBSTDCPP_VER_CONDA} ${LIBSTDCPP_VER_SYS})
-    LIBSTDCPP_ACTIVE=""
-    if [[ ${VER_COMP} -gt 0 ]]; then
-        LIBSTDCPP_ACTIVE=${LIBSTDCPP_SYS}
-    else
-        LIBSTDCPP_ACTIVE=${LIBSTDCPP_CONDA}
-    fi
-    export LD_PRELOAD=${LIBSTDCPP_ACTIVE}
-    echo "======================================================"
-    echo "Note: Set environment variable \"export LD_PRELOAD=${LIBSTDCPP_ACTIVE}\" to avoid the \"version \`GLIBCXX_N.N.NN' not found\" error."
-    echo "======================================================"
-fi
+echo "======================================================"
+echo "Note: Set environment variable \"export LD_PRELOAD=${LD_PRELOAD}\" to avoid the \"version \`GLIBCXX_N.N.NN' not found\" error."
+echo "======================================================"
 CMD="import torch; print(f'torch_cxx11_abi:     {torch._C._GLIBCXX_USE_CXX11_ABI}'); print(f'torch_version:       {torch.__version__}');"
 if [ $((${MODE} & 0x02)) -ne 0 ]; then
     CMD="${CMD} import torchvision; print(f'torchvision_version: {torchvision.__version__}');"

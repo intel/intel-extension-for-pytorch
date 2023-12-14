@@ -41,35 +41,27 @@ RUN curl -fsSL -v -o miniconda.sh -O https://repo.anaconda.com/miniconda/Minicon
     rm miniconda.sh && \
     echo "\nsource ~/miniconda3/bin/activate" >> ./.bashrc
 
+# --build-arg COMPILE=ON to compile from source
+ARG COMPILE
 FROM base AS dev
 COPY --chown=ubuntu:ubuntu . ./intel-extension-for-pytorch
-RUN cp ./intel-extension-for-pytorch/scripts/compile_bundle.sh ./ && \
-    sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
 RUN . ./miniconda3/bin/activate && \
     conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
-    bash compile_bundle.sh && \
-    cd intel-extension-for-pytorch && \
-    python -m pip install pyyaml && \
-    VER_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version) && \
-    VER_TORCHVISION=$(python tools/yaml_utils.py -f dependency_version.yml -d torchvision -k version) && \
-    VER_TORCHAUDIO=$(python tools/yaml_utils.py -f dependency_version.yml -d torchaudio -k version) && \
-    python -m pip uninstall -y pyyaml && \
-    cd .. && \
-    echo ${VER_TORCH} | grep "dev" > /dev/null; TORCH_DEV=$?; URL_NIGHTLY=""; if [ ${TORCH_DEV} -eq 0 ]; then URL_NIGHTLY="nightly/"; fi; echo "#!/bin/bash\npython -m pip install torch==${VER_TORCH} torchvision==${VER_TORCHVISION} torchaudio==${VER_TORCHAUDIO} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu" > torch_install.sh
+    cd intel-extension-for-pytorch/examples/cpu/inference/python/llm && \
+    if [ -z ${COMPILE} ]; then bash tools/env_setup.sh 6; else bash tools/env_setup.sh 2; fi
 
 FROM base AS deploy
-COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/dist ./wheels
-COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh .
-COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/torch_install.sh .
+COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/examples/cpu/inference/python/llm ./llm
+RUN rm ./llm/tools/get_libstdcpp_lib.sh
+COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/examples/cpu/inference/python/llm/tools/get_libstdcpp_lib.sh ./llm/tools/get_libstdcpp_lib.sh
 RUN . ./miniconda3/bin/activate && \
     conda create -y -n py310 python=3.10 && conda activate py310 && \
-    bash ./torch_install.sh && rm ./torch_install.sh && \
-    python -m pip install ./wheels/*.whl && \
-    python -m pip install intel-openmp && \
-    conda install -y jemalloc gperftools -c conda-forge && \
+    echo "conda activate py310" >> ./.bashrc && \
+    echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ./.bashrc && \
+    cd ./llm && \
+    bash tools/env_setup.sh 1 && \
     python -m pip cache purge && \
     conda clean -a -y && \
-    rm -rf ./wheels && \
-    echo "conda activate py310" >> ./.bashrc && \
-    ldpreload=$(bash get_libstdcpp_lib.sh) && echo "export LD_PRELOAD=${ldpreload}" >> ./.bashrc && rm get_libstdcpp_lib.sh && \
-    echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ./.bashrc
+    sudo mv ./oneCCL_release /opt/oneCCL && \
+    sudo chown -R root:root /opt/oneCCL && \
+    sed -i "s|ONECCL_PATH=.*|ONECCL_PATH=/opt/oneCCL|" ./tools/env_activate.sh

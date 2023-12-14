@@ -1,6 +1,22 @@
 Releases
 =============
 
+## 2.1.100
+
+### Highlights
+
+- Improved the performance of BF16 LLM generation inference: [#2253](https://github.com/intel/intel-extension-for-pytorch/commit/99aa54f757de6c7d98f704edc6f8a83650fb1541) [#2251](https://github.com/intel/intel-extension-for-pytorch/commit/1d5e83d85c3aaf7c00323d7cb4019b40849dd2ed) [#2236](https://github.com/intel/intel-extension-for-pytorch/commit/be349962f3362f8afde4f083ec04d335245992bb) [#2278](https://github.com/intel/intel-extension-for-pytorch/commit/066c3bff417df084fa8e1d48375c0e1404320e95)
+
+- Added the optimization for Codegen: [#2257](https://github.com/intel/intel-extension-for-pytorch/commit/7c598e42e5b7899f284616c05c6896bf9d8bd2b8)
+
+- Provided the dockerfile and updated the related doc to improve the UX for LLM users: [#2229](https://github.com/intel/intel-extension-for-pytorch/commit/11484c3ebad9f868d0179a46de3d1330d9011822) [#2195](https://github.com/intel/intel-extension-for-pytorch/commit/0cd25021952bddcf5a364da45dfbefd4a0c77af4) [#2299](https://github.com/intel/intel-extension-for-pytorch/commit/76a42e516a68539752a3a8ab9aeb814d28c44cf8) [#2315](https://github.com/intel/intel-extension-for-pytorch/commit/4091bb5c0bf5f3c3ce5fbece291b44159a7fbf5c) [#2283](https://github.com/intel/intel-extension-for-pytorch/commit/e5ed8270d4d89bf68757f967676db57292c71920)
+
+- Improved the accuracy of the quantization path of LLMs: [#2280](https://github.com/intel/intel-extension-for-pytorch/commit/abc4c4e160cec3c792f5316e358173b8722a786e) [#2292](https://github.com/intel/intel-extension-for-pytorch/commit/4e212e41affa2ed07ffaf57bf10e9781113bc101) [#2275](https://github.com/intel/intel-extension-for-pytorch/commit/ed5957eb3b6190ad0be728656674f0a2a3b89158) [#2319](https://github.com/intel/intel-extension-for-pytorch/commit/1dae69de39408bc0ad245f4914d5f60e008a6eb3)
+
+- Misc fix and enhancement: [#2198](https://github.com/intel/intel-extension-for-pytorch/commit/ed1deccb86403e12e895227045d558117c5ea0fe) [#2264](https://github.com/intel/intel-extension-for-pytorch/commit/5dedcd6eb7bbf70dc92f0c20962fb2340e42e76f) [#2290](https://github.com/intel/intel-extension-for-pytorch/commit/c6e46cecd899317acfd2bd2a44a3f17b3cc1ce69)
+
+**Full Changelog**: https://github.com/intel/intel-extension-for-pytorch/compare/v2.1.0+cpu...v2.1.100+cpu
+
 ## 2.1.0
 
 ### Highlights

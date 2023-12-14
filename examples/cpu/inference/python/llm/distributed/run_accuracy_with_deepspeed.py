@@ -451,9 +451,8 @@ if args.accuracy_only:
 
             with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
                 enabled=True
-                if args.int8_bf16_mixed or self._dtype == torch.bfloat16
+                if args.int8_bf16_mixed or self._dtype == "bfloat16"
                 else False,
-                dtype=torch.bfloat16,
             ):
                 if self._with_jit and self.iter == 0:
                     if self._dtype != "int8":
@@ -526,7 +525,7 @@ if args.accuracy_only:
             if eos_token_id is not None:
                 # setting eos_token_id as pad token
                 generation_kwargs["eos_token_id"] = eos_token_id
-                generation_kwargs["pad_token_id"] = eos_token_id  
+                generation_kwargs["pad_token_id"] = eos_token_id
             return self.model.generate(context, **generation_kwargs)
 
     class HuggingFaceSeq2SeqModel(HuggingFaceModel):

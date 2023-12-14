@@ -4,7 +4,7 @@ unset LD_PRELOAD \
       KMP_TPAUSE \
       KMP_SETTINGS \
       KMP_AFFINITY \
-      KMP_FORJOIN_BARRIER_PATTERN \
+      KMP_FORKJOIN_BARRIER_PATTERN \
       KMP_PLAIN_BARRIER_PATTERN \
       KMP_REDUCTION_BARRIER_PATTERN
 
@@ -34,11 +34,11 @@ fi
 
 # Set a few env variables to get best performance
 export LD_PRELOAD=${CONDA_PREFIX}/lib/libstdc++.so.6
-export KMP_BLOCKTIME=INF
+export KMP_BLOCKTIME=1
 export KMP_TPAUSE=0
 export KMP_SETTINGS=1
 export KMP_AFFINITY=granularity=fine,compact,1,0
-export KMP_FORJOIN_BARRIER_PATTERN=dist,dist
+export KMP_FORKJOIN_BARRIER_PATTERN=dist,dist
 export KMP_PLAIN_BARRIER_PATTERN=dist,dist
 export KMP_REDUCTION_BARRIER_PATTERN=dist,dist
 export LD_PRELOAD=${LD_PRELOAD}:${CONDA_PREFIX}/lib/libiomp5.so # Intel OpenMP

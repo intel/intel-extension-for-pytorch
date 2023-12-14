@@ -131,7 +131,7 @@ if args.accuracy_only:
             self.config = AutoConfig.from_pretrained(
                 model_id if config is None else config, torchscript=with_jit, trust_remote_code=True
             )
-            
+
             if model_type == "baichuan":
                 from llm.utils.utils import _get_relative_imports, _gradient_checkpointing_disable, _gradient_checkpointing_enable
                 import transformers
@@ -286,9 +286,8 @@ if args.accuracy_only:
 
             with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
                 enabled=True
-                if args.int8_bf16_mixed or self._dtype == torch.bfloat16
+                if args.int8_bf16_mixed or self._dtype == "bfloat16"
                 else False,
-                dtype=torch.bfloat16,
             ):
                 if self._with_jit and self.iter == 0:
                     if self._dtype != "int8":
