@@ -13,7 +13,7 @@ These LLM-specific optimizations can be automatically applied with a single fron
 
    llm/llm_optimize_transformers
 
-Optimized Models
+Supported Models
 ----------------
 
 .. list-table::
@@ -61,9 +61,9 @@ Optimized Models
 
 \*\* For GPT-NEOX/FALCON/OPT models, the accuracy recipes of static quantization INT8 are not ready, thus, they will be skipped in our coverage.
 
-*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well optimized with all approaches like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM families, we are working in progress to cover those optimizations, which will expand the model list above.
+*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM model families, we are working in progress to cover those optimizations, which will expand the model list above.
 
-Check `LLM best known practice <../../examples/cpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts..
+Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/v2.1.0%2Bcpu/examples/cpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts..
 
 Demos
 -----
@@ -137,12 +137,12 @@ The section below provides a brief introduction to LLM optimization methodologie
 Linear Operator Optimization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Linear operator is the most obvious hotspot in LLMs inference. There are three backend to speedup linear GEMM kernels in Intel® Extension for PyTorch*. They are oneDNN, Tensor Processing Primitives (TPP), which are used by `Fast BERT feature <./features/fast_bert.md>`_, and customized linear kernels for weight only quantization. All of them use specific block format to utilize hardware resources in a highly efficient way. 
+Linear operator is the most obvious hotspot in LLMs inference. There are three backend to speedup linear GEMM kernels in Intel® Extension for PyTorch*. They are oneDNN, Tensor Processing Primitives (TPP), which are used by `Fast BERT feature <./fast_bert.md>`_, and customized linear kernels for weight only quantization. All of them use specific block format to utilize hardware resources in a highly efficient way. 
 
 Low Precision Data Types
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-While Generative AI (GenAI) workloads and models are getting more and more popular, LLMs used in these workloads are getting more and more parameters. The increasing size of LLMs enhances workload accuracies; however, it also leads to significantly heavier computations and places higher requirements to the underlying hardware. Given that, quantization becomes a more important methodology for inference workloads.
+While Generative AI (GenAI) workloads and models are getting more and more popular, large language models (LLM) used in these workloads are getting more and more parameters. The increasing size of LLM models enhances workload accuracies; however, it also leads to significantly heavier computations and places higher requirements to the underlying hardware. Given that, quantization becomes a more important methodology for inference workloads.
 
 Quantization with shorter data types benefits from its nature to improve memory IO throughputs and amount of computations on CPU. Moreover, shorter data types make it possible to keep more data in CPU cache, thus reducing memory access occurrences. Comparing to cache access, memory access is much more time costing. Specifically from computation perspective, AVX-512 Vector Neural Network Instructions (VNNI) instruction set shipped with the 2nd Generation Intel® Xeon® Scalable Processors and newer, as well as Intel® Advanced Matrix Extensions (Intel® AMX) instruction set shipped with the 4th Generation Intel® Xeon® Scalable Processors, provide instruction level accelerations to INT8 computations.
 

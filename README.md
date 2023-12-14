@@ -6,12 +6,10 @@ Intel® Extension for PyTorch\* provides optimizations for both eager mode and g
 
 The extension can be loaded as a Python module for Python programs or linked as a C++ library for C++ programs. In Python scripts users can enable it dynamically by importing `intel_extension_for_pytorch`.
 
+In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Starting from 2.1.0, specific optimizations for certain LLM models are introduced in the Intel® Extension for PyTorch\*. Check [LLM optimizations](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/llm.html) for details.
+
 * Check [CPU tutorial](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® CPUs. Source code is available at the [main branch](https://github.com/intel/intel-extension-for-pytorch/tree/main).
 * Check [GPU tutorial](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® GPUs. Source code is available at the [xpu-main branch](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main).
-
-## Large Language Models (LLMs) Optimization
-
-In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Starting from 2.1.0, specific optimizations for certain LLM models are introduced in the Intel® Extension for PyTorch\*. Check [LLM optimizations](./examples/cpu/inference/python/llm) for details.
 
 ## Installation
 
@@ -24,7 +22,7 @@ python -m pip install intel_extension_for_pytorch
 ```
 
 ```python
-python -m pip install intel_extension_for_pytorch --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
+python -m pip install intel_extension_for_pytorch -f https://developer.intel.com/ipex-whl-stable-cpu
 ```
 
 **Note:** Intel® Extension for PyTorch\* has PyTorch version requirement. Please check more detailed information via the URL below.
@@ -38,7 +36,7 @@ Compilation instruction of the latest CPU code base `main` branch can be found a
 You can install Intel® Extension for PyTorch\* for GPU via command below.
 
 ```python
-python -m pip install torch==2.0.1a0 torchvision==0.15.2a0 intel_extension_for_pytorch==2.0.110+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
+python -m pip install torch==2.0.1a0 torchvision==0.15.2a0 intel_extension_for_pytorch==2.0.110+xpu -f https://developer.intel.com/ipex-whl-stable-xpu
 ```
 
 **Note:** The patched PyTorch 2.0.1a0 is required to work with Intel® Extension for PyTorch\* on Intel® graphics card for now.
@@ -91,9 +89,9 @@ with torch.no_grad():
   model(data)
 ```
 
-## Intel® AI Reference Models
+## Model Zoo
 
-Use cases that had already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/pytorch-r2.1.100-models) (former Model Zoo). A bunch of PyTorch use cases for benchmarking are also available on the [Github page](https://github.com/IntelAI/models/tree/pytorch-r2.1.100-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running the scripts in the Reference Models.
+Use cases that had already been optimized by Intel engineers are available at [Model Zoo for Intel® Architecture](https://github.com/IntelAI/models/tree/pytorch-r2.1-models). A bunch of PyTorch use cases for benchmarking are also available on the [Github page](https://github.com/IntelAI/models/tree/pytorch-r2.1-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running scripts in the Model Zoo.
 
 ## License
 

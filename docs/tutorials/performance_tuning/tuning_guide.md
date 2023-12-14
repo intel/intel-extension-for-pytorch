@@ -37,7 +37,7 @@ On the Intel® Xeon® Scalable Processors with Intel® C620 Series Chipsets, (fo
 
 <div align="center">
 
-![Block Diagram of the Intel® Xeon® processor Scalable family microarchitecture](../../../images/performance_tuning_guide/block_diagram_xeon_architecture.png)
+![Block Diagram of the Intel® Xeon® processor Scalable family microarchitecture](https://software.intel.com/content/dam/develop/external/us/en/images/xeon-processor-scalable-family-tech-overview-fig03-737410.png)
 
 Figure 1: Block Diagram of the Intel® Xeon® processor Scalable family microarchitecture.
 
@@ -47,7 +47,7 @@ Usually, a CPU chip is called a socket. A typical two-socket configuration is il
 
 <div align="center">
 
-![Typical two-socket configuration](../../../images/performance_tuning_guide/two_socket_config.png)
+![Typical two-socket configuration](https://software.intel.com/content/dam/develop/external/us/en/images/xeon-processor-scalable-family-tech-overview-fig06-737410.png)
 
 Figure 2: Typical two-socket configuration.
 

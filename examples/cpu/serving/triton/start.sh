@@ -40,7 +40,7 @@ start_host() {
 
     # Run Triton Host Server for specified model
     CORE_NUMBER=$(lscpu | grep 'Core(s) per socket:' | awk '{print $4}')
-    docker run -it --rm -e OMP_NUM_THREADS=$CORE_NUMBER --cpuset-cpus 0-"$((CORE_NUMBER - 1))" --shm-size=1g -p${1}:8000 -p8001:8001 -p8002:8002 --tmpfs /tmp:rw,noexec,nosuid,size=1g -v$(pwd)/backend:/models:rw --name ai_inference_host ai_inference:v1 tritonserver --model-repository=/models --log-verbose 1 --log-error 1 --log-info 1
+    docker run -it --read-only --rm -e OMP_NUM_THREADS=$CORE_NUMBER --privileged --shm-size=1g -p${1}:8000 -p8001:8001 -p8002:8002 --tmpfs /tmp:rw,noexec,nosuid,size=1g --tmpfs /root/.cache/:rw,noexec,nosuid,size=4g -v$(pwd)/backend:/models --name ai_inference_host ai_inference:v1 numactl -C 0-"$((CORE_NUMBER - 1))" -m 0 tritonserver --model-repository=/models --log-verbose 1 --log-error 1 --log-info 1
 }
 
 start_client() {

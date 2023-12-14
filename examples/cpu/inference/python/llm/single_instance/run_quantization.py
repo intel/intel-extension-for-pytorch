@@ -67,7 +67,6 @@ parser.add_argument(
     action="store_true",
     help="by default it is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
 )
-parser.add_argument("--qconfig-summary-file", default="", help="qconfig for static quantization")
 parser.add_argument("--quantized-model-path", default="./saved_results/best_model.pt")
 parser.add_argument("--benchmark", action="store_true")
 parser.add_argument("--input-tokens", default="32", type=str)
@@ -254,105 +253,187 @@ global_past_key_value = [
 
 
 if args.ipex_smooth_quant:
-    if args.qconfig_summary_file is not "":
+    ipex_smooth_quant_model_list = [
+        "meta-llama/Llama-2-7b-hf",
+        "meta-llama/Llama-2-13b-hf",
+        "meta-llama/Llama-2-70b-hf",
+        "EleutherAI/gpt-j-6b",
+        "mistralai/Mistral-7B-v0.1",
+    ]
+    assert args.model_id in ipex_smooth_quant_model_list, (
+        args.model_id + " does not support ipex_smooth_quant"
+    )
+
+    class Evaluator:
+        def __init__(
+            self, dataset, tokenizer, args, batch_size=1, pad_val=1, pad_max=512
+        ):
+            self.dataset = dataset
+            self.tokenizer = tokenizer
+            self.batch_size = batch_size
+            self.pad_val = pad_val
+            self.pad_max = pad_max
+            self.args = args
+
+            # tokenize the dataset
+            self.dataset = self.dataset.map(self.tokenize_function, batched=True)
+            self.dataset.set_format(type="torch", columns=["input_ids"])
+
+        @torch.no_grad()
+        def tokenize_function(self, examples):
+            if "prompt" in examples:
+                example = self.tokenizer(examples["prompt"])
+            elif "text" in examples:
+                example = self.tokenizer(examples["text"])
+            elif "code" in examples:
+                example = self.tokenizer(examples["code"])
+            return example
+
+        @torch.no_grad()
+        def collate_batch(self, batch):
+            position_ids_padded = []
+            input_ids_padded = []
+            last_ind = []
+            attention_mask_padded = []
+            for text in batch:
+                input_ids = text["input_ids"]
+                input_ids = (
+                    input_ids[: int(self.pad_max)]
+                    if len(input_ids) > int(self.pad_max)
+                    else input_ids
+                )
+                last_ind.append(input_ids.shape[0] - 1)
+                attention_mask = torch.ones(len(input_ids))
+                position_ids = torch.arange(len(input_ids))
+                input_ids_padded.append(input_ids)
+                attention_mask_padded.append(attention_mask)
+                position_ids_padded.append(position_ids)
+                if not model.use_global_past_key_value:
+                    # dummy past key value
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(self.args.batch_size * num_beams)), dtype=torch.long
+                    ).contiguous()
+                    past_key_value = [
+                        (
+                            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                            torch.zeros([1, 16, 1, 256]).contiguous(),
+                            torch.zeros([1, 16, 1, 256]).contiguous(),
+                            beam_idx_tmp,
+                        )
+                        for i in range(28)
+                    ]
+            return (
+                (
+                    torch.vstack(input_ids_padded),
+                    torch.vstack(attention_mask_padded),
+                    torch.vstack(position_ids_padded),
+                    tuple(global_past_key_value)
+                    if model.use_global_past_key_value
+                    else tuple(past_key_value),
+                ),
+                torch.tensor(last_ind),
+            )
+
+    calib_dataset = load_dataset(
+        args.dataset if args.dataset else model.default_dataset, split="train"
+    )
+    user_model.eval()
+    calib_evaluator = Evaluator(
+        calib_dataset, tokenizer, args, batch_size=args.batch_size
+    )
+    calib_dataloader = DataLoader(
+        calib_evaluator.dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        collate_fn=calib_evaluator.collate_batch,
+    )
+
+    def calib_func(prepared_model):
+        for i, (
+            (input_ids, attention_mask, position_ids, past_key_values),
+            last_ind,
+        ) in enumerate(calib_dataloader):
+            if i == 512:
+                break
+            prepared_model(
+                input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_values=past_key_values,
+            )
+
+    if model.use_neural_compressor:
+        from neural_compressor import PostTrainingQuantConfig, quantization
+
+        qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
+        user_model = ipex.optimize_transformers(
+            user_model.eval(),
+            dtype=amp_dtype,
+            quantization_config=qconfig,
+            inplace=True,
+            deployment_mode=False,
+        )
+        op_type_dict = {
+            "add": {"weight": {"dtype": ["fp32"]}, "activation": {"dtype": ["fp32"]}},
+            "linear": {
+                "weight": {
+                    "dtype": ["int8"],
+                    "scheme": ["sym"],
+                    "granularity": ["per_channel"],
+                    "algorithm": ["minmax"],
+                },
+                "activation": {
+                    "dtype": ["uint8"],
+                    "scheme": ["asym"],
+                    "granularity": ["per_tensor"],
+                    "algorithm": ["kl"],
+                },
+            },
+        }
+
+        excluded_precisions = [] if args.int8_bf16_mixed else ["bf16"]
+        recipes = {"smooth_quant": True, "smooth_quant_args": {"alpha": args.alpha}}
+
+        recipes["smooth_quant_args"]["folding"] = True
+
+        print("smooth_quant_args:", recipes)
+        conf = PostTrainingQuantConfig(
+            backend="ipex",
+            excluded_precisions=excluded_precisions,
+            op_type_dict=op_type_dict,
+            recipes=recipes,
+        )
+
+        q_model = quantization.fit(
+            user_model,
+            conf,
+            calib_dataloader=calib_dataloader,
+            calib_func=calib_func,
+        )
+
+        q_model.save(args.output_dir)
+    else:
+        example_inputs = None
+        for i, (
+            (input_ids, attention_mask, position_ids, past_key_values),
+            last_ind,
+        ) in enumerate(calib_dataloader):
+            example_inputs = (input_ids, attention_mask, position_ids, past_key_values)
+            break
+        from intel_extension_for_pytorch.quantization import prepare, convert
+
         qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=args.alpha)
         user_model = ipex.optimize_transformers(
             user_model.eval(),
             dtype=amp_dtype,
             quantization_config=qconfig,
-            qconfig_summary_file=args.qconfig_summary_file,
             inplace=True,
-            deployment_mode=True,
+            deployment_mode=False,
         )
-        pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-        user_model.trace_graph.save(args.output_dir + '/' + args.quant_model_name)
-        quant_model = user_model.trace_graph
-    else:
-        class Evaluator:
-            def __init__(
-                self, dataset, tokenizer, args, batch_size=1, pad_val=1, pad_max=512
-            ):
-                self.dataset = dataset
-                self.tokenizer = tokenizer
-                self.batch_size = batch_size
-                self.pad_val = pad_val
-                self.pad_max = pad_max
-                self.args = args
-    
-                # tokenize the dataset
-                self.dataset = self.dataset.map(self.tokenize_function, batched=True)
-                self.dataset.set_format(type="torch", columns=["input_ids"])
-    
-            @torch.no_grad()
-            def tokenize_function(self, examples):
-                if "prompt" in examples:
-                    example = self.tokenizer(examples["prompt"])
-                elif "text" in examples:
-                    example = self.tokenizer(examples["text"])
-                elif "code" in examples:
-                    example = self.tokenizer(examples["code"])
-                return example
-    
-            @torch.no_grad()
-            def collate_batch(self, batch):
-                position_ids_padded = []
-                input_ids_padded = []
-                last_ind = []
-                attention_mask_padded = []
-                for text in batch:
-                    input_ids = text["input_ids"]
-                    input_ids = (
-                        input_ids[: int(self.pad_max)]
-                        if len(input_ids) > int(self.pad_max)
-                        else input_ids
-                    )
-                    last_ind.append(input_ids.shape[0] - 1)
-                    attention_mask = torch.ones(len(input_ids))
-                    position_ids = torch.arange(len(input_ids))
-                    input_ids_padded.append(input_ids)
-                    attention_mask_padded.append(attention_mask)
-                    position_ids_padded.append(position_ids)
-                    if not model.use_global_past_key_value:
-                        # dummy past key value
-                        beam_idx_tmp = torch.zeros(
-                            (2048, int(self.args.batch_size * num_beams)), dtype=torch.long
-                        ).contiguous()
-                        past_key_value = [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 16, 1, 256]).contiguous(),
-                                torch.zeros([1, 16, 1, 256]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(28)
-                        ]
-                return (
-                    (
-                        torch.vstack(input_ids_padded),
-                        torch.vstack(attention_mask_padded),
-                        torch.vstack(position_ids_padded),
-                        tuple(global_past_key_value)
-                        if model.use_global_past_key_value
-                        else tuple(past_key_value),
-                    ),
-                    torch.tensor(last_ind),
-                )
-    
-        calib_dataset = load_dataset(
-            args.dataset if args.dataset else model.default_dataset, split="train"
+        prepared_model = prepare(
+            user_model.eval(), qconfig, example_inputs=example_inputs, inplace=True
         )
-        user_model.eval()
-        calib_evaluator = Evaluator(
-            calib_dataset, tokenizer, args, batch_size=args.batch_size
-        )
-        calib_dataloader = DataLoader(
-            calib_evaluator.dataset,
-            batch_size=args.batch_size,
-            shuffle=False,
-            collate_fn=calib_evaluator.collate_batch,
-        )
-    
-        def calib_func(prepared_model):
+        with torch.no_grad():
             for i, (
                 (input_ids, attention_mask, position_ids, past_key_values),
                 last_ind,
@@ -361,106 +442,21 @@ if args.ipex_smooth_quant:
                     break
                 prepared_model(
                     input_ids,
-                    attention_mask=attention_mask,
                     position_ids=position_ids,
+                    attention_mask=attention_mask,
                     past_key_values=past_key_values,
                 )
-    
-        if model.use_neural_compressor:
-            from neural_compressor import PostTrainingQuantConfig, quantization
-    
-            qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
-            user_model = ipex.optimize_transformers(
-                user_model.eval(),
-                dtype=amp_dtype,
-                quantization_config=qconfig,
-                inplace=True,
-                deployment_mode=False,
+        with torch.no_grad(), torch.cpu.amp.autocast(
+            enabled=amp_enabled,
+        ):
+            convert_model = convert(prepared_model.eval(), inplace=True).eval()
+            self_jit = torch.jit.trace(
+                convert_model.eval(), example_inputs, strict=False, check_trace=False
             )
-            op_type_dict = {
-                "add": {"weight": {"dtype": ["fp32"]}, "activation": {"dtype": ["fp32"]}},
-                "linear": {
-                    "weight": {
-                        "dtype": ["int8"],
-                        "scheme": ["sym"],
-                        "granularity": ["per_channel"],
-                        "algorithm": ["minmax"],
-                    },
-                    "activation": {
-                        "dtype": ["uint8"],
-                        "scheme": ["asym"],
-                        "granularity": ["per_tensor"],
-                        "algorithm": ["kl"],
-                    },
-                },
-            }
-    
-            excluded_precisions = [] if args.int8_bf16_mixed else ["bf16"]
-            recipes = {"smooth_quant": True, "smooth_quant_args": {"alpha": args.alpha}}
-    
-            recipes["smooth_quant_args"]["folding"] = True
-    
-            print("smooth_quant_args:", recipes)
-            conf = PostTrainingQuantConfig(
-                backend="ipex",
-                excluded_precisions=excluded_precisions,
-                op_type_dict=op_type_dict,
-                recipes=recipes,
-            )
-    
-            q_model = quantization.fit(
-                user_model,
-                conf,
-                calib_dataloader=calib_dataloader,
-                calib_func=calib_func,
-            )
-    
-            q_model.save(args.output_dir)
-        else:
-            example_inputs = None
-            for i, (
-                (input_ids, attention_mask, position_ids, past_key_values),
-                last_ind,
-            ) in enumerate(calib_dataloader):
-                example_inputs = (input_ids, attention_mask, position_ids, past_key_values)
-                break
-            from intel_extension_for_pytorch.quantization import prepare, convert
-    
-            qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=args.alpha)
-            user_model = ipex.optimize_transformers(
-                user_model.eval(),
-                dtype=amp_dtype,
-                quantization_config=qconfig,
-                inplace=True,
-                deployment_mode=False,
-            )
-            prepared_model = prepare(
-                user_model.eval(), qconfig, example_inputs=example_inputs, inplace=True
-            )
-            with torch.no_grad():
-                for i, (
-                    (input_ids, attention_mask, position_ids, past_key_values),
-                    last_ind,
-                ) in enumerate(calib_dataloader):
-                    if i == 512:
-                        break
-                    prepared_model(
-                        input_ids,
-                        position_ids=position_ids,
-                        attention_mask=attention_mask,
-                        past_key_values=past_key_values,
-                    )
-            with torch.no_grad(), torch.cpu.amp.autocast(
-                enabled=amp_enabled,
-            ):
-                convert_model = convert(prepared_model.eval(), inplace=True).eval()
-                self_jit = torch.jit.trace(
-                    convert_model.eval(), example_inputs, strict=False, check_trace=False
-                )
-                self_jit = torch.jit.freeze(self_jit.eval())
-                pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-                self_jit.save(args.output_dir + "/" + args.quant_model_name)
-                quant_model = self_jit
+            self_jit = torch.jit.freeze(self_jit.eval())
+            pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+            self_jit.save(args.output_dir + "/" + args.quant_model_name)
+            quant_model = self_jit
 
 elif args.ipex_weight_only_quantization:
     weight_dtype = torch.quint4x2 if args.weight_dtype == "INT4" else torch.qint8

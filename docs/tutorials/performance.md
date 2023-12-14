@@ -9,45 +9,6 @@ This page shows performance boost with Intel® Extension for PyTorch\* on severa
 
 Find the latest performance data for 4th gen Intel® Xeon® Scalable processors and 3rd gen Intel® Xeon® processors, including detailed hardware and software configurations, at [Intel® Developer Zone article](https://www.intel.com/content/www/us/en/developer/topic-technology/artificial-intelligence/performance.html).
 
-## LLM Performance
-
-We benchmarked LLaMA2 7B, 13B, GPT-J 6B with test input token length set to 256 and 1024 respectively. The tests were carried out on AWS M7i and M6i instances. CPUs of M6i instances are 3rd Gen Intel® Xeon® Processors which do not have AMX instructions for BF16 computing acceleration, so we take FP32 precision for benchmarking instead of BF16 on M6i instances.
-
-![LLaMA2 7B Results](../../images/performance/m7i_m6i_comp_llama7b.png)
-
-![LLaMA2 13B Results](../../images/performance/m7i_m6i_comp_llama13b.png)
-
-![GPT-J 6B Results](../../images/performance/m7i_m6i_comp_gptj6b.png)
-
-The LLM inference performances on M7i and M6i instances are compared based on the above results. M7i, with the 4th Gen Xeon® processors, has a remarkable performance advantage over M6i with the 3rd Gen Xeon® processors.
-
-M7i performance boost ratio over M6i for non-quantized (BF16 or FP32) models:
-
-|            | Speedup | Throughput |
-|:----------:|:-------:|:----------:|
-|  LLaMA2 7B |  2.47x  |    2.62x   |
-| LLaMA2 13B |  2.57x  |    2.62x   |
-|  GPT-J 6B  |  2.58x  |    2.85x   |
-
-M7i performance boost ratio over M6i for INT8 quantized models:
-
-|            | Speedup | Throughput |
-|:----------:|:-------:|:----------:|
-|  LLaMA2 7B |  1.27x  |    1.38x   |
-| LLaMA2 13B |  1.27x  |    1.27x   |
-|  GPT-J 6B  |  1.29x  |    1.36x   |
-
-We can also conclude that **with a larger batch size the capacity of the model service can be improved at the cost of longer response latency for the individual sessions**. The following table exhibits that for INT8 quantized LLaMA2-7b model on M7i instances, input batch_size=8 would increase the total throughput by 6.47x compared with batch_size=1, whereas P90 token latency gets 1.26x longer.
-
-| Batch size | Decoder latency | Total tokens per sec |
-|:----------:|:---------------:|:--------------------:|
-|      1     |        39       |         26.32        |
-|      8     |        49       |        170.21        |
-|            |                 |                      |
-|***Ratio*** |      1.26x      |         6.47x        |
-
-*Note:* Measured by Intel on 17th Aug 2023; M7i.16xLarge, M6i.16xLarge instances in US-west-2. OS-Ubuntu 22.04-lts, kernel 6.20.0-1009-aws, SW: PyTorch* 2.1 and Intel® Extension for PyTorch* 2.1/llm_feature_branch.
-
 ## INT8 with v1.11
 
 ### Performance Numbers

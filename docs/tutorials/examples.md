@@ -177,8 +177,6 @@ We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://py
 [//]: # (marker_inf_bert_dynamo_fp32)
 [//]: # (marker_inf_bert_dynamo_fp32)
 
-*Note:* In TorchDynamo mode, since the native PyTorch operators like `aten::convolution` and `aten::linear` are well supported and optimized in `ipex` backend, we need to disable weights prepacking by setting `weights_prepack=False` in `ipex.optimize()`.
-
 #### BFloat16
 
 The `optimize` function works for both Float32 and BFloat16 data type. For BFloat16 data type, set the `dtype` parameter to `torch.bfloat16`.
@@ -350,5 +348,5 @@ $ ldd example-app
 
 ## Intel® AI Reference Models
 
-Use cases that have already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/pytorch-r2.1.100-models) (former Model Zoo). A number of PyTorch use cases for benchmarking are also available in the [benchmarks](https://github.com/IntelAI/models/tree/pytorch-r2.1.100-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-the-box by simply running scripts in the Intel® AI Reference Models.
+Use cases that have already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/pytorch-r2.1-models) (former Model Zoo). A number of PyTorch use cases for benchmarking are also available in the [benchmarks](https://github.com/IntelAI/models/tree/pytorch-r2.1-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-the-box by simply running scripts in the Intel® AI Reference Models.
 

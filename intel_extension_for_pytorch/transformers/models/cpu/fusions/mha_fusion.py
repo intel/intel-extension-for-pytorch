@@ -30,8 +30,7 @@ class _IPEXRopeCPU(nn.Module):
         position_ids = position_ids.contiguous()
         sin_cos, _, _ = self.embed_positions(seq_len)
         # ToDo: when the input is concat_qkv, the output will be (query, key, value)
-        x = x.contiguous()
-        query, _, _ = torch.ops.torch_ipex.rotary_position_embedding(
+        query, key, value = torch.ops.torch_ipex.rotary_position_embedding(
             x,
             sin_cos,
             position_ids,
