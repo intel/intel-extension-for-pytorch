@@ -50,6 +50,7 @@ fi
 # Save current directory path
 BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 WHEELFOLDER=${BASEFOLDER}/../wheels
+TORCH_INSTALL_SCRIPT=${WHEELFOLDER}/torch_install.sh
 AUX_INSTALL_SCRIPT=${WHEELFOLDER}/aux_install.sh
 cd ${BASEFOLDER}/..
 
@@ -121,8 +122,9 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     conda install -y cmake ninja
 
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
+    echo "#!/bin/bash" > ${TORCH_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
-        echo "python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/" >> ${AUX_INSTALL_SCRIPT}
+        echo "python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/" >> ${TORCH_INSTALL_SCRIPT}
         python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
     else
         if [ ! -f ${ONECCL_ROOT}/env/vars.sh ]; then
@@ -195,7 +197,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
             export DPCPP_GCC_INSTALL_DIR="${CONDA_PREFIX}/lib/gcc/x86_64-conda-linux-gnu/12.3.0"
         fi
         export INTELONEAPIROOT=${ONEAPIROOT}
-        COMPUTE_BACKEND=dpcpp python setup.py bdist_wheel
+        USE_SYSTEM_ONECCL=ON COMPUTE_BACKEND=dpcpp python setup.py bdist_wheel
         unset INTELONEAPIROOT
         if [ -d ${CONDA_PREFIX}/lib/gcc/x86_64-conda-linux-gnu ]; then
             unset DPCPP_GCC_INSTALL_DIR
@@ -275,7 +277,14 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     rm -rf DeepSpeed
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
+    bash ${TORCH_INSTALL_SCRIPT}
     python -m pip install ${WHEELFOLDER}/*.whl
     bash ${AUX_INSTALL_SCRIPT}
     rm -rf ${WHEELFOLDER}
+    if [ -f ${TORCH_INSTALL_SCRIPT} ]; then
+        rm ${TORCH_INSTALL_SCRIPT}
+    fi
+    if [ -f ${AUX_INSTALL_SCRIPT} ]; then
+        rm ${AUX_INSTALL_SCRIPT}
+    fi
 fi
