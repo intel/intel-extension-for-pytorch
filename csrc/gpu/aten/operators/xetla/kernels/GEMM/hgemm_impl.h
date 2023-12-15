@@ -639,7 +639,8 @@ inline void hgemm_qkv(
     const scalar_t* b,
     const int m,
     const int n,
-    const int k) {
+    const int k,
+    const int group) {
   static_assert(L3_KS == 1, "for qkv fusion, L3_KS should be 1");
   constexpr mem_layout layout_a = mem_layout::row_major;
   constexpr mem_layout layout_b =
@@ -651,7 +652,9 @@ inline void hgemm_qkv(
   uint32_t lda = k;
   uint32_t ldb = B_ROW_MAJOR ? n : k;
   uint32_t ldc = n;
-  cl::sycl::range<3> GroupRange{3, group_range_m, group_range_n};
+  uint32_t size_b = k * n;
+  uint32_t size_o = m * n;
+  cl::sycl::range<3> GroupRange{group, group_range_m, group_range_n};
   cl::sycl::range<3> LocalRange{SLM_KS, thread_range_m, thread_range_n};
   cl::sycl::nd_range<3> NDRange(GroupRange * LocalRange, LocalRange);
 
@@ -694,9 +697,9 @@ inline void hgemm_qkv(
 
       uint32_t batch_id = ei.get_group(0);
       slm_barrier_init<gemm_op_t>();
-      scalar_t* out = (batch_id == 0) ? out0 : ((batch_id == 1) ? out1 : out2);
-
-      uint32_t size_b = k * n;
+      scalar_t* out = (batch_id <= group - 3)
+          ? out0 + batch_id * size_o
+          : ((batch_id == group - 2) ? out1 : out2);
 
       typename gemm_op_t::arguments_t arg(
           m,
@@ -737,7 +740,8 @@ inline void hgemm_qkv_bias(
     const scalar_t* bias,
     const int m,
     const int n,
-    const int k) {
+    const int k,
+    const int group) {
   static_assert(L3_KS == 1, "for qkv fusion, L3_KS should be 1");
   constexpr mem_layout layout_a = mem_layout::row_major;
   constexpr mem_layout layout_b =
@@ -749,7 +753,10 @@ inline void hgemm_qkv_bias(
   uint32_t lda = k;
   uint32_t ldb = B_ROW_MAJOR ? n : k;
   uint32_t ldc = n;
-  cl::sycl::range<3> GroupRange{3, group_range_m, group_range_n};
+  uint32_t size_o = m * n;
+  uint32_t size_b = k * n;
+  uint32_t size_bias = n;
+  cl::sycl::range<3> GroupRange{group, group_range_m, group_range_n};
   cl::sycl::range<3> LocalRange{SLM_KS, thread_range_m, thread_range_n};
   cl::sycl::nd_range<3> NDRange(GroupRange * LocalRange, LocalRange);
 
@@ -795,10 +802,9 @@ inline void hgemm_qkv_bias(
 
       uint32_t batch_id = ei.get_group(0);
       slm_barrier_init<gemm_op_t>();
-      scalar_t* out = (batch_id == 0) ? out0 : ((batch_id == 1) ? out1 : out2);
-
-      uint32_t size_b = k * n;
-      uint32_t size_bias = n;
+      scalar_t* out = (batch_id <= group - 3)
+          ? out0 + batch_id * size_o
+          : ((batch_id == group - 2) ? out1 : out2);
 
       typename gemm_op_t::arguments_t arg(
           m,

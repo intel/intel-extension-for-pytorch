@@ -742,6 +742,9 @@ def optimize_transformers(
         warnings.warn(
             f"fail to apply optimize_transformers due to: {e}, fallback to the origin model"
         )
+        import traceback
+
+        traceback.print_exc()
         return model
 
     return model

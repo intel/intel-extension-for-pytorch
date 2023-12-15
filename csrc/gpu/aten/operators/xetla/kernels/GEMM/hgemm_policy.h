@@ -6,7 +6,7 @@
 // clang-format off
 
 #define HGEMM_COMMA ,
-#define HGEMM_NUM_POLICIES_ 26
+#define HGEMM_NUM_POLICIES_ 27
 #define HGEMM_NUM_POLICIES (2 * HGEMM_NUM_POLICIES_)
 #define HGEMM_ENUMERATE_POLICIES_(_, B_ROW_MAJOR, T) \
   _(8, 64, 8, 16, 32, 8, B_ROW_MAJOR)T      \
@@ -23,6 +23,7 @@
   _(32, 128, 32, 16, 16, 4, B_ROW_MAJOR)T   \
   _(32, 256, 32, 16, 16, 2, B_ROW_MAJOR)T   \
   _(32, 512, 32, 16, 16, 1, B_ROW_MAJOR)T   \
+  _(64, 16, 16, 16, 16, 8, B_ROW_MAJOR)T    \
   _(64, 128, 64, 16, 16, 4, B_ROW_MAJOR)T   \
   _(64, 256, 64, 16, 16, 2, B_ROW_MAJOR)T   \
   _(64, 512, 64, 16, 16, 1, B_ROW_MAJOR)T   \
@@ -491,6 +492,10 @@ static std::unordered_map<GemmShapeT, int, GemmShapeT> hgemm_qkv_special_table =
         {{1024, 7168, 14336}, hgemm_policy::_256x256_32x64x32_1_true_},
         {{1024, 3584, 7168}, hgemm_policy::_256x256_32x64x32_1_true_},
         {{1024, 7168, 3584}, hgemm_policy::_256x256_32x64x32_1_true_},
+        {{1, 8192, 256}, hgemm_policy::_64x16_16x16x16_8_true_},
+        {{4, 8192, 256}, hgemm_policy::_64x16_16x16x16_8_true_},
+        {{1, 8192, 128}, hgemm_policy::_64x16_16x16x16_8_true_},
+        {{4, 8192, 128}, hgemm_policy::_64x16_16x16x16_8_true_},
 };
 
 inline int hgemm_find_policy_id_(

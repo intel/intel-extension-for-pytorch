@@ -320,7 +320,8 @@ namespace xetla {
       const sycl::half* b,                                                     \
       const int m,                                                             \
       const int n,                                                             \
-      const int k) {                                                           \
+      const int k,                                                             \
+      const int group) {                                                       \
     hgemm_qkv<                                                                 \
         sycl::half,                                                            \
         WG_M,                                                                  \
@@ -332,7 +333,7 @@ namespace xetla {
         1,                                                                     \
         1,                                                                     \
         3,                                                                     \
-        B_ROW_MAJOR>(queue, out0, out1, out2, a, b, m, n, k);                  \
+        B_ROW_MAJOR>(queue, out0, out1, out2, a, b, m, n, k, group);           \
   }                                                                            \
   void HGEMM_QKV_BIAS_IMPL_NAME(                                               \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
@@ -345,7 +346,8 @@ namespace xetla {
       const sycl::half* bias,                                                  \
       const int m,                                                             \
       const int n,                                                             \
-      const int k) {                                                           \
+      const int k,                                                             \
+      const int group) {                                                       \
     hgemm_qkv_bias<                                                            \
         sycl::half,                                                            \
         WG_M,                                                                  \
@@ -357,7 +359,7 @@ namespace xetla {
         1,                                                                     \
         1,                                                                     \
         3,                                                                     \
-        B_ROW_MAJOR>(queue, out0, out1, out2, a, b, bias, m, n, k);            \
+        B_ROW_MAJOR>(queue, out0, out1, out2, a, b, bias, m, n, k, group);     \
   }
 
 HGEMM_ENUMERATE_POLICIES(HGEMM_ENUMERATE_IMPLS)
@@ -497,6 +499,7 @@ void (*hgemm_qkv_policies[HGEMM_NUM_POLICIES])(
     const sycl::half*,
     const int,
     const int,
+    const int,
     const int) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_QKV_IMPL_NAME)};
 
 void (*hgemm_qkv_bias_policies[HGEMM_NUM_POLICIES])(
@@ -507,6 +510,7 @@ void (*hgemm_qkv_bias_policies[HGEMM_NUM_POLICIES])(
     const sycl::half*,
     const sycl::half*,
     const sycl::half*,
+    const int,
     const int,
     const int,
     const int) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_QKV_BIAS_IMPL_NAME)};
@@ -744,7 +748,7 @@ GemmStatus hgemm_qkv(
   int policy_id = hgemm_qkv_find_policy_id(m, n, k, is_b_row_major);
   if (policy_id < 0)
     return GemmStatus::kError;
-  hgemm_qkv_policies[policy_id](queue, out0, out1, out2, a, b, m, n, k);
+  hgemm_qkv_policies[policy_id](queue, out0, out1, out2, a, b, m, n, k, 3);
   return GemmStatus::kSuccess;
 }
 
@@ -764,7 +768,47 @@ GemmStatus hgemm_qkv_bias(
   if (policy_id < 0)
     return GemmStatus::kError;
   hgemm_qkv_bias_policies[policy_id](
-      queue, out0, out1, out2, a, b, bias, m, n, k);
+      queue, out0, out1, out2, a, b, bias, m, n, k, 3);
+  return GemmStatus::kSuccess;
+}
+
+GemmStatus hgemm_qkv_group(
+    sycl::queue& queue,
+    sycl::half* out0,
+    sycl::half* out1,
+    sycl::half* out2,
+    const sycl::half* a,
+    const sycl::half* b,
+    const int m,
+    const int n,
+    const int k,
+    const int group,
+    const bool is_b_row_major) {
+  int policy_id = hgemm_qkv_find_policy_id(m, n, k, is_b_row_major);
+  if (policy_id < 0)
+    return GemmStatus::kError;
+  hgemm_qkv_policies[policy_id](queue, out0, out1, out2, a, b, m, n, k, group);
+  return GemmStatus::kSuccess;
+}
+
+GemmStatus hgemm_qkv_group_bias(
+    sycl::queue& queue,
+    sycl::half* out0,
+    sycl::half* out1,
+    sycl::half* out2,
+    const sycl::half* a,
+    const sycl::half* b,
+    const sycl::half* bias,
+    const int m,
+    const int n,
+    const int k,
+    const int group,
+    const bool is_b_row_major) {
+  int policy_id = hgemm_qkv_find_policy_id(m, n, k, is_b_row_major);
+  if (policy_id < 0)
+    return GemmStatus::kError;
+  hgemm_qkv_bias_policies[policy_id](
+      queue, out0, out1, out2, a, b, bias, m, n, k, group);
   return GemmStatus::kSuccess;
 }
 

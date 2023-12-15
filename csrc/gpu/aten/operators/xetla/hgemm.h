@@ -168,5 +168,32 @@ GemmStatus hgemm_qkv_bias(
     const int k,
     const bool is_b_row_major);
 
+GemmStatus hgemm_qkv_group(
+    sycl::queue& queue,
+    sycl::half* out0,
+    sycl::half* out1,
+    sycl::half* out2,
+    const sycl::half* a,
+    const sycl::half* b,
+    const int m,
+    const int n,
+    const int k,
+    const int group,
+    const bool is_b_row_major);
+
+GemmStatus hgemm_qkv_group_bias(
+    sycl::queue& queue,
+    sycl::half* out0,
+    sycl::half* out1,
+    sycl::half* out2,
+    const sycl::half* a,
+    const sycl::half* b,
+    const sycl::half* bias,
+    const int m,
+    const int n,
+    const int k,
+    const int group,
+    const bool is_b_row_major);
+
 } // namespace xetla
 } // namespace xpu

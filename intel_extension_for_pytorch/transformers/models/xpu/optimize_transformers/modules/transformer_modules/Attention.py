@@ -204,6 +204,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     def combine_kv_cache_2nd2last(self, query, key, value, layer_past=None):
         key = self.runtime_cache.key_cache[: self.seq_len, :, :, :]
         value = self.runtime_cache.value_cache[: self.seq_len, :, :, :]
+        # to: [bs_beam, num_heads, seq_len, head_dim]
         query = query.permute(1, 2, 0, 3)
         key = key.permute(1, 2, 0, 3)
         value = value.permute(1, 2, 0, 3)
