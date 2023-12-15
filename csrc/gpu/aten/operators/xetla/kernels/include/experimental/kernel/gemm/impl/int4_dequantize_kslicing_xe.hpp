@@ -98,19 +98,19 @@ class gemm_universal_t<
   using mem_desc_a_t = typename gemm_t::mem_desc_a_t;
   using mem_desc_b_t = typename gemm_t::mem_desc_b_t;
   using mem_desc_scale_t = typename gemm_t::mem_desc_scale_t;
-  using mem_desc_zero_pt_t = typename gemm_t::mem_desc_zero_pt_t;
+  //using mem_desc_zero_pt_t = typename gemm_t::mem_desc_zero_pt_t;
   using mem_desc_c_t = typename epilogue_t::mem_desc_c_t;
   using matA_base_t = typename mem_desc_a_t::base_t;
   using matB_base_t = typename mem_desc_b_t::base_t;
   using matC_base_t = typename mem_desc_c_t::base_t;
   using scale_base_t = typename mem_desc_scale_t::base_t;
-  using zero_pt_base_t = typename mem_desc_zero_pt_t::base_t;
+  //using zero_pt_base_t = typename mem_desc_zero_pt_t::base_t;
 
   using dtype_a = typename mem_desc_a_t::dtype;
   using dtype_b = typename mem_desc_b_t::dtype;
   using dtype_c = typename mem_desc_c_t::dtype;
   using dtype_scale = typename mem_desc_scale_t::dtype;
-  using dtype_zero_pt = typename mem_desc_zero_pt_t::dtype;
+  //using dtype_zero_pt = typename mem_desc_zero_pt_t::dtype;
   using matAcc_t = typename gemm_t::matAcc_t;
   using dtype_acc = typename matAcc_t::dtype;
   using mem_desc_acc_t =
@@ -205,9 +205,9 @@ class gemm_universal_t<
     epilogue_args_t epilogue_args;
 
     scale_base_t scale_base;
-    zero_pt_base_t zero_pt_base;
+    // zero_pt_base_t zero_pt_base;
     uint32_t scale_ld;
-    uint32_t zero_pt_ld;
+    // uint32_t zero_pt_ld;
 
     /// @brief Constructs arguments with default method.
     inline arguments_t() = default;
@@ -248,8 +248,8 @@ class gemm_universal_t<
         uint32_t matC_ld_,
         scale_base_t scale_base_,
         uint32_t scale_ld_,
-        zero_pt_base_t zero_pt_base_,
-        uint32_t zero_pt_ld_,
+        // zero_pt_base_t zero_pt_base_,
+        // uint32_t zero_pt_ld_,
         acc_base_t acc_base_ = {},
         cnt_base_t cnt_base_ = {},
         epilogue_args_t epilogue_args_ = {})
@@ -264,8 +264,8 @@ class gemm_universal_t<
           matC_ld(matC_ld_),
           scale_base(scale_base_),
           scale_ld(scale_ld_),
-          zero_pt_base(zero_pt_base_),
-          zero_pt_ld(zero_pt_ld_),
+          // zero_pt_base(zero_pt_base_),
+          // zero_pt_ld(zero_pt_ld_),
           acc_base(acc_base_),
           cnt_base(cnt_base_),
           epilogue_args(epilogue_args_) {}
@@ -281,8 +281,8 @@ class gemm_universal_t<
           matC_ld(args.matC_ld),
           scale_base(args.scale_base),
           scale_ld(args.scale_ld),
-          zero_pt_base(args.zero_pt_base),
-          zero_pt_ld(args.zero_pt_ld),
+          // zero_pt_base(args.zero_pt_base),
+          // zero_pt_ld(args.zero_pt_ld),
           acc_base(args.acc_base),
           cnt_base(args.cnt_base),
           epilogue_args(args.epilogue_args) {}
@@ -301,8 +301,8 @@ class gemm_universal_t<
       this->matC_ld = args.matC_ld;
       this->scale_base = args.scale_base;
       this->scale_ld = args.scale_ld;
-      this->zero_pt_base = args.zerp_pt_base;
-      this->zero_pt_ld = args.zero_pt_ld;
+      // this->zero_pt_base = args.zerp_pt_base;
+      // this->zero_pt_ld = args.zero_pt_ld;
       this->acc_base = args.acc_base;
       this->cnt_base = args.cnt_base;
       this->epilogue_args = args.epilogue_args;
@@ -502,8 +502,8 @@ class gemm_universal_t<
     int start_x_scale = start_n;
     int start_y_scale = start_k / dequant_s;
 
-    int start_x_zero_pt = start_n / pack_ratio;
-    int start_y_zero_pt = start_k / dequant_s;
+    // int start_x_zero_pt = start_n / pack_ratio;
+    // int start_y_zero_pt = start_k / dequant_s;
 
     // set up arguments
     uint32_t gemm_slm_base = slm_base;
@@ -537,20 +537,21 @@ class gemm_universal_t<
         args.scale_base,
         {args.matrix_n, scale_size_y, args.scale_ld},
         {start_x_scale, start_y_scale});
-    mem_desc_zero_pt_t mem_desc_zero_pt(
-        args.zero_pt_base,
-        {args.matrix_n / pack_ratio,
-         scale_size_y,
-         args.zero_pt_ld / pack_ratio},
-        {start_x_zero_pt, start_y_zero_pt});
+    // mem_desc_zero_pt_t mem_desc_zero_pt(
+    //     args.zero_pt_base,
+    //     {args.matrix_n / pack_ratio,
+    //      scale_size_y,
+    //      args.zero_pt_ld / pack_ratio},
+    //     {start_x_zero_pt, start_y_zero_pt});
 
     uint32_t inner_loop_count = (wg_tile_k + k_stride - 1) / k_stride;
     gemm_args_t gemm_args(
         mem_desc_a,
         mem_desc_b,
         inner_loop_count,
-        mem_desc_scale,
-        mem_desc_zero_pt);
+        mem_desc_scale
+        // mem_desc_zero_pt
+        );
     matAcc_t matAcc;
     matAcc.init(0);
     gemm_t gemm;

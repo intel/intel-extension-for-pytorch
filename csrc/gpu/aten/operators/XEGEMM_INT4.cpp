@@ -119,7 +119,8 @@ static Tensor mm_bias_int4(
     const Tensor& bias_,
     const Tensor& weight_scl,
     const Tensor& weight_zp,
-    int64_t calib_gz) {
+    int64_t calib_gz,
+    int64_t arch) {
   auto input_flat = input.flatten(0, -2);
   auto weight_flat = weight.flatten(0, -2);
 
@@ -138,6 +139,7 @@ static Tensor mm_bias_int4(
                     .add_matrix_zp(weight_zp)
                     .add_epilogue(bias, HGEMMXetla_INT4::EpilogueType::BIAS)
                     .add_calib_gz(calib_gz)
+                    .add_arch(arch)
                     .build();
   TORCH_CHECK(policy.fallback() == false, "mm bias int4: invalid gemm shape");
   policy.run();
@@ -149,7 +151,8 @@ static Tensor mm_int4(
     const Tensor& weight,
     const Tensor& weight_scl,
     const Tensor& weight_zp,
-    int64_t calib_gz) {
+    int64_t calib_gz,
+    int64_t arch) {
   auto input_flat = input.flatten(0, -2);
   auto weight_flat = weight.flatten(0, -2);
 
@@ -166,6 +169,7 @@ static Tensor mm_int4(
                     .add_matrix_scl(weight_scl)
                     .add_matrix_zp(weight_zp)
                     .add_calib_gz(calib_gz)
+                    .add_arch(arch)
                     .build();
   TORCH_CHECK(policy.fallback() == false, "mm int4: invalid gemm shape");
   policy.run();
@@ -310,30 +314,6 @@ static Tensor mm_bias_resadd_resadd_int4(
   return resize_as_mat1(input_, output);
 }
 
-static Tensor mm_low_bits_arc(
-    const Tensor& input,
-    const Tensor& weight,
-    const Tensor& bias,
-    const Tensor& weight_scl,
-    const Tensor& weight_zp,
-    bool has_bias,
-    const std::string& compute_dtype,
-    const std::string& weight_dtype,
-    int64_t calib_gz) {
-  auto input_flat = input.flatten(0, -2);
-  auto weight_flat = weight.flatten(0, -2);
-
-  int m = input_flat.sizes()[0];
-  int k = input_flat.sizes()[1];
-  int n = weight.sizes()[1] * 2;
-  auto output = at::empty({m, n}, input.options());
-
-  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
-  // TODO: add implementation for mm_low_bits on arc
-
-  return output;
-}
-
 static Tensor mm_low_bits(
     const Tensor& input,
     const Tensor& weight,
@@ -346,25 +326,10 @@ static Tensor mm_low_bits(
     int64_t calib_gz) {
   DeviceId curDevID;
   AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
-  if (fp64_valid) {
-    // on PVC
-    return has_bias
-        ? mm_bias_int4(input, weight, bias, weight_scl, weight_zp, calib_gz)
-        : mm_int4(input, weight, weight_scl, weight_zp, calib_gz);
-  } else {
-    // on ATS-M or arc
-    return mm_low_bits_arc(
-        input,
-        weight,
-        bias,
-        weight_scl,
-        weight_zp,
-        has_bias,
-        compute_dtype,
-        weight_dtype,
-        calib_gz);
-  }
+  int64_t fp64_valid = static_cast<int64_t>(Settings::I().has_2d_block_array(curDevID));
+  return has_bias
+      ? mm_bias_int4(input, weight, bias, weight_scl, weight_zp, calib_gz, fp64_valid)
+      : mm_int4(input, weight, weight_scl, weight_zp, calib_gz, fp64_valid);
 }
 
 } // namespace AtenIpexTypeXPU

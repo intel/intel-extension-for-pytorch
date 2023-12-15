@@ -169,12 +169,12 @@ using namespace xpu::xetla;
     DISPATCHER, F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
   DISPATCHER(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)
 
-#define HGEMM_INT4_COMMON_DISPATCH(WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
+#define HGEMM_INT4_COMMON_DISPATCH(WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS, ARCH) \
   {                                                                          \
-    if (num_epilogues_ == 0)                                                 \
+    if (num_epilogues_ == 0 && ARCH == 0)                                                 \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_DISPATCH,                                               \
-          hgemm_wint4,                                                       \
+          hgemm_wint4_pvc,                                                       \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -182,10 +182,32 @@ using namespace xpu::xetla;
           SG_K,                                                              \
           GZ,                                                                \
           SLM_KS)                                                            \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS)               \
+    else if (num_epilogues_ == 0 && ARCH == 1)                                                 \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_DISPATCH,                                               \
+          hgemm_wint4_arc,                                                       \
+          WG_M,                                                              \
+          WG_N,                                                              \
+          SG_M,                                                              \
+          SG_N,                                                              \
+          SG_K,                                                              \
+          GZ,                                                                \
+          SLM_KS)                                                            \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS && ARCH == 0)               \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_BIAS_DISPATCH,                                          \
-          hgemm_bias_wint4,                                                  \
+          hgemm_bias_wint4_pvc,                                                  \
+          WG_M,                                                              \
+          WG_N,                                                              \
+          SG_M,                                                              \
+          SG_N,                                                              \
+          SG_K,                                                              \
+          GZ,                                                                \
+          SLM_KS)                                                            \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS && ARCH == 1)               \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_BIAS_DISPATCH,                                          \
+          hgemm_bias_wint4_arc,                                                  \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -198,7 +220,7 @@ using namespace xpu::xetla;
         epilogue_type_[1] == RES_ADD && epilogue_type_[2] == RES_ADD)        \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_BIAS_RES_RES_DISPATCH,                                  \
-          hgemm_bias_res_res_wint4,                                          \
+          hgemm_bias_res_res_wint4_pvc,                                          \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -211,7 +233,7 @@ using namespace xpu::xetla;
         epilogue_type_[1] == GELU)                                           \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_BIAS_GELU_DISPATCH,                                     \
-          hgemm_bias_gelu_wint4,                                             \
+          hgemm_bias_gelu_wint4_pvc,                                             \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -222,7 +244,7 @@ using namespace xpu::xetla;
     else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD)            \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_RES_DISPATCH,                                           \
-          hgemm_res_wint4,                                                   \
+          hgemm_res_wint4_pvc,                                                   \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -233,7 +255,7 @@ using namespace xpu::xetla;
     else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL)            \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_RESMUL_DISPATCH,                                        \
-          hgemm_mul_wint4,                                                   \
+          hgemm_mul_wint4_pvc,                                                   \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -244,7 +266,7 @@ using namespace xpu::xetla;
     else if (num_epilogues_ == 1 && epilogue_type_[0] == SPLIT3)             \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_QKV_DISPATCH,                                           \
-          hgemm_qkv_wint4,                                                   \
+          hgemm_qkv_wint4_pvc,                                                   \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -257,7 +279,7 @@ using namespace xpu::xetla;
         epilogue_type_[1] == SPLIT3)                                         \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_QKV_BIAS_DISPATCH,                                      \
-          hgemm_qkv_bias_wint4,                                              \
+          hgemm_qkv_bias_wint4_pvc,                                              \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -277,7 +299,8 @@ template <
     int slm_ks_,
     int max_m_,
     int max_n_,
-    int max_k_>
+    int max_k_,
+    int arch_>
 struct GemmWint4Config {
   static constexpr int wg_m = wg_m_;
   static constexpr int wg_n = wg_n_;
@@ -289,6 +312,7 @@ struct GemmWint4Config {
   static constexpr int max_m = max_m_;
   static constexpr int max_n = max_n_;
   static constexpr int max_k = max_k_;
+  static constexpr int arch = arch_;
 
   static bool less_than(int m, int n, int k, int group_size) {
     if (gz < group_size)
@@ -306,54 +330,65 @@ struct GemmWint4Config {
 #define MAX_INT std::numeric_limits<int>::max()
 
 // clang-format off
-#define ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ(gz)                        \
-  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, 4096>,               \
-  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, 4096>,            \
-  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, 4096>,            \
-  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, 4096>,           \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, 4096>,          \
-  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, 4096>,     \
-  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, 16384>,              \
-  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, 16384>,           \
-  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, 16384>,           \
-  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, 16384>,          \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, 16384>,         \
-  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, 16384>,    \
-  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, MAX_INT>,            \
-  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, MAX_INT>,         \
-  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, MAX_INT>,         \
-  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, MAX_INT>,        \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, MAX_INT>,       \
-  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, MAX_INT>,  \
-  GemmWint4Config<8, 256, 8, 16, 32, gz, 2, 8, 16384, 4096>,             \
-  GemmWint4Config<16, 256, 16, 16, 32, gz, 2, 16, 16384, 4096>,          \
-  GemmWint4Config<32, 256, 32, 16, 32, gz, 2, 32, 16384, 4096>,          \
-  GemmWint4Config<64, 256, 64, 16, 32, gz, 2, 64, 16384, 4096>,          \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 16384, 4096>,         \
-  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 16384, 4096>,    \
-  GemmWint4Config<8, 256, 8, 16, 32, gz, 2, 8, 16384, MAX_INT>,          \
-  GemmWint4Config<16, 256, 16, 16, 32, gz, 2, 16, 16384, MAX_INT>,       \
-  GemmWint4Config<32, 256, 32, 16, 32, gz, 2, 32, 16384, MAX_INT>,       \
-  GemmWint4Config<64, 256, 64, 16, 32, gz, 2, 64, 16384, MAX_INT>,       \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 16384, MAX_INT>,      \
-  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 16384, MAX_INT>, \
-  GemmWint4Config<8, 512, 8, 16, 32, gz, 1, 8, 50416, 4096>,             \
-  GemmWint4Config<16, 512, 16, 16, 32, gz, 1, 16, 50416, 4096>,          \
-  GemmWint4Config<32, 512, 32, 16, 32, gz, 1, 32, 50416, 4096>,          \
-  GemmWint4Config<64, 512, 64, 16, 32, gz, 1, 64, 50416, 4096>,          \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 50416, 4096>,         \
-  GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, 50416, 4096>,    \
-  GemmWint4Config<8, 512, 8, 16, 32, gz, 1, 8, MAX_INT, MAX_INT>,        \
-  GemmWint4Config<16, 512, 16, 16, 32, gz, 1, 16, MAX_INT, MAX_INT>,     \
-  GemmWint4Config<32, 512, 32, 16, 32, gz, 1, 32, MAX_INT, MAX_INT>,     \
-  GemmWint4Config<64, 512, 64, 16, 32, gz, 1, 64, MAX_INT, MAX_INT>,     \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, MAX_INT, MAX_INT>,    \
-  GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, MAX_INT, MAX_INT>
+#define ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_PVC(gz)                       \
+  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, 4096, 1>,               \
+  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, 4096, 1>,            \
+  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, 4096, 1>,            \
+  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, 4096, 1>,           \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, 4096, 1>,          \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, 4096, 1>,     \
+  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, 16384, 1>,              \
+  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, 16384, 1>,           \
+  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, 16384, 1>,           \
+  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, 16384, 1>,          \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, 16384, 1>,         \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, 16384, 1>,    \
+  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, MAX_INT, 1>,            \
+  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, MAX_INT, 1>,         \
+  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, MAX_INT, 1>,         \
+  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, MAX_INT, 1>,        \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, MAX_INT, 1>,       \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, MAX_INT, 1>,  \
+  GemmWint4Config<8, 256, 8, 16, 32, gz, 2, 8, 16384, 4096, 1>,             \
+  GemmWint4Config<16, 256, 16, 16, 32, gz, 2, 16, 16384, 4096, 1>,          \
+  GemmWint4Config<32, 256, 32, 16, 32, gz, 2, 32, 16384, 4096, 1>,          \
+  GemmWint4Config<64, 256, 64, 16, 32, gz, 2, 64, 16384, 4096, 1>,          \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 16384, 4096, 1>,         \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 16384, 4096, 1>,    \
+  GemmWint4Config<8, 256, 8, 16, 32, gz, 2, 8, 16384, MAX_INT, 1>,          \
+  GemmWint4Config<16, 256, 16, 16, 32, gz, 2, 16, 16384, MAX_INT, 1>,       \
+  GemmWint4Config<32, 256, 32, 16, 32, gz, 2, 32, 16384, MAX_INT, 1>,       \
+  GemmWint4Config<64, 256, 64, 16, 32, gz, 2, 64, 16384, MAX_INT, 1>,       \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 16384, MAX_INT, 1>,      \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 16384, MAX_INT, 1>, \
+  GemmWint4Config<8, 512, 8, 16, 32, gz, 1, 8, 50416, 4096, 1>,             \
+  GemmWint4Config<16, 512, 16, 16, 32, gz, 1, 16, 50416, 4096, 1>,          \
+  GemmWint4Config<32, 512, 32, 16, 32, gz, 1, 32, 50416, 4096, 1>,          \
+  GemmWint4Config<64, 512, 64, 16, 32, gz, 1, 64, 50416, 4096, 1>,          \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 50416, 4096, 1>,         \
+  GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, 50416, 4096, 1>,    \
+  GemmWint4Config<8, 512, 8, 16, 32, gz, 1, 8, MAX_INT, MAX_INT, 1>,        \
+  GemmWint4Config<16, 512, 16, 16, 32, gz, 1, 16, MAX_INT, MAX_INT, 1>,     \
+  GemmWint4Config<32, 512, 32, 16, 32, gz, 1, 32, MAX_INT, MAX_INT, 1>,     \
+  GemmWint4Config<64, 512, 64, 16, 32, gz, 1, 64, MAX_INT, MAX_INT, 1>,     \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, MAX_INT, MAX_INT, 1>,    \
+  GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, MAX_INT, MAX_INT, 1>
+
+#define ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(gz)                       \
+  GemmWint4Config<8, 64, 8, 16, 16, gz, 8, MAX_INT, MAX_INT, MAX_INT, 0>
 // clang-format on
 
-#define ORDERED_GEMM_WINT4_CONFIG_SET       \
-  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ(0), \
-      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ(128)
+#define ORDERED_GEMM_WINT4_CONFIG_SET_ARC       \
+  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(16), \
+  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(64), \
+  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(128), \
+  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(256), \
+  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(512), \
+  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(1024)
+
+#define ORDERED_GEMM_WINT4_CONFIG_SET_PVC       \
+  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_PVC(0), \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_PVC(128)
 
 inline Tensor resize_as_mat1(const Tensor& mat1, const Tensor& output) {
   auto output_ = output.flatten(0, -2);
@@ -392,11 +427,16 @@ class HGEMMXetla_INT4 final {
   bool fallback_;
   int m_, n_, k_;
   int64_t calib_gz_;
+  int64_t arch_ = 1; // 0: ARC, 1: PVC
 
  public:
   HGEMMXetla_INT4() = default;
   bool fallback() const {
     return fallback_;
+  }
+  HGEMMXetla_INT4& add_arch(int64_t arch) {
+    arch_ = arch;
+    return *this;
   }
   HGEMMXetla_INT4& add_matrix_out(const Tensor& output) {
     outputs_.emplace_back(const_cast<Tensor*>(&output));
@@ -554,7 +594,8 @@ class HGEMMXetla_INT4 final {
         static constexpr int sg_k = Config::sg_k;
         static constexpr int gz = Config::gz;
         static constexpr int slm_ks = Config::slm_ks;
-        HGEMM_INT4_COMMON_DISPATCH(wg_m, wg_n, sg_m, sg_n, sg_k, gz, slm_ks);
+        static constexpr int arch = Config::arch;
+        HGEMM_INT4_COMMON_DISPATCH(wg_m, wg_n, sg_m, sg_n, sg_k, gz, slm_ks, arch);
       };
       return execute_function;
     } else {
@@ -583,6 +624,11 @@ class HGEMMXetla_INT4 final {
     using scalar_t =
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
     auto& q = dpcppGetCurrentQueue();
-    dispatch<scalar_t, ORDERED_GEMM_WINT4_CONFIG_SET>(q);
+    if (arch_ == 1) {
+      dispatch<scalar_t, ORDERED_GEMM_WINT4_CONFIG_SET_PVC>(q);
+    } else {
+      dispatch<scalar_t, ORDERED_GEMM_WINT4_CONFIG_SET_ARC>(q);
+    }
+    
   }
 };
