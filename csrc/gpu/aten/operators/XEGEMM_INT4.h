@@ -165,16 +165,17 @@ using namespace xpu::xetla;
         k_);                                                                \
   }
 
-#define HGEMM_INT4_COMMON_DISPATCH_IMPL(                     \
-    DISPATCHER, F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
+#define HGEMM_INT4_COMMON_DISPATCH_IMPL(                                    \
+    DISPATCHER, F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                \
   DISPATCHER(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)
 
-#define HGEMM_INT4_COMMON_DISPATCH(WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS, ARCH) \
+#define HGEMM_INT4_COMMON_DISPATCH(                                          \
+    WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS, ARCH)                          \
   {                                                                          \
-    if (num_epilogues_ == 0 && ARCH == 0)                                                 \
+    if (num_epilogues_ == 0 && ARCH == 1)                                    \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_DISPATCH,                                               \
-          hgemm_wint4_pvc,                                                       \
+          hgemm_wint4_pvc,                                                   \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -182,10 +183,10 @@ using namespace xpu::xetla;
           SG_K,                                                              \
           GZ,                                                                \
           SLM_KS)                                                            \
-    else if (num_epilogues_ == 0 && ARCH == 1)                                                 \
+    else if (num_epilogues_ == 0 && ARCH == 0)                               \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_DISPATCH,                                               \
-          hgemm_wint4_arc,                                                       \
+          hgemm_wint4_arc,                                                   \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -193,10 +194,10 @@ using namespace xpu::xetla;
           SG_K,                                                              \
           GZ,                                                                \
           SLM_KS)                                                            \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS && ARCH == 0)               \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS && ARCH == 1)  \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_BIAS_DISPATCH,                                          \
-          hgemm_bias_wint4_pvc,                                                  \
+          hgemm_bias_wint4_pvc,                                              \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -204,10 +205,10 @@ using namespace xpu::xetla;
           SG_K,                                                              \
           GZ,                                                                \
           SLM_KS)                                                            \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS && ARCH == 1)               \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS && ARCH == 0)  \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_BIAS_DISPATCH,                                          \
-          hgemm_bias_wint4_arc,                                                  \
+          hgemm_bias_wint4_arc,                                              \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -217,10 +218,11 @@ using namespace xpu::xetla;
           SLM_KS)                                                            \
     else if (                                                                \
         num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                  \
-        epilogue_type_[1] == RES_ADD && epilogue_type_[2] == RES_ADD)        \
+        epilogue_type_[1] == RES_ADD && epilogue_type_[2] == RES_ADD &&      \
+        ARCH == 1)                                                           \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_BIAS_RES_RES_DISPATCH,                                  \
-          hgemm_bias_res_res_wint4_pvc,                                          \
+          hgemm_bias_res_res_wint4_pvc,                                      \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -230,10 +232,10 @@ using namespace xpu::xetla;
           SLM_KS)                                                            \
     else if (                                                                \
         num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                  \
-        epilogue_type_[1] == GELU)                                           \
+        epilogue_type_[1] == GELU && ARCH == 1)                              \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_BIAS_GELU_DISPATCH,                                     \
-          hgemm_bias_gelu_wint4_pvc,                                             \
+          hgemm_bias_gelu_wint4_pvc,                                         \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -241,10 +243,11 @@ using namespace xpu::xetla;
           SG_K,                                                              \
           GZ,                                                                \
           SLM_KS)                                                            \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD)            \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD             \
+          && ARCH == 1)                                                      \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_RES_DISPATCH,                                           \
-          hgemm_res_wint4_pvc,                                                   \
+          hgemm_res_wint4_pvc,                                               \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -252,10 +255,11 @@ using namespace xpu::xetla;
           SG_K,                                                              \
           GZ,                                                                \
           SLM_KS)                                                            \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL)            \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL             \
+          && ARCH == 1)                                                      \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_RESMUL_DISPATCH,                                        \
-          hgemm_mul_wint4_pvc,                                                   \
+          hgemm_mul_wint4_pvc,                                               \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -263,10 +267,11 @@ using namespace xpu::xetla;
           SG_K,                                                              \
           GZ,                                                                \
           SLM_KS)                                                            \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == SPLIT3)             \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == SPLIT3 &&           \
+          ARCH == 1)                                                         \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_QKV_DISPATCH,                                           \
-          hgemm_qkv_wint4_pvc,                                                   \
+          hgemm_qkv_wint4_pvc,                                               \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -276,10 +281,10 @@ using namespace xpu::xetla;
           SLM_KS)                                                            \
     else if (                                                                \
         num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                  \
-        epilogue_type_[1] == SPLIT3)                                         \
+        epilogue_type_[1] == SPLIT3 && ARCH == 1)                            \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
           HGEMM_INT4_QKV_BIAS_DISPATCH,                                      \
-          hgemm_qkv_bias_wint4_pvc,                                              \
+          hgemm_qkv_bias_wint4_pvc,                                          \
           WG_M,                                                              \
           WG_N,                                                              \
           SG_M,                                                              \
@@ -505,10 +510,10 @@ class HGEMMXetla_INT4 final {
     m_ = a_sizes[0];
     k_ = a_sizes[1];
     // Normalize calibration group size.
-    if (calib_gz_ == -1 || calib_gz_ == k_)
+    if ((calib_gz_ == -1 || calib_gz_ == k_) && arch_ == 1)
       calib_gz_ = 0;
     // Check if calibration group size is valid.
-    if (calib_gz_ != 0 && calib_gz_ != 128)
+    if ((calib_gz_ != 0 && calib_gz_ != 128) && arch_ == 1)
       return *this;
     // Set correct n dim.
     if (has_split3)
