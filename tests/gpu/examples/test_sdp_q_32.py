@@ -31,6 +31,32 @@ class TestTorchMethod(TestCase):
             out_cpu, out_xpu.cpu().float(), atol=checking_atol, rtol=checking_rtol
         )
 
+    def test_fsdp_autocast(self, dtype=torch.bfloat16):
+        head_dim = 256
+        seq_lenth = 32
+        k_seq_lenth = 32
+        v_seq_lenth = 32
+        query = torch.rand(1, 16, seq_lenth, head_dim, dtype=torch.float32)
+        key = torch.rand(1, 16, k_seq_lenth, head_dim, dtype=torch.bfloat16)
+        value = torch.rand(1, 16, v_seq_lenth, head_dim, dtype=torch.bfloat16)
+
+        out_cpu = F.scaled_dot_product_attention(
+            query.float(), key.float(), value.float(), is_causal=False
+        )
+
+        with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16):
+            out_xpu = F.scaled_dot_product_attention(
+                query.xpu(), key.xpu(), value.xpu(), is_causal=False
+            )
+        self.assertEqual(out_cpu, out_xpu.cpu().float(), atol=1e-2, rtol=1e-2)
+
+        with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+            out_xpu = F.scaled_dot_product_attention(
+                query.xpu(), key.xpu(), value.xpu(), is_causal=False
+            )
+
+        self.assertEqual(out_cpu, out_xpu.cpu().float(), atol=1e-2, rtol=1e-2)
+
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
     def test_fsdp_strided(self, dtype=torch.float16):
         query = torch.permute(

@@ -267,6 +267,18 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
       "linalg_multi_dot",
       Tensor(TensorList),
       lower_precision_fp)
+  KERNEL_XPU(
+      ADD_NS(scaled_dot_product_attention),
+      "scaled_dot_product_attention",
+      Tensor(
+          const Tensor&,
+          const Tensor&,
+          const Tensor&,
+          const c10::optional<Tensor>&,
+          double,
+          bool,
+          c10::optional<double>),
+      lower_precision_fp)
   // The macro doesn't like these (I think it chokes on commas inside <>) so
   // write them manually
   m.impl(
