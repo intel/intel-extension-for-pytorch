@@ -9,9 +9,9 @@ from ._transformer_configuration import IPEXTransformerConfig, SupportedActivati
 from ._transformers import MAX_OUT_SEQ_LEN, MAX_SEQ_LEN
 from .transformer_modules.BaseAttention import IPEXTransformerAttn
 from .transformer_modules.Decoderblock import IPEXTransformerBlock
-from .transformer_modules.GroupedAttention import (
+from .transformer_modules.GroupedAttention import (  # noqa F401
     IPEXTransformerAttnOptimizedFp16Grouped,
-)  # noqa F401
+)
 from .transformer_modules.Linear import IPEXTransformerLinear
 from .transformer_modules.Mlp import *  # noqa
 from .transformer_modules.NaiveAttention import IPEXTransformerAttnNaive  # noqa
@@ -141,7 +141,9 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
         # out_shape: (num_kv_heads * 2 + num_attention_heads) * self.head_dim
         weight_shape = [num_kv_head, num_head // num_kv_head + 2, -1, embed_dim]
         bias_shape = [num_kv_head, num_head // num_kv_head + 2, -1]
-        qkv_weight = self.module.self_attention.query_key_value.weight.view(weight_shape)
+        qkv_weight = self.module.self_attention.query_key_value.weight.view(
+            weight_shape
+        )
         q_weight = qkv_weight[:, :-2].flatten(0, -2).contiguous()
         k_weight = qkv_weight[:, [-2]].flatten(0, -2).contiguous()
         v_weight = qkv_weight[:, [-1]].flatten(0, -2).contiguous()

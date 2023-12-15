@@ -1,7 +1,10 @@
 import torch
 
 from .._transformer_configuration import IPEXTransformerConfig
-from .Attention import IPEXTransformerAttnOptimizedFp16, IPEXTransformerAttn
+from .Attention import (  # noqa F401
+    IPEXTransformerAttnOptimizedFp16,
+    IPEXTransformerAttn,
+)
 
 
 class IPEXTransformerAttnOptimizedFp16Grouped(IPEXTransformerAttnOptimizedFp16):
@@ -63,7 +66,9 @@ class IPEXTransformerAttnOptimizedFp16Grouped(IPEXTransformerAttnOptimizedFp16):
             return super().compute_qkv_gemm(hidden_states, query, key, value)
         hidden_states_flat = hidden_states.flatten(0, -2)
         if self.q_proj.bias is None:
-            torch.matmul(hidden_states_flat, self.q_proj.weight, out=query.flatten(0, -2))
+            torch.matmul(
+                hidden_states_flat, self.q_proj.weight, out=query.flatten(0, -2)
+            )
         else:
             torch.addmm(
                 self.q_proj.bias,
@@ -83,7 +88,9 @@ class IPEXTransformerAttnOptimizedFp16Grouped(IPEXTransformerAttnOptimizedFp16):
             )
 
         if self.v_proj.bias is None:
-            torch.matmul(hidden_states_flat, self.v_proj.weight, out=value.flatten(0, -2))
+            torch.matmul(
+                hidden_states_flat, self.v_proj.weight, out=value.flatten(0, -2)
+            )
         else:
             torch.addmm(
                 self.v_proj.bias,
