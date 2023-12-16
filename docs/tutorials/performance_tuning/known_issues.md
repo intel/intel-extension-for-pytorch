@@ -38,7 +38,21 @@ Troubleshooting
 - **Problem**: Some workloads terminate with an error `CL_DEVICE_NOT_FOUND` after some time on WSL2.
   - **Cause**:  This issue is due to the [TDR feature](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/tdr-registry-keys#tdrdelay) on Windows.
   - **Solution**: Try increasing TDRDelay in your Windows Registry to a large value, such as 20 (it is 2 seconds, by default), and reboot.
-  
+- **Problem**: Runtime error `Unable to find TSan function` might be raised when running some CPU AI workloads in certain scenarios.
+  - **Cause**:  This issue is probably caused by the compatibility issue of OMP tool libraries.
+  - **Solution**: Please try the workaround: disable OMP tool libraries by `export OMP_TOOL="disabled"`, to unblock your workload. We are working on the final solution and will release it as soon as possible.
+- **Problem**: The profiled data on GPU operators using legacy profiler is not accurate sometimes.
+  - **Cause**: Compiler in 2024.0 oneAPI basekit optimizes barrier implementation which brings negative impact on legacy profiler.
+  - **Solution**: Use Kineto profiler instead. Or use legacy profiler with `export UR_L0_IN_ORDER_BARRIER_BY_SIGNAL=0` to workaround this issue.
+- **Problem**: Random bad termination after AI model convergence test (>24 hours) finishes.
+  - **Cause**: This is a random issue when some AI model convergence test execution finishes. It is not user-friendly as the model execution ends ungracefully.
+  - **Solution**: Kill the process after the convergence test finished, or use checkpoints to divide the convergence test into several phases and execute separately.
+- **Problem**: Random GPU hang issue when executing the first allreduce in LLM inference workloads on 1 Intel® Data Center GPU Max 1550 card.
+  - **Cause**: Race condition happens between oneDNN kernels and oneCCL Bindings for Pytorch\* allreduce primitive. 
+  - **Solution**: Use `TORCH_LLM_ALLREDUCE=0` to workaround this issue.
+- **Problem**: GPU hang issue when executing LLM inference workloads on multi Intel® Data Center GPU Max series cards over PCIe communication.
+  - **Cause**: oneCCL Bindings for Pytorch\* allreduce primitive does not support PCIe for cross-cards communication.
+  - **Solution**: Enable XeLink for cross-cards communication, or use `TORCH_LLM_ALLREDUCE=0` for the PCIe only environments.
 ### Library Dependencies
 
 - **Problem**: Cannot find oneMKL library when building Intel® Extension for PyTorch\* without oneMKL.
@@ -87,28 +101,15 @@ Troubleshooting
 
 - Unit test failures on Intel® Data Center GPU Flex Series 170
 
-  The following unit tests fail on Intel® Data Center GPU Flex Series 170 but the same test cases pass on Intel® Data Center GPU Max Series. The root cause of the failures is under investigation.
-    - `test_multilabel_margin_loss.py::TestNNMethod::test_multiabel_margin_loss`
+  The following unit test fails on Intel® Data Center GPU Flex Series 170 but the same test case passes on Intel® Data Center GPU Max Series. The root cause of the failure is under investigation.
     - `test_weight_norm.py::TestNNMethod::test_weight_norm_differnt_type`
-      
-- Unit test failures on Intel® Data Center GPU Max Series
 
-  The following unit tests randomly fail on Intel® Data Center GPU Max Series if running with other test cases together using `pytest -v`. These cases pass if run individually on the same environment. The root cause of the failures is under investigation.
-  
-     - `test_nn.py::TestNNDeviceTypeXPU::test_activations_bfloat16_xpu`
-     - `test_eigh.py::TestTorchMethod::test_linalg_eigh`
-     - `test_baddbmm.py::TestTorchMethod::test_baddbmm_scale`
-
-  The following unit tests fail on Intel® Data Center GPU Max Series. The root cause of the failures is under investigation with oneDNN as the operators under test use oneDNN primitives.
-  
-     - `test_lstm.py::TestNNMethod::test_lstm_rnnt_onednn`
-     - `test_conv_transposed.py::TestTorchMethod::test_deconv3d_bias`
-
-- Unit test failures on CPU (ICX, CPX, SPR).
-
-  The following unit test fails on CPU if using latest transformers versoin (4.31.0). The workaround solution is to use old version transformers by pip `install transformers==4.30.0` instead.
-  
-     - `test_tpp_ops.py::TPPOPsTester::test_tpp_bert_embeddings`
+  The following unit tests fail in Windows environment on Intel® Arc™ A770 Graphic card. The root cause of the failures is under investigation.
+     - `test_foreach.py::TestTorchMethod::test_foreach_cos`
+     - `test_foreach.py::TestTorchMethod::test_foreach_sin`
+     - `test_polar.py::TestTorchMethod::test_polar_float`
+     - `test_special_ops.py::TestTorchMethod::test_special_spherical_bessel_j0`
+     - `test_transducer_loss.py::TestNNMethod::test_vallina_transducer_loss`
 
 ## CPU-specific issues
 

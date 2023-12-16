@@ -187,6 +187,15 @@ The example code below works for all data types.
 
 ### Basic Usage
 
+**Download and Install cppsdk**
+
+Ensure you have download and install cppsdk in the [installation page](https://intel.github.io/intel-extension-for-pytorch/index.html#installation) before compiling the cpp code.
+
+1. Go to [installation page](https://intel.github.io/intel-extension-for-pytorch/index.html#installation)
+2. Select the desired Platform & Version & OS
+3. In the package part, select cppsdk
+4. Follow the instructions in the cppsdk installation page to download and install cppsdk into libtorch.
+
 **example-app.cpp**
 
 [//]: # (marker_cppsdk_sample_app)
@@ -206,21 +215,22 @@ $ cd build
 $ CC=icx CXX=icpx cmake -DCMAKE_PREFIX_PATH=<LIBPYTORCH_PATH> ..
 $ make
 ```
+The <LIBPYTORCH_PATH> is the absolute path of libtorch we install at the first step.
 
 If *Found IPEX* is shown as dynamic library paths, the extension was linked into the binary. This can be verified with the Linux command *ldd*.
 
 ```bash
 $ CC=icx CXX=icpx cmake -DCMAKE_PREFIX_PATH=/workspace/libtorch ..
--- The C compiler identification is IntelLLVM 2023.2.0
--- The CXX compiler identification is IntelLLVM 2023.2.0
+-- The C compiler identification is IntelLLVM 2024.0.0
+-- The CXX compiler identification is IntelLLVM 2024.0.0
 -- Detecting C compiler ABI info
 -- Detecting C compiler ABI info - done
--- Check for working C compiler: /workspace/intel/oneapi/compiler/2023.2.0/linux/bin/icx - skipped
+-- Check for working C compiler: /workspace/intel/oneapi/compiler/2024.0.0/linux/bin/icx - skipped
 -- Detecting C compile features
 -- Detecting C compile features - done
 -- Detecting CXX compiler ABI info
 -- Detecting CXX compiler ABI info - done
--- Check for working CXX compiler: /workspace/intel/oneapi/compiler/2023.2.0/linux/bin/icpx - skipped
+-- Check for working CXX compiler: /workspace/intel/oneapi/compiler/2024.0.0/linux/bin/icpx - skipped
 -- Detecting CXX compile features
 -- Detecting CXX compile features - done
 -- Looking for pthread.h
@@ -242,16 +252,16 @@ $ ldd example-app
         libintel-ext-pt-cpu.so => /workspace/libtorch/lib/libintel-ext-pt-cpu.so (0x00007fd5a1a1b000)
         libintel-ext-pt-gpu.so => /workspace/libtorch/lib/libintel-ext-pt-gpu.so (0x00007fd5862b0000)
         ...
-        libmkl_intel_lp64.so.2 => /workspace/intel/oneapi/mkl/2023.2.0/lib/intel64/libmkl_intel_lp64.so.2 (0x00007fd584ab0000)
-        libmkl_core.so.2 => /workspace/intel/oneapi/mkl/2023.2.0/lib/intel64/libmkl_core.so.2 (0x00007fd5806cc000)
-        libmkl_gnu_thread.so.2 => /workspace/intel/oneapi/mkl/2023.2.0/lib/intel64/libmkl_gnu_thread.so.2 (0x00007fd57eb1d000)
-        libmkl_sycl.so.3 => /workspace/intel/oneapi/mkl/2023.2.0/lib/intel64/libmkl_sycl.so.3 (0x00007fd55512c000)
-        libOpenCL.so.1 => /workspace/intel/oneapi/compiler/2023.2.0/linux/lib/libOpenCL.so.1 (0x00007fd55511d000)
-        libsvml.so => /workspace/intel/oneapi/compiler/2023.2.0/linux/compiler/lib/intel64_lin/libsvml.so (0x00007fd553b11000)
-        libirng.so => /workspace/intel/oneapi/compiler/2023.2.0/linux/compiler/lib/intel64_lin/libirng.so (0x00007fd553600000)
-        libimf.so => /workspace/intel/oneapi/compiler/2023.2.0/linux/compiler/lib/intel64_lin/libimf.so (0x00007fd55321b000)
-        libintlc.so.5 => /workspace/intel/oneapi/compiler/2023.2.0/linux/compiler/lib/intel64_lin/libintlc.so.5 (0x00007fd553a9c000)
-        libsycl.so.6 => /workspace/intel/oneapi/compiler/2023.2.0/linux/lib/libsycl.so.6 (0x00007fd552f36000)
+        libmkl_intel_lp64.so.2 => /workspace/intel/oneapi/mkl/2024.0.0/lib/intel64/libmkl_intel_lp64.so.2 (0x00007fd584ab0000)
+        libmkl_core.so.2 => /workspace/intel/oneapi/mkl/2024.0.0/lib/intel64/libmkl_core.so.2 (0x00007fd5806cc000)
+        libmkl_gnu_thread.so.2 => /workspace/intel/oneapi/mkl/2024.0.0/lib/intel64/libmkl_gnu_thread.so.2 (0x00007fd57eb1d000)
+        libmkl_sycl.so.3 => /workspace/intel/oneapi/mkl/2024.0.0/lib/intel64/libmkl_sycl.so.3 (0x00007fd55512c000)
+        libOpenCL.so.1 => /workspace/intel/oneapi/compiler/2024.0.0/linux/lib/libOpenCL.so.1 (0x00007fd55511d000)
+        libsvml.so => /workspace/intel/oneapi/compiler/2024.0.0/linux/compiler/lib/intel64_lin/libsvml.so (0x00007fd553b11000)
+        libirng.so => /workspace/intel/oneapi/compiler/2024.0.0/linux/compiler/lib/intel64_lin/libirng.so (0x00007fd553600000)
+        libimf.so => /workspace/intel/oneapi/compiler/2024.0.0/linux/compiler/lib/intel64_lin/libimf.so (0x00007fd55321b000)
+        libintlc.so.5 => /workspace/intel/oneapi/compiler/2024.0.0/linux/compiler/lib/intel64_lin/libintlc.so.5 (0x00007fd553a9c000)
+        libsycl.so.6 => /workspace/intel/oneapi/compiler/2024.0.0/linux/lib/libsycl.so.6 (0x00007fd552f36000)
         ...
 ```
 

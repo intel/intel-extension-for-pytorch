@@ -46,8 +46,8 @@ parser.add_argument(
     "--device",
     type=str,
     choices=["cpu", "xpu"],
-    default="cpu",
-    help="cpu",
+    default="xpu",
+    help="xpu or cpu",
 )
 parser.add_argument(
     "--dtype",
