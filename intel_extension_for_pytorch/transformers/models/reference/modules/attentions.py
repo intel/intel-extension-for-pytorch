@@ -373,7 +373,7 @@ def _FalconAttention_forward(
     past_kv_length = 0 if layer_past is None else layer_past[0].shape[1]
 
     if self.rotary:
-        seq_len = query_length + torch.tensor(past_kv_length)
+        seq_len = query_length + past_kv_length
         key_layer = self._IPEXROPE(
             key_layer,
             torch.tensor(past_kv_length),
