@@ -643,22 +643,8 @@ def _is_packable_convolution(match):
             return False
     is_transposed = conv_node.args[-3]
     if is_transposed:
-        # TODO: Support dynamic shape case for MKLDNN conv transpose.
-        if free_symbols(input_size):
-            return False
-        groups = conv_node.args[-1]
-        in_channels = weight_meta_value.size(0)
-        # doesn't support group_depthwise_conv_transpose.
-        if groups > 1 and groups == in_channels:
-            return False
-        # Port from: aten/src/ATen/native/Convolution.cpp:is_output_padding_big
-        output_paddings = conv_node.args[-2]
-        strides = conv_node.args[3]
-        if any(
-            output_padding >= stride
-            for output_padding, stride in zip(output_paddings, strides)
-        ):
-            return False
+        # TODO: add xpu support for deconv fusion
+        return False
     return True
 
 
@@ -726,9 +712,6 @@ def _register_weight_pack_pass():
         with graph.inserting_before(conv_node):
             constant_args = [args[4], args[3], args[5], args[-1]]
             packed_conv_op = torch_ipex._convolution_pointwise.default
-            if is_transposed:
-                constant_args.insert(1, args[-2])  # output_padding
-                packed_conv_op = torch_ipex._convolution_transpose_pointwise.default
             weight = args[1]
             packed_conv_inputs = (
                 (args[0], weight, args[2]) + tuple(constant_args) + ("none", [], "")
