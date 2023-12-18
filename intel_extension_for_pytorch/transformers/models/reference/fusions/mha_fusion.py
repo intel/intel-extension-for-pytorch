@@ -124,7 +124,7 @@ class _IPEXRopeRef(nn.Module):
         x_embed = (x.float() * cos) + (self.rotate_half(x.float()) * sin)
         return x_embed.to(x.dtype)
 
-    def forward(
+    def apply_ref_rope(
         self,
         x: torch.Tensor,
         position_ids: torch.Tensor,
@@ -202,6 +202,46 @@ class _IPEXRopeRef(nn.Module):
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
         return x
+
+    def forward(
+        self,
+        concat_x: torch.Tensor,
+        position_ids: torch.Tensor,
+        num_head: int,
+        head_dim: int,
+        offset: int,
+        rotary_ndims: int,
+        seq_len: Optional[int] = None,
+        num_concats: Optional[int] = None,
+    ):
+        if num_concats is None:
+            return self.apply_ref_rope(
+                concat_x,
+                position_ids,
+                num_head,
+                head_dim,
+                offset,
+                rotary_ndims,
+                seq_len,
+            )
+        else:
+            hidden_size = concat_x.shape[-1] // num_concats
+            query = concat_x[..., :hidden_size]
+            key = concat_x[..., hidden_size : 2 * hidden_size]
+            value = concat_x[..., 2 * hidden_size :]
+            query = self.apply_ref_rope(
+                query,
+                position_ids,
+                num_head,
+                head_dim,
+                offset,
+                rotary_ndims,
+                seq_len,
+            )
+            key = self.apply_ref_rope(
+                key, position_ids, num_head, head_dim, offset, rotary_ndims, seq_len
+            )
+            return query, key, value
 
 
 class _IPEXScaleDotProductRef(nn.Module):

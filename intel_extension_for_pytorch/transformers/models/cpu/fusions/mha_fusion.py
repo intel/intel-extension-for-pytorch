@@ -26,21 +26,32 @@ class _IPEXRopeCPU(nn.Module):
         offset: int,
         rotary_ndims: int,
         seq_len: Optional[int] = None,
+        num_concats: Optional[int] = None,
     ):
         position_ids = position_ids.contiguous()
         sin_cos, _, _ = self.embed_positions(seq_len)
-        # ToDo: when the input is concat_qkv, the output will be (query, key, value)
-        x = x.contiguous()
-        query, _, _ = torch.ops.torch_ipex.rotary_position_embedding(
-            x,
-            sin_cos,
-            position_ids,
-            num_head,
-            head_dim,
-            offset,
-            rotary_ndims,
-        )
-        return query
+        if num_concats is None:
+            x, _, _ = torch.ops.torch_ipex.rotary_position_embedding(
+                x,
+                sin_cos,
+                position_ids,
+                num_head,
+                head_dim,
+                offset,
+                rotary_ndims,
+            )
+            return x
+        else:
+            query, key, value = torch.ops.torch_ipex.rotary_position_embedding(
+                x,
+                sin_cos,
+                position_ids,
+                num_head,
+                head_dim,
+                offset,
+                rotary_ndims,
+            )
+            return query, key, value
 
 
 class _IPEXScaleDotProductCPU(nn.Module):

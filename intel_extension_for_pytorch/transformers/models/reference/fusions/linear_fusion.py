@@ -2,6 +2,7 @@ import torch
 from torch import nn
 import math
 import copy
+from intel_extension_for_pytorch.nn.modules import IpexWoqLinear
 
 
 class _IPEXlinearSiluRef(nn.Module):
@@ -85,6 +86,24 @@ class _IPEXConcatLinearRef(nn.Module):
         for i in range(self.num_concat):
             attr_name = f"linear_{i}"
             setattr(self, attr_name, copy.deepcopy(linear_list[i]))
+        self.concat_linear = None
+        self._num_concats = None
+        if all(not isinstance(linear, IpexWoqLinear) for linear in linear_list):
+            weights_list = []
+            bias_list = []
+            for i in range(self.num_concat):
+                weights_list.append(linear_list[i].weight)
+                if linear_list[i].bias is not None:
+                    bias_list.append(linear_list[i].bias)
+            concat_weight = torch.concat(weights_list, 0)
+            use_bias = True if bias_list is None else False
+            concat_bias = torch.concat(bias_list, 0) if use_bias else None
+            self.concat_linear = nn.Linear(
+                concat_weight.shape[1], concat_weight.shape[0], use_bias
+            )
+            self.concat_linear.weight = nn.Parameter(concat_weight)
+            self.concat_linear.bias = nn.Parameter(concat_bias) if use_bias else None
+            self._num_concats = len(weights_list)
 
     def forward(self, x):
         output_list = []

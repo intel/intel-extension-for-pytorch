@@ -2,7 +2,6 @@ import torch
 from torch import nn
 import math
 import warnings
-import copy
 from intel_extension_for_pytorch.nn.modules import IpexWoqLinear
 from intel_extension_for_pytorch.quantization import (
     get_weight_only_quant_qconfig_mapping,
@@ -221,12 +220,15 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
         super().__init__(module.linear_0, tpp=tpp, woq=woq)
         assert hasattr(module, "num_concat")
         self.num_concat = module.num_concat
-        self.linear_list = []
-        for i in range(self.num_concat):
-            attr_name = f"linear_{i}"
-            assert hasattr(module, attr_name)
-            self.linear_list.append(getattr(module, attr_name))
         self.concat_linear = None
+        self.linear_list = []
+        self.woq = woq
+        self.tpp = tpp
+        if woq:
+            for i in range(self.num_concat):
+                attr_name = f"linear_{i}"
+                assert hasattr(module, attr_name)
+                self.linear_list.append(getattr(module, attr_name))
         if woq and all(
             isinstance(linear, IpexWoqLinear) for linear in self.linear_list
         ):
@@ -303,6 +305,7 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                 mod.bias = nn.Parameter(concat_bias) if use_bias else None
                 mod.qconfig = qconfig
                 mod._num_concats = len(weights_list)
+                self._num_concats = mod._num_concats
                 if w_dtype == torch.quint4x2:
                     self.concat_linear = IpexWoqLinear.from_float_and_int4_weight(
                         mod,
@@ -317,20 +320,32 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                         mod, concat_scales, concat_zeros
                     )
         else:
-            for i in range(self.num_concat):
-                attr_name = f"linear_{i}"
-                setattr(self, attr_name, copy.deepcopy(getattr(module, attr_name)))
+            self._num_concats = module._num_concats
+            if (
+                self.tpp
+                and hasattr(module, "concat_linear")
+                and module.concat_linear is not None
+            ):
+                self.concat_linear = module.concat_linear
+            else:
+                for i in range(self.num_concat):
+                    attr_name = f"linear_{i}"
+                    setattr(self, attr_name, getattr(module, attr_name))
 
     def forward(self, x):
         if self.concat_linear is not None:
-            num_concats = self.concat_linear._num_concats
             concat_output = self.concat_linear(x)
-            hidden_size = concat_output.shape[-1] // num_concats
-            concat_output = concat_output.view(num_concats, -1, hidden_size)
-            expected_shape = list(x.shape)[:-1] + [hidden_size]
-            return tuple(
-                [concat_output[i].view(expected_shape) for i in range(num_concats)]
-            )
+            if self.woq:
+                num_concats = self._num_concats
+                hidden_size = concat_output.shape[-1] // num_concats
+                concat_output = concat_output.view(num_concats, -1, hidden_size)
+                expected_shape = list(x.shape)[:-1] + [hidden_size]
+                return tuple(
+                    [concat_output[i].view(expected_shape) for i in range(num_concats)]
+                )
+            else:
+                return concat_output
+
         output_list = []
         for i in range(self.num_concat):
             assert hasattr(self, f"linear_{i}")
