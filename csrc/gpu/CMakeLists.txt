@@ -217,6 +217,21 @@ if (USE_ONEMKL)
     endif()
 endif()
 
+find_package(spdlog QUIET)
+
+if(SPDLOG_FOUND) 
+  target_link_libraries(intel-ext-pt-gpu PUBLIC spdlog::spdlog_header_only)
+  target_include_directories(intel-ext-pt-gpu PUBLIC ${SPDLOG_INCLUDE_DIRS})
+  if(BUILD_SEPARATE_OPS)
+    foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
+      target_link_libraries(${op_lib} PUBLIC spdlog::spdlog_header_only)
+      target_include_directories(${op_lib} PUBLIC ${SPDLOG_INCLUDE_DIRS})
+    endforeach()
+  endif()
+else()
+  message(FATAL_ERROR "Error: Cannot find spdlog")
+endif()
+
 # XXX: Please make sure to find oneMKL before oneDNN
 find_package(oneDNN QUIET)
 if(ONEDNN_FOUND)

@@ -6,14 +6,6 @@ import pytest
 
 
 class TestVerbose(TestCase):
-    def test_ipex_verbose(self):
-        verb_list = [torch.xpu.VerbLevel.ON, torch.xpu.VerbLevel.OFF]
-        for verb in verb_list:
-            torch.xpu.set_verbose_level(verb)
-            assert torch.xpu.get_verbose_level() == verb, (
-                "Fail to set IPEX_VERBOSE level: " + verb
-            )
-
     def test_onednn_verbose(self):
         verb_list = [
             torch.xpu.OnednnVerbLevel.OFF,

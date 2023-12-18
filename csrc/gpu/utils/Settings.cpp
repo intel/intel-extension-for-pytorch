@@ -1,6 +1,7 @@
 #include <ATen/native/quantized/PackedParams.h>
 #include <oneDNN/Runtime.h>
 #include <runtime/Device.h>
+#include <utils/LogUtils.h>
 #include <utils/Settings.h>
 #include <utils/oneMKLUtils.h>
 
@@ -24,12 +25,24 @@ namespace dpcpp {
  * XPU ONLY optionos:
  * ==========GPU==========
  *   IPEX_VERBOSE:
- *      Default = 0 | Set verbose level with synchronization execution mode
+ *      Default = 0 | Set verbose level with synchronization execution mode, will be removed
  *   IPEX_XPU_SYNC_MODE:
  *      Default = 0 | Set 1 to enforce synchronization execution mode
  *   IPEX_TILE_AS_DEVICE:
  *      Default = 1 | Set 0 to disable tile partition and map per root device
  *      Only works when `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE`
+ *   IPEX_LOG_LEVEL:
+ *      Default = 3 | Set IPEX_LOG_LEVEL = WARN, it will log message level bigger than warn
+ *   IPEX_LOG_COMPONENT:
+ *      Default = "ALL" | Set IPEX_LOG_COMPONENT = ALL, it will log all component message.
+ *      If you would like to log several components pls use ';' as sepreator, 
+ *      such as "OPS;RUNTIME", if you would like to use sub_component, pls use '/' as sepreator
+ *   IPEX_LOG_ROTATE_SIZE:
+ *      Default = -1 | Set Rotate file size for IPEX_LOG, less than 0 means using SPLIT FILE
+ *   IPEX_LOG_SPLIT_SIZE:
+ *      Default = -1 | Set split file size for IPEX_LOG, less than 0 means using ROTATE FILE
+ *   IPEX_LOG_OUTPUT:
+ *      Default = "" | Set output file path for IPEX_LOG, default is null
  * ==========GPU==========
  *
  * EXPERIMENTAL options:
@@ -115,6 +128,44 @@ Settings::Settings() {
   verbose_level = VERBOSE_LEVEL::DISABLE;
   DPCPP_INIT_ENV_VAL("IPEX_VERBOSE", verbose_level, VERBOSE_LEVEL, show_opt);
 
+  log_level = LOG_LEVEL::WARN;
+  DPCPP_INIT_ENV_VAL("IPEX_LOGGING_LEVEL", log_level, LOG_LEVEL, show_opt);
+
+  // get IPEX_LOG_ROTATE_SIZE
+  auto IPEX_LOG_ROTATE_SIZE_env = std::getenv("IPEX_LOG_ROTATE_SIZE");
+  if (IPEX_LOG_ROTATE_SIZE_env == NULL) {
+    log_rotate_size = -1;
+  } else {
+    log_rotate_size = std::stoi(IPEX_LOG_ROTATE_SIZE_env, 0, 10);
+  }
+
+  // get IPEX_LOG_SPLIT_SIZE
+  auto IPEX_LOG_SPLIT_SIZE_env = std::getenv("IPEX_LOG_SPLIT_SIZE");
+  if (IPEX_LOG_SPLIT_SIZE_env == NULL) {
+    log_split_size = -1;
+  } else {
+    log_split_size = std::stoi(IPEX_LOG_SPLIT_SIZE_env, 0, 10);
+  }
+
+  // get IPEX_LOG_OUTPUT
+  auto IPEX_LOG_OUTPUT_env = std::getenv("IPEX_LOG_OUTPUT");
+  if (IPEX_LOG_OUTPUT_env == NULL) {
+    log_output = "";
+  } else {
+    log_output = std::string(IPEX_LOG_OUTPUT_env);
+  }
+
+  // get IPEX_LOG_COMPONENT
+  auto IPEX_LOG_COMPONENT_env = std::getenv("IPEX_LOG_COMPONENT");
+  if (IPEX_LOG_COMPONENT_env == NULL) {
+    log_component = "ALL";
+  } else {
+    log_component = std::string(IPEX_LOG_COMPONENT_env);
+  }
+
+  // initialize default logger
+  BasicLogger::get_instance();
+
   xpu_backend = XPU_BACKEND::GPU;
   DPCPP_INIT_ENV_VAL("IPEX_XPU_BACKEND", xpu_backend, XPU_BACKEND, show_opt);
 
@@ -187,6 +238,82 @@ bool Settings::set_verbose_level(int level) {
     return true;
   }
   return false;
+}
+
+bool Settings::set_log_level(int level) {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  if (level >= LOG_LEVEL::LOG_LEVEL_MIN && level <= LOG_LEVEL::LOG_LEVEL_MAX) {
+    log_level = static_cast<LOG_LEVEL>(level);
+
+    // re-trigger backend setting
+    BasicLogger::update_logger();
+    return true;
+  }
+  return false;
+}
+
+int Settings::get_log_level() const {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  return static_cast<int>(log_level);
+}
+
+std::string Settings::get_log_output_file_path() {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  // re-trigger backend setting
+  return log_output;
+}
+
+bool Settings::set_log_output_file_path(std::string path) {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  log_output = path;
+  // re-trigger backend setting
+  BasicLogger::update_logger();
+  return true;
+}
+
+bool Settings::set_log_rotate_file_size(int size) {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  if (size > 0) {
+    log_split_size = size;
+    // re-trigger backend setting
+    BasicLogger::update_logger();
+    return true;
+  }
+  return false;
+}
+
+int Settings::get_log_rotate_file_size() {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  return log_rotate_size;
+}
+
+bool Settings::set_log_split_file_size(int size) {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  if (size > 0) {
+    log_split_size = size;
+    // re-trigger backend setting
+    BasicLogger::update_logger();
+    return true;
+  }
+  return false;
+}
+
+int Settings::get_log_split_file_size() {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  return log_split_size;
+}
+
+bool Settings::set_log_component(std::string component) {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  log_component = component;
+  // re-trigger backend setting
+  BasicLogger::update_logger();
+  return true;
+}
+
+std::string Settings::get_log_component() {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  return log_component;
 }
 
 XPU_BACKEND Settings::get_backend() const {

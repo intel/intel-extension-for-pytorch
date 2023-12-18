@@ -8,8 +8,28 @@ namespace xpu {
 enum ENV_VAL { OFF = 0, ON = 1, ENV_VAL_MAX = ON };
 static const char* ENV_VAL_STR[]{"OFF", "ON"};
 
-enum VERBOSE_LEVEL { DISABLE = 0, DEBUG = 1, VERBOSE_LEVEL_MAX = DEBUG };
+enum VERBOSE_LEVEL { DISABLE = 0, XXX = 1, VERBOSE_LEVEL_MAX = XXX };
 static const char* VERBOSE_LEVEL_STR[]{"DISABLE", "DEBUG"};
+
+enum LOG_LEVEL {
+  DISABLED = -1,
+  TRACE = 0,
+  DEBUG = 1,
+  INFO = 2,
+  WARN = 3,
+  ERR = 4,
+  CRITICAL = 5,
+  LOG_LEVEL_MAX = CRITICAL,
+  LOG_LEVEL_MIN = DISABLED
+};
+static const char* LOG_LEVEL_STR[]{
+    "DISABLED",
+    "TRACE",
+    "DEBUG",
+    "INFO",
+    "WARN",
+    "ERR",
+    "CRITICAL"};
 
 enum XPU_BACKEND { GPU = 0, CPU = 1, AUTO = 2, XPU_BACKEND_MAX = AUTO };
 static const char* XPU_BACKEND_STR[]{"GPU", "CPU", "AUTO"};
@@ -52,6 +72,21 @@ class IPEX_API Settings final {
   int get_verbose_level() const;
   bool set_verbose_level(int level);
 
+  int get_log_level() const;
+  bool set_log_level(int level);
+
+  std::string get_log_output_file_path();
+  bool set_log_output_file_path(std::string path);
+
+  bool set_log_rotate_file_size(int size);
+  int get_log_rotate_file_size();
+
+  bool set_log_split_file_size(int size);
+  int get_log_split_file_size();
+
+  bool set_log_component(std::string component);
+  std::string get_log_component();
+
   XPU_BACKEND get_backend() const;
   bool set_backend(XPU_BACKEND backend);
 
@@ -93,6 +128,11 @@ class IPEX_API Settings final {
 
  private:
   VERBOSE_LEVEL verbose_level;
+  LOG_LEVEL log_level;
+  std::string log_component;
+  std::string log_output;
+  int log_rotate_size;
+  int log_split_size;
   XPU_BACKEND xpu_backend;
   COMPUTE_ENG compute_eng;
   FP32_MATH_MODE fp32_math_mode;

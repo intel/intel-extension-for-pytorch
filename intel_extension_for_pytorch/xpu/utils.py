@@ -140,11 +140,125 @@ class VerbLevel(EnumBase):
 
 
 def get_verbose_level():
+    raise AssertionError("WARNING, the IPEX_VERBOSE are deprecated")
     return VerbLevel.get_value(_C._get_verbose_level)
 
 
 def set_verbose_level(level):
+    raise AssertionError("WARNING, the IPEX_VERBOSE are deprecated")
     VerbLevel.set_value(_C._set_verbose_level, level)
+
+
+class LogLevel(EnumBase):
+    DISABLED = intel_extension_for_pytorch._C.LogLevel.DISABLED
+    TRACE = intel_extension_for_pytorch._C.LogLevel.TRACE
+    DEBUG = intel_extension_for_pytorch._C.LogLevel.DEBUG
+    INFO = intel_extension_for_pytorch._C.LogLevel.INFO
+    WARN = intel_extension_for_pytorch._C.LogLevel.WARN
+    ERR = intel_extension_for_pytorch._C.LogLevel.ERR
+    CRITICAL = intel_extension_for_pytorch._C.LogLevel.CRITICAL
+
+
+def get_log_level():
+    return LogLevel.get_value(_C.get_log_level)
+
+
+def set_log_level(level):
+    LogLevel.set_value(_C._set_log_level, level)
+
+
+def get_log_output_file_path():
+    return _C._get_log_output_file_path
+
+
+def set_log_output_file_path(path):
+    _C._set_log_output_file_path(path)
+
+
+def get_log_rotate_file_size():
+    return _C._get_log_rotate_file_size
+
+
+def set_log_rotate_file_size(size):
+    assert size > 0, "Invalid file size, it should be bigger than 1mb"
+    _C._set_log_rotate_file_size(size)
+
+
+def get_log_split_file_size():
+    return _C._get_log_split_file_size
+
+
+def set_log_split_file_size(size):
+    assert size > 0, "Invalid file size, it should be bigger than 1mb"
+    _C._set_log_split_file_size(size)
+
+
+def _get_log_component():
+    return _C._get_log_component
+
+
+def set_log_component(component):
+    _C._set_log_component(component)
+
+
+# usage for ipex Logger, can use as torch.xpu.Logger(xxx) to set the ipex logging settings
+class Logger:
+    def __init__(
+        self,
+        level=3,
+        output_file_path="",
+        rotate_file_size=-1,
+        split_file_size=-1,
+        log_component="ALL",
+    ):
+        if level >= -1 and level <= 5:
+            self.level = level
+        else:
+            raise RuntimeError(
+                "Unexpected log level, need -1 to 5, but meet value {}!".format(level)
+            )
+
+        self.output_file_path = output_file_path
+
+        if rotate_file_size > 0 and split_file_size > 0:
+            raise RumtimeError(
+                "Rotate file logging and split file logging can not be used ad the same time"
+            )
+        elif rotate_file_size > 0:
+            self.rotate_file_size = rotate_file_size
+            set_log_rotate_file_size(self.rotate_file_size)
+        elif split_file_size > 0:
+            self.split_file_size = split_file_size
+            set_log_split_file_size(self.split_file_size)
+
+        self.log_component = log_component
+
+        set_log_level(self.level)
+        set_log_output_file_path(self.output_file_path)
+        set_log_component(self.log_component)
+
+    def __enter__(self):
+        if self.level != LogLevel.DISABLED:
+            if rotate_file_size > 0 and split_file_size > 0:
+                raise RumtimeError(
+                    "Rotate file logging and split file logging can not be used ad the same time"
+                )
+            elif rotate_file_size > 0:
+                self.rotate_file_size = rotate_file_size
+                set_log_rotate_file_size(self.rotate_file_size)
+            elif split_file_size > 0:
+                self.split_file_size = split_file_size
+
+            set_log_split_file_size(self.split_file_size)
+            set_log_output_file_path(self.output_file_path)
+            set_log_component(self.log_component)
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # TODO: when ouside are using another ipex log, will cause an error, it just disable all the ipex log here
+        set_log_level(LogLevel.DISABLED)
+        return False
 
 
 # oneDNN Verbose

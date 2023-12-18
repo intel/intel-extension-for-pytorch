@@ -38,6 +38,16 @@ class proxy_compute_eng(object):
     XETLA = -5
 
 
+class proxy_log_level(object):
+    DISABLED = -2
+    TRACE = -3
+    DEBUG = -4
+    INFO = -5
+    WARN = -6
+    ERR = -7
+    CRITICAL = -8
+
+
 # --- [ CPU proxys:
 _register_proxy_ops("interaction_forward")
 
@@ -69,3 +79,7 @@ if not hasattr(intel_extension_for_pytorch._C, "XPUFP32MathMode"):
 
 if not hasattr(intel_extension_for_pytorch._C, "XPUComputeEng"):
     intel_extension_for_pytorch._C.__dict__["XPUComputeEng"] = proxy_compute_eng
+
+
+if not hasattr(intel_extension_for_pytorch._C, "LogLevel"):
+    intel_extension_for_pytorch._C.__dict__["LogLevel"] = proxy_log_level

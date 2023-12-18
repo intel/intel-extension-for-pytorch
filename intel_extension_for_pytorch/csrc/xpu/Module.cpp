@@ -670,6 +670,53 @@ void init_xpu_module(pybind11::module& m) {
     return Settings::I().set_verbose_level(level);
   });
 
+  py::enum_<LOG_LEVEL>(m, "LogLevel")
+      .value("DISABLED", LOG_LEVEL::DISABLED)
+      .value("TRACE", LOG_LEVEL::TRACE)
+      .value("DEBUG", LOG_LEVEL::DEBUG)
+      .value("INFO", LOG_LEVEL::INFO)
+      .value("WARN", LOG_LEVEL::WARN)
+      .value("ERR", LOG_LEVEL::ERR)
+      .value("CRITICAL", LOG_LEVEL::CRITICAL)
+      .export_values();
+
+  m.def("_get_log_level", []() { return Settings::I().get_log_level(); });
+
+  m.def("_set_log_level", [](int level) {
+    return Settings::I().set_log_level(level);
+  });
+
+  m.def("_get_log_output_file_path", []() {
+    return Settings::I().get_log_output_file_path();
+  });
+
+  m.def("_set_log_output_file_path", [](std::string path) {
+    return Settings::I().set_log_output_file_path(path);
+  });
+
+  m.def("_get_log_rotate_file_size", []() {
+    return Settings::I().get_log_rotate_file_size();
+  });
+
+  m.def("_set_log_rotate_file_size", [](int size) {
+    return Settings::I().set_log_rotate_file_size(size);
+  });
+
+  m.def("_get_log_split_file_size", []() {
+    return Settings::I().get_log_split_file_size();
+  });
+
+  m.def("_set_log_split_file_size", [](int size) {
+    return Settings::I().set_log_split_file_size(size);
+  });
+
+  m.def("_set_log_component", [](std::string component) {
+    return Settings::I().set_log_component(component);
+  });
+
+  m.def(
+      "_get_log_component", []() { return Settings::I().get_log_component(); });
+
   py::enum_<xpu::XPU_BACKEND>(m, "XPUBackend")
       .value("GPU", xpu::XPU_BACKEND::GPU)
       .value("CPU", xpu::XPU_BACKEND::CPU)
