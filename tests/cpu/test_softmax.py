@@ -62,6 +62,13 @@ class softmax_MHA(torch.nn.Module):
         attention_scores = torch.matmul(x, x.transpose(-1, -2))
         attention_scores = attention_scores / 64
         attention_scores = nn.Softmax(dim=-1)(attention_scores)
+        # Previously, the backend requires the pattern to be dequant-matmul-div-add-softmax
+        # so that they could be selected into the MHA partition.
+        # Now, dequant-matmul-div-softmax can hit the MHA pattern since add
+        # becomes optional in the pattern matcher.
+        # We add a softmax call here to test the functionality of ipex::softmax_ when
+        # it's input is an oneDNN graph fusion group.
+        attention_scores = nn.Softmax(dim=-1)(attention_scores)
         return attention_scores
 
 
