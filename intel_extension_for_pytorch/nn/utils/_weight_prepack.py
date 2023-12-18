@@ -264,11 +264,11 @@ class _IPEXLinear(_IPEXPrepackModule):
                 x = x.to(self.weight.dtype).contiguous()
                 if self.bias is not None:
                     output = torch.ops.torch_ipex.tpp_linear_bias(
-                        x, self.weight, self.bias, self.out_features
+                        x, self.weight.detach(), self.bias.detach(), self.out_features
                     )
                 else:
                     output = torch.ops.torch_ipex.tpp_linear(
-                        x, self.weight, self.out_features
+                        x, self.weight.detach(), self.out_features
                     )
         else:
             output = torch.ops.torch_ipex.ipex_MKLSGEMM(
