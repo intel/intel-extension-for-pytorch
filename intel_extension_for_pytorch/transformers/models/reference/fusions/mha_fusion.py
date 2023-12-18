@@ -149,7 +149,7 @@ class _IPEXRopeRef(nn.Module):
                 x = torch.cat([x_rot, x_pass], dim=-1)
             else:
                 x = self.apply_rotary_pos_emb_gptj(x, sin, cos)
-        elif self.model_backbone == "LlamaForCausalLM":
+        elif self.model_backbone in ["LlamaForCausalLM", "MistralForCausalLM"]:
             x = x.transpose(1, 2)
             x = self.apply_rotary_pos_emb_llama(x, _cos, _sin, position_ids)
         elif self.model_backbone == "BaichuanForCausalLM":
@@ -212,7 +212,7 @@ class _IPEXScaleDotProductRef(nn.Module):
             self.bias = module.bias
             self.scale_attn = module.scale_attn
             self.attn_dropout = module.attn_dropout
-        elif self.model_backbone == "LlamaForCausalLM":
+        elif self.model_backbone in ["LlamaForCausalLM", "MistralForCausalLM"]:
             self.num_key_value_groups = (
                 module.num_key_value_groups
                 if hasattr(module, "num_key_value_groups")
@@ -267,6 +267,21 @@ class _IPEXScaleDotProductRef(nn.Module):
                 module.num_multi_query_groups_per_partition
             )
             self.hidden_size_per_attention_head = module.hidden_size_per_attention_head
+        elif self.model_backbone == "GPTBigCodeForCausalLM":
+            self.scale_attention_softmax_in_fp32 = (
+                module.scale_attention_softmax_in_fp32
+            )
+            self.attention_softmax_in_fp32 = module.attention_softmax_in_fp32
+            self.layer_idx = module.layer_idx
+            self.scale_attn_weights = module.scale_attn_weights
+            self.embed_dim = module.embed_dim
+            self.num_heads = module.num_heads
+            self.head_dim = self.embed_dim // self.num_heads
+            self.multi_query = module.multi_query
+            self.mask_value = None
+            self.attn_dropout = module.attn_dropout
+        elif self.model_backbone == "T5ForConditionalGeneration":
+            self.dropout = module.dropout
 
         for k, v in module.__class__.__dict__.items():
             if k.startswith("__") or k.startswith("forward"):
@@ -296,6 +311,8 @@ class _IPEXScaleDotProductRef(nn.Module):
         head_mask: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[Tuple[torch.Tensor]] = None,
         alibi: Optional[torch.Tensor] = None,
+        add_casual_mask: Optional[bool] = True,
+        seq_info: Optional[torch.Tensor] = None,
     ):
         if (
             self.model_backbone == "FalconForCausalLM"
@@ -320,6 +337,8 @@ class _IPEXScaleDotProductRef(nn.Module):
                     "CodeGenForCausalLM",
                     "BaichuanForCausalLM",
                     "ChatGLMModel",
+                    "GPTBigCodeForCausalLM",
+                    "T5ForConditionalGeneration",
                 ]
                 else key
             )
@@ -333,6 +352,7 @@ class _IPEXScaleDotProductRef(nn.Module):
                     "CodeGenForCausalLM",
                     "BaichuanForCausalLM",
                     "ChatGLMModel",
+                    "T5ForConditionalGeneration",
                 ]
                 else query
             )
@@ -349,7 +369,7 @@ class _IPEXScaleDotProductRef(nn.Module):
             attn_output, attn_weights = self._attn(
                 query, key, value, attention_mask, head_mask
             )
-        elif self.model_backbone == "LlamaForCausalLM":
+        elif self.model_backbone in ["LlamaForCausalLM", "MistralForCausalLM"]:
             # repeat k/v heads if n_kv_heads < n_heads
             key = self._repeat_kv(key, self.num_key_value_groups)
             value = self._repeat_kv(value, self.num_key_value_groups)
@@ -557,6 +577,34 @@ class _IPEXScaleDotProductRef(nn.Module):
                     query, key, value, attention_mask
                 )
             attn_weights = None
+        elif self.model_backbone == "GPTBigCodeForCausalLM":
+            query = query.reshape(*query.shape[:2], -1)
+            key = key.squeeze()
+            value = value.squeeze()
+            attention_mask = attention_mask.transpose(1, 2)
+            attn_output, attn_weights = self._attn(
+                query, key.transpose(-1, -2), value, attention_mask, head_mask
+            )
+            if self.multi_query:
+                attn_output = attn_output.transpose(1, 2)
+        elif self.model_backbone == "T5ForConditionalGeneration":
+            # compute scores
+            scores = torch.matmul(
+                query, key.transpose(3, 2)
+            )  # equivalent of torch.einsum("bnqd,bnkd->bnqk", query, key), compatible with onnx op>9
+
+            scores += attention_mask
+            attn_weights = nn.functional.softmax(scores.float(), dim=-1).type_as(
+                scores
+            )  # (batch_size, n_heads, seq_length, key_length)
+            attn_weights = nn.functional.dropout(
+                attn_weights, p=self.dropout, training=self.training
+            )  # (batch_size, n_heads, seq_length, key_length)
+
+            # Mask heads if we want to
+            if head_mask is not None:
+                attn_weights = attn_weights * head_mask
+            attn_output = torch.matmul(attn_weights, value)
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
         return attn_output, attn_weights, present

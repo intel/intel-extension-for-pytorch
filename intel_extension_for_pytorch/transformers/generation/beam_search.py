@@ -181,11 +181,64 @@ def _beam_search(
             "CodeGenForCausalLM",
             "BaichuanForCausalLM",
             "ChatGLMModel",
+            "GPTBigCodeForCausalLM",
+            "T5ForConditionalGeneration",
+            "MistralForCausalLM",
         ]:
             first_token = False
             has_position_id = "position_ids" in model_inputs
             if model_inputs["past_key_values"] is None:
                 first_token = True
+                if self.model_backbone == "T5ForConditionalGeneration":
+                    first_token = False
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(batch_size * num_beams)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                self.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.k(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(batch_size * num_beams),
+                                    -1,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.n_heads,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.key_value_proj_dim,
+                                )
+                                .transpose(0, 1),
+                                self.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.v(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(batch_size * num_beams),
+                                    -1,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.n_heads,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.key_value_proj_dim,
+                                )
+                                .transpose(0, 1),
+                                beam_idx_tmp,
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
             if first_token:
                 if hasattr(self.config, "n_layer"):
                     num_hidden_layers = self.config.n_layer
@@ -237,6 +290,14 @@ def _beam_search(
                     model_inputs["return_last_logit"] = torch.tensor(
                         model_inputs["return_last_logit"]
                     )
+                if self.model_backbone == "T5ForConditionalGeneration":
+                    model_inputs.pop("head_mask", None)
+                    model_inputs.pop("decoder_head_mask", None)
+                    model_inputs.pop("decoder_attention_mask", None)
+                    model_inputs.pop("cross_attn_head_mask", None)
+                    model_inputs["encoder_outputs"] = (
+                        model_inputs["encoder_outputs"]["last_hidden_state"],
+                    )
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
                 else:
@@ -273,11 +334,6 @@ def _beam_search(
                 continue  # don't waste resources running the code we don't need
             next_token_logits = outputs.logits[:, -1, :]
 
-        # hack: adjust tokens for Marian. For Marian we have to make sure that the `pad_token_id`
-        # cannot be generated both before and after the `nn.functional.log_softmax` operation.
-        next_token_logits = self.adjust_logits_during_generation(
-            next_token_logits, cur_len=cur_len
-        )
         next_token_scores = nn.functional.log_softmax(
             next_token_logits, dim=-1
         )  # (batch_size * num_beams, vocab_size)

@@ -6,8 +6,12 @@
 #           https://docs.docker.com/develop/develop-images/build_enhancements/
 
 ARG BASE_IMAGE=ubuntu:22.04
-FROM ${BASE_IMAGE}
+FROM ${BASE_IMAGE} AS base
+RUN if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then rm /etc/apt/apt.conf.d/proxy.conf; fi && \
+    if [ ! -z ${HTTP_PROXY} ]; then echo "Acquire::http::Proxy \"${HTTP_PROXY}\";" >> /etc/apt/apt.conf.d/proxy.conf; fi && \
+    if [ ! -z ${HTTPS_PROXY} ]; then echo "Acquire::https::Proxy \"${HTTPS_PROXY}\";" >> /etc/apt/apt.conf.d/proxy.conf; fi
 RUN apt update && \
+    apt full-upgrade -y && \
     DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y \
     sudo \
     ca-certificates \
@@ -15,31 +19,57 @@ RUN apt update && \
     curl \
     wget \
     vim \
-    ccache \
     numactl \
-    make \
-    libjpeg-dev \
-    libpng-dev \
-    && rm -rf /var/lib/apt/lists/*
-RUN useradd -m ubuntu
-RUN echo 'ubuntu ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+    gcc-12 \
+    g++-12 \
+    make
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 && \
+    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 && \
+    update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100 && \
+    update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 100
+RUN apt clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then rm /etc/apt/apt.conf.d/proxy.conf; fi
+
+RUN useradd -m ubuntu && \
+    echo 'ubuntu ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 USER ubuntu
 WORKDIR /home/ubuntu
 
 RUN curl -fsSL -v -o miniconda.sh -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh  && \
-    bash miniconda.sh -b -p ~/miniconda3 && \
+    bash miniconda.sh -b -p ./miniconda3 && \
     rm miniconda.sh && \
-    echo "source ~/miniconda3/bin/activate" >> ~/.bashrc
+    echo "source ~/miniconda3/bin/activate" >> ./.bashrc
 
-RUN curl -fsSL -v -o compile_bundle.sh -O https://github.com/intel/intel-extension-for-pytorch/raw/main/scripts/compile_bundle.sh && \
-    . ~/miniconda3/bin/activate && \
-    conda create -y -n py310 python=3.10 && \
-    conda activate py310 && \
+FROM base AS dev
+COPY --chown=ubuntu:ubuntu . ./intel-extension-for-pytorch
+RUN cp ./intel-extension-for-pytorch/scripts/compile_bundle.sh ./ && \
+    sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
+RUN . ./miniconda3/bin/activate && \
+    conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
     bash compile_bundle.sh && \
-    rm -rf intel-extension-for-pytorch llvm-project compile_bundle.sh && \
-    conda install -y jemalloc gperftools -c conda-forge && \
-    python -m pip uninstall -y mkl-static mkl-include && \
+    cd intel-extension-for-pytorch && \
+    python -m pip install pyyaml && \
+    VER_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version) && \
+    VER_TORCHVISION=$(python tools/yaml_utils.py -f dependency_version.yml -d torchvision -k version) && \
+    VER_TORCHAUDIO=$(python tools/yaml_utils.py -f dependency_version.yml -d torchaudio -k version) && \
+    python -m pip uninstall -y pyyaml && \
+    cd .. && \
+    echo ${VER_TORCH} | grep "dev" > /dev/null; TORCH_DEV=$?; URL_NIGHTLY=""; if [ ${TORCH_DEV} -eq 0 ]; then URL_NIGHTLY="nightly/"; fi; echo "#!/bin/bash\npython -m pip install torch==${VER_TORCH} torchvision==${VER_TORCHVISION} torchaudio==${VER_TORCHAUDIO} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu" > torch_install.sh
+
+FROM base AS deploy
+COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/dist ./wheels
+COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh .
+COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/torch_install.sh .
+RUN . ./miniconda3/bin/activate && \
+    conda create -y -n py310 python=3.10 && conda activate py310 && \
+    bash ./torch_install.sh && rm ./torch_install.sh && \
+    python -m pip install ./wheels/*.whl && \
     python -m pip install intel-openmp && \
-    echo "conda activate py310" >> ~/.bashrc && \
-    echo "export LD_PRELOAD=${CONDA_PREFIX}/lib/libstdc++.so" >> ~/.bashrc && \
-    echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ~/.bashrc
+    conda install -y jemalloc gperftools -c conda-forge && \
+    python -m pip cache purge && \
+    conda clean -a -y && \
+    rm -rf ./wheels && \
+    echo "conda activate py310" >> ./.bashrc && \
+    ldpreload=$(bash get_libstdcpp_lib.sh) && echo "export LD_PRELOAD=${ldpreload}" >> ./.bashrc && rm get_libstdcpp_lib.sh && \
+    echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ./.bashrc

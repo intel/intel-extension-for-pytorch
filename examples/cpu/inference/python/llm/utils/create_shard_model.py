@@ -1,7 +1,7 @@
 import torch
 import argparse
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaTokenizer, T5ForConditionalGeneration
 
 # supported models
 MODEL_CLASSES = {
@@ -14,6 +14,9 @@ MODEL_CLASSES = {
     "codegen": (AutoModelForCausalLM, AutoTokenizer),
     "baichuan": (AutoModelForCausalLM, AutoTokenizer),
     "chatglm": (AutoModelForCausalLM, AutoTokenizer),
+    "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
+    "t5": (T5ForConditionalGeneration, AutoTokenizer),
+    "mistral": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 

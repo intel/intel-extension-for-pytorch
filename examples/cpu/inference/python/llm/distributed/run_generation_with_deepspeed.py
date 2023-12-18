@@ -19,11 +19,13 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     LlamaTokenizer,
+    T5ForConditionalGeneration,
 )
 
 import sys
 
 sys.path.append(sys.path[0] + '/../../')
+from llm.utils.model_class.baichuan import BaichuanTokenizer
 
 # supported models now
 MODEL_CLASSES = {
@@ -37,9 +39,12 @@ MODEL_CLASSES = {
     "chatglm": (AutoModelForCausalLM, AutoTokenizer),
     "bloom": (AutoModelForCausalLM, AutoTokenizer),
     "codegen": (AutoModelForCausalLM, AutoTokenizer),
-    "baichuan2": (AutoModelForCausalLM, AutoTokenizer),
-    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan2": (AutoModelForCausalLM, BaichuanTokenizer),
+    "baichuan": (AutoModelForCausalLM, BaichuanTokenizer),
     "chatglm": (AutoModelForCausalLM, AutoTokenizer),
+    "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
+    "t5": (T5ForConditionalGeneration, AutoTokenizer),
+    "mistral": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -241,10 +246,13 @@ if model_type == "auto":
 if model_type == "falcon":
     model_input_names = ["input_ids", "attention_mask"]
     tokenizer.model_input_names = model_input_names
-if model_type == "baichuan2":
-    from llm.utils.utils import _get_relative_imports
+
+if model_type in ["baichuan2", "baichuan"]:
+    from llm.utils.utils import _get_relative_imports, _gradient_checkpointing_disable, _gradient_checkpointing_enable
     import transformers
     transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
+    transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_disable = _gradient_checkpointing_disable
+    transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_enable = _gradient_checkpointing_enable
 
 if args.config_file is None:
     config = AutoConfig.from_pretrained(
@@ -275,7 +283,7 @@ if args.benchmark:
     deepspeed.runtime.utils.see_memory_usage("pre-from-pretrained", force=True)
 
 # Construct model with fake meta tensors, later will be replaced during ds-inference ckpt load
-if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2"]:
+if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "t5", "mistral"]:
     model = model_class[0].from_pretrained(
         model_name,
         config=config,
@@ -384,9 +392,21 @@ if args.ipex:
 
 
 # Generate
-
-
 print_rank0(f"*** Starting to generate {num_tokens} tokens with bs={args.batch_size}")
+
+num_beams = 1 if args.greedy else 4
+generate_kwargs = dict(do_sample=False, num_beams=num_beams, max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens)
+
+if args.token_latency:
+    if not hasattr(model.config, "token_latency"):
+        model.config.token_latency = True
+
+if re.search("gptbigcode", config.architectures[0], re.IGNORECASE):
+    model_type = "gptbigcode"
+elif re.search("t5", model.config.architectures[0], re.IGNORECASE):
+    generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
+    generate_kwargs.pop("max_new_tokens")
+print_rank0(f"Generate args {generate_kwargs}")
 
 # input tokens
 input_sentences = []
@@ -417,14 +437,6 @@ else:
 if args.batch_size > len(input_sentences):
     # dynamically extend to support larger bs by repetition
     input_sentences *= math.ceil(args.batch_size / len(input_sentences))
-num_beams = 1 if args.greedy else 4
-generate_kwargs = dict(max_new_tokens=num_tokens, do_sample=False, num_beams=num_beams)
-if args.token_latency:
-    if not hasattr(model.config, "token_latency"):
-        model.config.token_latency = True
-
-print_rank0(f"Generate args {generate_kwargs}")
-
 
 inputs = input_sentences[: args.batch_size]
 input_size = tokenizer.batch_encode_plus(inputs, return_tensors="pt").input_ids.size(

@@ -8,13 +8,17 @@ import copy
 import re
 import tempfile
 from intel_extension_for_pytorch.quantization import prepare, convert
+from collections import namedtuple
+import itertools
+from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
+from hf_configs.chatglm.modeling_chatglm import ChatGLMForConditionalGeneration
 
 try:
     import transformers
     from transformers import AutoConfig
 except ImportError:
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.31.0"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.35.2"]
     )
     import transformers
     from transformers import AutoConfig
@@ -49,281 +53,161 @@ def _get_gptj_example_inputs():
     )
 
 
+model_info = namedtuple(
+    "model_info",
+    "name, model_class, has_position_ids, attention_class, decoder_class",
+)
+supported_models = [
+    model_info(
+        "gptj",
+        transformers.models.gptj.modeling_gptj.GPTJForCausalLM,
+        True,
+        lambda m: m.transformer.h[0].attn.__class__,
+        lambda m: m.transformer.h[0].__class__,
+    ),
+    model_info(
+        "llama",
+        transformers.models.llama.modeling_llama.LlamaForCausalLM,
+        True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
+    model_info(
+        "gptneox",
+        transformers.models.gpt_neox.modeling_gpt_neox.GPTNeoXForCausalLM,
+        True,
+        lambda m: m.gpt_neox.layers[0].attention.__class__,
+        None,
+    ),
+    model_info(
+        "opt",
+        transformers.models.opt.modeling_opt.OPTForCausalLM,
+        False,
+        lambda m: m.model.decoder.layers[0].self_attn.__class__,
+        lambda m: m.model.decoder.layers[0].__class__,
+    ),
+    model_info(
+        "falcon",
+        transformers.models.falcon.modeling_falcon.FalconForCausalLM,
+        False,
+        lambda m: m.transformer.h[0].self_attention.__class__,
+        lambda m: m.transformer.h[0].__class__,
+    ),
+    model_info(
+        "bloom",
+        transformers.models.bloom.modeling_bloom.BloomForCausalLM,
+        False,
+        lambda m: m.transformer.h[0].self_attention.__class__,
+        lambda m: m.transformer.h[0].__class__,
+    ),
+    model_info(
+        "codegen",
+        transformers.models.codegen.modeling_codegen.CodeGenForCausalLM,
+        True,
+        lambda m: m.transformer.h[0].attn.__class__,
+        lambda m: m.transformer.h[0].__class__,
+    ),
+    model_info(
+        "baichuan",
+        BaichuanForCausalLM,
+        False,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
+    model_info(
+        "chatglm",
+        ChatGLMForConditionalGeneration,
+        False,
+        lambda m: m.transformer.encoder.layers[0].self_attention.__class__,
+        lambda m: m.transformer.encoder.layers[0].__class__,
+    ),
+    model_info(
+        "gptbigcode",
+        transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeForCausalLM,
+        True,
+        lambda m: m.transformer.h[0].attn.__class__,
+        lambda m: m.transformer.h[0].__class__,
+    ),
+    model_info(
+        "t5",
+        transformers.models.t5.modeling_t5.T5ForConditionalGeneration,
+        False,
+        lambda m: m.decoder.block[0].layer[0].SelfAttention.__class__,
+        lambda m: m.decoder.block[0].__class__,
+    ),
+    model_info(
+        "mistral",
+        transformers.models.mistral.modeling_mistral.MistralForCausalLM,
+        True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
+]
+
+
 class OptimizeTransformersTester(TestCase):
-    def model_replacement_check(self, model, has_position_id, torchcompile=False):
-        for dtype in [torch.bfloat16]:
-            for deployment_mode in [True, False]:
-                if torchcompile and deployment_mode:
-                    continue
-                ref_m = copy.deepcopy(model)
-                ipex_m = copy.deepcopy(model)
-
-                ipex_m = ipex.optimize_transformers(
-                    ipex_m, dtype=dtype, deployment_mode=deployment_mode, inplace=True
+    def model_replacement_check(self, m, dtype, deployment_mode, torchcompile=False):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/{m.name}", return_dict=False, trust_remote_code=True
+        )
+        model = m.model_class(config).eval()
+        if m.name == "falcon":
+            with torch.no_grad():
+                ipex.nn.utils._model_convert.replace_customized_linear_with_linear(
+                    model.eval()
                 )
-
-                if torchcompile:
-                    torch._dynamo.reset()
-                    ipex._set_compiler_backend("inductor")
-                    ipex_m = torch.compile(ipex_m, backend="ipex")
-
-                input_ids = torch.ones(10).to(torch.long)
-                attention_mask = torch.ones(len(input_ids))
-                with torch.no_grad(), torch.cpu.amp.autocast(
-                    enabled=True if dtype is torch.bfloat16 else False
-                ):
-                    if has_position_id:
-                        position_ids = torch.arange(len(input_ids))
-                        key_hf = ref_m(
-                            input_ids=input_ids.unsqueeze(0),
-                            attention_mask=attention_mask.unsqueeze(0),
-                            position_ids=position_ids.unsqueeze(0),
-                            use_cache=True,
-                        )
-                        key_ipex = ipex_m(
-                            input_ids=input_ids.unsqueeze(0),
-                            attention_mask=attention_mask.unsqueeze(0),
-                            position_ids=position_ids.unsqueeze(0),
-                            use_cache=True,
-                        )
-                    else:
-                        key_hf = ref_m(
-                            input_ids=input_ids.unsqueeze(0),
-                            attention_mask=attention_mask.unsqueeze(0),
-                            use_cache=True,
-                        )
-                        key_ipex = ipex_m(
-                            input_ids=input_ids.unsqueeze(0),
-                            attention_mask=attention_mask.unsqueeze(0),
-                            use_cache=True,
-                        )
-                    self.assertEqual(key_hf[0], key_ipex[0], prec=0.1)
-
-                    if re.search("GPTJ", model.config.architectures[0]) or re.search(
-                        "codegen", model.config.architectures[0]
-                    ):
-                        assert (
-                            ipex_m.transformer.h[0].attn.__class__
-                            is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
-                        )
-                        assert (
-                            ipex_m.transformer.h[0].__class__
-                            is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
-                        )
-                    elif re.search(
-                        "llama", model.config.architectures[0], re.IGNORECASE
-                    ):
-                        assert (
-                            ipex_m.model.layers[0].self_attn.__class__
-                            is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
-                        )
-                        assert (
-                            ipex_m.model.layers[0].__class__
-                            is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
-                        )
-                    elif re.search(
-                        "gptneox", model.config.architectures[0], re.IGNORECASE
-                    ):
-                        assert (
-                            ipex_m.gpt_neox.layers[0].attention.__class__
-                            is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
-                        )
-                    elif re.search("opt", model.config.architectures[0], re.IGNORECASE):
-                        assert (
-                            ipex_m.model.decoder.layers[0].self_attn.__class__
-                            is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
-                        )
-                        assert (
-                            ipex_m.model.decoder.layers[0].__class__
-                            is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
-                        )
-                    elif re.search(
-                        "falcon", model.config.architectures[0], re.IGNORECASE
-                    ) or re.search(
-                        "bloom", model.config.architectures[0], re.IGNORECASE
-                    ):
-                        assert (
-                            type(ipex_m.transformer.h[0].self_attention)
-                            is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
-                        )
-                        assert (
-                            type(ipex_m.transformer.h[0])
-                            is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
-                        )
-                    elif re.search(
-                        "baichuan", model.config.architectures[0], re.IGNORECASE
-                    ):
-                        assert (
-                            type(ipex_m.model.layers[0].self_attn)
-                            is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
-                        )
-                        assert (
-                            type(ipex_m.model.layers[0])
-                            is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
-                        )
-                    elif re.search(
-                        "chatglm", model.config.architectures[0], re.IGNORECASE
-                    ):
-                        assert (
-                            type(ipex_m.transformer.encoder.layers[0].self_attention)
-                            is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
-                        )
-                        assert (
-                            type(ipex_m.transformer.encoder.layers[0])
-                            is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
-                        )
-
-    def test_model_replacement_gptj(self):
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/gptj", return_dict=False
+        ref_m = copy.deepcopy(model)
+        ipex_m = copy.deepcopy(model)
+        ipex_m = ipex.optimize_transformers(
+            ipex_m, dtype=dtype, deployment_mode=deployment_mode, inplace=True
         )
-        m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
-        self.model_replacement_check(m, True)
+        if torchcompile:
+            torch._dynamo.reset()
+            ipex._set_compiler_backend("inductor")
+            ipex_m = torch.compile(ipex_m, backend="ipex")
 
-    def test_model_replacement_gptj_torchcompile(self):
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/gptj", return_dict=False
+        assert (
+            m.attention_class(ipex_m)
+            is ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
         )
-        m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
-        self.model_replacement_check(m, True, torchcompile=True)
-
-    def test_model_replacement_llama(self):
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/llama", return_dict=False
-        )
-        m = transformers.models.llama.modeling_llama.LlamaForCausalLM(config).eval()
-        self.model_replacement_check(m, True)
-
-    def test_model_replacement_llama_torchcompile(self):
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/llama", return_dict=False
-        )
-        m = transformers.models.llama.modeling_llama.LlamaForCausalLM(config).eval()
-        self.model_replacement_check(m, True, torchcompile=True)
-
-    def test_model_replacement_gptneox(self):
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/gptneox", return_dict=False
-        )
-        m = transformers.models.gpt_neox.modeling_gpt_neox.GPTNeoXForCausalLM(
-            config
-        ).eval()
-        self.model_replacement_check(m, True)
-
-    def test_model_replacement_gptneox_torchcompile(self):
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/gptneox", return_dict=False
-        )
-        m = transformers.models.gpt_neox.modeling_gpt_neox.GPTNeoXForCausalLM(
-            config
-        ).eval()
-        self.model_replacement_check(m, True, torchcompile=True)
-
-    def test_model_replacement_opt(self):
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/opt", return_dict=False
+        assert (
+            m.decoder_class(ipex_m)
+            is ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
+            if m.decoder_class is not None
+            else True
         )
 
-        m = transformers.models.opt.modeling_opt.OPTForCausalLM(config).eval()
-        self.model_replacement_check(m, False)
-
-    def test_model_replacement_opt_torchcompile(self):
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/opt", return_dict=False
-        )
-
-        m = transformers.models.opt.modeling_opt.OPTForCausalLM(config).eval()
-        self.model_replacement_check(m, False, torchcompile=True)
-
-    def test_model_replacement_falcon(self):
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/falcon", return_dict=False
-        )
-
-        m = transformers.models.falcon.modeling_falcon.FalconForCausalLM(config).eval()
+        input_ids = torch.ones(10).to(torch.long)
+        attention_mask = torch.ones(len(input_ids))
+        position_ids = torch.arange(len(input_ids))
+        decoder_input_ids = torch.ones(1).to(torch.long)
+        input_dict = {
+            "input_ids": input_ids.unsqueeze(0),
+            "attention_mask": attention_mask.unsqueeze(0),
+            "use_cache": True,
+        }
+        if m.has_position_ids:
+            input_dict["position_ids"] = position_ids.unsqueeze(0)
+        if re.search("t5", model.config.architectures[0], re.IGNORECASE):
+            input_dict["decoder_input_ids"] = decoder_input_ids.unsqueeze(0)
         with torch.no_grad():
-            ipex.nn.utils._model_convert.replace_customized_linear_with_linear(m.eval())
-        self.model_replacement_check(m, False)
+            key_hf = ref_m(**input_dict)
+        with torch.no_grad(), torch.cpu.amp.autocast(
+            enabled=True if dtype is torch.bfloat16 else False
+        ):
+            key_ipex = ipex_m(**input_dict)
+        self.assertEqual(key_hf[0], key_ipex[0], prec=0.1)
 
-    def test_model_replacement_falcon_torchcompile(self):
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/falcon", return_dict=False
-        )
-
-        m = transformers.models.falcon.modeling_falcon.FalconForCausalLM(config).eval()
-        with torch.no_grad():
-            ipex.nn.utils._model_convert.replace_customized_linear_with_linear(m.eval())
-        self.model_replacement_check(m, False, torchcompile=True)
-
-    def test_model_replacement_bloom(self):
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/bloom", return_dict=False
-        )
-
-        m = transformers.models.bloom.modeling_bloom.BloomForCausalLM(config).eval()
-        self.model_replacement_check(m, False)
-
-    def test_model_replacement_bloom_torchcompile(self):
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/bloom", return_dict=False
-        )
-        m = transformers.models.bloom.modeling_bloom.BloomForCausalLM(config).eval()
-        # TODO: fix accuracy issue
-        # self.model_replacement_check(m, False, torchcompile=True)
-
-    def test_model_replacement_codegen(self):
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/codegen", return_dict=False
-        )
-        m = transformers.models.codegen.modeling_codegen.CodeGenForCausalLM(
-            config
-        ).eval()
-        self.model_replacement_check(m, True)
-
-    def test_model_replacement_codegen_torchcompile(self):
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/codegen", return_dict=False
-        )
-        m = transformers.models.codegen.modeling_codegen.CodeGenForCausalLM(
-            config
-        ).eval()
-        self.model_replacement_check(m, True, torchcompile=True)
-
-    def test_model_replacement_baichuan(self):
-        from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
-
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/baichuan", return_dict=False, trust_remote_code=True
-        )
-        m = BaichuanForCausalLM(config).eval()
-        self.model_replacement_check(m, False)
-
-    def test_model_replacement_baichuan_torchcompile(self):
-        from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
-
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/baichuan", return_dict=False, trust_remote_code=True
-        )
-        m = BaichuanForCausalLM(config).eval()
-        self.model_replacement_check(m, False, torchcompile=True)
-
-    def test_model_replacement_chatglm(self):
-        from hf_configs.chatglm.modeling_chatglm import ChatGLMForConditionalGeneration
-
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/chatglm", return_dict=False, trust_remote_code=True
-        )
-        m = ChatGLMForConditionalGeneration(config).eval()
-        self.model_replacement_check(m, False)
-
-    def test_model_replacement_chatglm_torchcompile(self):
-        from hf_configs.chatglm.modeling_chatglm import ChatGLMForConditionalGeneration
-
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/chatglm", return_dict=False, trust_remote_code=True
-        )
-        m = ChatGLMForConditionalGeneration(config).eval()
-        self.model_replacement_check(m, False, torchcompile=True)
+    def test_model_replacement(self):
+        dtypes = [torch.bfloat16]
+        enable_torchcompile = [False, True]
+        deployment_mode = [True, False]
+        for m, torchcompile, dtype, jit in itertools.product(
+            supported_models, enable_torchcompile, dtypes, deployment_mode
+        ):
+            if torchcompile and deployment_mode:
+                continue
+            self.model_replacement_check(m, dtype, jit, torchcompile)
 
     def _model_replacement_check_woq(self, model):
         qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping()

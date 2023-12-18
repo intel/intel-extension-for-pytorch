@@ -4,9 +4,14 @@ from typing import Optional, Tuple, Union, List
 from transformers.modeling_outputs import (
     CausalLMOutputWithPast,
     BaseModelOutputWithPast,
+    CausalLMOutputWithCrossAttentions,
+    BaseModelOutputWithPastAndCrossAttentions,
+    Seq2SeqLMOutput,
+    BaseModelOutput,
 )
 
 from transformers.utils import logging
+import warnings
 
 logger = logging.get_logger(__name__)
 
@@ -304,6 +309,89 @@ def OPTForCausalLM_forward(
     )
 
 
+def BloomForCausalLM_forward(
+    self,
+    input_ids: Optional[torch.LongTensor] = None,
+    past_key_values: Optional[Tuple[Tuple[torch.Tensor, torch.Tensor], ...]] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    head_mask: Optional[torch.Tensor] = None,
+    inputs_embeds: Optional[torch.Tensor] = None,
+    labels: Optional[torch.Tensor] = None,
+    use_cache: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+    **deprecated_arguments,
+) -> Union[Tuple[torch.Tensor], CausalLMOutputWithCrossAttentions]:
+    r"""
+    labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
+        Labels for language modeling. Note that the labels **are shifted** inside the model, i.e. you can set
+        `labels = input_ids` Indices are selected in `[-100, 0, ..., config.vocab_size]` All labels set to `-100`
+        are ignored (masked), the loss is only computed for labels in `[0, ..., config.vocab_size]`
+    """
+    if deprecated_arguments.pop("position_ids", False) is not False:
+        warnings.warn(
+            "`position_ids` have no functionality in BLOOM and will be removed in v5.0.0. You can safely ignore"
+            " passing `position_ids`.",
+            FutureWarning,
+        )
+    if len(deprecated_arguments) > 0:
+        raise ValueError(f"Got unexpected arguments: {deprecated_arguments}")
+
+    return_dict = (
+        return_dict if return_dict is not None else self.config.use_return_dict
+    )
+
+    transformer_outputs = self.transformer(
+        input_ids,
+        past_key_values=past_key_values,
+        attention_mask=attention_mask,
+        head_mask=head_mask,
+        inputs_embeds=inputs_embeds,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+        output_hidden_states=output_hidden_states,
+        return_dict=return_dict,
+    )
+    hidden_states = transformer_outputs[0]
+
+    if (
+        hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and hidden_states.size(1) != 1
+    ):
+        hidden_states = hidden_states[:, -1:, :]
+    lm_logits = self.lm_head(hidden_states)
+
+    loss = None
+    if labels is not None:
+        # move labels to correct device to enable model parallelism
+        labels = labels.to(lm_logits.device)
+        # Shift so that tokens < n predict n
+        shift_logits = lm_logits[..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous()
+        batch_size, seq_length, vocab_size = shift_logits.shape
+        # Flatten the tokens
+        loss_fct = CrossEntropyLoss()
+        loss = loss_fct(
+            shift_logits.view(batch_size * seq_length, vocab_size),
+            shift_labels.view(batch_size * seq_length),
+        )
+
+    if not return_dict:
+        output = (lm_logits,) + transformer_outputs[1:]
+        return ((loss,) + output) if loss is not None else output
+
+    return CausalLMOutputWithCrossAttentions(
+        loss=loss,
+        logits=lm_logits,
+        past_key_values=transformer_outputs.past_key_values,
+        hidden_states=transformer_outputs.hidden_states,
+        attentions=transformer_outputs.attentions,
+    )
+
+
 def CodeGenForCausalLM_forward(
     self,
     input_ids: Optional[torch.LongTensor] = None,
@@ -343,7 +431,13 @@ def CodeGenForCausalLM_forward(
         return_dict=return_dict,
     )
     hidden_states = transformer_outputs[0]
-
+    if (
+        hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and hidden_states.size(1) != 1
+    ):
+        hidden_states = hidden_states[:, -1:, :]
     # make sure sampling in fp16 works correctly and
     # compute loss in fp32 to match with mesh-tf version
     # https://github.com/EleutherAI/gpt-neo/blob/89ce74164da2fb16179106f54e2269b5da8db333/models/gpt2/gpt2.py#L179
@@ -565,7 +659,7 @@ def BaichuanForCausalLM_forward(
     position_ids: Optional[torch.LongTensor] = None,
     inputs_embeds: Optional[torch.FloatTensor] = None,
     labels: Optional[torch.LongTensor] = None,
-    use_cache: Optional[bool] = None,
+    use_cache: Optional[bool] = True,
     output_attentions: Optional[bool] = False,
     output_hidden_states: Optional[bool] = False,
     return_dict: Optional[bool] = None,
@@ -601,6 +695,13 @@ def BaichuanForCausalLM_forward(
         )
 
     hidden_states = outputs[0]
+    if (
+        hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and hidden_states.size(1) != 1
+    ):
+        hidden_states = hidden_states[:, -1:, :]
     logits = self.lm_head(hidden_states)
     loss = None
     if labels is not None:
@@ -804,6 +905,13 @@ def ChatGLMForConditionalGeneration_forward(
     hidden_states = transformer_outputs[0]
     if return_last_logit:
         hidden_states = hidden_states[-1:]
+    if (
+        hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and hidden_states.size(1) != 1
+    ):
+        hidden_states = hidden_states[:, -1:, :]
     lm_logits = self.transformer.output_layer(hidden_states)
     lm_logits = lm_logits.transpose(0, 1).contiguous()
 
@@ -836,6 +944,542 @@ def ChatGLMForConditionalGeneration_forward(
     )
 
 
+def GPTBigCodeModel_forward(
+    self,
+    input_ids: Optional[torch.Tensor] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    past_key_values: Optional[List[torch.Tensor]] = None,
+    position_ids: Optional[torch.Tensor] = None,
+    token_type_ids: Optional[torch.Tensor] = None,
+    head_mask: Optional[torch.Tensor] = None,
+    inputs_embeds: Optional[torch.Tensor] = None,
+    encoder_hidden_states: Optional[torch.Tensor] = None,
+    encoder_attention_mask: Optional[torch.Tensor] = None,
+    use_cache: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+) -> Union[Tuple, BaseModelOutputWithPastAndCrossAttentions]:
+    output_attentions = (
+        output_attentions
+        if output_attentions is not None
+        else self.config.output_attentions
+    )
+    output_hidden_states = (
+        output_hidden_states
+        if output_hidden_states is not None
+        else self.config.output_hidden_states
+    )
+    use_cache = use_cache if use_cache is not None else self.config.use_cache
+    return_dict = (
+        return_dict if return_dict is not None else self.config.use_return_dict
+    )
+
+    if input_ids is not None and inputs_embeds is not None:
+        raise ValueError(
+            "You cannot specify both input_ids and inputs_embeds at the same time"
+        )
+    elif input_ids is not None:
+        input_shape = input_ids.size()
+        input_ids = input_ids.view(-1, input_shape[-1])
+        batch_size = input_ids.shape[0]
+    elif inputs_embeds is not None:
+        input_shape = inputs_embeds.size()[:-1]
+        batch_size = inputs_embeds.shape[0]
+    else:
+        raise ValueError("You have to specify either input_ids or inputs_embeds")
+
+    if batch_size <= 0:
+        raise ValueError("batch_size has to be defined and > 0")
+
+    device = input_ids.device if input_ids is not None else inputs_embeds.device
+
+    if token_type_ids is not None:
+        token_type_ids = token_type_ids.view(-1, input_shape[-1])
+    if position_ids is not None:
+        position_ids = position_ids.view(-1, input_shape[-1])
+
+    if past_key_values is None:
+        past_length = 0
+        past_key_values = tuple([None] * len(self.h))
+    else:
+        past_length = past_key_values[0][0].shape[2]
+
+    if (
+        attention_mask is not None
+        and len(attention_mask.shape) == 2
+        and position_ids is None
+    ):
+        # create position_ids on the fly for batch generation
+        position_ids = attention_mask.long().cumsum(-1) - 1
+        position_ids.masked_fill_(attention_mask == 0, 1)
+        if past_length > 0:
+            position_ids = position_ids[
+                :, past_length : input_shape[-1] + past_length :
+            ]
+    elif position_ids is None:
+        position_ids = torch.arange(
+            past_length,
+            input_shape[-1] + past_length,
+            dtype=torch.long,
+            device=device,
+        )
+        position_ids = position_ids.unsqueeze(0).view(-1, input_shape[-1])
+
+    # Self-attention mask.
+    query_length = input_shape[-1]
+    key_length = past_length + query_length
+    self_attention_mask = self.bias[
+        None, key_length - query_length : key_length, :key_length
+    ]
+
+    if attention_mask is not None:
+        self_attention_mask = self_attention_mask * attention_mask.view(
+            batch_size, 1, -1
+        ).to(dtype=torch.bool, device=self_attention_mask.device)
+
+    # MQA models: (batch_size, query_length, n_heads, key_length)
+    # MHA models: (batch_size, n_heads, query_length, key_length)
+    # attention_mask = self_attention_mask.unsqueeze(2 if self.multi_query else 1)
+    attention_mask = self_attention_mask.unsqueeze(1)
+
+    # If a 2D or 3D attention mask is provided for the cross-attention
+    # we need to make broadcastable to [batch_size, num_heads, seq_length, seq_length]
+    if (
+        self.config.add_cross_attention
+        and encoder_hidden_states is not None
+        and encoder_attention_mask is not None
+    ):
+        if encoder_attention_mask.dim() == 2:
+            encoder_attention_mask.unsqueeze(1)
+        assert encoder_attention_mask.dim() == 3
+        encoder_attention_mask = encoder_attention_mask.bool().unsqueeze(
+            2 if self.multi_query else 1
+        )
+    else:
+        encoder_attention_mask = None
+
+    # Prepare head mask if needed
+    # 1.0 in head_mask indicate we keep the head
+    # attention_probs has shape bsz x n_heads x N x N
+    # head_mask has shape n_layer x batch x n_heads x N x N
+    head_mask = self.get_head_mask(head_mask, self.config.n_layer)
+
+    if inputs_embeds is None:
+        inputs_embeds = self.wte(input_ids)
+    position_embeds = self.wpe(position_ids)
+    hidden_states = inputs_embeds + position_embeds
+
+    if token_type_ids is not None:
+        token_type_embeds = self.wte(token_type_ids)
+        hidden_states = hidden_states + token_type_embeds
+
+    hidden_states = self.drop(hidden_states)
+
+    output_shape = input_shape + (hidden_states.size(-1),)
+
+    presents = () if use_cache else None
+    all_self_attentions = () if output_attentions else None
+    all_cross_attentions = (
+        () if output_attentions and self.config.add_cross_attention else None
+    )
+    all_hidden_states = () if output_hidden_states else None
+    for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
+        if output_hidden_states:
+            all_hidden_states = all_hidden_states + (hidden_states,)
+
+        if self.gradient_checkpointing and self.training:
+
+            def create_custom_forward(module):
+                def custom_forward(*inputs):
+                    # None for past_key_value
+                    return module(*inputs, use_cache, output_attentions)
+
+                return custom_forward
+
+            outputs = torch.utils.checkpoint.checkpoint(
+                create_custom_forward(block),
+                hidden_states,
+                None,
+                attention_mask,
+                head_mask[i],
+                encoder_hidden_states,
+                encoder_attention_mask,
+            )
+        else:
+            outputs = block(
+                hidden_states,
+                layer_past=layer_past,
+                attention_mask=attention_mask,
+                head_mask=head_mask[i],
+                encoder_hidden_states=encoder_hidden_states,
+                encoder_attention_mask=encoder_attention_mask,
+                use_cache=use_cache,
+                output_attentions=output_attentions,
+            )
+
+        hidden_states = outputs[0]
+        if use_cache:
+            presents = presents + (outputs[1],)
+
+        if output_attentions:
+            all_self_attentions = all_self_attentions + (
+                outputs[2 if use_cache else 1],
+            )
+            if self.config.add_cross_attention:
+                all_cross_attentions = all_cross_attentions + (
+                    outputs[3 if use_cache else 2],
+                )
+
+    hidden_states = self.ln_f(hidden_states)
+
+    hidden_states = hidden_states.view(output_shape)
+    # Add last hidden state
+    if output_hidden_states:
+        all_hidden_states = all_hidden_states + (hidden_states,)
+
+    if not return_dict:
+        return tuple(
+            v
+            for v in [
+                hidden_states,
+                presents,
+                all_hidden_states,
+                all_self_attentions,
+                all_cross_attentions,
+            ]
+            if v is not None
+        )
+    return BaseModelOutputWithPastAndCrossAttentions(
+        last_hidden_state=hidden_states,
+        past_key_values=presents,
+        hidden_states=all_hidden_states,
+        attentions=all_self_attentions,
+        cross_attentions=all_cross_attentions,
+    )
+
+
+def GPTBigCodeForCausalLM_forward(
+    self,
+    input_ids: Optional[torch.Tensor] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.Tensor] = None,
+    past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None,
+    token_type_ids: Optional[torch.Tensor] = None,
+    head_mask: Optional[torch.Tensor] = None,
+    inputs_embeds: Optional[torch.Tensor] = None,
+    encoder_hidden_states: Optional[torch.Tensor] = None,
+    encoder_attention_mask: Optional[torch.Tensor] = None,
+    labels: Optional[torch.Tensor] = None,
+    use_cache: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+) -> Union[Tuple, CausalLMOutputWithCrossAttentions]:
+    r"""
+    labels (`torch.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
+        Labels for language modeling. Note that the labels **are shifted** inside the model, i.e. you can set
+        `labels = input_ids` Indices are selected in `[-100, 0, ..., config.vocab_size]` All labels set to `-100`
+        are ignored (masked), the loss is only computed for labels in `[0, ..., config.vocab_size]`
+    """
+    return_dict = (
+        return_dict if return_dict is not None else self.config.use_return_dict
+    )
+
+    transformer_outputs = self.transformer(
+        input_ids,
+        past_key_values=past_key_values,
+        attention_mask=attention_mask,
+        token_type_ids=token_type_ids,
+        position_ids=position_ids,
+        head_mask=head_mask,
+        inputs_embeds=inputs_embeds,
+        encoder_hidden_states=encoder_hidden_states,
+        encoder_attention_mask=encoder_attention_mask,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+        output_hidden_states=output_hidden_states,
+        return_dict=return_dict,
+    )
+    hidden_states = transformer_outputs[0]
+    if (
+        hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and hidden_states.size(1) != 1
+    ):
+        hidden_states = hidden_states[:, -1:, :]
+    lm_logits = self.lm_head(hidden_states)
+
+    loss = None
+    if labels is not None:
+        # Shift so that tokens < n predict n
+        shift_logits = lm_logits[..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous().to(shift_logits.device)
+        # Flatten the tokens
+        loss_fct = CrossEntropyLoss()
+        loss = loss_fct(
+            shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
+        )
+
+    if not return_dict:
+        output = (lm_logits,) + transformer_outputs[1:]
+        return ((loss,) + output) if loss is not None else output
+
+    return CausalLMOutputWithCrossAttentions(
+        loss=loss,
+        logits=lm_logits,
+        past_key_values=transformer_outputs.past_key_values,
+        hidden_states=transformer_outputs.hidden_states,
+        attentions=transformer_outputs.attentions,
+        cross_attentions=transformer_outputs.cross_attentions,
+    )
+
+
+def T5ForConditionalGeneration_forward(
+    self,
+    decoder_input_ids: Optional[torch.LongTensor] = None,
+    attention_mask: Optional[torch.FloatTensor] = None,
+    past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None,
+    encoder_outputs: Optional[Tuple[Tuple[torch.Tensor]]] = None,
+    input_ids: Optional[torch.LongTensor] = None,
+    decoder_attention_mask: Optional[torch.BoolTensor] = None,
+    head_mask: Optional[torch.FloatTensor] = None,
+    decoder_head_mask: Optional[torch.FloatTensor] = None,
+    cross_attn_head_mask: Optional[torch.Tensor] = None,
+    inputs_embeds: Optional[torch.FloatTensor] = None,
+    decoder_inputs_embeds: Optional[torch.FloatTensor] = None,
+    labels: Optional[torch.LongTensor] = None,
+    use_cache: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+) -> Union[Tuple[torch.FloatTensor], Seq2SeqLMOutput]:
+    use_cache = use_cache if use_cache is not None else self.config.use_cache
+    return_dict = (
+        return_dict if return_dict is not None else self.config.use_return_dict
+    )
+
+    # FutureWarning: head_mask was separated into two input args - head_mask, decoder_head_mask
+    if head_mask is not None and decoder_head_mask is None:
+        if self.config.num_layers == self.config.num_decoder_layers:
+            warnings.warn(__HEAD_MASK_WARNING_MSG, FutureWarning)
+            decoder_head_mask = head_mask
+
+    # Encode if needed (training, first prediction pass)
+    if encoder_outputs is None:
+        # Convert encoder inputs in embeddings if needed
+        encoder_outputs = self.encoder(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            head_mask=head_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+    elif return_dict and not isinstance(encoder_outputs, BaseModelOutput):
+        encoder_outputs = BaseModelOutput(
+            last_hidden_state=encoder_outputs[0],
+            hidden_states=encoder_outputs[1] if len(encoder_outputs) > 1 else None,
+            attentions=encoder_outputs[2] if len(encoder_outputs) > 2 else None,
+        )
+
+    hidden_states = encoder_outputs[0]
+
+    if self.model_parallel:
+        torch.cuda.set_device(self.decoder.first_device)
+
+    if (
+        labels is not None
+        and decoder_input_ids is None
+        and decoder_inputs_embeds is None
+    ):
+        # get decoder inputs from shifting lm labels to the right
+        decoder_input_ids = self._shift_right(labels)
+
+    # Set device for model parallelism
+    if self.model_parallel:
+        torch.cuda.set_device(self.decoder.first_device)
+        hidden_states = hidden_states.to(self.decoder.first_device)
+        if decoder_input_ids is not None:
+            decoder_input_ids = decoder_input_ids.to(self.decoder.first_device)
+        if attention_mask is not None:
+            attention_mask = attention_mask.to(self.decoder.first_device)
+        if decoder_attention_mask is not None:
+            decoder_attention_mask = decoder_attention_mask.to(
+                self.decoder.first_device
+            )
+
+    # Decode
+    decoder_outputs = self.decoder(
+        input_ids=decoder_input_ids,
+        attention_mask=decoder_attention_mask,
+        inputs_embeds=decoder_inputs_embeds,
+        past_key_values=past_key_values,
+        encoder_hidden_states=hidden_states,
+        encoder_attention_mask=attention_mask,
+        head_mask=decoder_head_mask,
+        cross_attn_head_mask=cross_attn_head_mask,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+        output_hidden_states=output_hidden_states,
+        return_dict=return_dict,
+    )
+
+    sequence_output = decoder_outputs[0]
+
+    # Set device for model parallelism
+    if self.model_parallel:
+        torch.cuda.set_device(self.encoder.first_device)
+        self.lm_head = self.lm_head.to(self.encoder.first_device)
+        sequence_output = sequence_output.to(self.lm_head.weight.device)
+
+    if self.config.tie_word_embeddings:
+        sequence_output = sequence_output * (self.model_dim**-0.5)
+    if (
+        hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and sequence_output.size(1) != 1
+    ):
+        sequence_output = sequence_output[:, -1:, :]
+    lm_logits = self.lm_head(sequence_output)
+
+    loss = None
+    if labels is not None:
+        loss_fct = CrossEntropyLoss(ignore_index=-100)
+        # move labels to correct device to enable PP
+        labels = labels.to(lm_logits.device)
+        loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
+
+    if not return_dict:
+        output = (lm_logits,) + decoder_outputs[1:] + encoder_outputs
+        return ((loss,) + output) if loss is not None else output
+
+    return Seq2SeqLMOutput(
+        loss=loss,
+        logits=lm_logits,
+        past_key_values=decoder_outputs.past_key_values,
+        decoder_hidden_states=decoder_outputs.hidden_states,
+        decoder_attentions=decoder_outputs.attentions,
+        cross_attentions=decoder_outputs.cross_attentions,
+        encoder_last_hidden_state=encoder_outputs.last_hidden_state,
+        encoder_hidden_states=encoder_outputs.hidden_states,
+        encoder_attentions=encoder_outputs.attentions,
+    )
+
+
+def T5DenseGatedActDense_forward(self, hidden_states):
+    hidden_gelu = self.act(self.wi_0(hidden_states))
+    hidden_linear = self.wi_1(hidden_states)
+    hidden_states = hidden_gelu * hidden_linear
+    hidden_states = self.dropout(hidden_states)
+    if (
+        hasattr(self, "wo")
+        and hasattr(self.wo, "weight")
+        and isinstance(self.wo.weight, torch.Tensor)
+        and hidden_states.dtype != self.wo.weight.dtype
+        and self.wo.weight.dtype != torch.int8
+    ):
+        hidden_states = hidden_states.to(self.wo.weight.dtype)
+    hidden_states = self.wo(hidden_states)
+    return hidden_states
+
+
+def T5DenseActDense_forward(self, hidden_states):
+    hidden_states = self.wi(hidden_states)
+    hidden_states = self.act(hidden_states)
+    hidden_states = self.dropout(hidden_states)
+    if (
+        hasattr(self, "wo")
+        and hasattr(self.wo, "weight")
+        and isinstance(self.wo.weight, torch.Tensor)
+        and hidden_states.dtype != self.wo.weight.dtype
+        and self.wo.weight.dtype != torch.int8
+    ):
+        hidden_states = hidden_states.to(self.wo.weight.dtype)
+    hidden_states = self.wo(hidden_states)
+    return hidden_states
+
+
+def MistralForCausalLM_forward(
+    self,
+    input_ids: torch.LongTensor = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_values: Optional[List[torch.FloatTensor]] = None,
+    inputs_embeds: Optional[torch.FloatTensor] = None,
+    labels: Optional[torch.LongTensor] = None,
+    use_cache: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+) -> Union[Tuple, CausalLMOutputWithPast]:
+    output_attentions = (
+        output_attentions
+        if output_attentions is not None
+        else self.config.output_attentions
+    )
+    output_hidden_states = (
+        output_hidden_states
+        if output_hidden_states is not None
+        else self.config.output_hidden_states
+    )
+    return_dict = (
+        return_dict if return_dict is not None else self.config.use_return_dict
+    )
+
+    # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
+    outputs = self.model(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        position_ids=position_ids,
+        past_key_values=past_key_values,
+        inputs_embeds=inputs_embeds,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+        output_hidden_states=output_hidden_states,
+        return_dict=return_dict,
+    )
+
+    hidden_states = outputs[0]
+    if (
+        hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and hidden_states.size(1) != 1
+    ):
+        hidden_states = hidden_states[:, -1:, :]
+    logits = self.lm_head(hidden_states)
+    logits = logits.float()
+
+    loss = None
+    if labels is not None:
+        # Shift so that tokens < n predict n
+        shift_logits = logits[..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous()
+        # Flatten the tokens
+        loss_fct = CrossEntropyLoss()
+        shift_logits = shift_logits.view(-1, self.config.vocab_size)
+        shift_labels = shift_labels.view(-1)
+        # Enable model parallelism
+        shift_labels = shift_labels.to(shift_logits.device)
+        loss = loss_fct(shift_logits, shift_labels)
+
+    if not return_dict:
+        output = (logits,) + outputs[1:]
+        return (loss,) + output if loss is not None else output
+
+    return CausalLMOutputWithPast(
+        loss=loss,
+        logits=logits,
+        past_key_values=outputs.past_key_values,
+        hidden_states=outputs.hidden_states,
+        attentions=outputs.attentions,
+    )
+
+
 def prepare_inputs_for_generation(
     self,
     input_ids: torch.LongTensor,
@@ -852,3 +1496,52 @@ def prepare_inputs_for_generation(
         "use_cache": kwargs.get("use_cache"),
         "attention_mask": attention_mask,
     }
+
+
+def prepare_inputs_for_generation_gptbigcode(
+    self, input_ids, past_key_values=None, inputs_embeds=None, **kwargs
+):
+    token_type_ids = kwargs.get("token_type_ids", None)
+    # Omit tokens covered by past_key_values
+    if past_key_values:
+        past_length = past_key_values[0][0].shape[2]
+
+        # Some generation methods already pass only the last input ID
+        if input_ids.shape[1] > past_length:
+            remove_prefix_length = past_length
+        else:
+            # Default to old behavior: keep only final ID
+            remove_prefix_length = input_ids.shape[1] - 1
+
+        input_ids = input_ids[:, remove_prefix_length:]
+        if token_type_ids is not None:
+            token_type_ids = token_type_ids[:, -input_ids.shape[1] :]
+
+    attention_mask = kwargs.get("attention_mask", None)
+    position_ids = kwargs.get("position_ids", None)
+
+    if attention_mask is not None and position_ids is None:
+        # create position_ids on the fly for batch generation
+        position_ids = attention_mask.long().cumsum(-1) - 1
+        position_ids.masked_fill_(attention_mask == 0, 1)
+        if past_key_values:
+            position_ids = position_ids[:, -input_ids.shape[1] :]
+    else:
+        position_ids = None
+
+    # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
+    if inputs_embeds is not None and past_key_values is None:
+        model_inputs = {"inputs_embeds": inputs_embeds}
+    else:
+        model_inputs = {"input_ids": input_ids}
+
+    model_inputs.update(
+        {
+            "past_key_values": past_key_values,
+            "use_cache": kwargs.get("use_cache"),
+            "position_ids": position_ids,
+            "attention_mask": attention_mask,
+            "token_type_ids": token_type_ids,
+        }
+    )
+    return model_inputs

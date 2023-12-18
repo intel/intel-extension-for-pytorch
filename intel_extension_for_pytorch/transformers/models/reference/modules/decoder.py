@@ -7,6 +7,7 @@ from ...reference.fusions.linear_fusion import (
     _IPEXlinearNewGeluRef,
     _IPEXlinearReluRef,
     _IPEXlinearGeluRef,
+    _IPEXlinearMulRef,
     _IPEXlinearSiluMulRef,
 )
 
@@ -410,6 +411,282 @@ def GLMBlock_forward(
     return output, kv_cache
 
 
+def GPTBigCodeBlock_forward(
+    self,
+    hidden_states: Optional[Tuple[torch.Tensor]],
+    layer_past: Optional[torch.Tensor] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    head_mask: Optional[torch.Tensor] = None,
+    encoder_hidden_states: Optional[torch.Tensor] = None,
+    encoder_attention_mask: Optional[torch.Tensor] = None,
+    use_cache: Optional[bool] = False,
+    output_attentions: Optional[bool] = False,
+) -> Union[
+    Tuple[torch.Tensor],
+    Tuple[torch.Tensor, torch.Tensor],
+    Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+]:
+    residual = hidden_states
+    hidden_states = self.ln_1(hidden_states)
+    attn_outputs = self.attn(
+        hidden_states,
+        layer_past=layer_past,
+        attention_mask=attention_mask,
+        head_mask=head_mask,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+    )
+    attn_output = attn_outputs[0]  # output_attn: a, present, (attentions)
+    outputs = attn_outputs[1:]
+    # residual connection
+    if not self.distributed:
+        hidden_states = self.mha_linear_add(attn_output, residual)
+    else:
+        hidden_states = self.attn.c_proj(attn_output)
+        hidden_states = attn_output + residual
+
+    if encoder_hidden_states is not None:
+        # add one self-attention block for cross-attention
+        if not hasattr(self, "crossattention"):
+            raise ValueError(
+                f"If `encoder_hidden_states` are passed, {self} has to be instantiated with "
+                "cross-attention layers by setting `config.add_cross_attention=True`"
+            )
+        residual = hidden_states
+        hidden_states = self.ln_cross_attn(hidden_states)
+        cross_attn_outputs = self.crossattention(
+            hidden_states,
+            attention_mask=attention_mask,
+            head_mask=head_mask,
+            encoder_hidden_states=encoder_hidden_states,
+            encoder_attention_mask=encoder_attention_mask,
+            output_attentions=output_attentions,
+        )
+        attn_output = cross_attn_outputs[0]
+        # residual connection
+        hidden_states = residual + attn_output
+        outputs = (
+            outputs + cross_attn_outputs[2:]
+        )  # add cross attentions if we output attention weights
+
+    residual = hidden_states
+    hidden_states = self.ln_2(hidden_states)
+    feed_forward_hidden_states = self.linear_gelu(hidden_states)
+    if not self.distributed:
+        hidden_states = self.mlp_linear_add(feed_forward_hidden_states, residual)
+    else:
+        feed_forward_hidden_states = self.mlp.c_proj(feed_forward_hidden_states)
+        feed_forward_hidden_states = self.dropout(feed_forward_hidden_states)
+        # residual connection
+        hidden_states = residual + feed_forward_hidden_states
+
+    if use_cache:
+        outputs = (hidden_states,) + outputs
+    else:
+        outputs = (hidden_states,) + outputs[1:]
+
+    return outputs  # hidden_states, present, (attentions, cross_attentions)
+
+
+def T5Block_forward(
+    self,
+    hidden_states,
+    attention_mask=None,
+    position_bias=None,
+    encoder_hidden_states=None,
+    encoder_attention_mask=None,
+    encoder_decoder_position_bias=None,
+    layer_head_mask=None,
+    cross_attn_layer_head_mask=None,
+    past_key_value=None,
+    use_cache=False,
+    output_attentions=False,
+    return_dict=True,
+):
+    if past_key_value is not None:
+        if not self.is_decoder:
+            logger.warning(
+                "`past_key_values` is passed to the encoder. Please make sure this is intended."
+            )
+        expected_num_past_key_values = 4 if encoder_hidden_states is None else 8
+
+        self_attn_past_key_value = past_key_value[:4]
+        if len(past_key_value) != expected_num_past_key_values:
+            cross_attn_past_key_value = None
+        else:
+            cross_attn_past_key_value = past_key_value[4:]
+    else:
+        self_attn_past_key_value, cross_attn_past_key_value = None, None
+
+    self_attention_outputs = self.layer[0](
+        hidden_states,
+        attention_mask=attention_mask,
+        position_bias=position_bias,
+        layer_head_mask=layer_head_mask,
+        past_key_value=self_attn_past_key_value,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+    )
+    hidden_states, present_key_value_state = self_attention_outputs[:2]
+    attention_outputs = self_attention_outputs[
+        2:
+    ]  # Keep self-attention outputs and relative position weights
+
+    # clamp inf values to enable fp16 training
+    if hidden_states.dtype == torch.float16:
+        clamp_value = torch.where(
+            torch.isinf(hidden_states).any(),
+            torch.finfo(hidden_states.dtype).max - 1000,
+            torch.finfo(hidden_states.dtype).max,
+        )
+        hidden_states = torch.clamp(hidden_states, min=-clamp_value, max=clamp_value)
+
+    do_cross_attention = self.is_decoder and encoder_hidden_states is not None
+    if do_cross_attention:
+        # the actual query length is unknown for cross attention
+        # if using past key value states. Need to inject it here
+        if present_key_value_state is not None:
+            query_length = present_key_value_state[0].shape[2]
+        else:
+            query_length = None
+
+        cross_attention_outputs = self.layer[1](
+            hidden_states,
+            key_value_states=encoder_hidden_states,
+            attention_mask=encoder_attention_mask,
+            position_bias=encoder_decoder_position_bias,
+            layer_head_mask=cross_attn_layer_head_mask,
+            past_key_value=cross_attn_past_key_value,
+            query_length=query_length,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+        )
+        hidden_states = cross_attention_outputs[0]
+
+        # clamp inf values to enable fp16 training
+        if hidden_states.dtype == torch.float16:
+            clamp_value = torch.where(
+                torch.isinf(hidden_states).any(),
+                torch.finfo(hidden_states.dtype).max - 1000,
+                torch.finfo(hidden_states.dtype).max,
+            )
+            hidden_states = torch.clamp(
+                hidden_states, min=-clamp_value, max=clamp_value
+            )
+
+        # Combine self attn and cross attn key value states
+        if present_key_value_state is not None:
+            present_key_value_state = (
+                present_key_value_state + cross_attention_outputs[1]
+            )
+
+        # Keep cross-attention outputs and relative position weights
+        attention_outputs = attention_outputs + cross_attention_outputs[2:]
+
+    # Apply Feed Forward layer
+    if hasattr(self, "linear_gelu"):
+        forwarded_states = self.layer[-1].layer_norm(hidden_states)
+        hidden_gelu = self.linear_gelu(forwarded_states)
+        forwarded_states = self.linear_mul(forwarded_states, hidden_gelu)
+        if not self.distributed:
+            if (
+                hasattr(self.linear_add.linear, "weight")
+                and isinstance(self.linear_add.linear.weight, torch.Tensor)
+                and forwarded_states.dtype != self.linear_add.linear.weight.dtype
+            ):
+                forwarded_states = forwarded_states.to(
+                    self.linear_add.linear.weight.dtype
+                )
+            hidden_states = self.linear_add(forwarded_states, hidden_states)
+        else:
+            if (
+                isinstance(self.layer[-1].DenseReluDense.wo.weight, torch.Tensor)
+                and forwarded_states.dtype
+                != self.layer[-1].DenseReluDense.wo.weight.dtype
+            ):
+                forwarded_states = forwarded_states.to(
+                    self.layer[-1].DenseReluDense.wo.weight.dtype
+                )
+            forwarded_states = self.layer[-1].DenseReluDense.wo(forwarded_states)
+            hidden_states = hidden_states + self.layer[-1].DenseReluDense.dropout(
+                forwarded_states
+            )
+    else:
+        hidden_states = self.layer[-1](hidden_states)
+
+    # clamp inf values to enable fp16 training
+    if hidden_states.dtype == torch.float16:
+        clamp_value = torch.where(
+            torch.isinf(hidden_states).any(),
+            torch.finfo(hidden_states.dtype).max - 1000,
+            torch.finfo(hidden_states.dtype).max,
+        )
+        hidden_states = torch.clamp(hidden_states, min=-clamp_value, max=clamp_value)
+
+    outputs = (hidden_states,)
+
+    if use_cache:
+        outputs = outputs + (present_key_value_state,) + attention_outputs
+    else:
+        outputs = outputs + attention_outputs
+
+    # hidden-states, present_key_value_states,
+    # (self-attention position bias), (self-attention weights),
+    # (cross-attention position bias), (cross-attention weights)
+    return outputs
+
+
+def MistralDecoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    residual = hidden_states
+
+    hidden_states = self.input_layernorm(hidden_states)
+
+    # Self Attention
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        position_ids=position_ids,
+        past_key_value=past_key_value,
+        output_attentions=output_attentions,
+        use_cache=use_cache,
+    )
+    if not self.distributed:
+        hidden_states = self.mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.self_attn.o_proj(hidden_states)
+        hidden_states = residual + hidden_states
+
+    # Fully Connected
+    residual = hidden_states
+    hidden_states = self.post_attention_layernorm(hidden_states)
+
+    mlp_gate = self.linear_silu_mul(hidden_states)
+
+    if not self.distributed:
+        hidden_states = self.mlp_linear_add(mlp_gate, residual)
+    else:
+        hidden_states = self.mlp.down_proj(mlp_gate)
+        hidden_states = residual + hidden_states
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (self_attn_weights,)
+
+    if use_cache:
+        outputs += (present_key_value,)
+
+    return outputs
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -427,7 +704,11 @@ class _IPEXDecoderLayerRef(nn.Module):
                 del self.__dict__["_modules"]["mlp"].fc_out
             self.linear_gelu = _IPEXlinearNewGeluRef(module.mlp.fc_in)
             del self.__dict__["_modules"]["mlp"].fc_in
-        elif self.model_backbone in ["LlamaForCausalLM", "BaichuanForCausalLM"]:
+        elif self.model_backbone in [
+            "LlamaForCausalLM",
+            "BaichuanForCausalLM",
+            "MistralForCausalLM",
+        ]:
             if not self.distributed:
                 self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
                 self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.down_proj)
@@ -475,6 +756,29 @@ class _IPEXDecoderLayerRef(nn.Module):
                 self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.dense_4h_to_h)
                 del self.__dict__["_modules"]["self_attention"].dense
                 del self.__dict__["_modules"]["mlp"].dense_4h_to_h
+        elif self.model_backbone == "GPTBigCodeForCausalLM":
+            self.linear_gelu = _IPEXlinearGeluRef(module.mlp.c_fc)
+            del self.__dict__["_modules"]["mlp"].c_fc
+            if not self.distributed:
+                self.mha_linear_add = _IPEXlinearAddRef(module.attn.c_proj)
+                self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.c_proj)
+                del self.__dict__["_modules"]["attn"].c_proj
+                del self.__dict__["_modules"]["mlp"].c_proj
+        elif self.model_backbone == "T5ForConditionalGeneration":
+            if config.feed_forward_proj == "gated-gelu":
+                self.linear_gelu = _IPEXlinearGeluRef(
+                    module.layer[-1].DenseReluDense.wi_0
+                )
+                self.linear_mul = _IPEXlinearMulRef(
+                    module.layer[-1].DenseReluDense.wi_1
+                )
+                del self.__dict__["_modules"]["layer"][-1].DenseReluDense.wi_0
+                del self.__dict__["_modules"]["layer"][-1].DenseReluDense.wi_1
+                if not self.distributed:
+                    self.linear_add = _IPEXlinearAddRef(
+                        module.layer[-1].DenseReluDense.wo
+                    )
+                    del self.__dict__["_modules"]["layer"][-1].DenseReluDense.wo
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -492,6 +796,11 @@ class _IPEXDecoderLayerRef(nn.Module):
         past_key_value: Optional[Tuple[torch.Tensor]] = None,
         alibi: Optional[torch.Tensor] = None,
         rotary_pos_emb: Optional[torch.Tensor] = None,
+        encoder_hidden_states: Optional[torch.Tensor] = None,
+        encoder_attention_mask: Optional[torch.Tensor] = None,
+        position_bias: Optional[torch.Tensor] = None,
+        encoder_decoder_position_bias: Optional[torch.Tensor] = None,
+        cross_attn_layer_head_mask: Optional[torch.Tensor] = None,
     ):
         if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
             return GPTJBlock_forward(
@@ -562,6 +871,43 @@ class _IPEXDecoderLayerRef(nn.Module):
         elif self.model_backbone == "ChatGLMModel":
             return GLMBlock_forward(
                 self, hidden_states, attention_mask, rotary_pos_emb, kv_cache, use_cache
+            )
+        elif self.model_backbone == "GPTBigCodeForCausalLM":
+            return GPTBigCodeBlock_forward(
+                self,
+                hidden_states,
+                layer_past,
+                attention_mask,
+                head_mask,
+                encoder_hidden_states,
+                encoder_attention_mask,
+                use_cache,
+                output_attentions,
+            )
+        elif self.model_backbone == "T5ForConditionalGeneration":
+            return T5Block_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_bias,
+                encoder_hidden_states,
+                encoder_attention_mask,
+                encoder_decoder_position_bias,
+                layer_head_mask,
+                cross_attn_layer_head_mask,
+                past_key_value,
+                use_cache,
+                output_attentions,
+            )
+        elif self.model_backbone == "MistralForCausalLM":
+            return MistralDecoderLayer_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

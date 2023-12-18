@@ -51,13 +51,14 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument("--output-dir", nargs="?", default="./saved_results")
 
     # quantization related arguments.
-    parser.add_argument("--int8", action="store_true")
+    parser.add_argument("--int8", action="store_true", help="default static int8 path (fp32 mixed)")
     parser.add_argument(
         "--int8-bf16-mixed",
         action="store_true",
-        help="by default it is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
+        help="by default static quant is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
     )
-    parser.add_argument("--quantized-model-path", default="")
+    parser.add_argument("--quantized-model-path", default="", help="path to the quantized model file")
+    parser.add_argument("--qconfig-summary-file", default="", help="qconfig for static quantization")
     parser.add_argument("--quant-model-name", default="best_model.pt")
 
     parser.add_argument(
@@ -65,7 +66,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         nargs="?",
         default="NeelNanda/pile-10k",
         help="Calibration dataset for static quantization and GPTQ")
-    parser.add_argument("--ipex-smooth-quant", action="store_true")
+    parser.add_argument("--ipex-smooth-quant", action="store_true", help="smoothquant forstatic quantization")
     parser.add_argument("--alpha", default=0.5, type=float, help="alpha value for smoothquant")
     parser.add_argument(
         "--ipex-weight-only-quantization",
@@ -242,7 +243,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 else:
                     # No need to set group size if args.gptq is true
                     # Group size is read from the checkpoint
-                    quant_cmd.extend(["--group-size", str(group_size)])
+                    infer_cmd.extend(["--group-size", str(group_size)])
             else:
                 infer_cmd.extend(["--ipex-smooth-quant"])
                 infer_cmd.extend(["--alpha", str(args.alpha)])
@@ -262,7 +263,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--prompt", str(args.prompt)])
 
             print("LLM RUNTIME INFO: quantizing model ...")
-            result = subprocess.run(quant_cmd)
+            result = subprocess.run(infer_cmd)
             if result.returncode != 0:
                 print("LLM RUNTIME ERROR: Quantizing model failed. Quit.")
                 quit()
@@ -348,6 +349,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     quant_cmd.extend(["--ipex-smooth-quant"])
                     quant_cmd.extend(["--alpha", str(args.alpha)])
                     quant_cmd.extend(["--dataset", str(args.dataset)])
+                    quant_cmd.extend(["--qconfig-summary-file", str(args.qconfig_summary_file)])
                 print("LLM RUNTIME INFO: quantizing model ...")
                 result = subprocess.run(quant_cmd)
                 if result.returncode != 0:
@@ -413,6 +415,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "codegen": ("/codegen_local_shard"),
                 "baichuan": ("/baichuan_local_shard"),
                 "chatglm": ("/chatglm_local_shard"),
+                "gptbigcode": ("/gptbigcode_local_shard"),
+                "t5": ("/t5_local_shard"),
+                "mistral": ("/mistral_local_shard"),
             }
             model_type = next(
                 (x for x in MODEL_CLASSES.keys() if x in args.model_name_or_path.lower()), "auto"

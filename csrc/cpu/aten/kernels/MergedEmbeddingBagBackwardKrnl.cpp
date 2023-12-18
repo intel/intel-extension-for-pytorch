@@ -2,6 +2,7 @@
 #include <aten/MergedEmbeddingBag.h>
 #include <c10/core/CPUAllocator.h>
 #include <omp.h>
+#include "vec/merged_emb_utils.hpp"
 #include "vec/unroll_helper.hpp"
 #include "vec/vec.h"
 
@@ -19,13 +20,14 @@ typename std::enable_if<
     void>::
     type inline copy_from_grad_cache(
         data_t* wgrad,
-        const EmbeddingGradCache<acc_t>& egc,
+        const EmbeddingRowCache<acc_t>& ewc,
         int64_t emb_dim) {
 #if defined(CPU_CAPABILITY_AVX512_BF16)
   if (emb_dim == 128) {
     __m512 cache_vec[8];
-    for (auto& [k, v] : egc.cache) {
-      compile_time_for<8>::op(load_fp32, cache_vec, v.data);
+    auto emb_cache = ewc.cache();
+    for (auto& [k, v] : emb_cache) {
+      compile_time_for<8>::op(load_fp32, cache_vec, v);
       if (std::is_same<data_t, BFloat16>::value)
         compile_time_for<8>::op(
             cast_bf16_and_store, cache_vec, &wgrad[k * emb_dim]);
@@ -40,17 +42,18 @@ typename std::enable_if<
   using fVec = at::vec::Vectorized<float>;
   auto vec_size = lpVec::size();
   auto fvec_size = fVec::size();
-  for (auto& [k, v] : egc.cache) {
+  auto emb_cache = ewc.cache();
+  for (auto& [k, v] : emb_cache) {
     int64_t i = 0;
     for (; i + vec_size <= emb_dim; i += vec_size) {
-      fVec cache_vec1 = fVec::loadu(&v.data[i]);
-      fVec cache_vec2 = fVec::loadu(&v.data[i + fvec_size]);
+      fVec cache_vec1 = fVec::loadu(&v[i]);
+      fVec cache_vec2 = fVec::loadu(&v[i + fvec_size]);
       lpVec out_vec =
           at::vec::convert_from_float<data_t>(cache_vec1, cache_vec2);
       out_vec.store(&wgrad[k * emb_dim + i]);
     }
     for (; i < emb_dim; i++) {
-      wgrad[k * emb_dim + i] = data_t(v.data[i]);
+      wgrad[k * emb_dim + i] = data_t(v[i]);
     }
   }
 }
@@ -61,7 +64,7 @@ typename std::enable_if<
     void>::
     type inline copy_from_grad_cache(
         data_t* wgrad,
-        const EmbeddingGradCache<acc_t>& egc,
+        const EmbeddingRowCache<acc_t>& ewc,
         int64_t emb_dim) {
   // do nothing but just make compiler happy
   return;
@@ -82,10 +85,10 @@ typename std::enable_if<
         const data_t* grad,
         data_t* result,
         const int64_t pooling_mode,
-        EmbeddingGradCache<acc_t>& egc) {
+        EmbeddingRowCache<acc_t>& ewc) {
   using Vec = at::vec::Vectorized<data_t>;
   const auto vec_size = Vec::size();
-  auto find = egc.cache.end();
+  acc_t* find = nullptr;
   // only accumulate wid % numthd == thdidx
   const int32_t thdidx = omp_get_thread_num();
   const int32_t numthd = omp_get_num_threads();
@@ -102,10 +105,9 @@ typename std::enable_if<
       data_t scale = 1.0 / (end_idx - start_idx);
       if (wid % numthd == thdidx) {
         if (use_cache) {
-          find = egc.cache.find(wid);
-          if (find == egc.cache.end()) {
-            egc.cache.emplace(wid, emb_dim);
-            find = egc.cache.find(wid);
+          find = ewc.find(wid);
+          if (find == nullptr) {
+            find = ewc.emplace(wid, emb_dim);
           }
         }
         for (; i + vec_size <= emb_dim; i += vec_size) {
@@ -116,14 +118,12 @@ typename std::enable_if<
               grad_vec = grad_vec * Vec(scale);
             }
           }
-          auto acc_ptr =
-              use_cache ? &find->second.data[i] : &result[wid * emb_dim + i];
+          auto acc_ptr = use_cache ? &find[i] : &result[wid * emb_dim + i];
           wgrad_vec = Vec::loadu(acc_ptr);
           wgrad_vec += grad_vec;
           wgrad_vec.store(acc_ptr);
         }
-        auto acc_ptr =
-            use_cache ? &find->second.data[0] : &result[wid * emb_dim];
+        auto acc_ptr = use_cache ? &find[0] : &result[wid * emb_dim];
         for (; i < emb_dim; i++) {
           auto grad_value = grad[b * emb_dim + i];
           if (pooling_mode == MEAN && (end_idx - start_idx) > 1) {
@@ -151,7 +151,7 @@ typename std::enable_if<
         const data_t* grad,
         data_t* result,
         const int64_t pooling_mode,
-        EmbeddingGradCache<acc_t>& egc) {
+        EmbeddingRowCache<acc_t>& ewc) {
   // Low precision grad have to accumulate to cache with acc_t
   assert(use_cache);
 #if defined(CPU_CAPABILITY_AVX512_BF16)
@@ -178,10 +178,9 @@ typename std::enable_if<
       int32_t wid = indices[j];
       float scale = 1.0 / (end_idx - start_idx);
       if (wid % numthd == thdidx) {
-        auto find = egc.cache.find(wid);
-        if (find == egc.cache.end()) {
-          egc.cache.emplace(wid, emb_dim);
-          find = egc.cache.find(wid);
+        auto find = ewc.find(wid);
+        if (find == nullptr) {
+          find = ewc.emplace(wid, emb_dim);
         }
 #if defined(CPU_CAPABILITY_AVX512_BF16)
         if (emb_dim == 128) {
@@ -198,11 +197,9 @@ typename std::enable_if<
               compile_time_for<8>::op(mul_fp32_constant_b, fp32_grad, vec_l);
             }
           }
-          compile_time_for<8>::op(
-              load_fp32, fp32_acc_buffer, find->second.data);
+          compile_time_for<8>::op(load_fp32, fp32_acc_buffer, find);
           compile_time_for<8>::op(add_fp32, fp32_acc_buffer, fp32_grad);
-          compile_time_for<8>::op(
-              store_fp32, fp32_acc_buffer, find->second.data);
+          compile_time_for<8>::op(store_fp32, fp32_acc_buffer, find);
           continue;
         }
 #endif
@@ -217,19 +214,19 @@ typename std::enable_if<
               fgrad_vec2 = fgrad_vec2 * fVec(scale);
             }
           }
-          fwgrad_vec1 = fVec::loadu(&find->second.data[i]);
-          fwgrad_vec2 = fVec::loadu(&find->second.data[i + fvec_size]);
+          fwgrad_vec1 = fVec::loadu(&find[i]);
+          fwgrad_vec2 = fVec::loadu(&find[i + fvec_size]);
           fwgrad_vec1 += fgrad_vec1;
           fwgrad_vec2 += fgrad_vec2;
-          fwgrad_vec1.store(&find->second.data[i]);
-          fwgrad_vec2.store(&find->second.data[i + fvec_size]);
+          fwgrad_vec1.store(&find[i]);
+          fwgrad_vec2.store(&find[i + fvec_size]);
         }
         for (; i < emb_dim; i++) {
           float grad_value = grad[b * emb_dim + i];
           if (pooling_mode == MEAN && (end_idx - start_idx) > 1) {
             grad_value = grad_value * scale;
           }
-          find->second.data[i] += grad_value;
+          find[i] += grad_value;
         }
       }
     }
@@ -255,7 +252,7 @@ merged_embeddingbag_dense_backward(
 #pragma omp parallel
   {
     for (int32_t n = 0; n < num_emb; ++n) {
-      EmbeddingGradCache<acc_t> egc;
+      EmbeddingRowCache<acc_t> ewc;
       embeddingbag_bwd_acc_kern<data_t, index_t, acc_t, /*use_cache=*/true>(
           /*bs_begin=*/0,
           num_batch,
@@ -267,8 +264,8 @@ merged_embeddingbag_dense_backward(
           grads_ptr[n],
           o_ptr[n],
           pooling_mode,
-          egc);
-      copy_from_grad_cache(o_ptr[n], egc, emb_dim);
+          ewc);
+      copy_from_grad_cache(o_ptr[n], ewc, emb_dim);
     }
   }
 }
@@ -287,8 +284,8 @@ merged_embeddingbag_dense_backward(
     int64_t emb_dim,
     std::vector<int64_t> last_offsets,
     int64_t pooling_mode) {
-  // For float/double, do not need egc to accumulate grad
-  EmbeddingGradCache<data_t> dummy_egc;
+  // For float/double, do not need ewc to accumulate grad
+  EmbeddingRowCache<data_t> dummy_ewc;
 #pragma omp parallel
   {
     for (int32_t n = 0; n < num_emb; ++n) {
@@ -303,7 +300,7 @@ merged_embeddingbag_dense_backward(
           grads_ptr[n],
           o_ptr[n],
           pooling_mode,
-          dummy_egc);
+          dummy_ewc);
     }
   }
 }
@@ -570,14 +567,15 @@ inline void adagrad_update<at::BFloat16, float>(
 template <typename data_t, typename acc_t>
 void inline EmbeddingGradUpdate<data_t, acc_t, SGDArgs>::update(
     data_t* weight,
-    const EmbeddingGradCache<acc_t>& egc,
+    const EmbeddingRowCache<acc_t>& ewc,
     const SGDArgs& args,
     const int32_t table_id,
     const int64_t emb_dim) {
   BFloat16* bf16_trail_ptr = args.bf16_trail[table_id].data_ptr<BFloat16>();
-  for (auto& it : egc.cache) {
+  auto emb_cache = ewc.cache();
+  for (auto& it : emb_cache) {
     size_t idx = it.first;
-    auto& grad = it.second.data;
+    acc_t* grad = it.second;
     sgd_update<data_t, acc_t>(
         &weight[idx * emb_dim],
         &bf16_trail_ptr[idx * emb_dim],
@@ -591,15 +589,16 @@ void inline EmbeddingGradUpdate<data_t, acc_t, SGDArgs>::update(
 template <typename data_t, typename acc_t>
 void inline EmbeddingGradUpdate<data_t, acc_t, AdaGradArgs>::update(
     data_t* weight,
-    const EmbeddingGradCache<acc_t>& egc,
+    const EmbeddingRowCache<acc_t>& ewc,
     const AdaGradArgs& args,
     const int32_t table_id,
     const int64_t emb_dim) {
   BFloat16* bf16_trail_ptr = args.bf16_trail[table_id].data_ptr<BFloat16>();
   acc_t* hessian_ptr = args.hessian[table_id].data_ptr<acc_t>();
-  for (auto& it : egc.cache) {
+  auto emb_cache = ewc.cache();
+  for (auto& it : emb_cache) {
     size_t idx = it.first;
-    auto& grad = it.second.data;
+    acc_t* grad = it.second;
     adagrad_update<data_t, acc_t>(
         &weight[idx * emb_dim],
         &bf16_trail_ptr[idx * emb_dim],
@@ -629,7 +628,7 @@ void merged_embeddingbag_backward_update(
 #pragma omp parallel
   {
     for (int32_t n = 0; n < num_emb; ++n) {
-      EmbeddingGradCache<acc_t> egc;
+      EmbeddingRowCache<acc_t> ewc;
       embeddingbag_bwd_acc_kern<data_t, index_t, acc_t, /*use_cache=*/true>(
           /*bs_begin=*/0,
           num_batch,
@@ -641,9 +640,9 @@ void merged_embeddingbag_backward_update(
           grads_ptr[n],
           /*outout_ptr=*/nullptr,
           pooling_mode,
-          egc);
+          ewc);
       EmbeddingGradUpdate<data_t, acc_t, optimizer_arg_t>::update(
-          w_ptr[n], egc, args, n, emb_dim);
+          w_ptr[n], ewc, args, n, emb_dim);
     }
   }
 }
@@ -802,6 +801,241 @@ void merged_embeddingbag_backward_adagrad_cpu_kernel_impl(
       });
 }
 
+template <typename acc_t, typename data_t, typename index_t>
+void prepare_emb_bwd_cache(
+    std::vector<EmbeddingRowCache<acc_t>>& cache,
+    data_t* grad_ptr,
+    index_t** indices_ptr,
+    std::vector<int64_t> row_offsets,
+    index_t** offsets_ptr,
+    int64_t gbatch,
+    int64_t num_emb,
+    int64_t emb_dim,
+    int64_t world_size,
+    int64_t rank,
+    std::vector<int64_t> last_offsets) {
+  const int64_t lbatch = gbatch / world_size;
+#pragma omp parallel
+  {
+    const int64_t num_thd = omp_get_num_threads();
+    int64_t tid = omp_get_thread_num();
+    for (int64_t n = 0; n < num_emb; ++n) {
+      index_t* index = indices_ptr[n];
+      index_t* offsets = offsets_ptr[n];
+      int64_t last_offset = last_offsets[n];
+      int64_t row_offset = row_offsets[n];
+      for (int64_t b = 0; b < lbatch; ++b) {
+        int64_t gb = rank * lbatch + b;
+        int64_t start_idx = offsets[gb];
+        int64_t end_idx = ((gb + 1) == gbatch && last_offset != -1)
+            ? last_offset
+            : offsets[gb + 1];
+        for (int64_t j = start_idx; j < end_idx; ++j) {
+          index_t emb_idx = index[j] + row_offset;
+          if (((emb_idx / world_size) % num_thd == tid)) {
+            index_t dest = emb_idx % world_size;
+            EmbeddingRowCache<acc_t>& emb_cache = cache[dest * num_thd + tid];
+            auto find = emb_cache.find(emb_idx);
+            if (find == nullptr) {
+              find = emb_cache.emplace(emb_idx, emb_dim);
+            }
+            const data_t* grdPtr =
+                &grad_ptr[(b * num_emb + n) * emb_dim]; // EMBGRD
+            add_ker<acc_t, data_t>(find, grdPtr, emb_dim);
+          }
+        }
+      }
+    }
+  }
+  return;
+}
+
+std::tuple<std::vector<Tensor>, std::vector<Tensor>, std::vector<Tensor>>
+mergedemb_distribute_backward_local_kernel_impl(
+    const Tensor& grad,
+    const std::vector<int64_t> row_offset,
+    const TensorList& indices,
+    const TensorList& offsets,
+    const int64_t rank,
+    const int64_t world_size,
+    const bool include_last_offsets) {
+  RECORD_FUNCTION(__FUNCTION__, c10::ArrayRef<c10::IValue>({}));
+
+  int64_t num_emb = indices.size();
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(num_emb > 0);
+  int64_t global_batch_size = offsets[0].size(0);
+  if (include_last_offsets) {
+    global_batch_size -= 1;
+  }
+  int64_t emb_dim = grad.size(2);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(num_emb == indices.size());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(num_emb == offsets.size());
+
+  auto index_type = indices[0].scalar_type();
+  auto data_type = grad.scalar_type();
+  std::vector<int64_t> last_offsets(num_emb, -1);
+
+  for (int i = 0; i < num_emb; i++) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+        indices[i].is_contiguous() && indices[i].scalar_type() == index_type);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+        offsets[i].is_contiguous() && offsets[i].scalar_type() == index_type);
+    // handle last offsets
+    last_offsets[i] = indices[i].numel();
+  }
+
+  std::vector<Tensor> idx(world_size);
+  std::vector<Tensor> val(world_size);
+  std::vector<Tensor> ofs(world_size);
+
+  const int64_t num_thd = omp_get_max_threads();
+
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::kBFloat16,
+      grad.scalar_type(),
+      "mergedemb_distribute_backward_local",
+      [&] {
+        AT_DISPATCH_INDEX_TYPES(
+            indices[0].scalar_type(),
+            "mergedemb_distribute_backward_local",
+            [&] {
+              using acc_t = acc_type<scalar_t, true>;
+              std::vector<EmbeddingRowCache<acc_t>> cache(world_size * num_thd);
+              scalar_t* grad_ptr = grad.data_ptr<scalar_t>();
+              index_t* indices_ptr[num_emb];
+              index_t* offsets_ptr[num_emb];
+              for (int i = 0; i < num_emb; i++) {
+                indices_ptr[i] = indices[i].data_ptr<index_t>();
+                offsets_ptr[i] = offsets[i].data_ptr<index_t>();
+              }
+              // read from grad and accumuate in emb grad cache
+              prepare_emb_bwd_cache<acc_t, scalar_t, index_t>(
+                  cache,
+                  grad_ptr,
+                  indices_ptr,
+                  row_offset,
+                  offsets_ptr,
+                  global_batch_size,
+                  num_emb,
+                  emb_dim,
+                  world_size,
+                  rank,
+                  last_offsets);
+              // read from emb grad cache and write to the buffer while will be
+              // comunicated with other ranks
+              prepare_ccl_buffer<acc_t, scalar_t, index_t>(
+                  idx,
+                  val,
+                  ofs,
+                  cache,
+                  world_size,
+                  num_thd,
+                  emb_dim,
+                  indices[0].options(),
+                  grad.options());
+            });
+      });
+
+  return std::make_tuple(idx, val, ofs);
+}
+
+template <typename acc_t, typename data_t, typename index_t>
+void mergedemb_distribute_backward_merge(
+    std::vector<EmbeddingRowCache<acc_t>>& thdcache,
+    const int64_t world_size,
+    const int64_t emb_dim,
+    index_t** idx_ptr,
+    data_t** val_ptr,
+    int64_t** ofs_ptr) {
+  RECORD_FUNCTION(__FUNCTION__, c10::ArrayRef<c10::IValue>({}));
+#pragma omp parallel shared(thdcache)
+  {
+    const int64_t numthd = omp_get_num_threads();
+    const int64_t thdidx = omp_get_thread_num();
+    EmbeddingRowCache<acc_t>& cache = thdcache[thdidx];
+    for (int64_t i = 0; i < world_size; ++i) {
+      int64_t ts = ofs_ptr[i][thdidx];
+      int64_t te = ofs_ptr[i][thdidx + 1];
+      const index_t* idx = idx_ptr[i];
+      const data_t* val = val_ptr[i];
+      // j is the index of current gradient being processed in exchange buffer
+      // (val_ptr)
+      for (int64_t j = ts; j < te; ++j) {
+        const index_t emb_idx = idx[j];
+        const index_t row_idx = emb_idx / world_size;
+        auto find = cache.find(row_idx);
+        if (find == nullptr) {
+          find = cache.emplace(row_idx, emb_dim);
+        }
+        const data_t* grad = &val[j * emb_dim];
+        add_ker<acc_t, data_t>(find, grad, emb_dim);
+      }
+    }
+  }
+}
+
+template <typename acc_t, typename data_t>
+void mergedemb_distribute_adagrad_update(
+    std::vector<EmbeddingRowCache<acc_t>>& thdcache,
+    data_t* weight_ptr,
+    int64_t emb_dim,
+    AdaGradArgs args) {
+  RECORD_FUNCTION(__FUNCTION__, c10::ArrayRef<c10::IValue>({}));
+#pragma omp parallel shared(thdcache)
+  {
+    const int64_t thdidx = omp_get_thread_num();
+    EmbeddingRowCache<acc_t>& cache = thdcache[thdidx];
+    EmbeddingGradUpdate<data_t, acc_t, AdaGradArgs>::update(
+        weight_ptr, cache, args, /*table_id=*/0, emb_dim);
+  }
+}
+
+void mergedemb_distribute_backward_merge_adagrad_update_kernel_impl(
+    const TensorList& idx,
+    const TensorList& val,
+    const TensorList& ofs,
+    Tensor& weight,
+    Tensor& weight_trail,
+    Tensor& hessian,
+    const double lr,
+    const double eps) {
+  RECORD_FUNCTION(__FUNCTION__, c10::ArrayRef<c10::IValue>({}));
+  int64_t world_size = idx.size();
+  int64_t emb_dim = weight.size(1);
+  const int64_t num_thd = omp_get_max_threads();
+  // res = torch.zeros((lbatch, num_emb, emb_dim), dtype=torch.bfloat16)
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::kBFloat16,
+      weight.scalar_type(),
+      "mergedemb_distribute_backward_merge",
+      [&] {
+        AT_DISPATCH_INDEX_TYPES(
+            idx[0].scalar_type(), "mergedemb_distribute_backward_merge", [&] {
+              using acc_t = acc_type<scalar_t, true>;
+              std::vector<EmbeddingRowCache<acc_t>> cache(num_thd);
+              index_t* idx_ptr[world_size];
+              scalar_t* val_ptr[world_size];
+              int64_t* ofs_ptr[world_size];
+              for (int i = 0; i < world_size; i++) {
+                idx_ptr[i] = idx[i].data_ptr<index_t>();
+                val_ptr[i] = val[i].data_ptr<scalar_t>();
+                ofs_ptr[i] = ofs[i].data_ptr<int64_t>();
+              }
+              // read from weight and accumuate in emb cache
+              mergedemb_distribute_backward_merge<acc_t, scalar_t, index_t>(
+                  cache, world_size, emb_dim, idx_ptr, val_ptr, ofs_ptr);
+              AdaGradArgs args =
+                  AdaGradArgs({weight_trail}, {hessian}, eps, lr);
+              scalar_t* weight_ptr = weight.data_ptr<scalar_t>();
+              mergedemb_distribute_adagrad_update<acc_t, scalar_t>(
+                  cache, weight_ptr, emb_dim, args);
+            });
+      });
+
+  return;
+}
+
 } // anonymous namespace
 
 REGISTER_DISPATCH(
@@ -815,6 +1049,14 @@ REGISTER_DISPATCH(
 REGISTER_DISPATCH(
     merged_embeddingbag_backward_adagrad_cpu_kernel_stub,
     &merged_embeddingbag_backward_adagrad_cpu_kernel_impl);
+
+REGISTER_DISPATCH(
+    mergedemb_distribute_backward_local_kernel_stub,
+    &mergedemb_distribute_backward_local_kernel_impl);
+
+REGISTER_DISPATCH(
+    mergedemb_distribute_backward_merge_adagrad_update_stub,
+    &mergedemb_distribute_backward_merge_adagrad_update_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

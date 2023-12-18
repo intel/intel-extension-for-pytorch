@@ -648,3 +648,186 @@ class MergedEmbeddingBagWithCat(MergedEmbeddingBag):
             offsets,
             dense_feature,
         )
+
+
+import torch.distributed as dist
+
+
+def sparse_all2all(
+    world_size: int,
+    send_idx: List[torch.Tensor],
+    send_buf: List[torch.Tensor],
+    send_ofs: List[torch.Tensor],
+):
+    # the first thing to know is the recv tensor sizes
+    # this requires an all to all
+    is_buffers = [torch.empty(1, dtype=torch.int64) for _ in range(world_size)]
+    for i in range(world_size):
+        is_buffers[i][0] = send_idx[i].shape[0]
+    os_buffers = [torch.empty(1, dtype=torch.int64) for _ in range(world_size)]
+    dist.all_to_all(os_buffers, is_buffers)
+    dist.barrier()
+
+    # init received buffers sizes
+    index_type = send_idx[0].dtype
+    val_type = send_buf[0].dtype
+    emb_dim = send_buf[0].shape[1]
+    ofs_size = send_ofs[0].shape[0]
+    recv_idx = [torch.zeros(os_buffers[i], dtype=index_type) for i in range(world_size)]
+    recv_buf = [
+        torch.zeros((os_buffers[i], emb_dim), dtype=val_type) for i in range(world_size)
+    ]
+    recv_ofs = [torch.zeros((ofs_size,), dtype=torch.int64) for i in range(world_size)]
+    dist.all_to_all(recv_idx, send_idx)
+    dist.all_to_all(recv_buf, send_buf)
+    dist.all_to_all(recv_ofs, send_ofs)
+    dist.barrier()
+    return recv_idx, recv_buf, recv_ofs
+
+
+class DistMergeEmbeddingBagFunc(Function):
+    @staticmethod
+    def forward(
+        ctx,
+        weight: torch.Tensor,
+        row_offset: torch.Tensor,
+        indices: List[torch.Tensor],
+        offsets: List[torch.Tensor],
+        rank: int,
+        world_size: int,
+        include_last_offsets: bool,
+        adagrad_args: AdaGradArgs,
+    ):
+        global_bs = offsets[0].size(0)
+        if include_last_offsets:
+            global_bs -= 1
+        local_bs = int(global_bs / world_size)
+        ctx.indices = indices
+        ctx.offsets = offsets
+        ctx.weight = weight
+        ctx.row_offset = row_offset
+        ctx.include_last_offsets = include_last_offsets
+        ctx.adagrad_args = adagrad_args
+        ctx.rank = rank
+        ctx.world_size = world_size
+        num_emb = len(indices)
+        emb_dim = weight.shape[1]
+        (
+            send_idx,
+            send_buf,
+            send_ofs,
+        ) = torch.ops.torch_ipex.mergedemb_distribute_forward_local(
+            weight, row_offset, indices, offsets, rank, world_size, include_last_offsets
+        )
+        recv_idx, recv_buf, recv_ofs = sparse_all2all(
+            world_size, send_idx, send_buf, send_ofs
+        )
+        output = torch.empty((local_bs, num_emb, emb_dim), dtype=weight.dtype)
+        torch.ops.torch_ipex.mergedemb_distribute_forward_merge(
+            output, recv_idx, recv_buf, recv_ofs, num_emb
+        )
+        return output
+
+    @staticmethod
+    def backward(ctx, grad: torch.Tensor):
+        row_offset = ctx.row_offset
+        indices = ctx.indices
+        offsets = ctx.offsets
+        rank = ctx.rank
+        world_size = ctx.world_size
+        include_last_offsets = ctx.include_last_offsets
+        (
+            send_idx,
+            send_buf,
+            send_ofs,
+        ) = torch.ops.torch_ipex.mergedemb_distribute_backward_local(
+            grad, row_offset, indices, offsets, rank, world_size, include_last_offsets
+        )
+        recv_idx, recv_buf, recv_ofs = sparse_all2all(
+            world_size, send_idx, send_buf, send_ofs
+        )
+        weight = ctx.weight
+        adagrad_args = ctx.adagrad_args
+        trail = adagrad_args.bf16_trail
+        hessian = adagrad_args.hessian
+        lr = adagrad_args.lr
+        eps = adagrad_args.eps
+        torch.ops.torch_ipex.mergedemb_distribute_backward_merge_adagrad_update(
+            recv_idx, recv_buf, recv_ofs, weight, trail[0], hessian[0], lr, eps
+        )
+        return None, None, None, None, None, None, None, None
+
+
+class DistMergeEmbeddingBagWithAdaGrad(MergedEmbeddingBagWithAdaGrad):
+    r"""
+    The distributed version or MergedEmbeddingBagWithAdaGrad
+    After creating Pytorch Distributed process group, we can create DistMergeEmbeddingBagWithAdaGrad
+    and the emb tables will be automatically seperated to different ranks.
+    Each rank will keep particia table and will only run forward/backward/update on the rows it keeped in local.
+    We will also merge the result from different ranks through all to all during forward/backward.
+    The returned results for forward is shape of [local BS * num tables * emb_dim]
+    Example usage:
+
+        >>> EmbLists = torch.nn.Modulist(emb1, emb2, emb3, ..., emb_m)
+        >>> dist.init_process_group("ccl", world_size=world_size, rank=rank)
+        >>> distributed_emb = DistMergeEmbeddingBagWithAdaGrad.from_embeddingbag_list(EmbLists)
+        >>> out = distributed_emb(indices, offsets)
+    """
+
+    def __init__(
+        self,
+        embedding_specs: List[EmbeddingSpec],
+        lr: float = 0.01,
+        eps: float = 1e-10,
+    ):
+        super(MergedEmbeddingBagWithAdaGrad, self).__init__(embedding_specs)
+        assert (
+            self.pooling_mode == PoolingMode.SUM
+        ), "only support SUM for DistMergeEmbeddingBagWithAdaGrad"
+        self._rank = dist.get_rank()
+        self._size = dist.get_world_size()
+        # create row_offset
+        self._row_offset = [0 for i in range(self.n_tables + 1)]
+        for i in range(self.n_tables):
+            self._row_offset[i + 1] = self.weights[i].shape[0] + self._row_offset[i]
+        # create allin1 weight
+        # TODO: The initialization for weight here requiures 2 * total weight size PEAK memory
+        # We may able to optimize here to:
+        #     1. Require (1 + 1 / world_size) PEAK memory if always load all table first
+        #     2. Require (1 / world_size) memory with loading optimizations like using "meta" device
+        weight_allin1 = torch.cat([w.data for w in self.weights])[
+            self._rank :: self._size, :
+        ].clone()
+        # drop the oringal weighs
+        self.weights = nn.ParameterList([nn.parameter.Parameter(weight_allin1)])
+        self.n_tables = 1
+        self.adagrad_args = self.init_adagrad_args(lr, eps)
+        if weight_allin1.dtype == torch.bfloat16:
+            self.adagrad_args.bf16_trail.append(
+                torch.zeros_like(weight_allin1, dtype=torch.bfloat16)
+            )
+            self.adagrad_args.hessian.append(
+                torch.zeros_like(weight_allin1, dtype=torch.float)
+            )
+        else:
+            self.adagrad_args.bf16_trail.append(torch.empty(0, dtype=torch.bfloat16))
+            self.adagrad_args.hessian.append(torch.zeros_like(weight_allin1))
+
+    def forward(self, indices: List[torch.Tensor], offset: List[torch.Tensor]):
+        out = DistMergeEmbeddingBagFunc.apply(
+            self.weights[0],
+            self._row_offset,
+            indices,
+            offset,
+            self._rank,
+            self._size,
+            self.include_last_offset,
+            self.adagrad_args,
+        )
+        return out
+
+    def extra_repr(self) -> str:
+        s = ""
+        s += f"world_size: {self._size}, rank_id: {self._rank}\n"
+        s += super(DistMergeEmbeddingBagWithAdaGrad, self).extra_repr()
+        return s

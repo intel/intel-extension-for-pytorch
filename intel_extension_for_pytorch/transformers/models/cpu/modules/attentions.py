@@ -23,6 +23,7 @@ class _IPEXAttentionCPU(nn.Module):
             not in [
                 "OPTForCausalLM",
                 "BloomForCausalLM",
+                "T5ForConditionalGeneration",
             ]
             or self.model_backbone == "BaichuanForCausalLM"
             and hasattr(module, "rotary_emb")
@@ -33,13 +34,17 @@ class _IPEXAttentionCPU(nn.Module):
                 self.rope_base,
                 self.model_backbone,
             )
-        if self.model_backbone in ["GPTJForCausalLM", "LlamaForCausalLM"]:
+        if self.model_backbone in [
+            "GPTJForCausalLM",
+            "LlamaForCausalLM",
+            "MistralForCausalLM",
+        ]:
             if hasattr(module, "concat_qkv"):
                 self.concat_qkv = _IPEXConcatLinearCPU(
                     module.concat_qkv, tpp=tpp, woq=woq
                 )
 
-        if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
+        if self.model_backbone in ["CodeGenForCausalLM"]:
             self._IPEXROPE.embed_positions.sin_cos = self.embed_positions
         self.text_max_length = (
             config.text_max_length if hasattr(config, "text_max_length") else 2048

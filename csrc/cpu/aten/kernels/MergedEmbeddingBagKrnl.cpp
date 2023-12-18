@@ -6,6 +6,7 @@
 #include <aten/MergedEmbeddingBag.h>
 #include <torch/all.h>
 #include "autocast/autocast_mode.h"
+#include "vec/merged_emb_utils.hpp"
 #include "vec/unroll_helper.hpp"
 #include "vec/vec.h"
 
@@ -599,6 +600,305 @@ std::vector<Tensor> merged_embeddingbag_forward_cpu_kernel_impl(
   return outputs;
 }
 
+/**
+ * Read from embedding table, and write to world_size * num_chk * num_emb's
+ *EmbeddingRowCache world_size dimension decide which ranks should this
+ *particial look up result sent to num_emb dimmension devide which emb table
+ *should this particial look up result belong to num_chk dimension is hard code
+ *to 16 here for better parallel scope, list 3 parallel choices:
+ *(1) Only parallel on num_emb, this limite the thread nums == num_emb
+ *(2) Parallel on num_emb and gbatch. Total tasks = num_emb * gbatch
+ *(3) Parallel on num_emb and num_chk. Total tasks = num_emb * num_chk
+ *
+ *(2) may have more OMP overhead compared with (3) since per
+ *task workload is too small. And num_chk=16 is only an empirical value
+ *
+ *@param cache EmbeddingRowCache List with  world_size * num_chk * num_emb
+ *EmbeddingRowCache
+ *@param weight_ptr weight (cat all tables together) ptr
+ *@param indices_ptr num_emb's indices ptr's ptr
+ *@param row_offsets indices offset for different tables
+ *@param offsets_ptr num_emb's offsets_ptr ptr's ptr
+ *@param gbatch global batch size
+ *@param num_chk number of chunks for global batch size
+ *@param num_emb number of tables
+ *@param emb_dim num of scalers per row in embedding table
+ *@param world_size world size
+ *@param rank rank id for current device
+ *@param last_offsets last indices in case indices_ptr may not include it
+ */
+template <typename acc_t, typename data_t, typename index_t>
+void weight_to_cache_with_chunk(
+    std::vector<EmbeddingRowCache<acc_t>>& cache,
+    data_t* weight_ptr,
+    index_t** indices_ptr,
+    std::vector<int64_t> row_offsets,
+    index_t** offsets_ptr,
+    int64_t gbatch,
+    int64_t num_chk,
+    int64_t num_emb,
+    int64_t emb_dim,
+    int64_t world_size,
+    int64_t rank,
+    std::vector<int64_t> last_offsets) {
+  RECORD_FUNCTION(__FUNCTION__, c10::ArrayRef<c10::IValue>({}));
+  const int64_t tbatch = (gbatch - 1) / num_chk + 1;
+  const int64_t lbatch = gbatch / world_size;
+#pragma omp parallel for collapse(2) schedule(guided) shared(cache)
+  for (int64_t n = 0; n < num_emb; ++n) {
+    for (int64_t nc = 0; nc < num_chk; ++nc) {
+      int64_t tb_start = nc * tbatch;
+      int64_t tb_end = std::min(tb_start + tbatch, gbatch);
+      index_t* index = indices_ptr[n];
+      index_t* offsets = offsets_ptr[n];
+      int64_t last_offset = last_offsets[n];
+      int64_t row_offset = row_offsets[n];
+      for (int64_t gb = tb_start; gb < tb_end; ++gb) {
+        int64_t start_idx = offsets[gb];
+        int64_t end_idx = ((gb + 1) == gbatch && last_offset != -1)
+            ? last_offset
+            : offsets[gb + 1];
+        for (int64_t j = start_idx; j < end_idx; ++j) {
+          index_t emb_idx = index[j] + row_offset;
+          if ((emb_idx % world_size == rank)) {
+            index_t dest = gb / lbatch;
+            index_t rowi = (gb % lbatch * num_emb) + n;
+            EmbeddingRowCache<acc_t>& emb_cache =
+                cache[dest * num_emb * num_chk + nc * num_emb + n];
+            index_t local_index = emb_idx / world_size;
+            const data_t* wgtPtr = &weight_ptr[local_index * emb_dim];
+            auto find = emb_cache.find(rowi);
+            if (find == nullptr) {
+              find = emb_cache.emplace(rowi, emb_dim);
+            }
+            // load and add to cache
+            add_ker<acc_t, data_t>(find, wgtPtr, emb_dim);
+          }
+        }
+      }
+    }
+  }
+  return;
+}
+
+/**
+ * reduce the EmbeddingRowCache list from world_size * num_chk * num_emb to
+ *world_size * num_emb (on num_chk dimension)
+ *@param cache EmbeddingRowCache List with  world_size * num_emb
+ *EmbeddingRowCache
+ *@param cache_with_chunk EmbeddingRowCache List with  world_size * num_chk *
+ *num_emb
+ *@param num_chk number of chunks for global batch size
+ *@param num_emb number of tables
+ *@param emb_dim num of scalers per row in embedding table
+ *@param world_size world size
+ */
+template <typename acc_t, typename index_t>
+void accumulate_on_chunks(
+    std::vector<EmbeddingRowCache<acc_t>>& cache,
+    std::vector<EmbeddingRowCache<acc_t>>& cache_with_chunk,
+    int64_t num_chk,
+    int64_t num_emb,
+    int64_t emb_dim,
+    int64_t world_size) {
+  RECORD_FUNCTION(__FUNCTION__, c10::ArrayRef<c10::IValue>({}));
+#pragma omp parallel for collapse(2) schedule(guided)
+  for (int64_t dest = 0; dest < world_size; ++dest) {
+    for (int64_t n = 0; n < num_emb; ++n) {
+      EmbeddingRowCache<acc_t>& dst_map = cache[dest * num_emb + n];
+      for (int64_t nc = 0; nc < num_chk; ++nc) {
+        const EmbeddingRowCache<acc_t>& src_map =
+            cache_with_chunk[dest * num_emb * num_chk + nc * num_emb + n];
+        auto emb_cache = src_map.cache();
+        for (const auto& [k, v] : emb_cache) {
+          auto find = dst_map.find(k);
+          if (find == nullptr) {
+            find = dst_map.emplace(k, v, emb_dim);
+          } else {
+            add_ker<acc_t, acc_t>(find, v, emb_dim);
+          }
+        }
+      }
+    }
+  }
+  return;
+}
+
+std::tuple<std::vector<Tensor>, std::vector<Tensor>, std::vector<Tensor>>
+mergedemb_distribute_forward_local_kernel_impl(
+    const Tensor& weight,
+    const std::vector<int64_t> row_offset,
+    const TensorList& indices,
+    const TensorList& offsets,
+    const int64_t rank,
+    const int64_t world_size,
+    const bool include_last_offsets) {
+  RECORD_FUNCTION(__FUNCTION__, c10::ArrayRef<c10::IValue>({}));
+
+  int64_t num_emb = indices.size();
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(num_emb > 0);
+  int64_t global_batch_size = offsets[0].size(0);
+  if (include_last_offsets) {
+    global_batch_size -= 1;
+  }
+  int64_t emb_dim = weight.size(1);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(num_emb == indices.size());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(num_emb == offsets.size());
+
+  auto index_type = indices[0].scalar_type();
+  auto data_type = weight.scalar_type();
+  std::vector<int64_t> last_offsets(num_emb, -1);
+
+  for (int i = 0; i < num_emb; i++) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+        indices[i].is_contiguous() && indices[i].scalar_type() == index_type);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+        offsets[i].is_contiguous() && offsets[i].scalar_type() == index_type);
+    // handle last offsets
+    last_offsets[i] = indices[i].numel();
+  }
+
+  std::vector<Tensor> idx(world_size);
+  std::vector<Tensor> val(world_size);
+  std::vector<Tensor> ofs(world_size);
+
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::kBFloat16,
+      at::kHalf,
+      weight.scalar_type(),
+      "mergedemb_distribute_forward_local",
+      [&] {
+        AT_DISPATCH_INDEX_TYPES(
+            indices[0].scalar_type(),
+            "mergedemb_distribute_forward_local",
+            [&] {
+              using acc_t = acc_type<scalar_t, true>;
+              std::vector<EmbeddingRowCache<acc_t>> cache(world_size * num_emb);
+              scalar_t* weight_ptr = weight.data_ptr<scalar_t>();
+              index_t* indices_ptr[num_emb];
+              index_t* offsets_ptr[num_emb];
+              for (int i = 0; i < num_emb; i++) {
+                indices_ptr[i] = indices[i].data_ptr<index_t>();
+                offsets_ptr[i] = offsets[i].data_ptr<index_t>();
+              }
+              // read from weight and accumuate in emb cache
+              int64_t num_chk = 16;
+              std::vector<EmbeddingRowCache<acc_t>> cache_with_num_chk(
+                  world_size * num_chk * num_emb);
+              weight_to_cache_with_chunk<acc_t, scalar_t, index_t>(
+                  cache_with_num_chk,
+                  weight_ptr,
+                  indices_ptr,
+                  row_offset,
+                  offsets_ptr,
+                  global_batch_size,
+                  num_chk,
+                  num_emb,
+                  emb_dim,
+                  world_size,
+                  rank,
+                  last_offsets);
+              accumulate_on_chunks<acc_t, index_t>(
+                  cache,
+                  cache_with_num_chk,
+                  num_chk,
+                  num_emb,
+                  emb_dim,
+                  world_size);
+              // read from emb cache and write to the buffer while will be
+              // comunicated with other ranks
+              prepare_ccl_buffer<acc_t, scalar_t, index_t>(
+                  idx,
+                  val,
+                  ofs,
+                  cache,
+                  world_size,
+                  num_emb,
+                  emb_dim,
+                  indices[0].options(),
+                  weight.options());
+            });
+      });
+
+  return std::make_tuple(idx, val, ofs);
+}
+
+template <typename acc_t, typename data_t, typename index_t>
+void mergedemb_distribute_forward_merge(
+    const int64_t world_size,
+    const int64_t num_emb,
+    const int64_t emb_dim,
+    index_t** idx_ptr,
+    data_t** val_ptr,
+    int64_t** ofs_ptr,
+    data_t* res_ptr) {
+#pragma omp parallel for
+  for (int64_t i = 0; i < num_emb; ++i) {
+    EmbeddingRowCache<acc_t> cache;
+    for (int64_t j = 0; j < world_size; ++j) {
+      const int64_t ts = ofs_ptr[j][i];
+      const int64_t te = ofs_ptr[j][i + 1];
+      for (int64_t k = ts; k < te; ++k) {
+        index_t rowi = idx_ptr[j][k];
+        const data_t* accPtr = &val_ptr[j][k * emb_dim];
+        auto find = cache.find(rowi);
+        if (find == nullptr) {
+          find = cache.emplace(rowi, emb_dim);
+        }
+        add_ker<acc_t, data_t>(find, accPtr, emb_dim);
+      }
+    }
+    auto emb_cache = cache.cache();
+    for (auto& [key, value] : emb_cache) {
+      data_t* dest = &res_ptr[key * emb_dim]; // EMBRES
+      move_ker<data_t, acc_t>(dest, value, emb_dim);
+    }
+  }
+}
+
+void mergedemb_distribute_forward_merge_kernel_impl(
+    Tensor& output,
+    const TensorList& idx,
+    const TensorList& val,
+    const TensorList& ofs,
+    const int64_t num_emb) {
+  RECORD_FUNCTION(__FUNCTION__, c10::ArrayRef<c10::IValue>({}));
+  int64_t world_size = idx.size();
+  int64_t emb_dim = output.size(2);
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::kBFloat16,
+      at::kHalf,
+      output.scalar_type(),
+      "mergedemb_distribute_forward_merge",
+      [&] {
+        AT_DISPATCH_INDEX_TYPES(
+            idx[0].scalar_type(), "mergedemb_distribute_forward_merge", [&] {
+              using acc_t = acc_type<scalar_t, true>;
+              scalar_t* res_ptr = output.data_ptr<scalar_t>();
+              index_t* idx_ptr[world_size];
+              scalar_t* val_ptr[world_size];
+              int64_t* ofs_ptr[world_size];
+              for (int i = 0; i < world_size; i++) {
+                idx_ptr[i] = idx[i].data_ptr<index_t>();
+                val_ptr[i] = val[i].data_ptr<scalar_t>();
+                ofs_ptr[i] = ofs[i].data_ptr<int64_t>();
+              }
+              // read from weight and accumuate in emb cache
+              mergedemb_distribute_forward_merge<acc_t, scalar_t, index_t>(
+                  world_size,
+                  num_emb,
+                  emb_dim,
+                  idx_ptr,
+                  val_ptr,
+                  ofs_ptr,
+                  res_ptr);
+            });
+      });
+
+  return;
+}
+
 } // anonymous namespace
 
 REGISTER_DISPATCH(
@@ -607,6 +907,11 @@ REGISTER_DISPATCH(
 REGISTER_DISPATCH(
     merged_embeddingbag_cat_fw_stub,
     &merged_embedding_cat_fw_impl);
-
+REGISTER_DISPATCH(
+    mergedemb_distribute_forward_local_kernel_stub,
+    &mergedemb_distribute_forward_local_kernel_impl);
+REGISTER_DISPATCH(
+    mergedemb_distribute_forward_merge_kernel_stub,
+    &mergedemb_distribute_forward_merge_kernel_impl);
 } // namespace cpu
 } // namespace torch_ipex

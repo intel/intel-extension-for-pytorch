@@ -1262,7 +1262,8 @@ first_token_masked_mha(
     at::Tensor& beam_idx,
     const int64_t beam_batch,
     const double scale_attn,
-    at::Tensor attention_mask) {
+    at::Tensor attention_mask,
+    bool add_casual_mask = true) {
   auto origin_type = query.scalar_type();
   auto bs = query.size(0);
   auto query_length = query.size(1);
@@ -1276,11 +1277,13 @@ first_token_masked_mha(
     key_cache = key_cache.to(at::kFloat);
     value_cache = value_cache.to(at::kFloat);
   }
-  auto casual_mask =
-      at::full({query_length, key_lenght}, -1e6, query.options());
-  casual_mask = at::triu(casual_mask, 1);
-  casual_mask = casual_mask.unsqueeze(0).unsqueeze(0);
-  attention_mask = attention_mask + casual_mask;
+  if (add_casual_mask) {
+    auto casual_mask =
+        at::full({query_length, key_lenght}, -1e6, query.options());
+    casual_mask = at::triu(casual_mask, 1);
+    casual_mask = casual_mask.unsqueeze(0).unsqueeze(0);
+    attention_mask = attention_mask + casual_mask;
+  }
   if (key.scalar_type() != at::kBFloat16 && key.scalar_type() != at::kFloat) {
     TORCH_CHECK(
         false,
@@ -1301,7 +1304,8 @@ first_token_masked_mha(
   }
   auto attn_outputs = at::Tensor();
   auto attn_weights = at::Tensor();
-  if (key.scalar_type() == at::kFloat || key.scalar_type() == at::kBFloat16) {
+  if ((key.scalar_type() == at::kFloat || key.scalar_type() == at::kBFloat16) &&
+      attention_mask.stride(-1) == 1) {
     query = query.transpose(1, 2);
     key = key.transpose(1, 2);
     value = value.transpose(1, 2);
@@ -1350,7 +1354,8 @@ masked_multihead_self_attention_kernel_impl(
     const double scale_attn,
     int64_t max_positions,
     const c10::optional<at::Tensor>& head_mask /* optional */,
-    const c10::optional<at::Tensor>& attention_mask /* optional */) {
+    const c10::optional<at::Tensor>& attention_mask /* optional */,
+    c10::optional<bool> add_casual_mask /* optional */) {
   TORCH_CHECK(
       attention_mask.has_value(),
       "Attention mask is necessary for ipex::masked_multihead_self_attention_kernel_impl");
@@ -1439,7 +1444,8 @@ masked_multihead_self_attention_kernel_impl(
         beam_idx,
         beam_batch,
         scale_attn,
-        attention_mask_v);
+        attention_mask_v,
+        add_casual_mask.value_or(true));
   }
 }
 } // anonymous namespace
