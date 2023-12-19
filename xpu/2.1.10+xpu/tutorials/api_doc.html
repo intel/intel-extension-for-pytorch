@@ -373,7 +373,7 @@ on, such as SGD. The default value is <code class="docutils literal notranslate"
 <li><p><strong>dtype</strong> (<em>torch.dtype</em>) – Now it works for <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.float</span></code>.
 The default value is <code class="docutils literal notranslate"><span class="pre">torch.float</span></code>. When working with quantization, it means the mixed dtype with quantization.</p></li>
 <li><p><strong>inplace</strong> (<em>bool</em>) – Whether to perform inplace optimization. Default value is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
-<li><p><strong>device</strong> (<em>str</em>) – Specify the device on which the optimization will be performed. Select from `cpu` and `xpu`. Default value is <code class="docutils literal notranslate"><span class="pre">cpu</span></code>.</p></li>
+<li><p><strong>device</strong> (<em>str</em>) – Perform optimization on which device. Curentlty only support cpu. Default value is <code class="docutils literal notranslate"><span class="pre">cpu</span></code>.</p></li>
 <li><p><strong>quantization_config</strong> (<em>object</em>) – Defining the IPEX quantization recipe (Weight only quant or static quant).
 Default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>.
 Once used, meaning using IPEX quantizatization model for model.generate().(only works on CPU)</p></li>
@@ -1578,7 +1578,7 @@ ipex.cpu.runtime.Task object.</p>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f68dad9d040> 
+   <jinja2.runtime.BlockReference object at 0x7efcc9154970> 
   <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a></div>
 
 
