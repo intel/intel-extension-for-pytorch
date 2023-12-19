@@ -442,7 +442,7 @@ def GPTBigCodeBlock_forward(
     if not self.distributed:
         hidden_states = self.mha_linear_add(attn_output, residual)
     else:
-        hidden_states = self.attn.c_proj(attn_output)
+        attn_output = self.attn.c_proj(attn_output)
         hidden_states = attn_output + residual
 
     if encoder_hidden_states is not None:
@@ -476,7 +476,6 @@ def GPTBigCodeBlock_forward(
         hidden_states = self.mlp_linear_add(feed_forward_hidden_states, residual)
     else:
         feed_forward_hidden_states = self.mlp.c_proj(feed_forward_hidden_states)
-        feed_forward_hidden_states = self.dropout(feed_forward_hidden_states)
         # residual connection
         hidden_states = residual + feed_forward_hidden_states
 

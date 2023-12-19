@@ -197,7 +197,9 @@ if args.accuracy_only:
                 transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
                 transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_disable = _gradient_checkpointing_disable
                 transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_enable = _gradient_checkpointing_enable
-            if world_size == 1 or model_type in ["falcon", "baichuan", "t5", "mistral"]:
+            if re.search("gptbigcode", self.config.architectures[0], re.IGNORECASE):
+                model_type = "gptbigcode"
+            if world_size == 1 or model_type in ["falcon", "baichuan", "t5", "mistral", "gptbigcode"]:
                 self.model = model_class[0].from_pretrained(
                     model_id,
                     config=config,

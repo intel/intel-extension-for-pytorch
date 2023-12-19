@@ -969,7 +969,7 @@ def _GPTBigCodeAttention_forward(
         attention_mask,
     )
 
-    attn_output = attn_output.transpose(1, 2).reshape(hidden_states.shape)
+    attn_output = attn_output.transpose(1, 2).reshape(batch_size, query_length, -1)
 
     outputs = (attn_output, present)
     if output_attentions:

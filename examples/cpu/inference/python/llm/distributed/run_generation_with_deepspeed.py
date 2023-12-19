@@ -242,6 +242,8 @@ if model_type == "auto":
         "rw", config.architectures[0], re.IGNORECASE
     ):
         model_type = "falcon"
+    if re.search("gptbigcode", config.architectures[0], re.IGNORECASE):
+        model_type = "gptbigcode"
 
 if model_type == "falcon":
     model_input_names = ["input_ids", "attention_mask"]
@@ -253,7 +255,6 @@ if model_type in ["baichuan2", "baichuan"]:
     transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
     transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_disable = _gradient_checkpointing_disable
     transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_enable = _gradient_checkpointing_enable
-
 if args.config_file is None:
     config = AutoConfig.from_pretrained(
         args.model_id, torchscript=True, trust_remote_code=True
@@ -283,7 +284,7 @@ if args.benchmark:
     deepspeed.runtime.utils.see_memory_usage("pre-from-pretrained", force=True)
 
 # Construct model with fake meta tensors, later will be replaced during ds-inference ckpt load
-if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "t5", "mistral"]:
+if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "t5", "mistral", "gptbigcode"]:
     model = model_class[0].from_pretrained(
         model_name,
         config=config,
@@ -401,9 +402,7 @@ if args.token_latency:
     if not hasattr(model.config, "token_latency"):
         model.config.token_latency = True
 
-if re.search("gptbigcode", config.architectures[0], re.IGNORECASE):
-    model_type = "gptbigcode"
-elif re.search("t5", model.config.architectures[0], re.IGNORECASE):
+if re.search("t5", model.config.architectures[0], re.IGNORECASE):
     generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
     generate_kwargs.pop("max_new_tokens")
 print_rank0(f"Generate args {generate_kwargs}")
