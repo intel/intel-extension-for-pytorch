@@ -14,9 +14,9 @@ namespace cpu {
 namespace {
 
 at::Tensor tpp_linear_bias_kernel_impl(
-    at::Tensor& t_in,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias) {
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias) {
   auto sizes = t_in.sizes().vec();
   auto wt_sizes = t_wt.sizes();
   sizes[2] = wt_sizes[0] * wt_sizes[3];
@@ -38,7 +38,9 @@ at::Tensor tpp_linear_bias_kernel_impl(
   return t_out;
 }
 
-at::Tensor tpp_linear_nobias_kernel_impl(at::Tensor& t_in, at::Tensor& t_wt) {
+at::Tensor tpp_linear_nobias_kernel_impl(
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt) {
   auto sizes = t_in.sizes().vec();
   auto wt_sizes = t_wt.sizes();
   sizes[2] = wt_sizes[0] * wt_sizes[3];
@@ -61,9 +63,9 @@ at::Tensor tpp_linear_nobias_kernel_impl(at::Tensor& t_in, at::Tensor& t_wt) {
 }
 
 at::Tensor tpp_linear_gelu_kernel_impl(
-    at::Tensor& t_in,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias) {
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias) {
   auto sizes = t_in.sizes().vec();
   auto wt_sizes = t_wt.sizes();
   sizes[2] = wt_sizes[0] * wt_sizes[3];
@@ -86,9 +88,9 @@ at::Tensor tpp_linear_gelu_kernel_impl(
 }
 
 at::Tensor tpp_linear_silu_kernel_impl(
-    at::Tensor& t_in,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias) {
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias) {
   auto sizes = t_in.sizes().vec();
   auto wt_sizes = t_wt.sizes();
   sizes[2] = wt_sizes[0] * wt_sizes[3];
@@ -111,9 +113,9 @@ at::Tensor tpp_linear_silu_kernel_impl(
 }
 
 at::Tensor tpp_linear_relu_kernel_impl(
-    at::Tensor& t_in,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias) {
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias) {
   auto sizes = t_in.sizes().vec();
   auto wt_sizes = t_wt.sizes();
   sizes[2] = wt_sizes[0] * wt_sizes[3];
@@ -136,11 +138,11 @@ at::Tensor tpp_linear_relu_kernel_impl(
 }
 
 at::Tensor tpp_linear_add_add_kernel_impl(
-    at::Tensor& t_in,
-    at::Tensor& t_in1,
-    at::Tensor& t_in2,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias,
+    const at::Tensor& t_in,
+    const at::Tensor& t_in1,
+    const at::Tensor& t_in2,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias,
     double scale) {
   auto t_out = at::empty_like(t_in1);
   auto dt = t_wt.dtype();
@@ -161,10 +163,10 @@ at::Tensor tpp_linear_add_add_kernel_impl(
 }
 
 at::Tensor tpp_linear_add_kernel_impl(
-    at::Tensor& t_in,
-    at::Tensor& t_in1,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias,
+    const at::Tensor& t_in,
+    const at::Tensor& t_in1,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias,
     double scale) {
   auto t_out = at::empty_like(t_in1);
   auto dt = t_wt.dtype();
@@ -185,10 +187,10 @@ at::Tensor tpp_linear_add_kernel_impl(
 }
 
 at::Tensor tpp_linear_mul_kernel_impl(
-    at::Tensor& t_in,
-    at::Tensor& t_in1,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias) {
+    const at::Tensor& t_in,
+    const at::Tensor& t_in1,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias) {
   auto t_out = at::empty_like(t_in1);
   auto dt = t_wt.dtype();
   if (dt == at::kFloat) {

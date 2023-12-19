@@ -85,17 +85,18 @@ inline at::Tensor wt_tensor_for_first_token(at::Tensor& t) {
 
 template <typename T>
 inline void tpp_linear_bias(
-    at::Tensor& t_in,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias,
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias,
     at::Tensor& t_out) {
+  auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
-  auto wt_sizes = t_wt.sizes();
+  auto wt_sizes = t_wt_.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
   if (BS > FT_OPT_SIZE) { // first token compute
     if (wt_sizes[3] != 100) {
-      t_wt = wt_tensor_for_first_token<T>(t_wt);
-      wt_sizes = t_wt.sizes();
+      t_wt_ = wt_tensor_for_first_token<T>(t_wt_);
+      wt_sizes = t_wt_.sizes();
     }
     large_cache_opt = true;
   }
@@ -108,7 +109,7 @@ inline void tpp_linear_bias(
   auto Hk = wt_sizes[3];
   auto K = Nk * Hk;
 
-  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt);
+  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt_);
 
   auto in = GetVLAPtr<T>(t_in, {Nc, Hc});
 
@@ -172,16 +173,17 @@ inline void tpp_linear_bias(
 
 template <typename T, typename Tout = T>
 inline void tpp_linear_no_bias(
-    at::Tensor& t_in,
-    at::Tensor& t_wt,
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt,
     at::Tensor& t_out) {
+  auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
-  auto wt_sizes = t_wt.sizes();
+  auto wt_sizes = t_wt_.sizes();
   if (BS > FT_OPT_SIZE) { // first token compute
     if (wt_sizes[3] != 100) {
-      t_wt = wt_tensor_for_first_token<T>(t_wt);
-      wt_sizes = t_wt.sizes();
+      t_wt_ = wt_tensor_for_first_token<T>(t_wt_);
+      wt_sizes = t_wt_.sizes();
     }
     large_cache_opt = true;
   }
@@ -192,7 +194,7 @@ inline void tpp_linear_no_bias(
   auto Nk = wt_sizes[0];
   auto Hk = wt_sizes[3];
   auto K = Nk * Hk;
-  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt);
+  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt_);
 
   auto in = GetVLAPtr<T>(t_in, {Nc, Hc});
   auto wt_V = GetVLAPtr<T>(t_wt_V, {Nc, Hc * Hk});
@@ -241,18 +243,19 @@ inline void tpp_linear_no_bias(
 
 template <typename T>
 inline void tpp_linear_mul(
-    at::Tensor t_in,
-    at::Tensor t_in1,
-    at::Tensor t_wt,
-    at::Tensor t_bias,
+    const at::Tensor t_in,
+    const at::Tensor t_in1,
+    const at::Tensor t_wt,
+    const at::Tensor t_bias,
     at::Tensor t_out) {
+  auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
   if (BS > FT_OPT_SIZE) { // first token compute
-    t_wt = wt_tensor_for_first_token<T>(t_wt);
+    t_wt_ = wt_tensor_for_first_token<T>(t_wt_);
     large_cache_opt = true;
   }
-  auto wt_sizes = t_wt.sizes();
+  auto wt_sizes = t_wt_.sizes();
   auto C = in_sizes[2];
 
   auto Nc = wt_sizes[1];
@@ -261,7 +264,7 @@ inline void tpp_linear_mul(
   auto Hk = wt_sizes[3];
   auto K = Nk * Hk;
 
-  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt);
+  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt_);
 
   auto in = GetVLAPtr<T>(t_in, {Nc, Hc});
   auto in1 = GetVLAPtr<T>(t_in1, {Nk, Hk});
@@ -332,21 +335,22 @@ inline void tpp_linear_mul(
 
 template <typename T>
 inline void tpp_linear_add_add(
-    at::Tensor& t_in,
-    at::Tensor& t_in1,
-    at::Tensor& t_in2,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias,
+    const at::Tensor& t_in,
+    const at::Tensor& t_in1,
+    const at::Tensor& t_in2,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias,
     at::Tensor& t_out,
     double scale) {
+  auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
   if (BS > FT_OPT_SIZE) { // first token compute
-    t_wt = wt_tensor_for_first_token<T>(t_wt);
+    t_wt_ = wt_tensor_for_first_token<T>(t_wt_);
     large_cache_opt = true;
   }
 
-  auto wt_sizes = t_wt.sizes();
+  auto wt_sizes = t_wt_.sizes();
   auto C = in_sizes[2];
 
   auto Nc = wt_sizes[1];
@@ -355,7 +359,7 @@ inline void tpp_linear_add_add(
   auto Hk = wt_sizes[3];
   auto K = Nk * Hk;
 
-  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt);
+  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt_);
 
   auto in = GetVLAPtr<T>(t_in, {Nc, Hc});
   auto in1 = GetVLAPtr<T>(t_in1, {Nk, Hk});
@@ -430,17 +434,18 @@ inline void tpp_linear_add_add(
 
 template <typename T>
 inline void tpp_linear_gelu(
-    at::Tensor& t_in,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias,
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias,
     at::Tensor& t_out) {
+  auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
   if (BS > FT_OPT_SIZE) { // first token compute
-    t_wt = wt_tensor_for_first_token<T>(t_wt);
+    t_wt_ = wt_tensor_for_first_token<T>(t_wt_);
     large_cache_opt = true;
   }
-  auto wt_sizes = t_wt.sizes();
+  auto wt_sizes = t_wt_.sizes();
   auto C = in_sizes[2];
 
   auto Nc = wt_sizes[1];
@@ -449,7 +454,7 @@ inline void tpp_linear_gelu(
   auto Hk = wt_sizes[3];
   auto K = Nk * Hk;
 
-  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt);
+  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt_);
 
   auto in = GetVLAPtr<T>(t_in, {Nc, Hc});
   auto wt_V = GetVLAPtr<T>(t_wt_V, {Nc, Hc * Hk});
@@ -518,19 +523,20 @@ inline void tpp_linear_gelu(
 
 template <typename T>
 inline void tpp_linear_add(
-    at::Tensor t_in,
-    at::Tensor t_in1,
-    at::Tensor t_wt,
-    at::Tensor t_bias,
+    const at::Tensor t_in,
+    const at::Tensor t_in1,
+    const at::Tensor t_wt,
+    const at::Tensor t_bias,
     at::Tensor t_out,
     float scale) {
+  auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
   if (BS > FT_OPT_SIZE) { // first token compute
-    t_wt = wt_tensor_for_first_token<T>(t_wt);
+    t_wt_ = wt_tensor_for_first_token<T>(t_wt_);
     large_cache_opt = true;
   }
-  auto wt_sizes = t_wt.sizes();
+  auto wt_sizes = t_wt_.sizes();
   auto C = in_sizes[2];
 
   auto Nc = wt_sizes[1];
@@ -539,7 +545,7 @@ inline void tpp_linear_add(
   auto Hk = wt_sizes[3];
   auto K = Nk * Hk;
 
-  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt);
+  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt_);
 
   auto in = GetVLAPtr<T>(t_in, {Nc, Hc});
   auto in1 = GetVLAPtr<T>(t_in1, {Nk, Hk});
@@ -610,17 +616,18 @@ inline void tpp_linear_add(
 
 template <typename T>
 inline void tpp_linear_silu(
-    at::Tensor t_in,
-    at::Tensor t_wt,
-    at::Tensor t_bias,
+    const at::Tensor t_in,
+    const at::Tensor t_wt,
+    const at::Tensor t_bias,
     at::Tensor t_out) {
+  auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
   if (BS > FT_OPT_SIZE) { // first token compute
-    t_wt = wt_tensor_for_first_token<T>(t_wt);
+    t_wt_ = wt_tensor_for_first_token<T>(t_wt_);
     large_cache_opt = true;
   }
-  auto wt_sizes = t_wt.sizes();
+  auto wt_sizes = t_wt_.sizes();
   auto C = in_sizes[2];
 
   auto Nc = wt_sizes[1];
@@ -629,7 +636,7 @@ inline void tpp_linear_silu(
   auto Hk = wt_sizes[3];
   auto K = Nk * Hk;
 
-  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt);
+  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt_);
 
   auto in = GetVLAPtr<T>(t_in, {Nc, Hc});
   auto wt_V = GetVLAPtr<T>(t_wt_V, {Nc, Hc * Hk});
@@ -699,17 +706,18 @@ inline void tpp_linear_silu(
 
 template <typename T>
 inline void tpp_linear_relu(
-    at::Tensor t_in,
-    at::Tensor t_wt,
-    at::Tensor t_bias,
+    const at::Tensor t_in,
+    const at::Tensor t_wt,
+    const at::Tensor t_bias,
     at::Tensor t_out) {
+  auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
   if (BS > FT_OPT_SIZE) { // first token compute
-    t_wt = wt_tensor_for_first_token<T>(t_wt);
+    t_wt_ = wt_tensor_for_first_token<T>(t_wt_);
     large_cache_opt = true;
   }
-  auto wt_sizes = t_wt.sizes();
+  auto wt_sizes = t_wt_.sizes();
   auto C = in_sizes[2];
 
   auto Nc = wt_sizes[1];
@@ -718,7 +726,7 @@ inline void tpp_linear_relu(
   auto Hk = wt_sizes[3];
   auto K = Nk * Hk;
 
-  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt);
+  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt_);
 
   auto in = GetVLAPtr<T>(t_in, {Nc, Hc});
   auto wt_V = GetVLAPtr<T>(t_wt_V, {Nc, Hc * Hk});

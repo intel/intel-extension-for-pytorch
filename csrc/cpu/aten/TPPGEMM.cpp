@@ -16,69 +16,69 @@ DEFINE_DISPATCH(tpp_linear_mul_kernel_stub);
 DEFINE_DISPATCH(tpp_linear_add_add_kernel_stub);
 
 at::Tensor tpp_linear_nobias_forward_cpu(
-    at::Tensor& t_in,
-    at::Tensor& t_wt,
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt,
     c10::optional<int64_t> out_features) {
   return tpp_linear_nobias_kernel_stub(kCPU, t_in, t_wt);
 }
 
 at::Tensor tpp_linear_bias_forward_cpu(
-    at::Tensor& t_in,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias,
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias,
     c10::optional<int64_t> out_features) {
   return tpp_linear_bias_kernel_stub(kCPU, t_in, t_wt, t_bias);
 }
 
 at::Tensor tpp_linear_gelu_forward_cpu(
-    at::Tensor& t_in,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias,
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias,
     c10::optional<int64_t> out_features) {
   return tpp_linear_gelu_kernel_stub(kCPU, t_in, t_wt, t_bias);
 }
 
 at::Tensor tpp_linear_silu_forward_cpu(
-    at::Tensor& t_in,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias,
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias,
     c10::optional<int64_t> out_features) {
   return tpp_linear_silu_kernel_stub(kCPU, t_in, t_wt, t_bias);
 }
 
 at::Tensor tpp_linear_relu_forward_cpu(
-    at::Tensor& t_in,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias,
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias,
     c10::optional<int64_t> out_features) {
   return tpp_linear_relu_kernel_stub(kCPU, t_in, t_wt, t_bias);
 }
 
 at::Tensor tpp_linear_add_forward_cpu(
-    at::Tensor& t_in,
-    at::Tensor& t_in1,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias,
+    const at::Tensor& t_in,
+    const at::Tensor& t_in1,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias,
     double scale,
     c10::optional<int64_t> out_features) {
   return tpp_linear_add_kernel_stub(kCPU, t_in, t_in1, t_wt, t_bias, scale);
 }
 
 at::Tensor tpp_linear_mul_forward_cpu(
-    at::Tensor& t_in,
-    at::Tensor& t_in1,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias,
+    const at::Tensor& t_in,
+    const at::Tensor& t_in1,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias,
     c10::optional<int64_t> out_features) {
   return tpp_linear_mul_kernel_stub(kCPU, t_in, t_in1, t_wt, t_bias);
 }
 
 at::Tensor tpp_linear_add_add_forward_cpu(
-    at::Tensor& t_in,
-    at::Tensor& t_in1,
-    at::Tensor& t_in2,
-    at::Tensor& t_wt,
-    at::Tensor& t_bias,
+    const at::Tensor& t_in,
+    const at::Tensor& t_in1,
+    const at::Tensor& t_in2,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias,
     double scale,
     c10::optional<int64_t> out_features) {
   return tpp_linear_add_add_kernel_stub(

@@ -143,13 +143,17 @@ class TestTPPlinear(TestCase):
             [torch.float32, torch.bfloat16],
             ["torchscript", "inductor"],
             [True, False],
+            [True, False],
         )
         for (
             Model,
             dtype,
             compiler_backend,
             dynamic,
+            cpp_wrapper,
         ) in options:
+            if compiler_backend == "torchscript" and cpp_wrapper:
+                continue
             model = Model().to(dtype=dtype).eval()
             x = x.to(dtype=dtype)
 
@@ -160,6 +164,7 @@ class TestTPPlinear(TestCase):
                 ref_out = model(x)
             torch._dynamo.reset()
             ipex._set_compiler_backend(compiler_backend)
+            torch._inductor.config.cpp_wrapper = cpp_wrapper
             compile_model = torch.compile(model, dynamic=dynamic, backend="ipex")
             with torch.no_grad():
                 out = compile_model(x)
@@ -194,12 +199,16 @@ class TestTPPlinear(TestCase):
             [torch.float32, torch.bfloat16],
             ["torchscript", "inductor"],
             [True, False],
+            [True, False],
         )
         for (
             dtype,
             compiler_backend,
             dynamic,
+            cpp_wrapper,
         ) in options:
+            if compiler_backend == "torchscript" and cpp_wrapper:
+                continue
             model = Linear_gelu().to(dtype=dtype).eval()
             x = x.to(dtype=dtype)
 
@@ -215,6 +224,7 @@ class TestTPPlinear(TestCase):
                 ref_out = fn(x)
             torch._dynamo.reset()
             ipex._set_compiler_backend(compiler_backend)
+            torch._inductor.config.cpp_wrapper = cpp_wrapper
             compile_fn = torch.compile(fn, dynamic=dynamic, backend="ipex")
             with torch.no_grad():
                 out = compile_fn(x)
@@ -249,12 +259,16 @@ class TestTPPlinear(TestCase):
             [torch.float32, torch.bfloat16],
             ["torchscript", "inductor"],
             [True, False],
+            [True, False],
         )
         for (
             dtype,
             compiler_backend,
             dynamic,
+            cpp_wrapper,
         ) in options:
+            if compiler_backend == "torchscript" and cpp_wrapper:
+                continue
             model = Linear_silu().to(dtype=dtype).eval()
             x = x.to(dtype=dtype)
 
@@ -270,6 +284,7 @@ class TestTPPlinear(TestCase):
                 ref_out = fn(x)
             torch._dynamo.reset()
             ipex._set_compiler_backend(compiler_backend)
+            torch._inductor.config.cpp_wrapper = cpp_wrapper
             compile_fn = torch.compile(fn, dynamic=dynamic, backend="ipex")
             with torch.no_grad():
                 out = compile_fn(x)
@@ -304,12 +319,16 @@ class TestTPPlinear(TestCase):
             [torch.float32, torch.bfloat16],
             ["torchscript", "inductor"],
             [True, False],
+            [True, False],
         )
         for (
             dtype,
             compiler_backend,
             dynamic,
+            cpp_wrapper,
         ) in options:
+            if compiler_backend == "torchscript" and cpp_wrapper:
+                continue
             model = Linear_relu().to(dtype=dtype).eval()
             x = x.to(dtype=dtype)
 
@@ -325,6 +344,7 @@ class TestTPPlinear(TestCase):
                 ref_out = fn(x)
             torch._dynamo.reset()
             ipex._set_compiler_backend(compiler_backend)
+            torch._inductor.config.cpp_wrapper = cpp_wrapper
             compile_fn = torch.compile(fn, dynamic=dynamic, backend="ipex")
             with torch.no_grad():
                 out = compile_fn(x)
@@ -359,12 +379,16 @@ class TestTPPlinear(TestCase):
             [torch.float32, torch.bfloat16],
             ["torchscript", "inductor"],
             [True, False],
+            [True, False],
         )
         for (
             dtype,
             compiler_backend,
             dynamic,
+            cpp_wrapper,
         ) in options:
+            if compiler_backend == "torchscript" and cpp_wrapper:
+                continue
             model = Linear_mul().to(dtype=dtype).eval()
             x = x.to(dtype=dtype)
 
@@ -380,6 +404,7 @@ class TestTPPlinear(TestCase):
                 ref_out = fn(x)
             torch._dynamo.reset()
             ipex._set_compiler_backend(compiler_backend)
+            torch._inductor.config.cpp_wrapper = cpp_wrapper
             compile_fn = torch.compile(fn, dynamic=dynamic, backend="ipex")
             with torch.no_grad():
                 out = compile_fn(x)
@@ -414,12 +439,16 @@ class TestTPPlinear(TestCase):
             [torch.float32, torch.bfloat16],
             ["torchscript", "inductor"],
             [True, False],
+            [True, False],
         )
         for (
             dtype,
             compiler_backend,
             dynamic,
+            cpp_wrapper,
         ) in options:
+            if compiler_backend == "torchscript" and cpp_wrapper:
+                continue
             model = Linear_add().to(dtype=dtype).eval()
             x = x.to(dtype=dtype)
 
@@ -435,6 +464,7 @@ class TestTPPlinear(TestCase):
                 ref_out = fn(x)
             torch._dynamo.reset()
             ipex._set_compiler_backend(compiler_backend)
+            torch._inductor.config.cpp_wrapper = cpp_wrapper
             compile_fn = torch.compile(fn, dynamic=dynamic, backend="ipex")
             with torch.no_grad():
                 out = compile_fn(x)
@@ -469,12 +499,16 @@ class TestTPPlinear(TestCase):
             [torch.float32, torch.bfloat16],
             ["torchscript", "inductor"],
             [True, False],
+            [True, False],
         )
         for (
             dtype,
             compiler_backend,
             dynamic,
+            cpp_wrapper,
         ) in options:
+            if compiler_backend == "torchscript" and cpp_wrapper:
+                continue
             model = Linear_add_add().to(dtype=dtype).eval()
             x = x.to(dtype=dtype)
 
@@ -496,6 +530,7 @@ class TestTPPlinear(TestCase):
                 ref_out = fn(x)
             torch._dynamo.reset()
             ipex._set_compiler_backend(compiler_backend)
+            torch._inductor.config.cpp_wrapper = cpp_wrapper
             compile_fn = torch.compile(fn, dynamic=dynamic, backend="ipex")
             with torch.no_grad():
                 out = compile_fn(x)
