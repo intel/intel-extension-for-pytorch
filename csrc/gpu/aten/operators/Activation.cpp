@@ -779,8 +779,34 @@ at::Tensor& mish_out(const at::Tensor& self, at::Tensor& out) {
       });
 }
 
+Tensor mish_backward(const Tensor& grad_output, const Tensor& input) {
+  Tensor grad_input = at::empty({0}, input.options());
+  auto iter = TensorIterator::binary_op(grad_input, grad_output, input);
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "mish_backward_xpu",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [=](scalar_t dy, scalar_t x) -> scalar_t {
+              using accscalar_t = acc_type<scalar_t>;
+              const accscalar_t dy_acc = static_cast<accscalar_t>(dy);
+              const accscalar_t x_acc = static_cast<accscalar_t>(x);
+              const accscalar_t s_acc = accscalar_t(1) /
+                  (accscalar_t(1) + Numerics<accscalar_t>::exp(-x_acc));
+              const accscalar_t t_acc = std::tanh(Numerics<accscalar_t>::log1p(
+                  Numerics<accscalar_t>::exp(x_acc)));
+              return dy_acc *
+                  (t_acc + x_acc * s_acc * (accscalar_t(1) - t_acc * t_acc));
+            });
+      });
+  return grad_input;
+}
+
 TORCH_LIBRARY_IMPL(aten, XPU, m) {
   m.impl("silu_backward", TORCH_FN(silu_backward));
+  m.impl("mish_backward", TORCH_FN(mish_backward));
 }
 
 } // namespace AtenIpexTypeXPU
