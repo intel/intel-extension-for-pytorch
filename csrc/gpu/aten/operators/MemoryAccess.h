@@ -113,18 +113,19 @@ struct multi_outputs_store_helper {
 
 } // namespace detail
 
-#define NO_DOUBLE_FORALL_SCALAR_TYPES_WITH_COMPLEX_EXCEPT_COMPLEX_HALF(_) \
-  _(uint8_t, Byte)                                                        \
-  _(int8_t, Char)                                                         \
-  _(int16_t, Short)                                                       \
-  _(int, Int)                                                             \
-  _(int64_t, Long)                                                        \
-  _(at::Half, Half)                                                       \
-  _(float, Float)                                                         \
-  _(c10::complex<float>, ComplexFloat)                                    \
-  _(bool, Bool)                                                           \
-  _(at::BFloat16, BFloat16)                                               \
-  _(c10::Float8_e4m3fn, Float8_e4m3fn)                                    \
+#define NO_DOUBLE_FORALL_SCALAR_TYPES_WITH_COMPLEX(_) \
+  _(uint8_t, Byte)                                    \
+  _(int8_t, Char)                                     \
+  _(int16_t, Short)                                   \
+  _(int, Int)                                         \
+  _(int64_t, Long)                                    \
+  _(at::Half, Half)                                   \
+  _(float, Float)                                     \
+  _(c10::complex<float>, ComplexFloat)                \
+  _(c10::complex<c10::Half>, ComplexHalf)             \
+  _(bool, Bool)                                       \
+  _(at::BFloat16, BFloat16)                           \
+  _(c10::Float8_e4m3fn, Float8_e4m3fn)                \
   _(c10::Float8_e5m2, Float8_e5m2)
 
 #define NO_DOUBLE_FETCH_AND_CAST_CASE(type, scalartype) \
@@ -135,8 +136,7 @@ inline dest_t no_double_fetch_and_cast(
     const ScalarType src_type,
     const void* ptr) {
   switch (src_type) {
-    NO_DOUBLE_FORALL_SCALAR_TYPES_WITH_COMPLEX_EXCEPT_COMPLEX_HALF(
-        NO_DOUBLE_FETCH_AND_CAST_CASE)
+    NO_DOUBLE_FORALL_SCALAR_TYPES_WITH_COMPLEX(NO_DOUBLE_FETCH_AND_CAST_CASE)
     default:
       SYCL_KERNEL_ASSERT(false);
   }
@@ -153,8 +153,7 @@ inline void no_double_cast_and_store(
     void* ptr,
     src_t value) {
   switch (dest_type) {
-    NO_DOUBLE_FORALL_SCALAR_TYPES_WITH_COMPLEX_EXCEPT_COMPLEX_HALF(
-        NO_DOUBLE_CAST_AND_STORE_CASE)
+    NO_DOUBLE_FORALL_SCALAR_TYPES_WITH_COMPLEX(NO_DOUBLE_CAST_AND_STORE_CASE)
     default:;
   }
   SYCL_KERNEL_ASSERT(false);
