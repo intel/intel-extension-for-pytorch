@@ -4,6 +4,7 @@
 #include <ATen/record_function.h>
 #include <torch/library.h>
 
+#include <core/Guard.h>
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
@@ -132,6 +133,8 @@ at::Tensor nms_kernel(
       " and ",
       scores.size(0))
 
+  DPCPPGuard device_guard(dets.device());
+
   if (dets.numel() == 0) {
     return at::empty({0}, dets.options().dtype(at::kLong));
   }
@@ -208,7 +211,9 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("nms.xpu", at::AtenIpexTypeXPU::nms_kernel);
 }
 
-TORCH_LIBRARY_FRAGMENT(torchvision, m) {
-  IPEX_TORCHVISION_OP_REGISTER("nms", at::AtenIpexTypeXPU::nms_kernel);
+IPEX_TORCH_LIBRARY_IMPL(torchvision, XPU, m) {
+  m.impl(
+      TORCH_SELECTIVE_NAME("torchvision::nms"),
+      TORCH_FN((&at::AtenIpexTypeXPU::nms_kernel)));
 }
 } // namespace

@@ -251,15 +251,6 @@ extern int FLAGS_caffe2_log_level;
           IpexFunctionWarpper<decltype(Func), &Func, false, true>::type:: \
               call);
 
-#define IPEX_TORCHVISION_OP_REGISTER(NAME, Func)                          \
-  at::AtenIpexTypeXPU::construct_function_schema_and_register(            \
-      "torchvision::" NAME, Func, m);                                     \
-  m.impl(                                                                 \
-      TORCH_SELECTIVE_NAME("torchvision::" NAME),                         \
-      &AtenIpexTypeXPU::                                                  \
-          IpexFunctionWarpper<decltype(Func), &Func, false, true>::type:: \
-              call);
-
 #define IPEX_OP_REGISTER_NEED_PLAIN(NAME, Func)                \
   at::AtenIpexTypeXPU::construct_function_schema_and_register( \
       "torch_ipex::" NAME, Func, m);                           \
