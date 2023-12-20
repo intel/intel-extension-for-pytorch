@@ -225,8 +225,12 @@ void reflection_pad1d_out_template(
     return;
   Tensor input = input_.contiguous();
 
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND1(
-      kHalf, input.scalar_type(), "reflection_pad1d_out_template", [&] {
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+      kHalf,
+      kBFloat16,
+      input.scalar_type(),
+      "reflection_pad1d_out_template",
+      [&] {
         reflection_pad1d_out_kernel<scalar_t>(
             input.data_ptr<scalar_t>(),
             output.data_ptr<scalar_t>(),
@@ -321,8 +325,12 @@ void reflection_pad2d_out_template(
 
   Tensor input = input_.contiguous();
 
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND1(
-      kHalf, input.scalar_type(), "reflection_pad2d_out_template", [&] {
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+      kHalf,
+      kBFloat16,
+      input.scalar_type(),
+      "reflection_pad2d_out_template",
+      [&] {
         reflection_pad2d_out_kernel<scalar_t>(
             input.data_ptr<scalar_t>(),
             output.data_ptr<scalar_t>(),
