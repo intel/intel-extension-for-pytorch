@@ -260,44 +260,38 @@ def _beam_search(
                         for i in range(num_hidden_layers)
                     ]
                 )
-
-            if hasattr(self, "trace_graph"):
-                if first_token:
-                    new_attention_mask = model_inputs["attention_mask"][
-                        :batch_size
-                    ].clone()
-                    new_input_ids = model_inputs["input_ids"][:batch_size].clone()
+                new_attention_mask = model_inputs["attention_mask"][:batch_size].clone()
+                new_input_ids = model_inputs["input_ids"][:batch_size].clone()
+                if has_position_id:
+                    new_position_ids = model_inputs["position_ids"][:batch_size].clone()
+                for i in range(batch_size):
+                    new_attention_mask[i] = model_inputs["attention_mask"][
+                        i * num_beams
+                    ]
+                    new_input_ids[i] = model_inputs["input_ids"][i * num_beams]
                     if has_position_id:
-                        new_position_ids = model_inputs["position_ids"][
-                            :batch_size
-                        ].clone()
-                    for i in range(batch_size):
-                        new_attention_mask[i] = model_inputs["attention_mask"][
+                        new_position_ids[i] = model_inputs["position_ids"][
                             i * num_beams
                         ]
-                        new_input_ids[i] = model_inputs["input_ids"][i * num_beams]
-                        if has_position_id:
-                            new_position_ids[i] = model_inputs["position_ids"][
-                                i * num_beams
-                            ]
-                    model_inputs["attention_mask"] = new_attention_mask
-                    model_inputs["input_ids"] = new_input_ids
-                    if has_position_id:
-                        model_inputs["position_ids"] = new_position_ids
-                model_inputs.pop("use_cache", None)
-                model_inputs.pop("token_type_ids", None)
-                if "return_last_logit" in model_inputs:
-                    model_inputs["return_last_logit"] = torch.tensor(
-                        model_inputs["return_last_logit"]
-                    )
-                if self.model_backbone == "T5ForConditionalGeneration":
-                    model_inputs.pop("head_mask", None)
-                    model_inputs.pop("decoder_head_mask", None)
-                    model_inputs.pop("decoder_attention_mask", None)
-                    model_inputs.pop("cross_attn_head_mask", None)
-                    model_inputs["encoder_outputs"] = (
-                        model_inputs["encoder_outputs"]["last_hidden_state"],
-                    )
+                model_inputs["attention_mask"] = new_attention_mask
+                model_inputs["input_ids"] = new_input_ids
+                if has_position_id:
+                    model_inputs["position_ids"] = new_position_ids
+            model_inputs.pop("use_cache", None)
+            model_inputs.pop("token_type_ids", None)
+            if "return_last_logit" in model_inputs:
+                model_inputs["return_last_logit"] = torch.tensor(
+                    model_inputs["return_last_logit"]
+                )
+            if self.model_backbone == "T5ForConditionalGeneration":
+                model_inputs.pop("head_mask", None)
+                model_inputs.pop("decoder_head_mask", None)
+                model_inputs.pop("decoder_attention_mask", None)
+                model_inputs.pop("cross_attn_head_mask", None)
+                model_inputs["encoder_outputs"] = (
+                    model_inputs["encoder_outputs"]["last_hidden_state"],
+                )
+            if hasattr(self, "trace_graph"):
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
                 else:
@@ -318,6 +312,8 @@ def _beam_search(
                     output_attentions=output_attentions,
                     output_hidden_states=output_hidden_states,
                 )
+                if first_token and len(model_inputs["past_key_values"][1]) == 4:
+                    outputs.logits = outputs.logits.repeat_interleave(num_beams, dim=0)
                 if synced_gpus and this_peer_finished:
                     cur_len = cur_len + 1
                     continue  # don't waste resources running the code we don't need
