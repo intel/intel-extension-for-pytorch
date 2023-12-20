@@ -53,6 +53,8 @@ parser.add_argument(
 parser.add_argument(
     "--jit", action="store_true", help="convert model to torchscript mode."
 )
+parser.add_argument("--torch-compile", action="store_true")
+parser.add_argument("--backend", default="ipex", type=str, help="backend of torch.compile")
 parser.add_argument("--int8-bf16-mixed", action="store_true", help="int8 mixed bf16")
 parser.add_argument("--quantized-model-path", default="./saved_result/best_model.pt")
 parser.add_argument(
@@ -170,6 +172,13 @@ if args.accuracy_only:
                     inplace=True,
                     deployment_mode=False,
                 )
+
+            if args.torch_compile:
+                if dtype == "int8":
+                    raise SystemExit("[ERROR] Currently this script does not support torch.compile with int8 datatype, please set dtype to float32 or bfloat16 if want to use torch.compile.")
+                if with_jit:
+                    raise SystemExit("[ERROR] JIT cannot co-work with torch.compile, please set jit to False if want to use torch.compile.")
+                self.model.forward = torch.compile(self.model.forward, dynamic=True, backend=args.backend)
 
             self.base_model = self.model
 

@@ -147,7 +147,7 @@ if args.ipex:
 if args.torch_compile:
     if args.deployment_mode:
         raise SystemExit("[ERROR] deployment_mode cannot co-work with torch.compile, please set deployment_mode to False if want to use torch.compile.")
-    model.generate = torch.compile(model.generate, backend=args.backend)
+    model.forward = torch.compile(model.forward, dynamic=True, backend=args.backend)
 
 num_beams = 1 if args.greedy else 4
 # generate args
