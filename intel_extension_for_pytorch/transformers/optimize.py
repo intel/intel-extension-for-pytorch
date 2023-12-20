@@ -125,6 +125,7 @@ def model_convert_reference(_model):
         T5DenseGatedActDense_forward,
         T5DenseActDense_forward,
         MistralForCausalLM_forward,
+        MptForCausalLM_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptbigcode,
     )
@@ -416,6 +417,22 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+    elif _model.config.architectures[0] == "MptForCausalLM":
+        convert_function(_model, "forward", MptForCausalLM_forward)
+        convert_class(
+            _model,
+            transformers.models.mpt.modeling_mpt.MptAttention,
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            transformers.models.mpt.modeling_mpt.MptBlock,
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
     return _model
 
 
@@ -428,6 +445,8 @@ def get_dummy_input(_model, return_dict=False):
         model_num_layers = _model.config.num_hidden_layers
     elif hasattr(_model.config, "num_layers"):
         model_num_layers = _model.config.num_layers
+    elif hasattr(_model.config, "n_layers"):
+        model_num_layers = _model.config.n_layers
     else:
         AssertionError(
             False,
@@ -668,7 +687,8 @@ def optimize_transformers(
     r"""
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
     This API focus on transformers models, especially for generation tasks inference.
-    Well supported model family: Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode, T5, Mistral.
+    Well supported model family:
+    Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode, T5, Mistral, MPT.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
@@ -770,11 +790,12 @@ def optimize_transformers(
             "GPTBigCodeForCausalLM",
             "T5ForConditionalGeneration",
             "MistralForCausalLM",
+            "MptForCausalLM",
         ]
         if not well_supported_model:
             warnings.warn(
                 "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, Baichuan, ChatGLM, \
-                    GPTBigCode, T5, and Mistral, fallback to origin model"
+                    GPTBigCode, T5, Mistral, and MPT, fallback to origin model"
             )
             return model
 

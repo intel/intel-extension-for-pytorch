@@ -35,6 +35,7 @@ from llm.utils.model_class.chatglm import ChatGLMConfig
 from llm.utils.model_class.gptbigcode import GPTJBigCodeConfig
 from llm.utils.model_class.t5 import T5Config
 from llm.utils.model_class.mistral import MistralConfig
+from llm.utils.model_class.mpt import MPTConfig
 
 transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
 transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_disable = (
@@ -203,11 +204,15 @@ elif re.search("t5", config.architectures[0], re.IGNORECASE):
     model = T5Config(args.model_id)
 elif re.search("mistral", config.architectures[0], re.IGNORECASE):
     model = MistralConfig(args.model_id)
+elif re.search("mpt", config.architectures[0], re.IGNORECASE):
+    model = MPTConfig(args.model_id)
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
+if model.name == "mpt" and args.prompt is None:
+    config.max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
 
 user_model = model.get_user_model(config, args.benchmark)
 
@@ -222,34 +227,27 @@ user_model.eval()
 beam_idx_tmp = torch.zeros(
     (2048, int(args.batch_size * num_beams)), dtype=torch.long
 ).contiguous()
+def _get_target_nums(names):
+    for n in names:
+        if hasattr(user_model.config, n):
+            return getattr(user_model.config, n)
+    print(f"Not found target {names[0]}")
+    exit(0)
+num_heads_names = ["num_attention_heads", "n_head", "num_heads", "n_heads"]
+num_layers_names = ["num_hidden_layers", "n_layer", "num_layers", "n_layers"]
+hidden_size_names = ["hidden_size", "n_embd"]
+n_heads = _get_target_nums(num_heads_names)
+n_layers = _get_target_nums(num_layers_names)
+hidden_size = _get_target_nums(hidden_size_names)
+head_dim = int(hidden_size / n_heads)
 global_past_key_value = [
     (
         torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-        torch.zeros(
-            [
-                1,
-                user_model.config.num_attention_heads,
-                1,
-                int(
-                    user_model.config.hidden_size
-                    / user_model.config.num_attention_heads
-                ),
-            ]
-        ).contiguous(),
-        torch.zeros(
-            [
-                1,
-                user_model.config.num_attention_heads,
-                1,
-                int(
-                    user_model.config.hidden_size
-                    / user_model.config.num_attention_heads
-                ),
-            ]
-        ).contiguous(),
+        torch.zeros([1, n_heads, 1, head_dim]).contiguous(),
+        torch.zeros([1, n_heads, 1, head_dim]).contiguous(),
         beam_idx_tmp,
     )
-    for i in range(user_model.config.num_hidden_layers)
+    for i in range(n_layers)
 ]
 
 
@@ -533,55 +531,15 @@ elif args.ipex_weight_only_quantization:
         global_past_key_value = [
             (
                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                torch.zeros(
-                    [
-                        1,
-                        user_model.config.num_attention_heads,
-                        1,
-                        int(
-                            user_model.config.hidden_size
-                            / user_model.config.num_attention_heads
-                        ),
-                    ]
-                ).contiguous(),
-                torch.zeros(
-                    [
-                        1,
-                        user_model.config.num_attention_heads,
-                        1,
-                        int(
-                            user_model.config.hidden_size
-                            / user_model.config.num_attention_heads
-                        ),
-                    ]
-                ).contiguous(),
+                torch.zeros([1, n_heads, 1, head_dim]).contiguous(),
+                torch.zeros([1, n_heads, 1, head_dim]).contiguous(),
                 beam_idx_tmp,
                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                torch.zeros(
-                    [
-                        32,
-                        1,
-                        user_model.config.num_attention_heads,
-                        int(
-                            user_model.config.hidden_size
-                            / user_model.config.num_attention_heads
-                        ),
-                    ]
-                ).contiguous(),
-                torch.zeros(
-                    [
-                        32,
-                        1,
-                        user_model.config.num_attention_heads,
-                        int(
-                            user_model.config.hidden_size
-                            / user_model.config.num_attention_heads
-                        ),
-                    ]
-                ).contiguous(),
+                torch.zeros([32, 1, n_heads, head_dim]).contiguous(),
+                torch.zeros([32, 1, n_heads, head_dim]).contiguous(),
                 beam_idx_tmp,
             )
-            for i in range(user_model.config.num_hidden_layers)
+            for i in range(n_layers)
         ]
         example_inputs = (
             torch.ones(1).to(torch.long).unsqueeze(0),

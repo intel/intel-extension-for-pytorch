@@ -165,6 +165,7 @@ def _greedy_search(
             "GPTBigCodeForCausalLM",
             "T5ForConditionalGeneration",
             "MistralForCausalLM",
+            "MptForCausalLM",
         ]:
             first_token = False
             input_bs = input_ids.size()[0]
@@ -227,6 +228,8 @@ def _greedy_search(
                     num_hidden_layers = self.config.num_hidden_layers
                 elif hasattr(self.config, "num_layers"):
                     num_hidden_layers = self.config.num_layers
+                elif hasattr(self.config, "n_layers"):
+                    num_hidden_layers = self.config.n_layers
                 beam_idx_tmp = torch.zeros(
                     (2048, int(input_bs)), dtype=torch.long
                 ).contiguous()

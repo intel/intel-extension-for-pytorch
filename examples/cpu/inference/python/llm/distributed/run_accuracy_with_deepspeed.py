@@ -40,6 +40,7 @@ MODEL_CLASSES = {
     "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
     "t5": (T5ForConditionalGeneration, AutoTokenizer),
     "mistral": (AutoModelForCausalLM, AutoTokenizer),
+    "mpt": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -343,8 +344,8 @@ if args.accuracy_only:
             exit(0)
 
         def _get_past_key_values(self, input_bs, last_hidden_state=None):
-            num_heads_names = ["num_attention_heads", "n_head"]
-            num_layers_names = ["num_hidden_layers", "n_layer", "num_layers"]
+            num_heads_names = ["num_attention_heads", "n_head", "num_heads", "n_heads"]
+            num_layers_names = ["num_hidden_layers", "n_layer", "num_layers", "n_layers"]
             hidden_size_names = ["hidden_size", "n_embd"]
             num_attention_heads = self._get_target_nums(num_heads_names)
             num_hidden_layers = self._get_target_nums(num_layers_names)

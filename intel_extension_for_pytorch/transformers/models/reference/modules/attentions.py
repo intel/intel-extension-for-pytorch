@@ -1068,6 +1068,54 @@ def _MistralAttention_forward(
     return attn_output, attn_weights, past_key_value
 
 
+def _MptAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    position_bias: torch.Tensor,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+):
+    batch_size, seq_length = hidden_states.shape[:2]
+
+    mixed_qkv = self.Wqkv(hidden_states)
+    query_states, key_states, value_states = mixed_qkv.chunk(3, dim=2)
+    query_states = query_states.reshape(
+        batch_size, seq_length, self.n_heads, self.head_dim
+    )
+    key_states = key_states.reshape(batch_size, seq_length, self.n_heads, self.head_dim)
+    value_states = value_states.reshape(
+        batch_size, seq_length, self.n_heads, self.head_dim
+    )
+
+    if position_bias is not None:
+        if len(position_bias.shape) != 3:
+            raise ValueError(
+                f"Expecting position_bias shape to be 3 dimensions, got {len(position_bias.shape)}"
+            )
+        key_start_idx = (
+            -seq_length - past_key_value[0].shape[2]
+            if past_key_value is not None
+            else -seq_length
+        )
+        position_bias = position_bias[:, :, key_start_idx:]
+    (attn_output, attn_weights, past_key_value) = self._IPEXScaleDotProduct(
+        query_states,
+        key_states,
+        value_states,
+        1 / self.softmax_scale,
+        past_key_value,
+        None,
+        position_bias + attention_mask,
+        position_bias,
+    )
+    attn_output = (
+        attn_output.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_length, -1)
+    )
+    attn_output = self.out_proj(attn_output)
+
+    return attn_output, attn_weights, past_key_value
+
+
 def _relative_position_bucket(
     self, relative_position, bidirectional=True, num_buckets=32, max_distance=128
 ):
@@ -1251,6 +1299,8 @@ class _IPEXAttentionRef(nn.Module):
             self.hidden_size = module.hidden_size_per_attention_head
         elif hasattr(module, "inner_dim"):
             self.hidden_size = module.inner_dim
+        elif hasattr(module, "d_model"):
+            self.hidden_size = module.d_model
 
         # common known as num of attention_heads
         if hasattr(module, "num_attention_heads"):
@@ -1287,6 +1337,7 @@ class _IPEXAttentionRef(nn.Module):
                 "OPTForCausalLM",
                 "BloomForCausalLM",
                 "T5ForConditionalGeneration",
+                "MptForCausalLM",
             ]
             or self.model_backbone == "BaichuanForCausalLM"
             and hasattr(module, "rotary_emb")
@@ -1644,6 +1695,10 @@ class _IPEXAttentionRef(nn.Module):
                 past_key_value,
                 output_attentions,
                 use_cache,
+            )
+        elif self.model_backbone == "MptForCausalLM":
+            return _MptAttention_forward(
+                self, hidden_states, position_bias, past_key_value, attention_mask
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

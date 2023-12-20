@@ -1,7 +1,7 @@
 # Text Generation
 
 We provide the inference benchmarking scripts for large language models text generation.<br/>
-Support large language model families, including GPT-J, LLaMA, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode, T5, Mistral.<br/>
+Support large language model families, including GPT-J, LLaMA, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode, T5, Mistral, MPT.<br/>
 The scripts include both single instance and distributed (DeepSpeed) use cases.<br/>
 The scripts cover model generation inference with low precions cases for different models with best perf and accuracy (bf16 AMP，static quantization and weight only quantization).<br/>
 
@@ -21,19 +21,18 @@ The scripts cover model generation inference with low precions cases for differe
 |GPTBigCode|"bigcode/starcoder"| ✅ | ✅ |  ✅ | ❎ \*\*|
 |T5|"google/flan-t5-xl"| ✅ | ✅ |  ✅ | ❎ \*\*|
 |Mistral|"mistralai/Mistral-7B-v0.1"| ✅ | ✅ |  ✅ | ❎ \*\*|
+|MPT\*|"mosaicml/mpt-7b"| ✅ | ✅ |  ✅ | ❎ \*\*|
 
 \* For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for FP32/BF16 but needed for quantizations.
 
 \* For ChatGLM models, the default torch_dtype is float16 in config.json. We need to replace the "float16" with "float32" in config.json.
 
-\*\* For GPT-NEOX/FALCON/OPT/Bloom/CodeGen/Baichuan/GPTBigCode/T5/Mistral models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.
+\* For MPT models from remote hub, we need to modify the config.json to use the modeling_mpt.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/mosaicml_mpt-7b_config.json".
+
+\*\* For GPT-NEOX/FALCON/OPT/Bloom/CodeGen/Baichuan/GPTBigCode/T5/Mistral/MPT models, the accuracy recipes of static quantization INT8 are not ready thus they will be skipped in our coverage.
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM model families, we are working in progress to cover those optimizations, which will expand the model list above.
 
-
-# Models to be Optimized
-
-We are working on the optimizations of a wider range of popular LLMs. Models like BLOOM, ChatGLM2/ChatGLM3, T5, BaiChuan/BaiChuan2, StarCoder and CodeLlama are to be optimized in the next release, and more models like Dolly2, MPT, QWen, Mistral, etc. are on the way.
 
 # Environment Setup
 
@@ -484,7 +483,7 @@ deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_
 
 ### BF16:
 
-# Run GPTJ/LLAMA/OPT/Falcon/Bloom/CodeGen/Baichuan/GPTBigCode/T5/Mistral with bfloat16 DeepSpeed
+# Run GPTJ/LLAMA/OPT/Falcon/Bloom/CodeGen/Baichuan/GPTBigCode/T5/Mistral/MPT with bfloat16 DeepSpeed
 deepspeed --bind_cores_to_rank run_generation_with_deepspeed.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --deployment-mode
 
 # An example of llama2 7b model:

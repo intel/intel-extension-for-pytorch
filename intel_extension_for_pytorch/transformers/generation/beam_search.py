@@ -184,6 +184,7 @@ def _beam_search(
             "GPTBigCodeForCausalLM",
             "T5ForConditionalGeneration",
             "MistralForCausalLM",
+            "MptForCausalLM",
         ]:
             first_token = False
             has_position_id = "position_ids" in model_inputs
@@ -246,6 +247,8 @@ def _beam_search(
                     num_hidden_layers = self.config.num_hidden_layers
                 elif hasattr(self.config, "num_layers"):
                     num_hidden_layers = self.config.num_layers
+                elif hasattr(self.config, "n_layers"):
+                    num_hidden_layers = self.config.n_layers
                 beam_idx_tmp = torch.zeros(
                     (2048, int(batch_size * num_beams)), dtype=torch.long
                 ).contiguous()

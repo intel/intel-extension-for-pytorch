@@ -686,6 +686,54 @@ def MistralDecoderLayer_forward(
     return outputs
 
 
+def MptBlock_forward(
+    self,
+    hidden_states: torch.Tensor,
+    position_bias: torch.Tensor,
+    attention_mask: torch.Tensor,
+    layer_past: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+    use_cache: bool = True,
+    output_attentions: bool = False,
+):
+    # hidden_states: [batch_size, seq_length, hidden_size]
+    # Layer norm at the beginning of the transformer layer.
+    layernorm_output = self.norm_1(hidden_states)
+
+    residual = hidden_states
+
+    # Self attention.
+    attn_outputs, attn_weights, past_key_value = self.attn(
+        layernorm_output,
+        position_bias=position_bias,
+        attention_mask=attention_mask,
+        past_key_value=layer_past,
+    )
+
+    hidden_states = self.resid_attn_dropout(attn_outputs) + residual
+
+    layernorm_output = self.norm_2(hidden_states)
+
+    # Get residual
+    residual = hidden_states
+
+    # MLP.
+    output = self.linear_gelu(layernorm_output)
+    if not self.distributed:
+        output = self.linear_add(output, residual)
+    else:
+        output = self.ffn.down_proj(output)
+        output = output + residual
+    outputs = (output,)
+
+    if use_cache:
+        outputs += (past_key_value,)
+
+    if output_attentions:
+        outputs += (attn_weights,)
+
+    return outputs  # hidden_states, present, attentions
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -778,6 +826,12 @@ class _IPEXDecoderLayerRef(nn.Module):
                         module.layer[-1].DenseReluDense.wo
                     )
                     del self.__dict__["_modules"]["layer"][-1].DenseReluDense.wo
+        elif self.model_backbone == "MptForCausalLM":
+            self.linear_gelu = _IPEXlinearGeluRef(module.ffn.up_proj)
+            del self.__dict__["_modules"]["ffn"].up_proj
+            if not self.distributed:
+                self.linear_add = _IPEXlinearAddRef(module.ffn.down_proj)
+                del self.__dict__["_modules"]["ffn"].down_proj
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -907,6 +961,16 @@ class _IPEXDecoderLayerRef(nn.Module):
                 past_key_value,
                 output_attentions,
                 use_cache,
+            )
+        elif self.model_backbone == "MptForCausalLM":
+            return MptBlock_forward(
+                self,
+                hidden_states,
+                position_bias,
+                attention_mask,
+                layer_past,
+                use_cache,
+                output_attentions,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

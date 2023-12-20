@@ -142,6 +142,13 @@ supported_models = [
         lambda m: m.model.layers[0].self_attn.__class__,
         lambda m: m.model.layers[0].__class__,
     ),
+    model_info(
+        "mpt",
+        transformers.models.mpt.modeling_mpt.MptForCausalLM,
+        False,
+        lambda m: m.transformer.blocks[0].attn.__class__,
+        lambda m: m.transformer.blocks[0].__class__,
+    ),
 ]
 
 

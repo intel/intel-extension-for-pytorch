@@ -322,6 +322,12 @@ class _IPEXScaleDotProductRef(nn.Module):
             self.attn_dropout = module.attn_dropout
         elif self.model_backbone == "T5ForConditionalGeneration":
             self.dropout = module.dropout
+        elif self.model_backbone == "MptForCausalLM":
+            self.hidden_size = module.hidden_size
+            self.n_heads = module.n_heads
+            self.head_dim = module.head_dim
+            self.softmax_scale = module.softmax_scale
+            self.attn_dropout_p = module.attn_dropout_p
 
         for k, v in module.__class__.__dict__.items():
             if k.startswith("__") or k.startswith("forward"):
@@ -379,6 +385,7 @@ class _IPEXScaleDotProductRef(nn.Module):
                     "ChatGLMModel",
                     "GPTBigCodeForCausalLM",
                     "T5ForConditionalGeneration",
+                    "MptForCausalLM",
                 ]
                 else key
             )
@@ -393,6 +400,7 @@ class _IPEXScaleDotProductRef(nn.Module):
                     "BaichuanForCausalLM",
                     "ChatGLMModel",
                     "T5ForConditionalGeneration",
+                    "MptForCausalLM",
                 ]
                 else query
             )
@@ -644,6 +652,25 @@ class _IPEXScaleDotProductRef(nn.Module):
             # Mask heads if we want to
             if head_mask is not None:
                 attn_weights = attn_weights * head_mask
+            attn_output = torch.matmul(attn_weights, value)
+        elif self.model_backbone == "MptForCausalLM":
+            attention_scores = (
+                torch.matmul(query, key.transpose(-1, -2)) * self.softmax_scale
+            )
+            if alibi is not None:
+                attention_scores = attention_scores + alibi
+                attention_mask = (attention_mask - alibi).to(torch.bool)
+            if attention_mask is not None:
+                attention_scores = attention_scores.masked_fill(
+                    attention_mask, torch.finfo(query.dtype).min
+                )
+            attn_weights = nn.functional.softmax(attention_scores.float(), dim=-1).to(
+                value.dtype
+            )
+            attn_weights = nn.functional.dropout(
+                attn_weights, p=self.attn_dropout_p, training=self.training
+            )
+
             attn_output = torch.matmul(attn_weights, value)
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
