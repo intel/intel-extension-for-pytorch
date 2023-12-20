@@ -213,7 +213,7 @@ using woq_tpp_gemm_kernel_fn = at::Tensor (*)(
     const std::vector<at::Tensor>&,
     const std::vector<at::Tensor>&,
     const std::vector<at::Tensor>&,
-    bool,
+    const int,
     int64_t,
     int64_t,
     int64_t,
@@ -223,10 +223,9 @@ using woq_tpp_gemm_kernel_fn = at::Tensor (*)(
     int64_t);
 
 using woq_tpp_gemm_packB_fn =
-    at::Tensor (*)(const at::Tensor&, bool, size_t, size_t, int64_t);
+    at::Tensor (*)(const at::Tensor&, int, size_t, size_t, int64_t);
 
-using woq_tpp_gemm_unpackB_fn =
-    at::Tensor (*)(const at::Tensor&, bool, int64_t);
+using woq_tpp_gemm_unpackB_fn = at::Tensor (*)(const at::Tensor&, int, int64_t);
 
 DECLARE_DISPATCH(woq_tpp_gemm_kernel_fn, woq_tpp_gemm_kernel_stub);
 DECLARE_DISPATCH(woq_tpp_gemm_packB_fn, woq_tpp_gemm_packB_stub);
@@ -236,6 +235,12 @@ DECLARE_DISPATCH(woq_tpp_gemm_unpackB_fn, woq_tpp_gemm_unpackB_stub);
 #define WOQ_FUSE_GELU 1
 #define WOQ_FUSE_ADD 2
 #define WOQ_FUSE_ADD_ADD 3
+#define WOQ_FUSE_NEW_GELU 4
+
+#define WOQ_DTYPE_QINT8 1
+#define WOQ_DTYPE_QINT4 2
+#define WOQ_DTYPE_NF4 3
+
 #endif
 
 } // namespace cpu

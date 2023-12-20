@@ -904,6 +904,41 @@ class WeightOnlyQuantizationTester(TestCase):
                         output1, output2.to(output1.dtype), atol=1e-2, rtol=1e-4
                     )
 
+    def test_weight_only_quantization_new_gelu_fused_op(self):
+        class Mod(nn.Module):
+            def __init__(self, bias):
+                super().__init__()
+                self.linear = nn.Linear(64, 64, bias=bias)
+                self.gelu = nn.GELU(approximate="tanh")
+
+            def forward(self, x):
+                return self.gelu(self.linear(x))
+
+        bias_list = [False, True]
+        bf16_list = [False, True]
+        cases = itertools.product(bias_list, bf16_list)
+        for bias, bf16 in cases:
+            with torch.cpu.amp.autocast(
+                enabled=bf16, dtype=torch.bfloat16 if bf16 else None
+            ):
+                model = Mod(bias).eval()
+                data = torch.rand(4, 64)
+                qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                    lowp_mode=2
+                )
+                prepared_model = prepare(
+                    model, qconfig, example_inputs=data, inplace=False
+                )
+                with torch.no_grad():
+                    woq_model = convert(prepared_model)
+                    output1 = woq_model(data)
+                    output2 = torch.ops.torch_ipex.woq_linear_new_gelu(
+                        data, woq_model.linear._op_context.get_data_handle()
+                    )
+                    torch.testing.assert_close(
+                        output1, output2.to(output1.dtype), atol=1e-2, rtol=1e-4
+                    )
+
     def test_weight_only_quantization_add_fused_op(self):
         class Mod(nn.Module):
             def __init__(self, bias):

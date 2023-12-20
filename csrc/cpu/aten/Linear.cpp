@@ -367,6 +367,7 @@ at::Tensor woq_linear_pack_weight(
   // TPP kernel does not support edge cases
   // It generates packed weight in 4d (Nc, Kc, block_k, block_n)
   auto N = weight_shape[0], K = weight_shape[1];
+  int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
   // For TPP kernel, we only consider even K
   if (K % 2 == 0) {
     size_t block_n = 32;
@@ -397,13 +398,13 @@ at::Tensor woq_linear_pack_weight(
           0,
           pad_size_bytes);
       return woq_tpp_gemm_packB_stub(
-          kCPU, weight_int4, is_int4, block_n, block_k, lowp_mode);
+          kCPU, weight_int4, w_dtype, block_n, block_k, lowp_mode);
     }
     if (N % block_n) {
       return weight;
     } else {
       return woq_tpp_gemm_packB_stub(
-          kCPU, weight, is_int4, block_n, block_k, lowp_mode);
+          kCPU, weight, w_dtype, block_n, block_k, lowp_mode);
     }
   }
   return weight;
@@ -414,7 +415,8 @@ at::Tensor woq_linear_unpack_weight(
     const at::Tensor& weight,
     bool is_int4,
     int64_t lowp_mode) {
-  return woq_tpp_gemm_unpackB_stub(kCPU, weight, is_int4, lowp_mode);
+  int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
+  return woq_tpp_gemm_unpackB_stub(kCPU, weight, w_dtype, lowp_mode);
 }
 
 DEFINE_DISPATCH(woq_tpp_gemm_kernel_stub);
@@ -429,6 +431,7 @@ at::Tensor woq_linear_kernel(
     int64_t lowp_mode,
     int64_t num_concats,
     int64_t act_quant_mode) {
+  int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
   return woq_tpp_gemm_kernel_stub(
       kCPU,
@@ -437,7 +440,7 @@ at::Tensor woq_linear_kernel(
       scales_list,
       zps_list,
       bias_list,
-      is_int4,
+      w_dtype,
       lowp_mode,
       num_concats,
       WOQ_FUSE_NONE, // no post op fusion
@@ -471,8 +474,15 @@ at::Tensor woq_linear_eltwise_kernel(
     int64_t lowp_mode,
     int64_t num_concats,
     int64_t act_quant_mode) {
-  int64_t post_op_fusion_type =
-      post_op == "gelu" ? WOQ_FUSE_GELU : WOQ_FUSE_NONE;
+  int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
+  int64_t post_op_fusion_type = WOQ_FUSE_NONE;
+  if (post_op == "gelu") {
+    if (algorithm == "none") {
+      post_op_fusion_type = WOQ_FUSE_GELU;
+    } else if (algorithm == "tanh") {
+      post_op_fusion_type = WOQ_FUSE_NEW_GELU;
+    }
+  }
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
   return woq_tpp_gemm_kernel_stub(
       kCPU,
@@ -481,7 +491,7 @@ at::Tensor woq_linear_eltwise_kernel(
       scales_list,
       zps_list,
       bias_list,
-      is_int4,
+      w_dtype,
       lowp_mode,
       num_concats,
       post_op_fusion_type,
@@ -502,6 +512,17 @@ at::Tensor woq_linear_gelu_forward(
           input, "gelu", torch::List<c10::optional<at::Scalar>>(), "none");
 }
 
+at::Tensor woq_linear_new_gelu_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context) {
+  RECORD_FUNCTION(
+      "torch_ipex::woq_linear_new_gelu", c10::ArrayRef<c10::IValue>({}));
+  return reinterpret_cast<IpexWoqLinearOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run_eltwise(
+          input, "gelu", torch::List<c10::optional<at::Scalar>>(), "tanh");
+}
+
 at::Tensor woq_linear_add_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
@@ -514,6 +535,7 @@ at::Tensor woq_linear_add_kernel(
     int64_t num_concats,
     const std::vector<at::Tensor>& others,
     int64_t act_quant_mode) {
+  int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
   return woq_tpp_gemm_kernel_stub(
       kCPU,
@@ -522,7 +544,7 @@ at::Tensor woq_linear_add_kernel(
       scales_list,
       zps_list,
       bias_list,
-      is_int4,
+      w_dtype,
       lowp_mode,
       num_concats,
       WOQ_FUSE_ADD, // post op add
@@ -544,6 +566,7 @@ at::Tensor woq_linear_add_add_kernel(
     int64_t num_concats,
     const std::vector<at::Tensor>& others,
     int64_t act_quant_mode) {
+  int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
   return woq_tpp_gemm_kernel_stub(
       kCPU,
@@ -552,7 +575,7 @@ at::Tensor woq_linear_add_add_kernel(
       scales_list,
       zps_list,
       bias_list,
-      is_int4,
+      w_dtype,
       lowp_mode,
       num_concats,
       WOQ_FUSE_ADD_ADD, // post op add-add
@@ -734,6 +757,17 @@ at::Tensor woq_linear_gelu_forward(
   return op.call(cpu_cached_cast(target_type, input), op_context);
 }
 
+at::Tensor woq_linear_new_gelu_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::woq_linear_new_gelu", "")
+                       .typed<decltype(woq_linear_new_gelu_forward)>();
+  auto target_type = get_autocast_dtype();
+  return op.call(cpu_cached_cast(target_type, input), op_context);
+}
+
 at::Tensor woq_linear_add_forward(
     const at::Tensor& input,
     const at::Tensor& op_context,
@@ -809,6 +843,15 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "woq_linear_gelu",
       c10::DispatchKey::AutocastCPU,
       torch_ipex::autocast::woq_linear_gelu_forward);
+  m.def("woq_linear_new_gelu(Tensor input, Tensor W_prepack) -> Tensor");
+  m.impl(
+      "woq_linear_new_gelu",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::woq_linear_new_gelu_forward);
+  m.impl(
+      "woq_linear_new_gelu",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::woq_linear_new_gelu_forward);
   m.def(
       "woq_linear_add(Tensor input, Tensor W_prepack, Tensor[] others) -> Tensor");
   m.impl(
