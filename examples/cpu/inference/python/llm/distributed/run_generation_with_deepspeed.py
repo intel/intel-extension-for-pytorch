@@ -244,6 +244,8 @@ if model_type == "auto":
         model_type = "falcon"
     if re.search("gptbigcode", config.architectures[0], re.IGNORECASE):
         model_type = "gptbigcode"
+    if re.search("gptneox", config.architectures[0], re.IGNORECASE):
+        model_type = "gpt-neox"
 
 if model_type == "falcon":
     model_input_names = ["input_ids", "attention_mask"]

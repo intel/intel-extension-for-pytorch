@@ -284,7 +284,7 @@ def _GPTNeoXAttention_forward(
             query,
             key,
             value,
-            self.norm_factor,
+            self.norm_factor_value,
             layer_past,
             head_mask,
             attention_mask,
@@ -1487,6 +1487,11 @@ class _IPEXAttentionRef(nn.Module):
             self.gradient_checkpointing = False
         if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
             self.scale_attn_value = self.scale_attn.item()
+        if self.model_backbone == "GPTNeoXForCausalLM":
+            if isinstance(self.norm_factor, torch.Tensor):
+                self.norm_factor_value = self.norm_factor.item()
+            else:
+                self.norm_factor_value = 1 / self.norm_factor
 
     def forward(
         self,

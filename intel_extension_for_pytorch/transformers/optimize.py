@@ -254,12 +254,6 @@ def model_convert_reference(_model):
             "forward",
             T5DenseGatedActDense_forward,
         )
-    elif (
-        hasattr(_model, "__class__")
-        and _model.__class__
-        == transformers.models.mistral.modeling_mistral.MistralForCausalLM
-    ):
-        convert_function(_model, "forward", MistralForCausalLM_forward)
 
     # checking if model has been wrapped by deepspeed (distributed or not)
     try:
@@ -281,7 +275,6 @@ def model_convert_reference(_model):
         transformers.models.codegen.modeling_codegen.CodeGenAttention,
         transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeAttention,
         transformers.models.t5.modeling_t5.T5Attention,
-        transformers.models.mistral.modeling_mistral.MistralAttention,
     ]:
         convert_class(
             _model,
@@ -299,7 +292,6 @@ def model_convert_reference(_model):
         transformers.models.bloom.modeling_bloom.BloomBlock,
         transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeBlock,
         transformers.models.t5.modeling_t5.T5Block,
-        transformers.models.mistral.modeling_mistral.MistralDecoderLayer,
     ]:
         convert_class(
             _model,
@@ -408,6 +400,22 @@ def model_convert_reference(_model):
             distributed=distributed,
         )
         convert_function(_model.transformer, "get_masks", GLM2_get_masks)
+    elif _model.config.architectures[0] == "MistralForCausalLM":
+        convert_function(_model, "forward", MistralForCausalLM_forward)
+        convert_class(
+            _model,
+            transformers.models.mistral.modeling_mistral.MistralAttention,
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            transformers.models.mistral.modeling_mistral.MistralDecoderLayer,
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
     return _model
 
 
@@ -577,7 +585,6 @@ def model_convert_lowering(
 
             supported_classes = [
                 transformers.models.llama.modeling_llama.LlamaRMSNorm,
-                transformers.models.mistral.modeling_mistral.MistralRMSNorm,
             ]
             if _model.config.architectures[0] == "BaichuanForCausalLM":
                 supported_classes.append(type(_model.model.layers[0].input_layernorm))
@@ -587,6 +594,10 @@ def model_convert_lowering(
             ):
                 supported_classes.append(
                     type(_model.transformer.encoder.layers[0].input_layernorm)
+                )
+            if hasattr(transformers.models, "mistral"):
+                supported_classes.append(
+                    transformers.models.mistral.modeling_mistral.MistralRMSNorm
                 )
 
             for supported_class in supported_classes:

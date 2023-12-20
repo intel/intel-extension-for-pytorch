@@ -11,7 +11,7 @@ The scripts cover model generation inference with low precions cases for differe
 |---|:---:|:---:|:---:|:---:|:---:|
 |LLAMA| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" | ✅ | ✅ | ✅ | ✅ | 
 |GPT-J| "EleutherAI/gpt-j-6b" | ✅ | ✅ | ✅ | ✅ | 
-|GPT-NEOX| "EleutherAI/gpt-neox-20b" | ✅ | ✅ | ✅ | ❎ \*\* | 
+|GPT-NEOX| "EleutherAI/gpt-neox-20b", "databricks/dolly-v2-12b" | ✅ | ✅ | ✅ | ❎ \*\* | 
 |FALCON\*|"tiiuae/falcon-40b" | ✅ | ✅ |  ✅ | ❎ \*\*| 
 |OPT|"facebook/opt-30b", "facebook/opt-1.3b"| ✅ | ✅ |  ✅ | ❎ \*\*| 
 |Bloom|"bigscience/bloom", "bigscience/bloom-1b7"| ✅ | ✅ |  ✅ | ❎ \*\*|

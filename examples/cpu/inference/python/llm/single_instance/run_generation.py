@@ -155,6 +155,8 @@ generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams, ma
 
 if re.search("gptbigcode", model.config.architectures[0], re.IGNORECASE):
     model_type = "gptbigcode"
+if re.search("gptneox", model.config.architectures[0], re.IGNORECASE):
+    model_type = "gpt-neox"
 elif re.search("t5", model.config.architectures[0], re.IGNORECASE):
     generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
     generate_kwargs.pop("max_new_tokens")
