@@ -180,3 +180,10 @@
   - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_nn_functional_pdist_xpu_float32
   - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_ormqr_xpu_float32
   - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_tensordot_xpu_float32
+- reason: Skipped due to no implemented for now. Associated ops will be implemented in future.
+  cases:
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_abs_backward_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_accumulate_grad_different_strides_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_backward_for_add_op_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_backward_for_sub_op_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_gelu_backward_xpu
