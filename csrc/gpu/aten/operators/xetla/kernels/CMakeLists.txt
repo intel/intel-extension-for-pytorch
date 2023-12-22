@@ -9,13 +9,15 @@ set(IPEX_INCLUDE_DIRS
 
 # link openblas
 set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -fsycl)
-set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -fsycl-targets=spir64_gen)
 
-# disable loop invariance optimization, this is for performance
+if (USE_AOT_DEVLIST)
+  set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -fsycl-targets=spir64_gen)
+endif()
+
+# For large registers mode, enable 256 registers for kernels
+set(XETLA_OFFLINE_OPTIONS "-doubleGRF")
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-disable-indvars-opt")
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-codegen")
-# For large registers mode, enable 256 registers for kernels
-set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -doubleGRF")
 # For registers usage verbose at AOT
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -Xfinalizer -printregusage")
 # Enable bank conflict reduction.
@@ -24,7 +26,12 @@ set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -Xfinalizer -enableBCR")
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -Xfinalizer -DPASTokenReduction")
 
 set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -Xs )
-set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} "-device pvc -options '${XETLA_OFFLINE_OPTIONS} ' ")
+if (USE_AOT_DEVLIST)
+  set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} "-device pvc -options '${XETLA_OFFLINE_OPTIONS}'")
+else()
+  set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} "${XETLA_OFFLINE_OPTIONS}")
+endif()
+
 
 cmake_minimum_required(VERSION 3.16)
 set(CMAKE_CXX_STANDARD 20)
@@ -56,5 +63,8 @@ target_include_directories(${TARGET} PUBLIC ${XETLA_INCLUDE_DIR} )
 target_include_directories(${TARGET} PUBLIC ${IPEX_INCLUDE_DIRS} )
 
 target_link_options(${TARGET} PRIVATE ${XETLA_KERNEL_FLAGS})
-
-target_compile_options(${TARGET} PRIVATE -fsycl -fsycl-targets=spir64_gen)
+if (USE_AOT_DEVLIST)
+  target_compile_options(${TARGET} PRIVATE -fsycl -fsycl-targets=spir64_gen)
+else()
+  target_compile_options(${TARGET} PRIVATE -fsycl)
+endif()
