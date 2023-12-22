@@ -130,7 +130,7 @@ inline void _exp_reduce_sum_fusion_kernel(
   for (long i = 0; i < vec_size * (size / vec_size); i += vec_size) {
     auto tmp0 = at::vec::Vectorized<scalar_t>::loadu(a + i);
     auto tmp1 = tmp0 - vec_max;
-    auto tmp2 = tmp1.exp_u20();
+    auto tmp2 = tmp1.exp();
     vec_tmp_sum += tmp2;
     at::native::_store(out + i, tmp2);
   }
