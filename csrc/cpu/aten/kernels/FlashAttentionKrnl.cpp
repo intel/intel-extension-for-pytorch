@@ -85,6 +85,16 @@ inline void _mkl_gemm(
       ldc);
 }
 
+template <typename T>
+inline void _store(T* dst, at::vec::Vectorized<T> src) {
+  src.store(dst);
+}
+
+inline void _store(at::BFloat16* dst, at::vec::Vectorized<float> src) {
+  auto res = at::vec::convert_float_bfloat16(src, src);
+  res.store(dst, at::vec::Vectorized<float>::size());
+}
+
 namespace torch_ipex {
 using namespace tpp;
 namespace cpu {
@@ -132,7 +142,7 @@ inline void _exp_reduce_sum_fusion_kernel(
     auto tmp1 = tmp0 - vec_max;
     auto tmp2 = tmp1.exp();
     vec_tmp_sum += tmp2;
-    at::native::_store(out + i, tmp2);
+    _store(out + i, tmp2);
   }
   tmp_sum = at::vec::vec_reduce_all<scalar_t>(
       [](at::vec::Vectorized<scalar_t>& x, at::vec::Vectorized<scalar_t>& y) {
@@ -161,7 +171,7 @@ inline void _normalization_kernel(
   for (long i = 0; i < vec_size * (size / vec_size); i += vec_size) {
     auto tmp0 = at::vec::Vectorized<T1>::loadu(a + i);
     auto tmp1 = tmp0 / vec_sum;
-    at::native::_store(out + i, tmp1);
+    _store(out + i, tmp1);
   }
   for (long i = vec_size * (size / vec_size); i < size; i++) {
     auto tmp0 = a[i];
@@ -187,7 +197,7 @@ inline void _mul_reduce_max_fusion_kernel(
     auto tmp0 = at::vec::Vectorized<scalar_t>::loadu(a + i);
     auto tmp1 = tmp0 * vec_scale;
     vec_tmp_max = at::vec::maximum(vec_tmp_max, tmp1);
-    at::native::_store(out + i, tmp1);
+    _store(out + i, tmp1);
   }
   for (long i = vec_size * (size / vec_size); i < size; i++) {
     auto tmp0 = a[i];
