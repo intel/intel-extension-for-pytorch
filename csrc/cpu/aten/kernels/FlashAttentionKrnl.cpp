@@ -1,3 +1,11 @@
+#include <ATen/ATen.h>
+#include <ATen/Dispatch.h>
+#include <ATen/Parallel.h>
+#include <ATen/cpu/vec/functional.h>
+#include <ATen/cpu/vec/vec.h>
+#include <ATen/native/CPUBlas.h>
+#include <ATen/native/cpu/utils.h>
+
 #include <ATen/Tensor.h>
 #include <aten/FlashAttention.h>
 #include <torch/all.h>
@@ -6,13 +14,6 @@
 #include "csrc/cpu/tpp/woq/tla.h"
 #include "mkl.h"
 #include "vec/vec.h"
-
-#include <ATen/Dispatch.h>
-#include <ATen/Parallel.h>
-#include <ATen/cpu/vec/functional.h>
-#include <ATen/cpu/vec/vec.h>
-#include <ATen/native/CPUBlas.h>
-#include <ATen/native/cpu/utils.h>
 
 inline void _mkl_gemm(
     const CBLAS_LAYOUT layout,
@@ -777,24 +778,85 @@ void flash_attention_kernel_impl(
 
   AT_DISPATCH_FLOATING_TYPES_AND(
       kBFloat16, query.scalar_type(), "flash_attention", [&] {
-        cpu_flash_attention<scalar_t, 32, 512>(
-            output,
-            logsumexp,
-            cum_seq_q,
-            cum_seq_k,
-            max_q,
-            max_k,
-            philox_seed,
-            philox_offset,
-            debug_attn_mask,
-            query,
-            key,
-            value,
-            dropout_p,
-            is_causal,
-            return_debug_mask,
-            attention_mask,
-            scale);
+        if (query.scalar_type() == kBFloat16) {
+          cpu_flash_attention<scalar_t, 32, 512>(
+              output,
+              logsumexp,
+              cum_seq_q,
+              cum_seq_k,
+              max_q,
+              max_k,
+              philox_seed,
+              philox_offset,
+              debug_attn_mask,
+              query,
+              key,
+              value,
+              dropout_p,
+              is_causal,
+              return_debug_mask,
+              attention_mask,
+              scale);
+        } else {
+          if (q_seq_len >= 768) {
+            cpu_flash_attention<scalar_t, 256, 512>(
+                output,
+                logsumexp,
+                cum_seq_q,
+                cum_seq_k,
+                max_q,
+                max_k,
+                philox_seed,
+                philox_offset,
+                debug_attn_mask,
+                query,
+                key,
+                value,
+                dropout_p,
+                is_causal,
+                return_debug_mask,
+                attention_mask,
+                scale);
+          } else if (q_seq_len >= 192) {
+            cpu_flash_attention<scalar_t, 64, 512>(
+                output,
+                logsumexp,
+                cum_seq_q,
+                cum_seq_k,
+                max_q,
+                max_k,
+                philox_seed,
+                philox_offset,
+                debug_attn_mask,
+                query,
+                key,
+                value,
+                dropout_p,
+                is_causal,
+                return_debug_mask,
+                attention_mask,
+                scale);
+          } else {
+            cpu_flash_attention<scalar_t, 32, 512>(
+                output,
+                logsumexp,
+                cum_seq_q,
+                cum_seq_k,
+                max_q,
+                max_k,
+                philox_seed,
+                philox_offset,
+                debug_attn_mask,
+                query,
+                key,
+                value,
+                dropout_p,
+                is_causal,
+                return_debug_mask,
+                attention_mask,
+                scale);
+          }
+        }
       });
 }
 
@@ -967,10 +1029,8 @@ flash_attention_mask_kernel(
 }
 } // anonymous namespace
 
-ALSO_REGISTER_AVX512_DISPATCH(
-    flash_attention_kernel_stub,
-    &flash_attention_kernel);
-ALSO_REGISTER_AVX512_DISPATCH(
+REGISTER_DISPATCH(flash_attention_kernel_stub, &flash_attention_kernel);
+REGISTER_DISPATCH(
     flash_attention_mask_kernel_stub,
     &flash_attention_mask_kernel);
 
