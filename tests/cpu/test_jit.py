@@ -5179,6 +5179,30 @@ class Tester(TestCase):
                 any(n.kind() == "aten::max_pool2d" for n in trace_graph.nodes())
             )
 
+    def test_max_pool2d_lowp(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super(Model, self).__init__()
+                self.pool = torch.nn.MaxPool2d(3, stride=2)
+
+            def forward(self, x):
+                return self.pool(x)
+
+        model = Model().eval()
+        for dtype in [torch.bfloat16, torch.float16]:
+            x = torch.randn(1, 3, 24, 24, dtype=dtype)
+            with torch.no_grad():
+                ref_out = model(x)
+                traced_model = torch.jit.trace(model, x)
+                traced_out = traced_model(x)
+                self.assertEqual(ref_out, traced_out)
+                trace_graph = traced_model.graph_for(x)
+                if dtype == torch.float16 and not core.onednn_has_fp16_support():
+                    continue
+                self.assertTrue(
+                    any(n.kind() == "ipex::max_pool2d" for n in trace_graph.nodes())
+                )
+
     def test_restore_inplace(self):
         class M(nn.Module):
             def __init__(self, eltwise_fn, params_dict=None):

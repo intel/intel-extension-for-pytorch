@@ -4,6 +4,7 @@
 
 #include <ATen/code_template.h>
 #include <torch/csrc/jit/passes/remove_mutation.h>
+#include "utils/onednn_utils.h"
 
 namespace torch_ipex {
 namespace jit {
@@ -1303,7 +1304,12 @@ void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
       return false;
     }
     if (dtype_option.value() != c10::ScalarType::BFloat16 &&
-        dtype_option.value() != c10::ScalarType::Float) {
+        dtype_option.value() != c10::ScalarType::Float &&
+        dtype_option.value() != c10::ScalarType::Half) {
+      return false;
+    }
+    if (dtype_option.value() == c10::ScalarType::Half &&
+        !torch_ipex::utils::onednn_has_fp16_type_support()) {
       return false;
     }
     return true;
