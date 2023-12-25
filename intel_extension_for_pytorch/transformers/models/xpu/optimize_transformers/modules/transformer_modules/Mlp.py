@@ -164,8 +164,8 @@ class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
 
     # TODO(ganyi): int4 load data
     def load_parameter(self, fc_in, fc_out):
-        self.fc_in_quant.weight = fc_in.qweight
-        self.fc_out_quant.weight = fc_out.qweight
+        self.fc_in_quant.weight = fc_in.qweight.byte()
+        self.fc_out_quant.weight = fc_out.qweight.byte()
 
         self.fc_in_quant.bias = fc_in.bias
         self.fc_out_quant.bias = fc_out.bias
@@ -173,11 +173,13 @@ class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
         self.fc_in_quant.scale = fc_in.scales
         self.fc_out_quant.scale = fc_out.scales
 
-        self.fc_in_quant.zp = fc_in.qzeros
-        self.fc_out_quant.zp = fc_out.qzeros
+        has_qzeros = hasattr(fc_in, "qzeros")
+        if has_qzeros:
+            self.fc_in_quant.zp = fc_in.qzeros.byte()
+            self.fc_out_quant.zp = fc_out.qzeros.byte()
 
-        self.fc_in_quant.gs = fc_in.group_size
-        self.fc_out_quant.gs = fc_out.group_size
+        self.fc_in_quant.gs = fc_in.blocksize
+        self.fc_out_quant.gs = fc_out.blocksize
 
     def transpose_parameter(self):
         pass

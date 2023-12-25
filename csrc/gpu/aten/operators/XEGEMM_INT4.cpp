@@ -83,7 +83,8 @@ static void mm_qkv_out_wint4(
   TORCH_CHECK(is_a_contiguous && is_b_row_major);
   TORCH_CHECK(
       input.scalar_type() == kHalf &&
-      (weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte));
+      (weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
+       weight.scalar_type() == kChar));
   GEMM_QKV_WINT4_XETLA_DISPATCH(has_bias);
 }
 
@@ -326,9 +327,11 @@ static Tensor mm_low_bits(
     int64_t calib_gz) {
   DeviceId curDevID;
   AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  int64_t fp64_valid = static_cast<int64_t>(Settings::I().has_2d_block_array(curDevID));
+  int64_t fp64_valid =
+      static_cast<int64_t>(Settings::I().has_2d_block_array(curDevID));
   return has_bias
-      ? mm_bias_int4(input, weight, bias, weight_scl, weight_zp, calib_gz, fp64_valid)
+      ? mm_bias_int4(
+            input, weight, bias, weight_scl, weight_zp, calib_gz, fp64_valid)
       : mm_int4(input, weight, weight_scl, weight_zp, calib_gz, fp64_valid);
 }
 

@@ -165,133 +165,130 @@ using namespace xpu::xetla;
         k_);                                                                \
   }
 
-#define HGEMM_INT4_COMMON_DISPATCH_IMPL(                                    \
-    DISPATCHER, F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                \
+#define HGEMM_INT4_COMMON_DISPATCH_IMPL(                     \
+    DISPATCHER, F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
   DISPATCHER(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)
 
-#define HGEMM_INT4_COMMON_DISPATCH(                                          \
-    WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS, ARCH)                          \
-  {                                                                          \
-    if (num_epilogues_ == 0 && ARCH == 1)                                    \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_DISPATCH,                                               \
-          hgemm_wint4_pvc,                                                   \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (num_epilogues_ == 0 && ARCH == 0)                               \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_DISPATCH,                                               \
-          hgemm_wint4_arc,                                                   \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS && ARCH == 1)  \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_BIAS_DISPATCH,                                          \
-          hgemm_bias_wint4_pvc,                                              \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS && ARCH == 0)  \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_BIAS_DISPATCH,                                          \
-          hgemm_bias_wint4_arc,                                              \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (                                                                \
-        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                  \
-        epilogue_type_[1] == RES_ADD && epilogue_type_[2] == RES_ADD &&      \
-        ARCH == 1)                                                           \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_BIAS_RES_RES_DISPATCH,                                  \
-          hgemm_bias_res_res_wint4_pvc,                                      \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (                                                                \
-        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                  \
-        epilogue_type_[1] == GELU && ARCH == 1)                              \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_BIAS_GELU_DISPATCH,                                     \
-          hgemm_bias_gelu_wint4_pvc,                                         \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD             \
-          && ARCH == 1)                                                      \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_RES_DISPATCH,                                           \
-          hgemm_res_wint4_pvc,                                               \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL             \
-          && ARCH == 1)                                                      \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_RESMUL_DISPATCH,                                        \
-          hgemm_mul_wint4_pvc,                                               \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == SPLIT3 &&           \
-          ARCH == 1)                                                         \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_QKV_DISPATCH,                                           \
-          hgemm_qkv_wint4_pvc,                                               \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (                                                                \
-        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                  \
-        epilogue_type_[1] == SPLIT3 && ARCH == 1)                            \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_QKV_BIAS_DISPATCH,                                      \
-          hgemm_qkv_bias_wint4_pvc,                                          \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
+#define HGEMM_INT4_COMMON_DISPATCH(                                            \
+    WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS, ARCH)                            \
+  {                                                                            \
+    if (num_epilogues_ == 0 && ARCH == 1)                                      \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_DISPATCH,                                                 \
+          hgemm_wint4_pvc,                                                     \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (num_epilogues_ == 0 && ARCH == 0)                                 \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_DISPATCH,                                                 \
+          hgemm_wint4_arc,                                                     \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS && ARCH == 1)    \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_BIAS_DISPATCH,                                            \
+          hgemm_bias_wint4_pvc,                                                \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS && ARCH == 0)    \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_BIAS_DISPATCH,                                            \
+          hgemm_bias_wint4_arc,                                                \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (                                                                  \
+        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                    \
+        epilogue_type_[1] == RES_ADD && epilogue_type_[2] == RES_ADD &&        \
+        ARCH == 1)                                                             \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_BIAS_RES_RES_DISPATCH,                                    \
+          hgemm_bias_res_res_wint4_pvc,                                        \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (                                                                  \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                    \
+        epilogue_type_[1] == GELU && ARCH == 1)                                \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_BIAS_GELU_DISPATCH,                                       \
+          hgemm_bias_gelu_wint4_pvc,                                           \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD && ARCH == 1) \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_RES_DISPATCH,                                             \
+          hgemm_res_wint4_pvc,                                                 \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL && ARCH == 1) \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_RESMUL_DISPATCH,                                          \
+          hgemm_mul_wint4_pvc,                                                 \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == SPLIT3 && ARCH == 1)  \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_QKV_DISPATCH,                                             \
+          hgemm_qkv_wint4_pvc,                                                 \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (                                                                  \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                    \
+        epilogue_type_[1] == SPLIT3 && ARCH == 1)                              \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_QKV_BIAS_DISPATCH,                                        \
+          hgemm_qkv_bias_wint4_pvc,                                            \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
   }
 
 template <
@@ -383,13 +380,13 @@ struct GemmWint4Config {
   GemmWint4Config<8, 64, 8, 16, 16, gz, 8, MAX_INT, MAX_INT, MAX_INT, 0>
 // clang-format on
 
-#define ORDERED_GEMM_WINT4_CONFIG_SET_ARC       \
-  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(16), \
-  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(64), \
-  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(128), \
-  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(256), \
-  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(512), \
-  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(1024)
+#define ORDERED_GEMM_WINT4_CONFIG_SET_ARC             \
+  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(16),      \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(64),  \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(128), \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(256), \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(512), \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(1024)
 
 #define ORDERED_GEMM_WINT4_CONFIG_SET_PVC       \
   ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_PVC(0), \
@@ -485,12 +482,15 @@ class HGEMMXetla_INT4 final {
   HGEMMXetla_INT4& build() {
     fallback_ = true;
     if (input_->scalar_type() != kHalf ||
-        (weight_->scalar_type() != kByte &&
-         weight_->scalar_type() != kQUInt8) ||
+        (weight_->scalar_type() != kByte && weight_->scalar_type() != kQUInt8 &&
+         weight_->scalar_type() != kChar) ||
         std::any_of(outputs_.begin(), outputs_.end(), [](Tensor* out) {
           return out->scalar_type() != kHalf;
-        }))
+        })) {
+      std::cout << "dtype check fail!" << std::endl;
       return *this;
+    }
+    // return *this;
     bool has_split3 =
         (epilogue_type_[0] == SPLIT3 ||
          (epilogue_type_[0] == BIAS && epilogue_type_[1] == SPLIT3));
@@ -499,8 +499,11 @@ class HGEMMXetla_INT4 final {
            (has_split3 && weight_->dim() == 3)) &&
           std::all_of(outputs_.begin(), outputs_.end(), [](Tensor* out) {
             return out->dim() == 2;
-          })))
+          }))) {
+      std::cout << "dim check fail!" << std::endl;
       return *this;
+    }
+    // return *this;
     is_a_row_major_ = input_->is_contiguous();
     is_a_col_major_ = input_->transpose(0, 1).is_contiguous();
     is_b_row_major_ = weight_->is_contiguous();
@@ -513,8 +516,12 @@ class HGEMMXetla_INT4 final {
     if ((calib_gz_ == -1 || calib_gz_ == k_) && arch_ == 1)
       calib_gz_ = 0;
     // Check if calibration group size is valid.
-    if ((calib_gz_ != 0 && calib_gz_ != 128) && arch_ == 1)
+    // std::cout << "calib_gz_ == " << calib_gz_ << std::endl;
+    if ((calib_gz_ != 0 && calib_gz_ != 64 && calib_gz_ != 128) && arch_ == 1) {
+      std::cout << "calib_gz check fail!" << std::endl;
       return *this;
+    }
+    // return *this;
     // Set correct n dim.
     if (has_split3)
       n_ = b_sizes[2] * 2;
@@ -530,8 +537,11 @@ class HGEMMXetla_INT4 final {
               ((!has_split3 && epilogues_[i]->sizes()[0] == n_) ||
                (has_split3 && epilogues_[i]->sizes()[1] == n_));
           ck = ck && epilogues_[i]->scalar_type() == kHalf;
-          if (!ck)
+          if (!ck) {
+            std::cout << "bias ck check fail!" << std::endl;
             return *this;
+          }
+          // return *this;
         } break;
         case RES_MUL:
         case RES_ADD: {
@@ -540,8 +550,11 @@ class HGEMMXetla_INT4 final {
               epilogues_[i]->sizes()[1] == n_;
           ck = ck && epilogues_[i]->is_contiguous();
           ck = ck && epilogues_[i]->scalar_type() == kHalf;
-          if (!ck)
+          if (!ck) {
+            std::cout << "res_add ck check fail!" << std::endl;
             return *this;
+          }
+          // return *this;
         } break;
         default: {
         } break;
@@ -600,7 +613,8 @@ class HGEMMXetla_INT4 final {
         static constexpr int gz = Config::gz;
         static constexpr int slm_ks = Config::slm_ks;
         static constexpr int arch = Config::arch;
-        HGEMM_INT4_COMMON_DISPATCH(wg_m, wg_n, sg_m, sg_n, sg_k, gz, slm_ks, arch);
+        HGEMM_INT4_COMMON_DISPATCH(
+            wg_m, wg_n, sg_m, sg_n, sg_k, gz, slm_ks, arch);
       };
       return execute_function;
     } else {
@@ -634,6 +648,5 @@ class HGEMMXetla_INT4 final {
     } else {
       dispatch<scalar_t, ORDERED_GEMM_WINT4_CONFIG_SET_ARC>(q);
     }
-    
   }
 };

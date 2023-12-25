@@ -15,6 +15,7 @@ DTYPE_BITS_MAPPING = {
     "int8": 8,
 }
 
+
 def convert_dtype_str2torch(str_dtype):
     if str_dtype == "int8":
         return torch.int8
@@ -75,7 +76,6 @@ class WeightOnlyLinear(nn.Module):
         scale_dtype="fp32",
         blocksize: int = 64,
         scheme="sym",
-        zp=False,
         double_quant_scale_dtype=None,
         compression_dtype=torch.int32,
         compression_dim=1,
@@ -159,7 +159,7 @@ class WeightOnlyLinear(nn.Module):
                 torch.empty(
                     (
                         math.ceil(self.in_features / self.blocksize),
-                        math.ceil(self.out_features / self.n_pack)
+                        math.ceil(self.out_features / self.n_pack),
                     ),
                     dtype=self.compression_dtype,
                     device=device,
@@ -195,20 +195,17 @@ class WeightOnlyLinear(nn.Module):
                         compression_dtype=self.compression_dtype,
                     ),
                 ),
-                if zp:
-                    self.register_buffer(
-                        "qzeros",
-                        torch.empty(
-                            (
-                                self.out_features,
-                                math.ceil(
-                                    self.in_features / self.blocksize / self.n_pack
-                                )
-                            ),
-                            dtype=self.compression_dtype,
-                            device=device,
+                self.register_buffer(
+                    "qzeros",
+                    torch.zeros(
+                        (
+                            self.out_features,
+                            math.ceil(self.in_features / self.blocksize / self.n_pack),
                         ),
-                    )
+                        dtype=self.compression_dtype,
+                        device=device,
+                    ),
+                )
             else:
                 weight = torch.empty(
                     (math.ceil(out_features / self.n_pack), in_features),
@@ -229,18 +226,17 @@ class WeightOnlyLinear(nn.Module):
                         compression_dtype=self.compression_dtype,
                     ),
                 )
-                if zp:
-                    self.register_buffer(
-                        "qzeros",
-                        torch.empty(
-                            (
-                                math.ceil(self.out_features / self.n_pack),
-                                math.ceil(self.in_features / self.blocksize)
-                            ),
-                            dtype=self.compression_dtype,
-                            device=device,
+                self.register_buffer(
+                    "qzeros",
+                    torch.zeros(
+                        (
+                            math.ceil(self.out_features / self.n_pack),
+                            math.ceil(self.in_features / self.blocksize),
                         ),
-                    )
+                        dtype=self.compression_dtype,
+                        device=device,
+                    ),
+                )
         if g_idx:
             self.register_buffer(
                 "g_idx", torch.empty(in_features, dtype=torch.int32, device=device)
@@ -250,7 +246,11 @@ class WeightOnlyLinear(nn.Module):
         if bias:
             self.register_buffer(
                 "bias",
-                torch.empty(self.out_features, dtype=convert_dtype_str2torch(self.compute_dtype), device=device),
+                torch.empty(
+                    self.out_features,
+                    dtype=convert_dtype_str2torch(self.compute_dtype),
+                    device=device,
+                ),
             )
         else:
             self.bias = None
@@ -265,7 +265,9 @@ class WeightOnlyLinear(nn.Module):
             zp = torch.zeros_like(scale, dtype=torch.uint8) + shift_bias
         if bias is not None:
             assert hasattr(self, "bias"), "bias is not set when initializing."
-            self.bias = bias.type(convert_dtype_str2torch(self.compute_dtype)).to(self.device)
+            self.bias = bias.type(convert_dtype_str2torch(self.compute_dtype)).to(
+                self.device
+            )
         if g_idx is not None:
             assert hasattr(self, "g_idx"), "g_idx is not set when initializing."
             self.g_idx = g_idx.type(torch.int32).to(self.device)
@@ -329,7 +331,10 @@ class WeightOnlyLinear(nn.Module):
 
         device = scales.device
         fp32_weight = torch.zeros(
-            self.out_features, self.in_features, dtype=convert_dtype_str2torch(self.compute_dtype), device=device
+            self.out_features,
+            self.in_features,
+            dtype=convert_dtype_str2torch(self.compute_dtype),
+            device=device,
         )
         if self.g_idx is None:
             # used for recovering fp32_weight
@@ -409,9 +414,9 @@ class WeightOnlyLinear(nn.Module):
     def forward(self, input: Tensor) -> Tensor:
         return torch.ops.torch_ipex.mm_low_bits(
             input,
-            self.qweight,
+            self.qweight.byte(),
             self.scales,
-            self.qzeros,
+            self.qzeros.byte() if hasattr(self, "qzeros") else None,
             self.bias,
             self.bias is not None,
             self.compute_dtype,

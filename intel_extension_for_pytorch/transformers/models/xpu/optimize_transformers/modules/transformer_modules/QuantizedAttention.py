@@ -16,25 +16,30 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         self.qkv_proj_quant = IPEXTransformerQLinear()
 
     def load_parameter(self, q_proj, k_proj, v_proj, out_proj):
-        self.q_proj_quant.weight = q_proj.qweight
-        self.k_proj_quant.weight = k_proj.qweight
-        self.v_proj_quant.weight = v_proj.qweight
-        self.out_proj_quant.weight = out_proj.qweight
+        self.q_proj_quant.weight = q_proj.qweight.byte()
+        self.k_proj_quant.weight = k_proj.qweight.byte()
+        self.v_proj_quant.weight = v_proj.qweight.byte()
+        self.out_proj_quant.weight = out_proj.qweight.byte()
+        # print("self.q_proj_quant.weight dtype: ", self.q_proj_quant.weight.dtype)
 
         self.q_proj_quant.scale = q_proj.scales
         self.k_proj_quant.scale = k_proj.scales
         self.v_proj_quant.scale = v_proj.scales
         self.out_proj_quant.scale = out_proj.scales
 
-        self.q_proj_quant.zp = q_proj.qzeros
-        self.k_proj_quant.zp = k_proj.qzeros
-        self.v_proj_quant.zp = v_proj.qzeros
-        self.out_proj_quant.zp = out_proj.qzeros
+        has_qzeros = hasattr(q_proj, "qzeros")
+        # q, k, v, out should have the same attributes
+        if has_qzeros:
+            self.q_proj_quant.zp = q_proj.qzeros.byte()
+            self.k_proj_quant.zp = k_proj.qzeros.byte()
+            self.v_proj_quant.zp = v_proj.qzeros.byte()
+            self.out_proj_quant.zp = out_proj.qzeros.byte()
+            # print("self.q_proj_quant.zp dtype: ", self.q_proj_quant.zp.dtype)
 
-        self.q_proj_quant.gs = q_proj.group_size
-        self.k_proj_quant.gs = k_proj.group_size
-        self.v_proj_quant.gs = v_proj.group_size
-        self.out_proj_quant.gs = out_proj.group_size
+        self.q_proj_quant.gs = q_proj.blocksize
+        self.k_proj_quant.gs = k_proj.blocksize
+        self.v_proj_quant.gs = v_proj.blocksize
+        self.out_proj_quant.gs = out_proj.blocksize
 
         self.position_embed = self.config.rotary_embedding_class(
             self.config, torch.float16
@@ -67,17 +72,20 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
             .contiguous()
             .view(shape)
         )
-        self.qkv_proj_quant.zp = (
-            torch.stack(
-                [self.q_proj_quant.zp, self.k_proj_quant.zp, self.v_proj_quant.zp]
+        has_qzeros = hasattr(self.q_proj_quant, "qzeros")
+        if has_qzeros:
+            self.qkv_proj_quant.zp = (
+                torch.stack(
+                    [self.q_proj_quant.zp, self.k_proj_quant.zp, self.v_proj_quant.zp]
+                )
+                .contiguous()
+                .view(shape)
             )
-            .contiguous()
-            .view(shape)
-        )
         self.qkv_proj_quant.gs = self.q_proj_quant.gs
         self.qkv_proj_quant.bias = None
 
     def compute_qkv_gemm(self, hidden_states, query, key, value):
+        # print("self.qkv_proj_quant.weight.dtype: ", self.qkv_proj_quant.weight.dtype)
         torch.ops.torch_ipex.mm_qkv_out_int4(
             hidden_states,
             self.qkv_proj_quant.weight,

@@ -73,13 +73,17 @@ def pad_for_gptj_lm_head(model, is_int4=False):
             model.lm_head.bias if model.lm_head.bias is not None else None
         )
         lm_head_new.scales = model.lm_head.scales
-        lm_head_new.qzeros = model.lm_head.qzeros
-        lm_head_new.group_size = model.lm_head.group_size
+        if hasattr(model.lm_head, "qzeros"):
+            lm_head_new.qzeros = model.lm_head.qzeros
+        else:
+            lm_head_new.qzeros = None
+        lm_head_new.group_size = model.lm_head.groupsize
         model.lm_head = lm_head_new
 
         model.lm_head.qweight.data = int4_gemm_padding(model.lm_head.qweight)
         model.lm_head.scales.data = int4_gemm_scale_padding(model.lm_head.scales)
-        model.lm_head.qzeros.data = int4_gemm_padding(model.lm_head.qzeros)
+        if model.lm_head.qzeros is not None:
+            model.lm_head.qzeros.data = int4_gemm_padding(model.lm_head.qzeros)
 
         if model.lm_head.bias is not None:
             model.lm_head.bias.data = int4_gemm_bias_padding(model.lm_head.bias)
