@@ -1,3 +1,4 @@
+#include "Blas.h"
 #include <ATen/WrapDimUtilsMulti.h>
 #include <ATen/native/Resize.h>
 #include "BlasImpl.h"

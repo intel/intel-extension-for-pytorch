@@ -3,6 +3,7 @@
 #include <ATen/record_function.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
+#include "../Blas.h"
 #include "../comm/ATDispatch.h"
 #include "sdp_utils.h"
 #include "utils/CustomOperatorRegistration.h"
@@ -92,38 +93,62 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math_impl(
   auto attn_mask = attn_mask_;
   // Naive, composite implementation defined here.
 
-  // Scale q, k before matmul for stability see https://tinyurl.com/sudb9s96 for
-  // math
+  // [Original] Scale q, k before matmul for stability see
+  // https://tinyurl.com/sudb9s96 for math
+  // Here we apply scaling after matmul for op fusion purpose
   bool is_negative_scaling = scale.has_value() && scale.value() < 0.0;
-  const auto scaling_factor =
-      sdp::calculate_scale(
-          query_, is_negative_scaling ? std::abs(scale.value()) : scale)
-          .sqrt();
+  const auto orig_scaling_factor = sdp::calculate_scale(
+      query_, is_negative_scaling ? std::abs(scale.value()) : scale);
 
-  const auto query = query_ *
-      (is_negative_scaling ? c10::SymFloat(0.0) - scaling_factor
-                           : scaling_factor);
   if (is_causal) {
     TORCH_CHECK(
         !attn_mask.has_value(),
         "_scaled_dot_product_attention: Explicit attn_mask should not be set when is_causal=True");
     TORCH_CHECK(
-        !query.is_nested() && !key.is_nested(),
+        !query_.is_nested() && !key.is_nested(),
         "_scaled_dot_product_attention: Nested tensors for query / key are not supported when is_causal=True");
 
     // Replace attn_mask with causal mask; lower triangular elements take part
     // in attention.
-    const auto L = query.sym_size(-2), S = key.sym_size(-2);
+    const auto L = query_.sym_size(-2), S = key.sym_size(-2);
     attn_mask =
-        at::ones_symint({L, S}, query.options().dtype(at::kBool)).tril();
-    attn_mask = sdp::convert_boolean_attn_mask(attn_mask, query.dtype());
+        at::ones_symint({L, S}, query_.options().dtype(at::kBool)).tril();
+    attn_mask = sdp::convert_boolean_attn_mask(attn_mask, query_.dtype());
   }
-  auto attn = at::matmul(query, key.transpose(-2, -1) * scaling_factor);
+
+  Tensor attn;
   if (attn_mask.has_value()) {
-    if (at::areAnyTensorSubclassLike({attn, *attn_mask})) {
-      attn = attn.add(*attn_mask);
+    attn_mask = attn_mask->contiguous();
+    if (is_negative_scaling) {
+      attn = trans_matmul_div_add(
+          key,
+          /*dim1=*/-1,
+          /*dim2=*/-1,
+          query_,
+          c10::SymFloat(0.0) - orig_scaling_factor,
+          *attn_mask,
+          1.0);
     } else {
-      attn.add_(*attn_mask);
+      attn = trans_matmul_div_add(
+          key,
+          /*dim1=*/-1,
+          /*dim2=*/-1,
+          query_,
+          orig_scaling_factor,
+          *attn_mask,
+          1.0);
+    }
+  } else {
+    if (is_negative_scaling) {
+      attn = trans_matmul_div_scalar(
+          key,
+          /*dim1=*/-1,
+          /*dim2=*/-1,
+          query_,
+          c10::SymFloat(0.0) - orig_scaling_factor);
+    } else {
+      attn = trans_matmul_div_scalar(
+          key, /*dim1=*/-1, /*dim2=*/-1, query_, orig_scaling_factor);
     }
   }
   attn = at::softmax(attn, -1);
@@ -166,15 +191,18 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math(
           Tensor query_fp32 = query_.to(at::kFloat);
           Tensor key_fp32 = key.to(at::kFloat);
           Tensor value_fp32 = value.to(at::kFloat);
-          return _scaled_dot_product_attention_math_impl(
-              query_fp32,
-              key_fp32,
-              value_fp32,
-              attn_mask_,
-              dropout_p,
-              is_causal,
-              dropout_mask,
-              scale);
+          auto [attn_output, attn_weight] =
+              _scaled_dot_product_attention_math_impl(
+                  query_fp32,
+                  key_fp32,
+                  value_fp32,
+                  attn_mask_,
+                  dropout_p,
+                  is_causal,
+                  dropout_mask,
+                  scale);
+          return std::make_tuple(
+              attn_output.to(at::kHalf), attn_weight.to(at::kHalf));
         }
         return _scaled_dot_product_attention_math_impl(
             query_,
