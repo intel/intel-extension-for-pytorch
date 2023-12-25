@@ -991,36 +991,53 @@ def _MistralAttention_forward(
     **kwargs,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
     bsz, q_len, _ = hidden_states.size()
+    concat_qkv = None
     if hasattr(self, "concat_qkv"):
-        query, key, value = self.concat_qkv(hidden_states)
+        concat_qkv = self.concat_qkv(hidden_states)
     else:
         query = self.q_proj(hidden_states)
         key = self.k_proj(hidden_states)
         value = self.v_proj(hidden_states)
-    query = query.view(bsz, q_len, self.num_heads, self.head_dim)
-    key = key.view(bsz, q_len, self.num_key_value_heads, self.head_dim)
-    value = value.view(bsz, q_len, self.num_key_value_heads, self.head_dim)
+
     kv_seq_len = (
         q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
     )
-    key = self._IPEXROPE(
-        key,
-        position_ids,
-        self.num_key_value_heads,
-        self.head_dim,
-        self.head_dim // 2,
-        self.head_dim,
-        kv_seq_len,
-    )
-    query = self._IPEXROPE(
-        query,
-        position_ids,
-        self.num_heads,
-        self.head_dim,
-        self.head_dim // 2,
-        self.head_dim,
-        kv_seq_len,
-    )
+
+    if concat_qkv is not None and type(concat_qkv) is not tuple:
+        query, key, value = self._IPEXROPE(
+            concat_qkv,
+            position_ids,
+            self.num_heads,
+            self.head_dim,
+            self.head_dim // 2,
+            self.head_dim,
+            kv_seq_len,
+            self.concat_qkv._num_concats,
+        )
+    else:
+        if concat_qkv is not None:
+            query, key, value = concat_qkv
+        query = query.view(bsz, q_len, self.num_heads, self.head_dim)
+        key = key.view(bsz, q_len, self.num_key_value_heads, self.head_dim)
+        value = value.view(bsz, q_len, self.num_key_value_heads, self.head_dim)
+        key = self._IPEXROPE(
+            key,
+            position_ids,
+            self.num_key_value_heads,
+            self.head_dim,
+            self.head_dim // 2,
+            self.head_dim,
+            kv_seq_len,
+        )
+        query = self._IPEXROPE(
+            query,
+            position_ids,
+            self.num_heads,
+            self.head_dim,
+            self.head_dim // 2,
+            self.head_dim,
+            kv_seq_len,
+        )
 
     if use_cache:
         (attn_output, attn_weights, past_key_value) = self._IPEXScaleDotProduct(
