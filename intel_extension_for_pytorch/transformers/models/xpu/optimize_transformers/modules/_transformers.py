@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.distributed as dist
+import intel_extension_for_pytorch as ipex
 from typing import Optional, Tuple
 
 
@@ -78,9 +79,10 @@ class IPEXEmptyINT4LinearWithPadding(nn.Module):
         self.n_dim = n_dim
 
     def forward(self, input):
+        arch = 1 if ipex._C._has_2d_block_array(0) else 0
         if self.bias is None:
             return torch.ops.torch_ipex.mm_int4(
-                input, self.qweight, self.scales, self.qzeros, self.group_size
+                input, self.qweight, self.scales, self.qzeros, self.group_size, arch
             )[:, :, : self.n_dim]
         else:
             return torch.ops.torch_ipex.mm_bias_int4(
@@ -90,6 +92,7 @@ class IPEXEmptyINT4LinearWithPadding(nn.Module):
                 self.scales,
                 self.qzeros,
                 self.group_size,
+                arch,
             )[:, :, : self.n_dim]
 
 

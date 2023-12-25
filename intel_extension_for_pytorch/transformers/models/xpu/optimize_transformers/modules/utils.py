@@ -65,16 +65,17 @@ def pad_for_gptj_lm_head(model, is_int4=False):
     else:
         setattr(model, "slicing_pad", True)  # noqa
     if is_int4:
+        # NOTE: lm_head will not be replaced by WeightOnlyLinear in itrex
         n = model.lm_head.out_features
 
         lm_head_new = IPEXEmptyINT4LinearWithPadding(n)
-        lm_head_new.qweight = model.lm_head.qweight
+        lm_head_new.qweight = model.lm_head.qweight.byte()
         lm_head_new.bias = (
             model.lm_head.bias if model.lm_head.bias is not None else None
         )
         lm_head_new.scales = model.lm_head.scales
         if hasattr(model.lm_head, "qzeros"):
-            lm_head_new.qzeros = model.lm_head.qzeros
+            lm_head_new.qzeros = model.lm_head.qzeros.byte()
         else:
             lm_head_new.qzeros = None
         lm_head_new.group_size = model.lm_head.groupsize

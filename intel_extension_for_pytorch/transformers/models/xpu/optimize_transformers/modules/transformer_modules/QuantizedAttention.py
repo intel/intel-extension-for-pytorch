@@ -1,4 +1,5 @@
 import torch
+import intel_extension_for_pytorch as ipex
 from .._transformer_configuration import IPEXTransformerConfig
 from .Attention import IPEXTransformerAttnOptimizedFp16
 from .Linear import IPEXTransformerQLinear
@@ -36,6 +37,11 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
             self.out_proj_quant.zp = out_proj.qzeros.byte()
             # print("self.q_proj_quant.zp dtype: ", self.q_proj_quant.zp.dtype)
 
+        self.q_proj_quant.bias = q_proj.bias
+        self.k_proj_quant.bias = k_proj.bias
+        self.v_proj_quant.bias = v_proj.bias
+        self.out_proj_quant.bias = out_proj.bias
+
         self.q_proj_quant.gs = q_proj.blocksize
         self.k_proj_quant.gs = k_proj.blocksize
         self.v_proj_quant.gs = v_proj.blocksize
@@ -72,7 +78,7 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
             .contiguous()
             .view(shape)
         )
-        has_qzeros = hasattr(self.q_proj_quant, "qzeros")
+        has_qzeros = hasattr(self.q_proj_quant, "zp")
         if has_qzeros:
             self.qkv_proj_quant.zp = (
                 torch.stack(
@@ -82,7 +88,19 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
                 .view(shape)
             )
         self.qkv_proj_quant.gs = self.q_proj_quant.gs
-        self.qkv_proj_quant.bias = None
+        if self.q_proj_quant.bias is not None:
+            bias_shape = [3, -1]
+            self.qkv_proj_quant.bias = (
+                torch.stack(
+                    [
+                        self.q_proj_quant.bias,
+                        self.k_proj_quant.bias,
+                        self.v_proj_quant.bias,
+                    ]
+                )
+                .contiguous()
+                .view(bias_shape)
+            )
 
     def compute_qkv_gemm(self, hidden_states, query, key, value):
         # print("self.qkv_proj_quant.weight.dtype: ", self.qkv_proj_quant.weight.dtype)
@@ -100,16 +118,27 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         return query, key, value
 
     def out_proj_compute(self, attn_output, residual=None):
+        arch = 1 if ipex._C._has_2d_block_array(0) else 0
         if residual is None:
-            attn_output = torch.ops.torch_ipex.mm_int4(
-                attn_output,
-                self.out_proj_quant.weight,
-                self.out_proj_quant.scale,
-                self.out_proj_quant.zp,
-                self.out_proj_quant.gs,
-            )
             if self.out_proj.bias is not None:
-                attn_output += self.out_proj.bias
+                attn_output = torch.ops.torch_ipex.mm_bias_int4(
+                    attn_output,
+                    self.out_proj_quant.weight,
+                    self.out_proj.bias,
+                    self.out_proj_quant.scale,
+                    self.out_proj_quant.zp,
+                    self.out_proj_quant.gs,
+                    arch,
+                )
+            else:
+                attn_output = torch.ops.torch_ipex.mm_int4(
+                    attn_output,
+                    self.out_proj_quant.weight,
+                    self.out_proj_quant.scale,
+                    self.out_proj_quant.zp,
+                    self.out_proj_quant.gs,
+                    arch,
+                )
         else:
             shape = [attn_output.shape[0], attn_output.shape[1], self.embed_dim]
             if self.out_proj.bias is not None:
@@ -120,6 +149,7 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
                     self.out_proj_quant.scale,
                     self.out_proj_quant.zp,
                     self.out_proj_quant.gs,
+                    arch,
                 )
             else:
                 attn_output = torch.ops.torch_ipex.mm_int4(
@@ -128,6 +158,7 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
                     self.out_proj_quant.scale,
                     self.out_proj_quant.zp,
                     self.out_proj_quant.gs,
+                    arch,
                 )
             attn_output = attn_output + residual
             attn_output = attn_output.view(shape)
