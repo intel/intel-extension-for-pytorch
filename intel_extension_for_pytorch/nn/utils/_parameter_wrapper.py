@@ -104,21 +104,39 @@ def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
         torch.nn.ParameterList,
     ]
 
-    module_convert_list_fp16 = [
-        torch.nn.Conv1d,
+    module_convert_list_fp16_inference = [
         torch.nn.Conv2d,
         torch.nn.Conv3d,
+        torch.nn.ConvTranspose2d,
+        torch.nn.ConvTranspose3d,
         torch.nn.Linear,
+        torch.nn.Embedding,
         MergedEmbeddingBagWithCat,
         torch.nn.ParameterList,
     ]
 
+    module_convert_list_fp16_training = [
+        torch.nn.Conv1d,
+        torch.nn.Conv2d,
+        torch.nn.Conv3d,
+        torch.nn.ConvTranspose2d,
+        torch.nn.ConvTranspose3d,
+        torch.nn.Linear,
+        torch.nn.Embedding,
+        torch.nn.EmbeddingBag,
+        torch.nn.ParameterList,
+    ]
+
     if dtype == torch.float16:
-        return module_convert_list_fp16
-    elif inference:
-        return module_convert_list_bf16_inference
-    else:
-        return module_convert_list_bf16_training
+        if inference:
+            return module_convert_list_fp16_inference
+        else:
+            return module_convert_list_fp16_training
+    elif dtype == torch.bfloat16:
+        if inference:
+            return module_convert_list_bf16_inference
+        else:
+            return module_convert_list_bf16_training
 
 
 def _should_prepack(module, is_training, is_xpu=False):

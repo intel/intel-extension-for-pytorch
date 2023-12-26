@@ -336,7 +336,7 @@ class TestPrepackCases(TestCase):
                         ipex_model2 = ipex.optimize(
                             origin_model2, dtype=dtype, level="O1", inplace=True
                         )
-            if is_train or dtype == torch.float16:
+            if is_train:
                 self.assertTrue(ipex_model1.conv.weight.dtype == dtype)
                 self.assertTrue(ipex_model2.conv.weight.dtype == dtype)
 
