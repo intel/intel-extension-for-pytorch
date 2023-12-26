@@ -5,8 +5,8 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(single_query_cached_kv_attention_kernel_stub);
-DEFINE_DISPATCH(reshape_and_cache_kernel_stub);
+IPEX_DEFINE_DISPATCH(single_query_cached_kv_attention_kernel_stub);
+IPEX_DEFINE_DISPATCH(reshape_and_cache_kernel_stub);
 
 /*
  *Caculate the masked multihead attention for decoder layer in decoder only

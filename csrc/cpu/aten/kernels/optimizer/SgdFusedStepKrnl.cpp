@@ -430,7 +430,7 @@ c10::optional<at::Tensor> sgd_fused_step_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(sgd_fused_step_kernel_stub, &sgd_fused_step_kernel_impl);
+IPEX_REGISTER_DISPATCH(sgd_fused_step_kernel_stub, &sgd_fused_step_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -22,7 +22,7 @@ at::Tensor rmsnorm_kernel_impl(
 using rms_norm_kernel_fn =
     at::Tensor (*)(const at::Tensor&, const at::Tensor&, float);
 
-DECLARE_DISPATCH(rms_norm_kernel_fn, rmsnorm_kernel_stub);
+IPEX_DECLARE_DISPATCH(rms_norm_kernel_fn, rmsnorm_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

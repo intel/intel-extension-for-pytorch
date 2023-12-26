@@ -49,7 +49,7 @@ using nms_cpu_kernel_fn = at::Tensor (*)(
     const at::Tensor&,
     const float,
     const bool);
-DECLARE_DISPATCH(nms_cpu_kernel_fn, nms_cpu_kernel_stub);
+IPEX_DECLARE_DISPATCH(nms_cpu_kernel_fn, nms_cpu_kernel_stub);
 
 using batch_score_nms_cpu_kernel_fn =
     std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> (*)(
@@ -57,7 +57,7 @@ using batch_score_nms_cpu_kernel_fn =
         const at::Tensor&,
         const float,
         const int);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     batch_score_nms_cpu_kernel_fn,
     batch_score_nms_cpu_kernel_stub);
 
@@ -69,7 +69,7 @@ using rpn_nms_cpu_kernel_fn =
         const int,
         const float,
         const int);
-DECLARE_DISPATCH(rpn_nms_cpu_kernel_fn, rpn_nms_cpu_kernel_stub);
+IPEX_DECLARE_DISPATCH(rpn_nms_cpu_kernel_fn, rpn_nms_cpu_kernel_stub);
 
 using box_head_nms_cpu_kernel_fn = std::tuple<
     std::vector<at::Tensor>,
@@ -82,7 +82,7 @@ using box_head_nms_cpu_kernel_fn = std::tuple<
     const float,
     const int,
     const int);
-DECLARE_DISPATCH(box_head_nms_cpu_kernel_fn, box_head_nms_cpu_kernel_stub);
+IPEX_DECLARE_DISPATCH(box_head_nms_cpu_kernel_fn, box_head_nms_cpu_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

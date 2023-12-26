@@ -17,9 +17,9 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(embedding_bag_kernel_stub);
-DEFINE_DISPATCH(embedding_bag_backward_kernel_stub);
-DEFINE_DISPATCH(embedding_bag_int8_kernel_stub);
+IPEX_DEFINE_DISPATCH(embedding_bag_kernel_stub);
+IPEX_DEFINE_DISPATCH(embedding_bag_backward_kernel_stub);
+IPEX_DEFINE_DISPATCH(embedding_bag_int8_kernel_stub);
 
 class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
  public:

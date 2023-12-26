@@ -365,11 +365,11 @@ Tensor embedding_bag_int8_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(embedding_bag_kernel_stub, &embedding_bag_kernel_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(embedding_bag_kernel_stub, &embedding_bag_kernel_impl);
+IPEX_REGISTER_DISPATCH(
     embedding_bag_backward_kernel_stub,
     &embedding_bag_backward_kernel_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     embedding_bag_int8_kernel_stub,
     &embedding_bag_int8_kernel_impl);
 

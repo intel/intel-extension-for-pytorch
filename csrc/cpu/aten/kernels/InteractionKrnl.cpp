@@ -1141,13 +1141,15 @@ at::Tensor dil_qinteraction_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     interaction_forward_kernel_stub,
     &interaction_forward_kernel_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     interaction_backward_kernel_stub,
     &interaction_backward_kernel_impl);
-REGISTER_DISPATCH(dil_qinteraction_kernel_stub, &dil_qinteraction_kernel_impl);
+IPEX_REGISTER_DISPATCH(
+    dil_qinteraction_kernel_stub,
+    &dil_qinteraction_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

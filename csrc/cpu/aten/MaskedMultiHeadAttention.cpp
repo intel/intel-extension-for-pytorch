@@ -5,7 +5,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(masked_multihead_self_attention_kernel_stub);
+IPEX_DEFINE_DISPATCH(masked_multihead_self_attention_kernel_stub);
 
 /*
  *Caculate the masked multihead attention for decoder layer in decoder only

@@ -4,8 +4,8 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(div_add_softmax_kernel_stub);
-DEFINE_DISPATCH(add_softmax_inplace_kernel_stub);
+IPEX_DEFINE_DISPATCH(div_add_softmax_kernel_stub);
+IPEX_DEFINE_DISPATCH(add_softmax_inplace_kernel_stub);
 
 at::Tensor DivAddSoftmax(
     at::Tensor& a,

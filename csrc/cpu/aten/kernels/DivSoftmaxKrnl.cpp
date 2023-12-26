@@ -223,7 +223,7 @@ at::Tensor div_maskedfill_softmax_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     div_maskedfill_softmax_kernel_stub,
     &div_maskedfill_softmax_kernel_impl);
 

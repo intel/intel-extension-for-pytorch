@@ -11,10 +11,10 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(nms_cpu_kernel_stub);
-DEFINE_DISPATCH(batch_score_nms_cpu_kernel_stub);
-DEFINE_DISPATCH(rpn_nms_cpu_kernel_stub);
-DEFINE_DISPATCH(box_head_nms_cpu_kernel_stub);
+IPEX_DEFINE_DISPATCH(nms_cpu_kernel_stub);
+IPEX_DEFINE_DISPATCH(batch_score_nms_cpu_kernel_stub);
+IPEX_DEFINE_DISPATCH(rpn_nms_cpu_kernel_stub);
+IPEX_DEFINE_DISPATCH(box_head_nms_cpu_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

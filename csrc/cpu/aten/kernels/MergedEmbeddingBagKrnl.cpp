@@ -901,16 +901,16 @@ void mergedemb_distribute_forward_merge_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     merged_embeddingbag_forward_cpu_kernel_stub,
     &merged_embeddingbag_forward_cpu_kernel_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     merged_embeddingbag_cat_fw_stub,
     &merged_embedding_cat_fw_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     mergedemb_distribute_forward_local_kernel_stub,
     &mergedemb_distribute_forward_local_kernel_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     mergedemb_distribute_forward_merge_kernel_stub,
     &mergedemb_distribute_forward_merge_kernel_impl);
 } // namespace cpu

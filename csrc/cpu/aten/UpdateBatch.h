@@ -61,7 +61,9 @@ using rnnt_update_batch_kernel_fn = bool (*)(
     int64_t,
     int64_t,
     int64_t);
-DECLARE_DISPATCH(rnnt_update_batch_kernel_fn, rnnt_update_batch_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    rnnt_update_batch_kernel_fn,
+    rnnt_update_batch_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

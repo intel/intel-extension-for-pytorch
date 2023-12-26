@@ -1038,23 +1038,23 @@ void mergedemb_distribute_backward_merge_adagrad_update_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     merged_embeddingbag_backward_cpu_kernel_stub,
     &merged_embeddingbag_backward_cpu_kernel_impl);
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     merged_embeddingbag_backward_sgd_cpu_kernel_stub,
     &merged_embeddingbag_backward_sgd_cpu_kernel_impl);
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     merged_embeddingbag_backward_adagrad_cpu_kernel_stub,
     &merged_embeddingbag_backward_adagrad_cpu_kernel_impl);
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     mergedemb_distribute_backward_local_kernel_stub,
     &mergedemb_distribute_backward_local_kernel_impl);
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     mergedemb_distribute_backward_merge_adagrad_update_stub,
     &mergedemb_distribute_backward_merge_adagrad_update_kernel_impl);
 

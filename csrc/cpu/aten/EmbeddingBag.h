@@ -45,7 +45,7 @@ using embedding_bag_kernel_fn = at::Tensor (*)(
     const at::Tensor&,
     const at::Tensor&,
     bool);
-DECLARE_DISPATCH(embedding_bag_kernel_fn, embedding_bag_kernel_stub);
+IPEX_DECLARE_DISPATCH(embedding_bag_kernel_fn, embedding_bag_kernel_stub);
 
 using embedding_bag_backward_kernel_fn = at::Tensor (*)(
     const at::Tensor&,
@@ -53,7 +53,7 @@ using embedding_bag_backward_kernel_fn = at::Tensor (*)(
     const at::Tensor&,
     int64_t,
     bool);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     embedding_bag_backward_kernel_fn,
     embedding_bag_backward_kernel_stub);
 
@@ -63,7 +63,9 @@ using embedding_bag_int8_kernel_fn = at::Tensor (*)(
     const at::Tensor&,
     double,
     bool);
-DECLARE_DISPATCH(embedding_bag_int8_kernel_fn, embedding_bag_int8_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    embedding_bag_int8_kernel_fn,
+    embedding_bag_int8_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

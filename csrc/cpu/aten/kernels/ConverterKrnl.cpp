@@ -119,10 +119,10 @@ std::tuple<at::Tensor, at::Tensor> split_float_bfloat16_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     cat_bfloat16_float_kernel_stub,
     &cat_bfloat16_float_kernel_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     split_float_bfloat16_kernel_stub,
     &split_float_bfloat16_kernel_impl);
 

@@ -1450,7 +1450,7 @@ masked_multihead_self_attention_kernel_impl(
 }
 } // anonymous namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     masked_multihead_self_attention_kernel_stub,
     &masked_multihead_self_attention_kernel_impl);
 

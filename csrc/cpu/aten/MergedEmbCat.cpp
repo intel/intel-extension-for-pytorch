@@ -7,8 +7,8 @@ namespace cpu {
 
 using namespace at;
 
-DEFINE_DISPATCH(merged_embeddingbag_cat_fw_stub);
-DEFINE_DISPATCH(qmerged_embeddingbag_cat_fw_stub);
+IPEX_DEFINE_DISPATCH(merged_embeddingbag_cat_fw_stub);
+IPEX_DEFINE_DISPATCH(qmerged_embeddingbag_cat_fw_stub);
 
 Tensor merged_embeddingbag_cat_forward(
     const TensorList& weights,

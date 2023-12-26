@@ -8,7 +8,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(lars_norm_kernel_stub);
+IPEX_DEFINE_DISPATCH(lars_norm_kernel_stub);
 
 /**
  * LARS fused update kernel.

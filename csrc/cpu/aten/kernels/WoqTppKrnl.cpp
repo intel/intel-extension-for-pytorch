@@ -3644,9 +3644,9 @@ at::Tensor qlinear_woq_unpack(
 
 } // namespace
 
-REGISTER_DISPATCH(woq_tpp_gemm_kernel_stub, &qlinear_woq_affine);
-REGISTER_DISPATCH(woq_tpp_gemm_packB_stub, &qlinear_woq_pack);
-REGISTER_DISPATCH(woq_tpp_gemm_unpackB_stub, &qlinear_woq_unpack);
+IPEX_REGISTER_DISPATCH(woq_tpp_gemm_kernel_stub, &qlinear_woq_affine);
+IPEX_REGISTER_DISPATCH(woq_tpp_gemm_packB_stub, &qlinear_woq_pack);
+IPEX_REGISTER_DISPATCH(woq_tpp_gemm_unpackB_stub, &qlinear_woq_unpack);
 
 } // namespace cpu
 } // namespace torch_ipex

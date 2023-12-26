@@ -7,7 +7,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(merged_embeddingbag_forward_cpu_kernel_stub);
+IPEX_DEFINE_DISPATCH(merged_embeddingbag_forward_cpu_kernel_stub);
 
 std::vector<Tensor> merged_embeddingbag_forward_cpu(
     const std::vector<Tensor>& weights,

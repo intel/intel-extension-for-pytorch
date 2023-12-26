@@ -267,7 +267,7 @@ using merged_embeddingbag_forward_cpu_kernel_fn = std::vector<Tensor> (*)(
     const TensorList&,
     const int64_t,
     const bool);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     merged_embeddingbag_forward_cpu_kernel_fn,
     merged_embeddingbag_forward_cpu_kernel_stub);
 
@@ -278,7 +278,7 @@ using merged_embeddingbag_backward_cpu_kernel_fn = std::vector<Tensor> (*)(
     const TensorList&,
     const int64_t,
     const bool);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     merged_embeddingbag_backward_cpu_kernel_fn,
     merged_embeddingbag_backward_cpu_kernel_stub);
 
@@ -292,7 +292,7 @@ using merged_embeddingbag_backward_sgd_cpu_kernel_fn = void (*)(
     const TensorList&,
     const double,
     const double);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     merged_embeddingbag_backward_sgd_cpu_kernel_fn,
     merged_embeddingbag_backward_sgd_cpu_kernel_stub);
 
@@ -307,7 +307,7 @@ using merged_embeddingbag_backward_adagrad_cpu_kernel_fn = void (*)(
     const TensorList&,
     const double,
     const double);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     merged_embeddingbag_backward_adagrad_cpu_kernel_fn,
     merged_embeddingbag_backward_adagrad_cpu_kernel_stub);
 
@@ -320,7 +320,7 @@ using mergedemb_distribute_forward_local_kernel_fn = std::
         const int64_t,
         const int64_t,
         const bool);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     mergedemb_distribute_forward_local_kernel_fn,
     mergedemb_distribute_forward_local_kernel_stub);
 
@@ -330,7 +330,7 @@ using mergedemb_distribute_forward_merge_kernel_fn = void (*)(
     const TensorList&,
     const TensorList&,
     const int64_t);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     mergedemb_distribute_forward_merge_kernel_fn,
     mergedemb_distribute_forward_merge_kernel_stub);
 
@@ -343,7 +343,7 @@ using mergedemb_distribute_backward_local_kernel_fn = std::
         const int64_t,
         const int64_t,
         const bool);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     mergedemb_distribute_backward_local_kernel_fn,
     mergedemb_distribute_backward_local_kernel_stub);
 
@@ -356,7 +356,7 @@ using mergedemb_distribute_backward_merge_adagrad_update_fn = void (*)(
     Tensor&,
     const double,
     const double);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     mergedemb_distribute_backward_merge_adagrad_update_fn,
     mergedemb_distribute_backward_merge_adagrad_update_stub);
 

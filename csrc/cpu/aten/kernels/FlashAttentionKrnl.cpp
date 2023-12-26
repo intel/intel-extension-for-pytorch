@@ -1029,8 +1029,8 @@ flash_attention_mask_kernel(
 }
 } // anonymous namespace
 
-REGISTER_DISPATCH(flash_attention_kernel_stub, &flash_attention_kernel);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(flash_attention_kernel_stub, &flash_attention_kernel);
+IPEX_REGISTER_DISPATCH(
     flash_attention_mask_kernel_stub,
     &flash_attention_mask_kernel);
 

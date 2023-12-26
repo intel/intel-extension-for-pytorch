@@ -14,7 +14,7 @@ std::string get_current_isa_level_kernel_impl() {
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     get_current_isa_level_kernel_stub,
     &get_current_isa_level_kernel_impl);
 

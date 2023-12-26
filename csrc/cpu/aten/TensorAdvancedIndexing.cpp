@@ -26,8 +26,8 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(index_select_contig_stub);
-DEFINE_DISPATCH(copy_stub);
+IPEX_DEFINE_DISPATCH(index_select_contig_stub);
+IPEX_DEFINE_DISPATCH(copy_stub);
 
 at::Tensor& index_select_out_cpu_(
     const at::Tensor& self,

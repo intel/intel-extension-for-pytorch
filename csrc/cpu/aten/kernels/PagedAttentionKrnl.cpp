@@ -428,10 +428,10 @@ void reshape_and_cache_cpu_kernel_impl(
 
 } // namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     single_query_cached_kv_attention_kernel_stub,
     &single_query_cached_kv_attention_kernel_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     reshape_and_cache_kernel_stub,
     &reshape_and_cache_cpu_kernel_impl);
 

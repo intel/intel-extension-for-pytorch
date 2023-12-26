@@ -6,14 +6,14 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(tpp_linear_nobias_kernel_stub);
-DEFINE_DISPATCH(tpp_linear_bias_kernel_stub);
-DEFINE_DISPATCH(tpp_linear_gelu_kernel_stub);
-DEFINE_DISPATCH(tpp_linear_silu_kernel_stub);
-DEFINE_DISPATCH(tpp_linear_relu_kernel_stub);
-DEFINE_DISPATCH(tpp_linear_add_kernel_stub);
-DEFINE_DISPATCH(tpp_linear_mul_kernel_stub);
-DEFINE_DISPATCH(tpp_linear_add_add_kernel_stub);
+IPEX_DEFINE_DISPATCH(tpp_linear_nobias_kernel_stub);
+IPEX_DEFINE_DISPATCH(tpp_linear_bias_kernel_stub);
+IPEX_DEFINE_DISPATCH(tpp_linear_gelu_kernel_stub);
+IPEX_DEFINE_DISPATCH(tpp_linear_silu_kernel_stub);
+IPEX_DEFINE_DISPATCH(tpp_linear_relu_kernel_stub);
+IPEX_DEFINE_DISPATCH(tpp_linear_add_kernel_stub);
+IPEX_DEFINE_DISPATCH(tpp_linear_mul_kernel_stub);
+IPEX_DEFINE_DISPATCH(tpp_linear_add_add_kernel_stub);
 
 at::Tensor tpp_linear_nobias_forward_cpu(
     const at::Tensor& t_in,

@@ -149,6 +149,14 @@ if(USE_LIBXSMM)
   target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/lib/libxsmm.a)
 endif(USE_LIBXSMM)
 
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build sleef static" FORCE)
+set(BUILD_DFT OFF CACHE BOOL "Don't build sleef DFT lib" FORCE)
+set(BUILD_GNUABI_LIBS OFF CACHE BOOL "Don't build sleef gnuabi libs" FORCE)
+set(BUILD_TESTS OFF CACHE BOOL "Don't build sleef tests" FORCE)
+add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/sleef ${THIRD_PARTY_BUILD_PATH_NAME}/sleef EXCLUDE_FROM_ALL)
+set_property(TARGET sleef PROPERTY FOLDER "dependencies")
+target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE sleef)
+
 add_dependencies(${PLUGIN_NAME_CPU} dnnl)
 # If Graph Compiler is built, then it should link to its LLVM dependencies,
 # and not the LLVM symbols exposed by PyTorch.

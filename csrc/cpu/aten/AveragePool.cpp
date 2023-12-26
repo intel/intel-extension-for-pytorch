@@ -13,11 +13,11 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(avg_pool2d_kernel_stub);
-DEFINE_DISPATCH(avg_pool2d_backward_kernel_stub);
+IPEX_DEFINE_DISPATCH(avg_pool2d_kernel_stub);
+IPEX_DEFINE_DISPATCH(avg_pool2d_backward_kernel_stub);
 
-DEFINE_DISPATCH(avg_pool3d_kernel_stub);
-DEFINE_DISPATCH(avg_pool3d_backward_kernel_stub);
+IPEX_DEFINE_DISPATCH(avg_pool3d_kernel_stub);
+IPEX_DEFINE_DISPATCH(avg_pool3d_backward_kernel_stub);
 
 at::Tensor avg_pool2d_out_cpu(
     const at::Tensor& input,

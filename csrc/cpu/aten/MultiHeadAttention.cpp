@@ -4,9 +4,9 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(bert_mha_kernel_stub);
-DEFINE_DISPATCH(sd_mha_kernel_v1_stub);
-DEFINE_DISPATCH(sd_mha_kernel_v2_stub);
+IPEX_DEFINE_DISPATCH(bert_mha_kernel_stub);
+IPEX_DEFINE_DISPATCH(sd_mha_kernel_v1_stub);
+IPEX_DEFINE_DISPATCH(sd_mha_kernel_v2_stub);
 
 at::Tensor bert_flash_mha(
     const at::Tensor& qkv,

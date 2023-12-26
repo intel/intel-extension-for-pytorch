@@ -32,7 +32,7 @@ using div_maskedfill_softmax_kernel_fn = at::Tensor (*)(
     const float&,
     const float&);
 
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     div_maskedfill_softmax_kernel_fn,
     div_maskedfill_softmax_kernel_stub);
 

@@ -7,9 +7,9 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(mkl_sgemm_packB_stub);
-DEFINE_DISPATCH(mkl_sgemm_kernel_stub);
-DEFINE_DISPATCH(mkl_prepack_sgemm_kernel_stub);
+IPEX_DEFINE_DISPATCH(mkl_sgemm_packB_stub);
+IPEX_DEFINE_DISPATCH(mkl_sgemm_kernel_stub);
+IPEX_DEFINE_DISPATCH(mkl_prepack_sgemm_kernel_stub);
 
 /**
  * FP32 Linear inplace version with MKL SGEMM kernel.

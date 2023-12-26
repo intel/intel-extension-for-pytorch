@@ -7,7 +7,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(adam_fused_step_kernel_stub);
+IPEX_DEFINE_DISPATCH(adam_fused_step_kernel_stub);
 
 void adam_fused_step(
     const at::Tensor& param_,
@@ -106,7 +106,7 @@ void adam_fused_step(
 namespace {
 
 IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_REGISTER_DISPATCH(
+  IPEX_OP_IPEX_REGISTER_DISPATCH(
       "adam_fused_step",
       torch_ipex::cpu::adam_fused_step,
       at::DispatchKey::CPU);

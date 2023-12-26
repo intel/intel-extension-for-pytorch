@@ -16,9 +16,9 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(interaction_forward_kernel_stub);
-DEFINE_DISPATCH(interaction_backward_kernel_stub);
-DEFINE_DISPATCH(dil_qinteraction_kernel_stub);
+IPEX_DEFINE_DISPATCH(interaction_forward_kernel_stub);
+IPEX_DEFINE_DISPATCH(interaction_backward_kernel_stub);
+IPEX_DEFINE_DISPATCH(dil_qinteraction_kernel_stub);
 
 at::Tensor _interaction_forward(const std::vector<at::Tensor>& input) {
   // pointer to interaction_forward_kernel_impl(input);

@@ -622,7 +622,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(lamb_fused_step_kernel_stub, &lamb_fused_step_kernel_impl);
+IPEX_REGISTER_DISPATCH(
+    lamb_fused_step_kernel_stub,
+    &lamb_fused_step_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

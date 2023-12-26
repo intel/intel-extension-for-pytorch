@@ -64,8 +64,8 @@ using instancenorm_backward_fn = std::vector<at::Tensor> (*)(
     const at::Tensor& /* variance */,
     bool is_channels_last);
 
-DECLARE_DISPATCH(instancenorm_forward_fn, InstanceNormKernel);
-DECLARE_DISPATCH(instancenorm_backward_fn, InstanceNormBackwardKernel);
+IPEX_DECLARE_DISPATCH(instancenorm_forward_fn, InstanceNormKernel);
+IPEX_DECLARE_DISPATCH(instancenorm_backward_fn, InstanceNormBackwardKernel);
 
 } // namespace cpu
 } // namespace torch_ipex

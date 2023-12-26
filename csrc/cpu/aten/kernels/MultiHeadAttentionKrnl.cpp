@@ -708,9 +708,9 @@ at::Tensor sd_mha_kernel_v2_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(bert_mha_kernel_stub, &bert_mha_kernel_impl);
-REGISTER_DISPATCH(sd_mha_kernel_v1_stub, &sd_mha_kernel_v1_impl);
-REGISTER_DISPATCH(sd_mha_kernel_v2_stub, &sd_mha_kernel_v2_impl);
+IPEX_REGISTER_DISPATCH(bert_mha_kernel_stub, &bert_mha_kernel_impl);
+IPEX_REGISTER_DISPATCH(sd_mha_kernel_v1_stub, &sd_mha_kernel_v1_impl);
+IPEX_REGISTER_DISPATCH(sd_mha_kernel_v2_stub, &sd_mha_kernel_v2_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

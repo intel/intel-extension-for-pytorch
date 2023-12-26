@@ -75,7 +75,9 @@ using adagrad_fused_step_kernel_fn = std::tuple<at::Tensor, at::Tensor> (*)(
     double,
     double,
     double);
-DECLARE_DISPATCH(adagrad_fused_step_kernel_fn, adagrad_fused_step_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    adagrad_fused_step_kernel_fn,
+    adagrad_fused_step_kernel_stub);
 
 using lamb_fused_step_kernel_fn =
     std::tuple<at::Tensor, at::Tensor, at::Tensor> (*)(
@@ -90,7 +92,7 @@ using lamb_fused_step_kernel_fn =
         double,
         double,
         double);
-DECLARE_DISPATCH(lamb_fused_step_kernel_fn, lamb_fused_step_kernel_stub);
+IPEX_DECLARE_DISPATCH(lamb_fused_step_kernel_fn, lamb_fused_step_kernel_stub);
 
 using sgd_fused_step_kernel_fn = c10::optional<at::Tensor> (*)(
     at::Tensor&,
@@ -102,11 +104,11 @@ using sgd_fused_step_kernel_fn = c10::optional<at::Tensor> (*)(
     double,
     double,
     bool);
-DECLARE_DISPATCH(sgd_fused_step_kernel_fn, sgd_fused_step_kernel_stub);
+IPEX_DECLARE_DISPATCH(sgd_fused_step_kernel_fn, sgd_fused_step_kernel_stub);
 
 using packed_add_kernel_fn =
     at::Tensor (*)(at::Tensor&, at::Tensor&, const at::Tensor&, double);
-DECLARE_DISPATCH(packed_add_kernel_fn, packed_add_kernel_stub);
+IPEX_DECLARE_DISPATCH(packed_add_kernel_fn, packed_add_kernel_stub);
 
 using adam_fused_step_kernel_fn = void (*)(
     const at::Tensor&,
@@ -122,11 +124,11 @@ using adam_fused_step_kernel_fn = void (*)(
     double,
     double,
     double);
-DECLARE_DISPATCH(adam_fused_step_kernel_fn, adam_fused_step_kernel_stub);
+IPEX_DECLARE_DISPATCH(adam_fused_step_kernel_fn, adam_fused_step_kernel_stub);
 
 using lars_norm_kernel_fn = float (*)(const at::Tensor&);
 
-DECLARE_DISPATCH(lars_norm_kernel_fn, lars_norm_kernel_stub);
+IPEX_DECLARE_DISPATCH(lars_norm_kernel_fn, lars_norm_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

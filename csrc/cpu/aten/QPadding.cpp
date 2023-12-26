@@ -13,10 +13,10 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(replication_pad2d_kernel_stub);
-DEFINE_DISPATCH(replication_pad3d_kernel_stub);
-DEFINE_DISPATCH(reflection_pad2d_kernel_stub);
-DEFINE_DISPATCH(reflection_pad3d_kernel_stub);
+IPEX_DEFINE_DISPATCH(replication_pad2d_kernel_stub);
+IPEX_DEFINE_DISPATCH(replication_pad3d_kernel_stub);
+IPEX_DEFINE_DISPATCH(reflection_pad2d_kernel_stub);
+IPEX_DEFINE_DISPATCH(reflection_pad3d_kernel_stub);
 
 at::Tensor replication_pad2d(
     const at::Tensor& input,

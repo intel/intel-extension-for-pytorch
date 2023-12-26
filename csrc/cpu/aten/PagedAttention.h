@@ -49,10 +49,10 @@ using reshape_and_cache_fn = void (*)(
     at::Tensor& value_cache,
     at::Tensor& slot_mapping);
 
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     single_query_cached_kv_attention_fn,
     single_query_cached_kv_attention_kernel_stub);
-DECLARE_DISPATCH(reshape_and_cache_fn, reshape_and_cache_kernel_stub);
+IPEX_DECLARE_DISPATCH(reshape_and_cache_fn, reshape_and_cache_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

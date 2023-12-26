@@ -1736,8 +1736,8 @@ void GroupNormBackwardKernelImpl(
 
 } // namespace
 
-REGISTER_DISPATCH(GroupNormKernel, &GroupNormKernelImpl);
-REGISTER_DISPATCH(GroupNormBackwardKernel, &GroupNormBackwardKernelImpl);
+IPEX_REGISTER_DISPATCH(GroupNormKernel, &GroupNormKernelImpl);
+IPEX_REGISTER_DISPATCH(GroupNormBackwardKernel, &GroupNormBackwardKernelImpl);
 
 } // namespace cpu
 } // namespace torch_ipex

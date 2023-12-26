@@ -335,7 +335,7 @@ std::tuple<at::Tensor, at::Tensor> adagrad_fused_step_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     adagrad_fused_step_kernel_stub,
     &adagrad_fused_step_kernel_impl);
 

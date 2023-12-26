@@ -10,7 +10,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(rotary_position_embedding_kernel_stub);
+IPEX_DEFINE_DISPATCH(rotary_position_embedding_kernel_stub);
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor>
 rotary_position_embedding_forward_cpu(

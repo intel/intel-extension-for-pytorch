@@ -6,7 +6,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(adagrad_fused_step_kernel_stub);
+IPEX_DEFINE_DISPATCH(adagrad_fused_step_kernel_stub);
 
 std::tuple<at::Tensor, at::Tensor> adagrad_fused_step(
     const at::Tensor& param_,

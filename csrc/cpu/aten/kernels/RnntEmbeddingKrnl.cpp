@@ -69,7 +69,7 @@ void rnnt_embedding_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(rnnt_embedding_kernel_stub, &rnnt_embedding_kernel_impl);
+IPEX_REGISTER_DISPATCH(rnnt_embedding_kernel_stub, &rnnt_embedding_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -32,10 +32,10 @@ void copy_kernel(at::TensorIterator& iter, bool /*non_blocking*/);
 
 using index_select_fn =
     void (*)(const at::Tensor&, const at::Tensor&, int64_t, const at::Tensor&);
-DECLARE_DISPATCH(index_select_fn, index_select_contig_stub);
+IPEX_DECLARE_DISPATCH(index_select_fn, index_select_contig_stub);
 
 using copy_fn = void (*)(at::TensorIterator&, bool non_blocking);
-DECLARE_DISPATCH(copy_fn, copy_stub);
+IPEX_DECLARE_DISPATCH(copy_fn, copy_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

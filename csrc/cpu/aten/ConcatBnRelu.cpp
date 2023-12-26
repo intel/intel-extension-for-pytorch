@@ -5,7 +5,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(concat_bn_relu_kernel_stub);
+IPEX_DEFINE_DISPATCH(concat_bn_relu_kernel_stub);
 
 /**
  * This kernel fuses Concat+BN+ReLU as a signel operator.

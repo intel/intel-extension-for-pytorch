@@ -25,7 +25,7 @@ using rnnt_embedding_kernel_fn = void (*)(
     int64_t,
     int64_t,
     int64_t);
-DECLARE_DISPATCH(rnnt_embedding_kernel_fn, rnnt_embedding_kernel_stub);
+IPEX_DECLARE_DISPATCH(rnnt_embedding_kernel_fn, rnnt_embedding_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

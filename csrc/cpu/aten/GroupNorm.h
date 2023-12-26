@@ -35,8 +35,8 @@ using backward_fn = void (*)(
     at::Tensor& /* dgamma */,
     at::Tensor& /* dbeta */);
 
-DECLARE_DISPATCH(forward_fn, GroupNormKernel);
-DECLARE_DISPATCH(backward_fn, GroupNormBackwardKernel);
+IPEX_DECLARE_DISPATCH(forward_fn, GroupNormKernel);
+IPEX_DECLARE_DISPATCH(backward_fn, GroupNormBackwardKernel);
 
 } // namespace cpu
 } // namespace torch_ipex

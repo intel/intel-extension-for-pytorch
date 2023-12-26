@@ -102,17 +102,17 @@ If you want to add a new custom kernel, and the kernel uses CPU ISA instructions
 //
 // In csrc/cpu/aten/MyKernel.h:
 //   using fn_type = void(*)(const Tensor& x);
-//   DECLARE_DISPATCH(fn_type, stub);
+//   IPEX_DECLARE_DISPATCH(fn_type, stub);
 //
 // In csrc/cpu/aten/MyKernel.cpp
-//   DEFINE_DISPATCH(stub);
+//   IPEX_DEFINE_DISPATCH(stub);
 //
 // In csrc/cpu/aten/kernels/MyKernel.cpp:
 //   namespace {
 //     // use anonymous namespace so that different cpu versions won't conflict
 //     void kernel(const Tensor& x) { ... }
 //   }
-//   REGISTER_DISPATCH(stub, &kernel);
+//   IPEX_REGISTER_DISPATCH(stub, &kernel);
 //
 // To call:
 //   stub(kCPU, tensor);
@@ -148,7 +148,7 @@ void cvt_fp32_to_bf16_kernel_impl(at::BFloat16* dst, const float* src, int len);
 }
 
 using cvt_fp32_to_bf16_kernel_fn = void (*)(at::BFloat16*, const float*, int);
-DECLARE_DISPATCH(cvt_fp32_to_bf16_kernel_fn, cvt_fp32_to_bf16_kernel_stub);
+IPEX_DECLARE_DISPATCH(cvt_fp32_to_bf16_kernel_fn, cvt_fp32_to_bf16_kernel_stub);
 } // namespace cpu
 } // namespace torch_ipex
 
@@ -161,7 +161,7 @@ DECLARE_DISPATCH(cvt_fp32_to_bf16_kernel_fn, cvt_fp32_to_bf16_kernel_stub);
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(cvt_fp32_to_bf16_kernel_stub);
+IPEX_DEFINE_DISPATCH(cvt_fp32_to_bf16_kernel_stub);
 
 void cvt_fp32_to_bf16(at::BFloat16* dst, const float* src, int len) {
   return cvt_fp32_to_bf16_kernel_stub(kCPU, dst, src, len);
@@ -249,7 +249,7 @@ void cvt_fp32_to_bf16_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(cvt_fp32_to_bf16_kernel_stub, &cvt_fp32_to_bf16_kernel_impl);
+IPEX_REGISTER_DISPATCH(cvt_fp32_to_bf16_kernel_stub, &cvt_fp32_to_bf16_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex
@@ -278,7 +278,7 @@ std::tuple<int, int> get_cpp_typesize_and_vecsize_kernel_impl(
 
 using get_cpp_typesize_and_vecsize_kernel_fn =
     std::tuple<int, int> (*)(at::ScalarType);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     get_cpp_typesize_and_vecsize_kernel_fn,
     get_cpp_typesize_and_vecsize_kernel_stub);
 
@@ -295,7 +295,7 @@ DECLARE_DISPATCH(
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(get_cpp_typesize_and_vecsize_kernel_stub);
+IPEX_DEFINE_DISPATCH(get_cpp_typesize_and_vecsize_kernel_stub);
 
 // get cpp typesize and vectorsize by at::ScalarType
 std::tuple<int, int> get_cpp_typesize_and_vecsize(at::ScalarType dtype) {
@@ -355,7 +355,7 @@ std::tuple<int, int> get_cpp_typesize_and_vecsize_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     get_cpp_typesize_and_vecsize_kernel_stub,
     &get_cpp_typesize_and_vecsize_kernel_impl);
 

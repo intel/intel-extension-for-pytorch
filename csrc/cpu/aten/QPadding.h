@@ -29,10 +29,10 @@ void reflection_pad3d_kernel_impl(
 
 using padding_fn =
     void (*)(const at::Tensor&, const at::Tensor&, c10::IntArrayRef);
-DECLARE_DISPATCH(padding_fn, replication_pad2d_kernel_stub);
-DECLARE_DISPATCH(padding_fn, replication_pad3d_kernel_stub);
-DECLARE_DISPATCH(padding_fn, reflection_pad2d_kernel_stub);
-DECLARE_DISPATCH(padding_fn, reflection_pad3d_kernel_stub);
+IPEX_DECLARE_DISPATCH(padding_fn, replication_pad2d_kernel_stub);
+IPEX_DECLARE_DISPATCH(padding_fn, replication_pad3d_kernel_stub);
+IPEX_DECLARE_DISPATCH(padding_fn, reflection_pad2d_kernel_stub);
+IPEX_DECLARE_DISPATCH(padding_fn, reflection_pad3d_kernel_stub);
 
 namespace padding {
 

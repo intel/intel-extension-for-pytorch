@@ -472,7 +472,7 @@ Tensor qmerged_embedding_cat_fw_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     qmerged_embeddingbag_cat_fw_stub,
     &qmerged_embedding_cat_fw_impl);
 

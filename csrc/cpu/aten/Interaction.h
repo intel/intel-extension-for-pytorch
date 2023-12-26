@@ -35,14 +35,14 @@ at::Tensor dil_qinteraction_kernel_impl(
 
 using interaction_forward_kernel_fn =
     at::Tensor (*)(const std::vector<at::Tensor>&);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     interaction_forward_kernel_fn,
     interaction_forward_kernel_stub);
 
 using interaction_backward_kernel_fn = std::vector<at::Tensor> (*)(
     const at::Tensor&,
     const std::vector<at::Tensor>&);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     interaction_backward_kernel_fn,
     interaction_backward_kernel_stub);
 
@@ -51,7 +51,7 @@ using dil_qinteraction_kernel_fn = at::Tensor (*)(
     double,
     int64_t,
     at::ScalarType);
-DECLARE_DISPATCH(dil_qinteraction_kernel_fn, dil_qinteraction_kernel_stub);
+IPEX_DECLARE_DISPATCH(dil_qinteraction_kernel_fn, dil_qinteraction_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

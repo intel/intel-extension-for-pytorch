@@ -3,9 +3,9 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(merged_embeddingbag_backward_cpu_kernel_stub);
-DEFINE_DISPATCH(merged_embeddingbag_backward_sgd_cpu_kernel_stub);
-DEFINE_DISPATCH(merged_embeddingbag_backward_adagrad_cpu_kernel_stub);
+IPEX_DEFINE_DISPATCH(merged_embeddingbag_backward_cpu_kernel_stub);
+IPEX_DEFINE_DISPATCH(merged_embeddingbag_backward_sgd_cpu_kernel_stub);
+IPEX_DEFINE_DISPATCH(merged_embeddingbag_backward_adagrad_cpu_kernel_stub);
 
 std::vector<Tensor> merged_embeddingbag_backward_cpu(
     const TensorList& grad_outs_,

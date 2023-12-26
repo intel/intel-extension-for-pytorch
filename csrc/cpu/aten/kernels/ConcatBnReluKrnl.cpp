@@ -130,7 +130,7 @@ at::Tensor concat_bn_relu_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(concat_bn_relu_kernel_stub, &concat_bn_relu_kernel_impl);
+IPEX_REGISTER_DISPATCH(concat_bn_relu_kernel_stub, &concat_bn_relu_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -357,7 +357,7 @@ at::Tensor ipex_linear_eltwise(
 }
 
 #ifdef USE_LIBXSMM
-DEFINE_DISPATCH(woq_tpp_gemm_packB_stub);
+IPEX_DEFINE_DISPATCH(woq_tpp_gemm_packB_stub);
 at::Tensor woq_linear_pack_weight(
     const at::Tensor& weight,
     std::vector<int64_t>& weight_shape,
@@ -410,7 +410,7 @@ at::Tensor woq_linear_pack_weight(
   return weight;
 }
 
-DEFINE_DISPATCH(woq_tpp_gemm_unpackB_stub);
+IPEX_DEFINE_DISPATCH(woq_tpp_gemm_unpackB_stub);
 at::Tensor woq_linear_unpack_weight(
     const at::Tensor& weight,
     bool is_int4,
@@ -419,7 +419,7 @@ at::Tensor woq_linear_unpack_weight(
   return woq_tpp_gemm_unpackB_stub(kCPU, weight, w_dtype, lowp_mode);
 }
 
-DEFINE_DISPATCH(woq_tpp_gemm_kernel_stub);
+IPEX_DEFINE_DISPATCH(woq_tpp_gemm_kernel_stub);
 at::Tensor woq_linear_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,

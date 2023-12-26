@@ -75,7 +75,7 @@ float lars_norm_kernel_impl(const at::Tensor& input_tensor_) {
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(lars_norm_kernel_stub, &lars_norm_kernel_impl);
+IPEX_REGISTER_DISPATCH(lars_norm_kernel_stub, &lars_norm_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

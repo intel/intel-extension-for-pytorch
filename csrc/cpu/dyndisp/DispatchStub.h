@@ -22,17 +22,17 @@ using namespace c10;
 //
 // In csrc/cpu/aten/MyKernel.h:
 //   using fn_type = void(*)(const Tensor& x);
-//   DECLARE_DISPATCH(fn_type, stub);
+//   IPEX_DECLARE_DISPATCH(fn_type, stub);
 //
 // In csrc/cpu/aten/MyKernel.cpp
-//   DEFINE_DISPATCH(stub);
+//   IPEX_DEFINE_DISPATCH(stub);
 //
 // In csrc/cpu/aten/kernels/MyKernel.cpp:
 //   namespace {
 //     // use anonymous namespace so that different cpu versions won't conflict
 //     void kernel(const Tensor& x) { ... }
 //   }
-//   REGISTER_DISPATCH(stub, &kernel);
+//   IPEX_REGISTER_DISPATCH(stub, &kernel);
 //
 // To call:
 //   stub(kCPU, tensor);
@@ -261,11 +261,11 @@ struct RegisterHIPDispatch {
 } // anonymous namespace
 
 // Compiler will complain if you put things like std::tuple<Tensor, Tensor> in
-// the `fn` argument of DECLARE_DISPATCH. Some possible workarounds, e.g.,
+// the `fn` argument of IPEX_DECLARE_DISPATCH. Some possible workarounds, e.g.,
 // adding parentheses and using helper struct to get rid of the parentheses, do
 // not work with MSVC. So do a `using`-declaration if you need to pass in such
 // `fn`, e.g., grid_sampler_2d_backward_cpu_kernel in GridSampleKernel.h.
-#define DECLARE_DISPATCH(fn, name)         \
+#define IPEX_DECLARE_DISPATCH(fn, name)    \
   struct name : DispatchStub<fn, name> {   \
     name() = default;                      \
     name(const name&) = delete;            \
@@ -273,32 +273,33 @@ struct RegisterHIPDispatch {
   };                                       \
   extern IPEX_API struct name name
 
-#define DEFINE_DISPATCH(name) struct name name
+#define IPEX_DEFINE_DISPATCH(name) struct name name
 
-#undef REGISTER_ARCH_DISPATCH
-#define REGISTER_ARCH_DISPATCH(name, arch, fn) \
-  template <>                                  \
+#undef IPEX_REGISTER_ARCH_DISPATCH
+#define IPEX_REGISTER_ARCH_DISPATCH(name, arch, fn) \
+  template <>                                       \
   decltype(fn) DispatchStub<decltype(fn), struct name>::arch = fn;
 
 #ifdef HAVE_AVX512_CPU_DEFINITION
-#define REGISTER_AVX512_DISPATCH(name, fn) \
-  REGISTER_ARCH_DISPATCH(name, AVX512, fn)
+#define IPEX_REGISTER_AVX512_DISPATCH(name, fn) \
+  IPEX_REGISTER_ARCH_DISPATCH(name, AVX512, fn)
 #else
-#define REGISTER_AVX512_DISPATCH(name, fn)
+#define IPEX_REGISTER_AVX512_DISPATCH(name, fn)
 #endif
 
 #ifdef HAVE_AVX2_CPU_DEFINITION
-#define REGISTER_AVX2_DISPATCH(name, fn) REGISTER_ARCH_DISPATCH(name, AVX2, fn)
+#define IPEX_REGISTER_AVX2_DISPATCH(name, fn) \
+  IPEX_REGISTER_ARCH_DISPATCH(name, AVX2, fn)
 #else
-#define REGISTER_AVX2_DISPATCH(name, fn)
+#define IPEX_REGISTER_AVX2_DISPATCH(name, fn)
 #endif
 
-#undef REGISTER_NO_CPU_DISPATCH
-#define REGISTER_NO_CPU_DISPATCH(name, fn_type)                        \
-  REGISTER_ARCH_DISPATCH(name, DEFAULT, static_cast<fn_type>(nullptr)) \
-  REGISTER_AVX512_DISPATCH(name, static_cast<fn_type>(nullptr))        \
-  REGISTER_AVX2_DISPATCH(name, static_cast<fn_type>(nullptr))          \
-  REGISTER_VSX_DISPATCH(name, static_cast<fn_type>(nullptr))
+#undef IPEX_REGISTER_NO_CPU_DISPATCH
+#define IPEX_REGISTER_NO_CPU_DISPATCH(name, fn_type)                        \
+  IPEX_REGISTER_ARCH_DISPATCH(name, DEFAULT, static_cast<fn_type>(nullptr)) \
+  IPEX_REGISTER_AVX512_DISPATCH(name, static_cast<fn_type>(nullptr))        \
+  IPEX_REGISTER_AVX2_DISPATCH(name, static_cast<fn_type>(nullptr))          \
+  IPEX_REGISTER_VSX_DISPATCH(name, static_cast<fn_type>(nullptr))
 
 /*
 ToDo: Fix warning: "REGISTER_HIP_DISPATCH" redefined to stock pytorch.
@@ -315,18 +316,18 @@ ToDo: Fix warning: "REGISTER_HIP_DISPATCH" redefined to stock pytorch.
 // NB: This macro must be used in an actual 'cu' file; if you try using
 // it from a 'cpp' file it will not work!
 #if defined(__CUDACC__)
-#define REGISTER_DISPATCH(name, fn) REGISTER_CUDA_DISPATCH(name, fn)
+#define IPEX_REGISTER_DISPATCH(name, fn) REGISTER_CUDA_DISPATCH(name, fn)
 #elif defined(__HIPCC__)
 // TODO: cut this over to HIP dispatch once we stop pretending that CUDA
 // is HIP in the PyTorch HIPify build.
-#define REGISTER_DISPATCH(name, fn) REGISTER_CUDA_DISPATCH(name, fn)
-// #define REGISTER_DISPATCH(name, fn) REGISTER_HIP_DISPATCH(name, fn)
+#define IPEX_REGISTER_DISPATCH(name, fn) REGISTER_CUDA_DISPATCH(name, fn)
+// #define IPEX_REGISTER_DISPATCH(name, fn) REGISTER_HIP_DISPATCH(name, fn)
 #elif defined(CPU_CAPABILITY)
-#define REGISTER_DISPATCH(name, fn) \
-  REGISTER_ARCH_DISPATCH(name, CPU_CAPABILITY, fn)
-#undef REGISTER_NO_AVX512_DISPATCH
-#define REGISTER_NO_AVX512_DISPATCH(name, fn_type) \
-  REGISTER_AVX512_DISPATCH(name, static_cast<fn_type>(nullptr))
+#define IPEX_REGISTER_DISPATCH(name, fn) \
+  IPEX_REGISTER_ARCH_DISPATCH(name, CPU_CAPABILITY, fn)
+#undef IPEX_REGISTER_NO_AVX512_DISPATCH
+#define IPEX_REGISTER_NO_AVX512_DISPATCH(name, fn_type) \
+  IPEX_REGISTER_AVX512_DISPATCH(name, static_cast<fn_type>(nullptr))
 #endif
 
 } // namespace cpu

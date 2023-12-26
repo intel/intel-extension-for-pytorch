@@ -371,7 +371,7 @@ bool rnnt_update_batch_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     rnnt_update_batch_kernel_stub,
     &rnnt_update_batch_kernel_impl);
 

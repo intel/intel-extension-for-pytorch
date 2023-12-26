@@ -5,8 +5,8 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(flash_attention_kernel_stub);
-DEFINE_DISPATCH(flash_attention_mask_kernel_stub);
+IPEX_DEFINE_DISPATCH(flash_attention_kernel_stub);
+IPEX_DEFINE_DISPATCH(flash_attention_mask_kernel_stub);
 
 /*
  *Caculate the flash attention SDPA and substitude the PT one.

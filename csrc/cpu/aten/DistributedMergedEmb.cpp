@@ -6,8 +6,8 @@ namespace torch_ipex {
 namespace cpu {
 
 using namespace at;
-DEFINE_DISPATCH(mergedemb_distribute_forward_local_kernel_stub);
-DEFINE_DISPATCH(mergedemb_distribute_forward_merge_kernel_stub);
+IPEX_DEFINE_DISPATCH(mergedemb_distribute_forward_local_kernel_stub);
+IPEX_DEFINE_DISPATCH(mergedemb_distribute_forward_merge_kernel_stub);
 
 /**
  * mergedemb_distribute_forward_local_cpu -> sparse_all_to_all ->
@@ -60,8 +60,8 @@ void mergedemb_distribute_forward_merge_cpu(
       kCPU, output, idx, val, ofs, num_emb);
 }
 
-DEFINE_DISPATCH(mergedemb_distribute_backward_local_kernel_stub);
-DEFINE_DISPATCH(mergedemb_distribute_backward_merge_adagrad_update_stub);
+IPEX_DEFINE_DISPATCH(mergedemb_distribute_backward_local_kernel_stub);
+IPEX_DEFINE_DISPATCH(mergedemb_distribute_backward_merge_adagrad_update_stub);
 /**
  * mergedemb_distribute_backward_local_cpu -> sparse_all_to_all ->
  * mergedemb_distribute_backward_merge_adagrad_update_cpu. Will serve the

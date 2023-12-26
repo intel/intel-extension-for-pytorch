@@ -7,7 +7,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(sgd_fused_step_kernel_stub);
+IPEX_DEFINE_DISPATCH(sgd_fused_step_kernel_stub);
 
 /**
  * SGD fused update kernel.
@@ -89,7 +89,7 @@ c10::optional<at::Tensor> sgd_fused_step(
 
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_REGISTER_DISPATCH(
+  IPEX_OP_IPEX_REGISTER_DISPATCH(
       "sgd_fused_step", torch_ipex::cpu::sgd_fused_step, at::DispatchKey::CPU);
 }
 } // namespace

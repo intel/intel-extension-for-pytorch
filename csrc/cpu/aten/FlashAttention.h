@@ -46,7 +46,7 @@ flash_attention_mask(
     bool return_debug_mask,
     c10::optional<at::Tensor> attention_mask,
     c10::optional<double> scale);
-}
+} // namespace
 
 using flash_attention_kernel_fn = std::tuple<
     at::Tensor,
@@ -66,7 +66,7 @@ using flash_attention_kernel_fn = std::tuple<
     bool return_debug_mask,
     c10::optional<double> scale);
 
-DECLARE_DISPATCH(flash_attention_kernel_fn, flash_attention_kernel_stub);
+IPEX_DECLARE_DISPATCH(flash_attention_kernel_fn, flash_attention_kernel_stub);
 
 using flash_attention_mask_kernel_fn = std::tuple<
     at::Tensor,
@@ -87,7 +87,7 @@ using flash_attention_mask_kernel_fn = std::tuple<
     c10::optional<at::Tensor> attention_mask,
     c10::optional<double> scale);
 
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     flash_attention_mask_kernel_fn,
     flash_attention_mask_kernel_stub);
 

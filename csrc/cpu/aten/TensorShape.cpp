@@ -73,7 +73,7 @@ void resize_out(
   }
 }
 
-DEFINE_DISPATCH(cat_contig_stub);
+IPEX_DEFINE_DISPATCH(cat_contig_stub);
 
 inline void cat_check_no_zero_dim(
     const at::MaterializedITensorListRef& tensors) {

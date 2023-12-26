@@ -98,14 +98,26 @@ using tpp_linear_add_add_kernel_impl_fn = at::Tensor (*)(
     const at::Tensor&,
     double);
 
-DECLARE_DISPATCH(tpp_linear_nobias_impl_fn, tpp_linear_nobias_kernel_stub);
-DECLARE_DISPATCH(tpp_linear_bias_kernel_impl_fn, tpp_linear_bias_kernel_stub);
-DECLARE_DISPATCH(tpp_linear_gelu_kernel_impl_fn, tpp_linear_gelu_kernel_stub);
-DECLARE_DISPATCH(tpp_linear_silu_kernel_impl_fn, tpp_linear_silu_kernel_stub);
-DECLARE_DISPATCH(tpp_linear_relu_kernel_impl_fn, tpp_linear_relu_kernel_stub);
-DECLARE_DISPATCH(tpp_linear_add_kernel_impl_fn, tpp_linear_add_kernel_stub);
-DECLARE_DISPATCH(tpp_linear_mul_kernel_impl_fn, tpp_linear_mul_kernel_stub);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(tpp_linear_nobias_impl_fn, tpp_linear_nobias_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    tpp_linear_bias_kernel_impl_fn,
+    tpp_linear_bias_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    tpp_linear_gelu_kernel_impl_fn,
+    tpp_linear_gelu_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    tpp_linear_silu_kernel_impl_fn,
+    tpp_linear_silu_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    tpp_linear_relu_kernel_impl_fn,
+    tpp_linear_relu_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    tpp_linear_add_kernel_impl_fn,
+    tpp_linear_add_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    tpp_linear_mul_kernel_impl_fn,
+    tpp_linear_mul_kernel_stub);
+IPEX_DECLARE_DISPATCH(
     tpp_linear_add_add_kernel_impl_fn,
     tpp_linear_add_add_kernel_stub);
 

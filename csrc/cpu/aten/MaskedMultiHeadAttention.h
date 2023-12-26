@@ -39,7 +39,7 @@ using masked_multihead_self_attention_kernel_fn =
         const c10::optional<at::Tensor>& attention_mask /* optional */,
         c10::optional<bool> add_casual_mask /* optional */);
 
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     masked_multihead_self_attention_kernel_fn,
     masked_multihead_self_attention_kernel_stub);
 

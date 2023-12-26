@@ -3014,10 +3014,12 @@ at::Tensor woq_linear_unpackB_impl(const at::Tensor& weight) {
 }
 } // namespace
 
-REGISTER_DISPATCH(woq_gemm_kernel_stub, &woq_gemm_kernel_impl);
-REGISTER_DISPATCH(woq_gemm_eltwise_kernel_stub, &woq_gemm_eltwise_kernel_impl);
-REGISTER_DISPATCH(woq_linear_unpackB_stub, &woq_linear_unpackB_impl);
-REGISTER_DISPATCH(woq_linear_packB_stub, &woq_linear_packB_impl);
+IPEX_REGISTER_DISPATCH(woq_gemm_kernel_stub, &woq_gemm_kernel_impl);
+IPEX_REGISTER_DISPATCH(
+    woq_gemm_eltwise_kernel_stub,
+    &woq_gemm_eltwise_kernel_impl);
+IPEX_REGISTER_DISPATCH(woq_linear_unpackB_stub, &woq_linear_unpackB_impl);
+IPEX_REGISTER_DISPATCH(woq_linear_packB_stub, &woq_linear_packB_impl);
 } // namespace cpu
 } // namespace torch_ipex
 #endif

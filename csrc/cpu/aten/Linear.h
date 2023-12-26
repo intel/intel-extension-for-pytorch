@@ -202,10 +202,10 @@ using woq_linear_packB_fn =
 
 using woq_linear_unpackB_fn = at::Tensor (*)(const at::Tensor&);
 
-DECLARE_DISPATCH(woq_gemm_kernel_fn, woq_gemm_kernel_stub);
-DECLARE_DISPATCH(woq_gemm_eltwise_kernel_fn, woq_gemm_eltwise_kernel_stub);
-DECLARE_DISPATCH(woq_linear_packB_fn, woq_linear_packB_stub);
-DECLARE_DISPATCH(woq_linear_unpackB_fn, woq_linear_unpackB_stub);
+IPEX_DECLARE_DISPATCH(woq_gemm_kernel_fn, woq_gemm_kernel_stub);
+IPEX_DECLARE_DISPATCH(woq_gemm_eltwise_kernel_fn, woq_gemm_eltwise_kernel_stub);
+IPEX_DECLARE_DISPATCH(woq_linear_packB_fn, woq_linear_packB_stub);
+IPEX_DECLARE_DISPATCH(woq_linear_unpackB_fn, woq_linear_unpackB_stub);
 
 using woq_tpp_gemm_kernel_fn = at::Tensor (*)(
     const at::Tensor&,
@@ -227,9 +227,9 @@ using woq_tpp_gemm_packB_fn =
 
 using woq_tpp_gemm_unpackB_fn = at::Tensor (*)(const at::Tensor&, int, int64_t);
 
-DECLARE_DISPATCH(woq_tpp_gemm_kernel_fn, woq_tpp_gemm_kernel_stub);
-DECLARE_DISPATCH(woq_tpp_gemm_packB_fn, woq_tpp_gemm_packB_stub);
-DECLARE_DISPATCH(woq_tpp_gemm_unpackB_fn, woq_tpp_gemm_unpackB_stub);
+IPEX_DECLARE_DISPATCH(woq_tpp_gemm_kernel_fn, woq_tpp_gemm_kernel_stub);
+IPEX_DECLARE_DISPATCH(woq_tpp_gemm_packB_fn, woq_tpp_gemm_packB_stub);
+IPEX_DECLARE_DISPATCH(woq_tpp_gemm_unpackB_fn, woq_tpp_gemm_unpackB_stub);
 
 #define WOQ_FUSE_NONE 0
 #define WOQ_FUSE_GELU 1

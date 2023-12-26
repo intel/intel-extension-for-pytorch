@@ -29,7 +29,7 @@ using cat_contig_fn = void (*)(
     const at::MaterializedITensorListRef&,
     int64_t,
     bool);
-DECLARE_DISPATCH(cat_contig_fn, cat_contig_stub);
+IPEX_DECLARE_DISPATCH(cat_contig_fn, cat_contig_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

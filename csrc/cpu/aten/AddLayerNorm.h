@@ -101,7 +101,7 @@ using add_layer_norm_kernel_fn = at::Tensor (*)(
     const c10::optional<at::Tensor>&,
     const c10::optional<at::Tensor>&,
     float);
-DECLARE_DISPATCH(add_layer_norm_kernel_fn, add_layer_norm_kernel_stub);
+IPEX_DECLARE_DISPATCH(add_layer_norm_kernel_fn, add_layer_norm_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

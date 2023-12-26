@@ -13,7 +13,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(sum_kernel_stub);
+IPEX_DEFINE_DISPATCH(sum_kernel_stub);
 
 at::Tensor sum_out_cpu(
     const at::Tensor& input,

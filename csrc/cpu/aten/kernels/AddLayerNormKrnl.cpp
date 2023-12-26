@@ -110,7 +110,7 @@ at::Tensor add_layer_norm_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(add_layer_norm_kernel_stub, &add_layer_norm_kernel_impl);
+IPEX_REGISTER_DISPATCH(add_layer_norm_kernel_stub, &add_layer_norm_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

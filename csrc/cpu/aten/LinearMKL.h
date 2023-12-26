@@ -102,9 +102,11 @@ using mkl_prepack_sgemm_kernel_fn = void (*)(
     const at::Tensor&,
     const int64_t,
     at::Tensor&);
-DECLARE_DISPATCH(mkl_sgemm_packB_fn, mkl_sgemm_packB_stub);
-DECLARE_DISPATCH(mkl_sgemm_kernel_fn, mkl_sgemm_kernel_stub);
-DECLARE_DISPATCH(mkl_prepack_sgemm_kernel_fn, mkl_prepack_sgemm_kernel_stub);
+IPEX_DECLARE_DISPATCH(mkl_sgemm_packB_fn, mkl_sgemm_packB_stub);
+IPEX_DECLARE_DISPATCH(mkl_sgemm_kernel_fn, mkl_sgemm_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    mkl_prepack_sgemm_kernel_fn,
+    mkl_prepack_sgemm_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

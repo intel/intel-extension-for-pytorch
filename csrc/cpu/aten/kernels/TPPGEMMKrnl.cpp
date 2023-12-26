@@ -210,16 +210,24 @@ at::Tensor tpp_linear_mul_kernel_impl(
 
 } // namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     tpp_linear_nobias_kernel_stub,
     &tpp_linear_nobias_kernel_impl);
-REGISTER_DISPATCH(tpp_linear_bias_kernel_stub, &tpp_linear_bias_kernel_impl);
-REGISTER_DISPATCH(tpp_linear_gelu_kernel_stub, &tpp_linear_gelu_kernel_impl);
-REGISTER_DISPATCH(tpp_linear_relu_kernel_stub, &tpp_linear_relu_kernel_impl);
-REGISTER_DISPATCH(tpp_linear_silu_kernel_stub, &tpp_linear_silu_kernel_impl);
-REGISTER_DISPATCH(tpp_linear_mul_kernel_stub, &tpp_linear_mul_kernel_impl);
-REGISTER_DISPATCH(tpp_linear_add_kernel_stub, &tpp_linear_add_kernel_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
+    tpp_linear_bias_kernel_stub,
+    &tpp_linear_bias_kernel_impl);
+IPEX_REGISTER_DISPATCH(
+    tpp_linear_gelu_kernel_stub,
+    &tpp_linear_gelu_kernel_impl);
+IPEX_REGISTER_DISPATCH(
+    tpp_linear_relu_kernel_stub,
+    &tpp_linear_relu_kernel_impl);
+IPEX_REGISTER_DISPATCH(
+    tpp_linear_silu_kernel_stub,
+    &tpp_linear_silu_kernel_impl);
+IPEX_REGISTER_DISPATCH(tpp_linear_mul_kernel_stub, &tpp_linear_mul_kernel_impl);
+IPEX_REGISTER_DISPATCH(tpp_linear_add_kernel_stub, &tpp_linear_add_kernel_impl);
+IPEX_REGISTER_DISPATCH(
     tpp_linear_add_add_kernel_stub,
     &tpp_linear_add_add_kernel_impl);
 } // namespace cpu

@@ -710,7 +710,7 @@ void sum_kernel_impl(at::TensorIterator& iter) {
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(sum_kernel_stub, &sum_kernel_impl);
+IPEX_REGISTER_DISPATCH(sum_kernel_stub, &sum_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

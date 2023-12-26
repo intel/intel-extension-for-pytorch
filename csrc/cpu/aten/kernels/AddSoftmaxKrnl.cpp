@@ -273,8 +273,10 @@ at::Tensor& add_softmax_inplace_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(div_add_softmax_kernel_stub, &div_add_softmax_kernel_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
+    div_add_softmax_kernel_stub,
+    &div_add_softmax_kernel_impl);
+IPEX_REGISTER_DISPATCH(
     add_softmax_inplace_kernel_stub,
     &add_softmax_inplace_kernel_impl);
 

@@ -522,7 +522,9 @@ void adam_fused_step_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(adam_fused_step_kernel_stub, &adam_fused_step_kernel_impl);
+IPEX_REGISTER_DISPATCH(
+    adam_fused_step_kernel_stub,
+    &adam_fused_step_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -29,7 +29,7 @@ using rotary_position_embedding_kernel_fn =
         int64_t offset,
         int64_t rotary_ndims);
 
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     rotary_position_embedding_kernel_fn,
     rotary_position_embedding_kernel_stub);
 

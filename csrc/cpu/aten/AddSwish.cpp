@@ -10,7 +10,7 @@
 
 namespace torch_ipex {
 namespace cpu {
-DEFINE_DISPATCH(add_swish_kernel_stub);
+IPEX_DEFINE_DISPATCH(add_swish_kernel_stub);
 
 // Currently we only support 1D tensor of bias(operand of add).
 at::Tensor AddSwish(

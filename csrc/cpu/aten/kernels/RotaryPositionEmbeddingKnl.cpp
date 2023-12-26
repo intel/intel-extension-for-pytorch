@@ -198,7 +198,7 @@ rotary_position_embedding_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     rotary_position_embedding_kernel_stub,
     &rotary_position_embedding_kernel_impl);
 
