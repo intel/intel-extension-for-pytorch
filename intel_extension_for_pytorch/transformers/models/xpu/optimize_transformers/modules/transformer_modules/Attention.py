@@ -431,9 +431,10 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         if self.use_casual_mask is True and query.shape[2] != 1:
             is_causal = True
         blocked_attn_mask = None
-        seq_len = (
-            key.size(2) + self.prompt_len if self.is_beam_search() else key.size(2)
-        )
+        if self.is_1st_token() or not self.is_beam_search():
+            seq_len = key.size(2)
+        else:
+            seq_len = key.size(2) + self.prompt_len
         if attention_mask is not None:
             if attention_mask.dtype == torch.bool:
                 blocked_attn_mask = None
@@ -681,18 +682,20 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         return IPEXTransformerAttnOptimizedFp16.blocked_alibi
 
     def get_blocked_attn_mask(self, attn_mask, seq_len):
+        alignment = 8
         if self.layer_id == 0:
             cache_len = (
                 self.max_position
                 if self.max_position > seq_len
                 else seq_len + self.runtime_cache_size
             )
+            align_cache_len = (cache_len + alignment - 1) // alignment * alignment
             IPEXTransformerAttnOptimizedFp16.blocked_attn_mask = torch.empty(
                 (
                     attn_mask.shape[0],
                     attn_mask.shape[1],
                     attn_mask.shape[2],
-                    cache_len,
+                    align_cache_len,
                 ),
                 device=attn_mask.device,
                 dtype=attn_mask.dtype,
