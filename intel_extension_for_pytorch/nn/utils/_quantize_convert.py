@@ -102,6 +102,7 @@ class WeightOnlyLinear(nn.Module):
         self.weight_dtype = weight_dtype
         self.device = device
         self.compression_dim = compression_dim
+        self.weight_transposed = False
         assert compression_dtype in [
             torch.int8,
             torch.int16,
@@ -258,6 +259,9 @@ class WeightOnlyLinear(nn.Module):
             self.bias = None
 
     def forward(self, input: Tensor) -> Tensor:
+        if not self.weight_transposed:
+            self.qweight.data = self.qweight.data.T.contiguous()
+            self.weight_transposed = True
         return torch.ops.torch_ipex.mm_low_bits(
             input,
             self.qweight.byte(),
@@ -272,7 +276,7 @@ class WeightOnlyLinear(nn.Module):
 
     def set_weights_bias(self, weight_data, bias=None):
         self.qweight = ParamsLowBits(
-            data=weight_data.T.contiguous(),
+            data=weight_data,
             requires_grad=False,
             quant_state={"scheme": self.scheme},
             blocksize=self.blocksize,
