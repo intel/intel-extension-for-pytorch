@@ -2137,8 +2137,8 @@ class GeluTanhFwdTPP {
 
   void operator()(Tin* in, Tout* out) {
 #ifdef __AVX512F__
-    const __m512 c1 = _mm512_set1_ps((float)0.79788);
-    const __m512 c2 = _mm512_set1_ps((float)0.03568);
+    const __m512 c1 = _mm512_set1_ps((float)0.7978846);
+    const __m512 c2 = _mm512_set1_ps((float)0.0356814);
     const __m512 c_half = _mm512_set1_ps((float)0.5);
     for (int j = 0; j < M; j++) {
       int i;

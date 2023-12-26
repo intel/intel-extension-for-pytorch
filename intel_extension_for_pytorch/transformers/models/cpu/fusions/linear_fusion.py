@@ -168,7 +168,15 @@ class _IPEXlinearNewGeluCPU(_IPEXlinearFusionCPU):
                 else x.new_empty(0),
                 self.linear.out_features,
             )
-
+        elif (
+            self.woq
+            and hasattr(self.linear, "_op_context")
+            and self.linear._op_context is not None
+        ):
+            return torch.ops.torch_ipex.woq_linear_new_gelu(
+                x,
+                self.linear._op_context.get_data_handle(),
+            )
         else:  # fallback path
             x = self.linear(x)
             return (
