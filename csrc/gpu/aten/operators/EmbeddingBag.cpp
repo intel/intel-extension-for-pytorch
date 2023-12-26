@@ -307,6 +307,126 @@ void vec_chunk_kernel_embeddingbag(
   }
 }
 
+template <
+    int vec_size,
+    typename vec_t,
+    typename scalar_t,
+    typename accscalar_t,
+    typename index_t>
+struct EmbeddingBagUpdateOutputKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    vec_chunk_kernel_embeddingbag<
+        vec_size,
+        vec_t,
+        scalar_t,
+        accscalar_t,
+        index_t>(
+        mode,
+        input,
+        offset,
+        weight,
+        output,
+        offset2bag,
+        bag_size,
+        per_sample_weights_defined,
+        per_sample_weights,
+        per_sample_weights_stride,
+        max_indices,
+        WGNumber,
+        numBags,
+        weight_total_elem,
+        chunk_size,
+        bag_chunk_num,
+        bag_wi_num,
+        bagsPerLoop,
+        input_length,
+        weight_stride0,
+        weight_stride1,
+        include_last_offset,
+        padding_idx,
+        if_align_vector,
+        item);
+  }
+  EmbeddingBagUpdateOutputKernelFunctor(
+      const int64_t mode_,
+      index_t* input_,
+      index_t* offset_,
+      scalar_t* weight_,
+      scalar_t* output_,
+      index_t* offset2bag_,
+      index_t* bag_size_,
+      bool per_sample_weights_defined_,
+      scalar_t* per_sample_weights_,
+      int64_t per_sample_weights_stride_,
+      index_t* max_indices_,
+      int64_t WGNumber_,
+      int64_t numBags_,
+      int64_t weight_total_elem_,
+      int64_t chunk_size_,
+      int64_t bag_chunk_num_,
+      int64_t bag_wi_num_,
+      int64_t bagsPerLoop_,
+      int64_t input_length_,
+      int64_t weight_stride0_,
+      int64_t weight_stride1_,
+      bool include_last_offset_,
+      index_t padding_idx_,
+      bool if_align_vector_,
+      sycl::nd_item<1> item_)
+      : mode(mode_),
+        input(input_),
+        offset(offset_),
+        weight(weight_),
+        output(output_),
+        offset2bag(offset2bag_),
+        bag_size(bag_size_),
+        per_sample_weights_defined(per_sample_weights_defined_),
+        per_sample_weights(per_sample_weights_),
+        per_sample_weights_stride(per_sample_weights_stride_),
+        max_indices(max_indices_),
+        WGNumber(WGNumber_),
+        numBags(numBags_),
+        weight_total_elem(weight_total_elem_),
+        chunk_size(chunk_size_),
+        bag_chunk_num(bag_chunk_num_),
+        bag_wi_num(bag_wi_num_),
+        bagsPerLoop(bagsPerLoop_),
+        input_length(input_length_),
+        weight_stride0(weight_stride0_),
+        weight_stride1(weight_stride1_),
+        include_last_offset(include_last_offset_),
+        padding_idx(padding_idx_),
+        if_align_vector(if_align_vector_),
+        item(item_) {}
+
+ private:
+  const int64_t mode;
+  index_t* input;
+  index_t* offset;
+  scalar_t* weight;
+  scalar_t* output;
+  index_t* offset2bag;
+  index_t* bag_size;
+  bool per_sample_weights_defined;
+  scalar_t* per_sample_weights;
+  int64_t per_sample_weights_stride;
+  index_t* max_indices;
+  int64_t WGNumber;
+  int64_t numBags;
+  int64_t weight_total_elem;
+  int64_t chunk_size;
+  int64_t bag_chunk_num;
+  int64_t bag_wi_num;
+  int64_t bagsPerLoop;
+  int64_t input_length;
+  int64_t weight_stride0;
+  int64_t weight_stride1;
+  const bool include_last_offset;
+  const index_t padding_idx;
+  const bool if_align_vector;
+  sycl::nd_item<1> item;
+};
+
 /*
   The kernel EmbeddingBag is optimized for memory coleascing and thread
   efficiency. Vec design and chunk design are deployed for this kernel. In
@@ -440,39 +560,37 @@ void EmbeddingBag_updateOutputKernel(
       auto max_indices = mode == MODE_MAX ? max_indices_data : nullptr;       \
       using vec_t =                                                           \
           at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;        \
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {                         \
-        vec_chunk_kernel_embeddingbag<                                        \
-            vec_size,                                                         \
-            vec_t,                                                            \
-            scalar_t,                                                         \
-            accscalar_t,                                                      \
-            index_t>(                                                         \
-            mode,                                                             \
-            input,                                                            \
-            offset,                                                           \
-            weight,                                                           \
-            output,                                                           \
-            offset2bag,                                                       \
-            bag_size,                                                         \
-            per_sample_weights_defined,                                       \
-            per_sample_weights,                                               \
-            per_sample_weights_stride,                                        \
-            max_indices,                                                      \
-            WGNumber,                                                         \
-            numBags,                                                          \
-            weight_total_elem,                                                \
-            chunk_size,                                                       \
-            bag_chunk_num,                                                    \
-            bag_wi_num,                                                       \
-            bagsPerLoop,                                                      \
-            input_length,                                                     \
-            weight_stride0,                                                   \
-            weight_stride1,                                                   \
-            include_last_offset,                                              \
-            padding_idx,                                                      \
-            if_align_vector,                                                  \
-            item);                                                            \
-      };                                                                      \
+      EmbeddingBagUpdateOutputKernelFunctor<                                  \
+          vec_size,                                                           \
+          vec_t,                                                              \
+          scalar_t,                                                           \
+          accscalar_t,                                                        \
+          index_t>                                                            \
+          kfn(mode,                                                           \
+              input,                                                          \
+              offset,                                                         \
+              weight,                                                         \
+              output,                                                         \
+              offset2bag,                                                     \
+              bag_size,                                                       \
+              per_sample_weights_defined,                                     \
+              per_sample_weights,                                             \
+              per_sample_weights_stride,                                      \
+              max_indices,                                                    \
+              WGNumber,                                                       \
+              numBags,                                                        \
+              weight_total_elem,                                              \
+              chunk_size,                                                     \
+              bag_chunk_num,                                                  \
+              bag_wi_num,                                                     \
+              bagsPerLoop,                                                    \
+              input_length,                                                   \
+              weight_stride0,                                                 \
+              weight_stride1,                                                 \
+              include_last_offset,                                            \
+              padding_idx,                                                    \
+              if_align_vector,                                                \
+              item);                                                          \
       cgh.parallel_for(                                                       \
           sycl::nd_range<1>(                                                  \
               sycl::range<1>(global_range), sycl::range<1>(local_range)),     \
@@ -580,6 +698,57 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
 }
 
 template <typename scalar_t, typename index_t>
+struct EmbeddingBagAccGradParametersKernelMaxFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    auto max_indices_ptr = max_indices_data;
+    auto gradOutput_ptr = gradOutput_data;
+    auto gradWeight_ptr = gradWeight_data;
+
+    auto chunkOffset = item.get_group()[0] * item.get_local_range()[1] +
+        item.get_local_id()[1];
+
+    for (auto chunk = chunkOffset; chunk < numChunks;
+         chunk += item.get_group_range()[0] * item.get_global_range()[1]) {
+      auto featureDim = (chunk % chunksPerBag) * item.get_local_range(0) +
+          item.get_local_id(0);
+      if (featureDim < stride) {
+        auto bag = chunk / chunksPerBag;
+
+        auto word_idx = max_indices_ptr[bag * stride + featureDim];
+        if (word_idx >= 0) {
+          // If bag is empty, we have max_indices[idx] set to -1 in forward.
+          atomicAdd(
+              (dpcpp_global_ptr_pt<scalar_t>)&(
+                  gradWeight_ptr[word_idx * stride + featureDim]),
+              gradOutput_ptr[bag * stride + featureDim]);
+        }
+      }
+    }
+  }
+  EmbeddingBagAccGradParametersKernelMaxFunctor(
+      index_t* max_indices_data_,
+      scalar_t* gradOutput_data_,
+      scalar_t* gradWeight_data_,
+      int64_t stride_,
+      int64_t chunksPerBag_,
+      int64_t numChunks_)
+      : max_indices_data(max_indices_data_),
+        gradOutput_data(gradOutput_data_),
+        gradWeight_data(gradWeight_data_),
+        stride(stride_),
+        chunksPerBag(chunksPerBag_),
+        numChunks(numChunks_) {}
+
+ private:
+  index_t* max_indices_data;
+  scalar_t* gradOutput_data;
+  scalar_t* gradWeight_data;
+  int64_t stride;
+  int64_t chunksPerBag;
+  int64_t numChunks;
+};
+
+template <typename scalar_t, typename index_t>
 void EmbeddingBag_accGradParametersKernel_max(
     index_t* max_indices,
     scalar_t* gradOutput,
@@ -596,32 +765,13 @@ void EmbeddingBag_accGradParametersKernel_max(
     auto gradOutput_data = gradOutput;
     auto gradWeight_data = gradWeight;
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-      auto max_indices_ptr = max_indices_data;
-      auto gradOutput_ptr = gradOutput_data;
-      auto gradWeight_ptr = gradWeight_data;
-
-      auto chunkOffset = item.get_group()[0] * item.get_local_range()[1] +
-          item.get_local_id()[1];
-
-      for (auto chunk = chunkOffset; chunk < numChunks;
-           chunk += item.get_group_range()[0] * item.get_global_range()[1]) {
-        auto featureDim = (chunk % chunksPerBag) * item.get_local_range(0) +
-            item.get_local_id(0);
-        if (featureDim < stride) {
-          auto bag = chunk / chunksPerBag;
-
-          auto word_idx = max_indices_ptr[bag * stride + featureDim];
-          if (word_idx >= 0) {
-            // If bag is empty, we have max_indices[idx] set to -1 in forward.
-            atomicAdd(
-                (dpcpp_global_ptr_pt<scalar_t>)&(
-                    gradWeight_ptr[word_idx * stride + featureDim]),
-                gradOutput_ptr[bag * stride + featureDim]);
-          }
-        }
-      }
-    };
+    EmbeddingBagAccGradParametersKernelMaxFunctor<scalar_t, index_t> kfn(
+        max_indices_data,
+        gradOutput_data,
+        gradWeight_data,
+        stride,
+        chunksPerBag,
+        numChunks);
 
     // kick off kernel
     cgh.parallel_for(
@@ -825,6 +975,87 @@ Tensor _embedding_bag_dense_backward_dpcpp(
   return result;
 }
 
+template <typename scalar_t, typename index_t, typename accscalar_t>
+struct EmbeddingBagPerSampleWeightsBackwardKernelFunctor {
+  void operator()(sycl::nd_item<1> item_id) const {
+    int idx = item_id.get_global_linear_id();
+    auto sg = item_id.get_sub_group();
+    int sgSize =
+        sg.get_local_range()[0]; // number of work-items in this sub-group
+    int sgId = idx / sgSize; // subgroup index
+    int sglid =
+        sg.get_local_id()[0]; // index of the work-item in this sub-group
+
+    int num_sg = num_group * max_group_size / sgSize; // number of sub-groups
+    for (int sample_idx = sgId; sample_idx < num_samples;
+         sample_idx += num_sg) {
+      accscalar_t result = 0.;
+      const int bag_idx = (int)offset2bag[sample_idx];
+      const int embedding_idx = (int)indices[sample_idx];
+      if (embedding_idx != padding_idx) {
+        for (int feature_idx = sglid; feature_idx < embedding_features;
+             feature_idx += sgSize) {
+          result += grad[grad_stride0 * bag_idx + grad_stride1 * feature_idx] *
+              weight[weight_stride0 * embedding_idx +
+                     weight_stride1 * feature_idx];
+        }
+      }
+      // subgroup reduce sum
+      for (int offset = sgSize / 2; offset > 0; offset /= 2) {
+        result += sycl::shift_group_left(sg, result, offset);
+      };
+      if (sglid == 0) {
+        output[sample_idx] = result;
+      }
+    }
+  }
+  EmbeddingBagPerSampleWeightsBackwardKernelFunctor(
+      const scalar_t* grad_,
+      int64_t grad_stride0_,
+      int64_t grad_stride1_,
+      const scalar_t* weight_,
+      int64_t weight_stride0_,
+      int64_t weight_stride1_,
+      const index_t* indices_,
+      const index_t* offset2bag_,
+      int64_t num_samples_,
+      int64_t embedding_features_,
+      scalar_t* output_,
+      index_t padding_idx_,
+      int64_t num_group_,
+      int64_t max_group_size_)
+      : grad(grad_),
+        grad_stride0(grad_stride0_),
+        grad_stride1(grad_stride1_),
+        weight(weight_),
+        weight_stride0(weight_stride0_),
+        weight_stride1(weight_stride1_),
+        indices(indices_),
+        offset2bag(offset2bag_),
+        num_samples(num_samples_),
+        embedding_features(embedding_features_),
+        output(output_),
+        padding_idx(padding_idx_),
+        num_group(num_group_),
+        max_group_size(max_group_size_) {}
+
+ private:
+  const scalar_t* grad;
+  int64_t grad_stride0;
+  int64_t grad_stride1;
+  const scalar_t* weight;
+  int64_t weight_stride0;
+  int64_t weight_stride1;
+  const index_t* indices;
+  const index_t* offset2bag;
+  int64_t num_samples;
+  int64_t embedding_features;
+  scalar_t* output;
+  index_t padding_idx;
+  int64_t num_group;
+  int64_t max_group_size;
+};
+
 template <typename scalar_t, typename index_t>
 static void _embedding_bag_per_sample_weights_backward_kernel(
     const scalar_t* grad,
@@ -849,43 +1080,25 @@ static void _embedding_bag_per_sample_weights_backward_kernel(
   sycl::range<1> local_range{max_group_size};
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(
-        sycl::nd_range<1>(global_range, local_range),
-        [=](sycl::nd_item<1> item_id) {
-          int idx = item_id.get_global_linear_id();
-          auto sg = item_id.get_sub_group();
-          int sgSize =
-              sg.get_local_range()[0]; // number of work-items in this sub-group
-          int sgId = idx / sgSize; // subgroup index
-          int sglid =
-              sg.get_local_id()[0]; // index of the work-item in this sub-group
-
-          int num_sg =
-              num_group * max_group_size / sgSize; // number of sub-groups
-          for (int sample_idx = sgId; sample_idx < num_samples;
-               sample_idx += num_sg) {
-            accscalar_t result = 0.;
-            const int bag_idx = (int)offset2bag[sample_idx];
-            const int embedding_idx = (int)indices[sample_idx];
-            if (embedding_idx != padding_idx) {
-              for (int feature_idx = sglid; feature_idx < embedding_features;
-                   feature_idx += sgSize) {
-                result +=
-                    grad[grad_stride0 * bag_idx + grad_stride1 * feature_idx] *
-                    weight
-                        [weight_stride0 * embedding_idx +
-                         weight_stride1 * feature_idx];
-              }
-            }
-            // subgroup reduce sum
-            for (int offset = sgSize / 2; offset > 0; offset /= 2) {
-              result += sycl::shift_group_left(sg, result, offset);
-            };
-            if (sglid == 0) {
-              output[sample_idx] = result;
-            }
-          }
-        });
+    EmbeddingBagPerSampleWeightsBackwardKernelFunctor<
+        scalar_t,
+        index_t,
+        accscalar_t>
+        kfn(grad,
+            grad_stride0,
+            grad_stride1,
+            weight,
+            weight_stride0,
+            weight_stride1,
+            indices,
+            offset2bag,
+            num_samples,
+            embedding_features,
+            output,
+            padding_idx,
+            num_group,
+            max_group_size);
+    cgh.parallel_for(sycl::nd_range<1>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }

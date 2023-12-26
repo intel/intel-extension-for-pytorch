@@ -21,16 +21,27 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename IdxType>
+struct IndicesCountKernelFunctor {
+  void operator()(sycl::item<1> item) const {
+    auto row = indices[item.get_id(0)];
+    atomicAdd((dpcpp_global_ptr_pt<IdxType>)(&indices_cnt[row]), 1);
+  }
+  IndicesCountKernelFunctor(IdxType* indices_cnt_, IdxType* indices_)
+      : indices_cnt(indices_cnt_), indices(indices_) {}
+
+ private:
+  IdxType* indices_cnt;
+  IdxType* indices;
+};
+
+template <typename IdxType>
 static inline void indices_count(
     IdxType* indices_cnt,
     IdxType* indices,
     int64_t indices_num) {
   auto& queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item) {
-      auto row = indices[item.get_id(0)];
-      atomicAdd((dpcpp_global_ptr_pt<IdxType>)(&indices_cnt[row]), 1);
-    };
+    IndicesCountKernelFunctor<IdxType> kfn(indices_cnt, indices);
     __cgh.parallel_for(sycl::range<1>(indices_num), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -102,6 +113,82 @@ static inline void embedding_dense_backward_kernel(
 }
 
 template <typename scalar_t, typename accscalar_t, typename index_t>
+struct RenormKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int tid = item.get_local_linear_id();
+    int sgSize = item.get_local_range(0);
+    auto group_idx = item.get_group(0);
+    if (group_idx >= num_unique_indices) {
+      return;
+    }
+
+    int base_index = indices[group_idx] * weights_stride0;
+
+    accscalar_t v = static_cast<accscalar_t>(0);
+    for (int i = tid; i < dim; i += sgSize) {
+      auto x =
+          static_cast<accscalar_t>(weights[base_index + i * weights_stride1]);
+      if (norm_type == 1) {
+        v += std::abs(x);
+      } else if (norm_type == 2) {
+        v += x * x;
+      } else {
+        v += std::pow(x, norm_type);
+      }
+    }
+
+    v = GroupReduceSumSGSizeEqualstoNumSG(
+        item,
+        v,
+        static_cast<accscalar_t*>(
+            smem.template get_multi_ptr<sycl::access::decorated::no>().get()));
+
+    if (tid == 0) {
+      smem[0] = std::pow(v, static_cast<accscalar_t>(1.0 / norm_type));
+    }
+    item.barrier(dpcpp_local_fence);
+
+    if (smem[0] > max_norm) {
+      auto factor = static_cast<scalar_t>(
+          max_norm / (smem[0] + std::numeric_limits<accscalar_t>::epsilon()));
+      for (int i = tid; i < dim; i += sgSize) {
+        weights[base_index + i * weights_stride1] *= factor;
+      }
+    }
+  }
+  RenormKernelFunctor(
+      scalar_t* weights_,
+      index_t* indices_,
+      accscalar_t max_norm_,
+      accscalar_t norm_type_,
+      int64_t dim_,
+      int64_t weights_stride0_,
+      int64_t weights_stride1_,
+      int64_t num_unique_indices_,
+      dpcpp_local_acc_t<accscalar_t> smem_)
+      : weights(weights_),
+        indices(indices_),
+        max_norm(max_norm_),
+        norm_type(norm_type_),
+        dim(dim_),
+        weights_stride0(weights_stride0_),
+        weights_stride1(weights_stride1_),
+        num_unique_indices(num_unique_indices_),
+        smem(smem_) {}
+
+ private:
+  scalar_t* weights;
+  index_t* indices;
+  accscalar_t max_norm;
+  accscalar_t norm_type;
+  int64_t dim;
+  int64_t weights_stride0;
+  int64_t weights_stride1;
+  int64_t num_unique_indices;
+  dpcpp_local_acc_t<accscalar_t> smem;
+};
+
+template <typename scalar_t, typename accscalar_t, typename index_t>
 void renorm_kernel(
     scalar_t* weights,
     index_t* indices,
@@ -117,50 +204,16 @@ void renorm_kernel(
     auto smem = dpcpp_local_acc_t<accscalar_t>(
         (work_group_size / 8) * sizeof(accscalar_t),
         cgh); // We use the smallest subgroup size to ensure enough space
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      int tid = item.get_local_linear_id();
-      int sgSize = item.get_local_range(0);
-      auto group_idx = item.get_group(0);
-      if (group_idx >= num_unique_indices) {
-        return;
-      }
-
-      int base_index = indices[group_idx] * weights_stride0;
-
-      accscalar_t v = static_cast<accscalar_t>(0);
-      for (int i = tid; i < dim; i += sgSize) {
-        auto x =
-            static_cast<accscalar_t>(weights[base_index + i * weights_stride1]);
-        if (norm_type == 1) {
-          v += std::abs(x);
-        } else if (norm_type == 2) {
-          v += x * x;
-        } else {
-          v += std::pow(x, norm_type);
-        }
-      }
-
-      v = GroupReduceSumSGSizeEqualstoNumSG(
-          item,
-          v,
-          static_cast<accscalar_t*>(
-              smem.template get_multi_ptr<sycl::access::decorated::no>()
-                  .get()));
-
-      if (tid == 0) {
-        smem[0] = std::pow(v, static_cast<accscalar_t>(1.0 / norm_type));
-      }
-      item.barrier(dpcpp_local_fence);
-
-      if (smem[0] > max_norm) {
-        auto factor = static_cast<scalar_t>(
-            max_norm / (smem[0] + std::numeric_limits<accscalar_t>::epsilon()));
-        for (int i = tid; i < dim; i += sgSize) {
-          weights[base_index + i * weights_stride1] *= factor;
-        }
-      }
-    };
-
+    RenormKernelFunctor<scalar_t, accscalar_t, index_t> kfn(
+        weights,
+        indices,
+        max_norm,
+        norm_type,
+        dim,
+        weights_stride0,
+        weights_stride1,
+        num_unique_indices,
+        smem);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(work_group_size * num_unique_indices),
