@@ -144,6 +144,45 @@ void mkl_vdot<c10::complex<float>>(
 #endif
 
 template <typename scalar_t>
+struct CopyTriangleSymmetricTemplateKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    auto linear_id = item_id.get_linear_id();
+    float triangle_row_ = (Numerics<float>::sqrt(1 + 8.0f * linear_id) - 1) / 2;
+    int64_t triangle_row = triangle_row_;
+    int64_t triangle_col = linear_id - (triangle_row * (triangle_row + 1)) / 2;
+    int64_t r;
+    int64_t c;
+
+    if (upper) {
+      r = triangle_col;
+      c = triangle_row + 1;
+    } else {
+      r = triangle_row + 1;
+      c = triangle_col;
+    }
+
+    auto src_off = r * row_stride + c * column_stride;
+    auto dst_off = c * row_stride + r * column_stride;
+    data_ptr[dst_off] = data_ptr[src_off];
+  }
+  CopyTriangleSymmetricTemplateKernelFunctor(
+      bool upper_,
+      int64_t row_stride_,
+      int64_t column_stride_,
+      scalar_t* data_ptr_)
+      : upper(upper_),
+        row_stride(row_stride_),
+        column_stride(column_stride_),
+        data_ptr(data_ptr_) {}
+
+ private:
+  bool upper;
+  int64_t row_stride;
+  int64_t column_stride;
+  scalar_t* data_ptr;
+};
+
+template <typename scalar_t>
 void copy_triangle_symmetric_template(Tensor& self, bool upper) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto row_stride = self.stride(0);
@@ -154,29 +193,8 @@ void copy_triangle_symmetric_template(Tensor& self, bool upper) {
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto data_ptr = (scalar_t*)self.data_ptr();
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      auto linear_id = item_id.get_linear_id();
-      float triangle_row_ =
-          (Numerics<float>::sqrt(1 + 8.0f * linear_id) - 1) / 2;
-      int64_t triangle_row = triangle_row_;
-      int64_t triangle_col =
-          linear_id - (triangle_row * (triangle_row + 1)) / 2;
-      int64_t r;
-      int64_t c;
-
-      if (upper) {
-        r = triangle_col;
-        c = triangle_row + 1;
-      } else {
-        r = triangle_row + 1;
-        c = triangle_col;
-      }
-
-      auto src_off = r * row_stride + c * column_stride;
-      auto dst_off = c * row_stride + r * column_stride;
-      data_ptr[dst_off] = data_ptr[src_off];
-    };
-
+    CopyTriangleSymmetricTemplateKernelFunctor<scalar_t> kfn(
+        upper, row_stride, column_stride, data_ptr);
     __cgh.parallel_for(sycl::range</*dim=*/1>(work_item_num), kfn);
   };
 
@@ -628,22 +646,40 @@ static inline std::
 constexpr int n_elems_per_work_item = UNROLLED_ELEM_PER_WORK_ITEM;
 
 template <int n_elems_per_work_item, typename func_t>
+struct _Elementwise_KernelFunctor {
+  void operator()(sycl::item<1> itemId) const {
+    int idx = itemId.get_linear_id();
+#pragma unroll
+    for (int i = 0; i < n_elems_per_work_item; ++i) {
+      if (idx < total_n_elems) {
+        f(idx);
+        idx += total_work_items;
+      }
+    }
+  }
+  _Elementwise_KernelFunctor(
+      int total_n_elems_,
+      func_t f_,
+      int total_work_items_)
+      : total_n_elems(total_n_elems_),
+        f(f_),
+        total_work_items(total_work_items_) {}
+
+ private:
+  int total_n_elems;
+  func_t f;
+  int total_work_items;
+};
+
+template <int n_elems_per_work_item, typename func_t>
 void _elementwise_kernel(int total_n_elems, func_t f) {
   int total_work_items =
       (total_n_elems + n_elems_per_work_item - 1) / n_elems_per_work_item;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(
-        sycl::range<1>(total_work_items), [=](sycl::item<1> itemId) {
-          int idx = itemId.get_linear_id();
-#pragma unroll
-          for (int i = 0; i < n_elems_per_work_item; ++i) {
-            if (idx < total_n_elems) {
-              f(idx);
-              idx += total_work_items;
-            }
-          }
-        });
+    _Elementwise_KernelFunctor<n_elems_per_work_item, func_t> kfn(
+        total_n_elems, f, total_work_items);
+    cgh.parallel_for(sycl::range<1>(total_work_items), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

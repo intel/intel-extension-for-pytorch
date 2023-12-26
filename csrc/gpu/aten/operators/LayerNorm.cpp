@@ -360,6 +360,116 @@ template <
     typename accscalar_t,
     typename mean_t,
     typename weight_t,
+    int vec_size,
+    typename vec_t,
+    typename weight_vec_t>
+struct GammaBetaBackwardSimpleDPCPPKernelFunctor {
+  void operator()(sycl::nd_item<3> item_id) const {
+    auto local_row_id = item_id.get_local_id(1);
+    auto local_col_id = item_id.get_local_id(2);
+    auto group_id = item_id.get_group(0);
+
+    accscalar_t dg_sum1[vec_size], db_sum1[vec_size];
+#pragma unroll(vec_size)
+    for (int v = 0; v < vec_size; ++v) {
+      dg_sum1[v] = 0;
+      db_sum1[v] = 0;
+    }
+
+    for (int row_id = local_row_id; row_id < cfg.Batch;
+         row_id += cfg.block_row) {
+      accscalar_t mean_val = mean_data[row_id];
+      accscalar_t rstd_val = var_data[row_id];
+      auto plane_offset =
+          (group_id * cfg.workgroup_size + local_col_id) * vec_size;
+      if (plane_offset < cfg.Plane) {
+        auto offset = row_id * cfg.Plane + plane_offset;
+        vec_t X_val = *(reinterpret_cast<vec_t*>(X_data + offset));
+        vec_t dY_val = *(reinterpret_cast<vec_t*>(dY_data + offset));
+#pragma unroll(vec_size)
+        for (int v = 0; v < vec_size; ++v) {
+          dg_sum1[v] += (dg_data == nullptr)
+              ? accscalar_t(0)
+              : static_cast<accscalar_t>(dY_val[v]) *
+                  (static_cast<accscalar_t>(X_val[v]) - mean_val) * rstd_val;
+          db_sum1[v] += (db_data == nullptr)
+              ? accscalar_t(0)
+              : static_cast<accscalar_t>(dY_val[v]);
+        }
+      }
+    }
+
+    if (cfg.block_row > 1) {
+      norm_group_reduce_row<vec_size, accscalar_t>(
+          item_id,
+          dg_sum1,
+          db_sum1,
+          local_sum1,
+          local_sum2,
+          cfg.block_row,
+          [](accscalar_t a, accscalar_t b) { return a + b; });
+    }
+
+    if (local_row_id == 0) {
+      auto plane_offset =
+          (group_id * cfg.workgroup_size + local_col_id) * vec_size;
+      if (plane_offset < cfg.Plane) {
+        weight_vec_t dg_val, db_val;
+        if (cfg.block_row > 1) {
+#pragma unroll(vec_size)
+          for (int v = 0; v < vec_size; ++v) {
+            dg_val[v] = static_cast<weight_t>(local_sum1[0][local_col_id][v]);
+            db_val[v] = static_cast<weight_t>(local_sum2[0][local_col_id][v]);
+          }
+        } else {
+#pragma unroll(vec_size)
+          for (int v = 0; v < vec_size; ++v) {
+            dg_val[v] = static_cast<weight_t>(dg_sum1[v]);
+            db_val[v] = static_cast<weight_t>(db_sum1[v]);
+          }
+        }
+        *(reinterpret_cast<weight_vec_t*>(dg_data + plane_offset)) = dg_val;
+        *(reinterpret_cast<weight_vec_t*>(db_data + plane_offset)) = db_val;
+      }
+    }
+  }
+  GammaBetaBackwardSimpleDPCPPKernelFunctor(
+      const mean_t* mean_data_,
+      const mean_t* var_data_,
+      NormConfig cfg_,
+      scalar_t* dY_data_,
+      scalar_t* X_data_,
+      weight_t* dg_data_,
+      weight_t* db_data_,
+      dpcpp_local_acc_t<accscalar_t, 3> local_sum1_,
+      dpcpp_local_acc_t<accscalar_t, 3> local_sum2_)
+      : mean_data(mean_data_),
+        var_data(var_data_),
+        cfg(cfg_),
+        dY_data(dY_data_),
+        X_data(X_data_),
+        dg_data(dg_data_),
+        db_data(db_data_),
+        local_sum1(local_sum1_),
+        local_sum2(local_sum2_) {}
+
+ private:
+  const mean_t* mean_data;
+  const mean_t* var_data;
+  NormConfig cfg;
+  scalar_t* dY_data;
+  scalar_t* X_data;
+  weight_t* dg_data;
+  weight_t* db_data;
+  dpcpp_local_acc_t<accscalar_t, 3> local_sum1;
+  dpcpp_local_acc_t<accscalar_t, 3> local_sum2;
+};
+
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    typename mean_t,
+    typename weight_t,
     int vec_size>
 void GammaBetaBackwardSimpleDPCPPKernel(
     const Tensor& dY,
@@ -388,83 +498,27 @@ void GammaBetaBackwardSimpleDPCPPKernel(
         sycl::range<3>(cfg.block_row, cfg.workgroup_size, vec_size), cgh);
     dpcpp_local_acc_t<accscalar_t, 3> local_sum2(
         sycl::range<3>(cfg.block_row, cfg.workgroup_size, vec_size), cgh);
+    GammaBetaBackwardSimpleDPCPPKernelFunctor<
+        scalar_t,
+        accscalar_t,
+        mean_t,
+        weight_t,
+        vec_size,
+        vec_t,
+        weight_vec_t>
+        kfn(mean_data,
+            var_data,
+            cfg,
+            dY_data,
+            X_data,
+            dg_data,
+            db_data,
+            local_sum1,
+            local_sum2);
     cgh.parallel_for(
         sycl::nd_range<3>(
             sycl::range<3>(global_range), sycl::range<3>(local_range)),
-        [=](sycl::nd_item<3> item_id) {
-          auto local_row_id = item_id.get_local_id(1);
-          auto local_col_id = item_id.get_local_id(2);
-          auto group_id = item_id.get_group(0);
-
-          accscalar_t dg_sum1[vec_size], db_sum1[vec_size];
-#pragma unroll(vec_size)
-          for (int v = 0; v < vec_size; ++v) {
-            dg_sum1[v] = 0;
-            db_sum1[v] = 0;
-          }
-
-          for (int row_id = local_row_id; row_id < cfg.Batch;
-               row_id += cfg.block_row) {
-            accscalar_t mean_val = mean_data[row_id];
-            accscalar_t rstd_val = var_data[row_id];
-            auto plane_offset =
-                (group_id * cfg.workgroup_size + local_col_id) * vec_size;
-            if (plane_offset < cfg.Plane) {
-              auto offset = row_id * cfg.Plane + plane_offset;
-              vec_t X_val = *(reinterpret_cast<vec_t*>(X_data + offset));
-              vec_t dY_val = *(reinterpret_cast<vec_t*>(dY_data + offset));
-#pragma unroll(vec_size)
-              for (int v = 0; v < vec_size; ++v) {
-                dg_sum1[v] += (dg_data == nullptr)
-                    ? accscalar_t(0)
-                    : static_cast<accscalar_t>(dY_val[v]) *
-                        (static_cast<accscalar_t>(X_val[v]) - mean_val) *
-                        rstd_val;
-                db_sum1[v] += (db_data == nullptr)
-                    ? accscalar_t(0)
-                    : static_cast<accscalar_t>(dY_val[v]);
-              }
-            }
-          }
-
-          if (cfg.block_row > 1) {
-            norm_group_reduce_row<vec_size, accscalar_t>(
-                item_id,
-                dg_sum1,
-                db_sum1,
-                local_sum1,
-                local_sum2,
-                cfg.block_row,
-                [](accscalar_t a, accscalar_t b) { return a + b; });
-          }
-
-          if (local_row_id == 0) {
-            auto plane_offset =
-                (group_id * cfg.workgroup_size + local_col_id) * vec_size;
-            if (plane_offset < cfg.Plane) {
-              weight_vec_t dg_val, db_val;
-              if (cfg.block_row > 1) {
-#pragma unroll(vec_size)
-                for (int v = 0; v < vec_size; ++v) {
-                  dg_val[v] =
-                      static_cast<weight_t>(local_sum1[0][local_col_id][v]);
-                  db_val[v] =
-                      static_cast<weight_t>(local_sum2[0][local_col_id][v]);
-                }
-              } else {
-#pragma unroll(vec_size)
-                for (int v = 0; v < vec_size; ++v) {
-                  dg_val[v] = static_cast<weight_t>(dg_sum1[v]);
-                  db_val[v] = static_cast<weight_t>(db_sum1[v]);
-                }
-              }
-              *(reinterpret_cast<weight_vec_t*>(dg_data + plane_offset)) =
-                  dg_val;
-              *(reinterpret_cast<weight_vec_t*>(db_data + plane_offset)) =
-                  db_val;
-            }
-          }
-        });
+        kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
