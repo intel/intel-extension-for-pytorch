@@ -30,6 +30,128 @@ inline int get_interval(
   }
 }
 
+template <typename scalar_t, typename accscalar_t>
+struct FractionalMaxPool2dOutFrameKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto input_ptr = input_data;
+    auto output_ptr = output_data;
+    auto indices_ptr = indices_data;
+    auto samples_ptr = samples_data;
+
+    int linearIndex = item.get_global_id()[0];
+    for (int l = 0; l < loops; ++l) {
+      int outputIndex = linearIndex + l * (work_group_size * work_group_num);
+      int batch = outputIndex / (numPlane * outputSizeH * outputSizeW);
+      int plane = is_channels_last
+          ? outputIndex % numPlane
+          : (outputIndex / outputSizeH / outputSizeW) % numPlane;
+      int outputH = is_channels_last
+          ? outputIndex / numPlane / outputSizeW % outputSizeH
+          : outputIndex / outputSizeW % outputSizeH;
+      int outputW = is_channels_last ? outputIndex / numPlane % outputSizeW
+                                     : outputIndex % outputSizeW;
+
+      if (batch < numBatch && plane < numPlane && outputH < outputSizeH &&
+          outputW < outputSizeW) {
+        int poolW = get_interval<scalar_t, accscalar_t>(
+            static_cast<accscalar_t>(
+                samples_ptr
+                    [batch * numPlane * 2 + plane * 2] /*[batch][plane][0] */),
+            outputW,
+            inputSizeW,
+            outputSizeW,
+            poolSizeW);
+        int poolH = get_interval<scalar_t, accscalar_t>(
+            static_cast<accscalar_t>(samples_ptr
+                                         [batch * numPlane * 2 + plane * 2 +
+                                          1] /*[batch][plane][1] */),
+            outputH,
+            inputSizeH,
+            outputSizeH,
+            poolSizeH);
+
+        scalar_t maxVal = std::numeric_limits<scalar_t>::lowest();
+        int maxIndex = -1;
+
+        for (int h = poolH; h < poolH + poolSizeH; ++h) {
+          for (int w = poolW; w < poolW + poolSizeW; ++w) {
+            int64_t load_offset = is_channels_last
+                ? batch * inputSizeH * inputSizeW * numPlane + plane +
+                    h * inputSizeW * numPlane + w * numPlane
+                : batch * numPlane * inputSizeH * inputSizeW +
+                    plane * inputSizeH * inputSizeW + h * inputSizeW + w;
+            scalar_t val = input_ptr[load_offset];
+            if (val > maxVal) {
+              maxIndex = h * inputSizeW + w;
+              maxVal = val;
+            }
+          }
+        }
+
+        int64_t store_offset = is_channels_last
+            ? batch * outputSizeH * outputSizeW * numPlane + plane +
+                outputH * outputSizeW * numPlane + outputW * numPlane
+            : batch * numPlane * outputSizeH * outputSizeW +
+                plane * outputSizeH * outputSizeW + outputH * outputSizeW +
+                outputW;
+        indices_ptr[store_offset] = maxIndex;
+        output_ptr[store_offset] = maxVal;
+      }
+    }
+  }
+  FractionalMaxPool2dOutFrameKernelFunctor(
+      scalar_t* output_data_,
+      int64_t* indices_data_,
+      scalar_t* input_data_,
+      scalar_t* samples_data_,
+      int numBatch_,
+      int numPlane_,
+      int inputSizeH_,
+      int inputSizeW_,
+      int outputSizeH_,
+      int outputSizeW_,
+      int poolSizeH_,
+      int poolSizeW_,
+      const bool is_channels_last_,
+      int work_group_size_,
+      int work_group_num_,
+      int loops_)
+      : output_data(output_data_),
+        indices_data(indices_data_),
+        input_data(input_data_),
+        samples_data(samples_data_),
+        numBatch(numBatch_),
+        numPlane(numPlane_),
+        inputSizeH(inputSizeH_),
+        inputSizeW(inputSizeW_),
+        outputSizeH(outputSizeH_),
+        outputSizeW(outputSizeW_),
+        poolSizeH(poolSizeH_),
+        poolSizeW(poolSizeW_),
+        is_channels_last(is_channels_last_),
+        work_group_size(work_group_size_),
+        work_group_num(work_group_num_),
+        loops(loops_) {}
+
+ private:
+  scalar_t* output_data;
+  int64_t* indices_data;
+  scalar_t* input_data;
+  scalar_t* samples_data;
+  int numBatch;
+  int numPlane;
+  int inputSizeH;
+  int inputSizeW;
+  int outputSizeH;
+  int outputSizeW;
+  int poolSizeH;
+  int poolSizeW;
+  const bool is_channels_last;
+  int work_group_size;
+  int work_group_num;
+  int loops;
+};
+
 template <typename scalar_t>
 void fractional_max_pool2d_out_frame(
     scalar_t* output,
@@ -68,73 +190,23 @@ void fractional_max_pool2d_out_frame(
     auto output_data = output;
     auto indices_data = indices;
     auto samples_data = samples;
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto input_ptr = input_data;
-      auto output_ptr = output_data;
-      auto indices_ptr = indices_data;
-      auto samples_ptr = samples_data;
-
-      int linearIndex = item.get_global_id()[0];
-      for (int l = 0; l < loops; ++l) {
-        int outputIndex = linearIndex + l * (work_group_size * work_group_num);
-        int batch = outputIndex / (numPlane * outputSizeH * outputSizeW);
-        int plane = is_channels_last
-            ? outputIndex % numPlane
-            : (outputIndex / outputSizeH / outputSizeW) % numPlane;
-        int outputH = is_channels_last
-            ? outputIndex / numPlane / outputSizeW % outputSizeH
-            : outputIndex / outputSizeW % outputSizeH;
-        int outputW = is_channels_last ? outputIndex / numPlane % outputSizeW
-                                       : outputIndex % outputSizeW;
-
-        if (batch < numBatch && plane < numPlane && outputH < outputSizeH &&
-            outputW < outputSizeW) {
-          int poolW = get_interval<scalar_t, accscalar_t>(
-              static_cast<accscalar_t>(samples_ptr
-                                           [batch * numPlane * 2 +
-                                            plane * 2] /*[batch][plane][0] */),
-              outputW,
-              inputSizeW,
-              outputSizeW,
-              poolSizeW);
-          int poolH = get_interval<scalar_t, accscalar_t>(
-              static_cast<accscalar_t>(samples_ptr
-                                           [batch * numPlane * 2 + plane * 2 +
-                                            1] /*[batch][plane][1] */),
-              outputH,
-              inputSizeH,
-              outputSizeH,
-              poolSizeH);
-
-          scalar_t maxVal = std::numeric_limits<scalar_t>::lowest();
-          int maxIndex = -1;
-
-          for (int h = poolH; h < poolH + poolSizeH; ++h) {
-            for (int w = poolW; w < poolW + poolSizeW; ++w) {
-              int64_t load_offset = is_channels_last
-                  ? batch * inputSizeH * inputSizeW * numPlane + plane +
-                      h * inputSizeW * numPlane + w * numPlane
-                  : batch * numPlane * inputSizeH * inputSizeW +
-                      plane * inputSizeH * inputSizeW + h * inputSizeW + w;
-              scalar_t val = input_ptr[load_offset];
-              if (val > maxVal) {
-                maxIndex = h * inputSizeW + w;
-                maxVal = val;
-              }
-            }
-          }
-
-          int64_t store_offset = is_channels_last
-              ? batch * outputSizeH * outputSizeW * numPlane + plane +
-                  outputH * outputSizeW * numPlane + outputW * numPlane
-              : batch * numPlane * outputSizeH * outputSizeW +
-                  plane * outputSizeH * outputSizeW + outputH * outputSizeW +
-                  outputW;
-          indices_ptr[store_offset] = maxIndex;
-          output_ptr[store_offset] = maxVal;
-        }
-      }
-    };
+    FractionalMaxPool2dOutFrameKernelFunctor<scalar_t, accscalar_t> kfn(
+        output_data,
+        indices_data,
+        input_data,
+        samples_data,
+        numBatch,
+        numPlane,
+        inputSizeH,
+        inputSizeW,
+        outputSizeH,
+        outputSizeW,
+        poolSizeH,
+        poolSizeW,
+        is_channels_last,
+        work_group_size,
+        work_group_num,
+        loops);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(work_group_size * work_group_num),
@@ -143,6 +215,74 @@ void fractional_max_pool2d_out_frame(
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <typename scalar_t, bool is_channels_last>
+struct FractionalMaxPool2dBackwardOutFrameKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto gradInput_ptr = gradInput_data;
+    auto gradOutput_ptr = gradOutput_data;
+    auto indices_ptr = indices_data;
+
+    int64_t outputIndex = item.get_global_id()[0];
+    if (outputIndex < gradOutputSize) {
+      int batch = outputIndex / out_n_stride;
+      if constexpr (is_channels_last) {
+        int plane = outputIndex % numPlane;
+        int64_t index = indices_ptr[outputIndex];
+        int64_t gI_offset = batch * in_n_stride + plane + index * numPlane;
+        atomicAdd(
+            (dpcpp_global_ptr_pt<scalar_t>)&gradInput_ptr[gI_offset],
+            gradOutput_ptr[outputIndex]);
+      } else {
+        int plane = outputIndex / out_cf_c_stride % numPlane;
+        int64_t index = indices_ptr[outputIndex];
+        int inputW = index % gradInputSizeW;
+        int inputH = index / gradInputSizeW;
+        int64_t gI_offset =
+            batch * in_n_stride + plane * in_cf_c_stride + index;
+        atomicAdd(
+            (dpcpp_global_ptr_pt<scalar_t>)&gradInput_ptr[gI_offset],
+            gradOutput_ptr[outputIndex]);
+      }
+    }
+  }
+  FractionalMaxPool2dBackwardOutFrameKernelFunctor(
+      scalar_t* gradInput_data_,
+      scalar_t* gradOutput_data_,
+      int64_t* indices_data_,
+      int numBatch_,
+      int numPlane_,
+      int gradInputSizeW_,
+      int64_t gradOutputSize_,
+      int out_cf_c_stride_,
+      int in_cf_c_stride_,
+      int out_n_stride_,
+      int in_n_stride_)
+      : gradInput_data(gradInput_data_),
+        gradOutput_data(gradOutput_data_),
+        indices_data(indices_data_),
+        numBatch(numBatch_),
+        numPlane(numPlane_),
+        gradInputSizeW(gradInputSizeW_),
+        gradOutputSize(gradOutputSize_),
+        out_cf_c_stride(out_cf_c_stride_),
+        in_cf_c_stride(in_cf_c_stride_),
+        out_n_stride(out_n_stride_),
+        in_n_stride(in_n_stride_) {}
+
+ private:
+  scalar_t* gradInput_data;
+  scalar_t* gradOutput_data;
+  int64_t* indices_data;
+  int numBatch;
+  int numPlane;
+  int gradInputSizeW;
+  int64_t gradOutputSize;
+  int out_cf_c_stride;
+  int in_cf_c_stride;
+  int out_n_stride;
+  int in_n_stride;
+};
 
 template <typename scalar_t, bool is_channels_last>
 void fractional_max_pool2d_backward_out_frame(
@@ -172,34 +312,18 @@ void fractional_max_pool2d_backward_out_frame(
     auto gradInput_data = gradInput;
     auto gradOutput_data = gradOutput;
     auto indices_data = indices;
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto gradInput_ptr = gradInput_data;
-      auto gradOutput_ptr = gradOutput_data;
-      auto indices_ptr = indices_data;
-
-      int64_t outputIndex = item.get_global_id()[0];
-      if (outputIndex < gradOutputSize) {
-        int batch = outputIndex / out_n_stride;
-        if constexpr (is_channels_last) {
-          int plane = outputIndex % numPlane;
-          int64_t index = indices_ptr[outputIndex];
-          int64_t gI_offset = batch * in_n_stride + plane + index * numPlane;
-          atomicAdd(
-              (dpcpp_global_ptr_pt<scalar_t>)&gradInput_ptr[gI_offset],
-              gradOutput_ptr[outputIndex]);
-        } else {
-          int plane = outputIndex / out_cf_c_stride % numPlane;
-          int64_t index = indices_ptr[outputIndex];
-          int inputW = index % gradInputSizeW;
-          int inputH = index / gradInputSizeW;
-          int64_t gI_offset =
-              batch * in_n_stride + plane * in_cf_c_stride + index;
-          atomicAdd(
-              (dpcpp_global_ptr_pt<scalar_t>)&gradInput_ptr[gI_offset],
-              gradOutput_ptr[outputIndex]);
-        }
-      }
-    };
+    FractionalMaxPool2dBackwardOutFrameKernelFunctor<scalar_t, is_channels_last>
+        kfn(gradInput_data,
+            gradOutput_data,
+            indices_data,
+            numBatch,
+            numPlane,
+            gradInputSizeW,
+            gradOutputSize,
+            out_cf_c_stride,
+            in_cf_c_stride,
+            out_n_stride,
+            in_n_stride);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(work_group_size)),

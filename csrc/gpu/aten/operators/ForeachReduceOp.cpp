@@ -103,6 +103,42 @@ struct LpNormFunctor {
 };
 
 template <typename T, int NormType, typename opmath_t = acc_type<T>>
+struct lpnormChunkReduceKernelFunctor {
+  void operator()(sycl::nd_item<1> item_id) const {
+    auto lid = item_id.get_local_linear_id();
+    auto group_id = item_id.get_group(0);
+
+    const opmath_t* output_this_tensor =
+        output_per_tensor + group_id * max_chunks_per_tensor;
+    opmath_t val = 0;
+    for (int i = lid; i < max_chunks_per_tensor; i += wg_size) {
+      val += output_this_tensor[i];
+    }
+    auto sum_val = sycl::reduce_over_group(
+        item_id.get_group(), val, sycl::plus<opmath_t>());
+    if (lid == 0) {
+      ret_per_tensor[group_id] =
+          NormType == 1 ? sum_val : Numerics<opmath_t>::sqrt(sum_val);
+    }
+  }
+  lpnormChunkReduceKernelFunctor(
+      const opmath_t* output_per_tensor_,
+      T* ret_per_tensor_,
+      int max_chunks_per_tensor_,
+      int wg_size_)
+      : output_per_tensor(output_per_tensor_),
+        ret_per_tensor(ret_per_tensor_),
+        max_chunks_per_tensor(max_chunks_per_tensor_),
+        wg_size(wg_size_) {}
+
+ private:
+  const opmath_t* output_per_tensor;
+  T* ret_per_tensor;
+  int max_chunks_per_tensor;
+  int wg_size;
+};
+
+template <typename T, int NormType, typename opmath_t = acc_type<T>>
 void lpnorm_chunk_reduce_kernel(
     const opmath_t* output_per_tensor,
     T* ret_per_tensor,
@@ -111,23 +147,8 @@ void lpnorm_chunk_reduce_kernel(
   auto& queue = dpcppGetCurrentQueue();
   int wg_size = std::min(max_chunks_per_tensor, int(dpcppMaxWorkItemsPerEU()));
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
-      auto lid = item_id.get_local_linear_id();
-      auto group_id = item_id.get_group(0);
-
-      const opmath_t* output_this_tensor =
-          output_per_tensor + group_id * max_chunks_per_tensor;
-      opmath_t val = 0;
-      for (int i = lid; i < max_chunks_per_tensor; i += wg_size) {
-        val += output_this_tensor[i];
-      }
-      auto sum_val = sycl::reduce_over_group(
-          item_id.get_group(), val, sycl::plus<opmath_t>());
-      if (lid == 0) {
-        ret_per_tensor[group_id] =
-            NormType == 1 ? sum_val : Numerics<opmath_t>::sqrt(sum_val);
-      }
-    };
+    lpnormChunkReduceKernelFunctor<T, NormType, opmath_t> kfn(
+        output_per_tensor, ret_per_tensor, max_chunks_per_tensor, wg_size);
     __cgh.parallel_for(sycl::nd_range<1>(n_tensor * wg_size, wg_size), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);

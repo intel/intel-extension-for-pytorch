@@ -16,22 +16,37 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 template <int n_elems_per_work_item, typename func_t>
+struct _Elemwise_KernelFunctor {
+  void operator()(sycl::item<1> itemId) const {
+    int idx = itemId.get_linear_id();
+#pragma unroll
+    for (int i = 0; i < n_elems_per_work_item; ++i) {
+      if (idx < total_n_elems) {
+        f(idx);
+        idx += total_work_items;
+      }
+    }
+  }
+  _Elemwise_KernelFunctor(int total_n_elems_, func_t f_, int total_work_items_)
+      : total_n_elems(total_n_elems_),
+        f(f_),
+        total_work_items(total_work_items_) {}
+
+ private:
+  int total_n_elems;
+  func_t f;
+  int total_work_items;
+};
+
+template <int n_elems_per_work_item, typename func_t>
 void _elemwise_kernel(int total_n_elems, func_t f) {
   int total_work_items =
       (total_n_elems + n_elems_per_work_item - 1) / n_elems_per_work_item;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(
-        sycl::range<1>(total_work_items), [=](sycl::item<1> itemId) {
-          int idx = itemId.get_linear_id();
-#pragma unroll
-          for (int i = 0; i < n_elems_per_work_item; ++i) {
-            if (idx < total_n_elems) {
-              f(idx);
-              idx += total_work_items;
-            }
-          }
-        });
+    _Elemwise_KernelFunctor<n_elems_per_work_item, func_t> kfn(
+        total_n_elems, f, total_work_items);
+    cgh.parallel_for(sycl::range<1>(total_work_items), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

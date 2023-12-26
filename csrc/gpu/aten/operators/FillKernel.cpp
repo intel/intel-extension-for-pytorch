@@ -43,6 +43,37 @@ void fill_kernel_dpcpp(TensorIterator& iter, Scalar value) {
 }
 
 template <typename IndexType, int Dim>
+struct FillSliceWithIndexKernelFunctor {
+  void operator()(sycl::nd_item<1> item_id) const {
+    IndexType local_id = item_id.get_local_id(0);
+    IndexType slice = item_id.get_group_linear_id();
+    const uint64_t offset = IndexToOffset<int64_t, IndexType>::get(slice, out);
+    int64_t* base = out_data + offset;
+
+    for (IndexType i = local_id; i < sliceSize;
+         i += item_id.get_local_range(0)) {
+      // Torch indices are 1-based (hence the +1)
+      base[i * sliceStride] = i /* + TH_INDEX_BASE */;
+    }
+  }
+  FillSliceWithIndexKernelFunctor(
+      TensorInfo<int64_t, IndexType> out_,
+      IndexType sliceSize_,
+      IndexType sliceStride_,
+      int64_t* out_data_)
+      : out(out_),
+        sliceSize(sliceSize_),
+        sliceStride(sliceStride_),
+        out_data(out_data_) {}
+
+ private:
+  TensorInfo<int64_t, IndexType> out;
+  IndexType sliceSize;
+  IndexType sliceStride;
+  int64_t* out_data;
+};
+
+template <typename IndexType, int Dim>
 void fillSliceWithIndex(
     TensorInfo<int64_t, IndexType> out,
     IndexType totalSlices,
@@ -53,19 +84,8 @@ void fillSliceWithIndex(
   int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto out_data = out.data;
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
-      IndexType local_id = item_id.get_local_id(0);
-      IndexType slice = item_id.get_group_linear_id();
-      const uint64_t offset =
-          IndexToOffset<int64_t, IndexType>::get(slice, out);
-      int64_t* base = out_data + offset;
-
-      for (IndexType i = local_id; i < sliceSize;
-           i += item_id.get_local_range(0)) {
-        // Torch indices are 1-based (hence the +1)
-        base[i * sliceStride] = i /* + TH_INDEX_BASE */;
-      }
-    };
+    FillSliceWithIndexKernelFunctor<IndexType, Dim> kfn(
+        out, sliceSize, sliceStride, out_data);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(totalSlices * local_size),
