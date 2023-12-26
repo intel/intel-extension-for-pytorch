@@ -21,6 +21,210 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t, bool channels_last>
+struct MaxPool3dWithIndicesOutFrameImplKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    for (auto outputIndex = item.get_global_id(0); outputIndex < OutputSize;
+         outputIndex += global_range) {
+      int batch = 0;
+      int channel = 0;
+      int oDepth = 0;
+      int oRow = 0;
+      int oColumn = 0;
+      // used only for channels-first indexing
+      int64_t slice = 0;
+      batch = outputIndex / out_batch_stride;
+      if constexpr (!channels_last) {
+        // indexing order: batch, channel, depth
+        oColumn = outputIndex % OutputSizeW;
+        oRow = outputIndex / OutputSizeW % OutputSizeH;
+        oDepth = outputIndex / out_cf_d_stride % OutputSizeD;
+        channel = outputIndex / out_cf_c_stride % numChannels;
+        slice = outputIndex / out_cf_c_stride;
+      } else {
+        channel = outputIndex % numChannels;
+        oColumn = outputIndex / numChannels % OutputSizeW;
+        oRow = outputIndex / out_cl_h_stride % OutputSizeH;
+        oDepth = outputIndex / out_cl_d_stride % OutputSizeD;
+        slice = outputIndex / out_cf_d_stride;
+      }
+
+      // For int64_t data type, see
+      // https://github.com/pytorch/pytorch/issues/52822
+      int tStart = oDepth * dT - pT;
+      int hStart = oRow * dH - pH;
+      int wStart = oColumn * dW - pW;
+      int tEnd = std::min(tStart + (kT - 1) * dilationT + 1, InputSizeD);
+      int hEnd = std::min(hStart + (kH - 1) * dilationH + 1, InputSizeH);
+      int wEnd = std::min(wStart + (kW - 1) * dilationW + 1, InputSizeW);
+
+      while (tStart < 0)
+        tStart += dilationT;
+      while (hStart < 0)
+        hStart += dilationH;
+      while (wStart < 0)
+        wStart += dilationW;
+
+      int64_t maxIndex;
+      int64_t ioffset;
+
+      if constexpr (!channels_last) {
+        ioffset = (int64_t)slice * in_cf_c_stride;
+      } else {
+        ioffset = ((int64_t)batch * in_batch_stride) + channel;
+      }
+
+      scalar_t max = Numerics<scalar_t>::lower_bound(); // -Infinity
+
+      for (int t = tStart; t < tEnd; t += dilationT) {
+        for (int h = hStart; h < hEnd; h += dilationH) {
+          for (int w = wStart; w < wEnd; w += dilationW) {
+            scalar_t val;
+            int index = t * in_hw_stride + h * InputSizeW + w;
+            if constexpr (!channels_last) {
+              val = inputData[ioffset + index];
+            } else {
+              int64_t index_channels_last = index * numChannels;
+              val = inputData[ioffset + index_channels_last];
+            }
+
+            if ((max < val) || std::isnan(val)) {
+              max = val;
+              maxIndex = index;
+            }
+          }
+        }
+      }
+
+      int64_t out_index;
+      if constexpr (!channels_last) {
+        out_index = (int64_t)slice * out_cf_c_stride +
+            oDepth * out_cf_d_stride + oRow * OutputSizeW + oColumn;
+      } else {
+        out_index = (int64_t)batch * out_batch_stride +
+            oDepth * out_cl_d_stride + oRow * out_cl_h_stride +
+            oColumn * numChannels + channel;
+      }
+      outputData[out_index] = max;
+      indicesData[out_index] = maxIndex;
+    }
+  }
+  MaxPool3dWithIndicesOutFrameImplKernelFunctor(
+      scalar_t* inputData_,
+      scalar_t* outputData_,
+      int64_t* indicesData_,
+      int numChannels_,
+      int InputSizeD_,
+      int InputSizeH_,
+      int InputSizeW_,
+      int nbatch_,
+      int OutputSizeD_,
+      int OutputSizeH_,
+      int OutputSizeW_,
+      int kT_,
+      int kH_,
+      int kW_,
+      int dT_,
+      int dH_,
+      int dW_,
+      int pT_,
+      int pH_,
+      int pW_,
+      int dilationT_,
+      int dilationH_,
+      int dilationW_,
+      int64_t wg_size_,
+      int64_t OutputSize_,
+      int global_range_,
+      int out_cf_d_stride_,
+      int out_cf_c_stride_,
+      int in_cf_d_stride_,
+      int in_cf_c_stride_,
+      int out_cl_h_stride_,
+      int out_cl_d_stride_,
+      int in_cl_h_stride_,
+      int in_cl_d_stride_,
+      int in_batch_stride_,
+      int out_batch_stride_,
+      int in_hw_stride_)
+      : inputData(inputData_),
+        outputData(outputData_),
+        indicesData(indicesData_),
+        numChannels(numChannels_),
+        InputSizeD(InputSizeD_),
+        InputSizeH(InputSizeH_),
+        InputSizeW(InputSizeW_),
+        nbatch(nbatch_),
+        OutputSizeD(OutputSizeD_),
+        OutputSizeH(OutputSizeH_),
+        OutputSizeW(OutputSizeW_),
+        kT(kT_),
+        kH(kH_),
+        kW(kW_),
+        dT(dT_),
+        dH(dH_),
+        dW(dW_),
+        pT(pT_),
+        pH(pH_),
+        pW(pW_),
+        dilationT(dilationT_),
+        dilationH(dilationH_),
+        dilationW(dilationW_),
+        wg_size(wg_size_),
+        OutputSize(OutputSize_),
+        global_range(global_range_),
+        out_cf_d_stride(out_cf_d_stride_),
+        out_cf_c_stride(out_cf_c_stride_),
+        in_cf_d_stride(in_cf_d_stride_),
+        in_cf_c_stride(in_cf_c_stride_),
+        out_cl_h_stride(out_cl_h_stride_),
+        out_cl_d_stride(out_cl_d_stride_),
+        in_cl_h_stride(in_cl_h_stride_),
+        in_cl_d_stride(in_cl_d_stride_),
+        in_batch_stride(in_batch_stride_),
+        out_batch_stride(out_batch_stride_),
+        in_hw_stride(in_hw_stride_) {}
+
+ private:
+  scalar_t* inputData;
+  scalar_t* outputData;
+  int64_t* indicesData;
+  int numChannels;
+  int InputSizeD;
+  int InputSizeH;
+  int InputSizeW;
+  int nbatch;
+  int OutputSizeD;
+  int OutputSizeH;
+  int OutputSizeW;
+  int kT;
+  int kH;
+  int kW;
+  int dT;
+  int dH;
+  int dW;
+  int pT;
+  int pH;
+  int pW;
+  int dilationT;
+  int dilationH;
+  int dilationW;
+  int64_t wg_size;
+  int64_t OutputSize;
+  int global_range;
+  int out_cf_d_stride;
+  int out_cf_c_stride;
+  int in_cf_d_stride;
+  int in_cf_c_stride;
+  int out_cl_h_stride;
+  int out_cl_d_stride;
+  int in_cl_h_stride;
+  int in_cl_d_stride;
+  int in_batch_stride;
+  int out_batch_stride;
+  int in_hw_stride;
+};
+
+template <typename scalar_t, bool channels_last>
 static void max_pool3d_with_indices_out_frame_impl(
     scalar_t* inputData,
     scalar_t* outputData,
@@ -71,92 +275,44 @@ static void max_pool3d_with_indices_out_frame_impl(
   auto out_batch_stride = OutputSizeD * OutputSizeH * OutputSizeW * numChannels;
   auto in_hw_stride = InputSizeH * InputSizeW;
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      for (auto outputIndex = item.get_global_id(0); outputIndex < OutputSize;
-           outputIndex += global_range) {
-        int batch = 0;
-        int channel = 0;
-        int oDepth = 0;
-        int oRow = 0;
-        int oColumn = 0;
-        // used only for channels-first indexing
-        int64_t slice = 0;
-        batch = outputIndex / out_batch_stride;
-        if constexpr (!channels_last) {
-          // indexing order: batch, channel, depth
-          oColumn = outputIndex % OutputSizeW;
-          oRow = outputIndex / OutputSizeW % OutputSizeH;
-          oDepth = outputIndex / out_cf_d_stride % OutputSizeD;
-          channel = outputIndex / out_cf_c_stride % numChannels;
-          slice = outputIndex / out_cf_c_stride;
-        } else {
-          channel = outputIndex % numChannels;
-          oColumn = outputIndex / numChannels % OutputSizeW;
-          oRow = outputIndex / out_cl_h_stride % OutputSizeH;
-          oDepth = outputIndex / out_cl_d_stride % OutputSizeD;
-          slice = outputIndex / out_cf_d_stride;
-        }
-
-        // For int64_t data type, see
-        // https://github.com/pytorch/pytorch/issues/52822
-        int tStart = oDepth * dT - pT;
-        int hStart = oRow * dH - pH;
-        int wStart = oColumn * dW - pW;
-        int tEnd = std::min(tStart + (kT - 1) * dilationT + 1, InputSizeD);
-        int hEnd = std::min(hStart + (kH - 1) * dilationH + 1, InputSizeH);
-        int wEnd = std::min(wStart + (kW - 1) * dilationW + 1, InputSizeW);
-
-        while (tStart < 0)
-          tStart += dilationT;
-        while (hStart < 0)
-          hStart += dilationH;
-        while (wStart < 0)
-          wStart += dilationW;
-
-        int64_t maxIndex;
-        int64_t ioffset;
-
-        if constexpr (!channels_last) {
-          ioffset = (int64_t)slice * in_cf_c_stride;
-        } else {
-          ioffset = ((int64_t)batch * in_batch_stride) + channel;
-        }
-
-        scalar_t max = Numerics<scalar_t>::lower_bound(); // -Infinity
-
-        for (int t = tStart; t < tEnd; t += dilationT) {
-          for (int h = hStart; h < hEnd; h += dilationH) {
-            for (int w = wStart; w < wEnd; w += dilationW) {
-              scalar_t val;
-              int index = t * in_hw_stride + h * InputSizeW + w;
-              if constexpr (!channels_last) {
-                val = inputData[ioffset + index];
-              } else {
-                int64_t index_channels_last = index * numChannels;
-                val = inputData[ioffset + index_channels_last];
-              }
-
-              if ((max < val) || std::isnan(val)) {
-                max = val;
-                maxIndex = index;
-              }
-            }
-          }
-        }
-
-        int64_t out_index;
-        if constexpr (!channels_last) {
-          out_index = (int64_t)slice * out_cf_c_stride +
-              oDepth * out_cf_d_stride + oRow * OutputSizeW + oColumn;
-        } else {
-          out_index = (int64_t)batch * out_batch_stride +
-              oDepth * out_cl_d_stride + oRow * out_cl_h_stride +
-              oColumn * numChannels + channel;
-        }
-        outputData[out_index] = max;
-        indicesData[out_index] = maxIndex;
-      }
-    };
+    MaxPool3dWithIndicesOutFrameImplKernelFunctor<scalar_t, channels_last> kfn(
+        inputData,
+        outputData,
+        indicesData,
+        numChannels,
+        InputSizeD,
+        InputSizeH,
+        InputSizeW,
+        nbatch,
+        OutputSizeD,
+        OutputSizeH,
+        OutputSizeW,
+        kT,
+        kH,
+        kW,
+        dT,
+        dH,
+        dW,
+        pT,
+        pH,
+        pW,
+        dilationT,
+        dilationH,
+        dilationW,
+        wg_size,
+        OutputSize,
+        global_range,
+        out_cf_d_stride,
+        out_cf_c_stride,
+        in_cf_d_stride,
+        in_cf_c_stride,
+        out_cl_h_stride,
+        out_cl_d_stride,
+        in_cl_h_stride,
+        in_cl_d_stride,
+        in_batch_stride,
+        out_batch_stride,
+        in_hw_stride);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(work_group_size)),
@@ -164,6 +320,66 @@ static void max_pool3d_with_indices_out_frame_impl(
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <typename scalar_t, bool channels_last>
+struct MaxPool3dWithIndicesBackwardOutFrameImplKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    for (auto outputIndex = item.get_global_id(0); outputIndex < gradOutputSize;
+         outputIndex += global_range) {
+      int batch = outputIndex / out_nbatch_stride;
+      if constexpr (channels_last) {
+        int channel = outputIndex % numChannels;
+        int64_t index = indices_ptr[outputIndex];
+        int64_t gradIn_offset =
+            batch * in_nbatch_stride + channel + index * numChannels;
+        atomicAdd(
+            (dpcpp_global_ptr_pt<scalar_t>)&gradInput_ptr[gradIn_offset],
+            gradOutput_ptr[outputIndex]);
+      } else {
+        int channel = outputIndex / out_cf_channel_stride % numChannels;
+        int64_t index = indices_ptr[outputIndex];
+        int64_t gradIn_offset =
+            batch * in_nbatch_stride + channel * in_cf_channel_stride + index;
+        atomicAdd(
+            (dpcpp_global_ptr_pt<scalar_t>)&gradInput_ptr[gradIn_offset],
+            gradOutput_ptr[outputIndex]);
+      }
+    }
+  }
+  MaxPool3dWithIndicesBackwardOutFrameImplKernelFunctor(
+      scalar_t* gradInput_ptr_,
+      scalar_t* gradOutput_ptr_,
+      int64_t* indices_ptr_,
+      int numChannels_,
+      int64_t gradOutputSize_,
+      int64_t global_range_,
+      int out_cf_channel_stride_,
+      int in_cf_channel_stride_,
+      int out_nbatch_stride_,
+      int in_nbatch_stride_)
+      : gradInput_ptr(gradInput_ptr_),
+        gradOutput_ptr(gradOutput_ptr_),
+        indices_ptr(indices_ptr_),
+        numChannels(numChannels_),
+        gradOutputSize(gradOutputSize_),
+        global_range(global_range_),
+        out_cf_channel_stride(out_cf_channel_stride_),
+        in_cf_channel_stride(in_cf_channel_stride_),
+        out_nbatch_stride(out_nbatch_stride_),
+        in_nbatch_stride(in_nbatch_stride_) {}
+
+ private:
+  scalar_t* gradInput_ptr;
+  scalar_t* gradOutput_ptr;
+  int64_t* indices_ptr;
+  int numChannels;
+  int64_t gradOutputSize;
+  int64_t global_range;
+  int out_cf_channel_stride;
+  int in_cf_channel_stride;
+  int out_nbatch_stride;
+  int in_nbatch_stride;
+};
 
 template <typename scalar_t, bool channels_last>
 static void max_pool3d_with_indices_backward_out_frame_impl(
@@ -195,30 +411,19 @@ static void max_pool3d_with_indices_backward_out_frame_impl(
   auto in_nbatch_stride = numChannels * in_cf_channel_stride;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      for (auto outputIndex = item.get_global_id(0);
-           outputIndex < gradOutputSize;
-           outputIndex += global_range) {
-        int batch = outputIndex / out_nbatch_stride;
-        if constexpr (channels_last) {
-          int channel = outputIndex % numChannels;
-          int64_t index = indices_ptr[outputIndex];
-          int64_t gradIn_offset =
-              batch * in_nbatch_stride + channel + index * numChannels;
-          atomicAdd(
-              (dpcpp_global_ptr_pt<scalar_t>)&gradInput_ptr[gradIn_offset],
-              gradOutput_ptr[outputIndex]);
-        } else {
-          int channel = outputIndex / out_cf_channel_stride % numChannels;
-          int64_t index = indices_ptr[outputIndex];
-          int64_t gradIn_offset =
-              batch * in_nbatch_stride + channel * in_cf_channel_stride + index;
-          atomicAdd(
-              (dpcpp_global_ptr_pt<scalar_t>)&gradInput_ptr[gradIn_offset],
-              gradOutput_ptr[outputIndex]);
-        }
-      }
-    };
+    MaxPool3dWithIndicesBackwardOutFrameImplKernelFunctor<
+        scalar_t,
+        channels_last>
+        kfn(gradInput_ptr,
+            gradOutput_ptr,
+            indices_ptr,
+            numChannels,
+            gradOutputSize,
+            global_range,
+            out_cf_channel_stride,
+            in_cf_channel_stride,
+            out_nbatch_stride,
+            in_nbatch_stride);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(work_group_size)),

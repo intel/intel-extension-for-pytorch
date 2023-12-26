@@ -14,13 +14,77 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t>
+struct LaunchCrossKernelFunctor {
+  void operator()(sycl::nd_item<1> item_id) const {
+    int64_t linear_index = item_id.get_global_id(0);
+    for (int64_t i = linear_index; i < N;
+         i += work_group_num * work_group_size) {
+      const auto offsets = offset_calculator.get(i);
+      auto* out_row = out + offsets[0];
+      const auto* x_row = x + offsets[1];
+      const auto* y_row = y + offsets[2];
+
+      const scalar_t val0 =
+          (x_row[1 * xstride] * y_row[2 * ystride] -
+           x_row[2 * xstride] * y_row[1 * ystride]);
+
+      const scalar_t val1 =
+          (x_row[2 * xstride] * y_row[0 * ystride] -
+           x_row[0 * xstride] * y_row[2 * ystride]);
+
+      const scalar_t val2 =
+          (x_row[0 * xstride] * y_row[1 * ystride] -
+           x_row[1 * xstride] * y_row[0 * ystride]);
+
+      out_row[0 * ostride] = val0;
+      out_row[1 * ostride] = val1;
+      out_row[2 * ostride] = val2;
+    }
+  }
+  LaunchCrossKernelFunctor(
+      int64_t ostride_,
+      int64_t xstride_,
+      int64_t ystride_,
+      const int64_t N_,
+      int64_t work_group_size_,
+      int64_t work_group_num_,
+      scalar_t* out_,
+      const scalar_t* x_,
+      const scalar_t* y_,
+      OffsetCalculator<3> offset_calculator_)
+      : ostride(ostride_),
+        xstride(xstride_),
+        ystride(ystride_),
+        N(N_),
+        work_group_size(work_group_size_),
+        work_group_num(work_group_num_),
+        out(out_),
+        x(x_),
+        y(y_),
+        offset_calculator(offset_calculator_) {}
+
+ private:
+  int64_t ostride;
+  int64_t xstride;
+  int64_t ystride;
+  const int64_t N;
+  int64_t work_group_size;
+  int64_t work_group_num;
+  scalar_t* out;
+  const scalar_t* x;
+  const scalar_t* y;
+  OffsetCalculator<3> offset_calculator;
+};
+
 void launch_cross_kernel(
     const TensorIteratorBase& iter,
     int64_t ostride,
     int64_t xstride,
     int64_t ystride) {
   const auto N = iter.numel();
-  auto offset_calculator = make_element_offset_calculator<3>(iter);
+  OffsetCalculator<3> offset_calculator =
+      make_element_offset_calculator<3>(iter);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
       N > 0 && N <= std::numeric_limits<int32_t>::max());
   auto& dpcpp_queue = dpcppGetCurrentQueue();
@@ -38,33 +102,17 @@ void launch_cross_kernel(
           auto out = static_cast<scalar_t*>(iter.data_ptr(0));
           auto x = static_cast<const scalar_t*>(iter.data_ptr(1));
           auto y = static_cast<const scalar_t*>(iter.data_ptr(2));
-
-          auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
-            int64_t linear_index = item_id.get_global_id(0);
-            for (int64_t i = linear_index; i < N;
-                 i += work_group_num * work_group_size) {
-              const auto offsets = offset_calculator.get(i);
-              auto* out_row = out + offsets[0];
-              const auto* x_row = x + offsets[1];
-              const auto* y_row = y + offsets[2];
-
-              const scalar_t val0 =
-                  (x_row[1 * xstride] * y_row[2 * ystride] -
-                   x_row[2 * xstride] * y_row[1 * ystride]);
-
-              const scalar_t val1 =
-                  (x_row[2 * xstride] * y_row[0 * ystride] -
-                   x_row[0 * xstride] * y_row[2 * ystride]);
-
-              const scalar_t val2 =
-                  (x_row[0 * xstride] * y_row[1 * ystride] -
-                   x_row[1 * xstride] * y_row[0 * ystride]);
-
-              out_row[0 * ostride] = val0;
-              out_row[1 * ostride] = val1;
-              out_row[2 * ostride] = val2;
-            }
-          };
+          LaunchCrossKernelFunctor<scalar_t> kfn(
+              ostride,
+              xstride,
+              ystride,
+              N,
+              work_group_size,
+              work_group_num,
+              out,
+              x,
+              y,
+              offset_calculator);
           cgh.parallel_for(
               sycl::nd_range<1>(
                   sycl::range<1>(work_group_num * work_group_size),

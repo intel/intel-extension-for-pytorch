@@ -82,6 +82,81 @@ struct OutputTensorSizeStride {
   IndexType outputStride[MaxDims];
 };
 
+template <
+    typename Tout,
+    typename underlying_out_t,
+    typename Tin,
+    typename underlying_in_t,
+    typename IndexType,
+    int Dims,
+    bool is_quantized_out = false,
+    bool is_quantized_in = false>
+struct CatArrayBatchedCopyKernelFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    IndexType tid = item.get_global_id(1);
+    IndexType in = item.get_group(0);
+
+    IndexType nElements = inputs[in].nElements;
+
+    if (tid >= nElements)
+      return;
+
+    Tin* data = inputs[in].input;
+    IndexType offset = inputs[in].offset;
+    IndexType dimSize = inputs[in].dimSize;
+    IndexType dataOffset = offset * dimStride;
+
+    IndexType stride = item.get_global_range(1);
+
+    while (tid < nElements) {
+      IndexType elementOffset = CatArrIndexToOffset<IndexType, Dims>::compute(
+          os.outputSize, os.outputStride, dimSize, concatDim, tid);
+      if constexpr (is_quantized_out) {
+        // this path handles case of qtype/float inputs + qtype output
+        auto out_float = static_cast<float>(
+            round_impl<float>(
+                (static_cast<float>(data[tid]) - inputs[in].zero_point_in) *
+                inputs[in].scale_in / os.scale_out) +
+            os.zero_point_out);
+        auto out = Numerics<float>::min(
+            Numerics<float>::max(
+                out_float,
+                static_cast<float>(
+                    std::numeric_limits<underlying_out_t>::min())),
+            static_cast<float>(std::numeric_limits<underlying_out_t>::max()));
+        output[dataOffset + elementOffset] = static_cast<Tout>(out);
+      } else if constexpr (is_quantized_in) {
+        // this path handles cases of qtype input + float output
+        output[dataOffset + elementOffset] =
+            (static_cast<float>(data[tid]) - inputs[in].zero_point_in) *
+            inputs[in].scale_in;
+      } else {
+        // this path handles cases of non-qtype
+        output[dataOffset + elementOffset] = data[tid];
+      }
+      tid += stride;
+    }
+  }
+  CatArrayBatchedCopyKernelFunctor(
+      Tout* output_,
+      CatArrInputTensor<Tin, IndexType>* inputs_,
+      OutputTensorSizeStride<IndexType, CAT_ARRAY_MAX_INPUT_DIMS> os_,
+      const int concatDim_,
+      IndexType dimStride_)
+      : output(output_),
+        inputs(inputs_),
+        os(os_),
+        concatDim(concatDim_),
+        dimStride(dimStride_) {}
+
+ private:
+  Tout* output;
+  CatArrInputTensor<Tin, IndexType>* inputs;
+  OutputTensorSizeStride<IndexType, CAT_ARRAY_MAX_INPUT_DIMS> os;
+  const int concatDim;
+  IndexType dimStride;
+};
+
 /**
  * Kernel used to concatenated grimDim.y tensors into an output tensor. Uses a
  * grid-stride loop based off of the blockIdx.x, threadIdx.x for each input to
@@ -136,51 +211,16 @@ void CatArrayBatchedCopy(
   sycl::range<2> local_range(1, numWI);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-      IndexType tid = item.get_global_id(1);
-      IndexType in = item.get_group(0);
-
-      IndexType nElements = inputs[in].nElements;
-
-      if (tid >= nElements)
-        return;
-
-      Tin* data = inputs[in].input;
-      IndexType offset = inputs[in].offset;
-      IndexType dimSize = inputs[in].dimSize;
-      IndexType dataOffset = offset * dimStride;
-
-      IndexType stride = item.get_global_range(1);
-
-      while (tid < nElements) {
-        IndexType elementOffset = CatArrIndexToOffset<IndexType, Dims>::compute(
-            os.outputSize, os.outputStride, dimSize, concatDim, tid);
-        if constexpr (is_quantized_out) {
-          // this path handles case of qtype/float inputs + qtype output
-          auto out_float = static_cast<float>(
-              round_impl<float>(
-                  (static_cast<float>(data[tid]) - inputs[in].zero_point_in) *
-                  inputs[in].scale_in / os.scale_out) +
-              os.zero_point_out);
-          auto out = Numerics<float>::min(
-              Numerics<float>::max(
-                  out_float,
-                  static_cast<float>(
-                      std::numeric_limits<underlying_out_t>::min())),
-              static_cast<float>(std::numeric_limits<underlying_out_t>::max()));
-          output[dataOffset + elementOffset] = static_cast<Tout>(out);
-        } else if constexpr (is_quantized_in) {
-          // this path handles cases of qtype input + float output
-          output[dataOffset + elementOffset] =
-              (static_cast<float>(data[tid]) - inputs[in].zero_point_in) *
-              inputs[in].scale_in;
-        } else {
-          // this path handles cases of non-qtype
-          output[dataOffset + elementOffset] = data[tid];
-        }
-        tid += stride;
-      }
-    };
+    CatArrayBatchedCopyKernelFunctor<
+        Tout,
+        underlying_out_t,
+        Tin,
+        underlying_in_t,
+        IndexType,
+        Dims,
+        is_quantized_out,
+        is_quantized_in>
+        kfn(output, inputs, os, concatDim, dimStride);
     cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf)
