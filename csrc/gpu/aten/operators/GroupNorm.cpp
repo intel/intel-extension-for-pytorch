@@ -236,6 +236,55 @@ class GroupNormBackward : public NormBackward<scalar_t, mean_t, weight_t> {
   bool channels_last;
 };
 
+template <
+    typename scalar_t,
+    typename mean_t,
+    typename weight_t,
+    typename accscalar_t>
+struct ComputeFusedParamsDPCPPKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    auto id = item_id.get_id(0);
+
+    const int64_t ng = id / (C / group);
+    const int64_t c = id % C;
+    const accscalar_t x = (gamma_data == nullptr)
+        ? static_cast<accscalar_t>(rstd_data[ng])
+        : static_cast<accscalar_t>(rstd_data[ng]) *
+            static_cast<accscalar_t>(gamma_data[c]);
+    a_data[id] = x;
+    b_data[id] = -x * static_cast<accscalar_t>(mean_data[ng]) +
+        (beta_data == nullptr ? accscalar_t(0)
+                              : static_cast<accscalar_t>(beta_data[c]));
+  }
+  ComputeFusedParamsDPCPPKernelFunctor(
+      int64_t C_,
+      int64_t group_,
+      const mean_t* mean_data_,
+      const mean_t* rstd_data_,
+      const weight_t* gamma_data_,
+      const weight_t* beta_data_,
+      acc_type<scalar_t>* a_data_,
+      acc_type<scalar_t>* b_data_)
+      : C(C_),
+        group(group_),
+        mean_data(mean_data_),
+        rstd_data(rstd_data_),
+        gamma_data(gamma_data_),
+        beta_data(beta_data_),
+        a_data(a_data_),
+        b_data(b_data_) {}
+
+ private:
+  int64_t C;
+  int64_t group;
+  const mean_t* mean_data;
+  const mean_t* rstd_data;
+  const weight_t* gamma_data;
+  const weight_t* beta_data;
+  acc_type<scalar_t>* a_data;
+  acc_type<scalar_t>* b_data;
+};
+
 template <typename scalar_t, typename mean_t, typename weight_t>
 void ComputeFusedParamsDPCPPKernel(
     int64_t N,
@@ -251,20 +300,20 @@ void ComputeFusedParamsDPCPPKernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto global_range = N * C;
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(sycl::range<1>(global_range), [=](sycl::item<1> item_id) {
-      auto id = item_id.get_id(0);
-
-      const int64_t ng = id / (C / group);
-      const int64_t c = id % C;
-      const accscalar_t x = (gamma_data == nullptr)
-          ? static_cast<accscalar_t>(rstd_data[ng])
-          : static_cast<accscalar_t>(rstd_data[ng]) *
-              static_cast<accscalar_t>(gamma_data[c]);
-      a_data[id] = x;
-      b_data[id] = -x * static_cast<accscalar_t>(mean_data[ng]) +
-          (beta_data == nullptr ? accscalar_t(0)
-                                : static_cast<accscalar_t>(beta_data[c]));
-    });
+    ComputeFusedParamsDPCPPKernelFunctor<
+        scalar_t,
+        mean_t,
+        weight_t,
+        accscalar_t>
+        kfn(C,
+            group,
+            mean_data,
+            rstd_data,
+            gamma_data,
+            beta_data,
+            a_data,
+            b_data);
+    cgh.parallel_for(sycl::range<1>(global_range), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -346,6 +395,33 @@ void GroupNormKernelImplInternal(
 }
 
 template <typename accscalar_t, typename mean_t, typename weight_t>
+struct ComputeGradOutputCoeffientDPCPPKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    auto nc = item_id.get_id(0);
+
+    const int64_t ng = nc / (C / group);
+    const int64_t c = nc % C;
+    c1[nc] = static_cast<accscalar_t>(rstd[ng]) *
+        (gamma == nullptr ? accscalar_t(1)
+                          : static_cast<accscalar_t>(gamma[c]));
+  }
+  ComputeGradOutputCoeffientDPCPPKernelFunctor(
+      int64_t C_,
+      int64_t group_,
+      const mean_t* rstd_,
+      const weight_t* gamma_,
+      accscalar_t* c1_)
+      : C(C_), group(group_), rstd(rstd_), gamma(gamma_), c1(c1_) {}
+
+ private:
+  int64_t C;
+  int64_t group;
+  const mean_t* rstd;
+  const weight_t* gamma;
+  accscalar_t* c1;
+};
+
+template <typename accscalar_t, typename mean_t, typename weight_t>
 void ComputeGradOutputCoeffientDPCPPKernel(
     int64_t N,
     int64_t C,
@@ -356,18 +432,105 @@ void ComputeGradOutputCoeffientDPCPPKernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = N * C;
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(sycl::range<1>(total_threads), [=](sycl::item<1> item_id) {
-      auto nc = item_id.get_id(0);
-
-      const int64_t ng = nc / (C / group);
-      const int64_t c = nc % C;
-      c1[nc] = static_cast<accscalar_t>(rstd[ng]) *
-          (gamma == nullptr ? accscalar_t(1)
-                            : static_cast<accscalar_t>(gamma[c]));
-    });
+    ComputeGradOutputCoeffientDPCPPKernelFunctor<accscalar_t, mean_t, weight_t>
+        kfn(C, group, rstd, gamma, c1);
+    cgh.parallel_for(sycl::range<1>(total_threads), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
+
+template <typename accscalar_t, typename mean_t, typename weight_t>
+struct ComputeBackwardFusedParamsDPCPPKernelFunctor {
+  [[intel::reqd_sub_group_size(SIMD)]] void operator()(
+      sycl::nd_item<2> item_id) const {
+    auto local_id = item_id.get_local_id(1);
+    auto n = item_id.get_group(0);
+    auto g = item_id.get_group(1);
+    auto ng = n * G + g;
+    accscalar_t sum1 = 0;
+    accscalar_t sum2 = 0;
+    for (int64_t i = local_id; i < D; i += workgroup_size) {
+      auto nc = ng * D + i;
+      auto c = g * D + i;
+      const accscalar_t gamma_v = gamma == nullptr
+          ? accscalar_t(1)
+          : static_cast<accscalar_t>(gamma[c]);
+      sum1 += ds[nc] * gamma_v;
+      sum2 += db[nc] * gamma_v;
+    }
+
+    norm_group_reduce<accscalar_t>(
+        item_id,
+        sub_group_num,
+        sum1,
+        sum2,
+        local_sum1,
+        local_sum2,
+        [](accscalar_t a, accscalar_t b) { return a + b; });
+
+    if (local_id == 0) {
+      const accscalar_t s = accscalar_t(1) / static_cast<accscalar_t>(D * HxW);
+      const accscalar_t x = (sum2 * static_cast<accscalar_t>(mean[ng]) - sum1) *
+          static_cast<accscalar_t>(rstd[ng]) *
+          static_cast<accscalar_t>(rstd[ng]) *
+          static_cast<accscalar_t>(rstd[ng]) * s;
+      c2[ng] = x;
+      c3[ng] = -x * static_cast<accscalar_t>(mean[ng]) -
+          sum2 * static_cast<accscalar_t>(rstd[ng]) * s;
+    }
+  }
+  ComputeBackwardFusedParamsDPCPPKernelFunctor(
+      int64_t N_,
+      int64_t C_,
+      int64_t HxW_,
+      int64_t G_,
+      const mean_t* mean_,
+      const mean_t* rstd_,
+      const weight_t* gamma_,
+      const accscalar_t* ds_,
+      const accscalar_t* db_,
+      accscalar_t* c2_,
+      accscalar_t* c3_,
+      int64_t D_,
+      int64_t workgroup_size_,
+      int sub_group_num_,
+      dpcpp_local_acc_t<accscalar_t> local_sum1_,
+      dpcpp_local_acc_t<accscalar_t> local_sum2_)
+      : N(N_),
+        C(C_),
+        HxW(HxW_),
+        G(G_),
+        mean(mean_),
+        rstd(rstd_),
+        gamma(gamma_),
+        ds(ds_),
+        db(db_),
+        c2(c2_),
+        c3(c3_),
+        D(D_),
+        workgroup_size(workgroup_size_),
+        sub_group_num(sub_group_num_),
+        local_sum1(local_sum1_),
+        local_sum2(local_sum2_) {}
+
+ private:
+  int64_t N;
+  int64_t C;
+  int64_t HxW;
+  int64_t G;
+  const mean_t* mean;
+  const mean_t* rstd;
+  const weight_t* gamma;
+  const accscalar_t* ds;
+  const accscalar_t* db;
+  accscalar_t* c2;
+  accscalar_t* c3;
+  int64_t D;
+  int64_t workgroup_size;
+  int sub_group_num;
+  dpcpp_local_acc_t<accscalar_t> local_sum1;
+  dpcpp_local_acc_t<accscalar_t> local_sum2;
+};
 
 template <typename accscalar_t, typename mean_t, typename weight_t>
 void ComputeBackwardFusedParamsDPCPPKernel(
@@ -397,52 +560,93 @@ void ComputeBackwardFusedParamsDPCPPKernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     dpcpp_local_acc_t<accscalar_t> local_sum1(sub_group_num, cgh);
     dpcpp_local_acc_t<accscalar_t> local_sum2(sub_group_num, cgh);
+    ComputeBackwardFusedParamsDPCPPKernelFunctor<accscalar_t, mean_t, weight_t>
+        kfn(N,
+            C,
+            HxW,
+            G,
+            mean,
+            rstd,
+            gamma,
+            ds,
+            db,
+            c2,
+            c3,
+            D,
+            workgroup_size,
+            sub_group_num,
+            local_sum1,
+            local_sum2);
     cgh.parallel_for(
         sycl::nd_range<2>(
             sycl::range<2>(N, group * workgroup_size),
             sycl::range<2>(1, workgroup_size)),
-        [=](sycl::nd_item<2> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
-          auto local_id = item_id.get_local_id(1);
-          auto n = item_id.get_group(0);
-          auto g = item_id.get_group(1);
-          auto ng = n * G + g;
-          accscalar_t sum1 = 0;
-          accscalar_t sum2 = 0;
-          for (int64_t i = local_id; i < D; i += workgroup_size) {
-            auto nc = ng * D + i;
-            auto c = g * D + i;
-            const accscalar_t gamma_v = gamma == nullptr
-                ? accscalar_t(1)
-                : static_cast<accscalar_t>(gamma[c]);
-            sum1 += ds[nc] * gamma_v;
-            sum2 += db[nc] * gamma_v;
-          }
-
-          norm_group_reduce<accscalar_t>(
-              item_id,
-              sub_group_num,
-              sum1,
-              sum2,
-              local_sum1,
-              local_sum2,
-              [](accscalar_t a, accscalar_t b) { return a + b; });
-
-          if (local_id == 0) {
-            const accscalar_t s =
-                accscalar_t(1) / static_cast<accscalar_t>(D * HxW);
-            const accscalar_t x =
-                (sum2 * static_cast<accscalar_t>(mean[ng]) - sum1) *
-                static_cast<accscalar_t>(rstd[ng]) *
-                static_cast<accscalar_t>(rstd[ng]) *
-                static_cast<accscalar_t>(rstd[ng]) * s;
-            c2[ng] = x;
-            c3[ng] = -x * static_cast<accscalar_t>(mean[ng]) -
-                sum2 * static_cast<accscalar_t>(rstd[ng]) * s;
-          }
-        });
+        kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
+
+template <
+    typename scalar_t,
+    typename mean_t,
+    typename weight_t,
+    typename accscalar_t>
+struct GammaBetaBackwardDPCPPKernelFunctor {
+  void operator()(sycl::nd_item<1> item_id) const {
+    auto index = item_id.get_global_linear_id();
+    if (index < C) {
+      auto G = group;
+      auto D = C / G;
+      accscalar_t sum1 = 0;
+      accscalar_t sum2 = 0;
+      for (int64_t n = 0; n < N; ++n) {
+        auto nc = n * C + index;
+        auto ng = n * G + index / D;
+        sum1 += (dgamma == nullptr)
+            ? accscalar_t(0)
+            : ((ds[nc] - db[nc] * static_cast<accscalar_t>(mean[ng])) *
+               static_cast<accscalar_t>(rstd[ng]));
+        sum2 += (dbeta == nullptr) ? accscalar_t(0) : db[nc];
+      }
+      if (dgamma != nullptr) {
+        dgamma[index] = sum1;
+      }
+      if (dbeta != nullptr) {
+        dbeta[index] = sum2;
+      }
+    }
+  }
+  GammaBetaBackwardDPCPPKernelFunctor(
+      int64_t N_,
+      int64_t C_,
+      int64_t group_,
+      const mean_t* mean_,
+      const mean_t* rstd_,
+      const acc_type<scalar_t>* ds_,
+      const acc_type<scalar_t>* db_,
+      weight_t* dgamma_,
+      weight_t* dbeta_)
+      : N(N_),
+        C(C_),
+        group(group_),
+        mean(mean_),
+        rstd(rstd_),
+        ds(ds_),
+        db(db_),
+        dgamma(dgamma_),
+        dbeta(dbeta_) {}
+
+ private:
+  int64_t N;
+  int64_t C;
+  int64_t group;
+  const mean_t* mean;
+  const mean_t* rstd;
+  const acc_type<scalar_t>* ds;
+  const acc_type<scalar_t>* db;
+  weight_t* dgamma;
+  weight_t* dbeta;
+};
 
 template <typename scalar_t, typename mean_t, typename weight_t>
 void GammaBetaBackwardDPCPPKernel(
@@ -465,33 +669,12 @@ void GammaBetaBackwardDPCPPKernel(
   auto total_threads =
       ((C + workgroup_size - 1) / workgroup_size) * workgroup_size;
   auto cgf = DPCPP_Q_CGF(cgh) {
+    GammaBetaBackwardDPCPPKernelFunctor<scalar_t, mean_t, weight_t, accscalar_t>
+        kfn(N, C, group, mean, rstd, ds, db, dgamma, dbeta);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(total_threads), sycl::range<1>(workgroup_size)),
-        [=](sycl::nd_item<1> item_id) {
-          auto index = item_id.get_global_linear_id();
-          if (index < C) {
-            auto G = group;
-            auto D = C / G;
-            accscalar_t sum1 = 0;
-            accscalar_t sum2 = 0;
-            for (int64_t n = 0; n < N; ++n) {
-              auto nc = n * C + index;
-              auto ng = n * G + index / D;
-              sum1 += (dgamma == nullptr)
-                  ? accscalar_t(0)
-                  : ((ds[nc] - db[nc] * static_cast<accscalar_t>(mean[ng])) *
-                     static_cast<accscalar_t>(rstd[ng]));
-              sum2 += (dbeta == nullptr) ? accscalar_t(0) : db[nc];
-            }
-            if (dgamma != nullptr) {
-              dgamma[index] = sum1;
-            }
-            if (dbeta != nullptr) {
-              dbeta[index] = sum2;
-            }
-          }
-        });
+        kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
