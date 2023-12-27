@@ -674,6 +674,65 @@ void error_handle(
 #endif
 
 template <typename scalar_t, typename IndexType, bool upper>
+struct ApplyTriuTrilKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    for (size_t linearIndex = item.get_global_id(0); linearIndex < (size_t)N;
+         linearIndex += item.get_global_range()[0]) {
+      IndexType batch_id = linearIndex / (self_size_0 * self_size_1);
+      IndexType row = (linearIndex % (self_size_0 * self_size_1)) / self_size_1;
+      IndexType col = (linearIndex % (self_size_0 * self_size_1)) % self_size_1;
+
+      IndexType src_index =
+          batch_id * self_stride + row * self_stride_0 + col * self_stride_1;
+      IndexType tgt_index = batch_id * result_stride + row * result_stride_0 +
+          col * result_stride_1;
+
+      bool mask = upper ? (col - row >= k) : (col - row <= k);
+      result_ptr[tgt_index] = mask ? self_ptr[src_index] : scalar_t(0);
+    }
+  }
+  ApplyTriuTrilKernelFunctor(
+      const int64_t k_,
+      int64_t N_,
+      IndexType self_size_0_,
+      IndexType self_size_1_,
+      IndexType self_stride_,
+      IndexType self_stride_0_,
+      IndexType self_stride_1_,
+      IndexType result_stride_,
+      IndexType result_stride_0_,
+      IndexType result_stride_1_,
+      scalar_t* result_ptr_,
+      scalar_t* self_ptr_)
+      : k(k_),
+        N(N_),
+        self_size_0(self_size_0_),
+        self_size_1(self_size_1_),
+        self_stride(self_stride_),
+        self_stride_0(self_stride_0_),
+        self_stride_1(self_stride_1_),
+        result_stride(result_stride_),
+        result_stride_0(result_stride_0_),
+        result_stride_1(result_stride_1_),
+        result_ptr(result_ptr_),
+        self_ptr(self_ptr_) {}
+
+ private:
+  const int64_t k;
+  int64_t N;
+  IndexType self_size_0;
+  IndexType self_size_1;
+  IndexType self_stride;
+  IndexType self_stride_0;
+  IndexType self_stride_1;
+  IndexType result_stride;
+  IndexType result_stride_0;
+  IndexType result_stride_1;
+  scalar_t* result_ptr;
+  scalar_t* self_ptr;
+};
+
+template <typename scalar_t, typename IndexType, bool upper>
 void apply_triu_tril(Tensor& result, const Tensor& self, const int64_t k) {
   auto& queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
@@ -695,25 +754,19 @@ void apply_triu_tril(Tensor& result, const Tensor& self, const int64_t k) {
   scalar_t* self_ptr = (scalar_t*)(self.data_ptr());
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      for (size_t linearIndex = item.get_global_id(0); linearIndex < (size_t)N;
-           linearIndex += item.get_global_range()[0]) {
-        IndexType batch_id = linearIndex / (self_size_0 * self_size_1);
-        IndexType row =
-            (linearIndex % (self_size_0 * self_size_1)) / self_size_1;
-        IndexType col =
-            (linearIndex % (self_size_0 * self_size_1)) % self_size_1;
-
-        IndexType src_index =
-            batch_id * self_stride + row * self_stride_0 + col * self_stride_1;
-        IndexType tgt_index = batch_id * result_stride + row * result_stride_0 +
-            col * result_stride_1;
-
-        bool mask = upper ? (col - row >= k) : (col - row <= k);
-        result_ptr[tgt_index] = mask ? self_ptr[src_index] : scalar_t(0);
-      }
-    };
-
+    ApplyTriuTrilKernelFunctor<scalar_t, IndexType, upper> kfn(
+        k,
+        N,
+        self_size_0,
+        self_size_1,
+        self_stride,
+        self_stride_0,
+        self_stride_1,
+        result_stride,
+        result_stride_0,
+        result_stride_1,
+        result_ptr,
+        self_ptr);
     // kick off kernel
     cgh.parallel_for(
         sycl::nd_range<1>(
