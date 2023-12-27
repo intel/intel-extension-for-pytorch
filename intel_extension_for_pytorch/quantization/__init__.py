@@ -17,3 +17,4 @@ from ._quantize_utils import (
     quantize_per_block,
     dequantize_per_block,
 )
+from ._GPTQ import gptq

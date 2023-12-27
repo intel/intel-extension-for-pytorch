@@ -224,66 +224,17 @@ elif args.int4_model == "":
             collate_fn=calib_dataset.collate_batch
         )
 
-        def calib_func(prepared_model):
-            for i, calib_input in enumerate(calib_dataloader):
-                if i > calib_iters:
-                    break
-                prepared_model(calib_input[0])
-
-        recipes = {}
-        eval_func = None
-        from neural_compressor import PostTrainingQuantConfig, quantization
-        # specify the op_type_dict and op_name_dict
-        op_type_dict = {
-            '.*': {  # re.match
-                "weight": {
-                    'bits': 4,  # only support 4-bit for now
-                    'group_size': -1,  # only support per-channel for now
-                    'scheme': 'asym',  # only support asym for now
-                    'algorithm': 'GPTQ',  # RTN/AWQ/TEQ
-                },
-            },
-        }
-        op_name_dict = {
-            'lm_head': {"weight": {'dtype': 'fp32'}, },
-            'embed_out': {"weight": {'dtype': 'fp32'}, },
-        }
-        recipes["rtn_args"] = {
-            "enable_mse_search": False,
-            "enable_full_range": False,
-        }
-        recipes['gptq_args'] = {
-            'percdamp': .01,
-            'act_order': False,
-            'block_size': 128,
-            'nsamples': 128,
-            'use_max_length': True,
-        }
-
-        conf = PostTrainingQuantConfig(
-            approach='weight_only',
-            op_type_dict=op_type_dict,
-            op_name_dict=op_name_dict,
-            recipes=recipes,
-        )
-
-        q_model = quantization.fit(
-            user_model,
-            conf,
-            calib_dataloader=calib_dataloader,
-            calib_func=calib_func,
-            eval_func=eval_func,
-        )
-        compressed_model = q_model.export_compressed_model(
+        compressed_model = ipex.quantization.gptq(  
+            model=user_model,
+            dataloader=calib_dataloader,
+            group_size=128, 
+            use_max_length=True,
             compression_dtype=torch.int32,
             compression_dim=1,
             scale_dtype=torch.float16,
-        )
-        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-        low_precision_checkpoint_file_path = args.output_dir + "/gptq_checkpoint.pt"
-        torch.save(compressed_model.state_dict(), low_precision_checkpoint_file_path)
+            save_dir=args.output_dir)
 
-        logging.info("Calibration finished. Low-precision checkpoint generated as {}.".format(low_precision_checkpoint_file_path))
+        logging.info("Calibration finished. Low-precision checkpoint generated as {}.".format(args.output_dir))
         # Quit here because we want to use different environment variables to run GPTQ and benchmark.
         # So, run this script twice and specify the GPTQ checkpoint file for the second run.
         quit()
@@ -293,6 +244,14 @@ elif args.int4_model == "":
 
     logging.info("Loading low_precision_checkpoint...")
     low_precision_checkpoint = torch.load(low_precision_checkpoint_file_path)
+    config_dict = {
+            "weight_key": "qweight",
+            "scale_key": "scales",
+            "zero_point_key": "qzeros",
+            "bias_key": "bias",
+            "g_idx_key": "g_idx"
+        }
+    state_dict_and_config = (low_precision_checkpoint, config_dict)
     logging.info("low_precision_checkpoint loaded.")
 
     user_model, tokenizer = load_original_model(args)
@@ -341,7 +300,7 @@ elif args.int4_model == "":
         dtype=torch.bfloat16,
         quantization_config=qconfig_mapping,
         inplace=True,
-        low_precision_checkpoint=low_precision_checkpoint,
+        low_precision_checkpoint=state_dict_and_config,
         deployment_mode=False,
     )
     example_inputs = None

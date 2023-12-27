@@ -826,9 +826,8 @@ def optimize_transformers(
                     low_precision_checkpoint, dict
                 ), "Invalid low_precision_checkpoint argument"
                 state_dict = low_precision_checkpoint
-            lowp_checkpoint = state_dict if config is None else (state_dict, config)
             _model = _convert_woq_with_low_precision_checkpoint(
-                _model, quantization_config, lowp_checkpoint
+                _model, quantization_config, state_dict, config
             )
 
         # model reference conversion

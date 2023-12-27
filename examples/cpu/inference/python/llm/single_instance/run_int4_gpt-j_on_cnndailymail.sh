@@ -48,7 +48,7 @@ export LD_PRELOAD=${LD_PRELOAD}:${CONDA_PREFIX}/lib/libtcmalloc.so
 python single_instance/run_int4_gpt-j_on_cnndailymail.py \
     --dataset-path ./saved_results/cnn_dailymail_validation.json \
     --model ${model_path} \
-    --low-precision-checkpoint ./saved_results/gptq_checkpoint.pt
+    --low-precision-checkpoint ./saved_results/gptq_checkpoint_g128.pt
 retVal=$?
 if [ $retVal -ne 0 ]; then
     echo "`date +%Y-%m-%d\ %T` - ERROR - Exit."

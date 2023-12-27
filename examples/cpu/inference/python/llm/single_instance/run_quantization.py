@@ -491,6 +491,15 @@ elif args.ipex_weight_only_quantization:
     )
     if args.low_precision_checkpoint != "":
         low_precision_checkpoint = torch.load(args.low_precision_checkpoint)
+        config_dict = {
+            "weight_key": "qweight",
+            "scale_key": "scales",
+            "zero_point_key": "qzeros",
+            "bias_key": "bias",
+            "g_idx_key": "g_idx"
+        }
+        state_dict_and_config = (low_precision_checkpoint, config_dict)
+        low_precision_checkpoint = state_dict_and_config
     else:
         low_precision_checkpoint = None
     user_model = ipex.optimize_transformers(

@@ -343,18 +343,19 @@ The performance results on AWS instances can be found [here](../../../../../docs
 
 ## Weight-only quantization with low precision checkpoint (Experimental)
 
-Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 probably results in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a dataset by such algorithms. The results are saved as a `state_dict` in a `.pt` file. We provided a script here to run GPTQ (Intel® Neural Compressor 2.3.1 is required).
+## Weight only quantization with low precision checkpoint (Experimental)
+Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 probably results in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a dataset by such algorithms. The low precision checkpoint is saved as a `state_dict` in a `.pt` file and can be loaded later for weight only quantization. We provide an example here to run GPTQ.
 
 Here is how to use it:
 
 ```bash
-# Step 1: Generate modified weights and quantization info
+# Step 1: Generate modified weights and quantization info and save as checkpoint
 python utils/run_gptq.py --model <MODEL_ID> --output-dir ./saved_results
 # Please note that tiiuae/falcon-40b is not supported yet
 ```
+The dataset for calibration is NeelNanda/pile-10k by default. To use other dataset, such as lambada, you may use `--dataset <dataset id>` to specify. You can specify calibration sample size by modifying `--nsamples <int>` (default is 128); you can also choose whether or not to align calibration data to a fixed length by modifying `--use_max_length <bool>` and `--pad_max_length <int>`. For details please refer to [GPTQ](../../../../../intel_extension_for_pytorch/quantization/_GPTQ/README.md)
 
-It may take a few hours to finish. Modified weights and their quantization info are stored in `gptq_checkpoint_g128.pt`, where g128 means group size for input channel is 128 by default. Group size controls the granularity of quantization of weight along input channel. The dataset for calibration is NeelNanda/pile-10k by default. To use other dataset, such as lambada, you may use `--dataset <dataset id>` to specify.
-
+It may take a few hours to finish. Modified weights and their quantization info are stored in `gptq_checkpoint_g128.pt`, where g128 means group size for input channel is 128 by default. Group size controls the granularity of quantization of weight along input channel. 
 Then generate model for weight only quantization with INT4 weights and run tasks.
 
 ```bash
@@ -413,9 +414,7 @@ Please note that 100 GB disk space, 100 GB memory and Internet access are needed
 
 **Checkpoint Requirements**
 
-IPEX now only supports some certain cases. Weights must be N by K and per-channel asymmetrically quantized (group size = -1) to UINT4 and then compressed along K axis to `torch.int32`.
-
-Data type of scales can be any floating point types. Shape of scales should be [N] or with additional dimensions whose length is 1, e.g., [N, 1] or [1, N]. Zero points should have the same shape as scales and stored as `torch.int32` but the true data type is UINT4. Bias is optional in the `state_dict` (checkpoint). If it is present, we read bias in the `state_dict`. Otherwise we read bias from the original model. Bias is `None` if it cannot be found in both cases.
+IPEX now only supports some certain cases. Weights must be N by K and asymmetrically quantized to UINT4 and then compressed along K axis to `torch.int32`. Data type of scales can be any floating point types. Shape of scales should be [N, number_of_groups] or with additional dimensions whose length is 1. Zero points should have the same shape as scales and stored as `torch.int32` but the true data type is UINT4. Bias is optional in the `state_dict` (checkpoint). If it is present, we read bias in the `state_dict`. Otherwise we read bias from the original model. Bias is `None` if it cannot be found in both cases.
 
 ## Accuracy test:
 

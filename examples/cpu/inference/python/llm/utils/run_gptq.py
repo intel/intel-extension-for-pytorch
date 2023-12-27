@@ -14,16 +14,23 @@ import torch
 from datasets import load_dataset
 from torch.nn.functional import pad
 from torch.utils.data import DataLoader
+import intel_extension_for_pytorch as ipex
 
 parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--model", nargs="?", default="EleutherAI/gpt-j-6b"
-)
+parser.add_argument("--model", nargs="?", default="EleutherAI/gpt-j-6b")
 parser.add_argument("--dataset", nargs="?", default="NeelNanda/pile-10k")
 parser.add_argument("--output-dir", nargs="?", default="./saved_results")
+parser.add_argument("--wbits", default=4, type=int)
 parser.add_argument("--group-size", default=128, type=int)
-parser.add_argument("--calib-iters", default=512, type=int,
-                    help="calibration iters.")
+parser.add_argument("--sym", default=False, type=bool)
+parser.add_argument("--act-order", default=False, type=bool)
+parser.add_argument("--percdamp", default=.01, type=float)
+parser.add_argument("--nsamples", default=128, type=int)
+parser.add_argument("--pad-max-length", default=2048, type=int)
+parser.add_argument("--use-max-length", default=False, type=bool)
+parser.add_argument("--compression-dtype", default=torch.int32)
+parser.add_argument("--compression-dim", default=1, type=int)
+parser.add_argument("--scale-dtype", default=torch.float16)
 args = parser.parse_args()
 
 
@@ -165,62 +172,8 @@ calib_dataloader = DataLoader(
     collate_fn=calib_evaluator.collate_batch,
 )
 
-def calib_func(prepared_model):
-    for i, calib_input in enumerate(calib_dataloader):
-        if i > args.calib_iters:
-            break
-        prepared_model(calib_input[0])
-
-recipes = {}
-eval_func = None
-from neural_compressor import PostTrainingQuantConfig, quantization
-# specify the op_type_dict and op_name_dict
-op_type_dict = {
-    '.*': {  # re.match
-        "weight": {
-            'bits': 4,  # only support 4-bit for now
-            'group_size': args.group_size,
-            'scheme': 'asym',  # only support asym for now
-            'algorithm': 'GPTQ',  # RTN/AWQ/TEQ
-        },
-    },
-}
-op_name_dict = {
-    'lm_head': {"weight": {'dtype': 'fp32'}, },
-    'embed_out': {"weight": {'dtype': 'fp32'}, },  # for dolly_v2
-}
-recipes["rtn_args"] = {
-    "enable_mse_search": False,
-    "enable_full_range": False,
-}
-recipes['gptq_args'] = {
-    'percdamp': .01,
-    'act_order': False,
-    'block_size': 128,
-    'nsamples': 128,
-    'use_max_length': False
-}
-
-conf = PostTrainingQuantConfig(
-    approach='weight_only',
-    op_type_dict=op_type_dict,
-    op_name_dict=op_name_dict,
-    recipes=recipes,
-)
-
-q_model = quantization.fit(
-    user_model,
-    conf,
-    calib_dataloader=calib_dataloader,
-    calib_func=calib_func,
-    eval_func=eval_func,
-)
-compressed_model = q_model.export_compressed_model(
-    compression_dtype=torch.int32,
-    compression_dim=1,
-    scale_dtype=torch.float16,
-)
-Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-output_file_name = f"gptq_checkpoint_g{args.group_size}.pt"
-torch.save(compressed_model.state_dict(), args.output_dir + "/" + output_file_name)
-print('\n Checkpoint saved to', args.output_dir + "/" + output_file_name + "\n")
+compressed_model = ipex.quantization.gptq(  
+                        model=user_model,
+                        dataloader=calib_dataloader,
+                        group_size=args.group_size,
+                        save_dir=args.output_dir)
