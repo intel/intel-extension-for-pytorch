@@ -255,7 +255,7 @@ class NewIPEXQWENBlock(IPEXTransformerBlock):
 
         if layer_past is not None:
             # [bs*beam, seq_len, num_head, head_dim] -> [bs*beam, num_head, seq_len, head_dim]
-            layer_past = (layer_past[0].transpose(1, 2).contiguous(), layer_past[1])
+            layer_past = (layer_past[0].transpose(1, 2), layer_past[1])
 
         attn_output, present_key_value, self_attn_weights = self.attn(
             hidden_states=layernorm_output,
@@ -290,7 +290,7 @@ class NewIPEXQWENBlock(IPEXTransformerBlock):
             # present_key_value: (key, value), of shape [bs*beam, num_head, seq_len, head_dim]
             # [bs*beam, num_head, seq_len, head_dim] -> [bs*beam, seq_len, num_head, head_dim]
             present_key_value = (
-                present_key_value[0].transpose(1, 2).contiguous(),
+                present_key_value[0].transpose(1, 2),
                 present_key_value[1],
             )
             outputs += (present_key_value,)

@@ -17,10 +17,10 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         self.qkv_proj_quant = IPEXTransformerQLinear()
 
     def load_parameter(self, q_proj, k_proj, v_proj, out_proj):
-        self.q_proj_quant.weight = q_proj.qweight.byte()
-        self.k_proj_quant.weight = k_proj.qweight.byte()
-        self.v_proj_quant.weight = v_proj.qweight.byte()
-        self.out_proj_quant.weight = out_proj.qweight.byte()
+        self.q_proj_quant.weight = q_proj.qweight
+        self.k_proj_quant.weight = k_proj.qweight
+        self.v_proj_quant.weight = v_proj.qweight
+        self.out_proj_quant.weight = out_proj.qweight
         # print("self.q_proj_quant.weight dtype: ", self.q_proj_quant.weight.dtype)
 
         self.q_proj_quant.scale = q_proj.scales
@@ -31,10 +31,10 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         has_qzeros = hasattr(q_proj, "qzeros")
         # q, k, v, out should have the same attributes
         if has_qzeros:
-            self.q_proj_quant.zp = q_proj.qzeros.byte()
-            self.k_proj_quant.zp = k_proj.qzeros.byte()
-            self.v_proj_quant.zp = v_proj.qzeros.byte()
-            self.out_proj_quant.zp = out_proj.qzeros.byte()
+            self.q_proj_quant.zp = q_proj.qzeros
+            self.k_proj_quant.zp = k_proj.qzeros
+            self.v_proj_quant.zp = v_proj.qzeros
+            self.out_proj_quant.zp = out_proj.qzeros
             # print("self.q_proj_quant.zp dtype: ", self.q_proj_quant.zp.dtype)
 
         self.q_proj_quant.bias = q_proj.bias
