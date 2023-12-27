@@ -2845,40 +2845,6 @@ Tensor convolution_pointwise(
       algorithm);
 }
 
-Tensor convolution_pointwise_meta(
-    const Tensor& input_t,
-    const Tensor& weight_t,
-    const c10::optional<Tensor>& bias_opt,
-    IntArrayRef padding,
-    IntArrayRef stride,
-    IntArrayRef dilation,
-    int64_t groups,
-    c10::string_view attr,
-    torch::List<c10::optional<at::Scalar>> scalars,
-    c10::optional<c10::string_view> algorithm) {
-  // oneDNN supports padding the two sides of src with different values
-  // the padding order should be front_top_left and back_bottom_right
-  auto padding_front_top_left = padding.vec();
-  auto padding_back_bottom_right = padding.vec();
-
-  auto k = weight_t.ndimension();
-  if (k == input_t.ndimension() + 1) {
-    k = input_t.ndimension();
-  }
-  int64_t dim = k - 2;
-
-  auto dst_tz = conv_dst_tz(
-      input_t.ndimension(),
-      input_t.sizes(),
-      weight_t.sizes(),
-      padding,
-      padding,
-      stride,
-      dilation);
-  Tensor output = at::empty(dst_tz, input_t.options());
-  return output;
-}
-
 Tensor convolution_pointwise_binary(
     const Tensor& input_t,
     Tensor& other_t,
@@ -3079,10 +3045,6 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       TORCH_SELECTIVE_NAME("torch_ipex::_convolution_pointwise_.binary"),
       c10::DispatchKey::XPU,
       TORCH_FN(at::AtenIpexTypeXPU::convolution_pointwise_binary_));
-  m.impl(
-      TORCH_SELECTIVE_NAME("torch_ipex::_convolution_pointwise"),
-      c10::DispatchKey::Meta,
-      TORCH_FN(at::AtenIpexTypeXPU::convolution_pointwise_meta));
 }
 
 } // namespace AtenIpexTypeXPU

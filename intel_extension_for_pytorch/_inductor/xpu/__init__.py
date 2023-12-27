@@ -6,6 +6,7 @@ from .codegen.wrapper import XPUTritonWrapperCodeGen
 
 from .lowering import *
 from .fx_passes.fusion import *
+from ._meta_registrations import *
 
 if torch.xpu.is_available():
     override_size_asserts()

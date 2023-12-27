@@ -80,21 +80,22 @@ class TestTorchMethod(TestCase):
         called = False
         device = dpcpp_device
         for unary_fn in unary_list:
-            # device=cpu_device
-            model = M(
-                3, 3, unary_fn, kernel_size=3, stride=1, padding=1, bias=False
-            ).to(device)
+            for dynam in [True, False]:
+                # device=cpu_device
+                model = M(
+                    3, 3, unary_fn, kernel_size=3, stride=1, padding=1, bias=False
+                ).to(device)
 
-            model.eval()
-            with torch.no_grad():
-                # with torch.xpu.onednn_verbose(2):
-                run = torch.compile(model, backend="inductor")
-                torch.manual_seed(0)
-                example_input = torch.randn(1, 3, 72, 72).to(device)
-                actual = run(example_input)
+                model.eval()
+                with torch.no_grad():
+                    # with torch.xpu.onednn_verbose(2):
+                    run = torch.compile(model, backend="inductor", dynamic=dynam)
+                    torch.manual_seed(0)
+                    example_input = torch.randn(1, 3, 72, 72).to(device)
 
-                ref = model(example_input)
-                self.assertEqual(ref, actual)
+                    actual = run(example_input)
+                    ref = model(example_input)
+                    self.assertEqual(ref, actual)
 
     @pytest.mark.skipif(
         platform.system() == "Windows" or "WSL2" in platform.uname().release,
