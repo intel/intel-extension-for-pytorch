@@ -439,6 +439,7 @@ struct GemmWint4Config {
   GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, MAX_INT, MAX_INT, 1>
 
 #define ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(gz)                       \
+  GemmWint4Config<8, 64, 8, 16, 16, gz, 8, 8, 4096, 4096, 0>,               \
   GemmWint4Config<8, 64, 8, 16, 16, gz, 8, MAX_INT, MAX_INT, MAX_INT, 0>
 // clang-format on
 
