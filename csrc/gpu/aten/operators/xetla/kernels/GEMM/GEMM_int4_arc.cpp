@@ -48,9 +48,75 @@ namespace xetla {
       const sycl::half* bias,                                                  \
       const uint32_t m,                                                        \
       const uint32_t n,                                                        \
+      const uint32_t k);                                                       \
+  template void hgemm_qkv_wint4_arc<                                           \
+      sycl::half,                                                              \
+      WG_M,                                                                    \
+      WG_N,                                                                    \
+      SG_M,                                                                    \
+      SG_N,                                                                    \
+      SG_K,                                                                    \
+      DEQUANT_S,                                                               \
+      SLM_KS,                                                                  \
+      1,                                                                       \
+      8,                                                                       \
+      3>(                                                                      \
+      sycl::queue & queue,                                                     \
+      sycl::half * out0,                                                       \
+      sycl::half * out1,                                                       \
+      sycl::half * out2,                                                       \
+      const sycl::half* a,                                                     \
+      const uint8_t* b,                                                        \
+      const uint8_t* b_zp,                                                     \
+      const sycl::half* b_scale,                                               \
+      const uint32_t m,                                                        \
+      const uint32_t n,                                                        \
+      const uint32_t k);                                                       \
+  template void hgemm_qkv_bias_wint4_arc<                                      \
+      sycl::half,                                                              \
+      WG_M,                                                                    \
+      WG_N,                                                                    \
+      SG_M,                                                                    \
+      SG_N,                                                                    \
+      SG_K,                                                                    \
+      DEQUANT_S,                                                               \
+      SLM_KS,                                                                  \
+      1,                                                                       \
+      8,                                                                       \
+      3>(                                                                      \
+      sycl::queue & queue,                                                     \
+      sycl::half * out0,                                                       \
+      sycl::half * out1,                                                       \
+      sycl::half * out2,                                                       \
+      const sycl::half* a,                                                     \
+      const uint8_t* b,                                                        \
+      const uint8_t* b_zp,                                                     \
+      const sycl::half* b_scale,                                               \
+      const sycl::half* bias,                                                  \
+      const uint32_t m,                                                        \
+      const uint32_t n,                                                        \
+      const uint32_t k);                                                       \
+  template void hgemm_silu_wint4_arc<                                          \
+      sycl::half,                                                              \
+      WG_M,                                                                    \
+      WG_N,                                                                    \
+      SG_M,                                                                    \
+      SG_N,                                                                    \
+      SG_K,                                                                    \
+      DEQUANT_S,                                                               \
+      SLM_KS,                                                                  \
+      1,                                                                       \
+      8,                                                                       \
+      3>(                                                                      \
+      sycl::queue & queue,                                                     \
+      sycl::half * out,                                                        \
+      const sycl::half* a,                                                     \
+      const uint8_t* b,                                                        \
+      const uint8_t* b_zp,                                                     \
+      const sycl::half* b_scale,                                               \
+      const uint32_t m,                                                        \
+      const uint32_t n,                                                        \
       const uint32_t k);
-
-
 
 
 // k group ARC
