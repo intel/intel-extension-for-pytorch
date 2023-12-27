@@ -22,6 +22,167 @@ using namespace xpu::oneDNN;
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
+
+template <typename scalar_t, typename accscalar_t, typename index_t>
+struct AvgPool3dBackwardOutFrameAtomicKernelFunctor {
+  void operator()(sycl::nd_item<3> item) const {
+    index_t oCol = item.get_global_id()[2];
+    index_t oRow = item.get_global_id()[1];
+    index_t oFrame = (item.get_group(0) + offsetZ) % osize1;
+    index_t slice = (item.get_group(0) + offsetZ) / osize1;
+
+    if (oRow < osize2 && oCol < osize3) {
+      index_t tstart = oFrame * dT - padT;
+      index_t hstart = oRow * dH - padH;
+      index_t wstart = oCol * dW - padW;
+      index_t tend = Numerics<index_t>::min(tstart + kT, isize1 + padT);
+      index_t hend = Numerics<index_t>::min(hstart + kH, isize2 + padH);
+      index_t wend = Numerics<index_t>::min(wstart + kW, isize3 + padW);
+      index_t pool_size = (tend - tstart) * (hend - hstart) * (wend - wstart);
+      tstart = Numerics<index_t>::max(tstart, 0);
+      hstart = Numerics<index_t>::max(hstart, 0);
+      wstart = Numerics<index_t>::max(wstart, 0);
+      tend = Numerics<index_t>::min(tend, isize1);
+      hend = Numerics<index_t>::min(hend, isize2);
+      wend = Numerics<index_t>::min(wend, isize3);
+
+      accscalar_t divide_factor;
+      if (divisor_override) {
+        divide_factor = static_cast<accscalar_t>(divisor_override);
+      } else {
+        if (count_include_pad) {
+          divide_factor = static_cast<accscalar_t>(pool_size);
+        } else {
+          divide_factor = static_cast<accscalar_t>(
+              (tend - tstart) * (hend - hstart) * (wend - wstart));
+        }
+      }
+
+      scalar_t val = static_cast<scalar_t>(
+          static_cast<accscalar_t>(grad_output_ptr
+                                       [slice * ostride0 + oFrame * ostride1 +
+                                        oRow * ostride2 + oCol * ostride3]) /
+          divide_factor);
+
+      for (index_t iFrame = tstart; iFrame < tend; ++iFrame) {
+        for (index_t iRow = hstart; iRow < hend; ++iRow) {
+          for (index_t iCol = wstart; iCol < wend; ++iCol) {
+            const index_t index = slice * istride0 + iFrame * istride1 +
+                iRow * istride2 + iCol * istride3;
+            atomicAdd(
+                (dpcpp_global_ptr_pt<scalar_t>)&grad_input_ptr[index], val);
+          }
+        }
+      }
+    }
+  }
+  AvgPool3dBackwardOutFrameAtomicKernelFunctor(
+      int kT_,
+      int kH_,
+      int kW_,
+      int dT_,
+      int dH_,
+      int dW_,
+      int padT_,
+      int padH_,
+      int padW_,
+      bool count_include_pad_,
+      int offsetZ_,
+      int totalZ_,
+      int divisor_override_,
+      index_t ostride0_,
+      index_t ostride1_,
+      index_t ostride2_,
+      index_t ostride3_,
+      index_t istride0_,
+      index_t istride1_,
+      index_t istride2_,
+      index_t istride3_,
+      index_t width_group_size_,
+      index_t height_group_size_,
+      index_t width_group_range_,
+      index_t height_group_range_,
+      index_t z_group_range_,
+      scalar_t* grad_output_ptr_,
+      scalar_t* grad_input_ptr_,
+      index_t osize1_,
+      index_t osize2_,
+      index_t osize3_,
+      index_t isize1_,
+      index_t isize2_,
+      index_t isize3_)
+      : kT(kT_),
+        kH(kH_),
+        kW(kW_),
+        dT(dT_),
+        dH(dH_),
+        dW(dW_),
+        padT(padT_),
+        padH(padH_),
+        padW(padW_),
+        count_include_pad(count_include_pad_),
+        offsetZ(offsetZ_),
+        totalZ(totalZ_),
+        divisor_override(divisor_override_),
+        ostride0(ostride0_),
+        ostride1(ostride1_),
+        ostride2(ostride2_),
+        ostride3(ostride3_),
+        istride0(istride0_),
+        istride1(istride1_),
+        istride2(istride2_),
+        istride3(istride3_),
+        width_group_size(width_group_size_),
+        height_group_size(height_group_size_),
+        width_group_range(width_group_range_),
+        height_group_range(height_group_range_),
+        z_group_range(z_group_range_),
+        grad_output_ptr(grad_output_ptr_),
+        grad_input_ptr(grad_input_ptr_),
+        osize1(osize1_),
+        osize2(osize2_),
+        osize3(osize3_),
+        isize1(isize1_),
+        isize2(isize2_),
+        isize3(isize3_) {}
+
+ private:
+  int kT;
+  int kH;
+  int kW;
+  int dT;
+  int dH;
+  int dW;
+  int padT;
+  int padH;
+  int padW;
+  bool count_include_pad;
+  int offsetZ;
+  int totalZ;
+  int divisor_override;
+  index_t ostride0;
+  index_t ostride1;
+  index_t ostride2;
+  index_t ostride3;
+  index_t istride0;
+  index_t istride1;
+  index_t istride2;
+  index_t istride3;
+  index_t width_group_size;
+  index_t height_group_size;
+  index_t width_group_range;
+  index_t height_group_range;
+  index_t z_group_range;
+  scalar_t* grad_output_ptr;
+  scalar_t* grad_input_ptr;
+  index_t osize1;
+  index_t osize2;
+  index_t osize3;
+  index_t isize1;
+  index_t isize2;
+  index_t isize3;
+};
+
 template <typename scalar_t, typename accscalar_t, typename index_t>
 void avg_pool3d_backward_out_frame_atomic(
     const Tensor& grad_output,
@@ -71,57 +232,41 @@ void avg_pool3d_backward_out_frame_atomic(
   index_t isize3 = grad_input.size(3);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
-      index_t oCol = item.get_global_id()[2];
-      index_t oRow = item.get_global_id()[1];
-      index_t oFrame = (item.get_group(0) + offsetZ) % osize1;
-      index_t slice = (item.get_group(0) + offsetZ) / osize1;
-
-      if (oRow < osize2 && oCol < osize3) {
-        index_t tstart = oFrame * dT - padT;
-        index_t hstart = oRow * dH - padH;
-        index_t wstart = oCol * dW - padW;
-        index_t tend = Numerics<index_t>::min(tstart + kT, isize1 + padT);
-        index_t hend = Numerics<index_t>::min(hstart + kH, isize2 + padH);
-        index_t wend = Numerics<index_t>::min(wstart + kW, isize3 + padW);
-        index_t pool_size = (tend - tstart) * (hend - hstart) * (wend - wstart);
-        tstart = Numerics<index_t>::max(tstart, 0);
-        hstart = Numerics<index_t>::max(hstart, 0);
-        wstart = Numerics<index_t>::max(wstart, 0);
-        tend = Numerics<index_t>::min(tend, isize1);
-        hend = Numerics<index_t>::min(hend, isize2);
-        wend = Numerics<index_t>::min(wend, isize3);
-
-        accscalar_t divide_factor;
-        if (divisor_override) {
-          divide_factor = static_cast<accscalar_t>(divisor_override);
-        } else {
-          if (count_include_pad) {
-            divide_factor = static_cast<accscalar_t>(pool_size);
-          } else {
-            divide_factor = static_cast<accscalar_t>(
-                (tend - tstart) * (hend - hstart) * (wend - wstart));
-          }
-        }
-
-        scalar_t val = static_cast<scalar_t>(
-            static_cast<accscalar_t>(grad_output_ptr
-                                         [slice * ostride0 + oFrame * ostride1 +
-                                          oRow * ostride2 + oCol * ostride3]) /
-            divide_factor);
-
-        for (index_t iFrame = tstart; iFrame < tend; ++iFrame) {
-          for (index_t iRow = hstart; iRow < hend; ++iRow) {
-            for (index_t iCol = wstart; iCol < wend; ++iCol) {
-              const index_t index = slice * istride0 + iFrame * istride1 +
-                  iRow * istride2 + iCol * istride3;
-              atomicAdd(
-                  (dpcpp_global_ptr_pt<scalar_t>)&grad_input_ptr[index], val);
-            }
-          }
-        }
-      }
-    };
+    AvgPool3dBackwardOutFrameAtomicKernelFunctor<scalar_t, accscalar_t, index_t>
+        kfn(kT,
+            kH,
+            kW,
+            dT,
+            dH,
+            dW,
+            padT,
+            padH,
+            padW,
+            count_include_pad,
+            offsetZ,
+            totalZ,
+            divisor_override,
+            ostride0,
+            ostride1,
+            ostride2,
+            ostride3,
+            istride0,
+            istride1,
+            istride2,
+            istride3,
+            width_group_size,
+            height_group_size,
+            width_group_range,
+            height_group_range,
+            z_group_range,
+            grad_output_ptr,
+            grad_input_ptr,
+            osize1,
+            osize2,
+            osize3,
+            isize1,
+            isize2,
+            isize3);
 
     cgh.parallel_for(
         sycl::nd_range<3>(
@@ -136,6 +281,132 @@ void avg_pool3d_backward_out_frame_atomic(
 
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
 }
+
+template <typename scalar_t, typename accscalar_t, typename index_t>
+struct AvgPool3dBackwardOutFrameStride1KernelFunctor {
+  void operator()(sycl::nd_item<3> item) const {
+    index_t iCol = item.get_global_id()[2];
+    index_t iRow = item.get_global_id()[1];
+    index_t iFrame = (item.get_group(0) + offsetZ) % isize1;
+    index_t slice = (item.get_group(0) + offsetZ) / isize1;
+
+    if (iRow < isize2 && iCol < isize3) {
+      accscalar_t sum = 0.0;
+      scalar_t* gOut =
+          &grad_output_ptr
+              [slice * ostride0 +
+               Numerics<index_t>::max(0, iFrame - kT + 1) * ostride1 +
+               Numerics<index_t>::max(0, iRow - kH + 1) * ostride2 +
+               Numerics<index_t>::max(0, iCol - kW + 1) * ostride3];
+      index_t frameOffset = 0;
+      for (index_t oFrame = Numerics<index_t>::max(0, iFrame - kT + 1);
+           oFrame < Numerics<index_t>::min(iFrame + 1, osize1);
+           ++oFrame) {
+        index_t rowOffset = frameOffset;
+        for (index_t oRow = Numerics<index_t>::max(0, iRow - kH + 1);
+             oRow < Numerics<index_t>::min(iRow + 1, osize2);
+             ++oRow) {
+          index_t colOffset = rowOffset;
+          for (index_t oCol = Numerics<index_t>::max(0, iCol - kW + 1);
+               oCol < Numerics<index_t>::min(iCol + 1, osize3);
+               ++oCol) {
+            sum += gOut[colOffset];
+            ++colOffset;
+          }
+          rowOffset += osize3;
+        }
+        frameOffset += osize2 * osize3;
+      }
+      grad_input_ptr
+          [slice * istride0 + iFrame * istride1 + iRow * istride2 +
+           iCol * istride3] = static_cast<scalar_t>(sum * normFactor);
+    }
+  }
+  AvgPool3dBackwardOutFrameStride1KernelFunctor(
+      int kT_,
+      int kH_,
+      int kW_,
+      accscalar_t normFactor_,
+      int offsetZ_,
+      int totalZ_,
+      index_t ostride0_,
+      index_t ostride1_,
+      index_t ostride2_,
+      index_t ostride3_,
+      index_t istride0_,
+      index_t istride1_,
+      index_t istride2_,
+      index_t istride3_,
+      index_t width_group_size_,
+      index_t height_group_size_,
+      index_t width_group_range_,
+      index_t height_group_range_,
+      index_t z_group_range_,
+      scalar_t* grad_output_ptr_,
+      scalar_t* grad_input_ptr_,
+      index_t osize1_,
+      index_t osize2_,
+      index_t osize3_,
+      index_t isize1_,
+      index_t isize2_,
+      index_t isize3_)
+      : kT(kT_),
+        kH(kH_),
+        kW(kW_),
+        normFactor(normFactor_),
+        offsetZ(offsetZ_),
+        totalZ(totalZ_),
+        ostride0(ostride0_),
+        ostride1(ostride1_),
+        ostride2(ostride2_),
+        ostride3(ostride3_),
+        istride0(istride0_),
+        istride1(istride1_),
+        istride2(istride2_),
+        istride3(istride3_),
+        width_group_size(width_group_size_),
+        height_group_size(height_group_size_),
+        width_group_range(width_group_range_),
+        height_group_range(height_group_range_),
+        z_group_range(z_group_range_),
+        grad_output_ptr(grad_output_ptr_),
+        grad_input_ptr(grad_input_ptr_),
+        osize1(osize1_),
+        osize2(osize2_),
+        osize3(osize3_),
+        isize1(isize1_),
+        isize2(isize2_),
+        isize3(isize3_) {}
+
+ private:
+  int kT;
+  int kH;
+  int kW;
+  accscalar_t normFactor;
+  int offsetZ;
+  int totalZ;
+  index_t ostride0;
+  index_t ostride1;
+  index_t ostride2;
+  index_t ostride3;
+  index_t istride0;
+  index_t istride1;
+  index_t istride2;
+  index_t istride3;
+  index_t width_group_size;
+  index_t height_group_size;
+  index_t width_group_range;
+  index_t height_group_range;
+  index_t z_group_range;
+  scalar_t* grad_output_ptr;
+  scalar_t* grad_input_ptr;
+  index_t osize1;
+  index_t osize2;
+  index_t osize3;
+  index_t isize1;
+  index_t isize2;
+  index_t isize3;
+};
 
 template <typename scalar_t, typename accscalar_t, typename index_t>
 void avg_pool3d_backward_out_frame_stride1(
@@ -178,44 +449,37 @@ void avg_pool3d_backward_out_frame_stride1(
   index_t isize2 = grad_input.size(2);
   index_t isize3 = grad_input.size(3);
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
-      index_t iCol = item.get_global_id()[2];
-      index_t iRow = item.get_global_id()[1];
-      index_t iFrame = (item.get_group(0) + offsetZ) % isize1;
-      index_t slice = (item.get_group(0) + offsetZ) / isize1;
-
-      if (iRow < isize2 && iCol < isize3) {
-        accscalar_t sum = 0.0;
-        scalar_t* gOut =
-            &grad_output_ptr
-                [slice * ostride0 +
-                 Numerics<index_t>::max(0, iFrame - kT + 1) * ostride1 +
-                 Numerics<index_t>::max(0, iRow - kH + 1) * ostride2 +
-                 Numerics<index_t>::max(0, iCol - kW + 1) * ostride3];
-        index_t frameOffset = 0;
-        for (index_t oFrame = Numerics<index_t>::max(0, iFrame - kT + 1);
-             oFrame < Numerics<index_t>::min(iFrame + 1, osize1);
-             ++oFrame) {
-          index_t rowOffset = frameOffset;
-          for (index_t oRow = Numerics<index_t>::max(0, iRow - kH + 1);
-               oRow < Numerics<index_t>::min(iRow + 1, osize2);
-               ++oRow) {
-            index_t colOffset = rowOffset;
-            for (index_t oCol = Numerics<index_t>::max(0, iCol - kW + 1);
-                 oCol < Numerics<index_t>::min(iCol + 1, osize3);
-                 ++oCol) {
-              sum += gOut[colOffset];
-              ++colOffset;
-            }
-            rowOffset += osize3;
-          }
-          frameOffset += osize2 * osize3;
-        }
-        grad_input_ptr
-            [slice * istride0 + iFrame * istride1 + iRow * istride2 +
-             iCol * istride3] = static_cast<scalar_t>(sum * normFactor);
-      }
-    };
+    AvgPool3dBackwardOutFrameStride1KernelFunctor<
+        scalar_t,
+        accscalar_t,
+        index_t>
+        kfn(kT,
+            kH,
+            kW,
+            normFactor,
+            offsetZ,
+            totalZ,
+            ostride0,
+            ostride1,
+            ostride2,
+            ostride3,
+            istride0,
+            istride1,
+            istride2,
+            istride3,
+            width_group_size,
+            height_group_size,
+            width_group_range,
+            height_group_range,
+            z_group_range,
+            grad_output_ptr,
+            grad_input_ptr,
+            osize1,
+            osize2,
+            osize3,
+            isize1,
+            isize2,
+            isize3);
 
     cgh.parallel_for(
         sycl::nd_range<3>(
@@ -230,6 +494,164 @@ void avg_pool3d_backward_out_frame_stride1(
 
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
 }
+
+template <typename scalar_t, typename accscalar_t, typename index_t>
+struct AvgPool3dBackwardOutFrameKernelFunctor {
+  void operator()(sycl::nd_item<3> item) const {
+    index_t oCol = item.get_global_id()[2];
+    index_t oRow = item.get_global_id()[1];
+    index_t oFrame = (item.get_group(0) + offsetZ) % osize1;
+    index_t slice = (item.get_group(0) + offsetZ) / osize1;
+
+    if (oRow < osize2 && oCol < osize3) {
+      index_t tstart = oFrame * dT - padT;
+      index_t hstart = oRow * dH - padH;
+      index_t wstart = oCol * dW - padW;
+      index_t tend = Numerics<index_t>::min(tstart + kT, isize1 + padT);
+      index_t hend = Numerics<index_t>::min(hstart + kH, isize2 + padH);
+      index_t wend = Numerics<index_t>::min(wstart + kW, isize3 + padW);
+      index_t pool_size = (tend - tstart) * (hend - hstart) * (wend - wstart);
+      tstart = Numerics<index_t>::max(tstart, 0);
+      hstart = Numerics<index_t>::max(hstart, 0);
+      wstart = Numerics<index_t>::max(wstart, 0);
+      tend = Numerics<index_t>::min(tend, isize1);
+      hend = Numerics<index_t>::min(hend, isize2);
+      wend = Numerics<index_t>::min(wend, isize3);
+
+      accscalar_t divide_factor;
+      if (divisor_override) {
+        divide_factor = static_cast<accscalar_t>(divisor_override);
+      } else {
+        if (count_include_pad) {
+          divide_factor = static_cast<accscalar_t>(pool_size);
+        } else {
+          divide_factor = static_cast<accscalar_t>(
+              (tend - tstart) * (hend - hstart) * (wend - wstart));
+        }
+      }
+
+      scalar_t val = static_cast<scalar_t>(
+          static_cast<accscalar_t>(grad_output_ptr
+                                       [slice * ostride0 + oFrame * ostride1 +
+                                        oRow * ostride2 + oCol * ostride3]) /
+          divide_factor);
+      for (index_t iFrame = tstart; iFrame < tend; ++iFrame) {
+        for (index_t iRow = hstart; iRow < hend; ++iRow) {
+          for (index_t iCol = wstart; iCol < wend; ++iCol) {
+            grad_input_ptr
+                [slice * istride0 + iFrame * istride1 + iRow * istride2 +
+                 iCol * istride3] = val;
+          }
+        }
+      }
+    }
+  }
+  AvgPool3dBackwardOutFrameKernelFunctor(
+      int kT_,
+      int kH_,
+      int kW_,
+      int dT_,
+      int dH_,
+      int dW_,
+      int padT_,
+      int padH_,
+      int padW_,
+      bool count_include_pad_,
+      int offsetZ_,
+      int totalZ_,
+      int divisor_override_,
+      index_t ostride0_,
+      index_t ostride1_,
+      index_t ostride2_,
+      index_t ostride3_,
+      index_t istride0_,
+      index_t istride1_,
+      index_t istride2_,
+      index_t istride3_,
+      index_t width_group_size_,
+      index_t height_group_size_,
+      index_t width_group_range_,
+      index_t height_group_range_,
+      index_t z_group_range_,
+      scalar_t* grad_output_ptr_,
+      scalar_t* grad_input_ptr_,
+      index_t osize1_,
+      index_t osize2_,
+      index_t osize3_,
+      index_t isize1_,
+      index_t isize2_,
+      index_t isize3_)
+      : kT(kT_),
+        kH(kH_),
+        kW(kW_),
+        dT(dT_),
+        dH(dH_),
+        dW(dW_),
+        padT(padT_),
+        padH(padH_),
+        padW(padW_),
+        count_include_pad(count_include_pad_),
+        offsetZ(offsetZ_),
+        totalZ(totalZ_),
+        divisor_override(divisor_override_),
+        ostride0(ostride0_),
+        ostride1(ostride1_),
+        ostride2(ostride2_),
+        ostride3(ostride3_),
+        istride0(istride0_),
+        istride1(istride1_),
+        istride2(istride2_),
+        istride3(istride3_),
+        width_group_size(width_group_size_),
+        height_group_size(height_group_size_),
+        width_group_range(width_group_range_),
+        height_group_range(height_group_range_),
+        z_group_range(z_group_range_),
+        grad_output_ptr(grad_output_ptr_),
+        grad_input_ptr(grad_input_ptr_),
+        osize1(osize1_),
+        osize2(osize2_),
+        osize3(osize3_),
+        isize1(isize1_),
+        isize2(isize2_),
+        isize3(isize3_) {}
+
+ private:
+  int kT;
+  int kH;
+  int kW;
+  int dT;
+  int dH;
+  int dW;
+  int padT;
+  int padH;
+  int padW;
+  bool count_include_pad;
+  int offsetZ;
+  int totalZ;
+  int divisor_override;
+  index_t ostride0;
+  index_t ostride1;
+  index_t ostride2;
+  index_t ostride3;
+  index_t istride0;
+  index_t istride1;
+  index_t istride2;
+  index_t istride3;
+  index_t width_group_size;
+  index_t height_group_size;
+  index_t width_group_range;
+  index_t height_group_range;
+  index_t z_group_range;
+  scalar_t* grad_output_ptr;
+  scalar_t* grad_input_ptr;
+  index_t osize1;
+  index_t osize2;
+  index_t osize3;
+  index_t isize1;
+  index_t isize2;
+  index_t isize3;
+};
 
 template <typename scalar_t, typename accscalar_t, typename index_t>
 void avg_pool3d_backward_out_frame(
@@ -279,55 +701,41 @@ void avg_pool3d_backward_out_frame(
   index_t isize2 = grad_input.size(2);
   index_t isize3 = grad_input.size(3);
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
-      index_t oCol = item.get_global_id()[2];
-      index_t oRow = item.get_global_id()[1];
-      index_t oFrame = (item.get_group(0) + offsetZ) % osize1;
-      index_t slice = (item.get_group(0) + offsetZ) / osize1;
-
-      if (oRow < osize2 && oCol < osize3) {
-        index_t tstart = oFrame * dT - padT;
-        index_t hstart = oRow * dH - padH;
-        index_t wstart = oCol * dW - padW;
-        index_t tend = Numerics<index_t>::min(tstart + kT, isize1 + padT);
-        index_t hend = Numerics<index_t>::min(hstart + kH, isize2 + padH);
-        index_t wend = Numerics<index_t>::min(wstart + kW, isize3 + padW);
-        index_t pool_size = (tend - tstart) * (hend - hstart) * (wend - wstart);
-        tstart = Numerics<index_t>::max(tstart, 0);
-        hstart = Numerics<index_t>::max(hstart, 0);
-        wstart = Numerics<index_t>::max(wstart, 0);
-        tend = Numerics<index_t>::min(tend, isize1);
-        hend = Numerics<index_t>::min(hend, isize2);
-        wend = Numerics<index_t>::min(wend, isize3);
-
-        accscalar_t divide_factor;
-        if (divisor_override) {
-          divide_factor = static_cast<accscalar_t>(divisor_override);
-        } else {
-          if (count_include_pad) {
-            divide_factor = static_cast<accscalar_t>(pool_size);
-          } else {
-            divide_factor = static_cast<accscalar_t>(
-                (tend - tstart) * (hend - hstart) * (wend - wstart));
-          }
-        }
-
-        scalar_t val = static_cast<scalar_t>(
-            static_cast<accscalar_t>(grad_output_ptr
-                                         [slice * ostride0 + oFrame * ostride1 +
-                                          oRow * ostride2 + oCol * ostride3]) /
-            divide_factor);
-        for (index_t iFrame = tstart; iFrame < tend; ++iFrame) {
-          for (index_t iRow = hstart; iRow < hend; ++iRow) {
-            for (index_t iCol = wstart; iCol < wend; ++iCol) {
-              grad_input_ptr
-                  [slice * istride0 + iFrame * istride1 + iRow * istride2 +
-                   iCol * istride3] = val;
-            }
-          }
-        }
-      }
-    };
+    AvgPool3dBackwardOutFrameKernelFunctor<scalar_t, accscalar_t, index_t> kfn(
+        kT,
+        kH,
+        kW,
+        dT,
+        dH,
+        dW,
+        padT,
+        padH,
+        padW,
+        count_include_pad,
+        offsetZ,
+        totalZ,
+        divisor_override,
+        ostride0,
+        ostride1,
+        ostride2,
+        ostride3,
+        istride0,
+        istride1,
+        istride2,
+        istride3,
+        width_group_size,
+        height_group_size,
+        width_group_range,
+        height_group_range,
+        z_group_range,
+        grad_output_ptr,
+        grad_input_ptr,
+        osize1,
+        osize2,
+        osize3,
+        isize1,
+        isize2,
+        isize3);
 
     cgh.parallel_for(
         sycl::nd_range<3>(
@@ -342,6 +750,174 @@ void avg_pool3d_backward_out_frame(
 
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
 }
+
+template <typename scalar_t, typename accscalar_t, typename index_t>
+struct AvgPool3dOutFrameKernelFunctor {
+  void operator()(sycl::nd_item<3> item) const {
+    index_t oCol = item.get_global_id()[2];
+    index_t oRow = item.get_global_id()[1];
+    index_t oFrame = (item.get_group(0) + offsetZ) % oDepth;
+    index_t slice = (item.get_group(0) + offsetZ) / oDepth;
+
+    if (oRow < oHeight && oCol < oWidth) {
+      accscalar_t sum = 0.0f;
+
+      index_t tstart = oFrame * dT - padT;
+      index_t hstart = oRow * dH - padH;
+      index_t wstart = oCol * dW - padW;
+      index_t tend = Numerics<index_t>::min(tstart + kT, iDepth + padT);
+      index_t hend = Numerics<index_t>::min(hstart + kH, iHeight + padH);
+      index_t wend = Numerics<index_t>::min(wstart + kW, iWidth + padW);
+      index_t pool_size = (tend - tstart) * (hend - hstart) * (wend - wstart);
+
+      tstart = Numerics<index_t>::max(tstart, 0);
+      hstart = Numerics<index_t>::max(hstart, 0);
+      wstart = Numerics<index_t>::max(wstart, 0);
+      tend = Numerics<index_t>::min(tend, iDepth);
+      hend = Numerics<index_t>::min(hend, iHeight);
+      wend = Numerics<index_t>::min(wend, iWidth);
+
+      if (tstart >= tend || hstart >= hend || wstart >= wend) {
+        output
+            [oCol * ostride3 + oRow * ostride2 + oFrame * ostride1 +
+             slice * ostride0] = 0.0f;
+        return;
+      }
+
+      accscalar_t divide_factor;
+      if (divisor_override) {
+        divide_factor = static_cast<accscalar_t>(divisor_override);
+      } else {
+        if (count_include_pad) {
+          divide_factor = static_cast<accscalar_t>(pool_size);
+        } else {
+          divide_factor = static_cast<accscalar_t>(
+              (tend - tstart) * (hend - hstart) * (wend - wstart));
+        }
+      }
+
+      index_t ti, hi, wi;
+      for (ti = tstart; ti < tend; ++ti) {
+        for (hi = hstart; hi < hend; ++hi) {
+          for (wi = wstart; wi < wend; ++wi) {
+            scalar_t val = input
+                [wi * istride3 + hi * istride2 + ti * istride1 +
+                 slice * istride0];
+            sum += val;
+          }
+        }
+      }
+      output
+          [oCol * ostride3 + oRow * ostride2 + oFrame * ostride1 +
+           slice * ostride0] = static_cast<scalar_t>(sum / divide_factor);
+    }
+  }
+  AvgPool3dOutFrameKernelFunctor(
+      int kT_,
+      int kH_,
+      int kW_,
+      int dT_,
+      int dH_,
+      int dW_,
+      int padT_,
+      int padH_,
+      int padW_,
+      bool count_include_pad_,
+      int offsetZ_,
+      int totalZ_,
+      int divisor_override_,
+      index_t oWidth_,
+      index_t oHeight_,
+      index_t oDepth_,
+      index_t iWidth_,
+      index_t iHeight_,
+      index_t iDepth_,
+      index_t ostride0_,
+      index_t ostride1_,
+      index_t ostride2_,
+      index_t ostride3_,
+      index_t istride0_,
+      index_t istride1_,
+      index_t istride2_,
+      index_t istride3_,
+      index_t width_group_size_,
+      index_t height_group_size_,
+      index_t width_group_range_,
+      index_t height_group_range_,
+      index_t z_group_range_,
+      scalar_t* input_,
+      scalar_t* output_)
+      : kT(kT_),
+        kH(kH_),
+        kW(kW_),
+        dT(dT_),
+        dH(dH_),
+        dW(dW_),
+        padT(padT_),
+        padH(padH_),
+        padW(padW_),
+        count_include_pad(count_include_pad_),
+        offsetZ(offsetZ_),
+        totalZ(totalZ_),
+        divisor_override(divisor_override_),
+        oWidth(oWidth_),
+        oHeight(oHeight_),
+        oDepth(oDepth_),
+        iWidth(iWidth_),
+        iHeight(iHeight_),
+        iDepth(iDepth_),
+        ostride0(ostride0_),
+        ostride1(ostride1_),
+        ostride2(ostride2_),
+        ostride3(ostride3_),
+        istride0(istride0_),
+        istride1(istride1_),
+        istride2(istride2_),
+        istride3(istride3_),
+        width_group_size(width_group_size_),
+        height_group_size(height_group_size_),
+        width_group_range(width_group_range_),
+        height_group_range(height_group_range_),
+        z_group_range(z_group_range_),
+        input(input_),
+        output(output_) {}
+
+ private:
+  int kT;
+  int kH;
+  int kW;
+  int dT;
+  int dH;
+  int dW;
+  int padT;
+  int padH;
+  int padW;
+  bool count_include_pad;
+  int offsetZ;
+  int totalZ;
+  int divisor_override;
+  index_t oWidth;
+  index_t oHeight;
+  index_t oDepth;
+  index_t iWidth;
+  index_t iHeight;
+  index_t iDepth;
+  index_t ostride0;
+  index_t ostride1;
+  index_t ostride2;
+  index_t ostride3;
+  index_t istride0;
+  index_t istride1;
+  index_t istride2;
+  index_t istride3;
+  index_t width_group_size;
+  index_t height_group_size;
+  index_t width_group_range;
+  index_t height_group_range;
+  index_t z_group_range;
+  scalar_t* input;
+  scalar_t* output;
+};
 
 template <typename scalar_t, typename accscalar_t, typename index_t>
 void avg_pool3d_out_frame(
@@ -389,65 +965,42 @@ void avg_pool3d_out_frame(
   scalar_t* input = work_input.data_ptr<scalar_t>();
   scalar_t* output = work_output.data_ptr<scalar_t>();
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
-      index_t oCol = item.get_global_id()[2];
-      index_t oRow = item.get_global_id()[1];
-      index_t oFrame = (item.get_group(0) + offsetZ) % oDepth;
-      index_t slice = (item.get_group(0) + offsetZ) / oDepth;
+    AvgPool3dOutFrameKernelFunctor<scalar_t, accscalar_t, index_t> kfn(
+        kT,
+        kH,
+        kW,
+        dT,
+        dH,
+        dW,
+        padT,
+        padH,
+        padW,
+        count_include_pad,
+        offsetZ,
+        totalZ,
+        divisor_override,
+        oWidth,
+        oHeight,
+        oDepth,
+        iWidth,
+        iHeight,
+        iDepth,
+        ostride0,
+        ostride1,
+        ostride2,
+        ostride3,
+        istride0,
+        istride1,
+        istride2,
+        istride3,
+        width_group_size,
+        height_group_size,
+        width_group_range,
+        height_group_range,
+        z_group_range,
+        input,
+        output);
 
-      if (oRow < oHeight && oCol < oWidth) {
-        accscalar_t sum = 0.0f;
-
-        index_t tstart = oFrame * dT - padT;
-        index_t hstart = oRow * dH - padH;
-        index_t wstart = oCol * dW - padW;
-        index_t tend = Numerics<index_t>::min(tstart + kT, iDepth + padT);
-        index_t hend = Numerics<index_t>::min(hstart + kH, iHeight + padH);
-        index_t wend = Numerics<index_t>::min(wstart + kW, iWidth + padW);
-        index_t pool_size = (tend - tstart) * (hend - hstart) * (wend - wstart);
-
-        tstart = Numerics<index_t>::max(tstart, 0);
-        hstart = Numerics<index_t>::max(hstart, 0);
-        wstart = Numerics<index_t>::max(wstart, 0);
-        tend = Numerics<index_t>::min(tend, iDepth);
-        hend = Numerics<index_t>::min(hend, iHeight);
-        wend = Numerics<index_t>::min(wend, iWidth);
-
-        if (tstart >= tend || hstart >= hend || wstart >= wend) {
-          output
-              [oCol * ostride3 + oRow * ostride2 + oFrame * ostride1 +
-               slice * ostride0] = 0.0f;
-          return;
-        }
-
-        accscalar_t divide_factor;
-        if (divisor_override) {
-          divide_factor = static_cast<accscalar_t>(divisor_override);
-        } else {
-          if (count_include_pad) {
-            divide_factor = static_cast<accscalar_t>(pool_size);
-          } else {
-            divide_factor = static_cast<accscalar_t>(
-                (tend - tstart) * (hend - hstart) * (wend - wstart));
-          }
-        }
-
-        index_t ti, hi, wi;
-        for (ti = tstart; ti < tend; ++ti) {
-          for (hi = hstart; hi < hend; ++hi) {
-            for (wi = wstart; wi < wend; ++wi) {
-              scalar_t val = input
-                  [wi * istride3 + hi * istride2 + ti * istride1 +
-                   slice * istride0];
-              sum += val;
-            }
-          }
-        }
-        output
-            [oCol * ostride3 + oRow * ostride2 + oFrame * ostride1 +
-             slice * ostride0] = static_cast<scalar_t>(sum / divide_factor);
-      }
-    };
     cgh.parallel_for(
         sycl::nd_range<3>(
             sycl::range<3>{
