@@ -169,6 +169,46 @@ void _amp_foreach_non_finite_check_and_unscale_(
       });
 }
 
+struct AmpUpdateScaleKernelFunctor {
+  void operator()() const {
+    if (*found_inf) {
+      *current_scale *= backoff_factor;
+      *growth_tracker = 0;
+    } else {
+      // Entering this branch means we just carried out a successful step,
+      // so growth_tracker is incremented before comparing to growth_interval.
+      auto successful = (*growth_tracker) + 1;
+      if (successful == growth_interval) {
+        *current_scale *= growth_factor;
+        *growth_tracker = 0;
+      } else {
+        *growth_tracker = successful;
+      }
+    }
+  }
+  AmpUpdateScaleKernelFunctor(
+      float* current_scale_,
+      int* growth_tracker_,
+      float* found_inf_,
+      double growth_factor_,
+      double backoff_factor_,
+      int growth_interval_)
+      : current_scale(current_scale_),
+        growth_tracker(growth_tracker_),
+        found_inf(found_inf_),
+        growth_factor(growth_factor_),
+        backoff_factor(backoff_factor_),
+        growth_interval(growth_interval_) {}
+
+ private:
+  float* current_scale;
+  int* growth_tracker;
+  float* found_inf;
+  double growth_factor;
+  double backoff_factor;
+  int growth_interval;
+};
+
 // _amp_update_scale_kernel is launched with a single work-item to compute the
 // new scale. The scale factor is maintained and updated on the XPU
 // asynchronously.
@@ -181,23 +221,13 @@ void _amp_update_scale_kernel(
     int growth_interval) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgf) {
-    auto kfn = [=]() {
-      if (*found_inf) {
-        *current_scale *= backoff_factor;
-        *growth_tracker = 0;
-      } else {
-        // Entering this branch means we just carried out a successful step,
-        // so growth_tracker is incremented before comparing to growth_interval.
-        auto successful = (*growth_tracker) + 1;
-        if (successful == growth_interval) {
-          *current_scale *= growth_factor;
-          *growth_tracker = 0;
-        } else {
-          *growth_tracker = successful;
-        }
-      }
-    };
-
+    AmpUpdateScaleKernelFunctor kfn(
+        current_scale,
+        growth_tracker,
+        found_inf,
+        growth_factor,
+        backoff_factor,
+        growth_interval);
     cgf.single_task(kfn);
   };
 
