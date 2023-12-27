@@ -42,6 +42,179 @@ template <
     typename mean_t,
     typename weight_t,
     typename index_t,
+    typename accscalar_t,
+    typename vec_t,
+    typename weight_vec_t,
+    int Num,
+    int vec_size,
+    bool one_moment = false>
+struct FusedNormKernel1Functor {
+  [[intel::reqd_sub_group_size(SIMD)]] void operator()(
+      sycl::nd_item<1> item_id) const {
+    auto group_id = item_id.get_group(0);
+    auto local_id = item_id.get_local_id(0);
+    index_t group_offset = group_id * Plane;
+
+    vec_t X_val[Num];
+    accscalar_t sum1 = 0;
+    accscalar_t sum2 = 0;
+
+    for (int i = 0; i < Num; ++i) {
+      index_t plane_offset = (i * workgroup_size + local_id) * vec_size;
+      if (plane_offset < Plane) {
+        X_val[i] =
+            *(reinterpret_cast<vec_t*>(X_data + group_offset + plane_offset));
+
+        if (add1_data != nullptr && add2_data != nullptr) {
+          vec_t add1_val = *(reinterpret_cast<vec_t*>(
+              add1_data + group_offset + plane_offset));
+          vec_t add2_val = *(reinterpret_cast<vec_t*>(
+              add2_data + group_offset + plane_offset));
+#pragma unroll
+          for (int v = 0; v < vec_size; ++v) {
+            X_val[i][v] += add1_val[v] + add2_val[v];
+            if constexpr (!one_moment) {
+              sum1 += static_cast<accscalar_t>(X_val[i][v]);
+            }
+            sum2 += Numerics<accscalar_t>::pow(X_val[i][v], 2);
+          }
+        } else if (add1_data != nullptr) {
+          vec_t add1_val = *(reinterpret_cast<vec_t*>(
+              add1_data + group_offset + plane_offset));
+          for (int v = 0; v < vec_size; ++v) {
+            X_val[i][v] += add1_val[v];
+            if constexpr (!one_moment) {
+              sum1 += static_cast<accscalar_t>(X_val[i][v]);
+            }
+            sum2 += Numerics<accscalar_t>::pow(X_val[i][v], 2);
+          }
+
+        } else {
+#pragma unroll(vec_size)
+          for (int v = 0; v < vec_size; ++v) {
+            if constexpr (!one_moment) {
+              sum1 += static_cast<accscalar_t>(X_val[i][v]);
+            }
+            sum2 += Numerics<accscalar_t>::pow(X_val[i][v], 2);
+          }
+        }
+      }
+    }
+
+    if constexpr (one_moment) {
+      sum2 = sycl::reduce_over_group(
+          item_id.get_group(), sum2, sycl::plus<accscalar_t>());
+      if (local_id == 0) {
+        accscalar_t scale = static_cast<accscalar_t>(Plane);
+        local_sum2[0] = Numerics<accscalar_t>::rsqrt(
+            sum2 < 0 ? 0 : sum2 / scale + static_cast<accscalar_t>(eps));
+      }
+    } else {
+      norm_group_reduce<accscalar_t>(
+          item_id,
+          sub_group_num,
+          sum1,
+          sum2,
+          local_sum1,
+          local_sum2,
+          [](accscalar_t a, accscalar_t b) { return a + b; });
+      if (local_id == 0) {
+        accscalar_t scale = static_cast<accscalar_t>(Plane);
+        sum2 = (sum2 - sum1 * sum1 / scale) / scale;
+        sum1 = sum1 / scale;
+        local_sum1[0] = sum1;
+        local_sum2[0] = Numerics<accscalar_t>::rsqrt(
+            sum2 < 0 ? 0 : sum2 + static_cast<accscalar_t>(eps));
+      }
+    }
+
+    item_id.barrier();
+
+    auto mean_val = one_moment ? 0 : local_sum1[0];
+    auto var_val = local_sum2[0];
+    for (int i = 0; i < Num; ++i) {
+      index_t plane_offset = (i * workgroup_size + local_id) * vec_size;
+      if (plane_offset < Plane) {
+        weight_vec_t gamma_val, beta_val;
+        if (gamma_data != nullptr) {
+          gamma_val =
+              *(reinterpret_cast<weight_vec_t*>(gamma_data + plane_offset));
+        }
+        if (beta_data != nullptr) {
+          beta_val =
+              *(reinterpret_cast<weight_vec_t*>(beta_data + plane_offset));
+        }
+
+#pragma unroll(vec_size)
+        for (int v = 0; v < vec_size; ++v) {
+          if (gamma_data != nullptr && beta_data != nullptr) {
+            X_val[i][v] = static_cast<accscalar_t>(gamma_val[v]) *
+                    (var_val *
+                     static_cast<accscalar_t>(X_val[i][v] - mean_val)) +
+                static_cast<accscalar_t>(beta_val[v]);
+          } else if (gamma_data != nullptr) {
+            X_val[i][v] = static_cast<accscalar_t>(gamma_val[v]) *
+                (var_val * static_cast<accscalar_t>(X_val[i][v] - mean_val));
+          } else if (beta_data != nullptr) {
+            X_val[i][v] =
+                (var_val * static_cast<accscalar_t>(X_val[i][v] - mean_val)) +
+                static_cast<accscalar_t>(beta_val[v]);
+          } else {
+            X_val[i][v] =
+                (var_val * static_cast<accscalar_t>(X_val[i][v] - mean_val));
+          }
+        }
+        *(reinterpret_cast<vec_t*>(Y_data + group_offset + plane_offset)) =
+            X_val[i];
+      }
+    }
+  }
+  FusedNormKernel1Functor(
+      scalar_t* add1_data_,
+      scalar_t* add2_data_,
+      scalar_t* X_data_,
+      weight_t* gamma_data_,
+      weight_t* beta_data_,
+      scalar_t* Y_data_,
+      float eps_,
+      int Plane_,
+      int workgroup_size_,
+      int sub_group_num_,
+      dpcpp_local_acc_t<accscalar_t> local_sum1_,
+      dpcpp_local_acc_t<accscalar_t> local_sum2_)
+      : add1_data(add1_data_),
+        add2_data(add2_data_),
+        X_data(X_data_),
+        gamma_data(gamma_data_),
+        beta_data(beta_data_),
+        Y_data(Y_data_),
+        eps(eps_),
+        Plane(Plane_),
+        workgroup_size(workgroup_size_),
+        sub_group_num(sub_group_num_),
+        local_sum1(local_sum1_),
+        local_sum2(local_sum2_) {}
+
+ private:
+  scalar_t* add1_data;
+  scalar_t* add2_data;
+  scalar_t* X_data;
+  weight_t* gamma_data;
+  weight_t* beta_data;
+  scalar_t* Y_data;
+  float eps;
+  int Plane;
+  int workgroup_size;
+  int sub_group_num;
+  dpcpp_local_acc_t<accscalar_t> local_sum1;
+  dpcpp_local_acc_t<accscalar_t> local_sum2;
+};
+
+template <
+    typename scalar_t,
+    typename mean_t,
+    typename weight_t,
+    typename index_t,
     int vec_size,
     bool one_moment = false>
 void fused_norm_kernel1(
@@ -77,131 +250,33 @@ void fused_norm_kernel1(
   auto cgf = DPCPP_Q_CGF(cgh) {
     dpcpp_local_acc_t<accscalar_t> local_sum1(sub_group_num, cgh);
     dpcpp_local_acc_t<accscalar_t> local_sum2(sub_group_num, cgh);
+    FusedNormKernel1Functor<
+        scalar_t,
+        mean_t,
+        weight_t,
+        index_t,
+        accscalar_t,
+        vec_t,
+        weight_vec_t,
+        Num,
+        vec_size,
+        one_moment>
+        kfn(add1_data,
+            add2_data,
+            X_data,
+            gamma_data,
+            beta_data,
+            Y_data,
+            eps,
+            Plane,
+            workgroup_size,
+            sub_group_num,
+            local_sum1,
+            local_sum2);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
-        [=](sycl::nd_item<1> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
-          auto group_id = item_id.get_group(0);
-          auto local_id = item_id.get_local_id(0);
-          index_t group_offset = group_id * Plane;
-
-          vec_t X_val[Num];
-          accscalar_t sum1 = 0;
-          accscalar_t sum2 = 0;
-
-          for (int i = 0; i < Num; ++i) {
-            index_t plane_offset = (i * workgroup_size + local_id) * vec_size;
-            if (plane_offset < Plane) {
-              X_val[i] = *(reinterpret_cast<vec_t*>(
-                  X_data + group_offset + plane_offset));
-
-              if (add1_data != nullptr && add2_data != nullptr) {
-                vec_t add1_val = *(reinterpret_cast<vec_t*>(
-                    add1_data + group_offset + plane_offset));
-                vec_t add2_val = *(reinterpret_cast<vec_t*>(
-                    add2_data + group_offset + plane_offset));
-#pragma unroll
-                for (int v = 0; v < vec_size; ++v) {
-                  X_val[i][v] += add1_val[v] + add2_val[v];
-                  if constexpr (!one_moment) {
-                    sum1 += static_cast<accscalar_t>(X_val[i][v]);
-                  }
-                  sum2 += Numerics<accscalar_t>::pow(X_val[i][v], 2);
-                }
-              } else if (add1_data != nullptr) {
-                vec_t add1_val = *(reinterpret_cast<vec_t*>(
-                    add1_data + group_offset + plane_offset));
-                for (int v = 0; v < vec_size; ++v) {
-                  X_val[i][v] += add1_val[v];
-                  if constexpr (!one_moment) {
-                    sum1 += static_cast<accscalar_t>(X_val[i][v]);
-                  }
-                  sum2 += Numerics<accscalar_t>::pow(X_val[i][v], 2);
-                }
-
-              } else {
-#pragma unroll(vec_size)
-                for (int v = 0; v < vec_size; ++v) {
-                  if constexpr (!one_moment) {
-                    sum1 += static_cast<accscalar_t>(X_val[i][v]);
-                  }
-                  sum2 += Numerics<accscalar_t>::pow(X_val[i][v], 2);
-                }
-              }
-            }
-          }
-
-          if constexpr (one_moment) {
-            sum2 = sycl::reduce_over_group(
-                item_id.get_group(), sum2, sycl::plus<accscalar_t>());
-            if (local_id == 0) {
-              accscalar_t scale = static_cast<accscalar_t>(Plane);
-              local_sum2[0] = Numerics<accscalar_t>::rsqrt(
-                  sum2 < 0 ? 0 : sum2 / scale + static_cast<accscalar_t>(eps));
-            }
-          } else {
-            norm_group_reduce<accscalar_t>(
-                item_id,
-                sub_group_num,
-                sum1,
-                sum2,
-                local_sum1,
-                local_sum2,
-                [](accscalar_t a, accscalar_t b) { return a + b; });
-            if (local_id == 0) {
-              accscalar_t scale = static_cast<accscalar_t>(Plane);
-              sum2 = (sum2 - sum1 * sum1 / scale) / scale;
-              sum1 = sum1 / scale;
-              local_sum1[0] = sum1;
-              local_sum2[0] = Numerics<accscalar_t>::rsqrt(
-                  sum2 < 0 ? 0 : sum2 + static_cast<accscalar_t>(eps));
-            }
-          }
-
-          item_id.barrier();
-
-          auto mean_val = one_moment ? 0 : local_sum1[0];
-          auto var_val = local_sum2[0];
-          for (int i = 0; i < Num; ++i) {
-            index_t plane_offset = (i * workgroup_size + local_id) * vec_size;
-            if (plane_offset < Plane) {
-              weight_vec_t gamma_val, beta_val;
-              if (gamma_data != nullptr) {
-                gamma_val = *(
-                    reinterpret_cast<weight_vec_t*>(gamma_data + plane_offset));
-              }
-              if (beta_data != nullptr) {
-                beta_val = *(
-                    reinterpret_cast<weight_vec_t*>(beta_data + plane_offset));
-              }
-
-#pragma unroll(vec_size)
-              for (int v = 0; v < vec_size; ++v) {
-                if (gamma_data != nullptr && beta_data != nullptr) {
-                  X_val[i][v] = static_cast<accscalar_t>(gamma_val[v]) *
-                          (var_val *
-                           static_cast<accscalar_t>(X_val[i][v] - mean_val)) +
-                      static_cast<accscalar_t>(beta_val[v]);
-                } else if (gamma_data != nullptr) {
-                  X_val[i][v] = static_cast<accscalar_t>(gamma_val[v]) *
-                      (var_val *
-                       static_cast<accscalar_t>(X_val[i][v] - mean_val));
-                } else if (beta_data != nullptr) {
-                  X_val[i][v] =
-                      (var_val *
-                       static_cast<accscalar_t>(X_val[i][v] - mean_val)) +
-                      static_cast<accscalar_t>(beta_val[v]);
-                } else {
-                  X_val[i][v] =
-                      (var_val *
-                       static_cast<accscalar_t>(X_val[i][v] - mean_val));
-                }
-              }
-              *(reinterpret_cast<vec_t*>(
-                  Y_data + group_offset + plane_offset)) = X_val[i];
-            }
-          }
-        });
+        kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
