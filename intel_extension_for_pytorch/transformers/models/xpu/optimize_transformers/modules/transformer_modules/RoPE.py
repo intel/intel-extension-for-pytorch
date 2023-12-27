@@ -529,3 +529,105 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
         sin, cos = self.get_sin_cos(position_ids, layer_id, beam_size, kv_seq_len)
         self.apply_rotary_pos_emb(query, key, sin, cos)
         return query, key
+
+
+class QWenRotaryEmbedding(torch.nn.Module):
+    def __init__(self, config: IPEXTransformerConfig, dtype):
+        super().__init__()
+        if config.rotary_pct == 1.0:
+            self.rotary_ndims = None
+        else:
+            assert config.rotary_pct < 1
+            self.rotary_ndims = int(config.kv_channels * config.rotary_pct)
+        dim = self.rotary_ndims if self.rotary_ndims is not None else config.kv_channels
+        self.dim = dim
+        self.base = config.rotary_emb_base
+        inv_freq = 1.0 / (self.base ** (torch.arange(0, dim, 2).float() / dim))
+        self.register_buffer("inv_freq", inv_freq, persistent=False)
+        import importlib
+
+        if importlib.util.find_spec("einops") is None:
+            raise RuntimeError("einops is required for Rotary Embedding")
+
+        self._rotary_pos_emb_cache = None
+        self._seq_len_cached = 0
+        self._ntk_alpha_cached = 1.0
+        self._ntk_alpha_cached_list = [1.0]
+
+    def update_rotary_pos_emb_cache(self, seqlen, ntk_alpha=1.0):
+        if seqlen > self._seq_len_cached or ntk_alpha != self._ntk_alpha_cached:
+            base = self.base * ntk_alpha ** (self.dim / (self.dim - 2))
+            self.inv_freq = 1.0 / (
+                base
+                ** (
+                    torch.arange(0, self.dim, 2, device=self.inv_freq.device).float()
+                    / self.dim
+                )
+            )
+            self._seq_len_cached = max(2 * seqlen, 16)
+            self._ntk_alpha_cached = ntk_alpha
+            seq = torch.arange(self._seq_len_cached, device=self.inv_freq.device)
+            freqs = torch.outer(seq.type_as(self.inv_freq), self.inv_freq)
+
+            emb = torch.cat((freqs, freqs), dim=-1)
+            from einops import rearrange
+
+            emb = rearrange(emb, "n d -> 1 n 1 d")
+
+            cos, sin = emb.cos(), emb.sin()
+            self._rotary_pos_emb_cache = [cos, sin]
+
+    def forward(self, max_seq_len, ntk_alpha=1.0):
+        self.update_rotary_pos_emb_cache(max_seq_len, ntk_alpha)
+        cos, sin = self._rotary_pos_emb_cache
+        return [cos[:, :max_seq_len], sin[:, :max_seq_len]]
+
+
+def _rotate_half(x):
+    from einops import rearrange
+
+    x = rearrange(x, "... (j d) -> ... j d", j=2)
+    x1, x2 = x.unbind(dim=-2)
+    return torch.cat((-x2, x1), dim=-1)
+
+
+def _apply_rotary_pos_emb(t, freqs):
+    """Apply rotary embedding to the first rotary_dim of the iput
+
+    Arguments:
+      t (tensor(batch_size, seq_len, n_head, head_dim)):
+        the input embedding/hidden states
+      freqs (list[tensor(1, seq_len, 1, rotary_dim), tensor(1, seq_len, 1, rotary_dim)]):
+        the cached cos/sin position embeddings
+    """
+    rot_dim = freqs[0].shape[-1]
+    cos, sin = freqs
+    t_float = t.float()
+    t_rot, t_pass = t_float[..., :rot_dim], t_float[..., rot_dim:]
+    t_rot = (t_rot * cos) + (_rotate_half(t_rot) * sin)
+    return torch.cat((t_rot, t_pass), dim=-1).type_as(t)
+
+
+def apply_rotary_pos_emb(query, key, rotary_pos_emb_list):
+    cur_len = query.shape[1]
+    if len(rotary_pos_emb_list) == 1:
+        rotary_pos_emb = rotary_pos_emb_list[0]
+        rotary_pos_emb = [i[:, -cur_len:, :, :] for i in rotary_pos_emb]
+        rotary_pos_emb = (rotary_pos_emb,) * 2
+        q_pos_emb, k_pos_emb = rotary_pos_emb
+        # Slice the pos emb for current inference
+        query = _apply_rotary_pos_emb(query, q_pos_emb)
+        key = _apply_rotary_pos_emb(key, k_pos_emb)
+    else:
+        query_list = []
+        key_list = []
+        for i, rotary_pos_emb in enumerate(rotary_pos_emb_list):
+            rotary_pos_emb = [i[:, -cur_len:, :, :] for i in rotary_pos_emb]
+            rotary_pos_emb = (rotary_pos_emb,) * 2
+            q_pos_emb, k_pos_emb = rotary_pos_emb
+            # Slice the pos emb for current inference
+            query_list += [_apply_rotary_pos_emb(query[i : i + 1, :, :], q_pos_emb)]
+            key_list += [_apply_rotary_pos_emb(key[i : i + 1, :, :], k_pos_emb)]
+        query = torch.cat(query_list, dim=0)
+        key = torch.cat(key_list, dim=0)
+    return query, key

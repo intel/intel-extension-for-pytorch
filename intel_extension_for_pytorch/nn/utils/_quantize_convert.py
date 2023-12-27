@@ -97,7 +97,11 @@ class WeightOnlyLinear(nn.Module):
         self.double_quant_scale_dtype = double_quant_scale_dtype
         self.compute_dtype = compute_dtype
         self.compress_statistics = compress_statistics
-        self.blocksize = blocksize if blocksize != -1 and blocksize < self.in_features else self.in_features
+        self.blocksize = (
+            blocksize
+            if blocksize != -1 and blocksize < self.in_features
+            else self.in_features
+        )
         self.scheme = scheme
         self.weight_dtype = weight_dtype
         self.device = device
@@ -160,7 +164,7 @@ class WeightOnlyLinear(nn.Module):
                 torch.empty(
                     (
                         math.ceil(self.in_features / self.blocksize),
-                        math.ceil(self.out_features / self.n_pack),
+                        math.ceil(self.out_features / self.n_pack)
                     ),
                     dtype=self.compression_dtype,
                     device=device,

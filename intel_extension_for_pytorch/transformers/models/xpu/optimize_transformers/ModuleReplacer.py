@@ -6,6 +6,7 @@ from .modules.Functions import (
     llama_forward_hook,
     bloom_forward_hook,
     opt_forward_hook,
+    qwen_forward_hook,
     ipex_build_bloom_alibi_tensor,
 )
 from .modules.utils import is_int4
@@ -21,6 +22,7 @@ from .modules.gptj import NewIPEXGPTJBlock
 from .modules.bloom import NewIPEXBloomBlock
 from .modules.llama import NewIPEXLLAMABlock
 from .modules.opt import NewIPEXOPTBlock
+from .modules.qwen import NewIPEXQWENBlock
 import os
 
 
@@ -61,6 +63,7 @@ def default_override_function_list() -> List:
         llama_forward_hook,
         bloom_forward_hook,
         opt_forward_hook,
+        qwen_forward_hook,
         ipex_build_bloom_alibi_tensor,
     ]
     return default_fn_list
@@ -84,6 +87,9 @@ class ModuleReplacer:
         self.tp_group = tp_group
 
     def replace_module(self, model, dtype, config=None, prefix=""):
+        """
+        dtype: str, e.g., "int4", "fp16"
+        """
         if config is None and hasattr(model, "config"):
             config = model.config
             config.dtype = dtype
@@ -101,6 +107,7 @@ class ModuleReplacer:
             ImplementMode.naive if enable_naive_path else ImplementMode.optimized
         )
         for name, child in model.named_children():
+            # print(name, type(child), child.__class__.__name__)
             if type(child) in self.module_dict.keys():
                 new_module = self.module_dict[type(child)](
                     child,
@@ -116,6 +123,21 @@ class ModuleReplacer:
                     # IPEXLLMResourceContrainer.push(new_module)
                     setattr(model, name, new_module)
                     is_replace_success = True
+            # QWenBlock is not supported in transformers
+            elif child.__class__.__name__ == "QWenBlock":
+                new_module = NewIPEXQWENBlock(
+                    child,
+                    config,
+                    dtype=dtype,
+                    device="xpu",
+                    module_name=module_name + name,
+                    impl_mode=impl_mode,
+                    tp_size=self.tp_size,
+                    tp_group=self.tp_group,
+                )
+                if new_module is not None:
+                    setattr(model, name, new_module)
+                    is_replace_success = True
             else:
                 is_replace_success = is_replace_success or self.replace_module(
                     child, dtype, config, module_name + name
@@ -124,7 +146,10 @@ class ModuleReplacer:
 
     def replace_op(self, model):
         for name, child in model.named_children():
-            if type(child) in self.module_dict.keys():
+            if (
+                type(child) in self.module_dict.keys()
+                or child.__class__.__name__ == "QWenBlock"
+            ):
                 continue
             if name == "lm_head" and (not is_int4(model)):
                 setattr(model, name, IPEXLmHeadLinearAllreduceWithPadding(child))

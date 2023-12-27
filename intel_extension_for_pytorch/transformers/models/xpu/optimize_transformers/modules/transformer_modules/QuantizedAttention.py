@@ -52,7 +52,48 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         )
 
     def transpose_parameter(self):
-        pass
+        self.q_proj_quant.weight.data = self.q_proj_quant.weight.transpose(
+            0, 1
+        ).contiguous()
+        self.k_proj_quant.weight.data = self.k_proj_quant.weight.transpose(
+            0, 1
+        ).contiguous()
+        self.v_proj_quant.weight.data = self.v_proj_quant.weight.transpose(
+            0, 1
+        ).contiguous()
+        self.out_proj_quant.weight.data = self.out_proj_quant.weight.transpose(
+            0, 1
+        ).contiguous()
+
+        self.q_proj_quant.scale.data = self.q_proj_quant.scale.transpose(
+            0, 1
+        ).contiguous()
+        self.k_proj_quant.scale.data = self.k_proj_quant.scale.transpose(
+            0, 1
+        ).contiguous()
+        self.v_proj_quant.scale.data = self.v_proj_quant.scale.transpose(
+            0, 1
+        ).contiguous()
+        self.out_proj_quant.scale.data = self.out_proj_quant.scale.transpose(
+            0, 1
+        ).contiguous()
+
+        has_qzeros = hasattr(self.q_proj_quant, "zp")
+        if has_qzeros:
+            self.q_proj_quant.zp.data = self.q_proj_quant.zp.transpose(
+                0, 1
+            ).contiguous()
+            self.k_proj_quant.zp.data = self.k_proj_quant.zp.transpose(
+                0, 1
+            ).contiguous()
+            self.v_proj_quant.zp.data = self.v_proj_quant.zp.transpose(
+                0, 1
+            ).contiguous()
+            self.out_proj_quant.zp.data = self.out_proj_quant.zp.transpose(
+                0, 1
+            ).contiguous()
+
+        torch.xpu.synchronize()
 
     def cat_qkv(self):
         shape = [3, -1, self.q_proj_quant.weight.shape[-1]]

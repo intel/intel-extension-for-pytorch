@@ -28,6 +28,23 @@ class IPEXTransformerQLinear(nn.Module):
         )
 
 
+class IPEXTransformerWOQLinear(nn.Module):
+    def __init__(self, qweight=None, bias=None, scales=None, zp=None, gs=None):
+        super(IPEXTransformerWOQLinear, self).__init__()
+        # we set the weight and bias to None to avoid any possible memory presure
+        self.qweight = qweight
+        self.bias = bias
+        self.scales = scales
+        self.qzeros = zp
+        self.blocksize = gs
+        self.weight = None
+
+    def forward(self, input):
+        return torch.ops.torch_ipex.mm_int4(
+            input, self.qweight, self.scale, self.zp, self.gs
+        )
+
+
 def matmul_add_add(attn_output, weight, tp_size=1, bias=None, residual=None):
     seq_len, bs, _ = attn_output.size()
     if residual is None:

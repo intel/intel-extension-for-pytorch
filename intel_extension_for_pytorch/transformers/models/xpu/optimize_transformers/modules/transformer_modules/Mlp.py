@@ -1,9 +1,15 @@
 import torch
 import torch.nn as nn
 import torch.distributed as dist
+import intel_extension_for_pytorch as ipex
 
 from .Activation import ACT2FN
-from .Linear import IPEXTransformerLinear, IPEXTransformerQLinear, matmul_add_add
+from .Linear import (
+    IPEXTransformerLinear,
+    IPEXTransformerQLinear,
+    IPEXTransformerWOQLinear,
+    matmul_add_add,
+)
 
 
 class IPEXTransformerBaseMLP(nn.Module):
@@ -182,7 +188,28 @@ class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
         self.fc_out_quant.gs = fc_out.blocksize
 
     def transpose_parameter(self):
-        pass
+        self.fc_in_quant.weight.data = self.fc_in_quant.weight.transpose(
+            0, 1
+        ).contiguous()
+        self.fc_out_quant.weight.data = self.fc_out_quant.weight.transpose(
+            0, 1
+        ).contiguous()
+
+        self.fc_in_quant.scale.data = self.fc_in_quant.scale.transpose(
+            0, 1
+        ).contiguous()
+        self.fc_out_quant.scale.data = self.fc_out_quant.scale.transpose(
+            0, 1
+        ).contiguous()
+
+        has_qzeros = hasattr(self.fc_in_quant, "zp")
+        if has_qzeros:
+            self.fc_in_quant.zp.data = self.fc_in_quant.zp.transpose(0, 1).contiguous()
+            self.fc_out_quant.zp.data = self.fc_out_quant.zp.transpose(
+                0, 1
+            ).contiguous()
+
+        torch.xpu.synchronize()
 
     def inter_mm(self, hidden_states):
         if self.fc_in_quant.bias is None:
@@ -317,4 +344,144 @@ class IPEXTransformerMLPOptimizedFp16SiluLlama(IPEXTransformerMLPOptimizedFp16Si
         hidden_states = torch.ops.torch_ipex.mm_resmul(
             hidden_states, self.up_proj.weight, hidden_states1
         )
+        return hidden_states
+
+
+class IPEXTransformerMLPOptimizedFp16SiluQwen(IPEXTransformerMLPOptimizedFp16Silu):
+    def __init__(self, config):
+        super().__init__(config)
+        self.c_proj = IPEXTransformerLinear()
+
+    def load_parameter(self, fc_in, fc_out, c_proj):
+        #            QWenMLP
+        # fc_in   |    w1
+        # fc_out  |    w2
+        # c_proj  |    c_proj
+        super().load_parameter(fc_in, fc_out)
+        self.c_proj.weight = c_proj.weight
+        self.c_proj.bias = c_proj.bias
+
+    def transpose_parameter(self):
+        super().transpose_parameter()
+        self.c_proj.weight.data = self.c_proj.weight.transpose(0, 1).contiguous()
+        # Note: synchronize to ensure the completion of contiguous
+        torch.xpu.synchronize()
+
+    def inter_mm(self, hidden_states):
+        # hidden_states = self.fc_in(hidden_states) * self.act(self.fc_out(hidden_states))
+        hidden_states = self.fc_in(hidden_states) * torch.ops.torch_ipex.mm_silu(
+            hidden_states, self.fc_out.weight
+        )
+        return hidden_states
+
+    def out_mm(self, hidden_states, residual=None):
+        hidden_states = self.c_proj(hidden_states)
+        if residual is not None:
+            hidden_states += residual
+        return hidden_states
+
+
+class IPEXTransformerMLPOptimizedInt4Silu(IPEXTransformerMLPOptimizedInt4):
+    def __init__(self, config):
+        super().__init__(config)
+
+
+class IPEXTransformerMLPOptimizedInt4SiluQwen(IPEXTransformerMLPOptimizedInt4Silu):
+    def __init__(self, config):
+        super().__init__(config)
+        self.c_proj_quant = IPEXTransformerQLinear()
+        self.arch = 1 if ipex._C._has_2d_block_array(0) else 0
+
+    def load_parameter(self, fc_in, fc_out, c_proj):
+        super().load_parameter(fc_in, fc_out)
+        self.c_proj_quant.weight = c_proj.qweight.byte()
+        self.c_proj_quant.bias = c_proj.bias
+
+        self.c_proj_quant.scale = c_proj.scales
+        has_qzeros = hasattr(c_proj, "qzeros")
+        if has_qzeros:
+            self.c_proj_quant.zp = c_proj.qzeros.byte()
+        self.c_proj_quant.gs = c_proj.blocksize
+
+    def transpose_parameter(self):
+        super().transpose_parameter()
+        self.c_proj_quant.weight.data = self.c_proj_quant.weight.transpose(
+            0, 1
+        ).contiguous()
+        self.c_proj_quant.scale.data = self.c_proj_quant.scale.transpose(
+            0, 1
+        ).contiguous()
+        has_qzeros = hasattr(self.c_proj_quant, "zp")
+        if has_qzeros:
+            self.c_proj_quant.zp.data = self.c_proj_quant.zp.transpose(
+                0, 1
+            ).contiguous()
+        torch.xpu.synchronize()
+
+    def inter_mm(self, hidden_states):
+        if self.fc_in_quant.bias is None:
+            hidden_states1 = torch.ops.torch_ipex.mm_int4(
+                hidden_states,
+                self.fc_in_quant.weight,
+                self.fc_in_quant.scale,
+                self.fc_in_quant.zp,
+                self.fc_in_quant.gs,
+                self.arch,
+            )
+        else:
+            hidden_states1 = torch.ops.torch_ipex.mm_bias_int4(
+                hidden_states,
+                self.fc_in_quant.weight,
+                self.fc_in_quant.bias,
+                self.fc_in_quant.scale,
+                self.fc_in_quant.zp,
+                self.fc_in_quant.gs,
+                self.arch,
+            )
+
+        if self.fc_out_quant.bias is None:
+            hidden_states2 = torch.ops.torch_ipex.mm_int4(
+                hidden_states,
+                self.fc_out_quant.weight,
+                self.fc_out_quant.scale,
+                self.fc_out_quant.zp,
+                self.fc_out_quant.gs,
+                self.arch,
+            )
+        else:
+            hidden_states2 = torch.ops.torch_ipex.mm_bias_int4(
+                hidden_states,
+                self.fc_out_quant.weight,
+                self.fc_out_quant.bias,
+                self.fc_out_quant.scale,
+                self.fc_out_quant.zp,
+                self.fc_out_quant.gs,
+                self.arch,
+            )
+
+        return hidden_states1 * self.act(hidden_states2)
+
+    def out_mm(self, hidden_states, residual=None):
+        if self.c_proj_quant.bias is None:
+            hidden_states = torch.ops.torch_ipex.mm_int4(
+                hidden_states,
+                self.c_proj_quant.weight,
+                self.c_proj_quant.scale,
+                self.c_proj_quant.zp,
+                self.c_proj_quant.gs,
+                self.arch,
+            )
+        else:
+            hidden_states = torch.ops.torch_ipex.mm_bias_int4(
+                hidden_states,
+                self.c_proj_quant.weight,
+                self.c_proj_quant.bias,
+                self.c_proj_quant.scale,
+                self.c_proj_quant.zp,
+                self.c_proj_quant.gs,
+                self.arch,
+            )
+
+        if residual is not None:
+            hidden_states += residual
         return hidden_states

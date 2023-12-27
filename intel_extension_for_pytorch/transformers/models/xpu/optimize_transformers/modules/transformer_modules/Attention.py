@@ -6,6 +6,7 @@ import math
 from .NaiveAttention import IPEXTransformerAttnNaive
 from .BaseAttention import IPEXTransformerAttn, IPEXRuntimeAttnCache
 from .Linear import matmul_add_add
+from .RoPE import apply_rotary_pos_emb
 import intel_extension_for_pytorch as ipex
 
 
@@ -32,7 +33,6 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     def prepare_cache_for_greedy_search(self, hidden_states, layer_past):
         bs_beam, seq_len, _ = self.get_runtime_shape(hidden_states)
         self.prepare_kv_cache(hidden_states, self.num_attn_head)
-
         self.prev_seq_len = layer_past[0].size(2) if layer_past is not None else 0
         self.seq_len = self.prev_seq_len + 1 if self.prev_seq_len != 0 else seq_len
 
@@ -174,9 +174,32 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     def post_qkv(self, query, key, value, position_ids, layer_past, **kwargs):
         bs_beam, seq, _ = self.get_runtime_shape(query)
         seq = seq if layer_past is None else layer_past[0].size(2) + 1
-        query, key = self.position_embed(
-            query, key, position_ids, self.layer_id, self.beam_size, seq
-        )
+        # for qwen
+        rotary_pos_emb_list = kwargs.pop("rotary_pos_emb_list", None)
+        if rotary_pos_emb_list is not None:
+            if self.is_first_token_beam_search():
+                query, key = apply_rotary_pos_emb(query, key, rotary_pos_emb_list)
+                self.runtime_cache.key_prompt = key
+            else:
+                # FIX: need to optimize
+                query = query.transpose(0, 1)
+                key = key.transpose(0, 1)
+                query, key = apply_rotary_pos_emb(query, key, rotary_pos_emb_list)
+                query = query.transpose(0, 1)
+                key = key.transpose(0, 1)
+                if self.is_beam_search():
+                    self.runtime_cache.key_cache[
+                        self.seq_len - 1 : self.seq_len, :, :, :
+                    ] = key
+                else:
+                    self.runtime_cache.key_cache[
+                        self.prev_seq_len : self.seq_len, :, :, :
+                    ] = key
+            # print(query.shape, key.shape)
+        else:
+            query, key = self.position_embed(
+                query, key, position_ids, self.layer_id, self.beam_size, seq
+            )
         query, key, value = self.combine_kv_cache_interface(query, key, value)
         return query, key, value
 
@@ -192,6 +215,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     def combine_kv_cache_1st_token_beam_search(
         self, query, key, value, layer_past=None
     ):
+        # [bs*beam, seq_len, num_head, head_dim] -> [bs*beam, num_head, seq_len, head_dim]
         self.runtime_cache.key_prompt = self.runtime_cache.key_prompt.permute(
             0, 2, 1, 3
         )
@@ -204,6 +228,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     def combine_kv_cache_2nd2last(self, query, key, value, layer_past=None):
         key = self.runtime_cache.key_cache[: self.seq_len, :, :, :]
         value = self.runtime_cache.value_cache[: self.seq_len, :, :, :]
+        # [seq_len, bs*beam, num_head, head_dim] -> [bs*beam, num_head, seq_len, head_dim]
         query = query.permute(1, 2, 0, 3)
         key = key.permute(1, 2, 0, 3)
         value = value.permute(1, 2, 0, 3)
@@ -236,6 +261,28 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     # ################################################################ sdp ##############################################
 
     def sdp(self, query, key, value, attention_mask, head_mask, alibi):
+        # QWen needs to initilize attention_mask inside attn module
+        causal_mask = None
+        key_size = key.shape[2]
+        if query.shape[2] == key_size:
+            causal_mask = torch.tril(
+                torch.ones((key_size, key_size), dtype=torch.bool, device=query.device)
+            ).view(1, 1, key_size, key_size)
+        if attention_mask is not None:
+            attention_mask = attention_mask.expand(-1, -1, query.size(2), -1)
+            if causal_mask is not None:
+                attention_mask = attention_mask.masked_fill(
+                    ~causal_mask, torch.finfo(query.dtype).min
+                )
+        else:
+            if causal_mask is not None:
+                attention_mask = causal_mask
+                new_attention_mask = torch.zeros_like(
+                    attention_mask, dtype=query.dtype, device=query.device
+                )
+                attention_mask = new_attention_mask.masked_fill_(
+                    attention_mask.logical_not(), torch.finfo(query.dtype).min
+                )
         # for ATS-M machine
         if not ipex._C._has_2d_block_array(0):
             return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
@@ -262,7 +309,6 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
             dropout,
             is_casual,
         )
-
         attention_output = self.process_sdp_output(attention_output)
         attention_output = attention_output.reshape(
             attention_output.size()[:-2] + (self.head_dim * self.num_attn_head,)
@@ -300,11 +346,11 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
                 first_token=self.is_1st_token(),
             )
 
-            # if self.is_1st_token_beam_search():
-            #     attn_output = attn_output.permute(0, 2, 1, 3)
-            # else:
-            #     attn_output = attn_output.permute(2, 0, 1, 3)
-            attn_output = attn_output.permute(0, 2, 1, 3)
+            if self.is_1st_token_beam_search():
+                attn_output = attn_output.permute(0, 2, 1, 3)
+            else:
+                attn_output = attn_output.permute(2, 0, 1, 3)
+            # attn_output = attn_output.permute(0, 2, 1, 3)
             attn_output = attn_output.reshape(
                 attn_output.size()[:-2] + (self.embed_dim // self.tp_size,)
             )
@@ -444,7 +490,6 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
             blocked_alibi = self.get_blocked_alibi(alibi, seq_len)
         if seq_len >= self.max_position:
             self.max_position = seq_len + self.runtime_cache_size
-
         return dropout, alpha, beta, is_causal, blocked_attn_mask, blocked_alibi
 
     def compute_sdp(
@@ -608,9 +653,11 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
             return self.process_sdp_output_general(attention_output)
 
     def process_sdp_output_1st_token_beam_search(self, attention_output):
+        # [seq_len, num_head, bs*beam, head_dim] -> [seq_len, bs*beam, num_head, head_dim]
         return attention_output.permute(0, 2, 1, 3)
 
     def process_sdp_output_general(self, attention_output):
+        # [bs*beam, num_head, seq_len, head_dim] -> [seq_len, bs*beam, num_head, head_dim]
         return attention_output.permute(2, 0, 1, 3)
 
     # ######################################################################### post sdp ######################
