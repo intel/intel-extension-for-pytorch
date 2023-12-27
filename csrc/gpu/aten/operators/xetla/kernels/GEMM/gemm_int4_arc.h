@@ -1,0 +1,263 @@
+#pragma once
+
+#include <utils/DPCPP.h>
+#include "../../GEMM_INT4.h"
+#include "../xetla.h"
+
+namespace xpu {
+namespace xetla {
+
+using namespace gpu::xetla;
+
+
+template <
+    typename dtype_a,
+    typename dtype_b,
+    typename dtype_c,
+    typename dtype_zero_pt,
+    typename dtype_scale,
+    typename dtype_acc,
+    uint32_t wg_m,
+    uint32_t wg_n,
+    uint32_t sg_m,
+    uint32_t sg_n,
+    uint32_t sg_k,
+    uint32_t l3_kslicing,
+    uint32_t slm_kslicing,
+    uint32_t dequant_s,
+    typename post_ops>
+struct hgemm_wint4_arc_func {
+  using tile_shape = gpu::xetla::group::tile_shape_t<wg_n, wg_m, sg_n, sg_m>;
+  static constexpr uint32_t periodic_sync_interval = 8;
+  static constexpr uint32_t prefetch_distance = 3;
+
+  using mem_desc_a_t =
+      mem_desc_t<dtype_a, mem_layout::row_major, mem_space::global,
+      DEVICE_MEM_ALIGNMENT / sizeof(dtype_a)>;
+  using mem_desc_b_t =
+      mem_desc_t<dtype_b, mem_layout::row_major, mem_space::global,
+      DEVICE_MEM_ALIGNMENT / sizeof(dtype_b)>;
+  using mem_desc_c_t =
+      mem_desc_t<dtype_c, mem_layout::row_major, mem_space::global,
+      DEVICE_MEM_ALIGNMENT / sizeof(dtype_c)>;
+  using mem_desc_scale_t = 
+      mem_desc_t<dtype_scale, mem_layout::row_major, mem_space::global,
+      DEVICE_MEM_ALIGNMENT / sizeof(dtype_scale)>;
+
+  using compute_attr = gpu::xetla::group::compute_attr_t<fp16, fp16, dtype_acc>;
+  using perf_tuning_knob = gpu::xetla::group::
+      perf_tuning_knob_t<sg_k, prefetch_distance, periodic_sync_interval>;
+
+  using compute_policy = gpu::xetla::group::compute_policy_bit4_dequantize_xmx<
+      compute_attr,
+      perf_tuning_knob,
+      gpu::xetla::group::quant_type::S4_FULLRANGE,
+      dtype_scale,
+      dequant_s,
+      gpu_arch::Dg2>;
+  using gemm_t = gpu::xetla::group::
+      gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t, mem_desc_scale_t>;
+
+  using epilogue_t = gpu::xetla::group::epilogue_t<
+      gpu::xetla::group::epilogue_policy_tile_op<post_ops, gpu_arch::Dg2>,
+      tile_shape,
+      mem_desc_c_t>;
+
+  using group_swizzle = gpu::xetla::kernel::group_swizzle_default<gpu_arch::Dg2>;
+  using dispatch_policy = dispatch_policy_int4_dequantize_kslicing<
+      group_swizzle,
+      l3_kslicing,
+      slm_kslicing>;
+  using gemm_op_t =
+      gpu::xetla::kernel::gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
+
+  using dtype_cnt = uint32_t;
+
+  static const char* func_name() {
+    return "hgemm_wint4_arc_func";
+  }
+
+  static inline void run(
+      sycl::queue& queue,
+      dtype_a* A,
+      dtype_b* B,
+      dtype_c* C,
+      uint32_t mat_m,
+      uint32_t mat_n,
+      uint32_t mat_k,
+      dtype_zero_pt* zero_pt_ptr,
+      dtype_scale* scale_ptr,
+      typename epilogue_t::arguments_t epilogue_args = {}) {
+    // allocate temp buffers for global split
+    size_t size_acc = gemm_op_t::get_acc_buf_size(mat_m, mat_n);
+    size_t size_cnt = gemm_op_t::get_cnt_buf_size(mat_m, mat_n);
+
+    using data_type_acc = float; // half * half  = float
+    using data_type_cnt = uint32_t;
+    auto context = queue.get_info<info::queue::context>();
+    auto device = queue.get_info<info::queue::device>();
+    dtype_acc* acc = static_cast<data_type_acc*>(aligned_alloc_device(
+        DEVICE_MEM_ALIGNMENT, size_acc * sizeof(dtype_acc), device, context));
+    dtype_cnt* cnt = static_cast<uint32_t*>(aligned_alloc_device(
+        DEVICE_MEM_ALIGNMENT, size_cnt * sizeof(dtype_cnt), device, context));
+
+    typename gemm_op_t::arguments_t gemm_arg(
+        mat_m,
+        mat_k,
+        mat_n,
+        A,
+        mat_k,
+        B,
+        mat_n,
+        C,
+        mat_n,
+        scale_ptr,
+        mat_n,
+        acc,
+        cnt,
+        epilogue_args);
+
+    cl::sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
+
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      cgh.parallel_for(NDRange, [=](nd_item<3> item) KERNEL_MAIN {
+        slm_barrier_init<gemm_op_t>();
+        gemm_op_t gemm_op;
+        gemm_op(item, gemm_arg);
+      });
+    };
+    DPCPP_Q_SUBMIT(queue, cgf);
+  }
+};
+
+template <
+    typename scalar_t,
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES>
+inline void hgemm_wint4_arc(
+    sycl::queue& queue,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint8_t* b,
+    const uint8_t* b_zp,
+    const scalar_t* b_scale,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  static_assert(L3_KS == 1, "for fused op, L3_KS should be 1");
+  using data_type_a = scalar_t;
+  using data_type_b = int4x2;
+  using data_type_c = scalar_t;
+  using data_type_zp = int4x2;
+  using data_type_scale = scalar_t;
+  using data_type_acc = float;
+  using hgemm_wint4_arc_functor = hgemm_wint4_arc_func<
+      data_type_a,
+      data_type_b,
+      data_type_c,
+      data_type_zp,
+      data_type_scale,
+      data_type_acc,
+      WG_M,
+      WG_N,
+      SG_M,
+      SG_N,
+      SG_K,
+      L3_KS,
+      SLM_KS,
+      DQUANT_S,
+      subgroup::chained_tile_op_t<>>;
+
+  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
+  hgemm_wint4_arc_functor::run(
+      queue,
+      const_cast<scalar_t*>(a),
+      const_cast<data_type_b*>(b_alias),
+      out,
+      m,
+      n,
+      k,
+      const_cast<data_type_zp*>(b_zp_alias),
+      const_cast<scalar_t*>(b_scale));
+}
+
+template <
+    typename scalar_t,
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES>
+inline void hgemm_bias_wint4_arc(
+    sycl::queue& queue,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint8_t* b,
+    const uint8_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* bias,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  using data_type_a = scalar_t;
+  using data_type_b = int4x2;
+  using data_type_c = scalar_t;
+  using data_type_zp = int4x2;
+  using data_type_scale = scalar_t;
+  using data_type_acc = float;
+  using data_type_bias = scalar_t;
+  using mem_desc_bias_t = mem_desc_t<data_type_bias,
+          mem_layout::row_major, mem_space::global,
+          DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>;
+  using bias_op_t = subgroup::bias_add_op_t<mem_desc_bias_t, gpu_arch::Dg2>;
+  using post_op = subgroup::chained_tile_op_t<bias_op_t>;
+  using hgemm_wint4_arc_functor = hgemm_wint4_arc_func<
+      data_type_a,
+      data_type_b,
+      data_type_c,
+      data_type_zp,
+      data_type_scale,
+      data_type_acc,
+      WG_M,
+      WG_N,
+      SG_M,
+      SG_N,
+      SG_K,
+      L3_KS,
+      SLM_KS,
+      DQUANT_S,
+      post_op>;
+  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
+
+  hgemm_wint4_arc_functor::run(
+      queue,
+      const_cast<scalar_t*>(a),
+      const_cast<data_type_b*>(b_alias),
+      out,
+      m,
+      n,
+      k,
+      const_cast<data_type_zp*>(b_zp_alias),
+      const_cast<scalar_t*>(b_scale),
+      {{{const_cast<scalar_t*>(bias), {n, 1, n}}}});
+}
+
+
+
+} // namespace xetla
+} // namespace xpu
