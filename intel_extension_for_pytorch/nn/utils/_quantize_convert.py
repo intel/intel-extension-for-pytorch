@@ -201,9 +201,7 @@ class WeightOnlyLinear(nn.Module):
                     torch.zeros(
                         (
                             self.out_features,
-                            math.ceil(
-                                self.in_features / self.blocksize / self.n_pack
-                            )
+                            math.ceil(self.in_features / self.blocksize / self.n_pack)
                         ),
                         dtype=self.compression_dtype,
                         device=device,
@@ -264,7 +262,7 @@ class WeightOnlyLinear(nn.Module):
             self.weight_transposed = True
         return torch.ops.torch_ipex.mm_low_bits(
             input,
-            self.qweight.byte(),
+            self.qweight,
             self.scales,
             self.qzeros.byte() if hasattr(self, "qzeros") else None,
             self.bias,
@@ -276,7 +274,7 @@ class WeightOnlyLinear(nn.Module):
 
     def set_weights_bias(self, weight_data, bias=None):
         self.qweight = ParamsLowBits(
-            data=weight_data,
+            data=weight_data.byte(),
             requires_grad=False,
             quant_state={"scheme": self.scheme},
             blocksize=self.blocksize,
