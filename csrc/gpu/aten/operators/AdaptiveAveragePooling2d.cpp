@@ -17,6 +17,107 @@ using namespace xpu::dpcpp;
 using namespace xpu::oneDNN;
 
 namespace {
+
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    bool is_channels_last,
+    bool is_quantized = false>
+struct AdaptiveAvgPool2dKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int64_t gi = item.get_global_linear_id();
+    for (int64_t i = gi; i < numel; i += global_range) {
+      int64_t _ow, _oh, _oc, _ob;
+      if constexpr (is_channels_last) {
+        _oc = i % oc;
+        _ow = i / oc % ow;
+        _oh = i / oc / ow % oh;
+        _ob = i / oc / ow / oh;
+      } else {
+        _ow = i % ow;
+        _oh = i / ow % oh;
+        _oc = i / ow / oh % oc;
+        _ob = i / ow / oh / oc;
+      }
+
+      int64_t _ih0 = native::start_index(_oh, oh, ih);
+      int64_t _ih1 = native::end_index(_oh, oh, ih);
+      int64_t _iw0 = native::start_index(_ow, ow, iw);
+      int64_t _iw1 = native::end_index(_ow, ow, iw);
+      int64_t kh = _ih1 - _ih0;
+      int64_t kw = _iw1 - _iw0;
+      int64_t _ib = _ob;
+      int64_t _ic = _oc;
+
+      accscalar_t sum = 0;
+      for (int _ih = _ih0; _ih < _ih1; _ih++) {
+        for (int _iw = _iw0; _iw < _iw1; _iw++) {
+          if constexpr (is_quantized) {
+            sum += accscalar_t(
+                ((accscalar_t)input[_ib][_ic][_ih][_iw] - (accscalar_t)zp) *
+                scale);
+          } else {
+            sum += accscalar_t(input[_ib][_ic][_ih][_iw]);
+          }
+        }
+      }
+      accscalar_t avg = sum / kh / kw;
+
+      const auto store = [](PackedTensorAccessor64<scalar_t, 4> oacc,
+                            int64_t _ob,
+                            int64_t _oc,
+                            int64_t _oh,
+                            int64_t _ow,
+                            scalar_t res) { oacc[_ob][_oc][_oh][_ow] = res; };
+      if constexpr (is_quantized) {
+        scalar_t qavg = quantize_val<scalar_t>(scale, zp, avg);
+        store(output, _ob, _oc, _oh, _ow, qavg);
+      } else {
+        store(output, _ob, _oc, _oh, _ow, avg);
+      }
+    }
+  }
+  AdaptiveAvgPool2dKernelFunctor(
+      int ih_,
+      int iw_,
+      int ob_,
+      int oc_,
+      int oh_,
+      int ow_,
+      accscalar_t scale_,
+      int64_t zp_,
+      int64_t numel_,
+      int global_range_,
+      PackedTensorAccessor64<scalar_t, 4> input_,
+      PackedTensorAccessor64<scalar_t, 4> output_)
+      : ih(ih_),
+        iw(iw_),
+        ob(ob_),
+        oc(oc_),
+        oh(oh_),
+        ow(ow_),
+        scale(scale_),
+        zp(zp_),
+        numel(numel_),
+        global_range(global_range_),
+        input(input_),
+        output(output_) {}
+
+ private:
+  int ih;
+  int iw;
+  int ob;
+  int oc;
+  int oh;
+  int ow;
+  accscalar_t scale;
+  int64_t zp;
+  int64_t numel;
+  int global_range;
+  PackedTensorAccessor64<scalar_t, 4> input;
+  PackedTensorAccessor64<scalar_t, 4> output;
+};
+
 template <
     typename scalar_t,
     typename accscalar_t,
@@ -43,59 +144,24 @@ void adaptive_avg_pool2d_kernel(
       ? local_range
       : (total_item / local_range) * local_range;
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      int64_t gi = item.get_global_linear_id();
-      for (int64_t i = gi; i < numel; i += global_range) {
-        int64_t _ow, _oh, _oc, _ob;
-        if constexpr (is_channels_last) {
-          _oc = i % oc;
-          _ow = i / oc % ow;
-          _oh = i / oc / ow % oh;
-          _ob = i / oc / ow / oh;
-        } else {
-          _ow = i % ow;
-          _oh = i / ow % oh;
-          _oc = i / ow / oh % oc;
-          _ob = i / ow / oh / oc;
-        }
+    AdaptiveAvgPool2dKernelFunctor<
+        scalar_t,
+        accscalar_t,
+        is_channels_last,
+        is_quantized>
+        kfn(ih,
+            iw,
+            ob,
+            oc,
+            oh,
+            ow,
+            scale,
+            zp,
+            numel,
+            global_range,
+            input,
+            output);
 
-        int64_t _ih0 = native::start_index(_oh, oh, ih);
-        int64_t _ih1 = native::end_index(_oh, oh, ih);
-        int64_t _iw0 = native::start_index(_ow, ow, iw);
-        int64_t _iw1 = native::end_index(_ow, ow, iw);
-        int64_t kh = _ih1 - _ih0;
-        int64_t kw = _iw1 - _iw0;
-        int64_t _ib = _ob;
-        int64_t _ic = _oc;
-
-        accscalar_t sum = 0;
-        for (int _ih = _ih0; _ih < _ih1; _ih++) {
-          for (int _iw = _iw0; _iw < _iw1; _iw++) {
-            if constexpr (is_quantized) {
-              sum += accscalar_t(
-                  ((accscalar_t)input[_ib][_ic][_ih][_iw] - (accscalar_t)zp) *
-                  scale);
-            } else {
-              sum += accscalar_t(input[_ib][_ic][_ih][_iw]);
-            }
-          }
-        }
-        accscalar_t avg = sum / kh / kw;
-
-        const auto store = [](PackedTensorAccessor64<scalar_t, 4> oacc,
-                              int64_t _ob,
-                              int64_t _oc,
-                              int64_t _oh,
-                              int64_t _ow,
-                              scalar_t res) { oacc[_ob][_oc][_oh][_ow] = res; };
-        if constexpr (is_quantized) {
-          scalar_t qavg = quantize_val<scalar_t>(scale, zp, avg);
-          store(output, _ob, _oc, _oh, _ow, qavg);
-        } else {
-          store(output, _ob, _oc, _oh, _ow, avg);
-        }
-      }
-    };
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
@@ -281,6 +347,89 @@ class adaptive_avg_pool2d_backward_kernel {
 };
 
 template <typename scalar_t, typename accscalar_t, bool is_channels_last>
+struct AdaptiveAvgPool2dBackwardKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int64_t gi = item.get_global_linear_id();
+    int64_t li = item.get_local_id(0);
+
+    for (int64_t i = gi; i < numel; i += global_range) {
+      int64_t _iw, _ih, _ic, _ib;
+      if constexpr (is_channels_last) {
+        _ic = i % ic;
+        _iw = i / ic % iw;
+        _ih = i / ic / iw % ih;
+        _ib = i / ic / iw / ih;
+      } else {
+        _iw = i % iw;
+        _ih = i / iw % ih;
+        _ic = i / iw / ih % ic;
+        _ib = i / iw / ih / ic;
+      }
+
+      int64_t _oh0 = native::start_index(_ih, ih, oh);
+      int64_t _oh1 = native::end_index(_ih, ih, oh);
+      int64_t _ow0 = native::start_index(_iw, iw, ow);
+      int64_t _ow1 = native::end_index(_iw, iw, ow);
+      int64_t _ob = _ib;
+      int64_t _oc = _ic;
+
+      accscalar_t gx = 0;
+      accscalar_t _ikh, _ikw;
+      for (int _oh = _oh0; _oh < _oh1; _oh++) {
+        _ikh = accscalar_t(1.0) /
+            (accscalar_t)(native::end_index(_oh, oh, ih) - native::start_index(_oh, oh, ih));
+        for (int _ow = _ow0; _ow < _ow1; _ow++) {
+          _ikw = accscalar_t(1.0) /
+              (accscalar_t)(native::end_index(_ow, ow, iw) - native::start_index(_ow, ow, iw));
+          gx += gyacc[_ob][_oc][_oh][_ow] * _ikh * _ikw;
+        }
+      }
+
+      const auto store = [](PackedTensorAccessor64<scalar_t, 4> gxacc,
+                            int64_t _ib,
+                            int64_t _ic,
+                            int64_t _ih,
+                            int64_t _iw,
+                            scalar_t res) { gxacc[_ib][_ic][_ih][_iw] = res; };
+      store(gxacc, _ib, _ic, _ih, _iw, (scalar_t)gx);
+    }
+  }
+  AdaptiveAvgPool2dBackwardKernelFunctor(
+      int ib_,
+      int ic_,
+      int ih_,
+      int iw_,
+      int oh_,
+      int ow_,
+      int64_t numel_,
+      int global_range_,
+      PackedTensorAccessor64<scalar_t, 4> gyacc_,
+      PackedTensorAccessor64<scalar_t, 4> gxacc_)
+      : ib(ib_),
+        ic(ic_),
+        ih(ih_),
+        iw(iw_),
+        oh(oh_),
+        ow(ow_),
+        numel(numel_),
+        global_range(global_range_),
+        gyacc(gyacc_),
+        gxacc(gxacc_) {}
+
+ private:
+  int ib;
+  int ic;
+  int ih;
+  int iw;
+  int oh;
+  int ow;
+  int64_t numel;
+  int global_range;
+  PackedTensorAccessor64<scalar_t, 4> gyacc;
+  PackedTensorAccessor64<scalar_t, 4> gxacc;
+};
+
+template <typename scalar_t, typename accscalar_t, bool is_channels_last>
 class adaptive_avg_pool2d_backward_kernel<
     scalar_t,
     accscalar_t,
@@ -305,54 +454,12 @@ class adaptive_avg_pool2d_backward_kernel<
         : (total_item / local_range) * local_range;
 
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        int64_t gi = item.get_global_linear_id();
-        int64_t li = item.get_local_id(0);
+      AdaptiveAvgPool2dBackwardKernelFunctor<
+          scalar_t,
+          accscalar_t,
+          is_channels_last>
+          kfn(ib, ic, ih, iw, oh, ow, numel, global_range, gyacc, gxacc);
 
-        for (int64_t i = gi; i < numel; i += global_range) {
-          int64_t _iw, _ih, _ic, _ib;
-          if constexpr (is_channels_last) {
-            _ic = i % ic;
-            _iw = i / ic % iw;
-            _ih = i / ic / iw % ih;
-            _ib = i / ic / iw / ih;
-          } else {
-            _iw = i % iw;
-            _ih = i / iw % ih;
-            _ic = i / iw / ih % ic;
-            _ib = i / iw / ih / ic;
-          }
-
-          int64_t _oh0 = native::start_index(_ih, ih, oh);
-          int64_t _oh1 = native::end_index(_ih, ih, oh);
-          int64_t _ow0 = native::start_index(_iw, iw, ow);
-          int64_t _ow1 = native::end_index(_iw, iw, ow);
-          int64_t _ob = _ib;
-          int64_t _oc = _ic;
-
-          accscalar_t gx = 0;
-          accscalar_t _ikh, _ikw;
-          for (int _oh = _oh0; _oh < _oh1; _oh++) {
-            _ikh = accscalar_t(1.0) /
-                (accscalar_t)(native::end_index(_oh, oh, ih) - native::start_index(_oh, oh, ih));
-            for (int _ow = _ow0; _ow < _ow1; _ow++) {
-              _ikw = accscalar_t(1.0) /
-                  (accscalar_t)(native::end_index(_ow, ow, iw) - native::start_index(_ow, ow, iw));
-              gx += gyacc[_ob][_oc][_oh][_ow] * _ikh * _ikw;
-            }
-          }
-
-          const auto store = [](PackedTensorAccessor64<scalar_t, 4> gxacc,
-                                int64_t _ib,
-                                int64_t _ic,
-                                int64_t _ih,
-                                int64_t _iw,
-                                scalar_t res) {
-            gxacc[_ib][_ic][_ih][_iw] = res;
-          };
-          store(gxacc, _ib, _ic, _ih, _iw, (scalar_t)gx);
-        }
-      };
       cgh.parallel_for(
           sycl::nd_range<1>(
               sycl::range<1>(global_range), sycl::range<1>(local_range)),
@@ -361,6 +468,138 @@ class adaptive_avg_pool2d_backward_kernel<
 
     DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
   }
+};
+
+template <typename scalar_t, typename accscalar_t, bool is_channels_last>
+struct AdaptiveAvgPool2dBackwardKernel2Functor {
+  void operator()(sycl::nd_item<1> item) const {
+    int64_t gi = item.get_global_linear_id();
+    int64_t li = item.get_local_id(0);
+
+    // for-loop order: oh*ow->ih->iw
+    // reuse oh*ow(oh0, oh1, ow0, ow1), ih(ikh), iw(ikw) in inner loop.
+    for (int _ih = li; _ih < ih; _ih += local_range) {
+      _oh0_cached[_ih] = (int)native::start_index(_ih, ih, oh);
+      _oh1_cached[_ih] = (int)native::end_index(_ih, ih, oh);
+    }
+    for (int _iw = li; _iw < iw; _iw += local_range) {
+      _ow0_cached[_iw] = (int)native::start_index(_iw, iw, ow);
+      _ow1_cached[_iw] = (int)native::end_index(_iw, iw, ow);
+    }
+    for (int _oh = li; _oh < oh; _oh += local_range) {
+      _ikh_cached[_oh] = accscalar_t(1.0) /
+          (accscalar_t)(native::end_index(_oh, oh, ih) -
+                        native::start_index(_oh, oh, ih));
+    }
+    for (int _ow = li; _ow < ow; _ow += local_range) {
+      _ikw_cached[_ow] = accscalar_t(1.0) /
+          (accscalar_t)(native::end_index(_ow, ow, iw) -
+                        native::start_index(_ow, ow, iw));
+    }
+
+    item.barrier(dpcpp_local_fence);
+
+    for (int64_t i = gi; i < numel; i += global_range) {
+      int64_t _iw, _ih, _ic, _ib;
+      if constexpr (is_channels_last) {
+        _ic = i % ic;
+        _iw = i / ic % iw;
+        _ih = i / ic / iw % ih;
+        _ib = i / ic / iw / ih;
+      } else {
+        _iw = i % iw;
+        _ih = i / iw % ih;
+        _ic = i / iw / ih % ic;
+        _ib = i / iw / ih / ic;
+      }
+
+      int64_t _oh0, _oh1, _ow0, _ow1;
+      _oh0 = _oh0_cached[_ih];
+      _oh1 = _oh1_cached[_ih];
+      _ow0 = _ow0_cached[_iw];
+      _ow1 = _ow1_cached[_iw];
+      int64_t _ob = _ib;
+      int64_t _oc = _ic;
+
+      accscalar_t gx = 0;
+      accscalar_t _ikh, _ikw;
+      for (int _oh = _oh0; _oh < _oh1; _oh++) {
+        _ikh = _ikh_cached[_oh];
+        for (int _ow = _ow0; _ow < _ow1; _ow++) {
+          _ikw = _ikw_cached[_ow];
+          gx += gyacc[_ob][_oc][_oh][_ow] * _ikh * _ikw;
+        }
+      }
+
+      const auto store = [](PackedTensorAccessor64<scalar_t, 4> gxacc,
+                            int64_t _ib,
+                            int64_t _ic,
+                            int64_t _ih,
+                            int64_t _iw,
+                            scalar_t res) { gxacc[_ib][_ic][_ih][_iw] = res; };
+      store(gxacc, _ib, _ic, _ih, _iw, (scalar_t)gx);
+    }
+  }
+  AdaptiveAvgPool2dBackwardKernel2Functor(
+      int ib_,
+      int ic_,
+      int ih_,
+      int iw_,
+      int oh_,
+      int ow_,
+      int64_t numel_,
+      int local_range_,
+      int global_range_,
+      PackedTensorAccessor64<scalar_t, 4> gyacc_,
+      PackedTensorAccessor64<scalar_t, 4> gxacc_,
+      int64_t ohw01_shared_size_,
+      int64_t ikhw_shared_size_,
+      dpcpp_local_acc_t<int> _oh0_cached_,
+      dpcpp_local_acc_t<int> _oh1_cached_,
+      dpcpp_local_acc_t<int> _ow0_cached_,
+      dpcpp_local_acc_t<int> _ow1_cached_,
+      dpcpp_local_acc_t<accscalar_t> _ikh_cached_,
+      dpcpp_local_acc_t<accscalar_t> _ikw_cached_)
+      : ib(ib_),
+        ic(ic_),
+        ih(ih_),
+        iw(iw_),
+        oh(oh_),
+        ow(ow_),
+        numel(numel_),
+        local_range(local_range_),
+        global_range(global_range_),
+        gyacc(gyacc_),
+        gxacc(gxacc_),
+        ohw01_shared_size(ohw01_shared_size_),
+        ikhw_shared_size(ikhw_shared_size_),
+        _oh0_cached(_oh0_cached_),
+        _oh1_cached(_oh1_cached_),
+        _ow0_cached(_ow0_cached_),
+        _ow1_cached(_ow1_cached_),
+        _ikh_cached(_ikh_cached_),
+        _ikw_cached(_ikw_cached_) {}
+
+ private:
+  int ib;
+  int ic;
+  int ih;
+  int iw;
+  int oh;
+  int ow;
+  int64_t numel;
+  int local_range;
+  int global_range;
+  PackedTensorAccessor64<scalar_t, 4> gyacc;
+  PackedTensorAccessor64<scalar_t, 4> gxacc;
+  int64_t ohw01_shared_size;
+  int64_t ikhw_shared_size;
+  dpcpp_local_acc_t<int> _oh0_cached;
+  dpcpp_local_acc_t<int> _oh1_cached;
+  dpcpp_local_acc_t<int> _ow0_cached;
+  dpcpp_local_acc_t<int> _ow1_cached;
+  dpcpp_local_acc_t<accscalar_t> _ikh_cached;
+  dpcpp_local_acc_t<accscalar_t> _ikw_cached;
 };
 
 template <typename scalar_t, typename accscalar_t, bool is_channels_last>
@@ -403,76 +642,31 @@ class adaptive_avg_pool2d_backward_kernel<
       dpcpp_local_acc_t<int> _ow1_cached(iw * sizeof(int), cgh);
       dpcpp_local_acc_t<accscalar_t> _ikh_cached(oh * sizeof(accscalar_t), cgh);
       dpcpp_local_acc_t<accscalar_t> _ikw_cached(ow * sizeof(accscalar_t), cgh);
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        int64_t gi = item.get_global_linear_id();
-        int64_t li = item.get_local_id(0);
 
-        // for-loop order: oh*ow->ih->iw
-        // reuse oh*ow(oh0, oh1, ow0, ow1), ih(ikh), iw(ikw) in inner loop.
-        for (int _ih = li; _ih < ih; _ih += local_range) {
-          _oh0_cached[_ih] = (int)native::start_index(_ih, ih, oh);
-          _oh1_cached[_ih] = (int)native::end_index(_ih, ih, oh);
-        }
-        for (int _iw = li; _iw < iw; _iw += local_range) {
-          _ow0_cached[_iw] = (int)native::start_index(_iw, iw, ow);
-          _ow1_cached[_iw] = (int)native::end_index(_iw, iw, ow);
-        }
-        for (int _oh = li; _oh < oh; _oh += local_range) {
-          _ikh_cached[_oh] = accscalar_t(1.0) /
-              (accscalar_t)(native::end_index(_oh, oh, ih) -
-                            native::start_index(_oh, oh, ih));
-        }
-        for (int _ow = li; _ow < ow; _ow += local_range) {
-          _ikw_cached[_ow] = accscalar_t(1.0) /
-              (accscalar_t)(native::end_index(_ow, ow, iw) -
-                            native::start_index(_ow, ow, iw));
-        }
+      AdaptiveAvgPool2dBackwardKernel2Functor<
+          scalar_t,
+          accscalar_t,
+          is_channels_last>
+          kfn(ib,
+              ic,
+              ih,
+              iw,
+              oh,
+              ow,
+              numel,
+              local_range,
+              global_range,
+              gyacc,
+              gxacc,
+              ohw01_shared_size,
+              ikhw_shared_size,
+              _oh0_cached,
+              _oh1_cached,
+              _ow0_cached,
+              _ow1_cached,
+              _ikh_cached,
+              _ikw_cached);
 
-        item.barrier(dpcpp_local_fence);
-
-        for (int64_t i = gi; i < numel; i += global_range) {
-          int64_t _iw, _ih, _ic, _ib;
-          if constexpr (is_channels_last) {
-            _ic = i % ic;
-            _iw = i / ic % iw;
-            _ih = i / ic / iw % ih;
-            _ib = i / ic / iw / ih;
-          } else {
-            _iw = i % iw;
-            _ih = i / iw % ih;
-            _ic = i / iw / ih % ic;
-            _ib = i / iw / ih / ic;
-          }
-
-          int64_t _oh0, _oh1, _ow0, _ow1;
-          _oh0 = _oh0_cached[_ih];
-          _oh1 = _oh1_cached[_ih];
-          _ow0 = _ow0_cached[_iw];
-          _ow1 = _ow1_cached[_iw];
-          int64_t _ob = _ib;
-          int64_t _oc = _ic;
-
-          accscalar_t gx = 0;
-          accscalar_t _ikh, _ikw;
-          for (int _oh = _oh0; _oh < _oh1; _oh++) {
-            _ikh = _ikh_cached[_oh];
-            for (int _ow = _ow0; _ow < _ow1; _ow++) {
-              _ikw = _ikw_cached[_ow];
-              gx += gyacc[_ob][_oc][_oh][_ow] * _ikh * _ikw;
-            }
-          }
-
-          const auto store = [](PackedTensorAccessor64<scalar_t, 4> gxacc,
-                                int64_t _ib,
-                                int64_t _ic,
-                                int64_t _ih,
-                                int64_t _iw,
-                                scalar_t res) {
-            gxacc[_ib][_ic][_ih][_iw] = res;
-          };
-          store(gxacc, _ib, _ic, _ih, _iw, (scalar_t)gx);
-        }
-      };
       cgh.parallel_for(
           sycl::nd_range<1>(
               sycl::range<1>(global_range), sycl::range<1>(local_range)),
