@@ -129,6 +129,22 @@ using namespace xpu::xetla;
         k_);                                                                \
   }
 
+#define HGEMM_INT4_SILU_DISPATCH(                                         \
+    F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
+  {                                                                         \
+    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
+    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                \
+        q,                                                                  \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
+        weight_->data_ptr<uint8_t>(),                                       \
+        weight_zp_->data_ptr<uint8_t>(),                                    \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
+        m_,                                                                 \
+        n_,                                                                 \
+        k_);                                                                \
+  }
+
 #define HGEMM_INT4_QKV_DISPATCH(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
   {                                                                          \
     RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)        \
@@ -289,6 +305,52 @@ using namespace xpu::xetla;
           SG_K,                                                                \
           GZ,                                                                  \
           SLM_KS)                                                              \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == SILU && ARCH == 1)    \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_SILU_DISPATCH,                                            \
+          hgemm_silu_wint4_pvc,                                                \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == SILU && ARCH == 0)    \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_SILU_DISPATCH,                                            \
+          hgemm_silu_wint4_arc,                                                \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == SPLIT3 && ARCH == 0)  \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_QKV_DISPATCH,                                             \
+          hgemm_qkv_wint4_arc,                                                 \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (                                                                  \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                    \
+        epilogue_type_[1] == SPLIT3 && ARCH == 0)                              \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_QKV_BIAS_DISPATCH,                                        \
+          hgemm_qkv_bias_wint4_arc,                                            \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
   }
 
 template <
@@ -429,14 +491,14 @@ class HGEMMXetla_INT4 final {
   bool fallback_;
   int m_, n_, k_;
   int64_t calib_gz_;
-  int64_t arch_ = 1; // 0: ARC, 1: PVC
+  int8_t arch_ = 1; // 0: ARC, 1: PVC
 
  public:
   HGEMMXetla_INT4() = default;
   bool fallback() const {
     return fallback_;
   }
-  HGEMMXetla_INT4& add_arch(int64_t arch) {
+  HGEMMXetla_INT4& add_arch(int8_t arch) {
     arch_ = arch;
     return *this;
   }

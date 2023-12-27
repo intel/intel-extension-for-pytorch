@@ -11,7 +11,7 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-#define GEMM_QKV_WINT4_XETLA_DISPATCH(has_bias)                               \
+#define GEMM_QKV_WINT4_XETLA_DISPATCH(has_bias, arch)                         \
   if (!has_bias) {                                                            \
     auto policy =                                                             \
         HGEMMXetla_INT4()                                                     \
@@ -24,6 +24,7 @@ namespace AtenIpexTypeXPU {
             .add_matrix_zp(weight_zp)                                         \
             .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SPLIT3)    \
             .add_calib_gz(calib_gz)                                           \
+            .add_arch(arch)                                                   \
             .build();                                                         \
     TORCH_CHECK(policy.fallback() == false, "qkv: invalid gemm shape");       \
     policy.run();                                                             \
@@ -40,6 +41,7 @@ namespace AtenIpexTypeXPU {
             .add_epilogue(bias_.value(), HGEMMXetla_INT4::EpilogueType::BIAS) \
             .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SPLIT3)    \
             .add_calib_gz(calib_gz)                                           \
+            .add_arch(arch)                                                   \
             .build();                                                         \
     TORCH_CHECK(policy.fallback() == false, "qkv bias: invalid gemm shape");  \
     policy.run();                                                             \
@@ -85,7 +87,11 @@ static void mm_qkv_out_wint4(
       input.scalar_type() == kHalf &&
       (weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
        weight.scalar_type() == kChar));
-  GEMM_QKV_WINT4_XETLA_DISPATCH(has_bias);
+
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  int8_t fp64_valid = static_cast<int8_t>(Settings::I().has_2d_block_array(curDevID));
+  GEMM_QKV_WINT4_XETLA_DISPATCH(has_bias, fp64_valid);
 }
 
 #undef GEMM_QKV_WINT4_XETLA_DISPATCH
@@ -121,7 +127,7 @@ static Tensor mm_bias_int4(
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     int64_t calib_gz,
-    int64_t arch) {
+    int8_t arch) {
   auto input_flat = input.flatten(0, -2);
   auto weight_flat = weight.flatten(0, -2);
 
@@ -153,7 +159,7 @@ static Tensor mm_int4(
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     int64_t calib_gz,
-    int64_t arch) {
+    int8_t arch) {
   auto input_flat = input.flatten(0, -2);
   auto weight_flat = weight.flatten(0, -2);
 
@@ -191,7 +197,10 @@ static Tensor mm_silu_int4(
   int n = weight_flat.sizes()[1] * 2;
   int k = input_flat.sizes()[1];
   auto output = at::empty({m, n}, input.options());
-
+  
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  int8_t fp64_valid = static_cast<int8_t>(Settings::I().has_2d_block_array(curDevID));
   auto policy = HGEMMXetla_INT4()
                     .add_matrix_out(output)
                     .add_matrix_inp(input_flat)
@@ -200,6 +209,7 @@ static Tensor mm_silu_int4(
                     .add_matrix_zp(weight_zp)
                     .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SILU)
                     .add_calib_gz(calib_gz)
+                    .add_arch(fp64_valid)
                     .build();
   TORCH_CHECK(policy.fallback() == false, "mm silu int4: invalid gemm shape");
   policy.run();

@@ -71,6 +71,27 @@ namespace xetla {
       const uint32_t m,                                                        \
       const uint32_t n,                                                        \
       const uint32_t k);                                                       \
+  template void hgemm_silu_wint4_pvc<                                          \
+      sycl::half,                                                              \
+      WG_M,                                                                    \
+      WG_N,                                                                    \
+      SG_M,                                                                    \
+      SG_N,                                                                    \
+      SG_K,                                                                    \
+      DEQUANT_S,                                                               \
+      SLM_KS,                                                                  \
+      1,                                                                       \
+      1,                                                                       \
+      3>(                                                                      \
+      sycl::queue & queue,                                                     \
+      sycl::half * out,                                                        \
+      const sycl::half* a,                                                     \
+      const uint8_t* b,                                                        \
+      const uint8_t* b_zp,                                                     \
+      const sycl::half* b_scale,                                               \
+      const uint32_t m,                                                        \
+      const uint32_t n,                                                        \
+      const uint32_t k);                                                       \
   template void hgemm_res_wint4_pvc<                                           \
       sycl::half,                                                              \
       WG_M,                                                                    \
