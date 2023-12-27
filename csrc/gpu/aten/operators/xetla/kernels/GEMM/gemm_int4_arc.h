@@ -387,7 +387,8 @@ inline void hgemm_qkv_bias_wint4_arc(
   using data_type_bias = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
       subgroup::bias_add_op_t<
-      mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>, gpu_arch::Xe>>;
+      mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global,
+      DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>, gpu_arch::Dg2>>;
   using hgemm_wint4_arc_functor = hgemm_wint4_arc_func<
       data_type_a,
       data_type_b,

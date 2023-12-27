@@ -381,6 +381,12 @@ struct GemmWint4Config {
   static bool less_than(int m, int n, int k, int group_size) {
     if (gz < group_size)
       return true;
+    if (gz >= group_size && arch == 0) {
+      if (k / group_size > slm_ks && k % (group_size * slm_ks) != 0)
+        return false;
+      else
+        return true;
+    }
     if (gz == group_size && max_n < n)
       return true;
     if (gz == group_size && max_n == n && max_k < k)
@@ -439,12 +445,13 @@ struct GemmWint4Config {
   GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, MAX_INT, MAX_INT, 1>
 
 #define ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(gz)                       \
-  GemmWint4Config<8, 64, 8, 16, 16, gz, 8, 8, 4096, 4096, 0>,               \
-  GemmWint4Config<8, 64, 8, 16, 16, gz, 8, MAX_INT, MAX_INT, MAX_INT, 0>
+  GemmWint4Config<8, 64, 8, 16, 16, gz, 8, MAX_INT, MAX_INT, MAX_INT, 0>,   \
+  GemmWint4Config<8, 64, 8, 16, 16, gz, 4, MAX_INT, MAX_INT, MAX_INT, 0>
 // clang-format on
 
 #define ORDERED_GEMM_WINT4_CONFIG_SET_ARC             \
   ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(16),      \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(32),  \
       ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(64),  \
       ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(128), \
       ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(256), \
