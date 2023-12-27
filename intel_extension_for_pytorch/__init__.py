@@ -113,6 +113,7 @@ from .transformers import (
     optimize_transformers,
     _set_optimized_model_for_generation,
 )
+from . import llm
 from .frontend import enable_auto_channels_last, disable_auto_channels_last
 from .frontend import set_fp32_math_mode, get_fp32_math_mode, FP32MathMode
 from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl

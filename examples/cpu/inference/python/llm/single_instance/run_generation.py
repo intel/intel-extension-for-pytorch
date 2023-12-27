@@ -140,7 +140,7 @@ model = model.eval()
 model = model.to(memory_format=torch.channels_last)
 # to ipex
 if args.ipex:
-    model = ipex.optimize_transformers(
+    model = ipex.llm.optimize(
         model.eval(),
         dtype=amp_dtype,
         inplace=True,

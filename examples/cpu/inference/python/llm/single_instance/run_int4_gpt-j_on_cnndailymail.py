@@ -200,11 +200,11 @@ num_beams = 4
 batch_size = 1
 if args.fp32 or args.bf16:
     user_model, tokenizer = load_original_model(args)
-    logging.info("Optimize model by ipex.optimize_transformers")
+    logging.info("Optimize model by ipex.llm.optimize")
     user_model = user_model.eval()
     user_model = user_model.to(memory_format=torch.channels_last)
     inf_dtype = torch.float if args.fp32 else torch.bfloat16
-    user_model = ipex.optimize_transformers(
+    user_model = ipex.llm.optimize(
         user_model.eval(),
         dtype=inf_dtype,
         inplace=True,
@@ -294,8 +294,8 @@ elif args.int4_model == "":
     qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
         weight_dtype=weight_dtype, lowp_mode=lowp_mode
     )
-    logging.info("Start quantizing model to INT4 by ipex.optimize_transformers.")
-    user_model = ipex.optimize_transformers(
+    logging.info("Start quantizing model to INT4 by ipex.llm.optimize.")
+    user_model = ipex.llm.optimize(
         user_model.eval(),
         dtype=torch.bfloat16,
         quantization_config=qconfig_mapping,

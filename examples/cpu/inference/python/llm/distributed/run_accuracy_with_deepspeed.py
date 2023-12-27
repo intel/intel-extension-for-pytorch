@@ -322,7 +322,7 @@ if args.accuracy_only:
                     qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
                         weight_dtype=weight_dtype, lowp_mode=lowp_mode
                     )
-                self.model = ipex.optimize_transformers(
+                self.model = ipex.llm.optimize(
                     self.model.eval(),
                     dtype=infer_dtype,
                     quantization_config=qconfig if ipex_woq_enabled else None,

@@ -165,7 +165,7 @@ class OptimizeTransformersTester(TestCase):
                 )
         ref_m = copy.deepcopy(model)
         ipex_m = copy.deepcopy(model)
-        ipex_m = ipex.optimize_transformers(
+        ipex_m = ipex.llm.optimize(
             ipex_m, dtype=dtype, deployment_mode=deployment_mode, inplace=True
         )
         if torchcompile:
@@ -222,7 +222,7 @@ class OptimizeTransformersTester(TestCase):
         orig_woq_model = prepare(orig_model, qconfig_mapping, inplace=True)
         orig_woq_model = convert(orig_woq_model, inplace=True)
 
-        model = ipex.optimize_transformers(
+        model = ipex.llm.optimize(
             model,
             dtype=torch.float,
             quantization_config=qconfig_mapping,
@@ -296,7 +296,7 @@ class OptimizeTransformersTester(TestCase):
         quant_m = copy.deepcopy(m)
         qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
         example_inputs = _get_gptj_example_inputs()
-        quant_m = ipex.optimize_transformers(
+        quant_m = ipex.llm.optimize(
             quant_m, dtype=torch.float, quantization_config=qconfig, inplace=True
         )
         from intel_extension_for_pytorch.quantization import prepare
@@ -315,7 +315,7 @@ class OptimizeTransformersTester(TestCase):
                 if dtype is torch.bfloat16:
                     ipex_m = ipex_m.to(torch.bfloat16)
                 qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
-                ipex_m = ipex.optimize_transformers(
+                ipex_m = ipex.llm.optimize(
                     ipex_m,
                     dtype=dtype,
                     quantization_config=qconfig,
@@ -361,7 +361,7 @@ class OptimizeTransformersTester(TestCase):
             qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
                 lowp_mode=lowp_mode
             )
-            ipex_m = ipex.optimize_transformers(
+            ipex_m = ipex.llm.optimize(
                 ipex_m,
                 dtype=torch.float,
                 quantization_config=qconfig,

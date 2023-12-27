@@ -254,7 +254,7 @@ global_past_key_value = [
 if args.ipex_smooth_quant:
     if args.qconfig_summary_file is not "":
         qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=args.alpha)
-        user_model = ipex.optimize_transformers(
+        user_model = ipex.llm.optimize(
             user_model.eval(),
             dtype=amp_dtype,
             quantization_config=qconfig,
@@ -368,7 +368,7 @@ if args.ipex_smooth_quant:
             from neural_compressor import PostTrainingQuantConfig, quantization
     
             qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
-            user_model = ipex.optimize_transformers(
+            user_model = ipex.llm.optimize(
                 user_model.eval(),
                 dtype=amp_dtype,
                 quantization_config=qconfig,
@@ -425,7 +425,7 @@ if args.ipex_smooth_quant:
             from intel_extension_for_pytorch.quantization import prepare, convert
     
             qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=args.alpha)
-            user_model = ipex.optimize_transformers(
+            user_model = ipex.llm.optimize(
                 user_model.eval(),
                 dtype=amp_dtype,
                 quantization_config=qconfig,
@@ -502,7 +502,7 @@ elif args.ipex_weight_only_quantization:
         low_precision_checkpoint = state_dict_and_config
     else:
         low_precision_checkpoint = None
-    user_model = ipex.optimize_transformers(
+    user_model = ipex.llm.optimize(
         user_model.eval(),
         dtype=amp_dtype,
         quantization_config=qconfig,
@@ -582,7 +582,7 @@ if args.benchmark:
         "baichuan", config.architectures[0], re.IGNORECASE
     ) and not re.search("chatglm", config.architectures[0], re.IGNORECASE):
         qconfig = ipex.quantization.default_static_qconfig_mapping
-        user_model = ipex.optimize_transformers(
+        user_model = ipex.llm.optimize(
             user_model.eval(),
             dtype=torch.float,
             inplace=True,

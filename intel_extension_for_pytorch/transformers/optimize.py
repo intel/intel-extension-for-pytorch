@@ -71,7 +71,7 @@ def _set_optimized_model_for_generation(
 
     setattr(model, "trace_graph", optimized_model)  # noqa: B010
     print(
-        "ipex.optimize_transformers has set the optimized or quantization model for model.generate()"
+        "ipex.llm.optimize has set the optimized or quantization model for model.generate()"
     )
     return model
 
@@ -563,9 +563,9 @@ def ipex_quantization_flow(
 
     if static_qconfig_file is not None:
         prepared_model.load_qconf_summary(qconf_summary=static_qconfig_file)
-        print("ipex.optimize_transformers is doing the static quantization")
+        print("ipex.llm.optimize is doing the static quantization")
     else:
-        print("ipex.optimize_transformers is doing the weight only quantization")
+        print("ipex.llm.optimize is doing the weight only quantization")
 
     with torch.no_grad(), torch.cpu.amp.autocast(
         enabled=True if dtype is torch.bfloat16 else False
@@ -672,7 +672,7 @@ def model_convert_lowering(
     return _model
 
 
-def optimize_transformers(
+def optimize(
     model,
     optimizer=None,
     dtype=torch.float,
@@ -724,7 +724,7 @@ def optimize_transformers(
         Optimized model object for model.generate(), also workable with model.forward
 
     .. warning::
-        Please invoke ``optimize_transformers`` function AFTER invoking DeepSpeed in Tensor Parallel
+        Please invoke ``ipex.llm.optimize`` function AFTER invoking DeepSpeed in Tensor Parallel
         inference scenario.
 
     Examples:
@@ -733,7 +733,7 @@ def optimize_transformers(
         >>> model = ...
         >>> model.load_state_dict(torch.load(PATH))
         >>> model.eval()
-        >>> optimized_model = ipex.optimize_transformers(model, dtype=torch.bfloat16)
+        >>> optimized_model = ipex.llm.optimize(model, dtype=torch.bfloat16)
         >>> optimized_model.generate()
 
     """
@@ -741,7 +741,7 @@ def optimize_transformers(
         return model
     if model.training or optimizer is not None:
         warnings.warn(
-            "fail to apply optimize_transformers, this API supports inference for now, fallback to default path"
+            "fail to apply ipex.llm.optimize, this API supports inference for now, fallback to default path"
         )
         return model, optimizer
 
@@ -751,7 +751,7 @@ def optimize_transformers(
         validated_version = "4.35.2"
         if "transformers" not in installed_pkg:
             raise RuntimeError(
-                "optimize_transformers requires transformers package with version at least {} , fallback".format(
+                "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
                     min_version
                 )
             )
@@ -762,7 +762,7 @@ def optimize_transformers(
         trans_version = transformers.__version__
         if version.parse(trans_version) < version.parse(min_version):
             raise RuntimeError(
-                "optimize_transformers requires transformers: at least {} while but your transformers== {}, fallback".format(
+                "ipex.llm.optimize requires transformers: at least {} while but your transformers== {}, fallback".format(
                     min_version, trans_version
                 )
             )
@@ -794,7 +794,7 @@ def optimize_transformers(
         ]
         if not well_supported_model:
             warnings.warn(
-                "optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, Baichuan, ChatGLM, \
+                "ipex.llm.optimize supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, Baichuan, ChatGLM, \
                     GPTBigCode, T5, Mistral, and MPT, fallback to origin model"
             )
             return model
@@ -877,7 +877,7 @@ def optimize_transformers(
                     return _model
                 else:
                     print(
-                        "ipex.optimize_transformers is prepared for the calibration of the static quantization"
+                        "ipex.llm.optimize is prepared for the calibration of the static quantization"
                     )
 
             else:  # weight only quantization
@@ -908,8 +908,37 @@ def optimize_transformers(
 
     except RuntimeError as e:
         warnings.warn(
-            f"fail to apply optimize_transformers due to: {e}, fallback to the origin model"
+            f"fail to apply ipex.llm.optimize due to: {e}, fallback to the origin model"
         )
         return model
 
     return model
+
+
+def optimize_transformers(
+    model,
+    optimizer=None,
+    dtype=torch.float,
+    inplace=False,
+    device="cpu",
+    quantization_config=None,
+    qconfig_summary_file=None,
+    low_precision_checkpoint=None,
+    sample_inputs=None,
+    deployment_mode=True,
+):
+    warnings.warn(
+        "ipex.optimize_transformers API is going to be deprecated, please use ipex.llm.optimize instead."
+    )
+    return optimize(
+        model=model,
+        optimizer=optimizer,
+        dtype=dtype,
+        inplace=inplace,
+        device=device,
+        quantization_config=quantization_config,
+        qconfig_summary_file=qconfig_summary_file,
+        low_precision_checkpoint=low_precision_checkpoint,
+        sample_inputs=sample_inputs,
+        deployment_mode=deployment_mode,
+    )

@@ -167,7 +167,7 @@ if args.accuracy_only:
             self.model = self.model.eval()
 
             if with_ipex and dtype != "int8":
-                self.model = ipex.optimize_transformers(
+                self.model = ipex.llm.optimize(
                     self.model.eval(),
                     dtype=infer_dtype,
                     inplace=True,
