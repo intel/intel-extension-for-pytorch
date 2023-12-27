@@ -76,5 +76,5 @@ if args.local_rank == 0 :
         low_cpu_mem_usage=True,
         trust_remote_code=True,
     )
-    model.save_pretrained(save_directory=args.save_path, max_shard_size=args.max_shard_size)
+    model.save_pretrained(save_directory=args.save_path, max_shard_size=args.max_shard_size, safe_serialization=False)
     tokenizer.save_pretrained(save_directory=args.save_path)
