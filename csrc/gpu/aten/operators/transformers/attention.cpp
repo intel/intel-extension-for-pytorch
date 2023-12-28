@@ -166,15 +166,18 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math(
           Tensor query_fp32 = query_.to(at::kFloat);
           Tensor key_fp32 = key.to(at::kFloat);
           Tensor value_fp32 = value.to(at::kFloat);
-          return _scaled_dot_product_attention_math_impl(
-              query_fp32,
-              key_fp32,
-              value_fp32,
-              attn_mask_,
-              dropout_p,
-              is_causal,
-              dropout_mask,
-              scale);
+          auto [attn_output, attn_weight] =
+              _scaled_dot_product_attention_math_impl(
+                  query_fp32,
+                  key_fp32,
+                  value_fp32,
+                  attn_mask_,
+                  dropout_p,
+                  is_causal,
+                  dropout_mask,
+                  scale);
+          return std::make_tuple(
+              attn_output.to(at::kHalf), attn_weight.to(at::kHalf));
         }
         return _scaled_dot_product_attention_math_impl(
             query_,
