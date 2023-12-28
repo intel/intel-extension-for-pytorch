@@ -182,7 +182,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 print("LLM RUNTIME ERROR: Running generation task failed. Quit.")
                 quit()
             print("LLM RUNTIME INFO: Finished successfully.")
-        elif re.search("baichuan", str(args.model_name_or_path), re.IGNORECASE) or re.search("chatglm", str(args.model_name_or_path), re.IGNORECASE):
+        elif (
+            re.search("baichuan", str(args.model_name_or_path), re.IGNORECASE)
+            or re.search("chatglm", str(args.model_name_or_path), re.IGNORECASE)
+            or re.search("t5", str(args.model_name_or_path), re.IGNORECASE)
+            ):
             qpath = Path(parent_path, "single_instance/run_quantization.py")
             infer_cmd = ["python", qpath]
             infer_cmd.extend(["-m", str(args.model_name_or_path)])
