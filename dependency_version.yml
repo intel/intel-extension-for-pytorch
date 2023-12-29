@@ -8,16 +8,16 @@ oneCCL:
   branch: 2021.10
   commit: bfc879266e870b732bd165e399897419c44ad13d
 pytorch:
-  version: 2.2.0.dev20231213+cpu
+  version: 2.3.0.dev20231219+cpu
 torch-ccl:
   repo: https://github.com/intel/torch-ccl.git
   tag: ccl_torch_dev_1115
   commit: 8c0fd87ec2cf8ab99f5bada4b85f151ac9984818
   version: 2.2.0+cpu
 torchaudio:
-  version: 2.2.0.dev20231213+cpu
+  version: 2.3.0.dev20231219+cpu
 torchvision:
-  version: 0.18.0.dev20231213+cpu
+  version: 0.18.0.dev20231219+cpu
 deepspeed:
   branch: gma/run-opt-branch
   repo: https://github.com/delock/DeepSpeedSYCLSupport.git
