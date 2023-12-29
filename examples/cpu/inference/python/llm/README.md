@@ -36,6 +36,8 @@ The scripts cover model generation inference with low precions cases for differe
 
 # Environment Setup
 
+*Note*: The instructions in this section will setup an environment with a recent PyTorch\* nightly build and **a latest source build of IPEX**. If you like to use stable PyTorch\* and IPEX release versions, please refer the instructions [in the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.1.100%2Bcpu/examples/cpu/inference/python/llm/README.md#environment-setup), in which IPEX is installed via prebuilt wheels using `pip install` rather than source code building.
+
 1\. Get the Intel® Extension for PyTorch\* source code
 
 ```bash
