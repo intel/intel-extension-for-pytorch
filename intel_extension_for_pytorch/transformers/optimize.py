@@ -713,7 +713,6 @@ def optimize(
             Weights shape should be N by K and they are quantized to UINT4 and compressed along K, then stored as
             `torch.int32`. Zero points are also UINT4 and stored as INT32. Scales and bias are floating point values.
             Bias is optional. If bias is not in state dict, bias of the original model is used.
-            Only per-channel quantization of weight is supported (group size = -1).
             Default value is ``None``.
         sample_inputs (Tuple tensors): sample inputs used for model quantization or torchscript.
             Default value is ``None``, and for well supported model, we provide this sample inputs automaticlly.

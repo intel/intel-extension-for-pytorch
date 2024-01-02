@@ -252,7 +252,7 @@ global_past_key_value = [
 
 
 if args.ipex_smooth_quant:
-    if args.qconfig_summary_file is not "":
+    if args.qconfig_summary_file != "":
         qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=args.alpha)
         user_model = ipex.llm.optimize(
             user_model.eval(),
