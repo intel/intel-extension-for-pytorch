@@ -268,10 +268,19 @@ class TestOptimizeCases(TestCase):
             ipex_model, ipex_optimizer = ipex.optimize(
                 origin_model, optimizer=origin_optimizer, dtype=dtype
             )
-            for origi_p, opti_p in zip(
-                origin_model.parameters(), ipex_model.parameters()
-            ):
-                self.assertEqual(origi_p.requires_grad, opti_p.requires_grad)
+            self.assertEqual(
+                origin_model.conv.weight.requires_grad,
+                ipex_model.conv.weight.requires_grad,
+            )
+            self.assertEqual(
+                origin_model.conv.bias.requires_grad, ipex_model.conv.bias.requires_grad
+            )
+            self.assertEqual(
+                origin_model.bn.weight.requires_grad, ipex_model.bn.weight.requires_grad
+            )
+            self.assertEqual(
+                origin_model.bn.bias.requires_grad, ipex_model.bn.bias.requires_grad
+            )
 
             x = model.input1.to(memory_format=torch.channels_last)
             origin_x = x.clone()
@@ -738,6 +747,35 @@ class TestOptimizeCases(TestCase):
             self.assertEqual(
                 ipex_optimizer_state[var_name], ref_ipex_optimizer_state[var_name]
             )
+
+    # This test case is to simulate the use case of Stable Diffusion fine-tuning
+    def test_eval_backward(self):
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super(Model, self).__init__()
+                self.conv = torch.nn.Conv2d(3, 2, kernel_size=(2, 2))
+
+            def forward(self, x):
+                return self.conv(x)
+
+        x = torch.randn(1, 3, 8, 8)
+        x_optimized = copy.deepcopy(x)
+        x.requires_grad_()
+        x_optimized.requires_grad_()
+
+        m = Model().eval()
+        optimized_m = ipex.optimize(m)
+
+        y = m(x)
+        y.sum().backward()
+
+        y_optimized = optimized_m(x_optimized)
+        y_optimized.sum().backward()
+
+        grad = x.grad
+        grad_optimized = x_optimized.grad
+
+        self.assertEqual(grad, grad_optimized)
 
     def test_load_after_optimize(self):
         class Model(torch.nn.Module):

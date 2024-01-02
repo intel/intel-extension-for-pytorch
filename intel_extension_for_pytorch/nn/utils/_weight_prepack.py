@@ -516,13 +516,13 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
             # workflow:
             # model.train() -> ipex.optimize(model) -> model.eval()
             new_m._ipex_module_empty_weight_tensor = torch.nn.Parameter(
-                torch.Tensor().to(dtype=new_m.weight.dtype)
+                torch.Tensor().to(dtype=new_m.weight.dtype), requires_grad=False
             )
             if new_m.bias is None:
                 new_m.register_parameter("_ipex_module_empty_bias_tensor", None)
             else:
                 new_m._ipex_module_empty_bias_tensor = torch.nn.Parameter(
-                    torch.Tensor().to(dtype=new_m.bias.dtype)
+                    torch.Tensor().to(dtype=new_m.bias.dtype), requires_grad=False
                 )
             return new_m
         else:
