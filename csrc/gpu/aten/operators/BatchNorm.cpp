@@ -1433,6 +1433,7 @@ std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> native_batch_norm_out(
     }
 
   } else {
+    out = at::empty_like(input);
     const bool has_running_mean =
         (running_mean_opt.has_value() && running_mean_opt->defined());
     const bool has_running_var =
@@ -1475,7 +1476,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm(
     bool training,
     double momentum,
     double epsilon) {
-  Tensor dst = at::empty_like(src);
+  Tensor dst;
   int n_input = src.size(1);
   auto options = src.options().dtype(toAccumulateType(src.scalar_type()));
   Tensor save_mean = at::empty({n_input}, options);
