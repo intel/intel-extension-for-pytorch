@@ -155,6 +155,15 @@ def IPEX_WEIGHT_CONVERT_MODULE_XPU(inference: bool, dtype: torch.bfloat16):
     except ImportError:
         pass
 
+    try:
+        from transformers.models.bart.modeling_bart import (
+            BartLearnedPositionalEmbedding,
+        )
+
+        module_convert_list_inference.append(BartLearnedPositionalEmbedding)
+    except ImportError:
+        pass
+
     if inference:
         return module_convert_list_inference
     else:
