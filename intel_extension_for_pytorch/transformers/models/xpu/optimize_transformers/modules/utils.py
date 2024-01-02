@@ -78,7 +78,7 @@ def pad_for_gptj_lm_head(model, is_int4=False):
             lm_head_new.qzeros = model.lm_head.qzeros
         else:
             lm_head_new.qzeros = None
-        lm_head_new.group_size = model.lm_head.groupsize
+        lm_head_new.group_size = model.lm_head.blocksize
         model.lm_head = lm_head_new
 
         model.lm_head.qweight.data = model.lm_head.qweight.transpose(0, 1).contiguous()
