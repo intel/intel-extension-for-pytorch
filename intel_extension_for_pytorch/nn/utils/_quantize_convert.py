@@ -79,7 +79,6 @@ class WeightOnlyLinear(nn.Module):
         double_quant_scale_dtype=None,
         compression_dtype=torch.int32,
         compression_dim=1,
-        g_idx=False,
         device=None,
         use_optimum_format=False,
     ) -> None:
@@ -129,136 +128,6 @@ class WeightOnlyLinear(nn.Module):
             + "0 is output channel, 1 is input channel."
         )
         self.use_optimum_format = use_optimum_format
-        if self.use_optimum_format:
-            self.register_buffer(
-                "scales",
-                torch.empty(
-                    (math.ceil(in_features / self.blocksize), out_features),
-                    dtype=convert_dtype_str2torch(self.scale_dtype),
-                    device=device,
-                ),
-            )
-            self.scales = self.scales.T
-            weight = torch.empty(
-                (math.ceil(in_features / self.n_pack), out_features),
-                dtype=self.compression_dtype,
-                device=device,
-            )
-            self.register_buffer(
-                "qweight",
-                ParamsLowBits(
-                    weight,
-                    requires_grad=False,
-                    quant_state={"scheme": self.scheme},
-                    blocksize=self.blocksize,
-                    compress_statistics=self.compress_statistics,
-                    quant_dtype=self.weight_dtype,
-                    scale_dtype=self.scale_dtype,
-                    double_quant_scale_dtype=self.double_quant_scale_dtype,
-                    compression_dtype=self.compression_dtype,
-                ),
-            )
-            self.qweight = self.qweight.T
-            self.register_buffer(
-                "qzeros",
-                torch.empty(
-                    (
-                        math.ceil(self.in_features / self.blocksize),
-                        math.ceil(self.out_features / self.n_pack)
-                    ),
-                    dtype=self.compression_dtype,
-                    device=device,
-                ),
-            )
-            self.qzeros = self.qzeros.T
-        else:
-            self.register_buffer(
-                "scales",
-                torch.empty(
-                    (out_features, math.ceil(in_features / self.blocksize)),
-                    dtype=convert_dtype_str2torch(self.scale_dtype),
-                    device=device,
-                ),
-            )
-            if compression_dim == 1:
-                weight = torch.empty(
-                    (out_features, math.ceil(in_features / self.n_pack)),
-                    dtype=self.compression_dtype,
-                    device=device,
-                )
-                self.register_buffer(
-                    "qweight",
-                    ParamsLowBits(
-                        weight,
-                        requires_grad=False,
-                        quant_state={"scheme": self.scheme},
-                        blocksize=self.blocksize,
-                        compress_statistics=self.compress_statistics,
-                        quant_dtype=self.weight_dtype,
-                        scale_dtype=self.scale_dtype,
-                        double_quant_scale_dtype=self.double_quant_scale_dtype,
-                        compression_dtype=self.compression_dtype,
-                    ),
-                ),
-                self.register_buffer(
-                    "qzeros",
-                    torch.zeros(
-                        (
-                            self.out_features,
-                            math.ceil(self.in_features / self.blocksize / self.n_pack)
-                        ),
-                        dtype=self.compression_dtype,
-                        device=device,
-                    ),
-                )
-            else:
-                weight = torch.empty(
-                    (math.ceil(out_features / self.n_pack), in_features),
-                    dtype=self.compression_dtype,
-                    device=device,
-                )
-                self.register_buffer(
-                    "qweight",
-                    ParamsLowBits(
-                        weight,
-                        requires_grad=False,
-                        quant_state={"scheme": self.scheme},
-                        blocksize=self.blocksize,
-                        compress_statistics=self.compress_statistics,
-                        quant_dtype=self.weight_dtype,
-                        scale_dtype=self.scale_dtype,
-                        double_quant_scale_dtype=self.double_quant_scale_dtype,
-                        compression_dtype=self.compression_dtype,
-                    ),
-                )
-                self.register_buffer(
-                    "qzeros",
-                    torch.zeros(
-                        (
-                            math.ceil(self.out_features / self.n_pack),
-                            math.ceil(self.in_features / self.blocksize)
-                        ),
-                        dtype=self.compression_dtype,
-                        device=device,
-                    ),
-                )
-        if g_idx:
-            self.register_buffer(
-                "g_idx", torch.empty(in_features, dtype=torch.int32, device=device)
-            )
-        else:
-            self.g_idx = None
-        if bias:
-            self.register_buffer(
-                "bias",
-                torch.empty(
-                    self.out_features,
-                    dtype=convert_dtype_str2torch(self.compute_dtype),
-                    device=device,
-                ),
-            )
-        else:
-            self.bias = None
 
     def forward(self, input: Tensor) -> Tensor:
         if not self.weight_transposed:
@@ -268,7 +137,7 @@ class WeightOnlyLinear(nn.Module):
             input,
             self.qweight,
             self.scales,
-            self.qzeros.byte() if hasattr(self, "qzeros") else None,
+            self.qzeros,
             self.bias,
             self.bias is not None,
             self.compute_dtype,
@@ -277,7 +146,7 @@ class WeightOnlyLinear(nn.Module):
         )
 
     def set_weights_bias(self, weight_data, bias=None):
-        self.qweight = ParamsLowBits(
+        qweight = ParamsLowBits(
             data=weight_data.byte(),
             requires_grad=False,
             quant_state={"scheme": self.scheme},
@@ -288,8 +157,45 @@ class WeightOnlyLinear(nn.Module):
             double_quant_scale_dtype=self.double_quant_scale_dtype,
             compression_dtype=self.compression_dtype,
         )
+        self.register_buffer("qweight", qweight)
         if bias is not None:
-            self.bias = torch.nn.Parameter(bias, requires_grad=False)
+            self.register_buffer("bias", torch.nn.Parameter(bias, requires_grad=False))
+        else:
+            self.bias = None
+
+    def set_scales_zps_gidx(self, scales, qzeros=None, g_idx=None):
+        self.register_buffer("scales", scales)
+        if qzeros is None:
+            if self.use_optimum_format:
+                qzeros = torch.zeros(
+                    (
+                        math.ceil(self.in_features / self.blocksize),
+                        math.ceil(self.out_features / self.n_pack)
+                    ),
+                    dtype=self.compression_dtype,
+                    device=self.device,
+                )
+                qzeros = qzeros.T
+            elif self.compression_dim == 1:
+                qzeros = torch.zeros(
+                    (
+                        self.out_features,
+                        math.ceil(self.in_features / self.blocksize / self.n_pack)
+                    ),
+                    dtype=self.compression_dtype,
+                    device=self.device,
+                )
+            else:
+                qzeros = torch.zeros(
+                    (
+                        math.ceil(self.out_features / self.n_pack),
+                        math.ceil(self.in_features / self.blocksize)
+                    ),
+                    dtype=self.compression_dtype,
+                    device=self.device,
+                )
+        self.register_buffer("qzeros", qzeros.byte())
+        self.register_buffer("g_idx", g_idx)
 
     def extra_repr(self) -> str:
         tmp_str = (
