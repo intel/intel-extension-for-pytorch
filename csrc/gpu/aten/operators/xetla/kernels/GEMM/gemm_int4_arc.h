@@ -52,7 +52,6 @@ struct hgemm_wint4_arc_func {
   using compute_policy = gpu::xetla::group::compute_policy_bit4_dequantize_xmx<
       compute_attr,
       perf_tuning_knob,
-    //   gpu::xetla::group::quant_type::S4_FULLRANGE,
       gpu::xetla::group::quant_type::S4_SYM,
       dtype_scale,
       dequant_s,
