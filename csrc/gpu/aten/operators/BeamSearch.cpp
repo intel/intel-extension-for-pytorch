@@ -377,6 +377,30 @@ Tensor update_beam_indices_for_cache(
   return out_cache_indices;
 }
 
+Tensor update_native_beam_indices_for_cache(
+    const Tensor& src_cache_indices,
+    const Tensor& beam_ids,
+    int64_t beam_size,
+    int64_t batch_size) {
+  Tensor out_cache_indices = at::empty(
+      {src_cache_indices.size(0) + 1, src_cache_indices.size(1)},
+      src_cache_indices.options());
+  const int step = src_cache_indices.size(0);
+  IPEX_DISPATCH_INTEGRAL_TYPES(
+      src_cache_indices.scalar_type(),
+      "update_native_beam_indices_for_cache",
+      [&]() {
+        impl::update_native_beam_indices_kernel(
+            src_cache_indices.data_ptr<scalar_t>(),
+            out_cache_indices.data_ptr<scalar_t>(),
+            beam_ids.data_ptr<int64_t>(),
+            step,
+            beam_size,
+            batch_size);
+      });
+  return out_cache_indices;
+}
+
 // Decoding stops when meet the stop condition. Pick final high score sentence
 // as beam search output. When decoding ends, global/candidate pool maintain
 // high score tokens for non-eos/eos sentences. Merge two lists and select top
@@ -483,6 +507,11 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
       "update_beam_indices_for_cache",
       update_beam_indices_for_cache,
+      c10::DispatchKey::XPU);
+
+  IPEX_OP_REGISTER_DISPATCH(
+      "update_native_beam_indices_for_cache",
+      update_native_beam_indices_for_cache,
       c10::DispatchKey::XPU);
 
   IPEX_OP_REGISTER_DISPATCH(

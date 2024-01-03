@@ -556,9 +556,53 @@ void update_beam_indices_kernel(
 
       if (sentence_id < batch_size * beam_size && time_step < num_step) {
         const scalar_t src_beam = beam_ids[sentence_id];
-        // const scalar_t src_beam =
-        //     (scalar_t)beam_ids[sentence_id] - batch_id * beam_size;
-        // fix for reference beam search
+        const int32_t src_offset = batch_size * beam_size * time_step +
+            batch_id * beam_size + src_beam;
+        const int32_t out_offset =
+            batch_size * beam_size * time_step + batch_id * beam_size + beam_id;
+
+        out_cache_indices[out_offset] =
+            (time_step == step) ? beam_id : src_cache_indices[src_offset];
+      }
+    };
+
+    cgh.parallel_for(
+        sycl::nd_range<2>(
+            sycl::range<2>(wg_number * wg_size, batch_size * beam_size),
+            sycl::range<2>(wg_size, 1)),
+        kfn);
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+template <typename scalar_t>
+void update_native_beam_indices_kernel(
+    scalar_t* src_cache_indices,
+    scalar_t* out_cache_indices,
+    int64_t* beam_ids,
+    int32_t step,
+    int32_t beam_size,
+    int32_t batch_size) {
+  int32_t num_step = step + 1;
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  int32_t wg_size = 32;
+  int32_t wg_number = (num_step + wg_size - 1) / wg_size;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
+      int32_t time_step =
+          item.get_group(0) * item.get_local_range(0) + item.get_local_id(0);
+      int32_t sentence_id =
+          item.get_group(1) * item.get_local_range(1) + item.get_local_id(1);
+
+      int32_t beam_id = sentence_id % beam_size;
+      int32_t batch_id = sentence_id / beam_size;
+      int32_t offset = num_step * batch_size * beam_size;
+
+      if (sentence_id < batch_size * beam_size && time_step < num_step) {
+        const scalar_t src_beam =
+            (scalar_t)beam_ids[sentence_id] - batch_id * beam_size;
+        // for reference beam search
         const int32_t src_offset = batch_size * beam_size * time_step +
             batch_id * beam_size + src_beam;
         const int32_t out_offset =
