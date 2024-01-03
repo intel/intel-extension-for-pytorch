@@ -408,6 +408,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "gptbigcode": ("/gptbigcode_local_shard"),
                 "t5": ("/t5_local_shard"),
                 "mistral": ("/mistral_local_shard"),
+                "mpt": ("/mpt_local_shard"),
             }
             model_type = next(
                 (x for x in MODEL_CLASSES.keys() if x in args.model_name_or_path.lower()), "auto"

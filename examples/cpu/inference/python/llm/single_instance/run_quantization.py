@@ -211,7 +211,7 @@ else:
 
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
-if model.name == "mpt" and args.prompt is None:
+if model.name == "mpt" and not hasattr(config, "max_seq_len") and args.prompt is None:
     config.max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
 
 user_model = model.get_user_model(config, args.benchmark)
