@@ -183,7 +183,7 @@ endif()
 find_package(OMP QUIET)
 if(${OpenMP_FOUND})
   # It will use openmp lib of current compiler.
-  # message("!!!!!OpenMP_CXX_LIBRARIES: ${OpenMP_CXX_LIBRARIES}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
   target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC "${OpenMP_CXX_LIBRARIES}")
 endif()
 
