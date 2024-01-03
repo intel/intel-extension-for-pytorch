@@ -129,24 +129,31 @@ if(CLANG_FORMAT)
 endif()
 
 if(USE_LIBXSMM)
-  include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
-  set(args
-  CC=${CMAKE_C_COMPILER}
-  CXX=${CMAKE_CXX_COMPILER}
-  FC=${CMAKE_Fortran_COMPILER}
-  )
-
-  ExternalProject_Add(libxsmm
-    SOURCE_DIR ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm
-    BUILD_IN_SOURCE 1
-    CONFIGURE_COMMAND ""
-    BUILD_COMMAND
-      make
-      "-j"
-      ${args}
-    INSTALL_COMMAND ""
+  if(BUILD_LIBXSMM_VIA_CMAKE)
+    add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm cpu_third_party/libxsmm EXCLUDE_FROM_ALL)
+    add_definitions(-DLIBXSMM_DEFAULT_CONFIG)
+    target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/include)
+    target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE xsmm)
+  else(BUILD_LIBXSMM_VIA_CMAKE)
+    include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
+    set(args
+    CC=${CMAKE_C_COMPILER}
+    CXX=${CMAKE_CXX_COMPILER}
+    FC=${CMAKE_Fortran_COMPILER}
     )
-  target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/lib/libxsmm.a)
+
+    ExternalProject_Add(libxsmm
+      SOURCE_DIR ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm
+      BUILD_IN_SOURCE 1
+      CONFIGURE_COMMAND ""
+      BUILD_COMMAND
+        make
+        "-j"
+        ${args}
+      INSTALL_COMMAND ""
+      )
+    target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/lib/libxsmm.a)
+  endif(BUILD_LIBXSMM_VIA_CMAKE)
 endif(USE_LIBXSMM)
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build sleef static" FORCE)
