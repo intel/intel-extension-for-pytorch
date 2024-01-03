@@ -203,7 +203,7 @@ if args.accuracy_only:
             if world_size == 1 or model_type in ["falcon", "baichuan", "t5", "mistral", "gptbigcode"]:
                 self.model = model_class[0].from_pretrained(
                     model_id,
-                    config=config,
+                    config=self.config,
                     low_cpu_mem_usage=True,
                     torch_dtype=load_dtype,
                     trust_remote_code=True,

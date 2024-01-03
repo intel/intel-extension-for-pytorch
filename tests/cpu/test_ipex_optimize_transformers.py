@@ -153,9 +153,13 @@ supported_models = [
 
 
 class OptimizeTransformersTester(TestCase):
-    def model_replacement_check(self, m, dtype, deployment_mode, torchcompile=False):
+    def model_replacement_check(
+        self, m, dtype, deployment_mode, torchcompile=False, return_dict=False
+    ):
         config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/{m.name}", return_dict=False, trust_remote_code=True
+            f"{curpath}/hf_configs/{m.name}",
+            return_dict=return_dict,
+            trust_remote_code=True,
         )
         model = m.model_class(config).eval()
         if m.name == "falcon":
@@ -203,18 +207,24 @@ class OptimizeTransformersTester(TestCase):
             enabled=True if dtype is torch.bfloat16 else False
         ):
             key_ipex = ipex_m(**input_dict)
-        self.assertEqual(key_hf[0], key_ipex[0], prec=0.1)
+        if return_dict:
+            assert isinstance(key_ipex, dict)
+            self.assertEqual(key_hf["logits"], key_ipex["logits"], prec=0.1)
+        else:
+            assert isinstance(key_ipex, tuple)
+            self.assertEqual(key_hf[0], key_ipex[0], prec=0.1)
 
     def test_model_replacement(self):
         dtypes = [torch.bfloat16]
         enable_torchcompile = [False, True]
         deployment_mode = [True, False]
-        for m, torchcompile, dtype, jit in itertools.product(
-            supported_models, enable_torchcompile, dtypes, deployment_mode
+        return_dict = [False, True]
+        for m, torchcompile, dtype, jit, return_dict in itertools.product(
+            supported_models, enable_torchcompile, dtypes, deployment_mode, return_dict
         ):
             if torchcompile and deployment_mode:
                 continue
-            self.model_replacement_check(m, dtype, jit, torchcompile)
+            self.model_replacement_check(m, dtype, jit, torchcompile, return_dict)
 
     def _model_replacement_check_woq(self, model):
         qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping()

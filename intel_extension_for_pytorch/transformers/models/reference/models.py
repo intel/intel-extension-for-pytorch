@@ -1,13 +1,12 @@
 import torch
 from torch.nn import CrossEntropyLoss
-from typing import Optional, Tuple, Union, List
+from typing import Any, Optional, Tuple, Union, List
 from transformers.modeling_outputs import (
     CausalLMOutputWithPast,
     BaseModelOutputWithPast,
     CausalLMOutputWithCrossAttentions,
     BaseModelOutputWithPastAndCrossAttentions,
     Seq2SeqLMOutput,
-    BaseModelOutput,
 )
 
 from transformers.utils import logging
@@ -29,12 +28,8 @@ def GPTJForCausalLM_forward(
     use_cache: Optional[bool] = None,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
 ) -> Union[Tuple, CausalLMOutputWithPast]:
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
-    )
-
     transformer_outputs = self.transformer(
         input_ids,
         past_key_values=past_key_values,
@@ -46,7 +41,7 @@ def GPTJForCausalLM_forward(
         use_cache=use_cache,
         output_attentions=output_attentions,
         output_hidden_states=output_hidden_states,
-        return_dict=return_dict,
+        return_dict=False,
     )
     hidden_states = transformer_outputs[0]
 
@@ -81,17 +76,8 @@ def GPTJForCausalLM_forward(
 
         loss = loss.to(hidden_states.dtype)
 
-    if not return_dict:
-        output = (lm_logits,) + transformer_outputs[1:]
-        return ((loss,) + output) if loss is not None else output
-
-    return CausalLMOutputWithPast(
-        loss=loss,
-        logits=lm_logits,
-        past_key_values=transformer_outputs.past_key_values,
-        hidden_states=transformer_outputs.hidden_states,
-        attentions=transformer_outputs.attentions,
-    )
+    output = (lm_logits,) + transformer_outputs[1:]
+    return ((loss,) + output) if loss is not None else output
 
 
 def LlamaForCausalLM_forward(
@@ -105,7 +91,7 @@ def LlamaForCausalLM_forward(
     use_cache: Optional[bool] = None,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
 ) -> Union[Tuple, CausalLMOutputWithPast]:
     output_attentions = (
         output_attentions
@@ -116,9 +102,6 @@ def LlamaForCausalLM_forward(
         output_hidden_states
         if output_hidden_states is not None
         else self.config.output_hidden_states
-    )
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
     )
 
     # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
@@ -131,7 +114,7 @@ def LlamaForCausalLM_forward(
         use_cache=use_cache,
         output_attentions=output_attentions,
         output_hidden_states=output_hidden_states,
-        return_dict=return_dict,
+        return_dict=False,
     )
 
     hidden_states = outputs[0]
@@ -158,17 +141,8 @@ def LlamaForCausalLM_forward(
         shift_labels = shift_labels.to(shift_logits.device)
         loss = loss_fct(shift_logits, shift_labels)
 
-    if not return_dict:
-        output = (logits,) + outputs[1:]
-        return (loss,) + output if loss is not None else output
-
-    return CausalLMOutputWithPast(
-        loss=loss,
-        logits=logits,
-        past_key_values=outputs.past_key_values,
-        hidden_states=outputs.hidden_states,
-        attentions=outputs.attentions,
-    )
+    output = (logits,) + outputs[1:]
+    return (loss,) + output if loss is not None else output
 
 
 def GPTNeoXForCausalLM_forward(
@@ -183,11 +157,8 @@ def GPTNeoXForCausalLM_forward(
     use_cache: Optional[bool] = None,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
 ) -> Union[Tuple, CausalLMOutputWithPast]:
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
-    )
     outputs = self.gpt_neox(
         input_ids,
         attention_mask=attention_mask,
@@ -198,7 +169,7 @@ def GPTNeoXForCausalLM_forward(
         use_cache=use_cache,
         output_attentions=output_attentions,
         output_hidden_states=output_hidden_states,
-        return_dict=return_dict,
+        return_dict=False,
     )
 
     hidden_states = outputs[0]
@@ -223,17 +194,8 @@ def GPTNeoXForCausalLM_forward(
             shift_logits.view(-1, shift_logits.size(-1)), labels.view(-1)
         )
 
-    if not return_dict:
-        output = (lm_logits,) + outputs[1:]
-        return ((lm_loss,) + output) if lm_loss is not None else output
-
-    return CausalLMOutputWithPast(
-        loss=lm_loss,
-        logits=lm_logits,
-        past_key_values=outputs.past_key_values,
-        hidden_states=outputs.hidden_states,
-        attentions=outputs.attentions,
-    )
+    output = (lm_logits,) + outputs[1:]
+    return ((lm_loss,) + output) if lm_loss is not None else output
 
 
 def OPTForCausalLM_forward(
@@ -247,7 +209,7 @@ def OPTForCausalLM_forward(
     use_cache: Optional[bool] = None,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
 ) -> Union[Tuple, CausalLMOutputWithPast]:
     output_attentions = (
         output_attentions
@@ -258,9 +220,6 @@ def OPTForCausalLM_forward(
         output_hidden_states
         if output_hidden_states is not None
         else self.config.output_hidden_states
-    )
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
     )
 
     # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
@@ -273,7 +232,7 @@ def OPTForCausalLM_forward(
         use_cache=use_cache,
         output_attentions=output_attentions,
         output_hidden_states=output_hidden_states,
-        return_dict=return_dict,
+        return_dict=False,
     )
     hidden_states = outputs[0]
     if (
@@ -296,17 +255,8 @@ def OPTForCausalLM_forward(
             shift_logits.view(-1, self.config.vocab_size), shift_labels.view(-1)
         )
 
-    if not return_dict:
-        output = (logits,) + outputs[1:]
-        return (loss,) + output if loss is not None else output
-
-    return CausalLMOutputWithPast(
-        loss=loss,
-        logits=logits,
-        past_key_values=outputs.past_key_values,
-        hidden_states=outputs.hidden_states,
-        attentions=outputs.attentions,
-    )
+    output = (logits,) + outputs[1:]
+    return (loss,) + output if loss is not None else output
 
 
 def BloomForCausalLM_forward(
@@ -320,7 +270,7 @@ def BloomForCausalLM_forward(
     use_cache: Optional[bool] = None,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
     **deprecated_arguments,
 ) -> Union[Tuple[torch.Tensor], CausalLMOutputWithCrossAttentions]:
     r"""
@@ -338,10 +288,6 @@ def BloomForCausalLM_forward(
     if len(deprecated_arguments) > 0:
         raise ValueError(f"Got unexpected arguments: {deprecated_arguments}")
 
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
-    )
-
     transformer_outputs = self.transformer(
         input_ids,
         past_key_values=past_key_values,
@@ -351,7 +297,7 @@ def BloomForCausalLM_forward(
         use_cache=use_cache,
         output_attentions=output_attentions,
         output_hidden_states=output_hidden_states,
-        return_dict=return_dict,
+        return_dict=False,
     )
     hidden_states = transformer_outputs[0]
 
@@ -379,17 +325,76 @@ def BloomForCausalLM_forward(
             shift_labels.view(batch_size * seq_length),
         )
 
-    if not return_dict:
-        output = (lm_logits,) + transformer_outputs[1:]
-        return ((loss,) + output) if loss is not None else output
+    output = (lm_logits,) + transformer_outputs[1:]
+    return ((loss,) + output) if loss is not None else output
 
-    return CausalLMOutputWithCrossAttentions(
-        loss=loss,
-        logits=lm_logits,
-        past_key_values=transformer_outputs.past_key_values,
-        hidden_states=transformer_outputs.hidden_states,
-        attentions=transformer_outputs.attentions,
-    )
+
+def FalconForCausalLM_forward(
+    self,
+    input_ids: Optional[torch.LongTensor] = None,
+    past_key_values: Optional[Tuple[Tuple[torch.Tensor, torch.Tensor], ...]] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    head_mask: Optional[torch.Tensor] = None,
+    inputs_embeds: Optional[torch.Tensor] = None,
+    labels: Optional[torch.Tensor] = None,
+    use_cache: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
+) -> Union[Tuple[torch.Tensor], CausalLMOutputWithCrossAttentions]:
+    if position_ids is None:
+        transformer_outputs = self.transformer(
+            input_ids,
+            past_key_values=past_key_values,
+            attention_mask=attention_mask,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=False,
+        )
+    else:
+        transformer_outputs = self.transformer(
+            input_ids,
+            past_key_values=past_key_values,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=False,
+        )
+    hidden_states = transformer_outputs[0]
+
+    if (
+        hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and hidden_states.size(1) != 1
+    ):
+        hidden_states = hidden_states[:, -1:, :]
+
+    lm_logits = self.lm_head(hidden_states)
+
+    loss = None
+    if labels is not None:
+        # Shift so that tokens < n predict n
+        shift_logits = lm_logits[..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous()
+        batch_size, seq_length, vocab_size = shift_logits.shape
+        # Flatten the tokens
+        loss_fct = CrossEntropyLoss()
+        loss = loss_fct(
+            shift_logits.view(batch_size * seq_length, vocab_size),
+            shift_labels.view(batch_size * seq_length),
+        )
+
+    output = (lm_logits,) + transformer_outputs[1:]
+    return ((loss,) + output) if loss is not None else output
 
 
 def CodeGenForCausalLM_forward(
@@ -405,7 +410,7 @@ def CodeGenForCausalLM_forward(
     use_cache: Optional[bool] = None,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
 ) -> Union[Tuple, CausalLMOutputWithPast]:
     r"""
     labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -413,9 +418,6 @@ def CodeGenForCausalLM_forward(
         `labels = input_ids` Indices are selected in `[-100, 0, ..., config.vocab_size]` All labels set to `-100`
         are ignored (masked), the loss is only computed for labels in `[0, ..., config.vocab_size]`
     """
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
-    )
 
     transformer_outputs = self.transformer(
         input_ids,
@@ -428,7 +430,7 @@ def CodeGenForCausalLM_forward(
         use_cache=use_cache,
         output_attentions=output_attentions,
         output_hidden_states=output_hidden_states,
-        return_dict=return_dict,
+        return_dict=False,
     )
     hidden_states = transformer_outputs[0]
     if (
@@ -458,17 +460,8 @@ def CodeGenForCausalLM_forward(
 
         loss = loss.to(hidden_states.dtype)
 
-    if not return_dict:
-        output = (lm_logits,) + transformer_outputs[1:]
-        return ((loss,) + output) if loss is not None else output
-
-    return CausalLMOutputWithPast(
-        loss=loss,
-        logits=lm_logits,
-        past_key_values=transformer_outputs.past_key_values,
-        hidden_states=transformer_outputs.hidden_states,
-        attentions=transformer_outputs.attentions,
-    )
+    output = (lm_logits,) + transformer_outputs[1:]
+    return ((loss,) + output) if loss is not None else output
 
 
 def BaichuanModel_forward(
@@ -481,7 +474,7 @@ def BaichuanModel_forward(
     use_cache: Optional[bool] = None,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
 ) -> Union[Tuple, BaseModelOutputWithPast]:
     if input_ids is not None and inputs_embeds is not None:
         raise ValueError(
@@ -494,9 +487,6 @@ def BaichuanModel_forward(
     else:
         raise ValueError("You need to provide input_ids or inputs_embeds")
 
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
-    )
     use_cache = use_cache if use_cache is not None else self.config.use_cache
     seq_length_with_past = seq_length
     past_key_values_length = 0
@@ -637,17 +627,10 @@ def BaichuanModel_forward(
         all_hidden_states += (hidden_states,)
 
     next_cache = next_decoder_cache if use_cache else None
-    if not return_dict:
-        return tuple(
-            v
-            for v in [hidden_states, next_cache, all_hidden_states, all_self_attns]
-            if v is not None
-        )
-    return BaseModelOutputWithPast(
-        last_hidden_state=hidden_states,
-        past_key_values=next_cache,
-        hidden_states=all_hidden_states,
-        attentions=all_self_attns,
+    return tuple(
+        v
+        for v in [hidden_states, next_cache, all_hidden_states, all_self_attns]
+        if v is not None
     )
 
 
@@ -662,13 +645,9 @@ def BaichuanForCausalLM_forward(
     use_cache: Optional[bool] = True,
     output_attentions: Optional[bool] = False,
     output_hidden_states: Optional[bool] = False,
-    return_dict: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
     **kwargs,
 ) -> Union[Tuple, CausalLMOutputWithPast]:
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
-    )
-
     # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
     if position_ids is not None:
         outputs = self.model(
@@ -680,7 +659,7 @@ def BaichuanForCausalLM_forward(
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
+            return_dict=False,
         )
     else:
         outputs = self.model(
@@ -691,7 +670,7 @@ def BaichuanForCausalLM_forward(
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
+            return_dict=False,
         )
 
     hidden_states = outputs[0]
@@ -718,17 +697,8 @@ def BaichuanForCausalLM_forward(
         shift_labels = shift_labels.to(shift_logits.device)
         loss = loss_fct(shift_logits, shift_labels) + z_loss
 
-    if not return_dict:
-        output = (logits,) + outputs[1:]
-        return (loss,) + output if loss is not None else output
-
-    return CausalLMOutputWithPast(
-        loss=loss,
-        logits=logits,
-        past_key_values=outputs.past_key_values,
-        hidden_states=outputs.hidden_states,
-        attentions=outputs.attentions,
-    )
+    output = (logits,) + outputs[1:]
+    return (loss,) + output if loss is not None else output
 
 
 def ChatGLMModel_forward(
@@ -741,7 +711,7 @@ def ChatGLMModel_forward(
     inputs_embeds: Optional[torch.Tensor] = None,
     use_cache: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
 ):
     output_hidden_states = (
         output_hidden_states
@@ -749,9 +719,6 @@ def ChatGLMModel_forward(
         else self.config.output_hidden_states
     )
     use_cache = use_cache if use_cache is not None else self.config.use_cache
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
-    )
 
     batch_size, seq_length = input_ids.shape
 
@@ -800,18 +767,10 @@ def ChatGLMModel_forward(
         output_hidden_states=output_hidden_states,
     )
 
-    if not return_dict:
-        return tuple(
-            v
-            for v in [hidden_states, presents, all_hidden_states, all_self_attentions]
-            if v is not None
-        )
-
-    return BaseModelOutputWithPast(
-        last_hidden_state=hidden_states,
-        past_key_values=presents,
-        hidden_states=all_hidden_states,
-        attentions=all_self_attentions,
+    return tuple(
+        v
+        for v in [hidden_states, presents, all_hidden_states, all_self_attentions]
+        if v is not None
     )
 
 
@@ -884,12 +843,9 @@ def ChatGLMForConditionalGeneration_forward(
     use_cache: Optional[bool] = None,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
 ):
     use_cache = use_cache if use_cache is not None else self.config.use_cache
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
-    )
 
     transformer_outputs = self.transformer(
         input_ids=input_ids,
@@ -899,7 +855,7 @@ def ChatGLMForConditionalGeneration_forward(
         inputs_embeds=inputs_embeds,
         use_cache=use_cache,
         output_hidden_states=output_hidden_states,
-        return_dict=return_dict,
+        return_dict=False,
     )
 
     hidden_states = transformer_outputs[0]
@@ -931,17 +887,8 @@ def ChatGLMForConditionalGeneration_forward(
         lm_logits = lm_logits.to(hidden_states.dtype)
         loss = loss.to(hidden_states.dtype)
 
-    if not return_dict:
-        output = (lm_logits,) + transformer_outputs[1:]
-        return ((loss,) + output) if loss is not None else output
-
-    return CausalLMOutputWithPast(
-        loss=loss,
-        logits=lm_logits,
-        past_key_values=transformer_outputs.past_key_values,
-        hidden_states=transformer_outputs.hidden_states,
-        attentions=transformer_outputs.attentions,
-    )
+    output = (lm_logits,) + transformer_outputs[1:]
+    return ((loss,) + output) if loss is not None else output
 
 
 def GPTBigCodeModel_forward(
@@ -958,7 +905,7 @@ def GPTBigCodeModel_forward(
     use_cache: Optional[bool] = None,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
 ) -> Union[Tuple, BaseModelOutputWithPastAndCrossAttentions]:
     output_attentions = (
         output_attentions
@@ -971,9 +918,6 @@ def GPTBigCodeModel_forward(
         else self.config.output_hidden_states
     )
     use_cache = use_cache if use_cache is not None else self.config.use_cache
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
-    )
 
     if input_ids is not None and inputs_embeds is not None:
         raise ValueError(
@@ -1138,24 +1082,16 @@ def GPTBigCodeModel_forward(
     if output_hidden_states:
         all_hidden_states = all_hidden_states + (hidden_states,)
 
-    if not return_dict:
-        return tuple(
-            v
-            for v in [
-                hidden_states,
-                presents,
-                all_hidden_states,
-                all_self_attentions,
-                all_cross_attentions,
-            ]
-            if v is not None
-        )
-    return BaseModelOutputWithPastAndCrossAttentions(
-        last_hidden_state=hidden_states,
-        past_key_values=presents,
-        hidden_states=all_hidden_states,
-        attentions=all_self_attentions,
-        cross_attentions=all_cross_attentions,
+    return tuple(
+        v
+        for v in [
+            hidden_states,
+            presents,
+            all_hidden_states,
+            all_self_attentions,
+            all_cross_attentions,
+        ]
+        if v is not None
     )
 
 
@@ -1174,7 +1110,7 @@ def GPTBigCodeForCausalLM_forward(
     use_cache: Optional[bool] = None,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
 ) -> Union[Tuple, CausalLMOutputWithCrossAttentions]:
     r"""
     labels (`torch.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -1182,9 +1118,6 @@ def GPTBigCodeForCausalLM_forward(
         `labels = input_ids` Indices are selected in `[-100, 0, ..., config.vocab_size]` All labels set to `-100`
         are ignored (masked), the loss is only computed for labels in `[0, ..., config.vocab_size]`
     """
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
-    )
 
     transformer_outputs = self.transformer(
         input_ids,
@@ -1199,7 +1132,7 @@ def GPTBigCodeForCausalLM_forward(
         use_cache=use_cache,
         output_attentions=output_attentions,
         output_hidden_states=output_hidden_states,
-        return_dict=return_dict,
+        return_dict=False,
     )
     hidden_states = transformer_outputs[0]
     if (
@@ -1222,18 +1155,8 @@ def GPTBigCodeForCausalLM_forward(
             shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
         )
 
-    if not return_dict:
-        output = (lm_logits,) + transformer_outputs[1:]
-        return ((loss,) + output) if loss is not None else output
-
-    return CausalLMOutputWithCrossAttentions(
-        loss=loss,
-        logits=lm_logits,
-        past_key_values=transformer_outputs.past_key_values,
-        hidden_states=transformer_outputs.hidden_states,
-        attentions=transformer_outputs.attentions,
-        cross_attentions=transformer_outputs.cross_attentions,
-    )
+    output = (lm_logits,) + transformer_outputs[1:]
+    return ((loss,) + output) if loss is not None else output
 
 
 def T5ForConditionalGeneration_forward(
@@ -1253,12 +1176,9 @@ def T5ForConditionalGeneration_forward(
     use_cache: Optional[bool] = None,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
 ) -> Union[Tuple[torch.FloatTensor], Seq2SeqLMOutput]:
     use_cache = use_cache if use_cache is not None else self.config.use_cache
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
-    )
 
     # FutureWarning: head_mask was separated into two input args - head_mask, decoder_head_mask
     if head_mask is not None and decoder_head_mask is None:
@@ -1276,13 +1196,7 @@ def T5ForConditionalGeneration_forward(
             head_mask=head_mask,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-        )
-    elif return_dict and not isinstance(encoder_outputs, BaseModelOutput):
-        encoder_outputs = BaseModelOutput(
-            last_hidden_state=encoder_outputs[0],
-            hidden_states=encoder_outputs[1] if len(encoder_outputs) > 1 else None,
-            attentions=encoder_outputs[2] if len(encoder_outputs) > 2 else None,
+            return_dict=False,
         )
 
     hidden_states = encoder_outputs[0]
@@ -1324,7 +1238,7 @@ def T5ForConditionalGeneration_forward(
         use_cache=use_cache,
         output_attentions=output_attentions,
         output_hidden_states=output_hidden_states,
-        return_dict=return_dict,
+        return_dict=False,
     )
 
     sequence_output = decoder_outputs[0]
@@ -1353,21 +1267,8 @@ def T5ForConditionalGeneration_forward(
         labels = labels.to(lm_logits.device)
         loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
 
-    if not return_dict:
-        output = (lm_logits,) + decoder_outputs[1:] + encoder_outputs
-        return ((loss,) + output) if loss is not None else output
-
-    return Seq2SeqLMOutput(
-        loss=loss,
-        logits=lm_logits,
-        past_key_values=decoder_outputs.past_key_values,
-        decoder_hidden_states=decoder_outputs.hidden_states,
-        decoder_attentions=decoder_outputs.attentions,
-        cross_attentions=decoder_outputs.cross_attentions,
-        encoder_last_hidden_state=encoder_outputs.last_hidden_state,
-        encoder_hidden_states=encoder_outputs.hidden_states,
-        encoder_attentions=encoder_outputs.attentions,
-    )
+    output = (lm_logits,) + decoder_outputs[1:] + encoder_outputs
+    return ((loss,) + output) if loss is not None else output
 
 
 def T5DenseGatedActDense_forward(self, hidden_states):
@@ -1414,7 +1315,7 @@ def MistralForCausalLM_forward(
     use_cache: Optional[bool] = None,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
 ) -> Union[Tuple, CausalLMOutputWithPast]:
     output_attentions = (
         output_attentions
@@ -1425,9 +1326,6 @@ def MistralForCausalLM_forward(
         output_hidden_states
         if output_hidden_states is not None
         else self.config.output_hidden_states
-    )
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
     )
 
     # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
@@ -1440,7 +1338,7 @@ def MistralForCausalLM_forward(
         use_cache=use_cache,
         output_attentions=output_attentions,
         output_hidden_states=output_hidden_states,
-        return_dict=return_dict,
+        return_dict=False,
     )
 
     hidden_states = outputs[0]
@@ -1467,17 +1365,8 @@ def MistralForCausalLM_forward(
         shift_labels = shift_labels.to(shift_logits.device)
         loss = loss_fct(shift_logits, shift_labels)
 
-    if not return_dict:
-        output = (logits,) + outputs[1:]
-        return (loss,) + output if loss is not None else output
-
-    return CausalLMOutputWithPast(
-        loss=loss,
-        logits=logits,
-        past_key_values=outputs.past_key_values,
-        hidden_states=outputs.hidden_states,
-        attentions=outputs.attentions,
-    )
+    output = (logits,) + outputs[1:]
+    return (loss,) + output if loss is not None else output
 
 
 def MptForCausalLM_forward(
@@ -1490,7 +1379,7 @@ def MptForCausalLM_forward(
     use_cache: Optional[bool] = True,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
+    return_dict: Optional[bool] = False,
 ) -> Union[Tuple[torch.Tensor], CausalLMOutputWithCrossAttentions]:
     r"""
     labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -1498,9 +1387,6 @@ def MptForCausalLM_forward(
         `labels = input_ids` Indices are selected in `[-100, 0, ..., config.vocab_size]` All labels set to `-100`
         are ignored (masked), the loss is only computed for labels in `[0, ..., config.vocab_size]`
     """
-    return_dict = (
-        return_dict if return_dict is not None else self.config.use_return_dict
-    )
 
     transformer_outputs = self.transformer(
         input_ids,
@@ -1510,7 +1396,7 @@ def MptForCausalLM_forward(
         use_cache=use_cache,
         output_attentions=output_attentions,
         output_hidden_states=output_hidden_states,
-        return_dict=return_dict,
+        return_dict=False,
     )
     hidden_states = transformer_outputs[0]
     if (
@@ -1537,17 +1423,101 @@ def MptForCausalLM_forward(
             shift_labels.view(batch_size * seq_length),
         )
 
-    if not return_dict:
-        output = (lm_logits,) + transformer_outputs[1:]
-        return ((loss,) + output) if loss is not None else output
+    output = (lm_logits,) + transformer_outputs[1:]
+    return ((loss,) + output) if loss is not None else output
 
-    return CausalLMOutputWithCrossAttentions(
-        loss=loss,
-        logits=lm_logits,
-        past_key_values=transformer_outputs.past_key_values,
-        hidden_states=transformer_outputs.hidden_states,
-        attentions=transformer_outputs.attentions,
-    )
+
+def output_hook(module: torch.nn.Module, args, kwargs, outputs: Any):
+    if module.config.use_return_dict or (
+        "return_dict" in kwargs and kwargs["return_dict"]
+    ):
+        idx = 0
+        loss = None
+        hidden_states = None
+        attentions = None
+        cross_attentions = None
+        encoder_hidden_states = None
+        encoder_attentions = None
+        if "labels" in kwargs:
+            loss = outputs[idx]
+            idx += 1
+        logits = outputs[idx]
+        idx += 1
+        past_key_values = outputs[idx]
+        idx += 1
+        if (
+            "output_hidden_states" in kwargs and kwargs["output_hidden_states"]
+        ) or module.config.output_hidden_states:
+            hidden_states = outputs[idx]
+            idx += 1
+        if (
+            "output_attentions" in kwargs and kwargs["output_attentions"]
+        ) or module.config.output_attentions:
+            attentions = outputs[idx]
+            idx += 1
+            if idx < len(outputs):
+                cross_attentions = outputs[idx]
+                idx += 1
+        if idx < len(outputs):
+            last_hidden_state = outputs[idx]
+            idx += 1
+            if (
+                "output_hidden_states" in kwargs and kwargs["output_hidden_states"]
+            ) or module.config.output_hidden_states:
+                encoder_hidden_states = outputs[idx]
+                idx += 1
+            if (
+                "output_attentions" in kwargs and kwargs["output_attentions"]
+            ) or module.config.output_attentions:
+                encoder_attentions = outputs[idx]
+                idx += 1
+        if module.config.architectures[0] == "T5ForConditionalGeneration":
+            return Seq2SeqLMOutput(
+                loss=loss,
+                logits=logits,
+                past_key_values=past_key_values,
+                decoder_hidden_states=hidden_states,
+                decoder_attentions=attentions,
+                cross_attentions=cross_attentions,
+                encoder_last_hidden_state=last_hidden_state,
+                encoder_hidden_states=encoder_hidden_states,
+                encoder_attentions=encoder_attentions,
+            )
+
+        if module.config.architectures[0] in [
+            "BloomForCausalLM",
+            "GPTBigCodeForCausalLM",
+            "MptForCausalLM",
+            "FalconForCausalLM",
+            "RWForCausalLM",
+        ]:
+            return CausalLMOutputWithCrossAttentions(
+                loss=loss,
+                logits=logits,
+                past_key_values=past_key_values,
+                hidden_states=hidden_states,
+                attentions=attentions,
+            )
+        return CausalLMOutputWithPast(
+            loss=loss,
+            logits=logits,
+            past_key_values=past_key_values,
+            hidden_states=hidden_states,
+            attentions=attentions,
+        )
+    return outputs
+
+
+class IPEX_LLM_Model_Return(torch.nn.Module):
+    def __init__(self, model, optimized_model):
+        super().__init__()
+        self.config = model.config
+        self.optimized_model = optimized_model
+        self.model = model
+
+    def forward(self, *args, **kwargs):
+        outputs = self.optimized_model(*args, **kwargs)
+        return output_hook(self.model, args, kwargs, outputs)
 
 
 def prepare_inputs_for_generation(

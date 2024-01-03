@@ -299,15 +299,6 @@ def _beam_search(
                     outputs = self.trace_graph_first(**model_inputs)
                 else:
                     outputs = self.trace_graph(**model_inputs)
-
-                if first_token and len(model_inputs["past_key_values"][1]) == 4:
-                    outputs = list(outputs)
-                    outputs[0] = outputs[0].repeat_interleave(num_beams, dim=0)
-                    outputs = tuple(outputs)
-                if synced_gpus and this_peer_finished:
-                    cur_len = cur_len + 1
-                    continue  # don't waste resources running the code we don't need
-                next_token_logits = outputs[0][:, -1, :]
             else:
                 outputs = self(
                     **model_inputs,
@@ -315,12 +306,18 @@ def _beam_search(
                     output_attentions=output_attentions,
                     output_hidden_states=output_hidden_states,
                 )
-                if first_token and len(model_inputs["past_key_values"][1]) == 4:
-                    outputs.logits = outputs.logits.repeat_interleave(num_beams, dim=0)
-                if synced_gpus and this_peer_finished:
-                    cur_len = cur_len + 1
-                    continue  # don't waste resources running the code we don't need
-                next_token_logits = outputs.logits[:, -1, :]
+
+            if len(model_inputs["past_key_values"][1]) == 4:
+                if isinstance(outputs, dict):
+                    if outputs.logits.shape[0] != num_beams:
+                        outputs.logits = outputs.logits.repeat_interleave(
+                            num_beams, dim=0
+                        )
+                else:
+                    if outputs[0].shape[0] != num_beams:
+                        outputs = list(outputs)
+                        outputs[0] = outputs[0].repeat_interleave(num_beams, dim=0)
+                        outputs = tuple(outputs)
         else:
             outputs = self(
                 **model_inputs,
@@ -328,10 +325,13 @@ def _beam_search(
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
             )
-            if synced_gpus and this_peer_finished:
-                cur_len = cur_len + 1
-                continue  # don't waste resources running the code we don't need
+        if synced_gpus and this_peer_finished:
+            cur_len = cur_len + 1
+            continue  # don't waste resources running the code we don't need
+        if isinstance(outputs, dict):
             next_token_logits = outputs.logits[:, -1, :]
+        else:
+            next_token_logits = outputs[0][:, -1, :]
 
         next_token_scores = nn.functional.log_softmax(
             next_token_logits, dim=-1

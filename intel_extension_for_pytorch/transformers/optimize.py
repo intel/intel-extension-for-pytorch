@@ -66,10 +66,14 @@ def _set_optimized_model_for_generation(
     optimized_model,
     first_token_optimized_model=None,
 ):
-    if first_token_optimized_model is not None:
-        setattr(model, "trace_graph_first", first_token_optimized_model)  # noqa: B010
+    from .models.reference.models import IPEX_LLM_Model_Return
 
-    setattr(model, "trace_graph", optimized_model)  # noqa: B010
+    if first_token_optimized_model is not None:
+        model.trace_graph_first = IPEX_LLM_Model_Return(
+            model, first_token_optimized_model
+        ).forward
+
+    model.trace_graph = IPEX_LLM_Model_Return(model, optimized_model).forward
     print(
         "ipex.llm.optimize has set the optimized or quantization model for model.generate()"
     )
@@ -113,6 +117,7 @@ def model_convert_reference(_model):
         GPTNeoXForCausalLM_forward,
         OPTForCausalLM_forward,
         BloomForCausalLM_forward,
+        FalconForCausalLM_forward,
         CodeGenForCausalLM_forward,
         BaichuanForCausalLM_forward,
         BaichuanModel_forward,
@@ -322,6 +327,7 @@ def model_convert_reference(_model):
             ipex.nn.utils._model_convert.replace_customized_linear_with_linear(
                 _model.eval()
             )
+        convert_function(_model, "forward", FalconForCausalLM_forward)
         convert_class(
             _model,
             type(_model.transformer.h[0].self_attention),
@@ -902,7 +908,11 @@ def optimize(
             is_quantization,
             is_woq,
         )
+        # do not register output hook when doing calibration
+        if not (is_quantization and qconfig_summary_file is None):
+            from .models.reference.models import output_hook
 
+            _model.register_forward_hook(output_hook, with_kwargs=True)
         return _model
 
     except RuntimeError as e:

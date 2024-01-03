@@ -260,10 +260,6 @@ def _greedy_search(
                         model_inputs["encoder_outputs"]["last_hidden_state"],
                     )
                 outputs = self.trace_graph(**model_inputs)
-                if synced_gpus and this_peer_finished:
-                    cur_len = cur_len + 1
-                    continue  # don't waste resources running the code we don't need
-                next_token_logits = outputs[0][:, -1, :]
             else:
                 outputs = self(
                     **model_inputs,
@@ -271,10 +267,6 @@ def _greedy_search(
                     output_attentions=output_attentions,
                     output_hidden_states=output_hidden_states,
                 )
-                if synced_gpus and this_peer_finished:
-                    cur_len = cur_len + 1
-                    continue  # don't waste resources running the code we don't need
-                next_token_logits = outputs.logits[:, -1, :]
         else:
             outputs = self(
                 **model_inputs,
@@ -282,10 +274,14 @@ def _greedy_search(
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
             )
-            if synced_gpus and this_peer_finished:
-                cur_len = cur_len + 1
-                continue  # don't waste resources running the code we don't need
+
+        if synced_gpus and this_peer_finished:
+            cur_len = cur_len + 1
+            continue  # don't waste resources running the code we don't need
+        if isinstance(outputs, dict):
             next_token_logits = outputs.logits[:, -1, :]
+        else:
+            next_token_logits = outputs[0][:, -1, :]
 
         # pre-process distribution
         next_tokens_scores = logits_processor(input_ids, next_token_logits)
