@@ -439,46 +439,80 @@ class IPEXTransformerMLPOptimizedInt4SiluQwen(IPEXTransformerMLPOptimizedInt4Sil
             )
 
         if self.fc_out_quant.bias is None:
-            return hidden_states1 * torch.ops.torch_ipex.mm_silu_int4(
+            return torch.ops.torch_ipex.mm_silu_mul_int4(
                 hidden_states,
                 self.fc_out_quant.weight,
                 self.fc_out_quant.scale,
                 self.fc_out_quant.zp,
                 self.fc_out_quant.gs,
+                hidden_states1,
             )
+            # return hidden_states1 * torch.ops.torch_ipex.mm_silu_int4(
+            #     hidden_states,
+            #     self.fc_out_quant.weight,
+            #     self.fc_out_quant.scale,
+            #     self.fc_out_quant.zp,
+            #     self.fc_out_quant.gs,
+            # )
         else:
-            hidden_states2 = torch.ops.torch_ipex.mm_bias_int4(
+            return torch.ops.torch_ipex.mm_bias_silu_mul_int4(
                 hidden_states,
                 self.fc_out_quant.weight,
                 self.fc_out_quant.bias,
                 self.fc_out_quant.scale,
                 self.fc_out_quant.zp,
                 self.fc_out_quant.gs,
-                self.arch,
+                hidden_states1,
             )
-            return hidden_states1 * self.act(hidden_states2)
+            # hidden_states2 = torch.ops.torch_ipex.mm_bias_int4(
+            #     hidden_states,
+            #     self.fc_out_quant.weight,
+            #     self.fc_out_quant.bias,
+            #     self.fc_out_quant.scale,
+            #     self.fc_out_quant.zp,
+            #     self.fc_out_quant.gs,
+            #     self.arch,
+            # )
+            # return hidden_states1 * self.act(hidden_states2)
 
     def out_mm(self, hidden_states, residual=None):
         if self.c_proj_quant.bias is None:
-            hidden_states = torch.ops.torch_ipex.mm_int4(
+            hidden_states = torch.ops.torch_ipex.mm_add_int4(
                 hidden_states,
                 self.c_proj_quant.weight,
                 self.c_proj_quant.scale,
                 self.c_proj_quant.zp,
                 self.c_proj_quant.gs,
-                self.arch,
+                residual,
             )
+            # hidden_states = torch.ops.torch_ipex.mm_int4(
+            #     hidden_states,
+            #     self.c_proj_quant.weight,
+            #     self.c_proj_quant.scale,
+            #     self.c_proj_quant.zp,
+            #     self.c_proj_quant.gs,
+            #     self.arch,
+            # )
         else:
-            hidden_states = torch.ops.torch_ipex.mm_bias_int4(
+            hidden_states = torch.ops.torch_ipex.mm_bias_add_int4(
                 hidden_states,
                 self.c_proj_quant.weight,
                 self.c_proj_quant.bias,
                 self.c_proj_quant.scale,
                 self.c_proj_quant.zp,
                 self.c_proj_quant.gs,
-                self.arch,
+                residual,
             )
+            # hidden_states = torch.ops.torch_ipex.mm_bias_int4(
+            #     hidden_states,
+            #     self.c_proj_quant.weight,
+            #     self.c_proj_quant.bias,
+            #     self.c_proj_quant.scale,
+            #     self.c_proj_quant.zp,
+            #     self.c_proj_quant.gs,
+            #     self.arch,
+            # )
 
-        if residual is not None:
-            hidden_states += residual
+        # if residual is not None:
+        #     hidden_states += residual
         return hidden_states
