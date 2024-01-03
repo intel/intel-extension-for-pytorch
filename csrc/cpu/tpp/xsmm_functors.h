@@ -303,17 +303,17 @@ template <int N>
 inline uint64_t string_to_hash_int(
     const std::string& str,
     const std::array<int, N>& params) {
-  uint64_t hash_value = 0;
-  unsigned int b = 378551;
-  unsigned int a = 63689;
-  unsigned int i = 0;
-  for (i = 0; i < str.length(); i++) {
-    hash_value = hash_value * a + str[i];
-    a = a * b;
+  // Using FNV-1a algorithm
+  uint64_t hash_value = 14695981039346656037ULL; // Initial hash value
+  // Hash the string
+  for (char c : str) {
+    hash_value ^= static_cast<uint64_t>(c);
+    hash_value *= 1099511628211ULL; // FNV prime
   }
-  for (auto param : params) {
-    hash_value = hash_value * a + param;
-    a = a * b;
+  // Hash the vector of integers
+  for (int intValue : params) {
+    hash_value ^= static_cast<uint64_t>(intValue);
+    hash_value *= 1099511628211ULL; // FNV prime
   }
   return hash_value;
 }
