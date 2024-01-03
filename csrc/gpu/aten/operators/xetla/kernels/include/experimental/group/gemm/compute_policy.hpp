@@ -60,7 +60,8 @@ struct compute_policy_int4_dequantize_xmx<compute_attr_, perf_tuning_knob_,
 };
 
 enum quant_type {
-    S4_FULLRANGE,
+//     S4_FULLRANGE,
+    S4_SYM,
 };
 
 /// @brief Compute policy for unaligned shape and xmx engine.

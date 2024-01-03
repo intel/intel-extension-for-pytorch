@@ -965,7 +965,7 @@ private:
                 int block_id = (i * num_block_x + j);
                 auto matB_blk = matB.reg.xetla_select<matB_t::block_elems, 1>(
                                                 block_id * matB_t::block_elems)
-                                        .xetla_format<uint8_t>();
+                                        .xetla_format<int8_t>();
                 int scale_block_id
                         = (i / block_b_y_per_scale * num_block_x + j);
                 auto scale_vec
@@ -976,18 +976,16 @@ private:
                         = matB_acc.reg.xetla_select<matB_acc_t::block_elems, 1>(
                                 block_id * matB_acc_t::block_elems);
 
-                xetla_vector<uint8_t, block_size_x_b * block_size_y_b> cvt_blk;
+                xetla_vector<int8_t, block_size_x_b * block_size_y_b> cvt_blk;
                 cvt_blk.xetla_select<matB_t::block_elems, 2>(0)
                         = matB_blk & 0x0f;
-                cvt_blk.xetla_select<matB_t::block_elems, 2>(1) = matB_blk >> 4;
+                cvt_blk.xetla_select<matB_t::block_elems, 2>(1) = (matB_blk<<4) >> 4;
 
                 xetla_vector<int32_t, block_size_x_b * block_size_y_b>
                         cvt_blk_i32;
-                if constexpr (bit4_type_ == quant_type::S4_FULLRANGE) {
-                    xetla_vector<int8_t, block_size_x_b *block_size_y_b>
-                            cvt_blk_i8
-                            = (cvt_blk.xetla_format<int8_t>()) - int8_t(8);
-                    cvt_blk_i32 = (cvt_blk_i8.xetla_format<int8_t>());
+                // if constexpr (bit4_type_ == quant_type::S4_FULLRANGE) {
+                if constexpr (bit4_type_ == quant_type::S4_SYM) { 
+                    cvt_blk_i32 = (cvt_blk.xetla_format<int8_t>());
                 }
 
                 xetla_vector<dtype_mma_b, matB_acc_t::block_elems * vnni_rows>
