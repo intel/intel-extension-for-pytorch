@@ -978,7 +978,7 @@ private:
 
                 xetla_vector<int32_t, block_size_x_b * block_size_y_b>
                         cvt_blk_i32;
-                if constexpr (bit4_type_ == quant_type::s4_sym) { 
+                if constexpr (bit4_type_ == quant_type::S4_SYM) { 
                     xetla_vector<int8_t, block_size_x_b * block_size_y_b> cvt_blk_i8;
                     cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0)
                             = matB_blk & 0x0f;
