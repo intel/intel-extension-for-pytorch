@@ -1410,7 +1410,7 @@ class CPUOPsTester(TestCase):
                 [False, True],
             ]:
                 for batch_size, seq_len, n_head, head_dim in itertools.product(
-                    [2, 12], [267, 1030], [1, 3], [8, 16]
+                    [2, 12], [1, 267, 1030], [1, 3], [8, 16]
                 ):
                     atol = 1e-5
                     rtol = 5e-6

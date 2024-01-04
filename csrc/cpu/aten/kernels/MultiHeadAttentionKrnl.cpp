@@ -228,7 +228,7 @@ at::Tensor sd_mha_base_kernel(
       /*K*/ av_gemm_K,
       /*str_a*/ 1,
       /*str_b*/ 1,
-      /*lda*/ kvSplitSize,
+      /*lda*/ av_gemm_K,
       /*ldb*/ headSize,
       /*ldc*/ headSize,
       /*beta*/ 1.0,
@@ -240,7 +240,7 @@ at::Tensor sd_mha_base_kernel(
       /*K*/ av_gemm_K_tail,
       /*str_a*/ 1,
       /*str_b*/ 1,
-      /*lda*/ kvTail,
+      /*lda*/ av_gemm_K_tail,
       /*ldb*/ headSize,
       /*ldc*/ headSize,
       /*beta*/ 1.0,
@@ -252,7 +252,7 @@ at::Tensor sd_mha_base_kernel(
       /*K*/ av_gemm_K,
       /*str_a*/ 1,
       /*str_b*/ 1,
-      /*lda*/ kvSplitSize,
+      /*lda*/ av_gemm_K,
       /*ldb*/ headSize,
       /*ldc*/ headSize,
       /*beta*/ 0.0,
@@ -264,7 +264,7 @@ at::Tensor sd_mha_base_kernel(
       /*K*/ av_gemm_K_tail,
       /*str_a*/ 1,
       /*str_b*/ 1,
-      /*lda*/ kvTail,
+      /*lda*/ av_gemm_K_tail,
       /*ldb*/ headSize,
       /*ldc*/ headSize,
       /*beta*/ 0.0,
@@ -312,28 +312,37 @@ at::Tensor sd_mha_base_kernel(
     for (int j = 0; j < num_head; ++j) {
       for (int l = 0; l < kvSlice; ++l) {
         if (l != kvSlice - 1) {
-          xform_tpp_k(
-              key + i * kvSize * kStride + headSize * j +
-                  l * kvSplitSize * kStride,
-              key_reorder_ptr + i * num_head * headSize * kvSize +
-                  j * headSize * kvSize + l * kvSplitSize * headSize);
-          xform_tpp_v(
-              value + i * kvSize * vStride + headSize * j +
-                  l * kvSplitSize * vStride,
-              value_reorder_ptr + i * num_head * kvSize * headSize +
-                  j * kvSize * headSize + l * kvSplitSize * headSize);
+          // main
+          if (headSize % 2 == 0) {
+            xform_tpp_k(
+                key + i * kvSize * kStride + headSize * j +
+                    l * kvSplitSize * kStride,
+                key_reorder_ptr + i * num_head * headSize * kvSize +
+                    j * headSize * kvSize + l * kvSplitSize * headSize);
+          }
+          if (kvSplitSize % 2 == 0) {
+            xform_tpp_v(
+                value + i * kvSize * vStride + headSize * j +
+                    l * kvSplitSize * vStride,
+                value_reorder_ptr + i * num_head * kvSize * headSize +
+                    j * kvSize * headSize + l * kvSplitSize * headSize);
+          }
         } else {
           // Tail
-          xform_tpp_k_tail(
-              key + i * kvSize * kStride + headSize * j +
-                  l * kvSplitSize * kStride,
-              key_reorder_ptr + i * num_head * headSize * kvSize +
-                  j * headSize * kvSize + l * kvSplitSize * headSize);
-          xform_tpp_v_tail(
-              value + i * kvSize * vStride + headSize * j +
-                  l * kvSplitSize * vStride,
-              value_reorder_ptr + i * num_head * kvSize * headSize +
-                  j * kvSize * headSize + l * kvSplitSize * headSize);
+          if (headSize % 2 == 0) {
+            xform_tpp_k_tail(
+                key + i * kvSize * kStride + headSize * j +
+                    l * kvSplitSize * kStride,
+                key_reorder_ptr + i * num_head * headSize * kvSize +
+                    j * headSize * kvSize + l * kvSplitSize * headSize);
+          }
+          if (kvTail % 2 == 0) {
+            xform_tpp_v_tail(
+                value + i * kvSize * vStride + headSize * j +
+                    l * kvSplitSize * vStride,
+                value_reorder_ptr + i * num_head * kvSize * headSize +
+                    j * kvSize * headSize + l * kvSplitSize * headSize);
+          }
         }
       }
     }
@@ -402,7 +411,8 @@ at::Tensor sd_mha_base_kernel(
               headSize,
               l);
 
-          if (kvSplitSize % 2 != 0) {
+          if ((l != kvSlice - 1 && kvSplitSize % 2 != 0) ||
+              (l == kvSlice - 1 && kvTail % 2 != 0)) {
             // If K of Gemm is not even, use mkl gemm instead of tpp
             cblas_gemm_bf16bf16f32(
                 CblasRowMajor,

@@ -379,7 +379,7 @@ void cpu_flash_attention(
       /*K*/ av_gemm_K,
       /*str_a*/ 1,
       /*str_b*/ 1,
-      /*lda*/ kvSplitSize,
+      /*lda*/ av_gemm_K,
       /*ldb*/ headSize,
       /*ldc*/ headSize,
       /*beta*/ 0.0,
@@ -391,7 +391,7 @@ void cpu_flash_attention(
       /*K*/ av_gemm_K_tail,
       /*str_a*/ 1,
       /*str_b*/ 1,
-      /*lda*/ kvTail,
+      /*lda*/ av_gemm_K_tail,
       /*ldb*/ headSize,
       /*ldc*/ headSize,
       /*beta*/ 0.0,
@@ -403,7 +403,7 @@ void cpu_flash_attention(
       /*K*/ av_gemm_K,
       /*str_a*/ 1,
       /*str_b*/ 1,
-      /*lda*/ kvSplitSize,
+      /*lda*/ av_gemm_K,
       /*ldb*/ headSize,
       /*ldc*/ headSize,
       /*beta*/ 1.0,
@@ -415,7 +415,7 @@ void cpu_flash_attention(
       /*K*/ av_gemm_K_tail,
       /*str_a*/ 1,
       /*str_b*/ 1,
-      /*lda*/ kvTail,
+      /*lda*/ av_gemm_K_tail,
       /*ldb*/ headSize,
       /*ldc*/ headSize,
       /*beta*/ 1.0,
@@ -492,24 +492,33 @@ void cpu_flash_attention(
             (void)z; // Suppress unused variable
             n = l * kvSplitSize;
             if (n + kvSplitSize < kvSize) {
-              k_xform(
-                  k_data + i * kStrideB + j * kStrideH + n * kStrideN,
-                  key_reorder_ptr + i * num_head * headSize * kvSize +
-                      j * headSize * kvSize + n * headSize);
-              v_xform(
-                  v_data + i * vStrideB + j * vStrideH + n * vStrideN,
-                  value_reorder_ptr + i * num_head * kvSize * headSize +
-                      j * kvSize * headSize + n * headSize);
+              if (headSize % 2 == 0) {
+                // main
+                k_xform(
+                    k_data + i * kStrideB + j * kStrideH + n * kStrideN,
+                    key_reorder_ptr + i * num_head * headSize * kvSize +
+                        j * headSize * kvSize + n * headSize);
+              }
+              if (kvSplitSize % 2 == 0) {
+                v_xform(
+                    v_data + i * vStrideB + j * vStrideH + n * vStrideN,
+                    value_reorder_ptr + i * num_head * kvSize * headSize +
+                        j * kvSize * headSize + n * headSize);
+              }
             } else {
-              // Tail
-              k_xform_tail(
-                  k_data + i * kStrideB + j * kStrideH + n * kStrideN,
-                  key_reorder_ptr + i * num_head * headSize * kvSize +
-                      j * headSize * kvSize + n * headSize);
-              v_xform_tail(
-                  v_data + i * vStrideB + j * vStrideH + n * vStrideN,
-                  value_reorder_ptr + i * num_head * kvSize * headSize +
-                      j * kvSize * headSize + n * headSize);
+              // tail
+              if (headSize % 2 == 0) {
+                k_xform_tail(
+                    k_data + i * kStrideB + j * kStrideH + n * kStrideN,
+                    key_reorder_ptr + i * num_head * headSize * kvSize +
+                        j * headSize * kvSize + n * headSize);
+              }
+              if (kvTail % 2 == 0) {
+                v_xform_tail(
+                    v_data + i * vStrideB + j * vStrideH + n * vStrideN,
+                    value_reorder_ptr + i * num_head * kvSize * headSize +
+                        j * kvSize * headSize + n * headSize);
+              }
             }
             // Move to the next query
             at::native::data_index_step(i, batchSize, j, num_head, l, kvSlice);
@@ -683,47 +692,48 @@ void cpu_flash_attention(
             }
             // Calculate Softmax(q @ k.T) @ v
             if constexpr (is_reduced_type) {
-              if (kvSplitSize % 2 == 0 && !is_causal) {
-                if (n + kvSplitSize < kvSize) {
-                  // main
-                  if (n == 0) {
-                    av_gemm(
-                        qk_reduced_data,
-                        value_reorder_ptr + i * num_head * kvSize * headSize +
-                            j * kvSize * headSize + n * headSize,
-                        dst_data,
-                        1);
-                  } else {
-                    // bias
-                    av_gemm_bias(
-                        qk_reduced_data,
-                        value_reorder_ptr + i * num_head * kvSize * headSize +
-                            j * kvSize * headSize + n * headSize,
-                        dst_data,
-                        1);
-                  }
+              if (n + kvSplitSize < kvSize && kvSplitSize % 2 == 0 &&
+                  !is_causal) {
+                // main
+                if (n == 0) {
+                  av_gemm(
+                      qk_reduced_data,
+                      value_reorder_ptr + i * num_head * kvSize * headSize +
+                          j * kvSize * headSize + n * headSize,
+                      dst_data,
+                      1);
                 } else {
-                  // tail
-                  if (n == 0) {
-                    av_gemm_tail(
-                        qk_reduced_data,
-                        value_reorder_ptr + i * num_head * kvSize * headSize +
-                            j * kvSize * headSize + n * headSize,
-                        dst_data,
-                        1);
-                  } else {
-                    // bias
-                    av_gemm_bias_tail(
-                        qk_reduced_data,
-                        value_reorder_ptr + i * num_head * kvSize * headSize +
-                            j * kvSize * headSize + n * headSize,
-                        dst_data,
-                        1);
-                  }
+                  // bias
+                  av_gemm_bias(
+                      qk_reduced_data,
+                      value_reorder_ptr + i * num_head * kvSize * headSize +
+                          j * kvSize * headSize + n * headSize,
+                      dst_data,
+                      1);
+                }
+              } else if (
+                  n + kvSplitSize >= kvSize && kvTail % 2 == 0 && !is_causal) {
+                // tail
+                if (n == 0) {
+                  av_gemm_tail(
+                      qk_reduced_data,
+                      value_reorder_ptr + i * num_head * kvSize * headSize +
+                          j * kvSize * headSize + n * headSize,
+                      dst_data,
+                      1);
+                } else {
+                  // bias
+                  av_gemm_bias_tail(
+                      qk_reduced_data,
+                      value_reorder_ptr + i * num_head * kvSize * headSize +
+                          j * kvSize * headSize + n * headSize,
+                      dst_data,
+                      1);
                 }
               }
             }
-            if (!is_reduced_type || kvSplitSize % 2 != 0 || is_causal) {
+            if (!is_reduced_type || kvSplitSize % 2 != 0 || kvTail % 2 != 0 ||
+                is_causal) {
               _mkl_gemm(
                   CblasColMajor,
                   CblasNoTrans,
