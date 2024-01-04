@@ -181,6 +181,77 @@ using namespace xpu::xetla;
         k_);                                                                \
   }
 
+#define HGEMM_INT4_SILU_MUL_DISPATCH(                                       \
+    F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
+  {                                                                         \
+    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
+    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                \
+        q,                                                                  \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
+        weight_->data_ptr<uint8_t>(),                                       \
+        weight_zp_->data_ptr<uint8_t>(),                                    \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(epilogues_[1]->data_ptr<scalar_t>()), \
+        m_,                                                                 \
+        n_,                                                                 \
+        k_);                                                                \
+  }
+
+#define HGEMM_INT4_BIAS_SILU_MUL_DISPATCH(                                  \
+    F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
+  {                                                                         \
+    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
+    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                \
+        q,                                                                  \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
+        weight_->data_ptr<uint8_t>(),                                       \
+        weight_zp_->data_ptr<uint8_t>(),                                    \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+        reinterpret_cast<sycl::half*>(epilogues_[2]->data_ptr<scalar_t>()), \
+        m_,                                                                 \
+        n_,                                                                 \
+        k_);                                                                \
+  }
+
+#define HGEMM_INT4_ADD_DISPATCH(                                            \
+    F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
+  {                                                                         \
+    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
+    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                \
+        q,                                                                  \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
+        weight_->data_ptr<uint8_t>(),                                       \
+        weight_zp_->data_ptr<uint8_t>(),                                    \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+        m_,                                                                 \
+        n_,                                                                 \
+        k_);                                                                \
+  }
+
+#define HGEMM_INT4_BIAS_ADD_DISPATCH(                                            \
+    F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
+  {                                                                         \
+    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
+    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                \
+        q,                                                                  \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
+        weight_->data_ptr<uint8_t>(),                                       \
+        weight_zp_->data_ptr<uint8_t>(),                                    \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+        reinterpret_cast<sycl::half*>(epilogues_[1]->data_ptr<scalar_t>()), \
+        m_,                                                                 \
+        n_,                                                                 \
+        k_);                                                                \
+  }
+
+
 #define HGEMM_INT4_COMMON_DISPATCH_IMPL(                     \
     DISPATCHER, F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
   DISPATCHER(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)
@@ -344,6 +415,84 @@ using namespace xpu::xetla;
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
           HGEMM_INT4_QKV_BIAS_DISPATCH,                                        \
           hgemm_qkv_bias_wint4_arc,                                            \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (                                                                  \
+        num_epilogues_ == 2 && epilogue_type_[0] == SILU &&                    \
+        epilogue_type_[1] == RES_MUL && ARCH == 1)                             \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_SILU_MUL_DISPATCH,                                        \
+          hgemm_silu_mul_wint4_pvc,                                            \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (                                                                  \
+        num_epilogues_ == 2 && epilogue_type_[0] == SILU &&                    \
+        epilogue_type_[1] == RES_MUL && ARCH == 0)                             \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_SILU_MUL_DISPATCH,                                        \
+          hgemm_silu_mul_wint4_arc,                                            \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (                                                                  \
+        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                    \
+        epilogue_type_[1] == SILU && epilogue_type_[2] == RES_MUL &&ARCH == 1) \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_BIAS_SILU_MUL_DISPATCH,                                   \
+          hgemm_bias_silu_mul_wint4_pvc,                                       \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (                                                                  \
+        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                    \
+        epilogue_type_[1] == SILU && epilogue_type_[2] == RES_MUL &&ARCH == 0) \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_BIAS_SILU_MUL_DISPATCH,                                   \
+          hgemm_bias_silu_mul_wint4_arc,                                       \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (                                                                  \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                    \
+        epilogue_type_[1] == RES_ADD && ARCH == 1)                             \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_BIAS_ADD_DISPATCH,                                        \
+          hgemm_bias_add_wint4_pvc,                                            \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
+    else if (                                                                  \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                    \
+        epilogue_type_[1] == RES_ADD && ARCH == 0)                             \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_BIAS_ADD_DISPATCH,                                        \
+          hgemm_bias_add_wint4_arc,                                            \
           WG_M,                                                                \
           WG_N,                                                                \
           SG_M,                                                                \

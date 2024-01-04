@@ -345,6 +345,154 @@ static Tensor mm_low_bits(
       : mm_int4(input, weight, weight_scl, weight_zp, calib_gz, fp64_valid);
 }
 
+static Tensor mm_silu_mul_int4(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    int64_t calib_gz,
+    const Tensor& res) {
+  auto input_flat = input.flatten(0, -2);
+  auto weight_flat = weight.flatten(0, -2);
+  auto res_flat = res.flatten(0, -2);
+  // a: m x k, b: k x n
+  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
+  int m = input_flat.sizes()[0];
+  int n = weight_flat.sizes()[1] * 2;
+  int k = input_flat.sizes()[1];
+  auto output = at::empty({m, n}, input.options());
+  
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  int8_t fp64_valid = static_cast<int8_t>(Settings::I().has_2d_block_array(curDevID));
+  auto policy = HGEMMXetla_INT4()
+                    .add_matrix_out(output)
+                    .add_matrix_inp(input_flat)
+                    .add_matrix_wei(weight_flat)
+                    .add_matrix_scl(weight_scl)
+                    .add_matrix_zp(weight_zp)
+                    .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SILU)
+                    .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL)
+                    .add_calib_gz(calib_gz)
+                    .add_arch(fp64_valid)
+                    .build();
+  TORCH_CHECK(policy.fallback() == false, "mm silu int4: invalid gemm shape");
+  policy.run();
+  return resize_as_mat1(input, output);
+}
+
+static Tensor mm_bias_silu_mul_int4(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    int64_t calib_gz,
+    const Tensor& res) {
+  auto input_flat = input.flatten(0, -2);
+  auto weight_flat = weight.flatten(0, -2);
+  auto res_flat = res.flatten(0, -2);
+  auto bias_flat = bias.flatten();
+  // a: m x k, b: k x n
+  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
+  int m = input_flat.sizes()[0];
+  int n = weight_flat.sizes()[1] * 2;
+  int k = input_flat.sizes()[1];
+  auto output = at::empty({m, n}, input.options());
+  
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  int8_t fp64_valid = static_cast<int8_t>(Settings::I().has_2d_block_array(curDevID));
+  auto policy = HGEMMXetla_INT4()
+                    .add_matrix_out(output)
+                    .add_matrix_inp(input_flat)
+                    .add_matrix_wei(weight_flat)
+                    .add_matrix_scl(weight_scl)
+                    .add_matrix_zp(weight_zp)
+                    .add_epilogue(bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS)
+                    .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SILU)
+                    .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL)
+                    .add_calib_gz(calib_gz)
+                    .add_arch(fp64_valid)
+                    .build();
+  TORCH_CHECK(policy.fallback() == false, "mm silu int4: invalid gemm shape");
+  policy.run();
+  return resize_as_mat1(input, output);
+}
+
+static Tensor mm_add_int4(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    int64_t calib_gz,
+    const Tensor& res) {
+  auto input_flat = input.flatten(0, -2);
+  auto weight_flat = weight.flatten(0, -2);
+  auto res_flat = res.flatten(0, -2);
+  // a: m x k, b: k x n
+  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
+  int m = input_flat.sizes()[0];
+  int n = weight_flat.sizes()[1] * 2;
+  int k = input_flat.sizes()[1];
+  auto output = at::empty({m, n}, input.options());
+  
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  int8_t fp64_valid = static_cast<int8_t>(Settings::I().has_2d_block_array(curDevID));
+  auto policy = HGEMMXetla_INT4()
+                    .add_matrix_out(output)
+                    .add_matrix_inp(input_flat)
+                    .add_matrix_wei(weight_flat)
+                    .add_matrix_scl(weight_scl)
+                    .add_matrix_zp(weight_zp)
+                    .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD)
+                    .add_calib_gz(calib_gz)
+                    .add_arch(fp64_valid)
+                    .build();
+  TORCH_CHECK(policy.fallback() == false, "mm silu int4: invalid gemm shape");
+  policy.run();
+  return resize_as_mat1(input, output);
+}
+
+static Tensor mm_bias_add_int4(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    int64_t calib_gz,
+    const Tensor& res) {
+  auto input_flat = input.flatten(0, -2);
+  auto weight_flat = weight.flatten(0, -2);
+  auto res_flat = res.flatten(0, -2);
+  auto bias_flat = bias.flatten();
+  // a: m x k, b: k x n
+  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
+  int m = input_flat.sizes()[0];
+  int n = weight_flat.sizes()[1] * 2;
+  int k = input_flat.sizes()[1];
+  auto output = at::empty({m, n}, input.options());
+  
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  int8_t fp64_valid = static_cast<int8_t>(Settings::I().has_2d_block_array(curDevID));
+  auto policy = HGEMMXetla_INT4()
+                    .add_matrix_out(output)
+                    .add_matrix_inp(input_flat)
+                    .add_matrix_wei(weight_flat)
+                    .add_matrix_scl(weight_scl)
+                    .add_matrix_zp(weight_zp)
+                    .add_epilogue(bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS)
+                    .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD)
+                    .add_calib_gz(calib_gz)
+                    .add_arch(fp64_valid)
+                    .build();
+  TORCH_CHECK(policy.fallback() == false, "mm silu int4: invalid gemm shape");
+  policy.run();
+  return resize_as_mat1(input, output);
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
 

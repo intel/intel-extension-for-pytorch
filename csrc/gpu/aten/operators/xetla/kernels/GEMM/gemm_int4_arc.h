@@ -515,6 +515,286 @@ inline void hgemm_silu_wint4_arc(
       {{{}}});
 }
 
+template <
+    typename scalar_t,
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES>
+inline void hgemm_silu_mul_wint4_arc(
+    sycl::queue& queue,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint8_t* b,
+    const uint8_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* mul,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  static_assert(L3_KS == 1, "for fused op, L3_KS should be 1");
+
+  using data_type_a = scalar_t;
+  using data_type_b = int4x2;
+  using data_type_c = scalar_t;
+  using data_type_zp = int4x2;
+  using data_type_scale = scalar_t;
+  using data_type_acc = float;
+  using data_type_mul = scalar_t;
+  using post_op = subgroup::chained_tile_op_t<
+      epilogue_impl::silu_op_t,
+      subgroup::elemwise_reduce_op_t<reduce_op::prod, data_type_mul, gpu_arch::Dg2>
+      >;
+  using hgemm_wint4_arc_functor = hgemm_wint4_arc_func<
+      data_type_a,
+      data_type_b,
+      data_type_c,
+      data_type_zp,
+      data_type_scale,
+      data_type_acc,
+      WG_M,
+      WG_N,
+      SG_M,
+      SG_N,
+      SG_K,
+      L3_KS,
+      SLM_KS,
+      DQUANT_S,
+      post_op>;
+
+  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
+
+  hgemm_wint4_arc_functor::run(
+      queue,
+      const_cast<scalar_t*>(a),
+      const_cast<data_type_b*>(b_alias),
+      out,
+      m,
+      n,
+      k,
+      const_cast<data_type_zp*>(b_zp_alias),
+      const_cast<scalar_t*>(b_scale),
+      {{{}, {const_cast<scalar_t*>(mul), {n, m, n}}}});
+}
+
+template <
+    typename scalar_t,
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES>
+inline void hgemm_bias_silu_mul_wint4_arc(
+    sycl::queue& queue,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint8_t* b,
+    const uint8_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* bias,
+    const scalar_t* mul,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  static_assert(L3_KS == 1, "for fused op, L3_KS should be 1");
+
+  using data_type_a = scalar_t;
+  using data_type_b = int4x2;
+  using data_type_c = scalar_t;
+  using data_type_zp = int4x2;
+  using data_type_scale = scalar_t;
+  using data_type_acc = float;
+  using data_type_mul = scalar_t;
+  using data_type_bias = scalar_t;
+  using post_op = subgroup::chained_tile_op_t<
+      subgroup::bias_add_op_t<mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>, gpu_arch::Dg2>,
+      epilogue_impl::silu_op_t,
+      subgroup::elemwise_reduce_op_t<reduce_op::prod, data_type_mul, gpu_arch::Dg2>
+      >;
+  using hgemm_wint4_arc_functor = hgemm_wint4_arc_func<
+      data_type_a,
+      data_type_b,
+      data_type_c,
+      data_type_zp,
+      data_type_scale,
+      data_type_acc,
+      WG_M,
+      WG_N,
+      SG_M,
+      SG_N,
+      SG_K,
+      L3_KS,
+      SLM_KS,
+      DQUANT_S,
+      post_op>;
+
+  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
+
+  hgemm_wint4_arc_functor::run(
+      queue,
+      const_cast<scalar_t*>(a),
+      const_cast<data_type_b*>(b_alias),
+      out,
+      m,
+      n,
+      k,
+      const_cast<data_type_zp*>(b_zp_alias),
+      const_cast<scalar_t*>(b_scale),
+      {{{const_cast<scalar_t*>(bias), {n, 1, n}}, {}, {const_cast<scalar_t*>(mul), {n, m, n}}}});
+}
+
+template <
+    typename scalar_t,
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES>
+inline void hgemm_bias_add_wint4_arc(
+    sycl::queue& queue,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint8_t* b,
+    const uint8_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* bias,
+    const scalar_t* res,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  static_assert(L3_KS == 1, "for fused op, L3_KS should be 1");
+
+  using data_type_a = scalar_t;
+  using data_type_b = int4x2;
+  using data_type_c = scalar_t;
+  using data_type_zp = int4x2;
+  using data_type_scale = scalar_t;
+  using data_type_acc = float;
+  using data_type_res = scalar_t;
+  using data_type_bias = scalar_t;
+  using post_op = subgroup::chained_tile_op_t<
+      subgroup::bias_add_op_t<mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>, gpu_arch::Dg2>,
+      subgroup::elemwise_reduce_op_t<reduce_op::sum, data_type_res, gpu_arch::Dg2>
+      >;
+  using hgemm_wint4_arc_functor = hgemm_wint4_arc_func<
+      data_type_a,
+      data_type_b,
+      data_type_c,
+      data_type_zp,
+      data_type_scale,
+      data_type_acc,
+      WG_M,
+      WG_N,
+      SG_M,
+      SG_N,
+      SG_K,
+      L3_KS,
+      SLM_KS,
+      DQUANT_S,
+      post_op>;
+
+  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
+
+  hgemm_wint4_arc_functor::run(
+      queue,
+      const_cast<scalar_t*>(a),
+      const_cast<data_type_b*>(b_alias),
+      out,
+      m,
+      n,
+      k,
+      const_cast<data_type_zp*>(b_zp_alias),
+      const_cast<scalar_t*>(b_scale),
+      {{{const_cast<scalar_t*>(bias), {n, 1, n}}, {const_cast<scalar_t*>(res), {n, m, n}}}});
+}
+
+template <
+    typename scalar_t,
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES>
+inline void hgemm_res_wint4_arc(
+    sycl::queue& queue,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint8_t* b,
+    const uint8_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* res,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  static_assert(L3_KS == 1, "for fused op, L3_KS should be 1");
+
+  using data_type_a = scalar_t;
+  using data_type_b = int4x2;
+  using data_type_c = scalar_t;
+  using data_type_zp = int4x2;
+  using data_type_scale = scalar_t;
+  using data_type_acc = float;
+  using data_type_res = scalar_t;
+  using post_op = subgroup::chained_tile_op_t<
+      subgroup::
+          elemwise_reduce_op_t<reduce_op::sum, data_type_res, gpu_arch::Dg2>>;
+  using hgemm_wint4_arc_functor = hgemm_wint4_arc_func<
+      data_type_a,
+      data_type_b,
+      data_type_c,
+      data_type_zp,
+      data_type_scale,
+      data_type_acc,
+      WG_M,
+      WG_N,
+      SG_M,
+      SG_N,
+      SG_K,
+      L3_KS,
+      SLM_KS,
+      DQUANT_S,
+      post_op>;
+
+  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
+
+  hgemm_wint4_arc_functor::run(
+      queue,
+      const_cast<scalar_t*>(a),
+      const_cast<data_type_b*>(b_alias),
+      out,
+      m,
+      n,
+      k,
+      const_cast<data_type_zp*>(b_zp_alias),
+      const_cast<scalar_t*>(b_scale),
+      {{{const_cast<scalar_t*>(res), {n, m, n}}}});
+}
+
 
 } // namespace xetla
 } // namespace xpu
