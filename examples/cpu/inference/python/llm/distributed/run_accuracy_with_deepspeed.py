@@ -200,7 +200,7 @@ if args.accuracy_only:
                 transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_enable = _gradient_checkpointing_enable
             if re.search("gptbigcode", self.config.architectures[0], re.IGNORECASE):
                 model_type = "gptbigcode"
-            if world_size == 1 or model_type in ["falcon", "baichuan", "t5", "mistral", "gptbigcode"]:
+            if world_size == 1 or model_type in ["falcon", "baichuan", "gptbigcode"]:
                 self.model = model_class[0].from_pretrained(
                     model_id,
                     config=self.config,
@@ -210,20 +210,23 @@ if args.accuracy_only:
                 )
             else:
                 with deepspeed.OnDevice(dtype=load_dtype, device="meta"):
-                    if model_class[0] == AutoModelForCausalLM:
-                        self.model = (
-                            model_class[0]
-                            .from_config(self.config, trust_remote_code=True)
-                            .to(load_dtype)
-                        )
+                    if model_type in ["t5"]:
+                        self.model =  model_class[0](config=self.config)
                     else:
-                        self.model = model_class[0].from_pretrained(
-                            model_id,
-                            low_cpu_mem_usage=True,
-                            config=self.config,
-                            torch_dtype=load_dtype,
-                            trust_remote_code=True,
-                        )
+                        if model_class[0] == AutoModelForCausalLM:
+                            self.model = (
+                                model_class[0]
+                                .from_config(self.config, trust_remote_code=True)
+                                .to(load_dtype)
+                            )
+                        else:
+                            self.model = model_class[0].from_pretrained(
+                                model_id,
+                                low_cpu_mem_usage=True,
+                                config=self.config,
+                                torch_dtype=load_dtype,
+                                trust_remote_code=True,
+                            )
 
             self.model = self.model.eval()
 

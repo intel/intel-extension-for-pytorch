@@ -289,7 +289,7 @@ if args.benchmark:
     deepspeed.runtime.utils.see_memory_usage("pre-from-pretrained", force=True)
 
 # Construct model with fake meta tensors, later will be replaced during ds-inference ckpt load
-if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "t5", "mistral", "gptbigcode"]:
+if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "gptbigcode"]:
     model = model_class[0].from_pretrained(
         model_name,
         config=config,
@@ -299,9 +299,12 @@ if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "t5", "m
     )
 else:
     with deepspeed.OnDevice(dtype=load_dtype, device="meta"):
-        model = (
-            model_class[0].from_config(config, trust_remote_code=True).to(load_dtype)
-        )
+        if  model_type in ["t5"]:
+            model =  model_class[0](config=config)
+        else:
+            model = (
+                model_class[0].from_config(config, trust_remote_code=True).to(load_dtype)
+            )
 
 if args.benchmark:
     deepspeed.runtime.utils.see_memory_usage("post-from-pretrained", force=True)

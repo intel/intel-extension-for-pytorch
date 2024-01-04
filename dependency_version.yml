@@ -21,7 +21,7 @@ torchvision:
 deepspeed:
   branch: gma/run-opt-branch
   repo: https://github.com/delock/DeepSpeedSYCLSupport.git
-  version: 0.11.2+57ff508
+  version: 0.11.2+94873fe
   commit: gma/run-opt-branch
 lm-evaluation-harness:
   repo: https://github.com/EleutherAI/lm-evaluation-harness
