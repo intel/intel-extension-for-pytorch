@@ -14,7 +14,18 @@ Assumptions:
 
 ### Build or Pull Container:
 
-`./build.sh` script has docker build command, update all the relevant build arguments and execute the script.
+Run the following commands to build a docker image by compiling from source.
+
+```
+git clone https://github.com/intel/intel-extension-for-pytorch.git
+cd intel-extension-for-pytorch
+git checkout xpu-main
+git submodule sync
+git submodule update --init --recursive
+docker build -f docker/Dockerfile.compile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') -t intel-extension-for-pytorch:xpu .
+```
+
+Alternatively, `./build.sh` script has docker build command to install prebuilt wheel files, update all the relevant build arguments and execute the script. Run the command below in current directory.
 
 ```bash
 ./build.sh 
@@ -35,16 +46,8 @@ docker container so that the GPU is accessible.
 IMAGE_NAME=intel/intel-extension-for-pytorch:xpu
 ```
 ```bash
-
-VIDEO=$(getent group video | sed -E 's,^video:[^:]*:([^:]*):.*$,\1,')
-RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,')
-
-test -z "$RENDER" || RENDER_GROUP="--group-add ${RENDER}"
-
 docker run --rm \
     -v <your-local-dir>:/workspace \
-    --group-add ${VIDEO} \
-    ${RENDER_GROUP} \
     --device=/dev/dri \
     --ipc=host \
     -e http_proxy=$http_proxy \
@@ -85,10 +88,16 @@ python -c "import torch; import intel_extension_for_pytorch as ipex; print(torch
 
 Sample output looks like below:
 ```
-1.13.0a0+gitb1dde16 
-1.13.10+xpu 
-[0]: _DeviceProperties(name='Intel(R) Graphics [0x0bd5]', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=62244MB, max_compute_units=512) 
-[1]: _DeviceProperties(name='Intel(R) Graphics [0x0bd5]', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=62244MB, max_compute_units=512)
+2.1.0a0+cxx11.abi
+2.1.10+xpu
+[0]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
+[1]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
+[2]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
+[3]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
+[4]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
+[5]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
+[6]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
+[7]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
 ```
 #### Running your own script
 
