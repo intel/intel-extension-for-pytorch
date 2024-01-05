@@ -678,6 +678,25 @@ def model_convert_lowering(
     return _model
 
 
+# TODO: refine this check in other specific path
+def validate_device_avaliable(device: str):
+    def error_message(device):
+        raise RuntimeError(
+            f"Device [{device}] is not avaliable in your IPEX package, need to re-install IPEX with [{device}] support, exiting..."
+        )
+
+    if device == "xpu":
+        if not ipex._C._has_xpu():
+            error_message(device)
+    elif device == "cpu":
+        if not ipex._C._has_cpu():
+            error_message(device)
+    else:
+        raise RuntimeError(
+            f"Device [{device}] is not supported in the IPEX package. Options in [xpu, cpu], exiting..."
+        )
+
+
 def optimize(
     model,
     optimizer=None,
@@ -703,7 +722,8 @@ def optimize(
         dtype (torch.dtype): Now it works for ``torch.bfloat16`` and ``torch.float``.
             The default value is ``torch.float``. When working with quantization, it means the mixed dtype with quantization.
         inplace (bool): Whether to perform inplace optimization. Default value is ``False``.
-        device (str): Perform optimization on which device. Curentlty only support cpu. Default value is ``cpu``.
+        device (str): Specifying the device on which the optimization will be performed.
+            Can be either 'cpu' or 'xpu' ('xpu' is not applicable for cpu only packages). The default value is 'cpu'.
         quantization_config (object): Defining the IPEX quantization recipe (Weight only quant or static quant).
             Default value is ``None``. Once used, meaning using IPEX quantizatization model for model.generate().
         qconfig_summary_file (str): Path to the IPEX static quantization config json file.
@@ -749,6 +769,8 @@ def optimize(
             "fail to apply ipex.llm.optimize, this API supports inference for now, fallback to default path"
         )
         return model, optimizer
+
+    validate_device_avaliable(device)
 
     try:
         installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
