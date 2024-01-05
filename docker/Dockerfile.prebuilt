@@ -37,10 +37,10 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf  /var/lib/apt/lists/*
 
-RUN no_proxy=$no_proxy wget -qO - https://repositories.intel.com/graphics/intel-graphics.key | \
+RUN wget -qO - https://repositories.intel.com/gpu/intel-graphics.key | \
     gpg --dearmor --output /usr/share/keyrings/intel-graphics.gpg
-RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu jammy max" | \
-    tee  /etc/apt/sources.list.d/intel.gpu.jammy.list
+RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu jammy unified" | \
+    tee /etc/apt/sources.list.d/intel-gpu-jammy.list
 
 ARG ICD_VER
 ARG LEVEL_ZERO_GPU_VER
@@ -94,26 +94,34 @@ RUN ln -sf $(which ${PYTHON}) /usr/local/bin/python && \
 
 ARG TORCH_VERSION
 ARG TORCHVISION_VERSION
+ARG TORCHAUDIO_VERSION
 ARG IPEX_VERSION
 ARG ONECCL_BIND_PT_VERSION
 ARG TORCH_WHL_URL
 ARG IPEX_WHL_URL
 ARG TORCHVISION_WHL_URL
+ARG TORCHAUDIO_WHL_URL
 ARG ONECCL_BIND_PT_WHL_URL
 
 RUN python -m pip install numpy
 
-RUN python -m pip install torch==${TORCH_VERSION} -f ${TORCH_WHL_URL} && \
-    python -m pip install intel_extension_for_pytorch==${IPEX_VERSION} -f ${IPEX_WHL_URL} && \
-    python -m pip install torchvision==${TORCHVISION_VERSION} -f ${TORCHVISION_WHL_URL} && \
-    python -m pip install oneccl_bind_pt==${ONECCL_BIND_PT_VERSION} -f ${ONECCL_BIND_PT_WHL_URL} 
+RUN python -m pip install torch==${TORCH_VERSION} --extra-index-url ${TORCH_WHL_URL} && \
+    python -m pip install intel_extension_for_pytorch==${IPEX_VERSION} --extra-index-url ${IPEX_WHL_URL} && \
+    python -m pip install torchvision==${TORCHVISION_VERSION} --extra-index-url ${TORCHVISION_WHL_URL} && \
+    python -m pip install torchaudio==${TORCHAUDIO_VERSION} --extra-index-url ${TORCHAUDIO_WHL_URL} && \
+    python -m pip install oneccl_bind_pt==${ONECCL_BIND_PT_VERSION} --extra-index-url ${ONECCL_BIND_PT_WHL_URL} 
 
 ENV LD_LIBRARY_PATH=/opt/intel/oneapi/lib:/opt/intel/oneapi/lib/intel64:$LD_LIBRARY_PATH
 
-RUN apt update && \
-    apt install -y sudo 
-RUN adduser --disabled-password --gecos "" user
-RUN echo 'user ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+ARG UNAME
+ARG GID
+ARG GNAME=render
+ARG VNAME=video
 
-# Set the non-root user as the default user
-USER user
+RUN useradd -m -s /bin/bash $UNAME
+
+RUN groupadd -g $GID $GNAME
+
+RUN usermod -a -G $VNAME,$GNAME $UNAME
+
+USER $UNAME
