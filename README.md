@@ -1,4 +1,12 @@
-# Intel® Extension for PyTorch\*
+<div align="center">
+  
+Intel® Extension for Pytorch*
+===========================
+
+[💻Examples](./docs/tutorials/examples.md)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[📖CPU Documentations](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[📖GPU Documentations](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/)
+</div>
+
+
 
 Intel® Extension for PyTorch\* extends PyTorch\* with up-to-date features optimizations for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel X<sup>e</sup> Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch\* `xpu` device, Intel® Extension for PyTorch\* provides easy GPU acceleration for Intel discrete GPUs with PyTorch\*.
 
@@ -10,6 +18,13 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 
 * Check [CPU tutorial](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® CPUs. Source code is available at the [main branch](https://github.com/intel/intel-extension-for-pytorch/tree/main).
 * Check [GPU tutorial](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® GPUs. Source code is available at the [xpu-main branch](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main).
+
+
+
+## Large Language Models (LLMs) Optimization
+
+In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Starting from 2.1.0, specific optimizations for certain LLM models are introduced in the Intel® Extension for PyTorch\*. Check [LLM optimizations CPU](./examples/cpu/inference/python/llm) and [LLM optimizations GPU](./examples/gpu/inference/python/llm) for details.
+
 
 ## Installation
 
@@ -28,7 +43,7 @@ python -m pip install intel-extension-for-pytorch --extra-index-url https://pyto
 
 More installation methods can be found at [CPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/installation.html).
 
-Compilation instruction of the latest CPU code base `main` branch can be found in the session Package `source` at [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/installation.html).
+Compilation instruction of the latest CPU code base `main` branch can be found in the session Package `source` at [CPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/installation.html).
 
 ### GPU version
 
@@ -38,13 +53,14 @@ You can install Intel® Extension for PyTorch\* for GPU via command below.
 python -m pip install torch==2.1.0a0 torchvision==0.16.0a0 torchaudio==2.1.0a0 intel-extension-for-pytorch==2.1.10+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 # for PRC user, you can check with the following link
 python -m pip install torch==2.1.0a0 torchvision==0.16.0a0 torchaudio==2.1.0a0 intel-extension-for-pytorch==2.1.10+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/
+
 ```
 
-**Note:** The patched PyTorch 2.0.1 is required to work with Intel® Extension for PyTorch\* on Intel® graphics card for now.
+**Note:** The patched PyTorch 2.1.0 is required to work with Intel® Extension for PyTorch\* on Intel® graphics card for now.
 
 More installation methods can be found at [GPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/installation.html).
 
-Compilation instruction of the latest GPU code base `xpu-main` branch can be found in the session Package `source` at [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/installation.html).
+Compilation instruction of the latest GPU code base `xpu-main` branch can be found in the session Package `source` at [GPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/installation.html).
 
 ## Getting Started
 
