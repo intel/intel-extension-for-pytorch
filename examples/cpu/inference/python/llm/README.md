@@ -345,8 +345,10 @@ The performance results on AWS instances can be found [here](../../../../../docs
 
 ## Weight-only quantization with low precision checkpoint (Experimental)
 
-## Weight only quantization with low precision checkpoint (Experimental)
 Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 probably results in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a dataset by such algorithms. The low precision checkpoint is saved as a `state_dict` in a `.pt` file and can be loaded later for weight only quantization. We provide an example here to run GPTQ.
+
+*Note:* Currently pytorch models validated by GPTQ include: gpt-j, opt, llama, Llama-2, bloom, bloomz,
+dolly-v1, dolly-v2, gpt-neo, gpt-neox, mpt, falcon.
 
 Here is how to use it:
 

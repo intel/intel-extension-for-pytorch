@@ -6,7 +6,6 @@ import time
 import torch
 import torch.nn as nn
 import transformers
-from tqdm import tqdm
 from functools import partial
 from .model_utils import (
     find_layers,
@@ -370,7 +369,7 @@ class GPTQuantizer(object):
 
         # Step3: run forward to obtain calibration datasets
         logger.info("Collecting calibration inputs...")
-        for batch in tqdm(self.dataloader):
+        for batch in self.dataloader:
             if not self.layer_wise:
                 batch = move_input_to_device(batch, self.device)
             try:
