@@ -191,6 +191,8 @@ class NewIPEXQWENBlock(IPEXTransformerBlock):
         if self.ipex_config.transpose:
             self.transpose_parameter()
         self.attn.cat_qkv()
+        self.module.attn.c_attn.weight.data = self.attn.qkv_proj.weight.data
+        self.module.attn.c_attn.bias.data = self.attn.qkv_proj.bias.data
 
     def forward(
         self,
