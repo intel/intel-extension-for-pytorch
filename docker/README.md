@@ -88,10 +88,16 @@ python -c "import torch; import intel_extension_for_pytorch as ipex; print(torch
 
 Sample output looks like below:
 ```
-1.13.0a0+gitb1dde16 
-1.13.10+xpu 
-[0]: _DeviceProperties(name='Intel(R) Graphics [0x0bd5]', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=62244MB, max_compute_units=512) 
-[1]: _DeviceProperties(name='Intel(R) Graphics [0x0bd5]', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=62244MB, max_compute_units=512)
+2.1.0a0+cxx11.abi
+2.1.10+xpu
+[0]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
+[1]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
+[2]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
+[3]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
+[4]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
+[5]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
+[6]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
+[7]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
 ```
 #### Running your own script
 

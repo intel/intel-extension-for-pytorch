@@ -19,6 +19,13 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 * Check [CPU tutorial](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® CPUs. Source code is available at the [main branch](https://github.com/intel/intel-extension-for-pytorch/tree/main).
 * Check [GPU tutorial](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® GPUs. Source code is available at the [xpu-main branch](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main).
 
+
+
+## Large Language Models (LLMs) Optimization
+
+In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Starting from 2.1.0, specific optimizations for certain LLM models are introduced in the Intel® Extension for PyTorch\*. Check [LLM optimizations CPU](./examples/cpu/inference/python/llm) and [LLM optimizations GPU](./examples/gpu/inference/python/llm) for details.
+
+
 ## Installation
 
 ### CPU version
@@ -36,7 +43,7 @@ python -m pip install intel-extension-for-pytorch --extra-index-url https://pyto
 
 More installation methods can be found at [CPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/installation.html).
 
-Compilation instruction of the latest CPU code base `main` branch can be found in the session Package `source` at [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/installation.html).
+Compilation instruction of the latest CPU code base `main` branch can be found in the session Package `source` at [CPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/installation.html).
 
 ### GPU version
 
@@ -53,7 +60,7 @@ python -m pip install torch==2.1.0a0 torchvision==0.16.0a0 torchaudio==2.1.0a0 i
 
 More installation methods can be found at [GPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/installation.html).
 
-Compilation instruction of the latest GPU code base `xpu-main` branch can be found in the session Package `source` at [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/installation.html).
+Compilation instruction of the latest GPU code base `xpu-main` branch can be found in the session Package `source` at [GPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/installation.html).
 
 ## Getting Started
 
