@@ -332,6 +332,41 @@ Tensor mul_add_autocast(
       alpha);
 }
 
+template <typename scalar_t, typename packed_bf16>
+struct PackedAddKernelFunctor {
+  void operator()(sycl::item<1> item) const {
+    int64_t gid = item.get_linear_id();
+    auto MSB_p = MSB_data;
+    auto LSB_p = LSB_data;
+    auto gw_p = gw_data;
+
+    packed_bf16 p16;
+    p16.s[0] = LSB_p[gid];
+    p16.s[1] = MSB_p[gid];
+    p16.f += lr * (float)(gw_p[gid]);
+    LSB_p[gid] = p16.s[0];
+    MSB_p[gid] = p16.s[1];
+  }
+  PackedAddKernelFunctor(
+      unsigned short* __restrict__ MSB_data_,
+      unsigned short* __restrict__ LSB_data_,
+      const at::BFloat16* __restrict__ gw_data_,
+      int num_elem_,
+      float lr_)
+      : MSB_data(MSB_data_),
+        LSB_data(LSB_data_),
+        gw_data(gw_data_),
+        num_elem(num_elem_),
+        lr(lr_) {}
+
+ private:
+  unsigned short* __restrict__ MSB_data;
+  unsigned short* __restrict__ LSB_data;
+  const at::BFloat16* __restrict__ gw_data;
+  int num_elem;
+  float lr;
+};
+
 template <typename scalar_t>
 static inline void packed_add_kernel(
     unsigned short* __restrict__ w_MSB,
@@ -349,23 +384,86 @@ static inline void packed_add_kernel(
     auto MSB_data = w_MSB;
     auto LSB_data = w_LSB;
     auto gw_data = gw;
-
-    cgh.parallel_for(sycl::range<1>(num_elem), [=](sycl::item<1> item) {
-      int64_t gid = item.get_linear_id();
-      auto MSB_p = MSB_data;
-      auto LSB_p = LSB_data;
-      auto gw_p = gw_data;
-
-      packed_bf16 p16;
-      p16.s[0] = LSB_p[gid];
-      p16.s[1] = MSB_p[gid];
-      p16.f += lr * (float)(gw_p[gid]);
-      LSB_p[gid] = p16.s[0];
-      MSB_p[gid] = p16.s[1];
-    });
+    PackedAddKernelFunctor<scalar_t, packed_bf16> kfn(
+        MSB_data, LSB_data, gw_data, num_elem, lr);
+    cgh.parallel_for(sycl::range<1>(num_elem), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
+
+template <typename scalar_t, typename accscalar_t, typename packed_bf16>
+struct SparsePackedAddKernelFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    auto MSB_p = w_MSB;
+    auto LSB_p = w_LSB;
+    auto uniqueOffsets_ptr = uniqueOffsets;
+    auto origIndices_ptr = origIndices;
+    auto values_ptr = values;
+    auto indices1D_ptr = indices1D;
+    // auto newValues_ptr = newValues_data;
+
+    int seg = item.get_global_id()[0];
+
+    if (seg < newNnz) {
+      const int newValueRow = seg * stride;
+      const int begin = uniqueOffsets_ptr[seg];
+      const int end = (seg < newNnz - 1) ? uniqueOffsets_ptr[seg + 1] : nnz;
+      const int featureDim = item.get_global_id()[1];
+
+      accscalar_t tmp = 0;
+      for (int row = begin; row < end; row++) {
+        const int valueRow = ((int)origIndices_ptr[row]) * stride;
+        if (featureDim < stride) {
+          tmp += static_cast<accscalar_t>(values_ptr[valueRow + featureDim]);
+        }
+      }
+      if (featureDim < stride) {
+        const int weight_index = indices1D_ptr[seg] * stride + featureDim;
+        packed_bf16 p16;
+        p16.s[0] = LSB_p[weight_index];
+        p16.s[1] = MSB_p[weight_index];
+        p16.f += lr * (float)(tmp);
+        LSB_p[weight_index] = p16.s[0];
+        MSB_p[weight_index] = p16.s[1];
+        // newValues_ptr[newValueRow + featureDim] =
+        // static_cast<scalar_t>(tmp);
+      }
+    }
+  }
+  SparsePackedAddKernelFunctor(
+      unsigned short* __restrict__ w_MSB_,
+      unsigned short* __restrict__ w_LSB_,
+      const at::BFloat16* __restrict__ values_,
+      int64_t* indices1D_,
+      int64_t* origIndices_,
+      int64_t* uniqueOffsets_,
+      int64_t stride_,
+      int64_t nnz_,
+      float lr_,
+      int64_t newNnz_)
+      : w_MSB(w_MSB_),
+        w_LSB(w_LSB_),
+        values(values_),
+        indices1D(indices1D_),
+        origIndices(origIndices_),
+        uniqueOffsets(uniqueOffsets_),
+        stride(stride_),
+        nnz(nnz_),
+        lr(lr_),
+        newNnz(newNnz_) {}
+
+ private:
+  unsigned short* __restrict__ w_MSB;
+  unsigned short* __restrict__ w_LSB;
+  const at::BFloat16* __restrict__ values;
+  int64_t* indices1D;
+  int64_t* origIndices;
+  int64_t* uniqueOffsets;
+  int64_t stride;
+  int64_t nnz;
+  float lr;
+  int64_t newNnz;
+};
 
 template <typename scalar_t>
 static inline void sparse_packed_add_kernel(
@@ -399,43 +497,17 @@ static inline void sparse_packed_add_kernel(
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     // auto newValues_data = newValues.data_ptr<scalar_t>();
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-      auto MSB_p = w_MSB;
-      auto LSB_p = w_LSB;
-      auto uniqueOffsets_ptr = uniqueOffsets;
-      auto origIndices_ptr = origIndices;
-      auto values_ptr = values;
-      auto indices1D_ptr = indices1D;
-      // auto newValues_ptr = newValues_data;
-
-      int seg = item.get_global_id()[0];
-
-      if (seg < newNnz) {
-        const int newValueRow = seg * stride;
-        const int begin = uniqueOffsets_ptr[seg];
-        const int end = (seg < newNnz - 1) ? uniqueOffsets_ptr[seg + 1] : nnz;
-        const int featureDim = item.get_global_id()[1];
-
-        accscalar_t tmp = 0;
-        for (int row = begin; row < end; row++) {
-          const int valueRow = ((int)origIndices_ptr[row]) * stride;
-          if (featureDim < stride) {
-            tmp += static_cast<accscalar_t>(values_ptr[valueRow + featureDim]);
-          }
-        }
-        if (featureDim < stride) {
-          const int weight_index = indices1D_ptr[seg] * stride + featureDim;
-          packed_bf16 p16;
-          p16.s[0] = LSB_p[weight_index];
-          p16.s[1] = MSB_p[weight_index];
-          p16.f += lr * (float)(tmp);
-          LSB_p[weight_index] = p16.s[0];
-          MSB_p[weight_index] = p16.s[1];
-          // newValues_ptr[newValueRow + featureDim] =
-          // static_cast<scalar_t>(tmp);
-        }
-      }
-    };
+    SparsePackedAddKernelFunctor<scalar_t, accscalar_t, packed_bf16> kfn(
+        w_MSB,
+        w_LSB,
+        values,
+        indices1D,
+        origIndices,
+        uniqueOffsets,
+        stride,
+        nnz,
+        lr,
+        newNnz);
 
     // kick off kernel
     cgh.parallel_for(

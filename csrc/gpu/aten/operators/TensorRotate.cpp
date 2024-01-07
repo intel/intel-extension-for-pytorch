@@ -26,6 +26,59 @@ template <
     bool unsigned_index,
     template <int, typename, bool>
     class OffsetCalculator>
+struct ApplyRotaryEmbeddingImplKernelFunctor {
+  void operator()(sycl::nd_item<1> item_id) const {
+    auto item_idx = item_id.get_local_id(0);
+    auto item_range = item_id.get_local_range(0);
+    auto group_idx = item_id.get_group(0);
+    auto sg = item_id.get_sub_group();
+    scalar_t tensor_val;
+    for (int i = item_idx; i < problem_size; i += item_range) {
+      auto global_offset = group_idx * problem_size + i;
+      const auto offset = offset_calc.get(global_offset);
+      tensor_val = *(tensor + offset[1]);
+      scalar_t scale = i % 2 == 0 ? -1 : 1;
+      scalar_t shift_val = sg.shuffle_xor(tensor_val, 1) * scale;
+      scalar_t sin_val = *(sin + offset[2]);
+      scalar_t cos_val = *(cos + offset[3]);
+      scalar_t out_val = shift_val * sin_val + tensor_val * cos_val;
+      scalar_t* out_ptr = out + offset[0];
+      *out_ptr = out_val;
+    }
+  }
+  ApplyRotaryEmbeddingImplKernelFunctor(
+      scalar_t* tensor_,
+      scalar_t* sin_,
+      scalar_t* cos_,
+      scalar_t* out_,
+      OffsetCalculator<N, index_type, unsigned_index> offset_calc_,
+      int64_t problem_size_,
+      int64_t total_size_)
+      : tensor(tensor_),
+        sin(sin_),
+        cos(cos_),
+        out(out_),
+        offset_calc(offset_calc_),
+        problem_size(problem_size_),
+        total_size(total_size_) {}
+
+ private:
+  scalar_t* tensor;
+  scalar_t* sin;
+  scalar_t* cos;
+  scalar_t* out;
+  OffsetCalculator<N, index_type, unsigned_index> offset_calc;
+  int64_t problem_size;
+  int64_t total_size;
+};
+
+template <
+    typename scalar_t,
+    int N,
+    typename index_type,
+    bool unsigned_index,
+    template <int, typename, bool>
+    class OffsetCalculator>
 void apply_rotary_embedding_impl(
     scalar_t* tensor,
     scalar_t* sin,
@@ -41,25 +94,13 @@ void apply_rotary_embedding_impl(
   int64_t work_group_num = (total_size + problem_size - 1) / problem_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
-      auto item_idx = item_id.get_local_id(0);
-      auto item_range = item_id.get_local_range(0);
-      auto group_idx = item_id.get_group(0);
-      auto sg = item_id.get_sub_group();
-      scalar_t tensor_val;
-      for (int i = item_idx; i < problem_size; i += item_range) {
-        auto global_offset = group_idx * problem_size + i;
-        const auto offset = offset_calc.get(global_offset);
-        tensor_val = *(tensor + offset[1]);
-        scalar_t scale = i % 2 == 0 ? -1 : 1;
-        scalar_t shift_val = sg.shuffle_xor(tensor_val, 1) * scale;
-        scalar_t sin_val = *(sin + offset[2]);
-        scalar_t cos_val = *(cos + offset[3]);
-        scalar_t out_val = shift_val * sin_val + tensor_val * cos_val;
-        scalar_t* out_ptr = out + offset[0];
-        *out_ptr = out_val;
-      }
-    };
+    ApplyRotaryEmbeddingImplKernelFunctor<
+        scalar_t,
+        N,
+        index_type,
+        unsigned_index,
+        OffsetCalculator>
+        kfn(tensor, sin, cos, out, offset_calc, problem_size, total_size);
 
     cgh.parallel_for(
         sycl::nd_range<1>(

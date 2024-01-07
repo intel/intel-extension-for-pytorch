@@ -28,6 +28,154 @@ static inline scalar_t logSumExp(scalar_t a, scalar_t b) {
 }
 
 template <typename scalar_t, typename acc_t>
+struct TransducerLossForwardKernelFunctor {
+  void operator()(sycl::nd_item<3> item_id) const {
+    auto local_id = item_id.get_local_id(2);
+    int batch = item_id.get_group(1);
+    int path = item_id.get_group(0);
+
+    const auto myFLen = audLen[batch];
+    const auto myGLen = txtLen[batch] + 1;
+    const auto myLabel = label + batch * (maxGLen - 1);
+    const int64_t myBatchOffset = packedInput
+        ? (batch == 0 ? 0 : batchOffset[batch - 1])
+        : batch * maxFLen * maxGLen;
+    const int64_t myStrideT = packedInput ? myGLen : maxGLen;
+
+    const scalar_t* myX = x + myBatchOffset * dictSize;
+
+    for (int i = local_id; i < maxGLen; i += local_size) {
+      local_label[i] = myLabel[i];
+    }
+    item_id.barrier();
+
+    if (path == 0) {
+      acc_t* myAlpha = alpha + batch * maxFLen * maxGLen;
+      if (local_id == 0)
+        myAlpha[0] = 0;
+      item_id.barrier();
+
+      for (int64_t step = 1; step < myFLen + myGLen - 1; ++step) {
+        for (int64_t u = local_id; u < myGLen; u += local_size) {
+          int64_t t = step - u;
+          if (t >= 0 && t < myFLen && u >= 0 && u < myGLen) {
+            if (u == 0) {
+              // alpha(t, u) = alpha(t-1, u) * null(t-1, u)
+              myAlpha[t * maxGLen] = myAlpha[(t - 1) * maxGLen] +
+                  myX[((t - 1) * myStrideT) * dictSize + blankIdx];
+            } else if (t == 0) {
+              // alpha(t, u-1) = alpha(t, u-1) * y(t, u-1)
+              myAlpha[u] =
+                  myAlpha[u - 1] + myX[(u - 1) * dictSize + local_label[u - 1]];
+            } else {
+              // alpha(t, u) = alpha(t-1, u) * null(t-1, u) + alpha(t,
+              // u-1) * y(t, u-1)
+              acc_t current = myAlpha[(t - 1) * maxGLen + u] +
+                  myX[((t - 1) * myStrideT + u) * dictSize + blankIdx];
+              acc_t next = myAlpha[t * maxGLen + u - 1] +
+                  myX[(t * myStrideT + u - 1) * dictSize + local_label[u - 1]];
+              myAlpha[t * maxGLen + u] = logSumExp<acc_t>(next, current);
+            }
+          }
+        }
+        item_id.barrier();
+      }
+    } else {
+      // beta path
+      acc_t* myBeta = beta + batch * maxFLen * maxGLen;
+      if (local_id == 0) {
+        myBeta[(myFLen - 1) * maxGLen + myGLen - 1] =
+            myX[((myFLen - 1) * myStrideT + myGLen - 1) * dictSize + blankIdx];
+      }
+      item_id.barrier();
+      for (int64_t step = myFLen + myGLen - 3; step >= 0; --step) {
+        for (int64_t u = local_id; u < myGLen; u += local_size) {
+          int64_t t = step - u;
+          if (t >= 0 and t < myFLen and u >= 0 and u < myGLen) {
+            if (u == myGLen - 1) {
+              // beta(t,u) = beta(t+1,u) * null(t,u)
+              myBeta[t * maxGLen + u] = myBeta[(t + 1) * maxGLen + u] +
+                  myX[(t * myStrideT + u) * dictSize + blankIdx];
+            } else if (t == myFLen - 1) {
+              // beta(t,u) = beta(t,u+1) * y(t,u)
+              myBeta[t * maxGLen + u] = myBeta[t * maxGLen + u + 1] +
+                  myX[(t * myStrideT + u) * dictSize + local_label[u]];
+            } else {
+              // beta(t,u) = beta(t+1,u)*null(t,u) + beta(t,u+1)*y(t,u)
+              int64_t offset1 = (t + 1) * maxGLen + u;
+              int64_t offset2 = (t * myStrideT + u) * dictSize + blankIdx;
+              int64_t offset3 = t * maxGLen + u + 1;
+              int64_t offset4 = (t * myStrideT + u) * dictSize + local_label[u];
+              acc_t current = myBeta[(t + 1) * maxGLen + u] +
+                  myX[(t * myStrideT + u) * dictSize + blankIdx];
+              acc_t next = myBeta[t * maxGLen + u + 1] +
+                  myX[(t * myStrideT + u) * dictSize + local_label[u]];
+              myBeta[int64_t(t * maxGLen + u)] =
+                  logSumExp<acc_t>(next, current);
+            }
+          }
+        }
+        item_id.barrier();
+      }
+      if (local_id == 0) {
+        loss[batch] = -myBeta[0];
+      }
+    }
+  }
+  TransducerLossForwardKernelFunctor(
+      const scalar_t* x_,
+      const int* label_,
+      const int* audLen_,
+      const int* txtLen_,
+      const int64_t* batchOffset_,
+      int64_t dictSize_,
+      int64_t blankIdx_,
+      int64_t maxFLen_,
+      int64_t maxGLen_,
+      bool packedInput_,
+      const int batchSize_,
+      acc_t* alpha_,
+      acc_t* beta_,
+      scalar_t* loss_,
+      int64_t local_size_,
+      dpcpp_local_acc_t<int> local_label_)
+      : x(x_),
+        label(label_),
+        audLen(audLen_),
+        txtLen(txtLen_),
+        batchOffset(batchOffset_),
+        dictSize(dictSize_),
+        blankIdx(blankIdx_),
+        maxFLen(maxFLen_),
+        maxGLen(maxGLen_),
+        packedInput(packedInput_),
+        batchSize(batchSize_),
+        alpha(alpha_),
+        beta(beta_),
+        loss(loss_),
+        local_size(local_size_),
+        local_label(local_label_) {}
+
+ private:
+  const scalar_t* x;
+  const int* label;
+  const int* audLen;
+  const int* txtLen;
+  const int64_t* batchOffset;
+  int64_t dictSize;
+  int64_t blankIdx;
+  int64_t maxFLen;
+  int64_t maxGLen;
+  bool packedInput;
+  const int batchSize;
+  acc_t* alpha;
+  acc_t* beta;
+  scalar_t* loss;
+  int64_t local_size;
+  dpcpp_local_acc_t<int> local_label;
+};
+
+template <typename scalar_t, typename acc_t>
 void transducer_loss_forward_kernel(
     const scalar_t* x,
     const int* label,
@@ -52,105 +200,27 @@ void transducer_loss_forward_kernel(
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     dpcpp_local_acc_t<int> local_label(maxGLen, cgh);
+    TransducerLossForwardKernelFunctor<scalar_t, acc_t> kfn(
+        x,
+        label,
+        audLen,
+        txtLen,
+        batchOffset,
+        dictSize,
+        blankIdx,
+        maxFLen,
+        maxGLen,
+        packedInput,
+        batchSize,
+        alpha,
+        beta,
+        loss,
+        local_size,
+        local_label);
     cgh.parallel_for(
         sycl::nd_range<3>(
             sycl::range<3>(global_range), sycl::range<3>(local_range)),
-        [=](sycl::nd_item<3> item_id) {
-          auto local_id = item_id.get_local_id(2);
-          int batch = item_id.get_group(1);
-          int path = item_id.get_group(0);
-
-          const auto myFLen = audLen[batch];
-          const auto myGLen = txtLen[batch] + 1;
-          const auto myLabel = label + batch * (maxGLen - 1);
-          const int64_t myBatchOffset = packedInput
-              ? (batch == 0 ? 0 : batchOffset[batch - 1])
-              : batch * maxFLen * maxGLen;
-          const int64_t myStrideT = packedInput ? myGLen : maxGLen;
-
-          const scalar_t* myX = x + myBatchOffset * dictSize;
-
-          for (int i = local_id; i < maxGLen; i += local_size) {
-            local_label[i] = myLabel[i];
-          }
-          item_id.barrier();
-
-          if (path == 0) {
-            acc_t* myAlpha = alpha + batch * maxFLen * maxGLen;
-            if (local_id == 0)
-              myAlpha[0] = 0;
-            item_id.barrier();
-
-            for (int64_t step = 1; step < myFLen + myGLen - 1; ++step) {
-              for (int64_t u = local_id; u < myGLen; u += local_size) {
-                int64_t t = step - u;
-                if (t >= 0 && t < myFLen && u >= 0 && u < myGLen) {
-                  if (u == 0) {
-                    // alpha(t, u) = alpha(t-1, u) * null(t-1, u)
-                    myAlpha[t * maxGLen] = myAlpha[(t - 1) * maxGLen] +
-                        myX[((t - 1) * myStrideT) * dictSize + blankIdx];
-                  } else if (t == 0) {
-                    // alpha(t, u-1) = alpha(t, u-1) * y(t, u-1)
-                    myAlpha[u] = myAlpha[u - 1] +
-                        myX[(u - 1) * dictSize + local_label[u - 1]];
-                  } else {
-                    // alpha(t, u) = alpha(t-1, u) * null(t-1, u) + alpha(t,
-                    // u-1) * y(t, u-1)
-                    acc_t current = myAlpha[(t - 1) * maxGLen + u] +
-                        myX[((t - 1) * myStrideT + u) * dictSize + blankIdx];
-                    acc_t next = myAlpha[t * maxGLen + u - 1] +
-                        myX[(t * myStrideT + u - 1) * dictSize +
-                            local_label[u - 1]];
-                    myAlpha[t * maxGLen + u] = logSumExp<acc_t>(next, current);
-                  }
-                }
-              }
-              item_id.barrier();
-            }
-          } else {
-            // beta path
-            acc_t* myBeta = beta + batch * maxFLen * maxGLen;
-            if (local_id == 0) {
-              myBeta[(myFLen - 1) * maxGLen + myGLen - 1] =
-                  myX[((myFLen - 1) * myStrideT + myGLen - 1) * dictSize +
-                      blankIdx];
-            }
-            item_id.barrier();
-            for (int64_t step = myFLen + myGLen - 3; step >= 0; --step) {
-              for (int64_t u = local_id; u < myGLen; u += local_size) {
-                int64_t t = step - u;
-                if (t >= 0 and t < myFLen and u >= 0 and u < myGLen) {
-                  if (u == myGLen - 1) {
-                    // beta(t,u) = beta(t+1,u) * null(t,u)
-                    myBeta[t * maxGLen + u] = myBeta[(t + 1) * maxGLen + u] +
-                        myX[(t * myStrideT + u) * dictSize + blankIdx];
-                  } else if (t == myFLen - 1) {
-                    // beta(t,u) = beta(t,u+1) * y(t,u)
-                    myBeta[t * maxGLen + u] = myBeta[t * maxGLen + u + 1] +
-                        myX[(t * myStrideT + u) * dictSize + local_label[u]];
-                  } else {
-                    // beta(t,u) = beta(t+1,u)*null(t,u) + beta(t,u+1)*y(t,u)
-                    int64_t offset1 = (t + 1) * maxGLen + u;
-                    int64_t offset2 = (t * myStrideT + u) * dictSize + blankIdx;
-                    int64_t offset3 = t * maxGLen + u + 1;
-                    int64_t offset4 =
-                        (t * myStrideT + u) * dictSize + local_label[u];
-                    acc_t current = myBeta[(t + 1) * maxGLen + u] +
-                        myX[(t * myStrideT + u) * dictSize + blankIdx];
-                    acc_t next = myBeta[t * maxGLen + u + 1] +
-                        myX[(t * myStrideT + u) * dictSize + local_label[u]];
-                    myBeta[int64_t(t * maxGLen + u)] =
-                        logSumExp<acc_t>(next, current);
-                  }
-                }
-              }
-              item_id.barrier();
-            }
-            if (local_id == 0) {
-              loss[batch] = -myBeta[0];
-            }
-          }
-        });
+        kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -222,6 +292,99 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> transducer_loss_forward(
 }
 
 template <typename scalar_t, typename acc_t>
+struct TransducerLossBackwardKernelFunctor {
+  void operator()(sycl::nd_item<3> item_id) const {
+    const int local_id = item_id.get_local_id(2);
+    const int t = item_id.get_group(1);
+    const int batch = item_id.get_group(0);
+    const int64_t myFLen = audLen[batch];
+    const int64_t myGLen = txtLen[batch] + 1;
+    const int64_t myBatchOffset = packedInput
+        ? (batch == 0 ? 0 : batchOffset[batch - 1])
+        : batch * maxFLen * maxGLen;
+    const int64_t myStrideT = packedInput ? myGLen : maxGLen;
+    auto myX = x + (myBatchOffset + t * myStrideT) * dictSize;
+    auto myAlpha = alpha + batch * maxFLen * maxGLen;
+    auto myBeta = beta + batch * maxFLen * maxGLen;
+    auto myXGrad = xGrad + (myBatchOffset + t * myStrideT) * dictSize;
+    auto myLabel = label + batch * (maxGLen - 1);
+
+    int64_t u = local_id;
+    while (t < myFLen && u < myGLen) {
+      acc_t grad = Numerics<acc_t>::log(lossGrad[batch]) +
+          myAlpha[t * maxGLen + u] - myBeta[0];
+      if (u != myGLen - 1)
+        myXGrad[u * dictSize + myLabel[u]] = -Numerics<acc_t>::exp(
+            grad + myBeta[t * maxGLen + u + 1] +
+            myX[u * dictSize + myLabel[u]]);
+      if (t == myFLen - 1 && u == myGLen - 1)
+        myXGrad[u * dictSize + blankIdx] =
+            -Numerics<acc_t>::exp(grad + myX[u * dictSize + blankIdx]);
+      else if (t != myFLen - 1)
+        myXGrad[u * dictSize + blankIdx] = -Numerics<acc_t>::exp(
+            grad + myBeta[(t + 1) * maxGLen + u] +
+            myX[u * dictSize + blankIdx]);
+
+      u += local_size;
+    }
+  }
+  TransducerLossBackwardKernelFunctor(
+      const scalar_t* x_,
+      const scalar_t* lossGrad_,
+      const int* audLen_,
+      const int* txtLen_,
+      const int* label_,
+      const acc_t* alpha_,
+      const acc_t* beta_,
+      const int64_t* batchOffset_,
+      int64_t dictSize_,
+      int64_t blankIdx_,
+      int64_t maxFLen_,
+      int64_t maxGLen_,
+      bool packedInput_,
+      const int batchSize_,
+      scalar_t* xGrad_,
+      int64_t local_size_,
+      dpcpp_local_acc_t<int> local_label_)
+      : x(x_),
+        lossGrad(lossGrad_),
+        audLen(audLen_),
+        txtLen(txtLen_),
+        label(label_),
+        alpha(alpha_),
+        beta(beta_),
+        batchOffset(batchOffset_),
+        dictSize(dictSize_),
+        blankIdx(blankIdx_),
+        maxFLen(maxFLen_),
+        maxGLen(maxGLen_),
+        packedInput(packedInput_),
+        batchSize(batchSize_),
+        xGrad(xGrad_),
+        local_size(local_size_),
+        local_label(local_label_) {}
+
+ private:
+  const scalar_t* x;
+  const scalar_t* lossGrad;
+  const int* audLen;
+  const int* txtLen;
+  const int* label;
+  const acc_t* alpha;
+  const acc_t* beta;
+  const int64_t* batchOffset;
+  int64_t dictSize;
+  int64_t blankIdx;
+  int64_t maxFLen;
+  int64_t maxGLen;
+  bool packedInput;
+  const int batchSize;
+  scalar_t* xGrad;
+  int64_t local_size;
+  dpcpp_local_acc_t<int> local_label;
+};
+
+template <typename scalar_t, typename acc_t>
 void transducer_loss_backward_kernel(
     const scalar_t* x,
     const scalar_t* lossGrad,
@@ -247,44 +410,28 @@ void transducer_loss_backward_kernel(
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     dpcpp_local_acc_t<int> local_label(maxGLen, cgh);
+    TransducerLossBackwardKernelFunctor<scalar_t, acc_t> kfn(
+        x,
+        lossGrad,
+        audLen,
+        txtLen,
+        label,
+        alpha,
+        beta,
+        batchOffset,
+        dictSize,
+        blankIdx,
+        maxFLen,
+        maxGLen,
+        packedInput,
+        batchSize,
+        xGrad,
+        local_size,
+        local_label);
     cgh.parallel_for(
         sycl::nd_range<3>(
             sycl::range<3>(global_range), sycl::range<3>(local_range)),
-        [=](sycl::nd_item<3> item_id) {
-          const int local_id = item_id.get_local_id(2);
-          const int t = item_id.get_group(1);
-          const int batch = item_id.get_group(0);
-          const int64_t myFLen = audLen[batch];
-          const int64_t myGLen = txtLen[batch] + 1;
-          const int64_t myBatchOffset = packedInput
-              ? (batch == 0 ? 0 : batchOffset[batch - 1])
-              : batch * maxFLen * maxGLen;
-          const int64_t myStrideT = packedInput ? myGLen : maxGLen;
-          auto myX = x + (myBatchOffset + t * myStrideT) * dictSize;
-          auto myAlpha = alpha + batch * maxFLen * maxGLen;
-          auto myBeta = beta + batch * maxFLen * maxGLen;
-          auto myXGrad = xGrad + (myBatchOffset + t * myStrideT) * dictSize;
-          auto myLabel = label + batch * (maxGLen - 1);
-
-          int64_t u = local_id;
-          while (t < myFLen && u < myGLen) {
-            acc_t grad = Numerics<acc_t>::log(lossGrad[batch]) +
-                myAlpha[t * maxGLen + u] - myBeta[0];
-            if (u != myGLen - 1)
-              myXGrad[u * dictSize + myLabel[u]] = -Numerics<acc_t>::exp(
-                  grad + myBeta[t * maxGLen + u + 1] +
-                  myX[u * dictSize + myLabel[u]]);
-            if (t == myFLen - 1 && u == myGLen - 1)
-              myXGrad[u * dictSize + blankIdx] =
-                  -Numerics<acc_t>::exp(grad + myX[u * dictSize + blankIdx]);
-            else if (t != myFLen - 1)
-              myXGrad[u * dictSize + blankIdx] = -Numerics<acc_t>::exp(
-                  grad + myBeta[(t + 1) * maxGLen + u] +
-                  myX[u * dictSize + blankIdx]);
-
-            u += local_size;
-          }
-        });
+        kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }

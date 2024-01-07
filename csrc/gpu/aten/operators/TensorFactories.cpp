@@ -236,6 +236,55 @@ inline void get_coordinate_in_tril_trapezoid(
 } // namespace triangle_dpcpp
 
 template <typename scalar_t>
+struct TriuIndicesDpcppKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto tensor_ptr = data;
+    int64_t r, c;
+    for (int64_t linearIndex = item.get_global_id(0);
+         linearIndex < totalElements;
+         linearIndex += item.get_global_range()[0]) {
+      if (linearIndex < rectangle_size) {
+        // the coordinate is within the top rectangle
+        r = linearIndex / col;
+        c = linearIndex % col;
+      } else {
+        // the coordinate falls in the bottom trapezoid
+        triangle_dpcpp::get_coordinate_in_triu_trapezoid(
+            m_first_row, linearIndex - rectangle_size, r, c);
+        r += rectangle_size / col;
+      }
+      c += col_offset;
+      tensor_ptr[linearIndex] = r;
+      tensor_ptr[linearIndex + triu_size] = c;
+    }
+  }
+  TriuIndicesDpcppKernelFunctor(
+      scalar_t* data_,
+      int64_t col_offset_,
+      int64_t m_first_row_,
+      int64_t col_,
+      int64_t rectangle_size_,
+      int64_t triu_size_,
+      int64_t totalElements_)
+      : data(data_),
+        col_offset(col_offset_),
+        m_first_row(m_first_row_),
+        col(col_),
+        rectangle_size(rectangle_size_),
+        triu_size(triu_size_),
+        totalElements(totalElements_) {}
+
+ private:
+  scalar_t* data;
+  int64_t col_offset;
+  int64_t m_first_row;
+  int64_t col;
+  int64_t rectangle_size;
+  int64_t triu_size;
+  int64_t totalElements;
+};
+
+template <typename scalar_t>
 void triu_indices_dpcpp_kernel(
     scalar_t* tensor,
     int64_t col_offset,
@@ -253,27 +302,14 @@ void triu_indices_dpcpp_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto data = tensor;
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto tensor_ptr = data;
-      int64_t r, c;
-      for (int64_t linearIndex = item.get_global_id(0);
-           linearIndex < totalElements;
-           linearIndex += item.get_global_range()[0]) {
-        if (linearIndex < rectangle_size) {
-          // the coordinate is within the top rectangle
-          r = linearIndex / col;
-          c = linearIndex % col;
-        } else {
-          // the coordinate falls in the bottom trapezoid
-          triangle_dpcpp::get_coordinate_in_triu_trapezoid(
-              m_first_row, linearIndex - rectangle_size, r, c);
-          r += rectangle_size / col;
-        }
-        c += col_offset;
-        tensor_ptr[linearIndex] = r;
-        tensor_ptr[linearIndex + triu_size] = c;
-      }
-    };
+    TriuIndicesDpcppKernelFunctor<scalar_t> kfn(
+        data,
+        col_offset,
+        m_first_row,
+        col,
+        rectangle_size,
+        triu_size,
+        totalElements);
     // kick off kernel
     cgh.parallel_for(
         sycl::nd_range<1>(
@@ -283,6 +319,56 @@ void triu_indices_dpcpp_kernel(
 
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <typename scalar_t>
+struct TrilIndicesDpcppKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto tensor_ptr = data;
+    int64_t r, c;
+    for (int64_t linearIndex = item.get_global_id(0);
+         linearIndex < totalElements;
+         linearIndex += item.get_global_range()[0]) {
+      if (linearIndex < trapezoid_size) {
+        // the coordinate is within the top trapezoid
+        triangle_dpcpp::get_coordinate_in_tril_trapezoid(
+            m_first_row, linearIndex, r, c);
+      } else {
+        // the coordinate falls in the bottom rectangle
+        auto surplus = linearIndex - trapezoid_size;
+        // add the height of trapezoid: m_last_row (col) - m_first_row + 1
+        r = surplus / col + col - m_first_row + 1;
+        c = surplus % col;
+      }
+      r += row_offset;
+      tensor_ptr[linearIndex] = r;
+      tensor_ptr[linearIndex + tril_size] = c;
+    }
+  }
+  TrilIndicesDpcppKernelFunctor(
+      scalar_t* data_,
+      int64_t row_offset_,
+      int64_t m_first_row_,
+      int64_t col_,
+      int64_t trapezoid_size_,
+      int64_t tril_size_,
+      int64_t totalElements_)
+      : data(data_),
+        row_offset(row_offset_),
+        m_first_row(m_first_row_),
+        col(col_),
+        trapezoid_size(trapezoid_size_),
+        tril_size(tril_size_),
+        totalElements(totalElements_) {}
+
+ private:
+  scalar_t* data;
+  int64_t row_offset;
+  int64_t m_first_row;
+  int64_t col;
+  int64_t trapezoid_size;
+  int64_t tril_size;
+  int64_t totalElements;
+};
 
 template <typename scalar_t>
 void tril_indices_dpcpp_kernel(
@@ -302,28 +388,14 @@ void tril_indices_dpcpp_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto data = tensor;
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto tensor_ptr = data;
-      int64_t r, c;
-      for (int64_t linearIndex = item.get_global_id(0);
-           linearIndex < totalElements;
-           linearIndex += item.get_global_range()[0]) {
-        if (linearIndex < trapezoid_size) {
-          // the coordinate is within the top trapezoid
-          triangle_dpcpp::get_coordinate_in_tril_trapezoid(
-              m_first_row, linearIndex, r, c);
-        } else {
-          // the coordinate falls in the bottom rectangle
-          auto surplus = linearIndex - trapezoid_size;
-          // add the height of trapezoid: m_last_row (col) - m_first_row + 1
-          r = surplus / col + col - m_first_row + 1;
-          c = surplus % col;
-        }
-        r += row_offset;
-        tensor_ptr[linearIndex] = r;
-        tensor_ptr[linearIndex + tril_size] = c;
-      }
-    };
+    TrilIndicesDpcppKernelFunctor<scalar_t> kfn(
+        data,
+        row_offset,
+        m_first_row,
+        col,
+        trapezoid_size,
+        tril_size,
+        totalElements);
 
     // kick off kernel
     cgh.parallel_for(

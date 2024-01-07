@@ -62,32 +62,64 @@ Tensor isnan(const Tensor& self) {
 }
 
 template <typename scalar_t>
+struct AssertAsyncKernelFunctor1 {
+  void operator()() const {
+    SYCL_KERNEL_ASSERT(input[0] != 0);
+  }
+  AssertAsyncKernelFunctor1(scalar_t* input_) : input(input_) {}
+
+ private:
+  scalar_t* input;
+};
+
+template <typename scalar_t>
 void _assert_async_kernel(scalar_t* input) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgf) {
-    cgf.single_task([=]() { SYCL_KERNEL_ASSERT(input[0] != 0); });
+    AssertAsyncKernelFunctor1<scalar_t> kfn(input);
+    cgf.single_task(kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
+
+struct AssertAsyncKernelFunctor2 {
+  void operator()() const {
+    SYCL_KERNEL_ASSERT(input[0] != c10::complex<float>(0, 0));
+  }
+  AssertAsyncKernelFunctor2(c10::complex<float>* input_) : input(input_) {}
+
+ private:
+  c10::complex<float>* input;
+};
 
 template <>
 void _assert_async_kernel(c10::complex<float>* input) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgf) {
-    cgf.single_task(
-        [=]() { SYCL_KERNEL_ASSERT(input[0] != c10::complex<float>(0, 0)); });
+    AssertAsyncKernelFunctor2 kfn(input);
+    cgf.single_task(kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
+struct AssertAsyncKernelFunctor3 {
+  void operator()() const {
+    SYCL_KERNEL_ASSERT(input[0] != c10::complex<double>(0, 0));
+  }
+  AssertAsyncKernelFunctor3(c10::complex<double>* input_) : input(input_) {}
+
+ private:
+  c10::complex<double>* input;
+};
+
 template <>
 void _assert_async_kernel(c10::complex<double>* input) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgf) {
-    cgf.single_task(
-        [=]() { SYCL_KERNEL_ASSERT(input[0] != c10::complex<double>(0, 0)); });
+    AssertAsyncKernelFunctor3 kfn(input);
+    cgf.single_task(kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

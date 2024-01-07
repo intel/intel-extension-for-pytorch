@@ -27,6 +27,35 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename func_t>
+struct _Elementwise_KernelFunctor {
+  void operator()(sycl::nd_item<1> itemId) const {
+    int idx = itemId.get_global_linear_id();
+
+    for (int i = 0; i < loops; ++i) {
+      if (idx < total_n_elems) {
+        f(idx);
+        idx += total_work_items;
+      }
+    }
+  }
+  _Elementwise_KernelFunctor(
+      int loops_,
+      int total_n_elems_,
+      func_t f_,
+      int total_work_items_)
+      : loops(loops_),
+        total_n_elems(total_n_elems_),
+        f(f_),
+        total_work_items(total_work_items_) {}
+
+ private:
+  int loops;
+  int total_n_elems;
+  func_t f;
+  int total_work_items;
+};
+
+template <typename func_t>
 void _elementwise_kernel(int total_n_elems, func_t f) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
@@ -44,19 +73,12 @@ void _elementwise_kernel(int total_n_elems, func_t f) {
 
   int total_work_items = work_group_size * work_group_num;
   auto cgf = DPCPP_Q_CGF(cgh) {
+    _Elementwise_KernelFunctor<func_t> kfn(
+        loops, total_n_elems, f, total_work_items);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(total_work_items), sycl::range<1>(work_group_size)),
-        [=](sycl::nd_item<1> itemId) {
-          int idx = itemId.get_global_linear_id();
-
-          for (int i = 0; i < loops; ++i) {
-            if (idx < total_n_elems) {
-              f(idx);
-              idx += total_work_items;
-            }
-          }
-        });
+        kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -176,6 +198,59 @@ Tensor flip_dpcpp(const Tensor& self, IntArrayRef& dims) {
 }
 
 template <typename scalar_t>
+struct RollDpcppKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int64_t linear_index = item.get_global_id(0);
+    for (int i = 0; i < val_of_work_item; i++) {
+      if (linear_index < N) {
+        // roll dim idx is the index of linear_index along the rolling
+        // dimension.
+        int64_t roll_dim_idx = linear_index % (total_offset) / stride;
+        // index into the source data to find appropriate value.
+        int64_t source_idx = 0;
+        source_idx = roll_dim_idx >= shift ? linear_index - offset
+                                           : linear_index + start_offset;
+        out_data[linear_index] = in_data[source_idx];
+        linear_index += global_range;
+      }
+    }
+  }
+  RollDpcppKernelFunctor(
+      scalar_t* in_data_,
+      scalar_t* out_data_,
+      int val_of_work_item_,
+      int64_t N_,
+      int64_t total_offset_,
+      int64_t stride_,
+      int64_t shift_,
+      int64_t offset_,
+      int64_t start_offset_,
+      int global_range_)
+      : in_data(in_data_),
+        out_data(out_data_),
+        val_of_work_item(val_of_work_item_),
+        N(N_),
+        total_offset(total_offset_),
+        stride(stride_),
+        shift(shift_),
+        offset(offset_),
+        start_offset(start_offset_),
+        global_range(global_range_) {}
+
+ private:
+  scalar_t* in_data;
+  scalar_t* out_data;
+  int val_of_work_item;
+  int64_t N;
+  int64_t total_offset;
+  int64_t stride;
+  int64_t shift;
+  int64_t offset;
+  int64_t start_offset;
+  int global_range;
+};
+
+template <typename scalar_t>
 void roll_dpcpp_kernel(
     const Tensor& in_tensor,
     Tensor& out_tensor,
@@ -204,25 +279,21 @@ void roll_dpcpp_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data = in_tensor.data_ptr<scalar_t>();
     auto out_data = out_tensor.data_ptr<scalar_t>();
+    RollDpcppKernelFunctor<scalar_t> kfn(
+        in_data,
+        out_data,
+        val_of_work_item,
+        N,
+        total_offset,
+        stride,
+        shift,
+        offset,
+        start_offset,
+        global_range);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
-        [=](sycl::nd_item<1> item) {
-          int64_t linear_index = item.get_global_id(0);
-          for (int i = 0; i < val_of_work_item; i++) {
-            if (linear_index < N) {
-              // roll dim idx is the index of linear_index along the rolling
-              // dimension.
-              int64_t roll_dim_idx = linear_index % (total_offset) / stride;
-              // index into the source data to find appropriate value.
-              int64_t source_idx = 0;
-              source_idx = roll_dim_idx >= shift ? linear_index - offset
-                                                 : linear_index + start_offset;
-              out_data[linear_index] = in_data[source_idx];
-              linear_index += global_range;
-            }
-          }
-        });
+        kfn);
   };
   // launch kernel
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
