@@ -13,6 +13,162 @@
 using namespace at::AtenIpexTypeXPU;
 namespace xpu {
 namespace pstl {
+
+template <int scan_type, class InputIt, class OutputIt, class T>
+struct _Scan_KernelFunctor {
+  void operator()(sycl::nd_item<1> item_id) const {
+    auto local_id = item_id.get_local_linear_id();
+
+    // initialize local_input
+    auto cur_init = init;
+    if (scan_type == 1) {
+      local_scan[local_id] = first[local_id];
+    } else {
+      if (local_id > 0)
+        local_scan[local_id] = first[local_id - 1];
+      else
+        local_scan[local_id] = 0;
+    }
+    if (local_id == 0)
+      local_scan[local_id] += cur_init;
+    item_id.barrier(dpcpp_local_fence);
+
+    // body of KS algo
+    for (auto __k = 1; __k < N; __k <<= 1) {
+      auto tmp = (local_id >= __k) ? local_scan[local_id - __k] : 0;
+      item_id.barrier(dpcpp_local_fence);
+      local_scan[local_id] += tmp;
+      item_id.barrier(dpcpp_local_fence);
+    }
+
+    // flush result into dst
+    d_first[local_id] = local_scan[local_id];
+  }
+
+  _Scan_KernelFunctor(
+      InputIt first_,
+      T init_,
+      int64_t N_,
+      dpcpp_local_acc_t<T> local_scan_,
+      OutputIt d_first_)
+      : first(first_),
+        init(init_),
+        N(N_),
+        local_scan(local_scan_),
+        d_first(d_first_) {}
+
+ private:
+  InputIt first;
+  T init;
+  int64_t N;
+  dpcpp_local_acc_t<T> local_scan;
+  OutputIt d_first;
+};
+
+template <int scan_type, class InputIt, class OutputIt, class T>
+struct _Scan_KernelFunctor2 {
+  void operator()(sycl::nd_item<1> item_id) const {
+    auto local_id = item_id.get_local_linear_id();
+    auto global_id = item_id.get_global_linear_id();
+    auto group_id = item_id.get_group_linear_id();
+
+    // initialize local_input
+    auto cur_init = (group_id == 0 ? init : 0);
+    if (global_id < N) {
+      if (scan_type == 1) {
+        local_scan[local_id] = first[global_id];
+      } else {
+        if (local_id > 0)
+          local_scan[local_id] = first[global_id - 1];
+        else
+          local_scan[local_id] = 0;
+      }
+      if (local_id == 0)
+        local_scan[local_id] += cur_init;
+      if (local_id == wgroup_size - 1) {
+        carry_ptr[group_id] = first[global_id];
+      }
+    }
+    item_id.barrier(dpcpp_local_fence);
+
+    // body of KS algo
+    for (auto __k = 1; __k < wgroup_size; __k <<= 1) {
+      auto tmp = (local_id >= __k) ? local_scan[local_id - __k] : 0;
+      item_id.barrier(dpcpp_local_fence);
+      local_scan[local_id] += tmp;
+      item_id.barrier(dpcpp_local_fence);
+    }
+
+    // flush result into dst
+    if (global_id < N) {
+      d_first[global_id] = local_scan[local_id];
+    }
+    if (local_id == wgroup_size - 1) {
+      if (scan_type == 1)
+        carry_ptr[group_id] = local_scan[local_id];
+      else
+        carry_ptr[group_id] += local_scan[local_id];
+    }
+  }
+
+  _Scan_KernelFunctor2(
+      InputIt first_,
+      T init_,
+      int64_t N_,
+      dpcpp_local_acc_t<T> local_scan_,
+      T* carry_ptr_,
+      int64_t wgroup_size_,
+      OutputIt d_first_)
+      : first(first_),
+        init(init_),
+        N(N_),
+        local_scan(local_scan_),
+        carry_ptr(carry_ptr_),
+        wgroup_size(wgroup_size_),
+        d_first(d_first_) {}
+
+ private:
+  InputIt first;
+  T init;
+  int64_t N;
+  dpcpp_local_acc_t<T> local_scan;
+  T* carry_ptr;
+  int64_t wgroup_size;
+  OutputIt d_first;
+};
+
+template <class OutputIt, class T>
+struct _Scan_KernelFunctor3 {
+  void operator()(sycl::nd_item<1> item_id) const {
+    auto local_id = item_id.get_local_linear_id();
+    auto global_id = item_id.get_global_linear_id();
+    auto group_id = item_id.get_group_linear_id();
+
+    if (local_id == 0)
+      local_carry[0] = carry_ptr[group_id];
+    item_id.barrier(dpcpp_local_fence);
+
+    if (global_id < N) {
+      d_first[global_id] += local_carry[0];
+    }
+  }
+  _Scan_KernelFunctor3(
+      dpcpp_local_acc_t<T> local_carry_,
+      OutputIt d_first_,
+      T* carry_ptr_,
+      int64_t N_)
+      : local_carry(local_carry_),
+        d_first(d_first_),
+        carry_ptr(carry_ptr_),
+        N(N_) {}
+
+ private:
+  dpcpp_local_acc_t<T> local_carry;
+  OutputIt d_first;
+  T* carry_ptr;
+  int64_t N;
+};
+
 template <int scan_type, class InputIt, class OutputIt, class T>
 static inline OutputIt _scan_kernel(
     InputIt first,
@@ -31,35 +187,8 @@ static inline OutputIt _scan_kernel(
     // Kogge-Stone addr algorithm;
     auto cgf = DPCPP_Q_CGF(__cgh) {
       dpcpp_local_acc_t<T> local_scan(N, __cgh);
-
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
-        auto local_id = item_id.get_local_linear_id();
-
-        // initialize local_input
-        auto cur_init = init;
-        if (scan_type == 1) {
-          local_scan[local_id] = first[local_id];
-        } else {
-          if (local_id > 0)
-            local_scan[local_id] = first[local_id - 1];
-          else
-            local_scan[local_id] = 0;
-        }
-        if (local_id == 0)
-          local_scan[local_id] += cur_init;
-        item_id.barrier(dpcpp_local_fence);
-
-        // body of KS algo
-        for (auto __k = 1; __k < N; __k <<= 1) {
-          auto tmp = (local_id >= __k) ? local_scan[local_id - __k] : 0;
-          item_id.barrier(dpcpp_local_fence);
-          local_scan[local_id] += tmp;
-          item_id.barrier(dpcpp_local_fence);
-        }
-
-        // flush result into dst
-        d_first[local_id] = local_scan[local_id];
-      };
+      _Scan_KernelFunctor<scan_type, InputIt, OutputIt, T> kfn(
+          first, init, N, local_scan, d_first);
       __cgh.parallel_for(sycl::nd_range</*dim=*/1>(N, N), kfn);
     };
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -74,49 +203,8 @@ static inline OutputIt _scan_kernel(
   auto cgf_1 = DPCPP_Q_CGF(__cgh) {
     dpcpp_local_acc_t<T> local_scan(wgroup_size, __cgh);
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
-      auto local_id = item_id.get_local_linear_id();
-      auto global_id = item_id.get_global_linear_id();
-      auto group_id = item_id.get_group_linear_id();
-
-      // initialize local_input
-      auto cur_init = (group_id == 0 ? init : 0);
-      if (global_id < N) {
-        if (scan_type == 1) {
-          local_scan[local_id] = first[global_id];
-        } else {
-          if (local_id > 0)
-            local_scan[local_id] = first[global_id - 1];
-          else
-            local_scan[local_id] = 0;
-        }
-        if (local_id == 0)
-          local_scan[local_id] += cur_init;
-        if (local_id == wgroup_size - 1) {
-          carry_ptr[group_id] = first[global_id];
-        }
-      }
-      item_id.barrier(dpcpp_local_fence);
-
-      // body of KS algo
-      for (auto __k = 1; __k < wgroup_size; __k <<= 1) {
-        auto tmp = (local_id >= __k) ? local_scan[local_id - __k] : 0;
-        item_id.barrier(dpcpp_local_fence);
-        local_scan[local_id] += tmp;
-        item_id.barrier(dpcpp_local_fence);
-      }
-
-      // flush result into dst
-      if (global_id < N) {
-        d_first[global_id] = local_scan[local_id];
-      }
-      if (local_id == wgroup_size - 1) {
-        if (scan_type == 1)
-          carry_ptr[group_id] = local_scan[local_id];
-        else
-          carry_ptr[group_id] += local_scan[local_id];
-      }
-    };
+    _Scan_KernelFunctor2<scan_type, InputIt, OutputIt, T> kfn(
+        first, init, N, local_scan, carry_ptr, wgroup_size, d_first);
 
     __cgh.parallel_for(
         sycl::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
@@ -129,20 +217,7 @@ static inline OutputIt _scan_kernel(
   // 3. reduce among all work groups and flush data to dst
   auto cgf_3 = DPCPP_Q_CGF(__cgh) {
     dpcpp_local_acc_t<T> local_carry(1, __cgh);
-
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
-      auto local_id = item_id.get_local_linear_id();
-      auto global_id = item_id.get_global_linear_id();
-      auto group_id = item_id.get_group_linear_id();
-
-      if (local_id == 0)
-        local_carry[0] = carry_ptr[group_id];
-      item_id.barrier(dpcpp_local_fence);
-
-      if (global_id < N) {
-        d_first[global_id] += local_carry[0];
-      }
-    };
+    _Scan_KernelFunctor3<OutputIt, T> kfn(local_carry, d_first, carry_ptr, N);
     __cgh.parallel_for(
         sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
@@ -172,6 +247,54 @@ static inline OutputIt inclusive_scan(
 }
 
 template <typename index_t, class InputIt, class OutputIt, class UnaryPredicate>
+struct CopyIfKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    if (first) {
+      gmask_ptr[item_id] =
+          static_cast<index_t>(static_cast<bool>(pred(first[item_id])));
+    } else {
+      gmask_ptr[item_id] =
+          static_cast<index_t>(static_cast<bool>(pred(item_id)));
+    }
+  }
+  CopyIfKernelFunctor(InputIt first_, UnaryPredicate pred_, index_t* gmask_ptr_)
+      : first(first_), pred(pred_), gmask_ptr(gmask_ptr_) {}
+
+ private:
+  InputIt first;
+  UnaryPredicate pred;
+  index_t* gmask_ptr;
+};
+
+template <typename index_t, class InputIt, class OutputIt>
+struct CopyIfKernelFunctor2 {
+  void operator()(sycl::item<1> item_id) const {
+    if (gmask_ptr[item_id] != 0) {
+      if (first) {
+        d_first[tpos_ptr[item_id] - /*inclusive shift*/ 1] = first[item_id];
+      } else {
+        d_first[tpos_ptr[item_id] - /*inclusive shift*/ 1] = item_id;
+      }
+    }
+  }
+  CopyIfKernelFunctor2(
+      InputIt first_,
+      OutputIt d_first_,
+      index_t* gmask_ptr_,
+      index_t* tpos_ptr_)
+      : first(first_),
+        d_first(d_first_),
+        gmask_ptr(gmask_ptr_),
+        tpos_ptr(tpos_ptr_) {}
+
+ private:
+  InputIt first;
+  OutputIt d_first;
+  index_t* gmask_ptr;
+  index_t* tpos_ptr;
+};
+
+template <typename index_t, class InputIt, class OutputIt, class UnaryPredicate>
 static inline OutputIt copy_if(
     InputIt first,
     InputIt last,
@@ -190,15 +313,8 @@ static inline OutputIt copy_if(
 
   // 1. get mask for `if` positions
   auto cgf_1 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      if (first) {
-        gmask_ptr[item_id] =
-            static_cast<index_t>(static_cast<bool>(pred(first[item_id])));
-      } else {
-        gmask_ptr[item_id] =
-            static_cast<index_t>(static_cast<bool>(pred(item_id)));
-      }
-    };
+    CopyIfKernelFunctor<index_t, InputIt, OutputIt, UnaryPredicate> kfn(
+        first, pred, gmask_ptr);
 
     __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
@@ -209,15 +325,8 @@ static inline OutputIt copy_if(
 
   // 3. copy selected data into dst
   auto cgf_3 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      if (gmask_ptr[item_id] != 0) {
-        if (first) {
-          d_first[tpos_ptr[item_id] - /*inclusive shift*/ 1] = first[item_id];
-        } else {
-          d_first[tpos_ptr[item_id] - /*inclusive shift*/ 1] = item_id;
-        }
-      }
-    };
+    CopyIfKernelFunctor2<index_t, InputIt, OutputIt> kfn(
+        first, d_first, gmask_ptr, tpos_ptr);
 
     __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
@@ -226,6 +335,27 @@ static inline OutputIt copy_if(
   index_t M = target_pos[N - 1].template item<index_t>();
   return d_first + M;
 }
+
+template <
+    typename output_t,
+    class InputIt,
+    class OutputIt,
+    class UnaryOperation>
+struct TransformKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    d_first[item_id] = static_cast<output_t>(unary_op(first1[item_id]));
+  }
+  TransformKernelFunctor(
+      InputIt first1_,
+      OutputIt d_first_,
+      UnaryOperation unary_op_)
+      : first1(first1_), d_first(d_first_), unary_op(unary_op_) {}
+
+ private:
+  InputIt first1;
+  OutputIt d_first;
+  UnaryOperation unary_op;
+};
 
 template <
     typename output_t,
@@ -242,9 +372,8 @@ static inline OutputIt transform(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      d_first[item_id] = static_cast<output_t>(unary_op(first1[item_id]));
-    };
+    TransformKernelFunctor<output_t, InputIt, OutputIt, UnaryOperation> kfn(
+        first1, d_first, unary_op);
 
     __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
@@ -252,6 +381,34 @@ static inline OutputIt transform(
 
   return d_first + N;
 }
+
+template <
+    typename output_t,
+    class InputIt1,
+    class InputIt2,
+    class OutputIt,
+    class BinaryOperation>
+struct TransformKernelFunctor2 {
+  void operator()(sycl::item<1> item_id) const {
+    d_first[item_id] =
+        static_cast<output_t>(binary_op(first1[item_id], first2[item_id]));
+  }
+  TransformKernelFunctor2(
+      InputIt1 first1_,
+      InputIt2 first2_,
+      OutputIt d_first_,
+      BinaryOperation binary_op_)
+      : first1(first1_),
+        first2(first2_),
+        d_first(d_first_),
+        binary_op(binary_op_) {}
+
+ private:
+  InputIt1 first1;
+  InputIt2 first2;
+  OutputIt d_first;
+  BinaryOperation binary_op;
+};
 
 template <
     typename output_t,
@@ -270,10 +427,13 @@ static inline OutputIt transform(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      d_first[item_id] =
-          static_cast<output_t>(binary_op(first1[item_id], first2[item_id]));
-    };
+    TransformKernelFunctor2<
+        output_t,
+        InputIt1,
+        InputIt2,
+        OutputIt,
+        BinaryOperation>
+        kfn(first1, first2, d_first, binary_op);
 
     __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
@@ -281,6 +441,35 @@ static inline OutputIt transform(
 
   return d_first + N;
 }
+
+template <
+    typename output_t,
+    class InputIt1,
+    class InputIt2,
+    class OutputIt,
+    class BinaryOperation>
+struct TransformFirstTrueKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    first1[0] = 1;
+    d_first[item_id] =
+        static_cast<output_t>(binary_op(first1[item_id], first2[item_id]));
+  }
+  TransformFirstTrueKernelFunctor(
+      InputIt1 first1_,
+      InputIt2 first2_,
+      OutputIt d_first_,
+      BinaryOperation binary_op_)
+      : first1(first1_),
+        first2(first2_),
+        d_first(d_first_),
+        binary_op(binary_op_) {}
+
+ private:
+  InputIt1 first1;
+  InputIt2 first2;
+  OutputIt d_first;
+  BinaryOperation binary_op;
+};
 
 template <
     typename output_t,
@@ -299,11 +488,13 @@ static inline OutputIt transform_first_true(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      first1[0] = 1;
-      d_first[item_id] =
-          static_cast<output_t>(binary_op(first1[item_id], first2[item_id]));
-    };
+    TransformFirstTrueKernelFunctor<
+        output_t,
+        InputIt1,
+        InputIt2,
+        OutputIt,
+        BinaryOperation>
+        kfn(first1, first2, d_first, binary_op);
 
     __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
@@ -313,20 +504,85 @@ static inline OutputIt transform_first_true(
 }
 
 template <class T, class ForwardIt>
+struct IotaKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    first[item_id] = value + static_cast<T>(item_id);
+  }
+  IotaKernelFunctor(ForwardIt first_, T value_)
+      : first(first_), value(value_) {}
+
+ private:
+  ForwardIt first;
+  T value;
+};
+
+template <class T, class ForwardIt>
 static inline void iota(ForwardIt first, ForwardIt last, T value) {
   RECORD_FUNCTION("iota_xpu", {});
   const auto N = std::distance(first, last);
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      first[item_id] = value + static_cast<T>(item_id);
-    };
+    IotaKernelFunctor<T, ForwardIt> kfn(first, value);
 
     __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
+
+template <typename T, typename index_t, class ForwardIt, class BinaryPredicate>
+struct UniqueKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    if (item_id > 0)
+      gmask_ptr[item_id] = static_cast<index_t>(
+          static_cast<bool>(!p(first[item_id - 1], first[item_id])));
+    else
+      gmask_ptr[item_id] = static_cast<index_t>(1);
+  }
+  UniqueKernelFunctor(ForwardIt first_, index_t* gmask_ptr_, BinaryPredicate p_)
+      : first(first_), gmask_ptr(gmask_ptr_), p(p_) {}
+
+ private:
+  ForwardIt first;
+  index_t* gmask_ptr;
+  BinaryPredicate p;
+};
+
+template <typename T, typename index_t, class ForwardIt, class BinaryPredicate>
+struct UniqueKernelFunctor2 {
+  void operator()(sycl::item<1> item_id) const {
+    if (gmask_ptr[item_id] != 0)
+      scratchpad_ptr[tpos_ptr[item_id]] = first[item_id];
+  }
+  UniqueKernelFunctor2(
+      ForwardIt first_,
+      index_t* gmask_ptr_,
+      index_t* tpos_ptr_,
+      T* scratchpad_ptr_)
+      : first(first_),
+        gmask_ptr(gmask_ptr_),
+        tpos_ptr(tpos_ptr_),
+        scratchpad_ptr(scratchpad_ptr_) {}
+
+ private:
+  ForwardIt first;
+  index_t* gmask_ptr;
+  index_t* tpos_ptr;
+  T* scratchpad_ptr;
+};
+
+template <typename T, class ForwardIt>
+struct UniqueKernelFunctor3 {
+  void operator()(sycl::item<1> item_id) const {
+    first[item_id] = scratchpad_ptr[item_id];
+  }
+  UniqueKernelFunctor3(ForwardIt first_, T* scratchpad_ptr_)
+      : first(first_), scratchpad_ptr(scratchpad_ptr_) {}
+
+ private:
+  ForwardIt first;
+  T* scratchpad_ptr;
+};
 
 template <typename T, typename index_t, class ForwardIt, class BinaryPredicate>
 ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
@@ -344,13 +600,8 @@ ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
 
   // 1. get mask for `if` positions
   auto cgf_1 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      if (item_id > 0)
-        gmask_ptr[item_id] = static_cast<index_t>(
-            static_cast<bool>(!p(first[item_id - 1], first[item_id])));
-      else
-        gmask_ptr[item_id] = static_cast<index_t>(1);
-    };
+    UniqueKernelFunctor<T, index_t, ForwardIt, BinaryPredicate> kfn(
+        first, gmask_ptr, p);
 
     __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
@@ -364,10 +615,8 @@ ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
   T* scratchpad_ptr = scratchpad.data_ptr<T>();
 
   auto cgf_3 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      if (gmask_ptr[item_id] != 0)
-        scratchpad_ptr[tpos_ptr[item_id]] = first[item_id];
-    };
+    UniqueKernelFunctor2<T, index_t, ForwardIt, BinaryPredicate> kfn(
+        first, gmask_ptr, tpos_ptr, scratchpad_ptr);
 
     __cgh.parallel_for(sycl::range</*dim=*/>(N), kfn);
   };
@@ -377,9 +626,7 @@ ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
       target_pos[N - 1].template item<index_t>();
 
   auto cgf_4 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      first[item_id] = scratchpad_ptr[item_id];
-    };
+    UniqueKernelFunctor3<T, ForwardIt> kfn(first, scratchpad_ptr);
 
     __cgh.parallel_for(sycl::range</*dim=*/>(M), kfn);
   };
@@ -387,6 +634,87 @@ ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
 
   return first + M;
 }
+
+template <typename index_t, class ForwardIt, class BinaryPredicate>
+struct UniqueWithZipKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    if (item_id > 0)
+      gmask_ptr[item_id] = static_cast<index_t>(
+          static_cast<bool>(!p(first[item_id - 1], first[item_id])));
+    else
+      gmask_ptr[item_id] = static_cast<index_t>(1);
+  }
+  UniqueWithZipKernelFunctor(
+      ForwardIt first_,
+      BinaryPredicate p_,
+      index_t* gmask_ptr_)
+      : first(first_), p(p_), gmask_ptr(gmask_ptr_) {}
+
+ private:
+  ForwardIt first;
+  BinaryPredicate p;
+  index_t* gmask_ptr;
+};
+
+template <
+    typename T,
+    typename zT,
+    typename index_t,
+    class ForwardIt,
+    class ZipForwardIt,
+    class BinaryPredicate>
+struct UniqueWithZipKernelFunctor2 {
+  void operator()(sycl::item<1> item_id) const {
+    if (gmask_ptr[item_id] != 0) {
+      scratchpad_ptr[tpos_ptr[item_id]] = first[item_id];
+      z_scratchpad_ptr[tpos_ptr[item_id]] = z_first[item_id];
+    }
+  }
+  UniqueWithZipKernelFunctor2(
+      ForwardIt first_,
+      ZipForwardIt z_first_,
+      index_t* gmask_ptr_,
+      index_t* tpos_ptr_,
+      T* scratchpad_ptr_,
+      zT* z_scratchpad_ptr_)
+      : first(first_),
+        z_first(z_first_),
+        gmask_ptr(gmask_ptr_),
+        tpos_ptr(tpos_ptr_),
+        scratchpad_ptr(scratchpad_ptr_),
+        z_scratchpad_ptr(z_scratchpad_ptr_) {}
+
+ private:
+  ForwardIt first;
+  ZipForwardIt z_first;
+  index_t* gmask_ptr;
+  index_t* tpos_ptr;
+  T* scratchpad_ptr;
+  zT* z_scratchpad_ptr;
+};
+
+template <typename T, typename zT, class ForwardIt, class ZipForwardIt>
+struct UniqueWithZipKernelFunctor3 {
+  void operator()(sycl::item<1> item_id) const {
+    first[item_id] = scratchpad_ptr[item_id];
+    z_first[item_id] = z_scratchpad_ptr[item_id];
+  }
+  UniqueWithZipKernelFunctor3(
+      ForwardIt first_,
+      ZipForwardIt z_first_,
+      T* scratchpad_ptr_,
+      zT* z_scratchpad_ptr_)
+      : first(first_),
+        z_first(z_first_),
+        scratchpad_ptr(scratchpad_ptr_),
+        z_scratchpad_ptr(z_scratchpad_ptr_) {}
+
+ private:
+  ForwardIt first;
+  ZipForwardIt z_first;
+  T* scratchpad_ptr;
+  zT* z_scratchpad_ptr;
+};
 
 template <
     typename T,
@@ -415,13 +743,8 @@ std::tuple<ForwardIt, ZipForwardIt> unique_with_zip(
 
   // 1. get mask for `if` positions
   auto cgf_1 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      if (item_id > 0)
-        gmask_ptr[item_id] = static_cast<index_t>(
-            static_cast<bool>(!p(first[item_id - 1], first[item_id])));
-      else
-        gmask_ptr[item_id] = static_cast<index_t>(1);
-    };
+    UniqueWithZipKernelFunctor<index_t, ForwardIt, BinaryPredicate> kfn(
+        first, p, gmask_ptr);
 
     __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
@@ -437,12 +760,19 @@ std::tuple<ForwardIt, ZipForwardIt> unique_with_zip(
   zT* z_scratchpad_ptr = z_scratchpad.data_ptr<zT>();
 
   auto cgf_3 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      if (gmask_ptr[item_id] != 0) {
-        scratchpad_ptr[tpos_ptr[item_id]] = first[item_id];
-        z_scratchpad_ptr[tpos_ptr[item_id]] = z_first[item_id];
-      }
-    };
+    UniqueWithZipKernelFunctor2<
+        T,
+        zT,
+        index_t,
+        ForwardIt,
+        ZipForwardIt,
+        BinaryPredicate>
+        kfn(first,
+            z_first,
+            gmask_ptr,
+            tpos_ptr,
+            scratchpad_ptr,
+            z_scratchpad_ptr);
 
     __cgh.parallel_for(sycl::range</*dim=*/>(N), kfn);
   };
@@ -452,10 +782,8 @@ std::tuple<ForwardIt, ZipForwardIt> unique_with_zip(
       target_pos[N - 1].template item<index_t>();
 
   auto cgf_4 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      first[item_id] = scratchpad_ptr[item_id];
-      z_first[item_id] = z_scratchpad_ptr[item_id];
-    };
+    UniqueWithZipKernelFunctor3<T, zT, ForwardIt, ZipForwardIt> kfn(
+        first, z_first, scratchpad_ptr, z_scratchpad_ptr);
 
     __cgh.parallel_for(sycl::range</*dim=*/>(M), kfn);
   };
@@ -463,6 +791,44 @@ std::tuple<ForwardIt, ZipForwardIt> unique_with_zip(
 
   return std::make_tuple<ForwardIt, ZipForwardIt>(first + M, z_first + M);
 }
+
+template <
+    typename output_t,
+    class InputIt,
+    class OutputIt,
+    class BinaryOperation>
+struct AdjacentDifferenceKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    if (item_id > 0)
+      adiff[item_id] =
+          static_cast<output_t>(op(first[item_id - 1], first[item_id]));
+    else
+      adiff[item_id] = static_cast<output_t>(first[item_id]);
+  }
+  AdjacentDifferenceKernelFunctor(
+      InputIt first_,
+      BinaryOperation op_,
+      OutputIt adiff_)
+      : first(first_), op(op_), adiff(adiff_) {}
+
+ private:
+  InputIt first;
+  BinaryOperation op;
+  OutputIt adiff;
+};
+
+template <typename output_t, class OutputIt>
+struct AdjacentDifferenceKernelFunctor2 {
+  void operator()(sycl::item<1> item_id) const {
+    d_first[item_id] = adiff[item_id];
+  }
+  AdjacentDifferenceKernelFunctor2(OutputIt d_first_, OutputIt adiff_)
+      : d_first(d_first_), adiff(adiff_) {}
+
+ private:
+  OutputIt d_first;
+  OutputIt adiff;
+};
 
 template <
     typename output_t,
@@ -487,13 +853,12 @@ OutputIt adjacent_difference(
   }
 
   auto cgf_1 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      if (item_id > 0)
-        adiff[item_id] =
-            static_cast<output_t>(op(first[item_id - 1], first[item_id]));
-      else
-        adiff[item_id] = static_cast<output_t>(first[item_id]);
-    };
+    AdjacentDifferenceKernelFunctor<
+        output_t,
+        InputIt,
+        OutputIt,
+        BinaryOperation>
+        kfn(first, op, adiff);
 
     __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
@@ -501,10 +866,7 @@ OutputIt adjacent_difference(
 
   if (is_inplace) {
     auto cgf_2 = DPCPP_Q_CGF(__cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-        d_first[item_id] = adiff[item_id];
-      };
-
+      AdjacentDifferenceKernelFunctor2<output_t, OutputIt> kfn(d_first, adiff);
       __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
     };
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf_2);
@@ -518,6 +880,50 @@ OutputIt adjacent_difference(InputIt first, InputIt last, OutputIt d_first) {
   return adjacent_difference<output_t>(
       first, last, d_first, [](auto l, auto r) { return r - l; });
 }
+
+template <
+    typename input_t,
+    typename output_t,
+    typename index_t,
+    class InputIt,
+    class OutputIt,
+    class BinaryPredicate>
+struct CountBySegmentKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    if (item_id > 0)
+      gmask_ptr[item_id] = static_cast<index_t>(
+          static_cast<bool>(!p(first[item_id - 1], first[item_id])));
+    else
+      gmask_ptr[item_id] = static_cast<index_t>(1);
+  }
+  CountBySegmentKernelFunctor(
+      InputIt first_,
+      index_t* gmask_ptr_,
+      BinaryPredicate p_)
+      : first(first_), gmask_ptr(gmask_ptr_), p(p_) {}
+
+ private:
+  InputIt first;
+  index_t* gmask_ptr;
+  BinaryPredicate p;
+};
+
+template <typename output_t, typename index_t, class OutputIt>
+struct CountBySegmentKernelFunctor2 {
+  void operator()(sycl::item<1> item_id) const {
+    d_first[item_id] = range_ptr[tpos_ptr[item_id]];
+  }
+  CountBySegmentKernelFunctor2(
+      OutputIt d_first_,
+      output_t* range_ptr_,
+      index_t* tpos_ptr_)
+      : d_first(d_first_), range_ptr(range_ptr_), tpos_ptr(tpos_ptr_) {}
+
+ private:
+  OutputIt d_first;
+  output_t* range_ptr;
+  index_t* tpos_ptr;
+};
 
 template <
     typename input_t,
@@ -545,13 +951,14 @@ OutputIt count_by_segment(
 
   // 1. get mask for `if` positions
   auto cgf_1 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      if (item_id > 0)
-        gmask_ptr[item_id] = static_cast<index_t>(
-            static_cast<bool>(!p(first[item_id - 1], first[item_id])));
-      else
-        gmask_ptr[item_id] = static_cast<index_t>(1);
-    };
+    CountBySegmentKernelFunctor<
+        input_t,
+        output_t,
+        index_t,
+        InputIt,
+        OutputIt,
+        BinaryPredicate>
+        kfn(first, gmask_ptr, p);
 
     __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
@@ -582,9 +989,8 @@ OutputIt count_by_segment(
 
   // 4. flush range to every elements of counts
   auto cgf_4 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      d_first[item_id] = range_ptr[tpos_ptr[item_id]];
-    };
+    CountBySegmentKernelFunctor2<output_t, index_t, OutputIt> kfn(
+        d_first, range_ptr, tpos_ptr);
 
     __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
   };
@@ -773,6 +1179,62 @@ inline void merge(
   }
 }
 
+template <
+    int vec_size,
+    typename KeyType,
+    typename ValueType,
+    typename key_vec_t,
+    typename val_vec_t>
+struct VecCopyKernelImplFunctor {
+  void operator()(sycl::item<1> item) const {
+    auto item_id = item.get_linear_id();
+    int remaining = sort_sz - item_id * vec_size;
+    if (remaining < vec_size) {
+      for (int index = 0; index < remaining; index++) {
+        auto offset = item_id * vec_size + index;
+        key[offset] = tmp_key_data[offset];
+        val[offset] = tmp_val_data[offset];
+      }
+    } else {
+#pragma unroll
+      for (int index = 0; index < vec_size; index++) {
+        key_vec_ptr[item_id][index] = tmp_key_vec_ptr[item_id][index];
+        val_vec_ptr[item_id][index] = tmp_val_vec_ptr[item_id][index];
+      }
+    }
+  }
+  VecCopyKernelImplFunctor(
+      KeyType* key_,
+      KeyType* tmp_key_data_,
+      ValueType* val_,
+      ValueType* tmp_val_data_,
+      const size_t sort_sz_,
+      key_vec_t* key_vec_ptr_,
+      key_vec_t* tmp_key_vec_ptr_,
+      val_vec_t* val_vec_ptr_,
+      val_vec_t* tmp_val_vec_ptr_)
+      : key(key_),
+        tmp_key_data(tmp_key_data_),
+        val(val_),
+        tmp_val_data(tmp_val_data_),
+        sort_sz(sort_sz_),
+        key_vec_ptr(key_vec_ptr_),
+        tmp_key_vec_ptr(tmp_key_vec_ptr_),
+        val_vec_ptr(val_vec_ptr_),
+        tmp_val_vec_ptr(tmp_val_vec_ptr_) {}
+
+ private:
+  KeyType* key;
+  KeyType* tmp_key_data;
+  ValueType* val;
+  ValueType* tmp_val_data;
+  const size_t sort_sz;
+  key_vec_t* key_vec_ptr;
+  key_vec_t* tmp_key_vec_ptr;
+  val_vec_t* val_vec_ptr;
+  val_vec_t* tmp_val_vec_ptr;
+};
+
 template <int vec_size, typename KeyType, typename ValueType>
 void vec_copy_kernel_impl(
     KeyType* key,
@@ -790,23 +1252,16 @@ void vec_copy_kernel_impl(
   val_vec_t* tmp_val_vec_ptr = reinterpret_cast<val_vec_t*>(tmp_val_data);
   auto num_work_item = CeilDiv(sort_sz, (size_t)vec_size);
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item) {
-      auto item_id = item.get_linear_id();
-      int remaining = sort_sz - item_id * vec_size;
-      if (remaining < vec_size) {
-        for (int index = 0; index < remaining; index++) {
-          auto offset = item_id * vec_size + index;
-          key[offset] = tmp_key_data[offset];
-          val[offset] = tmp_val_data[offset];
-        }
-      } else {
-#pragma unroll
-        for (int index = 0; index < vec_size; index++) {
-          key_vec_ptr[item_id][index] = tmp_key_vec_ptr[item_id][index];
-          val_vec_ptr[item_id][index] = tmp_val_vec_ptr[item_id][index];
-        }
-      }
-    };
+    VecCopyKernelImplFunctor<vec_size, KeyType, ValueType, key_vec_t, val_vec_t>
+        kfn(key,
+            tmp_key_data,
+            val,
+            tmp_val_data,
+            sort_sz,
+            key_vec_ptr,
+            tmp_key_vec_ptr,
+            val_vec_ptr,
+            tmp_val_vec_ptr);
 
     __cgh.parallel_for(sycl::range</*dim=*/1>(num_work_item), kfn);
   };
@@ -855,6 +1310,105 @@ void copy_to_dst(
 #undef VEC_COPY_KERNEL_IMPL
 }
 
+template <typename KeyType, typename ValueType, typename CompFunc>
+struct MergeSortKernelFunctor {
+  void operator()(sycl::item<1> item) const {
+    leaf_sort<KeyType, ValueType>(item, key, val, leaf, sort_sz, comp_t);
+  }
+  MergeSortKernelFunctor(
+      KeyType* key_,
+      ValueType* val_,
+      const size_t leaf_,
+      const size_t sort_sz_,
+      const CompFunc comp_t_)
+      : key(key_), val(val_), leaf(leaf_), sort_sz(sort_sz_), comp_t(comp_t_) {}
+
+ private:
+  KeyType* key;
+  ValueType* val;
+  const size_t leaf;
+  const size_t sort_sz;
+  const CompFunc comp_t;
+};
+
+template <typename KeyType, typename ValueType, typename CompFunc>
+struct MergeSortKernelFunctor2 {
+  void operator()(sycl::item<1> item) const {
+    const size_t idx = item.get_linear_id();
+    const size_t sq1_start =
+        std::min(sorted_pair * ((idx * chunk) / sorted), sort_sz);
+    const size_t sq1_end = std::min(sq1_start + sorted, sort_sz);
+    const size_t sq2_start = sq1_end;
+    const size_t sq2_end = std::min(sq2_start + sorted, sort_sz);
+
+    const size_t offset_in_sq = chunk * (idx % chunk_num_per_sorted);
+
+    if (!data_in_tmp) {
+      merge(
+          offset_in_sq,
+          key,
+          val,
+          tmp_key_data,
+          tmp_val_data,
+          sq1_start,
+          sq1_end,
+          sq2_start,
+          sq2_end,
+          chunk,
+          comp_t);
+    } else {
+      merge(
+          offset_in_sq,
+          tmp_key_data,
+          tmp_val_data,
+          key,
+          val,
+          sq1_start,
+          sq1_end,
+          sq2_start,
+          sq2_end,
+          chunk,
+          comp_t);
+    }
+  }
+  MergeSortKernelFunctor2(
+      size_t sorted_pair_,
+      size_t chunk_num_per_sorted_,
+      size_t chunk_,
+      size_t sorted_,
+      KeyType* key_,
+      ValueType* val_,
+      KeyType* tmp_key_data_,
+      ValueType* tmp_val_data_,
+      const size_t sort_sz_,
+      const CompFunc comp_t_,
+      bool data_in_tmp_)
+      : sorted_pair(sorted_pair_),
+        chunk_num_per_sorted(chunk_num_per_sorted_),
+        chunk(chunk_),
+        sorted(sorted_),
+        key(key_),
+        val(val_),
+        tmp_key_data(tmp_key_data_),
+        tmp_val_data(tmp_val_data_),
+        sort_sz(sort_sz_),
+        comp_t(comp_t_),
+        data_in_tmp(data_in_tmp_) {}
+
+ private:
+  size_t sorted_pair;
+  size_t chunk_num_per_sorted;
+  size_t chunk;
+  size_t sorted;
+  KeyType* key;
+  ValueType* val;
+  KeyType* tmp_key_data;
+  ValueType* tmp_val_data;
+  const size_t sort_sz;
+  const CompFunc comp_t;
+  bool data_in_tmp;
+};
+
 // merge sort: only for 1d (single batch) tensor sort
 template <typename KeyType, typename ValueType, typename CompFunc>
 void merge_sort(
@@ -870,9 +1424,8 @@ void merge_sort(
   auto& q = dpcppGetCurrentQueue();
   // 1, leaf sort
   auto cgf_1 = DPCPP_Q_CGF(h) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item) {
-      leaf_sort<KeyType, ValueType>(item, key, val, leaf, sort_sz, comp_t);
-    };
+    MergeSortKernelFunctor<KeyType, ValueType, CompFunc> kfn(
+        key, val, leaf, sort_sz, comp_t);
     h.parallel_for(sycl::range<1>(leaf_step), kfn);
   };
   DPCPP_Q_SUBMIT(q, cgf_1);
@@ -903,44 +1456,18 @@ void merge_sort(
     size_t steps = full_pair_steps + incomplete_pair_steps;
 
     auto cgf_2 = DPCPP_Q_CGF(h) {
-      auto kfn = DPCPP_Q_KFN(sycl::item<1> item) {
-        const size_t idx = item.get_linear_id();
-        const size_t sq1_start =
-            std::min(sorted_pair * ((idx * chunk) / sorted), sort_sz);
-        const size_t sq1_end = std::min(sq1_start + sorted, sort_sz);
-        const size_t sq2_start = sq1_end;
-        const size_t sq2_end = std::min(sq2_start + sorted, sort_sz);
-
-        const size_t offset_in_sq = chunk * (idx % chunk_num_per_sorted);
-
-        if (!data_in_tmp) {
-          merge(
-              offset_in_sq,
-              key,
-              val,
-              tmp_key_data,
-              tmp_val_data,
-              sq1_start,
-              sq1_end,
-              sq2_start,
-              sq2_end,
-              chunk,
-              comp_t);
-        } else {
-          merge(
-              offset_in_sq,
-              tmp_key_data,
-              tmp_val_data,
-              key,
-              val,
-              sq1_start,
-              sq1_end,
-              sq2_start,
-              sq2_end,
-              chunk,
-              comp_t);
-        }
-      };
+      MergeSortKernelFunctor2<KeyType, ValueType, CompFunc> kfn(
+          sorted_pair,
+          chunk_num_per_sorted,
+          chunk,
+          sorted,
+          key,
+          val,
+          tmp_key_data,
+          tmp_val_data,
+          sort_sz,
+          comp_t,
+          data_in_tmp);
       h.parallel_for(sycl::range<1>(steps), kfn);
     };
     DPCPP_Q_SUBMIT(q, cgf_2);

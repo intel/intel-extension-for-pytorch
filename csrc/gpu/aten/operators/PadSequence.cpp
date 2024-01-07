@@ -60,6 +60,55 @@ struct OutputTensorSizeStride {
   IndexType outputStride[MaxDims];
 };
 
+template <typename T, typename IndexType, int Dims>
+struct CatArrayBatchedCopyKernelFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    IndexType tid = item.get_global_id(1);
+    IndexType in = item.get_group(0);
+
+    IndexType nElements = inputs[in].nElements;
+
+    if (tid >= nElements)
+      return;
+
+    T* data = inputs[in].input;
+    IndexType offset = inputs[in].offset;
+    IndexType dimSize = inputs[in].dimSize;
+    IndexType dataOffset = offset * dimStride;
+
+    IndexType stride = item.get_global_range(1);
+
+    while (tid < nElements) {
+      IndexType elementOffset = CatArrIndexToOffset<IndexType, Dims>::compute(
+          os.outputSize, os.outputStride, dimSize, concatDim, tid);
+      output[dataOffset + elementOffset] = data[tid];
+
+      tid += stride;
+    }
+  }
+  CatArrayBatchedCopyKernelFunctor(
+      T* output_,
+      CatArrInputTensor<T, IndexType>* inputs_,
+      OutputTensorSizeStride<IndexType, PAD_ARRAY_MAX_INPUT_DIMS> os_,
+      const int concatDim_,
+      IndexType dimStride_,
+      int batchCounter_)
+      : output(output_),
+        inputs(inputs_),
+        os(os_),
+        concatDim(concatDim_),
+        dimStride(dimStride_),
+        batchCounter(batchCounter_) {}
+
+ private:
+  T* output;
+  CatArrInputTensor<T, IndexType>* inputs;
+  OutputTensorSizeStride<IndexType, PAD_ARRAY_MAX_INPUT_DIMS> os;
+  const int concatDim;
+  IndexType dimStride;
+  int batchCounter;
+};
+
 /**
  * Kernel used to concatenated grimDim.y tensors into an output tensor. Uses
  a
@@ -110,30 +159,8 @@ void CatArrayBatchedCopy(
   sycl::range<2> local_range(1, numWI);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-      IndexType tid = item.get_global_id(1);
-      IndexType in = item.get_group(0);
-
-      IndexType nElements = inputs[in].nElements;
-
-      if (tid >= nElements)
-        return;
-
-      T* data = inputs[in].input;
-      IndexType offset = inputs[in].offset;
-      IndexType dimSize = inputs[in].dimSize;
-      IndexType dataOffset = offset * dimStride;
-
-      IndexType stride = item.get_global_range(1);
-
-      while (tid < nElements) {
-        IndexType elementOffset = CatArrIndexToOffset<IndexType, Dims>::compute(
-            os.outputSize, os.outputStride, dimSize, concatDim, tid);
-        output[dataOffset + elementOffset] = data[tid];
-
-        tid += stride;
-      }
-    };
+    CatArrayBatchedCopyKernelFunctor<T, IndexType, Dims> kfn(
+        output, inputs, os, concatDim, dimStride, batchCounter);
     cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf)
