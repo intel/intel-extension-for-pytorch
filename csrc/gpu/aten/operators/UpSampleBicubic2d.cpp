@@ -18,6 +18,137 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t>
+struct UpsampleBicubic2dOutFrameKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto in_ptr = in_data;
+    auto out_ptr = out_data;
+    int global_id = item.get_global_linear_id();
+
+    if (global_id < output_height * output_width) {
+      const int output_x = global_id % output_width;
+      const int output_y = global_id / output_width;
+      if (input_height == output_height && input_width == output_width) {
+        for (int n = 0; n < nbatch; n++) {
+          for (int c = 0; c < channels; c++) {
+            auto val = in_ptr
+                [n * input_height * input_width * channels +
+                 c * input_height * input_width + output_y * input_width +
+                 output_x];
+            out_ptr
+                [n * output_height * output_width * channels +
+                 c * output_height * output_width + output_y * output_width +
+                 output_x] = val;
+          }
+        }
+        return;
+      }
+
+      const scalar_t height_scale = area_pixel_compute_scale<scalar_t>(
+          input_height, output_height, align_corners);
+      const scalar_t width_scale = area_pixel_compute_scale<scalar_t>(
+          input_width, output_width, align_corners);
+
+      // Interpolation kernel
+      scalar_t real_x = area_pixel_compute_source_index(
+          width_scale, output_x, align_corners, /*cubic=*/true);
+      // TODO: floor should support at dispatch to half type
+      int in_x = Numerics<scalar_t>::floor(real_x);
+      scalar_t t_x = real_x - in_x;
+
+      scalar_t real_y = area_pixel_compute_source_index(
+          height_scale, output_y, align_corners, /*cubic=*/true);
+      int in_y = Numerics<scalar_t>::floor(real_y);
+      scalar_t t_y = real_y - in_y;
+      for (int n = 0; n < nbatch; n++) {
+        for (int c = 0; c < channels; c++) {
+          scalar_t coefficients[4];
+          for (int k = 0; k < 4; k++) {
+            coefficients[k] = cubic_interp1d(
+                upsample_get_value_bounded<scalar_t>(
+                    in_ptr,
+                    n,
+                    c,
+                    input_width,
+                    input_height,
+                    in_x - 1,
+                    in_y - 1 + k),
+                upsample_get_value_bounded<scalar_t>(
+                    in_ptr,
+                    n,
+                    c,
+                    input_width,
+                    input_height,
+                    in_x + 0,
+                    in_y - 1 + k),
+                upsample_get_value_bounded<scalar_t>(
+                    in_ptr,
+                    n,
+                    c,
+                    input_width,
+                    input_height,
+                    in_x + 1,
+                    in_y - 1 + k),
+                upsample_get_value_bounded<scalar_t>(
+                    in_ptr,
+                    n,
+                    c,
+                    input_width,
+                    input_height,
+                    in_x + 2,
+                    in_y - 1 + k),
+                t_x);
+          }
+
+          out_ptr
+              [n * output_height * output_width * channels +
+               c * output_height * output_width + output_y * output_width +
+               output_x] =
+                  static_cast<scalar_t>(cubic_interp1d(
+                      coefficients[0],
+                      coefficients[1],
+                      coefficients[2],
+                      coefficients[3],
+                      t_y));
+        }
+      }
+    }
+  }
+  UpsampleBicubic2dOutFrameKernelFunctor(
+      scalar_t* out_data_,
+      scalar_t* in_data_,
+      int64_t input_height_,
+      int64_t input_width_,
+      int64_t output_height_,
+      int64_t output_width_,
+      int64_t nbatch_,
+      int64_t channels_,
+      int64_t onum_,
+      bool align_corners_)
+      : out_data(out_data_),
+        in_data(in_data_),
+        input_height(input_height_),
+        input_width(input_width_),
+        output_height(output_height_),
+        output_width(output_width_),
+        nbatch(nbatch_),
+        channels(channels_),
+        onum(onum_),
+        align_corners(align_corners_) {}
+
+ private:
+  scalar_t* out_data;
+  scalar_t* in_data;
+  int64_t input_height;
+  int64_t input_width;
+  int64_t output_height;
+  int64_t output_width;
+  int64_t nbatch;
+  int64_t channels;
+  int64_t onum;
+  bool align_corners;
+};
+
+template <typename scalar_t>
 static void upsample_bicubic2d_out_frame(
     scalar_t* odata,
     scalar_t* idata,
@@ -42,100 +173,17 @@ static void upsample_bicubic2d_out_frame(
     auto in_data = idata;
     auto out_data = odata;
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto in_ptr = in_data;
-      auto out_ptr = out_data;
-      int global_id = item.get_global_linear_id();
-
-      if (global_id < output_height * output_width) {
-        const int output_x = global_id % output_width;
-        const int output_y = global_id / output_width;
-        if (input_height == output_height && input_width == output_width) {
-          for (int n = 0; n < nbatch; n++) {
-            for (int c = 0; c < channels; c++) {
-              auto val = in_ptr
-                  [n * input_height * input_width * channels +
-                   c * input_height * input_width + output_y * input_width +
-                   output_x];
-              out_ptr
-                  [n * output_height * output_width * channels +
-                   c * output_height * output_width + output_y * output_width +
-                   output_x] = val;
-            }
-          }
-          return;
-        }
-
-        const scalar_t height_scale = area_pixel_compute_scale<scalar_t>(
-            input_height, output_height, align_corners);
-        const scalar_t width_scale = area_pixel_compute_scale<scalar_t>(
-            input_width, output_width, align_corners);
-
-        // Interpolation kernel
-        scalar_t real_x = area_pixel_compute_source_index(
-            width_scale, output_x, align_corners, /*cubic=*/true);
-        // TODO: floor should support at dispatch to half type
-        int in_x = Numerics<scalar_t>::floor(real_x);
-        scalar_t t_x = real_x - in_x;
-
-        scalar_t real_y = area_pixel_compute_source_index(
-            height_scale, output_y, align_corners, /*cubic=*/true);
-        int in_y = Numerics<scalar_t>::floor(real_y);
-        scalar_t t_y = real_y - in_y;
-        for (int n = 0; n < nbatch; n++) {
-          for (int c = 0; c < channels; c++) {
-            scalar_t coefficients[4];
-            for (int k = 0; k < 4; k++) {
-              coefficients[k] = cubic_interp1d(
-                  upsample_get_value_bounded<scalar_t>(
-                      in_ptr,
-                      n,
-                      c,
-                      input_width,
-                      input_height,
-                      in_x - 1,
-                      in_y - 1 + k),
-                  upsample_get_value_bounded<scalar_t>(
-                      in_ptr,
-                      n,
-                      c,
-                      input_width,
-                      input_height,
-                      in_x + 0,
-                      in_y - 1 + k),
-                  upsample_get_value_bounded<scalar_t>(
-                      in_ptr,
-                      n,
-                      c,
-                      input_width,
-                      input_height,
-                      in_x + 1,
-                      in_y - 1 + k),
-                  upsample_get_value_bounded<scalar_t>(
-                      in_ptr,
-                      n,
-                      c,
-                      input_width,
-                      input_height,
-                      in_x + 2,
-                      in_y - 1 + k),
-                  t_x);
-            }
-
-            out_ptr
-                [n * output_height * output_width * channels +
-                 c * output_height * output_width + output_y * output_width +
-                 output_x] =
-                    static_cast<scalar_t>(cubic_interp1d(
-                        coefficients[0],
-                        coefficients[1],
-                        coefficients[2],
-                        coefficients[3],
-                        t_y));
-          }
-        }
-      }
-    };
+    UpsampleBicubic2dOutFrameKernelFunctor<scalar_t> kfn(
+        out_data,
+        in_data,
+        input_height,
+        input_width,
+        output_height,
+        output_width,
+        nbatch,
+        channels,
+        onum,
+        align_corners);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
@@ -143,6 +191,112 @@ static void upsample_bicubic2d_out_frame(
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
+
+template <typename scalar_t>
+struct UpsampleBicubic2dBackwardOutFrameKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto in_ptr = in_data;
+    auto out_ptr = out_data;
+    int global_id = item.get_global_linear_id();
+
+    if (global_id < output_height * output_width) {
+      const int output_x = global_id % output_width;
+      const int output_y = global_id / output_width;
+      // special case: output_xust copy
+      if (input_height == output_height && input_width == output_width) {
+        for (int n = 0; n < nbatch; n++) {
+          for (int c = 0; c < channels; ++c) {
+            auto val = out_ptr
+                [n * output_height * output_width * channels +
+                 c * output_height * output_width + output_y * output_width +
+                 output_x];
+            in_ptr
+                [n * input_height * input_width * channels +
+                 c * input_height * input_width + output_y * input_width +
+                 output_x] = val;
+          }
+        }
+        return;
+      }
+
+      const scalar_t height_scale = area_pixel_compute_scale<scalar_t>(
+          input_height, output_height, align_corners);
+      const scalar_t width_scale = area_pixel_compute_scale<scalar_t>(
+          input_width, output_width, align_corners);
+
+      scalar_t real_x = area_pixel_compute_source_index(
+          width_scale, output_x, align_corners, /*cubic=*/true);
+      int input_x = Numerics<scalar_t>::floor(real_x);
+      scalar_t t_x = real_x - input_x;
+
+      scalar_t real_y = area_pixel_compute_source_index(
+          height_scale, output_y, align_corners, /*cubic=*/true);
+      int input_y = Numerics<scalar_t>::floor(real_y);
+      scalar_t t_y = real_y - input_y;
+
+      scalar_t x_coeffs[4];
+      scalar_t y_coeffs[4];
+
+      get_cubic_upsample_coefficients(x_coeffs, t_x);
+      get_cubic_upsample_coefficients(y_coeffs, t_y);
+
+      for (int n = 0; n < nbatch; n++) {
+        for (int c = 0; c < channels; ++c) {
+          scalar_t out_value = out_ptr
+              [n * output_height * output_width * channels +
+               c * output_height * output_width + output_y * output_width +
+               output_x];
+          for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+              upsample_increment_value_bounded<scalar_t>(
+                  in_ptr,
+                  n,
+                  c,
+                  input_width,
+                  input_height,
+                  input_x - 1 + j,
+                  input_y - 1 + i,
+                  out_value * y_coeffs[i] * x_coeffs[j]);
+            }
+          }
+        }
+      }
+    }
+  }
+  UpsampleBicubic2dBackwardOutFrameKernelFunctor(
+      scalar_t* out_data_,
+      scalar_t* in_data_,
+      int64_t input_height_,
+      int64_t input_width_,
+      int64_t output_height_,
+      int64_t output_width_,
+      int64_t nbatch_,
+      int64_t channels_,
+      int64_t onum_,
+      bool align_corners_)
+      : out_data(out_data_),
+        in_data(in_data_),
+        input_height(input_height_),
+        input_width(input_width_),
+        output_height(output_height_),
+        output_width(output_width_),
+        nbatch(nbatch_),
+        channels(channels_),
+        onum(onum_),
+        align_corners(align_corners_) {}
+
+ private:
+  scalar_t* out_data;
+  scalar_t* in_data;
+  int64_t input_height;
+  int64_t input_width;
+  int64_t output_height;
+  int64_t output_width;
+  int64_t nbatch;
+  int64_t channels;
+  int64_t onum;
+  bool align_corners;
+};
 
 // Backward (adjoint) operation 1 <- 2 (accumulates)
 template <typename scalar_t>
@@ -169,75 +323,17 @@ static void upsample_bicubic2d_backward_out_frame(
     auto in_data = idata;
     auto out_data = odata;
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto in_ptr = in_data;
-      auto out_ptr = out_data;
-      int global_id = item.get_global_linear_id();
-
-      if (global_id < output_height * output_width) {
-        const int output_x = global_id % output_width;
-        const int output_y = global_id / output_width;
-        // special case: output_xust copy
-        if (input_height == output_height && input_width == output_width) {
-          for (int n = 0; n < nbatch; n++) {
-            for (int c = 0; c < channels; ++c) {
-              auto val = out_ptr
-                  [n * output_height * output_width * channels +
-                   c * output_height * output_width + output_y * output_width +
-                   output_x];
-              in_ptr
-                  [n * input_height * input_width * channels +
-                   c * input_height * input_width + output_y * input_width +
-                   output_x] = val;
-            }
-          }
-          return;
-        }
-
-        const scalar_t height_scale = area_pixel_compute_scale<scalar_t>(
-            input_height, output_height, align_corners);
-        const scalar_t width_scale = area_pixel_compute_scale<scalar_t>(
-            input_width, output_width, align_corners);
-
-        scalar_t real_x = area_pixel_compute_source_index(
-            width_scale, output_x, align_corners, /*cubic=*/true);
-        int input_x = Numerics<scalar_t>::floor(real_x);
-        scalar_t t_x = real_x - input_x;
-
-        scalar_t real_y = area_pixel_compute_source_index(
-            height_scale, output_y, align_corners, /*cubic=*/true);
-        int input_y = Numerics<scalar_t>::floor(real_y);
-        scalar_t t_y = real_y - input_y;
-
-        scalar_t x_coeffs[4];
-        scalar_t y_coeffs[4];
-
-        get_cubic_upsample_coefficients(x_coeffs, t_x);
-        get_cubic_upsample_coefficients(y_coeffs, t_y);
-
-        for (int n = 0; n < nbatch; n++) {
-          for (int c = 0; c < channels; ++c) {
-            scalar_t out_value = out_ptr
-                [n * output_height * output_width * channels +
-                 c * output_height * output_width + output_y * output_width +
-                 output_x];
-            for (int i = 0; i < 4; i++) {
-              for (int j = 0; j < 4; j++) {
-                upsample_increment_value_bounded<scalar_t>(
-                    in_ptr,
-                    n,
-                    c,
-                    input_width,
-                    input_height,
-                    input_x - 1 + j,
-                    input_y - 1 + i,
-                    out_value * y_coeffs[i] * x_coeffs[j]);
-              }
-            }
-          }
-        }
-      }
-    };
+    UpsampleBicubic2dBackwardOutFrameKernelFunctor<scalar_t> kfn(
+        out_data,
+        in_data,
+        input_height,
+        input_width,
+        output_height,
+        output_width,
+        nbatch,
+        channels,
+        onum,
+        align_corners);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),

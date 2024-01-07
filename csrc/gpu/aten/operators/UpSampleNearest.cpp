@@ -64,6 +64,60 @@ inline size_t idx_cl(
 }
 
 template <typename scalar_t, typename index_op_t>
+struct UpsampleNearest1dOutKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int dst_idx = item.get_global_linear_id();
+    if (dst_idx >= dim_c * dst_dim_w)
+      return;
+
+    int c = (dst_idx / dst_dim_w) % dim_c;
+
+    int dst_x = dst_idx % dst_dim_w;
+    int src_x = index_op(scale_factor, dst_x, src_dim_w);
+
+    int src_idx = c * src_dim_w + src_x;
+    int src_stride = dim_c * src_dim_w;
+    int dst_stride = dim_c * dst_dim_w;
+
+    for (int b = 0; b < dim_b; b++) {
+      output[dst_idx] = input[src_idx];
+      src_idx += src_stride;
+      dst_idx += dst_stride;
+    }
+  }
+  UpsampleNearest1dOutKernelFunctor(
+      int n_,
+      const scalar_t* input_,
+      size_t dim_b_,
+      size_t dim_c_,
+      size_t src_dim_w_,
+      size_t dst_dim_w_,
+      scalar_t* output_,
+      float scale_factor_,
+      index_op_t index_op_)
+      : n(n_),
+        input(input_),
+        dim_b(dim_b_),
+        dim_c(dim_c_),
+        src_dim_w(src_dim_w_),
+        dst_dim_w(dst_dim_w_),
+        output(output_),
+        scale_factor(scale_factor_),
+        index_op(index_op_) {}
+
+ private:
+  int n;
+  const scalar_t* input;
+  size_t dim_b;
+  size_t dim_c;
+  size_t src_dim_w;
+  size_t dst_dim_w;
+  scalar_t* output;
+  float scale_factor;
+  index_op_t index_op;
+};
+
+template <typename scalar_t, typename index_op_t>
 void upsample_nearest1d_out_kernel(
     int n,
     const scalar_t* input,
@@ -81,26 +135,16 @@ void upsample_nearest1d_out_kernel(
       (n + work_group_size - 1) / work_group_size * work_group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      int dst_idx = item.get_global_linear_id();
-      if (dst_idx >= dim_c * dst_dim_w)
-        return;
-
-      int c = (dst_idx / dst_dim_w) % dim_c;
-
-      int dst_x = dst_idx % dst_dim_w;
-      int src_x = index_op(scale_factor, dst_x, src_dim_w);
-
-      int src_idx = c * src_dim_w + src_x;
-      int src_stride = dim_c * src_dim_w;
-      int dst_stride = dim_c * dst_dim_w;
-
-      for (int b = 0; b < dim_b; b++) {
-        output[dst_idx] = input[src_idx];
-        src_idx += src_stride;
-        dst_idx += dst_stride;
-      }
-    };
+    UpsampleNearest1dOutKernelFunctor<scalar_t, index_op_t> kfn(
+        n,
+        input,
+        dim_b,
+        dim_c,
+        src_dim_w,
+        dst_dim_w,
+        output,
+        scale_factor,
+        index_op);
 
     cgh.parallel_for(
         sycl::nd_range<1>(
@@ -109,6 +153,63 @@ void upsample_nearest1d_out_kernel(
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <typename scalar_t, typename accscalar_t, typename index_bw_op_t>
+struct UpsampleNearest1dBackwardOutKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int dst_idx = item.get_global_linear_id();
+    if (dst_idx >= dim_c * dst_dim_w)
+      return;
+
+    int c = (dst_idx / (dst_dim_w)) % dim_c;
+
+    int dst_x = dst_idx % dst_dim_w;
+    // note that we do not want to clamp src_x to src_dim_w, since we might
+    // intentionally want to skip in case of scale_factor < 1.0
+    int src_x = index_bw_op(scale_factor, dst_x, src_dim_w);
+    int src_x_up = index_bw_op(scale_factor, dst_x + 1, src_dim_w);
+
+    for (int b = 0; b < dim_b; b++) {
+      accscalar_t grad = 0;
+      int src_idx = b * dim_c * src_dim_w + c * src_dim_w + src_x;
+      for (int x = src_x; x < src_x_up; x++) {
+        grad += grad_o[src_idx++];
+      }
+      grad_i[dst_idx] = grad;
+      dst_idx += dim_c * dst_dim_w;
+    }
+  }
+  UpsampleNearest1dBackwardOutKernelFunctor(
+      int n_,
+      const scalar_t* grad_o_,
+      size_t dim_b_,
+      size_t dim_c_,
+      size_t src_dim_w_,
+      size_t dst_dim_w_,
+      scalar_t* grad_i_,
+      float scale_factor_,
+      index_bw_op_t index_bw_op_)
+      : n(n_),
+        grad_o(grad_o_),
+        dim_b(dim_b_),
+        dim_c(dim_c_),
+        src_dim_w(src_dim_w_),
+        dst_dim_w(dst_dim_w_),
+        grad_i(grad_i_),
+        scale_factor(scale_factor_),
+        index_bw_op(index_bw_op_) {}
+
+ private:
+  int n;
+  const scalar_t* grad_o;
+  size_t dim_b;
+  size_t dim_c;
+  size_t src_dim_w;
+  size_t dst_dim_w;
+  scalar_t* grad_i;
+  float scale_factor;
+  index_bw_op_t index_bw_op;
+};
 
 template <typename scalar_t, typename accscalar_t, typename index_bw_op_t>
 void upsample_nearest1d_backward_out_kernel(
@@ -128,29 +229,19 @@ void upsample_nearest1d_backward_out_kernel(
       (n + work_group_size - 1) / work_group_size * work_group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      int dst_idx = item.get_global_linear_id();
-      if (dst_idx >= dim_c * dst_dim_w)
-        return;
-
-      int c = (dst_idx / (dst_dim_w)) % dim_c;
-
-      int dst_x = dst_idx % dst_dim_w;
-      // note that we do not want to clamp src_x to src_dim_w, since we might
-      // intentionally want to skip in case of scale_factor < 1.0
-      int src_x = index_bw_op(scale_factor, dst_x, src_dim_w);
-      int src_x_up = index_bw_op(scale_factor, dst_x + 1, src_dim_w);
-
-      for (int b = 0; b < dim_b; b++) {
-        accscalar_t grad = 0;
-        int src_idx = b * dim_c * src_dim_w + c * src_dim_w + src_x;
-        for (int x = src_x; x < src_x_up; x++) {
-          grad += grad_o[src_idx++];
-        }
-        grad_i[dst_idx] = grad;
-        dst_idx += dim_c * dst_dim_w;
-      }
-    };
+    UpsampleNearest1dBackwardOutKernelFunctor<
+        scalar_t,
+        accscalar_t,
+        index_bw_op_t>
+        kfn(n,
+            grad_o,
+            dim_b,
+            dim_c,
+            src_dim_w,
+            dst_dim_w,
+            grad_i,
+            scale_factor,
+            index_bw_op);
 
     cgh.parallel_for(
         sycl::nd_range<1>(
@@ -159,6 +250,71 @@ void upsample_nearest1d_backward_out_kernel(
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <typename scalar_t, typename index_op_t>
+struct UpsampleNearest2dOutKernelFunctor {
+  void operator()(sycl::nd_item<3> item) const {
+    size_t nc_idx = item.get_global_id(0);
+    int h2 = item.get_global_id(1);
+    int w2 = item.get_global_id(2);
+
+    if (w2 >= width2 || h2 >= height2) {
+      return;
+    }
+
+    int nc_range = item.get_global_range(0);
+
+    const size_t h1 =
+        height1 == height2 ? h2 : index_op(height_scale, h2, height1);
+    const size_t w1 = width1 == width2 ? w2 : index_op(width_scale, w2, width1);
+
+    size_t src_index = (nc_idx * height1 + h1) * width1 + w1;
+    size_t src_index_stride = nc_range * width1 * height1;
+    size_t dst_index = (nc_idx * height2 + h2) * width2 + w2;
+    size_t dst_index_stride = nc_range * width2 * height2;
+
+    // iterating over
+    while (nc_idx < nc) {
+      odata[dst_index] = idata[src_index];
+      dst_index += dst_index_stride;
+      src_index += src_index_stride;
+      nc_idx += nc_range;
+    }
+  }
+  UpsampleNearest2dOutKernelFunctor(
+      const scalar_t* idata_,
+      scalar_t* odata_,
+      const size_t nc_,
+      const size_t height1_,
+      const size_t width1_,
+      const size_t height2_,
+      const size_t width2_,
+      float height_scale_,
+      float width_scale_,
+      index_op_t index_op_)
+      : idata(idata_),
+        odata(odata_),
+        nc(nc_),
+        height1(height1_),
+        width1(width1_),
+        height2(height2_),
+        width2(width2_),
+        height_scale(height_scale_),
+        width_scale(width_scale_),
+        index_op(index_op_) {}
+
+ private:
+  const scalar_t* idata;
+  scalar_t* odata;
+  const size_t nc;
+  const size_t height1;
+  const size_t width1;
+  const size_t height2;
+  const size_t width2;
+  float height_scale;
+  float width_scale;
+  index_op_t index_op;
+};
 
 template <typename scalar_t, typename index_op_t>
 void upsample_nearest2d_out_kernel(
@@ -185,35 +341,17 @@ void upsample_nearest2d_out_kernel(
   int global_z = (nc + z_plane - 1) / z_plane * z_plane;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
-      size_t nc_idx = item.get_global_id(0);
-      int h2 = item.get_global_id(1);
-      int w2 = item.get_global_id(2);
-
-      if (w2 >= width2 || h2 >= height2) {
-        return;
-      }
-
-      int nc_range = item.get_global_range(0);
-
-      const size_t h1 =
-          height1 == height2 ? h2 : index_op(height_scale, h2, height1);
-      const size_t w1 =
-          width1 == width2 ? w2 : index_op(width_scale, w2, width1);
-
-      size_t src_index = (nc_idx * height1 + h1) * width1 + w1;
-      size_t src_index_stride = nc_range * width1 * height1;
-      size_t dst_index = (nc_idx * height2 + h2) * width2 + w2;
-      size_t dst_index_stride = nc_range * width2 * height2;
-
-      // iterating over
-      while (nc_idx < nc) {
-        odata[dst_index] = idata[src_index];
-        dst_index += dst_index_stride;
-        src_index += src_index_stride;
-        nc_idx += nc_range;
-      }
-    };
+    UpsampleNearest2dOutKernelFunctor<scalar_t, index_op_t> kfn(
+        idata,
+        odata,
+        nc,
+        height1,
+        width1,
+        height2,
+        width2,
+        height_scale,
+        width_scale,
+        index_op);
 
     cgh.parallel_for(
         sycl::nd_range<3>(
@@ -223,6 +361,63 @@ void upsample_nearest2d_out_kernel(
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <typename scalar_t, typename index_op_t>
+struct UpsampleNearest2dChannelsLastKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    const int index = item.get_global_linear_id();
+
+    if (index < out_numel) {
+      const int c = index % channels;
+      const int w2 = (index / channels) % width2;
+      const int h2 = (index / channels / width2) % height2;
+      const int n = index / channels / width2 / height2;
+
+      const size_t h1 =
+          height1 == height2 ? h2 : index_op(height_scale, h2, height1);
+      const size_t w1 =
+          width1 == width2 ? w2 : index_op(width_scale, w2, width1);
+
+      odata[index] = idata[idx_cl(n, h1, w1, c, height1, width1, channels)];
+    }
+  }
+  UpsampleNearest2dChannelsLastKernelFunctor(
+      const scalar_t* idata_,
+      scalar_t* odata_,
+      const size_t channels_,
+      const size_t height1_,
+      const size_t width1_,
+      const size_t height2_,
+      const size_t width2_,
+      float height_scale_,
+      float width_scale_,
+      const size_t out_numel_,
+      index_op_t index_op_)
+      : idata(idata_),
+        odata(odata_),
+        channels(channels_),
+        height1(height1_),
+        width1(width1_),
+        height2(height2_),
+        width2(width2_),
+        height_scale(height_scale_),
+        width_scale(width_scale_),
+        out_numel(out_numel_),
+        index_op(index_op_) {}
+
+ private:
+  const scalar_t* idata;
+  scalar_t* odata;
+  const size_t channels;
+  const size_t height1;
+  const size_t width1;
+  const size_t height2;
+  const size_t width2;
+  float height_scale;
+  float width_scale;
+  const size_t out_numel;
+  index_op_t index_op;
+};
 
 template <typename scalar_t, typename index_op_t>
 void upsample_nearest2d_channels_last_kernel(
@@ -244,23 +439,18 @@ void upsample_nearest2d_channels_last_kernel(
       (out_numel + work_group_size - 1) / work_group_size * work_group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      const int index = item.get_global_linear_id();
-
-      if (index < out_numel) {
-        const int c = index % channels;
-        const int w2 = (index / channels) % width2;
-        const int h2 = (index / channels / width2) % height2;
-        const int n = index / channels / width2 / height2;
-
-        const size_t h1 =
-            height1 == height2 ? h2 : index_op(height_scale, h2, height1);
-        const size_t w1 =
-            width1 == width2 ? w2 : index_op(width_scale, w2, width1);
-
-        odata[index] = idata[idx_cl(n, h1, w1, c, height1, width1, channels)];
-      }
-    };
+    UpsampleNearest2dChannelsLastKernelFunctor<scalar_t, index_op_t> kfn(
+        idata,
+        odata,
+        channels,
+        height1,
+        width1,
+        height2,
+        width2,
+        height_scale,
+        width_scale,
+        out_numel,
+        index_op);
 
     cgh.parallel_for(
         sycl::nd_range<1>(
@@ -269,6 +459,84 @@ void upsample_nearest2d_channels_last_kernel(
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <typename scalar_t, typename accscalar_t, typename index_bw_op_t>
+struct UpsampleNearest2dBackwardKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int dst_idx = item.get_global_linear_id();
+    if (dst_idx >= dim_c * dst_dim_h * dst_dim_w)
+      return;
+
+    int dst_c_stride = dst_dim_h * dst_dim_w;
+    int src_c_stride = src_dim_h * src_dim_w;
+
+    int c = (dst_idx / (dst_c_stride)) % dim_c;
+
+    int dst_y = (dst_idx / dst_dim_w) % dst_dim_h;
+    // note that we do not want to clamp src_y to src_dim_y, since we might
+    // intentionally want to skip in case of scale_factor < 1.0
+    int src_y = index_bw_op(height_scale, dst_y, src_dim_h);
+    int src_y_up = index_bw_op(height_scale, dst_y + 1, src_dim_h);
+
+    int dst_x = dst_idx % dst_dim_w;
+    // note that we do not want to clamp src_x to src_dim_w, since we might
+    // intentionally want to skip in case of scale_factor < 1.0
+    int src_x = index_bw_op(width_scale, dst_x, src_dim_w);
+    int src_x_up = index_bw_op(width_scale, dst_x + 1, src_dim_w);
+
+    for (int b = 0; b < dim_b; b++) {
+      accscalar_t grad = 0;
+      for (int y = src_y; y < src_y_up; y++) {
+        for (int x = src_x; x < src_x_up; x++) {
+          int src_idx =
+              b * dim_c * src_c_stride + c * src_c_stride + y * src_dim_w + x;
+          grad += grad_o[src_idx];
+        }
+      }
+      grad_i[dst_idx] = grad;
+      dst_idx += dim_c * dst_c_stride;
+    }
+  }
+  UpsampleNearest2dBackwardKernelFunctor(
+      size_t n_,
+      const scalar_t* grad_o_,
+      size_t dim_b_,
+      size_t dim_c_,
+      size_t src_dim_h_,
+      size_t src_dim_w_,
+      size_t dst_dim_h_,
+      size_t dst_dim_w_,
+      scalar_t* grad_i_,
+      float height_scale_,
+      float width_scale_,
+      index_bw_op_t index_bw_op_)
+      : n(n_),
+        grad_o(grad_o_),
+        dim_b(dim_b_),
+        dim_c(dim_c_),
+        src_dim_h(src_dim_h_),
+        src_dim_w(src_dim_w_),
+        dst_dim_h(dst_dim_h_),
+        dst_dim_w(dst_dim_w_),
+        grad_i(grad_i_),
+        height_scale(height_scale_),
+        width_scale(width_scale_),
+        index_bw_op(index_bw_op_) {}
+
+ private:
+  size_t n;
+  const scalar_t* grad_o;
+  size_t dim_b;
+  size_t dim_c;
+  size_t src_dim_h;
+  size_t src_dim_w;
+  size_t dst_dim_h;
+  size_t dst_dim_w;
+  scalar_t* grad_i;
+  float height_scale;
+  float width_scale;
+  index_bw_op_t index_bw_op;
+};
 
 template <typename scalar_t, typename accscalar_t, typename index_bw_op_t>
 void upsample_nearest2d_backward_kernel(
@@ -291,41 +559,19 @@ void upsample_nearest2d_backward_kernel(
       (n + work_group_size - 1) / work_group_size * work_group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      int dst_idx = item.get_global_linear_id();
-      if (dst_idx >= dim_c * dst_dim_h * dst_dim_w)
-        return;
-
-      int dst_c_stride = dst_dim_h * dst_dim_w;
-      int src_c_stride = src_dim_h * src_dim_w;
-
-      int c = (dst_idx / (dst_c_stride)) % dim_c;
-
-      int dst_y = (dst_idx / dst_dim_w) % dst_dim_h;
-      // note that we do not want to clamp src_y to src_dim_y, since we might
-      // intentionally want to skip in case of scale_factor < 1.0
-      int src_y = index_bw_op(height_scale, dst_y, src_dim_h);
-      int src_y_up = index_bw_op(height_scale, dst_y + 1, src_dim_h);
-
-      int dst_x = dst_idx % dst_dim_w;
-      // note that we do not want to clamp src_x to src_dim_w, since we might
-      // intentionally want to skip in case of scale_factor < 1.0
-      int src_x = index_bw_op(width_scale, dst_x, src_dim_w);
-      int src_x_up = index_bw_op(width_scale, dst_x + 1, src_dim_w);
-
-      for (int b = 0; b < dim_b; b++) {
-        accscalar_t grad = 0;
-        for (int y = src_y; y < src_y_up; y++) {
-          for (int x = src_x; x < src_x_up; x++) {
-            int src_idx =
-                b * dim_c * src_c_stride + c * src_c_stride + y * src_dim_w + x;
-            grad += grad_o[src_idx];
-          }
-        }
-        grad_i[dst_idx] = grad;
-        dst_idx += dim_c * dst_c_stride;
-      }
-    };
+    UpsampleNearest2dBackwardKernelFunctor<scalar_t, accscalar_t, index_bw_op_t>
+        kfn(n,
+            grad_o,
+            dim_b,
+            dim_c,
+            src_dim_h,
+            src_dim_w,
+            dst_dim_h,
+            dst_dim_w,
+            grad_i,
+            height_scale,
+            width_scale,
+            index_bw_op);
 
     cgh.parallel_for(
         sycl::nd_range<1>(
@@ -334,6 +580,70 @@ void upsample_nearest2d_backward_kernel(
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <typename scalar_t, typename accscalar_t, typename index_bw_op_t>
+struct UpsampleNearest2dBackwardChannelsLastKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int index = item.get_global_linear_id();
+
+    if (index < gi_numel) {
+      const int c = index % channels;
+      const int w2 = (index / channels) % width2;
+      const int h2 = (index / channels / width2) % height2;
+      const int n = index / channels / width2 / height2;
+
+      int h1 = index_bw_op(height_scale, h2, height1);
+      int h1_up = index_bw_op(height_scale, h2 + 1, height1);
+
+      int w1 = index_bw_op(width_scale, w2, width1);
+      int w1_up = index_bw_op(width_scale, w2 + 1, width1);
+
+      accscalar_t grad = 0;
+      for (int ih = h1; ih < h1_up; ih++) {
+        for (int iw = w1; iw < w1_up; iw++) {
+          grad += go[idx_cl(n, ih, iw, c, height1, width1, channels)];
+        }
+      }
+      gi[index] = static_cast<scalar_t>(grad);
+    }
+  }
+  UpsampleNearest2dBackwardChannelsLastKernelFunctor(
+      const scalar_t* go_,
+      scalar_t* gi_,
+      const size_t height1_,
+      const size_t width1_,
+      const size_t height2_,
+      const size_t width2_,
+      const size_t channels_,
+      const float height_scale_,
+      const float width_scale_,
+      const size_t gi_numel_,
+      index_bw_op_t index_bw_op_)
+      : go(go_),
+        gi(gi_),
+        height1(height1_),
+        width1(width1_),
+        height2(height2_),
+        width2(width2_),
+        channels(channels_),
+        height_scale(height_scale_),
+        width_scale(width_scale_),
+        gi_numel(gi_numel_),
+        index_bw_op(index_bw_op_) {}
+
+ private:
+  const scalar_t* go;
+  scalar_t* gi;
+  const size_t height1;
+  const size_t width1;
+  const size_t height2;
+  const size_t width2;
+  const size_t channels;
+  const float height_scale;
+  const float width_scale;
+  const size_t gi_numel;
+  index_bw_op_t index_bw_op;
+};
 
 template <typename scalar_t, typename accscalar_t, typename index_bw_op_t>
 void upsample_nearest2d_backward_channels_last_kernel(
@@ -357,30 +667,21 @@ void upsample_nearest2d_backward_channels_last_kernel(
       (gi_numel + work_group_size - 1) / work_group_size * work_group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      int index = item.get_global_linear_id();
-
-      if (index < gi_numel) {
-        const int c = index % channels;
-        const int w2 = (index / channels) % width2;
-        const int h2 = (index / channels / width2) % height2;
-        const int n = index / channels / width2 / height2;
-
-        int h1 = index_bw_op(height_scale, h2, height1);
-        int h1_up = index_bw_op(height_scale, h2 + 1, height1);
-
-        int w1 = index_bw_op(width_scale, w2, width1);
-        int w1_up = index_bw_op(width_scale, w2 + 1, width1);
-
-        accscalar_t grad = 0;
-        for (int ih = h1; ih < h1_up; ih++) {
-          for (int iw = w1; iw < w1_up; iw++) {
-            grad += go[idx_cl(n, ih, iw, c, height1, width1, channels)];
-          }
-        }
-        gi[index] = static_cast<scalar_t>(grad);
-      }
-    };
+    UpsampleNearest2dBackwardChannelsLastKernelFunctor<
+        scalar_t,
+        accscalar_t,
+        index_bw_op_t>
+        kfn(go,
+            gi,
+            height1,
+            width1,
+            height2,
+            width2,
+            channels,
+            height_scale,
+            width_scale,
+            gi_numel,
+            index_bw_op);
 
     cgh.parallel_for(
         sycl::nd_range<1>(
@@ -389,6 +690,85 @@ void upsample_nearest2d_backward_channels_last_kernel(
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <typename scalar_t, typename index_op_t>
+struct UpsampleNearest3dOutKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int dst_idx = item.get_global_linear_id();
+
+    if (dst_idx >= dim_c * dst_dim_d * dst_dim_h * dst_dim_w)
+      return;
+
+    int dst_c_stride = dst_dim_d * dst_dim_h * dst_dim_w;
+    int src_c_stride = src_dim_d * src_dim_h * src_dim_w;
+
+    int c = (dst_idx / (dst_c_stride)) % dim_c;
+
+    int dst_z = (dst_idx / dst_dim_h / dst_dim_w) % dst_dim_d;
+    int src_z = index_op(depth_scale, dst_z, src_dim_d);
+    int dst_y = (dst_idx / dst_dim_w) % dst_dim_h;
+    int src_y = index_op(height_scale, dst_y, src_dim_h);
+
+    int dst_x = dst_idx % dst_dim_w;
+    int src_x = index_op(width_scale, dst_x, src_dim_w);
+
+    int src_idx = c * src_c_stride + src_z * src_dim_h * src_dim_w +
+        src_y * src_dim_w + src_x;
+    for (int b = 0; b < dim_b; b++) {
+      output[dst_idx] = input[src_idx];
+      src_idx += dim_c * src_c_stride;
+      dst_idx += dim_c * dst_c_stride;
+    }
+  }
+  UpsampleNearest3dOutKernelFunctor(
+      int n_,
+      const scalar_t* input_,
+      size_t dim_b_,
+      size_t dim_c_,
+      size_t src_dim_d_,
+      size_t src_dim_h_,
+      size_t src_dim_w_,
+      size_t dst_dim_d_,
+      size_t dst_dim_h_,
+      size_t dst_dim_w_,
+      scalar_t* output_,
+      float depth_scale_,
+      float height_scale_,
+      float width_scale_,
+      index_op_t index_op_)
+      : n(n_),
+        input(input_),
+        dim_b(dim_b_),
+        dim_c(dim_c_),
+        src_dim_d(src_dim_d_),
+        src_dim_h(src_dim_h_),
+        src_dim_w(src_dim_w_),
+        dst_dim_d(dst_dim_d_),
+        dst_dim_h(dst_dim_h_),
+        dst_dim_w(dst_dim_w_),
+        output(output_),
+        depth_scale(depth_scale_),
+        height_scale(height_scale_),
+        width_scale(width_scale_),
+        index_op(index_op_) {}
+
+ private:
+  int n;
+  const scalar_t* input;
+  size_t dim_b;
+  size_t dim_c;
+  size_t src_dim_d;
+  size_t src_dim_h;
+  size_t src_dim_w;
+  size_t dst_dim_d;
+  size_t dst_dim_h;
+  size_t dst_dim_w;
+  scalar_t* output;
+  float depth_scale;
+  float height_scale;
+  float width_scale;
+  index_op_t index_op;
+};
 
 template <typename scalar_t, typename index_op_t>
 void upsample_nearest3d_out_kernel(
@@ -414,33 +794,22 @@ void upsample_nearest3d_out_kernel(
       (n + work_group_size - 1) / work_group_size * work_group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      int dst_idx = item.get_global_linear_id();
-
-      if (dst_idx >= dim_c * dst_dim_d * dst_dim_h * dst_dim_w)
-        return;
-
-      int dst_c_stride = dst_dim_d * dst_dim_h * dst_dim_w;
-      int src_c_stride = src_dim_d * src_dim_h * src_dim_w;
-
-      int c = (dst_idx / (dst_c_stride)) % dim_c;
-
-      int dst_z = (dst_idx / dst_dim_h / dst_dim_w) % dst_dim_d;
-      int src_z = index_op(depth_scale, dst_z, src_dim_d);
-      int dst_y = (dst_idx / dst_dim_w) % dst_dim_h;
-      int src_y = index_op(height_scale, dst_y, src_dim_h);
-
-      int dst_x = dst_idx % dst_dim_w;
-      int src_x = index_op(width_scale, dst_x, src_dim_w);
-
-      int src_idx = c * src_c_stride + src_z * src_dim_h * src_dim_w +
-          src_y * src_dim_w + src_x;
-      for (int b = 0; b < dim_b; b++) {
-        output[dst_idx] = input[src_idx];
-        src_idx += dim_c * src_c_stride;
-        dst_idx += dim_c * dst_c_stride;
-      }
-    };
+    UpsampleNearest3dOutKernelFunctor<scalar_t, index_op_t> kfn(
+        n,
+        input,
+        dim_b,
+        dim_c,
+        src_dim_d,
+        src_dim_h,
+        src_dim_w,
+        dst_dim_d,
+        dst_dim_h,
+        dst_dim_w,
+        output,
+        depth_scale,
+        height_scale,
+        width_scale,
+        index_op);
 
     cgh.parallel_for(
         sycl::nd_range<1>(
@@ -449,6 +818,102 @@ void upsample_nearest3d_out_kernel(
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <typename scalar_t, typename accscalar_t, typename index_bw_op_t>
+struct UpsampleNearest3dBackwardOutKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int dst_idx = item.get_global_linear_id();
+
+    if (dst_idx >= dim_c * dst_dim_d * dst_dim_h * dst_dim_w)
+      return;
+
+    int dst_c_stride = dst_dim_d * dst_dim_h * dst_dim_w;
+    int src_c_stride = src_dim_d * src_dim_h * src_dim_w;
+
+    int c = (dst_idx / (dst_c_stride)) % dim_c;
+
+    int dst_z = (dst_idx / dst_dim_h / dst_dim_w) % dst_dim_d;
+    // note that we do not want to clamp src_z to src_dim_z, since we might
+    // intentionally want to skip in case of scale_factor < 1.0
+    int src_z = index_bw_op(depth_scale, dst_z, src_dim_d);
+    int src_z_up = index_bw_op(depth_scale, dst_z + 1, src_dim_d);
+
+    int dst_y = (dst_idx / dst_dim_w) % dst_dim_h;
+    // note that we do not want to clamp src_y to src_dim_y, since we might
+    // intentionally want to skip in case of scale_factor < 1.0
+    int src_y = index_bw_op(height_scale, dst_y, src_dim_h);
+    int src_y_up = index_bw_op(height_scale, dst_y + 1, src_dim_h);
+
+    int dst_x = dst_idx % dst_dim_w;
+    // note that we do not want to clamp src_x to src_dim_w, since we might
+    // intentionally want to skip in case of scale_factor < 1.0
+    int src_x = index_bw_op(width_scale, dst_x, src_dim_w);
+    int src_x_up = index_bw_op(width_scale, dst_x + 1, src_dim_w);
+
+    for (int b = 0; b < dim_b; b++) {
+      accscalar_t grad = 0;
+      for (int z = src_z; z < src_z_up; z++) {
+        for (int y = src_y; y < src_y_up; y++) {
+          for (int x = src_x; x < src_x_up; x++) {
+            int src_idx = b * dim_c * src_c_stride + c * src_c_stride +
+                z * src_dim_h * src_dim_w + y * src_dim_w + x;
+            grad += grad_o[src_idx];
+          }
+        }
+      }
+      grad_i[dst_idx] = grad;
+      dst_idx += dim_c * dst_c_stride;
+    }
+  }
+  UpsampleNearest3dBackwardOutKernelFunctor(
+      int n_,
+      const scalar_t* grad_o_,
+      size_t dim_b_,
+      size_t dim_c_,
+      size_t src_dim_d_,
+      size_t src_dim_h_,
+      size_t src_dim_w_,
+      size_t dst_dim_d_,
+      size_t dst_dim_h_,
+      size_t dst_dim_w_,
+      scalar_t* grad_i_,
+      float depth_scale_,
+      float height_scale_,
+      float width_scale_,
+      index_bw_op_t index_bw_op_)
+      : n(n_),
+        grad_o(grad_o_),
+        dim_b(dim_b_),
+        dim_c(dim_c_),
+        src_dim_d(src_dim_d_),
+        src_dim_h(src_dim_h_),
+        src_dim_w(src_dim_w_),
+        dst_dim_d(dst_dim_d_),
+        dst_dim_h(dst_dim_h_),
+        dst_dim_w(dst_dim_w_),
+        grad_i(grad_i_),
+        depth_scale(depth_scale_),
+        height_scale(height_scale_),
+        width_scale(width_scale_),
+        index_bw_op(index_bw_op_) {}
+
+ private:
+  int n;
+  const scalar_t* grad_o;
+  size_t dim_b;
+  size_t dim_c;
+  size_t src_dim_d;
+  size_t src_dim_h;
+  size_t src_dim_w;
+  size_t dst_dim_d;
+  size_t dst_dim_h;
+  size_t dst_dim_w;
+  scalar_t* grad_i;
+  float depth_scale;
+  float height_scale;
+  float width_scale;
+  index_bw_op_t index_bw_op;
+};
 
 template <typename scalar_t, typename accscalar_t, typename index_bw_op_t>
 void upsample_nearest3d_backward_out_kernel(
@@ -474,50 +939,25 @@ void upsample_nearest3d_backward_out_kernel(
       (n + work_group_size - 1) / work_group_size * work_group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      int dst_idx = item.get_global_linear_id();
-
-      if (dst_idx >= dim_c * dst_dim_d * dst_dim_h * dst_dim_w)
-        return;
-
-      int dst_c_stride = dst_dim_d * dst_dim_h * dst_dim_w;
-      int src_c_stride = src_dim_d * src_dim_h * src_dim_w;
-
-      int c = (dst_idx / (dst_c_stride)) % dim_c;
-
-      int dst_z = (dst_idx / dst_dim_h / dst_dim_w) % dst_dim_d;
-      // note that we do not want to clamp src_z to src_dim_z, since we might
-      // intentionally want to skip in case of scale_factor < 1.0
-      int src_z = index_bw_op(depth_scale, dst_z, src_dim_d);
-      int src_z_up = index_bw_op(depth_scale, dst_z + 1, src_dim_d);
-
-      int dst_y = (dst_idx / dst_dim_w) % dst_dim_h;
-      // note that we do not want to clamp src_y to src_dim_y, since we might
-      // intentionally want to skip in case of scale_factor < 1.0
-      int src_y = index_bw_op(height_scale, dst_y, src_dim_h);
-      int src_y_up = index_bw_op(height_scale, dst_y + 1, src_dim_h);
-
-      int dst_x = dst_idx % dst_dim_w;
-      // note that we do not want to clamp src_x to src_dim_w, since we might
-      // intentionally want to skip in case of scale_factor < 1.0
-      int src_x = index_bw_op(width_scale, dst_x, src_dim_w);
-      int src_x_up = index_bw_op(width_scale, dst_x + 1, src_dim_w);
-
-      for (int b = 0; b < dim_b; b++) {
-        accscalar_t grad = 0;
-        for (int z = src_z; z < src_z_up; z++) {
-          for (int y = src_y; y < src_y_up; y++) {
-            for (int x = src_x; x < src_x_up; x++) {
-              int src_idx = b * dim_c * src_c_stride + c * src_c_stride +
-                  z * src_dim_h * src_dim_w + y * src_dim_w + x;
-              grad += grad_o[src_idx];
-            }
-          }
-        }
-        grad_i[dst_idx] = grad;
-        dst_idx += dim_c * dst_c_stride;
-      }
-    };
+    UpsampleNearest3dBackwardOutKernelFunctor<
+        scalar_t,
+        accscalar_t,
+        index_bw_op_t>
+        kfn(n,
+            grad_o,
+            dim_b,
+            dim_c,
+            src_dim_d,
+            src_dim_h,
+            src_dim_w,
+            dst_dim_d,
+            dst_dim_h,
+            dst_dim_w,
+            grad_i,
+            depth_scale,
+            height_scale,
+            width_scale,
+            index_bw_op);
 
     cgh.parallel_for(
         sycl::nd_range<1>(

@@ -171,22 +171,40 @@ static TensorIterator _make_unfold_backward_iter_over_grad_in(
 } // namespace
 
 template <int n_elems_per_work_item, typename func_t>
+struct UnfoldBackwardElementwiseKernelFunctor {
+  void operator()(sycl::item<1> itemId) const {
+    int idx = itemId.get_linear_id();
+#pragma unroll
+    for (int i = 0; i < n_elems_per_work_item; ++i) {
+      if (idx < total_n_elems) {
+        f(idx);
+        idx += total_work_items;
+      }
+    }
+  }
+  UnfoldBackwardElementwiseKernelFunctor(
+      int total_work_items_,
+      int total_n_elems_,
+      func_t f_)
+      : total_work_items(total_work_items_),
+        total_n_elems(total_n_elems_),
+        f(f_) {}
+
+ private:
+  int total_work_items;
+  int total_n_elems;
+  func_t f;
+};
+
+template <int n_elems_per_work_item, typename func_t>
 void _unfold_backward_elementwise_kernel(int total_n_elems, func_t f) {
   int total_work_items =
       (total_n_elems + n_elems_per_work_item - 1) / n_elems_per_work_item;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(
-        sycl::range<1>(total_work_items), [=](sycl::item<1> itemId) {
-          int idx = itemId.get_linear_id();
-#pragma unroll
-          for (int i = 0; i < n_elems_per_work_item; ++i) {
-            if (idx < total_n_elems) {
-              f(idx);
-              idx += total_work_items;
-            }
-          }
-        });
+    UnfoldBackwardElementwiseKernelFunctor<n_elems_per_work_item, func_t> kfn(
+        total_work_items, total_n_elems, f);
+    cgh.parallel_for(sycl::range<1>(total_work_items), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

@@ -21,6 +21,108 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t, typename accscalar_t>
+struct UpsampleBilinear2dOutFrameKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto in_ptr = in_data;
+    auto out_ptr = out_data;
+    int index = item.get_global_linear_id();
+
+    if (index < n) {
+      const int output_x = index % output_width;
+      const int output_y = index / output_width;
+
+      const accscalar_t h1r = area_pixel_compute_source_index<scalar_t>(
+          rheight, output_y, align_corners, /*cubic=*/false);
+      const int h1 = h1r;
+      const int h1p = (h1 < input_height - 1) ? 1 : 0;
+      const accscalar_t h1lambda = h1r - h1;
+      const accscalar_t h0lambda = static_cast<accscalar_t>(1) - h1lambda;
+
+      const accscalar_t w1r = area_pixel_compute_source_index<scalar_t>(
+          rwidth, output_x, align_corners, /*cubic=*/false);
+      const int w1 = w1r;
+      const int w1p = (w1 < input_width - 1) ? 1 : 0;
+      const accscalar_t w1lambda = w1r - w1;
+      const accscalar_t w0lambda = static_cast<accscalar_t>(1) - w1lambda;
+
+      for (int n = 0; n < nbatch; n++) {
+        for (int c = 0; c < channels; ++c) {
+          auto val = h0lambda *
+                  (w0lambda *
+                       in_ptr
+                           [n * input_height * input_width * channels +
+                            c * input_height * input_width + h1 * input_width +
+                            w1] +
+
+                   w1lambda *
+                       in_ptr
+                           [n * input_height * input_width * channels +
+                            c * input_height * input_width + h1 * input_width +
+                            w1 + w1p]) +
+
+              h1lambda *
+                  (w0lambda *
+                       in_ptr
+                           [n * input_height * input_width * channels +
+                            c * input_height * input_width +
+                            (h1 + h1p) * input_width + w1] +
+
+                   w1lambda *
+                       in_ptr
+                           [n * input_height * input_width * channels +
+                            c * input_height * input_width +
+                            (h1 + h1p) * input_width + w1 + w1p]);
+
+          out_ptr
+              [n * output_height * output_width * channels +
+               c * output_height * output_width + output_y * output_width +
+               output_x] = val;
+        }
+      }
+    }
+  }
+  UpsampleBilinear2dOutFrameKernelFunctor(
+      const int n_,
+      const accscalar_t rheight_,
+      const accscalar_t rwidth_,
+      const bool align_corners_,
+      scalar_t* in_data_,
+      scalar_t* out_data_,
+      int64_t input_height_,
+      int64_t input_width_,
+      int64_t output_height_,
+      int64_t output_width_,
+      int64_t nbatch_,
+      int64_t channels_)
+      : n(n_),
+        rheight(rheight_),
+        rwidth(rwidth_),
+        align_corners(align_corners_),
+        in_data(in_data_),
+        out_data(out_data_),
+        input_height(input_height_),
+        input_width(input_width_),
+        output_height(output_height_),
+        output_width(output_width_),
+        nbatch(nbatch_),
+        channels(channels_) {}
+
+ private:
+  const int n;
+  const accscalar_t rheight;
+  const accscalar_t rwidth;
+  const bool align_corners;
+  scalar_t* in_data;
+  scalar_t* out_data;
+  int64_t input_height;
+  int64_t input_width;
+  int64_t output_height;
+  int64_t output_width;
+  int64_t nbatch;
+  int64_t channels;
+};
+
+template <typename scalar_t, typename accscalar_t>
 void upsample_bilinear2d_out_frame(
     const int n,
     const accscalar_t rheight,
@@ -42,65 +144,19 @@ void upsample_bilinear2d_out_frame(
     auto in_data = idata;
     auto out_data = odata;
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto in_ptr = idata;
-      auto out_ptr = out_data;
-      int index = item.get_global_linear_id();
-
-      if (index < n) {
-        const int output_x = index % output_width;
-        const int output_y = index / output_width;
-
-        const accscalar_t h1r = area_pixel_compute_source_index<scalar_t>(
-            rheight, output_y, align_corners, /*cubic=*/false);
-        const int h1 = h1r;
-        const int h1p = (h1 < input_height - 1) ? 1 : 0;
-        const accscalar_t h1lambda = h1r - h1;
-        const accscalar_t h0lambda = static_cast<accscalar_t>(1) - h1lambda;
-
-        const accscalar_t w1r = area_pixel_compute_source_index<scalar_t>(
-            rwidth, output_x, align_corners, /*cubic=*/false);
-        const int w1 = w1r;
-        const int w1p = (w1 < input_width - 1) ? 1 : 0;
-        const accscalar_t w1lambda = w1r - w1;
-        const accscalar_t w0lambda = static_cast<accscalar_t>(1) - w1lambda;
-
-        for (int n = 0; n < nbatch; n++) {
-          for (int c = 0; c < channels; ++c) {
-            auto val = h0lambda *
-                    (w0lambda *
-                         in_ptr
-                             [n * input_height * input_width * channels +
-                              c * input_height * input_width +
-                              h1 * input_width + w1] +
-
-                     w1lambda *
-                         in_ptr
-                             [n * input_height * input_width * channels +
-                              c * input_height * input_width +
-                              h1 * input_width + w1 + w1p]) +
-
-                h1lambda *
-                    (w0lambda *
-                         in_ptr
-                             [n * input_height * input_width * channels +
-                              c * input_height * input_width +
-                              (h1 + h1p) * input_width + w1] +
-
-                     w1lambda *
-                         in_ptr
-                             [n * input_height * input_width * channels +
-                              c * input_height * input_width +
-                              (h1 + h1p) * input_width + w1 + w1p]);
-
-            out_ptr
-                [n * output_height * output_width * channels +
-                 c * output_height * output_width + output_y * output_width +
-                 output_x] = val;
-          }
-        }
-      }
-    };
+    UpsampleBilinear2dOutFrameKernelFunctor<scalar_t, accscalar_t> kfn(
+        n,
+        rheight,
+        rwidth,
+        align_corners,
+        in_data,
+        out_data,
+        input_height,
+        input_width,
+        output_height,
+        output_width,
+        nbatch,
+        channels);
 
     cgh.parallel_for(
         sycl::nd_range<1>(
@@ -118,6 +174,106 @@ size_t idx(
     const size_t x) {
   return (nc * height + y) * width + x;
 }
+
+template <typename scalar_t, typename accscalar_t>
+struct UpsampleBilinear2dBackwardOutFrameKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto in_ptr = in_data;
+    auto out_ptr = out_data;
+
+    for (size_t index =
+             item.get_local_id(0) + item.get_group(0) * item.get_local_range(0);
+         index < o_numel;
+         index += item.get_local_range(0) * item.get_group_range(0)) {
+      size_t index_temp = index;
+      const int w2 = index_temp % output_width;
+      index_temp /= output_width;
+      const int h2 = index_temp % output_height;
+      const size_t nc = index_temp / output_height;
+
+      const accscalar_t h1r = area_pixel_compute_source_index<scalar_t>(
+          rheight, h2, align_corners, /*cubic=*/false);
+      const int h1 = h1r;
+      const int h1p = (h1 < input_height - 1) ? 1 : 0;
+      const accscalar_t h1lambda = h1r - h1;
+      const accscalar_t h0lambda = static_cast<accscalar_t>(1) - h1lambda;
+
+      const accscalar_t w1r = area_pixel_compute_source_index<scalar_t>(
+          rwidth, w2, align_corners, /*cubic=*/false);
+      const int w1 = w1r;
+      const int w1p = (w1 < input_width - 1) ? 1 : 0;
+      const accscalar_t w1lambda = w1r - w1;
+      const accscalar_t w0lambda = static_cast<accscalar_t>(1) - w1lambda;
+
+      const scalar_t d2val = out_data[index];
+
+      atomicAdd(
+          (dpcpp_global_ptr_pt<
+              scalar_t>)(in_ptr + idx(nc, input_height, input_width, h1, w1)),
+          static_cast<scalar_t>(h0lambda * w0lambda * d2val));
+
+      atomicAdd(
+          (dpcpp_global_ptr_pt<
+              scalar_t>)(in_ptr + idx(nc, input_height, input_width, h1, w1 + w1p)),
+          static_cast<scalar_t>(h0lambda * w1lambda * d2val));
+
+      atomicAdd(
+          (dpcpp_global_ptr_pt<
+              scalar_t>)(in_ptr + idx(nc, input_height, input_width, h1 + h1p, w1)),
+          static_cast<scalar_t>(h1lambda * w0lambda * d2val));
+
+      atomicAdd(
+          (dpcpp_global_ptr_pt<
+              scalar_t>)(in_ptr + idx(nc, input_height, input_width, h1 + h1p, w1 + w1p)),
+          static_cast<scalar_t>(h1lambda * w1lambda * d2val));
+    }
+  }
+  UpsampleBilinear2dBackwardOutFrameKernelFunctor(
+      const size_t nc_,
+      int64_t input_height_,
+      int64_t input_width_,
+      int64_t output_height_,
+      int64_t output_width_,
+      int64_t nbatch_,
+      int64_t channels_,
+      const accscalar_t rheight_,
+      const accscalar_t rwidth_,
+      const bool align_corners_,
+      scalar_t* in_data_,
+      const scalar_t* out_data_,
+      const size_t o_numel_,
+      const size_t i_numel_)
+      : nc(nc_),
+        input_height(input_height_),
+        input_width(input_width_),
+        output_height(output_height_),
+        output_width(output_width_),
+        nbatch(nbatch_),
+        channels(channels_),
+        rheight(rheight_),
+        rwidth(rwidth_),
+        align_corners(align_corners_),
+        in_data(in_data_),
+        out_data(out_data_),
+        o_numel(o_numel_),
+        i_numel(i_numel_) {}
+
+ private:
+  const size_t nc;
+  int64_t input_height;
+  int64_t input_width;
+  int64_t output_height;
+  int64_t output_width;
+  int64_t nbatch;
+  int64_t channels;
+  const accscalar_t rheight;
+  const accscalar_t rwidth;
+  const bool align_corners;
+  scalar_t* in_data;
+  const scalar_t* out_data;
+  const size_t o_numel;
+  const size_t i_numel;
+};
 
 template <typename scalar_t, typename accscalar_t>
 void upsample_bilinear2d_backward_out_frame(
@@ -145,57 +301,21 @@ void upsample_bilinear2d_backward_out_frame(
     auto in_data = idata;
     auto out_data = odata;
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto in_ptr = in_data;
-      auto out_ptr = out_data;
-
-      for (size_t index = item.get_local_id(0) +
-               item.get_group(0) * item.get_local_range(0);
-           index < o_numel;
-           index += item.get_local_range(0) * item.get_group_range(0)) {
-        size_t index_temp = index;
-        const int w2 = index_temp % output_width;
-        index_temp /= output_width;
-        const int h2 = index_temp % output_height;
-        const size_t nc = index_temp / output_height;
-
-        const accscalar_t h1r = area_pixel_compute_source_index<scalar_t>(
-            rheight, h2, align_corners, /*cubic=*/false);
-        const int h1 = h1r;
-        const int h1p = (h1 < input_height - 1) ? 1 : 0;
-        const accscalar_t h1lambda = h1r - h1;
-        const accscalar_t h0lambda = static_cast<accscalar_t>(1) - h1lambda;
-
-        const accscalar_t w1r = area_pixel_compute_source_index<scalar_t>(
-            rwidth, w2, align_corners, /*cubic=*/false);
-        const int w1 = w1r;
-        const int w1p = (w1 < input_width - 1) ? 1 : 0;
-        const accscalar_t w1lambda = w1r - w1;
-        const accscalar_t w0lambda = static_cast<accscalar_t>(1) - w1lambda;
-
-        const scalar_t d2val = odata[index];
-
-        atomicAdd(
-            (dpcpp_global_ptr_pt<
-                scalar_t>)(in_ptr + idx(nc, input_height, input_width, h1, w1)),
-            static_cast<scalar_t>(h0lambda * w0lambda * d2val));
-
-        atomicAdd(
-            (dpcpp_global_ptr_pt<
-                scalar_t>)(in_ptr + idx(nc, input_height, input_width, h1, w1 + w1p)),
-            static_cast<scalar_t>(h0lambda * w1lambda * d2val));
-
-        atomicAdd(
-            (dpcpp_global_ptr_pt<
-                scalar_t>)(in_ptr + idx(nc, input_height, input_width, h1 + h1p, w1)),
-            static_cast<scalar_t>(h1lambda * w0lambda * d2val));
-
-        atomicAdd(
-            (dpcpp_global_ptr_pt<
-                scalar_t>)(in_ptr + idx(nc, input_height, input_width, h1 + h1p, w1 + w1p)),
-            static_cast<scalar_t>(h1lambda * w1lambda * d2val));
-      }
-    };
+    UpsampleBilinear2dBackwardOutFrameKernelFunctor<scalar_t, accscalar_t> kfn(
+        nc,
+        input_height,
+        input_width,
+        output_height,
+        output_width,
+        nbatch,
+        channels,
+        rheight,
+        rwidth,
+        align_corners,
+        in_data,
+        out_data,
+        o_numel,
+        i_numel);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(num_groups * 1024), sycl::range<1>(1024)),
