@@ -11,6 +11,35 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename input_t, typename output_t>
+struct ConvertIndicesFromCooToCsrKernelDpcppFunctor {
+  void operator()(sycl::nd_item<1> itemId) const {
+    auto linear_id = itemId.get_global_linear_id();
+    if (linear_id == 0) {
+      for (int64_t i = 0; i <= data_in[0]; i++)
+        data_out[i] = static_cast<output_t>(0);
+    } else if (linear_id < numel) {
+      for (int64_t i = data_in[linear_id - 1]; i < data_in[linear_id]; i++)
+        data_out[i + 1] = static_cast<output_t>(linear_id);
+    } else if (linear_id == numel) {
+      for (int64_t i = data_in[numel - 1] + 1; i < size + 1; i++)
+        data_out[i] = static_cast<output_t>(numel);
+    }
+  }
+  ConvertIndicesFromCooToCsrKernelDpcppFunctor(
+      int64_t numel_,
+      const input_t* data_in_,
+      output_t* data_out_,
+      const int64_t size_)
+      : numel(numel_), data_in(data_in_), data_out(data_out_), size(size_) {}
+
+ private:
+  int64_t numel;
+  const input_t* data_in;
+  output_t* data_out;
+  const int64_t size;
+};
+
+template <typename input_t, typename output_t>
 void convert_indices_from_coo_to_csr_kernel_dpcpp(
     const Tensor& result,
     const Tensor& input,
@@ -30,25 +59,38 @@ void convert_indices_from_coo_to_csr_kernel_dpcpp(
   const auto ngroups = (numel + wgroup_size - 1) / wgroup_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
+    ConvertIndicesFromCooToCsrKernelDpcppFunctor<input_t, output_t> kfn(
+        numel, data_in, data_out, size);
     cgh.parallel_for(
-        sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size),
-        [=](sycl::nd_item<1> itemId) {
-          auto linear_id = itemId.get_global_linear_id();
-          if (linear_id == 0) {
-            for (int64_t i = 0; i <= data_in[0]; i++)
-              data_out[i] = static_cast<output_t>(0);
-          } else if (linear_id < numel) {
-            for (int64_t i = data_in[linear_id - 1]; i < data_in[linear_id];
-                 i++)
-              data_out[i + 1] = static_cast<output_t>(linear_id);
-          } else if (linear_id == numel) {
-            for (int64_t i = data_in[numel - 1] + 1; i < size + 1; i++)
-              data_out[i] = static_cast<output_t>(numel);
-          }
-        });
+        sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
+
+template <typename input_t, typename output_t>
+struct ConvertIndicesFromCsrToCooKernelDpcppFunctor {
+  void operator()(sycl::nd_item<1> itemId) const {
+    int64_t linear_id = itemId.get_global_linear_id();
+    if (linear_id < nrows) {
+      for (int64_t i = crow_indices_data_in[linear_id];
+           i < crow_indices_data_in[linear_id + 1];
+           i++)
+        data_out[i] = static_cast<output_t>(linear_id);
+    }
+  }
+  ConvertIndicesFromCsrToCooKernelDpcppFunctor(
+      int64_t nrows_,
+      const input_t* crow_indices_data_in_,
+      output_t* data_out_)
+      : nrows(nrows_),
+        crow_indices_data_in(crow_indices_data_in_),
+        data_out(data_out_) {}
+
+ private:
+  int64_t nrows;
+  const input_t* crow_indices_data_in;
+  output_t* data_out;
+};
 
 template <typename input_t, typename output_t>
 void convert_indices_from_csr_to_coo_kernel_dpcpp(
@@ -77,17 +119,10 @@ void convert_indices_from_csr_to_coo_kernel_dpcpp(
   const auto ngroups = (nrows + wgroup_size - 1) / wgroup_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
+    ConvertIndicesFromCsrToCooKernelDpcppFunctor<input_t, output_t> kfn(
+        nrows, crow_indices_data_in, data_out);
     cgh.parallel_for(
-        sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size),
-        [=](sycl::nd_item<1> itemId) {
-          int64_t linear_id = itemId.get_global_linear_id();
-          if (linear_id < nrows) {
-            for (int64_t i = crow_indices_data_in[linear_id];
-                 i < crow_indices_data_in[linear_id + 1];
-                 i++)
-              data_out[i] = static_cast<output_t>(linear_id);
-          }
-        });
+        sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }

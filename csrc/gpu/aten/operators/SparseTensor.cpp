@@ -162,6 +162,60 @@ SparseTensor to_sparse(
 namespace AtenIpexTypeSparseXPU {
 namespace impl {
 
+template <typename scalar_t, typename accscalar_t>
+struct CoalesceValuesKernelFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    auto segment_offsets_ptr = segment_offsets_data;
+    auto value_indices_ptr = value_indices_data;
+    auto values_ptr = values_data;
+    auto newValues_ptr = newValues_data;
+
+    int seg = item.get_global_id()[0];
+
+    if (seg < newNnz) {
+      const int newValueRow = seg * stride;
+      const int begin = segment_offsets_ptr[seg];
+      const int end = (seg < newNnz - 1) ? segment_offsets_ptr[seg + 1] : nnz;
+      const int featureDim = item.get_global_id()[1];
+
+      accscalar_t tmp = 0;
+      for (int row = begin; row < end; row++) {
+        const int valueRow = ((int)value_indices_ptr[row]) * stride;
+        if (featureDim < stride) {
+          tmp += static_cast<accscalar_t>(values_ptr[valueRow + featureDim]);
+        }
+      }
+      if (featureDim < stride) {
+        newValues_ptr[newValueRow + featureDim] = static_cast<scalar_t>(tmp);
+      }
+    }
+  }
+  CoalesceValuesKernelFunctor(
+      int64_t nnz_,
+      int64_t newNnz_,
+      int64_t stride_,
+      int64_t* segment_offsets_data_,
+      int64_t* value_indices_data_,
+      scalar_t* values_data_,
+      scalar_t* newValues_data_)
+      : nnz(nnz_),
+        newNnz(newNnz_),
+        stride(stride_),
+        segment_offsets_data(segment_offsets_data_),
+        value_indices_data(value_indices_data_),
+        values_data(values_data_),
+        newValues_data(newValues_data_) {}
+
+ private:
+  int64_t nnz;
+  int64_t newNnz;
+  int64_t stride;
+  int64_t* segment_offsets_data;
+  int64_t* value_indices_data;
+  scalar_t* values_data;
+  scalar_t* newValues_data;
+};
+
 template <typename scalar_t>
 void coalesce_values_kernel(
     Tensor segment_offsets,
@@ -182,32 +236,14 @@ void coalesce_values_kernel(
     auto value_indices_data = value_indices.data_ptr<int64_t>();
     auto values_data = values.data_ptr<scalar_t>();
     auto newValues_data = newValues.data_ptr<scalar_t>();
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-      auto segment_offsets_ptr = segment_offsets_data;
-      auto value_indices_ptr = value_indices_data;
-      auto values_ptr = values_data;
-      auto newValues_ptr = newValues_data;
-
-      int seg = item.get_global_id()[0];
-
-      if (seg < newNnz) {
-        const int newValueRow = seg * stride;
-        const int begin = segment_offsets_ptr[seg];
-        const int end = (seg < newNnz - 1) ? segment_offsets_ptr[seg + 1] : nnz;
-        const int featureDim = item.get_global_id()[1];
-
-        accscalar_t tmp = 0;
-        for (int row = begin; row < end; row++) {
-          const int valueRow = ((int)value_indices_ptr[row]) * stride;
-          if (featureDim < stride) {
-            tmp += static_cast<accscalar_t>(values_ptr[valueRow + featureDim]);
-          }
-        }
-        if (featureDim < stride) {
-          newValues_ptr[newValueRow + featureDim] = static_cast<scalar_t>(tmp);
-        }
-      }
-    };
+    CoalesceValuesKernelFunctor<scalar_t, accscalar_t> kfn(
+        nnz,
+        newNnz,
+        stride,
+        segment_offsets_data,
+        value_indices_data,
+        values_data,
+        newValues_data);
 
     // kick off kernel
     cgh.parallel_for(

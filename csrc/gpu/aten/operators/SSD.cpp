@@ -20,6 +20,55 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t, typename accscalar_t>
+struct LocationsToBoxesKernelImplFunctor {
+  void operator()(sycl::nd_item<1> item_id) const {
+    auto index = item_id.get_global_linear_id();
+    auto local_index = item_id.get_local_id(0);
+
+    auto location_elm = static_cast<accscalar_t>(locations_ptr[index]);
+    auto prior_elm_x = static_cast<accscalar_t>(priors_ptr[index + 2]);
+    auto prior_elm_y = static_cast<accscalar_t>(priors_ptr[index]);
+    if (local_index % 4 < 2) {
+      local_boxes_buf[local_index] =
+          location_elm * center_variance * prior_elm_x + prior_elm_y;
+    } else {
+      local_boxes_buf[local_index] =
+          Numerics<accscalar_t>::exp(location_elm * size_variance) *
+          prior_elm_y;
+    }
+    item_id.barrier(sycl::access::fence_space::local_space);
+    if (local_index % 4 < 2) {
+      ret_ptr[index] = static_cast<scalar_t>(
+          local_boxes_buf[local_index] - local_boxes_buf[local_index + 2] / 2);
+    } else {
+      ret_ptr[index] = static_cast<scalar_t>(
+          local_boxes_buf[local_index - 2] + local_boxes_buf[local_index] / 2);
+    }
+  }
+  LocationsToBoxesKernelImplFunctor(
+      scalar_t* locations_ptr_,
+      scalar_t* priors_ptr_,
+      scalar_t* ret_ptr_,
+      float center_variance_,
+      float size_variance_,
+      dpcpp_local_acc_t<accscalar_t> local_boxes_buf_)
+      : locations_ptr(locations_ptr_),
+        priors_ptr(priors_ptr_),
+        ret_ptr(ret_ptr_),
+        center_variance(center_variance_),
+        size_variance(size_variance_),
+        local_boxes_buf(local_boxes_buf_) {}
+
+ private:
+  scalar_t* locations_ptr;
+  scalar_t* priors_ptr;
+  scalar_t* ret_ptr;
+  float center_variance;
+  float size_variance;
+  dpcpp_local_acc_t<accscalar_t> local_boxes_buf;
+};
+
 // Fuse small ops in the end of SSD-MobileNetv1, python frontend code is:
 //
 //  def locations_to_boxes(locations, priors, center_variance, size_variance):
@@ -58,34 +107,14 @@ void locations_to_boxes_kernel_impl(
   using accscalar_t = acc_type<scalar_t>;
   auto cgf = DPCPP_Q_CGF(cgh) {
     dpcpp_local_acc_t<accscalar_t> local_boxes_buf(group_size, cgh);
-    cgh.parallel_for(
-        sycl::nd_range<1>{global_range, local_range},
-        [=](sycl::nd_item<1> item_id) {
-          auto index = item_id.get_global_linear_id();
-          auto local_index = item_id.get_local_id(0);
-
-          auto location_elm = static_cast<accscalar_t>(locations_ptr[index]);
-          auto prior_elm_x = static_cast<accscalar_t>(priors_ptr[index + 2]);
-          auto prior_elm_y = static_cast<accscalar_t>(priors_ptr[index]);
-          if (local_index % 4 < 2) {
-            local_boxes_buf[local_index] =
-                location_elm * center_variance * prior_elm_x + prior_elm_y;
-          } else {
-            local_boxes_buf[local_index] =
-                Numerics<accscalar_t>::exp(location_elm * size_variance) *
-                prior_elm_y;
-          }
-          item_id.barrier(sycl::access::fence_space::local_space);
-          if (local_index % 4 < 2) {
-            ret_ptr[index] = static_cast<scalar_t>(
-                local_boxes_buf[local_index] -
-                local_boxes_buf[local_index + 2] / 2);
-          } else {
-            ret_ptr[index] = static_cast<scalar_t>(
-                local_boxes_buf[local_index - 2] +
-                local_boxes_buf[local_index] / 2);
-          }
-        });
+    LocationsToBoxesKernelImplFunctor<scalar_t, accscalar_t> kfn(
+        locations_ptr,
+        priors_ptr,
+        ret_ptr,
+        center_variance,
+        size_variance,
+        local_boxes_buf);
+    cgh.parallel_for(sycl::nd_range<1>{global_range, local_range}, kfn);
   };
   DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }

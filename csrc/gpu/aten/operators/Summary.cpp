@@ -36,6 +36,72 @@ static IndexType getBin(
   return bin;
 }
 
+template <
+    typename output_t,
+    typename input_t,
+    typename IndexType,
+    int ADims,
+    bool has_weight,
+    typename Op>
+struct kernelHistogram1DKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    auto out_ptr = out_data;
+    auto in_ptr = in_data;
+    auto weight_ptr = weight_data;
+
+    auto linearIndex = item_id.get_id(0);
+    // Convert `linearIndex` into an offset of `b`
+    const IndexType bOffset =
+        IndexToOffset<input_t, IndexType>::get(linearIndex, b);
+    const auto bVal = in_ptr[bOffset];
+    if (bVal >= minvalue && bVal <= maxvalue) {
+      // Use value at `b` as an offset of `a`
+      const IndexType bin =
+          getBin<input_t, IndexType>(bVal, minvalue, maxvalue, nbins);
+      const IndexType aOffset = IndexToOffset<output_t, IndexType>::get(bin, a);
+      atomicAdd(
+          (dpcpp_global_ptr_pt<output_t>)&out_ptr[aOffset],
+          getOp(weight_ptr, linearIndex));
+    }
+  }
+  kernelHistogram1DKernelFunctor(
+      TensorInfo<output_t, IndexType> a_,
+      TensorInfo<input_t, IndexType> b_,
+      TensorInfo<output_t, IndexType> c_,
+      int nbins_,
+      input_t minvalue_,
+      input_t maxvalue_,
+      IndexType totalElements_,
+      Op getOp_,
+      output_t* out_data_,
+      input_t* in_data_,
+      output_t* weight_data_)
+      : a(a_),
+        b(b_),
+        c(c_),
+        nbins(nbins_),
+        minvalue(minvalue_),
+        maxvalue(maxvalue_),
+        totalElements(totalElements_),
+        getOp(getOp_),
+        out_data(out_data_),
+        in_data(in_data_),
+        weight_data(weight_data_) {}
+
+ private:
+  TensorInfo<output_t, IndexType> a;
+  TensorInfo<input_t, IndexType> b;
+  TensorInfo<output_t, IndexType> c;
+  int nbins;
+  input_t minvalue;
+  input_t maxvalue;
+  IndexType totalElements;
+  Op getOp;
+  output_t* out_data;
+  input_t* in_data;
+  output_t* weight_data;
+};
+
 /*
   Kernel for computing the histogram of the input.
  */
@@ -62,27 +128,24 @@ void kernelHistogram1D(
     auto in_data = b.data;
     auto weight_data = c.data;
 
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      auto out_ptr = out_data;
-      auto in_ptr = in_data;
-      auto weight_ptr = weight_data;
-
-      auto linearIndex = item_id.get_id(0);
-      // Convert `linearIndex` into an offset of `b`
-      const IndexType bOffset =
-          IndexToOffset<input_t, IndexType>::get(linearIndex, b);
-      const auto bVal = in_ptr[bOffset];
-      if (bVal >= minvalue && bVal <= maxvalue) {
-        // Use value at `b` as an offset of `a`
-        const IndexType bin =
-            getBin<input_t, IndexType>(bVal, minvalue, maxvalue, nbins);
-        const IndexType aOffset =
-            IndexToOffset<output_t, IndexType>::get(bin, a);
-        atomicAdd(
-            (dpcpp_global_ptr_pt<output_t>)&out_ptr[aOffset],
-            getOp(weight_ptr, linearIndex));
-      }
-    };
+    kernelHistogram1DKernelFunctor<
+        output_t,
+        input_t,
+        IndexType,
+        ADims,
+        has_weight,
+        Op>
+        kfn(a,
+            b,
+            c,
+            nbins,
+            minvalue,
+            maxvalue,
+            totalElements,
+            getOp,
+            out_data,
+            in_data,
+            weight_data);
 
     __cgh.parallel_for(sycl::range</*dim=*/1>(totalElements), kfn);
   };

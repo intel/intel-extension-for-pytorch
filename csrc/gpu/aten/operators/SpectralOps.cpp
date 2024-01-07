@@ -79,6 +79,33 @@ struct HermitianSymmetryOffsetCalculator {
 };
 
 template <typename scalar_t, typename inp_calc_t, typename out_calc_t>
+struct FFTConjugateCopyKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    auto in_offset = ic.get(item_id)[0];
+    auto out_offset = oc.get(item_id)[0];
+    out_data[out_offset] = std::conj(in_data[in_offset]);
+  }
+  FFTConjugateCopyKernelFunctor(
+      int64_t numel_,
+      scalar_t* out_data_,
+      const scalar_t* in_data_,
+      inp_calc_t ic_,
+      out_calc_t oc_)
+      : numel(numel_),
+        out_data(out_data_),
+        in_data(in_data_),
+        ic(ic_),
+        oc(oc_) {}
+
+ private:
+  int64_t numel;
+  scalar_t* out_data;
+  const scalar_t* in_data;
+  inp_calc_t ic;
+  out_calc_t oc;
+};
+
+template <typename scalar_t, typename inp_calc_t, typename out_calc_t>
 void _fft_conjugate_copy_kernel(
     int64_t numel,
     scalar_t* out_data,
@@ -89,11 +116,8 @@ void _fft_conjugate_copy_kernel(
   int thread_num = numel;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      auto in_offset = ic.get(item_id)[0];
-      auto out_offset = oc.get(item_id)[0];
-      out_data[out_offset] = std::conj(in_data[in_offset]);
-    };
+    FFTConjugateCopyKernelFunctor<scalar_t, inp_calc_t, out_calc_t> kfn(
+        numel, out_data, in_data, ic, oc);
 
     cgh.parallel_for(sycl::range</*dim=*/1>(thread_num), kfn);
   };
