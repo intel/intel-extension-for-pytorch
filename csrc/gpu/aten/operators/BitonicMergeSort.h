@@ -92,6 +92,143 @@ inline uint64_t last_power2(uint64_t n) {
 } // namespace impl
 
 template <typename KeyType, typename ValueType, typename CompFunc>
+struct BitonicMergeSortKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto item_id = item.get_local_id(0);
+    auto batch = item.get_group(0);
+    auto outer = batch / inner_sz;
+    auto inner = batch % inner_sz;
+
+    // batch_off: input global memory offset
+    // batch_off_: temp global memory offset
+    auto batch_off = outer * sort_sz * inner_sz + inner;
+    // transpose if using temp global memory
+    // (outer, sort, inner) -> (outer, inner, sort)
+    // outer * bitonic_sort_sz * inner_sz + inner ->
+    // outer * inner_sz * bitonic_sort_sz + inner * bitonic_sort_sz
+    auto batch_off_ =
+        outer * inner_sz * bitonic_sort_sz + inner * bitonic_sort_sz;
+
+    // adjacent block is in inverse order for final global bitonic merge
+    bool inverse_order = false;
+    for (unsigned int blk = 0; blk < bitonic_sort_sz;
+         blk += bitonic_blk_sort_sz) {
+      auto blk_off = batch_off + blk * inner_sz;
+      auto blk_off_ = batch_off_ + blk;
+
+      if (/* must be a sliced case, (sliced && */ blk >= sort_sz) {
+        for (auto loc = item_id; loc < bitonic_blk_sort_sz; loc += local_sz) {
+          auto gbl_off_ = blk_off_ + loc;
+          g_key_[gbl_off_] = pad_k;
+          g_val_[gbl_off_] = 0;
+        }
+      } else {
+        for (auto loc = item_id; loc < bitonic_blk_sort_sz; loc += local_sz) {
+          auto loc_off = loc;
+          auto gbl_off = blk_off + loc * inner_sz;
+          s_key[loc_off] = (blk + loc < sort_sz) ? g_key[gbl_off] : pad_k;
+          s_val[loc_off] = (blk + loc < sort_sz) ? g_val[gbl_off]
+                                                 : static_cast<ValueType>(0);
+        }
+
+        impl::bitonic_sort<KeyType, ValueType, dpcpp_local_fence>(
+            item,
+            s_key.template get_multi_ptr<sycl::access::decorated::no>().get(),
+            s_val.template get_multi_ptr<sycl::access::decorated::no>().get(),
+            comp_t,
+            bitonic_blk_sort_sz,
+            /* stride */ 1,
+            inverse_order);
+
+        for (auto loc = item_id; loc < bitonic_blk_sort_sz; loc += local_sz) {
+          auto loc_off = loc;
+          if (sliced) {
+            auto gbl_off_ = blk_off_ + loc;
+            g_key_[gbl_off_] = s_key[loc_off];
+            g_val_[gbl_off_] = s_val[loc_off];
+          } else if (blk + loc < sort_sz) {
+            auto gbl_off = blk_off + loc * inner_sz;
+            g_key[gbl_off] = s_key[loc_off];
+            g_val[gbl_off] = s_val[loc_off];
+          }
+        }
+
+        inverse_order = !inverse_order;
+      }
+    }
+
+    // global merge if needed
+    if (sliced) {
+      impl::bitonic_sort<KeyType, ValueType, dpcpp_global_fence>(
+          item,
+          g_key_ + batch_off_,
+          g_val_ + batch_off_,
+          comp_t,
+          bitonic_sort_sz,
+          /* transposed for contiguous */ 1,
+          /* inverse_order */ false,
+          bitonic_blk_sort_sz * 2);
+
+      // transpose back
+      for (auto loc = item_id; loc < sort_sz; loc += local_sz) {
+        auto gbl_off = batch_off + loc * inner_sz;
+        auto gbl_off_ = batch_off_ + loc;
+        g_key[gbl_off] = g_key_[gbl_off_];
+        g_val[gbl_off] = g_val_[gbl_off_];
+      }
+    }
+  }
+  BitonicMergeSortKernelFunctor(
+      const size_t sort_sz_,
+      const size_t outer_sz_,
+      const size_t inner_sz_,
+      const KeyType pad_k_,
+      const CompFunc comp_t_,
+      size_t bitonic_sort_sz_,
+      size_t local_sz_,
+      size_t bitonic_blk_sort_sz_,
+      bool sliced_,
+      KeyType* g_key_,
+      ValueType* g_val_,
+      KeyType* g_key__,
+      ValueType* g_val__,
+      dpcpp_local_acc_t<KeyType> s_key_,
+      dpcpp_local_acc_t<ValueType> s_val_)
+      : sort_sz(sort_sz_),
+        outer_sz(outer_sz_),
+        inner_sz(inner_sz_),
+        pad_k(pad_k_),
+        comp_t(comp_t_),
+        bitonic_sort_sz(bitonic_sort_sz_),
+        local_sz(local_sz_),
+        bitonic_blk_sort_sz(bitonic_blk_sort_sz_),
+        sliced(sliced_),
+        g_key(g_key_),
+        g_val(g_val_),
+        g_key_(g_key__),
+        g_val_(g_val__),
+        s_key(s_key_),
+        s_val(s_val_) {}
+
+ private:
+  const size_t sort_sz;
+  const size_t outer_sz;
+  const size_t inner_sz;
+  const KeyType pad_k;
+  const CompFunc comp_t;
+  size_t bitonic_sort_sz;
+  size_t local_sz;
+  size_t bitonic_blk_sort_sz;
+  bool sliced;
+  KeyType* g_key;
+  ValueType* g_val;
+  KeyType* g_key_;
+  ValueType* g_val_;
+  dpcpp_local_acc_t<KeyType> s_key;
+  dpcpp_local_acc_t<ValueType> s_val;
+};
+
+template <typename KeyType, typename ValueType, typename CompFunc>
 void bitonic_merge_sort_kernel(
     KeyType* key,
     ValueType* val,
@@ -143,92 +280,22 @@ void bitonic_merge_sort_kernel(
   auto cgf = DPCPP_Q_CGF(h) {
     auto s_key = dpcpp_local_acc_t<KeyType>(bitonic_blk_sort_sz, h);
     auto s_val = dpcpp_local_acc_t<ValueType>(bitonic_blk_sort_sz, h);
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto item_id = item.get_local_id(0);
-      auto batch = item.get_group(0);
-      auto outer = batch / inner_sz;
-      auto inner = batch % inner_sz;
-
-      // batch_off: input global memory offset
-      // batch_off_: temp global memory offset
-      auto batch_off = outer * sort_sz * inner_sz + inner;
-      // transpose if using temp global memory
-      // (outer, sort, inner) -> (outer, inner, sort)
-      // outer * bitonic_sort_sz * inner_sz + inner ->
-      // outer * inner_sz * bitonic_sort_sz + inner * bitonic_sort_sz
-      auto batch_off_ =
-          outer * inner_sz * bitonic_sort_sz + inner * bitonic_sort_sz;
-
-      // adjacent block is in inverse order for final global bitonic merge
-      bool inverse_order = false;
-      for (unsigned int blk = 0; blk < bitonic_sort_sz;
-           blk += bitonic_blk_sort_sz) {
-        auto blk_off = batch_off + blk * inner_sz;
-        auto blk_off_ = batch_off_ + blk;
-
-        if (/* must be a sliced case, (sliced && */ blk >= sort_sz) {
-          for (auto loc = item_id; loc < bitonic_blk_sort_sz; loc += local_sz) {
-            auto gbl_off_ = blk_off_ + loc;
-            g_key_[gbl_off_] = pad_k;
-            g_val_[gbl_off_] = 0;
-          }
-        } else {
-          for (auto loc = item_id; loc < bitonic_blk_sort_sz; loc += local_sz) {
-            auto loc_off = loc;
-            auto gbl_off = blk_off + loc * inner_sz;
-            s_key[loc_off] = (blk + loc < sort_sz) ? g_key[gbl_off] : pad_k;
-            s_val[loc_off] = (blk + loc < sort_sz) ? g_val[gbl_off]
-                                                   : static_cast<ValueType>(0);
-          }
-
-          impl::bitonic_sort<KeyType, ValueType, dpcpp_local_fence>(
-              item,
-              s_key.template get_multi_ptr<sycl::access::decorated::no>().get(),
-              s_val.template get_multi_ptr<sycl::access::decorated::no>().get(),
-              comp_t,
-              bitonic_blk_sort_sz,
-              /* stride */ 1,
-              inverse_order);
-
-          for (auto loc = item_id; loc < bitonic_blk_sort_sz; loc += local_sz) {
-            auto loc_off = loc;
-            if (sliced) {
-              auto gbl_off_ = blk_off_ + loc;
-              g_key_[gbl_off_] = s_key[loc_off];
-              g_val_[gbl_off_] = s_val[loc_off];
-            } else if (blk + loc < sort_sz) {
-              auto gbl_off = blk_off + loc * inner_sz;
-              g_key[gbl_off] = s_key[loc_off];
-              g_val[gbl_off] = s_val[loc_off];
-            }
-          }
-
-          inverse_order = !inverse_order;
-        }
-      }
-
-      // global merge if needed
-      if (sliced) {
-        impl::bitonic_sort<KeyType, ValueType, dpcpp_global_fence>(
-            item,
-            g_key_ + batch_off_,
-            g_val_ + batch_off_,
-            comp_t,
-            bitonic_sort_sz,
-            /* transposed for contiguous */ 1,
-            /* inverse_order */ false,
-            bitonic_blk_sort_sz * 2);
-
-        // transpose back
-        for (auto loc = item_id; loc < sort_sz; loc += local_sz) {
-          auto gbl_off = batch_off + loc * inner_sz;
-          auto gbl_off_ = batch_off_ + loc;
-          g_key[gbl_off] = g_key_[gbl_off_];
-          g_val[gbl_off] = g_val_[gbl_off_];
-        }
-      }
-    };
-
+    BitonicMergeSortKernelFunctor<KeyType, ValueType, CompFunc> kfn(
+        sort_sz,
+        outer_sz,
+        inner_sz,
+        pad_k,
+        comp_t,
+        bitonic_sort_sz,
+        local_sz,
+        bitonic_blk_sort_sz,
+        sliced,
+        g_key,
+        g_val,
+        g_key_,
+        g_val_,
+        s_key,
+        s_val);
     h.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(outer_sz * inner_sz * local_sz),

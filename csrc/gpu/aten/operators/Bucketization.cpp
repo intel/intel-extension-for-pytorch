@@ -76,6 +76,71 @@ int64_t cus_upper_bound(
 }
 
 template <typename input_t, typename output_t>
+struct SearchsortedDpcppContiguousKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto data_in = data_in_data;
+    auto data_bd = data_bd_data;
+    auto data_out = data_out_data;
+
+    for (int64_t i = item.get_global_id(0); i < numel_in;
+         i += item.get_global_range()[0]) {
+      // If boundaries tensor is 1d, we always search the entire boundary
+      // tensor
+      int64_t start_bd = is_1d_boundaries ? 0 : i / idim_in * idim_bd;
+      int64_t end_bd = start_bd + idim_bd;
+
+      int64_t pos = !right
+          ? cus_lower_bound(start_bd, end_bd, data_in[i], data_bd, data_st) -
+              start_bd
+          : cus_upper_bound(start_bd, end_bd, data_in[i], data_bd, data_st) -
+              start_bd;
+
+      // type conversion might happen here
+      data_out[i] = pos;
+    }
+  }
+  SearchsortedDpcppContiguousKernelFunctor(
+      const bool right_,
+      int64_t numel_in_,
+      int64_t idim_in_,
+      int64_t idim_bd_,
+      const input_t* data_in_,
+      const input_t* data_bd_,
+      const int64_t* data_st_,
+      output_t* data_out_,
+      bool is_1d_boundaries_,
+      input_t* data_in_data_,
+      input_t* data_bd_data_,
+      output_t* data_out_data_)
+      : right(right_),
+        numel_in(numel_in_),
+        idim_in(idim_in_),
+        idim_bd(idim_bd_),
+        data_in(data_in_),
+        data_bd(data_bd_),
+        data_st(data_st_),
+        data_out(data_out_),
+        is_1d_boundaries(is_1d_boundaries_),
+        data_in_data(data_in_data_),
+        data_bd_data(data_bd_data_),
+        data_out_data(data_out_data_) {}
+
+ private:
+  const bool right;
+  int64_t numel_in;
+  int64_t idim_in;
+  int64_t idim_bd;
+  const input_t* data_in;
+  const input_t* data_bd;
+  const int64_t* data_st;
+  output_t* data_out;
+  bool is_1d_boundaries;
+  input_t* data_in_data;
+  input_t* data_bd_data;
+  output_t* data_out_data;
+};
+
+template <typename input_t, typename output_t>
 void searchsorted_dpcpp_contiguous(
     Tensor& result,
     const Tensor& input,
@@ -118,29 +183,19 @@ void searchsorted_dpcpp_contiguous(
     auto data_in_data = input.data_ptr<input_t>();
     auto data_bd_data = boundaries.data_ptr<input_t>();
     auto data_out_data = result.data_ptr<output_t>();
-
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto data_in = data_in_data;
-      auto data_bd = data_bd_data;
-      auto data_out = data_out_data;
-
-      for (int64_t i = item.get_global_id(0); i < numel_in;
-           i += item.get_global_range()[0]) {
-        // If boundaries tensor is 1d, we always search the entire boundary
-        // tensor
-        int64_t start_bd = is_1d_boundaries ? 0 : i / idim_in * idim_bd;
-        int64_t end_bd = start_bd + idim_bd;
-
-        int64_t pos = !right
-            ? cus_lower_bound(start_bd, end_bd, data_in[i], data_bd, data_st) -
-                start_bd
-            : cus_upper_bound(start_bd, end_bd, data_in[i], data_bd, data_st) -
-                start_bd;
-
-        // type conversion might happen here
-        data_out[i] = pos;
-      }
-    };
+    SearchsortedDpcppContiguousKernelFunctor<input_t, output_t> kfn(
+        right,
+        numel_in,
+        idim_in,
+        idim_bd,
+        data_in,
+        data_bd,
+        data_st,
+        data_out,
+        is_1d_boundaries,
+        data_in_data,
+        data_bd_data,
+        data_out_data);
     // kick off kernel
     cgh.parallel_for(
         sycl::nd_range<1>(sycl::range<1>(grng), sycl::range<1>(tile_size)),
