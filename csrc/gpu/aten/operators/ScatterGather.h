@@ -261,6 +261,37 @@ struct alignas(N) OpaqueType {
 };
 
 template <typename func_t>
+struct LaunchScatterGatherKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int nv = work_group_size * thread_work_size;
+    auto wg_id = item.get_group_linear_id();
+    auto local_id = item.get_local_linear_id();
+    int idx = nv * wg_id + local_id;
+    for (int i = 0; i < thread_work_size; ++i) {
+      if (idx < N) {
+        f(idx);
+        idx += work_group_size;
+      }
+    }
+  }
+  LaunchScatterGatherKernelFunctor(
+      int work_group_size_,
+      int thread_work_size_,
+      int64_t N_,
+      const func_t& f_)
+      : work_group_size(work_group_size_),
+        thread_work_size(thread_work_size_),
+        N(N_),
+        f(f_) {}
+
+ private:
+  int work_group_size;
+  int thread_work_size;
+  int64_t N;
+  const func_t f;
+};
+
+template <typename func_t>
 static void _launch_scatter_gather_kernel(int64_t N, const func_t& f) {
   TORCH_INTERNAL_ASSERT(N >= 0 && N <= std::numeric_limits<int32_t>::max());
   if (N == 0) {
@@ -286,18 +317,8 @@ static void _launch_scatter_gather_kernel(int64_t N, const func_t& f) {
   int thread_work_size = draft_work_group_num / work_group_num + 1;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      int nv = work_group_size * thread_work_size;
-      auto wg_id = item.get_group_linear_id();
-      auto local_id = item.get_local_linear_id();
-      int idx = nv * wg_id + local_id;
-      for (int i = 0; i < thread_work_size; ++i) {
-        if (idx < N) {
-          f(idx);
-          idx += work_group_size;
-        }
-      }
-    };
+    LaunchScatterGatherKernelFunctor<func_t> kfn(
+        work_group_size, thread_work_size, N, f);
     cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(work_group_size * work_group_num),

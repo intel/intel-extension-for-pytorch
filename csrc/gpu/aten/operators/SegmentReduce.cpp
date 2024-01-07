@@ -11,6 +11,44 @@ namespace impl {
 enum SegmentReductionType { MAX, MEAN, MIN, SUM, PROD };
 
 template <typename scalar_t, typename index_t>
+struct PostSumDivKernelFunctor {
+  void operator()(sycl::nd_item<1> itemId) const {
+    int64_t linear_id = itemId.get_global_linear_id();
+    if (linear_id < segment_count) {
+      SYCL_KERNEL_ASSERT(lengths_data[index] >= 0);
+      if (lengths_data[linear_id] == 0) {
+        if (is_initial_set) {
+          output_data[linear_id] = initial;
+        } else {
+          output_data[linear_id] = NAN;
+        }
+      } else if (!Numerics<scalar_t>::isnan(output_data[linear_id])) {
+        output_data[linear_id] =
+            output_data[linear_id] / lengths_data[linear_id];
+      }
+    }
+  }
+  PostSumDivKernelFunctor(
+      scalar_t* output_data_,
+      const index_t* lengths_data_,
+      const int64_t segment_count_,
+      bool is_initial_set_,
+      scalar_t initial_)
+      : output_data(output_data_),
+        lengths_data(lengths_data_),
+        segment_count(segment_count_),
+        is_initial_set(is_initial_set_),
+        initial(initial_) {}
+
+ private:
+  scalar_t* output_data;
+  const index_t* lengths_data;
+  const int64_t segment_count;
+  bool is_initial_set;
+  scalar_t initial;
+};
+
+template <typename scalar_t, typename index_t>
 // TODO: for optimize output 1D future.
 static void post_sum_div_kernel(
     scalar_t* output_data,
@@ -24,27 +62,127 @@ static void post_sum_div_kernel(
   const auto ngroups = (segment_count + wgroup_size - 1) / wgroup_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
+    PostSumDivKernelFunctor<scalar_t, index_t> kfn(
+        output_data, lengths_data, segment_count, is_initial_set, initial);
     cgh.parallel_for(
-        sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size),
-        [=](sycl::nd_item<1> itemId) {
-          int64_t linear_id = itemId.get_global_linear_id();
-          if (linear_id < segment_count) {
-            SYCL_KERNEL_ASSERT(lengths_data[index] >= 0);
-            if (lengths_data[linear_id] == 0) {
-              if (is_initial_set) {
-                output_data[linear_id] = initial;
-              } else {
-                output_data[linear_id] = NAN;
-              }
-            } else if (!Numerics<scalar_t>::isnan(output_data[linear_id])) {
-              output_data[linear_id] =
-                  output_data[linear_id] / lengths_data[linear_id];
-            }
-          }
-        });
+        sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
+
+template <typename scalar_t, typename index_t>
+struct SegmentReduceForwardKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int64_t idx = item.get_global_linear_id();
+    auto initial_value = initial_value_raw;
+    if (idx >= size) {
+      return;
+    }
+    int64_t row_id = idx / inner_offset;
+    int64_t lane_id = idx % inner_offset; // lane_id is the inner_idx
+    int64_t outer_idx = row_id / segment_count;
+    int64_t dim_idx = row_id % segment_count;
+
+    int64_t offset_idx =
+        outer_idx * lengths_cumsum_stride_axis * (segment_count + 1) + dim_idx;
+    index_t offset_start = lengths_cumsum_data[offset_idx];
+    index_t offset_end = lengths_cumsum_data[offset_idx + 1];
+
+    // ===== step2: apply reduction
+    for (index_t j = offset_start; j < offset_end; ++j) {
+      int64_t data_index = outer_idx * data_stride_axis * data_size_axis +
+          j * data_stride_axis + lane_id;
+      const auto data = values_data[data_index];
+      // TODO: There is no need to branch with every element
+      if (reduction == SegmentReductionType::MAX) {
+        initial_value = Numerics<scalar_t>::isnan(data)
+            ? data
+            : std::max<scalar_t>(initial_value, data);
+      } else if (
+          reduction == SegmentReductionType::MEAN ||
+          reduction == SegmentReductionType::SUM) {
+        initial_value = initial_value + data;
+      } else if (reduction == SegmentReductionType::MIN) {
+        initial_value = Numerics<scalar_t>::isnan(data)
+            ? data
+            : std::min<scalar_t>(initial_value, data);
+      } else if (reduction == SegmentReductionType::PROD) {
+        initial_value = initial_value * data;
+      }
+    }
+
+    // ===== step3: finalize reduction
+    int64_t lengths_idx =
+        outer_idx * lengths_stride_axis * segment_count + dim_idx;
+    SYCL_KERNEL_ASSERT(lengths_data[lengths_idx] >= 0);
+    if (lengths_data[lengths_idx] == 0 && !is_initial_set &&
+        reduction == SegmentReductionType::MEAN) {
+      initial_value = static_cast<scalar_t>(NAN);
+    } else if (
+        reduction == SegmentReductionType::MEAN &&
+        lengths_data[lengths_idx] > 0 &&
+        !Numerics<scalar_t>::isnan(initial_value)) {
+      initial_value = initial_value / lengths_data[lengths_idx];
+    }
+    int64_t output_index = outer_idx * output_stride_axis * output_size_axis +
+        dim_idx * output_stride_axis + lane_id;
+    output_data[output_index] = initial_value;
+  }
+  SegmentReduceForwardKernelFunctor(
+      SegmentReductionType reduction_,
+      scalar_t* output_data_,
+      scalar_t* values_data_,
+      const index_t* lengths_data_,
+      const index_t* lengths_cumsum_data_,
+      const int64_t segment_count_,
+      const int64_t lengths_stride_axis_,
+      bool is_initial_set_,
+      scalar_t initial_value_raw_,
+      const int64_t outer_offset_,
+      const int64_t inner_offset_,
+      const int64_t data_stride_axis_,
+      const int64_t data_size_axis_,
+      const int64_t output_stride_axis_,
+      const int64_t output_size_axis_,
+      const int64_t lengths_cumsum_stride_axis_,
+      const int64_t size_)
+      : reduction(reduction_),
+        output_data(output_data_),
+        values_data(values_data_),
+        lengths_data(lengths_data_),
+        lengths_cumsum_data(lengths_cumsum_data_),
+        segment_count(segment_count_),
+        lengths_stride_axis(lengths_stride_axis_),
+        is_initial_set(is_initial_set_),
+        initial_value_raw(initial_value_raw_),
+        outer_offset(outer_offset_),
+        inner_offset(inner_offset_),
+        data_stride_axis(data_stride_axis_),
+        data_size_axis(data_size_axis_),
+        output_stride_axis(output_stride_axis_),
+        output_size_axis(output_size_axis_),
+        lengths_cumsum_stride_axis(lengths_cumsum_stride_axis_),
+        size(size_) {}
+
+ private:
+  SegmentReductionType reduction;
+  scalar_t* output_data;
+  scalar_t* values_data;
+  const index_t* lengths_data;
+  const index_t* lengths_cumsum_data;
+  const int64_t segment_count;
+  const int64_t lengths_stride_axis;
+  bool is_initial_set;
+  scalar_t initial_value_raw;
+  const int64_t outer_offset;
+  const int64_t inner_offset;
+  const int64_t data_stride_axis;
+  const int64_t data_size_axis;
+  const int64_t output_stride_axis;
+  const int64_t output_size_axis;
+  const int64_t lengths_cumsum_stride_axis;
+  const int64_t size;
+};
 
 template <typename scalar_t, typename index_t>
 void segment_reduce_forward_kernel(
@@ -68,63 +206,24 @@ void segment_reduce_forward_kernel(
   const int64_t work_group_size = xpu::dpcpp::dpcppMaxWorkGroupSize();
   const int64_t work_group_num = (size + work_group_size - 1) / work_group_size;
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      int64_t idx = item.get_global_linear_id();
-      auto initial_value = initial_value_raw;
-      if (idx >= size) {
-        return;
-      }
-      int64_t row_id = idx / inner_offset;
-      int64_t lane_id = idx % inner_offset; // lane_id is the inner_idx
-      int64_t outer_idx = row_id / segment_count;
-      int64_t dim_idx = row_id % segment_count;
-
-      int64_t offset_idx =
-          outer_idx * lengths_cumsum_stride_axis * (segment_count + 1) +
-          dim_idx;
-      index_t offset_start = lengths_cumsum_data[offset_idx];
-      index_t offset_end = lengths_cumsum_data[offset_idx + 1];
-
-      // ===== step2: apply reduction
-      for (index_t j = offset_start; j < offset_end; ++j) {
-        int64_t data_index = outer_idx * data_stride_axis * data_size_axis +
-            j * data_stride_axis + lane_id;
-        const auto data = values_data[data_index];
-        // TODO: There is no need to branch with every element
-        if (reduction == SegmentReductionType::MAX) {
-          initial_value = Numerics<scalar_t>::isnan(data)
-              ? data
-              : std::max<scalar_t>(initial_value, data);
-        } else if (
-            reduction == SegmentReductionType::MEAN ||
-            reduction == SegmentReductionType::SUM) {
-          initial_value = initial_value + data;
-        } else if (reduction == SegmentReductionType::MIN) {
-          initial_value = Numerics<scalar_t>::isnan(data)
-              ? data
-              : std::min<scalar_t>(initial_value, data);
-        } else if (reduction == SegmentReductionType::PROD) {
-          initial_value = initial_value * data;
-        }
-      }
-
-      // ===== step3: finalize reduction
-      int64_t lengths_idx =
-          outer_idx * lengths_stride_axis * segment_count + dim_idx;
-      SYCL_KERNEL_ASSERT(lengths_data[lengths_idx] >= 0);
-      if (lengths_data[lengths_idx] == 0 && !is_initial_set &&
-          reduction == SegmentReductionType::MEAN) {
-        initial_value = static_cast<scalar_t>(NAN);
-      } else if (
-          reduction == SegmentReductionType::MEAN &&
-          lengths_data[lengths_idx] > 0 &&
-          !Numerics<scalar_t>::isnan(initial_value)) {
-        initial_value = initial_value / lengths_data[lengths_idx];
-      }
-      int64_t output_index = outer_idx * output_stride_axis * output_size_axis +
-          dim_idx * output_stride_axis + lane_id;
-      output_data[output_index] = initial_value;
-    };
+    SegmentReduceForwardKernelFunctor<scalar_t, index_t> kfn(
+        reduction,
+        output_data,
+        values_data,
+        lengths_data,
+        lengths_cumsum_data,
+        segment_count,
+        lengths_stride_axis,
+        is_initial_set,
+        initial_value_raw,
+        outer_offset,
+        inner_offset,
+        data_stride_axis,
+        data_size_axis,
+        output_stride_axis,
+        output_size_axis,
+        lengths_cumsum_stride_axis,
+        size);
 
     cgh.parallel_for(
         sycl::nd_range<1>(
@@ -136,6 +235,159 @@ void segment_reduce_forward_kernel(
   auto& dpcpp_queue = xpu::dpcpp::dpcppGetCurrentQueue();
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
+
+template <typename scalar_t, typename index_t>
+struct SegmentReduceBackwardKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int64_t idx = item.get_global_linear_id();
+    if (idx >= size) {
+      return;
+    }
+    if (idx >= size) {
+      return;
+    }
+    int64_t row_id = idx / inner_offset;
+    int64_t lane_id = idx % inner_offset; // lane_id is the inner_idx
+    int64_t outer_idx = row_id / segment_count;
+    int64_t dim_idx = row_id % segment_count;
+
+    int64_t lengths_idx =
+        outer_idx * lengths_stride_axis * segment_count + dim_idx;
+    auto segment_length = lengths_data[lengths_idx];
+    if (segment_length == 0) {
+      return;
+    }
+
+    int64_t offset_idx =
+        outer_idx * lengths_cumsum_stride_axis * (segment_count + 1) + dim_idx;
+    index_t offset_start = lengths_cumsum_data[offset_idx];
+    index_t offset_end = lengths_cumsum_data[offset_idx + 1];
+
+    int64_t output_index = outer_idx * output_stride_axis * output_size_axis +
+        dim_idx * output_stride_axis + lane_id;
+
+    if (reduction == SegmentReductionType::MAX ||
+        reduction == SegmentReductionType::MIN) {
+      int64_t counter = 0;
+      for (int64_t j = offset_start; j < offset_end; ++j) {
+        int64_t data_index = outer_idx * data_stride_axis * data_size_axis +
+            j * data_stride_axis + lane_id;
+        if (Numerics<scalar_t>::isnan(values_data[data_index]) ||
+            values_data[data_index] == output_data[output_index]) {
+          grad_input_data[data_index] = grad_data[output_index];
+          counter++;
+        }
+      }
+      // Average gradient based on number of maximum elements in the
+      // segment
+      if (counter < 2) {
+        return;
+      }
+      for (int64_t j = offset_start; j < offset_end; ++j) {
+        int64_t data_index = outer_idx * data_stride_axis * data_size_axis +
+            j * data_stride_axis + lane_id;
+        if (grad_input_data[data_index] > 0) {
+          grad_input_data[data_index] = grad_input_data[data_index] / counter;
+        }
+      }
+    } else if (reduction == SegmentReductionType::MEAN) {
+      auto grad_val = grad_data[output_index] / segment_length;
+      for (int64_t j = offset_start; j < offset_end; ++j) {
+        int64_t data_index = outer_idx * data_stride_axis * data_size_axis +
+            j * data_stride_axis + lane_id;
+        grad_input_data[data_index] = grad_val;
+      }
+    } else if (reduction == SegmentReductionType::SUM) {
+      const auto& grad_val = grad_data[output_index];
+      for (int64_t j = offset_start; j < offset_end; ++j) {
+        int64_t data_index = outer_idx * data_stride_axis * data_size_axis +
+            j * data_stride_axis + lane_id;
+        grad_input_data[data_index] = grad_val;
+      }
+    } else if (reduction == SegmentReductionType::PROD) {
+      const auto& grad_val =
+          grad_data[output_index] * output_data[output_index];
+      for (int64_t j = offset_start; j < offset_end; ++j) {
+        int64_t data_index = outer_idx * data_stride_axis * data_size_axis +
+            j * data_stride_axis + lane_id;
+        if (Numerics<scalar_t>::isnan(values_data[data_index]) ||
+            values_data[data_index] == 0) {
+          // explicitly compute exclusive prod
+          scalar_t exclusive_prod = initial_prod_value;
+          int64_t prod_idx;
+          for (int64_t k = offset_start; k < offset_end; ++k) {
+            if (k != j) {
+              prod_idx = outer_idx * data_stride_axis * data_size_axis +
+                  k * data_stride_axis + lane_id;
+              exclusive_prod *= values_data[prod_idx];
+            }
+          }
+          grad_input_data[data_index] =
+              grad_data[output_index] * exclusive_prod;
+        } else {
+          grad_input_data[data_index] = grad_val / values_data[data_index];
+        }
+      }
+    }
+  }
+  SegmentReduceBackwardKernelFunctor(
+      SegmentReductionType reduction_,
+      scalar_t* grad_input_data_,
+      scalar_t* grad_data_,
+      scalar_t* output_data_,
+      const scalar_t* values_data_,
+      const index_t* lengths_data_,
+      const index_t* lengths_cumsum_data_,
+      const int64_t segment_count_,
+      const int64_t lengths_stride_axis_,
+      scalar_t initial_prod_value_,
+      const int64_t outer_offset_,
+      const int64_t inner_offset_,
+      const int64_t data_stride_axis_,
+      const int64_t data_size_axis_,
+      const int64_t output_stride_axis_,
+      const int64_t output_size_axis_,
+      const int64_t lengths_cumsum_stride_axis_,
+      const int64_t size_)
+      : reduction(reduction_),
+        grad_input_data(grad_input_data_),
+        grad_data(grad_data_),
+        output_data(output_data_),
+        values_data(values_data_),
+        lengths_data(lengths_data_),
+        lengths_cumsum_data(lengths_cumsum_data_),
+        segment_count(segment_count_),
+        lengths_stride_axis(lengths_stride_axis_),
+        initial_prod_value(initial_prod_value_),
+        outer_offset(outer_offset_),
+        inner_offset(inner_offset_),
+        data_stride_axis(data_stride_axis_),
+        data_size_axis(data_size_axis_),
+        output_stride_axis(output_stride_axis_),
+        output_size_axis(output_size_axis_),
+        lengths_cumsum_stride_axis(lengths_cumsum_stride_axis_),
+        size(size_) {}
+
+ private:
+  SegmentReductionType reduction;
+  scalar_t* grad_input_data;
+  scalar_t* grad_data;
+  scalar_t* output_data;
+  const scalar_t* values_data;
+  const index_t* lengths_data;
+  const index_t* lengths_cumsum_data;
+  const int64_t segment_count;
+  const int64_t lengths_stride_axis;
+  scalar_t initial_prod_value;
+  const int64_t outer_offset;
+  const int64_t inner_offset;
+  const int64_t data_stride_axis;
+  const int64_t data_size_axis;
+  const int64_t output_stride_axis;
+  const int64_t output_size_axis;
+  const int64_t lengths_cumsum_stride_axis;
+  const int64_t size;
+};
 
 template <typename scalar_t, typename index_t>
 void segment_reduce_backward_kernel(
@@ -161,99 +413,25 @@ void segment_reduce_backward_kernel(
   const int64_t work_group_num = (size + work_group_size - 1) / work_group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      int64_t idx = item.get_global_linear_id();
-      if (idx >= size) {
-        return;
-      }
-      if (idx >= size) {
-        return;
-      }
-      int64_t row_id = idx / inner_offset;
-      int64_t lane_id = idx % inner_offset; // lane_id is the inner_idx
-      int64_t outer_idx = row_id / segment_count;
-      int64_t dim_idx = row_id % segment_count;
-
-      int64_t lengths_idx =
-          outer_idx * lengths_stride_axis * segment_count + dim_idx;
-      auto segment_length = lengths_data[lengths_idx];
-      if (segment_length == 0) {
-        return;
-      }
-
-      int64_t offset_idx =
-          outer_idx * lengths_cumsum_stride_axis * (segment_count + 1) +
-          dim_idx;
-      index_t offset_start = lengths_cumsum_data[offset_idx];
-      index_t offset_end = lengths_cumsum_data[offset_idx + 1];
-
-      int64_t output_index = outer_idx * output_stride_axis * output_size_axis +
-          dim_idx * output_stride_axis + lane_id;
-
-      if (reduction == SegmentReductionType::MAX ||
-          reduction == SegmentReductionType::MIN) {
-        int64_t counter = 0;
-        for (int64_t j = offset_start; j < offset_end; ++j) {
-          int64_t data_index = outer_idx * data_stride_axis * data_size_axis +
-              j * data_stride_axis + lane_id;
-          if (Numerics<scalar_t>::isnan(values_data[data_index]) ||
-              values_data[data_index] == output_data[output_index]) {
-            grad_input_data[data_index] = grad_data[output_index];
-            counter++;
-          }
-        }
-        // Average gradient based on number of maximum elements in the
-        // segment
-        if (counter < 2) {
-          return;
-        }
-        for (int64_t j = offset_start; j < offset_end; ++j) {
-          int64_t data_index = outer_idx * data_stride_axis * data_size_axis +
-              j * data_stride_axis + lane_id;
-          if (grad_input_data[data_index] > 0) {
-            grad_input_data[data_index] = grad_input_data[data_index] / counter;
-          }
-        }
-      } else if (reduction == SegmentReductionType::MEAN) {
-        auto grad_val = grad_data[output_index] / segment_length;
-        for (int64_t j = offset_start; j < offset_end; ++j) {
-          int64_t data_index = outer_idx * data_stride_axis * data_size_axis +
-              j * data_stride_axis + lane_id;
-          grad_input_data[data_index] = grad_val;
-        }
-      } else if (reduction == SegmentReductionType::SUM) {
-        const auto& grad_val = grad_data[output_index];
-        for (int64_t j = offset_start; j < offset_end; ++j) {
-          int64_t data_index = outer_idx * data_stride_axis * data_size_axis +
-              j * data_stride_axis + lane_id;
-          grad_input_data[data_index] = grad_val;
-        }
-      } else if (reduction == SegmentReductionType::PROD) {
-        const auto& grad_val =
-            grad_data[output_index] * output_data[output_index];
-        for (int64_t j = offset_start; j < offset_end; ++j) {
-          int64_t data_index = outer_idx * data_stride_axis * data_size_axis +
-              j * data_stride_axis + lane_id;
-          if (Numerics<scalar_t>::isnan(values_data[data_index]) ||
-              values_data[data_index] == 0) {
-            // explicitly compute exclusive prod
-            scalar_t exclusive_prod = initial_prod_value;
-            int64_t prod_idx;
-            for (int64_t k = offset_start; k < offset_end; ++k) {
-              if (k != j) {
-                prod_idx = outer_idx * data_stride_axis * data_size_axis +
-                    k * data_stride_axis + lane_id;
-                exclusive_prod *= values_data[prod_idx];
-              }
-            }
-            grad_input_data[data_index] =
-                grad_data[output_index] * exclusive_prod;
-          } else {
-            grad_input_data[data_index] = grad_val / values_data[data_index];
-          }
-        }
-      }
-    };
+    SegmentReduceBackwardKernelFunctor<scalar_t, index_t> kfn(
+        reduction,
+        grad_input_data,
+        grad_data,
+        output_data,
+        values_data,
+        lengths_data,
+        lengths_cumsum_data,
+        segment_count,
+        lengths_stride_axis,
+        initial_prod_value,
+        outer_offset,
+        inner_offset,
+        data_stride_axis,
+        data_size_axis,
+        output_stride_axis,
+        output_size_axis,
+        lengths_cumsum_stride_axis,
+        size);
 
     cgh.parallel_for(
         sycl::nd_range<1>(

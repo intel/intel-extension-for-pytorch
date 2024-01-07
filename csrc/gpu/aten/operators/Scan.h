@@ -1264,35 +1264,74 @@ static inline void launch_segment_scan_with_indices(const SSConfig& cfg) {
 }
 
 template <class SSConfig, bool TrivialIdxCal = false>
+struct AccumulateCarrierKernelFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    auto id = cfg.get_item_desc(item);
+    int64_t si, pi, bi, glb_off, crr_off;
+    if constexpr (TrivialIdxCal) {
+      glb_off = item.get_global_linear_id();
+      crr_off = id.chunk;
+    } else {
+      si = id.glb_batch % cfg.stride_;
+      bi = id.glb_batch / cfg.stride_;
+      pi = id.chunk * id.chunk_size + id.chunk_off;
+      glb_off = si + pi * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
+      crr_off = si + id.chunk * cfg.stride_ + bi * id.chunk_num * cfg.stride_;
+    }
+    if (id.glb_problem < cfg.problem_ && id.glb_batch < cfg.problem_batch_) {
+      cfg.oinfo_.data[glb_off] =
+          cfg.func_(cfg.oinfo_.data[glb_off], cfg.carrier_[crr_off]);
+    }
+  }
+  AccumulateCarrierKernelFunctor(const SSConfig cfg_) : cfg(cfg_) {}
+
+ private:
+  const SSConfig cfg;
+};
+
+template <class SSConfig, bool TrivialIdxCal = false>
 static inline void accumulate_carrier(const SSConfig& cfg) {
   TORCH_CHECK(
       cfg.carrier_ != nullptr, "scan: nullptr carrier in accumulation ...");
   auto& queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-      auto id = cfg.get_item_desc(item);
-      int64_t si, pi, bi, glb_off, crr_off;
-      if constexpr (TrivialIdxCal) {
-        glb_off = item.get_global_linear_id();
-        crr_off = id.chunk;
-      } else {
-        si = id.glb_batch % cfg.stride_;
-        bi = id.glb_batch / cfg.stride_;
-        pi = id.chunk * id.chunk_size + id.chunk_off;
-        glb_off = si + pi * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
-        crr_off = si + id.chunk * cfg.stride_ + bi * id.chunk_num * cfg.stride_;
-      }
-      if (id.glb_problem < cfg.problem_ && id.glb_batch < cfg.problem_batch_) {
-        cfg.oinfo_.data[glb_off] =
-            cfg.func_(cfg.oinfo_.data[glb_off], cfg.carrier_[crr_off]);
-      }
-    };
+    AccumulateCarrierKernelFunctor<SSConfig, TrivialIdxCal> kfn(cfg);
     __cgh.parallel_for(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <class SSConfig, bool TrivialIdxCal = false>
+struct AccumulateCarrierWithIndicesKernelFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    auto id = cfg.get_item_desc(item);
+    int64_t si, pi, bi, glb_off, crr_off;
+    if constexpr (TrivialIdxCal) {
+      glb_off = item.get_global_linear_id();
+      crr_off = id.chunk;
+    } else {
+      si = id.glb_batch % cfg.stride_;
+      bi = id.glb_batch / cfg.stride_;
+      pi = id.chunk * id.chunk_size + id.chunk_off;
+      glb_off = si + pi * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
+      crr_off = si + id.chunk * cfg.stride_ + bi * id.chunk_num * cfg.stride_;
+    }
+    if (id.glb_problem < cfg.problem_ && id.glb_batch < cfg.problem_batch_) {
+      binary_op_update(
+          cfg.carrier_[crr_off],
+          cfg.oinfo_.data[glb_off],
+          cfg.carrier_idx_[crr_off],
+          cfg.idxinfo_.data[glb_off],
+          cfg.func_);
+    }
+  }
+  AccumulateCarrierWithIndicesKernelFunctor(const SSConfig cfg_) : cfg(cfg_) {}
+
+ private:
+  const SSConfig cfg;
+};
 
 template <class SSConfig, bool TrivialIdxCal = false>
 static inline void accumulate_carrier_with_indices(const SSConfig& cfg) {
@@ -1304,28 +1343,7 @@ static inline void accumulate_carrier_with_indices(const SSConfig& cfg) {
   auto& queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-      auto id = cfg.get_item_desc(item);
-      int64_t si, pi, bi, glb_off, crr_off;
-      if constexpr (TrivialIdxCal) {
-        glb_off = item.get_global_linear_id();
-        crr_off = id.chunk;
-      } else {
-        si = id.glb_batch % cfg.stride_;
-        bi = id.glb_batch / cfg.stride_;
-        pi = id.chunk * id.chunk_size + id.chunk_off;
-        glb_off = si + pi * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
-        crr_off = si + id.chunk * cfg.stride_ + bi * id.chunk_num * cfg.stride_;
-      }
-      if (id.glb_problem < cfg.problem_ && id.glb_batch < cfg.problem_batch_) {
-        binary_op_update(
-            cfg.carrier_[crr_off],
-            cfg.oinfo_.data[glb_off],
-            cfg.carrier_idx_[crr_off],
-            cfg.idxinfo_.data[glb_off],
-            cfg.func_);
-      }
-    };
+    AccumulateCarrierWithIndicesKernelFunctor<SSConfig, TrivialIdxCal> kfn(cfg);
     __cgh.parallel_for(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
