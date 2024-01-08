@@ -530,11 +530,18 @@ elif args.ipex_weight_only_quantization:
             position_ids.unsqueeze(0),
         )
     elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.KV_MASK:
-        example_inputs = (
-            input_ids.unsqueeze(0),
-            tuple(global_past_key_value),
-            attention_mask.unsqueeze(0),
-        )
+        if re.search("OPT", config.architectures[0], re.IGNORECASE):
+            example_inputs = (
+                input_ids.unsqueeze(0),
+                attention_mask.unsqueeze(0),
+                tuple(global_past_key_value),
+            )
+        else: 
+            example_inputs = (
+                input_ids.unsqueeze(0),
+                tuple(global_past_key_value),
+                attention_mask.unsqueeze(0),
+            )
     elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_KV_ENC:
         last_hidden_state = torch.rand([1, 32, 2048])
         global_past_key_value = [
