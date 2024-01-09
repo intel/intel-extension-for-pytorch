@@ -4,8 +4,11 @@ import torch
 import torch.nn.functional as F
 import torch.nn.quantized.dynamic as nnqd
 from intel_extension_for_pytorch.nn.functional import interaction
-from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
 import intel_extension_for_pytorch._C as core
+from intel_extension_for_pytorch.utils.utils import has_cpu
+
+if has_cpu():
+    from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
 
 
 functions_supported_by_quantization = set(
@@ -72,7 +75,7 @@ module_types_supported_by_quantization = set(
         # torch.nn.Sigmoid,  # TODO
         # torch.nn.GELU,     # TODO
         torch.nn.EmbeddingBag,
-        MergedEmbeddingBagWithCat,
+        # MergedEmbeddingBagWithCat,
         torch.nn.Flatten,
         torch.nn.LSTM,
         # dynamic quantization module
@@ -80,6 +83,8 @@ module_types_supported_by_quantization = set(
         nnqd.LSTM,
     ]
 )
+if has_cpu():
+    module_types_supported_by_quantization.add(MergedEmbeddingBagWithCat)
 
 may_inplace_module = set(
     [
