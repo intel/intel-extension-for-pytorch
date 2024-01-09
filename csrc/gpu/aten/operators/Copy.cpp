@@ -38,6 +38,66 @@ namespace impl {
                   .check_all_same_dtype(false)  \
                   .check_all_same_device(false) \
                   .build();
+void direct_copy_kernel_gpu(TensorIteratorBase& iter) {
+  ScalarType dtype = iter.common_dtype();
+  if (isQIntType(dtype)) {
+    IPEX_DISPATCH_QINT_TYPES(dtype, "direct_copy_kernel_gpu", [&] {
+      dpcpp_fast_mode_kernel_for_tensor_iter(
+          iter, [=](scalar_t src_val) { return src_val; });
+    });
+  } else {
+    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND6(
+        kBool,
+        kHalf,
+        kBFloat16,
+        kComplexHalf,
+        kFloat8_e4m3fn,
+        kFloat8_e5m2,
+        dtype,
+        "direct_copy_kernel_gpu",
+        [&] {
+          dpcpp_fast_mode_kernel_for_tensor_iter(
+              iter, [=](scalar_t src_val) { return src_val; });
+        });
+  }
+}
+void conj_kernel_gpu(TensorIterator& iter) {
+  AT_DISPATCH_SWITCH(
+      iter.common_dtype(),
+      "conj_kernel_gpu",
+      AT_DISPATCH_CASE_ALL_TYPES_AND3(
+          kBool,
+          kBFloat16,
+          kHalf,
+          [&] {
+            // Conj is a no-op for non-complex types
+            direct_copy_kernel_gpu(iter);
+          })
+          AT_DISPATCH_CASE_COMPLEX_TYPES_AND(
+              kComplexHalf, iter.common_dtype(), "conj_kernel_gpu", [&] {
+                dpcpp_fast_mode_kernel_for_tensor_iter(
+                    iter, [=](scalar_t src_val) { return std::conj(src_val); });
+              }));
+}
+
+void neg_conj_kernel_gpu(TensorIteratorBase& iter) {
+  IPEX_DISPATCH_COMPLEX_TYPES(iter.common_dtype(), "neg_conj_kernel_gpu", [&] {
+    dpcpp_fast_mode_kernel_for_tensor_iter(
+        iter, [=](scalar_t src_val) { return std::conj(-src_val); });
+  });
+}
+void neg_kernel_gpu(TensorIteratorBase& iter) {
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      kHalf,
+      kBFloat16,
+      kComplexHalf,
+      iter.common_dtype(),
+      "neg_kernel_gpu",
+      [&] {
+        dpcpp_fast_mode_kernel_for_tensor_iter(
+            iter, [=](scalar_t src_val) { return -src_val; });
+      });
+}
 
 static bool copy_requires_temporaries(TensorIterator& iter, bool p2p_enabled) {
   Device dst_device = iter.device(0);
@@ -193,58 +253,17 @@ void copy_device_to_device(
     // https://jira.devtools.intel.com/browse/CMPLRLLVM-41292
     memcpyAsync(iter, copy_stream, p2p_enabled);
   } else {
-    auto dtype = iter.dtype(0);
-    if (isQIntType(dtype)) {
-      IPEX_DISPATCH_QINT_TYPES(dtype, "copy_", [&] {
-        dpcpp_fast_mode_kernel_for_tensor_iter(
-            iter, [=](scalar_t src_val) { return src_val; });
-      });
-    } else {
-      if (same_neg) {
-        if (!same_conj && same_type) {
-          IPEX_DISPATCH_COMPLEX_TYPES_AND(
-              kComplexHalf, dtype, "copy_conj", [&] {
-                dpcpp_fast_mode_kernel_for_tensor_iter(
-                    iter, [=](scalar_t src_val) { return std::conj(src_val); });
-              });
-        } else {
-          IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND6(
-              kBool,
-              kHalf,
-              kBFloat16,
-              kComplexHalf,
-              kFloat8_e4m3fn,
-              kFloat8_e5m2,
-              dtype,
-              "copy_",
-              [&] {
-                dpcpp_fast_mode_kernel_for_tensor_iter(
-                    iter, [=](scalar_t src_val) { return src_val; });
-              });
-        }
+    if (same_neg) {
+      if (!same_conj) {
+        conj_kernel_gpu(iter);
       } else {
-        if (!same_conj && same_type) {
-          IPEX_DISPATCH_COMPLEX_TYPES_AND(
-              kComplexHalf, dtype, "copy_conj", [&] {
-                dpcpp_fast_mode_kernel_for_tensor_iter(
-                    iter,
-                    [=](scalar_t src_val) { return std::conj(-src_val); });
-              });
-        } else {
-          IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND6(
-              kBool,
-              kHalf,
-              kBFloat16,
-              kComplexHalf,
-              kFloat8_e4m3fn,
-              kFloat8_e5m2,
-              dtype,
-              "copy_",
-              [&] {
-                dpcpp_fast_mode_kernel_for_tensor_iter(
-                    iter, [=](scalar_t src_val) { return -src_val; });
-              });
-        }
+        direct_copy_kernel_gpu(iter);
+      }
+    } else {
+      if (!same_conj) {
+        neg_conj_kernel_gpu(iter);
+      } else {
+        neg_kernel_gpu(iter);
       }
     }
   }
