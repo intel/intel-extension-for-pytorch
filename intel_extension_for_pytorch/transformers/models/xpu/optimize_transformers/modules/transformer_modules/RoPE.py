@@ -616,8 +616,12 @@ def apply_rotary_pos_emb(query, key, rotary_pos_emb_list):
         rotary_pos_emb = (rotary_pos_emb,) * 2
         q_pos_emb, k_pos_emb = rotary_pos_emb
         # Slice the pos emb for current inference
-        query = _apply_rotary_pos_emb(query, q_pos_emb)
-        key = _apply_rotary_pos_emb(key, k_pos_emb)
+        torch.ops.torch_ipex.apply_rotary_embedding_half(
+            query, q_pos_emb[1], q_pos_emb[0], query
+        )
+        torch.ops.torch_ipex.apply_rotary_embedding_half(
+            key, k_pos_emb[1], k_pos_emb[0], key
+        )
     else:
         query_list = []
         key_list = []
@@ -626,8 +630,15 @@ def apply_rotary_pos_emb(query, key, rotary_pos_emb_list):
             rotary_pos_emb = (rotary_pos_emb,) * 2
             q_pos_emb, k_pos_emb = rotary_pos_emb
             # Slice the pos emb for current inference
-            query_list += [_apply_rotary_pos_emb(query[i : i + 1, :, :], q_pos_emb)]
-            key_list += [_apply_rotary_pos_emb(key[i : i + 1, :, :], k_pos_emb)]
+            q_i, k_i = query[i : i + 1, :, :], key[i : i + 1, :, :]
+            torch.ops.torch_ipex.apply_rotary_embedding_half(
+                q_i, q_pos_emb[1], q_pos_emb[0], q_i
+            )
+            torch.ops.torch_ipex.apply_rotary_embedding_half(
+                k_i, k_pos_emb[1], k_pos_emb[0], k_i
+            )
+            query_list += [q_i]
+            key_list += [k_i]
         query = torch.cat(query_list, dim=0)
         key = torch.cat(key_list, dim=0)
     return query, key
