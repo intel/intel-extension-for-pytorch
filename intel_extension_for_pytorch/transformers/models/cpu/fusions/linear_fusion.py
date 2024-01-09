@@ -3,10 +3,13 @@ from torch import nn
 import math
 import warnings
 import copy
-from intel_extension_for_pytorch.nn.modules import IpexWoqLinear
 from intel_extension_for_pytorch.quantization import (
     get_weight_only_quant_qconfig_mapping,
 )
+from intel_extension_for_pytorch.utils.utils import has_cpu
+
+if has_cpu():
+    from intel_extension_for_pytorch.nn.modules import IpexWoqLinear
 
 
 class _IPEXlinearFusionCPU(nn.Module):
@@ -210,8 +213,10 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
             assert hasattr(module, attr_name)
             self.linear_list.append(getattr(module, attr_name))
         self.concat_linear = None
-        if woq and all(
-            isinstance(linear, IpexWoqLinear) for linear in self.linear_list
+        if (
+            woq
+            and has_cpu()
+            and all(isinstance(linear, IpexWoqLinear) for linear in self.linear_list)
         ):
             # Quantization is done before lowering to CPU.
             # We assume weights are all in shape [N, K] and per-channel quantized, axis = 0.
