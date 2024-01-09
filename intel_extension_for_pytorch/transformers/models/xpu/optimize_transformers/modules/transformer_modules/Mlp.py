@@ -374,10 +374,18 @@ class IPEXTransformerMLPOptimizedFp16SiluQwen(IPEXTransformerMLPOptimizedFp16Sil
         return hidden_states
 
     def out_mm(self, hidden_states, residual=None):
-        hidden_states = self.c_proj(hidden_states)
-        if residual is not None:
-            hidden_states += residual
-        return hidden_states
+        if self.c_proj.bias is None:
+            return torch.ops.torch_ipex.mm_resadd(
+                hidden_states, self.c_proj.weight, residual, 1.0
+            )
+        else:
+            return torch.ops.torch_ipex.mm_bias_resadd(
+                hidden_states, self.c_proj.weight, self.c_proj.bias, 1.0, residual, 1.0
+            )
+        # hidden_states = self.c_proj(hidden_states)
+        # if residual is not None:
+        #     hidden_states += residual
+        # return hidden_states
 
 
 class IPEXTransformerMLPOptimizedInt4Silu(IPEXTransformerMLPOptimizedInt4):
