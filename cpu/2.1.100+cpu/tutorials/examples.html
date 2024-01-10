@@ -335,7 +335,6 @@ Before running these examples, please note the following:</p>
 <section id="distributed-training">
 <h4>Distributed Training<a class="headerlink" href="#distributed-training" title="Permalink to this heading"></a></h4>
 <p>Distributed training with PyTorch DDP is accelerated by oneAPI Collective Communications Library Bindings for Pytorch* (oneCCL Bindings for Pytorch*). The extension supports FP32 and BF16 data types. More detailed information and examples are available at the <a class="reference external" href="https://github.com/intel/torch-ccl">Github repo</a>.</p>
-<p><strong>Note:</strong> When performing distributed training with BF16 data type, use oneCCL Bindings for Pytorch*. Due to a PyTorch limitation, distributed training with BF16 data type with Intel® Extension for PyTorch* is not supported.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch.distributed</span> <span class="k">as</span> <span class="nn">dist</span>
