@@ -1,6 +1,7 @@
 import torch
 import os
 from ._transformers import IPEXEmptyINT4LinearWithPadding
+from intel_extension_for_pytorch.nn.utils._quantize_convert import WeightOnlyLinear
 
 
 def is_int4(model):
@@ -64,8 +65,7 @@ def pad_for_gptj_lm_head(model, is_int4=False):
         return
     else:
         setattr(model, "slicing_pad", True)  # noqa
-    if is_int4:
-        # NOTE: lm_head will not be replaced by WeightOnlyLinear in itrex
+    if is_int4 and isinstance(model.lm_head, WeightOnlyLinear):
         n = model.lm_head.out_features
 
         lm_head_new = IPEXEmptyINT4LinearWithPadding(n)

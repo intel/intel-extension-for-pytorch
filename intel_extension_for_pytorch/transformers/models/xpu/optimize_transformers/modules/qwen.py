@@ -21,6 +21,7 @@ from .transformer_modules.GroupedAttention import (  # noqa F401
 )
 from .transformer_modules.Decoderblock import IPEXTransformerBlock
 from .transformer_modules.Mlp import *  # noqa
+from intel_extension_for_pytorch.nn.utils._quantize_convert import WeightOnlyLinear
 import sys
 
 import os
@@ -191,8 +192,15 @@ class NewIPEXQWENBlock(IPEXTransformerBlock):
         if self.ipex_config.transpose:
             self.transpose_parameter()
         self.attn.cat_qkv()
-        self.module.attn.c_attn.weight.data = self.attn.qkv_proj.weight.data
-        self.module.attn.c_attn.bias.data = self.attn.qkv_proj.bias.data
+        if isinstance(self.module.attn.c_attn, WeightOnlyLinear):
+            self.module.attn.c_attn.qweight.data = self.attn.qkv_proj_quant.weight.data
+            self.module.attn.c_attn.bias.data = self.attn.qkv_proj_quant.bias.data
+            self.module.attn.c_attn.scales.data = self.attn.qkv_proj_quant.scale.data
+            if hasattr(self.module.attn.c_attn, "qzeros"):
+                self.module.attn.c_attn.qzeros.data = self.attn.qkv_proj_quant.zp.data
+        else:
+            self.module.attn.c_attn.weight.data = self.attn.qkv_proj.weight.data
+            self.module.attn.c_attn.bias.data = self.attn.qkv_proj.bias.data
 
     def forward(
         self,
