@@ -1309,17 +1309,15 @@ first_token_masked_mha(
     query = query.transpose(1, 2);
     key = key.transpose(1, 2);
     value = value.transpose(1, 2);
-    attn_outputs =
-        std::get<0>(torch_ipex::cpu::flash_attention_mask_kernel_stub(
-            kCPU,
-            query,
-            key,
-            value,
-            /* dropout */ 0.0,
-            /* is_causal*/ false,
-            /* return_debug_mask */ false,
-            attention_mask,
-            1. / scale_attn));
+    attn_outputs = std::get<0>(torch_ipex::cpu::flash_attention_kernel_stub(
+        kCPU,
+        query,
+        key,
+        value,
+        /* dropout */ 0.0,
+        /* is_causal*/ false,
+        attention_mask,
+        1. / scale_attn));
   } else {
     key = key.permute({0, 2, 1, 3});
     query = query.permute({0, 2, 1, 3});

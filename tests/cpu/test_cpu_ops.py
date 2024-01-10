@@ -1443,49 +1443,34 @@ class CPUOPsTester(TestCase):
                     q2 = q2.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
                     v2 = v2.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
 
-                    if has_attention_mask:
-                        mask = torch.randn(
+                    mask = (
+                        torch.randn(
                             (batch_size, 1, seq_len, seq_len),
                             device="cpu",
                             dtype=dtype,
                             requires_grad=False,
                         )
-                        actual = torch.ops.torch_ipex.flash_attention_mask(
-                            q,
-                            k,
-                            v,
-                            dropout_p=0.0,
-                            is_causal=causal,
-                            return_debug_mask=False,
-                            attention_mask=mask,
-                        )[0]
-                        math_ref = (
-                            torch._scaled_dot_product_attention_math(
-                                q2,
-                                k2,
-                                v2,
-                                attn_mask=mask,
-                                dropout_p=0.0,
-                                is_causal=causal,
-                            )
-                        )[0]
-                    else:
-                        actual = torch._scaled_dot_product_flash_attention(
-                            q,
-                            k,
-                            v,
-                            dropout_p=0.0,
-                            is_causal=causal,
-                            return_debug_mask=False,
-                        )[0]
-                        math_ref = torch._scaled_dot_product_attention_math(
+                        if has_attention_mask
+                        else None
+                    )
+                    actual = torch.ops.torch_ipex.flash_attention(
+                        q,
+                        k,
+                        v,
+                        dropout_p=0.0,
+                        is_causal=causal,
+                        attention_mask=mask,
+                    )[0]
+                    math_ref = (
+                        torch._scaled_dot_product_attention_math(
                             q2,
                             k2,
                             v2,
-                            attn_mask=None,
+                            attn_mask=mask,
                             dropout_p=0.0,
                             is_causal=causal,
-                        )[0]
+                        )
+                    )[0]
 
                     if dtype is torch.bfloat16:
                         math_ref = math_ref.bfloat16()

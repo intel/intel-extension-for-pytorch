@@ -115,6 +115,80 @@ inline c10::SymFloat calculate_scale(
   return c10::SymFloat(softmax_scale);
 }
 
+template <typename scalar_t>
+inline Vectorized<scalar_t> exp_u20(Vectorized<scalar_t> data) {
+  return data.exp_u20();
+}
+#if defined(CPU_CAPABILITY_AVX512)
+// To implement exp_u20 here is faster than calling from add_softmax.h or PT
+// vec512_float.h
+inline Vectorized<float> exp_u20(Vectorized<float> data) {
+  __m512 values = __m512(data);
+  // A faster version of exp with ULP=20
+  static __m512 vec_factorial_1 =
+      _mm512_set1_ps(0.999999701f); // 1/factorial(1)
+  static __m512 vec_factorial_2 =
+      _mm512_set1_ps(0.499991506f); // 1/factorial(2)
+  static __m512 vec_factorial_3 =
+      _mm512_set1_ps(0.166676521f); // 1/factorial(3)
+  static __m512 vec_factorial_4 =
+      _mm512_set1_ps(0.0418978221f); // 1/factorial(4)
+  static __m512 vec_factorial_5 =
+      _mm512_set1_ps(0.00828929059f); // 1/factorial(5)
+  static __m512 vec_exp_log2ef =
+      (__m512)_mm512_set1_epi32(0x3fb8aa3b); // log2(e)
+  static __m512 vec_half = _mm512_set1_ps(0.5f);
+  static __m512 vec_one = _mm512_set1_ps(1.f);
+  static __m512 vec_zero = _mm512_set1_ps(0.f);
+  static __m512 vec_two = _mm512_set1_ps(2.f);
+  static __m512 vec_ln2f = (__m512)_mm512_set1_epi32(0x3f317218); // ln(2)
+  static __m512 vec_ln_flt_min = (__m512)_mm512_set1_epi32(0xc2aeac50);
+  static __m512 vec_ln_flt_max = (__m512)_mm512_set1_epi32(0x42b17218);
+  static __m512i vec_127 = _mm512_set1_epi32(0x0000007f);
+  static int n_mantissa_bits = 23;
+
+  // exp(x) =
+  // = exp(n * ln(2) + r) // divide x by ln(2) and get quot and rem
+  // = 2^n * exp(r) // simplify the exp(n*ln(2)) expression
+
+  auto less_ln_flt_min_mask =
+      _mm512_cmp_ps_mask(values, vec_ln_flt_min, 1 /*_CMP_LT_OS*/);
+  auto vec_src = _mm512_min_ps(values, vec_ln_flt_max);
+  vec_src = _mm512_max_ps(vec_src, vec_ln_flt_min);
+
+  // fx = floorf(x * log2ef + 0.5)
+  auto vec_fx = _mm512_fmadd_ps(vec_src, vec_exp_log2ef, vec_half);
+  auto vec_fx_i = _mm512_cvt_roundps_epi32(
+      vec_fx, _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC);
+  vec_fx = _mm512_cvtepi32_ps(vec_fx_i);
+
+  // x = x - fx * ln2
+  auto vec_exp_poly = _mm512_fnmadd_ps(vec_fx, vec_ln2f, vec_src);
+
+  // compute polynomial
+  auto vec_res =
+      _mm512_fmadd_ps(vec_exp_poly, vec_factorial_5, vec_factorial_4);
+  vec_res = _mm512_fmadd_ps(vec_exp_poly, vec_res, vec_factorial_3);
+  vec_res = _mm512_fmadd_ps(vec_exp_poly, vec_res, vec_factorial_2);
+  vec_res = _mm512_fmadd_ps(vec_exp_poly, vec_res, vec_factorial_1);
+  vec_res = _mm512_fmadd_ps(vec_exp_poly, vec_res, vec_one);
+
+  // compute 2^(n-1)
+  auto vec_exp_number = _mm512_sub_ps(vec_fx, vec_one);
+  auto vec_exp_number_i = _mm512_cvtps_epi32(vec_exp_number);
+  auto vec_two_pow_n_i = _mm512_add_epi32(vec_exp_number_i, vec_127);
+  vec_two_pow_n_i = _mm512_slli_epi32(vec_two_pow_n_i, n_mantissa_bits);
+  auto vec_two_pow_n = (__m512)vec_two_pow_n_i;
+  vec_two_pow_n =
+      _mm512_mask_blend_ps(less_ln_flt_min_mask, vec_two_pow_n, vec_zero);
+
+  // y = y * 2^n
+  vec_res = _mm512_mul_ps(vec_res, vec_two_pow_n);
+  vec_res = _mm512_mul_ps(vec_res, vec_two);
+  return vec_res;
+}
+#endif
+
 // 1) out = exp(a - val)
 // 2) val = sum(out)
 template <typename scalar_t>
@@ -130,7 +204,7 @@ inline void _exp_reduce_sum_fusion_kernel(
   for (long i = 0; i < vec_size * (size / vec_size); i += vec_size) {
     auto tmp0 = at::vec::Vectorized<scalar_t>::loadu(a + i);
     auto tmp1 = tmp0 - vec_max;
-    auto tmp2 = tmp1.exp_u20();
+    auto tmp2 = exp_u20(tmp1);
     vec_tmp_sum += tmp2;
     at::native::_store(out + i, tmp2);
   }
@@ -212,19 +286,11 @@ inline void _mul_reduce_max_fusion_kernel(
  *@template kv_split_size: kv block size
  *@param output: output result
  *@param logsumexp: logsumexp for backward
- *@param cum_seq_q: to adapt pt kernel; not used
- *@param cum_seq_k: to adapt pt kernel; not used
- *@param max_q: to adapt pt kernel; not used
- *@param max_k: to adapt pt kernel; not used
- *@param philox_seed: to adapt pt kernel; not used
- *@param philox_offset: to adapt pt kernel; not used
- *@param debug_attn_mask: to adapt pt kernel; not used
  *@param q: query
  *@param k: key
  *@param v: value
  *@param dropout_p: dropout probability
  *@param is_causal: assume causal attention masking if true
- *@param return_debug_mask
  *@param attention_mask: attention mask
  *@param scale: scaling factor applied prior to softmax
  */
@@ -232,19 +298,11 @@ template <typename scalar_t, int64_t q_split_size, int64_t kv_split_size>
 void cpu_flash_attention(
     const at::Tensor& output,
     const at::Tensor& logsumexp,
-    const at::Tensor& cum_seq_q,
-    const at::Tensor& cum_seq_k,
-    int64_t& max_q,
-    int64_t& max_k,
-    const at::Tensor& philox_seed,
-    const at::Tensor& philox_offset,
-    const at::Tensor& debug_attn_mask,
     const at::Tensor& q,
     const at::Tensor& k,
     const at::Tensor& v,
     double dropout_p,
     bool is_causal,
-    bool return_debug_mask,
     c10::optional<at::Tensor> attention_mask,
     c10::optional<double> scale) {
   // Query (Batch x Num_heads  x Q_seq_len  x Dim_per_head)
@@ -769,126 +827,65 @@ void cpu_flash_attention(
 void flash_attention_kernel_impl(
     const at::Tensor& output,
     const at::Tensor& logsumexp,
-    const at::Tensor& cum_seq_q,
-    const at::Tensor& cum_seq_k,
-    int64_t& max_q,
-    int64_t& max_k,
-    const at::Tensor& philox_seed,
-    const at::Tensor& philox_offset,
-    const at::Tensor& debug_attn_mask,
     const at::Tensor& query,
     const at::Tensor& key,
     const at::Tensor& value,
     double dropout_p,
     bool is_causal,
-    bool return_debug_mask,
     c10::optional<at::Tensor> attention_mask,
     c10::optional<double> scale) {
   auto q_seq_len = query.size(2);
 
   AT_DISPATCH_FLOATING_TYPES_AND(
       kBFloat16, query.scalar_type(), "flash_attention", [&] {
-        if (query.scalar_type() == kBFloat16) {
-          cpu_flash_attention<scalar_t, 32, 512>(
+        if (q_seq_len >= 768) {
+          cpu_flash_attention<scalar_t, 256, 512>(
               output,
               logsumexp,
-              cum_seq_q,
-              cum_seq_k,
-              max_q,
-              max_k,
-              philox_seed,
-              philox_offset,
-              debug_attn_mask,
               query,
               key,
               value,
               dropout_p,
               is_causal,
-              return_debug_mask,
+              attention_mask,
+              scale);
+        } else if (q_seq_len >= 192) {
+          cpu_flash_attention<scalar_t, 64, 512>(
+              output,
+              logsumexp,
+              query,
+              key,
+              value,
+              dropout_p,
+              is_causal,
               attention_mask,
               scale);
         } else {
-          if (q_seq_len >= 768) {
-            cpu_flash_attention<scalar_t, 256, 512>(
-                output,
-                logsumexp,
-                cum_seq_q,
-                cum_seq_k,
-                max_q,
-                max_k,
-                philox_seed,
-                philox_offset,
-                debug_attn_mask,
-                query,
-                key,
-                value,
-                dropout_p,
-                is_causal,
-                return_debug_mask,
-                attention_mask,
-                scale);
-          } else if (q_seq_len >= 192) {
-            cpu_flash_attention<scalar_t, 64, 512>(
-                output,
-                logsumexp,
-                cum_seq_q,
-                cum_seq_k,
-                max_q,
-                max_k,
-                philox_seed,
-                philox_offset,
-                debug_attn_mask,
-                query,
-                key,
-                value,
-                dropout_p,
-                is_causal,
-                return_debug_mask,
-                attention_mask,
-                scale);
-          } else {
-            cpu_flash_attention<scalar_t, 32, 512>(
-                output,
-                logsumexp,
-                cum_seq_q,
-                cum_seq_k,
-                max_q,
-                max_k,
-                philox_seed,
-                philox_offset,
-                debug_attn_mask,
-                query,
-                key,
-                value,
-                dropout_p,
-                is_causal,
-                return_debug_mask,
-                attention_mask,
-                scale);
-          }
+          cpu_flash_attention<scalar_t, 32, 512>(
+              output,
+              logsumexp,
+              query,
+              key,
+              value,
+              dropout_p,
+              is_causal,
+              attention_mask,
+              scale);
         }
       });
 }
 
-std::tuple<
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    c10::SymInt,
-    c10::SymInt,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor>
-flash_attention_kernel_base(
+std::tuple<at::Tensor, at::Tensor> flash_attention_kernel(
     const at::Tensor& query,
     const at::Tensor& key,
     const at::Tensor& value,
     double dropout_p,
     bool is_causal,
-    bool return_debug_mask,
     c10::optional<at::Tensor> attention_mask,
     c10::optional<double> scale) {
+  RECORD_FUNCTION(
+      "torch_ipex::flash_attention_kernel", c10::ArrayRef<c10::IValue>({}));
+
   const auto dtype = query.scalar_type();
   int64_t batchSize = query.size(0);
   int64_t qSize = query.size(2);
@@ -923,126 +920,32 @@ flash_attention_kernel_base(
           (!attention_mask.has_value() ||
            attention_mask.value().stride(-1) == 1),
       "IPEX flash_attention: Q/K/V/Mask should be continuous on the last dim");
-  TORCH_CHECK(
-      return_debug_mask == false,
-      "IPEX flash_attention: Currently do not support 'return_debug_mask'");
 
   at::Tensor output =
       at::empty({batchSize, qSize, num_head, headSize}, query.options());
   const auto accumulate_dtype = at::toOpMathType(dtype);
   at::Tensor logsumexp = at::empty(
       {batchSize, qSize, num_head}, query.options().dtype(accumulate_dtype));
-  at::Tensor cum_seq_q = at::empty({}, at::kLong);
-  at::Tensor cum_seq_k = at::empty({}, at::kLong);
-  int64_t max_q = 0;
-  int64_t max_k = 0;
-  at::Tensor philox_seed = at::empty({}, at::kLong);
-  at::Tensor philox_offset = at::empty({}, at::kLong);
-  at::Tensor debug_attn_mask = at::empty({}, query.options());
 
   flash_attention_kernel_impl(
       output,
       logsumexp,
-      cum_seq_q,
-      cum_seq_k,
-      max_q,
-      max_k,
-      philox_seed,
-      philox_offset,
-      debug_attn_mask,
       query,
       key,
       value,
       dropout_p,
       is_causal,
-      return_debug_mask,
       attention_mask,
       scale);
 
   output = output.transpose(1, 2);
   logsumexp = logsumexp.transpose(1, 2);
 
-  return std::make_tuple(
-      std::move(output),
-      std::move(logsumexp),
-      std::move(cum_seq_q),
-      std::move(cum_seq_k),
-      max_q,
-      max_k,
-      std::move(philox_seed),
-      std::move(philox_offset),
-      std::move(debug_attn_mask));
-}
-
-std::tuple<
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    c10::SymInt,
-    c10::SymInt,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor>
-flash_attention_kernel(
-    const at::Tensor& query,
-    const at::Tensor& key,
-    const at::Tensor& value,
-    double dropout_p,
-    bool is_causal,
-    bool return_debug_mask,
-    c10::optional<double> scale) {
-  RECORD_FUNCTION(
-      "torch_ipex::flash_attention_kernel", c10::ArrayRef<c10::IValue>({}));
-  return flash_attention_kernel_base(
-      query,
-      key,
-      value,
-      dropout_p,
-      is_causal,
-      return_debug_mask,
-      c10::nullopt,
-      scale);
-}
-
-std::tuple<
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    c10::SymInt,
-    c10::SymInt,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor>
-flash_attention_mask_kernel(
-    const at::Tensor& query,
-    const at::Tensor& key,
-    const at::Tensor& value,
-    double dropout_p,
-    bool is_causal,
-    bool return_debug_mask,
-    c10::optional<at::Tensor> attention_mask,
-    c10::optional<double> scale) {
-  RECORD_FUNCTION(
-      "torch_ipex::flash_attention_mask_kernel",
-      c10::ArrayRef<c10::IValue>({}));
-  return flash_attention_kernel_base(
-      query,
-      key,
-      value,
-      dropout_p,
-      is_causal,
-      return_debug_mask,
-      attention_mask,
-      scale);
+  return std::make_tuple(std::move(output), std::move(logsumexp));
 }
 } // anonymous namespace
 
 IPEX_REGISTER_DISPATCH(flash_attention_kernel_stub, &flash_attention_kernel);
-IPEX_REGISTER_DISPATCH(
-    flash_attention_mask_kernel_stub,
-    &flash_attention_mask_kernel);
 
 } // namespace cpu
 } // namespace torch_ipex
