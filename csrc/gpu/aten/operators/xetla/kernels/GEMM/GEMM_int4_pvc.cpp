@@ -1,8 +1,8 @@
-// #include "gemm_int4_pvc.h"
+#include "gemm_int4_pvc.h"
 
 
-// namespace xpu {
-// namespace xetla {
+namespace xpu {
+namespace xetla {
 
 #define HGEMM_WINT4_PVC_IMPL_FUNC(                                             \
       WG_M, WG_N, SG_M, SG_N, SG_K, DEQUANT_S, SLM_KS)                         \

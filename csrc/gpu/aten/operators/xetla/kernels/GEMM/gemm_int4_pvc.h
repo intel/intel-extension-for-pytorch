@@ -43,13 +43,17 @@ struct hgemm_wint4_pvc_func {
   using perf_tuning_knob = gpu::xetla::group::
       perf_tuning_knob_t<sg_k, prefetch_distance, periodic_sync_interval>;
 
+//   using compute_policy = gpu::xetla::group::compute_policy_int4_dequantize_xmx<
+//       compute_attr,
+//       perf_tuning_knob,
+//       dtype_scale,
+//       dtype_zero_pt,
+//       dequant_s == 0 ? 131072 : dequant_s,
+//       gpu_arch::Xe>;
   using compute_policy = gpu::xetla::group::compute_policy_int4_dequantize_xmx<
-      compute_attr,
-      perf_tuning_knob,
-      dtype_scale,
-      dtype_zero_pt,
-      dequant_s == 0 ? 131072 : dequant_s,
-      gpu_arch::Xe>;
+          compute_attr, perf_tuning_knob, dtype_scale, dtype_zero_pt,
+          gpu::xetla::group::quant_mode::S4_ASYM, dequant_s== 0 ? 131072 : dequant_s, gpu_arch::Xe>;
+
   using gemm_t = gpu::xetla::group::
       gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
 
@@ -102,7 +106,7 @@ struct hgemm_wint4_pvc_func {
     dtype_cnt* cnt = static_cast<uint32_t*>(aligned_alloc_device(
         DEVICE_MEM_ALIGNMENT, size_cnt * sizeof(dtype_cnt), device, context));
 
-    typename gemm_op_t::arguments_t gemm_arg(
+    typename gemm_op_t::template arguments_t <compute_policy::quant_type>gemm_arg(
         mat_m,
         mat_k,
         mat_n,

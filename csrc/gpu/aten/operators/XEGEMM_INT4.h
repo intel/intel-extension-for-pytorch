@@ -609,9 +609,9 @@ struct GemmWint4Config {
       ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(512), \
       ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(1024)
 
-// #define ORDERED_GEMM_WINT4_CONFIG_SET_PVC       \
-//   ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_PVC(0), \
-//       ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_PVC(128)
+#define ORDERED_GEMM_WINT4_CONFIG_SET_PVC       \
+  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_PVC(0), \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_PVC(128)
 
 inline Tensor resize_as_mat1(const Tensor& mat1, const Tensor& output) {
   auto output_ = output.flatten(0, -2);
