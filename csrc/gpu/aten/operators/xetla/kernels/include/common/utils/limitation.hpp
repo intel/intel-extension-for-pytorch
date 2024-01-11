@@ -28,12 +28,7 @@ namespace gpu::xetla {
 
 namespace core {
 template <gpu_arch arch, typename T>
-struct general_1d {};
-template <gpu_arch arch, typename T>
-class block_2d {};
-
-template <typename T>
-struct general_1d<gpu_arch::Xe, T> {
+struct general_1d {
     template <uint8_t NElts>
     static inline bool check_restriction(uint64_t offset, uint64_t p = 0) {
         static_assert(sizeof(T) == 4 || sizeof(T) == 8,
@@ -70,8 +65,8 @@ struct general_1d<gpu_arch::Xe, T> {
     }
 };
 
-template <typename T>
-class block_2d<gpu_arch::Xe, T> {
+template <gpu_arch arch_tag, typename T>
+class block_2d {
 public:
     template <bool transpose, bool vnni_transform>
     static inline bool check_load(xetla_tdescriptor tdesc) {
@@ -729,12 +724,7 @@ struct gemm<arch, std::enable_if_t<(arch <= gpu_arch::Xe)>> {
 
 namespace kernel {
 template <gpu_arch arch, typename T>
-class general_1d {};
-template <gpu_arch arch, typename T>
-class block_2d {};
-
-template <typename T>
-class general_1d<gpu_arch::Xe, T> {
+class general_1d {
 public:
     static inline bool check_alignment(T *base, uint32_t pitch) {
         auto pitch_in_bytes = pitch * element_size;
@@ -762,12 +752,12 @@ private:
     static constexpr size_t base_alignment_bytes = 4;
 };
 
-template <typename T>
-class block_2d<gpu_arch::Xe, T> {
+template <gpu_arch arch_tag, typename T>
+class block_2d {
 public:
     static inline bool check_tensor(
             uint64_t base, uint32_t width, uint32_t height, uint32_t pitch) {
-        return core::block_2d<gpu_arch::Xe, T>::check_surface(
+        return core::block_2d<arch_tag, T>::check_surface(
                 base, width * element_size, height, pitch * element_size);
     }
 

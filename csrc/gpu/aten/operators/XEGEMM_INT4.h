@@ -526,15 +526,17 @@ struct GemmWint4Config {
   static constexpr int max_n = max_n_;
   static constexpr int max_k = max_k_;
   static constexpr int arch = arch_;
-
+// gz 128 > group_size 32
   static bool less_than(int m, int n, int k, int group_size) {
+    std::cout << "+++!!!!!!gz " << gz << std::endl;
+    std::cout << "gz " << gz << " slm_ks " << slm_ks << std::endl;
     if (gz < group_size)
       return true;
-    if (gz >= group_size && arch == 0) {
+    if (gz == group_size && arch == 0) {
       if (k / group_size > slm_ks && k % (group_size * slm_ks) != 0)
-        return false;
-      else
         return true;
+      else
+        return false;
     }
     if (gz == group_size && max_n < n)
       return true;
@@ -607,9 +609,9 @@ struct GemmWint4Config {
       ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(512), \
       ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(1024)
 
-#define ORDERED_GEMM_WINT4_CONFIG_SET_PVC       \
-  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_PVC(0), \
-      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_PVC(128)
+// #define ORDERED_GEMM_WINT4_CONFIG_SET_PVC       \
+//   ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_PVC(0), \
+//       ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_PVC(128)
 
 inline Tensor resize_as_mat1(const Tensor& mat1, const Tensor& output) {
   auto output_ = output.flatten(0, -2);
@@ -863,7 +865,7 @@ class HGEMMXetla_INT4 final {
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
     auto& q = dpcppGetCurrentQueue();
     if (arch_ == 1) {
-      dispatch<scalar_t, ORDERED_GEMM_WINT4_CONFIG_SET_PVC>(q);
+      // dispatch<scalar_t, ORDERED_GEMM_WINT4_CONFIG_SET_PVC>(q);
     } else {
       dispatch<scalar_t, ORDERED_GEMM_WINT4_CONFIG_SET_ARC>(q);
     }

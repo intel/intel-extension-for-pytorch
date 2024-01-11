@@ -1326,14 +1326,17 @@ public:
             = tile_size_x * tile_size_y * sizeof(dtype);
     static constexpr uint32_t block_bytes
             = block_size_x * block_size_y * sizeof(dtype);
+
     using prefetch_dtype = typename std::conditional<
-            (block_bytes % (16 * sizeof(uint64_t)) == 0), uint64_t,
-            typename std::conditional<(block_bytes % (16 * sizeof(uint32_t))
+            (alignment_in_bytes % (sizeof(uint64_t)) == 0), uint64_t,
+            typename std::conditional<(alignment_in_bytes % (sizeof(uint32_t))
                                               == 0),
                     uint32_t, dtype>::type>::type;
     static constexpr uint32_t scale_factor
             = sizeof(prefetch_dtype) / sizeof(dtype);
-    static constexpr uint32_t simd_exec_size = block_size_x / scale_factor;
+    static constexpr uint32_t simd_exec_size = block_size_x / scale_factor <= 0
+            ? 1
+            : block_size_x / scale_factor;
 
 private:
     using this_payload_t

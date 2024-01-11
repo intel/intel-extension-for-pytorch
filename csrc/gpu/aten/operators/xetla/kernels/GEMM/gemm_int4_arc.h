@@ -29,8 +29,8 @@ template <
     typename post_ops>
 struct hgemm_wint4_arc_func {
   using tile_shape = gpu::xetla::group::tile_shape_t<wg_n, wg_m, sg_n, sg_m>;
-  static constexpr uint32_t periodic_sync_interval = 8;
-  static constexpr uint32_t prefetch_distance = 3;
+  static constexpr uint32_t periodic_sync_interval = 0;
+  static constexpr uint32_t prefetch_distance = 0;
 
   using mem_desc_a_t =
       mem_desc_t<dtype_a, mem_layout::row_major, mem_space::global,
@@ -49,15 +49,21 @@ struct hgemm_wint4_arc_func {
   using perf_tuning_knob = gpu::xetla::group::
       perf_tuning_knob_t<sg_k, prefetch_distance, periodic_sync_interval>;
 
-  using compute_policy = gpu::xetla::group::compute_policy_bit4_dequantize_xmx<
-      compute_attr,
-      perf_tuning_knob,
-      gpu::xetla::group::quant_type::S4_SYM,
-      dtype_scale,
-      dequant_s,
-      gpu_arch::Dg2>;
-  using gemm_t = gpu::xetla::group::
-      gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t, mem_desc_scale_t>;
+//   using compute_policy = gpu::xetla::group::compute_policy_bit4_dequantize_xmx<
+//       compute_attr,
+//       perf_tuning_knob,
+//       gpu::xetla::group::quant_type::S4_SYM,
+//       dtype_scale,
+//       dequant_s,
+//       gpu_arch::Dg2>;
+
+  using compute_policy = gpu::xetla::group::compute_policy_int4_dequantize_xmx<
+          compute_attr, perf_tuning_knob, dtype_scale, dtype_b,
+          gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP, dequant_s, gpu_arch::Dg2>;
+  using gemm_t = gpu::xetla::group::gemm_t<compute_policy, tile_shape,
+          mem_desc_a_t, mem_desc_b_t>;
+//   using gemm_t = gpu::xetla::group::
+//       gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t, mem_desc_scale_t>;
 
   using epilogue_t = gpu::xetla::group::epilogue_t<
       gpu::xetla::group::epilogue_policy_tile_op<post_ops, gpu_arch::Dg2>,
@@ -102,7 +108,7 @@ struct hgemm_wint4_arc_func {
     dtype_cnt* cnt = static_cast<uint32_t*>(aligned_alloc_device(
         DEVICE_MEM_ALIGNMENT, size_cnt * sizeof(dtype_cnt), device, context));
 
-    typename gemm_op_t::arguments_t gemm_arg(
+    typename gemm_op_t::template arguments_t <compute_policy::quant_type>gemm_arg(
         mat_m,
         mat_k,
         mat_n,
@@ -160,6 +166,12 @@ inline void hgemm_wint4_arc(
   using data_type_zp = int4x2;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
+  std::cout << "++++++++++++++++++with out bias +++++ " << SLM_KS << std::endl;
+  std::cout << "here is DQUANT_S " << DQUANT_S << std::endl;
+  std::cout << "here is L3_KS " << L3_KS << std::endl;
+  std::cout << "here is SLM_KS " << SLM_KS << std::endl;
+  std::cout << "here is shape " << m << " " << n << " " << k << std::endl;
+  std::cout << "++++++++++++++++++++++++++++++++++" << SLM_KS << std::endl;
   using hgemm_wint4_arc_functor = hgemm_wint4_arc_func<
       data_type_a,
       data_type_b,
@@ -226,6 +238,12 @@ inline void hgemm_bias_wint4_arc(
           DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>;
   using bias_op_t = subgroup::bias_add_op_t<mem_desc_bias_t, gpu_arch::Dg2>;
   using post_op = subgroup::chained_tile_op_t<bias_op_t>;
+  std::cout << "++++++++++++++++++with bias +++++ " << SLM_KS << std::endl;
+  std::cout << "here is DQUANT_S " << DQUANT_S << std::endl;
+  std::cout << "here is L3_KS " << L3_KS << std::endl;
+  std::cout << "here is SLM_KS " << SLM_KS << std::endl;
+  std::cout << "here is shape " << m << " " << n << " " << k << std::endl;
+  std::cout << "++++++++++++++++++++++++++++++++++" << SLM_KS << std::endl;
   using hgemm_wint4_arc_functor = hgemm_wint4_arc_func<
       data_type_a,
       data_type_b,
