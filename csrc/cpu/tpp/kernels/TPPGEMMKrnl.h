@@ -43,6 +43,9 @@ REGISTER_LOCAL_SCOPE(
     tpp_linear_silu_krnl,
     "tpp_linear_silu_krnl"); // linear bias + silu
 REGISTER_LOCAL_SCOPE(
+    tpp_fused_gate_up_proj_krnl,
+    "tpp_fused_gate_up_proj_krnl"); // fused gate_proj and up_proj
+REGISTER_LOCAL_SCOPE(
     tpp_linear_relu_krnl,
     "tpp_linear_relu_krnl"); // linear bias + relu
 
@@ -513,6 +516,141 @@ inline void tpp_linear_gelu(
             brgemm_tpp.config();
             if (!(nc + Ncb < Nc)) { // last nc iter
               gelu_fwd_tpp_rem(out[s1][nk], out[s1][nk]);
+            }
+          }
+        },
+        [&]() { brgemm_tpp.config(); },
+        [&]() { brgemm_tpp.release(); });
+  }
+}
+
+// Fused kernel for the gate_proj and the up_proj related computation in the MLP
+// of LLaMA. The ref computation of the kernel is:
+//    act_fn(gate_proj(x)) * up_proj(x) where act_fn is silu, gate_proj and
+//    up_proj are two nn.Linear with the same weight shapes and bias = False.
+// t_in is the input activation
+// t_wt_gate is the prepacked weight of the gate_proj
+// t_wt_up is the prepacked weight of the up_proj
+// t_bias_gate is the bias of the gate_proj
+// t_bias_up is the bias of the up_proj
+// t_out is the output result of the kernel
+template <typename T>
+inline void tpp_fused_gate_up_proj(
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt_gate,
+    const at::Tensor& t_bias_gate,
+    const at::Tensor& t_wt_up,
+    const at::Tensor& t_bias_up,
+    at::Tensor& t_out) {
+  auto t_wt_gate_ = t_wt_gate;
+  auto t_wt_up_ = t_wt_up;
+  auto in_sizes = t_in.sizes();
+  auto BS = in_sizes[0] * in_sizes[1];
+  if (BS > FT_OPT_SIZE) { // first token compute
+    t_wt_gate_ = wt_tensor_for_first_token<T>(t_wt_gate_);
+    t_wt_up_ = wt_tensor_for_first_token<T>(t_wt_up_);
+    large_cache_opt = true;
+  }
+
+  auto wt_sizes = t_wt_gate_.sizes();
+  auto C = in_sizes[2];
+
+  auto Nc = wt_sizes[1];
+  auto Hc = C / Nc;
+  auto Nk = wt_sizes[0];
+  auto Hk = wt_sizes[3];
+  auto K = Nk * Hk;
+
+  auto t_wt_gate_V =
+      torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt_gate_);
+  auto t_wt_up_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt_up_);
+
+  // This is used to store the intermediate result of the up_proj layer
+  auto t_out_tmp = at::empty_like(t_out);
+
+  auto in = GetVLAPtr<T>(t_in, {Nc, Hc});
+  auto wt_gate_V = GetVLAPtr<T>(t_wt_gate_V, {Nc, Hc * Hk});
+  auto wt_up_V = GetVLAPtr<T>(t_wt_up_V, {Nc, Hc * Hk});
+  auto bias_gate = GetVLAPtr<T>(t_bias_gate, {Hk});
+  auto bias_up = GetVLAPtr<T>(t_bias_up, {Hk});
+  auto out = GetVLAPtr<T>(t_out, {Nk, Hk});
+  auto out_tmp = GetVLAPtr<T>(t_out_tmp, {Nk, Hk});
+
+  auto Ncb = Nc;
+  auto BSb = 64L;
+  auto rem = BS % 64;
+  if (large_cache_opt)
+    Ncb = NCB_BLOCK_SIZE;
+
+  bool with_bias_gate = (t_bias_gate.numel() > 0);
+  bool with_bias_up = (t_bias_up.numel() > 0);
+  auto copy_bias_tpp = SCOPEIT(CpyBiasTPP<T>(BSb, Hk, K), BIAS);
+  auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<T>(rem, Hk, K), BIAS);
+  auto zero_tpp = SCOPEIT(SetZeroTPP<T>(BSb, Hk, K), EW_ZERO);
+  auto zero_tpp_rem = SCOPEIT(SetZeroTPP<T>(rem, Hk, K), EW_ZERO);
+  auto brgemm_tpp = SCOPEITGEMM(
+      (BrgemmTPP<T, T>(BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
+  auto brgemm_tpp_rem = SCOPEITGEMM(
+      (BrgemmTPP<T, T>(rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
+  auto silu_fwd_tpp = SCOPEIT(SiLUFwdTPP<T>(BSb, Hk, K, K), ACT);
+  auto silu_fwd_tpp_rem = SCOPEIT(SiLUFwdTPP<T>(rem, Hk, K, K), ACT);
+  auto mul_tpp = SCOPEIT((MulTPP<T, T>(BSb, Hk, K, K)), EW_MUL);
+  auto mul_tpp_rem = SCOPEIT((MulTPP<T, T>(rem, Hk, K, K)), EW_MUL);
+
+  {
+    RECORD_SCOPE(tpp_fused_gate_up_proj_krnl, {t_in, t_wt_gate_V});
+
+    auto loop_scheme = large_cache_opt ? GEMM_LOOP_SCHEME : "aCb";
+    auto igemm_loop = torch_ipex::tpp::ThreadedLoop<3>(
+        {{0, Nc, Ncb, false}, {0, BS, BSb}, {Nk}}, loop_scheme);
+    igemm_loop(
+        [&](int* ind) {
+          int nc = ind[0], s1 = ind[1], nk = ind[2];
+          auto count = nc + Ncb < Nc ? Ncb : Nc - nc;
+          bool is_rem = (s1 + BSb > BS);
+          if (!is_rem) {
+            if (nc == 0) {
+              if (with_bias_gate) {
+                copy_bias_tpp(bias_gate[nk], out[s1][nk]);
+              } else {
+                zero_tpp(out[s1][nk]);
+              }
+
+              if (with_bias_up) {
+                copy_bias_tpp(bias_up[nk], out_tmp[s1][nk]);
+              } else {
+                zero_tpp(out_tmp[s1][nk]);
+              }
+            }
+            brgemm_tpp(in[s1][nc], wt_gate_V[nk][nc], out[s1][nk], count, true);
+            brgemm_tpp(
+                in[s1][nc], wt_up_V[nk][nc], out_tmp[s1][nk], count, true);
+            if (!(nc + Ncb < Nc)) { // last nc iter
+              silu_fwd_tpp(out[s1][nk], out[s1][nk]);
+              mul_tpp(out[s1][nk], out_tmp[s1][nk], out[s1][nk]);
+            }
+          } else {
+            if (nc == 0) {
+              if (with_bias_gate) {
+                copy_bias_tpp_rem(bias_gate[nk], out[s1][nk]);
+              } else {
+                zero_tpp_rem(out[s1][nk]);
+              }
+
+              if (with_bias_up) {
+                copy_bias_tpp_rem(bias_up[nk], out_tmp[s1][nk]);
+              } else {
+                zero_tpp_rem(out_tmp[s1][nk]);
+              }
+            }
+            brgemm_tpp_rem(
+                in[s1][nc], wt_gate_V[nk][nc], out[s1][nk], count, false);
+            brgemm_tpp_rem(
+                in[s1][nc], wt_up_V[nk][nc], out_tmp[s1][nk], count, false);
+            brgemm_tpp.config();
+            if (!(nc + Ncb < Nc)) { // last nc iter
+              silu_fwd_tpp_rem(out[s1][nk], out[s1][nk]);
+              mul_tpp_rem(out[s1][nk], out_tmp[s1][nk], out[s1][nk]);
             }
           }
         },
