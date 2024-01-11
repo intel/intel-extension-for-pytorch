@@ -15,8 +15,6 @@ from transformers import (
     T5ForConditionalGeneration,
 )
 
-from llm.utils.model_class.baichuan import BaichuanTokenizer
-
 MODEL_CLASSES = {
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
@@ -25,7 +23,7 @@ MODEL_CLASSES = {
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
     "bloom": (AutoModelForCausalLM, AutoTokenizer),
     "codegen": (AutoModelForCausalLM, AutoTokenizer),
-    "baichuan": (AutoModelForCausalLM, BaichuanTokenizer),
+    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
     "chatglm": (AutoModelForCausalLM, AutoTokenizer),
     "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
     "t5": (T5ForConditionalGeneration, AutoTokenizer),
@@ -134,13 +132,6 @@ if args.accuracy_only:
             self.config = AutoConfig.from_pretrained(
                 model_id if config is None else config, torchscript=with_jit, trust_remote_code=True
             )
-
-            if model_type == "baichuan":
-                from llm.utils.utils import _get_relative_imports, _gradient_checkpointing_disable, _gradient_checkpointing_enable
-                import transformers
-                transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
-                transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_disable = _gradient_checkpointing_disable
-                transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_enable = _gradient_checkpointing_enable
 
             if self._dtype == "int8":
                 try:

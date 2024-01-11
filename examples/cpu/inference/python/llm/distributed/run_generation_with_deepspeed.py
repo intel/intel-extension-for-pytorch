@@ -25,7 +25,6 @@ from transformers import (
 import sys
 
 sys.path.append(sys.path[0] + '/../../')
-from llm.utils.model_class.baichuan import BaichuanTokenizer
 
 # supported models now
 MODEL_CLASSES = {
@@ -39,8 +38,8 @@ MODEL_CLASSES = {
     "chatglm": (AutoModelForCausalLM, AutoTokenizer),
     "bloom": (AutoModelForCausalLM, AutoTokenizer),
     "codegen": (AutoModelForCausalLM, AutoTokenizer),
-    "baichuan2": (AutoModelForCausalLM, BaichuanTokenizer),
-    "baichuan": (AutoModelForCausalLM, BaichuanTokenizer),
+    "baichuan2": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
     "chatglm": (AutoModelForCausalLM, AutoTokenizer),
     "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
     "t5": (T5ForConditionalGeneration, AutoTokenizer),
@@ -252,12 +251,6 @@ if model_type == "falcon":
     model_input_names = ["input_ids", "attention_mask"]
     tokenizer.model_input_names = model_input_names
 
-if model_type in ["baichuan2", "baichuan"]:
-    from llm.utils.utils import _get_relative_imports, _gradient_checkpointing_disable, _gradient_checkpointing_enable
-    import transformers
-    transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
-    transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_disable = _gradient_checkpointing_disable
-    transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_enable = _gradient_checkpointing_enable
 if args.config_file is None:
     config = AutoConfig.from_pretrained(
         args.model_id, torchscript=True, trust_remote_code=True

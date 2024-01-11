@@ -71,9 +71,9 @@ def _set_optimized_model_for_generation(
     if first_token_optimized_model is not None:
         model.trace_graph_first = IPEX_LLM_Model_Return(
             model, first_token_optimized_model
-        ).forward
+        )
 
-    model.trace_graph = IPEX_LLM_Model_Return(model, optimized_model).forward
+    model.trace_graph = IPEX_LLM_Model_Return(model, optimized_model)
     print(
         "ipex.llm.optimize has set the optimized or quantization model for model.generate()"
     )

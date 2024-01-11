@@ -599,7 +599,8 @@ def T5Block_forward(
             hidden_states = self.linear_add(forwarded_states, hidden_states)
         else:
             if (
-                isinstance(self.layer[-1].DenseReluDense.wo.weight, torch.Tensor)
+                hasattr(self.layer[-1].DenseReluDense.wo, "weight")
+                and isinstance(self.layer[-1].DenseReluDense.wo.weight, torch.Tensor)
                 and forwarded_states.dtype
                 != self.layer[-1].DenseReluDense.wo.weight.dtype
             ):
