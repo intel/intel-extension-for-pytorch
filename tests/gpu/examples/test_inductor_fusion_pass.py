@@ -185,6 +185,36 @@ class TestTorchMethod(TestCase):
         reason="Windows not yet supported for torch.compile",
     )
     @config.patch({"freezing": True})
+    def test_conv_unary_fusion(self):
+        class M(torch.nn.Module):
+            def __init__(self, unary_fn, **kwargs):
+                super().__init__()
+                self.conv = torch.nn.Conv2d(9, 8, kernel_size=3, stride=1, padding=1)
+                self.relu = torch.nn.ReLU()
+
+            def forward(self, x):
+                x = self.relu(x)
+                x = self.conv(x)
+                x = self.relu(x)
+
+                return x
+
+        with torch.no_grad():
+            for unary_fn in unary_list:
+                model = M(unary_fn).to("xpu")
+                x = torch.rand([2, 9, 10, 10]).to("xpu")
+                run = torch.compile(model, backend="inductor")
+                print("Run compiled fn")
+                actual = run(x)
+                print("Run imperative fn")
+                ref = model(x)
+                self.assertEqual(actual, ref)
+
+    @pytest.mark.skipif(
+        platform.system() == "Windows" or "WSL2" in platform.uname().release,
+        reason="Windows not yet supported for torch.compile",
+    )
+    @config.patch({"freezing": True})
     def test_linear_binary_fusion(self):
         class M(torch.nn.Module):
             def __init__(self, binary_fn, in_channels, out_channels, bias, **kwargs):

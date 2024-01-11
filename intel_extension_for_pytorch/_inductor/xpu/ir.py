@@ -18,6 +18,7 @@ from torch._prims_common import (
     make_channels_last_strides_for,
 )
 from torch._inductor.virtualized import V
+from torch._inductor.utils import pad_listlike
 
 
 def _prepare_convolution_fusion_create(
@@ -25,19 +26,19 @@ def _prepare_convolution_fusion_create(
     x: "TensorBox",
     weight: "TensorBox",
     bias: "TensorBox",
-    padding_: List[int],
-    stride_: List[int],
-    dilation_: List[int],
+    padding: List[int],
+    stride: List[int],
+    dilation: List[int],
     groups: int,
     transposed: bool = False,
-    output_padding_: List[int] = None,
+    output_padding: List[int] = None,
 ):
     """
     This function is a helper function to prepare inputs, layout and constant args
     for convolution post-op fusion's create function, including deciding the output
     layout (channels first or channels last), realizing inputs and make them etc. The
-    function only supports the CPU device since conv post-op fusion kernel is only
-    supported on CPU right now.
+    function only supports the XPU device since conv post-op fusion kernel is only
+    supported on XPU right now.
     """
 
     # Port from aten/src/ATen/native/ConvUtils.h: _conv_input_size
@@ -64,73 +65,48 @@ def _prepare_convolution_fusion_create(
             input_size.append(input_size_d)
         return list(map(int, input_size))
 
-    # The size of prepacked_weight is the prepacked weight size of deconv:
-    #   Groups > 1:  [g*o, i/g, ...]
-    #   Groups == 1: [o, i, ...]
-    # Returns original weight size in [i, o, ...]
-    def _original_deconv_weight_size(
-        prepacked_weight,
-        groups,
-    ):
-        prepacked_weight_size = prepacked_weight.size()
-        dim = len(prepacked_weight_size)
-        assert dim > 2, "Expect weight dim > 2"
-        if groups > 1:
-            weight_size = []
-            weight_size.append(prepacked_weight_size[1] * groups)
-            weight_size.append(prepacked_weight_size[0] / groups)
-            for d in range(2, dim):
-                weight_size.append(prepacked_weight_size[d])
-        else:
-            weight_size = prepacked_weight.transpose(0, 1).size()
-        return weight_size
-
-    stride = tuple(stride_)
-    padding = tuple(padding_)
-    dilation = tuple(dilation_)
-    assert isinstance(groups, int)
-    output_padding = tuple(output_padding_) if output_padding_ else (0, 0)
+    x.realize()
+    weight.realize()
+    if bias is not None:
+        bias.realize()
     with V.graph.fake_mode:
         x_fake = ir_node_to_tensor(x, guard_shape=True)
         weight_fake = ir_node_to_tensor(weight, guard_shape=True)
-        if transposed:
-            # When transposed, the size of the prepacked oneDNN weight is different
-            # from the PyTorch weight. We're not able to run aten conv with such
-            # size. We infer the output size from the input params here:
-            weight_size = _original_deconv_weight_size(weight_fake, groups)
-            input_size = x_fake.size()
-            output_size = _conv_input_size(
-                input_size,
-                weight_size,
-                padding,
-                output_padding,
-                stride,
-                dilation,
-                groups,
-            )
+        dims = len(x_fake.size()) - 2
+        assert 0 < len(padding) <= dims
+        assert 0 < len(dilation) <= dims
+        assert 0 < len(stride) <= dims
+        padding = pad_listlike(padding, dims)
+        dilation = pad_listlike(dilation, dims)
+        stride = pad_listlike(stride, dims)
+        if output_padding is None:
+            output_padding = pad_listlike([0], dims)
         else:
-            bias_fake = (
-                ir_node_to_tensor(bias, guard_shape=True) if bias is not None else bias
-            )
-            output = torch.ops.aten.convolution(
-                x_fake,
-                weight_fake,
-                bias_fake,
-                stride,
-                padding,
-                dilation,
-                transposed,
-                output_padding,
-                groups,
-            )
-            output_size = output.size()
+            assert 0 < len(output_padding) <= dims
+            output_padding = pad_listlike(output_padding, dims)
+
+        assert isinstance(groups, int)
+        bias_fake = (
+            ir_node_to_tensor(bias, guard_shape=True) if bias is not None else bias
+        )
+        output = torch.ops.aten.convolution(
+            x_fake,
+            weight_fake,
+            bias_fake,
+            stride,
+            padding,
+            dilation,
+            transposed,
+            output_padding,
+            groups,
+        )
+        output_size = output.size()
 
         req_stride_order = [0] + list(reversed(range(1, len(stride) + 1)))
         req_stride_order = [len(req_stride_order)] + req_stride_order
         output_stride = make_channels_last_strides_for(output_size)
 
     x = cls.require_stride_order(x, req_stride_order)
-    # assert x.get_device().type == "cpu" and weight.get_device().type == "cpu"
     inputs = [x, weight]
 
     kernel_layout = FixedLayout(
@@ -140,8 +116,6 @@ def _prepare_convolution_fusion_create(
         convert_shape_to_inductor(output_stride),
     )
     constant_args = [padding, stride, dilation, groups]
-    if transposed:
-        constant_args.insert(1, output_padding)
 
     if bias is not None:
         inputs.append(bias)
