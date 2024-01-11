@@ -583,7 +583,10 @@ $(document).ready(function() {
       elem_sel.setAttribute("id", stage.toLowerCase() + "-options");
       var opt = document.createElement("option");
       opt.setAttribute("value", "na");
-      opt.innerHTML = "select a " + stage.toLowerCase();
+      txt_history = "";
+      if(stage.toLowerCase() == "version")
+        txt_history = "history ";
+      opt.innerHTML = "select a " + txt_history + stage.toLowerCase();
       elem_sel.append(opt);
       $.each(items, function(index, value) {
         if(index < num_elem - 1) {
