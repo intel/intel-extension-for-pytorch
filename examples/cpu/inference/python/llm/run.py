@@ -182,11 +182,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 print("LLM RUNTIME ERROR: Running generation task failed. Quit.")
                 quit()
             print("LLM RUNTIME INFO: Finished successfully.")
-        elif (
-            re.search("baichuan", str(args.model_name_or_path), re.IGNORECASE)
-            or re.search("chatglm", str(args.model_name_or_path), re.IGNORECASE)
-            or re.search("t5", str(args.model_name_or_path), re.IGNORECASE)
-            ):
+        elif re.search("t5", str(args.model_name_or_path), re.IGNORECASE):
             qpath = Path(parent_path, "single_instance/run_quantization.py")
             infer_cmd = ["python", qpath]
             infer_cmd.extend(["-m", str(args.model_name_or_path)])
@@ -195,6 +191,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--num-iter", str(args.num_iter)])
             infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
             infer_cmd.extend(["--batch-size", str(args.batch_size)])
+            infer_cmd.extend(["--output-dir", str(args.output_dir)])
             if args.int8_bf16_mixed:
                 infer_cmd.extend(["--int8-bf16-mixed"])
             if args.int8:
@@ -405,7 +402,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "codegen": ("/codegen_local_shard"),
                 "baichuan": ("/baichuan_local_shard"),
                 "chatglm": ("/chatglm_local_shard"),
-                "gptbigcode": ("/gptbigcode_local_shard"),
+                "starcoder": ("/starcoder_local_shard"),
                 "t5": ("/t5_local_shard"),
                 "mistral": ("/mistral_local_shard"),
                 "mpt": ("/mpt_local_shard"),

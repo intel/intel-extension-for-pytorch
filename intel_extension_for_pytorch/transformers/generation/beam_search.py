@@ -306,18 +306,13 @@ def _beam_search(
                     output_attentions=output_attentions,
                     output_hidden_states=output_hidden_states,
                 )
-
-            if len(model_inputs["past_key_values"][1]) == 4:
+            if first_token and len(model_inputs["past_key_values"][1]) == 4:
                 if isinstance(outputs, dict):
-                    if outputs.logits.shape[0] != num_beams:
-                        outputs.logits = outputs.logits.repeat_interleave(
-                            num_beams, dim=0
-                        )
+                    outputs.logits = outputs.logits.repeat_interleave(num_beams, dim=0)
                 else:
-                    if outputs[0].shape[0] != num_beams:
-                        outputs = list(outputs)
-                        outputs[0] = outputs[0].repeat_interleave(num_beams, dim=0)
-                        outputs = tuple(outputs)
+                    outputs = list(outputs)
+                    outputs[0] = outputs[0].repeat_interleave(num_beams, dim=0)
+                    outputs = tuple(outputs)
         else:
             outputs = self(
                 **model_inputs,

@@ -17,11 +17,7 @@ import sys
 
 sys.path.append(sys.path[0] + "/../../")
 
-from llm.utils.utils import (
-    _get_relative_imports,
-    _gradient_checkpointing_disable,
-    _gradient_checkpointing_enable,
-)
+
 from llm.utils.model_class.llm import EXAMPLE_INPUTS_MODE
 from llm.utils.model_class.llama import LLAMAConfig
 from llm.utils.model_class.gptj import GPTJConfig
@@ -36,14 +32,6 @@ from llm.utils.model_class.gptbigcode import GPTJBigCodeConfig
 from llm.utils.model_class.t5 import T5Config
 from llm.utils.model_class.mistral import MistralConfig
 from llm.utils.model_class.mpt import MPTConfig
-
-transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
-transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_disable = (
-    _gradient_checkpointing_disable
-)
-transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_enable = (
-    _gradient_checkpointing_enable
-)
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -578,17 +566,14 @@ elif args.ipex_weight_only_quantization:
 
 if args.benchmark:
     torch._C._jit_set_texpr_fuser_enabled(False)
-    if not re.search(
-        "baichuan", config.architectures[0], re.IGNORECASE
-    ) and not re.search("chatglm", config.architectures[0], re.IGNORECASE):
-        qconfig = ipex.quantization.default_static_qconfig_mapping
-        user_model = ipex.llm.optimize(
-            user_model.eval(),
-            dtype=torch.float,
-            inplace=True,
-            quantization_config=qconfig,
-            deployment_mode=False,
-        )
+    qconfig = ipex.quantization.default_static_qconfig_mapping
+    user_model = ipex.llm.optimize(
+        user_model.eval(),
+        dtype=torch.float,
+        inplace=True,
+        quantization_config=qconfig,
+        deployment_mode=False,
+    )
     if not hasattr(user_model, "trace_graph"):
         print("load_quantized_model")
         try:

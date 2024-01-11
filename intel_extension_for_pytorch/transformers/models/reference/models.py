@@ -861,13 +861,6 @@ def ChatGLMForConditionalGeneration_forward(
     hidden_states = transformer_outputs[0]
     if return_last_logit:
         hidden_states = hidden_states[-1:]
-    if (
-        hasattr(self, "config")
-        and hasattr(self.config, "lm_head_generation")
-        and self.config.lm_head_generation
-        and hidden_states.size(1) != 1
-    ):
-        hidden_states = hidden_states[:, -1:, :]
     lm_logits = self.transformer.output_layer(hidden_states)
     lm_logits = lm_logits.transpose(0, 1).contiguous()
 
@@ -1518,6 +1511,9 @@ class IPEX_LLM_Model_Return(torch.nn.Module):
     def forward(self, *args, **kwargs):
         outputs = self.optimized_model(*args, **kwargs)
         return output_hook(self.model, args, kwargs, outputs)
+
+    def save(self, path):
+        self.optimized_model.save(path)
 
 
 def prepare_inputs_for_generation(
