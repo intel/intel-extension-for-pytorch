@@ -5,24 +5,23 @@ llvm:
   version: 16.0.6
 oneCCL:
   repo: https://github.com/oneapi-src/oneCCL.git
-  branch: 2021.10
-  commit: bfc879266e870b732bd165e399897419c44ad13d
+  branch: '2021.10'
+  commit: b4c31ba6b42b5bcc7228820e44d2d3f3d519fdc7
 pytorch:
-  version: 2.3.0.dev20231219+cpu
+  version: 2.2.0+cpu
 torch-ccl:
   repo: https://github.com/intel/torch-ccl.git
-  tag: ccl_torch_dev_1115
-  commit: 8c0fd87ec2cf8ab99f5bada4b85f151ac9984818
+  tag: ccl_torch_2.2.0_rc0
+  commit: 716b4cb46c7b955ae2ebd19927b39a81d626b8a8
   version: 2.2.0+cpu
 torchaudio:
-  version: 2.3.0.dev20231219+cpu
+  version: 2.2.0+cpu
 torchvision:
-  version: 0.18.0.dev20231219+cpu
+  version: 0.17.0+cpu
 deepspeed:
-  branch: gma/run-opt-branch
-  repo: https://github.com/delock/DeepSpeedSYCLSupport.git
-  version: 0.11.2+94873fe
-  commit: gma/run-opt-branch
+  branch: master
+  repo: https://github.com/microsoft/DeepSpeed.git
+  commit: 16c265c0ce103147d027d9cae32dd7680766af21
 lm-evaluation-harness:
   repo: https://github.com/EleutherAI/lm-evaluation-harness
   commit: cc9778fbe4fa1a709be2abed9deb6180fd40e7e2
