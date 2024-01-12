@@ -10,4 +10,4 @@ class MistralConfig(LLMConfig):
 
         # for smooth quant
         self.use_global_past_key_value = True
-        self.use_neural_compressor = False
+        self.use_ipex_autotune = True

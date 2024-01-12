@@ -9,5 +9,5 @@ class GPTJConfig(LLMConfig):
 
         # for smooth quant
         self.default_dataset = "NeelNanda/pile-10k"
-        self.use_global_past_key_value = False
-        self.use_neural_compressor = True
+        self.use_global_past_key_value = True
+        self.use_ipex_autotune = True

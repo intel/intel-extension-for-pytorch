@@ -25,13 +25,14 @@ class LLMConfig(ABC):
                 KV_MASK: input_ids+past_kv+attn_mask
                 MASK_POS_KV: input_ids+attn_mask+position_ids+past_kv
                 MASK_KV_POS: input_ids+attn_mask+past_kv+position_ids
+                MASK_KV_ENC: input_ids+attn_mask+past_kv+encoder_output
 
             # if support smooth quant
             self.default_dataset: default dataset
             self.use_global_past_key_value:
                 use_global_past_key_value in collate_batch
-            self.use_neural_compressor:
-                use_neural_compressor in ipex_smooth_quant
+            self.use_ipex_autotune:
+                use_ipex_autotune in ipex_smooth_quant
         '''
         self.model_id = model_id
 

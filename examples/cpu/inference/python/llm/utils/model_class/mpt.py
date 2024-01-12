@@ -12,7 +12,7 @@ class MPTConfig(LLMConfig):
 
         # for smooth quant
         self.use_global_past_key_value = True
-        self.use_neural_compressor = False
+        self.use_ipex_autotune = True
 
     def get_user_model(self, config, benchmark):
         self.model = AutoModelForCausalLM.from_pretrained(

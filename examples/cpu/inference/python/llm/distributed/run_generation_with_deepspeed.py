@@ -99,7 +99,7 @@ parser.add_argument(
     "--local_rank", required=False, type=int, help="used by dist launchers"
 )
 parser.add_argument(
-    "--int8-bf16-mixed",
+    "--quant-with-amp",
     action="store_true",
     help="by default it is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
 )
@@ -133,8 +133,10 @@ args = parser.parse_args()
 
 
 num_tokens = args.max_new_tokens
+use_ipex = args.ipex or args.ipex_weight_only_quantization
+
 # import extension
-if args.ipex:
+if use_ipex:
     import intel_extension_for_pytorch as ipex
 
     torch._C._jit_set_texpr_fuser_enabled(False)
@@ -209,7 +211,7 @@ def get_checkpoint_files(model_name_or_path):
 
 
 model_name = args.model_id
-if args.int8_bf16_mixed:
+if args.quant_with_amp:
     load_dtype = torch.bfloat16
     infer_dtype = torch.bfloat16
 else:
@@ -363,7 +365,7 @@ if args.benchmark:
     t_ready = time.time()
 
 # to ipex
-if args.ipex:
+if use_ipex:
     ipex_woq_enabled = args.ipex_weight_only_quantization
     if ipex_woq_enabled:
         weight_dtype = torch.quint4x2 if args.weight_dtype == "INT4" else torch.qint8

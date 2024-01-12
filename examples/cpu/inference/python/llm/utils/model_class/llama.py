@@ -15,7 +15,7 @@ class LLAMAConfig(LLMConfig):
         # for smooth quant
         self.default_dataset = "NeelNanda/pile-10k"
         self.use_global_past_key_value = True
-        self.use_neural_compressor = True
+        self.use_ipex_autotune = True
     
     def get_user_model(self, config, benchmark):
         if benchmark:
