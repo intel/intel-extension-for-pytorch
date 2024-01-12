@@ -223,9 +223,18 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     bash ${AUX_INSTALL_SCRIPT}
     python -m pip install ${WHEELFOLDER}/*.whl
     rm -rf ${WHEELFOLDER}
+    if [ -f prompt.json ]; then
+        rm -f prompt.json
+    fi
     wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
     cd single_instance
+    if [ -f prompt.json ]; then
+        rm -f prompt.json
+    fi
     ln -s ../prompt.json
     cd ../distributed
+    if [ -f prompt.json ]; then
+        rm -f prompt.json
+    fi
     ln -s ../prompt.json
 fi
