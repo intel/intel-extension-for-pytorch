@@ -16,10 +16,8 @@ from huggingface_hub import snapshot_download
 from transformers.models.bloom.modeling_bloom import BloomBlock as BloomBlock
 from transformers.utils import is_offline_mode
 from transformers import (
-    # pipeline,
     AutoConfig,
     AutoModelForCausalLM,
-    # AutoModel,
     LlamaForCausalLM,
     FalconForCausalLM,
     T5ForConditionalGeneration,
@@ -34,11 +32,10 @@ MODEL_CLASSES = {
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
     "bloom": (AutoModelForCausalLM, AutoTokenizer),
-    "llama": (AutoModelForCausalLM, LlamaTokenizer),
+    "llama": (AutoModelForCausalLM, AutoTokenizer),
     "t5": (T5ForConditionalGeneration, AutoTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
-    # "chatglm": (AutoModel, AutoTokenizer),
 }
 
 # the Deepspeed team made these so it's super fast to load (~1 minute), rather than wait 10-20min loading time.
@@ -50,16 +47,19 @@ t_start = time.time()
 
 parser = ArgumentParser()
 
-parser.add_argument('-m', '--model-id',
+parser.add_argument(
+    '-m', '--model-id',
     type=str,
     default='bigscience/bloom',
     help="the huggingface mdoel id"
 )
-parser.add_argument('--sub-model-name',
+parser.add_argument(
+    '--sub-model-name',
     type=str,
     help="the sub model name for accuracy check"
 )
-parser.add_argument('--device',
+parser.add_argument(
+    '--device',
     type=str,
     choices=["cpu", "cuda", "xpu"],
     help="cpu or cuda or xpu, same as --cuda or not",
@@ -84,7 +84,6 @@ parser.add_argument('--ipex', action='store_true', help="ipex is not enabled now
 parser.add_argument('--jit', action='store_true')
 parser.add_argument('--print-memory', action='store_true')
 parser.add_argument("--token-latency", action="store_true")
-parser.add_argument("--throughput", action="store_true")
 parser.add_argument("--accuracy-only", action="store_true")
 parser.add_argument(
     "--acc-tasks",
@@ -120,10 +119,11 @@ def get_int_from_env(env_keys, default):
             return val
     return default
 
-local_rank = get_int_from_env(["LOCAL_RANK","MPI_LOCALRANKID","PALS_LOCAL_RANKID"], "0")
-world_size = get_int_from_env(["WORLD_SIZE","PMI_SIZE","PALS_LOCAL_SIZE"], "1")
+
+local_rank = get_int_from_env(["LOCAL_RANK", "MPI_LOCALRANKID", "PALS_LOCAL_RANKID"], "0")
+world_size = get_int_from_env(["WORLD_SIZE", "PMI_SIZE", "PALS_LOCAL_SIZE"], "1")
 port = get_int_from_env(["MASTER_PORT"], 29500)
-print(f"*** local_rank={local_rank} world_size={world_size}")
+print(f"*** local_rank={local_rank} world_size={world_size} port={port}")
 
 deepspeed.init_distributed(get_accelerator().communication_backend_name(), distributed_port=port)
 x = torch.ones(
@@ -173,6 +173,12 @@ def get_checkpoint_files(model_name_or_path):
     return file_list
 
 
+def print_mem_usage(msg):
+    get_accelerator().empty_cache()
+    gc.collect()
+    deepspeed.runtime.utils.see_memory_usage(msg, force=True)
+
+
 model_name = args.model_id
 if args.dtype == "float16":
     load_dtype = torch.half
@@ -193,26 +199,15 @@ print_rank0(f"*** Loading the model {model_name}")
 model_type = next((x for x in MODEL_CLASSES.keys() if x in model_name.lower()), 'auto')
 model_class = MODEL_CLASSES[model_type]
 tokenizer = model_class[1].from_pretrained(model_name)
-config = AutoConfig.from_pretrained(model_name, torchscript=args.jit, trust_remote_code=True)
+config = AutoConfig.from_pretrained(model_name, torchscript=args.jit)
 #if not hasattr(config, "text_max_length") and args.prompt is None:
 #    config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 print_rank0("*** model config:", config)
 
-# XXX: can't automatically derive dtype via config's `from_pretrained`
-# dtype = torch.bfloat16 if model_name in ["bigscience/bloom", "bigscience/bigscience-small-testing"] else torch.float16
-
-
-# use one of these args to `init_inference`
-# 1. injection_policy is the slower version, but it's plain pytorch so it'll always work
-# 2. replace_with_kernel_inject is the faster one (fast fused kernels)
-kernel_inject = args.ki
-
 if args.benchmark:
-    get_accelerator().empty_cache()
-    gc.collect()
-    deepspeed.runtime.utils.see_memory_usage("pre-from-pretrained", force=True)
+    print_mem_usage("pre-from-pretrained")
 
-is_meta_support = not model_type in ["falcon"]
+is_meta_support = model_type not in ["falcon", "auto"]
 
 # Construct model with fake meta tensors, later will be replaced during ds-inference ckpt load
 with deepspeed.OnDevice(dtype=load_dtype, device="meta", enabled=is_meta_support):
@@ -220,20 +215,16 @@ with deepspeed.OnDevice(dtype=load_dtype, device="meta", enabled=is_meta_support
     # model to cpu instead of meta device. Use from_config instead to solve the issue for big models.
     # We add the instance type check here since some of the models haven't yet supported from_config.
     if model_class[0] == AutoModelForCausalLM and is_meta_support:
-        model = model_class[0].from_config(config, torch_dtype=load_dtype, trust_remote_code=True)
+        model = model_class[0].from_config(config, torch_dtype=load_dtype)
     else:
-        model = model_class[0].from_pretrained(model_name, config=config, low_cpu_mem_usage=True, torch_dtype=load_dtype, trust_remote_code=True)
+        model = model_class[0].from_pretrained(model_name, config=config, low_cpu_mem_usage=True, torch_dtype=load_dtype)
+
+print_rank0("*** model after load", model)
 
 if args.benchmark:
-    deepspeed.runtime.utils.see_memory_usage("post-from-pretrained", force=True)
+    print_mem_usage("post-from-pretrained")
 
 model = model.eval()
-model = model.to(memory_format=torch.channels_last)
-
-if args.benchmark:
-    get_accelerator().empty_cache()
-    gc.collect()
-    deepspeed.runtime.utils.see_memory_usage("post-init-ds-zero-init", force=True)
 
 ### Deepspeed-Inference Loading
 
@@ -247,18 +238,13 @@ def write_checkpoints_json():
         json.dump(data, open(checkpoints_json, "w"))
 
 
-if args.benchmark:
-    get_accelerator().empty_cache()
-    gc.collect()
-    deepspeed.runtime.utils.see_memory_usage("pre-ds-inference-init", force=True)
-
-if kernel_inject:
+if args.ki:
     kwargs = dict(replace_with_kernel_inject=True)
 else:
     kwargs = dict(replace_with_kernel_inject=False)
 
 repo_root = get_repo_root(model_name)
-if tp_presharded_mode and kernel_inject:
+if tp_presharded_mode and args.ki:
     # tp presharded repos come with their own checkpoints config file
     checkpoints_json = os.path.join(repo_root, "ds_inference_config.json")
 else:
@@ -275,10 +261,10 @@ model = deepspeed.init_inference(
     **kwargs,
 )
 
+print_rank0("*** model after init_inference", model)
+
 if args.benchmark:
-    get_accelerator().empty_cache()
-    gc.collect()
-    deepspeed.runtime.utils.see_memory_usage("post-ds-inference-init", force=True)
+    print_mem_usage("post-ds-inference-init")
 
 if args.benchmark:
     t_ready = time.time()
@@ -289,6 +275,7 @@ if args.ipex:
         model = ipex.optimize_transformers(model.eval(), dtype=infer_dtype, device="xpu", inplace=True)
     else:
         model = ipex.optimize_transformers(model.eval().to("xpu"), dtype=infer_dtype)
+    print_rank0("*** model after optimize_transformers", model)
 
 # bypass assertion for beam4
 if isinstance(model, deepspeed.InferenceEngine):
@@ -435,29 +422,25 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
     input_sentences = []
     if args.prompt is not None:
         input_sentences.append(args.prompt)
-    elif model_type == "auto":
-        raise SystemExit("[ERROR] model prompt is not supported, please use --prompt for this model: " + args.model_id)
     elif int(num_input_tokens) > 8192:
-        prompt = prompt_pool[model_type]["8192"] * int(int(num_input_tokens) / 8192)
+        input_sentences.append(prompt_pool[model_type]["8192"] * int(int(num_input_tokens) / 8192))
     elif num_input_tokens in prompt_pool[model_type]:
         input_sentences.append(prompt_pool[model_type][num_input_tokens])
     else:
         raise SystemExit('[ERROR] Plese use --prompt if want to use custom input.')
-
 
     if args.batch_size > len(input_sentences):
         # dynamically extend to support larger bs by repetition
         input_sentences *= math.ceil(args.batch_size / len(input_sentences))
 
     generate_kwargs = dict(max_new_tokens=num_tokens,
-                        do_sample=False, num_beams=num_beams)
+                           do_sample=False, num_beams=num_beams)
     if args.token_latency:
         generate_kwargs["token_latency"] = True
     if args.jit:
         generate_kwargs["jit"] = True
 
     inputs = input_sentences[: args.batch_size]
-    input_size = tokenizer.batch_encode_plus(inputs, return_tensors="pt").input_ids.size(dim=1)
 
     def generate():
         """returns a list of zipped inputs, outputs and number of new tokens"""
@@ -478,14 +461,14 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
 
         return zip(inputs, gen_text, total_new_tokens), outputs
 
-# Accuracy check, take the ref_prompt as reference for check
+    # Accuracy check, take the ref_prompt as reference for check
     f1 = open(os.path.join(os.path.dirname(__file__), "ref_prompt.json"))
     prompt_json = json.load(f1)
     f1.close()
-    ref_prompt=None
-    ref_prompt_cuda=None
+    ref_prompt = None
+    ref_prompt_cuda = None
     token_support = [(32, 32), (1024, 128)]
-    if (int(num_input_tokens), num_tokens) in token_support:
+    if (int(num_input_tokens), num_tokens) in token_support and args.sub_model_name in prompt_json:
         ref_prompt = prompt_json[args.sub_model_name][f"{num_input_tokens}-{num_tokens}"][f"{num_beams}"]
         try:
             ref_prompt_cuda = prompt_json[args.sub_model_name][f"{num_input_tokens}-{num_tokens}"][f"cuda-result: {num_beams}"]
@@ -509,10 +492,6 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
     ### Benchmark
     # benchmark it!
     else:
-        get_accelerator().empty_cache()
-        gc.collect()
-        deepspeed.runtime.utils.see_memory_usage("end-of-run", force=True)
-
         print_rank0("*** Running benchmark")
         total_time = 0.0
         cycles = args.num_iter
@@ -530,13 +509,15 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
 
                 if do_profiling:
                     torch.save(prof.key_averages().table(sort_by="self_xpu_time_total"), "./profile_{}.pt".format(local_rank))
-                    torch.save(prof.table(sort_by="id", row_limit=-1),'./profile_{}_id.pt'.format(local_rank))
+                    torch.save(prof.table(sort_by="id", row_limit=-1), './profile_{}_id.pt'.format(local_rank))
                     torch.save(prof.key_averages(group_by_input_shape=True).table(), "./profile_{}_detail.pt".format(local_rank))
                     prof.export_chrome_trace("./trace.json")
 
                 gen_ids = list(gen_ids)
-                print_rank0(gen_ids[0][1:])
+                for p, o, _ in gen_ids:
+                    print_rank0(f"*** In: {p}\n*** Out: {o[len(p):]}")
                 print_rank0("Iteration: %d, Time: %.6f sec" % (i, t1 - t0))
+                print_mem_usage("post-iteration-%d" % i)
                 # if model.config.model_type != 't5':
                 #     assert gen_ids[0][-1] == args.max_new_tokens, "Generated new tokens != max new tokens"
                 if i >= warmup:
@@ -549,7 +530,7 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
                     acc_pass += 1
 
         latency = total_time / (cycles - warmup)
-        print_rank0("\n", "-"*10, "Summary:", "-"*10)
+        print_rank0("\n", "-" * 10, "Summary:", "-" * 10)
         print_rank0("Inference latency: %.5f sec." % latency)
         if args.token_latency:
             import numpy as np
@@ -561,42 +542,18 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
             average_2n = list(chain(*[x[1:] for x in total_list]))
             average_2n.sort()
             average_2n_latency = np.mean(average_2n)
-            p90_latency = average_2n[int(len(average_2n)*0.9)]
-            p99_latency = average_2n[int(len(average_2n)*0.99)]
+            p90_latency = average_2n[int(len(average_2n) * 0.9)]
+            p99_latency = average_2n[int(len(average_2n) * 0.99)]
             print_rank0("First token average latency: %.5f sec." % first_latency)
             print_rank0("Average 2... latency: %.5f sec." % average_2n_latency)
             print_rank0("P90 2... latency: %.5f sec." % p90_latency)
             print_rank0("P99 2... latency: %.5f sec." % p99_latency)
-        print_rank0(f"Generate args: max_new_tokens={num_tokens}, input_tokens={num_input_tokens}, num_beams={num_beams}")
-        print_rank0(
-            f"""
-    *** Performance stats:
-    latency of {args.batch_size} full sentence: {(total_time / (cycles - warmup)):.3f} secs
-    """
-        )
+        print_rank0(f"Generate args: batch_size={args.batch_size}, max_new_tokens={num_tokens}, input_tokens={num_input_tokens}, num_beams={num_beams}")
 
-        # benchmark
-        if args.throughput:
-            t0 = time.time()
-            cycles = 5
-            total_new_tokens_generated = 0
-            for i in range(cycles):
-                generated, _ = generate()
-                total_new_tokens_generated += sum(new_tokens for _, _, new_tokens in generated)
-            get_accelerator().synchronize()
-            throughput = (time.time() - t0) / (total_new_tokens_generated)
-
-            print_rank0(
-                f"""
-        *** Performance stats:
-        Throughput per token including tokenize: {throughput*1000:.2f} msecs with (bs={args.batch_size})
-        Start to ready to generate: {t_ready - t_start:.3f} secs.
-        """
-            )
         if ref_prompt is None:
-            print_rank0(f"""Accuracy check skip""")
-        elif acc_pass==args.num_iter:
-            print_rank0(f"""Accuracy check pass""")
+            print_rank0("""Accuracy check skip""")
+        elif acc_pass == args.num_iter:
+            print_rank0("""Accuracy check pass""")
         else:
             print_rank0(f"""Accuracy check fail, the wrong iteration number is: {args.num_iter - acc_pass}""")
 

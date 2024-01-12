@@ -12,7 +12,6 @@ from .transformer_modules.Decoderblock import IPEXTransformerBlock
 from .transformer_modules.GroupedAttention import (  # noqa F401
     IPEXTransformerAttnOptimizedFp16Grouped,
 )
-from .transformer_modules.Linear import IPEXTransformerLinear
 from .transformer_modules.Mlp import *  # noqa
 from .transformer_modules.NaiveAttention import IPEXTransformerAttnNaive  # noqa
 from .transformer_modules.QuantizedAttention import (  # noqa F401; noqa
@@ -135,32 +134,9 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
         )
 
     def port_attn_parameter(self):
-        embed_dim = self.ipex_config.embedding_dim
-        num_head = self.ipex_config.num_attention_head // self.ipex_config.tp_size
-        num_kv_head = self.ipex_config.num_key_value_head // self.ipex_config.tp_size
-        # out_shape: (num_kv_heads * 2 + num_attention_heads) * self.head_dim
-        weight_shape = [num_kv_head, num_head // num_kv_head + 2, -1, embed_dim]
-        bias_shape = [num_kv_head, num_head // num_kv_head + 2, -1]
-        qkv_weight = self.module.self_attention.query_key_value.weight.view(
-            weight_shape
-        )
-        q_weight = qkv_weight[:, :-2].flatten(0, -2).contiguous()
-        k_weight = qkv_weight[:, [-2]].flatten(0, -2).contiguous()
-        v_weight = qkv_weight[:, [-1]].flatten(0, -2).contiguous()
-        del qkv_weight
-        if self.module.self_attention.query_key_value.bias is None:
-            q_bias, k_bias, v_bias = None, None, None
-        else:
-            qkv_bias = self.module.self_attention.query_key_value.bias.view(bias_shape)
-            q_bias = qkv_bias[:, :-2].flatten(0, -2).contiguous()
-            k_bias = qkv_bias[:, -2].flatten(0, -2).contiguous()
-            v_bias = qkv_bias[:, -1].flatten(0, -2).contiguous()
-            del qkv_bias
-        q_proj = IPEXTransformerLinear(q_weight, q_bias)
-        k_proj = IPEXTransformerLinear(k_weight, k_bias)
-        v_proj = IPEXTransformerLinear(v_weight, v_bias)
         self.attn.load_parameter(
-            q_proj, k_proj, v_proj, self.module.self_attention.dense
+            qkv_proj=self.module.self_attention.query_key_value,
+            out_proj=self.module.self_attention.dense,
         )
 
     def port_mlp_parameter(self):

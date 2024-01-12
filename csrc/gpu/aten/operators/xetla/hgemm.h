@@ -176,9 +176,10 @@ GemmStatus hgemm_qkv_group(
     const sycl::half* a,
     const sycl::half* b,
     const int m,
-    const int n,
     const int k,
+    const int num_kv_head,
     const int group,
+    const int head_dim,
     const bool is_b_row_major);
 
 GemmStatus hgemm_qkv_group_bias(
@@ -190,9 +191,10 @@ GemmStatus hgemm_qkv_group_bias(
     const sycl::half* b,
     const sycl::half* bias,
     const int m,
-    const int n,
     const int k,
+    const int num_kv_head,
     const int group,
+    const int head_dim,
     const bool is_b_row_major);
 
 } // namespace xetla

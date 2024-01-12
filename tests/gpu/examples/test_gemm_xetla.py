@@ -213,25 +213,19 @@ def ipex_mm_qkv(m, n, k, dtype, with_bias):
 def ipex_mm_qkv_group(m, n, k, dtype, with_bias):
     bs = 1
     a = torch.rand(bs, m, k).type(dtype).xpu()
-    num_head = 64
-    num_kv_head = 8
+    num_head = 16
+    num_kv_head = 2
     head_dim = n // num_head
     group = num_head // num_kv_head + 2
     wq = torch.rand(k, num_kv_head, group - 2, head_dim).type(dtype).xpu()
     wk = torch.rand(k, num_kv_head, 1, head_dim).type(dtype).xpu()
     wv = torch.rand(k, num_kv_head, 1, head_dim).type(dtype).xpu()
-    # -> [num_head//num_kv_head + 2, hidden_size, num_kv_head, head_dim]
-    wqkv = torch.concat([wq, wk, wv], dim=2).permute(2, 0, 1, 3).contiguous().xpu()
+    # -> [hidden_size, num_kv_head, num_head//num_kv_head + 2, head_dim]
+    wqkv = torch.concat([wq, wk, wv], dim=2)
     bq = torch.rand(num_kv_head, group - 2, head_dim).type(dtype).xpu()
     bk = torch.rand(num_kv_head, 1, head_dim).type(dtype).xpu()
     bv = torch.rand(num_kv_head, 1, head_dim).type(dtype).xpu()
-    bqkv = (
-        torch.concat([bq, bk, bv], dim=1)
-        .permute(1, 0, 2)
-        .flatten(1, 2)
-        .contiguous()
-        .xpu()
-    )
+    bqkv = torch.concat([bq, bk, bv], dim=1)
 
     a_cpu = a.cpu().float()
     wq_cpu = wq.reshape(k, num_head * head_dim).cpu().float()
@@ -241,17 +235,11 @@ def ipex_mm_qkv_group(m, n, k, dtype, with_bias):
     bk_cpu = bk.flatten().cpu().float()
     bv_cpu = bv.flatten().cpu().float()
 
-    c0 = torch.empty((group - 2, bs, m, num_kv_head * head_dim), dtype=dtype).xpu()
+    c0 = torch.empty((bs, m, num_kv_head * (group - 2) * head_dim), dtype=dtype).xpu()
     c1 = torch.empty((bs, m, num_kv_head * head_dim), dtype=dtype).xpu()
     c2 = torch.empty((bs, m, num_kv_head * head_dim), dtype=dtype).xpu()
-    wqkv = wqkv.view(-1, k, num_kv_head, head_dim).reshape(
-        -1, k, num_kv_head * head_dim
-    )
+    wqkv = wqkv.view(k, num_kv_head, group, head_dim)
     if with_bias:
-        # for i in range(num_head // num_kv_head):
-        #    c0[i] = a @ wqkv[i] + bq[i]
-        # c1 = a @ wqkv[i + 1] + bq[i+1]
-        # c2 = a @ wqkv[i + 2] + bv[i+2]
         torch.ops.torch_ipex.mm_qkv_group_out(a, wqkv, bqkv, c0, c1, c2)
 
         c0_cpu = a_cpu @ wq_cpu + bq_cpu
@@ -264,13 +252,7 @@ def ipex_mm_qkv_group(m, n, k, dtype, with_bias):
         c1_cpu = a_cpu @ wk_cpu
         c2_cpu = a_cpu @ wv_cpu
 
-    # from: [num_head//num_kv_head + 2, m, num_kv_head, head_dim]
-    # to: [bs, m, num_kv_head * num_head//num_kv_head * head_dim]
-    c0 = (
-        c0.view(-1, bs, m, num_kv_head, head_dim)
-        .permute(1, 2, 3, 0, 4)
-        .reshape(bs, m, -1)
-    )
+    c0 = c0.reshape(bs, m, -1)
     c1 = c1.reshape(bs, m, -1)
     c2 = c2.reshape(bs, m, -1)
 
@@ -337,8 +319,12 @@ class TestNNMethod(TestCase):
     def test_gemm_xetla_group(self):
         shapes = [
             # m, n, k
-            [4, 2048, 8192],
+            [1024, 1024, 8192],
+            [1024, 2048, 8192],
+            [1, 1024, 8192],
             [1, 2048, 8192],
+            [4, 1024, 8192],
+            [4, 2048, 8192],
             [3, 4096, 16384],
             [3, 16384, 4096],
             [3, 32000, 4096],

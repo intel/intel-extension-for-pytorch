@@ -81,6 +81,17 @@ Accuracy_lmeval_llama2-70b() {
 }
 
 
+## Falcon-40b
+Accuracy_lmeval_falcon-40b() {
+    model=tiiuae/falcon-40b
+    sub_model_name=falcon-40b
+    dir=accuracy/${model}/task${task}_ranknum2
+    mkdir -p ${dir}
+    LLM_ACC_TEST=1 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py -m ${model} --sub-model-name ${sub_model_name} --ipex --dtype float16 --accuracy-only --acc-tasks ${task} 2>&1 | tee log_acc_ds
+    mv log_acc_ds ${dir}
+}
+
+
 ## OPT-6.7b
 Accuracy_lmeval_opt-6.7b() {
     model=facebook/opt-6.7b
@@ -135,6 +146,7 @@ main() {
     Accuracy_lmeval_llama2-13b
     Accuracy_lmeval_llama2-34b
     Accuracy_lmeval_llama2-70b
+    Accuracy_lmeval_falcon-40b
     Accuracy_lmeval_opt-6.7b
     Accuracy_lmeval_opt-30b
     Accuracy_lmeval_bloom-7b

@@ -715,14 +715,18 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
             kv = kv[:, :, :, None, :].expand(
                 bs_beam, seq_len, num_kv_heads, n_rep, head_dim
             )
-            kv = kv.reshape(bs_beam, seq_len, num_kv_heads * n_rep, head_dim)
+            kv = kv.reshape(
+                bs_beam, seq_len, num_kv_heads * n_rep, head_dim
+            ).contiguous()
             kv = kv.permute(0, 2, 1, 3)
         else:
             kv = kv.permute(2, 0, 1, 3)
             kv = kv[:, :, :, None, :].expand(
                 seq_len, bs_beam, num_kv_heads, n_rep, head_dim
             )
-            kv = kv.reshape(seq_len, bs_beam, num_kv_heads * n_rep, head_dim)
+            kv = kv.reshape(
+                seq_len, bs_beam, num_kv_heads * n_rep, head_dim
+            ).contiguous()
             kv = kv.permute(1, 2, 0, 3)
         return kv
 

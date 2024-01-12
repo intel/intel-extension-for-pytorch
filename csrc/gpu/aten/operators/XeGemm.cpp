@@ -528,32 +528,34 @@ static void mm_qkv_group_out(
     Tensor& out1_,
     Tensor& out2_) {
   auto input = input_.flatten(0, -2);
-  auto out0 = out0_.flatten(1, -2);
+  auto out0 = out0_.flatten(0, -2);
   auto out1 = out1_.flatten(0, -2);
   auto out2 = out2_.flatten(0, -2);
   // input: [bs * seq_len, hidden_size]
-  // weight: [num_head//num_kv_head + 2, hidden_size, num_kv_head * head_dim]
-  // bias: [num_head//num_kv_head + 2, num_kv_head * head_dim]
-  // out0: [num_head // num_kv_head, bs * seq_len, num_kv_head * head_dim]
-  TORCH_CHECK(input.dim() == 2 && weight.dim() == 3);
-  TORCH_CHECK(out0.dim() == 3 && out1.dim() == 2 && out2.dim() == 2);
+  // weight: [hidden_size, num_kv_head, num_head//num_kv_head + 2, head_dim]
+  // bias: [num_kv_head, num_head//num_kv_head + 2, head_dim]
+  // out0: [bs * seq_len, num_kv_head * num_head//num_kv_head * head_dim]
+  TORCH_CHECK(input.dim() == 2 && weight.dim() == 4);
+  TORCH_CHECK(out0.dim() == 2 && out1.dim() == 2 && out2.dim() == 2);
   int m = input.sizes()[0];
   int k = input.sizes()[1];
-  int n = weight.sizes()[2];
-  int group = weight.sizes()[0];
+  int num_kv_head = weight.sizes()[1];
+  int group = weight.sizes()[2];
+  int head_dim = weight.sizes()[3];
+  int n = num_kv_head * head_dim;
 
   bool has_bias = bias_.has_value();
   if (has_bias) {
     auto bias = bias_.value();
     TORCH_CHECK(
-        bias.dim() == 2 && bias.sizes()[0] == group && bias.sizes()[1] == n);
+        bias.dim() == 3 && bias.sizes()[0] == num_kv_head &&
+        bias.sizes()[1] == group && bias.sizes()[2] == head_dim);
   }
 
   TORCH_CHECK(
-      out0.sizes()[0] == group - 2 && out0.sizes()[1] == m &&
-      out1.sizes()[0] == m && out2.sizes()[0] == m);
-  TORCH_CHECK(
-      out0.sizes()[2] == n && out1.sizes()[1] == n && out2.sizes()[1] == n);
+      out0.sizes()[0] == m && out0.sizes()[1] == n * (group - 2) &&
+      out1.sizes()[0] == m && out1.sizes()[1] == n && out2.sizes()[0] == m &&
+      out2.sizes()[1] == n);
 
   bool is_a_contiguous = input.is_contiguous();
   bool is_b_row_major = weight.is_contiguous();
@@ -565,7 +567,7 @@ static void mm_qkv_group_out(
   using namespace xpu::xetla;
   using scalar_t =
       decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
-  auto& q = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
 
   DeviceId curDevID;
   AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
@@ -599,16 +601,17 @@ static void mm_qkv_group_out(
       sprintf(str__, "hgemm_qkv_group(%d, %d, %d, g=%d)", m, n, k, group);
       RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
       auto status = hgemm_qkv_group(
-          q,
+          queue,
           reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
           m,
-          n,
           k,
+          num_kv_head,
           group,
+          head_dim,
           is_b_row_major);
       if (status == GemmStatus::kSuccess)
         return;
@@ -616,7 +619,7 @@ static void mm_qkv_group_out(
       sprintf(str__, "hgemm_qkv_group_bias(%d, %d, %d, g=%d)", m, n, k, group);
       RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
       auto status = hgemm_qkv_group_bias(
-          q,
+          queue,
           reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
@@ -624,49 +627,41 @@ static void mm_qkv_group_out(
           reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()),
           m,
-          n,
           k,
+          num_kv_head,
           group,
+          head_dim,
           is_b_row_major);
       if (status == GemmStatus::kSuccess)
         return;
     }
   }
 
-  auto wk = weight[group - 2];
-  auto wv = weight[group - 1];
+  using namespace at::indexing;
+  out0 = out0.view({m, num_kv_head, group - 2, head_dim});
+  out1 = out1.view({m, num_kv_head, head_dim});
+  out2 = out2.view({m, num_kv_head, head_dim});
   if (!has_bias) {
-    for (int i = 0; i < group - 2; i++) {
-      auto out = out0[i];
-      at::AtenIpexTypeXPU::mm_out(input, weight[i], out);
-    }
-    at::AtenIpexTypeXPU::mm_out(input, wk, out1);
-    at::AtenIpexTypeXPU::mm_out(input, wv, out2);
+    auto out =
+        mm_common(input, weight.view({k, num_kv_head * group * head_dim}));
+    out = out.view({m, num_kv_head, group, head_dim});
+    out0.index_put_(
+        {"..."},
+        out.index({Slice(), Slice(), Slice(None, group - 2), Slice()}));
+    out1.index_put_({"..."}, out.index({Slice(), Slice(), group - 2, Slice()}));
+    out2.index_put_({"..."}, out.index({Slice(), Slice(), group - 1, Slice()}));
   } else {
-    for (int i = 0; i < group - 2; i++) {
-      auto out = out0_[i];
-      at::AtenIpexTypeXPU::addmm_out(
-          bias_.value()[i],
-          input,
-          weight[i],
-          at::Scalar(1),
-          at::Scalar(1),
-          out);
-    }
-    at::AtenIpexTypeXPU::addmm_out(
-        bias_.value()[group - 2],
+    auto out = mm_bias(
         input,
-        wk,
-        at::Scalar(1),
-        at::Scalar(1),
-        out1_);
-    at::AtenIpexTypeXPU::addmm_out(
-        bias_.value()[group - 1],
-        input,
-        wv,
-        at::Scalar(1),
-        at::Scalar(1),
-        out2_);
+        weight.view({k, num_kv_head * group * head_dim}),
+        bias_.value().view({1, num_kv_head * group * head_dim}),
+        1.0);
+    out = out.view({m, num_kv_head, group, head_dim});
+    out0.index_put_(
+        {"..."},
+        out.index({Slice(), Slice(), Slice(None, group - 2), Slice()}));
+    out1.index_put_({"..."}, out.index({Slice(), Slice(), group - 2, Slice()}));
+    out2.index_put_({"..."}, out.index({Slice(), Slice(), group - 1, Slice()}));
   }
 }
 

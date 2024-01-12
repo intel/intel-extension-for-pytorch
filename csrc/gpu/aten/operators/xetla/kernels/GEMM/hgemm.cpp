@@ -24,6 +24,8 @@ namespace xetla {
 
 #define HGEMM_QKV_IMPL_NAME(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR) HGEMM_IMPL_NAME(hgemm_qkv, WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)
 #define HGEMM_QKV_BIAS_IMPL_NAME(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR) HGEMM_IMPL_NAME(hgemm_qkv_bias, WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)
+#define HGEMM_QKV_GROUP_IMPL_NAME(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR) HGEMM_IMPL_NAME(hgemm_qkv_group, WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)
+#define HGEMM_QKV_GROUP_BIAS_IMPL_NAME(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR) HGEMM_IMPL_NAME(hgemm_qkv_group_bias, WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)
 
 // clang-format on
 
@@ -320,8 +322,7 @@ namespace xetla {
       const sycl::half* b,                                                     \
       const int m,                                                             \
       const int n,                                                             \
-      const int k,                                                             \
-      const int group) {                                                       \
+      const int k) {                                                           \
     hgemm_qkv<                                                                 \
         sycl::half,                                                            \
         WG_M,                                                                  \
@@ -333,7 +334,7 @@ namespace xetla {
         1,                                                                     \
         1,                                                                     \
         3,                                                                     \
-        B_ROW_MAJOR>(queue, out0, out1, out2, a, b, m, n, k, group);           \
+        B_ROW_MAJOR>(queue, out0, out1, out2, a, b, m, n, k);                  \
   }                                                                            \
   void HGEMM_QKV_BIAS_IMPL_NAME(                                               \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
@@ -346,8 +347,7 @@ namespace xetla {
       const sycl::half* bias,                                                  \
       const int m,                                                             \
       const int n,                                                             \
-      const int k,                                                             \
-      const int group) {                                                       \
+      const int k) {                                                           \
     hgemm_qkv_bias<                                                            \
         sycl::half,                                                            \
         WG_M,                                                                  \
@@ -359,7 +359,73 @@ namespace xetla {
         1,                                                                     \
         1,                                                                     \
         3,                                                                     \
-        B_ROW_MAJOR>(queue, out0, out1, out2, a, b, bias, m, n, k, group);     \
+        B_ROW_MAJOR>(queue, out0, out1, out2, a, b, bias, m, n, k);            \
+  }                                                                            \
+  void HGEMM_QKV_GROUP_IMPL_NAME(                                              \
+      WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
+      sycl::queue & queue,                                                     \
+      sycl::half * out0,                                                       \
+      sycl::half * out1,                                                       \
+      sycl::half * out2,                                                       \
+      const sycl::half* a,                                                     \
+      const sycl::half* b,                                                     \
+      const int m,                                                             \
+      const int k,                                                             \
+      const int num_kv_head,                                                   \
+      const int group,                                                         \
+      const int head_dim) {                                                    \
+    hgemm_qkv_group<                                                           \
+        sycl::half,                                                            \
+        WG_M,                                                                  \
+        WG_N,                                                                  \
+        SG_M,                                                                  \
+        SG_N,                                                                  \
+        SG_K,                                                                  \
+        SLM_KS,                                                                \
+        1,                                                                     \
+        1,                                                                     \
+        3,                                                                     \
+        B_ROW_MAJOR>(                                                          \
+        queue, out0, out1, out2, a, b, m, k, num_kv_head, group, head_dim);    \
+  }                                                                            \
+  void HGEMM_QKV_GROUP_BIAS_IMPL_NAME(                                         \
+      WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
+      sycl::queue & queue,                                                     \
+      sycl::half * out0,                                                       \
+      sycl::half * out1,                                                       \
+      sycl::half * out2,                                                       \
+      const sycl::half* a,                                                     \
+      const sycl::half* b,                                                     \
+      const sycl::half* bias,                                                  \
+      const int m,                                                             \
+      const int k,                                                             \
+      const int num_kv_head,                                                   \
+      const int group,                                                         \
+      const int head_dim) {                                                    \
+    hgemm_qkv_group_bias<                                                      \
+        sycl::half,                                                            \
+        WG_M,                                                                  \
+        WG_N,                                                                  \
+        SG_M,                                                                  \
+        SG_N,                                                                  \
+        SG_K,                                                                  \
+        SLM_KS,                                                                \
+        1,                                                                     \
+        1,                                                                     \
+        3,                                                                     \
+        B_ROW_MAJOR>(                                                          \
+        queue,                                                                 \
+        out0,                                                                  \
+        out1,                                                                  \
+        out2,                                                                  \
+        a,                                                                     \
+        b,                                                                     \
+        bias,                                                                  \
+        m,                                                                     \
+        k,                                                                     \
+        num_kv_head,                                                           \
+        group,                                                                 \
+        head_dim);                                                             \
   }
 
 HGEMM_ENUMERATE_POLICIES(HGEMM_ENUMERATE_IMPLS)
@@ -499,7 +565,6 @@ void (*hgemm_qkv_policies[HGEMM_NUM_POLICIES])(
     const sycl::half*,
     const int,
     const int,
-    const int,
     const int) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_QKV_IMPL_NAME)};
 
 void (*hgemm_qkv_bias_policies[HGEMM_NUM_POLICIES])(
@@ -512,8 +577,35 @@ void (*hgemm_qkv_bias_policies[HGEMM_NUM_POLICIES])(
     const sycl::half*,
     const int,
     const int,
-    const int,
     const int) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_QKV_BIAS_IMPL_NAME)};
+
+void (*hgemm_qkv_group_policies[HGEMM_NUM_POLICIES])(
+    sycl::queue&,
+    sycl::half*,
+    sycl::half*,
+    sycl::half*,
+    const sycl::half*,
+    const sycl::half*,
+    const int,
+    const int,
+    const int,
+    const int,
+    const int) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_QKV_GROUP_IMPL_NAME)};
+
+void (*hgemm_qkv_group_bias_policies[HGEMM_NUM_POLICIES])(
+    sycl::queue&,
+    sycl::half*,
+    sycl::half*,
+    sycl::half*,
+    const sycl::half*,
+    const sycl::half*,
+    const sycl::half*,
+    const int,
+    const int,
+    const int,
+    const int,
+    const int) = {
+    HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_QKV_GROUP_BIAS_IMPL_NAME)};
 
 GemmStatus hgemm_addmm(
     sycl::queue& queue,
@@ -748,7 +840,7 @@ GemmStatus hgemm_qkv(
   int policy_id = hgemm_qkv_find_policy_id(m, n, k, is_b_row_major);
   if (policy_id < 0)
     return GemmStatus::kError;
-  hgemm_qkv_policies[policy_id](queue, out0, out1, out2, a, b, m, n, k, 3);
+  hgemm_qkv_policies[policy_id](queue, out0, out1, out2, a, b, m, n, k);
   return GemmStatus::kSuccess;
 }
 
@@ -768,7 +860,7 @@ GemmStatus hgemm_qkv_bias(
   if (policy_id < 0)
     return GemmStatus::kError;
   hgemm_qkv_bias_policies[policy_id](
-      queue, out0, out1, out2, a, b, bias, m, n, k, 3);
+      queue, out0, out1, out2, a, b, bias, m, n, k);
   return GemmStatus::kSuccess;
 }
 
@@ -780,14 +872,16 @@ GemmStatus hgemm_qkv_group(
     const sycl::half* a,
     const sycl::half* b,
     const int m,
-    const int n,
     const int k,
+    const int num_kv_head,
     const int group,
+    const int head_dim,
     const bool is_b_row_major) {
-  int policy_id = hgemm_qkv_find_policy_id(m, n, k, is_b_row_major);
+  int policy_id = hgemm_qkv_find_policy_id(m, head_dim, k, is_b_row_major);
   if (policy_id < 0)
     return GemmStatus::kError;
-  hgemm_qkv_policies[policy_id](queue, out0, out1, out2, a, b, m, n, k, group);
+  hgemm_qkv_group_policies[policy_id](
+      queue, out0, out1, out2, a, b, m, k, num_kv_head, group, head_dim);
   return GemmStatus::kSuccess;
 }
 
@@ -800,15 +894,16 @@ GemmStatus hgemm_qkv_group_bias(
     const sycl::half* b,
     const sycl::half* bias,
     const int m,
-    const int n,
     const int k,
+    const int num_kv_head,
     const int group,
+    const int head_dim,
     const bool is_b_row_major) {
-  int policy_id = hgemm_qkv_find_policy_id(m, n, k, is_b_row_major);
+  int policy_id = hgemm_qkv_find_policy_id(m, head_dim, k, is_b_row_major);
   if (policy_id < 0)
     return GemmStatus::kError;
-  hgemm_qkv_bias_policies[policy_id](
-      queue, out0, out1, out2, a, b, bias, m, n, k, group);
+  hgemm_qkv_group_bias_policies[policy_id](
+      queue, out0, out1, out2, a, b, bias, m, k, num_kv_head, group, head_dim);
   return GemmStatus::kSuccess;
 }
 

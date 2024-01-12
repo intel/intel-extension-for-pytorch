@@ -20,7 +20,6 @@ from .transformer_modules.GroupedAttention import (  # noqa F401
     IPEXTransformerAttnOptimizedFp16Grouped,
 )
 from .transformer_modules.Decoderblock import IPEXTransformerBlock
-from .transformer_modules.Linear import IPEXTransformerLinear
 from .transformer_modules.Mlp import *  # noqa
 import sys
 
@@ -138,49 +137,11 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
         )
 
     def port_attn_parameter(self):
-        embed_dim = self.attn.embed_dim
-        num_head = self.attn.num_attn_head
-        num_kv_head = self.attn.num_kv_head
-        head_dim = self.attn.head_dim
-        group = num_head // num_kv_head + 2
-
-        attn = self.module.self_attn
-
-        def helper(proj, g):
-            w = (
-                proj.weight.view(num_kv_head, g, head_dim, embed_dim)
-                .permute(1, 0, 2, 3)
-                .flatten(1, 2)
-                .contiguous()
-            )
-            del proj.weight
-            if proj.bias is not None:
-                b = (
-                    proj.bias.view(num_kv_head, g, head_dim)
-                    .permute(1, 0, 2)
-                    .flatten(1, 2)
-                    .contiguous()
-                )
-                del proj.bias
-            else:
-                b = None
-            return w, b
-
-        wq, bq = helper(attn.q_proj, group - 2)
-        wk, bk = helper(attn.k_proj, 1)
-        wv, bv = helper(attn.v_proj, 1)
-
-        # [num_head//num_kv_head + 2, num_kv_head * head_dim, embed_dim]
-        wqkv = torch.concat([wq, wk, wv], dim=0).contiguous()
-        if bq is None:
-            bqkv = None
-        else:
-            bqkv = torch.concat([bq, bk, bv], dim=0).contiguous()
-        assert bqkv is None
-        qkv_proj = IPEXTransformerLinear(wqkv, bqkv)
         self.attn.load_parameter(
-            qkv_proj,
-            self.module.self_attn.o_proj,
+            q_proj=self.module.self_attn.q_proj,
+            k_proj=self.module.self_attn.k_proj,
+            v_proj=self.module.self_attn.v_proj,
+            out_proj=self.module.self_attn.o_proj,
         )
 
     def port_mlp_parameter(self):
