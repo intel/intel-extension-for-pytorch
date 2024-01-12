@@ -3,6 +3,11 @@ gcc:
   min-version: 12.3.0
 llvm:
   version: 16.0.6
+lm-evaluation-harness:
+  commit: cc9778fbe4fa1a709be2abed9deb6180fd40e7e2
+  repo: https://github.com/EleutherAI/lm-evaluation-harness
+neural-compressor:
+  version: 2.4.1
 oneCCL:
   repo: https://github.com/oneapi-src/oneCCL.git
   branch: '2021.10'
@@ -22,12 +27,7 @@ deepspeed:
   branch: master
   repo: https://github.com/microsoft/DeepSpeed.git
   commit: 16c265c0ce103147d027d9cae32dd7680766af21
-lm-evaluation-harness:
-  repo: https://github.com/EleutherAI/lm-evaluation-harness
-  commit: cc9778fbe4fa1a709be2abed9deb6180fd40e7e2
 transformers:
   version: 4.35.2
 protobuf:
   version: 3.20.3
-neural-compressor:
-  version: 2.3.1

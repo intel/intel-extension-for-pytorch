@@ -51,9 +51,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument("--output-dir", nargs="?", default="./saved_results")
 
     # quantization related arguments.
-    parser.add_argument("--int8", action="store_true", help="default static int8 path (fp32 mixed)")
     parser.add_argument(
-        "--int8-bf16-mixed",
+        "--quant-with-amp",
         action="store_true",
         help="by default static quant is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
     )
@@ -67,7 +66,29 @@ def main(args_in: Optional[List[str]] = None) -> None:
         default="NeelNanda/pile-10k",
         help="Calibration dataset for static quantization and GPTQ")
     parser.add_argument("--ipex-smooth-quant", action="store_true", help="smoothquant forstatic quantization")
-    parser.add_argument("--alpha", default=0.5, type=float, help="alpha value for smoothquant")
+    parser.add_argument("--alpha", default=0.5, help="alpha value for smoothquant")
+    parser.add_argument(
+    "--folding", default=False, type=bool, help="whether to fold mul into the previous layer"
+    )
+    parser.add_argument(
+        "--init-alpha", default=0.5, type=float, help="a value to get baseline quantization error for auto-tuning"
+    )
+    parser.add_argument(
+        "--alpha-min", default=0.0, type=float, help="min value of auto-tuning alpha search space"
+    )
+    parser.add_argument(
+        "--alpha-max", default=1.0, type=float, help="max value of auto-tuning alpha search space"
+    )
+    parser.add_argument(
+        "--alpha-step", default=0.1, type=float, help="step_size of auto-tuning alpha search space"
+    )
+    parser.add_argument(
+        "--shared-criterion", choices=["min", "mean", "max"], default="max", type=str
+        , help="criterion for input LayerNorm op of a transformer block"
+    )
+    parser.add_argument(
+        "--enable-blockwise-loss", default=False, type=bool, help="whether to enable block-wise auto-tuning"
+    )
     parser.add_argument(
         "--ipex-weight-only-quantization",
         action="store_true",
@@ -134,7 +155,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument("--token-latency", action="store_true")
     parser.add_argument("--greedy", action="store_true")
     parser.add_argument("--profile", action="store_true")
-    parser.add_argument("--deployment-mode", action="store_true")
+    parser.add_argument("--disable-deployment-mode", action="store_true")
 
     # deepspeed inference related arguments.
     parser.add_argument("--autotp", action="store_true")
@@ -162,7 +183,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--greedy"])
             if args.ipex:
                 infer_cmd.extend(["--ipex"])
-            if args.deployment_mode:
+            if not args.disable_deployment_mode:
                 infer_cmd.extend(["--deployment-mode"])
             if args.profile:
                 infer_cmd.extend(["--profile"])
@@ -192,10 +213,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
             infer_cmd.extend(["--batch-size", str(args.batch_size)])
             infer_cmd.extend(["--output-dir", str(args.output_dir)])
-            if args.int8_bf16_mixed:
-                infer_cmd.extend(["--int8-bf16-mixed"])
-            if args.int8:
-                infer_cmd.extend(["--int8"])
+            if args.quant_with_amp:
+                infer_cmd.extend(["--quant-with-amp"])
             if args.greedy:
                 infer_cmd.extend(["--greedy"])
             if args.ipex_weight_only_quantization:
@@ -248,9 +267,18 @@ def main(args_in: Optional[List[str]] = None) -> None:
             else:
                 infer_cmd.extend(["--ipex-smooth-quant"])
                 infer_cmd.extend(["--alpha", str(args.alpha)])
+                if args.folding:
+                    infer_cmd.extend(["--folding"])
+                infer_cmd.extend(["--init-alpha", str(args.init_alpha)])
+                infer_cmd.extend(["--alpha-min", str(args.alpha_min)])
+                infer_cmd.extend(["--alpha-max", str(args.alpha_max)])
+                infer_cmd.extend(["--alpha-step", str(args.alpha_step)])
+                infer_cmd.extend(["--shared-criterion", str(args.shared_criterion)])
+                if args.enable_blockwise_loss:
+                    infer_cmd.extend(["--enable-blockwise-loss"])
                 infer_cmd.extend(["--dataset", str(args.dataset)])
-            if args.int8_bf16_mixed:
-                infer_cmd.extend(["--int8-bf16-mixed"])
+            if args.quant_with_amp:
+                infer_cmd.extend(["--quant-with-amp"])
             if args.greedy:
                 infer_cmd.extend(["--greedy"])
             if args.profile:
@@ -280,10 +308,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 quant_cmd.extend(["--output-dir", str(args.output_dir)])
                 if args.config_file is not None:
                     quant_cmd.extend(["--config-file", str(args.config_file)])
-                if args.int8_bf16_mixed:
-                    quant_cmd.extend(["--int8-bf16-mixed"])
-                if args.int8:
-                    quant_cmd.extend(["--int8"])
+                if args.quant_with_amp:
+                    quant_cmd.extend(["--quant-with-amp"])
                 if args.greedy:
                     quant_cmd.extend(["--greedy"])
                 if args.ipex_weight_only_quantization:
@@ -338,6 +364,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 else:
                     quant_cmd.extend(["--ipex-smooth-quant"])
                     quant_cmd.extend(["--alpha", str(args.alpha)])
+                    if args.folding:
+                        quant_cmd.extend(["--folding"])
+                    quant_cmd.extend(["--init-alpha", str(args.init_alpha)])
+                    quant_cmd.extend(["--alpha-min", str(args.alpha_min)])
+                    quant_cmd.extend(["--alpha-max", str(args.alpha_max)])
+                    quant_cmd.extend(["--alpha-step", str(args.alpha_step)])
+                    quant_cmd.extend(["--shared-criterion", str(args.shared_criterion)])
+                    if args.enable_blockwise_loss:
+                        quant_cmd.extend(["--enable-blockwise-loss"])
                     quant_cmd.extend(["--dataset", str(args.dataset)])
                     quant_cmd.extend(["--qconfig-summary-file", str(args.qconfig_summary_file)])
                 print("LLM RUNTIME INFO: quantizing model ...")
@@ -362,8 +397,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
             infer_cmd.extend(["--batch-size", str(args.batch_size)])
 
-            if args.int8_bf16_mixed:
-                infer_cmd.extend(["--int8-bf16-mixed"])
+            if args.quant_with_amp:
+                infer_cmd.extend(["--quant-with-amp"])
             if args.greedy:
                 infer_cmd.extend(["--greedy"])
             if args.profile:
@@ -444,7 +479,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--greedy"])
         if args.ipex:
             infer_cmd.extend(["--ipex"])
-        if args.deployment_mode:
+        if not args.disable_deployment_mode:
             infer_cmd.extend(["--deployment-mode"])
         if args.profile:
             infer_cmd.extend(["--profile"])
@@ -462,8 +497,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--ipex-weight-only-quantization"])
             infer_cmd.extend(["--weight-dtype", str(args.weight_dtype)])
             infer_cmd.extend(["--lowp-mode", str(args.lowp_mode)])
-            if args.int8_bf16_mixed:
-                infer_cmd.extend(["--int8-bf16-mixed"])
+            if args.quant_with_amp:
+                infer_cmd.extend(["--quant-with-amp"])
 
         print("LLM RUNTIME INFO: running model geneartion with deepspeed (autotp)...")
         result = subprocess.run(infer_cmd)

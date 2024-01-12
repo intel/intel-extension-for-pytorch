@@ -3,7 +3,6 @@ import time
 import json
 import pathlib
 import re
-
 from datasets import load_dataset
 
 import torch
@@ -50,9 +49,8 @@ parser.add_argument(
     action="store_true",
     help="use ipex weight-only quantization",
 )
-parser.add_argument("--int8", action="store_true")
 parser.add_argument(
-    "--int8-bf16-mixed",
+    "--quant-with-amp",
     action="store_true",
     help="by default it is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
 )
@@ -64,8 +62,28 @@ parser.add_argument("--prompt", default=None, type=str)
 parser.add_argument("--num-iter", default=100, type=int, help="num iter")
 parser.add_argument("--num-warmup", default=10, type=int, help="num warmup")
 parser.add_argument("--batch-size", default=1, type=int, help="batch size")
+parser.add_argument("--alpha", default=0.5, help="alpha value for smoothquant")
 parser.add_argument(
-    "--alpha", default=0.8, type=float, help="alpha value for smoothquant"
+    "--folding", action="store_true", help="whether to fold mul into the previous layer"
+)
+parser.add_argument(
+    "--init-alpha", default=0.5, type=float, help="a value to get baseline quantization error for auto-tuning"
+)
+parser.add_argument(
+    "--alpha-min", default=0.0, type=float, help="min value of auto-tuning alpha search space"
+)
+parser.add_argument(
+    "--alpha-max", default=1.0, type=float, help="max value of auto-tuning alpha search space"
+)
+parser.add_argument(
+    "--alpha-step", default=0.1, type=float, help="step_size of auto-tuning alpha search space"
+)
+parser.add_argument(
+    "--shared-criterion", choices=["min", "mean", "max"], default="max", type=str
+    , help="criterion for input LayerNorm op of a transformer block"
+)
+parser.add_argument(
+    "--enable-blockwise-loss", action="store_true", help="whether to enable block-wise auto-tuning"
 )
 parser.add_argument("--token-latency", action="store_true")
 parser.add_argument("--greedy", action="store_true")
@@ -139,7 +157,7 @@ except Exception:
     pass
 
 # amp autocast
-if args.int8_bf16_mixed:
+if args.quant_with_amp:
     amp_enabled = True
     amp_dtype = torch.bfloat16
 else:
@@ -238,6 +256,66 @@ global_past_key_value = [
     for i in range(n_layers)
 ]
 
+def get_example_inputs(model):
+    if model.use_global_past_key_value:
+        global global_past_key_value
+    example_inputs = None
+    input_ids = torch.ones(32).to(torch.long)
+    attention_mask = torch.ones(len(input_ids))
+    if model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_POS_KV:
+        position_ids = torch.arange(len(input_ids))
+        example_inputs = (
+            input_ids.unsqueeze(0),
+            attention_mask.unsqueeze(0),
+            position_ids.unsqueeze(0),
+            tuple(global_past_key_value),
+        )
+    elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_KV_POS:
+        position_ids = torch.arange(len(input_ids))
+        example_inputs = (
+            input_ids.unsqueeze(0),
+            attention_mask.unsqueeze(0),
+            tuple(global_past_key_value),
+            position_ids.unsqueeze(0),
+        )
+    elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.KV_MASK:
+        example_inputs = (
+            input_ids.unsqueeze(0),
+            tuple(global_past_key_value),
+            attention_mask.unsqueeze(0),
+        )
+    elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_KV:
+        example_inputs = (
+            input_ids.unsqueeze(0),
+            attention_mask.unsqueeze(0),
+            tuple(global_past_key_value),
+        )
+    elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_KV_ENC:
+        last_hidden_state = torch.rand([1, 32, 2048])
+        global_past_key_value = [
+            (
+                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                torch.zeros([1, n_heads, 1, head_dim]).contiguous(),
+                torch.zeros([1, n_heads, 1, head_dim]).contiguous(),
+                beam_idx_tmp,
+                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                torch.zeros([32, 1, n_heads, head_dim]).contiguous(),
+                torch.zeros([32, 1, n_heads, head_dim]).contiguous(),
+                beam_idx_tmp,
+            )
+            for i in range(n_layers)
+        ]
+        example_inputs = (
+            torch.ones(1).to(torch.long).unsqueeze(0),
+            attention_mask.unsqueeze(0),
+            tuple(global_past_key_value),
+            (last_hidden_state,),
+        )
+    else:
+        raise RuntimeError("Your model does not match existing example inputs used in ipex quantization, exiting...")
+    if hasattr(model, "extra_inputs"):
+        example_inputs = example_inputs + model.extra_inputs
+    return example_inputs
 
 if args.ipex_smooth_quant:
     if args.qconfig_summary_file != "":
@@ -295,41 +373,92 @@ if args.ipex_smooth_quant:
                     last_ind.append(input_ids.shape[0] - 1)
                     attention_mask = torch.ones(len(input_ids))
                     position_ids = torch.arange(len(input_ids))
+
                     input_ids_padded.append(input_ids)
                     attention_mask_padded.append(attention_mask)
                     position_ids_padded.append(position_ids)
-                    if not model.use_global_past_key_value:
-                        # dummy past key value
-                        beam_idx_tmp = torch.zeros(
-                            (2048, int(self.args.batch_size * num_beams)), dtype=torch.long
-                        ).contiguous()
-                        past_key_value = [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 16, 1, 256]).contiguous(),
-                                torch.zeros([1, 16, 1, 256]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(28)
-                        ]
-                return (
-                    (
+
+                if model.use_global_past_key_value:
+                    global global_past_key_value
+                if model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_POS_KV:
+                    model_inputs = (
                         torch.vstack(input_ids_padded),
                         torch.vstack(attention_mask_padded),
                         torch.vstack(position_ids_padded),
-                        tuple(global_past_key_value)
-                        if model.use_global_past_key_value
-                        else tuple(past_key_value),
-                    ),
-                    torch.tensor(last_ind),
-                )
+                        tuple(global_past_key_value),
+                    )
+                elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_KV_POS:
+                    model_inputs = (
+                        torch.vstack(input_ids_padded),
+                        torch.vstack(attention_mask_padded),
+                        tuple(global_past_key_value),
+                        torch.vstack(position_ids_padded),
+                    )
+                elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.KV_MASK:
+                    model_inputs = (
+                        torch.vstack(input_ids_padded),
+                        tuple(global_past_key_value),
+                        torch.vstack(attention_mask_padded),
+                    )
+                elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_KV:
+                    model_inputs = (
+                        torch.vstack(input_ids_padded),
+                        torch.vstack(attention_mask_padded),
+                        tuple(global_past_key_value),
+                    )
+                elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_KV_ENC:
+                    model_kwargs = {
+                        "attention_mask": torch.vstack(attention_mask_padded),
+                    }
+                    model_kwargs = user_model._prepare_encoder_decoder_kwargs_for_generation(
+                        torch.vstack(input_ids_padded), model_kwargs, "input_ids"
+                    )
+                    input_ids, example_inputs = user_model._expand_inputs_for_generation(
+                        input_ids=torch.vstack(input_ids_padded),
+                        expand_size=num_beams,
+                        is_encoder_decoder=True,
+                        **model_kwargs,
+                    )
+                    input_bs = int(args.batch_size * num_beams)
+                    last_hidden_state = example_inputs["encoder_outputs"]["last_hidden_state"]
+                    global_past_key_value = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, n_heads, 1, head_dim]).contiguous(),
+                                torch.zeros([1, n_heads, 1, head_dim]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                user_model.decoder.block[i].layer[1].EncDecAttention.k(last_hidden_state)
+                                .view(input_bs, -1, n_heads, head_dim).transpose(0, 1),
+                                user_model.decoder.block[i].layer[1].EncDecAttention.v(last_hidden_state)
+                                .view(input_bs, -1, n_heads, head_dim).transpose(0, 1),
+                                beam_idx_tmp,
+                            )
+                            for i in range(n_layers)
+                        ]
+                    )
+                    decoder_input_ids = (torch.zeros(input_bs).to(torch.long).unsqueeze(1))
+                    model_inputs = (
+                        decoder_input_ids,
+                        torch.vstack(attention_mask_padded),
+                        tuple(global_past_key_value),
+                        (last_hidden_state,),
+                    )
+                else:
+                    raise RuntimeError("Your model does not match existing example inputs used in ipex smooth quant, exiting...")
+
+                if hasattr(model, "extra_inputs"):
+                    model_inputs = model_inputs + model.extra_inputs
+
+                return (model_inputs, last_ind)
     
         calib_dataset = load_dataset(
             args.dataset if args.dataset else model.default_dataset, split="train"
         )
         user_model.eval()
         calib_evaluator = Evaluator(
-            calib_dataset, tokenizer, args, batch_size=args.batch_size
+            calib_dataset, tokenizer, args, batch_size=args.batch_size, pad_max=int(args.input_tokens) if model.name=="t5" else 512
         )
         calib_dataloader = DataLoader(
             calib_evaluator.dataset,
@@ -337,24 +466,18 @@ if args.ipex_smooth_quant:
             shuffle=False,
             collate_fn=calib_evaluator.collate_batch,
         )
-    
+
         def calib_func(prepared_model):
-            for i, (
-                (input_ids, attention_mask, position_ids, past_key_values),
-                last_ind,
-            ) in enumerate(calib_dataloader):
+            for i, (model_inputs, last_ind) in enumerate(calib_dataloader):
                 if i == 512:
                     break
-                prepared_model(
-                    input_ids,
-                    attention_mask=attention_mask,
-                    position_ids=position_ids,
-                    past_key_values=past_key_values,
-                )
+                prepared_model(*model_inputs)
+
+        example_inputs = get_example_inputs(model)
+
+        from intel_extension_for_pytorch.quantization import prepare, convert
     
-        if model.use_neural_compressor:
-            from neural_compressor import PostTrainingQuantConfig, quantization
-    
+        if model.use_ipex_autotune:
             qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
             user_model = ipex.llm.optimize(
                 user_model.eval(),
@@ -363,55 +486,59 @@ if args.ipex_smooth_quant:
                 inplace=True,
                 deployment_mode=False,
             )
-            op_type_dict = {
-                "add": {"weight": {"dtype": ["fp32"]}, "activation": {"dtype": ["fp32"]}},
-                "linear": {
-                    "weight": {
-                        "dtype": ["int8"],
-                        "scheme": ["sym"],
-                        "granularity": ["per_channel"],
-                        "algorithm": ["minmax"],
+            op_type_dict = {}
+            if re.search("chatglm", config.architectures[0], re.IGNORECASE):
+                op_type_dict = {
+                    "add": {"weight": {"dtype": ["fp32"]}, "activation": {"dtype": ["fp32"]}},
+                    "linear": {
+                        "weight": {
+                            "dtype": ["int8"],
+                            "scheme": ["sym"],
+                            "granularity": ["per_channel"],
+                            "algorithm": ["minmax"],
+                        },
+                        "activation": {
+                            "dtype": ["uint8"],
+                            "scheme": ["asym"],
+                            "granularity": ["per_tensor"],
+                            "algorithm": ["kl"],
+                        },
                     },
-                    "activation": {
-                        "dtype": ["uint8"],
-                        "scheme": ["asym"],
-                        "granularity": ["per_tensor"],
-                        "algorithm": ["kl"],
-                    },
-                },
-            }
-    
-            excluded_precisions = [] if args.int8_bf16_mixed else ["bf16"]
-            recipes = {"smooth_quant": True, "smooth_quant_args": {"alpha": args.alpha}}
-    
-            recipes["smooth_quant_args"]["folding"] = True
-    
-            print("smooth_quant_args:", recipes)
-            conf = PostTrainingQuantConfig(
-                backend="ipex",
-                excluded_precisions=excluded_precisions,
-                op_type_dict=op_type_dict,
-                recipes=recipes,
-            )
-    
-            q_model = quantization.fit(
+                }
+            
+            smoothquant_args = {"alpha": args.alpha if args.alpha == "auto" \
+                                else eval(args.alpha), "folding": args.folding}
+            if args.alpha == "auto":
+                smoothquant_args["auto_alpha_args"] = {
+                        "init_alpha": float(args.init_alpha),
+                        "alpha_min": float(args.alpha_min),
+                        "alpha_max": float(args.alpha_max),
+                        "alpha_step": float(args.alpha_step),
+                        "shared_criterion": args.shared_criterion,
+                        "enable_blockwise_loss": args.enable_blockwise_loss
+                }
+                # using specified sq recipes for llama2-7b
+                if re.search("llama", config.architectures[0], re.IGNORECASE):
+                    smoothquant_args = {"alpha": "auto", "folding": False}
+                    smoothquant_args["auto_alpha_args"] = {
+                        "init_alpha": 0.8,
+                        "alpha_min": 0.8,
+                        "alpha_max": 0.99,
+                        "alpha_step": 0.01,
+                        "shared_criterion": "mean",
+                        "enable_blockwise_loss": False
+                }
+
+            prepared_model = ipex.quantization.autotune(
                 user_model,
-                conf,
-                calib_dataloader=calib_dataloader,
+                calib_dataloader,
                 calib_func=calib_func,
+                op_type_dict=op_type_dict,
+                smoothquant_args=smoothquant_args
             )
-    
-            q_model.save(args.output_dir)
+            prepared_model.save_qconf_summary(args.output_dir + "/best_configure.json")
+
         else:
-            example_inputs = None
-            for i, (
-                (input_ids, attention_mask, position_ids, past_key_values),
-                last_ind,
-            ) in enumerate(calib_dataloader):
-                example_inputs = (input_ids, attention_mask, position_ids, past_key_values)
-                break
-            from intel_extension_for_pytorch.quantization import prepare, convert
-    
             qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=args.alpha)
             user_model = ipex.llm.optimize(
                 user_model.eval(),
@@ -423,30 +550,23 @@ if args.ipex_smooth_quant:
             prepared_model = prepare(
                 user_model.eval(), qconfig, example_inputs=example_inputs, inplace=True
             )
-            with torch.no_grad():
-                for i, (
-                    (input_ids, attention_mask, position_ids, past_key_values),
-                    last_ind,
-                ) in enumerate(calib_dataloader):
-                    if i == 512:
-                        break
-                    prepared_model(
-                        input_ids,
-                        position_ids=position_ids,
-                        attention_mask=attention_mask,
-                        past_key_values=past_key_values,
-                    )
-            with torch.no_grad(), torch.cpu.amp.autocast(
-                enabled=amp_enabled,
-            ):
-                convert_model = convert(prepared_model.eval(), inplace=True).eval()
-                self_jit = torch.jit.trace(
-                    convert_model.eval(), example_inputs, strict=False, check_trace=False
-                )
-                self_jit = torch.jit.freeze(self_jit.eval())
-                pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-                self_jit.save(args.output_dir + "/" + args.quant_model_name)
-                quant_model = self_jit
+
+            for i, (model_inputs, last_ind) in enumerate(calib_dataloader):
+                if i == 512:
+                    break
+                prepared_model(*model_inputs)
+
+        with torch.no_grad(), torch.cpu.amp.autocast(
+            enabled=amp_enabled,
+        ):
+            convert_model = convert(prepared_model.eval(), inplace=True).eval()
+            self_jit = torch.jit.trace(
+                convert_model.eval(), example_inputs, strict=False, check_trace=False
+            )
+            self_jit = torch.jit.freeze(self_jit.eval())
+            pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+            self_jit.save(args.output_dir + "/" + args.quant_model_name)
+            quant_model = self_jit
 
 elif args.ipex_weight_only_quantization:
     weight_dtype = torch.quint4x2 if args.weight_dtype == "INT4" else torch.qint8
@@ -498,60 +618,7 @@ elif args.ipex_weight_only_quantization:
         low_precision_checkpoint=low_precision_checkpoint,
         deployment_mode=False,
     )
-    example_inputs = None
-    input_ids = torch.ones(32).to(torch.long)
-    attention_mask = torch.ones(len(input_ids))
-    if model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_POS_KV:
-        position_ids = torch.arange(len(input_ids))
-        example_inputs = (
-            input_ids.unsqueeze(0),
-            attention_mask.unsqueeze(0),
-            position_ids.unsqueeze(0),
-            tuple(global_past_key_value),
-        )
-    elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_KV_POS:
-        position_ids = torch.arange(len(input_ids))
-        example_inputs = (
-            input_ids.unsqueeze(0),
-            attention_mask.unsqueeze(0),
-            tuple(global_past_key_value),
-            position_ids.unsqueeze(0),
-        )
-    elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.KV_MASK:
-        example_inputs = (
-            input_ids.unsqueeze(0),
-            tuple(global_past_key_value),
-            attention_mask.unsqueeze(0),
-        )
-    elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_KV_ENC:
-        last_hidden_state = torch.rand([1, 32, 2048])
-        global_past_key_value = [
-            (
-                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                torch.zeros([1, n_heads, 1, head_dim]).contiguous(),
-                torch.zeros([1, n_heads, 1, head_dim]).contiguous(),
-                beam_idx_tmp,
-                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                torch.zeros([32, 1, n_heads, head_dim]).contiguous(),
-                torch.zeros([32, 1, n_heads, head_dim]).contiguous(),
-                beam_idx_tmp,
-            )
-            for i in range(n_layers)
-        ]
-        example_inputs = (
-            torch.ones(1).to(torch.long).unsqueeze(0),
-            attention_mask.unsqueeze(0),
-            tuple(global_past_key_value),
-            (last_hidden_state,),
-        )
-    else:
-        example_inputs = (
-            input_ids.unsqueeze(0),
-            attention_mask.unsqueeze(0),
-            tuple(global_past_key_value),
-        )
-    if hasattr(model, "extra_inputs"):
-        example_inputs = example_inputs + model.extra_inputs
+    example_inputs = get_example_inputs(model)
     with torch.no_grad(), torch.cpu.amp.autocast(
         enabled=amp_enabled,
     ):

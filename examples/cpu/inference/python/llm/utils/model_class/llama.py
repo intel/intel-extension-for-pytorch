@@ -10,12 +10,12 @@ class LLAMAConfig(LLMConfig):
         self.name = "llama"
         self.model_id = model_id
         self.to_channels_last = False
-        self.example_inputs_mode = EXAMPLE_INPUTS_MODE.MASK_POS_KV
+        self.example_inputs_mode = EXAMPLE_INPUTS_MODE.MASK_KV_POS
 
         # for smooth quant
         self.default_dataset = "NeelNanda/pile-10k"
         self.use_global_past_key_value = True
-        self.use_neural_compressor = False
+        self.use_ipex_autotune = True
     
     def get_user_model(self, config, benchmark):
         if benchmark:

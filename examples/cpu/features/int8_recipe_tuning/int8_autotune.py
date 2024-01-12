@@ -85,8 +85,6 @@ for t in range(epochs):
     train(train_dataloader, model, loss_fn, optimizer)
 print("Done!")
 
-########################################################################  # noqa F401
-
 ################################ QUANTIZE ##############################  # noqa F401
 model.eval()
 
@@ -102,23 +100,17 @@ def evaluate(dataloader, model):
     accuracy /= size
     return accuracy
 
-# prepare model, do conv+bn folding, and init model quant_state.
-qconfig = ipex.quantization.default_static_qconfig
-data = torch.randn(1, 1, 28, 28)
-prepared_model = ipex.quantization.prepare(model, qconfig, example_inputs=data, inplace=False)
-
-
 ######################## recipe tuning with INC ########################  # noqa F401
 def eval(prepared_model):
     accu = evaluate(test_dataloader, prepared_model)
     return float(accu)
 
-# print(eval(prepared_model))
-tuned_model = ipex.quantization.autotune(prepared_model, test_dataloader, eval, sampling_sizes=[100],
+tuned_model = ipex.quantization.autotune(model, test_dataloader, eval_func=eval, sampling_sizes=[100],
                                          accuracy_criterion={'relative': .01}, tuning_time=0)
 ########################################################################  # noqa F401
 
 # run tuned model
+data = torch.randn(1, 1, 28, 28)
 convert_model = ipex.quantization.convert(tuned_model)
 with torch.no_grad():
     traced_model = torch.jit.trace(convert_model, data)

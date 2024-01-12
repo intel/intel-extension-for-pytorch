@@ -99,23 +99,8 @@ def validate(val_loader, model, criterion, args):
 
         return top1.avg.item()
 
-    print(".........runing calibration step.........")
-    from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, QConfig
-    qconfig = QConfig(
-        activation=MinMaxObserver.with_args(qscheme=torch.per_tensor_symmetric, dtype=torch.qint8),
-        weight=PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
-    x = torch.randn(1, 3, 224, 224)
-    prepared_model = ipex.quantization.prepare(model, qconfig, x, inplace=True)
-    with torch.no_grad():
-        for i, (images, target) in enumerate(val_loader):
-            images = images.contiguous(memory_format=torch.channels_last)
-            prepared_model(images)
-            if i == 4:
-                break
-    print(".........calibration step done.........")
-
     print(".........runing autotuning step.........")
-    tuned_model = ipex.quantization.autotune(prepared_model, val_loader, eval_func, sampling_sizes=[300])
+    tuned_model = ipex.quantization.autotune(model, val_loader, eval_func=eval_func, sampling_sizes=[300])
     print(".........autotuning step done.........")
 
     print(".........runing int8 inference.........")
@@ -157,7 +142,7 @@ def main(args):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('data', metavar='DIR', nargs='?', default='imagenet',
+    parser.add_argument('-data', metavar='DIR', nargs='?', default='imagenet',
                         help='path to dataset (default: imagenet)')
     parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                         choices=model_names,
