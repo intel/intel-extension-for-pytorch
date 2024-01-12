@@ -49,15 +49,29 @@
   - test_decomp.py::TestDecompXPU::test_comprehensive_tensordot_xpu_bfloat16
   - test_decomp.py::TestDecompXPU::test_comprehensive_tensordot_xpu_float16
   - test_decomp.py::TestDecompXPU::test_comprehensive_tensordot_xpu_float32
+  - test_decomp.py::TestDecompXPU::test_comprehensive_unfold_copy_xpu_float16
+  - test_decomp.py::TestDecompXPU::test_comprehensive_unfold_copy_xpu_float32
+  - test_decomp.py::TestDecompXPU::test_comprehensive_unfold_copy_xpu_float64
+  - test_decomp.py::TestDecompXPU::test_comprehensive_unfold_xpu_float16
+  - test_decomp.py::TestDecompXPU::test_comprehensive_unfold_xpu_float32
+  - test_decomp.py::TestDecompXPU::test_comprehensive_unfold_xpu_float64
   - test_decomp.py::TestDecompXPU::test_quick_addmm_xpu_bfloat16
   - test_decomp.py::TestDecompXPU::test_quick_addmm_xpu_float16
   - test_decomp.py::TestDecompXPU::test_quick_addmm_xpu_float32
+  - test_indexing.py::NumpyTestsXPU::test_trivial_fancy_out_of_bounds_xpu
+  - test_indexing.py::TestIndexingXPU::test_advancedindex_xpu_float64
+  - test_indexing.py::TestIndexingXPU::test_index_ind_dtype_xpu
+  - test_linalg.py::TestLinalgXPU::test_addmm_sizes_xpu_float32
+  - test_linalg.py::TestLinalgXPU::test_blas_alpha_beta_empty_xpu_bfloat16
+  - test_linalg.py::TestLinalgXPU::test_blas_alpha_beta_empty_xpu_float16
+  - test_linalg.py::TestLinalgXPU::test_blas_alpha_beta_empty_xpu_float32
   - test_linalg.py::TestLinalgXPU::test_cholesky_errors_and_warnings_xpu_float32
   - test_linalg.py::TestLinalgXPU::test_cholesky_errors_and_warnings_xpu_float64
   - test_linalg.py::TestLinalgXPU::test_cholesky_ex_non_pd_xpu_float32
   - test_linalg.py::TestLinalgXPU::test_cholesky_ex_non_pd_xpu_float64
   - test_linalg.py::TestLinalgXPU::test_linalg_matrix_exp_utils_xpu_float32
   - test_meta.py::TestMetaXPU::test_dispatch_meta_outplace_baddbmm_xpu_bfloat16
+  - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_all_strides_linalg_cholesky_xpu_float32
   - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_all_strides_nn_functional_linear_xpu_float32
   - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_all_strides_pca_lowrank_xpu_float32
   - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_all_strides_svd_lowrank_xpu_float32
@@ -77,10 +91,70 @@
   - test_meta.py::TestMetaXPU::test_meta_outplace_matrix_exp_xpu_float32
   - test_meta.py::TestMetaXPU::test_meta_outplace_nn_functional_batch_norm_without_cudnn_xpu_float32
   - test_meta.py::TestMetaXPU::test_meta_outplace_nn_functional_batch_norm_xpu_float32
+  - test_meta.py::TestMetaXPU::test_meta_outplace_nn_functional_scaled_dot_product_attention_xpu_float64
+  - test_modules.py::TestModuleXPU::test_cpu_gpu_parity_nn_TransformerDecoderLayer_xpu_float64
+  - test_modules.py::TestModuleXPU::test_cpu_gpu_parity_nn_TransformerEncoderLayer_eval_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_cpu_gpu_parity_nn_TransformerEncoderLayer_train_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_cpu_gpu_parity_nn_TransformerEncoder_eval_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_cpu_gpu_parity_nn_TransformerEncoder_train_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_cpu_gpu_parity_nn_Transformer_xpu_float64
+  - test_modules.py::TestModuleXPU::test_forward_nn_TransformerDecoderLayer_xpu_float64
+  - test_modules.py::TestModuleXPU::test_forward_nn_TransformerEncoderLayer_eval_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_forward_nn_TransformerEncoderLayer_train_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_forward_nn_TransformerEncoder_eval_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_forward_nn_TransformerEncoder_train_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_forward_nn_Transformer_xpu_float64
+  - test_modules.py::TestModuleXPU::test_grad_nn_TransformerDecoderLayer_xpu_float64
+  - test_modules.py::TestModuleXPU::test_grad_nn_TransformerEncoderLayer_eval_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_grad_nn_TransformerEncoderLayer_train_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_grad_nn_TransformerEncoder_eval_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_grad_nn_TransformerEncoder_train_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_grad_nn_Transformer_xpu_float64
+  - test_modules.py::TestModuleXPU::test_gradgrad_nn_TransformerDecoderLayer_xpu_float64
+  - test_modules.py::TestModuleXPU::test_gradgrad_nn_TransformerEncoderLayer_eval_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_gradgrad_nn_TransformerEncoderLayer_train_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_gradgrad_nn_TransformerEncoder_eval_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_gradgrad_nn_TransformerEncoder_train_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_gradgrad_nn_Transformer_xpu_float64
+  - test_modules.py::TestModuleXPU::test_if_train_and_eval_modes_differ_nn_TransformerDecoderLayer_xpu_float64
+  - test_modules.py::TestModuleXPU::test_if_train_and_eval_modes_differ_nn_TransformerEncoderLayer_xpu_float64
+  - test_modules.py::TestModuleXPU::test_if_train_and_eval_modes_differ_nn_TransformerEncoder_xpu_float64
+  - test_modules.py::TestModuleXPU::test_if_train_and_eval_modes_differ_nn_Transformer_xpu_float64
+  - test_modules.py::TestModuleXPU::test_multiple_device_transfer_nn_TransformerDecoderLayer_xpu_float64
+  - test_modules.py::TestModuleXPU::test_multiple_device_transfer_nn_TransformerEncoderLayer_eval_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_multiple_device_transfer_nn_TransformerEncoderLayer_train_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_multiple_device_transfer_nn_TransformerEncoder_train_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_multiple_device_transfer_nn_Transformer_xpu_float64
+  - test_modules.py::TestModuleXPU::test_non_contiguous_tensors_nn_TransformerDecoderLayer_xpu_float64
+  - test_modules.py::TestModuleXPU::test_non_contiguous_tensors_nn_TransformerEncoderLayer_eval_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_non_contiguous_tensors_nn_TransformerEncoderLayer_train_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_pickle_nn_TransformerDecoderLayer_xpu_float64
+  - test_modules.py::TestModuleXPU::test_pickle_nn_TransformerEncoderLayer_eval_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_pickle_nn_TransformerEncoderLayer_train_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_pickle_nn_Transformer_xpu_float64
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_5d_size_128_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_5d_size_2_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_5d_size_32_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_5d_size_4_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_edge_case_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_size_1023_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_size_1024_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_size_128_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_size_256_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_size_2_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_size_32_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_size_4_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_size_512_xpu
+  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_size_513_xpu
+  - test_nestedtensor.py::TestNestedTensorDeviceTypeXPU::test_layer_norm_xpu_float32
   - test_nn.py::TestNN::test_pdist
   - test_nn.py::TestNN::test_pdist_cuda_gradgrad_unimplemented
   - test_nn.py::TestNN::test_pdist_large
+  - test_nn.py::TestNN::test_pdist_zeros
+  - test_ops.py::TestCommonXPU::test_dtypes___rmatmul___xpu
+  - test_ops.py::TestCommonXPU::test_dtypes__refs_nn_functional_pdist_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_linalg_tensorsolve_xpu
+  - test_ops.py::TestCommonXPU::test_dtypes_matmul_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_mm_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_mv_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_native_batch_norm_xpu
@@ -107,6 +181,7 @@
   - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_interpolate_trilinear_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_linear_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_local_response_norm_xpu
+  - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_multi_head_attention_forward_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_pdist_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_norm_nuc_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_ops_nvprims_native_batch_norm_xpu
@@ -114,6 +189,8 @@
   - test_ops.py::TestCommonXPU::test_dtypes_pca_lowrank_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_svd_lowrank_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_tensordot_xpu
+  - test_ops.py::TestCommonXPU::test_errors_nn_functional_adaptive_max_pool2d_xpu
+  - test_ops.py::TestCommonXPU::test_errors_nn_functional_adaptive_max_pool3d_xpu
   - test_ops.py::TestCommonXPU::test_multiple_devices_addbmm_xpu_float32
   - test_ops.py::TestCommonXPU::test_multiple_devices_addmm_decomposed_xpu_float32
   - test_ops.py::TestCommonXPU::test_multiple_devices_addmm_xpu_float32
@@ -156,12 +233,7 @@
   - test_ops.py::TestCompositeComplianceXPU::test_backward_nn_functional_pdist_xpu_float32
   - test_ops.py::TestFakeTensorXPU::test_fake_crossref_backward_no_amp_nn_functional_pdist_xpu_float32
   - test_ops.py::TestMathBitsXPU::test_neg_view_nn_functional_pdist_xpu_float64
-  - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_multi_head_attention_forward_xpu
-  - test_ops.py::TestCommonXPU::test_errors_nn_functional_adaptive_max_pool2d_xpu
-  - test_ops.py::TestCommonXPU::test_errors_nn_functional_adaptive_max_pool3d_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_matmul_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes___rmatmul___xpu
-  - test_ops.py::TestCommonXPU::test_dtypes__refs_nn_functional_pdist_xpu  
+  - test_ops.py::TestMathBitsXPU::test_neg_view_nn_functional_scaled_dot_product_attention_xpu_float64
   - test_ops_gradients.py::TestBwdGradientsXPU::test_fn_grad_nn_functional_pdist_xpu_float64
   - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_matmul_xpu_float32
   - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_native_batch_norm_xpu_float32
