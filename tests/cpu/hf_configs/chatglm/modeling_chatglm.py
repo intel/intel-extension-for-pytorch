@@ -1372,11 +1372,8 @@ class ChatGLMForConditionalGeneration(ChatGLMPreTrainedModel):
 
         if isinstance(eos_token_id, int):
             eos_token_id = [eos_token_id]
-        eos_token_id_tensor = (
-            torch.tensor(eos_token_id).to(input_ids.device)
-            if eos_token_id is not None
-            else None
-        )
+        assert eos_token_id is not None
+        eos_token_id_tensor = torch.tensor(eos_token_id).to(input_ids.device)
 
         has_default_max_length = (
             kwargs.get("max_length") is None
