@@ -12,7 +12,7 @@ lm-evaluation-harness:
   commit: cc9778fbe4fa1a709be2abed9deb6180fd40e7e2
   repo: https://github.com/EleutherAI/lm-evaluation-harness
 neural-compressor:
-  version: 2.3.1
+  version: 2.4.1
 oneCCL:
   branch: '2021.10'
   commit: bfc879266e870b732bd165e399897419c44ad13d

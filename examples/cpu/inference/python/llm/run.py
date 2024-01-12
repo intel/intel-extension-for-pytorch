@@ -67,7 +67,29 @@ def main(args_in: Optional[List[str]] = None) -> None:
         default="NeelNanda/pile-10k",
         help="Calibration dataset for static quantization and GPTQ")
     parser.add_argument("--ipex-smooth-quant", action="store_true", help="smoothquant forstatic quantization")
-    parser.add_argument("--alpha", default=0.5, type=float, help="alpha value for smoothquant")
+    parser.add_argument("--alpha", default=0.5, help="alpha value for smoothquant")
+    parser.add_argument(
+    "--folding", default=False, type=bool, help="whether to fold mul into the previous layer"
+    )
+    parser.add_argument(
+        "--init-alpha", default=0.5, type=float, help="a value to get baseline quantization error for auto-tuning"
+    )
+    parser.add_argument(
+        "--alpha-min", default=0.0, type=float, help="min value of auto-tuning alpha search space"
+    )
+    parser.add_argument(
+        "--alpha-max", default=1.0, type=float, help="max value of auto-tuning alpha search space"
+    )
+    parser.add_argument(
+        "--alpha-step", default=0.1, type=float, help="step_size of auto-tuning alpha search space"
+    )
+    parser.add_argument(
+        "--shared-criterion", choices=["min", "mean", "max"], default="max", type=str
+        , help="criterion for input LayerNorm op of a transformer block"
+    )
+    parser.add_argument(
+        "--enable-blockwise-loss", default=False, type=bool, help="whether to enable block-wise auto-tuning"
+    )
     parser.add_argument(
         "--ipex-weight-only-quantization",
         action="store_true",
@@ -248,6 +270,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
             else:
                 infer_cmd.extend(["--ipex-smooth-quant"])
                 infer_cmd.extend(["--alpha", str(args.alpha)])
+                if args.folding:
+                    infer_cmd.extend(["--folding"])
+                infer_cmd.extend(["--init-alpha", str(args.init_alpha)])
+                infer_cmd.extend(["--alpha-min", str(args.alpha_min)])
+                infer_cmd.extend(["--alpha-max", str(args.alpha_max)])
+                infer_cmd.extend(["--alpha-step", str(args.alpha_step)])
+                infer_cmd.extend(["--shared-criterion", str(args.shared_criterion)])
+                if args.enable_blockwise_loss:
+                    infer_cmd.extend(["--enable-blockwise-loss"])
                 infer_cmd.extend(["--dataset", str(args.dataset)])
             if args.int8_bf16_mixed:
                 infer_cmd.extend(["--int8-bf16-mixed"])
@@ -338,6 +369,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 else:
                     quant_cmd.extend(["--ipex-smooth-quant"])
                     quant_cmd.extend(["--alpha", str(args.alpha)])
+                    if args.folding:
+                        quant_cmd.extend(["--folding"])
+                    quant_cmd.extend(["--init-alpha", str(args.init_alpha)])
+                    quant_cmd.extend(["--alpha-min", str(args.alpha_min)])
+                    quant_cmd.extend(["--alpha-max", str(args.alpha_max)])
+                    quant_cmd.extend(["--alpha-step", str(args.alpha_step)])
+                    quant_cmd.extend(["--shared-criterion", str(args.shared_criterion)])
+                    if args.enable_blockwise_loss:
+                        quant_cmd.extend(["--enable-blockwise-loss"])
                     quant_cmd.extend(["--dataset", str(args.dataset)])
                     quant_cmd.extend(["--qconfig-summary-file", str(args.qconfig_summary_file)])
                 print("LLM RUNTIME INFO: quantizing model ...")

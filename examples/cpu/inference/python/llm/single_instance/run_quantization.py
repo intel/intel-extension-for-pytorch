@@ -3,7 +3,6 @@ import time
 import json
 import pathlib
 import re
-
 from datasets import load_dataset
 
 import torch
@@ -64,8 +63,28 @@ parser.add_argument("--prompt", default=None, type=str)
 parser.add_argument("--num-iter", default=100, type=int, help="num iter")
 parser.add_argument("--num-warmup", default=10, type=int, help="num warmup")
 parser.add_argument("--batch-size", default=1, type=int, help="batch size")
+parser.add_argument("--alpha", default=0.5, help="alpha value for smoothquant")
 parser.add_argument(
-    "--alpha", default=0.8, type=float, help="alpha value for smoothquant"
+    "--folding", action="store_true", help="whether to fold mul into the previous layer"
+)
+parser.add_argument(
+    "--init-alpha", default=0.5, type=float, help="a value to get baseline quantization error for auto-tuning"
+)
+parser.add_argument(
+    "--alpha-min", default=0.0, type=float, help="min value of auto-tuning alpha search space"
+)
+parser.add_argument(
+    "--alpha-max", default=1.0, type=float, help="max value of auto-tuning alpha search space"
+)
+parser.add_argument(
+    "--alpha-step", default=0.1, type=float, help="step_size of auto-tuning alpha search space"
+)
+parser.add_argument(
+    "--shared-criterion", choices=["min", "mean", "max"], default="max", type=str
+    , help="criterion for input LayerNorm op of a transformer block"
+)
+parser.add_argument(
+    "--enable-blockwise-loss", action="store_true", help="whether to enable block-wise auto-tuning"
 )
 parser.add_argument("--token-latency", action="store_true")
 parser.add_argument("--greedy", action="store_true")
@@ -337,7 +356,7 @@ if args.ipex_smooth_quant:
             shuffle=False,
             collate_fn=calib_evaluator.collate_batch,
         )
-    
+
         def calib_func(prepared_model):
             for i, (
                 (input_ids, attention_mask, position_ids, past_key_values),
@@ -351,10 +370,18 @@ if args.ipex_smooth_quant:
                     position_ids=position_ids,
                     past_key_values=past_key_values,
                 )
+
+        example_inputs = None
+        for i, (
+            (input_ids, attention_mask, position_ids, past_key_values),
+            last_ind,
+        ) in enumerate(calib_dataloader):
+            example_inputs = (input_ids, attention_mask, position_ids, past_key_values)
+            break
+
+        from intel_extension_for_pytorch.quantization import prepare, convert
     
         if model.use_neural_compressor:
-            from neural_compressor import PostTrainingQuantConfig, quantization
-    
             qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
             user_model = ipex.llm.optimize(
                 user_model.eval(),
@@ -363,55 +390,59 @@ if args.ipex_smooth_quant:
                 inplace=True,
                 deployment_mode=False,
             )
-            op_type_dict = {
-                "add": {"weight": {"dtype": ["fp32"]}, "activation": {"dtype": ["fp32"]}},
-                "linear": {
-                    "weight": {
-                        "dtype": ["int8"],
-                        "scheme": ["sym"],
-                        "granularity": ["per_channel"],
-                        "algorithm": ["minmax"],
+            op_type_dict = {}
+            if re.search("chatglm", config.architectures[0], re.IGNORECASE):
+                op_type_dict = {
+                    "add": {"weight": {"dtype": ["fp32"]}, "activation": {"dtype": ["fp32"]}},
+                    "linear": {
+                        "weight": {
+                            "dtype": ["int8"],
+                            "scheme": ["sym"],
+                            "granularity": ["per_channel"],
+                            "algorithm": ["minmax"],
+                        },
+                        "activation": {
+                            "dtype": ["uint8"],
+                            "scheme": ["asym"],
+                            "granularity": ["per_tensor"],
+                            "algorithm": ["kl"],
+                        },
                     },
-                    "activation": {
-                        "dtype": ["uint8"],
-                        "scheme": ["asym"],
-                        "granularity": ["per_tensor"],
-                        "algorithm": ["kl"],
-                    },
-                },
-            }
-    
-            excluded_precisions = [] if args.int8_bf16_mixed else ["bf16"]
-            recipes = {"smooth_quant": True, "smooth_quant_args": {"alpha": args.alpha}}
-    
-            recipes["smooth_quant_args"]["folding"] = True
-    
-            print("smooth_quant_args:", recipes)
-            conf = PostTrainingQuantConfig(
-                backend="ipex",
-                excluded_precisions=excluded_precisions,
-                op_type_dict=op_type_dict,
-                recipes=recipes,
-            )
-    
-            q_model = quantization.fit(
+                }
+            
+            smoothquant_args = {"alpha": args.alpha if args.alpha == "auto" \
+                                else eval(args.alpha), "folding": args.folding}
+            if args.alpha == "auto":
+                smoothquant_args["auto_alpha_args"] = {
+                        "init_alpha": float(args.init_alpha),
+                        "alpha_min": float(args.alpha_min),
+                        "alpha_max": float(args.alpha_max),
+                        "alpha_step": float(args.alpha_step),
+                        "shared_criterion": args.shared_criterion,
+                        "enable_blockwise_loss": args.enable_blockwise_loss
+                }
+                # using specified sq recipes for llama2-7b
+                if re.search("llama", config.architectures[0], re.IGNORECASE):
+                    smoothquant_args = {"alpha": "auto", "folding": False}
+                    smoothquant_args["auto_alpha_args"] = {
+                        "init_alpha": 0.8,
+                        "alpha_min": 0.8,
+                        "alpha_max": 0.99,
+                        "alpha_step": 0.01,
+                        "shared_criterion": "mean",
+                        "enable_blockwise_loss": False
+                }
+
+            prepared_model = ipex.quantization.autotune(
                 user_model,
-                conf,
-                calib_dataloader=calib_dataloader,
+                calib_dataloader,
                 calib_func=calib_func,
+                op_type_dict=op_type_dict,
+                smoothquant_args=smoothquant_args
             )
-    
-            q_model.save(args.output_dir)
+            prepared_model.save_qconf_summary(args.output_dir + "/best_configure.json")
+
         else:
-            example_inputs = None
-            for i, (
-                (input_ids, attention_mask, position_ids, past_key_values),
-                last_ind,
-            ) in enumerate(calib_dataloader):
-                example_inputs = (input_ids, attention_mask, position_ids, past_key_values)
-                break
-            from intel_extension_for_pytorch.quantization import prepare, convert
-    
             qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=args.alpha)
             user_model = ipex.llm.optimize(
                 user_model.eval(),
@@ -436,17 +467,19 @@ if args.ipex_smooth_quant:
                         attention_mask=attention_mask,
                         past_key_values=past_key_values,
                     )
-            with torch.no_grad(), torch.cpu.amp.autocast(
-                enabled=amp_enabled,
-            ):
-                convert_model = convert(prepared_model.eval(), inplace=True).eval()
-                self_jit = torch.jit.trace(
-                    convert_model.eval(), example_inputs, strict=False, check_trace=False
-                )
-                self_jit = torch.jit.freeze(self_jit.eval())
-                pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-                self_jit.save(args.output_dir + "/" + args.quant_model_name)
-                quant_model = self_jit
+
+        with torch.no_grad(), torch.cpu.amp.autocast(
+            enabled=amp_enabled,
+        ):
+            convert_model = convert(prepared_model.eval(), inplace=True).eval()
+            self_jit = torch.jit.trace(
+                convert_model.eval(), example_inputs, strict=False, check_trace=False
+            )
+            self_jit = torch.jit.freeze(self_jit.eval())
+            pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+            self_jit.save(args.output_dir + "/" + args.quant_model_name)
+            quant_model = self_jit
+
 
 elif args.ipex_weight_only_quantization:
     weight_dtype = torch.quint4x2 if args.weight_dtype == "INT4" else torch.qint8

@@ -14,7 +14,9 @@ import os
 import unittest
 import transformers
 from transformers import AutoConfig
+import numpy
 from common_utils import TestCase
+
 import intel_extension_for_pytorch as ipex
 from test_ao_jit_llga_utils import JitLlgaTestCase, LLGA_FUSION_GROUP
 from torch.testing._internal.common_utils import run_tests
@@ -558,6 +560,88 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 num_mul = [n.kind() for n in graph.nodes()].count("aten::mul")
                 assert num_mul == 1 if share_weight_observers else 3
                 q_model(x)
+
+    def test_smooth_quant_autotune(self):
+        class DemoModel(torch.nn.Module):
+            def __init__(self):
+                super(DemoModel, self).__init__()
+                self.fc1 = torch.nn.Linear(3, 4)
+                self.fc2 = torch.nn.Linear(4, 3)
+
+            def forward(self, x):
+                out = self.fc1(x)
+                out = self.fc2(out)
+                return out
+
+        class DemoCalibDataloader:
+            def __init__(self):
+                self.batch_size = 1
+
+            def __iter__(self):
+                yield torch.randn([1, 3])
+
+        m = DemoModel().eval()
+        calib_dataloader = DemoCalibDataloader()
+        inputs = torch.rand(1, 3)
+
+        def calib_func(model):
+            model(inputs)
+
+        smoothquant_args_global = {
+            "alpha": numpy.arange(0.0, 1.0, 0.1).tolist(),
+        }
+        smoothquant_args_layer = {
+            "alpha": "auto",
+            "auto_alpha_args": {
+                "init_alpha": 0.8,
+                "alpha_min": 0.8,
+                "alpha_max": 0.99,
+                "alpha_step": 0.01,
+                "shared_criterion": "mean",
+                "enable_blockwise_loss": False,
+            },
+        }
+
+        for folding in [True, False]:
+            for smoothquant_args in [
+                smoothquant_args_global,
+                smoothquant_args_layer,
+            ]:
+                model = copy.deepcopy(m)
+                sq_args = copy.deepcopy(smoothquant_args)
+                smoothquant_args["folding"] = folding
+                tuned_model = ipex.quantization.autotune(
+                    model,
+                    calib_dataloader,
+                    eval_func=lambda x: 0.1,
+                    smoothquant_args=sq_args,
+                    sampling_sizes=[100],
+                    accuracy_criterion={"relative": 0.01},
+                    tuning_time=0,
+                )
+                converted_model = ipex.quantization.convert(tuned_model)
+                with torch.no_grad():
+                    traced_model = torch.jit.trace(converted_model, inputs)
+                    traced_model = torch.jit.freeze(traced_model)
+                    y = traced_model(inputs)
+
+                model = copy.deepcopy(m)
+                sq_args = copy.deepcopy(smoothquant_args)
+                smoothquant_args["folding"] = folding
+                tuned_model = ipex.quantization.autotune(
+                    model,
+                    calib_dataloader,
+                    calib_func=calib_func,
+                    smoothquant_args=sq_args,
+                    sampling_sizes=[100],
+                    accuracy_criterion={"relative": 0.01},
+                    tuning_time=0,
+                )
+                converted_model = ipex.quantization.convert(tuned_model)
+                with torch.no_grad():
+                    traced_model = torch.jit.trace(converted_model, inputs)
+                    traced_model = torch.jit.freeze(traced_model)
+                    y = traced_model(inputs)
 
     def test_none_example_input_for_quantization(self):
         class M(nn.Module):
