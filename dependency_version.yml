@@ -11,8 +11,8 @@ pytorch:
   version: 2.2.0+cpu
 torch-ccl:
   repo: https://github.com/intel/torch-ccl.git
-  tag: ccl_torch_2.2.0_rc0
-  commit: 716b4cb46c7b955ae2ebd19927b39a81d626b8a8
+  tag: ccl_torch_2.2.0_rc1
+  commit: ace9fb14ef0e3ee63ec2cf85fc04fcfe710401f2
   version: 2.2.0+cpu
 torchaudio:
   version: 2.2.0+cpu
