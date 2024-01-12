@@ -205,9 +205,9 @@ pytorch_install_dir = get_pytorch_install_dir()
 
 
 def _get_basekit_rt():
-    with open('dependency_version.yml', 'r') as f:
+    with open("dependency_version.yml", "r") as f:
         result = yaml.load(f.read(), Loader=yaml.FullLoader)
-        return result['basekit']
+        return result["basekit"]
 
 
 def _build_installation_dependency():
@@ -216,7 +216,7 @@ def _build_installation_dependency():
     install_requires.append("numpy")
     install_requires.append("packaging")
     install_requires.append("pydantic")
-    #for key, value in _get_basekit_rt().items():
+    # for key, value in _get_basekit_rt().items():
     #    install_requires.append(f"{key}=={value['version']}")
     return install_requires
 

@@ -212,14 +212,29 @@ _scaled_dot_product_efficient_attention(
       std::move(offset_t));
 }
 
-inline bool xetla_supported(Tensor q, Tensor k, Tensor v, bool is_training) {
+inline bool xetla_supported(
+    Tensor q,
+    Tensor k,
+    Tensor v,
+    bool is_training,
+    const c10::optional<Tensor>& b) {
   bool is_supported = false;
 #if defined(USE_XETLA)
   DeviceId curDevID;
   AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  bool bias_support = true;
+  // bias size requires [batch_size, 1, q_len, k_len]
+  if (b.has_value()) {
+    if (b.value().size(0) != q.size(0))
+      bias_support = false;
+    if (b.value().size(1) != 1)
+      bias_support = false;
+    if (b.value().size(2) != q.size(2))
+      bias_support = false;
+  }
   if (q.dtype() == at::kHalf && k.dtype() == at::kHalf &&
       v.dtype() == at::kHalf && !is_training &&
-      Settings::I().has_2d_block_array(curDevID)) {
+      Settings::I().has_2d_block_array(curDevID) && bias_support == true) {
     if ((q.size(-1) * sizeof(at::Half) % 128 == 0) &&
         (v.size(-1) * sizeof(at::Half) % 128 == 0))
       is_supported = true;
@@ -238,10 +253,11 @@ int64_t _fused_sdp_choice(
     c10::optional<double> scale) {
   bool is_training =
       (query.requires_grad() || key.requires_grad() || value.requires_grad());
-  // We have implemented efficient_attention backend with xetla, flash_attention
-  // backend is not supported now, which will be implemented in the future. So
-  // we provide two backends here.
-  sdp::SDPBackend backend = xetla_supported(query, key, value, is_training)
+  // We have implemented efficient_attention backend with xetla,
+  // flash_attention backend is not supported now, which will be implemented
+  // in the future. So we provide two backends here.
+  sdp::SDPBackend backend =
+      xetla_supported(query, key, value, is_training, attn_mask_)
       ? sdp::SDPBackend::efficient_attention
       : sdp::SDPBackend::math;
   if (backend == sdp::SDPBackend::error) {
@@ -387,8 +403,10 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
 //              layout : [kv_out_len, bs * beam, num_head, head_dim]
 // *index       shape  : [kv_out_len, bs * beam]
 //              layout : [kv_out_len, bs * beam]
-// *output      shape  : [bs * beam, num_head, kv_in_len + kv_out_len, head_dim]
-//              layout : [bs * beam, kv_in_len + kv_out_len, num_head, head_dim]
+// *output      shape  : [bs * beam, num_head, kv_in_len + kv_out_len,
+// head_dim]
+//              layout : [bs * beam, kv_in_len + kv_out_len, num_head,
+//              head_dim]
 // *timestep           : current time step of output seq
 Tensor xetla_fsdp_index_forward(
     const Tensor& query,

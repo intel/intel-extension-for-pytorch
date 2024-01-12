@@ -23,3 +23,19 @@ class TestTorchMethod(TestCase):
         out_xpu = F.scaled_dot_product_attention(query.xpu(), key.xpu(), value.xpu())
 
         self.assertEqual(out_cpu, out_xpu.cpu().float(), atol=1e-3, rtol=1e-3)
+
+    def test_sdp_broadcast(self, dtype=torch.float16):
+        query = torch.rand(8, 8, 77, 64, dtype=dtype)
+        key = torch.rand(8, 8, 77, 64, dtype=dtype)
+        value = torch.rand(8, 8, 77, 64, dtype=dtype)
+
+        bias = torch.rand(1, 1, 77, 77, dtype=dtype)
+
+        out_cpu = F.scaled_dot_product_attention(
+            query.float(), key.float(), value.float(), bias.float()
+        )
+        out_xpu = F.scaled_dot_product_attention(
+            query.xpu(), key.xpu(), value.xpu(), bias.xpu()
+        )
+
+        self.assertEqual(out_cpu, out_xpu.cpu().float(), atol=1e-3, rtol=1e-3)
