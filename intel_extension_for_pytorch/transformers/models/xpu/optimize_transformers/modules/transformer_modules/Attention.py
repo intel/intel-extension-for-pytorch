@@ -277,6 +277,12 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         else:
             if causal_mask is not None:
                 attention_mask = causal_mask
+                new_attention_mask = torch.zeros_like(
+                    attention_mask, dtype=query.dtype, device=query.device
+                )
+                attention_mask = new_attention_mask.masked_fill_(
+                    attention_mask.logical_not(), torch.finfo(query.dtype).min
+                )
         # for ATS-M machine
         if not ipex._C._has_2d_block_array(0):
             return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
