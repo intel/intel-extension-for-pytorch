@@ -86,6 +86,88 @@ inline void rrelu_with_noise_kernel(
 }
 
 template <typename scalar_t>
+struct RReLUWithNoiseKernelDoubleFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    rrelu_with_noise_kernel<scalar_t, double, 2>(
+        item,
+        numel,
+        rng_engine_inputs,
+        output_data,
+        input_data,
+        noise_data,
+        lower,
+        upper,
+        [](randStatePhilox4_32_10_t* state) {
+          return rand_uniform2_double(state);
+        });
+  }
+  RReLUWithNoiseKernelDoubleFunctor(
+      int64_t numel_,
+      PhiloxState rng_engine_inputs_,
+      scalar_t* output_data_,
+      scalar_t* input_data_,
+      scalar_t* noise_data_,
+      double lower_,
+      double upper_)
+      : numel(numel_),
+        rng_engine_inputs(rng_engine_inputs_),
+        output_data(output_data_),
+        input_data(input_data_),
+        noise_data(noise_data_),
+        lower(lower_),
+        upper(upper_) {}
+
+ private:
+  int64_t numel;
+  PhiloxState rng_engine_inputs;
+  scalar_t* output_data;
+  scalar_t* input_data;
+  scalar_t* noise_data;
+  double lower;
+  double upper;
+};
+
+template <typename scalar_t>
+struct RReLUWithNoiseKernelFloatFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    rrelu_with_noise_kernel<scalar_t, float, 4>(
+        item,
+        numel,
+        rng_engine_inputs,
+        output_data,
+        input_data,
+        noise_data,
+        lower,
+        upper,
+        [](randStatePhilox4_32_10_t* state) { return rand_uniform4(state); });
+  }
+  RReLUWithNoiseKernelFloatFunctor(
+      int64_t numel_,
+      PhiloxState rng_engine_inputs_,
+      scalar_t* output_data_,
+      scalar_t* input_data_,
+      scalar_t* noise_data_,
+      float lower_,
+      float upper_)
+      : numel(numel_),
+        rng_engine_inputs(rng_engine_inputs_),
+        output_data(output_data_),
+        input_data(input_data_),
+        noise_data(noise_data_),
+        lower(lower_),
+        upper(upper_) {}
+
+ private:
+  int64_t numel;
+  PhiloxState rng_engine_inputs;
+  scalar_t* output_data;
+  scalar_t* input_data;
+  scalar_t* noise_data;
+  float lower;
+  float upper;
+};
+
+template <typename scalar_t>
 inline void _rrelu_with_noise_train(
     Tensor& output,
     const Tensor& input_,
@@ -124,20 +206,14 @@ inline void _rrelu_with_noise_train(
 
   if (std::is_same<scalar_t, double>::value) {
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        rrelu_with_noise_kernel<scalar_t, double, 2>(
-            item,
-            numel,
-            rng_engine_inputs,
-            output_data,
-            input_data,
-            noise_data,
-            lower,
-            upper,
-            [](randStatePhilox4_32_10_t* state) {
-              return rand_uniform2_double(state);
-            });
-      };
+      RReLUWithNoiseKernelDoubleFunctor<scalar_t> kfn(
+          numel,
+          rng_engine_inputs,
+          output_data,
+          input_data,
+          noise_data,
+          lower,
+          upper);
       cgh.parallel_for(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
@@ -147,20 +223,14 @@ inline void _rrelu_with_noise_train(
     auto upper_ = static_cast<float>(upper);
     // half and float
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        rrelu_with_noise_kernel<scalar_t, float, 4>(
-            item,
-            numel,
-            rng_engine_inputs,
-            output_data,
-            input_data,
-            noise_data,
-            lower_,
-            upper_,
-            [](randStatePhilox4_32_10_t* state) {
-              return rand_uniform4(state);
-            });
-      };
+      RReLUWithNoiseKernelFloatFunctor<scalar_t> kfn(
+          numel,
+          rng_engine_inputs,
+          output_data,
+          input_data,
+          noise_data,
+          lower_,
+          upper_);
       cgh.parallel_for(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
