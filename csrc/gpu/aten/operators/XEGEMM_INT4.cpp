@@ -511,10 +511,10 @@ IPEX_LIBRARY_FRAGMENT() {
       "mm_bias_resadd_resadd_int4.xpu",
       at::AtenIpexTypeXPU::mm_bias_resadd_resadd_int4);
   IPEX_OP_REGISTER("mm_low_bits.xpu", at::AtenIpexTypeXPU::mm_low_bits);
-  // IPEX_OP_REGISTER("mm_silu_mul_int4.xpu", at::AtenIpexTypeXPU::mm_silu_mul_int4);
-  // IPEX_OP_REGISTER("mm_bias_silu_mul_int4.xpu", at::AtenIpexTypeXPU::mm_bias_silu_mul_int4);
-  // IPEX_OP_REGISTER("mm_add_int4.xpu", at::AtenIpexTypeXPU::mm_add_int4);
-  // IPEX_OP_REGISTER("mm_bias_add_int4.xpu", at::AtenIpexTypeXPU::mm_bias_add_int4);
+  IPEX_OP_REGISTER("mm_silu_mul_int4.xpu", at::AtenIpexTypeXPU::mm_silu_mul_int4);
+  IPEX_OP_REGISTER("mm_bias_silu_mul_int4.xpu", at::AtenIpexTypeXPU::mm_bias_silu_mul_int4);
+  IPEX_OP_REGISTER("mm_add_int4.xpu", at::AtenIpexTypeXPU::mm_add_int4);
+  IPEX_OP_REGISTER("mm_bias_add_int4.xpu", at::AtenIpexTypeXPU::mm_bias_add_int4);
 }
 } // namespace
 #endif

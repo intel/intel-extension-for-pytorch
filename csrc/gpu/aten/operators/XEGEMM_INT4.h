@@ -526,14 +526,12 @@ struct GemmWint4Config {
   static constexpr int max_n = max_n_;
   static constexpr int max_k = max_k_;
   static constexpr int arch = arch_;
-// gz 128 > group_size 32
+
   static bool less_than(int m, int n, int k, int group_size) {
-    std::cout << "+++!!!!!!gz " << gz << std::endl;
-    std::cout << "gz " << gz << " slm_ks " << slm_ks << std::endl;
     if (gz < group_size)
       return true;
     if (gz == group_size && arch == 0) {
-      if (k / group_size > slm_ks && k % (group_size * slm_ks) != 0)
+      if (max_k < k)
         return true;
       else
         return false;
@@ -596,7 +594,9 @@ struct GemmWint4Config {
   GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, MAX_INT, MAX_INT, 1>
 
 #define ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(gz)                       \
-  GemmWint4Config<8, 64, 8, 16, 16, gz, 8, MAX_INT, MAX_INT, MAX_INT, 0>,   \
+  GemmWint4Config<8, 64, 8, 16, 16, gz, 8, MAX_INT, MAX_INT, 0, 0>,         \
+  GemmWint4Config<8, 64, 8, 16, 16, gz, 8, MAX_INT, MAX_INT, 8192, 0>,      \
+  GemmWint4Config<8, 64, 8, 16, 16, gz, 4, MAX_INT, MAX_INT, 8192, 0>,      \
   GemmWint4Config<8, 64, 8, 16, 16, gz, 4, MAX_INT, MAX_INT, MAX_INT, 0>
 // clang-format on
 
@@ -604,10 +604,7 @@ struct GemmWint4Config {
   ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(16),      \
       ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(32),  \
       ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(64),  \
-      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(128), \
-      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(256), \
-      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(512), \
-      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(1024)
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(128)
 
 #define ORDERED_GEMM_WINT4_CONFIG_SET_PVC       \
   ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_PVC(0), \
@@ -840,7 +837,6 @@ class HGEMMXetla_INT4 final {
       return execute_function;
     } else {
       static constexpr int mid = (configs_size - 1) / 2;
-      using MiddleConfig = std::tuple_element_t<mid, ConfigsTuple>;
       if (MiddleConfig::less_than(m_, n_, k_, calib_gz_)) {
         return binary_search<
             scalar_t,
@@ -865,7 +861,7 @@ class HGEMMXetla_INT4 final {
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
     auto& q = dpcppGetCurrentQueue();
     if (arch_ == 1) {
-      // dispatch<scalar_t, ORDERED_GEMM_WINT4_CONFIG_SET_PVC>(q);
+      dispatch<scalar_t, ORDERED_GEMM_WINT4_CONFIG_SET_PVC>(q);
     } else {
       dispatch<scalar_t, ORDERED_GEMM_WINT4_CONFIG_SET_ARC>(q);
     }

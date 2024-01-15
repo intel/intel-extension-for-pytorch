@@ -133,6 +133,7 @@ class WeightOnlyLinear(nn.Module):
         if not self.weight_transposed:
             self.qweight.data = self.qweight.data.T.contiguous()
             self.weight_transposed = True
+            self.scales.data = self.scales.data.T.contiguous()
         return torch.ops.torch_ipex.mm_low_bits(
             input,
             self.qweight,
