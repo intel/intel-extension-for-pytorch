@@ -25,6 +25,224 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t>
+struct ClassNLLCriterionUpdateOutputKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    auto input_ptr = input_data;
+    auto target_ptr = target_data;
+    auto weights_ptr = has_weights ? weights_data : NULL;
+    auto output_ptr = output_data;
+    auto local_item_id = item_id.get_id(0);
+    for (int i = local_item_id; i < batch_size; i += local_size) {
+      int cur_target = target_ptr[i * target_stride];
+      if (cur_target >= 0 && cur_target < n_classes)
+        if (cur_target == ignore_index) {
+          output_ptr[i * output_stride_0] = 0.0f;
+          continue;
+        }
+      scalar_t cur_weight =
+          has_weights ? weights_ptr[cur_target] : static_cast<scalar_t>(1.0f);
+      output_ptr[i * output_stride_0] =
+          -static_cast<scalar_t>(
+              input_ptr[i * input_stride_0 + cur_target * input_stride_1]) *
+          cur_weight;
+    }
+  }
+  ClassNLLCriterionUpdateOutputKernelFunctor(
+      scalar_t* input_data_,
+      int64_t* target_data_,
+      scalar_t* weights_data_,
+      scalar_t* output_data_,
+      bool has_weights_,
+      int64_t batch_size_,
+      int64_t local_size_,
+      int64_t target_stride_,
+      int n_classes_,
+      int64_t ignore_index_,
+      int64_t output_stride_0_,
+      int64_t input_stride_0_,
+      int64_t input_stride_1_)
+      : input_data(input_data_),
+        target_data(target_data_),
+        weights_data(weights_data_),
+        output_data(output_data_),
+        has_weights(has_weights_),
+        batch_size(batch_size_),
+        local_size(local_size_),
+        target_stride(target_stride_),
+        n_classes(n_classes_),
+        ignore_index(ignore_index_),
+        output_stride_0(output_stride_0_),
+        input_stride_0(input_stride_0_),
+        input_stride_1(input_stride_1_) {}
+
+ private:
+  scalar_t* input_data;
+  int64_t* target_data;
+  scalar_t* weights_data;
+  scalar_t* output_data;
+  bool has_weights;
+  int64_t batch_size;
+  int64_t local_size;
+  int64_t target_stride;
+  int n_classes;
+  int64_t ignore_index;
+  int64_t output_stride_0;
+  int64_t input_stride_0;
+  int64_t input_stride_1;
+};
+
+template <typename scalar_t>
+struct ClassNLLCriterionUpdateOutputKernelFunctor2 {
+  void operator()(sycl::item<1> item_id) const {
+    auto input_ptr = input_data;
+    auto target_ptr = target_data;
+    auto weights_ptr = has_weights ? weights_data : NULL;
+    auto total_weight_ptr = total_weight_data;
+    auto output_ptr = output_data;
+    // auto local_item_id = item_id.get_id(0);
+    int cur_target = target_ptr[0];
+    if (cur_target != ignore_index) {
+      total_weight_ptr[0] =
+          has_weights ? weights_ptr[cur_target] : static_cast<scalar_t>(1.0f);
+      output_ptr[0] = -static_cast<scalar_t>(input_ptr[cur_target]) *
+          static_cast<scalar_t>(total_weight_ptr[0]);
+    }
+    if (reduction == at::Reduction::Mean && total_weight_ptr[0]) {
+      output_ptr[0] /= total_weight_ptr[0];
+    }
+  }
+  ClassNLLCriterionUpdateOutputKernelFunctor2(
+      scalar_t* input_data_,
+      int64_t* target_data_,
+      scalar_t* weights_data_,
+      scalar_t* output_data_,
+      scalar_t* total_weight_data_,
+      bool has_weights_,
+      int64_t batch_size_,
+      int64_t local_size_,
+      int64_t target_stride_,
+      int n_classes_,
+      int64_t ignore_index_,
+      int64_t reduction_)
+      : input_data(input_data_),
+        target_data(target_data_),
+        weights_data(weights_data_),
+        output_data(output_data_),
+        total_weight_data(total_weight_data_),
+        has_weights(has_weights_),
+        batch_size(batch_size_),
+        local_size(local_size_),
+        target_stride(target_stride_),
+        n_classes(n_classes_),
+        ignore_index(ignore_index_),
+        reduction(reduction_) {}
+
+ private:
+  scalar_t* input_data;
+  int64_t* target_data;
+  scalar_t* weights_data;
+  scalar_t* output_data;
+  scalar_t* total_weight_data;
+  bool has_weights;
+  int64_t batch_size;
+  int64_t local_size;
+  int64_t target_stride;
+  int n_classes;
+  int64_t ignore_index;
+  int64_t reduction;
+};
+
+template <typename scalar_t>
+struct ClassNLLCriterionUpdateOutputKernelFunctor3 {
+  void operator()(sycl::nd_item<1> item_id) const {
+    auto input_ptr = input_data;
+    auto target_ptr = target_data;
+    auto weights_ptr = has_weights ? weights_data : NULL;
+    auto total_weight_ptr = total_weight_data;
+    auto output_ptr = output_data;
+    int64_t local_id = item_id.get_local_id(0);
+    local_output_acc[local_id] = 0.0;
+    local_total_weight_acc[local_id] = 0.0;
+    for (int i = local_id; i < batch_size; i += local_size) {
+      int cur_target = target_ptr[i];
+      if (cur_target != ignore_index) {
+        scalar_t cur_weight =
+            has_weights ? weights_ptr[cur_target] : static_cast<scalar_t>(1.0f);
+        local_total_weight_acc[local_id] += cur_weight;
+        local_output_acc[local_id] -=
+            static_cast<scalar_t>(input_ptr[i * n_target + cur_target]) *
+            static_cast<scalar_t>(cur_weight);
+      }
+    }
+
+    // reduce
+    for (int64_t i = (local_size >> 1); i > 0; i >>= 1) {
+      item_id.barrier(dpcpp_global_and_local_fence);
+      if (local_id < i) {
+        local_total_weight_acc[local_id] +=
+            local_total_weight_acc[local_id + i];
+        local_output_acc[local_id] += local_output_acc[local_id + i];
+      }
+    }
+    item_id.barrier(dpcpp_global_and_local_fence);
+
+    output_ptr[0] = local_output_acc[0];
+    total_weight_ptr[0] = local_total_weight_acc[0];
+    if (reduction == at::Reduction::Mean && total_weight_ptr[0]) {
+      output_ptr[0] /= total_weight_ptr[0];
+    }
+  }
+  ClassNLLCriterionUpdateOutputKernelFunctor3(
+      scalar_t* input_data_,
+      int64_t* target_data_,
+      scalar_t* weights_data_,
+      scalar_t* output_data_,
+      scalar_t* total_weight_data_,
+      bool has_weights_,
+      int64_t batch_size_,
+      int64_t local_size_,
+      int64_t target_stride_,
+      int n_classes_,
+      int64_t ignore_index_,
+      int n_target_,
+      dpcpp_local_acc_t<scalar_t> local_output_acc_,
+      dpcpp_local_acc_t<scalar_t> local_total_weight_acc_,
+      int64_t reduction_)
+      : input_data(input_data_),
+        target_data(target_data_),
+        weights_data(weights_data_),
+        output_data(output_data_),
+        total_weight_data(total_weight_data_),
+        has_weights(has_weights_),
+        batch_size(batch_size_),
+        local_size(local_size_),
+        target_stride(target_stride_),
+        n_classes(n_classes_),
+        ignore_index(ignore_index_),
+        n_target(n_target_),
+        local_output_acc(local_output_acc_),
+        local_total_weight_acc(local_total_weight_acc_),
+        reduction(reduction_) {}
+
+ private:
+  scalar_t* input_data;
+  int64_t* target_data;
+  scalar_t* weights_data;
+  scalar_t* output_data;
+  scalar_t* total_weight_data;
+  bool has_weights;
+  int64_t batch_size;
+  int64_t local_size;
+  int64_t target_stride;
+  int n_classes;
+  int64_t ignore_index;
+  int n_target;
+  dpcpp_local_acc_t<scalar_t> local_output_acc;
+  dpcpp_local_acc_t<scalar_t> local_total_weight_acc;
+  int64_t reduction;
+};
+
+template <typename scalar_t>
 void ClassNLLCriterion_updateOutput(
     const Tensor& input,
     const Tensor& target,
@@ -87,28 +305,20 @@ void ClassNLLCriterion_updateOutput(
           ? weights_cont.data_ptr<scalar_t>()
           : input_data; // use the input as the dummy data.
       auto output_data = output.data_ptr<scalar_t>();
-      auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-        auto input_ptr = input_data;
-        auto target_ptr = target_data;
-        auto weights_ptr = has_weights ? weights_data : NULL;
-        auto output_ptr = output_data;
-        auto local_item_id = item_id.get_id(0);
-        for (int i = local_item_id; i < batch_size; i += local_size) {
-          int cur_target = target_ptr[i * target_stride];
-          if (cur_target >= 0 && cur_target < n_classes)
-            if (cur_target == ignore_index) {
-              output_ptr[i * output_stride_0] = 0.0f;
-              continue;
-            }
-          scalar_t cur_weight = has_weights ? weights_ptr[cur_target]
-                                            : static_cast<scalar_t>(1.0f);
-          output_ptr[i * output_stride_0] =
-              -static_cast<scalar_t>(
-                  input_ptr[i * input_stride_0 + cur_target * input_stride_1]) *
-              cur_weight;
-        }
-      };
-
+      ClassNLLCriterionUpdateOutputKernelFunctor<scalar_t> kfn(
+          input_data,
+          target_data,
+          weights_data,
+          output_data,
+          has_weights,
+          batch_size,
+          local_size,
+          target_stride,
+          n_classes,
+          ignore_index,
+          output_stride_0,
+          input_stride_0,
+          input_stride_1);
       cgh.parallel_for(sycl::range<1>(local_size), kfn);
     };
 
@@ -144,24 +354,19 @@ void ClassNLLCriterion_updateOutput(
       auto target_data = _target_data;
       auto total_weight_data = _total_weight_data;
       auto output_data = _output_data;
-      auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-        auto input_ptr = input_data;
-        auto target_ptr = target_data;
-        auto weights_ptr = has_weights ? weights_data : NULL;
-        auto total_weight_ptr = total_weight_data;
-        auto output_ptr = output_data;
-        // auto local_item_id = item_id.get_id(0);
-        int cur_target = target_ptr[0];
-        if (cur_target != ignore_index) {
-          total_weight_ptr[0] = has_weights ? weights_ptr[cur_target]
-                                            : static_cast<scalar_t>(1.0f);
-          output_ptr[0] = -static_cast<scalar_t>(input_ptr[cur_target]) *
-              static_cast<scalar_t>(total_weight_ptr[0]);
-        }
-        if (reduction == at::Reduction::Mean && total_weight_ptr[0]) {
-          output_ptr[0] /= total_weight_ptr[0];
-        }
-      };
+      ClassNLLCriterionUpdateOutputKernelFunctor2<scalar_t> kfn(
+          input_data,
+          target_data,
+          weights_data,
+          output_data,
+          total_weight_data,
+          has_weights,
+          batch_size,
+          local_size,
+          target_stride,
+          n_classes,
+          ignore_index,
+          reduction);
       cgh.parallel_for(sycl::range<1>(local_size), kfn);
     };
 
@@ -184,44 +389,22 @@ void ClassNLLCriterion_updateOutput(
       auto local_total_weight_acc =
           dpcpp_local_acc_t<scalar_t>(local_size, cgh);
 
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
-        auto input_ptr = input_data;
-        auto target_ptr = target_data;
-        auto weights_ptr = has_weights ? weights_data : NULL;
-        auto total_weight_ptr = total_weight_data;
-        auto output_ptr = output_data;
-        int64_t local_id = item_id.get_local_id(0);
-        local_output_acc[local_id] = 0.0;
-        local_total_weight_acc[local_id] = 0.0;
-        for (int i = local_id; i < batch_size; i += local_size) {
-          int cur_target = target_ptr[i];
-          if (cur_target != ignore_index) {
-            scalar_t cur_weight = has_weights ? weights_ptr[cur_target]
-                                              : static_cast<scalar_t>(1.0f);
-            local_total_weight_acc[local_id] += cur_weight;
-            local_output_acc[local_id] -=
-                static_cast<scalar_t>(input_ptr[i * n_target + cur_target]) *
-                static_cast<scalar_t>(cur_weight);
-          }
-        }
-
-        // reduce
-        for (int64_t i = (local_size >> 1); i > 0; i >>= 1) {
-          item_id.barrier(dpcpp_global_and_local_fence);
-          if (local_id < i) {
-            local_total_weight_acc[local_id] +=
-                local_total_weight_acc[local_id + i];
-            local_output_acc[local_id] += local_output_acc[local_id + i];
-          }
-        }
-        item_id.barrier(dpcpp_global_and_local_fence);
-
-        output_ptr[0] = local_output_acc[0];
-        total_weight_ptr[0] = local_total_weight_acc[0];
-        if (reduction == at::Reduction::Mean && total_weight_ptr[0]) {
-          output_ptr[0] /= total_weight_ptr[0];
-        }
-      };
+      ClassNLLCriterionUpdateOutputKernelFunctor3<scalar_t> kfn(
+          input_data,
+          target_data,
+          weights_data,
+          output_data,
+          total_weight_data,
+          has_weights,
+          batch_size,
+          local_size,
+          target_stride,
+          n_classes,
+          ignore_index,
+          n_target,
+          local_output_acc,
+          local_total_weight_acc,
+          reduction);
       cgh.parallel_for(
           sycl::nd_range<1>(
               sycl::range<1>(local_size), sycl::range<1>(local_size)),
@@ -231,6 +414,187 @@ void ClassNLLCriterion_updateOutput(
     DPCPP_Q_SUBMIT(queue, cgf);
   }
 }
+
+template <typename scalar_t>
+struct ClassNLLCriterionUpdateGradInputKernelFunctor {
+  void operator()(sycl::nd_item<1> item_id) const {
+    auto target_ptr = target_data;
+    auto gradOutput_ptr = gradOutput_data;
+    auto weights_ptr = has_weights ? weights_data : NULL;
+    auto gradInput_ptr = gradInput_data;
+
+    auto local_id = item_id.get_local_id(0);
+    auto group_id = item_id.get_group(0);
+
+    for (int i = group_id * local_size + local_id; i < batch_size;
+         i += item_id.get_global_range(0)) {
+      int cur_target = target_ptr[i * target_stride];
+      if (cur_target == ignore_index) {
+        continue;
+      }
+      scalar_t cur_weight =
+          has_weights ? weights_ptr[cur_target] : static_cast<scalar_t>(1.0f);
+      gradInput_ptr[i * gradInput_stride_0 + cur_target * gradInput_stride_1] =
+          -cur_weight *
+          static_cast<scalar_t>(gradOutput_ptr[i * gradOutput_stride_0]);
+    }
+  }
+  ClassNLLCriterionUpdateGradInputKernelFunctor(
+      int64_t* target_data_,
+      scalar_t* gradOutput_data_,
+      scalar_t* weights_data_,
+      scalar_t* gradInput_data_,
+      bool has_weights_,
+      int64_t local_size_,
+      int64_t batch_size_,
+      int64_t target_stride_,
+      int64_t ignore_index_,
+      int64_t gradInput_stride_0_,
+      int64_t gradInput_stride_1_,
+      int64_t gradOutput_stride_0_)
+      : target_data(target_data_),
+        gradOutput_data(gradOutput_data_),
+        weights_data(weights_data_),
+        gradInput_data(gradInput_data_),
+        has_weights(has_weights_),
+        local_size(local_size_),
+        batch_size(batch_size_),
+        target_stride(target_stride_),
+        ignore_index(ignore_index_),
+        gradInput_stride_0(gradInput_stride_0_),
+        gradInput_stride_1(gradInput_stride_1_),
+        gradOutput_stride_0(gradOutput_stride_0_) {}
+
+ private:
+  int64_t* target_data;
+  scalar_t* gradOutput_data;
+  scalar_t* weights_data;
+  scalar_t* gradInput_data;
+  bool has_weights;
+  int64_t local_size;
+  int64_t batch_size;
+  int64_t target_stride;
+  int64_t ignore_index;
+  int64_t gradInput_stride_0;
+  int64_t gradInput_stride_1;
+  int64_t gradOutput_stride_0;
+};
+
+template <typename scalar_t>
+struct ClassNLLCriterionUpdateGradInputKernelFunctor2 {
+  void operator()(sycl::item<1> item_id) const {
+    auto gradOutput_ptr = gradOutput_data;
+    auto weights_ptr = has_weights ? weights_data : NULL;
+    auto gradInput_ptr = gradInput_data;
+    auto target_ptr = target_data;
+    auto total_weight_ptr = total_weight_data;
+
+    if (*total_weight_ptr <= 0)
+      return;
+    scalar_t norm = (reduction == at::Reduction::Mean)
+        ? (static_cast<scalar_t>(1) / static_cast<scalar_t>(*total_weight_ptr))
+        : static_cast<scalar_t>(1);
+    int t = (int)*target_ptr;
+    if (t != (int)ignore_index) {
+      gradInput_ptr[t] =
+          -(has_weights ? weights_ptr[t] : static_cast<scalar_t>(1)) * norm *
+          gradOutput_ptr[0];
+    }
+  }
+  ClassNLLCriterionUpdateGradInputKernelFunctor2(
+      int64_t* target_data_,
+      scalar_t* gradOutput_data_,
+      scalar_t* weights_data_,
+      scalar_t* gradInput_data_,
+      scalar_t* total_weight_data_,
+      bool has_weights_,
+      int64_t ignore_index_,
+      int64_t reduction_)
+      : target_data(target_data_),
+        gradOutput_data(gradOutput_data_),
+        weights_data(weights_data_),
+        gradInput_data(gradInput_data_),
+        total_weight_data(total_weight_data_),
+        has_weights(has_weights_),
+        ignore_index(ignore_index_),
+        reduction(reduction_) {}
+
+ private:
+  int64_t* target_data;
+  scalar_t* gradOutput_data;
+  scalar_t* weights_data;
+  scalar_t* gradInput_data;
+  scalar_t* total_weight_data;
+  bool has_weights;
+  int64_t ignore_index;
+  int64_t reduction;
+};
+
+template <typename scalar_t>
+struct ClassNLLCriterionUpdateGradInputKernelFunctor3 {
+  void operator()(sycl::item<1> item_id) const {
+    auto gradOutput_ptr = gradOutput_data;
+    auto weights_ptr = has_weights ? weights_data : NULL;
+    auto gradInput_ptr = gradInput_data;
+    auto target_ptr = target_data;
+    auto total_weight_ptr = total_weight_data;
+
+    auto local_item_id = item_id.get_id(0);
+
+    if (*total_weight_ptr <= 0)
+      return;
+    int i, t;
+    scalar_t norm = (reduction == at::Reduction::Mean)
+        ? (static_cast<scalar_t>(1.0f) /
+           static_cast<scalar_t>(*total_weight_ptr))
+        : static_cast<scalar_t>(1);
+    for (i = local_item_id; i < nframe; i += local_size) {
+      t = (int)target_ptr[i];
+      if (t != (int)ignore_index) {
+        // assert(t >= 0 && t < n_classes)
+        gradInput_ptr[i * ndim + t] =
+            -(has_weights ? weights_ptr[t] : static_cast<scalar_t>(1)) * norm *
+            gradOutput_ptr[0];
+      }
+    }
+  }
+  ClassNLLCriterionUpdateGradInputKernelFunctor3(
+      int64_t* target_data_,
+      scalar_t* gradOutput_data_,
+      scalar_t* weights_data_,
+      scalar_t* gradInput_data_,
+      scalar_t* total_weight_data_,
+      bool has_weights_,
+      int64_t ignore_index_,
+      int64_t reduction_,
+      int ndim_,
+      int64_t local_size_,
+      int nframe_)
+      : target_data(target_data_),
+        gradOutput_data(gradOutput_data_),
+        weights_data(weights_data_),
+        gradInput_data(gradInput_data_),
+        total_weight_data(total_weight_data_),
+        has_weights(has_weights_),
+        ignore_index(ignore_index_),
+        reduction(reduction_),
+        ndim(ndim_),
+        local_size(local_size_),
+        nframe(nframe_) {}
+
+ private:
+  int64_t* target_data;
+  scalar_t* gradOutput_data;
+  scalar_t* weights_data;
+  scalar_t* gradInput_data;
+  scalar_t* total_weight_data;
+  bool has_weights;
+  int64_t ignore_index;
+  int64_t reduction;
+  int ndim;
+  int64_t local_size;
+  int nframe;
+};
 
 template <typename scalar_t>
 void ClassNLLCriterion_updateGradInput(
@@ -310,30 +674,19 @@ void ClassNLLCriterion_updateGradInput(
           ? weights_cont.data_ptr<scalar_t>()
           : gradOutput_data; // Use gradOutput handler as dummy weights
       auto gradInput_data = gradInput.data_ptr<scalar_t>();
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
-        auto target_ptr = target_data;
-        auto gradOutput_ptr = gradOutput_data;
-        auto weights_ptr = has_weights ? weights_data : NULL;
-        auto gradInput_ptr = gradInput_data;
-
-        auto local_id = item_id.get_local_id(0);
-        auto group_id = item_id.get_group(0);
-
-        for (int i = group_id * local_size + local_id; i < batch_size;
-             i += item_id.get_global_range(0)) {
-          int cur_target = target_ptr[i * target_stride];
-          if (cur_target == ignore_index) {
-            continue;
-          }
-          scalar_t cur_weight = has_weights ? weights_ptr[cur_target]
-                                            : static_cast<scalar_t>(1.0f);
-          gradInput_ptr
-              [i * gradInput_stride_0 + cur_target * gradInput_stride_1] =
-                  -cur_weight *
-              static_cast<scalar_t>(gradOutput_ptr[i * gradOutput_stride_0]);
-        }
-      };
-
+      ClassNLLCriterionUpdateGradInputKernelFunctor<scalar_t> kfn(
+          target_data,
+          gradOutput_data,
+          weights_data,
+          gradInput_data,
+          has_weights,
+          local_size,
+          batch_size,
+          target_stride,
+          ignore_index,
+          gradInput_stride_0,
+          gradInput_stride_1,
+          gradOutput_stride_0);
       cgh.parallel_for(
           sycl::nd_range<1>(
               sycl::range<1>(global_size), sycl::range<1>(local_size)),
@@ -364,26 +717,15 @@ void ClassNLLCriterion_updateGradInput(
       auto gradInput_data = gradInput.data_ptr<scalar_t>();
       auto target_data = target_cont.data_ptr<int64_t>();
       auto total_weight_data = total_weight.data_ptr<scalar_t>();
-      auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-        auto gradOutput_ptr = gradOutput_data;
-        auto weights_ptr = has_weights ? weights_data : NULL;
-        auto gradInput_ptr = gradInput_data;
-        auto target_ptr = target_data;
-        auto total_weight_ptr = total_weight_data;
-
-        if (*total_weight_ptr <= 0)
-          return;
-        scalar_t norm = (reduction == at::Reduction::Mean)
-            ? (static_cast<scalar_t>(1) /
-               static_cast<scalar_t>(*total_weight_ptr))
-            : static_cast<scalar_t>(1);
-        int t = (int)*target_ptr;
-        if (t != (int)ignore_index) {
-          gradInput_ptr[t] =
-              -(has_weights ? weights_ptr[t] : static_cast<scalar_t>(1)) *
-              norm * gradOutput_ptr[0];
-        }
-      };
+      ClassNLLCriterionUpdateGradInputKernelFunctor2<scalar_t> kfn(
+          target_data,
+          gradOutput_data,
+          weights_data,
+          gradInput_data,
+          total_weight_data,
+          has_weights,
+          ignore_index,
+          reduction);
       cgh.parallel_for(sycl::range<1>(1), kfn);
     };
     DPCPP_Q_SUBMIT(queue, cgf);
@@ -399,32 +741,18 @@ void ClassNLLCriterion_updateGradInput(
       auto gradInput_data = gradInput.data_ptr<scalar_t>();
       auto target_data = target_cont.data_ptr<int64_t>();
       auto total_weight_data = total_weight.data_ptr<scalar_t>();
-      auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-        auto gradOutput_ptr = gradOutput_data;
-        auto weights_ptr = has_weights ? weights_data : NULL;
-        auto gradInput_ptr = gradInput_data;
-        auto target_ptr = target_data;
-        auto total_weight_ptr = total_weight_data;
-
-        auto local_item_id = item_id.get_id(0);
-
-        if (*total_weight_ptr <= 0)
-          return;
-        int i, t;
-        scalar_t norm = (reduction == at::Reduction::Mean)
-            ? (static_cast<scalar_t>(1.0f) /
-               static_cast<scalar_t>(*total_weight_ptr))
-            : static_cast<scalar_t>(1);
-        for (i = local_item_id; i < nframe; i += local_size) {
-          t = (int)target_ptr[i];
-          if (t != (int)ignore_index) {
-            // assert(t >= 0 && t < n_classes)
-            gradInput_ptr[i * ndim + t] =
-                -(has_weights ? weights_ptr[t] : static_cast<scalar_t>(1)) *
-                norm * gradOutput_ptr[0];
-          }
-        }
-      };
+      ClassNLLCriterionUpdateGradInputKernelFunctor3<scalar_t> kfn(
+          target_data,
+          gradOutput_data,
+          weights_data,
+          gradInput_data,
+          total_weight_data,
+          has_weights,
+          ignore_index,
+          reduction,
+          ndim,
+          local_size,
+          nframe);
       cgh.parallel_for(sycl::range<1>(local_size), kfn);
     };
 
@@ -480,6 +808,70 @@ void spatial_class_nll_criterion_grad_output_no_reduce_shape_check(
 }
 
 template <typename scalar_t>
+struct SpatialClassNllCriterionUpdateOutputNoReduceKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    auto out_ptr = out_data;
+    auto self_ptr = self_data;
+    auto target_ptr = target_data;
+    auto weight_ptr = weight_data;
+
+    auto index = item_id.get_linear_id();
+    auto target_offset =
+        IndexToOffset<int64_t, uint64_t>::get(index, target_info);
+    auto output_offset =
+        IndexToOffset<scalar_t, uint64_t>::get(index, output_info);
+
+    int64_t cur_target = target_ptr[target_offset];
+    if (cur_target == ignore_index) {
+      out_ptr[output_offset] = ScalarConvert<int, scalar_t>::to(0);
+    } else {
+      auto self_offset =
+          IndexToOffset<scalar_t, uint64_t>::get(index, self_info);
+      auto weight_offset =
+          IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
+
+      auto self_slice_ptr = self_ptr + cur_target * self_info.strides[dst_dim];
+      scalar_t value = self_slice_ptr[self_offset];
+      scalar_t weight = weight_ptr[weight_offset];
+      out_ptr[output_offset] = -value * weight;
+    }
+  }
+  SpatialClassNllCriterionUpdateOutputNoReduceKernelFunctor(
+      int64_t ignore_index_,
+      TensorInfo<scalar_t, uint64_t> self_info_,
+      int dst_dim_,
+      TensorInfo<int64_t, uint64_t> target_info_,
+      TensorInfo<scalar_t, uint64_t> output_info_,
+      TensorInfo<scalar_t, uint64_t> weight_info_,
+      scalar_t* out_data_,
+      scalar_t* self_data_,
+      int64_t* target_data_,
+      scalar_t* weight_data_)
+      : ignore_index(ignore_index_),
+        self_info(self_info_),
+        dst_dim(dst_dim_),
+        target_info(target_info_),
+        output_info(output_info_),
+        weight_info(weight_info_),
+        out_data(out_data_),
+        self_data(self_data_),
+        target_data(target_data_),
+        weight_data(weight_data_) {}
+
+ private:
+  int64_t ignore_index;
+  TensorInfo<scalar_t, uint64_t> self_info;
+  int dst_dim;
+  TensorInfo<int64_t, uint64_t> target_info;
+  TensorInfo<scalar_t, uint64_t> output_info;
+  TensorInfo<scalar_t, uint64_t> weight_info;
+  scalar_t* out_data;
+  scalar_t* self_data;
+  int64_t* target_data;
+  scalar_t* weight_data;
+};
+
+template <typename scalar_t>
 void spatial_class_nll_criterion_update_output_no_reduce_kernel(
     const Tensor& self,
     const Tensor& target,
@@ -513,40 +905,144 @@ void spatial_class_nll_criterion_update_output_no_reduce_kernel(
     auto target_data = target.data_ptr<int64_t>();
     auto weight_data = weight.data_ptr<scalar_t>();
 
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      auto out_ptr = out_data;
-      auto self_ptr = self_data;
-      auto target_ptr = target_data;
-      auto weight_ptr = weight_data;
-
-      auto index = item_id.get_linear_id();
-      auto target_offset =
-          IndexToOffset<int64_t, uint64_t>::get(index, target_info);
-      auto output_offset =
-          IndexToOffset<scalar_t, uint64_t>::get(index, output_info);
-
-      int64_t cur_target = target_ptr[target_offset];
-      if (cur_target == ignore_index) {
-        out_ptr[output_offset] = ScalarConvert<int, scalar_t>::to(0);
-      } else {
-        auto self_offset =
-            IndexToOffset<scalar_t, uint64_t>::get(index, self_info);
-        auto weight_offset =
-            IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
-
-        auto self_slice_ptr =
-            self_ptr + cur_target * self_info.strides[dst_dim];
-        scalar_t value = self_slice_ptr[self_offset];
-        scalar_t weight = weight_ptr[weight_offset];
-        out_ptr[output_offset] = -value * weight;
-      }
-    };
+    SpatialClassNllCriterionUpdateOutputNoReduceKernelFunctor<scalar_t> kfn(
+        ignore_index,
+        self_info,
+        dst_dim,
+        target_info,
+        output_info,
+        weight_info,
+        out_data,
+        self_data,
+        target_data,
+        weight_data);
 
     cgh.parallel_for(sycl::range</*dim=*/1>(count), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
+
+template <typename scalar_t, typename accscalar_t>
+struct SpatialClassNllCriterionUpdateOutputKernelFunctor {
+  void operator()(sycl::nd_item<1> item_id) const {
+    auto out_ptr = out_data;
+    auto total_weight_ptr = total_weight_data;
+    auto self_ptr = self_data;
+    auto target_ptr = target_data;
+    auto weight_ptr = weight_data;
+
+    auto local_idx = item_id.get_local_linear_id();
+    auto global_idx = item_id.get_global_linear_id();
+    auto global_range_size = item_id.get_global_range().size();
+    auto num_combine = (numel + global_range_size - 1) / global_range_size;
+
+    accscalar_t input_sum = 0;
+    accscalar_t acc_weight = 0;
+    for (uint64_t i = 0; i < num_combine; ++i) {
+      auto global_shift = global_idx + i * global_range_size;
+      if (global_shift < numel) {
+        auto target_offset =
+            IndexToOffset<int64_t, uint64_t>::get(global_shift, target_info);
+        int64_t cur_target = target_ptr[target_offset];
+
+        if (cur_target != ignore_index) {
+          auto weight_offset =
+              IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
+          scalar_t weight = weight_ptr[weight_offset];
+
+          auto self_offset =
+              IndexToOffset<scalar_t, uint64_t>::get(global_shift, self_info);
+          auto self_slice_ptr =
+              self_ptr + cur_target * self_info.strides[dst_dim];
+          scalar_t value = self_slice_ptr[self_offset];
+          input_sum -= value * weight;
+          acc_weight += weight;
+        }
+      }
+    }
+    partial_sums[local_idx] = input_sum;
+    partial_weight[local_idx] = acc_weight;
+
+    simple_reduce(item_id, partial_sums, [](accscalar_t a, accscalar_t b) {
+      return Numerics<accscalar_t>::add(a, b);
+    });
+
+    simple_reduce(item_id, partial_weight, [](accscalar_t a, accscalar_t b) {
+      return Numerics<accscalar_t>::add(a, b);
+    });
+
+    if (local_idx == 0) {
+      atomicAdd(
+          (dpcpp_global_ptr_pt<scalar_t>)total_weight_ptr,
+          ScalarConvert<accscalar_t, scalar_t>::to(partial_weight[0]));
+      atomicAdd(
+          (dpcpp_global_ptr_pt<scalar_t>)out_ptr,
+          ScalarConvert<accscalar_t, scalar_t>::to(partial_sums[0]));
+    }
+  }
+  SpatialClassNllCriterionUpdateOutputKernelFunctor(
+      int64_t ignore_index_,
+      int64_t numel_,
+      TensorInfo<scalar_t, uint64_t> self_info_,
+      int dst_dim_,
+      TensorInfo<int64_t, uint64_t> target_info_,
+      TensorInfo<scalar_t, uint64_t> weight_info_,
+      scalar_t* out_data_,
+      scalar_t* total_weight_data_,
+      scalar_t* self_data_,
+      int64_t* target_data_,
+      scalar_t* weight_data_,
+      dpcpp_local_acc_t<accscalar_t, 1> partial_sums_,
+      dpcpp_local_acc_t<accscalar_t, 1> partial_weight_)
+      : ignore_index(ignore_index_),
+        numel(numel_),
+        self_info(self_info_),
+        dst_dim(dst_dim_),
+        target_info(target_info_),
+        weight_info(weight_info_),
+        out_data(out_data_),
+        total_weight_data(total_weight_data_),
+        self_data(self_data_),
+        target_data(target_data_),
+        weight_data(weight_data_),
+        partial_sums(partial_sums_),
+        partial_weight(partial_weight_) {}
+
+ private:
+  int64_t ignore_index;
+  int64_t numel;
+  TensorInfo<scalar_t, uint64_t> self_info;
+  int dst_dim;
+  TensorInfo<int64_t, uint64_t> target_info;
+  TensorInfo<scalar_t, uint64_t> weight_info;
+  scalar_t* out_data;
+  scalar_t* total_weight_data;
+  scalar_t* self_data;
+  int64_t* target_data;
+  scalar_t* weight_data;
+  dpcpp_local_acc_t<accscalar_t, 1> partial_sums;
+  dpcpp_local_acc_t<accscalar_t, 1> partial_weight;
+};
+
+template <typename scalar_t>
+struct SpatialClassNllCriterionUpdateOutputKernelFunctor2 {
+  void operator()(sycl::item<1> item_id) const {
+    auto out_ptr = out_data;
+    auto total_weight_ptr = total_weight_data;
+    if (total_weight_ptr[0] != 0) {
+      out_ptr[0] = Numerics<scalar_t>::div(out_ptr[0], total_weight_ptr[0]);
+    }
+  }
+  SpatialClassNllCriterionUpdateOutputKernelFunctor2(
+      scalar_t* out_data,
+      scalar_t* total_weight_data)
+      : out_data(out_data), total_weight_data(total_weight_data) {}
+
+ private:
+  scalar_t* out_data;
+  scalar_t* total_weight_data;
+};
 
 template <typename scalar_t, typename accscalar_t>
 void spatial_class_nll_criterion_update_output_kernel(
@@ -585,62 +1081,20 @@ void spatial_class_nll_criterion_update_output_kernel(
     dpcpp_local_acc_t<accscalar_t, 1> partial_sums(wgroup_size, cgh);
     dpcpp_local_acc_t<accscalar_t, 1> partial_weight(wgroup_size, cgh);
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
-      auto out_ptr = out_data;
-      auto total_weight_ptr = total_weight_data;
-      auto self_ptr = self_data;
-      auto target_ptr = target_data;
-      auto weight_ptr = weight_data;
-
-      auto local_idx = item_id.get_local_linear_id();
-      auto global_idx = item_id.get_global_linear_id();
-      auto global_range_size = item_id.get_global_range().size();
-      auto num_combine = (numel + global_range_size - 1) / global_range_size;
-
-      accscalar_t input_sum = 0;
-      accscalar_t acc_weight = 0;
-      for (uint64_t i = 0; i < num_combine; ++i) {
-        auto global_shift = global_idx + i * global_range_size;
-        if (global_shift < numel) {
-          auto target_offset =
-              IndexToOffset<int64_t, uint64_t>::get(global_shift, target_info);
-          int64_t cur_target = target_ptr[target_offset];
-
-          if (cur_target != ignore_index) {
-            auto weight_offset =
-                IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
-            scalar_t weight = weight_ptr[weight_offset];
-
-            auto self_offset =
-                IndexToOffset<scalar_t, uint64_t>::get(global_shift, self_info);
-            auto self_slice_ptr =
-                self_ptr + cur_target * self_info.strides[dst_dim];
-            scalar_t value = self_slice_ptr[self_offset];
-            input_sum -= value * weight;
-            acc_weight += weight;
-          }
-        }
-      }
-      partial_sums[local_idx] = input_sum;
-      partial_weight[local_idx] = acc_weight;
-
-      simple_reduce(item_id, partial_sums, [](accscalar_t a, accscalar_t b) {
-        return Numerics<accscalar_t>::add(a, b);
-      });
-
-      simple_reduce(item_id, partial_weight, [](accscalar_t a, accscalar_t b) {
-        return Numerics<accscalar_t>::add(a, b);
-      });
-
-      if (local_idx == 0) {
-        atomicAdd(
-            (dpcpp_global_ptr_pt<scalar_t>)total_weight_ptr,
-            ScalarConvert<accscalar_t, scalar_t>::to(partial_weight[0]));
-        atomicAdd(
-            (dpcpp_global_ptr_pt<scalar_t>)out_ptr,
-            ScalarConvert<accscalar_t, scalar_t>::to(partial_sums[0]));
-      }
-    };
+    SpatialClassNllCriterionUpdateOutputKernelFunctor<scalar_t, accscalar_t>
+        kfn(ignore_index,
+            numel,
+            self_info,
+            dst_dim,
+            target_info,
+            weight_info,
+            out_data,
+            total_weight_data,
+            self_data,
+            target_data,
+            weight_data,
+            partial_sums,
+            partial_weight);
 
     cgh.parallel_for(
         sycl::nd_range<1>(
@@ -656,13 +1110,8 @@ void spatial_class_nll_criterion_update_output_kernel(
       auto out_data = output.data_ptr<scalar_t>();
       auto total_weight_data = total_weight.data_ptr<scalar_t>();
 
-      auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-        auto out_ptr = out_data;
-        auto total_weight_ptr = total_weight_data;
-        if (total_weight_ptr[0] != 0) {
-          out_ptr[0] = Numerics<scalar_t>::div(out_ptr[0], total_weight_ptr[0]);
-        }
-      };
+      SpatialClassNllCriterionUpdateOutputKernelFunctor2<scalar_t> kfn(
+          out_data, total_weight_data);
 
       cgh.parallel_for(sycl::range</*dim=*/1>(1), kfn);
     };
@@ -670,6 +1119,71 @@ void spatial_class_nll_criterion_update_output_kernel(
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
   }
 }
+
+template <typename scalar_t>
+struct SpatialClassNllCriterionUpdateGradInputNoReduceKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    auto grad_input_ptr = grad_input_data;
+    auto grad_output_ptr = grad_output_data;
+    auto target_ptr = target_data;
+    auto weight_ptr = weight_data;
+
+    auto index = item_id.get_linear_id();
+    auto target_offset =
+        IndexToOffset<int64_t, uint64_t>::get(index, target_info);
+
+    int64_t cur_target = target_ptr[target_offset];
+    if (cur_target != ignore_index) {
+      auto grad_output_offset =
+          IndexToOffset<scalar_t, uint64_t>::get(index, grad_output_info);
+      auto weight_offset =
+          IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
+
+      scalar_t value = grad_output_ptr[grad_output_offset];
+      scalar_t weight = weight_ptr[weight_offset];
+
+      auto grad_input_offset =
+          IndexToOffset<scalar_t, uint64_t>::get(index, grad_input_info);
+      auto grad_input_slice_ptr =
+          grad_input_ptr + cur_target * grad_input_info.strides[dst_dim];
+
+      grad_input_slice_ptr[grad_input_offset] = -value * weight;
+    }
+  }
+  SpatialClassNllCriterionUpdateGradInputNoReduceKernelFunctor(
+      int64_t ignore_index_,
+      TensorInfo<scalar_t, uint64_t> grad_input_info_,
+      int dst_dim_,
+      TensorInfo<int64_t, uint64_t> target_info_,
+      TensorInfo<scalar_t, uint64_t> grad_output_info_,
+      TensorInfo<scalar_t, uint64_t> weight_info_,
+      scalar_t* grad_input_data_,
+      scalar_t* grad_output_data_,
+      int64_t* target_data_,
+      scalar_t* weight_data_)
+      : ignore_index(ignore_index_),
+        grad_input_info(grad_input_info_),
+        dst_dim(dst_dim_),
+        target_info(target_info_),
+        grad_output_info(grad_output_info_),
+        weight_info(weight_info_),
+        grad_input_data(grad_input_data_),
+        grad_output_data(grad_output_data_),
+        target_data(target_data_),
+        weight_data(weight_data_) {}
+
+ private:
+  int64_t ignore_index;
+  TensorInfo<scalar_t, uint64_t> grad_input_info;
+  int dst_dim;
+  TensorInfo<int64_t, uint64_t> target_info;
+  TensorInfo<scalar_t, uint64_t> grad_output_info;
+  TensorInfo<scalar_t, uint64_t> weight_info;
+  scalar_t* grad_input_data;
+  scalar_t* grad_output_data;
+  int64_t* target_data;
+  scalar_t* weight_data;
+};
 
 template <typename scalar_t>
 void spatial_class_nll_criterion_update_grad_input_no_reduce_kernel(
@@ -705,40 +1219,97 @@ void spatial_class_nll_criterion_update_grad_input_no_reduce_kernel(
     auto target_data = target.data_ptr<int64_t>();
     auto weight_data = weight.data_ptr<scalar_t>();
 
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      auto grad_input_ptr = grad_input_data;
-      auto grad_output_ptr = grad_output_data;
-      auto target_ptr = target_data;
-      auto weight_ptr = weight_data;
-
-      auto index = item_id.get_linear_id();
-      auto target_offset =
-          IndexToOffset<int64_t, uint64_t>::get(index, target_info);
-
-      int64_t cur_target = target_ptr[target_offset];
-      if (cur_target != ignore_index) {
-        auto grad_output_offset =
-            IndexToOffset<scalar_t, uint64_t>::get(index, grad_output_info);
-        auto weight_offset =
-            IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
-
-        scalar_t value = grad_output_ptr[grad_output_offset];
-        scalar_t weight = weight_ptr[weight_offset];
-
-        auto grad_input_offset =
-            IndexToOffset<scalar_t, uint64_t>::get(index, grad_input_info);
-        auto grad_input_slice_ptr =
-            grad_input_ptr + cur_target * grad_input_info.strides[dst_dim];
-
-        grad_input_slice_ptr[grad_input_offset] = -value * weight;
-      }
-    };
+    SpatialClassNllCriterionUpdateGradInputNoReduceKernelFunctor<scalar_t> kfn(
+        ignore_index,
+        grad_input_info,
+        dst_dim,
+        target_info,
+        grad_output_info,
+        weight_info,
+        grad_input_data,
+        grad_output_data,
+        target_data,
+        weight_data);
 
     cgh.parallel_for(sycl::range</*dim=*/1>(count), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
+
+template <typename scalar_t>
+struct SpatialClassNllCriterionUpdateGradInputKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    auto total_weight_ptr = total_weight_data;
+    scalar_t total_weight = total_weight_ptr[0];
+    if (total_weight <= 0)
+      return;
+
+    auto target_ptr = target_data;
+
+    auto index = item_id.get_linear_id();
+    auto target_offset =
+        IndexToOffset<int64_t, uint64_t>::get(index, target_info);
+
+    int64_t cur_target = target_ptr[target_offset];
+    if (cur_target != ignore_index) {
+      auto grad_input_ptr = grad_input_data;
+      auto grad_output_ptr = grad_output_data;
+      auto weight_ptr = weight_data;
+      auto weight_offset =
+          IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
+      scalar_t weight = weight_ptr[weight_offset];
+
+      scalar_t norm = (reduction == at::Reduction::Mean)
+          ? (ScalarConvert<int, scalar_t>::to(1) / total_weight)
+          : ScalarConvert<int, scalar_t>::to(1);
+
+      auto grad_input_offset =
+          IndexToOffset<scalar_t, uint64_t>::get(index, grad_input_info);
+      auto grad_input_slice_ptr =
+          grad_input_ptr + cur_target * grad_input_info.strides[dst_dim];
+
+      grad_input_slice_ptr[grad_input_offset] =
+          -weight * norm * grad_output_ptr[0];
+    }
+  }
+  SpatialClassNllCriterionUpdateGradInputKernelFunctor(
+      int64_t reduction_,
+      int64_t ignore_index_,
+      TensorInfo<scalar_t, uint64_t> grad_input_info_,
+      int dst_dim_,
+      TensorInfo<int64_t, uint64_t> target_info_,
+      TensorInfo<scalar_t, uint64_t> weight_info_,
+      scalar_t* grad_input_data_,
+      scalar_t* grad_output_data_,
+      int64_t* target_data_,
+      scalar_t* weight_data_,
+      scalar_t* total_weight_data_)
+      : reduction(reduction_),
+        ignore_index(ignore_index_),
+        grad_input_info(grad_input_info_),
+        dst_dim(dst_dim_),
+        target_info(target_info_),
+        weight_info(weight_info_),
+        grad_input_data(grad_input_data_),
+        grad_output_data(grad_output_data_),
+        target_data(target_data_),
+        weight_data(weight_data_),
+        total_weight_data(total_weight_data_) {}
+
+ private:
+  int64_t reduction;
+  int64_t ignore_index;
+  TensorInfo<scalar_t, uint64_t> grad_input_info;
+  int dst_dim;
+  TensorInfo<int64_t, uint64_t> target_info;
+  TensorInfo<scalar_t, uint64_t> weight_info;
+  scalar_t* grad_input_data;
+  scalar_t* grad_output_data;
+  int64_t* target_data;
+  scalar_t* weight_data;
+  scalar_t* total_weight_data;
+};
 
 template <typename scalar_t>
 void spatial_class_nll_criterion_update_grad_input_kernel(
@@ -774,40 +1345,18 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
     auto weight_data = weight.data_ptr<scalar_t>();
     auto total_weight_data = total_weight.data_ptr<scalar_t>();
 
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      auto total_weight_ptr = total_weight_data;
-      scalar_t total_weight = total_weight_ptr[0];
-      if (total_weight <= 0)
-        return;
-
-      auto target_ptr = target_data;
-
-      auto index = item_id.get_linear_id();
-      auto target_offset =
-          IndexToOffset<int64_t, uint64_t>::get(index, target_info);
-
-      int64_t cur_target = target_ptr[target_offset];
-      if (cur_target != ignore_index) {
-        auto grad_input_ptr = grad_input_data;
-        auto grad_output_ptr = grad_output_data;
-        auto weight_ptr = weight_data;
-        auto weight_offset =
-            IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
-        scalar_t weight = weight_ptr[weight_offset];
-
-        scalar_t norm = (reduction == at::Reduction::Mean)
-            ? (ScalarConvert<int, scalar_t>::to(1) / total_weight)
-            : ScalarConvert<int, scalar_t>::to(1);
-
-        auto grad_input_offset =
-            IndexToOffset<scalar_t, uint64_t>::get(index, grad_input_info);
-        auto grad_input_slice_ptr =
-            grad_input_ptr + cur_target * grad_input_info.strides[dst_dim];
-
-        grad_input_slice_ptr[grad_input_offset] =
-            -weight * norm * grad_output_ptr[0];
-      }
-    };
+    SpatialClassNllCriterionUpdateGradInputKernelFunctor<scalar_t> kfn(
+        reduction,
+        ignore_index,
+        grad_input_info,
+        dst_dim,
+        target_info,
+        weight_info,
+        grad_input_data,
+        grad_output_data,
+        target_data,
+        weight_data,
+        total_weight_data);
 
     cgh.parallel_for(sycl::range</*dim=*/1>(count), kfn);
   };

@@ -58,6 +58,266 @@ std::tuple<sycl::range<2>, sycl::range<2>> get_work_range(
 }
 
 template <typename scalar_t, typename target_t>
+struct CtcLossLogAlphaKernelFunctor {
+  void operator()(sycl::nd_item<2> item_id) const {
+    size_t intra_batch_id = item_id.get_local_id(1);
+    size_t intra_batch_size = item_id.get_local_range(1);
+    scalar_t* log_alpha_ptr = log_alpha_data;
+    scalar_t* log_probs_ptr = log_probs_data;
+    target_t* targets_ptr = targets_data;
+    scalar_t* neg_log_likelihood_ptr = neg_log_likelihood_data;
+    int64_t* input_lengths_ptr = input_lengths_data;
+    int64_t* target_lengths_ptr = target_lengths_data;
+    int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
+
+    // bookkeeping
+    int64_t b = item_id.get_local_id(0) +
+        item_id.get_group(0) * item_id.get_local_range(0);
+    size_t batch_slm_off = item_id.get_local_id(0) * intra_batch_size;
+    // This is a workaround for unknown compute cpp issue.
+    int64_t max_input_length = __max_input_length;
+    int64_t max_target_length = __max_target_length;
+    int64_t lp_input_stride = __lp_input_stride;
+    int64_t lp_batch_stride = __lp_batch_stride;
+    int64_t lp_char_stride = __lp_char_stride;
+    int64_t la_batch_stride = __la_batch_stride;
+    int64_t la_input_stride = __la_input_stride;
+    int64_t la_target_stride = __la_target_stride;
+    int64_t batch_size = __batch_size;
+    int64_t BLANK = __BLANK;
+    int64_t tg_target_stride = __tg_target_stride;
+
+    int64_t input_length = input_lengths_ptr[b];
+    int64_t target_length = target_lengths_ptr[b];
+    int64_t lp_batch_offset = b * lp_batch_stride;
+    int64_t la_batch_offset = b * la_batch_stride;
+    int64_t tg_batch_offset = tg_batch_offsets_ptr[b];
+
+    if (b < batch_size) {
+      // first row (t=0), the three equations for alpha_1 above eq (6)
+      for (int64_t s = intra_batch_id; s < 2 * max_target_length + 1;
+           s += intra_batch_size) {
+        scalar_t la;
+        switch (s) {
+          case 0:
+            la = log_probs_ptr[lp_batch_offset + lp_char_stride * BLANK];
+            break;
+          case 1:
+            la = target_length == 0 ? neginf
+                                    : log_probs_ptr
+                                          [lp_batch_offset +
+                                           lp_char_stride *
+                                               get_target_prime(
+                                                   targets_ptr,
+                                                   tg_batch_offset,
+                                                   tg_target_stride,
+                                                   1,
+                                                   BLANK)];
+            break;
+          default:
+            la = neginf;
+        }
+        log_alpha_ptr
+            [la_batch_offset +
+             /* la_input_stride * 0 */ +la_target_stride * s] = la;
+      }
+    }
+
+    for (int64_t block_s = 0; block_s < 2 * max_target_length + 1;
+         block_s += intra_batch_size) {
+      int64_t s = intra_batch_id + block_s;
+      // These two only depend on s, so we can cache them.
+      int64_t current_char; // l_s in eq (6)
+      bool have_three; // flag which of the two cases in eq (6) we have
+      if (b < batch_size && s < 2 * target_length + 1 && target_length > 0) {
+        current_char = get_target_prime(
+            targets_ptr, tg_batch_offset, tg_target_stride, s, BLANK);
+        have_three =
+            ((s > 1) &&
+             (get_target_prime(
+                  targets_ptr,
+                  tg_batch_offset,
+                  tg_target_stride,
+                  s - 2,
+                  BLANK) != current_char));
+      } else {
+        current_char = BLANK;
+        have_three = false;
+      }
+
+      auto lidx = intra_batch_id;
+      auto slm_lidx = batch_slm_off + lidx;
+      shared_local_buff[slm_lidx] = log_alpha_ptr
+          [la_batch_offset + la_input_stride * (0) +
+           la_target_stride * s]; // t == 0
+
+      for (int64_t t = 1; t < max_input_length; t++) {
+        item_id.barrier(dpcpp_local_fence);
+        scalar_t result_t_s = neginf;
+        if ((b < batch_size) && (t < input_length) &&
+            (s < 2 * target_length + 1)) {
+          // only for valid t, s. This is equation (6) and (7), la1, la2, la3
+          // are the three summands,
+          // lamax is the maximum for the logsumexp trick.
+          scalar_t la1 = shared_local_buff[slm_lidx];
+          scalar_t lamax = la1;
+          scalar_t la2, la3;
+          if (s > 0) { // for sequence idx start from 1
+            if (lidx > 0) {
+              // for sequence segement idx start from block_s + 1
+              la2 = shared_local_buff[slm_lidx - 1];
+            } else {
+              // only for item s =  block_s, and ptr[*, *, s-1] is not changed
+              // during this t loop as it is sloved in previous segement
+              la2 = log_alpha_ptr
+                  [la_batch_offset + la_input_stride * (t - 1) +
+                   la_target_stride * (s - 1)];
+            }
+            if (la2 > lamax)
+              lamax = la2;
+          } else {
+            la2 = neginf;
+          }
+          if (have_three) {
+            if (lidx > 1) {
+              // for sequence segement idx start from block_s + 2
+              la3 = shared_local_buff[slm_lidx - 2];
+            } else {
+              // only for item s = block_s or s = block_s + 1, and ptr[*,*,
+              // s-2] is not changed during this t loop as it is sloved in
+              // previous segement
+              la3 = log_alpha_ptr
+                  [la_batch_offset + la_input_stride * (t - 1) +
+                   la_target_stride * (s - 2)];
+            }
+            if (la3 > lamax)
+              lamax = la3;
+          } else {
+            la3 = neginf;
+          }
+          if (lamax == neginf) // when all are neginf. (then the whole thing
+            // is neginf, but we can pretend)
+            lamax = 0;
+
+          scalar_t tmp = Numerics<scalar_t>::log(
+              Numerics<scalar_t>::exp(la1 - lamax) +
+              Numerics<scalar_t>::exp(la2 - lamax) +
+              Numerics<scalar_t>::exp(la3 - lamax));
+          result_t_s = tmp + lamax +
+              static_cast<scalar_t>(log_probs_ptr
+                                        [lp_batch_offset + t * lp_input_stride +
+                                         lp_char_stride * current_char]);
+          log_alpha_ptr
+              [la_batch_offset + la_input_stride * t + la_target_stride * s] =
+                  result_t_s;
+
+        } else {
+          // otherwise we just set to neginf
+          if (b < batch_size && s < 2 * max_target_length + 1)
+            log_alpha_ptr
+                [la_batch_offset + la_input_stride * t + la_target_stride * s] =
+                    neginf;
+        }
+        item_id.barrier(dpcpp_local_fence);
+        shared_local_buff[slm_lidx] = result_t_s;
+      }
+      // sync on batch_s segement
+      item_id.barrier(dpcpp_global_fence);
+    }
+
+    if (b >= batch_size)
+      return;
+    // compute the loss (eq (8))
+    if (intra_batch_id == 0) {
+      if (target_length == 0) {
+        neg_log_likelihood_ptr[b] = -static_cast<scalar_t>(
+            log_alpha_ptr
+                [la_batch_offset + la_input_stride * (input_length - 1)]);
+      } else {
+        scalar_t l1 = log_alpha_ptr
+            [la_batch_offset + la_input_stride * (input_length - 1) +
+             la_target_stride * (target_length * 2)];
+        scalar_t l2 = target_length > 0
+            ? log_alpha_ptr
+                  [la_batch_offset + la_input_stride * (input_length - 1) +
+                   la_target_stride * (target_length * 2 - 1)]
+            : neginf;
+        scalar_t m = ((l1 > l2) ? l1 : l2);
+        m = ((m == neginf) ? static_cast<scalar_t>(0.0f) : m);
+        scalar_t log_likelihood = Numerics<scalar_t>::log(
+                                      Numerics<scalar_t>::exp(l1 - m) +
+                                      Numerics<scalar_t>::exp(l2 - m)) +
+            m;
+        neg_log_likelihood_ptr[b] = -log_likelihood;
+      }
+    }
+  }
+  CtcLossLogAlphaKernelFunctor(
+      int64_t __max_input_length_,
+      int64_t __max_target_length_,
+      int64_t __tg_target_stride_,
+      int64_t __batch_size_,
+      int64_t __BLANK_,
+      scalar_t neginf_,
+      int64_t __lp_input_stride_,
+      int64_t __lp_batch_stride_,
+      int64_t __lp_char_stride_,
+      int64_t __la_batch_stride_,
+      int64_t __la_input_stride_,
+      int64_t __la_target_stride_,
+      dpcpp_local_acc_t<scalar_t> shared_local_buff_,
+      scalar_t* log_alpha_data_,
+      scalar_t* log_probs_data_,
+      int64_t* input_lengths_data_,
+      target_t* targets_data_,
+      int64_t* target_lengths_data_,
+      scalar_t* neg_log_likelihood_data_,
+      int64_t* tg_batch_offsets_data_)
+      : __max_input_length(__max_input_length_),
+        __max_target_length(__max_target_length_),
+        __tg_target_stride(__tg_target_stride_),
+        __batch_size(__batch_size_),
+        __BLANK(__BLANK_),
+        neginf(neginf_),
+        __lp_input_stride(__lp_input_stride_),
+        __lp_batch_stride(__lp_batch_stride_),
+        __lp_char_stride(__lp_char_stride_),
+        __la_batch_stride(__la_batch_stride_),
+        __la_input_stride(__la_input_stride_),
+        __la_target_stride(__la_target_stride_),
+        shared_local_buff(shared_local_buff_),
+        log_alpha_data(log_alpha_data_),
+        log_probs_data(log_probs_data_),
+        input_lengths_data(input_lengths_data_),
+        targets_data(targets_data_),
+        target_lengths_data(target_lengths_data_),
+        neg_log_likelihood_data(neg_log_likelihood_data_),
+        tg_batch_offsets_data(tg_batch_offsets_data_) {}
+
+ private:
+  int64_t __max_input_length;
+  int64_t __max_target_length;
+  int64_t __tg_target_stride;
+  int64_t __batch_size;
+  int64_t __BLANK;
+  scalar_t neginf;
+  int64_t __lp_input_stride;
+  int64_t __lp_batch_stride;
+  int64_t __lp_char_stride;
+  int64_t __la_batch_stride;
+  int64_t __la_input_stride;
+  int64_t __la_target_stride;
+  dpcpp_local_acc_t<scalar_t> shared_local_buff;
+  scalar_t* log_alpha_data;
+  scalar_t* log_probs_data;
+  int64_t* input_lengths_data;
+  target_t* targets_data;
+  int64_t* target_lengths_data;
+  scalar_t* neg_log_likelihood_data;
+  int64_t* tg_batch_offsets_data;
+};
+
+template <typename scalar_t, typename target_t>
 void ctc_loss_log_alpha_kernel(
     Tensor& log_alpha,
     const Tensor& log_probs,
@@ -97,206 +357,261 @@ void ctc_loss_log_alpha_kernel(
     auto neg_log_likelihood_data = neg_log_likelihood.data_ptr<scalar_t>();
     auto tg_batch_offsets_data = tg_batch_offsets.data_ptr<int64_t>();
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
-      size_t intra_batch_id = item_id.get_local_id(1);
-      size_t intra_batch_size = item_id.get_local_range(1);
-      scalar_t* log_alpha_ptr = log_alpha_data;
-      scalar_t* log_probs_ptr = log_probs_data;
-      target_t* targets_ptr = targets_data;
-      scalar_t* neg_log_likelihood_ptr = neg_log_likelihood_data;
-      int64_t* input_lengths_ptr = input_lengths_data;
-      int64_t* target_lengths_ptr = target_lengths_data;
-      int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
-
-      // bookkeeping
-      int64_t b = item_id.get_local_id(0) +
-          item_id.get_group(0) * item_id.get_local_range(0);
-      size_t batch_slm_off = item_id.get_local_id(0) * intra_batch_size;
-      // This is a workaround for unknown compute cpp issue.
-      int64_t max_input_length = __max_input_length;
-      int64_t max_target_length = __max_target_length;
-      int64_t lp_input_stride = __lp_input_stride;
-      int64_t lp_batch_stride = __lp_batch_stride;
-      int64_t lp_char_stride = __lp_char_stride;
-      int64_t la_batch_stride = __la_batch_stride;
-      int64_t la_input_stride = __la_input_stride;
-      int64_t la_target_stride = __la_target_stride;
-      int64_t batch_size = __batch_size;
-      int64_t BLANK = __BLANK;
-      int64_t tg_target_stride = __tg_target_stride;
-
-      int64_t input_length = input_lengths_ptr[b];
-      int64_t target_length = target_lengths_ptr[b];
-      int64_t lp_batch_offset = b * lp_batch_stride;
-      int64_t la_batch_offset = b * la_batch_stride;
-      int64_t tg_batch_offset = tg_batch_offsets_ptr[b];
-
-      if (b < batch_size) {
-        // first row (t=0), the three equations for alpha_1 above eq (6)
-        for (int64_t s = intra_batch_id; s < 2 * max_target_length + 1;
-             s += intra_batch_size) {
-          scalar_t la;
-          switch (s) {
-            case 0:
-              la = log_probs_ptr[lp_batch_offset + lp_char_stride * BLANK];
-              break;
-            case 1:
-              la = target_length == 0 ? neginf
-                                      : log_probs_ptr
-                                            [lp_batch_offset +
-                                             lp_char_stride *
-                                                 get_target_prime(
-                                                     targets_ptr,
-                                                     tg_batch_offset,
-                                                     tg_target_stride,
-                                                     1,
-                                                     BLANK)];
-              break;
-            default:
-              la = neginf;
-          }
-          log_alpha_ptr
-              [la_batch_offset +
-               /* la_input_stride * 0 */ +la_target_stride * s] = la;
-        }
-      }
-
-      for (int64_t block_s = 0; block_s < 2 * max_target_length + 1;
-           block_s += intra_batch_size) {
-        int64_t s = intra_batch_id + block_s;
-        // These two only depend on s, so we can cache them.
-        int64_t current_char; // l_s in eq (6)
-        bool have_three; // flag which of the two cases in eq (6) we have
-        if (b < batch_size && s < 2 * target_length + 1 && target_length > 0) {
-          current_char = get_target_prime(
-              targets_ptr, tg_batch_offset, tg_target_stride, s, BLANK);
-          have_three =
-              ((s > 1) &&
-               (get_target_prime(
-                    targets_ptr,
-                    tg_batch_offset,
-                    tg_target_stride,
-                    s - 2,
-                    BLANK) != current_char));
-        } else {
-          current_char = BLANK;
-          have_three = false;
-        }
-
-        auto lidx = intra_batch_id;
-        auto slm_lidx = batch_slm_off + lidx;
-        shared_local_buff[slm_lidx] = log_alpha_ptr
-            [la_batch_offset + la_input_stride * (0) +
-             la_target_stride * s]; // t == 0
-
-        for (int64_t t = 1; t < max_input_length; t++) {
-          item_id.barrier(dpcpp_local_fence);
-          scalar_t result_t_s = neginf;
-          if ((b < batch_size) && (t < input_length) &&
-              (s < 2 * target_length + 1)) {
-            // only for valid t, s. This is equation (6) and (7), la1, la2, la3
-            // are the three summands,
-            // lamax is the maximum for the logsumexp trick.
-            scalar_t la1 = shared_local_buff[slm_lidx];
-            scalar_t lamax = la1;
-            scalar_t la2, la3;
-            if (s > 0) { // for sequence idx start from 1
-              if (lidx > 0) {
-                // for sequence segement idx start from block_s + 1
-                la2 = shared_local_buff[slm_lidx - 1];
-              } else {
-                // only for item s =  block_s, and ptr[*, *, s-1] is not changed
-                // during this t loop as it is sloved in previous segement
-                la2 = log_alpha_ptr
-                    [la_batch_offset + la_input_stride * (t - 1) +
-                     la_target_stride * (s - 1)];
-              }
-              if (la2 > lamax)
-                lamax = la2;
-            } else {
-              la2 = neginf;
-            }
-            if (have_three) {
-              if (lidx > 1) {
-                // for sequence segement idx start from block_s + 2
-                la3 = shared_local_buff[slm_lidx - 2];
-              } else {
-                // only for item s = block_s or s = block_s + 1, and ptr[*,*,
-                // s-2] is not changed during this t loop as it is sloved in
-                // previous segement
-                la3 = log_alpha_ptr
-                    [la_batch_offset + la_input_stride * (t - 1) +
-                     la_target_stride * (s - 2)];
-              }
-              if (la3 > lamax)
-                lamax = la3;
-            } else {
-              la3 = neginf;
-            }
-            if (lamax == neginf) // when all are neginf. (then the whole thing
-              // is neginf, but we can pretend)
-              lamax = 0;
-
-            scalar_t tmp = Numerics<scalar_t>::log(
-                Numerics<scalar_t>::exp(la1 - lamax) +
-                Numerics<scalar_t>::exp(la2 - lamax) +
-                Numerics<scalar_t>::exp(la3 - lamax));
-            result_t_s = tmp + lamax +
-                static_cast<scalar_t>(
-                             log_probs_ptr
-                                 [lp_batch_offset + t * lp_input_stride +
-                                  lp_char_stride * current_char]);
-            log_alpha_ptr
-                [la_batch_offset + la_input_stride * t + la_target_stride * s] =
-                    result_t_s;
-
-          } else {
-            // otherwise we just set to neginf
-            if (b < batch_size && s < 2 * max_target_length + 1)
-              log_alpha_ptr
-                  [la_batch_offset + la_input_stride * t +
-                   la_target_stride * s] = neginf;
-          }
-          item_id.barrier(dpcpp_local_fence);
-          shared_local_buff[slm_lidx] = result_t_s;
-        }
-        // sync on batch_s segement
-        item_id.barrier(dpcpp_global_fence);
-      }
-
-      if (b >= batch_size)
-        return;
-      // compute the loss (eq (8))
-      if (intra_batch_id == 0) {
-        if (target_length == 0) {
-          neg_log_likelihood_ptr[b] = -static_cast<scalar_t>(
-              log_alpha_ptr
-                  [la_batch_offset + la_input_stride * (input_length - 1)]);
-        } else {
-          scalar_t l1 = log_alpha_ptr
-              [la_batch_offset + la_input_stride * (input_length - 1) +
-               la_target_stride * (target_length * 2)];
-          scalar_t l2 = target_length > 0
-              ? log_alpha_ptr
-                    [la_batch_offset + la_input_stride * (input_length - 1) +
-                     la_target_stride * (target_length * 2 - 1)]
-              : neginf;
-          scalar_t m = ((l1 > l2) ? l1 : l2);
-          m = ((m == neginf) ? static_cast<scalar_t>(0.0f) : m);
-          scalar_t log_likelihood = Numerics<scalar_t>::log(
-                                        Numerics<scalar_t>::exp(l1 - m) +
-                                        Numerics<scalar_t>::exp(l2 - m)) +
-              m;
-          neg_log_likelihood_ptr[b] = -log_likelihood;
-        }
-      }
-    };
+    CtcLossLogAlphaKernelFunctor<scalar_t, target_t> kfn(
+        __max_input_length,
+        __max_target_length,
+        __tg_target_stride,
+        __batch_size,
+        __BLANK,
+        neginf,
+        __lp_input_stride,
+        __lp_batch_stride,
+        __lp_char_stride,
+        __la_batch_stride,
+        __la_input_stride,
+        __la_target_stride,
+        shared_local_buff,
+        log_alpha_data,
+        log_probs_data,
+        input_lengths_data,
+        targets_data,
+        target_lengths_data,
+        neg_log_likelihood_data,
+        tg_batch_offsets_data);
 
     cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }
+
+template <typename scalar_t, typename target_t>
+struct CtcLossBackwardLogBetaKernelFunctor {
+  void operator()(sycl::nd_item<2> item_id) const {
+    size_t intra_batch_id = item_id.get_local_id(1);
+    size_t intra_batch_size = item_id.get_local_range(1);
+    scalar_t* log_beta_ptr = log_beta_data;
+    scalar_t* log_probs_ptr = log_probs_data;
+    target_t* targets_ptr = targets_data;
+    int64_t* input_lengths_ptr = input_lengths_data;
+    int64_t* target_lengths_ptr = target_lengths_data;
+    int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
+
+    // bookkeeping
+    int64_t b = item_id.get_local_id(0) +
+        item_id.get_group(0) * item_id.get_local_range(0);
+    size_t batch_slm_off = item_id.get_local_id(0) * intra_batch_size;
+    // This is a workaround for unknown compute cpp issue.
+    int64_t max_input_length = __max_input_length;
+    int64_t max_target_length = __max_target_length;
+    int64_t lp_input_stride = __lp_input_stride;
+    int64_t lp_batch_stride = __lp_batch_stride;
+    int64_t lp_char_stride = __lp_char_stride;
+    int64_t lb_batch_stride = __lb_batch_stride;
+    int64_t lb_input_stride = __lb_input_stride;
+    int64_t lb_target_stride = __lb_target_stride;
+    int64_t batch_size = __batch_size;
+    int64_t BLANK = __BLANK;
+    int64_t tg_target_stride = __tg_target_stride;
+
+    int64_t input_length = input_lengths_ptr[b];
+    int64_t target_length = target_lengths_ptr[b];
+    int64_t lp_batch_offset = b * lp_batch_stride;
+    int64_t lb_batch_offset = b * lb_batch_stride;
+    int64_t tg_batch_offset = tg_batch_offsets_ptr[b];
+
+    if (b < batch_size) {
+      // "first" row, the beta initiaization before eq (10) (t=target_length -
+      // differes per batch)
+      int64_t last_s_offset =
+          2 * max_target_length - (2 * max_target_length % intra_batch_size);
+      for (int64_t s = last_s_offset + intra_batch_id; s >= 0;
+           s -= intra_batch_size) {
+        scalar_t lb;
+        if (s == 2 * target_length) {
+          lb = log_probs_ptr
+              [lp_batch_offset + (input_length - 1) * lp_input_stride +
+               lp_char_stride * BLANK];
+        } else if (s == 2 * target_length - 1) { // false for target_length ==
+          // 0
+          int64_t current_target_prime = get_target_prime(
+              targets_ptr, tg_batch_offset, tg_target_stride, s, BLANK);
+          lb = log_probs_ptr
+              [lp_batch_offset + (input_length - 1) * lp_input_stride +
+               lp_char_stride * current_target_prime];
+        } else {
+          lb = neginf;
+        }
+        if (s < 2 * max_target_length + 1) {
+          log_beta_ptr
+              [lb_batch_offset + (input_length - 1) * lb_input_stride +
+               lb_target_stride * s] = lb;
+        }
+      }
+    }
+
+    // go backward in s
+    for (int64_t block_s =
+             2 * max_target_length - (2 * max_target_length % intra_batch_size);
+         block_s >= 0;
+         block_s -= intra_batch_size) {
+      // sync on block_s segement
+      item_id.barrier(dpcpp_global_fence);
+
+      int64_t s = intra_batch_id + block_s;
+      int64_t current_target_prime;
+      scalar_t result_t_s = neginf;
+      bool have_three;
+      if (b < batch_size && s < 2 * target_length + 1 && target_length > 0) {
+        current_target_prime = get_target_prime(
+            targets_ptr, tg_batch_offset, tg_target_stride, s, BLANK);
+        have_three =
+            ((s < 2 * target_length - 1) &&
+             (get_target_prime(
+                  targets_ptr,
+                  tg_batch_offset,
+                  tg_target_stride,
+                  s + 2,
+                  BLANK) != current_target_prime));
+      } else {
+        current_target_prime = BLANK;
+        have_three = false;
+      }
+      // now go backward in t. Note that we need to skip the last timestep
+      // that we did above.
+
+      auto lidx = intra_batch_id;
+      auto slm_lidx = batch_slm_off + lidx;
+      shared_local_buff[slm_lidx] = log_beta_ptr
+          [lb_batch_offset + lb_input_stride * (input_length - 1) +
+           lb_target_stride * s]; // t = input_length -1
+
+      for (int64_t t = max_input_length - 2; t >= 0; t--) {
+        item_id.barrier(dpcpp_local_fence);
+        if ((b < batch_size) && (t < input_length - 1) &&
+            (s < 2 * target_length + 1)) {
+          scalar_t lb1 = shared_local_buff[slm_lidx];
+          scalar_t lbmax = lb1;
+          scalar_t lb2, lb3;
+
+          if (s < 2 * target_length) {
+            if (lidx < intra_batch_size - 1) {
+              lb2 = shared_local_buff[slm_lidx + 1];
+            } else {
+              lb2 = log_beta_ptr
+                  [lb_batch_offset + lb_input_stride * (t + 1) +
+                   lb_target_stride * (s + 1)];
+            }
+
+            if (lb2 > lbmax)
+              lbmax = lb2;
+          } else {
+            lb2 = neginf;
+          }
+          if (have_three) {
+            if (lidx < intra_batch_size - 2) {
+              lb3 = shared_local_buff[slm_lidx + 2];
+            } else {
+              lb3 = log_beta_ptr
+                  [lb_batch_offset + lb_input_stride * (t + 1) +
+                   lb_target_stride * (s + 2)];
+            }
+            if (lb3 > lbmax)
+              lbmax = lb3;
+          } else {
+            lb3 = neginf;
+          }
+          if (lbmax == neginf)
+            lbmax = 0;
+
+          scalar_t lb = Numerics<scalar_t>::log(
+                            Numerics<scalar_t>::exp(lb1 - lbmax) +
+                            Numerics<scalar_t>::exp(lb2 - lbmax) +
+                            Numerics<scalar_t>::exp(lb3 - lbmax)) +
+              lbmax +
+              static_cast<scalar_t>(
+                            log_probs_ptr
+                                [lp_batch_offset + t * lp_input_stride +
+                                 lp_char_stride * current_target_prime]);
+          result_t_s = lb;
+
+          log_beta_ptr
+              [lb_batch_offset + lb_input_stride * t + lb_target_stride * s] =
+                  lb;
+        } else if (
+            (b < batch_size) && (s < 2 * max_target_length + 1) &&
+            (((target_length == 0) && (s > 0)) ||
+             (s >= 2 * target_length + 1) || (t >= input_length))) {
+          log_beta_ptr
+              [lb_batch_offset + lb_input_stride * t + lb_target_stride * s] =
+                  neginf;
+        }
+        item_id.barrier(dpcpp_local_fence);
+        shared_local_buff[slm_lidx] = result_t_s;
+      }
+    }
+  }
+  CtcLossBackwardLogBetaKernelFunctor(
+      int64_t __max_input_length_,
+      int64_t __max_target_length_,
+      int64_t __tg_target_stride_,
+      int64_t __batch_size_,
+      int64_t __BLANK_,
+      scalar_t neginf_,
+      int64_t __lp_input_stride_,
+      int64_t __lp_batch_stride_,
+      int64_t __lp_char_stride_,
+      int64_t __lb_batch_stride_,
+      int64_t __lb_input_stride_,
+      int64_t __lb_target_stride_,
+      dpcpp_local_acc_t<scalar_t> shared_local_buff_,
+      scalar_t* log_beta_data_,
+      scalar_t* log_probs_data_,
+      int64_t* input_lengths_data_,
+      target_t* targets_data_,
+      int64_t* target_lengths_data_,
+      int64_t* tg_batch_offsets_data_)
+      : __max_input_length(__max_input_length_),
+        __max_target_length(__max_target_length_),
+        __tg_target_stride(__tg_target_stride_),
+        __batch_size(__batch_size_),
+        __BLANK(__BLANK_),
+        neginf(neginf_),
+        __lp_input_stride(__lp_input_stride_),
+        __lp_batch_stride(__lp_batch_stride_),
+        __lp_char_stride(__lp_char_stride_),
+        __lb_batch_stride(__lb_batch_stride_),
+        __lb_input_stride(__lb_input_stride_),
+        __lb_target_stride(__lb_target_stride_),
+        shared_local_buff(shared_local_buff_),
+        log_beta_data(log_beta_data_),
+        log_probs_data(log_probs_data_),
+        input_lengths_data(input_lengths_data_),
+        targets_data(targets_data_),
+        target_lengths_data(target_lengths_data_),
+        tg_batch_offsets_data(tg_batch_offsets_data_) {}
+
+ private:
+  int64_t __max_input_length;
+  int64_t __max_target_length;
+  int64_t __tg_target_stride;
+  int64_t __batch_size;
+  int64_t __BLANK;
+  scalar_t neginf;
+  int64_t __lp_input_stride;
+  int64_t __lp_batch_stride;
+  int64_t __lp_char_stride;
+  int64_t __lb_batch_stride;
+  int64_t __lb_input_stride;
+  int64_t __lb_target_stride;
+  dpcpp_local_acc_t<scalar_t> shared_local_buff;
+  scalar_t* log_beta_data;
+  scalar_t* log_probs_data;
+  int64_t* input_lengths_data;
+  target_t* targets_data;
+  int64_t* target_lengths_data;
+  int64_t* tg_batch_offsets_data;
+};
 
 // The second (backward) half of the forward backward algorithm, (10) and (11).
 // This is parallel to the
@@ -340,176 +655,172 @@ void ctc_loss_backward_log_beta_kernel(
     auto targets_data = targets.data_ptr<target_t>();
     auto target_lengths_data = target_lengths.data_ptr<int64_t>();
     auto tg_batch_offsets_data = tg_batch_offsets.data_ptr<int64_t>();
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
-      size_t intra_batch_id = item_id.get_local_id(1);
-      size_t intra_batch_size = item_id.get_local_range(1);
-      scalar_t* log_beta_ptr = log_beta_data;
-      scalar_t* log_probs_ptr = log_probs_data;
-      target_t* targets_ptr = targets_data;
-      int64_t* input_lengths_ptr = input_lengths_data;
-      int64_t* target_lengths_ptr = target_lengths_data;
-      int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
-
-      // bookkeeping
-      int64_t b = item_id.get_local_id(0) +
-          item_id.get_group(0) * item_id.get_local_range(0);
-      size_t batch_slm_off = item_id.get_local_id(0) * intra_batch_size;
-      // This is a workaround for unknown compute cpp issue.
-      int64_t max_input_length = __max_input_length;
-      int64_t max_target_length = __max_target_length;
-      int64_t lp_input_stride = __lp_input_stride;
-      int64_t lp_batch_stride = __lp_batch_stride;
-      int64_t lp_char_stride = __lp_char_stride;
-      int64_t lb_batch_stride = __lb_batch_stride;
-      int64_t lb_input_stride = __lb_input_stride;
-      int64_t lb_target_stride = __lb_target_stride;
-      int64_t batch_size = __batch_size;
-      int64_t BLANK = __BLANK;
-      int64_t tg_target_stride = __tg_target_stride;
-
-      int64_t input_length = input_lengths_ptr[b];
-      int64_t target_length = target_lengths_ptr[b];
-      int64_t lp_batch_offset = b * lp_batch_stride;
-      int64_t lb_batch_offset = b * lb_batch_stride;
-      int64_t tg_batch_offset = tg_batch_offsets_ptr[b];
-
-      if (b < batch_size) {
-        // "first" row, the beta initiaization before eq (10) (t=target_length -
-        // differes per batch)
-        int64_t last_s_offset =
-            2 * max_target_length - (2 * max_target_length % intra_batch_size);
-        for (int64_t s = last_s_offset + intra_batch_id; s >= 0;
-             s -= intra_batch_size) {
-          scalar_t lb;
-          if (s == 2 * target_length) {
-            lb = log_probs_ptr
-                [lp_batch_offset + (input_length - 1) * lp_input_stride +
-                 lp_char_stride * BLANK];
-          } else if (s == 2 * target_length - 1) { // false for target_length ==
-            // 0
-            int64_t current_target_prime = get_target_prime(
-                targets_ptr, tg_batch_offset, tg_target_stride, s, BLANK);
-            lb = log_probs_ptr
-                [lp_batch_offset + (input_length - 1) * lp_input_stride +
-                 lp_char_stride * current_target_prime];
-          } else {
-            lb = neginf;
-          }
-          if (s < 2 * max_target_length + 1) {
-            log_beta_ptr
-                [lb_batch_offset + (input_length - 1) * lb_input_stride +
-                 lb_target_stride * s] = lb;
-          }
-        }
-      }
-
-      // go backward in s
-      for (int64_t block_s = 2 * max_target_length -
-               (2 * max_target_length % intra_batch_size);
-           block_s >= 0;
-           block_s -= intra_batch_size) {
-        // sync on block_s segement
-        item_id.barrier(dpcpp_global_fence);
-
-        int64_t s = intra_batch_id + block_s;
-        int64_t current_target_prime;
-        scalar_t result_t_s = neginf;
-        bool have_three;
-        if (b < batch_size && s < 2 * target_length + 1 && target_length > 0) {
-          current_target_prime = get_target_prime(
-              targets_ptr, tg_batch_offset, tg_target_stride, s, BLANK);
-          have_three =
-              ((s < 2 * target_length - 1) &&
-               (get_target_prime(
-                    targets_ptr,
-                    tg_batch_offset,
-                    tg_target_stride,
-                    s + 2,
-                    BLANK) != current_target_prime));
-        } else {
-          current_target_prime = BLANK;
-          have_three = false;
-        }
-        // now go backward in t. Note that we need to skip the last timestep
-        // that we did above.
-
-        auto lidx = intra_batch_id;
-        auto slm_lidx = batch_slm_off + lidx;
-        shared_local_buff[slm_lidx] = log_beta_ptr
-            [lb_batch_offset + lb_input_stride * (input_length - 1) +
-             lb_target_stride * s]; // t = input_length -1
-
-        for (int64_t t = max_input_length - 2; t >= 0; t--) {
-          item_id.barrier(dpcpp_local_fence);
-          if ((b < batch_size) && (t < input_length - 1) &&
-              (s < 2 * target_length + 1)) {
-            scalar_t lb1 = shared_local_buff[slm_lidx];
-            scalar_t lbmax = lb1;
-            scalar_t lb2, lb3;
-
-            if (s < 2 * target_length) {
-              if (lidx < intra_batch_size - 1) {
-                lb2 = shared_local_buff[slm_lidx + 1];
-              } else {
-                lb2 = log_beta_ptr
-                    [lb_batch_offset + lb_input_stride * (t + 1) +
-                     lb_target_stride * (s + 1)];
-              }
-
-              if (lb2 > lbmax)
-                lbmax = lb2;
-            } else {
-              lb2 = neginf;
-            }
-            if (have_three) {
-              if (lidx < intra_batch_size - 2) {
-                lb3 = shared_local_buff[slm_lidx + 2];
-              } else {
-                lb3 = log_beta_ptr
-                    [lb_batch_offset + lb_input_stride * (t + 1) +
-                     lb_target_stride * (s + 2)];
-              }
-              if (lb3 > lbmax)
-                lbmax = lb3;
-            } else {
-              lb3 = neginf;
-            }
-            if (lbmax == neginf)
-              lbmax = 0;
-
-            scalar_t lb = Numerics<scalar_t>::log(
-                              Numerics<scalar_t>::exp(lb1 - lbmax) +
-                              Numerics<scalar_t>::exp(lb2 - lbmax) +
-                              Numerics<scalar_t>::exp(lb3 - lbmax)) +
-                lbmax +
-                static_cast<scalar_t>(
-                              log_probs_ptr
-                                  [lp_batch_offset + t * lp_input_stride +
-                                   lp_char_stride * current_target_prime]);
-            result_t_s = lb;
-
-            log_beta_ptr
-                [lb_batch_offset + lb_input_stride * t + lb_target_stride * s] =
-                    lb;
-          } else if (
-              (b < batch_size) && (s < 2 * max_target_length + 1) &&
-              (((target_length == 0) && (s > 0)) ||
-               (s >= 2 * target_length + 1) || (t >= input_length))) {
-            log_beta_ptr
-                [lb_batch_offset + lb_input_stride * t + lb_target_stride * s] =
-                    neginf;
-          }
-          item_id.barrier(dpcpp_local_fence);
-          shared_local_buff[slm_lidx] = result_t_s;
-        }
-      }
-    };
-
+    CtcLossBackwardLogBetaKernelFunctor<scalar_t, target_t> kfn(
+        __max_input_length,
+        __max_target_length,
+        __tg_target_stride,
+        __batch_size,
+        __BLANK,
+        neginf,
+        __lp_input_stride,
+        __lp_batch_stride,
+        __lp_char_stride,
+        __lb_batch_stride,
+        __lb_input_stride,
+        __lb_target_stride,
+        shared_local_buff,
+        log_beta_data,
+        log_probs_data,
+        input_lengths_data,
+        targets_data,
+        target_lengths_data,
+        tg_batch_offsets_data);
     cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }
+
+template <typename scalar_t, typename target_t>
+struct CtcLossBackwardCollectNonblankKernelFunctor {
+  void operator()(sycl::nd_item<2> item_id) const {
+    auto* gradient_ptr = gradient_data;
+    scalar_t* grad_out_ptr = grad_out_data;
+    scalar_t* log_alpha_ptr = log_alpha_data;
+    scalar_t* log_beta_ptr = log_beta_data;
+    scalar_t* log_probs_ptr = log_probs_data;
+    target_t* targets_ptr = targets_data;
+    scalar_t* neg_log_likelihood_ptr = neg_log_likelihood_data;
+    int64_t* input_lengths_ptr = input_lengths_data;
+    int64_t* target_lengths_ptr = target_lengths_data;
+    int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
+
+    int64_t b = item_id.get_local_id(0) +
+        item_id.get_group(0) * item_id.get_local_range(0);
+    int64_t s = item_id.get_local_id(1) +
+        item_id.get_group(1) * item_id.get_local_range(1);
+    // note, this directly indexes into targets, no targets prime!
+
+    if (b >= batch_size)
+      return;
+
+    int64_t input_length = input_lengths_ptr[b];
+    int64_t target_length = target_lengths_ptr[b];
+    int64_t gr_batch_offset = b * gr_batch_stride;
+    int64_t lp_batch_offset = b * lp_batch_stride;
+    int64_t la_batch_offset = b * la_batch_stride;
+    int64_t lb_batch_offset = b * lb_batch_stride;
+    int64_t tg_batch_offset = tg_batch_offsets_ptr[b];
+
+    if (s >= target_length)
+      return;
+
+    int64_t target = targets_ptr[tg_batch_offset + s * tg_target_stride];
+    scalar_t nll = neg_log_likelihood_ptr[b];
+    scalar_t gr = grad_out_ptr[b * grad_out_batch_stride];
+
+    if (zero_infinity && Numerics<scalar_t>::isinf(nll))
+      return;
+
+    for (int64_t t = 0; t < input_length; t++) {
+      scalar_t lp = log_probs_ptr
+          [lp_batch_offset + t * lp_input_stride + lp_char_stride * target];
+      atomicAdd(
+          (dpcpp_global_ptr_pt<scalar_t>)&gradient_ptr
+              [gr_batch_offset + t * gr_input_stride + gr_char_stride * target],
+          -Numerics<scalar_t>::exp(
+              static_cast<scalar_t>(log_alpha_ptr
+                                        [la_batch_offset + la_input_stride * t +
+                                         la_target_stride * (s * 2 + 1)]) +
+              static_cast<scalar_t>(log_beta_ptr
+                                        [lb_batch_offset + lb_input_stride * t +
+                                         lb_target_stride * (s * 2 + 1)]) +
+              nll - lp) *
+              gr);
+    }
+  }
+  CtcLossBackwardCollectNonblankKernelFunctor(
+      int64_t grad_out_batch_stride_,
+      int64_t tg_target_stride_,
+      int64_t batch_size_,
+      bool zero_infinity_,
+      int64_t gr_input_stride_,
+      int64_t gr_batch_stride_,
+      int64_t gr_char_stride_,
+      int64_t lp_input_stride_,
+      int64_t lp_batch_stride_,
+      int64_t lp_char_stride_,
+      int64_t la_batch_stride_,
+      int64_t la_input_stride_,
+      int64_t la_target_stride_,
+      int64_t lb_batch_stride_,
+      int64_t lb_input_stride_,
+      int64_t lb_target_stride_,
+      scalar_t* gradient_data_,
+      scalar_t* grad_out_data_,
+      scalar_t* log_alpha_data_,
+      scalar_t* log_beta_data_,
+      scalar_t* log_probs_data_,
+      int64_t* input_lengths_data_,
+      target_t* targets_data_,
+      int64_t* target_lengths_data_,
+      scalar_t* neg_log_likelihood_data_,
+      int64_t* tg_batch_offsets_data_)
+      : grad_out_batch_stride(grad_out_batch_stride_),
+        tg_target_stride(tg_target_stride_),
+        batch_size(batch_size_),
+        zero_infinity(zero_infinity_),
+        gr_input_stride(gr_input_stride_),
+        gr_batch_stride(gr_batch_stride_),
+        gr_char_stride(gr_char_stride_),
+        lp_input_stride(lp_input_stride_),
+        lp_batch_stride(lp_batch_stride_),
+        lp_char_stride(lp_char_stride_),
+        la_batch_stride(la_batch_stride_),
+        la_input_stride(la_input_stride_),
+        la_target_stride(la_target_stride_),
+        lb_batch_stride(lb_batch_stride_),
+        lb_input_stride(lb_input_stride_),
+        lb_target_stride(lb_target_stride_),
+        gradient_data(gradient_data_),
+        grad_out_data(grad_out_data_),
+        log_alpha_data(log_alpha_data_),
+        log_beta_data(log_beta_data_),
+        log_probs_data(log_probs_data_),
+        input_lengths_data(input_lengths_data_),
+        targets_data(targets_data_),
+        target_lengths_data(target_lengths_data_),
+        neg_log_likelihood_data(neg_log_likelihood_data_),
+        tg_batch_offsets_data(tg_batch_offsets_data_) {}
+
+ private:
+  int64_t grad_out_batch_stride;
+  int64_t tg_target_stride;
+  int64_t batch_size;
+  bool zero_infinity;
+  int64_t gr_input_stride;
+  int64_t gr_batch_stride;
+  int64_t gr_char_stride;
+  int64_t lp_input_stride;
+  int64_t lp_batch_stride;
+  int64_t lp_char_stride;
+  int64_t la_batch_stride;
+  int64_t la_input_stride;
+  int64_t la_target_stride;
+  int64_t lb_batch_stride;
+  int64_t lb_input_stride;
+  int64_t lb_target_stride;
+  scalar_t* gradient_data;
+  scalar_t* grad_out_data;
+  scalar_t* log_alpha_data;
+  scalar_t* log_beta_data;
+  scalar_t* log_probs_data;
+  int64_t* input_lengths_data;
+  target_t* targets_data;
+  int64_t* target_lengths_data;
+  scalar_t* neg_log_likelihood_data;
+  int64_t* tg_batch_offsets_data;
+};
 
 // This implements the subtrahend of equation (16) for all *nonblank*
 // characters.
@@ -583,71 +894,214 @@ void ctc_loss_backward_collect_nonblank_kernel(
     auto target_lengths_data = target_lengths.data_ptr<int64_t>();
     auto neg_log_likelihood_data = neg_log_likelihood.data_ptr<scalar_t>();
     auto tg_batch_offsets_data = tg_batch_offsets.data_ptr<int64_t>();
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
-      auto* gradient_ptr = gradient_data;
-      scalar_t* grad_out_ptr = grad_out_data;
-      scalar_t* log_alpha_ptr = log_alpha_data;
-      scalar_t* log_beta_ptr = log_beta_data;
-      scalar_t* log_probs_ptr = log_probs_data;
-      target_t* targets_ptr = targets_data;
-      scalar_t* neg_log_likelihood_ptr = neg_log_likelihood_data;
-      int64_t* input_lengths_ptr = input_lengths_data;
-      int64_t* target_lengths_ptr = target_lengths_data;
-      int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
-
-      int64_t b = item_id.get_local_id(0) +
-          item_id.get_group(0) * item_id.get_local_range(0);
-      int64_t s = item_id.get_local_id(1) +
-          item_id.get_group(1) * item_id.get_local_range(1);
-      // note, this directly indexes into targets, no targets prime!
-
-      if (b >= batch_size)
-        return;
-
-      int64_t input_length = input_lengths_ptr[b];
-      int64_t target_length = target_lengths_ptr[b];
-      int64_t gr_batch_offset = b * gr_batch_stride;
-      int64_t lp_batch_offset = b * lp_batch_stride;
-      int64_t la_batch_offset = b * la_batch_stride;
-      int64_t lb_batch_offset = b * lb_batch_stride;
-      int64_t tg_batch_offset = tg_batch_offsets_ptr[b];
-
-      if (s >= target_length)
-        return;
-
-      int64_t target = targets_ptr[tg_batch_offset + s * tg_target_stride];
-      scalar_t nll = neg_log_likelihood_ptr[b];
-      scalar_t gr = grad_out_ptr[b * grad_out_batch_stride];
-
-      if (zero_infinity && Numerics<scalar_t>::isinf(nll))
-        return;
-
-      for (int64_t t = 0; t < input_length; t++) {
-        scalar_t lp = log_probs_ptr
-            [lp_batch_offset + t * lp_input_stride + lp_char_stride * target];
-        atomicAdd(
-            (dpcpp_global_ptr_pt<scalar_t>)&gradient_ptr
-                [gr_batch_offset + t * gr_input_stride +
-                 gr_char_stride * target],
-            -Numerics<scalar_t>::exp(
-                static_cast<scalar_t>(
-                    log_alpha_ptr
-                        [la_batch_offset + la_input_stride * t +
-                         la_target_stride * (s * 2 + 1)]) +
-                static_cast<scalar_t>(
-                    log_beta_ptr
-                        [lb_batch_offset + lb_input_stride * t +
-                         lb_target_stride * (s * 2 + 1)]) +
-                nll - lp) *
-                gr);
-      }
-    };
+    CtcLossBackwardCollectNonblankKernelFunctor<scalar_t, target_t> kfn(
+        grad_out_batch_stride,
+        tg_target_stride,
+        batch_size,
+        zero_infinity,
+        gr_input_stride,
+        gr_batch_stride,
+        gr_char_stride,
+        lp_input_stride,
+        lp_batch_stride,
+        lp_char_stride,
+        la_batch_stride,
+        la_input_stride,
+        la_target_stride,
+        lb_batch_stride,
+        lb_input_stride,
+        lb_target_stride,
+        gradient_data,
+        grad_out_data,
+        log_alpha_data,
+        log_beta_data,
+        log_probs_data,
+        input_lengths_data,
+        targets_data,
+        target_lengths_data,
+        neg_log_likelihood_data,
+        tg_batch_offsets_data);
 
     cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }
+
+template <typename scalar_t, typename target_t>
+struct CtcLossBackwardCollectKernelFunctor {
+  void operator()(sycl::nd_item<2> item_id) const {
+    scalar_t* gradient_ptr = gradient_data;
+    scalar_t* grad_out_ptr = grad_out_data;
+    scalar_t* log_alpha_ptr = log_alpha_data;
+    scalar_t* log_beta_ptr = log_beta_data;
+    scalar_t* log_probs_ptr = log_probs_data;
+    target_t* targets_ptr = targets_data;
+    scalar_t* neg_log_likelihood_ptr = neg_log_likelihood_data;
+    int64_t* input_lengths_ptr = input_lengths_data;
+    int64_t* target_lengths_ptr = target_lengths_data;
+    int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
+
+    int64_t b = item_id.get_local_id(0) +
+        item_id.get_group(0) * item_id.get_local_range(0);
+    int64_t t = item_id.get_local_id(1) +
+        item_id.get_group(1) * item_id.get_local_range(1);
+
+    if ((t >= max_input_length) || (b >= batch_size))
+      return;
+
+    int64_t input_length = input_lengths_ptr[b];
+    int64_t target_length = target_lengths_ptr[b];
+    int64_t gr_batch_offset = b * gr_batch_stride;
+    int64_t lp_batch_offset = b * lp_batch_stride;
+    int64_t la_batch_offset = b * la_batch_stride;
+    int64_t lb_batch_offset = b * lb_batch_stride;
+    int64_t tg_batch_offset = tg_batch_offsets_ptr[b];
+
+    for (int s = 0; s < 2 * max_target_length + 1; s++) {
+      if (s < 2 * target_length + 1) { // if target_length == 0, s == 0
+        int64_t current_target_prime = get_target_prime(
+            targets_ptr, tg_batch_offset, tg_target_stride, s, BLANK);
+        scalar_t log_alpha_beta =
+            static_cast<scalar_t>(log_alpha_ptr
+                                      [la_batch_offset + la_input_stride * t +
+                                       la_target_stride * s]) +
+            static_cast<scalar_t>(log_beta_ptr
+                                      [lb_batch_offset + lb_input_stride * t +
+                                       lb_target_stride * s]);
+        scalar_t& lcab = gradient_ptr
+            [gr_batch_offset + t * gr_input_stride +
+             gr_char_stride * current_target_prime];
+        if (lcab == neginf) {
+          lcab = log_alpha_beta;
+        } else {
+          scalar_t max = ((lcab > log_alpha_beta) ? lcab : log_alpha_beta);
+          lcab =
+              Numerics<scalar_t>::log(
+                  Numerics<scalar_t>::exp(static_cast<scalar_t>(lcab) - max) +
+                  Numerics<scalar_t>::exp(log_alpha_beta - max)) +
+              max;
+        }
+      }
+    }
+
+    scalar_t nll = neg_log_likelihood_ptr[b];
+    scalar_t gr = grad_out_ptr[b * grad_out_batch_stride];
+
+    for (int64_t c = 0; c < num_labels; c++) {
+      scalar_t& res = gradient_ptr
+          [gr_batch_offset + t * gr_input_stride + gr_char_stride * c];
+      if (t < input_length &&
+          (!zero_infinity || !Numerics<scalar_t>::isinf(nll))) {
+        scalar_t lp = log_probs_ptr
+            [lp_batch_offset + t * lp_input_stride + lp_char_stride * c];
+        res = (Numerics<scalar_t>::exp(lp) -
+               Numerics<scalar_t>::exp(
+                   static_cast<scalar_t>(res) + static_cast<scalar_t>(nll) -
+                   lp)) *
+            gr;
+      } else {
+        res = 0.;
+      }
+    }
+  }
+  CtcLossBackwardCollectKernelFunctor(
+      int64_t grad_out_batch_stride_,
+      int64_t max_input_length_,
+      int64_t max_target_length_,
+      int64_t tg_target_stride_,
+      int64_t batch_size_,
+      int64_t num_labels_,
+      int64_t BLANK_,
+      scalar_t neginf_,
+      bool zero_infinity_,
+      int64_t gr_input_stride_,
+      int64_t gr_batch_stride_,
+      int64_t gr_char_stride_,
+      int64_t lp_input_stride_,
+      int64_t lp_batch_stride_,
+      int64_t lp_char_stride_,
+      int64_t la_batch_stride_,
+      int64_t la_input_stride_,
+      int64_t la_target_stride_,
+      int64_t lb_batch_stride_,
+      int64_t lb_input_stride_,
+      int64_t lb_target_stride_,
+      scalar_t* gradient_data_,
+      scalar_t* grad_out_data_,
+      scalar_t* log_alpha_data_,
+      scalar_t* log_beta_data_,
+      scalar_t* log_probs_data_,
+      int64_t* input_lengths_data_,
+      target_t* targets_data_,
+      int64_t* target_lengths_data_,
+      scalar_t* neg_log_likelihood_data_,
+      int64_t* tg_batch_offsets_data_)
+      : grad_out_batch_stride(grad_out_batch_stride_),
+        max_input_length(max_input_length_),
+        max_target_length(max_target_length_),
+        tg_target_stride(tg_target_stride_),
+        batch_size(batch_size_),
+        num_labels(num_labels_),
+        BLANK(BLANK_),
+        neginf(neginf_),
+        zero_infinity(zero_infinity_),
+        gr_input_stride(gr_input_stride_),
+        gr_batch_stride(gr_batch_stride_),
+        gr_char_stride(gr_char_stride_),
+        lp_input_stride(lp_input_stride_),
+        lp_batch_stride(lp_batch_stride_),
+        lp_char_stride(lp_char_stride_),
+        la_batch_stride(la_batch_stride_),
+        la_input_stride(la_input_stride_),
+        la_target_stride(la_target_stride_),
+        lb_batch_stride(lb_batch_stride_),
+        lb_input_stride(lb_input_stride_),
+        lb_target_stride(lb_target_stride_),
+        gradient_data(gradient_data_),
+        grad_out_data(grad_out_data_),
+        log_alpha_data(log_alpha_data_),
+        log_beta_data(log_beta_data_),
+        log_probs_data(log_probs_data_),
+        input_lengths_data(input_lengths_data_),
+        targets_data(targets_data_),
+        target_lengths_data(target_lengths_data_),
+        neg_log_likelihood_data(neg_log_likelihood_data_),
+        tg_batch_offsets_data(tg_batch_offsets_data_) {}
+
+ private:
+  int64_t grad_out_batch_stride;
+  int64_t max_input_length;
+  int64_t max_target_length;
+  int64_t tg_target_stride;
+  int64_t batch_size;
+  int64_t num_labels;
+  int64_t BLANK;
+  scalar_t neginf;
+  bool zero_infinity;
+  int64_t gr_input_stride;
+  int64_t gr_batch_stride;
+  int64_t gr_char_stride;
+  int64_t lp_input_stride;
+  int64_t lp_batch_stride;
+  int64_t lp_char_stride;
+  int64_t la_batch_stride;
+  int64_t la_input_stride;
+  int64_t la_target_stride;
+  int64_t lb_batch_stride;
+  int64_t lb_input_stride;
+  int64_t lb_target_stride;
+  scalar_t* gradient_data;
+  scalar_t* grad_out_data;
+  scalar_t* log_alpha_data;
+  scalar_t* log_beta_data;
+  scalar_t* log_probs_data;
+  int64_t* input_lengths_data;
+  target_t* targets_data;
+  int64_t* target_lengths_data;
+  scalar_t* neg_log_likelihood_data;
+  int64_t* tg_batch_offsets_data;
+};
 
 // This is the naive implementation of equation (16). It is parallelised in
 // batch and input timestep.
@@ -704,87 +1158,96 @@ void ctc_loss_backward_collect_kernel(
     auto target_lengths_data = target_lengths.data_ptr<int64_t>();
     auto neg_log_likelihood_data = neg_log_likelihood.data_ptr<scalar_t>();
     auto tg_batch_offsets_data = tg_batch_offsets.data_ptr<int64_t>();
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
-      scalar_t* gradient_ptr = gradient_data;
-      scalar_t* grad_out_ptr = grad_out_data;
-      scalar_t* log_alpha_ptr = log_alpha_data;
-      scalar_t* log_beta_ptr = log_beta_data;
-      scalar_t* log_probs_ptr = log_probs_data;
-      target_t* targets_ptr = targets_data;
-      scalar_t* neg_log_likelihood_ptr = neg_log_likelihood_data;
-      int64_t* input_lengths_ptr = input_lengths_data;
-      int64_t* target_lengths_ptr = target_lengths_data;
-      int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
-
-      int64_t b = item_id.get_local_id(0) +
-          item_id.get_group(0) * item_id.get_local_range(0);
-      int64_t t = item_id.get_local_id(1) +
-          item_id.get_group(1) * item_id.get_local_range(1);
-
-      if ((t >= max_input_length) || (b >= batch_size))
-        return;
-
-      int64_t input_length = input_lengths_ptr[b];
-      int64_t target_length = target_lengths_ptr[b];
-      int64_t gr_batch_offset = b * gr_batch_stride;
-      int64_t lp_batch_offset = b * lp_batch_stride;
-      int64_t la_batch_offset = b * la_batch_stride;
-      int64_t lb_batch_offset = b * lb_batch_stride;
-      int64_t tg_batch_offset = tg_batch_offsets_ptr[b];
-
-      for (int s = 0; s < 2 * max_target_length + 1; s++) {
-        if (s < 2 * target_length + 1) { // if target_length == 0, s == 0
-          int64_t current_target_prime = get_target_prime(
-              targets_ptr, tg_batch_offset, tg_target_stride, s, BLANK);
-          scalar_t log_alpha_beta =
-              static_cast<scalar_t>(log_alpha_ptr
-                                        [la_batch_offset + la_input_stride * t +
-                                         la_target_stride * s]) +
-              static_cast<scalar_t>(log_beta_ptr
-                                        [lb_batch_offset + lb_input_stride * t +
-                                         lb_target_stride * s]);
-          scalar_t& lcab = gradient_ptr
-              [gr_batch_offset + t * gr_input_stride +
-               gr_char_stride * current_target_prime];
-          if (lcab == neginf) {
-            lcab = log_alpha_beta;
-          } else {
-            scalar_t max = ((lcab > log_alpha_beta) ? lcab : log_alpha_beta);
-            lcab =
-                Numerics<scalar_t>::log(
-                    Numerics<scalar_t>::exp(static_cast<scalar_t>(lcab) - max) +
-                    Numerics<scalar_t>::exp(log_alpha_beta - max)) +
-                max;
-          }
-        }
-      }
-
-      scalar_t nll = neg_log_likelihood_ptr[b];
-      scalar_t gr = grad_out_ptr[b * grad_out_batch_stride];
-
-      for (int64_t c = 0; c < num_labels; c++) {
-        scalar_t& res = gradient_ptr
-            [gr_batch_offset + t * gr_input_stride + gr_char_stride * c];
-        if (t < input_length &&
-            (!zero_infinity || !Numerics<scalar_t>::isinf(nll))) {
-          scalar_t lp = log_probs_ptr
-              [lp_batch_offset + t * lp_input_stride + lp_char_stride * c];
-          res = (Numerics<scalar_t>::exp(lp) -
-                 Numerics<scalar_t>::exp(
-                     static_cast<scalar_t>(res) + static_cast<scalar_t>(nll) -
-                     lp)) *
-              gr;
-        } else {
-          res = 0.;
-        }
-      }
-    };
+    CtcLossBackwardCollectKernelFunctor<scalar_t, target_t> kfn(
+        grad_out_batch_stride,
+        max_input_length,
+        max_target_length,
+        tg_target_stride,
+        batch_size,
+        num_labels,
+        BLANK,
+        neginf,
+        zero_infinity,
+        gr_input_stride,
+        gr_batch_stride,
+        gr_char_stride,
+        lp_input_stride,
+        lp_batch_stride,
+        lp_char_stride,
+        la_batch_stride,
+        la_input_stride,
+        la_target_stride,
+        lb_batch_stride,
+        lb_input_stride,
+        lb_target_stride,
+        gradient_data,
+        grad_out_data,
+        log_alpha_data,
+        log_beta_data,
+        log_probs_data,
+        input_lengths_data,
+        targets_data,
+        target_lengths_data,
+        neg_log_likelihood_data,
+        tg_batch_offsets_data);
 
     cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }
+
+template <typename scalar_t>
+struct CtcLossZeroPaddedGradientsKernelFunctor {
+  void operator()(sycl::nd_item<2> item_id) const {
+    scalar_t* gradient_ptr = gradient_data;
+    int64_t* input_lengths_ptr = input_lengths_data;
+
+    int64_t b = item_id.get_local_id(0) +
+        item_id.get_group(0) * item_id.get_local_range(0);
+    int64_t t = item_id.get_local_id(1) +
+        item_id.get_group(1) * item_id.get_local_range(1);
+
+    if (b >= batch_size || t >= max_input_length) {
+      return;
+    }
+
+    scalar_t input_length = input_lengths_ptr[b];
+    if (t >= input_length) {
+      for (int l = 0; l < num_labels; l++)
+        gradient_ptr
+            [t * gr_timestep_stride + b * gr_batch_stride +
+             l * gr_label_stride] = 0.0f;
+    }
+  }
+  CtcLossZeroPaddedGradientsKernelFunctor(
+      int64_t gr_timestep_stride_,
+      int64_t gr_batch_stride_,
+      int64_t gr_label_stride_,
+      int64_t max_input_length_,
+      int64_t batch_size_,
+      int64_t num_labels_,
+      scalar_t* gradient_data_,
+      int64_t* input_lengths_data_)
+      : gr_timestep_stride(gr_timestep_stride_),
+        gr_batch_stride(gr_batch_stride_),
+        gr_label_stride(gr_label_stride_),
+        max_input_length(max_input_length_),
+        batch_size(batch_size_),
+        num_labels(num_labels_),
+        gradient_data(gradient_data_),
+        input_lengths_data(input_lengths_data_) {}
+
+ private:
+  int64_t gr_timestep_stride;
+  int64_t gr_batch_stride;
+  int64_t gr_label_stride;
+  int64_t max_input_length;
+  int64_t batch_size;
+  int64_t num_labels;
+  scalar_t* gradient_data;
+  int64_t* input_lengths_data;
+};
 
 // This is to zero gradients which corresponding to the out-of-sequence position
 // Those gradients should not be used in any model update since the input
@@ -810,27 +1273,15 @@ void ctc_loss_zero_padded_gradients(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto gradient_data = gradient.data_ptr<scalar_t>();
     auto input_lengths_data = input_lengths.data_ptr<int64_t>();
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
-      scalar_t* gradient_ptr = gradient_data;
-      int64_t* input_lengths_ptr = input_lengths_data;
-
-      int64_t b = item_id.get_local_id(0) +
-          item_id.get_group(0) * item_id.get_local_range(0);
-      int64_t t = item_id.get_local_id(1) +
-          item_id.get_group(1) * item_id.get_local_range(1);
-
-      if (b >= batch_size || t >= max_input_length) {
-        return;
-      }
-
-      scalar_t input_length = input_lengths_ptr[b];
-      if (t >= input_length) {
-        for (int l = 0; l < num_labels; l++)
-          gradient_ptr
-              [t * gr_timestep_stride + b * gr_batch_stride +
-               l * gr_label_stride] = 0.0f;
-      }
-    };
+    CtcLossZeroPaddedGradientsKernelFunctor<scalar_t> kfn(
+        gr_timestep_stride,
+        gr_batch_stride,
+        gr_label_stride,
+        max_input_length,
+        batch_size,
+        num_labels,
+        gradient_data,
+        input_lengths_data);
 
     cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
   };
