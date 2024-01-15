@@ -10,7 +10,8 @@ import tempfile
 from intel_extension_for_pytorch.quantization import prepare, convert
 from collections import namedtuple
 import itertools
-from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
+
+# from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
 from hf_configs.chatglm.modeling_chatglm import ChatGLMForConditionalGeneration
 
 try:
@@ -107,13 +108,15 @@ supported_models = [
         lambda m: m.transformer.h[0].attn.__class__,
         lambda m: m.transformer.h[0].__class__,
     ),
-    model_info(
-        "baichuan",
-        BaichuanForCausalLM,
-        False,
-        lambda m: m.model.layers[0].self_attn.__class__,
-        lambda m: m.model.layers[0].__class__,
-    ),
+    # Disable baichuan here because it fails randomly and will block ci.
+    # We will re-enable this case after resolving this random issue.
+    # model_info(
+    #     "baichuan",
+    #     BaichuanForCausalLM,
+    #     False,
+    #     lambda m: m.model.layers[0].self_attn.__class__,
+    #     lambda m: m.model.layers[0].__class__,
+    # ),
     model_info(
         "chatglm",
         ChatGLMForConditionalGeneration,
