@@ -20,17 +20,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--model", nargs="?", default="EleutherAI/gpt-j-6b")
 parser.add_argument("--dataset", nargs="?", default="NeelNanda/pile-10k")
 parser.add_argument("--output-dir", nargs="?", default="./saved_results")
-parser.add_argument("--wbits", default=4, type=int)
 parser.add_argument("--group-size", default=128, type=int)
-parser.add_argument("--sym", default=False, type=bool)
-parser.add_argument("--act-order", default=False, type=bool)
-parser.add_argument("--percdamp", default=.01, type=float)
 parser.add_argument("--nsamples", default=128, type=int)
 parser.add_argument("--pad-max-length", default=2048, type=int)
 parser.add_argument("--use-max-length", default=False, type=bool)
-parser.add_argument("--compression-dtype", default=torch.int32)
-parser.add_argument("--compression-dim", default=1, type=int)
-parser.add_argument("--scale-dtype", default=torch.float16)
 args = parser.parse_args()
 
 
@@ -140,8 +133,6 @@ def get_user_model():
             trust_remote_code=True,
         )
         tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
-    elif re.search("falcon", args.model.lower()):
-        assert False, "falcon is not supported yet"
     else:
         user_model = AutoModelForCausalLM.from_pretrained(
             args.model,
@@ -176,4 +167,7 @@ compressed_model = ipex.quantization.gptq(
                         model=user_model,
                         dataloader=calib_dataloader,
                         group_size=args.group_size,
-                        save_dir=args.output_dir)
+                        save_dir=args.output_dir,
+                        nsamples=args.nsamples,
+                        pad_max_length=args.pad_max_length,
+                        use_max_length=args.use_max_length)

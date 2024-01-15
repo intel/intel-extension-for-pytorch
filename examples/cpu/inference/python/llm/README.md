@@ -353,17 +353,15 @@ The performance results on AWS instances can be found [here](../../../../../docs
 
 Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 probably results in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a dataset by such algorithms. The low precision checkpoint is saved as a `state_dict` in a `.pt` file and can be loaded later for weight only quantization. We provide an example here to run GPTQ.
 
-*Note:* Currently pytorch models validated by GPTQ include: gpt-j, opt, llama, Llama-2, bloom, bloomz,
-dolly-v1, dolly-v2, gpt-neo, gpt-neox, mpt, falcon.
+*Note:* Currently GPTQ API is verified on the following models: gpt-j, opt, llama, Llama-2, bloom, bloomz, dolly-v1, dolly-v2, gpt-neo, gpt-neox, mpt, falcon. Some of them are not in the list of optimized models. Please use with care.
 
 Here is how to use it:
 
 ```bash
 # Step 1: Generate modified weights and quantization info and save as checkpoint
 python utils/run_gptq.py --model <MODEL_ID> --output-dir ./saved_results
-# Please note that tiiuae/falcon-40b is not supported yet
 ```
-The dataset for calibration is NeelNanda/pile-10k by default. To use other dataset, such as lambada, you may use `--dataset <dataset id>` to specify. You can specify calibration sample size by modifying `--nsamples <int>` (default is 128); you can also choose whether or not to align calibration data to a fixed length by modifying `--use_max_length <bool>` and `--pad_max_length <int>`. For details please refer to [GPTQ](../../../../../intel_extension_for_pytorch/quantization/_GPTQ/README.md)
+The dataset for calibration is `NeelNanda/pile-10k` by default. To use other dataset, such as lambada, you may use `--dataset <dataset id>` to specify. Group size is specified by `--group-size <group_size>` (default is 128). You can specify calibration sample size by modifying `--nsamples <int>` (default is 128); you can also choose whether or not to align calibration data to a fixed length by modifying `--use_max_length <bool>` and `--pad_max_length <int>`. For details please refer to [GPTQ](../../../../../intel_extension_for_pytorch/quantization/_GPTQ/README.md)
 
 It may take a few hours to finish. Modified weights and their quantization info are stored in `gptq_checkpoint_g128.pt`, where g128 means group size for input channel is 128 by default. Group size controls the granularity of quantization of weight along input channel. 
 Then generate model for weight only quantization with INT4 weights and run tasks.
