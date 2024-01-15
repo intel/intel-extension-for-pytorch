@@ -78,6 +78,66 @@ static inline void get_wgroup_size_for_coalesced_tensor(
   global_size_col = CeilDiv(stride, local_size_col);
 }
 
+template <typename scalar_t, typename IndexType, typename accscalar_t>
+struct AdagradFusedStepCoalescedKernelFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    auto param_ptr = param_data;
+    auto state_sum_ptr = state_sum_data;
+    auto param_indices_ptr = param_indices_data;
+    auto values_ptr = values_data;
+
+    IndexType seg = item.get_global_id()[0];
+    const uint64_t featureDim = item.get_global_id()[1];
+
+    if (seg < nnz && featureDim < stride_grad) {
+      const uint64_t newValueRow =
+          stride_param * param_indices_ptr[seg] * stride_grad;
+
+      accscalar_t tmp = 0, std = 0;
+      const uint64_t valueRow = seg * stride_grad;
+      tmp = static_cast<accscalar_t>(values_ptr[valueRow + featureDim]);
+      state_sum_data[newValueRow + featureDim] += Numerics<accscalar_t>::pow(
+          static_cast<accscalar_t>(tmp), accscalar_t(2.0));
+      std = Numerics<accscalar_t>::sqrt(
+                state_sum_data[newValueRow + featureDim]) +
+          static_cast<accscalar_t>(eps);
+      param_data[newValueRow + featureDim] +=
+          tmp / std * static_cast<accscalar_t>(-lr);
+    }
+  }
+
+  AdagradFusedStepCoalescedKernelFunctor(
+      scalar_t* param_data_,
+      scalar_t* state_sum_data_,
+      int64_t* param_indices_data_,
+      scalar_t* values_data_,
+      int64_t nnz_,
+      int64_t stride_grad_,
+      int64_t stride_param_,
+      float lr_,
+      float eps_)
+      : param_data(param_data_),
+        state_sum_data(state_sum_data_),
+        param_indices_data(param_indices_data_),
+        values_data(values_data_),
+        nnz(nnz_),
+        stride_grad(stride_grad_),
+        stride_param(stride_param_),
+        lr(lr_),
+        eps(eps_) {}
+
+ private:
+  scalar_t* param_data;
+  scalar_t* state_sum_data;
+  int64_t* param_indices_data;
+  scalar_t* values_data;
+  int64_t nnz;
+  int64_t stride_grad;
+  int64_t stride_param;
+  float lr;
+  float eps;
+};
+
 template <typename scalar_t, typename IndexType>
 void adagrad_fused_step_coalesced_kernel_impl(
     Tensor param,
@@ -107,31 +167,17 @@ void adagrad_fused_step_coalesced_kernel_impl(
     auto state_sum_data = state_sum.data_ptr<scalar_t>();
     auto param_indices_data = param_indices.data_ptr<int64_t>();
     auto values_data = values.data_ptr<scalar_t>();
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-      auto param_ptr = param_data;
-      auto state_sum_ptr = state_sum_data;
-      auto param_indices_ptr = param_indices_data;
-      auto values_ptr = values_data;
 
-      IndexType seg = item.get_global_id()[0];
-      const uint64_t featureDim = item.get_global_id()[1];
-
-      if (seg < nnz && featureDim < stride_grad) {
-        const uint64_t newValueRow =
-            stride_param * param_indices_ptr[seg] * stride_grad;
-
-        accscalar_t tmp = 0, std = 0;
-        const uint64_t valueRow = seg * stride_grad;
-        tmp = static_cast<accscalar_t>(values_ptr[valueRow + featureDim]);
-        state_sum_data[newValueRow + featureDim] += Numerics<accscalar_t>::pow(
-            static_cast<accscalar_t>(tmp), accscalar_t(2.0));
-        std = Numerics<accscalar_t>::sqrt(
-                  state_sum_data[newValueRow + featureDim]) +
-            static_cast<accscalar_t>(eps);
-        param_data[newValueRow + featureDim] +=
-            tmp / std * static_cast<accscalar_t>(-lr);
-      }
-    };
+    AdagradFusedStepCoalescedKernelFunctor<scalar_t, IndexType, accscalar_t>
+        kfn(param_data,
+            state_sum_data,
+            param_indices_data,
+            values_data,
+            nnz,
+            stride_grad,
+            stride_param,
+            lr,
+            eps);
 
     // kick off kernel
     cgh.parallel_for(
@@ -179,6 +225,115 @@ static inline void get_wgroup_size(
   global_size_col = CeilDiv(stride, local_size_col);
 }
 
+template <typename scalar_t, typename IndexType, typename accscalar_t>
+struct AdagradFusedStepNocoalescedKernelFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    uint64_t stride_grad_remainder = item.get_global_id()[1] / local_size_col;
+    uint64_t stride_grad_div = item.get_local_id(1);
+    IndexType seg = item.get_global_id()[0] / local_size_row;
+    IndexType reduce_id = item.get_local_id(0);
+
+    const uint64_t featureDim =
+        stride_grad_remainder * local_size_col + stride_grad_div;
+
+    auto param_ptr = param_data;
+    auto state_sum_ptr = state_sum_data;
+    auto segment_offsets_ptr = segment_offsets_data;
+    auto value_indices_ptr = value_indices_data;
+    auto param_indices_ptr = param_indices_data;
+    auto values_ptr = values_data;
+
+    if (seg < newNnz && featureDim < stride_grad) {
+      const IndexType begin = segment_offsets_ptr[seg];
+      const IndexType end =
+          (seg < newNnz - 1) ? segment_offsets_ptr[seg + 1] : nnz;
+
+      accscalar_t tmp = 0, std = 0;
+      for (IndexType row = begin + reduce_id; row < end;
+           row += local_size_row) {
+        const uint64_t valueRow =
+            ((IndexType)value_indices_ptr[row]) * stride_grad;
+        tmp += static_cast<accscalar_t>(values_ptr[valueRow + featureDim]);
+      }
+
+      local_sum[reduce_id][stride_grad_div] = tmp;
+      item.barrier(dpcpp_local_fence);
+
+      tmp = 0;
+      const uint64_t newValueRow =
+          stride_param * param_indices_ptr[seg] * stride_grad;
+      if (reduce_id == 0) {
+        for (IndexType i = 0; i < local_size_row; ++i) {
+          tmp += local_sum[i][stride_grad_div];
+        }
+
+        state_sum_data[newValueRow + featureDim] += Numerics<accscalar_t>::pow(
+            static_cast<accscalar_t>(tmp), accscalar_t(2.0));
+        std = Numerics<accscalar_t>::sqrt(
+                  state_sum_data[newValueRow + featureDim]) +
+            static_cast<accscalar_t>(eps);
+        param_data[newValueRow + featureDim] +=
+            tmp / std * static_cast<accscalar_t>(-lr);
+      }
+    }
+  }
+
+  AdagradFusedStepNocoalescedKernelFunctor(
+      scalar_t* param_data_,
+      scalar_t* state_sum_data_,
+      int64_t* segment_offsets_data_,
+      int64_t* value_indices_data_,
+      int64_t* param_indices_data_,
+      scalar_t* values_data_,
+      int64_t nnz_,
+      int64_t newNnz_,
+      int64_t stride_grad_,
+      int64_t stride_param_,
+      float lr_,
+      float eps_,
+      int64_t global_size_row_,
+      int64_t global_size_col_,
+      int64_t local_size_row_,
+      int64_t local_size_col_,
+      dpcpp_local_acc_t<accscalar_t, 2> local_sum_)
+      : param_data(param_data_),
+        state_sum_data(state_sum_data_),
+        segment_offsets_data(segment_offsets_data_),
+        value_indices_data(value_indices_data_),
+        param_indices_data(param_indices_data_),
+        values_data(values_data_),
+        nnz(nnz_),
+        newNnz(newNnz_),
+        stride_grad(stride_grad_),
+        stride_param(stride_param_),
+        lr(lr_),
+        eps(eps_),
+        global_size_row(global_size_row_),
+        global_size_col(global_size_col_),
+        local_size_row(local_size_row_),
+        local_size_col(local_size_col_),
+        local_sum(local_sum_) {}
+
+ private:
+  scalar_t* param_data;
+  scalar_t* state_sum_data;
+  int64_t* segment_offsets_data;
+  int64_t* value_indices_data;
+  int64_t* param_indices_data;
+  scalar_t* values_data;
+  int64_t nnz;
+  int64_t newNnz;
+  int64_t stride_grad;
+  int64_t stride_param;
+  float lr;
+  float eps;
+  int64_t global_size_row;
+  int64_t global_size_col;
+  int64_t local_size_row;
+  int64_t local_size_col;
+  dpcpp_local_acc_t<accscalar_t, 2> local_sum;
+};
+
 // Cycle sum of a unique index can be processed by multi-items. And, the result
 // will be saved by reducing multi-items.
 template <typename scalar_t, typename IndexType>
@@ -220,57 +375,24 @@ void adagrad_fused_step_nocoalesced_kernel_impl(
     auto local_sum = dpcpp_local_acc_t<accscalar_t, 2>(
         sycl::range<2>{local_size_row, local_size_col}, cgh);
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-      uint64_t stride_grad_remainder = item.get_global_id()[1] / local_size_col;
-      uint64_t stride_grad_div = item.get_local_id(1);
-      IndexType seg = item.get_global_id()[0] / local_size_row;
-      IndexType reduce_id = item.get_local_id(0);
-
-      const uint64_t featureDim =
-          stride_grad_remainder * local_size_col + stride_grad_div;
-
-      auto param_ptr = param_data;
-      auto state_sum_ptr = state_sum_data;
-      auto segment_offsets_ptr = segment_offsets_data;
-      auto value_indices_ptr = value_indices_data;
-      auto param_indices_ptr = param_indices_data;
-      auto values_ptr = values_data;
-
-      if (seg < newNnz && featureDim < stride_grad) {
-        const IndexType begin = segment_offsets_ptr[seg];
-        const IndexType end =
-            (seg < newNnz - 1) ? segment_offsets_ptr[seg + 1] : nnz;
-
-        accscalar_t tmp = 0, std = 0;
-        for (IndexType row = begin + reduce_id; row < end;
-             row += local_size_row) {
-          const uint64_t valueRow =
-              ((IndexType)value_indices_ptr[row]) * stride_grad;
-          tmp += static_cast<accscalar_t>(values_ptr[valueRow + featureDim]);
-        }
-
-        local_sum[reduce_id][stride_grad_div] = tmp;
-        item.barrier(dpcpp_local_fence);
-
-        tmp = 0;
-        const uint64_t newValueRow =
-            stride_param * param_indices_ptr[seg] * stride_grad;
-        if (reduce_id == 0) {
-          for (IndexType i = 0; i < local_size_row; ++i) {
-            tmp += local_sum[i][stride_grad_div];
-          }
-
-          state_sum_data[newValueRow + featureDim] +=
-              Numerics<accscalar_t>::pow(
-                  static_cast<accscalar_t>(tmp), accscalar_t(2.0));
-          std = Numerics<accscalar_t>::sqrt(
-                    state_sum_data[newValueRow + featureDim]) +
-              static_cast<accscalar_t>(eps);
-          param_data[newValueRow + featureDim] +=
-              tmp / std * static_cast<accscalar_t>(-lr);
-        }
-      }
-    };
+    AdagradFusedStepNocoalescedKernelFunctor<scalar_t, IndexType, accscalar_t>
+        kfn(param_data,
+            state_sum_data,
+            segment_offsets_data,
+            value_indices_data,
+            param_indices_data,
+            values_data,
+            nnz,
+            newNnz,
+            stride_grad,
+            stride_param,
+            lr,
+            eps,
+            global_size_row,
+            global_size_col,
+            local_size_row,
+            local_size_col,
+            local_sum);
 
     // kick off kernel
     cgh.parallel_for(
@@ -308,6 +430,106 @@ static inline void get_wgroup_size_large(
   global_size_row = CeilDiv(newNnz, local_size_row * loop);
   global_size_col = CeilDiv(stride, local_size_col);
 }
+
+template <typename scalar_t, typename IndexType, typename accscalar_t>
+struct AdagradFusedStepNocoalescedLargeGroupKernelFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    auto param_ptr = param_data;
+    auto state_sum_ptr = state_sum_data;
+    auto segment_offsets_ptr = segment_offsets_data;
+    auto value_indices_ptr = value_indices_data;
+    auto param_indices_ptr = param_indices_data;
+    auto values_ptr = values_data;
+
+    uint64_t stride_grad_remainder = item.get_global_id()[1] / local_size_col;
+    uint64_t stride_grad_div = item.get_local_id(1);
+    IndexType seg_remainder = item.get_global_id()[0] / local_size_row;
+    IndexType seg_div = item.get_local_id(0);
+
+    uint64_t featureDim =
+        stride_grad_remainder * local_size_col + stride_grad_div;
+    for (int l = 0; l < loop; ++l) {
+      IndexType seg =
+          seg_remainder * local_size_row * loop + l * local_size_row + seg_div;
+      const uint64_t newValueRow =
+          stride_param * param_indices_ptr[seg] * stride_grad;
+      if (seg < newNnz && featureDim < stride_grad) {
+        const IndexType begin = segment_offsets_ptr[seg];
+        const IndexType end =
+            (seg < newNnz - 1) ? segment_offsets_ptr[seg + 1] : nnz;
+
+        accscalar_t tmp = 0, std = 0;
+        for (IndexType row = begin; row < end; row++) {
+          const uint64_t valueRow =
+              ((IndexType)value_indices_ptr[row]) * stride_grad;
+          tmp += static_cast<accscalar_t>(values_ptr[valueRow + featureDim]);
+        }
+        state_sum_data[newValueRow + featureDim] += Numerics<accscalar_t>::pow(
+            static_cast<accscalar_t>(tmp), accscalar_t(2.0));
+        std = Numerics<accscalar_t>::sqrt(
+                  state_sum_data[newValueRow + featureDim]) +
+            static_cast<accscalar_t>(eps);
+        param_data[newValueRow + featureDim] +=
+            tmp / std * static_cast<accscalar_t>(-lr);
+      }
+    }
+  }
+
+  AdagradFusedStepNocoalescedLargeGroupKernelFunctor(
+      scalar_t* param_data_,
+      scalar_t* state_sum_data_,
+      int64_t* segment_offsets_data_,
+      int64_t* value_indices_data_,
+      int64_t* param_indices_data_,
+      scalar_t* values_data_,
+      int64_t nnz_,
+      int64_t newNnz_,
+      int64_t stride_grad_,
+      int64_t stride_param_,
+      float lr_,
+      float eps_,
+      int64_t global_size_row_,
+      int64_t global_size_col_,
+      int64_t local_size_row_,
+      int64_t local_size_col_,
+      int64_t loop_)
+      : param_data(param_data_),
+        state_sum_data(state_sum_data_),
+        segment_offsets_data(segment_offsets_data_),
+        value_indices_data(value_indices_data_),
+        param_indices_data(param_indices_data_),
+        values_data(values_data_),
+        nnz(nnz_),
+        newNnz(newNnz_),
+        stride_grad(stride_grad_),
+        stride_param(stride_param_),
+        lr(lr_),
+        eps(eps_),
+        global_size_row(global_size_row_),
+        global_size_col(global_size_col_),
+        local_size_row(local_size_row_),
+        local_size_col(local_size_col_),
+        loop(loop_) {}
+
+ private:
+  scalar_t* param_data;
+  scalar_t* state_sum_data;
+  int64_t* segment_offsets_data;
+  int64_t* value_indices_data;
+  int64_t* param_indices_data;
+  scalar_t* values_data;
+  int64_t nnz;
+  int64_t newNnz;
+  int64_t stride_grad;
+  int64_t stride_param;
+  float lr;
+  float eps;
+  int64_t global_size_row;
+  int64_t global_size_col;
+  int64_t local_size_row;
+  int64_t local_size_col;
+  int64_t loop;
+};
 
 // When the group is huge, we can reduce the number of groups by dividing the
 // loop.
@@ -347,48 +569,27 @@ void adagrad_fused_step_nocoalesced_large_group_kernel_impl(
     auto param_indices_data = param_indices.data_ptr<int64_t>();
     auto values_data = values.data_ptr<scalar_t>();
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-      auto param_ptr = param_data;
-      auto state_sum_ptr = state_sum_data;
-      auto segment_offsets_ptr = segment_offsets_data;
-      auto value_indices_ptr = value_indices_data;
-      auto param_indices_ptr = param_indices_data;
-      auto values_ptr = values_data;
-
-      uint64_t stride_grad_remainder = item.get_global_id()[1] / local_size_col;
-      uint64_t stride_grad_div = item.get_local_id(1);
-      IndexType seg_remainder = item.get_global_id()[0] / local_size_row;
-      IndexType seg_div = item.get_local_id(0);
-
-      uint64_t featureDim =
-          stride_grad_remainder * local_size_col + stride_grad_div;
-      for (int l = 0; l < loop; ++l) {
-        IndexType seg = seg_remainder * local_size_row * loop +
-            l * local_size_row + seg_div;
-        const uint64_t newValueRow =
-            stride_param * param_indices_ptr[seg] * stride_grad;
-        if (seg < newNnz && featureDim < stride_grad) {
-          const IndexType begin = segment_offsets_ptr[seg];
-          const IndexType end =
-              (seg < newNnz - 1) ? segment_offsets_ptr[seg + 1] : nnz;
-
-          accscalar_t tmp = 0, std = 0;
-          for (IndexType row = begin; row < end; row++) {
-            const uint64_t valueRow =
-                ((IndexType)value_indices_ptr[row]) * stride_grad;
-            tmp += static_cast<accscalar_t>(values_ptr[valueRow + featureDim]);
-          }
-          state_sum_data[newValueRow + featureDim] +=
-              Numerics<accscalar_t>::pow(
-                  static_cast<accscalar_t>(tmp), accscalar_t(2.0));
-          std = Numerics<accscalar_t>::sqrt(
-                    state_sum_data[newValueRow + featureDim]) +
-              static_cast<accscalar_t>(eps);
-          param_data[newValueRow + featureDim] +=
-              tmp / std * static_cast<accscalar_t>(-lr);
-        }
-      }
-    };
+    AdagradFusedStepNocoalescedLargeGroupKernelFunctor<
+        scalar_t,
+        IndexType,
+        accscalar_t>
+        kfn(param_data,
+            state_sum_data,
+            segment_offsets_data,
+            value_indices_data,
+            param_indices_data,
+            values_data,
+            nnz,
+            newNnz,
+            stride_grad,
+            stride_param,
+            lr,
+            eps,
+            global_size_row,
+            global_size_col,
+            local_size_row,
+            local_size_col,
+            loop);
 
     // kick off kernel
     cgh.parallel_for(
