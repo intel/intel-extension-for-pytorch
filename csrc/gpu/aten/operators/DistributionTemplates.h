@@ -115,6 +115,91 @@ template <
     typename scalar_t,
     typename accscalar_t,
     int unroll_factor,
+    typename dist_t,
+    typename transform_t>
+struct DistributionNullaryKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    distribution_elementwise_kernel<accscalar_t, unroll_factor>(
+        item,
+        numel,
+        PhiloxState(
+            std::get<0>(rng_engine_inputs), std::get<1>(rng_engine_inputs)),
+        dist_func,
+        [=](int idx, accscalar_t rand) {
+          scalar_t* out = (scalar_t*)&out_data[stride0 * idx];
+          *out = transform_func(rand);
+        });
+  }
+  DistributionNullaryKernelFunctor(
+      int64_t numel_,
+      std::pair<uint64_t, uint64_t> rng_engine_inputs_,
+      const dist_t dist_func_,
+      char* out_data_,
+      int stride0_,
+      const transform_t transform_func_)
+      : numel(numel_),
+        rng_engine_inputs(rng_engine_inputs_),
+        dist_func(dist_func_),
+        out_data(out_data_),
+        stride0(stride0_),
+        transform_func(transform_func_) {}
+
+ private:
+  int64_t numel;
+  std::pair<uint64_t, uint64_t> rng_engine_inputs;
+  const dist_t dist_func;
+  char* out_data;
+  int stride0;
+  const transform_t transform_func;
+};
+
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    int unroll_factor,
+    typename dist_t,
+    typename transform_t>
+struct DistributionNullaryKernelFunctor2 {
+  void operator()(sycl::nd_item<1> item) const {
+    distribution_elementwise_kernel<accscalar_t, unroll_factor>(
+        item,
+        numel,
+        PhiloxState(
+            std::get<0>(rng_engine_inputs), std::get<1>(rng_engine_inputs)),
+        dist_func,
+        [=](int idx, accscalar_t rand) {
+          auto offsets = offset_calc.get(idx);
+          scalar_t* out = (scalar_t*)&out_data[offsets[0]];
+          *out = transform_func(rand);
+        });
+  }
+  DistributionNullaryKernelFunctor2(
+      int64_t numel_,
+      std::pair<uint64_t, uint64_t> rng_engine_inputs_,
+      const dist_t dist_func_,
+      char* out_data_,
+      const transform_t transform_func_,
+      OffsetCalculator<1> offset_calc_)
+      : numel(numel_),
+        rng_engine_inputs(rng_engine_inputs_),
+        dist_func(dist_func_),
+        out_data(out_data_),
+        transform_func(transform_func_),
+        offset_calc(offset_calc_) {}
+
+ private:
+  int64_t numel;
+  std::pair<uint64_t, uint64_t> rng_engine_inputs;
+  const dist_t dist_func;
+  char* out_data;
+  const transform_t transform_func;
+  OffsetCalculator<1> offset_calc;
+};
+
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    int unroll_factor,
     typename RNG,
     typename dist_t,
     typename transform_t>
@@ -165,18 +250,18 @@ void distribution_nullary_kernel(
     auto strides = iter.get_inner_strides();
     int stride0 = strides[0];
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        distribution_elementwise_kernel<accscalar_t, unroll_factor>(
-            item,
-            numel,
-            PhiloxState(
-                std::get<0>(rng_engine_inputs), std::get<1>(rng_engine_inputs)),
-            dist_func,
-            [=](int idx, accscalar_t rand) {
-              scalar_t* out = (scalar_t*)&out_data[stride0 * idx];
-              *out = transform_func(rand);
-            });
-      };
+      DistributionNullaryKernelFunctor<
+          scalar_t,
+          accscalar_t,
+          unroll_factor,
+          dist_t,
+          transform_t>
+          kfn(numel,
+              rng_engine_inputs,
+              dist_func,
+              out_data,
+              stride0,
+              transform_func);
       cgh.parallel_for(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
@@ -184,19 +269,18 @@ void distribution_nullary_kernel(
   } else {
     auto offset_calc = make_offset_calculator<1>(iter);
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        distribution_elementwise_kernel<accscalar_t, unroll_factor>(
-            item,
-            numel,
-            PhiloxState(
-                std::get<0>(rng_engine_inputs), std::get<1>(rng_engine_inputs)),
-            dist_func,
-            [=](int idx, accscalar_t rand) {
-              auto offsets = offset_calc.get(idx);
-              scalar_t* out = (scalar_t*)&out_data[offsets[0]];
-              *out = transform_func(rand);
-            });
-      };
+      DistributionNullaryKernelFunctor2<
+          scalar_t,
+          accscalar_t,
+          unroll_factor,
+          dist_t,
+          transform_t>
+          kfn(numel,
+              rng_engine_inputs,
+              dist_func,
+              out_data,
+              transform_func,
+              offset_calc);
       cgh.parallel_for(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
@@ -237,10 +321,88 @@ void distribution_unary_elementwise_kernel(
 }
 
 template <typename scalar1_t, typename scalar2_t, typename func_t>
+struct DistributionUnaryKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    distribution_unary_elementwise_kernel(
+        item,
+        numel,
+        f,
+        philox_args,
+        output_data,
+        input_data,
+        input_offset_calculator,
+        output_offset_calculator);
+  }
+  DistributionUnaryKernelFunctor(
+      int numel_,
+      const func_t f_,
+      PhiloxState philox_args_,
+      scalar1_t* output_data_,
+      const scalar2_t* input_data_,
+      TrivialOffsetCalculator<1> input_offset_calculator_,
+      TrivialOffsetCalculator<1> output_offset_calculator_)
+      : numel(numel_),
+        f(f_),
+        philox_args(philox_args_),
+        output_data(output_data_),
+        input_data(input_data_),
+        input_offset_calculator(input_offset_calculator_),
+        output_offset_calculator(output_offset_calculator_) {}
+
+ private:
+  int numel;
+  const func_t f;
+  PhiloxState philox_args;
+  scalar1_t* output_data;
+  const scalar2_t* input_data;
+  TrivialOffsetCalculator<1> input_offset_calculator;
+  TrivialOffsetCalculator<1> output_offset_calculator;
+};
+
+template <typename scalar1_t, typename scalar2_t, typename func_t>
+struct DistributionUnaryKernelFunctor2 {
+  void operator()(sycl::nd_item<1> item) const {
+    distribution_unary_elementwise_kernel(
+        item,
+        numel,
+        f,
+        philox_args,
+        output_data,
+        input_data,
+        input_offset_calculator,
+        output_offset_calculator);
+  }
+  DistributionUnaryKernelFunctor2(
+      int numel_,
+      const func_t f_,
+      PhiloxState philox_args_,
+      scalar1_t* output_data_,
+      const scalar2_t* input_data_,
+      OffsetCalculator<1> input_offset_calculator_,
+      OffsetCalculator<1> output_offset_calculator_)
+      : numel(numel_),
+        f(f_),
+        philox_args(philox_args_),
+        output_data(output_data_),
+        input_data(input_data_),
+        input_offset_calculator(input_offset_calculator_),
+        output_offset_calculator(output_offset_calculator_) {}
+
+ private:
+  int numel;
+  const func_t f;
+  PhiloxState philox_args;
+  scalar1_t* output_data;
+  const scalar2_t* input_data;
+  OffsetCalculator<1> input_offset_calculator;
+  OffsetCalculator<1> output_offset_calculator;
+};
+
+template <typename scalar1_t, typename scalar2_t, typename func_t>
 void distribution_unary_kernel(
     TensorIterator& iter,
     PhiloxState philox_args,
-    const func_t& f) {
+    func_t f) {
   if (!iter.can_use_32bit_indexing()) {
     for (auto& sub_iter : iter.with_32bit_indexing()) {
       distribution_unary_kernel<scalar1_t, scalar2_t, decltype(f)>(
@@ -270,17 +432,14 @@ void distribution_unary_kernel(
     auto input_offset_calculator = TrivialOffsetCalculator<1>();
     auto output_offset_calculator = TrivialOffsetCalculator<1>();
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        distribution_unary_elementwise_kernel(
-            item,
-            numel,
-            f,
-            philox_args,
-            output_data,
-            input_data,
-            input_offset_calculator,
-            output_offset_calculator);
-      };
+      DistributionUnaryKernelFunctor<scalar1_t, scalar2_t, func_t> kfn(
+          numel,
+          f,
+          philox_args,
+          output_data,
+          input_data,
+          input_offset_calculator,
+          output_offset_calculator);
       cgh.parallel_for(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
@@ -289,17 +448,14 @@ void distribution_unary_kernel(
     auto input_offset_calculator = make_input_offset_calculator<1>(iter);
     auto output_offset_calculator = make_output_offset_calculator(iter);
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        distribution_unary_elementwise_kernel(
-            item,
-            numel,
-            f,
-            philox_args,
-            output_data,
-            input_data,
-            input_offset_calculator,
-            output_offset_calculator);
-      };
+      DistributionUnaryKernelFunctor2<scalar1_t, scalar2_t, func_t> kfn(
+          numel,
+          f,
+          philox_args,
+          output_data,
+          input_data,
+          input_offset_calculator,
+          output_offset_calculator);
       cgh.parallel_for(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
@@ -342,6 +498,100 @@ void distribution_binary_elementwise_kernel(
         f(state, input_data_1[in_offsets[0]], input_data_2[in_offsets[1]]);
   }
 }
+
+template <
+    typename func_t,
+    typename input_t_1,
+    typename input_t_2,
+    typename output_t>
+struct DistributionBinaryKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    distribution_binary_elementwise_kernel(
+        item,
+        numel,
+        f,
+        philox_args,
+        output_data,
+        input_data_1,
+        input_data_2,
+        input_offset_calculator,
+        output_offset_calculator);
+  }
+  DistributionBinaryKernelFunctor(
+      int64_t numel_,
+      const func_t f_,
+      PhiloxState philox_args_,
+      output_t* output_data_,
+      const input_t_1* input_data_1_,
+      const input_t_2* input_data_2_,
+      TrivialOffsetCalculator<2> input_offset_calculator_,
+      TrivialOffsetCalculator<1> output_offset_calculator_)
+      : numel(numel_),
+        f(f_),
+        philox_args(philox_args_),
+        output_data(output_data_),
+        input_data_1(input_data_1_),
+        input_data_2(input_data_2_),
+        input_offset_calculator(input_offset_calculator_),
+        output_offset_calculator(output_offset_calculator_) {}
+
+ private:
+  int64_t numel;
+  const func_t f;
+  PhiloxState philox_args;
+  output_t* output_data;
+  const input_t_1* input_data_1;
+  const input_t_2* input_data_2;
+  TrivialOffsetCalculator<2> input_offset_calculator;
+  TrivialOffsetCalculator<1> output_offset_calculator;
+};
+
+template <
+    typename func_t,
+    typename input_t_1,
+    typename input_t_2,
+    typename output_t>
+struct DistributionBinaryKernelFunctor2 {
+  void operator()(sycl::nd_item<1> item) const {
+    distribution_binary_elementwise_kernel(
+        item,
+        numel,
+        f,
+        philox_args,
+        output_data,
+        input_data_1,
+        input_data_2,
+        input_offset_calculator,
+        output_offset_calculator);
+  }
+  DistributionBinaryKernelFunctor2(
+      int64_t numel_,
+      const func_t f_,
+      PhiloxState philox_args_,
+      output_t* output_data_,
+      const input_t_1* input_data_1_,
+      const input_t_2* input_data_2_,
+      OffsetCalculator<2> input_offset_calculator_,
+      OffsetCalculator<1> output_offset_calculator_)
+      : numel(numel_),
+        f(f_),
+        philox_args(philox_args_),
+        output_data(output_data_),
+        input_data_1(input_data_1_),
+        input_data_2(input_data_2_),
+        input_offset_calculator(input_offset_calculator_),
+        output_offset_calculator(output_offset_calculator_) {}
+
+ private:
+  int64_t numel;
+  const func_t f;
+  PhiloxState philox_args;
+  output_t* output_data;
+  const input_t_1* input_data_1;
+  const input_t_2* input_data_2;
+  OffsetCalculator<2> input_offset_calculator;
+  OffsetCalculator<1> output_offset_calculator;
+};
 
 template <typename func_t>
 void distribution_binary_kernel(
@@ -388,18 +638,15 @@ void distribution_binary_kernel(
     auto input_offset_calculator = TrivialOffsetCalculator<2>();
     auto output_offset_calculator = TrivialOffsetCalculator<1>();
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        distribution_binary_elementwise_kernel(
-            item,
-            numel,
-            f,
-            philox_args,
-            output_data,
-            input_data_1,
-            input_data_2,
-            input_offset_calculator,
-            output_offset_calculator);
-      };
+      DistributionBinaryKernelFunctor<func_t, input_t_1, input_t_2, output_t>
+          kfn(numel,
+              f,
+              philox_args,
+              output_data,
+              input_data_1,
+              input_data_2,
+              input_offset_calculator,
+              output_offset_calculator);
       cgh.parallel_for(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
@@ -408,18 +655,15 @@ void distribution_binary_kernel(
     auto input_offset_calculator = make_input_offset_calculator<2>(iter);
     auto output_offset_calculator = make_output_offset_calculator(iter);
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        distribution_binary_elementwise_kernel(
-            item,
-            numel,
-            f,
-            philox_args,
-            output_data,
-            input_data_1,
-            input_data_2,
-            input_offset_calculator,
-            output_offset_calculator);
-      };
+      DistributionBinaryKernelFunctor2<func_t, input_t_1, input_t_2, output_t>
+          kfn(numel,
+              f,
+              philox_args,
+              output_data,
+              input_data_1,
+              input_data_2,
+              input_offset_calculator,
+              output_offset_calculator);
       cgh.parallel_for(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };

@@ -24,6 +24,116 @@ template <
     typename scalar_t,
     typename accscalar_t,
     typename dist_t,
+    typename transform_t,
+    int unroll_factor>
+struct DistributionElementwiseGridStrideKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int gid = item.get_group(0);
+    int tid = item.get_local_id(0);
+    RandomState<Philox4_32_10> state(
+        seeds.first, gid * group_items + tid, seeds.second);
+    int sample_id = gid * group_work_size + tid;
+#pragma unroll
+    for (int i = 0; i < unroll_factor; i++) {
+      if (sample_id >= numel)
+        return;
+      auto rand = dist_func(&state);
+      accscalar_t r = ScalarConvert<scalar_t, accscalar_t>::to(rand);
+      scalar_t ret = transform_func(r);
+      auto offset = sample_id * stride0;
+      scalar_t* out = (scalar_t*)(out_data + offset);
+      *out = ret;
+      sample_id += group_items;
+    }
+  }
+  DistributionElementwiseGridStrideKernelFunctor(
+      int numel_,
+      std::pair<uint64_t, uint64_t> seeds_,
+      const dist_t dist_func_,
+      const transform_t transform_func_,
+      int group_items_,
+      int group_work_size_,
+      int stride0_,
+      char* out_data_)
+      : numel(numel_),
+        seeds(seeds_),
+        dist_func(dist_func_),
+        transform_func(transform_func_),
+        group_items(group_items_),
+        group_work_size(group_work_size_),
+        stride0(stride0_),
+        out_data(out_data_) {}
+
+ private:
+  int numel;
+  std::pair<uint64_t, uint64_t> seeds;
+  const dist_t dist_func;
+  const transform_t transform_func;
+  int group_items;
+  int group_work_size;
+  int stride0;
+  char* out_data;
+};
+
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    typename dist_t,
+    typename transform_t,
+    int unroll_factor>
+struct DistributionElementwiseGridStrideKernelFunctor2 {
+  void operator()(sycl::nd_item<1> item) const {
+    int gid = item.get_group(0);
+    int tid = item.get_local_id(0);
+    RandomState<Philox4_32_10> state(
+        seeds.first, gid * group_items + tid, seeds.second);
+    int sample_id = gid * group_work_size + tid;
+#pragma unroll
+    for (int i = 0; i < unroll_factor; i++) {
+      if (sample_id >= numel)
+        return;
+      auto rand = dist_func(&state);
+      accscalar_t r = ScalarConvert<scalar_t, accscalar_t>::to(rand);
+      scalar_t ret = transform_func(r);
+      auto offset = offset_calc.get(sample_id)[0];
+      scalar_t* out = (scalar_t*)(out_data + offset);
+      *out = ret;
+      sample_id += group_items;
+    }
+  }
+  DistributionElementwiseGridStrideKernelFunctor2(
+      int numel_,
+      std::pair<uint64_t, uint64_t> seeds_,
+      const dist_t dist_func_,
+      const transform_t transform_func_,
+      int group_items_,
+      int group_work_size_,
+      char* out_data_,
+      OffsetCalculator<3> offset_calc_)
+      : numel(numel_),
+        seeds(seeds_),
+        dist_func(dist_func_),
+        transform_func(transform_func_),
+        group_items(group_items_),
+        group_work_size(group_work_size_),
+        out_data(out_data_),
+        offset_calc(offset_calc_) {}
+
+ private:
+  int numel;
+  std::pair<uint64_t, uint64_t> seeds;
+  const dist_t dist_func;
+  const transform_t transform_func;
+  int group_items;
+  int group_work_size;
+  char* out_data;
+  OffsetCalculator<3> offset_calc;
+};
+
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    typename dist_t,
     typename transform_t>
 void distribution_elementwise_grid_stride_kernel(
     at::TensorIterator& iter,
@@ -41,25 +151,20 @@ void distribution_elementwise_grid_stride_kernel(
     int stride0 = strides[0];
     auto cgf = DPCPP_Q_CGF(cgh) {
       auto out_data = (char*)iter.data_ptr(0);
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        int gid = item.get_group(0);
-        int tid = item.get_local_id(0);
-        RandomState<Philox4_32_10> state(
-            seeds.first, gid * group_items + tid, seeds.second);
-        int sample_id = gid * group_work_size + tid;
-#pragma unroll
-        for (int i = 0; i < unroll_factor; i++) {
-          if (sample_id >= numel)
-            return;
-          auto rand = dist_func(&state);
-          accscalar_t r = ScalarConvert<scalar_t, accscalar_t>::to(rand);
-          scalar_t ret = transform_func(r);
-          auto offset = sample_id * stride0;
-          scalar_t* out = (scalar_t*)(out_data + offset);
-          *out = ret;
-          sample_id += group_items;
-        }
-      };
+      DistributionElementwiseGridStrideKernelFunctor<
+          scalar_t,
+          accscalar_t,
+          dist_t,
+          transform_t,
+          unroll_factor>
+          kfn(numel,
+              seeds,
+              dist_func,
+              transform_func,
+              group_items,
+              group_work_size,
+              stride0,
+              out_data);
       cgh.parallel_for(
           sycl::nd_range<1>(
               sycl::range<1>(num_groups * group_items),
@@ -71,25 +176,20 @@ void distribution_elementwise_grid_stride_kernel(
     auto offset_calc = make_offset_calculator<1>(iter);
     auto cgf = DPCPP_Q_CGF(cgh) {
       auto out_data = (char*)iter.data_ptr(0);
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        int gid = item.get_group(0);
-        int tid = item.get_local_id(0);
-        RandomState<Philox4_32_10> state(
-            seeds.first, gid * group_items + tid, seeds.second);
-        int sample_id = gid * group_work_size + tid;
-#pragma unroll
-        for (int i = 0; i < unroll_factor; i++) {
-          if (sample_id >= numel)
-            return;
-          auto rand = dist_func(&state);
-          accscalar_t r = ScalarConvert<scalar_t, accscalar_t>::to(rand);
-          scalar_t ret = transform_func(r);
-          auto offset = offset_calc.get(sample_id)[0];
-          scalar_t* out = (scalar_t*)(out_data + offset);
-          *out = ret;
-          sample_id += group_items;
-        }
-      };
+      DistributionElementwiseGridStrideKernelFunctor2<
+          scalar_t,
+          accscalar_t,
+          dist_t,
+          transform_t,
+          unroll_factor>
+          kfn(numel,
+              seeds,
+              dist_func,
+              transform_func,
+              group_items,
+              group_work_size,
+              out_data,
+              offset_calc);
       cgh.parallel_for(
           sycl::nd_range<1>(
               sycl::range<1>(num_groups * group_items),

@@ -56,6 +56,32 @@ inline void renormRowsL1(
   }
 }
 
+template <typename scalar_t>
+struct RenormRowsKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    renormRowsL1<scalar_t>(
+        item,
+        t_ptr,
+        rows,
+        cols,
+        (unsigned char*)(slm.template get_multi_ptr<
+                                sycl::access::decorated::no>()
+                             .get()));
+  }
+  RenormRowsKernelFunctor(
+      int64_t rows_,
+      int64_t cols_,
+      scalar_t* t_ptr_,
+      dpcpp_local_acc_t<scalar_t> slm_)
+      : rows(rows_), cols(cols_), t_ptr(t_ptr_), slm(slm_) {}
+
+ private:
+  int64_t rows;
+  int64_t cols;
+  scalar_t* t_ptr;
+  dpcpp_local_acc_t<scalar_t> slm;
+};
+
 inline void renormRows(Tensor& t) {
   TORCH_CHECK(t.dim() == 2);
   int64_t rows = t.size(0);
@@ -78,16 +104,7 @@ inline void renormRows(Tensor& t) {
               (group_size / 8) * sizeof(scalar_t),
               cgh); // We use the smallest subgroup size to ensure enough space
           auto t_ptr = t.data_ptr<scalar_t>();
-          auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-            renormRowsL1<scalar_t>(
-                item,
-                t_ptr,
-                rows,
-                cols,
-                (unsigned char*)(slm.template get_multi_ptr<
-                                        sycl::access::decorated::no>()
-                                     .get()));
-          };
+          RenormRowsKernelFunctor<scalar_t> kfn(rows, cols, t_ptr, slm);
           cgh.parallel_for(
               sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
         };
@@ -184,6 +201,45 @@ inline void sampleMultinomialWithReplacement(
   }
 }
 
+template <typename scalar_t>
+struct MultinomialWithReplacementKernelImplFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    sampleMultinomialWithReplacement(
+        item,
+        rng_engine_inputs,
+        n_sample,
+        result_ptr,
+        numDist,
+        numCategories,
+        prefixSum_ptr,
+        normDist_ptr);
+  }
+  MultinomialWithReplacementKernelImplFunctor(
+      PhiloxState rng_engine_inputs_,
+      const int64_t n_sample_,
+      int64_t* result_ptr_,
+      int64_t numDist_,
+      int numCategories_,
+      scalar_t* prefixSum_ptr_,
+      scalar_t* normDist_ptr_)
+      : rng_engine_inputs(rng_engine_inputs_),
+        n_sample(n_sample_),
+        result_ptr(result_ptr_),
+        numDist(numDist_),
+        numCategories(numCategories_),
+        prefixSum_ptr(prefixSum_ptr_),
+        normDist_ptr(normDist_ptr_) {}
+
+ private:
+  PhiloxState rng_engine_inputs;
+  const int64_t n_sample;
+  int64_t* result_ptr;
+  int64_t numDist;
+  int numCategories;
+  scalar_t* prefixSum_ptr;
+  scalar_t* normDist_ptr;
+};
+
 void multinomial_with_replacement_kernel_impl(
     Tensor& result,
     const Tensor& self,
@@ -243,17 +299,14 @@ void multinomial_with_replacement_kernel_impl(
           auto result_ptr = result.data_ptr<int64_t>();
           auto prefixSum_ptr = prefixSum.data_ptr<scalar_t>();
           auto normDist_ptr = normDist.data_ptr<scalar_t>();
-          auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-            sampleMultinomialWithReplacement(
-                item,
-                rng_engine_inputs,
-                n_sample,
-                result_ptr,
-                numDist,
-                numCategories,
-                prefixSum_ptr,
-                normDist_ptr);
-          };
+          MultinomialWithReplacementKernelImplFunctor<scalar_t> kfn(
+              rng_engine_inputs,
+              n_sample,
+              result_ptr,
+              numDist,
+              numCategories,
+              prefixSum_ptr,
+              normDist_ptr);
           cgh.parallel_for(
               sycl::nd_range<2>(
                   sycl::range<2>(group_range_y, group_range_x * group_size),
