@@ -18,6 +18,118 @@ template <
     int GROUP_ITEMS,
     bool IS_DESCENDING,
     bool USE_INDICES,
+    typename PrivateValueT,
+    int SUBGROUP_SIZE,
+    int KEYS_PER_ITEM,
+    typename SelectMethod,
+    typename KeyTraitsT>
+struct FastGroupRadixSelectImplFunctor {
+  [[intel::reqd_sub_group_size(SUBGROUP_SIZE)]] void operator()(
+      sycl::nd_item<1> item) const {
+    auto slice = item.get_group_linear_id();
+    auto lid = item.get_local_id(0);
+
+    auto offset_s = slice * nelements;
+    auto key_in_begin = key_in + offset_s;
+    auto value_in_begin = value_in + offset_s;
+    auto key_out_begin = key_out + slice * ntopk;
+    auto value_out_begin = value_out + slice * ntopk;
+
+    auto method = SelectMethod(item, slm);
+
+    KeyT keys[SelectMethod::REG_LEN];
+    PrivateValueT values[SelectMethod::REG_LEN];
+
+    KeyT* keys_temp = reinterpret_cast<KeyT*>(
+        slm.template get_multi_ptr<sycl::access::decorated::no>().get() +
+        SelectMethod::GetSharedLocalMemorySize());
+    PrivateValueT* values_temp = reinterpret_cast<PrivateValueT*>(
+        slm.template get_multi_ptr<sycl::access::decorated::no>().get() +
+        SelectMethod::GetSharedLocalMemorySize() + ntopk * sizeof(KeyT));
+
+#pragma unroll
+    for (int ITEM = 0; ITEM < KEYS_PER_ITEM; ++ITEM) {
+      int offset = lid * KEYS_PER_ITEM + ITEM;
+      if (offset < nelements) {
+        keys[ITEM] = key_in_begin[offset];
+        values[ITEM] = USE_INDICES ? offset : value_in_begin[offset];
+      } else {
+        keys[ITEM] = padding_key;
+      }
+    }
+
+    int num_start = SelectMethod::PROCESSING_LENGTH;
+    while (num_start < nelements) {
+      method.select_group(
+          keys, values, sizeof(KeyT) * 8, 0, ntopk, keys_temp, values_temp);
+      item.barrier(dpcpp_local_fence);
+#pragma unroll
+      for (int ITEM = 0; ITEM < KEYS_PER_ITEM; ++ITEM) {
+        int offset = lid * KEYS_PER_ITEM + ITEM;
+        if (offset < ntopk) {
+          keys[ITEM] = keys_temp[offset];
+          values[ITEM] = values_temp[offset];
+        } else {
+          offset += num_start - ntopk;
+          if (offset < nelements) {
+            keys[ITEM] = key_in_begin[offset];
+            values[ITEM] = USE_INDICES ? offset : value_in_begin[offset];
+          } else {
+            keys[ITEM] = padding_key;
+          }
+        }
+      }
+      num_start += SelectMethod::PROCESSING_LENGTH - ntopk;
+      item.barrier(dpcpp_local_fence);
+    }
+
+    method.select_group(
+        keys,
+        values,
+        sizeof(KeyT) * 8,
+        0,
+        ntopk,
+        key_out_begin,
+        value_out_begin);
+  }
+  FastGroupRadixSelectImplFunctor(
+      const KeyT* key_in_,
+      KeyT* key_out_,
+      const ValueT* value_in_,
+      ValueT* value_out_,
+      int nsegments_,
+      int nelements_,
+      int ntopk_,
+      dpcpp_local_acc_t<unsigned char> slm_,
+      KeyT padding_key_)
+      : key_in(key_in_),
+        key_out(key_out_),
+        value_in(value_in_),
+        value_out(value_out_),
+        nsegments(nsegments_),
+        nelements(nelements_),
+        ntopk(ntopk_),
+        slm(slm_),
+        padding_key(padding_key_) {}
+
+ private:
+  const KeyT* key_in;
+  KeyT* key_out;
+  const ValueT* value_in;
+  ValueT* value_out;
+  int nsegments;
+  int nelements;
+  int ntopk;
+  dpcpp_local_acc_t<unsigned char> slm;
+  KeyT padding_key;
+};
+
+template <
+    typename KeyT,
+    typename ValueT,
+    int GROUP_ITEMS,
+    bool IS_DESCENDING,
+    bool USE_INDICES,
     typename PrivateValueT = ValueT,
     int SUBGROUP_SIZE>
 inline void fast_group_radix_select_impl_(
@@ -48,74 +160,26 @@ inline void fast_group_radix_select_impl_(
         SelectMethod::GetSharedLocalMemorySize() +
             ntopk * (sizeof(KeyT) + sizeof(ValueT)),
         h);
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item)
-        [[intel::reqd_sub_group_size(SUBGROUP_SIZE)]] {
-      auto slice = item.get_group_linear_id();
-      auto lid = item.get_local_id(0);
-
-      auto offset_s = slice * nelements;
-      auto key_in_begin = key_in + offset_s;
-      auto value_in_begin = value_in + offset_s;
-      auto key_out_begin = key_out + slice * ntopk;
-      auto value_out_begin = value_out + slice * ntopk;
-
-      auto method = SelectMethod(item, slm);
-
-      KeyT keys[SelectMethod::REG_LEN];
-      PrivateValueT values[SelectMethod::REG_LEN];
-
-      KeyT* keys_temp = reinterpret_cast<KeyT*>(
-          slm.template get_multi_ptr<sycl::access::decorated::no>().get() +
-          SelectMethod::GetSharedLocalMemorySize());
-      PrivateValueT* values_temp = reinterpret_cast<PrivateValueT*>(
-          slm.template get_multi_ptr<sycl::access::decorated::no>().get() +
-          SelectMethod::GetSharedLocalMemorySize() + ntopk * sizeof(KeyT));
-
-#pragma unroll
-      for (int ITEM = 0; ITEM < KEYS_PER_ITEM; ++ITEM) {
-        int offset = lid * KEYS_PER_ITEM + ITEM;
-        if (offset < nelements) {
-          keys[ITEM] = key_in_begin[offset];
-          values[ITEM] = USE_INDICES ? offset : value_in_begin[offset];
-        } else {
-          keys[ITEM] = padding_key;
-        }
-      }
-
-      int num_start = SelectMethod::PROCESSING_LENGTH;
-      while (num_start < nelements) {
-        method.select_group(
-            keys, values, sizeof(KeyT) * 8, 0, ntopk, keys_temp, values_temp);
-        item.barrier(dpcpp_local_fence);
-#pragma unroll
-        for (int ITEM = 0; ITEM < KEYS_PER_ITEM; ++ITEM) {
-          int offset = lid * KEYS_PER_ITEM + ITEM;
-          if (offset < ntopk) {
-            keys[ITEM] = keys_temp[offset];
-            values[ITEM] = values_temp[offset];
-          } else {
-            offset += num_start - ntopk;
-            if (offset < nelements) {
-              keys[ITEM] = key_in_begin[offset];
-              values[ITEM] = USE_INDICES ? offset : value_in_begin[offset];
-            } else {
-              keys[ITEM] = padding_key;
-            }
-          }
-        }
-        num_start += SelectMethod::PROCESSING_LENGTH - ntopk;
-        item.barrier(dpcpp_local_fence);
-      }
-
-      method.select_group(
-          keys,
-          values,
-          sizeof(KeyT) * 8,
-          0,
-          ntopk,
-          key_out_begin,
-          value_out_begin);
-    };
+    FastGroupRadixSelectImplFunctor<
+        KeyT,
+        ValueT,
+        GROUP_ITEMS,
+        IS_DESCENDING,
+        USE_INDICES,
+        PrivateValueT,
+        SUBGROUP_SIZE,
+        KEYS_PER_ITEM,
+        SelectMethod,
+        KeyTraitsT>
+        kfn(key_in,
+            key_out,
+            value_in,
+            value_out,
+            nsegments,
+            nelements,
+            ntopk,
+            slm,
+            padding_key);
     h.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(nsegments * GROUP_ITEMS),

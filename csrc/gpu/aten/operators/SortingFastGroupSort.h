@@ -21,6 +21,96 @@ template <
     int GROUP_ITEMS,
     bool IS_DESCENDING,
     bool USE_INDICES,
+    typename PrivateValueT,
+    int SUBGROUP_SIZE,
+    int KEYS_PER_ITEM,
+    typename SortMethod,
+    typename KeyTraitsT>
+struct FastGroupRadixSortImplKernelFunctor {
+  [[intel::reqd_sub_group_size(SUBGROUP_SIZE)]] void operator()(
+      sycl::nd_item<1> item) const {
+    auto gid = item.get_group_linear_id();
+    auto lid = item.get_local_id(0);
+    auto slice = gid % nsegments;
+    auto tid = gid / nsegments;
+    int remain_length = nsort - tid * SortMethod::PROCESSING_LENGTH;
+    remain_length = remain_length > SortMethod::PROCESSING_LENGTH
+        ? SortMethod::PROCESSING_LENGTH
+        : remain_length;
+
+    auto offset_s = slice * nsort + tid * SortMethod::PROCESSING_LENGTH;
+    auto key_in_begin = key_in + offset_s;
+    auto value_in_begin = value_in + offset_s;
+    auto key_out_begin = key_out + offset_s;
+    auto value_out_begin = value_out + offset_s;
+
+    auto method = SortMethod(item, slm);
+
+    KeyT keys[SortMethod::REG_LEN];
+    PrivateValueT values[SortMethod::REG_LEN];
+
+    KeyTraitsT(&ukeys)[KEYS_PER_ITEM] =
+        reinterpret_cast<KeyTraitsT(&)[KEYS_PER_ITEM]>(keys);
+
+#pragma unroll
+    for (int ITEM = 0; ITEM < KEYS_PER_ITEM; ++ITEM) {
+      int offset = lid * KEYS_PER_ITEM + ITEM;
+      if (offset < remain_length) {
+        ukeys[ITEM] = KeyTraits<KeyT>::convert(key_in_begin[offset]);
+        values[ITEM] = USE_INDICES
+            ? tid * SortMethod::PROCESSING_LENGTH + offset
+            : value_in_begin[offset];
+      } else {
+        ukeys[ITEM] = padding_key;
+      }
+    }
+
+    method.sort_group(keys, values, 0, sizeof(KeyT) * 8);
+
+#pragma unroll
+    for (int ITEM = 0; ITEM < KEYS_PER_ITEM; ++ITEM) {
+      int offset = lid * KEYS_PER_ITEM + ITEM;
+      if (offset < remain_length) {
+        key_out_begin[offset] = KeyTraits<KeyT>::deconvert(ukeys[ITEM]);
+        value_out_begin[offset] = values[ITEM];
+      }
+    }
+  }
+  FastGroupRadixSortImplKernelFunctor(
+      const KeyT* key_in_,
+      KeyT* key_out_,
+      const ValueT* value_in_,
+      ValueT* value_out_,
+      int nsegments_,
+      int nsort_,
+      KeyTraitsT padding_key_,
+      dpcpp_local_acc_t<unsigned char> slm_)
+      : key_in(key_in_),
+        key_out(key_out_),
+        value_in(value_in_),
+        value_out(value_out_),
+        nsegments(nsegments_),
+        nsort(nsort_),
+        padding_key(padding_key_),
+        slm(slm_) {}
+
+ private:
+  const KeyT* key_in;
+  KeyT* key_out;
+  const ValueT* value_in;
+  ValueT* value_out;
+  int nsegments;
+  int nsort;
+  KeyTraitsT padding_key;
+  dpcpp_local_acc_t<unsigned char> slm;
+};
+
+template <
+    typename KeyT,
+    typename ValueT,
+    int GROUP_ITEMS,
+    bool IS_DESCENDING,
+    bool USE_INDICES,
     typename PrivateValueT = ValueT,
     int SUBGROUP_SIZE>
 inline void fast_group_radix_sort_impl_(
@@ -56,55 +146,25 @@ inline void fast_group_radix_sort_impl_(
   auto cgf = DPCPP_Q_CGF(h) {
     auto slm = dpcpp_local_acc_t<unsigned char>(
         SortMethod::GetSharedLocalMemorySize(), h);
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item)
-        [[intel::reqd_sub_group_size(SUBGROUP_SIZE)]] {
-      auto gid = item.get_group_linear_id();
-      auto lid = item.get_local_id(0);
-      auto slice = gid % nsegments;
-      auto tid = gid / nsegments;
-      int remain_length = nsort - tid * SortMethod::PROCESSING_LENGTH;
-      remain_length = remain_length > SortMethod::PROCESSING_LENGTH
-          ? SortMethod::PROCESSING_LENGTH
-          : remain_length;
-
-      auto offset_s = slice * nsort + tid * SortMethod::PROCESSING_LENGTH;
-      auto key_in_begin = key_in + offset_s;
-      auto value_in_begin = value_in + offset_s;
-      auto key_out_begin = key_out + offset_s;
-      auto value_out_begin = value_out + offset_s;
-
-      auto method = SortMethod(item, slm);
-
-      KeyT keys[SortMethod::REG_LEN];
-      PrivateValueT values[SortMethod::REG_LEN];
-
-      KeyTraitsT(&ukeys)[KEYS_PER_ITEM] =
-          reinterpret_cast<KeyTraitsT(&)[KEYS_PER_ITEM]>(keys);
-
-#pragma unroll
-      for (int ITEM = 0; ITEM < KEYS_PER_ITEM; ++ITEM) {
-        int offset = lid * KEYS_PER_ITEM + ITEM;
-        if (offset < remain_length) {
-          ukeys[ITEM] = KeyTraits<KeyT>::convert(key_in_begin[offset]);
-          values[ITEM] = USE_INDICES
-              ? tid * SortMethod::PROCESSING_LENGTH + offset
-              : value_in_begin[offset];
-        } else {
-          ukeys[ITEM] = padding_key;
-        }
-      }
-
-      method.sort_group(keys, values, 0, sizeof(KeyT) * 8);
-
-#pragma unroll
-      for (int ITEM = 0; ITEM < KEYS_PER_ITEM; ++ITEM) {
-        int offset = lid * KEYS_PER_ITEM + ITEM;
-        if (offset < remain_length) {
-          key_out_begin[offset] = KeyTraits<KeyT>::deconvert(ukeys[ITEM]);
-          value_out_begin[offset] = values[ITEM];
-        }
-      }
-    };
+    FastGroupRadixSortImplKernelFunctor<
+        KeyT,
+        ValueT,
+        GROUP_ITEMS,
+        IS_DESCENDING,
+        USE_INDICES,
+        PrivateValueT,
+        SUBGROUP_SIZE,
+        KEYS_PER_ITEM,
+        SortMethod,
+        KeyTraitsT>
+        kfn(key_in,
+            key_out,
+            value_in,
+            value_out,
+            nsegments,
+            nsort,
+            padding_key,
+            slm);
     h.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(tiles * nsegments * GROUP_ITEMS),

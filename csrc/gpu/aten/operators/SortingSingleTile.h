@@ -206,6 +206,107 @@ template <
     int32_t SUBGROUP_SIZE,
     int32_t GROUP_THREADS,
     int32_t WORKS_PER_ITEM,
+    bool IS_DESCENDING,
+    typename RadixSortUpsweep_t>
+struct RadixSortUpsweepProcessKernelFunctor {
+  [[intel::reqd_sub_group_size(SUBGROUP_SIZE)]] void operator()(
+      sycl::nd_item<1> item) const {
+    auto Upsweep =
+        RadixSortUpsweep_t(keys_in, count, current_bit, num_bits, item, slm);
+    int32_t wg_offset, wg_end;
+    if (Upsweep.wg_id < big_shares) {
+      wg_offset =
+          (Upsweep.wg_id *
+           big_share_items); // for first several wg, they do one more tile.
+      wg_end = wg_offset + big_share_items;
+    } else if (Upsweep.wg_id < total_tiles) {
+      wg_offset = normal_base_offset + (Upsweep.wg_id * normal_share_items);
+      wg_end = std::min(sort_sz, wg_offset + normal_share_items);
+    }
+
+    // ResetDigitCounters
+    Upsweep.ResetDigitCounters();
+    // ResetUnpackedCounters
+    Upsweep.ResetUnpackedCounters();
+
+    // Unroll batches of full tiles
+    int UNROLL_COUNT = 255 / 4; // the largest value for counter
+    int UNROLLED_ELEMENTS = UNROLL_COUNT * tile_items;
+
+    while (wg_offset + UNROLLED_ELEMENTS <= wg_end) {
+      for (int i = 0; i < UNROLL_COUNT; ++i) {
+        Upsweep.ProcessFullTile(wg_offset);
+        wg_offset += tile_items;
+      }
+
+      item.barrier(dpcpp_local_fence);
+
+      // Aggregate back into local_count registers to prevent overflow
+      Upsweep.UnpackDigitCounts();
+
+      item.barrier(dpcpp_local_fence);
+      // clear for next round
+      Upsweep.ResetDigitCounters();
+    }
+
+    while (wg_offset + tile_items <= wg_end) {
+      Upsweep.ProcessFullTile(wg_offset);
+      wg_offset += tile_items;
+    }
+
+    Upsweep.ProcessPartialTile(wg_offset, wg_end);
+    item.barrier(dpcpp_local_fence);
+    Upsweep.UnpackDigitCounts();
+    item.barrier(dpcpp_local_fence);
+    Upsweep.ExtractCounts();
+  }
+  RadixSortUpsweepProcessKernelFunctor(
+      const KeyType* keys_in_,
+      int32_t* count_,
+      const int sort_sz_,
+      const int32_t current_bit_,
+      const int32_t num_bits_,
+      int32_t tile_items_,
+      const int total_tiles_,
+      int32_t big_shares_,
+      int32_t normal_share_items_,
+      int32_t normal_base_offset_,
+      int32_t big_share_items_,
+      dpcpp_local_acc_t<unsigned char> slm_)
+      : keys_in(keys_in_),
+        count(count_),
+        sort_sz(sort_sz_),
+        current_bit(current_bit_),
+        num_bits(num_bits_),
+        tile_items(tile_items_),
+        total_tiles(total_tiles_),
+        big_shares(big_shares_),
+        normal_share_items(normal_share_items_),
+        normal_base_offset(normal_base_offset_),
+        big_share_items(big_share_items_),
+        slm(slm_) {}
+
+ private:
+  const KeyType* keys_in;
+  int32_t* count;
+  const int sort_sz;
+  const int32_t current_bit;
+  const int32_t num_bits;
+  int32_t tile_items;
+  const int total_tiles;
+  int32_t big_shares;
+  int32_t normal_share_items;
+  int32_t normal_base_offset;
+  int32_t big_share_items;
+  dpcpp_local_acc_t<unsigned char> slm;
+};
+
+template <
+    typename KeyType,
+    typename ValueType,
+    int32_t SUBGROUP_SIZE,
+    int32_t GROUP_THREADS,
+    int32_t WORKS_PER_ITEM,
     bool IS_DESCENDING>
 void radix_sort_upsweep_process(
     const KeyType* keys_in,
@@ -240,57 +341,26 @@ void radix_sort_upsweep_process(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto slm = dpcpp_local_acc_t<unsigned char>(
         RadixSortUpsweep_t::GetSharedLocalStorageSize(), cgh);
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item)
-        [[intel::reqd_sub_group_size(SUBGROUP_SIZE)]] {
-      auto Upsweep =
-          RadixSortUpsweep_t(keys_in, count, current_bit, num_bits, item, slm);
-      int32_t wg_offset, wg_end;
-      if (Upsweep.wg_id < big_shares) {
-        wg_offset =
-            (Upsweep.wg_id *
-             big_share_items); // for first several wg, they do one more tile.
-        wg_end = wg_offset + big_share_items;
-      } else if (Upsweep.wg_id < total_tiles) {
-        wg_offset = normal_base_offset + (Upsweep.wg_id * normal_share_items);
-        wg_end = std::min(sort_sz, wg_offset + normal_share_items);
-      }
-
-      // ResetDigitCounters
-      Upsweep.ResetDigitCounters();
-      // ResetUnpackedCounters
-      Upsweep.ResetUnpackedCounters();
-
-      // Unroll batches of full tiles
-      int UNROLL_COUNT = 255 / 4; // the largest value for counter
-      int UNROLLED_ELEMENTS = UNROLL_COUNT * tile_items;
-
-      while (wg_offset + UNROLLED_ELEMENTS <= wg_end) {
-        for (int i = 0; i < UNROLL_COUNT; ++i) {
-          Upsweep.ProcessFullTile(wg_offset);
-          wg_offset += tile_items;
-        }
-
-        item.barrier(dpcpp_local_fence);
-
-        // Aggregate back into local_count registers to prevent overflow
-        Upsweep.UnpackDigitCounts();
-
-        item.barrier(dpcpp_local_fence);
-        // clear for next round
-        Upsweep.ResetDigitCounters();
-      }
-
-      while (wg_offset + tile_items <= wg_end) {
-        Upsweep.ProcessFullTile(wg_offset);
-        wg_offset += tile_items;
-      }
-
-      Upsweep.ProcessPartialTile(wg_offset, wg_end);
-      item.barrier(dpcpp_local_fence);
-      Upsweep.UnpackDigitCounts();
-      item.barrier(dpcpp_local_fence);
-      Upsweep.ExtractCounts();
-    };
+    RadixSortUpsweepProcessKernelFunctor<
+        KeyType,
+        ValueType,
+        SUBGROUP_SIZE,
+        GROUP_THREADS,
+        WORKS_PER_ITEM,
+        IS_DESCENDING,
+        RadixSortUpsweep_t>
+        kfn(keys_in,
+            count,
+            sort_sz,
+            current_bit,
+            num_bits,
+            tile_items,
+            total_tiles,
+            big_shares,
+            normal_share_items,
+            normal_base_offset,
+            big_share_items,
+            slm);
 
     cgh.parallel_for(
         sycl::nd_range<1>(
@@ -467,6 +537,49 @@ inline void ConsumeTile(
 }
 
 template <int32_t SUBGROUP_SIZE, int32_t WORKS_PER_ITEM>
+struct RadixSortScanBinsKernelFunctor {
+  [[intel::reqd_sub_group_size(SUBGROUP_SIZE)]] void operator()(
+      sycl::nd_item<1> item) const {
+    int wg_offset = 0;
+    int32_t running_prefix = 0;
+    const int32_t TILE_ITEMS = WORKS_PER_ITEM * wg_size;
+    while (wg_offset + TILE_ITEMS <= num_counts) {
+      ConsumeTile<SUBGROUP_SIZE, WORKS_PER_ITEM>(
+          count,
+          item,
+          wg_offset,
+          running_prefix,
+          static_cast<int32_t*>(
+              slm.template get_multi_ptr<sycl::access::decorated::no>().get()));
+      wg_offset += TILE_ITEMS;
+    }
+
+    if (wg_offset < num_counts) {
+      ConsumePartialTile<SUBGROUP_SIZE, WORKS_PER_ITEM>(
+          count,
+          item,
+          wg_offset,
+          num_counts - wg_offset,
+          running_prefix,
+          static_cast<int32_t*>(
+              slm.template get_multi_ptr<sycl::access::decorated::no>().get()));
+    }
+  }
+  RadixSortScanBinsKernelFunctor(
+      int32_t* count_,
+      int num_counts_,
+      int64_t wg_size_,
+      dpcpp_local_acc_t<int32_t> slm_)
+      : count(count_), num_counts(num_counts_), wg_size(wg_size_), slm(slm_) {}
+
+ private:
+  int32_t* count;
+  int num_counts;
+  int64_t wg_size;
+  dpcpp_local_acc_t<int32_t> slm;
+};
+
+template <int32_t SUBGROUP_SIZE, int32_t WORKS_PER_ITEM>
 void RadixSortScanBins(
     int32_t* count, // length = (max_grid_size *
                     // pass_config.radix_digits) +
@@ -479,35 +592,8 @@ void RadixSortScanBins(
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto slm = dpcpp_local_acc_t<int32_t>(wg_size / SUBGROUP_SIZE, cgh);
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item)
-        [[intel::reqd_sub_group_size(SUBGROUP_SIZE)]] {
-      int wg_offset = 0;
-      int32_t running_prefix = 0;
-      const int32_t TILE_ITEMS = WORKS_PER_ITEM * wg_size;
-      while (wg_offset + TILE_ITEMS <= num_counts) {
-        ConsumeTile<SUBGROUP_SIZE, WORKS_PER_ITEM>(
-            count,
-            item,
-            wg_offset,
-            running_prefix,
-            static_cast<int32_t*>(
-                slm.template get_multi_ptr<sycl::access::decorated::no>()
-                    .get()));
-        wg_offset += TILE_ITEMS;
-      }
-
-      if (wg_offset < num_counts) {
-        ConsumePartialTile<SUBGROUP_SIZE, WORKS_PER_ITEM>(
-            count,
-            item,
-            wg_offset,
-            num_counts - wg_offset,
-            running_prefix,
-            static_cast<int32_t*>(
-                slm.template get_multi_ptr<sycl::access::decorated::no>()
-                    .get()));
-      }
-    };
+    RadixSortScanBinsKernelFunctor<SUBGROUP_SIZE, WORKS_PER_ITEM> kfn(
+        count, num_counts, wg_size, slm);
 
     cgh.parallel_for(
         sycl::nd_range<1>(sycl::range<1>(wg_size), sycl::range<1>(wg_size)),
@@ -858,6 +944,89 @@ template <
     int32_t SUBGROUP_SIZE,
     int32_t GROUP_THREADS,
     int32_t WORKS_PER_ITEM,
+    bool IS_DESCENDING,
+    typename RadixSortDownsweep_t,
+    typename KeyTraitsT>
+struct RadixSortDownsweepProcessKernelFunctor {
+  [[intel::reqd_sub_group_size(SUBGROUP_SIZE)]] void operator()(
+      sycl::nd_item<1> item) const {
+    auto Downsweep = RadixSortDownsweep_t(
+        keys_in,
+        keys_out,
+        values_in,
+        values_out,
+        count,
+        sort_sz,
+        current_bit,
+        num_bits,
+        item,
+        slm);
+
+    int32_t wg_offset, wg_end;
+    if (Downsweep.wg_id < big_shares) {
+      wg_offset =
+          (Downsweep.wg_id * big_share_items); // for first several
+                                               // wg, they do one more tile.
+      wg_end = wg_offset + big_share_items;
+    } else if (Downsweep.wg_id < total_tiles) {
+      wg_offset = normal_base_offset + (Downsweep.wg_id * normal_share_items);
+      wg_end = std::min(sort_sz, wg_offset + normal_share_items);
+    }
+    Downsweep.ProcessRegion(wg_offset, wg_end);
+  }
+  RadixSortDownsweepProcessKernelFunctor(
+      const KeyType* keys_in_,
+      KeyType* keys_out_,
+      const ValueType* values_in_,
+      ValueType* values_out_,
+      int32_t* count_,
+      const int sort_sz_,
+      const int32_t current_bit_,
+      const int32_t num_bits_,
+      const int32_t total_tiles_,
+      int32_t big_shares_,
+      int32_t normal_share_items_,
+      int32_t normal_base_offset_,
+      int32_t big_share_items_,
+      dpcpp_local_acc_t<unsigned char> slm_)
+      : keys_in(keys_in_),
+        keys_out(keys_out_),
+        values_in(values_in_),
+        values_out(values_out_),
+        count(count_),
+        sort_sz(sort_sz_),
+        current_bit(current_bit_),
+        num_bits(num_bits_),
+        total_tiles(total_tiles_),
+        big_shares(big_shares_),
+        normal_share_items(normal_share_items_),
+        normal_base_offset(normal_base_offset_),
+        big_share_items(big_share_items_),
+        slm(slm_) {}
+
+ private:
+  const KeyType* keys_in;
+  KeyType* keys_out;
+  const ValueType* values_in;
+  ValueType* values_out;
+  int32_t* count;
+  const int sort_sz;
+  const int32_t current_bit;
+  const int32_t num_bits;
+  const int32_t total_tiles;
+  int32_t big_shares;
+  int32_t normal_share_items;
+  int32_t normal_base_offset;
+  int32_t big_share_items;
+  dpcpp_local_acc_t<unsigned char> slm;
+};
+
+template <
+    typename KeyType,
+    typename ValueType,
+    int32_t SUBGROUP_SIZE,
+    int32_t GROUP_THREADS,
+    int32_t WORKS_PER_ITEM,
     bool IS_DESCENDING>
 void radix_sort_downsweep_process(
     const KeyType* keys_in,
@@ -894,32 +1063,29 @@ void radix_sort_downsweep_process(
     auto slm = dpcpp_local_acc_t<unsigned char>(
         RadixSortDownsweep_t::GetSharedLocalStorageSize(), cgh);
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item)
-        [[intel::reqd_sub_group_size(SUBGROUP_SIZE)]] {
-      auto Downsweep = RadixSortDownsweep_t(
-          keys_in,
-          keys_out,
-          values_in,
-          values_out,
-          count,
-          sort_sz,
-          current_bit,
-          num_bits,
-          item,
-          slm);
-
-      int32_t wg_offset, wg_end;
-      if (Downsweep.wg_id < big_shares) {
-        wg_offset =
-            (Downsweep.wg_id * big_share_items); // for first several
-                                                 // wg, they do one more tile.
-        wg_end = wg_offset + big_share_items;
-      } else if (Downsweep.wg_id < total_tiles) {
-        wg_offset = normal_base_offset + (Downsweep.wg_id * normal_share_items);
-        wg_end = std::min(sort_sz, wg_offset + normal_share_items);
-      }
-      Downsweep.ProcessRegion(wg_offset, wg_end);
-    };
+    RadixSortDownsweepProcessKernelFunctor<
+        KeyType,
+        ValueType,
+        SUBGROUP_SIZE,
+        GROUP_THREADS,
+        WORKS_PER_ITEM,
+        IS_DESCENDING,
+        RadixSortDownsweep_t,
+        KeyTraitsT>
+        kfn(keys_in,
+            keys_out,
+            values_in,
+            values_out,
+            count,
+            sort_sz,
+            current_bit,
+            num_bits,
+            total_tiles,
+            big_shares,
+            normal_share_items,
+            normal_base_offset,
+            big_share_items,
+            slm);
 
     cgh.parallel_for(
         sycl::nd_range<1>(

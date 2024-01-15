@@ -180,6 +180,98 @@ template <
     int GROUP_THREADS,
     typename DigitT,
     typename CounterT,
+    int RADIX_BITS,
+    int SGSZ>
+struct DeviceRadixSortImplFunctor {
+  [[intel::reqd_sub_group_size(SGSZ)]] void operator()(
+      sycl::nd_item<1> item) const {
+    auto slice = item.get_group_linear_id();
+    auto offset_s = f(slice);
+    auto key_in_begin = key_in + offset_s;
+    auto key_out_begin = key_out + offset_s;
+    auto key_temp_begin = key_temp + offset_s;
+    auto value_in_begin = value_in + offset_s;
+    auto value_out_begin = value_out + offset_s;
+    auto value_temp_begin = value_temp + offset_s;
+    device_radix_sort_kernel<
+        KeyT,
+        ValueT,
+        OffsetCalT,
+        GROUP_THREADS,
+        SGSZ,
+        DigitT,
+        CounterT,
+        RADIX_BITS>(
+        item,
+        key_in_begin,
+        key_out_begin,
+        value_in_begin,
+        value_out_begin,
+        f,
+        key_temp_begin,
+        value_temp_begin,
+        keys_per_thread,
+        nsort,
+        stride,
+        static_cast<void*>(
+            slm.template get_multi_ptr<sycl::access::decorated::no>().get()),
+        is_descending,
+        use_indices);
+  }
+  DeviceRadixSortImplFunctor(
+      const KeyT* key_in_,
+      KeyT* key_out_,
+      const ValueT* value_in_,
+      ValueT* value_out_,
+      const OffsetCalT f_,
+      KeyT* key_temp_,
+      ValueT* value_temp_,
+      int nsegments_,
+      int nsort_,
+      int stride_,
+      bool is_descending_,
+      bool use_indices_,
+      int keys_per_thread_,
+      dpcpp_local_acc_t<char> slm_)
+      : key_in(key_in_),
+        key_out(key_out_),
+        value_in(value_in_),
+        value_out(value_out_),
+        f(f_),
+        key_temp(key_temp_),
+        value_temp(value_temp_),
+        nsegments(nsegments_),
+        nsort(nsort_),
+        stride(stride_),
+        is_descending(is_descending_),
+        use_indices(use_indices_),
+        keys_per_thread(keys_per_thread_),
+        slm(slm_) {}
+
+ private:
+  const KeyT* key_in;
+  KeyT* key_out;
+  const ValueT* value_in;
+  ValueT* value_out;
+  const OffsetCalT f;
+  KeyT* key_temp;
+  ValueT* value_temp;
+  int nsegments;
+  int nsort;
+  int stride;
+  bool is_descending;
+  bool use_indices;
+  int keys_per_thread;
+  dpcpp_local_acc_t<char> slm;
+};
+
+template <
+    typename KeyT,
+    typename ValueT,
+    typename OffsetCalT,
+    int GROUP_THREADS,
+    typename DigitT,
+    typename CounterT,
     int RADIX_BITS>
 inline void device_radix_sort_impl(
     const KeyT* key_in,
@@ -197,54 +289,41 @@ inline void device_radix_sort_impl(
   int keys_per_thread = (nsort + GROUP_THREADS - 1) / GROUP_THREADS;
   int slm_size =
       buckets_slm_bytes<GROUP_THREADS, DigitT, CounterT, RADIX_BITS>();
-#define DISPATCH_SG(SGSZ)                                                 \
-  {                                                                       \
-    auto& q = dpcppGetCurrentQueue();                                     \
-    auto cgf = DPCPP_Q_CGF(h) {                                           \
-      auto slm = dpcpp_local_acc_t<char>(slm_size, h);                    \
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item)                       \
-          [[intel::reqd_sub_group_size(SGSZ)]] {                          \
-        auto slice = item.get_group_linear_id();                          \
-        auto offset_s = f(slice);                                         \
-        auto key_in_begin = key_in + offset_s;                            \
-        auto key_out_begin = key_out + offset_s;                          \
-        auto key_temp_begin = key_temp + offset_s;                        \
-        auto value_in_begin = value_in + offset_s;                        \
-        auto value_out_begin = value_out + offset_s;                      \
-        auto value_temp_begin = value_temp + offset_s;                    \
-        device_radix_sort_kernel<                                         \
-            KeyT,                                                         \
-            ValueT,                                                       \
-            OffsetCalT,                                                   \
-            GROUP_THREADS,                                                \
-            SGSZ,                                                         \
-            DigitT,                                                       \
-            CounterT,                                                     \
-            RADIX_BITS>(                                                  \
-            item,                                                         \
-            key_in_begin,                                                 \
-            key_out_begin,                                                \
-            value_in_begin,                                               \
-            value_out_begin,                                              \
-            f,                                                            \
-            key_temp_begin,                                               \
-            value_temp_begin,                                             \
-            keys_per_thread,                                              \
-            nsort,                                                        \
-            stride,                                                       \
-            static_cast<void*>(                                           \
-                slm.template get_multi_ptr<sycl::access::decorated::no>() \
-                    .get()),                                              \
-            is_descending,                                                \
-            use_indices);                                                 \
-      };                                                                  \
-      h.parallel_for(                                                     \
-          sycl::nd_range<1>(                                              \
-              sycl::range<1>(nsegments * GROUP_THREADS),                  \
-              sycl::range<1>(GROUP_THREADS)),                             \
-          kfn);                                                           \
-    };                                                                    \
-    DPCPP_Q_SUBMIT(q, cgf);                                               \
+#define DISPATCH_SG(SGSZ)                                \
+  {                                                      \
+    auto& q = dpcppGetCurrentQueue();                    \
+    auto cgf = DPCPP_Q_CGF(h) {                          \
+      auto slm = dpcpp_local_acc_t<char>(slm_size, h);   \
+      DeviceRadixSortImplFunctor<                        \
+          KeyT,                                          \
+          ValueT,                                        \
+          OffsetCalT,                                    \
+          GROUP_THREADS,                                 \
+          DigitT,                                        \
+          CounterT,                                      \
+          RADIX_BITS,                                    \
+          SGSZ>                                          \
+          kfn(key_in,                                    \
+              key_out,                                   \
+              value_in,                                  \
+              value_out,                                 \
+              f,                                         \
+              key_temp,                                  \
+              value_temp,                                \
+              nsegments,                                 \
+              nsort,                                     \
+              stride,                                    \
+              is_descending,                             \
+              use_indices,                               \
+              keys_per_thread,                           \
+              slm);                                      \
+      h.parallel_for(                                    \
+          sycl::nd_range<1>(                             \
+              sycl::range<1>(nsegments * GROUP_THREADS), \
+              sycl::range<1>(GROUP_THREADS)),            \
+          kfn);                                          \
+    };                                                   \
+    DPCPP_Q_SUBMIT(q, cgf);                              \
   }
 
   auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());

@@ -190,6 +190,54 @@ inline void device_merge_full(
 }
 
 template <typename KeyT, typename ValueT, typename Compare>
+struct SegmentedDeviceMergeKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto offset = item.get_group_linear_id() * nsort;
+    auto key_slice_start = key_ptr + offset;
+    auto value_slice_start = value_ptr + offset;
+    auto key_temp_slice_start = key_temp_ptr + offset;
+    auto value_temp_slice_start = value_temp_ptr + offset;
+    device_merge_full(
+        key_slice_start,
+        key_temp_slice_start,
+        value_slice_start,
+        value_temp_slice_start,
+        chunk_size,
+        size_have_sorted,
+        nsort,
+        comp,
+        item);
+  }
+  SegmentedDeviceMergeKernelFunctor(
+      KeyT* key_ptr_,
+      KeyT* key_temp_ptr_,
+      ValueT* value_ptr_,
+      ValueT* value_temp_ptr_,
+      Compare comp_,
+      int nsort_,
+      int size_have_sorted_,
+      int chunk_size_)
+      : key_ptr(key_ptr_),
+        key_temp_ptr(key_temp_ptr_),
+        value_ptr(value_ptr_),
+        value_temp_ptr(value_temp_ptr_),
+        comp(comp_),
+        nsort(nsort_),
+        size_have_sorted(size_have_sorted_),
+        chunk_size(chunk_size_) {}
+
+ private:
+  KeyT* key_ptr;
+  KeyT* key_temp_ptr;
+  ValueT* value_ptr;
+  ValueT* value_temp_ptr;
+  Compare comp;
+  int nsort;
+  int size_have_sorted;
+  int chunk_size;
+};
+
+template <typename KeyT, typename ValueT, typename Compare>
 inline void segmented_device_merge(
     KeyT* key_ptr,
     KeyT* key_temp_ptr,
@@ -205,23 +253,15 @@ inline void segmented_device_merge(
   int group_sz = (nsort + chunk_size - 1) / chunk_size;
   auto& q = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(h) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto offset = item.get_group_linear_id() * nsort;
-      auto key_slice_start = key_ptr + offset;
-      auto value_slice_start = value_ptr + offset;
-      auto key_temp_slice_start = key_temp_ptr + offset;
-      auto value_temp_slice_start = value_temp_ptr + offset;
-      device_merge_full(
-          key_slice_start,
-          key_temp_slice_start,
-          value_slice_start,
-          value_temp_slice_start,
-          chunk_size,
-          size_have_sorted,
-          nsort,
-          comp,
-          item);
-    };
+    SegmentedDeviceMergeKernelFunctor<KeyT, ValueT, Compare> kfn(
+        key_ptr,
+        key_temp_ptr,
+        value_ptr,
+        value_temp_ptr,
+        comp,
+        nsort,
+        size_have_sorted,
+        chunk_size);
     h.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(nsegments * group_sz), sycl::range<1>(group_sz)),
