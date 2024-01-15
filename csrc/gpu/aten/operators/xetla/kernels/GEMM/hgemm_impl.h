@@ -126,6 +126,8 @@ struct hgemm_caller {
       });
     };
     DPCPP_Q_SUBMIT(queue, cgf);
+    sycl::free(acc, context);
+    sycl::free(cnt, context);
   }
 };
 
@@ -752,6 +754,8 @@ inline void hgemm_qkv(
     });
   };
   DPCPP_Q_SUBMIT(queue, cgf);
+  sycl::free(acc, context);
+  sycl::free(cnt, context);
 }
 
 template <
@@ -873,6 +877,8 @@ inline void hgemm_qkv_bias(
     });
   };
   DPCPP_Q_SUBMIT(queue, cgf);
+  sycl::free(acc, context);
+  sycl::free(cnt, context);
 }
 
 } // namespace xetla

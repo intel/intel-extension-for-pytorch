@@ -124,6 +124,8 @@ struct hgemm_wint4_arc_func {
       });
     };
     DPCPP_Q_SUBMIT(queue, cgf);
+    sycl::free(acc, context);
+    sycl::free(cnt, context);
   }
 };
 
