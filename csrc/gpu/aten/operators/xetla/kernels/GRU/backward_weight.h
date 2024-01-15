@@ -614,6 +614,83 @@ struct kernel_xcoder_gru_bpk {
     fused_op_0::call(ei, &args);
   }
 };
+
+template <typename gru_bpk_config_t, typename input>
+struct GruBackwardWeightImplKernelFunctor {
+  SYCL_ESIMD_KERNEL void operator()(nd_item<3> item) const {
+    xetla_exec_item ei(item);
+
+    using xcoder_gru_bpk_op = perf_kernel_xcoder_gru_bpk<
+        typename gru_bpk_config_t::input_T,
+        typename gru_bpk_config_t::Act_T,
+        gru_bpk_config_t::wg_tile_n_0,
+        gru_bpk_config_t::wg_tile_n_1,
+        gru_bpk_config_t::wg_tile_m,
+        gru_bpk_config_t::sg_tile_n_0,
+        gru_bpk_config_t::sg_tile_n_1,
+        gru_bpk_config_t::sg_tile_m,
+        gru_bpk_config_t::sg_tile_k>;
+
+    xcoder_gru_bpk_op::run(
+        ei,
+        (input*)err0_ptr,
+        (input*)err1_ptr,
+        (input*)layer_ptr,
+        (input*)hidden_ptr, /* inputs*/
+        (input*)w_i_ptr,
+        (input*)w_h_ptr, /*weights grads outputs*/
+        (float*)bias0_ptr,
+        (float*)bias1_ptr, /*bias grad outputs*/
+        batch_size,
+        input_size,
+        hidden_size,
+        sequence_length,
+        layer_size);
+  }
+  GruBackwardWeightImplKernelFunctor(
+      void* err0_ptr_,
+      void* err1_ptr_,
+      void* layer_ptr_,
+      void* hidden_ptr_,
+      void* w_i_ptr_,
+      void* w_h_ptr_,
+      void* bias0_ptr_,
+      void* bias1_ptr_,
+      int batch_size_,
+      int input_size_,
+      int hidden_size_,
+      int sequence_length_,
+      int layer_size_)
+      : err0_ptr(err0_ptr_),
+        err1_ptr(err1_ptr_),
+        layer_ptr(layer_ptr_),
+        hidden_ptr(hidden_ptr_),
+        w_i_ptr(w_i_ptr_),
+        w_h_ptr(w_h_ptr_),
+        bias0_ptr(bias0_ptr_),
+        bias1_ptr(bias1_ptr_),
+        batch_size(batch_size_),
+        input_size(input_size_),
+        hidden_size(hidden_size_),
+        sequence_length(sequence_length_),
+        layer_size(layer_size_) {}
+
+ private:
+  void* err0_ptr;
+  void* err1_ptr;
+  void* layer_ptr;
+  void* hidden_ptr;
+  void* w_i_ptr;
+  void* w_h_ptr;
+  void* bias0_ptr;
+  void* bias1_ptr;
+  int batch_size;
+  int input_size;
+  int hidden_size;
+  int sequence_length;
+  int layer_size;
+};
+
 // extern "C"
 template <typename gru_bpk_config_t>
 void gru_backward_weight_impl(
@@ -656,36 +733,21 @@ void gru_backward_weight_impl(
   cl::sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(Range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-      xetla_exec_item ei(item);
-
-      using xcoder_gru_bpk_op = perf_kernel_xcoder_gru_bpk<
-          typename gru_bpk_config_t::input_T,
-          typename gru_bpk_config_t::Act_T,
-          gru_bpk_config_t::wg_tile_n_0,
-          gru_bpk_config_t::wg_tile_n_1,
-          gru_bpk_config_t::wg_tile_m,
-          gru_bpk_config_t::sg_tile_n_0,
-          gru_bpk_config_t::sg_tile_n_1,
-          gru_bpk_config_t::sg_tile_m,
-          gru_bpk_config_t::sg_tile_k>;
-
-      xcoder_gru_bpk_op::run(
-          ei,
-          (input*)err0_ptr,
-          (input*)err1_ptr,
-          (input*)layer_ptr,
-          (input*)hidden_ptr, /* inputs*/
-          (input*)w_i_ptr,
-          (input*)w_h_ptr, /*weights grads outputs*/
-          (float*)bias0_ptr,
-          (float*)bias1_ptr, /*bias grad outputs*/
-          batch_size,
-          input_size,
-          hidden_size,
-          sequence_length,
-          layer_size);
-    });
+    GruBackwardWeightImplKernelFunctor<gru_bpk_config_t, input> kfn(
+        err0_ptr,
+        err1_ptr,
+        layer_ptr,
+        hidden_ptr,
+        w_i_ptr,
+        w_h_ptr,
+        bias0_ptr,
+        bias1_ptr,
+        batch_size,
+        input_size,
+        hidden_size,
+        sequence_length,
+        layer_size);
+    cgh.parallel_for<decltype(kfn)>(Range, kfn);
   };
   DPCPP_Q_SUBMIT(Queue, cgf);
 }

@@ -579,6 +579,124 @@ struct kernel_gru_cell_fusion {
   }
 };
 
+template <
+    typename gru_config_t,
+    typename input_T,
+    typename Act_T,
+    typename gru_op>
+struct GruForwardImplKernelFunctor {
+  SYCL_ESIMD_KERNEL void operator()(nd_item<3> item) const {
+    xetla_exec_item ei(item);
+    int layer_idx = ei.get_group(0);
+    int hidden_io_size = batch_size * hidden_size;
+    int input_weight_offset = layer_idx <= 1
+        ? layer_idx * input_size * hidden_size * 3
+        : input_size * hidden_size * 3 +
+            (layer_idx - 1) * hidden_size * hidden_size * 3;
+    int hidden_weight_offset = layer_idx * hidden_size * hidden_size * 3;
+    int bias_offset = layer_idx * hidden_size * 3;
+    int gates_base_offset = layer_idx * (sequence_size)*hidden_io_size;
+    int workspace_base_offset =
+        layer_idx * (sequence_size + 1) * hidden_io_size;
+    gru_op::call(
+        ei,
+        layer_idx != 0 ? (input_T*)dropout_buffer +
+                (layer_idx - 1) * sequence_size * hidden_io_size
+                       : (input_T*)layer_ptr, /* inputs*/
+        (input_T*)hx_ptr + layer_idx * hidden_size * batch_size,
+        /*
+hidden*/ (input_T*)i_weights + input_weight_offset, /*weights*/
+        (input_T*)h_weights + hidden_weight_offset, /*weights*/
+        (Act_T*)i_biases + bias_offset, /*Bias*/
+        (Act_T*)h_biases + bias_offset, /*Bias*/
+        (input_T*)layer_out_ptr +
+            layer_idx * hidden_size * batch_size, /*hn_out*/
+        layer_idx == layer_size - 1
+            ? (input_T*)hidden_out_ptr
+            : (input_T*)dropout_buffer + gates_base_offset, /*output*/
+        layer_idx < layer_size - 1 ? (Act_T*)mask_ptr + gates_base_offset
+                                   : nullptr, /*mask*/
+        (input_T*)reset_gate_ptr + gates_base_offset,
+        (input_T*)input_gate_ptr + gates_base_offset,
+        (input_T*)new_gate_ptr + gates_base_offset,
+        (input_T*)hgate_2_ptr + gates_base_offset,
+        (input_T*)workspace_ptr + workspace_base_offset, /*workspace*/
+        batch_size,
+        layer_idx == 0 ? input_size : hidden_size,
+        hidden_size,
+        sequence_size,
+        layer_size,
+        seq,
+        layer_idx);
+  }
+  GruForwardImplKernelFunctor(
+      void* layer_ptr_,
+      void* hx_ptr_,
+      void* i_weights_,
+      void* h_weights_,
+      void* i_biases_,
+      void* h_biases_,
+      void* layer_out_ptr_,
+      void* hidden_out_ptr_,
+      void* mask_ptr_,
+      void* dropout_buffer_,
+      void* workspace_ptr_,
+      void* reset_gate_ptr_,
+      void* input_gate_ptr_,
+      void* new_gate_ptr_,
+      void* hgate_2_ptr_,
+      int batch_size_,
+      int input_size_,
+      int hidden_size_,
+      int sequence_size_,
+      int layer_size_,
+      int seq_)
+      : layer_ptr(layer_ptr_),
+        hx_ptr(hx_ptr_),
+        i_weights(i_weights_),
+        h_weights(h_weights_),
+        i_biases(i_biases_),
+        h_biases(h_biases_),
+        layer_out_ptr(layer_out_ptr_),
+        hidden_out_ptr(hidden_out_ptr_),
+        mask_ptr(mask_ptr_),
+        dropout_buffer(dropout_buffer_),
+        workspace_ptr(workspace_ptr_),
+        reset_gate_ptr(reset_gate_ptr_),
+        input_gate_ptr(input_gate_ptr_),
+        new_gate_ptr(new_gate_ptr_),
+        hgate_2_ptr(hgate_2_ptr_),
+        batch_size(batch_size_),
+        input_size(input_size_),
+        hidden_size(hidden_size_),
+        sequence_size(sequence_size_),
+        layer_size(layer_size_),
+        seq(seq_) {}
+
+ private:
+  void* layer_ptr;
+  void* hx_ptr;
+  void* i_weights;
+  void* h_weights;
+  void* i_biases;
+  void* h_biases;
+  void* layer_out_ptr;
+  void* hidden_out_ptr;
+  void* mask_ptr;
+  void* dropout_buffer;
+  void* workspace_ptr;
+  void* reset_gate_ptr;
+  void* input_gate_ptr;
+  void* new_gate_ptr;
+  void* hgate_2_ptr;
+  int batch_size;
+  int input_size;
+  int hidden_size;
+  int sequence_size;
+  int layer_size;
+  int seq;
+};
+
 /// @brief
 /// inputs
 /// @param layer_ptr
@@ -664,50 +782,29 @@ void gru_forward_impl(
   // launch kernels
   for (int seq = 0; seq < sequence_size + layer_size - 1; seq++) {
     auto cgf = DPCPP_Q_CGF(cgh) {
-      cgh.parallel_for(Range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-        xetla_exec_item ei(item);
-        int layer_idx = ei.get_group(0);
-        int hidden_io_size = batch_size * hidden_size;
-        int input_weight_offset = layer_idx <= 1
-            ? layer_idx * input_size * hidden_size * 3
-            : input_size * hidden_size * 3 +
-                (layer_idx - 1) * hidden_size * hidden_size * 3;
-        int hidden_weight_offset = layer_idx * hidden_size * hidden_size * 3;
-        int bias_offset = layer_idx * hidden_size * 3;
-        int gates_base_offset = layer_idx * (sequence_size)*hidden_io_size;
-        int workspace_base_offset =
-            layer_idx * (sequence_size + 1) * hidden_io_size;
-        gru_op::call(
-            ei,
-            layer_idx != 0 ? (input_T*)dropout_buffer +
-                    (layer_idx - 1) * sequence_size * hidden_io_size
-                           : (input_T*)layer_ptr, /* inputs*/
-            (input_T*)hx_ptr + layer_idx * hidden_size * batch_size,
-            /*
-hidden*/ (input_T*)i_weights + input_weight_offset, /*weights*/
-            (input_T*)h_weights + hidden_weight_offset, /*weights*/
-            (Act_T*)i_biases + bias_offset, /*Bias*/
-            (Act_T*)h_biases + bias_offset, /*Bias*/
-            (input_T*)layer_out_ptr +
-                layer_idx * hidden_size * batch_size, /*hn_out*/
-            layer_idx == layer_size - 1
-                ? (input_T*)hidden_out_ptr
-                : (input_T*)dropout_buffer + gates_base_offset, /*output*/
-            layer_idx < layer_size - 1 ? (Act_T*)mask_ptr + gates_base_offset
-                                       : nullptr, /*mask*/
-            (input_T*)reset_gate_ptr + gates_base_offset,
-            (input_T*)input_gate_ptr + gates_base_offset,
-            (input_T*)new_gate_ptr + gates_base_offset,
-            (input_T*)hgate_2_ptr + gates_base_offset,
-            (input_T*)workspace_ptr + workspace_base_offset, /*workspace*/
-            batch_size,
-            layer_idx == 0 ? input_size : hidden_size,
-            hidden_size,
-            sequence_size,
-            layer_size,
-            seq,
-            layer_idx);
-      });
+      GruForwardImplKernelFunctor<gru_config_t, input_T, Act_T, gru_op> kfn(
+          layer_ptr,
+          hx_ptr,
+          i_weights,
+          h_weights,
+          i_biases,
+          h_biases,
+          layer_out_ptr,
+          hidden_out_ptr,
+          mask_ptr,
+          dropout_buffer,
+          workspace_ptr,
+          reset_gate_ptr,
+          input_gate_ptr,
+          new_gate_ptr,
+          hgate_2_ptr,
+          batch_size,
+          input_size,
+          hidden_size,
+          sequence_size,
+          layer_size,
+          seq);
+      cgh.parallel_for<decltype(kfn)>(Range, kfn);
     };
     DPCPP_Q_SUBMIT(Queue, cgf);
   }

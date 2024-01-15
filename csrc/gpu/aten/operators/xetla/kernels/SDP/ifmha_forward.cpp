@@ -11,6 +11,104 @@ template <
     bool kIsTraining>
 class IfmhaForwardKernel;
 
+template <typename ifmha_forward_op_t, typename T>
+struct IfmhaForwardImplKernelFunctor {
+  SYCL_ESIMD_KERNEL void operator()(sycl::nd_item<2> item) const {
+    // exec item
+    xetla_exec_item<2> ei(item);
+
+    // init ifmha forward op and arguments
+    ifmha_forward_op_t ifmha_fwd_op;
+    typename ifmha_forward_op_t::arguments_t args(
+        query,
+        key0,
+        key1,
+        value0,
+        value1,
+        index,
+        alibi,
+        bias,
+        dropout,
+        dropout_prob,
+        sm_scale,
+        out,
+        num_batches,
+        beam,
+        num_heads,
+        head_size,
+        kv_len0,
+        kv_len1,
+        alibi_padding,
+        attn_mask_padding);
+
+    // call the functor
+    ifmha_fwd_op(ei, args);
+  }
+  IfmhaForwardImplKernelFunctor(
+      T* query_,
+      T* key0_,
+      T* key1_,
+      T* value0_,
+      T* value1_,
+      int32_t* index_,
+      T* alibi_,
+      T* bias_,
+      uint8_t* dropout_,
+      float dropout_prob_,
+      float sm_scale_,
+      T* out_,
+      uint32_t num_batches_,
+      uint32_t beam_,
+      uint32_t num_heads_,
+      uint32_t head_size_,
+      uint32_t kv_len0_,
+      uint32_t kv_len1_,
+      uint32_t alibi_padding_,
+      uint32_t attn_mask_padding_)
+      : query(query_),
+        key0(key0_),
+        key1(key1_),
+        value0(value0_),
+        value1(value1_),
+        index(index_),
+        alibi(alibi_),
+        bias(bias_),
+        dropout(dropout_),
+        dropout_prob(dropout_prob_),
+        sm_scale(sm_scale_),
+        out(out_),
+        num_batches(num_batches_),
+        beam(beam_),
+        num_heads(num_heads_),
+        head_size(head_size_),
+        kv_len0(kv_len0_),
+        kv_len1(kv_len1_),
+        alibi_padding(alibi_padding_),
+        attn_mask_padding(attn_mask_padding_) {}
+
+ private:
+  T* query;
+  T* key0;
+  T* key1;
+  T* value0;
+  T* value1;
+  int32_t* index;
+  T* alibi;
+  T* bias;
+  uint8_t* dropout;
+  float dropout_prob;
+  float sm_scale;
+  T* out;
+  uint32_t num_batches;
+  uint32_t beam;
+  uint32_t num_heads;
+  uint32_t head_size;
+  uint32_t kv_len0;
+  uint32_t kv_len1;
+  uint32_t alibi_padding;
+  uint32_t attn_mask_padding;
+};
+
 // The launcher of indexed flash mha forward kernel
 template <
     typename ifmha_policy,
@@ -66,39 +164,33 @@ void ifmha_forward_impl(
       ifmha_forward_op_t::get_nd_range(num_batches, beam, num_heads);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for<
-        class IfmhaForwardKernel<ifmha_policy, T, kUseAlibi, kUseBias, kIsTraining>>(
-        NdRange, [=](sycl::nd_item<2> item) SYCL_ESIMD_KERNEL {
-      // exec item
-      xetla_exec_item<2> ei(item);
-
-      // init ifmha forward op and arguments
-      ifmha_forward_op_t ifmha_fwd_op;
-      typename ifmha_forward_op_t::arguments_t args(
-          query,
-          key0,
-          key1,
-          value0,
-          value1,
-          index,
-          alibi,
-          bias,
-          dropout,
-          dropout_prob,
-          sm_scale,
-          out,
-          num_batches,
-          beam,
-          num_heads,
-          head_size,
-          kv_len0,
-          kv_len1,
-          alibi_padding,
-          attn_mask_padding);
-
-      // call the functor
-      ifmha_fwd_op(ei, args);
-        });
+    IfmhaForwardImplKernelFunctor<ifmha_forward_op_t, T> kfn(
+        query,
+        key0,
+        key1,
+        value0,
+        value1,
+        index,
+        alibi,
+        bias,
+        dropout,
+        dropout_prob,
+        sm_scale,
+        out,
+        num_batches,
+        beam,
+        num_heads,
+        head_size,
+        kv_len0,
+        kv_len1,
+        alibi_padding,
+        attn_mask_padding);
+    cgh.parallel_for<class IfmhaForwardKernel<
+        ifmha_policy,
+        T,
+        kUseAlibi,
+        kUseBias,
+        kIsTraining>>(NdRange, kfn);
   };
   DPCPP_Q_SUBMIT(q, cgf);
 }

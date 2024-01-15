@@ -74,6 +74,20 @@ struct hgemm_wint4_func {
     return "hgemm_wint4_func";
   }
 
+  template <typename gemm_op_t>
+  struct RunKernelFunctor {
+    SYCL_ESIMD_KERNEL void operator()(nd_item<3> item) const {
+      xetla_exec_item<3> ei(item);
+      slm_barrier_init<gemm_op_t>();
+      gemm_op_t gemm_op;
+      gemm_op(ei, gemm_arg);
+    }
+    RunKernelFunctor(gemm_op_t::arguments_t gemm_arg_) : gemm_arg(gemm_arg_) {}
+
+   private:
+    gemm_op_t::arguments_t gemm_arg;
+  };
+
   static inline void run(
       sycl::queue& queue,
       dtype_a* A,
@@ -104,12 +118,8 @@ struct hgemm_wint4_func {
     cl::sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
 
     auto cgf = DPCPP_Q_CGF(cgh) {
-      cgh.parallel_for(NDRange, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-        xetla_exec_item<3> ei(item);
-        slm_barrier_init<gemm_op_t>();
-        gemm_op_t gemm_op;
-        gemm_op(ei, gemm_arg);
-      });
+      RunKernelFunctor<gemm_op_t> kfn(gemm_arg);
+      cgh.parallel_for<decltype(kfn)>(NDRange, kfn);
     };
     DPCPP_Q_SUBMIT(queue, cgf);
   }

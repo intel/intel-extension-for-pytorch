@@ -750,6 +750,112 @@ struct kernel_xcoder_gru_bpi {
   }
 };
 
+template <typename gru_bpi_config_t, typename input>
+struct GruBackwardDataImplKernelFunctor {
+  SYCL_ESIMD_KERNEL void operator()(sycl::nd_item<3> item) const {
+    xetla_exec_item ei(item);
+    using xcoder_gru_bpi_op = kernel_xcoder_gru_bpi<
+        typename gru_bpi_config_t::input_T,
+        typename gru_bpi_config_t::Act_T,
+        gru_bpi_config_t::wg_tile_m,
+        gru_bpi_config_t::wg_tile_n_0,
+        gru_bpi_config_t::wg_tile_n_1,
+        gru_bpi_config_t::sg_tile_m,
+        gru_bpi_config_t::sg_tile_n_0,
+        gru_bpi_config_t::sg_tile_n_1,
+        gru_bpi_config_t::sg_tile_k>;
+    xcoder_gru_bpi_op::run(
+        ei,
+        (input*)layer_err_ptr,
+        (input*)y_err_ptr, /* inputs*/
+        (input*)x_grad_ptr,
+        (input*)bpi0_ptr,
+        (input*)bpi1_ptr,
+        (input*)partial_grad_ptr,
+        (input*)x0_grad_ptr, /* outputs*/
+        (input*)reset_gate_ptr,
+        (input*)input_gate_ptr,
+        (input*)new_gate_ptr,
+        (input*)hgate_2_ptr,
+        (input*)hidden_ptr, /*workspace*/
+        (input*)i_weights,
+        (input*)h_weights, /*weights*/
+        (float*)mask_ptr,
+        batch_size,
+        input_size,
+        hidden_size,
+        sequence_length,
+        layer_size,
+        dropout);
+  }
+  GruBackwardDataImplKernelFunctor(
+      void* layer_err_ptr_,
+      void* y_err_ptr_,
+      void* x_grad_ptr_,
+      void* bpi0_ptr_,
+      void* bpi1_ptr_,
+      void* partial_grad_ptr_,
+      void* x0_grad_ptr_,
+      void* reset_gate_ptr_,
+      void* input_gate_ptr_,
+      void* new_gate_ptr_,
+      void* hgate_2_ptr_,
+      void* hidden_ptr_,
+      void* i_weights_,
+      void* h_weights_,
+      void* mask_ptr_,
+      int batch_size_,
+      int input_size_,
+      int hidden_size_,
+      int sequence_length_,
+      int layer_size_,
+      float dropout_)
+      : layer_err_ptr(layer_err_ptr_),
+        y_err_ptr(y_err_ptr_),
+        x_grad_ptr(x_grad_ptr_),
+        bpi0_ptr(bpi0_ptr_),
+        bpi1_ptr(bpi1_ptr_),
+        partial_grad_ptr(partial_grad_ptr_),
+        x0_grad_ptr(x0_grad_ptr_),
+        reset_gate_ptr(reset_gate_ptr_),
+        input_gate_ptr(input_gate_ptr_),
+        new_gate_ptr(new_gate_ptr_),
+        hgate_2_ptr(hgate_2_ptr_),
+        hidden_ptr(hidden_ptr_),
+        i_weights(i_weights_),
+        h_weights(h_weights_),
+        mask_ptr(mask_ptr_),
+        batch_size(batch_size_),
+        input_size(input_size_),
+        hidden_size(hidden_size_),
+        sequence_length(sequence_length_),
+        layer_size(layer_size_),
+        dropout(dropout_) {}
+
+ private:
+  void* layer_err_ptr;
+  void* y_err_ptr;
+  void* x_grad_ptr;
+  void* bpi0_ptr;
+  void* bpi1_ptr;
+  void* partial_grad_ptr;
+  void* x0_grad_ptr;
+  void* reset_gate_ptr;
+  void* input_gate_ptr;
+  void* new_gate_ptr;
+  void* hgate_2_ptr;
+  void* hidden_ptr;
+  void* i_weights;
+  void* h_weights;
+  void* mask_ptr;
+  int batch_size;
+  int input_size;
+  int hidden_size;
+  int sequence_length;
+  int layer_size;
+  float dropout;
+};
+
 // extern "C"
 template <typename gru_bpi_config_t>
 void gru_backward_data_impl(
@@ -800,42 +906,29 @@ void gru_backward_data_impl(
   cl::sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(Range, [=](sycl::nd_item<3> item) SYCL_ESIMD_KERNEL {
-      xetla_exec_item ei(item);
-      using xcoder_gru_bpi_op = kernel_xcoder_gru_bpi<
-          typename gru_bpi_config_t::input_T,
-          typename gru_bpi_config_t::Act_T,
-          gru_bpi_config_t::wg_tile_m,
-          gru_bpi_config_t::wg_tile_n_0,
-          gru_bpi_config_t::wg_tile_n_1,
-          gru_bpi_config_t::sg_tile_m,
-          gru_bpi_config_t::sg_tile_n_0,
-          gru_bpi_config_t::sg_tile_n_1,
-          gru_bpi_config_t::sg_tile_k>;
-      xcoder_gru_bpi_op::run(
-          ei,
-          (input*)layer_err_ptr,
-          (input*)y_err_ptr, /* inputs*/
-          (input*)x_grad_ptr,
-          (input*)bpi0_ptr,
-          (input*)bpi1_ptr,
-          (input*)partial_grad_ptr,
-          (input*)x0_grad_ptr, /* outputs*/
-          (input*)reset_gate_ptr,
-          (input*)input_gate_ptr,
-          (input*)new_gate_ptr,
-          (input*)hgate_2_ptr,
-          (input*)hidden_ptr, /*workspace*/
-          (input*)i_weights,
-          (input*)h_weights, /*weights*/
-          (float*)mask_ptr,
-          batch_size,
-          input_size,
-          hidden_size,
-          sequence_length,
-          layer_size,
-          dropout);
-    });
+    GruBackwardDataImplKernelFunctor<gru_bpi_config_t, input> kfn(
+        layer_err_ptr,
+        y_err_ptr,
+        x_grad_ptr,
+        bpi0_ptr,
+        bpi1_ptr,
+        partial_grad_ptr,
+        x0_grad_ptr,
+        reset_gate_ptr,
+        input_gate_ptr,
+        new_gate_ptr,
+        hgate_2_ptr,
+        hidden_ptr,
+        i_weights,
+        h_weights,
+        mask_ptr,
+        batch_size,
+        input_size,
+        hidden_size,
+        sequence_length,
+        layer_size,
+        dropout);
+    cgh.parallel_for<decltype(kfn)>(Range, kfn);
   };
   DPCPP_Q_SUBMIT(Queue, cgf);
 }

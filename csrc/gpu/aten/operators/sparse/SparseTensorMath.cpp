@@ -39,6 +39,50 @@ using indexT = int64_t;
 namespace impl {
 
 template <typename Op, typename IndexType, typename Real>
+struct SparseElementwiseKernellFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    IndexType ind_skip = indices.strides[0];
+    IndexType ind_nnz_skip = indices.strides[1];
+    IndexType value_size = values.strides[0];
+
+    for (IndexType linearId = (IndexType)item.get_group_linear_id();
+         linearId < nnz;
+         linearId += (IndexType)item.get_group_range()[0]) {
+      IndexType index = 0;
+      for (IndexType d = 0; d < indices.sizes[0]; d++) {
+        index = dense.sizes[d] * index +
+            indices.data[d * ind_skip + linearId * ind_nnz_skip];
+      }
+      Real* dst = dense.data + index * value_size;
+      Real* src = values.data + linearId * value_size;
+      for (IndexType linearId2 = (IndexType)item.get_local_id()[0];
+           linearId2 < value_size;
+           linearId2 += (IndexType)item.get_local_range()[0]) {
+        op(dst + linearId2, src + linearId2);
+      }
+    }
+  }
+  SparseElementwiseKernellFunctor(
+      Op op,
+      TensorInfo<Real, IndexType> dense_info,
+      TensorInfo<indexT, IndexType> indices_info,
+      TensorInfo<Real, IndexType> values_info,
+      const IndexType nnz_value)
+      : op(op),
+        dense(dense_info),
+        indices(indices_info),
+        values(values_info),
+        nnz(nnz_value) {}
+
+ private:
+  Op op;
+  TensorInfo<Real, IndexType> dense;
+  TensorInfo<indexT, IndexType> indices;
+  TensorInfo<Real, IndexType> values;
+  const IndexType nnz;
+};
+
+template <typename Op, typename IndexType, typename Real>
 void sparse_elementwise_kernel(
     Op op,
     TensorInfo<Real, IndexType> dense,
@@ -57,28 +101,8 @@ void sparse_elementwise_kernel(
   auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      IndexType ind_skip = indices.strides[0];
-      IndexType ind_nnz_skip = indices.strides[1];
-      IndexType value_size = values.strides[0];
-
-      for (IndexType linearId = (IndexType)item.get_group_linear_id();
-           linearId < nnz;
-           linearId += (IndexType)item.get_group_range()[0]) {
-        IndexType index = 0;
-        for (IndexType d = 0; d < indices.sizes[0]; d++) {
-          index = dense.sizes[d] * index +
-              indices.data[d * ind_skip + linearId * ind_nnz_skip];
-        }
-        Real* dst = dense.data + index * value_size;
-        Real* src = values.data + linearId * value_size;
-        for (IndexType linearId2 = (IndexType)item.get_local_id()[0];
-             linearId2 < value_size;
-             linearId2 += (IndexType)item.get_local_range()[0]) {
-          op(dst + linearId2, src + linearId2);
-        }
-      }
-    };
+    SparseElementwiseKernellFunctor<Op, IndexType, Real> kfn(
+        op, dense, indices, values, nnz);
 
     // kick off for kernel
     cgh.parallel_for(
@@ -88,6 +112,47 @@ void sparse_elementwise_kernel(
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <typename Op, typename IndexType, typename Real>
+struct SparseElementwiseKernelScalarFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    IndexType ind_skip = indices.strides[0];
+    IndexType ind_nnz_skip = indices.strides[1];
+    IndexType value_skip = values.strides[0];
+
+    for (IndexType linearId = (IndexType)item.get_group_linear_id() *
+                 (IndexType)item.get_local_range()[0] +
+             (IndexType)item.get_local_id()[0];
+         linearId < nnz;
+         linearId += (IndexType)item.get_group_range()[0] *
+             (IndexType)item.get_local_range()[0]) {
+      IndexType index = 0;
+      for (IndexType d = 0; d < indices.sizes[0]; d++) {
+        index = dense.sizes[d] * index +
+            indices.data[d * ind_skip + linearId * ind_nnz_skip];
+      }
+      op(dense.data + index, values.data + linearId * value_skip);
+    }
+  }
+  SparseElementwiseKernelScalarFunctor(
+      Op op,
+      TensorInfo<Real, IndexType> dense_info,
+      TensorInfo<indexT, IndexType> indices_info,
+      TensorInfo<Real, IndexType> values_info,
+      const IndexType nnz_value)
+      : op(op),
+        dense(dense_info),
+        indices(indices_info),
+        values(values_info),
+        nnz(nnz_value) {}
+
+ private:
+  Op op;
+  TensorInfo<Real, IndexType> dense;
+  TensorInfo<indexT, IndexType> indices;
+  TensorInfo<Real, IndexType> values;
+  const IndexType nnz;
+};
 
 template <typename Op, typename IndexType, typename Real>
 void sparse_elementwise_kernel_scalar(
@@ -108,25 +173,8 @@ void sparse_elementwise_kernel_scalar(
   auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      IndexType ind_skip = indices.strides[0];
-      IndexType ind_nnz_skip = indices.strides[1];
-      IndexType value_skip = values.strides[0];
-
-      for (IndexType linearId = (IndexType)item.get_group_linear_id() *
-                   (IndexType)item.get_local_range()[0] +
-               (IndexType)item.get_local_id()[0];
-           linearId < nnz;
-           linearId += (IndexType)item.get_group_range()[0] *
-               (IndexType)item.get_local_range()[0]) {
-        IndexType index = 0;
-        for (IndexType d = 0; d < indices.sizes[0]; d++) {
-          index = dense.sizes[d] * index +
-              indices.data[d * ind_skip + linearId * ind_nnz_skip];
-        }
-        op(dense.data + index, values.data + linearId * value_skip);
-      }
-    };
+    SparseElementwiseKernelScalarFunctor<Op, IndexType, Real> kfn(
+        op, dense, indices, values, nnz);
     // kick off for kernel
     cgh.parallel_for(
         sycl::nd_range<1>(

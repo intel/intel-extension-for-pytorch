@@ -32,6 +32,20 @@ struct hgemm_caller {
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
   using args_t = epilogue_t::arguments_t;
 
+  template <typename gemm_op_t>
+  struct HgemmCallerKernelFunctor {
+    SYCL_ESIMD_KERNEL void operator()(nd_item<3> item) const {
+      xetla_exec_item<3> ei(item);
+      slm_barrier_init<gemm_op_t>();
+      gemm_op_t gemm_op;
+      gemm_op(ei, arg);
+    }
+    HgemmCallerKernelFunctor(gemm_op_t::arguments_t arg_) : arg(arg_) {}
+
+   private:
+    gemm_op_t::arguments_t arg;
+  };
+
   void operator()(
       sycl::queue& queue,
       scalar_t* out,
@@ -95,12 +109,8 @@ struct hgemm_caller {
         args);
 
     auto cgf = DPCPP_Q_CGF(cgh) {
-      cgh.parallel_for(NDRange, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-        xetla_exec_item<3> ei(item);
-        slm_barrier_init<gemm_op_t>();
-        gemm_op_t gemm_op;
-        gemm_op(ei, arg);
-      });
+      HgemmCallerKernelFunctor<gemm_op_t> kfn(arg);
+      cgh.parallel_for<decltype(kfn)>(NDRange, kfn);
     };
     DPCPP_Q_SUBMIT(queue, cgf);
   }
@@ -629,6 +639,123 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
+    bool B_ROW_MAJOR,
+    mem_layout layout_a,
+    mem_layout layout_b>
+struct HgemmQKVKernelFunctor {
+  SYCL_ESIMD_KERNEL void operator()(nd_item<3> item) const {
+    xetla_exec_item<3> ei(item);
+
+    using data_type_b = scalar_t;
+    using data_type_a = scalar_t;
+    using data_type_c = scalar_t;
+    using data_type_acc = float;
+    static constexpr uint32_t periodic_sync_interval = SYNC_FREQ;
+    static constexpr uint32_t prefetch_distance = STAGES;
+    using tile_shape = tile_shape_t<WG_N, WG_M, SG_N, SG_M>;
+
+    using brgemm_t = typename brgemm_selector_t<
+        data_type_a,
+        data_type_b,
+        layout_a,
+        layout_b,
+        mem_space::global,
+        mem_space::global,
+        8,
+        8,
+        data_type_acc,
+        tile_shape,
+        SG_K,
+        mma_engine::xmx,
+        gpu_arch::Xe,
+        prefetch_distance,
+        periodic_sync_interval>::brgemm;
+    using epilogue_t = epilogue_t<
+        epilogue_policy_tile_op<chained_tile_op_t<>, gpu_arch::Xe>,
+        tile_shape,
+        mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
+    using gemm_op_t = gemm_t<
+        dispatch_policy_kslicing<L3_KS, SLM_KS, gpu_arch::Xe>,
+        brgemm_t,
+        epilogue_t>;
+
+    uint32_t batch_id = ei.get_group(0);
+    slm_barrier_init<gemm_op_t>();
+    scalar_t* out = (batch_id <= group - 3)
+        ? out0 + batch_id * size_o
+        : ((batch_id == group - 2) ? out1 : out2);
+
+    typename gemm_op_t::arguments_t arg(
+        m,
+        k,
+        n,
+        const_cast<scalar_t*>(a),
+        lda,
+        const_cast<scalar_t*>(b) + size_b * batch_id,
+        ldb,
+        out,
+        ldc);
+    gemm_op_t gemm_op;
+    gemm_op(ei, arg);
+  }
+  HgemmQKVKernelFunctor(
+      scalar_t* out0,
+      scalar_t* out1,
+      scalar_t* out2,
+      const scalar_t* a,
+      const scalar_t* b,
+      const int m,
+      const int n,
+      const int k,
+      const int group,
+      uint32_t lda,
+      uint32_t ldb,
+      uint32_t ldc,
+      uint32_t size_b,
+      uint32_t size_o)
+      : out0(out0),
+        out1(out1),
+        out2(out2),
+        a(a),
+        b(b),
+        m(m),
+        n(n),
+        k(k),
+        group(group),
+        lda(lda),
+        ldb(ldb),
+        ldc(ldc),
+        size_b(size_b),
+        size_o(size_o) {}
+
+ private:
+  scalar_t* out0;
+  scalar_t* out1;
+  scalar_t* out2;
+  const scalar_t* a;
+  const scalar_t* b;
+  const int m;
+  const int n;
+  const int k;
+  const int group;
+  uint32_t lda;
+  uint32_t ldb;
+  uint32_t ldc;
+  uint32_t size_b;
+  uint32_t size_o;
+};
+
+template <
+    typename scalar_t,
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES,
     bool B_ROW_MAJOR>
 inline void hgemm_qkv(
     sycl::queue& queue,
@@ -659,64 +786,167 @@ inline void hgemm_qkv(
   cl::sycl::nd_range<3> NDRange(GroupRange * LocalRange, LocalRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(NDRange, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-      xetla_exec_item<3> ei(item);
-
-      using data_type_b = scalar_t;
-      using data_type_a = scalar_t;
-      using data_type_c = scalar_t;
-      using data_type_acc = float;
-      static constexpr uint32_t periodic_sync_interval = SYNC_FREQ;
-      static constexpr uint32_t prefetch_distance = STAGES;
-      using tile_shape = tile_shape_t<WG_N, WG_M, SG_N, SG_M>;
-
-      using brgemm_t = typename brgemm_selector_t<
-          data_type_a,
-          data_type_b,
-          layout_a,
-          layout_b,
-          mem_space::global,
-          mem_space::global,
-          8,
-          8,
-          data_type_acc,
-          tile_shape,
-          SG_K,
-          mma_engine::xmx,
-          gpu_arch::Xe,
-          prefetch_distance,
-          periodic_sync_interval>::brgemm;
-      using epilogue_t = epilogue_t<
-          epilogue_policy_tile_op<chained_tile_op_t<>, gpu_arch::Xe>,
-          tile_shape,
-          mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
-      using gemm_op_t = gemm_t<
-          dispatch_policy_kslicing<L3_KS, SLM_KS, gpu_arch::Xe>,
-          brgemm_t,
-          epilogue_t>;
-
-      uint32_t batch_id = ei.get_group(0);
-      slm_barrier_init<gemm_op_t>();
-      scalar_t* out = (batch_id <= group - 3)
-          ? out0 + batch_id * size_o
-          : ((batch_id == group - 2) ? out1 : out2);
-
-      typename gemm_op_t::arguments_t arg(
-          m,
-          k,
-          n,
-          const_cast<scalar_t*>(a),
-          lda,
-          const_cast<scalar_t*>(b) + size_b * batch_id,
-          ldb,
-          out,
-          ldc);
-      gemm_op_t gemm_op;
-      gemm_op(ei, arg);
-    });
+    HgemmQKVKernelFunctor<
+        scalar_t,
+        WG_M,
+        WG_N,
+        SG_M,
+        SG_N,
+        SG_K,
+        SLM_KS,
+        L3_KS,
+        SYNC_FREQ,
+        STAGES,
+        B_ROW_MAJOR,
+        layout_a,
+        layout_b>
+        kfn(out0,
+            out1,
+            out2,
+            a,
+            b,
+            m,
+            n,
+            k,
+            group,
+            lda,
+            ldb,
+            ldc,
+            size_b,
+            size_o);
+    cgh.parallel_for<decltype(kfn)>(NDRange, kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <
+    typename scalar_t,
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES,
+    bool B_ROW_MAJOR,
+    mem_layout layout_a,
+    mem_layout layout_b>
+struct HgemmQKVBiasKernelFunctor {
+  SYCL_ESIMD_KERNEL void operator()(nd_item<3> item) const {
+    xetla_exec_item<3> ei(item);
+
+    using data_type_b = scalar_t;
+    using data_type_a = scalar_t;
+    using data_type_c = scalar_t;
+    using data_type_bias = scalar_t;
+    using data_type_acc = float;
+    static constexpr uint32_t periodic_sync_interval = SYNC_FREQ;
+    static constexpr uint32_t prefetch_distance = STAGES;
+    using tile_shape = tile_shape_t<WG_N, WG_M, SG_N, SG_M>;
+
+    using brgemm_t = typename brgemm_selector_t<
+        data_type_a,
+        data_type_b,
+        layout_a,
+        layout_b,
+        mem_space::global,
+        mem_space::global,
+        8,
+        8,
+        data_type_acc,
+        tile_shape,
+        SG_K,
+        mma_engine::xmx,
+        gpu_arch::Xe,
+        prefetch_distance,
+        periodic_sync_interval>::brgemm;
+    using epilogue_t = epilogue_t<
+        epilogue_policy_tile_op<
+            chained_tile_op_t<epilogue_impl::bias_op_t<data_type_bias>>,
+            gpu_arch::Xe>,
+        tile_shape,
+        mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
+    using gemm_op_t = gemm_t<
+        dispatch_policy_kslicing<L3_KS, SLM_KS, gpu_arch::Xe>,
+        brgemm_t,
+        epilogue_t>;
+
+    uint32_t batch_id = ei.get_group(0);
+    slm_barrier_init<gemm_op_t>();
+    scalar_t* out = (batch_id <= group - 3)
+        ? out0 + batch_id * size_o
+        : ((batch_id == group - 2) ? out1 : out2);
+
+    typename gemm_op_t::arguments_t arg(
+        m,
+        k,
+        n,
+        const_cast<scalar_t*>(a),
+        lda,
+        const_cast<scalar_t*>(b) + size_b * batch_id,
+        ldb,
+        out,
+        ldc,
+        {{{const_cast<scalar_t*>(bias) + size_bias * batch_id,
+           {n, 1, n},
+           {1}}}});
+    gemm_op_t gemm_op;
+    gemm_op(ei, arg);
+  }
+  HgemmQKVBiasKernelFunctor(
+      scalar_t* out0,
+      scalar_t* out1,
+      scalar_t* out2,
+      const scalar_t* a,
+      const scalar_t* b,
+      const scalar_t* bias,
+      const int m,
+      const int n,
+      const int k,
+      const int group,
+      uint32_t lda,
+      uint32_t ldb,
+      uint32_t ldc,
+      uint32_t size_b,
+      uint32_t size_o,
+      uint32_t size_bias)
+      : out0(out0),
+        out1(out1),
+        out2(out2),
+        a(a),
+        b(b),
+        bias(bias),
+        m(m),
+        n(n),
+        k(k),
+        group(group),
+        lda(lda),
+        ldb(ldb),
+        ldc(ldc),
+        size_b(size_b),
+        size_o(size_o),
+        size_bias(size_bias) {}
+
+ private:
+  scalar_t* out0;
+  scalar_t* out1;
+  scalar_t* out2;
+  const scalar_t* a;
+  const scalar_t* b;
+  const scalar_t* bias;
+  const int m;
+  const int n;
+  const int k;
+  const int group;
+  uint32_t lda;
+  uint32_t ldb;
+  uint32_t ldc;
+  uint32_t size_b;
+  uint32_t size_o;
+  uint32_t size_bias;
+};
 
 template <
     typename scalar_t,
@@ -761,67 +991,37 @@ inline void hgemm_qkv_bias(
   cl::sycl::nd_range<3> NDRange(GroupRange * LocalRange, LocalRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(NDRange, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-      xetla_exec_item<3> ei(item);
-
-      using data_type_b = scalar_t;
-      using data_type_a = scalar_t;
-      using data_type_c = scalar_t;
-      using data_type_bias = scalar_t;
-      using data_type_acc = float;
-      static constexpr uint32_t periodic_sync_interval = SYNC_FREQ;
-      static constexpr uint32_t prefetch_distance = STAGES;
-      using tile_shape = tile_shape_t<WG_N, WG_M, SG_N, SG_M>;
-
-      using brgemm_t = typename brgemm_selector_t<
-          data_type_a,
-          data_type_b,
-          layout_a,
-          layout_b,
-          mem_space::global,
-          mem_space::global,
-          8,
-          8,
-          data_type_acc,
-          tile_shape,
-          SG_K,
-          mma_engine::xmx,
-          gpu_arch::Xe,
-          prefetch_distance,
-          periodic_sync_interval>::brgemm;
-      using epilogue_t = epilogue_t<
-          epilogue_policy_tile_op<
-              chained_tile_op_t<epilogue_impl::bias_op_t<data_type_bias>>,
-              gpu_arch::Xe>,
-          tile_shape,
-          mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
-      using gemm_op_t = gemm_t<
-          dispatch_policy_kslicing<L3_KS, SLM_KS, gpu_arch::Xe>,
-          brgemm_t,
-          epilogue_t>;
-
-      uint32_t batch_id = ei.get_group(0);
-      slm_barrier_init<gemm_op_t>();
-      scalar_t* out = (batch_id <= group - 3)
-          ? out0 + batch_id * size_o
-          : ((batch_id == group - 2) ? out1 : out2);
-
-      typename gemm_op_t::arguments_t arg(
-          m,
-          k,
-          n,
-          const_cast<scalar_t*>(a),
-          lda,
-          const_cast<scalar_t*>(b) + size_b * batch_id,
-          ldb,
-          out,
-          ldc,
-          {{{const_cast<scalar_t*>(bias) + size_bias * batch_id,
-             {n, 1, n},
-             {1}}}});
-      gemm_op_t gemm_op;
-      gemm_op(ei, arg);
-    });
+    HgemmQKVBiasKernelFunctor<
+        scalar_t,
+        WG_M,
+        WG_N,
+        SG_M,
+        SG_N,
+        SG_K,
+        SLM_KS,
+        L3_KS,
+        SYNC_FREQ,
+        STAGES,
+        B_ROW_MAJOR,
+        layout_a,
+        layout_b>
+        kfn(out0,
+            out1,
+            out2,
+            a,
+            b,
+            bias,
+            m,
+            n,
+            k,
+            group,
+            lda,
+            ldb,
+            ldc,
+            size_b,
+            size_o,
+            size_bias);
+    cgh.parallel_for<decltype(kfn)>(NDRange, kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }

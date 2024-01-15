@@ -39,6 +39,75 @@ template <
     typename OP,
     typename InputType,
     typename OutputType>
+struct ElementWiseKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto in_data = in_data_;
+    auto out_data = out_data_;
+    auto id = item.get_global_linear_id();
+    ComputeType max = 0;
+    if (id < num_elements_) {
+      ComputeType s = 0;
+      if (is_fp8<OutputType>::value) {
+        if (scale_ != nullptr) {
+          s = *scale_;
+          if (id == 0 && scale_inv_ != nullptr) {
+            *scale_inv_ = sycl::native::recip(s);
+          }
+        }
+      }
+      ComputeType val = static_cast<ComputeType>(in_data[id]);
+      ComputeType temp = OP()(val, id, p_);
+      if (is_fp8<OutputType>::value && amax_ != nullptr) {
+        max = sycl::fmax(sycl::fabs(temp), max);
+        temp = temp * s;
+      }
+      out_data[id] = (OutputType)(temp);
+    }
+    if (is_fp8<OutputType>::value && amax_ != nullptr) {
+      auto group_max = sycl::reduce_over_group(
+          item.get_group(), max, sycl::maximum<ComputeType>());
+      if (item.get_local_linear_id() == 0) {
+        auto atm = sycl::atomic_ref<
+            float,
+            sycl::memory_order::relaxed,
+            sycl::memory_scope::device,
+            sycl::access::address_space::global_space>(*amax_);
+        atm.fetch_max(group_max);
+      }
+    }
+  }
+  ElementWiseKernelFunctor(
+      const InputType* in_data,
+      OutputType* out_data,
+      const ComputeType* scale,
+      ComputeType* scale_inv,
+      ComputeType* amax,
+      Param p,
+      int num_elements)
+      : in_data_(in_data),
+        out_data_(out_data),
+        scale_(scale),
+        scale_inv_(scale_inv),
+        amax_(amax),
+        p_(p),
+        num_elements_(num_elements) {}
+
+ private:
+  const InputType* in_data_;
+  OutputType* out_data_;
+  const ComputeType* scale_;
+  ComputeType* scale_inv_;
+  ComputeType* amax_;
+  Param p_;
+  int num_elements_;
+};
+
+template <
+    typename ComputeType,
+    typename Param,
+    typename OP,
+    typename InputType,
+    typename OutputType>
 void ElementWiseKernel(
     const InputType* in_,
     OutputType* out_,
@@ -57,42 +126,8 @@ void ElementWiseKernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data_ = in_;
     auto out_data_ = out_;
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto in_data = in_data_;
-      auto out_data = out_data_;
-      auto id = item.get_global_linear_id();
-      ComputeType max = 0;
-      if (id < num_elements_) {
-        ComputeType s = 0;
-        if (is_fp8<OutputType>::value) {
-          if (scale_ != nullptr) {
-            s = *scale_;
-            if (id == 0 && scale_inv_ != nullptr) {
-              *scale_inv_ = sycl::native::recip(s);
-            }
-          }
-        }
-        ComputeType val = static_cast<ComputeType>(in_data[id]);
-        ComputeType temp = OP()(val, id, p_);
-        if (is_fp8<OutputType>::value && amax_ != nullptr) {
-          max = sycl::fmax(sycl::fabs(temp), max);
-          temp = temp * s;
-        }
-        out_data[id] = (OutputType)(temp);
-      }
-      if (is_fp8<OutputType>::value && amax_ != nullptr) {
-        auto group_max = sycl::reduce_over_group(
-            item.get_group(), max, sycl::maximum<ComputeType>());
-        if (item.get_local_linear_id() == 0) {
-          auto atm = sycl::atomic_ref<
-              float,
-              sycl::memory_order::relaxed,
-              sycl::memory_scope::device,
-              sycl::access::address_space::global_space>(*amax_);
-          atm.fetch_max(group_max);
-        }
-      }
-    };
+    ElementWiseKernelFunctor<ComputeType, Param, OP, InputType, OutputType> kfn(
+        in_data_, out_data_, scale_, scale_inv_, amax_, p_, num_elements_);
 
     cgh.parallel_for(
         sycl::nd_range<1>(wgroup_num * wgroup_size, wgroup_size), kfn);

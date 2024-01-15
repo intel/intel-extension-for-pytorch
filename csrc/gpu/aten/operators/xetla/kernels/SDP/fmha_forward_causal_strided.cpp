@@ -723,6 +723,91 @@ template <
     bool kIsTraining>
 class FmhaForwardKernel;
 
+template <typename fmha_forward_op_t, typename T>
+struct FmhaForwardCausalStridedImplKernelFunctor {
+  SYCL_ESIMD_KERNEL void operator()(sycl::nd_item<3> item) const {
+    // exec item
+    xetla_exec_item<3> ei(item);
+
+    // init fmha forward op and arguments
+    fmha_forward_op_t fmha_fwd_op;
+    typename fmha_forward_op_t::arguments_t args(
+        query,
+        key,
+        value,
+        alibi,
+        bias,
+        dropout,
+        out,
+        num_batches,
+        num_heads,
+        head_size,
+        num_queries,
+        num_keys,
+        alpha,
+        dropout_prob,
+        alibi_padded_block_size,
+        attn_mask_padded_block_size);
+
+    // call the functor
+    fmha_fwd_op(ei, args);
+  }
+  FmhaForwardCausalStridedImplKernelFunctor(
+      T* query_,
+      T* key_,
+      T* value_,
+      T* alibi_,
+      T* bias_,
+      uint8_t* dropout_,
+      T* out_,
+      float alpha_,
+      float beta_,
+      float dropout_prob_,
+      uint32_t num_batches_,
+      uint32_t num_heads_,
+      uint32_t head_size_,
+      uint32_t num_queries_,
+      uint32_t num_keys_,
+      uint32_t alibi_padded_block_size_,
+      uint32_t attn_mask_padded_block_size_)
+      : query(query_),
+        key(key_),
+        value(value_),
+        alibi(alibi_),
+        bias(bias_),
+        dropout(dropout_),
+        out(out_),
+        alpha(alpha_),
+        beta(beta_),
+        dropout_prob(dropout_prob_),
+        num_batches(num_batches_),
+        num_heads(num_heads_),
+        head_size(head_size_),
+        num_queries(num_queries_),
+        num_keys(num_keys_),
+        alibi_padded_block_size(alibi_padded_block_size_),
+        attn_mask_padded_block_size(attn_mask_padded_block_size_) {}
+
+ private:
+  T* query;
+  T* key;
+  T* value;
+  T* alibi;
+  T* bias;
+  uint8_t* dropout;
+  T* out;
+  float alpha;
+  float beta;
+  float dropout_prob;
+  uint32_t num_batches;
+  uint32_t num_heads;
+  uint32_t head_size;
+  uint32_t num_queries;
+  uint32_t num_keys;
+  uint32_t alibi_padded_block_size;
+  uint32_t attn_mask_padded_block_size;
+};
+
 // The launcher of fmha forward kernel
 template <
     typename fmha_policy,
@@ -782,33 +867,25 @@ void fmha_forward_causal_strided_impl(
       fmha_forward_op_t::get_nd_range(num_batches * num_heads, num_queries);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(NdRange, [=](sycl::nd_item<3> item) SYCL_ESIMD_KERNEL {
-      // exec item
-      xetla_exec_item<3> ei(item);
-
-      // init fmha forward op and arguments
-      fmha_forward_op_t fmha_fwd_op;
-      typename fmha_forward_op_t::arguments_t args(
-          query,
-          key,
-          value,
-          alibi,
-          bias,
-          dropout,
-          out,
-          num_batches,
-          num_heads,
-          head_size,
-          num_queries,
-          num_keys,
-          alpha,
-          dropout_prob,
-          alibi_padded_block_size,
-          attn_mask_padded_block_size);
-
-      // call the functor
-      fmha_fwd_op(ei, args);
-    });
+    FmhaForwardCausalStridedImplKernelFunctor<fmha_forward_op_t, T> kfn(
+        query,
+        key,
+        value,
+        alibi,
+        bias,
+        dropout,
+        out,
+        alpha,
+        beta,
+        dropout_prob,
+        num_batches,
+        num_heads,
+        head_size,
+        num_queries,
+        num_keys,
+        alibi_padded_block_size,
+        attn_mask_padded_block_size);
+    cgh.parallel_for<decltype(kfn)>(NdRange, kfn);
   };
   DPCPP_Q_SUBMIT(q, cgf);
 

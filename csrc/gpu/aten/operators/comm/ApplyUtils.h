@@ -209,6 +209,40 @@ template <
     int ADims,
     int step,
     bool with_offset>
+struct KernelPointwiseApply1Functor {
+  void operator()(sycl::nd_item<1> item) const {
+    for (IndexType linearIndex = item.get_global_id(0) * step;
+         linearIndex < totalElements;
+         linearIndex += item.get_global_range()[0] * step) {
+      ApplyOp1<Op, scalar, IndexType, ADims, with_offset, step>::apply(
+          a,
+          op,
+          a_pointer,
+          sycl::min(step, static_cast<int>(totalElements - linearIndex)),
+          linearIndex);
+    }
+  }
+  KernelPointwiseApply1Functor(
+      TensorInfo<scalar, IndexType> a_,
+      IndexType totalElements_,
+      const Op op_,
+      void* a_pointer_)
+      : a(a_), totalElements(totalElements_), op(op_), a_pointer(a_pointer_) {}
+
+ private:
+  TensorInfo<scalar, IndexType> a;
+  IndexType totalElements;
+  const Op op;
+  void* a_pointer;
+};
+
+template <
+    typename Op,
+    typename scalar,
+    typename IndexType,
+    int ADims,
+    int step,
+    bool with_offset>
 void kernelPointwiseApply1(
     TensorInfo<scalar, IndexType> a,
     IndexType totalElements,
@@ -225,21 +259,18 @@ void kernelPointwiseApply1(
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     void* a_pointer = a.data;
-    cgh.parallel_for(
+    KernelPointwiseApply1Functor<
+        Op,
+        scalar,
+        IndexType,
+        ADims,
+        step,
+        with_offset>
+        kfn(a, totalElements, op, a_pointer);
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
-        [=](sycl::nd_item<1> item) {
-          for (IndexType linearIndex = item.get_global_id(0) * step;
-               linearIndex < totalElements;
-               linearIndex += item.get_global_range()[0] * step) {
-            ApplyOp1<Op, scalar, IndexType, ADims, with_offset, step>::apply(
-                a,
-                op,
-                a_pointer,
-                sycl::min(step, static_cast<int>(totalElements - linearIndex)),
-                linearIndex);
-          }
-        });
+        kfn);
   };
 
   // launch kernel
@@ -417,6 +448,62 @@ template <
     int BDims,
     int step,
     bool with_offset>
+struct KernelPointwiseApply2Functor {
+  void operator()(sycl::nd_item<1> item) const {
+    for (IndexType linearIndex = item.get_global_id(0) * step;
+         linearIndex < totalElements;
+         linearIndex += item.get_global_range()[0] * step) {
+      ApplyOp2<
+          Op,
+          scalar1,
+          scalar2,
+          IndexType,
+          ADims,
+          BDims,
+          with_offset,
+          step>::
+          apply(
+              output,
+              input,
+              op,
+              out_ptr,
+              in_ptr,
+              sycl::min(step, static_cast<int>(totalElements - linearIndex)),
+              linearIndex);
+    }
+  }
+  KernelPointwiseApply2Functor(
+      TensorInfo<scalar1, IndexType> output_,
+      TensorInfo<scalar2, IndexType> input_,
+      IndexType totalElements_,
+      const Op op_,
+      void* in_ptr_,
+      void* out_ptr_)
+      : output(output_),
+        input(input_),
+        totalElements(totalElements_),
+        op(op_),
+        in_ptr(in_ptr_),
+        out_ptr(out_ptr_) {}
+
+ private:
+  TensorInfo<scalar1, IndexType> output;
+  TensorInfo<scalar2, IndexType> input;
+  IndexType totalElements;
+  const Op op;
+  void* in_ptr;
+  void* out_ptr;
+};
+
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    int step,
+    bool with_offset>
 void kernelPointwiseApply2(
     TensorInfo<scalar1, IndexType> output,
     TensorInfo<scalar2, IndexType> input,
@@ -436,33 +523,20 @@ void kernelPointwiseApply2(
   auto cgf = DPCPP_Q_CGF(cgh) {
     void* in_ptr = input.data;
     void* out_ptr = output.data;
-    cgh.parallel_for(
+    KernelPointwiseApply2Functor<
+        Op,
+        scalar1,
+        scalar2,
+        IndexType,
+        ADims,
+        BDims,
+        step,
+        with_offset>
+        kfn(output, input, totalElements, op, in_ptr, out_ptr);
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
-        [=](sycl::nd_item<1> item) {
-          for (IndexType linearIndex = item.get_global_id(0) * step;
-               linearIndex < totalElements;
-               linearIndex += item.get_global_range()[0] * step) {
-            ApplyOp2<
-                Op,
-                scalar1,
-                scalar2,
-                IndexType,
-                ADims,
-                BDims,
-                with_offset,
-                step>::
-                apply(
-                    output,
-                    input,
-                    op,
-                    out_ptr,
-                    in_ptr,
-                    sycl::min(
-                        step, static_cast<int>(totalElements - linearIndex)),
-                    linearIndex);
-          }
-        });
+        kfn);
   };
 
   // launch kernel
@@ -634,6 +708,72 @@ template <
     int BDims,
     int CDims,
     int step>
+struct KernelPointwiseApply3Functor {
+  void operator()(sycl::nd_item<1> item) const {
+    for (IndexType linearIndex = item.get_global_id(0) * step;
+         linearIndex < totalElements;
+         linearIndex += item.get_global_range()[0] * step) {
+      ApplyOp3<
+          Op,
+          scalar1,
+          scalar2,
+          scalar3,
+          IndexType,
+          ADims,
+          BDims,
+          CDims,
+          step>::
+          apply(
+              output,
+              input1,
+              input2,
+              op,
+              out_ptr,
+              in1_ptr,
+              in2_ptr,
+              sycl::min(step, static_cast<int>(totalElements - linearIndex)),
+              linearIndex);
+    }
+  }
+  KernelPointwiseApply3Functor(
+      TensorInfo<scalar1, IndexType> output_,
+      TensorInfo<scalar2, IndexType> input1_,
+      TensorInfo<scalar3, IndexType> input2_,
+      IndexType totalElements_,
+      const Op op_,
+      void* in1_ptr_,
+      void* in2_ptr_,
+      void* out_ptr_)
+      : output(output_),
+        input1(input1_),
+        input2(input2_),
+        totalElements(totalElements_),
+        op(op_),
+        in1_ptr(in1_ptr_),
+        in2_ptr(in2_ptr_),
+        out_ptr(out_ptr_) {}
+
+ private:
+  TensorInfo<scalar1, IndexType> output;
+  TensorInfo<scalar2, IndexType> input1;
+  TensorInfo<scalar3, IndexType> input2;
+  IndexType totalElements;
+  const Op op;
+  void* in1_ptr;
+  void* in2_ptr;
+  void* out_ptr;
+};
+
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    int CDims,
+    int step>
 void kernelPointwiseApply3(
     TensorInfo<scalar1, IndexType> output,
     TensorInfo<scalar2, IndexType> input1,
@@ -654,36 +794,28 @@ void kernelPointwiseApply3(
     void* in1_ptr = input1.data;
     void* in2_ptr = input2.data;
     void* out_ptr = output.data;
-    cgh.parallel_for(
+    KernelPointwiseApply3Functor<
+        Op,
+        scalar1,
+        scalar2,
+        scalar3,
+        IndexType,
+        ADims,
+        BDims,
+        CDims,
+        step>
+        kfn(output,
+            input1,
+            input2,
+            totalElements,
+            op,
+            in1_ptr,
+            in2_ptr,
+            out_ptr);
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
-        [=](sycl::nd_item<1> item) {
-          for (IndexType linearIndex = item.get_global_id(0) * step;
-               linearIndex < totalElements;
-               linearIndex += item.get_global_range()[0] * step) {
-            ApplyOp3<
-                Op,
-                scalar1,
-                scalar2,
-                scalar3,
-                IndexType,
-                ADims,
-                BDims,
-                CDims,
-                step>::
-                apply(
-                    output,
-                    input1,
-                    input2,
-                    op,
-                    out_ptr,
-                    in1_ptr,
-                    in2_ptr,
-                    sycl::min(
-                        step, static_cast<int>(totalElements - linearIndex)),
-                    linearIndex);
-          }
-        });
+        kfn);
   };
 
   // launch kernel
@@ -888,6 +1020,84 @@ template <
     int CDims,
     int DDims,
     int step>
+struct KernelPointwiseApply4Functor {
+  void operator()(sycl::nd_item<1> item) const {
+    for (IndexType linearIndex = item.get_global_id(0) * step;
+         linearIndex < totalElements;
+         linearIndex += item.get_global_range()[0] * step) {
+      ApplyOp4<
+          Op,
+          scalar1,
+          scalar2,
+          scalar3,
+          scalar4,
+          IndexType,
+          ADims,
+          BDims,
+          CDims,
+          DDims,
+          step>::
+          apply(
+              output,
+              input1,
+              input2,
+              input3,
+              op,
+              out_ptr,
+              in1_ptr,
+              in2_ptr,
+              in3_ptr,
+              sycl::min(step, static_cast<int>(totalElements - linearIndex)),
+              linearIndex);
+    }
+  }
+  KernelPointwiseApply4Functor(
+      TensorInfo<scalar1, IndexType> output_,
+      TensorInfo<scalar2, IndexType> input1_,
+      TensorInfo<scalar3, IndexType> input2_,
+      TensorInfo<scalar4, IndexType> input3_,
+      IndexType totalElements_,
+      const Op op_,
+      void* in1_ptr_,
+      void* in2_ptr_,
+      void* in3_ptr_,
+      void* out_ptr_)
+      : output(output_),
+        input1(input1_),
+        input2(input2_),
+        input3(input3_),
+        totalElements(totalElements_),
+        op(op_),
+        in1_ptr(in1_ptr_),
+        in2_ptr(in2_ptr_),
+        in3_ptr(in3_ptr_),
+        out_ptr(out_ptr_) {}
+
+ private:
+  TensorInfo<scalar1, IndexType> output;
+  TensorInfo<scalar2, IndexType> input1;
+  TensorInfo<scalar3, IndexType> input2;
+  TensorInfo<scalar4, IndexType> input3;
+  IndexType totalElements;
+  const Op op;
+  void* in1_ptr;
+  void* in2_ptr;
+  void* in3_ptr;
+  void* out_ptr;
+};
+
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    typename scalar4,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    int CDims,
+    int DDims,
+    int step>
 void kernelPointwiseApply4(
     TensorInfo<scalar1, IndexType> output,
     TensorInfo<scalar2, IndexType> input1,
@@ -910,40 +1120,32 @@ void kernelPointwiseApply4(
     void* in2_ptr = input2.data;
     void* in3_ptr = input3.data;
     void* out_ptr = output.data;
-    cgh.parallel_for(
+    KernelPointwiseApply4Functor<
+        Op,
+        scalar1,
+        scalar2,
+        scalar3,
+        scalar4,
+        IndexType,
+        ADims,
+        BDims,
+        CDims,
+        DDims,
+        step>
+        kfn(output,
+            input1,
+            input2,
+            input3,
+            totalElements,
+            op,
+            in1_ptr,
+            in2_ptr,
+            in3_ptr,
+            out_ptr);
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
-        [=](sycl::nd_item<1> item) {
-          for (IndexType linearIndex = item.get_global_id(0) * step;
-               linearIndex < totalElements;
-               linearIndex += item.get_global_range()[0] * step) {
-            ApplyOp4<
-                Op,
-                scalar1,
-                scalar2,
-                scalar3,
-                scalar4,
-                IndexType,
-                ADims,
-                BDims,
-                CDims,
-                DDims,
-                step>::
-                apply(
-                    output,
-                    input1,
-                    input2,
-                    input3,
-                    op,
-                    out_ptr,
-                    in1_ptr,
-                    in2_ptr,
-                    in3_ptr,
-                    sycl::min(
-                        step, static_cast<int>(totalElements - linearIndex)),
-                    linearIndex);
-          }
-        });
+        kfn);
   };
 
   // launch kernel
