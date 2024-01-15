@@ -226,6 +226,106 @@ int get_vector_size(at::Tensor self, at::Tensor ret, at::Tensor mask) {
   return can_vectorize ? vec_size : 1;
 }
 
+template <
+    typename mask_t,
+    typename scalar_t,
+    typename accscalar_t,
+    typename index_t>
+struct DropoutTemplateKernelFunctor {
+  void operator()(sycl::item<1> item) const {
+    fused_dropout_kernel<scalar_t, accscalar_t, index_t>(
+        item, self_info, ret_info, mask_info, nelem, pa, rng_engine_inputs);
+  }
+  DropoutTemplateKernelFunctor(
+      TensorInfo<scalar_t, index_t> self_info_,
+      TensorInfo<scalar_t, index_t> ret_info_,
+      TensorInfo<mask_t, index_t> mask_info_,
+      int64_t nelem_,
+      accscalar_t pa_,
+      PhiloxState rng_engine_inputs_)
+      : self_info(self_info_),
+        ret_info(ret_info_),
+        mask_info(mask_info_),
+        nelem(nelem_),
+        pa(pa_),
+        rng_engine_inputs(rng_engine_inputs_) {}
+
+ private:
+  TensorInfo<scalar_t, index_t> self_info;
+  TensorInfo<scalar_t, index_t> ret_info;
+  TensorInfo<mask_t, index_t> mask_info;
+  int64_t nelem;
+  accscalar_t pa;
+  PhiloxState rng_engine_inputs;
+};
+
+template <
+    typename mask_t,
+    typename scalar_t,
+    typename accscalar_t,
+    typename index_t,
+    int Num>
+struct DropoutTemplateKernelFunctor2 {
+  void operator()(sycl::nd_item<1> item) const {
+    fused_dropout_kernel_vec<scalar_t, accscalar_t, index_t, Num>(
+        item, self_info, ret_info, mask_info, nelem, pa, rng_engine_inputs);
+  }
+  DropoutTemplateKernelFunctor2(
+      TensorInfo<scalar_t, index_t> self_info_,
+      TensorInfo<scalar_t, index_t> ret_info_,
+      TensorInfo<mask_t, index_t> mask_info_,
+      int64_t nelem_,
+      accscalar_t pa_,
+      PhiloxState rng_engine_inputs_)
+      : self_info(self_info_),
+        ret_info(ret_info_),
+        mask_info(mask_info_),
+        nelem(nelem_),
+        pa(pa_),
+        rng_engine_inputs(rng_engine_inputs_) {}
+
+ private:
+  TensorInfo<scalar_t, index_t> self_info;
+  TensorInfo<scalar_t, index_t> ret_info;
+  TensorInfo<mask_t, index_t> mask_info;
+  int64_t nelem;
+  accscalar_t pa;
+  PhiloxState rng_engine_inputs;
+};
+
+template <
+    typename mask_t,
+    typename scalar_t,
+    typename accscalar_t,
+    typename index_t>
+struct DropoutTemplateKernelFunctor3 {
+  void operator()(sycl::nd_item<1> item) const {
+    fused_dropout_kernel_unroll<scalar_t, accscalar_t, index_t>(
+        item, self_info, ret_info, mask_info, nelem, pa, rng_engine_inputs);
+  }
+  DropoutTemplateKernelFunctor3(
+      TensorInfo<scalar_t, index_t> self_info_,
+      TensorInfo<scalar_t, index_t> ret_info_,
+      TensorInfo<mask_t, index_t> mask_info_,
+      int64_t nelem_,
+      accscalar_t pa_,
+      PhiloxState rng_engine_inputs_)
+      : self_info(self_info_),
+        ret_info(ret_info_),
+        mask_info(mask_info_),
+        nelem(nelem_),
+        pa(pa_),
+        rng_engine_inputs(rng_engine_inputs_) {}
+
+ private:
+  TensorInfo<scalar_t, index_t> self_info;
+  TensorInfo<scalar_t, index_t> ret_info;
+  TensorInfo<mask_t, index_t> mask_info;
+  int64_t nelem;
+  accscalar_t pa;
+  PhiloxState rng_engine_inputs;
+};
+
 template <typename mask_t>
 std::tuple<Tensor, Tensor> dropout_template(
     DPCPPGeneratorImpl* gen,
@@ -284,16 +384,13 @@ std::tuple<Tensor, Tensor> dropout_template(
         auto& q = dpcppGetCurrentQueue();
         if (need_not_rand4) {
           auto cgf = DPCPP_Q_CGF(cgh) {
-            auto kfn = DPCPP_Q_KFN(sycl::item<1> item) {
-              fused_dropout_kernel<scalar_t, accscalar_t, index_t>(
-                  item,
-                  self_info,
-                  ret_info,
-                  mask_info,
-                  nelem,
-                  pa,
-                  rng_engine_inputs);
-            };
+            DropoutTemplateKernelFunctor<mask_t, scalar_t, accscalar_t, index_t>
+                kfn(self_info,
+                    ret_info,
+                    mask_info,
+                    nelem,
+                    pa,
+                    rng_engine_inputs);
             cgh.parallel_for(sycl::range<1>(nelem), kfn);
           };
           DPCPP_Q_SUBMIT(q, cgf);
@@ -305,48 +402,55 @@ std::tuple<Tensor, Tensor> dropout_template(
             case 8:
             case 4: {
               auto cgf = DPCPP_Q_CGF(cgh) {
-                auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-                  fused_dropout_kernel_vec<scalar_t, accscalar_t, index_t, 4>(
-                      item,
-                      self_info,
-                      ret_info,
-                      mask_info,
-                      nelem,
-                      pa,
-                      rng_engine_inputs);
-                };
+                constexpr int Num = 4;
+                DropoutTemplateKernelFunctor2<
+                    mask_t,
+                    scalar_t,
+                    accscalar_t,
+                    index_t,
+                    Num>
+                    kfn(self_info,
+                        ret_info,
+                        mask_info,
+                        nelem,
+                        pa,
+                        rng_engine_inputs);
                 cgh.parallel_for(sycl::nd_range<1>(glb_range, loc_range), kfn);
               };
               DPCPP_Q_SUBMIT(q, cgf);
             } break;
             case 2: {
               auto cgf = DPCPP_Q_CGF(cgh) {
-                auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-                  fused_dropout_kernel_vec<scalar_t, accscalar_t, index_t, 2>(
-                      item,
-                      self_info,
-                      ret_info,
-                      mask_info,
-                      nelem,
-                      pa,
-                      rng_engine_inputs);
-                };
+                constexpr int Num = 2;
+                DropoutTemplateKernelFunctor2<
+                    mask_t,
+                    scalar_t,
+                    accscalar_t,
+                    index_t,
+                    Num>
+                    kfn(self_info,
+                        ret_info,
+                        mask_info,
+                        nelem,
+                        pa,
+                        rng_engine_inputs);
                 cgh.parallel_for(sycl::nd_range<1>(glb_range, loc_range), kfn);
               };
               DPCPP_Q_SUBMIT(q, cgf);
             } break;
             case 1: {
               auto cgf = DPCPP_Q_CGF(cgh) {
-                auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-                  fused_dropout_kernel_unroll<scalar_t, accscalar_t, index_t>(
-                      item,
-                      self_info,
-                      ret_info,
-                      mask_info,
-                      nelem,
-                      pa,
-                      rng_engine_inputs);
-                };
+                DropoutTemplateKernelFunctor3<
+                    mask_t,
+                    scalar_t,
+                    accscalar_t,
+                    index_t>
+                    kfn(self_info,
+                        ret_info,
+                        mask_info,
+                        nelem,
+                        pa,
+                        rng_engine_inputs);
                 cgh.parallel_for(sycl::nd_range<1>(glb_range, loc_range), kfn);
               };
               DPCPP_Q_SUBMIT(q, cgf);

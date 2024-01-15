@@ -25,6 +25,212 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <int vec_size, typename scalar_t, typename vec_t, typename vec_mw_t>
+struct LaunchVecKernelAdamWMasterWeightFunctor {
+  void operator()(sycl::item<1> item) const {
+    auto id = item.get_id(0);
+
+    auto remaining = total_element - id * vec_size;
+
+    // for handling remaining tail
+    if (remaining < vec_size) {
+      for (auto v_index = 0; v_index < remaining; ++v_index) {
+        // kick out tail
+        auto linear_idx = id * vec_size + v_index;
+        // master weight grad should be fp32 to involve in computation to keep
+        // acc.
+        auto grad_elm = static_cast<float>(grad_ptr[linear_idx]);
+
+        auto master_weight_elem = master_weight_ptr[linear_idx];
+        master_weight_elem = master_weight_elem * stepweight_decay;
+
+        // exp_avg
+        auto exp_avg_ele = exp_avg_ptr[linear_idx];
+        exp_avg_ele =
+            exp_avg_ele * beta1_value + grad_elm * exp_avg_ele_coefficient;
+        exp_avg_ptr[linear_idx] = exp_avg_ele;
+
+        // exp_avg_sq
+        auto exp_avg_sq_ele = exp_avg_sq_ptr[linear_idx];
+        exp_avg_sq_ele = exp_avg_sq_ele * beta2_value +
+            grad_elm * grad_elm * exp_avg_sq_ele_coefficient;
+        exp_avg_sq_ptr[linear_idx] = exp_avg_sq_ele;
+
+        // amsgrad
+        if (amsgrad) {
+          max_exp_avg_sq_ptr[linear_idx] =
+              max_exp_avg_sq_ptr[linear_idx] < exp_avg_sq_ele
+              ? exp_avg_sq_ele
+              : max_exp_avg_sq_ptr[linear_idx];
+          master_weight_elem = master_weight_elem -
+              step_size * exp_avg_ele /
+                  (Numerics<float>::sqrt(
+                       max_exp_avg_sq_ptr[linear_idx] / bias_correction2) +
+                   eps_value);
+        } else {
+          master_weight_elem = master_weight_elem -
+              step_size * exp_avg_ele /
+                  (Numerics<float>::sqrt(exp_avg_sq_ele / bias_correction2) +
+                   eps_value);
+        }
+
+        // update master weight fp32
+        master_weight_ptr[linear_idx] = static_cast<float>(master_weight_elem);
+
+        // update real weight bf16/fp16
+        weight_ptr[linear_idx] = static_cast<scalar_t>(master_weight_elem);
+      }
+    } else {
+      // vector read
+      vec_mw_t exp_avg_value = exp_avg_vec[id];
+      vec_mw_t exp_avg_sq_value = exp_avg_sq_vec[id];
+      vec_mw_t master_weight_value = master_weight_vec[id];
+
+      // for vector write back
+      vec_t temp_weight;
+      vec_mw_t temp_master_weight;
+      vec_mw_t temp_exp_avg;
+      vec_mw_t temp_exp_avg_sq;
+
+#pragma unroll(vec_size)
+      for (auto v_index = 0; v_index < vec_size; ++v_index) {
+        // [watch out] here using these methods to read BF16
+        // grad vector to avoid omit for read instruction. external JIRA:
+        // https://jira.devtools.intel.com/browse/CMPLRLLVM-42194
+        auto grad_elm = static_cast<float>(grad_vec[id][v_index]);
+
+        auto master_weight_elem = master_weight_value[v_index];
+        master_weight_elem = master_weight_elem * stepweight_decay;
+
+        // exp_avg
+        auto exp_avg_ele = exp_avg_value[v_index];
+        exp_avg_ele =
+            exp_avg_ele * beta1_value + grad_elm * exp_avg_ele_coefficient;
+        temp_exp_avg[v_index] = exp_avg_ele;
+
+        // exp_avg_sq
+        auto exp_avg_sq_ele = exp_avg_sq_value[v_index];
+        exp_avg_sq_ele = exp_avg_sq_ele * beta2_value +
+            grad_elm * grad_elm * exp_avg_sq_ele_coefficient;
+        temp_exp_avg_sq[v_index] = exp_avg_sq_ele;
+
+        // amsgrad
+        if (amsgrad) {
+          auto max_exp_avg_sq_ele = max_exp_avg_sq_vec[id][v_index];
+          max_exp_avg_sq_ele = max_exp_avg_sq_ele < exp_avg_sq_ele
+              ? exp_avg_sq_ele
+              : max_exp_avg_sq_ele;
+          max_exp_avg_sq_vec[id][v_index] = max_exp_avg_sq_ele;
+          master_weight_elem = master_weight_elem -
+              step_size * exp_avg_ele /
+                  (Numerics<float>::sqrt(
+                       max_exp_avg_sq_ele / bias_correction2) +
+                   eps_value);
+        } else {
+          master_weight_elem = master_weight_elem -
+              step_size * exp_avg_ele /
+                  (Numerics<float>::sqrt(exp_avg_sq_ele / bias_correction2) +
+                   eps_value);
+        }
+
+        // update master weight fp32
+        temp_master_weight[v_index] = static_cast<float>(master_weight_elem);
+
+        // update real weight bf16/fp16
+        temp_weight[v_index] = static_cast<scalar_t>(master_weight_elem);
+      }
+
+      // write back
+      // update exp_avg
+      exp_avg_vec[id] = temp_exp_avg;
+
+      // update exp_avg_sq
+      exp_avg_sq_vec[id] = temp_exp_avg_sq;
+
+      // update master weight fp32
+      master_weight_vec[id] = temp_master_weight;
+
+      // update real weight bf16/fp16
+      weight_vec[id] = temp_weight;
+    }
+  }
+  LaunchVecKernelAdamWMasterWeightFunctor(
+      const bool amsgrad_,
+      const float exp_avg_ele_coefficient_,
+      const float exp_avg_sq_ele_coefficient_,
+      const float beta1_value_,
+      const float beta2_value_,
+      const float bias_correction1_,
+      const float bias_correction2_,
+      const float step_size_,
+      const float stepweight_decay_,
+      const float eps_value_,
+      const int64_t total_element_,
+      const int64_t global_range_,
+      float* master_weight_ptr_,
+      scalar_t* weight_ptr_,
+      scalar_t* grad_ptr_,
+      float* exp_avg_ptr_,
+      float* exp_avg_sq_ptr_,
+      float* max_exp_avg_sq_ptr_,
+      vec_t* grad_vec_,
+      vec_t* weight_vec_,
+      vec_mw_t* master_weight_vec_,
+      vec_mw_t* exp_avg_vec_,
+      vec_mw_t* exp_avg_sq_vec_,
+      vec_mw_t* max_exp_avg_sq_vec_)
+      : amsgrad(amsgrad_),
+        exp_avg_ele_coefficient(exp_avg_ele_coefficient_),
+        exp_avg_sq_ele_coefficient(exp_avg_sq_ele_coefficient_),
+        beta1_value(beta1_value_),
+        beta2_value(beta2_value_),
+        bias_correction1(bias_correction1_),
+        bias_correction2(bias_correction2_),
+        step_size(step_size_),
+        stepweight_decay(stepweight_decay_),
+        eps_value(eps_value_),
+        total_element(total_element_),
+        global_range(global_range_),
+        master_weight_ptr(master_weight_ptr_),
+        weight_ptr(weight_ptr_),
+        grad_ptr(grad_ptr_),
+        exp_avg_ptr(exp_avg_ptr_),
+        exp_avg_sq_ptr(exp_avg_sq_ptr_),
+        max_exp_avg_sq_ptr(max_exp_avg_sq_ptr_),
+        grad_vec(grad_vec_),
+        weight_vec(weight_vec_),
+        master_weight_vec(master_weight_vec_),
+        exp_avg_vec(exp_avg_vec_),
+        exp_avg_sq_vec(exp_avg_sq_vec_),
+        max_exp_avg_sq_vec(max_exp_avg_sq_vec_) {}
+
+ private:
+  const bool amsgrad;
+  const float exp_avg_ele_coefficient;
+  const float exp_avg_sq_ele_coefficient;
+  const float beta1_value;
+  const float beta2_value;
+  const float bias_correction1;
+  const float bias_correction2;
+  const float step_size;
+  const float stepweight_decay;
+  const float eps_value;
+  const int64_t total_element;
+  const int64_t global_range;
+  float* master_weight_ptr;
+  scalar_t* weight_ptr;
+  scalar_t* grad_ptr;
+  float* exp_avg_ptr;
+  float* exp_avg_sq_ptr;
+  float* max_exp_avg_sq_ptr;
+  vec_t* grad_vec;
+  vec_t* weight_vec;
+  vec_mw_t* master_weight_vec;
+  vec_mw_t* exp_avg_vec;
+  vec_mw_t* exp_avg_sq_vec;
+  vec_mw_t* max_exp_avg_sq_vec;
+};
+
 template <int vec_size, typename scalar_t>
 void launch_vec_kernel_AdamWMasterWeight(
     Tensor& master_weight,
@@ -72,138 +278,223 @@ void launch_vec_kernel_AdamWMasterWeight(
       amsgrad ? reinterpret_cast<vec_mw_t*>(max_exp_avg_sq_ptr) : nullptr;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(sycl::range<1>{global_range}, [=](sycl::item<1> item) {
-      auto id = item.get_id(0);
-
-      auto remaining = total_element - id * vec_size;
-
-      // for handling remaining tail
-      if (remaining < vec_size) {
-        for (auto v_index = 0; v_index < remaining; ++v_index) {
-          // kick out tail
-          auto linear_idx = id * vec_size + v_index;
-          // master weight grad should be fp32 to involve in computation to keep
-          // acc.
-          auto grad_elm = static_cast<float>(grad_ptr[linear_idx]);
-
-          auto master_weight_elem = master_weight_ptr[linear_idx];
-          master_weight_elem = master_weight_elem * stepweight_decay;
-
-          // exp_avg
-          auto exp_avg_ele = exp_avg_ptr[linear_idx];
-          exp_avg_ele =
-              exp_avg_ele * beta1_value + grad_elm * exp_avg_ele_coefficient;
-          exp_avg_ptr[linear_idx] = exp_avg_ele;
-
-          // exp_avg_sq
-          auto exp_avg_sq_ele = exp_avg_sq_ptr[linear_idx];
-          exp_avg_sq_ele = exp_avg_sq_ele * beta2_value +
-              grad_elm * grad_elm * exp_avg_sq_ele_coefficient;
-          exp_avg_sq_ptr[linear_idx] = exp_avg_sq_ele;
-
-          // amsgrad
-          if (amsgrad) {
-            max_exp_avg_sq_ptr[linear_idx] =
-                max_exp_avg_sq_ptr[linear_idx] < exp_avg_sq_ele
-                ? exp_avg_sq_ele
-                : max_exp_avg_sq_ptr[linear_idx];
-            master_weight_elem = master_weight_elem -
-                step_size * exp_avg_ele /
-                    (Numerics<float>::sqrt(
-                         max_exp_avg_sq_ptr[linear_idx] / bias_correction2) +
-                     eps_value);
-          } else {
-            master_weight_elem = master_weight_elem -
-                step_size * exp_avg_ele /
-                    (Numerics<float>::sqrt(exp_avg_sq_ele / bias_correction2) +
-                     eps_value);
-          }
-
-          // update master weight fp32
-          master_weight_ptr[linear_idx] =
-              static_cast<float>(master_weight_elem);
-
-          // update real weight bf16/fp16
-          weight_ptr[linear_idx] = static_cast<scalar_t>(master_weight_elem);
-        }
-      } else {
-        // vector read
-        vec_mw_t exp_avg_value = exp_avg_vec[id];
-        vec_mw_t exp_avg_sq_value = exp_avg_sq_vec[id];
-        vec_mw_t master_weight_value = master_weight_vec[id];
-
-        // for vector write back
-        vec_t temp_weight;
-        vec_mw_t temp_master_weight;
-        vec_mw_t temp_exp_avg;
-        vec_mw_t temp_exp_avg_sq;
-
-#pragma unroll(vec_size)
-        for (auto v_index = 0; v_index < vec_size; ++v_index) {
-          // [watch out] here using these methods to read BF16
-          // grad vector to avoid omit for read instruction. external JIRA:
-          // https://jira.devtools.intel.com/browse/CMPLRLLVM-42194
-          auto grad_elm = static_cast<float>(grad_vec[id][v_index]);
-
-          auto master_weight_elem = master_weight_value[v_index];
-          master_weight_elem = master_weight_elem * stepweight_decay;
-
-          // exp_avg
-          auto exp_avg_ele = exp_avg_value[v_index];
-          exp_avg_ele =
-              exp_avg_ele * beta1_value + grad_elm * exp_avg_ele_coefficient;
-          temp_exp_avg[v_index] = exp_avg_ele;
-
-          // exp_avg_sq
-          auto exp_avg_sq_ele = exp_avg_sq_value[v_index];
-          exp_avg_sq_ele = exp_avg_sq_ele * beta2_value +
-              grad_elm * grad_elm * exp_avg_sq_ele_coefficient;
-          temp_exp_avg_sq[v_index] = exp_avg_sq_ele;
-
-          // amsgrad
-          if (amsgrad) {
-            auto max_exp_avg_sq_ele = max_exp_avg_sq_vec[id][v_index];
-            max_exp_avg_sq_ele = max_exp_avg_sq_ele < exp_avg_sq_ele
-                ? exp_avg_sq_ele
-                : max_exp_avg_sq_ele;
-            max_exp_avg_sq_vec[id][v_index] = max_exp_avg_sq_ele;
-            master_weight_elem = master_weight_elem -
-                step_size * exp_avg_ele /
-                    (Numerics<float>::sqrt(
-                         max_exp_avg_sq_ele / bias_correction2) +
-                     eps_value);
-          } else {
-            master_weight_elem = master_weight_elem -
-                step_size * exp_avg_ele /
-                    (Numerics<float>::sqrt(exp_avg_sq_ele / bias_correction2) +
-                     eps_value);
-          }
-
-          // update master weight fp32
-          temp_master_weight[v_index] = static_cast<float>(master_weight_elem);
-
-          // update real weight bf16/fp16
-          temp_weight[v_index] = static_cast<scalar_t>(master_weight_elem);
-        }
-
-        // write back
-        // update exp_avg
-        exp_avg_vec[id] = temp_exp_avg;
-
-        // update exp_avg_sq
-        exp_avg_sq_vec[id] = temp_exp_avg_sq;
-
-        // update master weight fp32
-        master_weight_vec[id] = temp_master_weight;
-
-        // update real weight bf16/fp16
-        weight_vec[id] = temp_weight;
-      }
-    });
+    LaunchVecKernelAdamWMasterWeightFunctor<vec_size, scalar_t, vec_t, vec_mw_t>
+        kfn(amsgrad,
+            exp_avg_ele_coefficient,
+            exp_avg_sq_ele_coefficient,
+            beta1_value,
+            beta2_value,
+            bias_correction1,
+            bias_correction2,
+            step_size,
+            stepweight_decay,
+            eps_value,
+            total_element,
+            global_range,
+            master_weight_ptr,
+            weight_ptr,
+            grad_ptr,
+            exp_avg_ptr,
+            exp_avg_sq_ptr,
+            max_exp_avg_sq_ptr,
+            grad_vec,
+            weight_vec,
+            master_weight_vec,
+            exp_avg_vec,
+            exp_avg_sq_vec,
+            max_exp_avg_sq_vec);
+    cgh.parallel_for<decltype(kfn)>(sycl::range<1>{global_range}, kfn);
   };
 
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <int vec_size, typename vec_t>
+struct LaunchVecKernelAdamWFunctor {
+  void operator()(sycl::item<1> item) const {
+    auto id = item.get_id(0);
+
+    auto remaining = total_element - id * vec_size;
+
+    // for handling remaining tail
+    if (remaining < vec_size) {
+      for (auto v_index = 0; v_index < remaining; ++v_index) {
+        // kick out tail
+        auto linear_idx = id * vec_size + v_index;
+        // master weight grad should be fp32 to involve in computation to keep
+        // acc.
+        auto grad_elm = grad_ptr[linear_idx];
+        auto weight_elem = weight_ptr[linear_idx];
+        weight_elem = weight_elem * stepweight_decay;
+
+        // exp_avg
+        auto exp_avg_ele = exp_avg_ptr[linear_idx];
+        exp_avg_ele =
+            exp_avg_ele * beta1_value + grad_elm * exp_avg_ele_coefficient;
+        exp_avg_ptr[linear_idx] = exp_avg_ele;
+
+        // exp_avg_sq
+        auto exp_avg_sq_ele = exp_avg_sq_ptr[linear_idx];
+        exp_avg_sq_ele = exp_avg_sq_ele * beta2_value +
+            grad_elm * grad_elm * exp_avg_sq_ele_coefficient;
+        exp_avg_sq_ptr[linear_idx] = exp_avg_sq_ele;
+
+        // amsgrad
+        if (amsgrad) {
+          max_exp_avg_sq_ptr[linear_idx] =
+              max_exp_avg_sq_ptr[linear_idx] < exp_avg_sq_ele
+              ? exp_avg_sq_ele
+              : max_exp_avg_sq_ptr[linear_idx];
+          weight_elem = weight_elem -
+              step_size * exp_avg_ele /
+                  (Numerics<float>::sqrt(
+                       max_exp_avg_sq_ptr[linear_idx] / bias_correction2) +
+                   eps_value);
+        } else {
+          weight_elem = weight_elem -
+              step_size * exp_avg_ele /
+                  (Numerics<float>::sqrt(exp_avg_sq_ele / bias_correction2) +
+                   eps_value);
+        }
+
+        // update real weight
+        weight_ptr[linear_idx] = static_cast<float>(weight_elem);
+      }
+    } else {
+      // vector read
+      vec_t weight_value = weight_vec[id];
+      vec_t grad_value = grad_vec[id];
+      vec_t exp_avg_value = exp_avg_vec[id];
+      vec_t exp_avg_sq_value = exp_avg_sq_vec[id];
+
+      // for vector write back
+      vec_t temp_weight;
+      vec_t temp_exp_avg;
+      vec_t temp_exp_avg_sq;
+
+#pragma unroll
+      for (auto v_index = 0; v_index < vec_size; ++v_index) {
+        auto grad_elm = grad_value[v_index];
+
+        auto weight_elem = weight_value[v_index];
+        weight_elem = weight_elem * stepweight_decay;
+
+        // exp_avg
+        auto exp_avg_ele = exp_avg_value[v_index];
+        exp_avg_ele =
+            exp_avg_ele * beta1_value + grad_elm * exp_avg_ele_coefficient;
+        temp_exp_avg[v_index] = exp_avg_ele;
+
+        // exp_avg_sq
+        auto exp_avg_sq_ele = exp_avg_sq_value[v_index];
+        exp_avg_sq_ele = exp_avg_sq_ele * beta2_value +
+            grad_elm * grad_elm * exp_avg_sq_ele_coefficient;
+        temp_exp_avg_sq[v_index] = exp_avg_sq_ele;
+
+        // amsgrad
+        if (amsgrad) {
+          auto max_exp_avg_sq_ele = max_exp_avg_sq_vec[id][v_index];
+          max_exp_avg_sq_ele = max_exp_avg_sq_ele < exp_avg_sq_ele
+              ? static_cast<float>(exp_avg_sq_ele)
+              : max_exp_avg_sq_ele;
+          max_exp_avg_sq_vec[id][v_index] = max_exp_avg_sq_ele;
+          weight_elem = weight_elem -
+              step_size * exp_avg_ele /
+                  (Numerics<float>::sqrt(
+                       max_exp_avg_sq_ele / bias_correction2) +
+                   eps_value);
+        } else {
+          weight_elem = weight_elem -
+              step_size * exp_avg_ele /
+                  (Numerics<float>::sqrt(exp_avg_sq_ele / bias_correction2) +
+                   eps_value);
+        }
+
+        // update real weight fp32
+        temp_weight[v_index] = static_cast<float>(weight_elem);
+      }
+
+      // write back
+      // update exp_avg
+      exp_avg_vec[id] = temp_exp_avg;
+
+      // update exp_avg_sq
+      exp_avg_sq_vec[id] = temp_exp_avg_sq;
+
+      // update weight fp32
+      weight_vec[id] = temp_weight;
+    }
+  }
+  LaunchVecKernelAdamWFunctor(
+      const bool amsgrad_,
+      const float exp_avg_ele_coefficient_,
+      const float exp_avg_sq_ele_coefficient_,
+      const float beta1_value_,
+      const float beta2_value_,
+      const float bias_correction1_,
+      const float bias_correction2_,
+      const float step_size_,
+      const float stepweight_decay_,
+      const float eps_value_,
+      const int64_t total_element_,
+      const int64_t global_range_,
+      float* weight_ptr_,
+      float* grad_ptr_,
+      float* exp_avg_ptr_,
+      float* exp_avg_sq_ptr_,
+      float* max_exp_avg_sq_ptr_,
+      vec_t* grad_vec_,
+      vec_t* weight_vec_,
+      vec_t* exp_avg_vec_,
+      vec_t* exp_avg_sq_vec_,
+      vec_t* max_exp_avg_sq_vec_)
+      : amsgrad(amsgrad_),
+        exp_avg_ele_coefficient(exp_avg_ele_coefficient_),
+        exp_avg_sq_ele_coefficient(exp_avg_sq_ele_coefficient_),
+        beta1_value(beta1_value_),
+        beta2_value(beta2_value_),
+        bias_correction1(bias_correction1_),
+        bias_correction2(bias_correction2_),
+        step_size(step_size_),
+        stepweight_decay(stepweight_decay_),
+        eps_value(eps_value_),
+        total_element(total_element_),
+        global_range(global_range_),
+        weight_ptr(weight_ptr_),
+        grad_ptr(grad_ptr_),
+        exp_avg_ptr(exp_avg_ptr_),
+        exp_avg_sq_ptr(exp_avg_sq_ptr_),
+        max_exp_avg_sq_ptr(max_exp_avg_sq_ptr_),
+        grad_vec(grad_vec_),
+        weight_vec(weight_vec_),
+        exp_avg_vec(exp_avg_vec_),
+        exp_avg_sq_vec(exp_avg_sq_vec_),
+        max_exp_avg_sq_vec(max_exp_avg_sq_vec_) {}
+
+ private:
+  const bool amsgrad;
+  const float exp_avg_ele_coefficient;
+  const float exp_avg_sq_ele_coefficient;
+  const float beta1_value;
+  const float beta2_value;
+  const float bias_correction1;
+  const float bias_correction2;
+  const float step_size;
+  const float stepweight_decay;
+  const float eps_value;
+  const int64_t total_element;
+  const int64_t global_range;
+  float* weight_ptr;
+  float* grad_ptr;
+  float* exp_avg_ptr;
+  float* exp_avg_sq_ptr;
+  float* max_exp_avg_sq_ptr;
+  vec_t* grad_vec;
+  vec_t* weight_vec;
+  vec_t* exp_avg_vec;
+  vec_t* exp_avg_sq_vec;
+  vec_t* max_exp_avg_sq_vec;
+};
 
 // Here is the fused AdamW Kernel
 // no master weight
@@ -248,120 +539,30 @@ void launch_vec_kernel_AdamW(
       amsgrad ? reinterpret_cast<vec_t*>(max_exp_avg_sq_ptr) : nullptr;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(sycl::range<1>{global_range}, [=](sycl::item<1> item) {
-      auto id = item.get_id(0);
-
-      auto remaining = total_element - id * vec_size;
-
-      // for handling remaining tail
-      if (remaining < vec_size) {
-        for (auto v_index = 0; v_index < remaining; ++v_index) {
-          // kick out tail
-          auto linear_idx = id * vec_size + v_index;
-          // master weight grad should be fp32 to involve in computation to keep
-          // acc.
-          auto grad_elm = grad_ptr[linear_idx];
-          auto weight_elem = weight_ptr[linear_idx];
-          weight_elem = weight_elem * stepweight_decay;
-
-          // exp_avg
-          auto exp_avg_ele = exp_avg_ptr[linear_idx];
-          exp_avg_ele =
-              exp_avg_ele * beta1_value + grad_elm * exp_avg_ele_coefficient;
-          exp_avg_ptr[linear_idx] = exp_avg_ele;
-
-          // exp_avg_sq
-          auto exp_avg_sq_ele = exp_avg_sq_ptr[linear_idx];
-          exp_avg_sq_ele = exp_avg_sq_ele * beta2_value +
-              grad_elm * grad_elm * exp_avg_sq_ele_coefficient;
-          exp_avg_sq_ptr[linear_idx] = exp_avg_sq_ele;
-
-          // amsgrad
-          if (amsgrad) {
-            max_exp_avg_sq_ptr[linear_idx] =
-                max_exp_avg_sq_ptr[linear_idx] < exp_avg_sq_ele
-                ? exp_avg_sq_ele
-                : max_exp_avg_sq_ptr[linear_idx];
-            weight_elem = weight_elem -
-                step_size * exp_avg_ele /
-                    (Numerics<float>::sqrt(
-                         max_exp_avg_sq_ptr[linear_idx] / bias_correction2) +
-                     eps_value);
-          } else {
-            weight_elem = weight_elem -
-                step_size * exp_avg_ele /
-                    (Numerics<float>::sqrt(exp_avg_sq_ele / bias_correction2) +
-                     eps_value);
-          }
-
-          // update real weight
-          weight_ptr[linear_idx] = static_cast<float>(weight_elem);
-        }
-      } else {
-        // vector read
-        vec_t weight_value = weight_vec[id];
-        vec_t grad_value = grad_vec[id];
-        vec_t exp_avg_value = exp_avg_vec[id];
-        vec_t exp_avg_sq_value = exp_avg_sq_vec[id];
-
-        // for vector write back
-        vec_t temp_weight;
-        vec_t temp_exp_avg;
-        vec_t temp_exp_avg_sq;
-
-#pragma unroll
-        for (auto v_index = 0; v_index < vec_size; ++v_index) {
-          auto grad_elm = grad_value[v_index];
-
-          auto weight_elem = weight_value[v_index];
-          weight_elem = weight_elem * stepweight_decay;
-
-          // exp_avg
-          auto exp_avg_ele = exp_avg_value[v_index];
-          exp_avg_ele =
-              exp_avg_ele * beta1_value + grad_elm * exp_avg_ele_coefficient;
-          temp_exp_avg[v_index] = exp_avg_ele;
-
-          // exp_avg_sq
-          auto exp_avg_sq_ele = exp_avg_sq_value[v_index];
-          exp_avg_sq_ele = exp_avg_sq_ele * beta2_value +
-              grad_elm * grad_elm * exp_avg_sq_ele_coefficient;
-          temp_exp_avg_sq[v_index] = exp_avg_sq_ele;
-
-          // amsgrad
-          if (amsgrad) {
-            auto max_exp_avg_sq_ele = max_exp_avg_sq_vec[id][v_index];
-            max_exp_avg_sq_ele = max_exp_avg_sq_ele < exp_avg_sq_ele
-                ? static_cast<float>(exp_avg_sq_ele)
-                : max_exp_avg_sq_ele;
-            max_exp_avg_sq_vec[id][v_index] = max_exp_avg_sq_ele;
-            weight_elem = weight_elem -
-                step_size * exp_avg_ele /
-                    (Numerics<float>::sqrt(
-                         max_exp_avg_sq_ele / bias_correction2) +
-                     eps_value);
-          } else {
-            weight_elem = weight_elem -
-                step_size * exp_avg_ele /
-                    (Numerics<float>::sqrt(exp_avg_sq_ele / bias_correction2) +
-                     eps_value);
-          }
-
-          // update real weight fp32
-          temp_weight[v_index] = static_cast<float>(weight_elem);
-        }
-
-        // write back
-        // update exp_avg
-        exp_avg_vec[id] = temp_exp_avg;
-
-        // update exp_avg_sq
-        exp_avg_sq_vec[id] = temp_exp_avg_sq;
-
-        // update weight fp32
-        weight_vec[id] = temp_weight;
-      }
-    });
+    LaunchVecKernelAdamWFunctor<vec_size, vec_t> kfn(
+        amsgrad,
+        exp_avg_ele_coefficient,
+        exp_avg_sq_ele_coefficient,
+        beta1_value,
+        beta2_value,
+        bias_correction1,
+        bias_correction2,
+        step_size,
+        stepweight_decay,
+        eps_value,
+        total_element,
+        global_range,
+        weight_ptr,
+        grad_ptr,
+        exp_avg_ptr,
+        exp_avg_sq_ptr,
+        max_exp_avg_sq_ptr,
+        grad_vec,
+        weight_vec,
+        exp_avg_vec,
+        exp_avg_sq_vec,
+        max_exp_avg_sq_vec);
+    cgh.parallel_for<decltype(kfn)>(sycl::range<1>{global_range}, kfn);
   };
 
   DPCPP_Q_SUBMIT(queue, cgf);

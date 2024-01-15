@@ -48,6 +48,199 @@ inline accscalar_t p_norm(scalar_t data, scalar_t norm) {
 }
 
 template <typename scalar_t, typename accscalar_t>
+struct NormClampMulFusionKernelFunctor1 {
+  void operator()(sycl::nd_item<2> item) const {
+    int tensor_index = item.get_global_id()[1];
+    int local_id = item.get_local_id()[0];
+    int local_range = item.get_local_range()[0];
+
+    int cur_tensor_size = size_storage_data[tensor_index];
+    scalar_t* grad_ptr_storage = grad_storage_data[tensor_index];
+    scalar_t* norm_ptr_storage = norm_storage_data[tensor_index];
+
+    auto loop_times = ceil_div<int>(cur_tensor_size, local_range);
+
+    // step1, each work_group will calculate the norm for a tensor
+    for (int i = 0; i < loop_times; i++) {
+      int numel_index = i * local_range + local_id;
+      if (numel_index < cur_tensor_size) {
+        if (norm_type == 0.0f) {
+          norm_ptr_storage[local_id] += zero_norm<scalar_t, accscalar_t>(
+              static_cast<accscalar_t>(grad_ptr_storage[numel_index]));
+        } else if (norm_type == 1.0f) {
+          norm_ptr_storage[local_id] += one_norm<scalar_t, accscalar_t>(
+              static_cast<accscalar_t>(grad_ptr_storage[numel_index]));
+        } else {
+          norm_ptr_storage[local_id] += p_norm<scalar_t, accscalar_t>(
+              static_cast<accscalar_t>(grad_ptr_storage[numel_index]),
+              norm_type);
+        }
+      }
+    }
+
+    item.barrier(dpcpp_global_fence);
+
+    // step2, each work_group reduce a sum for a tensor
+    auto reduce_size = Numerics<int>::min(cur_tensor_size, local_range);
+    int64_t cal_size = upper_power_of_two(reduce_size);
+
+    for (int i = cal_size / 2; i >= 1; i /= 2) {
+      if (local_id < i && local_id + i < reduce_size) {
+        norm_ptr_storage[local_id] += norm_ptr_storage[local_id + i];
+      }
+      item.barrier(dpcpp_global_fence);
+    }
+
+    if (local_id == 0) {
+      if (norm_type != 0.0 && norm_type != 1.0) {
+        norm_result_addr[tensor_index] = p_norm<scalar_t, accscalar_t>(
+            norm_ptr_storage[local_id],
+            static_cast<accscalar_t>(1.0f / norm_type));
+      } else {
+        norm_result_addr[tensor_index] = norm_ptr_storage[local_id];
+      }
+    }
+  }
+  NormClampMulFusionKernelFunctor1(
+      int64_t local_range_,
+      int* size_storage_data_,
+      scalar_t** grad_storage_data_,
+      scalar_t** norm_storage_data_,
+      scalar_t* norm_result_addr_,
+      scalar_t* return_norm_addr_,
+      double norm_type_)
+      : local_range(local_range_),
+        size_storage_data(size_storage_data_),
+        grad_storage_data(grad_storage_data_),
+        norm_storage_data(norm_storage_data_),
+        norm_result_addr(norm_result_addr_),
+        return_norm_addr(return_norm_addr_),
+        norm_type(norm_type_) {}
+
+ private:
+  int64_t local_range;
+  int* size_storage_data;
+  scalar_t** grad_storage_data;
+  scalar_t** norm_storage_data;
+  scalar_t* norm_result_addr;
+  scalar_t* return_norm_addr;
+  double norm_type;
+};
+
+template <typename scalar_t, typename accscalar_t>
+struct NormClampMulFusionKernelFunctor2 {
+  void operator()(sycl::nd_item<1> item) const {
+    int local_id = item.get_global_linear_id();
+
+    // step3, calculate the whole norm result for norm vector
+    if (local_id < tensor_size) {
+      if (norm_type == 0.0f) {
+        norm_result_addr[local_id] =
+            zero_norm<scalar_t, accscalar_t>(norm_result_addr[local_id]);
+      } else if (norm_type == 1.0f) {
+        norm_result_addr[local_id] =
+            one_norm<scalar_t, accscalar_t>(norm_result_addr[local_id]);
+      } else {
+        norm_result_addr[local_id] = p_norm<scalar_t, accscalar_t>(
+            norm_result_addr[local_id], norm_type);
+      }
+    }
+    item.barrier(dpcpp_global_fence);
+
+    // step4, calculate the whole norm result for norm vector
+    auto tensor_reduce_size = tensor_size;
+
+    for (int i = tensor_reduce_size / 2; i >= 1; i /= 2) {
+      if (local_id < i && local_id + i < tensor_reduce_size) {
+        norm_result_addr[local_id] += norm_result_addr[local_id + i];
+      }
+      item.barrier(dpcpp_global_fence);
+    }
+
+    if (local_id == 0) {
+      if (norm_type != 0.0 && norm_type != 1.0) {
+        norm_result_addr[0] = p_norm<scalar_t, accscalar_t>(
+            norm_result_addr[local_id],
+            static_cast<accscalar_t>(1.0f / norm_type));
+      }
+      return_norm_addr[0] = static_cast<double>(norm_result_addr[0]);
+    }
+    item.barrier(dpcpp_global_fence);
+    SYCL_KERNEL_ASSERT(
+        !(error_if_nonfinite &&
+          (Numerics<accscalar_t>::isnan(norm_result_addr[0]) ||
+           Numerics<accscalar_t>::isinf(norm_result_addr[0]))) &&
+        "The total norm of gradients from parameters is non-finite, so it cannot be clipped. To disable this error and scale the gradients by the non-finite norm anyway, set error_if_nonfinite=False");
+  }
+  NormClampMulFusionKernelFunctor2(
+      scalar_t* norm_result_addr_,
+      scalar_t* return_norm_addr_,
+      double norm_type_,
+      int tensor_size_,
+      bool error_if_nonfinite_)
+      : norm_result_addr(norm_result_addr_),
+        return_norm_addr(return_norm_addr_),
+        norm_type(norm_type_),
+        tensor_size(tensor_size_),
+        error_if_nonfinite(error_if_nonfinite_) {}
+
+ private:
+  scalar_t* norm_result_addr;
+  scalar_t* return_norm_addr;
+  double norm_type;
+  int tensor_size;
+  bool error_if_nonfinite;
+};
+
+template <typename scalar_t, typename accscalar_t>
+struct NormClampMulFusionKernelFunctor3 {
+  void operator()(sycl::nd_item<2> item) const {
+    int tensor_index = item.get_global_id()[1];
+    int local_id = item.get_local_id()[0];
+    int local_range = item.get_local_range()[0];
+
+    int cur_tensor_size = size_storage_data[tensor_index];
+    scalar_t* grad_ptr_storage = grad_storage_data[tensor_index];
+    scalar_t* norm_ptr_storage = norm_storage_data[tensor_index];
+
+    auto loop_times = ceil_div<int>(tensor_size, local_range);
+
+    // step 5 calculate clip_coef and update grads
+    auto total_norm = norm_result_addr[0];
+    auto clip_coef = max_norm / (total_norm + 1e-6);
+    auto clip_coef_clamped = clip_coef > 1.0f ? 1.0f : clip_coef;
+
+    for (int i = 0; i < loop_times; i++) {
+      int numel_index = i * local_range + local_id;
+      if (numel_index < cur_tensor_size) {
+        grad_ptr_storage[numel_index] *= clip_coef_clamped;
+      }
+    }
+  }
+  NormClampMulFusionKernelFunctor3(
+      int* size_storage_data_,
+      scalar_t** grad_storage_data_,
+      scalar_t** norm_storage_data_,
+      scalar_t* norm_result_addr_,
+      int tensor_size_,
+      double max_norm_)
+      : size_storage_data(size_storage_data_),
+        grad_storage_data(grad_storage_data_),
+        norm_storage_data(norm_storage_data_),
+        norm_result_addr(norm_result_addr_),
+        tensor_size(tensor_size_),
+        max_norm(max_norm_) {}
+
+ private:
+  int* size_storage_data;
+  scalar_t** grad_storage_data;
+  scalar_t** norm_storage_data;
+  scalar_t* norm_result_addr;
+  int tensor_size;
+  double max_norm;
+};
+
+template <typename scalar_t, typename accscalar_t>
 void norm_clamp_mul_fusion(
     std::vector<Tensor> grads,
     std::vector<Tensor> norm_result_temp,
@@ -104,58 +297,14 @@ void norm_clamp_mul_fusion(
   scalar_t* return_norm_addr = static_cast<scalar_t*>(return_norm.data_ptr());
 
   auto cgf_1 = DPCPP_Q_CGF(cgh) {
-    auto kfn_1 = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-      int tensor_index = item.get_global_id()[1];
-      int local_id = item.get_local_id()[0];
-      int local_range = item.get_local_range()[0];
-
-      int cur_tensor_size = size_storage_data[tensor_index];
-      scalar_t* grad_ptr_storage = grad_storage_data[tensor_index];
-      scalar_t* norm_ptr_storage = norm_storage_data[tensor_index];
-
-      auto loop_times = ceil_div<int>(cur_tensor_size, local_range);
-
-      // step1, each work_group will calculate the norm for a tensor
-      for (int i = 0; i < loop_times; i++) {
-        int numel_index = i * local_range + local_id;
-        if (numel_index < cur_tensor_size) {
-          if (norm_type == 0.0f) {
-            norm_ptr_storage[local_id] += zero_norm<scalar_t, accscalar_t>(
-                static_cast<accscalar_t>(grad_ptr_storage[numel_index]));
-          } else if (norm_type == 1.0f) {
-            norm_ptr_storage[local_id] += one_norm<scalar_t, accscalar_t>(
-                static_cast<accscalar_t>(grad_ptr_storage[numel_index]));
-          } else {
-            norm_ptr_storage[local_id] += p_norm<scalar_t, accscalar_t>(
-                static_cast<accscalar_t>(grad_ptr_storage[numel_index]),
-                norm_type);
-          }
-        }
-      }
-
-      item.barrier(dpcpp_global_fence);
-
-      // step2, each work_group reduce a sum for a tensor
-      auto reduce_size = Numerics<int>::min(cur_tensor_size, local_range);
-      int64_t cal_size = upper_power_of_two(reduce_size);
-
-      for (int i = cal_size / 2; i >= 1; i /= 2) {
-        if (local_id < i && local_id + i < reduce_size) {
-          norm_ptr_storage[local_id] += norm_ptr_storage[local_id + i];
-        }
-        item.barrier(dpcpp_global_fence);
-      }
-
-      if (local_id == 0) {
-        if (norm_type != 0.0 && norm_type != 1.0) {
-          norm_result_addr[tensor_index] = p_norm<scalar_t, accscalar_t>(
-              norm_ptr_storage[local_id],
-              static_cast<accscalar_t>(1.0f / norm_type));
-        } else {
-          norm_result_addr[tensor_index] = norm_ptr_storage[local_id];
-        }
-      }
-    };
+    NormClampMulFusionKernelFunctor1<scalar_t, accscalar_t> kfn_1(
+        local_range,
+        size_storage_data,
+        grad_storage_data,
+        norm_storage_data,
+        norm_result_addr,
+        return_norm_addr,
+        norm_type);
     cgh.parallel_for(
         sycl::nd_range<2>(
             sycl::range<2>(local_range, tensor_size),
@@ -166,49 +315,12 @@ void norm_clamp_mul_fusion(
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf_1);
 
   auto cgf_2 = DPCPP_Q_CGF(cgh) {
-    auto kfn_2 = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      int local_id = item.get_global_linear_id();
-
-      // step3, calculate the whole norm result for norm vector
-      if (local_id < tensor_size) {
-        if (norm_type == 0.0f) {
-          norm_result_addr[local_id] =
-              zero_norm<scalar_t, accscalar_t>(norm_result_addr[local_id]);
-        } else if (norm_type == 1.0f) {
-          norm_result_addr[local_id] =
-              one_norm<scalar_t, accscalar_t>(norm_result_addr[local_id]);
-        } else {
-          norm_result_addr[local_id] = p_norm<scalar_t, accscalar_t>(
-              norm_result_addr[local_id], norm_type);
-        }
-      }
-      item.barrier(dpcpp_global_fence);
-
-      // step4, calculate the whole norm result for norm vector
-      auto tensor_reduce_size = tensor_size;
-
-      for (int i = tensor_reduce_size / 2; i >= 1; i /= 2) {
-        if (local_id < i && local_id + i < tensor_reduce_size) {
-          norm_result_addr[local_id] += norm_result_addr[local_id + i];
-        }
-        item.barrier(dpcpp_global_fence);
-      }
-
-      if (local_id == 0) {
-        if (norm_type != 0.0 && norm_type != 1.0) {
-          norm_result_addr[0] = p_norm<scalar_t, accscalar_t>(
-              norm_result_addr[local_id],
-              static_cast<accscalar_t>(1.0f / norm_type));
-        }
-        return_norm_addr[0] = static_cast<double>(norm_result_addr[0]);
-      }
-      item.barrier(dpcpp_global_fence);
-      SYCL_KERNEL_ASSERT(
-          !(error_if_nonfinite &&
-            (Numerics<accscalar_t>::isnan(norm_result_addr[0]) ||
-             Numerics<accscalar_t>::isinf(norm_result_addr[0]))) &&
-          "The total norm of gradients from parameters is non-finite, so it cannot be clipped. To disable this error and scale the gradients by the non-finite norm anyway, set error_if_nonfinite=False");
-    };
+    NormClampMulFusionKernelFunctor2<scalar_t, accscalar_t> kfn_2(
+        norm_result_addr,
+        return_norm_addr,
+        norm_type,
+        tensor_size,
+        error_if_nonfinite);
     cgh.parallel_for(
         sycl::nd_range<1>(global_range * local_range, local_range), kfn_2);
   };
@@ -216,29 +328,13 @@ void norm_clamp_mul_fusion(
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf_2);
 
   auto cgf_3 = DPCPP_Q_CGF(cgh) {
-    auto kfn_3 = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-      int tensor_index = item.get_global_id()[1];
-      int local_id = item.get_local_id()[0];
-      int local_range = item.get_local_range()[0];
-
-      int cur_tensor_size = size_storage_data[tensor_index];
-      scalar_t* grad_ptr_storage = grad_storage_data[tensor_index];
-      scalar_t* norm_ptr_storage = norm_storage_data[tensor_index];
-
-      auto loop_times = ceil_div<int>(tensor_size, local_range);
-
-      // step 5 calculate clip_coef and update grads
-      auto total_norm = norm_result_addr[0];
-      auto clip_coef = max_norm / (total_norm + 1e-6);
-      auto clip_coef_clamped = clip_coef > 1.0f ? 1.0f : clip_coef;
-
-      for (int i = 0; i < loop_times; i++) {
-        int numel_index = i * local_range + local_id;
-        if (numel_index < cur_tensor_size) {
-          grad_ptr_storage[numel_index] *= clip_coef_clamped;
-        }
-      }
-    };
+    NormClampMulFusionKernelFunctor3<scalar_t, accscalar_t> kfn_3(
+        size_storage_data,
+        grad_storage_data,
+        norm_storage_data,
+        norm_result_addr,
+        tensor_size,
+        max_norm);
     cgh.parallel_for(
         sycl::nd_range<2>(
             sycl::range<2>(local_range, tensor_size),

@@ -114,6 +114,44 @@ void MovingAverageMinMax(
   }
 }
 
+struct CalculateMovingAverageKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    MovingAverageMinMax(
+        observer_on_data,
+        x_min_data,
+        x_max_data,
+        running_min_data,
+        running_max_data,
+        averaging_const,
+        size,
+        item);
+  }
+  CalculateMovingAverageKernelFunctor(
+      const int64_t* observer_on_data_,
+      const float* x_min_data_,
+      const float* x_max_data_,
+      float* running_min_data_,
+      float* running_max_data_,
+      const float averaging_const_,
+      const int64_t size_)
+      : observer_on_data(observer_on_data_),
+        x_min_data(x_min_data_),
+        x_max_data(x_max_data_),
+        running_min_data(running_min_data_),
+        running_max_data(running_max_data_),
+        averaging_const(averaging_const_),
+        size(size_) {}
+
+ private:
+  const int64_t* observer_on_data;
+  const float* x_min_data;
+  const float* x_max_data;
+  float* running_min_data;
+  float* running_max_data;
+  const float averaging_const;
+  const int64_t size;
+};
+
 void _calculate_moving_average(
     const at::Tensor& x,
     const at::Tensor& observer_on,
@@ -141,17 +179,14 @@ void _calculate_moving_average(
 
     // Moving Average Min/Max observer for activations
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        MovingAverageMinMax(
-            observer_on_data,
-            x_min_data,
-            x_max_data,
-            running_min_data,
-            running_max_data,
-            averaging_const,
-            size,
-            item);
-      };
+      CalculateMovingAverageKernelFunctor kfn(
+          observer_on_data,
+          x_min_data,
+          x_max_data,
+          running_min_data,
+          running_max_data,
+          averaging_const,
+          size);
       cgh.parallel_for(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
@@ -164,22 +199,65 @@ void _calculate_moving_average(
 
     // Moving Average Min/Max observer for activations
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        MovingAverageMinMax(
-            observer_on_data,
-            x_min_data,
-            x_max_data,
-            running_min_data,
-            running_max_data,
-            averaging_const,
-            size,
-            item);
-      };
+      CalculateMovingAverageKernelFunctor kfn(
+          observer_on_data,
+          x_min_data,
+          x_max_data,
+          running_min_data,
+          running_max_data,
+          averaging_const,
+          size);
       cgh.parallel_for(sycl::nd_range<1>(num_groups * group_size, 1), kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);
   }
 }
+
+struct CalcMovingAvgQparamsHelperKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    ChooseQuantizationParamsKernelImpl(
+        fake_quant_on_data,
+        running_min_data,
+        running_max_data,
+        qmin,
+        qmax,
+        size,
+        symmetric_quant, // preserve_sparsity
+        scale_ptr,
+        zp_ptr,
+        item);
+  }
+  CalcMovingAvgQparamsHelperKernelFunctor(
+      const int64_t* fake_quant_on_data_,
+      const float* running_min_data_,
+      const float* running_max_data_,
+      int32_t qmin_,
+      int32_t qmax_,
+      int size_,
+      bool symmetric_quant_,
+      float* scale_ptr_,
+      int32_t* zp_ptr_)
+      : fake_quant_on_data(fake_quant_on_data_),
+        running_min_data(running_min_data_),
+        running_max_data(running_max_data_),
+        qmin(qmin_),
+        qmax(qmax_),
+        size(size_),
+        symmetric_quant(symmetric_quant_),
+        scale_ptr(scale_ptr_),
+        zp_ptr(zp_ptr_) {}
+
+ private:
+  const int64_t* fake_quant_on_data;
+  const float* running_min_data;
+  const float* running_max_data;
+  int32_t qmin;
+  int32_t qmax;
+  int size;
+  bool symmetric_quant;
+  float* scale_ptr;
+  int32_t* zp_ptr;
+};
 
 void _calc_moving_avg_qparams_helper(
     const at::Tensor& x,
@@ -205,19 +283,16 @@ void _calc_moving_avg_qparams_helper(
     float* running_max_data = running_max.data_ptr<float>();
 
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        ChooseQuantizationParamsKernelImpl(
-            fake_quant_on_data,
-            running_min_data,
-            running_max_data,
-            qmin,
-            qmax,
-            size,
-            symmetric_quant, // preserve_sparsity
-            scale_ptr,
-            zp_ptr,
-            item);
-      };
+      CalcMovingAvgQparamsHelperKernelFunctor kfn(
+          fake_quant_on_data,
+          running_min_data,
+          running_max_data,
+          qmin,
+          qmax,
+          size,
+          symmetric_quant,
+          scale_ptr,
+          zp_ptr);
       cgh.parallel_for(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
@@ -228,19 +303,16 @@ void _calc_moving_avg_qparams_helper(
     float* running_max_data = running_max.data_ptr<float>();
 
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        ChooseQuantizationParamsKernelImpl(
-            fake_quant_on_data,
-            running_min_data,
-            running_max_data,
-            qmin,
-            qmax,
-            1, // size
-            symmetric_quant, // preserve_sparsity
-            scale_ptr,
-            zp_ptr,
-            item);
-      };
+      CalcMovingAvgQparamsHelperKernelFunctor kfn(
+          fake_quant_on_data,
+          running_min_data,
+          running_max_data,
+          qmin,
+          qmax,
+          1, // size
+          symmetric_quant, // preserve_sparsity
+          scale_ptr,
+          zp_ptr);
       cgh.parallel_for(sycl::nd_range<1>(num_groups * group_size, 1), kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);
