@@ -50,6 +50,44 @@ struct TLMetaForWG {
   uint32_t wg_to_chunk;
 };
 
+template <typename T, typename Y, typename U, typename... ArgTypes>
+struct MultiTensorApplyKernelFunctor {
+  void operator()(sycl::nd_item<1> item_id) const {
+    // Expand the tuple elements manually and call the callable
+    expandAndCall(item_id, std::index_sequence_for<ArgTypes...>());
+  }
+  MultiTensorApplyKernelFunctor(
+      int64_t kChunkSize_,
+      T tlAddressMeta_,
+      Y tlWGMeta_,
+      U callable_,
+      ArgTypes... args_)
+      : kChunkSize(kChunkSize_),
+        tlAddressMeta(tlAddressMeta_),
+        tlWGMeta(tlWGMeta_),
+        callable(callable_),
+        args(std::make_tuple(args_...)) {}
+
+ private:
+  template <std::size_t... Indices>
+  void expandAndCall(sycl::nd_item<1> item_id, std::index_sequence<Indices...>)
+      const {
+    // Call the callable with expanded tuple elements
+    callable(
+        kChunkSize,
+        tlAddressMeta,
+        tlWGMeta,
+        item_id,
+        std::get<Indices>(args)...);
+  }
+
+  int64_t kChunkSize;
+  T tlAddressMeta;
+  Y tlWGMeta;
+  U callable;
+  std::tuple<ArgTypes...> args;
+};
+
 template <
     bool fused_kernel,
     typename T,
@@ -72,9 +110,8 @@ void multi_tensor_apply_kernel(
   }
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
-      callable(kChunkSize, tlAddressMeta, tlWGMeta, item_id, args...);
-    };
+    MultiTensorApplyKernelFunctor<T, Y, U, ArgTypes...> kfn(
+        kChunkSize, tlAddressMeta, tlWGMeta, callable, args...);
     __cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(global_size * max_wg_size),
