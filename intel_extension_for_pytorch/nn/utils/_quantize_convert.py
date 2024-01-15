@@ -131,9 +131,9 @@ class WeightOnlyLinear(nn.Module):
 
     def forward(self, input: Tensor) -> Tensor:
         if not self.weight_transposed:
-            self.qweight.data = self.qweight.data.T.contiguous()
+            self.qweight.copy_(self.qweight.t_().contiguous())
+            self.scales.copy_(self.scales.t_().contiguous())
             self.weight_transposed = True
-            self.scales.data = self.scales.data.T.contiguous()
         return torch.ops.torch_ipex.mm_low_bits(
             input,
             self.qweight,
