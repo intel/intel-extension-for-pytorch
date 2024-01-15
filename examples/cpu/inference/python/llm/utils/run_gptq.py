@@ -133,8 +133,6 @@ def get_user_model():
             trust_remote_code=True,
         )
         tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
-    elif re.search("falcon", args.model.lower()):
-        assert False, "falcon is not supported yet"
     else:
         user_model = AutoModelForCausalLM.from_pretrained(
             args.model,
@@ -173,3 +171,4 @@ compressed_model = ipex.quantization.gptq(
                         use_max_length=args.use_max_length,
                         pad_max_length=args.pad_max_length,
                         save_dir=args.output_dir)
+
