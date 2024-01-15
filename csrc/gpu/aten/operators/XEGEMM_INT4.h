@@ -341,6 +341,17 @@ using namespace xpu::xetla;
           SG_K,                                                                \
           GZ,                                                                  \
           SLM_KS)                                                              \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD && ARCH == 0) \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
+          HGEMM_INT4_RES_DISPATCH,                                             \
+          hgemm_res_wint4_arc,                                                 \
+          WG_M,                                                                \
+          WG_N,                                                                \
+          SG_M,                                                                \
+          SG_N,                                                                \
+          SG_K,                                                                \
+          GZ,                                                                  \
+          SLM_KS)                                                              \
     else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL && ARCH == 1) \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
           HGEMM_INT4_RESMUL_DISPATCH,                                          \
@@ -837,6 +848,7 @@ class HGEMMXetla_INT4 final {
       return execute_function;
     } else {
       static constexpr int mid = (configs_size - 1) / 2;
+      using MiddleConfig = std::tuple_element_t<mid, ConfigsTuple>;
       if (MiddleConfig::less_than(m_, n_, k_, calib_gz_)) {
         return binary_search<
             scalar_t,
