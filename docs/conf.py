@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.abspath('.'))
 # -- Project information -----------------------------------------------------
 
 project = 'Intel&#174 Extension for PyTorch*'
-copyright = 'Intel(R)'
+#copyright = ''
 author = ''
 
 # The full version, including alpha/beta/rc tags
