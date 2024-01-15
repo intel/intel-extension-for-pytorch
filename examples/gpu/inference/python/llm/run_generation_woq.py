@@ -1,4 +1,5 @@
 import torch
+import intel_extension_for_pytorch as ipex
 import time
 import json
 import pathlib
@@ -11,21 +12,13 @@ from torch.utils.data import DataLoader
 
 from transformers import (
     AutoConfig,
-    AutoModelForCausalLM,
-    LlamaForCausalLM,
     AutoTokenizer,
-    LlamaTokenizer,
 )
-
+from intel_extension_for_transformers.transformers.modeling import AutoModelForCausalLM
+from intel_extension_for_transformers.transformers import WeightOnlyQuantConfig
 
 # supported models
 MODEL_CLASSES = {
-    "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
-    "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
-    "llama": (AutoModelForCausalLM, LlamaTokenizer),
-    "opt": (AutoModelForCausalLM, AutoTokenizer),
-    "falcon": (AutoModelForCausalLM, AutoTokenizer),
-    "bloom": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
     "qwen": (AutoModelForCausalLM, AutoTokenizer),
 }
@@ -120,19 +113,6 @@ def get_memory_usage(name, args):
             memory_allocated = round(torch.xpu.memory_reserved() / 1024**3, 3)
         print(name, "memory used total:", memory_allocated, "GB")
 
-
-# import ipex
-if args.ipex:
-    import intel_extension_for_pytorch as ipex
-    '''
-    try:
-        ipex._C.disable_jit_linear_repack()
-    except Exception:
-        pass
-    '''
-#if args.jit:
-#    torch._C._jit_set_texpr_fuser_enabled(False)
-
 # dtype
 amp_enabled = True if args.dtype != "float32" else False
 amp_dtype = getattr(torch, args.dtype)
@@ -149,55 +129,23 @@ if amp_dtype == torch.float16 and args.woq and args.woq_checkpoint_path == "":
     load_dtype = torch.float32
 else:
     load_dtype = amp_dtype
+
+woq_quantization_config = WeightOnlyQuantConfig(compute_dtype="fp16", weight_dtype="int4_fullrange", scale_dtype="fp16", group_size=64)
 model = model_class[0].from_pretrained(
-    args.model_id, torch_dtype=load_dtype, config=config, low_cpu_mem_usage=True, trust_remote_code=True
+    args.model_id,
+    device_map=device,
+    quantization_config=woq_quantization_config,
+    trust_remote_code=True,
+    use_llm_runtime=False
 )
 tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
-
-woq_weight_path = args.woq_checkpoint_path
-if args.woq and args.woq_checkpoint_path == "":
-    woq_weight_path = args.calib_output_dir + args.calib_checkpoint_name
-    import intel_extension_for_pytorch as ipex
-    from ..dataset.calib_utils import get_loaders
-    model.eval()
-    dataloader, testloader = get_loaders(
-        args.calib_dataset,
-        tokenizer,
-        nsamples=args.calib_nsamples,
-        seed=args.calib_seed,
-        seqlen=model.seqlen
-    )
-    ipex.woq(
-        model,
-        dataloader,
-        woq_weight_path,
-        wbits=args.calib_wbits,
-        param_dtype=amp_dtype,
-    )
 
 model = model.eval().to(device)
 model = model.to(memory_format=torch.channels_last)
 
 # to ipex
-if args.ipex:
-    if args.disable_optimize_transformers:
-        model = ipex.optimize(model.eval(), dtype=amp_dtype)
-    else:
-        if "low_precision_checkpoint" in ipex.optimize_transformers.__code__.co_varnames:
-            woq_config_and_weight = None
-            if args.woq and args.device == "xpu":
-                woq_config = {}
-                woq_config['groups'] = args.calib_group_size
-                woq_config_and_weight = (torch.load(woq_weight_path), woq_config)
-            model = ipex.optimize_transformers(model.eval(), dtype=amp_dtype, device=args.device, inplace=True, low_precision_checkpoint=woq_config_and_weight)
-        else:
-            woq_config = {}
-            if args.woq:
-                woq_config['is_int4'] = args.calib_wbits == 4
-                woq_config['group_size'] = args.calib_group_size
-                woq_config['weight_path'] = woq_weight_path
-            model = ipex.optimize_transformers(model.eval(), dtype=amp_dtype, **woq_config)
-    get_memory_usage("Ipex", args)
+model = ipex.optimize_transformers(model.eval(), device="xpu", inplace=True, woq=True)
+get_memory_usage("Ipex", args)
 
 
 num_beams = 1 if args.greedy else args.num_beams
