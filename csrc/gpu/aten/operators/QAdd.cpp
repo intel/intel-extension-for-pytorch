@@ -17,6 +17,22 @@ using namespace at::native;
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 
+template <typename T, typename FuncType>
+struct QAddImplKernelFunctor {
+  void operator()(sycl::item<1> item) const {
+    auto i = item.get_linear_id();
+    o_ptr[i] = func(qa_ptr[i], qb_ptr[i]);
+  }
+  QAddImplKernelFunctor(T* qa_ptr_, T* qb_ptr_, T* o_ptr_, FuncType func_)
+      : qa_ptr(qa_ptr_), qb_ptr(qb_ptr_), o_ptr(o_ptr_), func(func_) {}
+
+ private:
+  T* qa_ptr;
+  T* qb_ptr;
+  T* o_ptr;
+  FuncType func;
+};
+
 template <typename T>
 Tensor q_add_impl(
     Tensor qa,
@@ -57,10 +73,8 @@ Tensor q_add_impl(
     T* qa_ptr = (T*)qa_.data_ptr();
     T* qb_ptr = (T*)qb_.data_ptr();
     T* o_ptr = (T*)out.data_ptr();
-    cgh.parallel_for(sycl::range<1>(qa_.numel()), [=](sycl::item<1> item) {
-      auto i = item.get_linear_id();
-      o_ptr[i] = func(qa_ptr[i], qb_ptr[i]);
-    });
+    QAddImplKernelFunctor<T, decltype(func)> kfn(qa_ptr, qb_ptr, o_ptr, func);
+    cgh.parallel_for<decltype(kfn)>(sycl::range<1>(qa_.numel()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 

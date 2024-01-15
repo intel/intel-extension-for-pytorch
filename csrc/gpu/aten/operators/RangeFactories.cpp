@@ -45,6 +45,20 @@ struct LogspaceOp {
   const accT start_, step_, base_;
 };
 
+template <typename scalar_t, typename func_t>
+struct DpcppElementwiseKernelWithIndexImplFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    auto idx = item_id.get_linear_id();
+    out_ptr[idx] = f(idx);
+  }
+  DpcppElementwiseKernelWithIndexImplFunctor(scalar_t* out_ptr_, func_t f_)
+      : out_ptr(out_ptr_), f(f_) {}
+
+ private:
+  scalar_t* out_ptr;
+  func_t f;
+};
+
 // TODO: move it to the loops for more generic supporting.
 template <typename scalar_t, typename func_t>
 void dpcpp_elementwise_kernel_with_index_impl(
@@ -60,10 +74,8 @@ void dpcpp_elementwise_kernel_with_index_impl(
   int64_t thread_number = std::min(N, (int64_t)std::numeric_limits<int>::max());
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      auto idx = item_id.get_linear_id();
-      out_ptr[idx] = f(idx);
-    };
+    DpcppElementwiseKernelWithIndexImplFunctor<scalar_t, func_t> kfn(
+        out_ptr, f);
     cgh.parallel_for(sycl::range</*dim=*/1>(thread_number), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -282,6 +294,43 @@ Tensor& range_dpcpp_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
   return result;
 }
 
+template <typename scalar_t, typename accscalar_t>
+struct ArangeDpcppOutKernelFunctor {
+  void operator()(sycl::nd_item<1> item_id) const {
+    slm_xstart[0] = xstart;
+    slm_xstep[0] = xstep;
+    auto ptr = acc;
+    auto global_id_col = item_id.get_global_id(0);
+    if (global_id_col < size) {
+      ptr[global_id_col] = slm_xstart[0] + global_id_col * slm_xstep[0];
+    }
+  }
+  ArangeDpcppOutKernelFunctor(
+      int64_t size_,
+      accscalar_t xstart_,
+      accscalar_t xend_,
+      accscalar_t xstep_,
+      scalar_t* acc_,
+      dpcpp_local_acc_t<accscalar_t> slm_xstart_,
+      dpcpp_local_acc_t<accscalar_t> slm_xstep_)
+      : size(size_),
+        xstart(xstart_),
+        xend(xend_),
+        xstep(xstep_),
+        acc(acc_),
+        slm_xstart(slm_xstart_),
+        slm_xstep(slm_xstep_) {}
+
+ private:
+  int64_t size;
+  accscalar_t xstart;
+  accscalar_t xend;
+  accscalar_t xstep;
+  scalar_t* acc;
+  dpcpp_local_acc_t<accscalar_t> slm_xstart;
+  dpcpp_local_acc_t<accscalar_t> slm_xstep;
+};
+
 Tensor& arange_dpcpp_out(
     Tensor& result,
     Scalar start,
@@ -364,15 +413,8 @@ Tensor& arange_dpcpp_out(
           dpcpp_local_acc_t<accscalar_t> slm_xstep(1, cgh);
 
           // kernel function per work-item
-          auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
-            slm_xstart[0] = xstart;
-            slm_xstep[0] = xstep;
-            auto ptr = acc;
-            auto global_id_col = item_id.get_global_id(0);
-            if (global_id_col < size) {
-              ptr[global_id_col] = slm_xstart[0] + global_id_col * slm_xstep[0];
-            }
-          };
+          ArangeDpcppOutKernelFunctor<scalar_t, accscalar_t> kfn(
+              size, xstart, xend, xstep, acc, slm_xstart, slm_xstep);
           // kick off kernel
           cgh.parallel_for(
               sycl::nd_range</*dim=*/1>(

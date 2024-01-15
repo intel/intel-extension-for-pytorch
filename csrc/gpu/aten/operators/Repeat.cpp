@@ -15,6 +15,43 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename index_t>
+struct RepeatInterleaveDpcppKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto rep_ptr = rep_data;
+    auto cum_ptr = cum_data;
+    auto res_ptr = res_data;
+
+    for (int64_t i = item.get_global_id(0); i < size;
+         i += item.get_global_range()[0]) {
+      int64_t end = cum_ptr[i];
+      int64_t repeat = rep_ptr[i];
+      int64_t start = end - repeat;
+      for (int64_t j = start; j < end; j++) {
+        res_ptr[j] = i;
+      }
+    }
+  }
+  RepeatInterleaveDpcppKernelFunctor(
+      index_t* rep_data_,
+      int64_t* cum_data_,
+      index_t* res_data_,
+      int64_t size_,
+      int64_t result_size_)
+      : rep_data(rep_data_),
+        cum_data(cum_data_),
+        res_data(res_data_),
+        size(size_),
+        result_size(result_size_) {}
+
+ private:
+  index_t* rep_data;
+  int64_t* cum_data;
+  index_t* res_data;
+  int64_t size;
+  int64_t result_size;
+};
+
+template <typename index_t>
 static void repeat_interleave_dpcpp_kernel(
     index_t* repeat_ptr,
     int64_t* cumsum_ptr,
@@ -35,21 +72,8 @@ static void repeat_interleave_dpcpp_kernel(
     auto cum_data = cumsum_ptr;
     auto res_data = result_ptr;
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto rep_ptr = rep_data;
-      auto cum_ptr = cum_data;
-      auto res_ptr = res_data;
-
-      for (int64_t i = item.get_global_id(0); i < size;
-           i += item.get_global_range()[0]) {
-        int64_t end = cum_ptr[i];
-        int64_t repeat = rep_ptr[i];
-        int64_t start = end - repeat;
-        for (int64_t j = start; j < end; j++) {
-          res_ptr[j] = i;
-        }
-      }
-    };
+    RepeatInterleaveDpcppKernelFunctor<index_t> kfn(
+        rep_data, cum_data, res_data, size, result_size);
     // kick off kernel
     cgh.parallel_for(
         sycl::nd_range<1>(

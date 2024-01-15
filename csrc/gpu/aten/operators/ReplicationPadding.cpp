@@ -21,6 +21,45 @@ inline int imax(int a, int b) {
 }
 
 template <typename scalar_t, typename F>
+struct ParallelReplicationPad1dKernelFunctor {
+  void operator()(sycl::nd_item<3> item) const {
+    auto output_id = item.get_global_id(0);
+    if (output_id > output_plane_size) {
+      return;
+    }
+    int64_t output_x = output_id % output.size(2);
+    int64_t i_start_x = imax(0, -pad_left);
+    int64_t o_start_x = imax(0, pad_left);
+    int64_t input_x =
+        imin(imax(pad_left, output_x), input.size(2) + pad_left - 1) -
+        o_start_x + i_start_x;
+
+    f(input, output, item.get_group(1), item.get_group(2), output_x, input_x);
+  }
+  ParallelReplicationPad1dKernelFunctor(
+      PackedTensorAccessor64<scalar_t, 3> input_,
+      PackedTensorAccessor64<scalar_t, 3> output_,
+      int64_t pad_left_,
+      int64_t pad_right_,
+      const F f_,
+      int64_t output_plane_size_)
+      : input(input_),
+        output(output_),
+        pad_left(pad_left_),
+        pad_right(pad_right_),
+        f(f_),
+        output_plane_size(output_plane_size_) {}
+
+ private:
+  PackedTensorAccessor64<scalar_t, 3> input;
+  PackedTensorAccessor64<scalar_t, 3> output;
+  int64_t pad_left;
+  int64_t pad_right;
+  const F f;
+  int64_t output_plane_size;
+};
+
+template <typename scalar_t, typename F>
 void parallel_replication_pad1d(
     PackedTensorAccessor64<scalar_t, 3> input,
     PackedTensorAccessor64<scalar_t, 3> output,
@@ -34,20 +73,8 @@ void parallel_replication_pad1d(
   int64_t nplane = output.size(1);
   int64_t nbatch = output.size(0);
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
-      auto output_id = item.get_global_id(0);
-      if (output_id > output_plane_size) {
-        return;
-      }
-      int64_t output_x = output_id % output.size(2);
-      int64_t i_start_x = imax(0, -pad_left);
-      int64_t o_start_x = imax(0, pad_left);
-      int64_t input_x =
-          imin(imax(pad_left, output_x), input.size(2) + pad_left - 1) -
-          o_start_x + i_start_x;
-
-      f(input, output, item.get_group(1), item.get_group(2), output_x, input_x);
-    };
+    ParallelReplicationPad1dKernelFunctor<scalar_t, F> kfn(
+        input, output, pad_left, pad_right, f, output_plane_size);
     cgh.parallel_for(
         sycl::nd_range<3>(
             sycl::range<3>(work_group_size * work_group_num, nplane, nbatch),
@@ -104,6 +131,79 @@ void replication_pad1d_backward_kernel(
 }
 
 template <typename scalar_t>
+struct ReplicationPadForwardKernel2dFunctor {
+  void operator()(sycl::nd_item<3> item) const {
+    int outputPointId =
+        item.get_local_id(0) + item.get_group(0) * item.get_local_range(0);
+    int plane = item.get_group(1);
+    int batch = item.get_group(2);
+    if (outputPointId >= o2 * o3)
+      return;
+    int outputPointX = outputPointId % o3;
+    int outputPointY = outputPointId / o3;
+    int iStartX = imax(0, -padL);
+    int iStartY = imax(0, -padT);
+    int oStartX = imax(0, padL);
+    int oStartY = imax(0, padT);
+    int inputPointX =
+        imin(imax(padL, outputPointX), i3 + padL - 1) - oStartX + iStartX;
+    int inputPointY =
+        imin(imax(padT, outputPointY), i2 + padT - 1) - oStartY + iStartY;
+
+    size_t in_ = ((batch * i1 + plane) * i2 + inputPointY) * i3 + inputPointX;
+    scalar_t valueToCopy = input[in_];
+    size_t out_ =
+        ((batch * o1 + plane) * o2 + outputPointY) * o3 + outputPointX;
+    output[out_] = valueToCopy;
+  }
+  ReplicationPadForwardKernel2dFunctor(
+      scalar_t* input_,
+      scalar_t* output_,
+      int64_t padT_,
+      int64_t padB_,
+      int64_t padL_,
+      int64_t padR_,
+      int o0_,
+      int o1_,
+      int o2_,
+      int o3_,
+      int i0_,
+      int i1_,
+      int i2_,
+      int i3_)
+      : input(input_),
+        output(output_),
+        padT(padT_),
+        padB(padB_),
+        padL(padL_),
+        padR(padR_),
+        o0(o0_),
+        o1(o1_),
+        o2(o2_),
+        o3(o3_),
+        i0(i0_),
+        i1(i1_),
+        i2(i2_),
+        i3(i3_) {}
+
+ private:
+  scalar_t* input;
+  scalar_t* output;
+  int64_t padT;
+  int64_t padB;
+  int64_t padL;
+  int64_t padR;
+  int o0;
+  int o1;
+  int o2;
+  int o3;
+  int i0;
+  int i1;
+  int i2;
+  int i3;
+};
+
+template <typename scalar_t>
 void replication_pad_forward_kernel2d(
     scalar_t* input,
     scalar_t* output,
@@ -124,30 +224,8 @@ void replication_pad_forward_kernel2d(
   int workgroup_size = outputPlaneSize > 256 ? 256 : outputPlaneSize;
   // clcle
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
-      int outputPointId =
-          item.get_local_id(0) + item.get_group(0) * item.get_local_range(0);
-      int plane = item.get_group(1);
-      int batch = item.get_group(2);
-      if (outputPointId >= o2 * o3)
-        return;
-      int outputPointX = outputPointId % o3;
-      int outputPointY = outputPointId / o3;
-      int iStartX = imax(0, -padL);
-      int iStartY = imax(0, -padT);
-      int oStartX = imax(0, padL);
-      int oStartY = imax(0, padT);
-      int inputPointX =
-          imin(imax(padL, outputPointX), i3 + padL - 1) - oStartX + iStartX;
-      int inputPointY =
-          imin(imax(padT, outputPointY), i2 + padT - 1) - oStartY + iStartY;
-
-      size_t in_ = ((batch * i1 + plane) * i2 + inputPointY) * i3 + inputPointX;
-      scalar_t valueToCopy = input[in_];
-      size_t out_ =
-          ((batch * o1 + plane) * o2 + outputPointY) * o3 + outputPointX;
-      output[out_] = valueToCopy;
-    };
+    ReplicationPadForwardKernel2dFunctor<scalar_t> kfn(
+        input, output, padT, padB, padL, padR, o0, o1, o2, o3, i0, i1, i2, i3);
     cgh.parallel_for(
         sycl::nd_range<3>(
             sycl::range<3>(
@@ -273,6 +351,79 @@ void replication_pad2d_out_template(
 }
 
 template <typename scalar_t>
+struct ReplicationPadBackwardKernelFunctor {
+  void operator()(sycl::nd_item<3> item) const {
+    int outputPointId =
+        item.get_local_id(0) + item.get_group(0) * item.get_local_range(0);
+    int plane = item.get_group(1);
+    int batch = item.get_group(2);
+    if (outputPointId >= go2 * go3)
+      return;
+    int outputPointX = outputPointId % go3;
+    int outputPointY = outputPointId / go3;
+    int iStartX = imax(0, -padL);
+    int iStartY = imax(0, -padT);
+    int oStartX = imax(0, padL);
+    int oStartY = imax(0, padT);
+    int inputPointX =
+        imin(imax(padL, outputPointX), gi3 + padL - 1) - oStartX + iStartX;
+    int inputPointY =
+        imin(imax(padT, outputPointY), gi2 + padT - 1) - oStartY + iStartY;
+    size_t go_ =
+        ((batch * go1 + plane) * go2 + outputPointY) * go3 + outputPointX;
+    scalar_t valueToCopy = gradOutput[go_];
+    size_t gi_ =
+        ((batch * gi1 + plane) * gi2 + inputPointY) * gi3 + inputPointX;
+    atomicAdd((dpcpp_global_ptr_pt<scalar_t>)&gradInput[gi_], valueToCopy);
+  }
+  ReplicationPadBackwardKernelFunctor(
+      scalar_t* gradInput_,
+      scalar_t* gradOutput_,
+      int padT_,
+      int padB_,
+      int padL_,
+      int padR_,
+      int go0_,
+      int go1_,
+      int go2_,
+      int go3_,
+      int gi0_,
+      int gi1_,
+      int gi2_,
+      int gi3_)
+      : gradInput(gradInput_),
+        gradOutput(gradOutput_),
+        padT(padT_),
+        padB(padB_),
+        padL(padL_),
+        padR(padR_),
+        go0(go0_),
+        go1(go1_),
+        go2(go2_),
+        go3(go3_),
+        gi0(gi0_),
+        gi1(gi1_),
+        gi2(gi2_),
+        gi3(gi3_) {}
+
+ private:
+  scalar_t* gradInput;
+  scalar_t* gradOutput;
+  int padT;
+  int padB;
+  int padL;
+  int padR;
+  int go0;
+  int go1;
+  int go2;
+  int go3;
+  int gi0;
+  int gi1;
+  int gi2;
+  int gi3;
+};
+
+template <typename scalar_t>
 void replication_pad_backward_kernel(
     scalar_t* gradInput,
     scalar_t* gradOutput,
@@ -293,30 +444,21 @@ void replication_pad_backward_kernel(
   int workgroup_size = outputPlaneSize > 256 ? 256 : outputPlaneSize;
   // clcle
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
-      int outputPointId =
-          item.get_local_id(0) + item.get_group(0) * item.get_local_range(0);
-      int plane = item.get_group(1);
-      int batch = item.get_group(2);
-      if (outputPointId >= go2 * go3)
-        return;
-      int outputPointX = outputPointId % go3;
-      int outputPointY = outputPointId / go3;
-      int iStartX = imax(0, -padL);
-      int iStartY = imax(0, -padT);
-      int oStartX = imax(0, padL);
-      int oStartY = imax(0, padT);
-      int inputPointX =
-          imin(imax(padL, outputPointX), gi3 + padL - 1) - oStartX + iStartX;
-      int inputPointY =
-          imin(imax(padT, outputPointY), gi2 + padT - 1) - oStartY + iStartY;
-      size_t go_ =
-          ((batch * go1 + plane) * go2 + outputPointY) * go3 + outputPointX;
-      scalar_t valueToCopy = gradOutput[go_];
-      size_t gi_ =
-          ((batch * gi1 + plane) * gi2 + inputPointY) * gi3 + inputPointX;
-      atomicAdd((dpcpp_global_ptr_pt<scalar_t>)&gradInput[gi_], valueToCopy);
-    };
+    ReplicationPadBackwardKernelFunctor<scalar_t> kfn(
+        gradInput,
+        gradOutput,
+        padT,
+        padB,
+        padL,
+        padR,
+        go0,
+        go1,
+        go2,
+        go3,
+        gi0,
+        gi1,
+        gi2,
+        gi3);
     cgh.parallel_for(
         sycl::nd_range<3>(
             sycl::range<3>(
@@ -414,6 +556,71 @@ void replication_pad2d_backward_out_template(
 }
 
 template <typename scalar_t, typename F>
+struct ParallelReplicationPad3dKernelFunctor {
+  void operator()(sycl::nd_item<3> item) const {
+    auto output_id = item.get_global_id(0);
+    if (output_id > output_plane_size) {
+      return;
+    }
+    int64_t output_x = output_id % output.size(4);
+    int64_t output_y = (output_id / output.size(4)) % output.size(3);
+    int64_t output_z = output_id / (output.size(3) * output.size(4));
+
+    int64_t i_start_x = imax(0, -pad_left);
+    int64_t i_start_y = imax(0, -pad_top);
+    int64_t i_start_z = imax(0, -pad_front);
+    int64_t o_start_x = imax(0, pad_left);
+    int64_t o_start_y = imax(0, pad_top);
+    int64_t o_start_z = imax(0, pad_front);
+
+    int64_t input_x =
+        imin(imax(pad_left, output_x), input.size(4) + pad_left - 1) -
+        o_start_x + i_start_x;
+    int64_t input_y =
+        imin(imax(pad_top, output_y), input.size(3) + pad_top - 1) - o_start_y +
+        i_start_y;
+    int64_t input_z =
+        imin(imax(pad_front, output_z), input.size(2) + pad_front - 1) -
+        o_start_z + i_start_z;
+
+    f(input,
+      output,
+      item.get_group(1),
+      item.get_group(2),
+      output_z,
+      output_y,
+      output_x,
+      input_z,
+      input_y,
+      input_x);
+  }
+  ParallelReplicationPad3dKernelFunctor(
+      PackedTensorAccessor64<scalar_t, 5> input_,
+      PackedTensorAccessor64<scalar_t, 5> output_,
+      int64_t pad_left_,
+      int64_t pad_top_,
+      int64_t pad_front_,
+      const F f_,
+      int64_t output_plane_size_)
+      : input(input_),
+        output(output_),
+        pad_left(pad_left_),
+        pad_top(pad_top_),
+        pad_front(pad_front_),
+        f(f_),
+        output_plane_size(output_plane_size_) {}
+
+ private:
+  PackedTensorAccessor64<scalar_t, 5> input;
+  PackedTensorAccessor64<scalar_t, 5> output;
+  int64_t pad_left;
+  int64_t pad_top;
+  int64_t pad_front;
+  const F f;
+  int64_t output_plane_size;
+};
+
+template <typename scalar_t, typename F>
 void parallel_replication_pad3d(
     PackedTensorAccessor64<scalar_t, 5> input,
     PackedTensorAccessor64<scalar_t, 5> output,
@@ -428,43 +635,8 @@ void parallel_replication_pad3d(
   int64_t nplane = output.size(1);
   int64_t nbatch = output.size(0);
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
-      auto output_id = item.get_global_id(0);
-      if (output_id > output_plane_size) {
-        return;
-      }
-      int64_t output_x = output_id % output.size(4);
-      int64_t output_y = (output_id / output.size(4)) % output.size(3);
-      int64_t output_z = output_id / (output.size(3) * output.size(4));
-
-      int64_t i_start_x = imax(0, -pad_left);
-      int64_t i_start_y = imax(0, -pad_top);
-      int64_t i_start_z = imax(0, -pad_front);
-      int64_t o_start_x = imax(0, pad_left);
-      int64_t o_start_y = imax(0, pad_top);
-      int64_t o_start_z = imax(0, pad_front);
-
-      int64_t input_x =
-          imin(imax(pad_left, output_x), input.size(4) + pad_left - 1) -
-          o_start_x + i_start_x;
-      int64_t input_y =
-          imin(imax(pad_top, output_y), input.size(3) + pad_top - 1) -
-          o_start_y + i_start_y;
-      int64_t input_z =
-          imin(imax(pad_front, output_z), input.size(2) + pad_front - 1) -
-          o_start_z + i_start_z;
-
-      f(input,
-        output,
-        item.get_group(1),
-        item.get_group(2),
-        output_z,
-        output_y,
-        output_x,
-        input_z,
-        input_y,
-        input_x);
-    };
+    ParallelReplicationPad3dKernelFunctor<scalar_t, F> kfn(
+        input, output, pad_left, pad_top, pad_front, f, output_plane_size);
     cgh.parallel_for(
         sycl::nd_range<3>(
             sycl::range<3>(work_group_size * work_group_num, nplane, nbatch),
