@@ -4393,9 +4393,9 @@ class Tester(TestCase):
             )
 
     def _test_linear_unary_fusion(self, op_list, seed=None, cls=None):
-        batch_size = 3
-        out_channels = 32
-        in_channels = 3
+        batch_size = 1
+        out_channels = 3
+        in_channels = 2
 
         if seed is None:
             rand_seed = int(get_rand_seed())

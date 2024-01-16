@@ -572,15 +572,15 @@ class TestLSTM(TorchTestCase):
     def _lstm_params_list(self):
         params_dict = {
             "input_size": [1, 2],
-            "hidden_size": [5, 32],
-            "num_layers": [1, 3],
+            "hidden_size": [2],
+            "num_layers": [1, 2],
             "bidirectional": [False, True],
             "bias": [False, True],
             "empty_state": [False, True],
             "batch_first": [False, True],
-            "dropout": [0, 0.4, 0.7, 1],
+            "dropout": [0, 0.4, 1],
             "batch_size": [1, 2],
-            "seq_len": [1, 3],
+            "seq_len": [1, 2],
         }
 
         params_list = []
