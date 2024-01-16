@@ -19,4 +19,8 @@ void InitIpexBindings(py::module& m) {
 #else
   m.def("_has_xpu", []() { return false; });
 #endif
+
+  // FIXME: For now the syngraph is not integrated into the IPEX,
+  // so here binded function is always return false here
+  m.def("_is_syngraph_available", []() { return false; });
 }

@@ -139,7 +139,6 @@ if has_cpu():
         _get_compiler_backend,
         compile,
     )
-    from ._inductor.cpu.dynamo_backends import *
     from .cpu.onednn_fusion import enable_onednn_fusion
     from ._init_on_device import OnDevice
 

@@ -8,3 +8,7 @@ def has_cpu() -> bool:
 
 def has_xpu() -> bool:
     return core._has_xpu()
+
+
+def _is_syngraph_available():
+    return core._is_syngraph_available()
