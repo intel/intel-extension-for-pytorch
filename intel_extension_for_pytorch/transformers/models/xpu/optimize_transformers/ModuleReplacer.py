@@ -24,11 +24,14 @@ from .modules.bloom import NewIPEXBloomBlock
 from .modules.llama import NewIPEXLLAMABlock
 from .modules.opt import NewIPEXOPTBlock
 from .modules.falcon import NewIPEXFalconBlock
+from .modules.DiffusersTransformer import NewIPEXBasicTransformerBlock
+
 import os
 
 
 def default_replaced_module_dict():
     import transformers
+    from diffusers.models.attention import BasicTransformerBlock
 
     default_replace_modules = {
         transformers.models.gptj.modeling_gptj.GPTJBlock: NewIPEXGPTJBlock,
@@ -37,6 +40,7 @@ def default_replaced_module_dict():
         transformers.models.bloom.modeling_bloom.BloomBlock: NewIPEXBloomBlock,
         # only support transformers version model, not in-library model
         transformers.models.falcon.modeling_falcon.FalconDecoderLayer: NewIPEXFalconBlock,
+        BasicTransformerBlock: NewIPEXBasicTransformerBlock,
     }
     return default_replace_modules
 
@@ -108,6 +112,11 @@ class ModuleReplacer:
             ImplementMode.naive if enable_naive_path else ImplementMode.optimized
         )
         for name, child in model.named_children():
+            if (
+                str(type(child))
+                == "<class 'diffusers.models.transformer_2d.Transformer2DModel'>"
+            ):
+                config = child.config
             if type(child) in self.module_dict.keys():
                 new_module = self.module_dict[type(child)](
                     child,

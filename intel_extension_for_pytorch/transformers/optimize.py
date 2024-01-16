@@ -582,26 +582,34 @@ def optimize_transformers(
             )
             return model
 
-        well_supported_model = (
-            re.search("GPTJ", model.config.architectures[0], re.IGNORECASE)
-            or re.search("llama", model.config.architectures[0], re.IGNORECASE)
-            or re.search("gptneox", model.config.architectures[0], re.IGNORECASE)
-            or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
-            or re.search("falcon", model.config.architectures[0], re.IGNORECASE)
-            or re.search("rw", model.config.architectures[0], re.IGNORECASE)
-        ) and device == "cpu"
-        # bypass_ref_model = (re.search("Bloom", model.config.architectures[0], re.IGNORECASE)) or device == "xpu"
-        xpu_supported_model = (
-            re.search("GPTJ", model.config.architectures[0], re.IGNORECASE)
-            or re.search("llama", model.config.architectures[0], re.IGNORECASE)
-            or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
-            or re.search("Bloom", model.config.architectures[0], re.IGNORECASE)
-            or re.search("Falcon", model.config.architectures[0], re.IGNORECASE)
-        ) and device == "xpu"
+        if isinstance(model.config, dict):
+            well_supported_model = False
+            xpu_supported_model = (
+                model.config.__contains__("_diffusers_version") and device == "xpu"
+            )
+        else:
+            well_supported_model = (
+                re.search("GPTJ", model.config.architectures[0], re.IGNORECASE)
+                or re.search("llama", model.config.architectures[0], re.IGNORECASE)
+                or re.search("gptneox", model.config.architectures[0], re.IGNORECASE)
+                or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
+                or re.search("falcon", model.config.architectures[0], re.IGNORECASE)
+                or re.search("rw", model.config.architectures[0], re.IGNORECASE)
+            ) and device == "cpu"
+            # bypass_ref_model = (re.search("Bloom", model.config.architectures[0], re.IGNORECASE)) or device == "xpu"
+            xpu_supported_model = (
+                re.search("GPTJ", model.config.architectures[0], re.IGNORECASE)
+                or re.search("llama", model.config.architectures[0], re.IGNORECASE)
+                or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
+                or re.search("Bloom", model.config.architectures[0], re.IGNORECASE)
+                or re.search("Falcon", model.config.architectures[0], re.IGNORECASE)
+            ) and device == "xpu"
+
         if not (well_supported_model or xpu_supported_model):
             warnings.warn(
                 "optimize_transformers supports GPT-J/Llama/OPT/Bloom/Falcon"
                 " of transformers model without `trust_remote_code=True` in XPU"
+                " and BasicTransformerBlock of diffusers in XPU"
                 " and Llama/GPT-J/GPT-Neox/Falcon/OPT"
                 " in CPU, fallback to origin model"
             )

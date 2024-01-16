@@ -219,7 +219,13 @@ class Converter:
                 device = "xpu"
             model = model.to(device).to(dtype)
         self.module_replacer.replace_func(model)
-        if model.config.torchscript is not True:
+        need_replace_module = False
+        if isinstance(model.config, dict):
+            need_replace_module = True
+        elif model.config.torchscript is not True:
+            need_replace_module = True
+
+        if need_replace_module:
             is_replace_success = self.module_replacer.replace_module(
                 model, dtype_tag, config=None
             )

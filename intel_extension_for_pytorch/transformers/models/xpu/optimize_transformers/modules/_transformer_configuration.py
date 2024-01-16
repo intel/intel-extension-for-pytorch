@@ -1,6 +1,7 @@
 import torch
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 
 class ImplementMode(Enum):
@@ -51,3 +52,30 @@ class IPEXTransformerConfig:
     tp_group: object = None
     transpose: bool = True
     dynamic_cache_stride: int = 16
+
+
+@dataclass
+class IPEXDiffusersTransformerConfig:
+    num_attention_heads: int
+    attention_head_dim: int
+    dropout: float = 0.0
+    cross_attention_dim: Optional[int] = None
+    activation_fn: str = "geglu"
+    num_embeds_ada_norm: Optional[int] = None
+    attention_bias: bool = False
+    only_cross_attention: bool = False
+    double_self_attention: bool = False
+    upcast_attention: bool = False
+    norm_elementwise_affine: bool = True
+    norm_type: str = (
+        "layer_norm"  # 'layer_norm', 'ada_norm', 'ada_norm_zero', 'ada_norm_single'
+    )
+    norm_eps: float = 1e-5
+    final_dropout: bool = False
+    attention_type: str = "default"
+    positional_embeddings: Optional[str] = None
+    num_positional_embeddings: Optional[int] = None
+    device: torch.device = "xpu"
+    dtype: str = "fp16"
+    tp_size: int = 1
+    tp_group: object = None
