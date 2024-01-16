@@ -246,7 +246,7 @@ void coalesce_values_kernel(
         newValues_data);
 
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(
             sycl::range<2>(num_group_0 * 4, num_group_1 * 64),
             sycl::range<2>(4, 64)),

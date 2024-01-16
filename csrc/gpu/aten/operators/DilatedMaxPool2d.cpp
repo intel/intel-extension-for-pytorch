@@ -219,7 +219,7 @@ void max_pool2d_out_frame(
         outputSize,
         stride,
         cfg);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -338,7 +338,7 @@ void max_pool2d_backward_out_frame(
         out_n_stride,
         in_n_stride,
         cfg);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);

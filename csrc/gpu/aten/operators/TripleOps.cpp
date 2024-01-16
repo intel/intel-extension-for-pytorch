@@ -386,7 +386,7 @@ static inline void packed_add_kernel(
     auto gw_data = gw;
     PackedAddKernelFunctor<scalar_t, packed_bf16> kfn(
         MSB_data, LSB_data, gw_data, num_elem, lr);
-    cgh.parallel_for(sycl::range<1>(num_elem), kfn);
+    cgh.parallel_for<decltype(kfn)>(sycl::range<1>(num_elem), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -510,7 +510,7 @@ static inline void sparse_packed_add_kernel(
         newNnz);
 
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(
             sycl::range<2>(num_group_0 * 4, num_group_1 * 64),
             sycl::range<2>(4, 64)),

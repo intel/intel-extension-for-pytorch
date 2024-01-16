@@ -113,7 +113,7 @@ void launch_cross_kernel(
               x,
               y,
               offset_calculator);
-          cgh.parallel_for(
+          cgh.parallel_for<decltype(kfn)>(
               sycl::nd_range<1>(
                   sycl::range<1>(work_group_num * work_group_size),
                   sycl::range<1>(work_group_size)),

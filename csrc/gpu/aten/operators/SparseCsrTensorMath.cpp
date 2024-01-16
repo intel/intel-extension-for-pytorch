@@ -61,7 +61,7 @@ void convert_indices_from_coo_to_csr_kernel_dpcpp(
   auto cgf = DPCPP_Q_CGF(cgh) {
     ConvertIndicesFromCooToCsrKernelDpcppFunctor<input_t, output_t> kfn(
         numel, data_in, data_out, size);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -121,7 +121,7 @@ void convert_indices_from_csr_to_coo_kernel_dpcpp(
   auto cgf = DPCPP_Q_CGF(cgh) {
     ConvertIndicesFromCsrToCooKernelDpcppFunctor<input_t, output_t> kfn(
         nrows, crow_indices_data_in, data_out);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

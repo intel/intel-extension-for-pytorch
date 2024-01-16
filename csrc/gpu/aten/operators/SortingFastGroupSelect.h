@@ -180,7 +180,7 @@ inline void fast_group_radix_select_impl_(
             ntopk,
             slm,
             padding_key);
-    h.parallel_for(
+    h.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(nsegments * GROUP_ITEMS),
             sycl::range<1>(GROUP_ITEMS)),

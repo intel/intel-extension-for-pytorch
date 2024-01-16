@@ -165,7 +165,7 @@ at::Tensor nms_kernel(
             impl::nms_kernel_impl<scalar_t>(
                 item, slm, dets_num, iou_threshold, dets_sorted_ptr, mask_ptr);
           };
-          cgh.parallel_for(
+          cgh.parallel_for<decltype(kfn)>(
               sycl::nd_range<2>(
                   sycl::range<2>(col_blocks, col_blocks * items_per_group),
                   sycl::range<2>(1, items_per_group)),

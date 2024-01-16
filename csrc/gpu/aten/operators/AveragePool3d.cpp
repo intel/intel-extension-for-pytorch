@@ -268,7 +268,7 @@ void avg_pool3d_backward_out_frame_atomic(
             isize2,
             isize3);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>{
                 z_group_range,
@@ -481,7 +481,7 @@ void avg_pool3d_backward_out_frame_stride1(
             isize2,
             isize3);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>{
                 z_group_range,
@@ -737,7 +737,7 @@ void avg_pool3d_backward_out_frame(
         isize2,
         isize3);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>{
                 z_group_range,
@@ -1001,7 +1001,7 @@ void avg_pool3d_out_frame(
         input,
         output);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>{
                 z_group_range,

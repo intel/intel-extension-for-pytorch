@@ -319,7 +319,7 @@ void ClassNLLCriterion_updateOutput(
           output_stride_0,
           input_stride_0,
           input_stride_1);
-      cgh.parallel_for(sycl::range<1>(local_size), kfn);
+      cgh.parallel_for<decltype(kfn)>(sycl::range<1>(local_size), kfn);
     };
 
     DPCPP_Q_SUBMIT(queue, cgf);
@@ -367,7 +367,7 @@ void ClassNLLCriterion_updateOutput(
           n_classes,
           ignore_index,
           reduction);
-      cgh.parallel_for(sycl::range<1>(local_size), kfn);
+      cgh.parallel_for<decltype(kfn)>(sycl::range<1>(local_size), kfn);
     };
 
     DPCPP_Q_SUBMIT(queue, cgf);
@@ -405,7 +405,7 @@ void ClassNLLCriterion_updateOutput(
           local_output_acc,
           local_total_weight_acc,
           reduction);
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(
               sycl::range<1>(local_size), sycl::range<1>(local_size)),
           kfn);
@@ -687,7 +687,7 @@ void ClassNLLCriterion_updateGradInput(
           gradInput_stride_0,
           gradInput_stride_1,
           gradOutput_stride_0);
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(
               sycl::range<1>(global_size), sycl::range<1>(local_size)),
           kfn);
@@ -726,7 +726,7 @@ void ClassNLLCriterion_updateGradInput(
           has_weights,
           ignore_index,
           reduction);
-      cgh.parallel_for(sycl::range<1>(1), kfn);
+      cgh.parallel_for<decltype(kfn)>(sycl::range<1>(1), kfn);
     };
     DPCPP_Q_SUBMIT(queue, cgf);
   } else {
@@ -753,7 +753,7 @@ void ClassNLLCriterion_updateGradInput(
           ndim,
           local_size,
           nframe);
-      cgh.parallel_for(sycl::range<1>(local_size), kfn);
+      cgh.parallel_for<decltype(kfn)>(sycl::range<1>(local_size), kfn);
     };
 
     DPCPP_Q_SUBMIT(queue, cgf);
@@ -917,7 +917,7 @@ void spatial_class_nll_criterion_update_output_no_reduce_kernel(
         target_data,
         weight_data);
 
-    cgh.parallel_for(sycl::range</*dim=*/1>(count), kfn);
+    cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(count), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -1096,7 +1096,7 @@ void spatial_class_nll_criterion_update_output_kernel(
             partial_sums,
             partial_weight);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(num_groups * wgroup_size),
             sycl::range<1>(wgroup_size)),
@@ -1113,7 +1113,7 @@ void spatial_class_nll_criterion_update_output_kernel(
       SpatialClassNllCriterionUpdateOutputKernelFunctor2<scalar_t> kfn(
           out_data, total_weight_data);
 
-      cgh.parallel_for(sycl::range</*dim=*/1>(1), kfn);
+      cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(1), kfn);
     };
 
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -1231,7 +1231,7 @@ void spatial_class_nll_criterion_update_grad_input_no_reduce_kernel(
         target_data,
         weight_data);
 
-    cgh.parallel_for(sycl::range</*dim=*/1>(count), kfn);
+    cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(count), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -1358,7 +1358,7 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
         weight_data,
         total_weight_data);
 
-    cgh.parallel_for(sycl::range</*dim=*/1>(count), kfn);
+    cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(count), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

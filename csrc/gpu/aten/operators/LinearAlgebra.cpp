@@ -195,7 +195,8 @@ void copy_triangle_symmetric_template(Tensor& self, bool upper) {
     auto data_ptr = (scalar_t*)self.data_ptr();
     CopyTriangleSymmetricTemplateKernelFunctor<scalar_t> kfn(
         upper, row_stride, column_stride, data_ptr);
-    __cgh.parallel_for(sycl::range</*dim=*/1>(work_item_num), kfn);
+    __cgh.parallel_for<decltype(kfn)>(
+        sycl::range</*dim=*/1>(work_item_num), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -679,7 +680,7 @@ void _elementwise_kernel(int total_n_elems, func_t f) {
   auto cgf = DPCPP_Q_CGF(cgh) {
     _Elementwise_KernelFunctor<n_elems_per_work_item, func_t> kfn(
         total_n_elems, f, total_work_items);
-    cgh.parallel_for(sycl::range<1>(total_work_items), kfn);
+    cgh.parallel_for<decltype(kfn)>(sycl::range<1>(total_work_items), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

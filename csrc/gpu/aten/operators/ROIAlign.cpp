@@ -402,7 +402,7 @@ at::Tensor roi_align_forward_kernel(
                 rois_ptr,
                 output_ptr);
           };
-          cgh.parallel_for(
+          cgh.parallel_for<decltype(kfn)>(
               sycl::nd_range<1>(
                   sycl::range<1>(num_groups * items_per_group),
                   sycl::range<1>(items_per_group)),
@@ -485,7 +485,7 @@ at::Tensor roi_align_backward_kernel(
                 h_stride,
                 w_stride);
           };
-          cgh.parallel_for(
+          cgh.parallel_for<decltype(kfn)>(
               sycl::nd_range<1>(
                   sycl::range<1>(num_groups * items_per_group),
                   sycl::range<1>(items_per_group)),

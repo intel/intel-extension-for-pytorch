@@ -346,7 +346,7 @@ static inline void launch_index_kernel(IdxConfig& cfg) {
   auto& queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(__cgh) {
     IndexKernel<IdxConfig, TrivialOffCal, known_problem_inner> idx_ker(cfg);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(idx_ker)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), idx_ker);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -622,7 +622,7 @@ void dpcpp_small_index_kernel_impl(
         f(out_ptr + out_offset, in_ptr + in_offset, offset);
       }
     };
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_size), sycl::range<1>(wgroup_size)),
         kfn);
@@ -675,7 +675,7 @@ void dpcpp_index_kernel_impl(
       }
       f(out_ptr, in_ptr, offset);
     };
-    __cgh.parallel_for(sycl::range</*dim=*/1>(numel), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(numel), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }

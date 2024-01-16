@@ -42,7 +42,7 @@ static inline void indices_count(
   auto& queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(__cgh) {
     IndicesCountKernelFunctor<IdxType> kfn(indices_cnt, indices);
-    __cgh.parallel_for(sycl::range<1>(indices_num), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range<1>(indices_num), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -214,7 +214,7 @@ void renorm_kernel(
         weights_stride1,
         num_unique_indices,
         smem);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(work_group_size * num_unique_indices),
             sycl::range<1>(work_group_size)),

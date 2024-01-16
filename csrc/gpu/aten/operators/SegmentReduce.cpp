@@ -64,7 +64,7 @@ static void post_sum_div_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     PostSumDivKernelFunctor<scalar_t, index_t> kfn(
         output_data, lengths_data, segment_count, is_initial_set, initial);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -225,7 +225,7 @@ void segment_reduce_forward_kernel(
         lengths_cumsum_stride_axis,
         size);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(work_group_size * work_group_num),
             sycl::range<1>(work_group_size)),
@@ -433,7 +433,7 @@ void segment_reduce_backward_kernel(
         lengths_cumsum_stride_axis,
         size);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(work_group_size * work_group_num),
             sycl::range<1>(work_group_size)),

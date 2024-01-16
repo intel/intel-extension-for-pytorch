@@ -75,7 +75,7 @@ static void repeat_interleave_dpcpp_kernel(
     RepeatInterleaveDpcppKernelFunctor<index_t> kfn(
         rep_data, cum_data, res_data, size, result_size);
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
         kfn);

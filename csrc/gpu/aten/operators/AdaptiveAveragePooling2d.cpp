@@ -162,7 +162,7 @@ void adaptive_avg_pool2d_kernel(
             input,
             output);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
         kfn);
@@ -460,7 +460,7 @@ class adaptive_avg_pool2d_backward_kernel<
           is_channels_last>
           kfn(ib, ic, ih, iw, oh, ow, numel, global_range, gyacc, gxacc);
 
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(
               sycl::range<1>(global_range), sycl::range<1>(local_range)),
           kfn);
@@ -667,7 +667,7 @@ class adaptive_avg_pool2d_backward_kernel<
               _ikh_cached,
               _ikw_cached);
 
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(
               sycl::range<1>(global_range), sycl::range<1>(local_range)),
           kfn);

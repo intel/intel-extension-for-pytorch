@@ -768,7 +768,7 @@ void apply_triu_tril(Tensor& result, const Tensor& self, const int64_t k) {
         result_ptr,
         self_ptr);
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);

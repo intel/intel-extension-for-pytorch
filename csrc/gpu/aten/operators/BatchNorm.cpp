@@ -418,7 +418,8 @@ void batch_norm_transform_input_kernel(
             bias_ptr,
             mean_ptr,
             var_or_invstd_ptr);
-    cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<2>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -563,7 +564,8 @@ void batch_norm_transform_input_channels_last_kernel(
             stride,
             fuse_relu,
             total_num);
-    cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<2>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -1002,7 +1004,7 @@ void batch_norm_collect_statistics_kernel(
             batch_stride,
             shared_n,
             shared_avg_var);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(
             sycl::range<2>(numPlane * work_group_size_y, work_group_size_x),
             sycl::range<2>(work_group_size_y, work_group_size_x)),
@@ -1115,7 +1117,8 @@ void batch_norm_update_mean_var_kernel(
         scalar_t,
         stat_accscalar_t>
         kfn(mean_, var_, channel_num, factor, epsilon);
-    cgh.parallel_for(sycl::nd_range<1>(global_range, local_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<1>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -1357,7 +1360,8 @@ void batch_norm_reduce_sum_channels_last_kernel(
             out_invstd_ptr,
             loop_count,
             shared);
-    cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<2>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 
@@ -1372,7 +1376,8 @@ void batch_norm_reduce_sum_channels_last_kernel(
           wg_size,
           out_mean_ptr,
           out_invstd_ptr);
-      __cgh.parallel_for(sycl::nd_range<1>(stride * wg_size, wg_size), kfn);
+      __cgh.parallel_for<decltype(kfn)>(
+          sycl::nd_range<1>(stride * wg_size, wg_size), kfn);
     };
     DPCPP_Q_SUBMIT(queue, cgf_2);
   }
@@ -2311,7 +2316,7 @@ void batch_norm_backward_channels_first_kernel(
             save_mean_ptr,
             save_invstd_ptr,
             local_sum);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(
             sycl::range<2>(numPlane * work_group_size_y, work_group_size_x),
             sycl::range<2>(work_group_size_y, work_group_size_x)),
@@ -2610,7 +2615,8 @@ void batch_norm_backward_reduce_kernel(
             i_feature_stride,
             sg_num,
             local_sum);
-    cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<2>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -2995,7 +3001,8 @@ void batch_norm_backward_reduce_channels_last_kernel(
             input_ptr,
             mean_ptr,
             shared);
-    cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<2>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 
@@ -3017,7 +3024,8 @@ void batch_norm_backward_reduce_channels_last_kernel(
               temp_sum_dy_ptr,
               temp_sum_dy_xmu_ptr,
               mean_ptr);
-      __cgh.parallel_for(sycl::nd_range<1>(stride * wg_size, wg_size), kfn);
+      __cgh.parallel_for<decltype(kfn)>(
+          sycl::nd_range<1>(stride * wg_size, wg_size), kfn);
     };
     DPCPP_Q_SUBMIT(queue, cgf_2);
   }
@@ -3411,7 +3419,8 @@ void batch_norm_backward_elemt_channels_first_kernel_impl(
             sum_dy_xmu_ptr,
             n_input,
             reduction_size);
-    cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<2>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -3658,7 +3667,8 @@ void batch_norm_backward_elemt_channels_last_kernel_impl(
             world_size,
             reduction_size,
             stride);
-    cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<2>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -4546,7 +4556,8 @@ void batch_norm_gather_stats_reduction(
             var_n_local_mem,
             counts_local_mem);
 
-    cgh.parallel_for(sycl::nd_range<2>{global_range, local_range}, kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<2>{global_range, local_range}, kfn);
   };
   DPCPP_Q_SUBMIT(*q, cgf);
 }

@@ -379,7 +379,8 @@ void ctc_loss_log_alpha_kernel(
         neg_log_likelihood_data,
         tg_batch_offsets_data);
 
-    cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_SUBMIT(sycl_queue, cgf);
@@ -675,7 +676,8 @@ void ctc_loss_backward_log_beta_kernel(
         targets_data,
         target_lengths_data,
         tg_batch_offsets_data);
-    cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_SUBMIT(sycl_queue, cgf);
@@ -922,7 +924,8 @@ void ctc_loss_backward_collect_nonblank_kernel(
         neg_log_likelihood_data,
         tg_batch_offsets_data);
 
-    cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_SUBMIT(sycl_queue, cgf);
@@ -1191,7 +1194,8 @@ void ctc_loss_backward_collect_kernel(
         neg_log_likelihood_data,
         tg_batch_offsets_data);
 
-    cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_SUBMIT(sycl_queue, cgf);
@@ -1283,7 +1287,8 @@ void ctc_loss_zero_padded_gradients(
         gradient_data,
         input_lengths_data);
 
-    cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_SUBMIT(sycl_queue, cgf);

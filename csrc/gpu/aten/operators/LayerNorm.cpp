@@ -515,7 +515,7 @@ void GammaBetaBackwardSimpleDPCPPKernel(
             db_data,
             local_sum1,
             local_sum2);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(global_range), sycl::range<3>(local_range)),
         kfn);

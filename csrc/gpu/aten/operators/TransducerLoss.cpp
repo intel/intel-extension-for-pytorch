@@ -217,7 +217,7 @@ void transducer_loss_forward_kernel(
         loss,
         local_size,
         local_label);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(global_range), sycl::range<3>(local_range)),
         kfn);
@@ -428,7 +428,7 @@ void transducer_loss_backward_kernel(
         xGrad,
         local_size,
         local_label);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(global_range), sycl::range<3>(local_range)),
         kfn);

@@ -391,7 +391,7 @@ std::tuple<Tensor, Tensor> dropout_template(
                     nelem,
                     pa,
                     rng_engine_inputs);
-            cgh.parallel_for(sycl::range<1>(nelem), kfn);
+            cgh.parallel_for<decltype(kfn)>(sycl::range<1>(nelem), kfn);
           };
           DPCPP_Q_SUBMIT(q, cgf);
         } else {
@@ -415,7 +415,8 @@ std::tuple<Tensor, Tensor> dropout_template(
                         nelem,
                         pa,
                         rng_engine_inputs);
-                cgh.parallel_for(sycl::nd_range<1>(glb_range, loc_range), kfn);
+                cgh.parallel_for<decltype(kfn)>(
+                    sycl::nd_range<1>(glb_range, loc_range), kfn);
               };
               DPCPP_Q_SUBMIT(q, cgf);
             } break;
@@ -434,7 +435,8 @@ std::tuple<Tensor, Tensor> dropout_template(
                         nelem,
                         pa,
                         rng_engine_inputs);
-                cgh.parallel_for(sycl::nd_range<1>(glb_range, loc_range), kfn);
+                cgh.parallel_for<decltype(kfn)>(
+                    sycl::nd_range<1>(glb_range, loc_range), kfn);
               };
               DPCPP_Q_SUBMIT(q, cgf);
             } break;
@@ -451,7 +453,8 @@ std::tuple<Tensor, Tensor> dropout_template(
                         nelem,
                         pa,
                         rng_engine_inputs);
-                cgh.parallel_for(sycl::nd_range<1>(glb_range, loc_range), kfn);
+                cgh.parallel_for<decltype(kfn)>(
+                    sycl::nd_range<1>(glb_range, loc_range), kfn);
               };
               DPCPP_Q_SUBMIT(q, cgf);
             } break;

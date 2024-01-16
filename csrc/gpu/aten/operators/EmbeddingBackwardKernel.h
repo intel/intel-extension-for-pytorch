@@ -67,7 +67,7 @@ void krn_partials_per_segment(
         ret_data, offsets_data, num_of_segments, numel);
 
     // kick off kernel
-    cgh.parallel_for(sycl::range<1>(num_of_segments), kfn);
+    cgh.parallel_for<decltype(kfn)>(sycl::range<1>(num_of_segments), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -132,7 +132,7 @@ void krn_partial_segment_offset(
         num_of_segments);
 
     // kick off kernel
-    cgh.parallel_for(sycl::range<1>(num_of_segments), kfn);
+    cgh.parallel_for<decltype(kfn)>(sycl::range<1>(num_of_segments), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -302,7 +302,7 @@ void compute_grad_weight_bags(
         segment_offsets_data);
 
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
@@ -421,7 +421,7 @@ void compute_grad_weight(
         segment_offsets_data);
 
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
@@ -538,7 +538,7 @@ void sum_and_scatter(
         segment_sizes_offsets_data);
 
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);

@@ -319,7 +319,7 @@ static void _launch_scatter_gather_kernel(int64_t N, const func_t& f) {
   auto cgf = DPCPP_Q_CGF(cgh) {
     LaunchScatterGatherKernelFunctor<func_t> kfn(
         work_group_size, thread_work_size, N, f);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(work_group_size * work_group_num),
             sycl::range<1>(work_group_size)),

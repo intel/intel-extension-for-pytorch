@@ -262,7 +262,7 @@ inline void segmented_device_merge(
         nsort,
         size_have_sorted,
         chunk_size);
-    h.parallel_for(
+    h.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(nsegments * group_sz), sycl::range<1>(group_sz)),
         kfn);

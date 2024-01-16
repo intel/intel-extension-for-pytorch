@@ -154,7 +154,7 @@ void gatherKthValue(
         kth_data,
         indices_data,
         smem);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(numInputSlices * local_size),
             sycl::range<1>(local_size)),
@@ -321,7 +321,7 @@ void gatherMedian(
         smem,
         num_nan);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(numInputSlices * local_size),
             sycl::range<1>(local_size)),

@@ -221,7 +221,8 @@ void CatArrayBatchedCopy(
         is_quantized_out,
         is_quantized_in>
         kfn(output, inputs, os, concatDim, dimStride);
-    cgh.parallel_for(sycl::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<2>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf)
 }

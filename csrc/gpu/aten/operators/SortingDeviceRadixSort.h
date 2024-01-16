@@ -317,7 +317,7 @@ inline void device_radix_sort_impl(
               use_indices,                               \
               keys_per_thread,                           \
               slm);                                      \
-      h.parallel_for(                                    \
+      h.parallel_for<decltype(kfn)>(                     \
           sycl::nd_range<1>(                             \
               sycl::range<1>(nsegments * GROUP_THREADS), \
               sycl::range<1>(GROUP_THREADS)),            \

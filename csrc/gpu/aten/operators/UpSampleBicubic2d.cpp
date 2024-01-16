@@ -184,7 +184,7 @@ static void upsample_bicubic2d_out_frame(
         channels,
         onum,
         align_corners);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
         kfn);
@@ -334,7 +334,7 @@ static void upsample_bicubic2d_backward_out_frame(
         channels,
         onum,
         align_corners);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
         kfn);

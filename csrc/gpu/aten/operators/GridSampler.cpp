@@ -659,7 +659,7 @@ void grid_sampler_2d_kernel(
         grid_data,
         input_data,
         output_data);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -1105,7 +1105,7 @@ void grid_sampler_2d_backward_kernel(
         grad_output_data,
         grad_input_data,
         grad_grid_data);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -1435,7 +1435,7 @@ void grid_sampler_3d_kernel(
         grid_data,
         input_data,
         output_data);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -1975,7 +1975,7 @@ void grid_sampler_3d_backward_kernel(
         grad_output_data,
         grad_input_data,
         grad_grid_data);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

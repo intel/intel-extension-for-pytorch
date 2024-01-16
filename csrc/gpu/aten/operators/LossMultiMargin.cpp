@@ -236,7 +236,7 @@ void MultiMarginCriterion_updateOutput(
           local_size,
           margin_,
           p_);
-      cgh.parallel_for(sycl::range<1>(local_size), kfn);
+      cgh.parallel_for<decltype(kfn)>(sycl::range<1>(local_size), kfn);
     } else {
       MultiMarginCriterionUpdateOutputKernelFunctor2<scalar_t> kfn(
           input_data,
@@ -251,7 +251,7 @@ void MultiMarginCriterion_updateOutput(
           margin_,
           p_,
           reduction);
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(
               sycl::range<1>(local_size), sycl::range<1>(local_size)),
           kfn);
@@ -417,7 +417,7 @@ void MultiMarginCriterion_updateGradInput(
         input_data,
         target_data,
         weights_data);
-    cgh.parallel_for(sycl::range<1>(local_size), kfn);
+    cgh.parallel_for<decltype(kfn)>(sycl::range<1>(local_size), kfn);
   };
 
   DPCPP_Q_SUBMIT(queue, cgf);

@@ -180,7 +180,7 @@ void adagrad_fused_step_coalesced_kernel_impl(
             eps);
 
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(
             sycl::range<2>(
                 global_size_row * local_size_row,
@@ -395,7 +395,7 @@ void adagrad_fused_step_nocoalesced_kernel_impl(
             local_sum);
 
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(
             sycl::range<2>(
                 global_size_row * local_size_row,
@@ -592,7 +592,7 @@ void adagrad_fused_step_nocoalesced_large_group_kernel_impl(
             loop);
 
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(
             sycl::range<2>(
                 global_size_row * local_size_row,

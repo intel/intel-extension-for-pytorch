@@ -236,7 +236,8 @@ void deform_interpolate(
         channel_per_group,
         out_size,
         glb_size);
-    _cgh.parallel_for(sycl::nd_range<1>({glb_size}, {wg_size}), kfn);
+    _cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<1>({glb_size}, {wg_size}), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }

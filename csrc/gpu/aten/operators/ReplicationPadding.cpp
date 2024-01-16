@@ -75,7 +75,7 @@ void parallel_replication_pad1d(
   auto cgf = DPCPP_Q_CGF(cgh) {
     ParallelReplicationPad1dKernelFunctor<scalar_t, F> kfn(
         input, output, pad_left, pad_right, f, output_plane_size);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(work_group_size * work_group_num, nplane, nbatch),
             sycl::range<3>(work_group_size, 1, 1)),
@@ -226,7 +226,7 @@ void replication_pad_forward_kernel2d(
   auto cgf = DPCPP_Q_CGF(cgh) {
     ReplicationPadForwardKernel2dFunctor<scalar_t> kfn(
         input, output, padT, padB, padL, padR, o0, o1, o2, o3, i0, i1, i2, i3);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(
                 CeilDiv(outputPlaneSize, workgroup_size) * workgroup_size,
@@ -459,7 +459,7 @@ void replication_pad_backward_kernel(
         gi1,
         gi2,
         gi3);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(
                 CeilDiv(outputPlaneSize, workgroup_size) * workgroup_size,
@@ -637,7 +637,7 @@ void parallel_replication_pad3d(
   auto cgf = DPCPP_Q_CGF(cgh) {
     ParallelReplicationPad3dKernelFunctor<scalar_t, F> kfn(
         input, output, pad_left, pad_top, pad_front, f, output_plane_size);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(work_group_size * work_group_num, nplane, nbatch),
             sycl::range<3>(work_group_size, 1, 1)),

@@ -146,7 +146,7 @@ void multilabel_margin_loss_forward_kernel(
     MultilabelMarginLossForwardKernelFunctor<scalar_t, acc_t> kfn(
         output, input, target, is_target, nframe, dim, size_average, smem);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(nframe * MULTILABELMARGIN_THREADS),
             sycl::range<1>(MULTILABELMARGIN_THREADS)),
@@ -287,7 +287,7 @@ void multilabel_margin_loss_backward_kernel(
         reduce,
         smem);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(nframe * MULTILABELMARGIN_THREADS),
             sycl::range<1>(MULTILABELMARGIN_THREADS)),

@@ -111,7 +111,7 @@ static inline void launch_weight_norm_reduce_kernel_(
         accscalar_t,
         vec_t>
         kfn(iinfo, oinfo, cfg, need_squre, is_final, shared);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
@@ -233,7 +233,7 @@ static inline void segment_weight_norm_(
         scalar_t,
         accscalar_t>
         kfn(vinfo, ginfo, winfo, ninfo, dim_after_collapse, cfg);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
@@ -395,7 +395,7 @@ static inline void weight_norm_(
             wg_size,
             batch_wg_range,
             shared);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
@@ -512,7 +512,7 @@ static inline void launch_weight_norm_backward_reduce_kernel_(
         accscalar_t,
         vec_t>
         kfn(i1info, i2info, oinfo, cfg, shared);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
@@ -692,7 +692,7 @@ static inline void segment_weight_norm_backward_(
             rinfo,
             dim_after_collapse,
             cfg);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
@@ -884,7 +884,7 @@ static inline void weight_norm_backward_(
             wg_size,
             batch_wg_range,
             shared);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);

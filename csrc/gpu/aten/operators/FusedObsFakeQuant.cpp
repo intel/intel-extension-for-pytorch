@@ -187,7 +187,7 @@ void _calculate_moving_average(
           running_max_data,
           averaging_const,
           size);
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);
@@ -207,7 +207,8 @@ void _calculate_moving_average(
           running_max_data,
           averaging_const,
           size);
-      cgh.parallel_for(sycl::nd_range<1>(num_groups * group_size, 1), kfn);
+      cgh.parallel_for<decltype(kfn)>(
+          sycl::nd_range<1>(num_groups * group_size, 1), kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);
   }
@@ -293,7 +294,7 @@ void _calc_moving_avg_qparams_helper(
           symmetric_quant,
           scale_ptr,
           zp_ptr);
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);
@@ -313,7 +314,8 @@ void _calc_moving_avg_qparams_helper(
           symmetric_quant, // preserve_sparsity
           scale_ptr,
           zp_ptr);
-      cgh.parallel_for(sycl::nd_range<1>(num_groups * group_size, 1), kfn);
+      cgh.parallel_for<decltype(kfn)>(
+          sycl::nd_range<1>(num_groups * group_size, 1), kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);
   }

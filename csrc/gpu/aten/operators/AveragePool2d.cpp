@@ -174,7 +174,7 @@ void avg_pool2d_channels_last_frame(
         divisor_override,
         count_include_pad,
         use_divisor);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
   };
 
@@ -338,7 +338,7 @@ void avg_pool2d_out_frame(
         count_include_pad,
         use_divisor);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);

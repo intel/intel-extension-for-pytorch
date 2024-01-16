@@ -105,7 +105,7 @@ void sparse_elementwise_kernel(
         op, dense, indices, values, nnz);
 
     // kick off for kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
@@ -176,7 +176,7 @@ void sparse_elementwise_kernel_scalar(
     SparseElementwiseKernelScalarFunctor<Op, IndexType, Real> kfn(
         op, dense, indices, values, nnz);
     // kick off for kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);

@@ -204,7 +204,7 @@ void _unfold_backward_elementwise_kernel(int total_n_elems, func_t f) {
   auto cgf = DPCPP_Q_CGF(cgh) {
     UnfoldBackwardElementwiseKernelFunctor<n_elems_per_work_item, func_t> kfn(
         total_work_items, total_n_elems, f);
-    cgh.parallel_for(sycl::range<1>(total_work_items), kfn);
+    cgh.parallel_for<decltype(kfn)>(sycl::range<1>(total_work_items), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

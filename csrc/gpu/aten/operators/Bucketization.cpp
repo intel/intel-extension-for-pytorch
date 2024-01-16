@@ -197,7 +197,7 @@ void searchsorted_dpcpp_contiguous(
         data_bd_data,
         data_out_data);
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(sycl::range<1>(grng), sycl::range<1>(tile_size)),
         kfn);
   };

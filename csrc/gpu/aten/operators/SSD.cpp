@@ -114,7 +114,8 @@ void locations_to_boxes_kernel_impl(
         center_variance,
         size_variance,
         local_boxes_buf);
-    cgh.parallel_for(sycl::nd_range<1>{global_range, local_range}, kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<1>{global_range, local_range}, kfn);
   };
   DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }

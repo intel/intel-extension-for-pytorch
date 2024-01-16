@@ -214,7 +214,7 @@ inline void _rrelu_with_noise_train(
           noise_data,
           lower,
           upper);
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);
@@ -231,7 +231,7 @@ inline void _rrelu_with_noise_train(
           noise_data,
           lower_,
           upper_);
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);

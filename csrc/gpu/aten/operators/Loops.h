@@ -174,7 +174,7 @@ static inline void launch_unrolled_kernel(
         storer_t>
         kfn(N, f, data, ic, oc, l, s);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(num_groups * group_items),
             sycl::range<1>(group_items)),
@@ -333,7 +333,7 @@ static inline void launch_vectorized_kernel(
             inp_calc_t,                                               \
             vec_size>                                                 \
             kfn(N, fn, data, input_calc);                             \
-        cgh.parallel_for(                                             \
+        cgh.parallel_for<decltype(kfn)>(                              \
             sycl::nd_range<1>(                                        \
                 sycl::range<1>(num_groups * group_size),              \
                 sycl::range<1>(group_size)),                          \
@@ -415,7 +415,7 @@ static inline void launch_legacy_kernel(int64_t N, const func_t& f) {
   auto cgf = DPCPP_Q_CGF(cgh) {
     ElementwiseKernelFunctor<func_t> kfn(N, f, group_size);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(num_groups * group_size),
             sycl::range<1>(group_size)),
@@ -468,7 +468,7 @@ static inline void launch_legacy_kernel(int64_t N, const func_t& f) {
   auto cgf = DPCPP_Q_CGF(cgh) {
     ElementwiseKernelFunctor2<vec_size, func_t> kfn(N, f, max_group_size);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(num_groups * max_group_size),
             sycl::range<1>(max_group_size)),
@@ -765,7 +765,7 @@ static inline void launch_unrolled_kernel_for_multi_outputs(
         inp_calc_t,
         out_calc_t>
         kfn(N, f, data, ic, oc);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(num_groups * group_items),
             sycl::range<1>(group_items)),

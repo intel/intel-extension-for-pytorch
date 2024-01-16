@@ -75,7 +75,7 @@ void _elementwise_kernel(int total_n_elems, func_t f) {
   auto cgf = DPCPP_Q_CGF(cgh) {
     _Elementwise_KernelFunctor<func_t> kfn(
         loops, total_n_elems, f, total_work_items);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(total_work_items), sycl::range<1>(work_group_size)),
         kfn);
@@ -290,7 +290,7 @@ void roll_dpcpp_kernel(
         offset,
         start_offset,
         global_range);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
         kfn);

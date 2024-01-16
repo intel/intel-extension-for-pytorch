@@ -187,7 +187,7 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
           }
         };
 
-        __cgh.parallel_for(
+        __cgh.parallel_for<decltype(kfn)>(
             sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
       };
       DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -435,7 +435,7 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
           const int64_t bOffset = start + (stride0 + stride1) * id;
           out[strideSelf * id] = in[bOffset];
         };
-        cgh.parallel_for(sycl::range<1>(dst.numel()), kfn);
+        cgh.parallel_for<decltype(kfn)>(sycl::range<1>(dst.numel()), kfn);
       };
       DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     }
@@ -459,7 +459,7 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
           const int64_t aOffset = start + (stride0 + stride1) * id;
           out[aOffset] = in[strideSrc * id];
         };
-        cgh.parallel_for(sycl::range<1>(src.numel()), kfn);
+        cgh.parallel_for<decltype(kfn)>(sycl::range<1>(src.numel()), kfn);
       };
       DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     }
@@ -543,7 +543,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
       }
     };
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
         kfn);
@@ -638,7 +638,7 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
         }
       }
     };
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
         kfn);
@@ -713,7 +713,7 @@ void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
       f(out_ptr, source_ptr + src_offset, out_offset);
     };
 
-    __cgh.parallel_for(sycl::range</*dim=*/1>(numel), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(numel), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -805,7 +805,7 @@ void index_put_deterministic_kernel(
       if (accumulate)
         self[s_gid] = acc;
     };
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
 
@@ -1079,7 +1079,7 @@ void take_dpcpp(Tensor& dst, const Tensor& src, const Tensor& index) {
       }
     };
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>({wgroup_range * wgroup_size}, {wgroup_size}), kfn);
   };
 

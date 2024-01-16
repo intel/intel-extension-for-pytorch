@@ -76,7 +76,7 @@ void dpcpp_elementwise_kernel_with_index_impl(
   auto cgf = DPCPP_Q_CGF(cgh) {
     DpcppElementwiseKernelWithIndexImplFunctor<scalar_t, func_t> kfn(
         out_ptr, f);
-    cgh.parallel_for(sycl::range</*dim=*/1>(thread_number), kfn);
+    cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(thread_number), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -416,7 +416,7 @@ Tensor& arange_dpcpp_out(
           ArangeDpcppOutKernelFunctor<scalar_t, accscalar_t> kfn(
               size, xstart, xend, xstep, acc, slm_xstart, slm_xstep);
           // kick off kernel
-          cgh.parallel_for(
+          cgh.parallel_for<decltype(kfn)>(
               sycl::nd_range</*dim=*/1>(
                   sycl::range<1>(wgroup_num_col * wgroup_size_col),
                   sycl::range<1>(wgroup_size_col)),

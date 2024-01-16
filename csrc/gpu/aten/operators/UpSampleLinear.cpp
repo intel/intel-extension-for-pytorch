@@ -158,7 +158,7 @@ void upsample_bilinear2d_out_frame(
         nbatch,
         channels);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(num_group * 1024), sycl::range<1>(1024)),
         kfn);
@@ -316,7 +316,7 @@ void upsample_bilinear2d_backward_out_frame(
         out_data,
         o_numel,
         i_numel);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(num_groups * 1024), sycl::range<1>(1024)),
         kfn);

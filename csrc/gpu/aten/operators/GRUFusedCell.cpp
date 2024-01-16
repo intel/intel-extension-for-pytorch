@@ -182,7 +182,8 @@ static inline void fuse_ops_kernel(
         COL,
         ROW,
         GROUP_SIZE);
-    cgh.parallel_for(sycl::nd_range<1>(global_size, local_size), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<1>(global_size, local_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -322,7 +323,8 @@ static inline void fuse_ops_kernel_backward(
         COL,
         ROW,
         GROUP_SIZE);
-    cgh.parallel_for(sycl::nd_range<1>(global_size, local_size), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<1>(global_size, local_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }

@@ -344,7 +344,7 @@ static void pdist_kernel_impl(
     PdistKernelImplFunctor<scalar_t, F, p_tpye, accscalar_t> kfn(
         n, m, p_val, n2_val, n2_squared_minus_1_val, out_data, in_data, shared);
 
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
 
@@ -472,7 +472,7 @@ static void pdist_backward_kernel_impl(
         in_ptr,
         grad_ptr,
         dist_ptr);
-    __cgh.parallel_for(work_load, kfn);
+    __cgh.parallel_for<decltype(kfn)>(work_load, kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -715,7 +715,7 @@ static void cdist_forward_kernel_impl(
         x2_data,
         shared);
 
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
 
@@ -1002,7 +1002,7 @@ static void cdist_backward_kernel_impl(
         x1_data,
         x2_data);
 
-    __cgh.parallel_for(work_load, kfn);
+    __cgh.parallel_for<decltype(kfn)>(work_load, kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

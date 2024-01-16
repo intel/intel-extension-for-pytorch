@@ -591,7 +591,7 @@ void EmbeddingBag_updateOutputKernel(
               padding_idx,                                                    \
               if_align_vector,                                                \
               item);                                                          \
-      cgh.parallel_for(                                                       \
+      cgh.parallel_for<decltype(kfn)>(                                        \
           sycl::nd_range<1>(                                                  \
               sycl::range<1>(global_range), sycl::range<1>(local_range)),     \
           kfn);                                                               \
@@ -774,7 +774,7 @@ void EmbeddingBag_accGradParametersKernel_max(
         numChunks);
 
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(
             sycl::range<2>(kernel_range, 4), sycl::range<2>(64, 4)),
         kfn);
@@ -1098,7 +1098,8 @@ static void _embedding_bag_per_sample_weights_backward_kernel(
             padding_idx,
             num_group,
             max_group_size);
-    cgh.parallel_for(sycl::nd_range<1>(global_range, local_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<1>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }

@@ -102,7 +102,7 @@ void apply_rotary_embedding_impl(
         OffsetCalculator>
         kfn(tensor, sin, cos, out, offset_calc, problem_size, total_size);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(work_group_num * wg_size), sycl::range<1>(wg_size)),
         kfn);

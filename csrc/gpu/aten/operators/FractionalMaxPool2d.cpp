@@ -207,7 +207,7 @@ void fractional_max_pool2d_out_frame(
         work_group_size,
         work_group_num,
         loops);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(work_group_size * work_group_num),
             sycl::range<1>(work_group_size)),
@@ -324,7 +324,7 @@ void fractional_max_pool2d_backward_out_frame(
             in_cf_c_stride,
             out_n_stride,
             in_n_stride);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(work_group_size)),
         kfn);

@@ -112,7 +112,7 @@ void multi_tensor_apply_kernel(
   auto cgf = DPCPP_Q_CGF(__cgh) {
     MultiTensorApplyKernelFunctor<T, Y, U, ArgTypes...> kfn(
         kChunkSize, tlAddressMeta, tlWGMeta, callable, args...);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_size * max_wg_size),
             sycl::range<1>(max_wg_size)),

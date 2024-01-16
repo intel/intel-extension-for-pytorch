@@ -313,7 +313,7 @@ void ComputeFusedParamsDPCPPKernel(
             beta_data,
             a_data,
             b_data);
-    cgh.parallel_for(sycl::range<1>(global_range), kfn);
+    cgh.parallel_for<decltype(kfn)>(sycl::range<1>(global_range), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -434,7 +434,7 @@ void ComputeGradOutputCoeffientDPCPPKernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     ComputeGradOutputCoeffientDPCPPKernelFunctor<accscalar_t, mean_t, weight_t>
         kfn(C, group, rstd, gamma, c1);
-    cgh.parallel_for(sycl::range<1>(total_threads), kfn);
+    cgh.parallel_for<decltype(kfn)>(sycl::range<1>(total_threads), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -577,7 +577,7 @@ void ComputeBackwardFusedParamsDPCPPKernel(
             sub_group_num,
             local_sum1,
             local_sum2);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(
             sycl::range<2>(N, group * workgroup_size),
             sycl::range<2>(1, workgroup_size)),
@@ -671,7 +671,7 @@ void GammaBetaBackwardDPCPPKernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     GammaBetaBackwardDPCPPKernelFunctor<scalar_t, mean_t, weight_t, accscalar_t>
         kfn(N, C, group, mean, rstd, ds, db, dgamma, dbeta);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(total_threads), sycl::range<1>(workgroup_size)),
         kfn);

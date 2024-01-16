@@ -62,7 +62,7 @@ void max_unpooling2d_forward_kernel(
     };
 
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
@@ -116,7 +116,7 @@ void max_unpooling3d_forward_kernel(
     };
 
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(32 * num_groups_0, 8 * num_groups_1, totalZ),
             sycl::range<3>(32, 8, 1)),
@@ -168,7 +168,7 @@ void max_unpooling3d_cl_forward_kernel(
     };
 
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);

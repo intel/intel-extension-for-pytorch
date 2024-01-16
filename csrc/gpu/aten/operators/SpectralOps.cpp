@@ -119,7 +119,7 @@ void _fft_conjugate_copy_kernel(
     FFTConjugateCopyKernelFunctor<scalar_t, inp_calc_t, out_calc_t> kfn(
         numel, out_data, in_data, ic, oc);
 
-    cgh.parallel_for(sycl::range</*dim=*/1>(thread_num), kfn);
+    cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(thread_num), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

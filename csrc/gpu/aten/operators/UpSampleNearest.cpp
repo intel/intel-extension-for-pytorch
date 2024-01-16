@@ -146,7 +146,7 @@ void upsample_nearest1d_out_kernel(
         scale_factor,
         index_op);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(work_group_size)),
         kfn);
@@ -243,7 +243,7 @@ void upsample_nearest1d_backward_out_kernel(
             scale_factor,
             index_bw_op);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(work_group_size)),
         kfn);
@@ -353,7 +353,7 @@ void upsample_nearest2d_out_kernel(
         width_scale,
         index_op);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(global_z, global_y, global_x),
             sycl::range<3>(local_z, local_y, local_x)),
@@ -452,7 +452,7 @@ void upsample_nearest2d_channels_last_kernel(
         out_numel,
         index_op);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(work_group_size)),
         kfn);
@@ -573,7 +573,7 @@ void upsample_nearest2d_backward_kernel(
             width_scale,
             index_bw_op);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(work_group_size)),
         kfn);
@@ -683,7 +683,7 @@ void upsample_nearest2d_backward_channels_last_kernel(
             gi_numel,
             index_bw_op);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(work_group_size)),
         kfn);
@@ -811,7 +811,7 @@ void upsample_nearest3d_out_kernel(
         width_scale,
         index_op);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(work_group_size)),
         kfn);
@@ -959,7 +959,7 @@ void upsample_nearest3d_backward_out_kernel(
             width_scale,
             index_bw_op);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(work_group_size)),
         kfn);

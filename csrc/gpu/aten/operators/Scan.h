@@ -734,7 +734,7 @@ static inline void launch_loop_scan(const LSConfig& cfg) {
         TrivialOffCal>
         ker(cfg);
     loop_scan sscan(ker, shared, max_carr);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(sscan)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), sscan);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -824,7 +824,7 @@ static inline void launch_loop_scan_with_indices(const LSConfig& cfg) {
         TrivialOffCal>
         ker(cfg);
     loop_scan_with_indices sscan(ker, shared, shared_idx);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(sscan)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), sscan);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -1218,7 +1218,7 @@ static inline void launch_segment_scan(const SSConfig& cfg) {
         TrivialIdxCal>
         ker(cfg);
     segment_scan gscan(ker, shared);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(gscan)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), gscan);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -1257,7 +1257,7 @@ static inline void launch_segment_scan_with_indices(const SSConfig& cfg) {
         is_idx_carried>
         ker(cfg);
     segment_scan_with_indices gscan(ker, shared, shared_idx);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(gscan)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), gscan);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -1297,7 +1297,7 @@ static inline void accumulate_carrier(const SSConfig& cfg) {
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     AccumulateCarrierKernelFunctor<SSConfig, TrivialIdxCal> kfn(cfg);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -1344,7 +1344,7 @@ static inline void accumulate_carrier_with_indices(const SSConfig& cfg) {
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     AccumulateCarrierWithIndicesKernelFunctor<SSConfig, TrivialIdxCal> kfn(cfg);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);

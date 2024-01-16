@@ -1187,19 +1187,19 @@ static void launch_reduce_kernel(
     switch (config.output_vec_size) {
       case 4: {
         reduce_kernel<4, R> ker(reduction, shared, finished);
-        cgh.parallel_for(
+        cgh.parallel_for<decltype(ker)>(
             sycl::nd_range<2>(config.global_sz(), config.group_sz()), ker);
         break;
       }
       case 2: {
         reduce_kernel<2, R> ker(reduction, shared, finished);
-        cgh.parallel_for(
+        cgh.parallel_for<decltype(ker)>(
             sycl::nd_range<2>(config.global_sz(), config.group_sz()), ker);
         break;
       }
       default: {
         reduce_kernel<1, R> ker(reduction, shared, finished);
-        cgh.parallel_for(
+        cgh.parallel_for<decltype(ker)>(
             sycl::nd_range<2>(config.global_sz(), config.group_sz()), ker);
         break;
       }

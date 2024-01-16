@@ -226,7 +226,7 @@ void beam_search_topk_stage1(
         num_wg_per_beam,
         wg_size,
         shared);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(
             sycl::range<2>(batch_size * beam_size * wg_size, num_wg_per_beam),
             sycl::range<2>(wg_size, 1)),
@@ -336,7 +336,7 @@ void beam_search_topk_stage2(
         batch_size,
         num_wg_per_beam,
         shared);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(batch_size * beam_size * num_wg_per_beam),
             sycl::range<1>(num_wg_per_beam)),
@@ -692,7 +692,7 @@ void batch_topk_kernel(
         early_stopping,
         wg_size,
         shared);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(sycl::range<1>(batch_size * 32), sycl::range<1>(32)),
         kfn);
   };
@@ -761,7 +761,7 @@ void update_token(
         batch_size,
         beam_size,
         wg_size);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(sycl::range<1>(256), sycl::range<1>(256)), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -838,7 +838,7 @@ void update_beam_indices_kernel(
         beam_size,
         batch_size,
         num_step);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(
             sycl::range<2>(wg_number * wg_size, batch_size * beam_size),
             sycl::range<2>(wg_size, 1)),
@@ -921,7 +921,7 @@ void update_native_beam_indices_kernel(
         batch_size,
         num_step);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(
             sycl::range<2>(wg_number * wg_size, batch_size * beam_size),
             sycl::range<2>(wg_size, 1)),
@@ -1065,7 +1065,7 @@ void insert_to_candidate_list(
         beam_size,
         cur_len,
         wg_size);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(batch_size * 256), sycl::range<1>(256)),
         kfn);
@@ -1221,7 +1221,7 @@ void finalize(
         wg_size,
         s_score,
         rank);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(batch_size * wg_size), sycl::range<1>(wg_size)),
         kfn);
@@ -1292,7 +1292,7 @@ void copy_input_to_output(
         beam_size,
         out_beams,
         wg_size);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(wg_size * seq_num), sycl::range<1>(wg_size)),
         kfn);

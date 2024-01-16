@@ -305,7 +305,7 @@ void norm_clamp_mul_fusion(
         norm_result_addr,
         return_norm_addr,
         norm_type);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn_1)>(
         sycl::nd_range<2>(
             sycl::range<2>(local_range, tensor_size),
             sycl::range<2>(local_range, 1)),
@@ -321,7 +321,7 @@ void norm_clamp_mul_fusion(
         norm_type,
         tensor_size,
         error_if_nonfinite);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn_2)>(
         sycl::nd_range<1>(global_range * local_range, local_range), kfn_2);
   };
 
@@ -335,7 +335,7 @@ void norm_clamp_mul_fusion(
         norm_result_addr,
         tensor_size,
         max_norm);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn_3)>(
         sycl::nd_range<2>(
             sycl::range<2>(local_range, tensor_size),
             sycl::range<2>(local_range, 1)),

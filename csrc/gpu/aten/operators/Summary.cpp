@@ -147,7 +147,8 @@ void kernelHistogram1D(
             in_data,
             weight_data);
 
-    __cgh.parallel_for(sycl::range</*dim=*/1>(totalElements), kfn);
+    __cgh.parallel_for<decltype(kfn)>(
+        sycl::range</*dim=*/1>(totalElements), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }

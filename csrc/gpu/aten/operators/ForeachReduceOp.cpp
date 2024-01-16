@@ -149,7 +149,8 @@ void lpnorm_chunk_reduce_kernel(
   auto cgf = DPCPP_Q_CGF(__cgh) {
     lpnormChunkReduceKernelFunctor<T, NormType, opmath_t> kfn(
         output_per_tensor, ret_per_tensor, max_chunks_per_tensor, wg_size);
-    __cgh.parallel_for(sycl::nd_range<1>(n_tensor * wg_size, wg_size), kfn);
+    __cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<1>(n_tensor * wg_size, wg_size), kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }

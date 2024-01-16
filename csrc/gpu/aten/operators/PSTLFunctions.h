@@ -189,7 +189,7 @@ static inline OutputIt _scan_kernel(
       dpcpp_local_acc_t<T> local_scan(N, __cgh);
       _Scan_KernelFunctor<scan_type, InputIt, OutputIt, T> kfn(
           first, init, N, local_scan, d_first);
-      __cgh.parallel_for(sycl::nd_range</*dim=*/1>(N, N), kfn);
+      __cgh.parallel_for<decltype(kfn)>(sycl::nd_range</*dim=*/1>(N, N), kfn);
     };
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
@@ -206,7 +206,7 @@ static inline OutputIt _scan_kernel(
     _Scan_KernelFunctor2<scan_type, InputIt, OutputIt, T> kfn(
         first, init, N, local_scan, carry_ptr, wgroup_size, d_first);
 
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
@@ -218,7 +218,7 @@ static inline OutputIt _scan_kernel(
   auto cgf_3 = DPCPP_Q_CGF(__cgh) {
     dpcpp_local_acc_t<T> local_carry(1, __cgh);
     _Scan_KernelFunctor3<OutputIt, T> kfn(local_carry, d_first, carry_ptr, N);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_3);
@@ -316,7 +316,7 @@ static inline OutputIt copy_if(
     CopyIfKernelFunctor<index_t, InputIt, OutputIt, UnaryPredicate> kfn(
         first, pred, gmask_ptr);
 
-    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
@@ -328,7 +328,7 @@ static inline OutputIt copy_if(
     CopyIfKernelFunctor2<index_t, InputIt, OutputIt> kfn(
         first, d_first, gmask_ptr, tpos_ptr);
 
-    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_3);
 
@@ -375,7 +375,7 @@ static inline OutputIt transform(
     TransformKernelFunctor<output_t, InputIt, OutputIt, UnaryOperation> kfn(
         first1, d_first, unary_op);
 
-    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
@@ -435,7 +435,7 @@ static inline OutputIt transform(
         BinaryOperation>
         kfn(first1, first2, d_first, binary_op);
 
-    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
@@ -496,7 +496,7 @@ static inline OutputIt transform_first_true(
         BinaryOperation>
         kfn(first1, first2, d_first, binary_op);
 
-    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
@@ -525,7 +525,7 @@ static inline void iota(ForwardIt first, ForwardIt last, T value) {
   auto cgf = DPCPP_Q_CGF(__cgh) {
     IotaKernelFunctor<T, ForwardIt> kfn(first, value);
 
-    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -603,7 +603,7 @@ ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
     UniqueKernelFunctor<T, index_t, ForwardIt, BinaryPredicate> kfn(
         first, gmask_ptr, p);
 
-    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
@@ -618,7 +618,7 @@ ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
     UniqueKernelFunctor2<T, index_t, ForwardIt, BinaryPredicate> kfn(
         first, gmask_ptr, tpos_ptr, scratchpad_ptr);
 
-    __cgh.parallel_for(sycl::range</*dim=*/>(N), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_3);
 
@@ -628,7 +628,7 @@ ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
   auto cgf_4 = DPCPP_Q_CGF(__cgh) {
     UniqueKernelFunctor3<T, ForwardIt> kfn(first, scratchpad_ptr);
 
-    __cgh.parallel_for(sycl::range</*dim=*/>(M), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/>(M), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_4);
 
@@ -746,7 +746,7 @@ std::tuple<ForwardIt, ZipForwardIt> unique_with_zip(
     UniqueWithZipKernelFunctor<index_t, ForwardIt, BinaryPredicate> kfn(
         first, p, gmask_ptr);
 
-    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
@@ -774,7 +774,7 @@ std::tuple<ForwardIt, ZipForwardIt> unique_with_zip(
             scratchpad_ptr,
             z_scratchpad_ptr);
 
-    __cgh.parallel_for(sycl::range</*dim=*/>(N), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_3);
 
@@ -785,7 +785,7 @@ std::tuple<ForwardIt, ZipForwardIt> unique_with_zip(
     UniqueWithZipKernelFunctor3<T, zT, ForwardIt, ZipForwardIt> kfn(
         first, z_first, scratchpad_ptr, z_scratchpad_ptr);
 
-    __cgh.parallel_for(sycl::range</*dim=*/>(M), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/>(M), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_4);
 
@@ -860,14 +860,14 @@ OutputIt adjacent_difference(
         BinaryOperation>
         kfn(first, op, adiff);
 
-    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
   if (is_inplace) {
     auto cgf_2 = DPCPP_Q_CGF(__cgh) {
       AdjacentDifferenceKernelFunctor2<output_t, OutputIt> kfn(d_first, adiff);
-      __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
+      __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(N), kfn);
     };
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf_2);
   }
@@ -960,7 +960,7 @@ OutputIt count_by_segment(
         BinaryPredicate>
         kfn(first, gmask_ptr, p);
 
-    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
@@ -992,7 +992,7 @@ OutputIt count_by_segment(
     CountBySegmentKernelFunctor2<output_t, index_t, OutputIt> kfn(
         d_first, range_ptr, tpos_ptr);
 
-    __cgh.parallel_for(sycl::range</*dim=*/1>(N), kfn);
+    __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_4);
 
@@ -1263,7 +1263,8 @@ void vec_copy_kernel_impl(
             val_vec_ptr,
             tmp_val_vec_ptr);
 
-    __cgh.parallel_for(sycl::range</*dim=*/1>(num_work_item), kfn);
+    __cgh.parallel_for<decltype(kfn)>(
+        sycl::range</*dim=*/1>(num_work_item), kfn);
   };
   DPCPP_Q_SUBMIT(q, cgf);
 }
@@ -1426,7 +1427,7 @@ void merge_sort(
   auto cgf_1 = DPCPP_Q_CGF(h) {
     MergeSortKernelFunctor<KeyType, ValueType, CompFunc> kfn(
         key, val, leaf, sort_sz, comp_t);
-    h.parallel_for(sycl::range<1>(leaf_step), kfn);
+    h.parallel_for<decltype(kfn)>(sycl::range<1>(leaf_step), kfn);
   };
   DPCPP_Q_SUBMIT(q, cgf_1);
 
@@ -1468,7 +1469,7 @@ void merge_sort(
           sort_sz,
           comp_t,
           data_in_tmp);
-      h.parallel_for(sycl::range<1>(steps), kfn);
+      h.parallel_for<decltype(kfn)>(sycl::range<1>(steps), kfn);
     };
     DPCPP_Q_SUBMIT(q, cgf_2);
 

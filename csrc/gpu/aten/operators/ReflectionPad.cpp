@@ -128,7 +128,7 @@ void reflection_pad1d_out_kernel(
     auto output_data = output;
     ReflectionPad1dOutKernelFunctor<scalar_t> kfn(
         input_data, output_data, input_w, pad_l, output_w);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(work_group_size * work_group_num, nplane, nbatch),
             sycl::range<3>(work_group_size, 1, 1)),
@@ -219,7 +219,7 @@ void reflection_pad2d_out_kernel(
         pad_l,
         output_dim_x,
         output_dim_y);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(work_group_size * work_group_num, nplane, nbatch),
             sycl::range<3>(work_group_size, 1, 1)),
@@ -464,7 +464,7 @@ void reflection_pad1d_backward_out_kernel(
     auto grad_output_data = grad_output;
     ReflectionPad1dBackwardOutKernelFunctor<scalar_t> kfn(
         grad_input_data, grad_output_data, input_w, pad_l, output_w);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(work_group_size * work_group_num, nplane, nbatch),
             sycl::range<3>(work_group_size, 1, 1)),
@@ -556,7 +556,7 @@ void reflection_pad2d_backward_out_kernel(
         pad_l,
         output_dim_x,
         output_dim_y);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(work_group_size * work_group_num, nplane, nbatch),
             sycl::range<3>(work_group_size, 1, 1)),
@@ -776,7 +776,7 @@ inline void parallel_reflection_pad3d(
   auto cgf = DPCPP_Q_CGF(cgh) {
     ParallelReflectionPad3dKernelFunctor<scalar_t, F> kfn(
         input, output, pad_left, pad_top, pad_front, f, output_plane_size);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(work_group_size * work_group_num, nplane, nbatch),
             sycl::range<3>(work_group_size, 1, 1)),

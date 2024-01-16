@@ -313,7 +313,7 @@ static void max_pool3d_with_indices_out_frame_impl(
         in_batch_stride,
         out_batch_stride,
         in_hw_stride);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(work_group_size)),
         kfn);
@@ -424,7 +424,7 @@ static void max_pool3d_with_indices_backward_out_frame_impl(
             in_cf_channel_stride,
             out_nbatch_stride,
             in_nbatch_stride);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(work_group_size)),
         kfn);

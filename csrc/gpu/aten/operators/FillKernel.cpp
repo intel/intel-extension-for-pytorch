@@ -86,7 +86,7 @@ void fillSliceWithIndex(
     auto out_data = out.data;
     FillSliceWithIndexKernelFunctor<IndexType, Dim> kfn(
         out, sliceSize, sliceStride, out_data);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(totalSlices * local_size),
             sycl::range<1>(local_size)),

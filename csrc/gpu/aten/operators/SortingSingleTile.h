@@ -362,7 +362,7 @@ void radix_sort_upsweep_process(
             big_share_items,
             slm);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(wg_number * wg_size), sycl::range<1>(wg_size)),
         kfn);
@@ -595,7 +595,7 @@ void RadixSortScanBins(
     RadixSortScanBinsKernelFunctor<SUBGROUP_SIZE, WORKS_PER_ITEM> kfn(
         count, num_counts, wg_size, slm);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(sycl::range<1>(wg_size), sycl::range<1>(wg_size)),
         kfn);
   };
@@ -1087,7 +1087,7 @@ void radix_sort_downsweep_process(
             big_share_items,
             slm);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(wg_number * wg_size), sycl::range<1>(wg_size)),
         kfn);

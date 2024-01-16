@@ -273,7 +273,7 @@ void fused_norm_kernel1(
             sub_group_num,
             local_sum1,
             local_sum2);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
         kfn);

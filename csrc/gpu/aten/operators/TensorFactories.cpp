@@ -311,7 +311,7 @@ void triu_indices_dpcpp_kernel(
         triu_size,
         totalElements);
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);
@@ -398,7 +398,7 @@ void tril_indices_dpcpp_kernel(
         totalElements);
 
     // kick off kernel
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(total_items), sycl::range<1>(group_size)),
         kfn);

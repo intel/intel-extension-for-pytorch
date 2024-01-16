@@ -315,7 +315,7 @@ void embedding_bag_kernel(
             max_idx_vec,
             cfg,
             fixing_bag_size);
-    __cgh.parallel_for(
+    __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);

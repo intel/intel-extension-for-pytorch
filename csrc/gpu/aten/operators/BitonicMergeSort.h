@@ -296,7 +296,7 @@ void bitonic_merge_sort_kernel(
         g_val_,
         s_key,
         s_val);
-    h.parallel_for(
+    h.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(outer_sz * inner_sz * local_sz),
             sycl::range<1>(local_sz)),

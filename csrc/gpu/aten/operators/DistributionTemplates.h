@@ -262,7 +262,7 @@ void distribution_nullary_kernel(
               out_data,
               stride0,
               transform_func);
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);
@@ -281,7 +281,7 @@ void distribution_nullary_kernel(
               out_data,
               transform_func,
               offset_calc);
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);
@@ -440,7 +440,7 @@ void distribution_unary_kernel(
           input_data,
           input_offset_calculator,
           output_offset_calculator);
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);
@@ -456,7 +456,7 @@ void distribution_unary_kernel(
           input_data,
           input_offset_calculator,
           output_offset_calculator);
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);
@@ -647,7 +647,7 @@ void distribution_binary_kernel(
               input_data_2,
               input_offset_calculator,
               output_offset_calculator);
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);
@@ -664,7 +664,7 @@ void distribution_binary_kernel(
               input_data_2,
               input_offset_calculator,
               output_offset_calculator);
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
     };
     DPCPP_Q_SUBMIT(sycl_queue, cgf);

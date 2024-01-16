@@ -658,7 +658,7 @@ static void mode_xpu_kernel(
             problem_upper_limit,
             item);
       };
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(group_number * group_size, group_size), kfn);
     };
     DPCPP_Q_SUBMIT(queue, cgf);
@@ -710,7 +710,7 @@ static void mode_xpu_kernel(
             group_size,
             item);
       };
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(group_number * group_size, group_size), kfn);
     };
     DPCPP_Q_SUBMIT(queue, cgf);

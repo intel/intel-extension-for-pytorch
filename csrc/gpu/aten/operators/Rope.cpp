@@ -90,7 +90,7 @@ struct RotaryEmbedding<
           }
         }
       };
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<2>(
               sycl::range<2>({1, max_group_num * wg_size}),
               sycl::range<2>({1, wg_size})),
@@ -172,7 +172,7 @@ struct RotaryEmbedding<
         }
       };
 
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<2>(
               sycl::range<2>({1, max_group_num * wg_size}),
               sycl::range<2>({1, wg_size})),

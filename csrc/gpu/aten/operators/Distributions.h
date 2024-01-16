@@ -165,7 +165,7 @@ void distribution_elementwise_grid_stride_kernel(
               group_work_size,
               stride0,
               out_data);
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(
               sycl::range<1>(num_groups * group_items),
               sycl::range<1>(group_items)),
@@ -190,7 +190,7 @@ void distribution_elementwise_grid_stride_kernel(
               group_work_size,
               out_data,
               offset_calc);
-      cgh.parallel_for(
+      cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(
               sycl::range<1>(num_groups * group_items),
               sycl::range<1>(group_items)),

@@ -105,7 +105,7 @@ inline void renormRows(Tensor& t) {
               cgh); // We use the smallest subgroup size to ensure enough space
           auto t_ptr = t.data_ptr<scalar_t>();
           RenormRowsKernelFunctor<scalar_t> kfn(rows, cols, t_ptr, slm);
-          cgh.parallel_for(
+          cgh.parallel_for<decltype(kfn)>(
               sycl::nd_range<1>(num_groups * group_size, group_size), kfn);
         };
         DPCPP_Q_SUBMIT(sycl_queue, cgf);
@@ -307,7 +307,7 @@ void multinomial_with_replacement_kernel_impl(
               numCategories,
               prefixSum_ptr,
               normDist_ptr);
-          cgh.parallel_for(
+          cgh.parallel_for<decltype(kfn)>(
               sycl::nd_range<2>(
                   sycl::range<2>(group_range_y, group_range_x * group_size),
                   sycl::range<2>(1, group_size)),

@@ -235,7 +235,7 @@ void fractional_max_pool3d_out_frame_cf(
         oT_stride,
         oplane_stride,
         obatch_stride);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(
                 numBatch, numPlane, work_group_size * work_group_num),
@@ -446,7 +446,7 @@ void fractional_max_pool3d_out_frame_cl(
         oH_stride,
         oT_stride,
         oBatch_stride);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(
                 numBatch, outputSizeT, work_group_size * work_group_num),
@@ -538,7 +538,7 @@ void fractional_max_pool3d_backward_out_frame(
         gradInputSizeH,
         gradInputSizeW,
         gradOutputPlaneSize);
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(
                 numBatch, numPlane, work_group_size * work_group_num),

@@ -129,7 +129,7 @@ void ElementWiseKernel(
     ElementWiseKernelFunctor<ComputeType, Param, OP, InputType, OutputType> kfn(
         in_data_, out_data_, scale_, scale_inv_, amax_, p_, num_elements_);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(wgroup_num * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
