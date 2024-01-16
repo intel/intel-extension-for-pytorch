@@ -42,8 +42,8 @@ RUN curl -fsSL -v -o miniconda.sh -O https://repo.anaconda.com/miniconda/Minicon
     echo "source ~/miniconda3/bin/activate" >> ./.bashrc
 
 # --build-arg COMPILE=ON to compile from source
-ARG COMPILE
 FROM base AS dev
+ARG COMPILE
 COPY --chown=ubuntu:ubuntu . ./intel-extension-for-pytorch
 RUN . ./miniconda3/bin/activate && \
     conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \

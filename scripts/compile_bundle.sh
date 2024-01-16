@@ -50,13 +50,14 @@ python -m pip install pyyaml
 VER_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
 VER_TORCHVISION=$(python tools/yaml_utils.py -f dependency_version.yml -d torchvision -k version)
 VER_TORCHAUDIO=$(python tools/yaml_utils.py -f dependency_version.yml -d torchaudio -k version)
-VER_LLVM=llvmorg-$(python tools/yaml_utils.py -f dependency_version.yml -d llvm -k version)
+REPO_LLVM=$(python tools/yaml_utils.py -f dependency_version.yml -d llvm -k repo)
+VER_LLVM=$(python tools/yaml_utils.py -f dependency_version.yml -d llvm -k commit)
 VER_GCC=$(python tools/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
 python -m pip uninstall -y pyyaml
 cd ..
 
 if [ ! -d llvm-project ]; then
-    git clone https://github.com/llvm/llvm-project.git
+    git clone ${REPO_LLVM} llvm-project
 fi
 cd llvm-project
 if [ ! -z "${VER_LLVM}" ]; then
