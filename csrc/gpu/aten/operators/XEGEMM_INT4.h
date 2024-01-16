@@ -129,20 +129,19 @@ using namespace xpu::xetla;
         k_);                                                                \
   }
 
-#define HGEMM_INT4_SILU_DISPATCH(                                         \
-    F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
-  {                                                                         \
-    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
-    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                \
-        q,                                                                  \
-        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
-        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-        weight_->data_ptr<uint8_t>(),                                       \
-        weight_zp_->data_ptr<uint8_t>(),                                    \
-        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-        m_,                                                                 \
-        n_,                                                                 \
-        k_);                                                                \
+#define HGEMM_INT4_SILU_DISPATCH(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
+  {                                                                           \
+    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)         \
+    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                  \
+        q,                                                                    \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),     \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),          \
+        weight_->data_ptr<uint8_t>(),                                         \
+        weight_zp_->data_ptr<uint8_t>(),                                      \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),     \
+        m_,                                                                   \
+        n_,                                                                   \
+        k_);                                                                  \
   }
 
 #define HGEMM_INT4_QKV_DISPATCH(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
@@ -216,24 +215,23 @@ using namespace xpu::xetla;
         k_);                                                                \
   }
 
-#define HGEMM_INT4_ADD_DISPATCH(                                            \
-    F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
-  {                                                                         \
-    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
-    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                \
-        q,                                                                  \
-        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
-        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-        weight_->data_ptr<uint8_t>(),                                       \
-        weight_zp_->data_ptr<uint8_t>(),                                    \
-        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-        reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
-        m_,                                                                 \
-        n_,                                                                 \
-        k_);                                                                \
+#define HGEMM_INT4_ADD_DISPATCH(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
+  {                                                                          \
+    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)        \
+    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                 \
+        q,                                                                   \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),    \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),         \
+        weight_->data_ptr<uint8_t>(),                                        \
+        weight_zp_->data_ptr<uint8_t>(),                                     \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),    \
+        reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()),  \
+        m_,                                                                  \
+        n_,                                                                  \
+        k_);                                                                 \
   }
 
-#define HGEMM_INT4_BIAS_ADD_DISPATCH(                                            \
+#define HGEMM_INT4_BIAS_ADD_DISPATCH(                                       \
     F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
   {                                                                         \
     RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
@@ -250,7 +248,6 @@ using namespace xpu::xetla;
         n_,                                                                 \
         k_);                                                                \
   }
-
 
 #define HGEMM_INT4_COMMON_DISPATCH_IMPL(                     \
     DISPATCHER, F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
@@ -461,7 +458,8 @@ using namespace xpu::xetla;
           SLM_KS)                                                              \
     else if (                                                                  \
         num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                    \
-        epilogue_type_[1] == SILU && epilogue_type_[2] == RES_MUL &&ARCH == 1) \
+        epilogue_type_[1] == SILU && epilogue_type_[2] == RES_MUL &&           \
+        ARCH == 1)                                                             \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
           HGEMM_INT4_BIAS_SILU_MUL_DISPATCH,                                   \
           hgemm_bias_silu_mul_wint4_pvc,                                       \
@@ -474,7 +472,8 @@ using namespace xpu::xetla;
           SLM_KS)                                                              \
     else if (                                                                  \
         num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                    \
-        epilogue_type_[1] == SILU && epilogue_type_[2] == RES_MUL &&ARCH == 0) \
+        epilogue_type_[1] == SILU && epilogue_type_[2] == RES_MUL &&           \
+        ARCH == 0)                                                             \
       HGEMM_INT4_COMMON_DISPATCH_IMPL(                                         \
           HGEMM_INT4_BIAS_SILU_MUL_DISPATCH,                                   \
           hgemm_bias_silu_mul_wint4_arc,                                       \
@@ -611,10 +610,10 @@ struct GemmWint4Config {
   GemmWint4Config<8, 64, 8, 16, 16, gz, 4, MAX_INT, MAX_INT, MAX_INT, 0>
 // clang-format on
 
-#define ORDERED_GEMM_WINT4_CONFIG_SET_ARC             \
-  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(16),      \
-      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(32),  \
-      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(64),  \
+#define ORDERED_GEMM_WINT4_CONFIG_SET_ARC            \
+  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(16),     \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(32), \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(64), \
       ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(128)
 
 #define ORDERED_GEMM_WINT4_CONFIG_SET_PVC       \

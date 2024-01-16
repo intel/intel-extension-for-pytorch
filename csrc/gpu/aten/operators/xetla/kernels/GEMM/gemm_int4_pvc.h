@@ -10,7 +10,6 @@ namespace xetla {
 
 using namespace gpu::xetla;
 
-
 template <
     typename dtype_a,
     typename dtype_b,
@@ -43,16 +42,22 @@ struct hgemm_wint4_pvc_func {
   using perf_tuning_knob = gpu::xetla::group::
       perf_tuning_knob_t<sg_k, prefetch_distance, periodic_sync_interval>;
 
-//   using compute_policy = gpu::xetla::group::compute_policy_int4_dequantize_xmx<
-//       compute_attr,
-//       perf_tuning_knob,
-//       dtype_scale,
-//       dtype_zero_pt,
-//       dequant_s == 0 ? 131072 : dequant_s,
-//       gpu_arch::Xe>;
+  //   using compute_policy =
+  //   gpu::xetla::group::compute_policy_int4_dequantize_xmx<
+  //       compute_attr,
+  //       perf_tuning_knob,
+  //       dtype_scale,
+  //       dtype_zero_pt,
+  //       dequant_s == 0 ? 131072 : dequant_s,
+  //       gpu_arch::Xe>;
   using compute_policy = gpu::xetla::group::compute_policy_int4_dequantize_xmx<
-          compute_attr, perf_tuning_knob, dtype_scale, dtype_zero_pt,
-          gpu::xetla::group::quant_mode::S4_ASYM, dequant_s== 0 ? 131072 : dequant_s, gpu_arch::Xe>;
+      compute_attr,
+      perf_tuning_knob,
+      dtype_scale,
+      dtype_zero_pt,
+      gpu::xetla::group::quant_mode::S4_ASYM,
+      dequant_s == 0 ? 131072 : dequant_s,
+      gpu_arch::Xe>;
 
   using gemm_t = gpu::xetla::group::
       gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
@@ -106,23 +111,24 @@ struct hgemm_wint4_pvc_func {
     dtype_cnt* cnt = static_cast<uint32_t*>(aligned_alloc_device(
         DEVICE_MEM_ALIGNMENT, size_cnt * sizeof(dtype_cnt), device, context));
 
-    typename gemm_op_t::template arguments_t <compute_policy::quant_type>gemm_arg(
-        mat_m,
-        mat_k,
-        mat_n,
-        A,
-        mat_k,
-        B,
-        mat_n,
-        C,
-        mat_n,
-        scale_ptr,
-        mat_n,
-        zero_pt_ptr,
-        mat_n,
-        acc,
-        cnt,
-        epilogue_args);
+    typename gemm_op_t::template arguments_t<compute_policy::quant_type>
+        gemm_arg(
+            mat_m,
+            mat_k,
+            mat_n,
+            A,
+            mat_k,
+            B,
+            mat_n,
+            C,
+            mat_n,
+            scale_ptr,
+            mat_n,
+            zero_pt_ptr,
+            mat_n,
+            acc,
+            cnt,
+            epilogue_args);
 
     cl::sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
 
@@ -230,8 +236,9 @@ inline void hgemm_bias_wint4_pvc(
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_bias = scalar_t;
-  using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>, gpu_arch::Xe>>;
+  using post_op = subgroup::chained_tile_op_t<subgroup::bias_add_op_t<
+      mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>,
+      gpu_arch::Xe>>;
   using hgemm_wint4_pvc_functor = hgemm_wint4_pvc_func<
       data_type_a,
       data_type_b,
@@ -263,7 +270,6 @@ inline void hgemm_bias_wint4_pvc(
       const_cast<scalar_t*>(b_scale),
       {{{const_cast<scalar_t*>(bias), {n, 1, n}}}});
 }
-
 
 template <
     typename scalar_t,
@@ -297,7 +303,9 @@ inline void hgemm_bias_gelu_wint4_pvc(
   using data_type_acc = float;
   using data_type_bias = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>, gpu_arch::Xe>,
+      subgroup::bias_add_op_t<
+          mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>,
+          gpu_arch::Xe>,
       subgroup::gelu_fwd_op_t>;
   using hgemm_wint4_pvc_functor = hgemm_wint4_pvc_func<
       data_type_a,
@@ -498,8 +506,7 @@ inline void hgemm_silu_wint4_pvc(
   using data_type_zp = int4x2;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
-  using post_op = subgroup::chained_tile_op_t<
-      epilogue_impl::silu_op_t>;
+  using post_op = subgroup::chained_tile_op_t<epilogue_impl::silu_op_t>;
   using hgemm_wint4_pvc_functor = hgemm_wint4_pvc_func<
       data_type_a,
       data_type_b,
@@ -567,8 +574,8 @@ inline void hgemm_silu_mul_wint4_pvc(
   using data_type_mul = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
       epilogue_impl::silu_op_t,
-      subgroup::elemwise_reduce_op_t<reduce_op::prod, data_type_mul, gpu_arch::Xe>
-      >;
+      subgroup::
+          elemwise_reduce_op_t<reduce_op::prod, data_type_mul, gpu_arch::Xe>>;
   using hgemm_wint4_pvc_functor = hgemm_wint4_pvc_func<
       data_type_a,
       data_type_b,
@@ -637,10 +644,12 @@ inline void hgemm_bias_silu_mul_wint4_pvc(
   using data_type_mul = scalar_t;
   using data_type_bias = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>, gpu_arch::Xe>,
+      subgroup::bias_add_op_t<
+          mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>,
+          gpu_arch::Xe>,
       epilogue_impl::silu_op_t,
-      subgroup::elemwise_reduce_op_t<reduce_op::prod, data_type_mul, gpu_arch::Xe>
-      >;
+      subgroup::
+          elemwise_reduce_op_t<reduce_op::prod, data_type_mul, gpu_arch::Xe>>;
   using hgemm_wint4_pvc_functor = hgemm_wint4_pvc_func<
       data_type_a,
       data_type_b,
@@ -671,7 +680,9 @@ inline void hgemm_bias_silu_mul_wint4_pvc(
       k,
       const_cast<data_type_zp*>(b_zp_alias),
       const_cast<scalar_t*>(b_scale),
-      {{{const_cast<scalar_t*>(bias), {n, 1, n}}, {}, {const_cast<scalar_t*>(mul), {n, m, n}}}});
+      {{{const_cast<scalar_t*>(bias), {n, 1, n}},
+        {},
+        {const_cast<scalar_t*>(mul), {n, m, n}}}});
 }
 
 template <
@@ -709,9 +720,11 @@ inline void hgemm_bias_add_wint4_pvc(
   using data_type_res = scalar_t;
   using data_type_bias = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>, gpu_arch::Xe>,
-      subgroup::elemwise_reduce_op_t<reduce_op::sum, data_type_res, gpu_arch::Xe>
-      >;
+      subgroup::bias_add_op_t<
+          mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>,
+          gpu_arch::Xe>,
+      subgroup::
+          elemwise_reduce_op_t<reduce_op::sum, data_type_res, gpu_arch::Xe>>;
   using hgemm_wint4_pvc_functor = hgemm_wint4_pvc_func<
       data_type_a,
       data_type_b,
@@ -742,7 +755,8 @@ inline void hgemm_bias_add_wint4_pvc(
       k,
       const_cast<data_type_zp*>(b_zp_alias),
       const_cast<scalar_t*>(b_scale),
-      {{{const_cast<scalar_t*>(bias), {n, 1, n}}, {const_cast<scalar_t*>(res), {n, m, n}}}});
+      {{{const_cast<scalar_t*>(bias), {n, 1, n}},
+        {const_cast<scalar_t*>(res), {n, m, n}}}});
 }
 
 template <
@@ -780,8 +794,9 @@ inline void hgemm_bias_res_res_wint4_pvc(
   using data_type_bias = scalar_t;
   using data_type_res = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
-      subgroup::
-          bias_add_op_t<mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>, gpu_arch::Xe>,
+      subgroup::bias_add_op_t<
+          mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>,
+          gpu_arch::Xe>,
       subgroup::
           elemwise_reduce_op_t<reduce_op::sum, data_type_res, gpu_arch::Xe>,
       subgroup::
@@ -948,9 +963,9 @@ inline void hgemm_qkv_bias_wint4_pvc(
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_bias = scalar_t;
-  using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<
-      mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>, gpu_arch::Xe>>;
+  using post_op = subgroup::chained_tile_op_t<subgroup::bias_add_op_t<
+      mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>,
+      gpu_arch::Xe>>;
   using hgemm_wint4_pvc_functor = hgemm_wint4_pvc_func<
       data_type_a,
       data_type_b,
@@ -1015,8 +1030,6 @@ inline void hgemm_qkv_bias_wint4_pvc(
       const_cast<scalar_t*>(b_scale + 2 * scale_offset),
       {{{const_cast<scalar_t*>(bias + 2 * n), {n, 1, n}}}});
 }
-
-
 
 } // namespace xetla
 } // namespace xpu

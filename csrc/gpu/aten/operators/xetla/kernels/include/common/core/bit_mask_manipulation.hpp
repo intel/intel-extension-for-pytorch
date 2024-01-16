@@ -1,18 +1,18 @@
 /*******************************************************************************
-* Copyright (c) 2022-2023 Intel Corporation
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*******************************************************************************/
+ * Copyright (c) 2022-2023 Intel Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *******************************************************************************/
 
 /// @file
 /// C++ API
@@ -37,12 +37,18 @@ namespace gpu::xetla {
 /// @param sat enables/disables the saturation (off by default). Possible
 /// values: saturation_on/saturation_off.
 /// @return vector of shifted left values.
-template <typename T0, typename T1, int SZ, typename U,
-        class Sat = xetla_saturation_off_tag>
+template <
+    typename T0,
+    typename T1,
+    int SZ,
+    typename U,
+    class Sat = xetla_saturation_off_tag>
 __XETLA_API xetla_vector<T0, SZ> xetla_shl(
-        xetla_vector<T1, SZ> src0, U src1, Sat sat = {}) {
-    return __ESIMD_ENS::shl<T0, T1, SZ, U, typename Sat::sat_tag>(
-            src0, src1, Sat::value);
+    xetla_vector<T1, SZ> src0,
+    U src1,
+    Sat sat = {}) {
+  return __ESIMD_ENS::shl<T0, T1, SZ, U, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
 }
 
 /// Shift left operation (scalar version)
@@ -54,11 +60,14 @@ __XETLA_API xetla_vector<T0, SZ> xetla_shl(
 /// @param sat enables/disables the saturation (off by default). Possible
 /// values: saturation_on/saturation_off.
 /// @return shifted left value.
-template <typename T0, typename T1, typename T2,
-        class Sat = xetla_saturation_off_tag>
+template <
+    typename T0,
+    typename T1,
+    typename T2,
+    class Sat = xetla_saturation_off_tag>
 typename std::remove_const<T0>::type xetla_shl(T1 src0, T2 src1, Sat sat = {}) {
-    return __ESIMD_ENS::shl<T0, T1, T2, typename Sat::sat_tag>(
-            src0, src1, Sat::value);
+  return __ESIMD_ENS::shl<T0, T1, T2, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
 }
 
 /// Shift right operation (vector version)
@@ -71,12 +80,18 @@ typename std::remove_const<T0>::type xetla_shl(T1 src0, T2 src1, Sat sat = {}) {
 /// @param sat enables/disables the saturation (off by default). Possible
 /// values: saturation_on/saturation_off.
 /// @return vector of shifted right values.
-template <typename T0, typename T1, int SZ, typename U,
-        class Sat = xetla_saturation_off_tag>
+template <
+    typename T0,
+    typename T1,
+    int SZ,
+    typename U,
+    class Sat = xetla_saturation_off_tag>
 __XETLA_API xetla_vector<T0, SZ> xetla_shr(
-        xetla_vector<T1, SZ> src0, U src1, Sat sat = {}) {
-    return __ESIMD_ENS::shr<T0, T1, SZ, U, typename Sat::sat_tag>(
-            src0, src1, Sat::value);
+    xetla_vector<T1, SZ> src0,
+    U src1,
+    Sat sat = {}) {
+  return __ESIMD_ENS::shr<T0, T1, SZ, U, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
 }
 
 /// Shift right operation (scalar version)
@@ -88,12 +103,17 @@ __XETLA_API xetla_vector<T0, SZ> xetla_shr(
 /// @param sat enables/disables the saturation (off by default). Possible
 /// values: saturation_on/saturation_off.
 /// @return shifted right value.
-template <typename T0, typename T1, typename T2,
-        class Sat = xetla_saturation_off_tag>
+template <
+    typename T0,
+    typename T1,
+    typename T2,
+    class Sat = xetla_saturation_off_tag>
 __XETLA_API typename std::remove_const<T0>::type xetla_shr(
-        T1 src0, T2 src1, Sat sat = {}) {
-    return __ESIMD_ENS::shr<T0, T1, T2, typename Sat::sat_tag>(
-            src0, src1, Sat::value);
+    T1 src0,
+    T2 src1,
+    Sat sat = {}) {
+  return __ESIMD_ENS::shr<T0, T1, T2, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
 }
 
 /// Rotate left operation with two vector inputs
@@ -106,8 +126,9 @@ __XETLA_API typename std::remove_const<T0>::type xetla_shr(
 /// @return vector of rotated elements.
 template <typename T0, typename T1, int SZ>
 __XETLA_API xetla_vector<T0, SZ> xetla_rol(
-        xetla_vector<T1, SZ> src0, xetla_vector<T1, SZ> src1) {
-    return __ESIMD_ENS::rol<T0, T1, SZ>(src0, src1);
+    xetla_vector<T1, SZ> src0,
+    xetla_vector<T1, SZ> src1) {
+  return __ESIMD_ENS::rol<T0, T1, SZ>(src0, src1);
 }
 
 /// Rotate left operation with a vector and a scalar inputs
@@ -119,12 +140,12 @@ __XETLA_API xetla_vector<T0, SZ> xetla_rol(
 /// @param src1 the number of bit positions the input vector shall be rotated.
 /// @return vector of rotated elements.
 template <typename T0, typename T1, int SZ, typename U>
-__XETLA_API std::enable_if_t<std::is_integral<T0>::value
-                && std::is_integral<T1>::value && std::is_integral<U>::value
-                && is_xetla_scalar<U>::value,
-        xetla_vector<T0, SZ>>
+__XETLA_API std::enable_if_t<
+    std::is_integral<T0>::value && std::is_integral<T1>::value &&
+        std::is_integral<U>::value && is_xetla_scalar<U>::value,
+    xetla_vector<T0, SZ>>
 xetla_rol(xetla_vector<T1, SZ> src0, U src1) {
-    return __ESIMD_ENS::rol<T0, T1, SZ, U>(src0, src1);
+  return __ESIMD_ENS::rol<T0, T1, SZ, U>(src0, src1);
 }
 
 /// Rotate left operation with two scalar inputs
@@ -135,11 +156,12 @@ xetla_rol(xetla_vector<T1, SZ> src0, U src1) {
 /// @param src1 the number of bit positions the input vector shall be rotated.
 /// @return rotated left value.
 template <typename T0, typename T1, typename T2>
-__XETLA_API std::enable_if_t<std::is_integral<T0>::value
-                && std::is_integral<T1>::value && std::is_integral<T2>::value,
-        remove_const_t<T0>>
+__XETLA_API std::enable_if_t<
+    std::is_integral<T0>::value && std::is_integral<T1>::value &&
+        std::is_integral<T2>::value,
+    remove_const_t<T0>>
 xetla_rol(T1 src0, T2 src1) {
-    return __ESIMD_ENS::rol<T0, T1, T2>(src0, src1);
+  return __ESIMD_ENS::rol<T0, T1, T2>(src0, src1);
 }
 
 /// Rotate right operation with two vector inputs
@@ -152,8 +174,9 @@ xetla_rol(T1 src0, T2 src1) {
 /// @return vector of rotated elements.
 template <typename T0, typename T1, int SZ>
 __XETLA_API xetla_vector<T0, SZ> xetla_ror(
-        xetla_vector<T1, SZ> src0, xetla_vector<T1, SZ> src1) {
-    return __ESIMD_ENS::ror<T0, T1, SZ>(src0, src1);
+    xetla_vector<T1, SZ> src0,
+    xetla_vector<T1, SZ> src1) {
+  return __ESIMD_ENS::ror<T0, T1, SZ>(src0, src1);
 }
 
 /// Rotate right operation with a vector and a scalar inputs
@@ -165,12 +188,12 @@ __XETLA_API xetla_vector<T0, SZ> xetla_ror(
 /// @param src1 the number of bit positions the input vector shall be rotated.
 /// @return vector of rotated elements.
 template <typename T0, typename T1, int SZ, typename U>
-__XETLA_API std::enable_if_t<std::is_integral<T0>::value
-                && std::is_integral<T1>::value && std::is_integral<U>::value
-                && is_xetla_scalar<U>::value,
-        xetla_vector<T0, SZ>>
+__XETLA_API std::enable_if_t<
+    std::is_integral<T0>::value && std::is_integral<T1>::value &&
+        std::is_integral<U>::value && is_xetla_scalar<U>::value,
+    xetla_vector<T0, SZ>>
 xetla_ror(xetla_vector<T1, SZ> src0, U src1) {
-    return __ESIMD_ENS::ror<T0, T1, SZ, U>(src0, src1);
+  return __ESIMD_ENS::ror<T0, T1, SZ, U>(src0, src1);
 }
 
 /// Rotate right operation with two scalar inputs
@@ -181,11 +204,12 @@ xetla_ror(xetla_vector<T1, SZ> src0, U src1) {
 /// @param src1 the number of bit positions the input vector shall be rotated.
 /// @return rotated right value.
 template <typename T0, typename T1, typename T2>
-__XETLA_API std::enable_if_t<std::is_integral<T0>::value
-                && std::is_integral<T1>::value && std::is_integral<T2>::value,
-        remove_const_t<T0>>
+__XETLA_API std::enable_if_t<
+    std::is_integral<T0>::value && std::is_integral<T1>::value &&
+        std::is_integral<T2>::value,
+    remove_const_t<T0>>
 xetla_ror(T1 src0, T2 src1) {
-    return __ESIMD_ENS::ror<T0, T1, T2>(src0, src1);
+  return __ESIMD_ENS::ror<T0, T1, T2>(src0, src1);
 }
 
 /// Logical Shift Right (vector version)
@@ -198,12 +222,18 @@ xetla_ror(T1 src0, T2 src1) {
 /// @param sat enables/disables the saturation (off by default). Possible
 /// values: saturation_on/saturation_off.
 /// @return vector of shifted elements.
-template <typename T0, typename T1, int SZ, typename U,
-        class Sat = xetla_saturation_off_tag>
+template <
+    typename T0,
+    typename T1,
+    int SZ,
+    typename U,
+    class Sat = xetla_saturation_off_tag>
 __XETLA_API xetla_vector<T0, SZ> xetla_lsr(
-        xetla_vector<T1, SZ> src0, U src1, Sat sat = {}) {
-    return __ESIMD_ENS::lsr<T0, T1, SZ, U, typename Sat::sat_tag>(
-            src0, src1, Sat::value);
+    xetla_vector<T1, SZ> src0,
+    U src1,
+    Sat sat = {}) {
+  return __ESIMD_ENS::lsr<T0, T1, SZ, U, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
 }
 
 /// Logical Shift Right (scalar version)
@@ -216,12 +246,17 @@ __XETLA_API xetla_vector<T0, SZ> xetla_lsr(
 /// @param sat enables/disables the saturation (off by default). Possible
 /// values: saturation_on/saturation_off.
 /// @return shifted value.
-template <typename T0, typename T1, typename T2,
-        class Sat = xetla_saturation_off_tag>
+template <
+    typename T0,
+    typename T1,
+    typename T2,
+    class Sat = xetla_saturation_off_tag>
 __XETLA_API typename std::remove_const<T0>::type xetla_lsr(
-        T1 src0, T2 src1, Sat sat = {}) {
-    return __ESIMD_ENS::lsr<T0, T1, T2, typename Sat::sat_tag>(
-            src0, src1, Sat::value);
+    T1 src0,
+    T2 src1,
+    Sat sat = {}) {
+  return __ESIMD_ENS::lsr<T0, T1, T2, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
 }
 
 /// Arithmetical Shift Right (vector version)
@@ -234,12 +269,18 @@ __XETLA_API typename std::remove_const<T0>::type xetla_lsr(
 /// @param sat enables/disables the saturation (off by default). Possible
 /// values: saturation_on/saturation_off.
 /// @return vector of shifted elements.
-template <typename T0, typename T1, int SZ, typename U,
-        class Sat = xetla_saturation_off_tag>
+template <
+    typename T0,
+    typename T1,
+    int SZ,
+    typename U,
+    class Sat = xetla_saturation_off_tag>
 __XETLA_API xetla_vector<T0, SZ> xetla_asr(
-        xetla_vector<T1, SZ> src0, U src1, Sat sat = {}) {
-    return __ESIMD_ENS::asr<T0, T1, SZ, U, typename Sat::sat_tag>(
-            src0, src1, Sat::value);
+    xetla_vector<T1, SZ> src0,
+    U src1,
+    Sat sat = {}) {
+  return __ESIMD_ENS::asr<T0, T1, SZ, U, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
 }
 
 /// Arithmetical Shift Right (scalar version)
@@ -252,12 +293,17 @@ __XETLA_API xetla_vector<T0, SZ> xetla_asr(
 /// @param sat enables/disables the saturation (off by default). Possible
 /// values: saturation_on/saturation_off.
 /// @return shifted value.
-template <typename T0, typename T1, typename T2,
-        class Sat = xetla_saturation_off_tag>
+template <
+    typename T0,
+    typename T1,
+    typename T2,
+    class Sat = xetla_saturation_off_tag>
 __XETLA_API typename std::remove_const<T0>::type xetla_asr(
-        T1 src0, T2 src1, Sat sat = {}) {
-    return __ESIMD_ENS::asr<T0, T1, T2, typename Sat::sat_tag>(
-            src0, src1, Sat::value);
+    T1 src0,
+    T2 src1,
+    Sat sat = {}) {
+  return __ESIMD_ENS::asr<T0, T1, T2, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
 }
 
 /// Pack a xetla_mask into a single unsigned 32-bit integer value.
@@ -270,7 +316,7 @@ __XETLA_API typename std::remove_const<T0>::type xetla_asr(
 /// @return The packed mask as an <code> unsigned int</code> 32-bit value.
 template <int N>
 __XETLA_API uint32_t xetla_pack_mask(xetla_mask<N> src0) {
-    return __ESIMD_NS::pack_mask<N>(src0);
+  return __ESIMD_NS::pack_mask<N>(src0);
 }
 
 /// Unpack an unsigned 32-bit integer value into a xetla_mask. Only \c N least
@@ -282,7 +328,7 @@ __XETLA_API uint32_t xetla_pack_mask(xetla_mask<N> src0) {
 /// @return The unpacked mask as a xetla_mask object.
 template <int N>
 __XETLA_API xetla_mask<N> xetla_unpack_mask(uint32_t src0) {
-    return __ESIMD_NS::unpack_mask<N>(src0);
+  return __ESIMD_NS::unpack_mask<N>(src0);
 }
 
 /// @} xetla_core_bit_manipulation

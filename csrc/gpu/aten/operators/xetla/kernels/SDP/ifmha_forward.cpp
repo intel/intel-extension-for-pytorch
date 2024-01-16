@@ -74,7 +74,6 @@ void ifmha_forward_impl(
         kIsTraining>>(NdRange, [=](sycl::nd_item<2> item) KERNEL_MAIN {
       // exec item
 
-
       // init ifmha forward op and arguments
       ifmha_forward_op_t ifmha_fwd_op;
       typename ifmha_forward_op_t::arguments_t args(

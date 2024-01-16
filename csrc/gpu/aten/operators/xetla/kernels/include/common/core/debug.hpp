@@ -1,24 +1,24 @@
 /*******************************************************************************
-* Copyright (c) 2022-2023 Intel Corporation
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*******************************************************************************/
+ * Copyright (c) 2022-2023 Intel Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *******************************************************************************/
 
 #pragma once
 
-#include "common/core/common.hpp"
 #include <CL/sycl.hpp>
 #include <ext/intel/esimd.hpp>
+#include "common/core/common.hpp"
 
 namespace gpu::xetla {
 
@@ -37,38 +37,38 @@ static constexpr size_t dims_pos = 0;
 static constexpr size_t dims_global_start = 1;
 static constexpr size_t dims_local_start = 1 + max_dims;
 
-static constexpr size_t nd_item_offset
-        = reg_start - element_num * sizeof(element_type);
+static constexpr size_t nd_item_offset =
+    reg_start - element_num * sizeof(element_type);
 static inline ESIMD_PRIVATE ESIMD_REGISTER(nd_item_offset)
-        __ESIMD_NS::simd<element_type, element_num> saved_nd_item;
+    __ESIMD_NS::simd<element_type, element_num> saved_nd_item;
 
 template <size_t dims>
 static inline void set(sycl::nd_item<dims> item) {
-    static_assert(dims <= max_dims);
+  static_assert(dims <= max_dims);
 
-    saved_nd_item[dims_pos] = dims;
-
-#pragma unroll
-    for (auto i = 0; i < dims; i++) {
-        saved_nd_item[dims_global_start + i] = item.get_group(i);
-    }
+  saved_nd_item[dims_pos] = dims;
 
 #pragma unroll
-    for (auto i = 0; i < dims; i++) {
-        saved_nd_item[dims_local_start + i] = item.get_local_id(i);
-    }
+  for (auto i = 0; i < dims; i++) {
+    saved_nd_item[dims_global_start + i] = item.get_group(i);
+  }
+
+#pragma unroll
+  for (auto i = 0; i < dims; i++) {
+    saved_nd_item[dims_local_start + i] = item.get_local_id(i);
+  }
 }
 
 static inline uint16_t get_dims() {
-    return saved_nd_item[dims_pos];
+  return saved_nd_item[dims_pos];
 }
 
 static inline int16_t get_group_id(size_t dim) {
-    return saved_nd_item[dims_global_start + dim];
+  return saved_nd_item[dims_global_start + dim];
 }
 
 static inline int16_t get_local_id(size_t dim) {
-    return saved_nd_item[dims_local_start + dim];
+  return saved_nd_item[dims_local_start + dim];
 }
 }; // namespace nd_item
 }; // namespace debug_ctx
@@ -100,42 +100,45 @@ ESIMD_INLINE void xetla_thread_exit() {
 #ifdef __SYCL_DEVICE_ONLY__
 // kernel printf
 #ifdef DEBUG
-#define XETLA_PRINTF(s, ...) \
-    do { \
-        const __attribute__((opencl_constant)) char f[] = STR_APPEND( \
-                "[XeTLA] [KERNEL] [group(%d, %d, %d), local(%d, " \
-                "%d, %d)] : ", \
-                s, "\n"); \
-        sycl::ext::oneapi::experimental::printf(f, \
-                debug_ctx::nd_item::get_group_id(0), \
-                debug_ctx::nd_item::get_group_id(1), \
-                debug_ctx::nd_item::get_group_id(2), \
-                debug_ctx::nd_item::get_local_id(0), \
-                debug_ctx::nd_item::get_local_id(1), \
-                debug_ctx::nd_item::get_local_id(2), ##__VA_ARGS__); \
-    } while (0)
+#define XETLA_PRINTF(s, ...)                                      \
+  do {                                                            \
+    const __attribute__((opencl_constant)) char f[] = STR_APPEND( \
+        "[XeTLA] [KERNEL] [group(%d, %d, %d), local(%d, "         \
+        "%d, %d)] : ",                                            \
+        s,                                                        \
+        "\n");                                                    \
+    sycl::ext::oneapi::experimental::printf(                      \
+        f,                                                        \
+        debug_ctx::nd_item::get_group_id(0),                      \
+        debug_ctx::nd_item::get_group_id(1),                      \
+        debug_ctx::nd_item::get_group_id(2),                      \
+        debug_ctx::nd_item::get_local_id(0),                      \
+        debug_ctx::nd_item::get_local_id(1),                      \
+        debug_ctx::nd_item::get_local_id(2),                      \
+        ##__VA_ARGS__);                                           \
+  } while (0)
 #else
-#define XETLA_PRINTF(s, ...) \
-    do { \
-        const __attribute__((opencl_constant)) char f[] \
-                = STR_APPEND("[XeTLA] [KERNEL] : ", s, "\n"); \
-        sycl::ext::oneapi::experimental::printf(f, ##__VA_ARGS__); \
-    } while (0)
+#define XETLA_PRINTF(s, ...)                                   \
+  do {                                                         \
+    const __attribute__((opencl_constant)) char f[] =          \
+        STR_APPEND("[XeTLA] [KERNEL] : ", s, "\n");            \
+    sycl::ext::oneapi::experimental::printf(f, ##__VA_ARGS__); \
+  } while (0)
 #endif
 #else
 // host printf
-#define XETLA_PRINTF(s, ...) \
-    do { \
-        const char *f = STR_APPEND("[XeTLA] [HOST] : ", s, "\n"); \
-        printf(f, ##__VA_ARGS__); \
-    } while (0)
+#define XETLA_PRINTF(s, ...)                                  \
+  do {                                                        \
+    const char* f = STR_APPEND("[XeTLA] [HOST] : ", s, "\n"); \
+    printf(f, ##__VA_ARGS__);                                 \
+  } while (0)
 #endif
 
 #else
 // log off
 #define XETLA_PRINTF(s, ...) \
-    do { \
-    } while (0)
+  do {                       \
+  } while (0)
 #endif
 
 // 2. define XETLA_ASSERT
@@ -143,21 +146,23 @@ ESIMD_INLINE void xetla_thread_exit() {
 #ifdef __SYCL_DEVICE_ONLY__
 // kernel assert
 #define XETLA_ASSERT(c, s, ...) \
-    do { \
-    } while (0)
+  do {                          \
+  } while (0)
 #else
 // host asset
 #ifdef DEBUG
 // host assert in debug version
-#define XETLA_ASSERT(c, s, ...) \
-    do { \
-        if (!(c)) { XETLA_PRINTF(s, ##__VA_ARGS__); } \
-    } while (0)
+#define XETLA_ASSERT(c, s, ...)       \
+  do {                                \
+    if (!(c)) {                       \
+      XETLA_PRINTF(s, ##__VA_ARGS__); \
+    }                                 \
+  } while (0)
 #else
 // host assert in release version
 #define XETLA_ASSERT(c, s, ...) \
-    do { \
-    } while (0)
+  do {                          \
+  } while (0)
 #endif
 #endif
 
@@ -165,21 +170,23 @@ ESIMD_INLINE void xetla_thread_exit() {
 // =========================================================
 #ifdef DEBUG
 enum class dbg_level : uint8_t {
-    kernel = 0,
-    workgroup = 1,
-    subgroup = 2,
-    core = 3
+  kernel = 0,
+  workgroup = 1,
+  subgroup = 2,
+  core = 3
 };
-#define DEBUG_INVOKE(level, ...) \
-    do { \
-        if constexpr (DEBUG >= static_cast<uint8_t>(level)) { \
-            if (!(__VA_ARGS__)) { XETLA_PRINTF("L%d: " #__VA_ARGS__, level); } \
-        } \
-    } while (0)
+#define DEBUG_INVOKE(level, ...)                          \
+  do {                                                    \
+    if constexpr (DEBUG >= static_cast<uint8_t>(level)) { \
+      if (!(__VA_ARGS__)) {                               \
+        XETLA_PRINTF("L%d: " #__VA_ARGS__, level);        \
+      }                                                   \
+    }                                                     \
+  } while (0)
 #else
 #define DEBUG_INVOKE(level, ...) \
-    do { \
-    } while (0)
+  do {                           \
+  } while (0)
 #endif
 
 } // namespace gpu::xetla

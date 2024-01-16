@@ -10,7 +10,6 @@ namespace xetla {
 
 using namespace gpu::xetla;
 
-
 template <
     typename dtype_a,
     typename dtype_b,
@@ -32,17 +31,25 @@ struct hgemm_wint4_arc_func {
   static constexpr uint32_t periodic_sync_interval = 0;
   static constexpr uint32_t prefetch_distance = 0;
 
-  using mem_desc_a_t =
-      mem_desc_t<dtype_a, mem_layout::row_major, mem_space::global,
+  using mem_desc_a_t = mem_desc_t<
+      dtype_a,
+      mem_layout::row_major,
+      mem_space::global,
       DEVICE_MEM_ALIGNMENT / sizeof(dtype_a)>;
-  using mem_desc_b_t =
-      mem_desc_t<dtype_b, mem_layout::row_major, mem_space::global,
+  using mem_desc_b_t = mem_desc_t<
+      dtype_b,
+      mem_layout::row_major,
+      mem_space::global,
       DEVICE_MEM_ALIGNMENT / sizeof(dtype_b)>;
-  using mem_desc_c_t =
-      mem_desc_t<dtype_c, mem_layout::row_major, mem_space::global,
+  using mem_desc_c_t = mem_desc_t<
+      dtype_c,
+      mem_layout::row_major,
+      mem_space::global,
       DEVICE_MEM_ALIGNMENT / sizeof(dtype_c)>;
-  using mem_desc_scale_t = 
-      mem_desc_t<dtype_scale, mem_layout::row_major, mem_space::global,
+  using mem_desc_scale_t = mem_desc_t<
+      dtype_scale,
+      mem_layout::row_major,
+      mem_space::global,
       DEVICE_MEM_ALIGNMENT / sizeof(dtype_scale)>;
 
   using compute_attr = gpu::xetla::group::compute_attr_t<fp16, fp16, dtype_acc>;
@@ -50,17 +57,23 @@ struct hgemm_wint4_arc_func {
       perf_tuning_knob_t<sg_k, prefetch_distance, periodic_sync_interval>;
 
   using compute_policy = gpu::xetla::group::compute_policy_int4_dequantize_xmx<
-          compute_attr, perf_tuning_knob, dtype_scale, dtype_b,
-          gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP, dequant_s, gpu_arch::Dg2>;
-  using gemm_t = gpu::xetla::group::gemm_t<compute_policy, tile_shape,
-          mem_desc_a_t, mem_desc_b_t>;
+      compute_attr,
+      perf_tuning_knob,
+      dtype_scale,
+      dtype_b,
+      gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
+      dequant_s,
+      gpu_arch::Dg2>;
+  using gemm_t = gpu::xetla::group::
+      gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
 
   using epilogue_t = gpu::xetla::group::epilogue_t<
       gpu::xetla::group::epilogue_policy_tile_op<post_ops, gpu_arch::Dg2>,
       tile_shape,
       mem_desc_c_t>;
 
-  using group_swizzle = gpu::xetla::kernel::group_swizzle_default<gpu_arch::Dg2>;
+  using group_swizzle =
+      gpu::xetla::kernel::group_swizzle_default<gpu_arch::Dg2>;
   using dispatch_policy = dispatch_policy_int4_dequantize_kslicing<
       group_swizzle,
       l3_kslicing,
@@ -98,21 +111,22 @@ struct hgemm_wint4_arc_func {
     dtype_cnt* cnt = static_cast<uint32_t*>(aligned_alloc_device(
         DEVICE_MEM_ALIGNMENT, size_cnt * sizeof(dtype_cnt), device, context));
 
-    typename gemm_op_t::template arguments_t <compute_policy::quant_type>gemm_arg(
-        mat_m,
-        mat_k,
-        mat_n,
-        A,
-        mat_k,
-        B,
-        mat_n,
-        C,
-        mat_n,
-        scale_ptr,
-        mat_n,
-        acc,
-        cnt,
-        epilogue_args);
+    typename gemm_op_t::template arguments_t<compute_policy::quant_type>
+        gemm_arg(
+            mat_m,
+            mat_k,
+            mat_n,
+            A,
+            mat_k,
+            B,
+            mat_n,
+            C,
+            mat_n,
+            scale_ptr,
+            mat_n,
+            acc,
+            cnt,
+            epilogue_args);
 
     cl::sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
 
@@ -219,9 +233,11 @@ inline void hgemm_bias_wint4_arc(
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_bias = scalar_t;
-  using mem_desc_bias_t = mem_desc_t<data_type_bias,
-          mem_layout::row_major, mem_space::global,
-          DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>;
+  using mem_desc_bias_t = mem_desc_t<
+      data_type_bias,
+      mem_layout::row_major,
+      mem_space::global,
+      DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>;
   using bias_op_t = subgroup::bias_add_op_t<mem_desc_bias_t, gpu_arch::Dg2>;
   using post_op = subgroup::chained_tile_op_t<bias_op_t>;
   using hgemm_wint4_arc_functor = hgemm_wint4_arc_func<
@@ -383,10 +399,13 @@ inline void hgemm_qkv_bias_wint4_arc(
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_bias = scalar_t;
-  using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<
-      mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global,
-      DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>, gpu_arch::Dg2>>;
+  using post_op = subgroup::chained_tile_op_t<subgroup::bias_add_op_t<
+      mem_desc_t<
+          data_type_bias,
+          mem_layout::row_major,
+          mem_space::global,
+          DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>,
+      gpu_arch::Dg2>>;
   using hgemm_wint4_arc_functor = hgemm_wint4_arc_func<
       data_type_a,
       data_type_b,
@@ -547,8 +566,8 @@ inline void hgemm_silu_mul_wint4_arc(
   using data_type_mul = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
       epilogue_impl::silu_op_t,
-      subgroup::elemwise_reduce_op_t<reduce_op::prod, data_type_mul, gpu_arch::Dg2>
-      >;
+      subgroup::
+          elemwise_reduce_op_t<reduce_op::prod, data_type_mul, gpu_arch::Dg2>>;
   using hgemm_wint4_arc_functor = hgemm_wint4_arc_func<
       data_type_a,
       data_type_b,
@@ -617,10 +636,16 @@ inline void hgemm_bias_silu_mul_wint4_arc(
   using data_type_mul = scalar_t;
   using data_type_bias = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>, gpu_arch::Dg2>,
+      subgroup::bias_add_op_t<
+          mem_desc_t<
+              data_type_bias,
+              mem_layout::row_major,
+              mem_space::global,
+              DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>,
+          gpu_arch::Dg2>,
       epilogue_impl::silu_op_t,
-      subgroup::elemwise_reduce_op_t<reduce_op::prod, data_type_mul, gpu_arch::Dg2>
-      >;
+      subgroup::
+          elemwise_reduce_op_t<reduce_op::prod, data_type_mul, gpu_arch::Dg2>>;
   using hgemm_wint4_arc_functor = hgemm_wint4_arc_func<
       data_type_a,
       data_type_b,
@@ -651,7 +676,9 @@ inline void hgemm_bias_silu_mul_wint4_arc(
       k,
       const_cast<data_type_zp*>(b_zp_alias),
       const_cast<scalar_t*>(b_scale),
-      {{{const_cast<scalar_t*>(bias), {n, 1, n}}, {}, {const_cast<scalar_t*>(mul), {n, m, n}}}});
+      {{{const_cast<scalar_t*>(bias), {n, 1, n}},
+        {},
+        {const_cast<scalar_t*>(mul), {n, m, n}}}});
 }
 
 template <
@@ -689,9 +716,15 @@ inline void hgemm_bias_add_wint4_arc(
   using data_type_res = scalar_t;
   using data_type_bias = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>, gpu_arch::Dg2>,
-      subgroup::elemwise_reduce_op_t<reduce_op::sum, data_type_res, gpu_arch::Dg2>
-      >;
+      subgroup::bias_add_op_t<
+          mem_desc_t<
+              data_type_bias,
+              mem_layout::row_major,
+              mem_space::global,
+              DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>,
+          gpu_arch::Dg2>,
+      subgroup::
+          elemwise_reduce_op_t<reduce_op::sum, data_type_res, gpu_arch::Dg2>>;
   using hgemm_wint4_arc_functor = hgemm_wint4_arc_func<
       data_type_a,
       data_type_b,
@@ -722,7 +755,8 @@ inline void hgemm_bias_add_wint4_arc(
       k,
       const_cast<data_type_zp*>(b_zp_alias),
       const_cast<scalar_t*>(b_scale),
-      {{{const_cast<scalar_t*>(bias), {n, 1, n}}, {const_cast<scalar_t*>(res), {n, m, n}}}});
+      {{{const_cast<scalar_t*>(bias), {n, 1, n}},
+        {const_cast<scalar_t*>(res), {n, m, n}}}});
 }
 
 template <
@@ -792,7 +826,6 @@ inline void hgemm_res_wint4_arc(
       const_cast<scalar_t*>(b_scale),
       {{{const_cast<scalar_t*>(res), {n, m, n}}}});
 }
-
 
 } // namespace xetla
 } // namespace xpu

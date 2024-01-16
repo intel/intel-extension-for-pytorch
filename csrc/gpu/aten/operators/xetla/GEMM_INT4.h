@@ -517,6 +517,5 @@ void hgemm_res_wint4_arc(
     const uint32_t n,
     const uint32_t k);
 
-
 } // namespace xetla
 } // namespace xpu
