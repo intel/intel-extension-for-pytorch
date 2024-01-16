@@ -27,7 +27,6 @@ if [ $# -gt 0 ]; then
     fi
 fi
 if [ ! -f ${WHEELFOLDER}/lm_eval*.whl ] ||
-   [ ! -f ${WHEELFOLDER}/deepspeed*.whl ] ||
    [ ! -d ${CCLFOLDER} ]; then
     (( MODE |= 0x02 ))
 fi
@@ -50,6 +49,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     LM_EVA_COMMIT=$(python tools/yaml_utils.py -f dependency_version.yml -d lm-evaluation-harness -k commit)
     DS_SYCL_REPO=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k repo)
     DS_SYCL_COMMIT=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k commit)
+    VER_DS_SYCL=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k version)
     TORCHCCL_REPO=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k repo)
     TORCHCCL_COMMIT=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k commit)
     VER_TORCHCCL=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k version)
@@ -162,7 +162,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         if [ -d torch-ccl ]; then
             rm -rf torch-ccl
         fi
-        git clone ${TORCHCCL_REPO}
+        git clone ${TORCHCCL_REPO} torch-ccl
         cd torch-ccl
         git checkout ${TORCHCCL_COMMIT}
         git submodule sync
@@ -180,7 +180,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     if [ -d lm-evaluation-harness ]; then
         rm -rf lm-evaluation-harness
     fi
-    git clone ${LM_EVA_REPO}
+    git clone ${LM_EVA_REPO} lm-evaluation-harness
     cd lm-evaluation-harness
     git checkout ${LM_EVA_COMMIT}
     python setup.py bdist_wheel
@@ -189,23 +189,28 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     rm -rf lm-evaluation-harness
 
     # Install DeepSpeed
-    if [ -d DeepSpeedSYCLSupport ]; then
-        rm -rf DeepSpeedSYCLSupport
+    if [ $((${MODE} & 0x04)) -ne 0 ]; then
+        echo "python -m pip install deepspeed==${VER_DS_SYCL}" >> ${AUX_INSTALL_SCRIPT}
+        python -m pip install deepspeed==${VER_DS_SYCL}
+    else
+        if [ -d DeepSpeed ]; then
+            rm -rf DeepSpeed
+        fi
+        git clone ${DS_SYCL_REPO} DeepSpeed
+        cd DeepSpeed
+        git checkout ${DS_SYCL_COMMIT}
+        python -m pip install -r requirements/requirements.txt
+        python setup.py bdist_wheel
+        cp dist/*.whl ${WHEELFOLDER}
+        cd ..
+        rm -rf DeepSpeed
     fi
-    git clone ${DS_SYCL_REPO}
-    cd DeepSpeedSYCLSupport
-    git checkout ${DS_SYCL_COMMIT}
-    python -m pip install -r requirements/requirements.txt
-    python setup.py bdist_wheel
-    cp dist/*.whl ${WHEELFOLDER}
-    cd ..
-    rm -rf DeepSpeedSYCLSupport
 
     # Install OneCCL
     if [ -d oneCCL ]; then
         rm -rf oneCCL
     fi
-    git clone ${ONECCL_REPO}
+    git clone ${ONECCL_REPO} oneCCL
     cd oneCCL
     git checkout ${ONECCL_COMMIT}
     mkdir build
