@@ -658,6 +658,59 @@ template <
     typename mean_t,
     typename weight_t,
     typename index_t,
+    typename accscalar_t,
+    typename vec_t,
+    typename weight_vec_t,
+    int vec_size,
+    template <typename, typename, typename>
+    class Norm,
+    bool one_moment = false>
+struct FusedNormKernelFunctor {
+  [[intel::reqd_sub_group_size(SIMD)]] void operator()(
+      sycl::nd_item<3> item_id) const {
+    accscalar_t sum1 = 0;
+    accscalar_t sum2 = 0;
+    norm.template reduce_combine<vec_size, vec_t, weight_vec_t, index_t>(
+        item_id, cfg, sum1, sum2);
+
+    if constexpr (one_moment) {
+      sum1 = sycl::reduce_over_group(
+          item_id.get_group(), sum1, sycl::plus<accscalar_t>());
+    } else {
+      norm_group_reduce<accscalar_t>(
+          item_id,
+          cfg.sub_group_num,
+          sum1,
+          sum2,
+          local_sum1,
+          local_sum2,
+          [](accscalar_t a, accscalar_t b) { return a + b; });
+    }
+    norm.template update<vec_size, index_t, vec_t, weight_vec_t>(
+        item_id, cfg, sum1, sum2);
+  }
+  FusedNormKernelFunctor(
+      dpcpp_local_acc_t<accscalar_t> local_sum1_,
+      dpcpp_local_acc_t<accscalar_t> local_sum2_,
+      Norm<scalar_t, mean_t, weight_t> norm_,
+      NormConfig cfg_)
+      : local_sum1(local_sum1_),
+        local_sum2(local_sum2_),
+        norm(norm_),
+        cfg(cfg_) {}
+
+ private:
+  dpcpp_local_acc_t<accscalar_t> local_sum1;
+  dpcpp_local_acc_t<accscalar_t> local_sum2;
+  Norm<scalar_t, mean_t, weight_t> norm;
+  const NormConfig cfg;
+};
+
+template <
+    typename scalar_t,
+    typename mean_t,
+    typename weight_t,
+    typename index_t,
     int vec_size,
     template <typename, typename, typename>
     class Norm,
@@ -677,31 +730,22 @@ void fused_norm_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     dpcpp_local_acc_t<accscalar_t> local_sum1(cfg.sub_group_num, cgh);
     dpcpp_local_acc_t<accscalar_t> local_sum2(cfg.sub_group_num, cgh);
-    cgh.parallel_for(
+    FusedNormKernelFunctor<
+        scalar_t,
+        mean_t,
+        weight_t,
+        index_t,
+        accscalar_t,
+        vec_t,
+        weight_vec_t,
+        vec_size,
+        Norm,
+        one_moment>
+        kfn(local_sum1, local_sum2, norm, cfg);
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
             sycl::range<3>(global_range), sycl::range<3>(local_range)),
-        [=](sycl::nd_item<3> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
-          accscalar_t sum1 = 0;
-          accscalar_t sum2 = 0;
-          norm.template reduce_combine<vec_size, vec_t, weight_vec_t, index_t>(
-              item_id, cfg, sum1, sum2);
-
-          if constexpr (one_moment) {
-            sum1 = sycl::reduce_over_group(
-                item_id.get_group(), sum1, sycl::plus<accscalar_t>());
-          } else {
-            norm_group_reduce<accscalar_t>(
-                item_id,
-                cfg.sub_group_num,
-                sum1,
-                sum2,
-                local_sum1,
-                local_sum2,
-                [](accscalar_t a, accscalar_t b) { return a + b; });
-          }
-          norm.template update<vec_size, index_t, vec_t, weight_vec_t>(
-              item_id, cfg, sum1, sum2);
-        });
+        kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -763,6 +807,83 @@ template <
     typename mean_t,
     typename weight_t,
     typename index_t,
+    typename accscalar_t,
+    typename vec_t,
+    typename weight_vec_t,
+    int vec_size,
+    template <typename, typename, typename>
+    class Norm,
+    bool one_moment = false>
+struct RowwiseMomentsDPCPPKernelFunctor {
+  [[intel::reqd_sub_group_size(SIMD)]] void operator()(
+      sycl::nd_item<3> item_id) const {
+    index_t local_id = item_id.get_local_id(2);
+
+    accscalar_t sum1 = 0;
+    accscalar_t sum2 = 0;
+    norm.template reduce_combine<vec_size, vec_t, weight_vec_t, index_t>(
+        item_id, cfg, sum1, sum2);
+    if constexpr (one_moment) {
+      sum1 = sycl::reduce_over_group(
+          item_id.get_group(), sum1, sycl::plus<accscalar_t>());
+    } else {
+      norm_group_reduce<accscalar_t>(
+          item_id,
+          cfg.sub_group_num,
+          sum1,
+          sum2,
+          local_sum1,
+          local_sum2,
+          [](accscalar_t a, accscalar_t b) { return a + b; });
+    }
+    if (cfg.workgroup_num_foreach > 1) {
+      norm_global_reduce<accscalar_t, index_t, one_moment>(
+          item_id,
+          cfg.workgroup_num_foreach,
+          cfg.workgroup_size,
+          cfg.sub_group_num_global,
+          sum1,
+          sum2,
+          static_cast<accscalar_t*>(cfg.scratchpad_ptr),
+          cfg.semaphores_ptr,
+          local_sum1,
+          local_sum2,
+          last_workgroup,
+          [](accscalar_t a, accscalar_t b) { return a + b; });
+      if (last_workgroup[0] && local_id == 0) {
+        norm.template reduce_project(item_id, sum1, sum2, cfg);
+      }
+    } else {
+      if (local_id == 0) {
+        norm.template reduce_project(item_id, sum1, sum2, cfg);
+      }
+    }
+  }
+  RowwiseMomentsDPCPPKernelFunctor(
+      dpcpp_local_acc_t<accscalar_t> local_sum1_,
+      dpcpp_local_acc_t<accscalar_t> local_sum2_,
+      Norm<scalar_t, mean_t, weight_t> norm_,
+      NormConfig cfg_,
+      dpcpp_local_acc_t<bool> last_workgroup_)
+      : local_sum1(local_sum1_),
+        local_sum2(local_sum2_),
+        norm(norm_),
+        cfg(cfg_),
+        last_workgroup(last_workgroup_) {}
+
+ private:
+  dpcpp_local_acc_t<accscalar_t> local_sum1;
+  dpcpp_local_acc_t<accscalar_t> local_sum2;
+  Norm<scalar_t, mean_t, weight_t> norm;
+  const NormConfig cfg;
+  dpcpp_local_acc_t<bool> last_workgroup;
+};
+
+template <
+    typename scalar_t,
+    typename mean_t,
+    typename weight_t,
+    typename index_t,
     int vec_size,
     template <typename, typename, typename>
     class Norm,
@@ -784,51 +905,20 @@ void RowwiseMomentsDPCPPKernel(
     dpcpp_local_acc_t<accscalar_t> local_sum1(cfg.sub_group_num, cgh);
     dpcpp_local_acc_t<accscalar_t> local_sum2(cfg.sub_group_num, cgh);
     dpcpp_local_acc_t<bool> last_workgroup(1, cgh);
-    cgh.parallel_for(
-        sycl::nd_range<3>(global_range, local_range),
-        [=](sycl::nd_item<3> item_id) [[intel::reqd_sub_group_size(SIMD)]] {
-          index_t local_id = item_id.get_local_id(2);
-
-          accscalar_t sum1 = 0;
-          accscalar_t sum2 = 0;
-          norm.template reduce_combine<vec_size, vec_t, weight_vec_t, index_t>(
-              item_id, cfg, sum1, sum2);
-          if constexpr (one_moment) {
-            sum1 = sycl::reduce_over_group(
-                item_id.get_group(), sum1, sycl::plus<accscalar_t>());
-          } else {
-            norm_group_reduce<accscalar_t>(
-                item_id,
-                cfg.sub_group_num,
-                sum1,
-                sum2,
-                local_sum1,
-                local_sum2,
-                [](accscalar_t a, accscalar_t b) { return a + b; });
-          }
-          if (cfg.workgroup_num_foreach > 1) {
-            norm_global_reduce<accscalar_t, index_t, one_moment>(
-                item_id,
-                cfg.workgroup_num_foreach,
-                cfg.workgroup_size,
-                cfg.sub_group_num_global,
-                sum1,
-                sum2,
-                static_cast<accscalar_t*>(cfg.scratchpad_ptr),
-                cfg.semaphores_ptr,
-                local_sum1,
-                local_sum2,
-                last_workgroup,
-                [](accscalar_t a, accscalar_t b) { return a + b; });
-            if (last_workgroup[0] && local_id == 0) {
-              norm.template reduce_project(item_id, sum1, sum2, cfg);
-            }
-          } else {
-            if (local_id == 0) {
-              norm.template reduce_project(item_id, sum1, sum2, cfg);
-            }
-          }
-        });
+    RowwiseMomentsDPCPPKernelFunctor<
+        scalar_t,
+        mean_t,
+        weight_t,
+        index_t,
+        accscalar_t,
+        vec_t,
+        weight_vec_t,
+        vec_size,
+        Norm,
+        one_moment>
+        kfn(local_sum1, local_sum2, norm, cfg, last_workgroup);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<3>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -893,6 +983,30 @@ template <
     int vec_size,
     template <typename, typename, typename>
     class Norm,
+    typename vec_t,
+    typename weight_vec_t>
+struct NormUpdateKernelFunctor {
+  void operator()(sycl::nd_item<3> item_id) const {
+    norm.template update<vec_size, index_t, vec_t, weight_vec_t>(item_id, cfg);
+  }
+  NormUpdateKernelFunctor(
+      Norm<scalar_t, mean_t, weight_t> norm_,
+      NormConfig cfg_)
+      : norm(norm_), cfg(cfg_) {}
+
+ private:
+  Norm<scalar_t, mean_t, weight_t> norm;
+  NormConfig cfg;
+};
+
+template <
+    typename scalar_t,
+    typename mean_t,
+    typename weight_t,
+    typename index_t,
+    int vec_size,
+    template <typename, typename, typename>
+    class Norm,
     bool one_moment = false>
 void NormUpdateKernel(
     Norm<scalar_t, mean_t, weight_t>& norm,
@@ -910,12 +1024,18 @@ void NormUpdateKernel(
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(
-        sycl::nd_range<3>(global_range, local_range),
-        [=](sycl::nd_item<3> item_id) {
-          norm.template update<vec_size, index_t, vec_t, weight_vec_t>(
-              item_id, cfg);
-        });
+    NormUpdateKernelFunctor<
+        scalar_t,
+        mean_t,
+        weight_t,
+        index_t,
+        vec_size,
+        Norm,
+        vec_t,
+        weight_vec_t>
+        kfn(norm, cfg);
+    cgh.parallel_for<decltype(kfn)>(
+        sycl::nd_range<3>(global_range, local_range), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -981,6 +1101,34 @@ template <
     int vec_size,
     template <typename, typename, typename>
     class Norm,
+    typename vec_t>
+struct NormEltwiseUpdateKernelFunctor {
+  void operator()(sycl::nd_item<1> item_id) const {
+    index_t local_id = item_id.get_global_linear_id();
+    for (index_t i = local_id; i < loops_end; i += total_threads) {
+      norm.template eltwise_update<vec_size, index_t, vec_t>(i);
+    }
+  }
+  NormEltwiseUpdateKernelFunctor(
+      Norm<scalar_t, mean_t, weight_t> norm_,
+      index_t loops_end_,
+      int total_threads_)
+      : norm(norm_), loops_end(loops_end_), total_threads(total_threads_) {}
+
+ private:
+  Norm<scalar_t, mean_t, weight_t> norm;
+  index_t loops_end;
+  int total_threads;
+};
+
+template <
+    typename scalar_t,
+    typename mean_t,
+    typename weight_t,
+    typename index_t,
+    int vec_size,
+    template <typename, typename, typename>
+    class Norm,
     bool one_moment = false>
 void NormEltwiseUpdateKernel(Norm<scalar_t, mean_t, weight_t>& norm) {
   using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
@@ -991,15 +1139,19 @@ void NormEltwiseUpdateKernel(Norm<scalar_t, mean_t, weight_t>& norm) {
   index_t loops_end = (norm.numel + vec_size - 1) / vec_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for(
+    NormEltwiseUpdateKernelFunctor<
+        scalar_t,
+        mean_t,
+        weight_t,
+        index_t,
+        vec_size,
+        Norm,
+        vec_t>
+        kfn(norm, loops_end, total_threads);
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(total_threads), sycl::range<1>(workgroup_size)),
-        [=](sycl::nd_item<1> item_id) {
-          index_t local_id = item_id.get_global_linear_id();
-          for (index_t i = local_id; i < loops_end; i += total_threads) {
-            norm.template eltwise_update<vec_size, index_t, vec_t>(i);
-          }
-        });
+        kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }

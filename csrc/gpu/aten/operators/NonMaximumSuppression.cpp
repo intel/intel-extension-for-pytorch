@@ -106,6 +106,32 @@ void nms_kernel_impl(
 
 } // namespace impl
 
+template <typename scalar_t>
+struct NMSKernelFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    impl::nms_kernel_impl<scalar_t>(
+        item, slm, dets_num, iou_threshold, dets_sorted_ptr, mask_ptr);
+  }
+  NMSKernelFunctor(
+      dpcpp_local_acc_t<float> slm_,
+      int dets_num_,
+      float iou_threshold_,
+      scalar_t* dets_sorted_ptr_,
+      unsigned long long* mask_ptr_)
+      : slm(slm_),
+        dets_num(dets_num_),
+        iou_threshold(iou_threshold_),
+        dets_sorted_ptr(dets_sorted_ptr_),
+        mask_ptr(mask_ptr_) {}
+
+ private:
+  dpcpp_local_acc_t<float> slm;
+  int dets_num;
+  float iou_threshold;
+  scalar_t* dets_sorted_ptr;
+  unsigned long long* mask_ptr;
+};
+
 at::Tensor nms_kernel(
     const at::Tensor& dets,
     const at::Tensor& scores,
@@ -161,10 +187,8 @@ at::Tensor nms_kernel(
           auto dets_sorted_ptr = (scalar_t*)dets_sorted.data_ptr();
           auto mask_ptr = (unsigned long long*)mask.data_ptr();
           auto slm = dpcpp_local_acc_t<float>(items_per_group * 4, cgh);
-          auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-            impl::nms_kernel_impl<scalar_t>(
-                item, slm, dets_num, iou_threshold, dets_sorted_ptr, mask_ptr);
-          };
+          NMSKernelFunctor<scalar_t> kfn(
+              slm, dets_num, iou_threshold, dets_sorted_ptr, mask_ptr);
           cgh.parallel_for<decltype(kfn)>(
               sycl::nd_range<2>(
                   sycl::range<2>(col_blocks, col_blocks * items_per_group),

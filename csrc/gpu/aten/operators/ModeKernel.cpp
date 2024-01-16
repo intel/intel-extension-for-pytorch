@@ -527,6 +527,128 @@ void mode_fused_impl(
   }
 }
 
+template <typename scalar_t>
+struct ModeXpuKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    mode_impl(
+        problem_values_ptr,
+        problem_indices_ptr,
+        values_info,
+        indices_info,
+        static_cast<scalar_t*>(
+            slm.template get_multi_ptr<sycl::access::decorated::no>().get()),
+        scratch_status_ptr,
+        scratch_value_ptr,
+        problem_time,
+        problem_size,
+        group_number,
+        group_size,
+        problem_upper_limit,
+        item);
+  }
+  ModeXpuKernelFunctor(
+      scalar_t* problem_values_ptr_,
+      int64_t* problem_indices_ptr_,
+      TensorInfo<scalar_t, int64_t> values_info_,
+      TensorInfo<int64_t, int64_t> indices_info_,
+      dpcpp_local_acc_t<scalar_t, 1> slm_,
+      int64_t* scratch_status_ptr_,
+      int64_t* scratch_value_ptr_,
+      int64_t problem_time_,
+      int64_t problem_size_,
+      int64_t group_number_,
+      int64_t group_size_,
+      int64_t problem_upper_limit_)
+      : problem_values_ptr(problem_values_ptr_),
+        problem_indices_ptr(problem_indices_ptr_),
+        values_info(values_info_),
+        indices_info(indices_info_),
+        slm(slm_),
+        scratch_status_ptr(scratch_status_ptr_),
+        scratch_value_ptr(scratch_value_ptr_),
+        problem_time(problem_time_),
+        problem_size(problem_size_),
+        group_number(group_number_),
+        group_size(group_size_),
+        problem_upper_limit(problem_upper_limit_) {}
+
+ private:
+  scalar_t* problem_values_ptr;
+  int64_t* problem_indices_ptr;
+  TensorInfo<scalar_t, int64_t> values_info;
+  TensorInfo<int64_t, int64_t> indices_info;
+  dpcpp_local_acc_t<scalar_t, 1> slm;
+  int64_t* scratch_status_ptr;
+  int64_t* scratch_value_ptr;
+  int64_t problem_time;
+  int64_t problem_size;
+  int64_t group_number;
+  int64_t group_size;
+  int64_t problem_upper_limit;
+};
+
+template <typename scalar_t>
+struct ModeXpuKernelFunctor2 {
+  void operator()(sycl::nd_item<1> item) const {
+    mode_fused_impl(
+        problem_values_ptr,
+        values_info,
+        indices_info,
+        static_cast<ModeOpHelper*>(
+            slm_helper.template get_multi_ptr<sycl::access::decorated::no>()
+                .get()),
+        static_cast<ModeOpValueIndex<scalar_t>*>(
+            slm_value_indice
+                .template get_multi_ptr<sycl::access::decorated::no>()
+                .get()),
+        static_cast<std::byte*>(
+            sort_scratch.template get_multi_ptr<sycl::access::decorated::no>()
+                .get()),
+        sort_scratch_memory_size,
+        problem_time,
+        problem_size,
+        group_number,
+        group_size,
+        item);
+  }
+  ModeXpuKernelFunctor2(
+      scalar_t* problem_values_ptr_,
+      TensorInfo<scalar_t, int64_t> values_info_,
+      TensorInfo<int64_t, int64_t> indices_info_,
+      dpcpp_local_acc_t<ModeOpHelper, 1> slm_helper_,
+      dpcpp_local_acc_t<ModeOpValueIndex<scalar_t>, 1> slm_value_indice_,
+      dpcpp_local_acc_t<std::byte, 1> sort_scratch_,
+      int64_t sort_scratch_memory_size_,
+      int64_t problem_time_,
+      int64_t problem_size_,
+      int64_t group_number_,
+      int64_t group_size_)
+      : problem_values_ptr(problem_values_ptr_),
+        values_info(values_info_),
+        indices_info(indices_info_),
+        slm_helper(slm_helper_),
+        slm_value_indice(slm_value_indice_),
+        sort_scratch(sort_scratch_),
+        sort_scratch_memory_size(sort_scratch_memory_size_),
+        problem_time(problem_time_),
+        problem_size(problem_size_),
+        group_number(group_number_),
+        group_size(group_size_) {}
+
+ private:
+  scalar_t* problem_values_ptr;
+  TensorInfo<scalar_t, int64_t> values_info;
+  TensorInfo<int64_t, int64_t> indices_info;
+  dpcpp_local_acc_t<ModeOpHelper, 1> slm_helper;
+  dpcpp_local_acc_t<ModeOpValueIndex<scalar_t>, 1> slm_value_indice;
+  dpcpp_local_acc_t<std::byte, 1> sort_scratch;
+  int64_t sort_scratch_memory_size;
+  int64_t problem_time;
+  int64_t problem_size;
+  int64_t group_number;
+  int64_t group_size;
+};
+
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 The answer rule of the cornor condition is:
 1. indice need to be the max indice of the most-appeared value
@@ -640,24 +762,19 @@ static void mode_xpu_kernel(
       auto problem_indices_ptr = problem_indices.data_ptr<int64_t>();
       auto scratch_status_ptr = scratch_status_tensor.data_ptr<int64_t>();
       auto scratch_value_ptr = scratch_value_tensor.data_ptr<int64_t>();
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        mode_impl(
-            problem_values_ptr,
-            problem_indices_ptr,
-            values_info,
-            indices_info,
-            static_cast<scalar_t*>(
-                slm.template get_multi_ptr<sycl::access::decorated::no>()
-                    .get()),
-            scratch_status_ptr,
-            scratch_value_ptr,
-            problem_time,
-            problem_size,
-            group_number,
-            group_size,
-            problem_upper_limit,
-            item);
-      };
+      ModeXpuKernelFunctor<scalar_t> kfn(
+          problem_values_ptr,
+          problem_indices_ptr,
+          values_info,
+          indices_info,
+          slm,
+          scratch_status_ptr,
+          scratch_value_ptr,
+          problem_time,
+          problem_size,
+          group_number,
+          group_size,
+          problem_upper_limit);
       cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(group_number * group_size, group_size), kfn);
     };
@@ -687,29 +804,18 @@ static void mode_xpu_kernel(
       dpcpp_local_acc_t<std::byte, 1> sort_scratch(
           sort_scratch_memory_size, cgh);
       auto problem_values_ptr = contiguous.data_ptr<scalar_t>();
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-        mode_fused_impl(
-            problem_values_ptr,
-            values_info,
-            indices_info,
-            static_cast<ModeOpHelper*>(
-                slm_helper.template get_multi_ptr<sycl::access::decorated::no>()
-                    .get()),
-            static_cast<ModeOpValueIndex<scalar_t>*>(
-                slm_value_indice
-                    .template get_multi_ptr<sycl::access::decorated::no>()
-                    .get()),
-            static_cast<std::byte*>(
-                sort_scratch
-                    .template get_multi_ptr<sycl::access::decorated::no>()
-                    .get()),
-            sort_scratch_memory_size,
-            problem_time,
-            problem_size,
-            group_number,
-            group_size,
-            item);
-      };
+      ModeXpuKernelFunctor2<scalar_t> kfn(
+          problem_values_ptr,
+          values_info,
+          indices_info,
+          slm_helper,
+          slm_value_indice,
+          sort_scratch,
+          sort_scratch_memory_size,
+          problem_time,
+          problem_size,
+          group_number,
+          group_size);
       cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<1>(group_number * group_size, group_size), kfn);
     };

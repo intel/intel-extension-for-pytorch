@@ -16,6 +16,66 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t>
+struct MaxUnpooling2dForwardKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto output_ptr = output_data;
+    auto input_ptr = input_data;
+    auto indices_ptr = indices_data;
+    for (int linearIndex = item.get_global_id(0);
+         linearIndex < numInputElements;
+         linearIndex += item.get_global_range()[0]) {
+      int c = is_channels_last
+          ? linearIndex % numChannels
+          : (linearIndex / inputWidth / inputHeight) % numChannels;
+      int n = linearIndex / inputWidth / inputHeight / numChannels;
+      int maxind = indices_ptr[linearIndex];
+      int offset = is_channels_last
+          ? n * numChannels * outputHeight * outputWidth + c
+          : (n * numChannels + c) * outputHeight * outputWidth;
+      output_ptr += offset;
+      if (is_channels_last) {
+        output_ptr[maxind * numChannels] = input_ptr[linearIndex];
+      } else {
+        output_ptr[maxind] = input_ptr[linearIndex];
+      }
+    }
+  };
+  MaxUnpooling2dForwardKernelFunctor(
+      const int64_t numInputElements_,
+      const scalar_t* input_data_,
+      const int64_t* indices_data_,
+      const int64_t numChannels_,
+      const int64_t inputHeight_,
+      const int64_t inputWidth_,
+      const int64_t outputHeight_,
+      const int64_t outputWidth_,
+      scalar_t* output_data_,
+      const bool is_channels_last_)
+      : numInputElements(numInputElements_),
+        input_data(input_data_),
+        indices_data(indices_data_),
+        numChannels(numChannels_),
+        inputHeight(inputHeight_),
+        inputWidth(inputWidth_),
+        outputHeight(outputHeight_),
+        outputWidth(outputWidth_),
+        output_data(output_data_),
+        is_channels_last(is_channels_last_) {}
+
+ private:
+  const int64_t numInputElements;
+  const scalar_t* input_data;
+  const int64_t* indices_data;
+  const int64_t numChannels;
+  const int64_t inputHeight;
+  const int64_t inputWidth;
+  const int64_t outputHeight;
+  const int64_t outputWidth;
+  scalar_t* output_data;
+  const bool is_channels_last;
+};
+
+template <typename scalar_t>
 void max_unpooling2d_forward_kernel(
     const int64_t numInputElements,
     const scalar_t* input,
@@ -37,29 +97,17 @@ void max_unpooling2d_forward_kernel(
     auto output_data = output;
     auto input_data = input;
     auto indices_data = indices;
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto output_ptr = output_data;
-      auto input_ptr = input_data;
-      auto indices_ptr = indices_data;
-      for (int linearIndex = item.get_global_id(0);
-           linearIndex < numInputElements;
-           linearIndex += item.get_global_range()[0]) {
-        int c = is_channels_last
-            ? linearIndex % numChannels
-            : (linearIndex / inputWidth / inputHeight) % numChannels;
-        int n = linearIndex / inputWidth / inputHeight / numChannels;
-        int maxind = indices_ptr[linearIndex];
-        int offset = is_channels_last
-            ? n * numChannels * outputHeight * outputWidth + c
-            : (n * numChannels + c) * outputHeight * outputWidth;
-        output_ptr += offset;
-        if (is_channels_last) {
-          output_ptr[maxind * numChannels] = input_ptr[linearIndex];
-        } else {
-          output_ptr[maxind] = input_ptr[linearIndex];
-        }
-      }
-    };
+    MaxUnpooling2dForwardKernelFunctor<scalar_t> kfn(
+        numInputElements,
+        input_data,
+        indices_data,
+        numChannels,
+        inputHeight,
+        inputWidth,
+        outputHeight,
+        outputWidth,
+        output_data,
+        is_channels_last);
 
     // kick off kernel
     cgh.parallel_for<decltype(kfn)>(
@@ -70,6 +118,68 @@ void max_unpooling2d_forward_kernel(
 
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <typename scalar_t>
+struct MaxUnpooling3dForwardKernelFunctor {
+  void operator()(sycl::nd_item<3> item) const {
+    auto output_ptr = output_data;
+    auto input_ptr = input_data;
+    auto indices_ptr = indices_data;
+
+    int64_t iColumn = item.get_global_id(0);
+    int64_t iRow = item.get_global_id(1);
+    int64_t iFrame = (item.get_group()[2] + offsetZ) % iT; // input frame/time
+    int64_t slice = (item.get_group()[2] + offsetZ) / iT; // input slice/feature
+    if (iRow < iH && iColumn < iW) {
+      scalar_t val = input_ptr
+          [slice * iT * iH * iW + iFrame * iH * iW + iRow * iW +
+           iColumn] /*[slice][iFrame][iRow][iColumn]*/;
+      int64_t index = indices_ptr
+          [slice * iT * iH * iW + iFrame * iH * iW + iRow * iW +
+           iColumn] /*[slice][iFrame][iRow][iColumn]*/;
+      output_ptr[slice * oT * oH * oW + index] = val;
+    }
+  }
+  MaxUnpooling3dForwardKernelFunctor(
+      scalar_t* input_data_,
+      int64_t* indices_data_,
+      scalar_t* output_data_,
+      const int64_t batchSize_,
+      const int64_t inputSlices_,
+      const int64_t iT_,
+      const int64_t iH_,
+      const int64_t iW_,
+      const int64_t oT_,
+      const int64_t oH_,
+      const int64_t oW_,
+      const int64_t offsetZ_)
+      : input_data(input_data_),
+        indices_data(indices_data_),
+        output_data(output_data_),
+        batchSize(batchSize_),
+        inputSlices(inputSlices_),
+        iT(iT_),
+        iH(iH_),
+        iW(iW_),
+        oT(oT_),
+        oH(oH_),
+        oW(oW_),
+        offsetZ(offsetZ_) {}
+
+ private:
+  scalar_t* input_data;
+  int64_t* indices_data;
+  scalar_t* output_data;
+  const int64_t batchSize;
+  const int64_t inputSlices;
+  const int64_t iT;
+  const int64_t iH;
+  const int64_t iW;
+  const int64_t oT;
+  const int64_t oH;
+  const int64_t oW;
+  const int64_t offsetZ;
+};
 
 template <typename scalar_t>
 void max_unpooling3d_forward_kernel(
@@ -94,26 +204,19 @@ void max_unpooling3d_forward_kernel(
     auto output_data = output;
     auto input_data = input;
     auto indices_data = indices;
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<3> item) {
-      auto output_ptr = output_data;
-      auto input_ptr = input_data;
-      auto indices_ptr = indices_data;
-
-      int64_t iColumn = item.get_global_id(0);
-      int64_t iRow = item.get_global_id(1);
-      int64_t iFrame = (item.get_group()[2] + offsetZ) % iT; // input frame/time
-      int64_t slice =
-          (item.get_group()[2] + offsetZ) / iT; // input slice/feature
-      if (iRow < iH && iColumn < iW) {
-        scalar_t val = input_ptr
-            [slice * iT * iH * iW + iFrame * iH * iW + iRow * iW +
-             iColumn] /*[slice][iFrame][iRow][iColumn]*/;
-        int64_t index = indices_ptr
-            [slice * iT * iH * iW + iFrame * iH * iW + iRow * iW +
-             iColumn] /*[slice][iFrame][iRow][iColumn]*/;
-        output_ptr[slice * oT * oH * oW + index] = val;
-      }
-    };
+    MaxUnpooling3dForwardKernelFunctor<scalar_t> kfn(
+        input_data,
+        indices_data,
+        output_data,
+        batchSize,
+        inputSlices,
+        iT,
+        iH,
+        iW,
+        oT,
+        oH,
+        oW,
+        offsetZ);
 
     // kick off kernel
     cgh.parallel_for<decltype(kfn)>(
@@ -125,6 +228,62 @@ void max_unpooling3d_forward_kernel(
 
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <typename scalar_t>
+struct MaxUnpooling3dClForwardKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto output_ptr = output_data;
+    auto input_ptr = input_data;
+    auto indices_ptr = indices_data;
+    for (int linearIndex = item.get_global_id(0);
+         linearIndex < numInputElements;
+         linearIndex += item.get_global_range()[0]) {
+      int c = linearIndex % numChannels;
+      int n = linearIndex / inputDepth / inputWidth / inputHeight / numChannels;
+      int maxind = indices_ptr[linearIndex];
+      int offset =
+          n * numChannels * outputDepth * outputHeight * outputWidth + c;
+      output_ptr += offset;
+      output_ptr[maxind * numChannels] = input_ptr[linearIndex];
+    }
+  }
+  MaxUnpooling3dClForwardKernelFunctor(
+      const int64_t numInputElements_,
+      const scalar_t* input_data_,
+      const int64_t* indices_data_,
+      const int64_t numChannels_,
+      const int64_t inputDepth_,
+      const int64_t inputHeight_,
+      const int64_t inputWidth_,
+      const int64_t outputDepth_,
+      const int64_t outputHeight_,
+      const int64_t outputWidth_,
+      scalar_t* output_data_)
+      : numInputElements(numInputElements_),
+        input_data(input_data_),
+        indices_data(indices_data_),
+        numChannels(numChannels_),
+        inputDepth(inputDepth_),
+        inputHeight(inputHeight_),
+        inputWidth(inputWidth_),
+        outputDepth(outputDepth_),
+        outputHeight(outputHeight_),
+        outputWidth(outputWidth_),
+        output_data(output_data_) {}
+
+ private:
+  const int64_t numInputElements;
+  const scalar_t* input_data;
+  const int64_t* indices_data;
+  const int64_t numChannels;
+  const int64_t inputDepth;
+  const int64_t inputHeight;
+  const int64_t inputWidth;
+  const int64_t outputDepth;
+  const int64_t outputHeight;
+  const int64_t outputWidth;
+  scalar_t* output_data;
+};
 
 template <typename scalar_t>
 void max_unpooling3d_cl_forward_kernel(
@@ -149,23 +308,18 @@ void max_unpooling3d_cl_forward_kernel(
     auto output_data = output;
     auto input_data = input;
     auto indices_data = indices;
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto output_ptr = output_data;
-      auto input_ptr = input_data;
-      auto indices_ptr = indices_data;
-      for (int linearIndex = item.get_global_id(0);
-           linearIndex < numInputElements;
-           linearIndex += item.get_global_range()[0]) {
-        int c = linearIndex % numChannels;
-        int n =
-            linearIndex / inputDepth / inputWidth / inputHeight / numChannels;
-        int maxind = indices_ptr[linearIndex];
-        int offset =
-            n * numChannels * outputDepth * outputHeight * outputWidth + c;
-        output_ptr += offset;
-        output_ptr[maxind * numChannels] = input_ptr[linearIndex];
-      }
-    };
+    MaxUnpooling3dClForwardKernelFunctor<scalar_t> kfn(
+        numInputElements,
+        input_data,
+        indices_data,
+        numChannels,
+        inputDepth,
+        inputHeight,
+        inputWidth,
+        outputDepth,
+        outputHeight,
+        outputWidth,
+        output_data);
 
     // kick off kernel
     cgh.parallel_for<decltype(kfn)>(
