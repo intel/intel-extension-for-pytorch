@@ -536,10 +536,11 @@ if args.ipex_smooth_quant:
                 op_type_dict=op_type_dict,
                 smoothquant_args=smoothquant_args
             )
+            pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
             prepared_model.save_qconf_summary(args.output_dir + "/best_configure.json")
 
         else:
-            qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=args.alpha)
+            qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=float(args.alpha))
             user_model = ipex.llm.optimize(
                 user_model.eval(),
                 dtype=amp_dtype,

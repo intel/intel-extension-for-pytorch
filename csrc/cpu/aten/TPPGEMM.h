@@ -24,6 +24,14 @@ at::Tensor tpp_linear_gelu_forward_cpu(
     const at::Tensor& t_bias,
     c10::optional<int64_t> out_features);
 
+at::Tensor tpp_fused_gate_up_proj_forward_cpu(
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt_gate,
+    const at::Tensor& t_bias_gate,
+    const at::Tensor& t_wt_up,
+    const at::Tensor& t_bias_up,
+    c10::optional<int64_t> out_features);
+
 at::Tensor tpp_linear_silu_forward_cpu(
     const at::Tensor& t_in,
     const at::Tensor& t_wt,
@@ -71,6 +79,13 @@ using tpp_linear_bias_kernel_impl_fn =
 using tpp_linear_gelu_kernel_impl_fn =
     at::Tensor (*)(const at::Tensor&, const at::Tensor&, const at::Tensor&);
 
+using tpp_fused_gate_up_proj_kernel_impl_fn = at::Tensor (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&);
+
 using tpp_linear_silu_kernel_impl_fn =
     at::Tensor (*)(const at::Tensor&, const at::Tensor&, const at::Tensor&);
 
@@ -105,6 +120,9 @@ IPEX_DECLARE_DISPATCH(
 IPEX_DECLARE_DISPATCH(
     tpp_linear_gelu_kernel_impl_fn,
     tpp_linear_gelu_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    tpp_fused_gate_up_proj_kernel_impl_fn,
+    tpp_fused_gate_up_proj_kernel_stub);
 IPEX_DECLARE_DISPATCH(
     tpp_linear_silu_kernel_impl_fn,
     tpp_linear_silu_kernel_stub);

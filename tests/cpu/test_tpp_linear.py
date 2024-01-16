@@ -46,6 +46,16 @@ class Linear_silu(torch.nn.Module):
         return torch.nn.functional.silu(self.mlp(x))
 
 
+class Linear_Gate_Up(torch.nn.Module):
+    def __init__(self, in_feature, out_feature, bias_gate, bias_up):
+        super(Linear_Gate_Up, self).__init__()
+        self.gate_proj = torch.nn.Linear(in_feature, out_feature, bias=bias_gate)
+        self.up_proj = torch.nn.Linear(in_feature, out_feature, bias=bias_up)
+
+    def forward(self, x):
+        return torch.nn.functional.silu(self.gate_proj(x)) * self.up_proj(x)
+
+
 class Linear_relu(torch.nn.Module):
     def __init__(self):
         super(Linear_relu, self).__init__()
@@ -171,6 +181,46 @@ class TestTPPlinear(TestCase):
             self.assertEqual(out, ref_out)
             self.assertTrue(out.dtype == dtype)
             _disable_tpp()
+
+    def test_tpp_fused_gate_up_proj(self):
+        in_feature = 64
+        out_feature = 32
+
+        x = torch.randn(1, 4, in_feature)
+        x_tpp = copy.deepcopy(x)
+
+        with torch.no_grad():
+            for dtype, bias_gate, bias_up in itertools.product(
+                [torch.float, torch.bfloat16], [False, True], [False, True]
+            ):
+                model = Linear_Gate_Up(
+                    in_feature, out_feature, bias_gate, bias_up
+                ).eval()
+                if dtype == torch.bfloat16:
+                    x = x.to(torch.bfloat16)
+                    x_tpp = x_tpp.to(torch.bfloat16)
+                    model = model.to(torch.bfloat16)
+                ref_out = model(x)
+
+                _enable_tpp()
+                model = ipex.optimize(model, dtype=dtype)
+                out = torch.ops.torch_ipex.tpp_fused_gate_up_proj(
+                    x_tpp,
+                    model.gate_proj.weight,
+                    model.gate_proj.bias,
+                    model.up_proj.weight,
+                    model.up_proj.bias,
+                )
+
+                out_linear_silu = torch.ops.torch_ipex.tpp_linear_silu(
+                    x_tpp, model.gate_proj.weight, model.gate_proj.bias
+                )
+                out_tpp_ref = torch.ops.torch_ipex.tpp_linear_mul(
+                    x_tpp, out_linear_silu, model.up_proj.weight, model.up_proj.bias
+                )
+                self.assertEqual(out, out_tpp_ref)
+                self.assertEqual(out, ref_out)
+                _disable_tpp()
 
     def test_tpp_linear_gelu(self):
         x1 = torch.rand(1, 4, 4096)
