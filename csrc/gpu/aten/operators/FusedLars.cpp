@@ -36,6 +36,7 @@ struct LaunchVecKernelLARSMasterWeightFunctor {
     auto id = item.get_id(0);
 
     // norm op will output one value tensor
+    auto grad_decay_value = static_cast<accscalar_t>(1.0 - dampening_value);
     auto w_norm_value = w_norm_ptr[0];
     auto g_norm_value = static_cast<accscalar_t>(g_norm_ptr[0]);
 
@@ -105,13 +106,16 @@ struct LaunchVecKernelLARSMasterWeightFunctor {
           temp_momentum_buffer_value = momentum_buffer_value[v_index];
           temp_momentum_buffer_value =
               momentum_value * temp_momentum_buffer_value;
-          temp_momentum_buffer_value += grad_elm;
+          temp_momentum_buffer_value += grad_elm * grad_decay_value;
         }
         temp_momentum_buffer[v_index] =
             static_cast<float>(temp_momentum_buffer_value);
 
         // d_p = buf
         grad_elm = temp_momentum_buffer_value;
+        if (using_nesterov) {
+          grad_elm += temp_momentum_buffer_value * momentum_value;
+        }
 
         // p.master_weight.add_(d_p, alpha=-group['lr'])
         auto res =
@@ -138,11 +142,13 @@ struct LaunchVecKernelLARSMasterWeightFunctor {
       vec_g_t* grad_vec_,
       bool using_momentum_,
       bool using_weight_decay_,
+      bool using_nesterov_,
       accscalar_t weight_decay_value_,
       accscalar_t momentum_value_,
       accscalar_t negative_lr_,
       accscalar_t eps_value_,
       accscalar_t eeta_value_,
+      accscalar_t dampening_value_,
       float* w_norm_ptr_,
       scalar_t* g_norm_ptr_,
       const double eeta_,
@@ -156,11 +162,13 @@ struct LaunchVecKernelLARSMasterWeightFunctor {
         grad_vec(grad_vec_),
         using_momentum(using_momentum_),
         using_weight_decay(using_weight_decay_),
+        using_nesterov(using_nesterov_),
         weight_decay_value(weight_decay_value_),
         momentum_value(momentum_value_),
         negative_lr(negative_lr_),
         eps_value(eps_value_),
         eeta_value(eeta_value_),
+        dampening_value(dampening_value_),
         w_norm_ptr(w_norm_ptr_),
         g_norm_ptr(g_norm_ptr_),
         eeta(eeta_),
@@ -176,11 +184,13 @@ struct LaunchVecKernelLARSMasterWeightFunctor {
   vec_g_t* grad_vec;
   bool using_momentum;
   bool using_weight_decay;
+  bool using_nesterov;
   accscalar_t weight_decay_value;
   accscalar_t momentum_value;
   accscalar_t negative_lr;
   accscalar_t eps_value;
   accscalar_t eeta_value;
+  accscalar_t dampening_value;
   float* w_norm_ptr;
   scalar_t* g_norm_ptr;
   const double eeta;
@@ -202,7 +212,9 @@ void launch_vec_kernel_LARSMasterWeight(
     const double eps,
     const double lr,
     const int64_t total_element,
-    const int64_t global_range) {
+    const int64_t global_range,
+    const double dampening,
+    const bool nesterov) {
   auto& queue = dpcppGetCurrentQueue();
 
   float* master_weight_ptr = master_weight.data_ptr<float>();
@@ -227,6 +239,7 @@ void launch_vec_kernel_LARSMasterWeight(
   auto negative_lr = static_cast<accscalar_t>((-1.0) * lr);
   auto eps_value = static_cast<accscalar_t>(eps);
   auto eeta_value = static_cast<accscalar_t>(eeta);
+  auto dampening_value = static_cast<accscalar_t>(dampening);
 
   auto w_norm_ptr = w_norm.data_ptr<float>();
   auto g_norm_ptr = g_norm.data_ptr<scalar_t>();
@@ -248,11 +261,13 @@ void launch_vec_kernel_LARSMasterWeight(
             grad_vec,
             using_momentum,
             using_weight_decay,
+            nesterov,
             weight_decay_value,
             momentum_value,
             negative_lr,
             eps_value,
             eeta_value,
+            dampening_value,
             w_norm_ptr,
             g_norm_ptr,
             eeta,
@@ -269,6 +284,7 @@ struct LaunchVecKernelLARSFunctor {
     auto id = item.get_id(0);
 
     // norm op will output one value tensor
+    auto grad_decay_value = 1.0 - dampening_value;
     auto w_norm_value = w_norm_ptr[0];
     auto g_norm_value = g_norm_ptr[0];
 
@@ -337,12 +353,15 @@ struct LaunchVecKernelLARSFunctor {
           temp_momentum_buffer_value = momentum_buffer_value[v_index];
           temp_momentum_buffer_value =
               momentum_value * temp_momentum_buffer_value;
-          temp_momentum_buffer_value += grad_elm;
+          temp_momentum_buffer_value += grad_elm * grad_decay_value;
         }
         temp_momentum_buffer[v_index] = temp_momentum_buffer_value;
 
         // d_p = buf
         grad_elm = temp_momentum_buffer_value;
+        if (using_nesterov) {
+          grad_elm += temp_momentum_buffer_value * momentum_value;
+        }
 
         // p.add_(d_p, alpha=-group['lr'])
         auto res = temp_weight_value + grad_elm * lars_lr;
@@ -363,11 +382,13 @@ struct LaunchVecKernelLARSFunctor {
       vec_g_t* grad_vec_,
       bool using_momentum_,
       bool using_weight_decay_,
+      bool using_nesterov_,
       float weight_decay_value_,
       float momentum_value_,
       float negative_lr_,
       float eps_value_,
       float eeta_value_,
+      float dampening_value_,
       float* w_norm_ptr_,
       float* g_norm_ptr_,
       const double eeta_,
@@ -378,11 +399,13 @@ struct LaunchVecKernelLARSFunctor {
         grad_vec(grad_vec_),
         using_momentum(using_momentum_),
         using_weight_decay(using_weight_decay_),
+        using_nesterov(using_nesterov_),
         weight_decay_value(weight_decay_value_),
         momentum_value(momentum_value_),
         negative_lr(negative_lr_),
         eps_value(eps_value_),
         eeta_value(eeta_value_),
+        dampening_value(dampening_value_),
         w_norm_ptr(w_norm_ptr_),
         g_norm_ptr(g_norm_ptr_),
         eeta(eeta_),
@@ -395,11 +418,13 @@ struct LaunchVecKernelLARSFunctor {
   vec_g_t* grad_vec;
   bool using_momentum;
   bool using_weight_decay;
+  bool using_nesterov;
   float weight_decay_value;
   float momentum_value;
   float negative_lr;
   float eps_value;
   float eeta_value;
+  float dampening_value;
   float* w_norm_ptr;
   float* g_norm_ptr;
   const double eeta;
@@ -420,7 +445,9 @@ void launch_vec_kernel_LARS(
     const double eps,
     const double lr,
     const int64_t total_element,
-    const int64_t global_range) {
+    const int64_t global_range,
+    const double dampening,
+    const bool nesterov) {
   auto& queue = dpcppGetCurrentQueue();
 
   float* weight_ptr = weight.data_ptr<float>();
@@ -442,6 +469,7 @@ void launch_vec_kernel_LARS(
   auto negative_lr = static_cast<float>((-1.0) * lr);
   auto eps_value = static_cast<float>(eps);
   auto eeta_value = static_cast<float>(eeta);
+  auto dampening_value = static_cast<float>(dampening);
 
   auto w_norm_ptr = w_norm.data_ptr<float>();
   auto g_norm_ptr = g_norm.data_ptr<float>();
@@ -455,11 +483,13 @@ void launch_vec_kernel_LARS(
         grad_vec,
         using_momentum,
         using_weight_decay,
+        nesterov,
         weight_decay_value,
         momentum_value,
         negative_lr,
         eps_value,
         eeta_value,
+        dampening_value,
         w_norm_ptr,
         g_norm_ptr,
         eeta,
@@ -483,7 +513,9 @@ static void ComputeLARSKernelMasterWeight(
     const double eeta,
     const double lr,
     const double eps,
-    const bool momentum_buf_initialized) {
+    const bool momentum_buf_initialized,
+    double dampening,
+    bool nesterov) {
   TORCH_CHECK(
       master_weight.scalar_type() == at::kFloat,
       "ComputeLARSKernelMasterWeight: expect param to be at::kFloat");
@@ -557,7 +589,9 @@ static void ComputeLARSKernelMasterWeight(
         eps,                                                \
         lr,                                                 \
         total_element,                                      \
-        global_range);                                      \
+        global_range,                                       \
+        dampening,                                          \
+        nesterov);                                          \
   }
 
   switch (vec_size) {
@@ -597,7 +631,9 @@ static void ComputeLARSKernel(
     const double eeta,
     const double lr,
     const double eps,
-    const bool momentum_buf_initialized) {
+    const bool momentum_buf_initialized,
+    double dampening,
+    bool nesterov) {
   TORCH_CHECK(
       weight.scalar_type() == at::kFloat,
       "ComputeSGDKernel: expect param to be at::kFloat");
@@ -659,7 +695,9 @@ static void ComputeLARSKernel(
         eps,                          \
         lr,                           \
         total_element,                \
-        global_range);                \
+        global_range,                 \
+        dampening,                    \
+        nesterov);                    \
   }
 
   switch (vec_size) {
@@ -689,77 +727,83 @@ static void ComputeLARSKernel(
 /**
  * LARS fused update kernel.
  * Support Float, BFloat16 training
- *@param fp32_weight FP32 Parameters or Master Parameter to be updated.
- *@param weight BF16 Parameters of layer support low precision computing.
- *@param grad Grad used to update Parameters.
- *@param momentum_buffer_ momentum to accelerate convergence.
+ *@param param_ Parameters to be update
+ *@param grad_ Grad used to update Parameters
+ *@param momentum_buf_ momentum to accelerate convergence
+ *@param param2_ Used for BF16 training, if param_ is float, param2_ is bf16
+ *params need to be synced after update if param_ is BFloat16, param2_ is
+ *params_ last 16 bit matissa to construct float params
+ *@param momentum Args for momentum.
+ *@param learning_rate  Weight for grad while update.
+ *@param eeta Trust coefficient
+ *@param eps Prevent division by zero
  *@param weight_decay Args for regularization to avoid over-fit.
- *@param momentum Args momentum.
- *@param eeta  Args eeta.
- *@param lr Learning rate.
- *@param eps Args eps.
+ *@param dampening Attribute for momentum.
+ *@param nesterov Attribute for momentum.
  */
 c10::optional<at::Tensor> lars_xpu_fused_step(
-    at::Tensor& fp32_weight,
-    at::Tensor& weight,
-    const at::Tensor& grad,
-    const c10::optional<at::Tensor>& momentum_buffer_,
-    double weight_decay,
+    at::Tensor& param_,
+    const at::Tensor& grad_,
+    const c10::optional<at::Tensor>& momentum_buf_,
+    at::Tensor& param2_,
     double momentum,
+    double learning_rate,
     double eeta,
-    double lr,
-    double eps) {
+    double eps,
+    double weight_decay,
+    double dampening,
+    bool nesterov) {
   RECORD_FUNCTION(
       "lars_xpu_fused_step",
-      std::vector<c10::IValue>({fp32_weight, weight, grad, momentum_buffer_}));
-  const OptionalDeviceGuard device_guard(device_of(fp32_weight));
+      std::vector<c10::IValue>({param_, param2_, grad_, momentum_buf_}));
+  const OptionalDeviceGuard device_guard(device_of(param_));
 
   // after inference, the model weight in the next training epoch maybe cached
   // block, so to plain now if needed
-  fp32_weight = to_plain_if_needed_(fp32_weight);
-  at::Tensor grad_processed = to_plain_if_needed(grad);
+  param_ = to_plain_if_needed_(param_);
+  at::Tensor grad_processed = to_plain_if_needed(grad_);
 
-  at::Tensor w_norm = at::norm(fp32_weight);
-  at::Tensor g_norm = at::norm(grad);
+  at::Tensor w_norm = at::norm(param_);
+  at::Tensor g_norm = at::norm(grad_);
 
   at::Tensor momentum_buffer;
   bool momentum_buf_initialized;
   if (momentum) {
-    if (!momentum_buffer_.has_value()) {
-      momentum_buffer = at::empty_like(fp32_weight);
+    if (!momentum_buf_.has_value()) {
+      momentum_buffer = at::empty_like(param_);
       momentum_buf_initialized = false;
     } else {
-      momentum_buffer = momentum_buffer_.value();
+      momentum_buffer = momentum_buf_.value();
       momentum_buf_initialized = true;
     }
   }
 
   // master weight mode, fp32_weight contains fp32 master weight, weight is
   // bf16 weight, grad is bf16
-  if (weight.numel()) {
+  if (param2_.numel()) {
     // after inference, the model weight in the next training epoch maybe cached
     // block, so to plain now if needed
-    weight = to_plain_if_needed_(weight);
+    param2_ = to_plain_if_needed_(param2_);
 
-    auto memory_format = weight.suggest_memory_format();
-    fp32_weight = fp32_weight.contiguous(memory_format);
+    auto memory_format = param2_.suggest_memory_format();
+    param_ = param_.contiguous(memory_format);
 
     if (momentum_buffer.numel()) {
       momentum_buffer = momentum_buffer.contiguous(memory_format);
     }
 
-    weight = weight.contiguous(memory_format);
+    param2_ = param2_.contiguous(memory_format);
     grad_processed = grad_processed.contiguous(memory_format);
 
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
-        weight.scalar_type(),
+        param2_.scalar_type(),
         "fusion_lars_with_master_weight",
         [&] {
           impl::ComputeLARSKernelMasterWeight<scalar_t>(
-              fp32_weight,
-              weight,
+              param_,
+              param2_,
               grad_processed,
               momentum_buffer,
               w_norm,
@@ -767,14 +811,16 @@ c10::optional<at::Tensor> lars_xpu_fused_step(
               weight_decay,
               momentum,
               eeta,
-              lr,
+              learning_rate,
               eps,
-              momentum_buf_initialized);
+              momentum_buf_initialized,
+              dampening,
+              nesterov);
         });
   } else {
     // normal sgd, no master weight, weight and grad are fp32
-    auto memory_format = fp32_weight.suggest_memory_format();
-    fp32_weight = fp32_weight.contiguous(memory_format);
+    auto memory_format = param_.suggest_memory_format();
+    param_ = param_.contiguous(memory_format);
 
     if (momentum_buffer.numel()) {
       momentum_buffer = momentum_buffer.contiguous(memory_format);
@@ -784,7 +830,7 @@ c10::optional<at::Tensor> lars_xpu_fused_step(
 
     // all Tensor are fp32
     impl::ComputeLARSKernel(
-        fp32_weight,
+        param_,
         grad_processed,
         momentum_buffer,
         w_norm,
@@ -792,9 +838,11 @@ c10::optional<at::Tensor> lars_xpu_fused_step(
         weight_decay,
         momentum,
         eeta,
-        lr,
+        learning_rate,
         eps,
-        momentum_buf_initialized);
+        momentum_buf_initialized,
+        dampening,
+        nesterov);
   }
 
   if (!momentum) {
@@ -810,7 +858,7 @@ c10::optional<at::Tensor> lars_xpu_fused_step(
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
-      "lars_xpu_fused_step",
+      "lars_fused_step",
       at::AtenIpexTypeXPU::lars_xpu_fused_step,
       c10::DispatchKey::XPU);
 }

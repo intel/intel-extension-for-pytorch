@@ -12,7 +12,6 @@ from ._functional import (
     adam_step,
     adamw_step,
     lars_step,
-    lars_xpu_step,
 )
 from ._lamb import Lamb
 from ._lars import Lars
@@ -48,7 +47,7 @@ OPTIMIZER_FUSED_STEP_MAPPING_XPU = {
     torch.optim.Adam: adam_step,
     torch.optim.Adagrad: adagrad_step,
     Lamb: lamb_step,
-    Lars: lars_xpu_step,
+    Lars: lars_step,
 }
 
 
