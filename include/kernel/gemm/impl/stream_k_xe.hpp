@@ -227,8 +227,8 @@ public:
     static cl::sycl::range<3> get_local_range() {
         uint32_t local_range_m = (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
         uint32_t local_range_n = (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
-        std::cout << "Local range: {" << 1 << ", " << local_range_m << ", "
-                  << local_range_n << "} \n";
+        // std::cout << "Local range: {" << 1 << ", " << local_range_m << ", "
+        //           << local_range_n << "} \n";
         assert(local_range_m * local_range_n <= 32);
         //Linearize for stream_k algorithm
         return cl::sycl::range<3> {1, 1, local_range_m * local_range_n};

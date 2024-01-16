@@ -32,9 +32,7 @@ Run_benchmark_qwen-7b_int4() {
 main() {
 
     export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2
-    export ENABLE_SDP_FUSION=1
 
-    export HF_HOME=/mllnvme0/huggingface/
     export HF_DATASETS_OFFLINE=1
     export TRANSFORMERS_OFFLINE=1
     export HF_EVALUATE_OFFLINE=1
