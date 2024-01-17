@@ -210,10 +210,14 @@ static void replaceWithSelectOp(Block* block) {
 }
 
 void removeSelectOpNode(Node* node) {
-  WithInsertPoint guard(node->prev()->prev()->prev()->prev());
+  WithInsertPoint guard(node);
   auto g = node->owningGraph();
   auto dtype = node->output()->type()->cast<TensorType>()->scalarType().value();
-  auto as_tensor_node = node->prev()->prev()->prev();
+  // The sequence of ops in the graph is like this -
+  // if_tensor = aten::as_tensor(%if_value, %, %)
+  // if_tensor = aten::unsqueeze(%if_tensor, %57)
+  // llga::Select(mask, if_tensor, then_tensor)
+  auto as_tensor_node = node->input(1)->node()->input(0)->node();
   auto expand_as_output =
       g->insert(aten::expand_as, {node->input(0), node->input(2)});
   expand_as_output->setType(node->input(2)->type());
