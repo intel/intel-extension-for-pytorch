@@ -276,7 +276,6 @@ def _greedy_search(
             )
 
         if synced_gpus and this_peer_finished:
-            cur_len = cur_len + 1
             continue  # don't waste resources running the code we don't need
         if isinstance(outputs, dict):
             next_token_logits = outputs.logits[:, -1, :]

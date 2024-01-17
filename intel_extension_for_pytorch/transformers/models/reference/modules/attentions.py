@@ -1104,17 +1104,17 @@ def _MptAttention_forward(
         batch_size, seq_length, self.n_heads, self.head_dim
     )
 
-    if position_bias is not None:
-        if len(position_bias.shape) != 3:
-            raise ValueError(
-                f"Expecting position_bias shape to be 3 dimensions, got {len(position_bias.shape)}"
-            )
-        key_start_idx = (
-            -seq_length - past_key_value[0].shape[2]
-            if past_key_value is not None
-            else -seq_length
+    if len(position_bias.shape) != 3:
+        raise ValueError(
+            f"Expecting position_bias shape to be 3 dimensions, got {len(position_bias.shape)}"
         )
-        position_bias = position_bias[:, :, key_start_idx:]
+    key_start_idx = (
+        -seq_length - past_key_value[0].shape[2]
+        if past_key_value is not None
+        else -seq_length
+    )
+    position_bias = position_bias[:, :, key_start_idx:]
+
     (attn_output, attn_weights, past_key_value) = self._IPEXScaleDotProduct(
         query_states,
         key_states,
