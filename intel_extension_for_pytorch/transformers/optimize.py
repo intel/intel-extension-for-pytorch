@@ -343,11 +343,6 @@ def model_convert_reference(_model):
             distributed=distributed,
         )
         convert_function(
-            _model,
-            "prepare_inputs_for_generation",
-            prepare_inputs_for_generation,
-        )
-        convert_function(
             _model.transformer,
             "_prepare_attn_mask",
             _prepare_attn_mask_falcon,

@@ -283,7 +283,8 @@ if args.benchmark:
     gc.collect()
     deepspeed.runtime.utils.see_memory_usage("pre-from-pretrained", force=True)
 
-# Construct model with fake meta tensors, later will be replaced during ds-inference ckpt load
+# For now, Falcon, baichuan, baichuan2, and gptbigcode have accuracy issue with from_config with deepspeed meta device load.
+# TODO: we will change the scope once deepspeed providing the support
 if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "gptbigcode"]:
     model = model_class[0].from_pretrained(
         model_name,
@@ -292,7 +293,7 @@ if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "gptbigc
         torch_dtype=load_dtype,
         trust_remote_code=True,
     )
-else:
+else: # Construct model with fake meta tensors, later will be replaced during ds-inference ckpt load
     with deepspeed.OnDevice(dtype=load_dtype, device="meta"):
         if  model_type in ["t5"]:
             model =  model_class[0](config=config)

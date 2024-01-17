@@ -194,6 +194,8 @@ class HuggingFaceModel(BaseLM):
         if re.search("gptbigcode", self.config.architectures[0], re.IGNORECASE):
             model_type = "gptbigcode"
 
+        # For now, Falcon, baichuan and gptbigcode have accuracy issue with from_config with deepspeed meta device load.
+        # TODO: we will change the scope once deepspeed providing the support
         if world_size == 1 or model_type in ["falcon", "baichuan", "gptbigcode"]:
             self.model = model_class[0].from_pretrained(
                 model_id,
