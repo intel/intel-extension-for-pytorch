@@ -135,7 +135,7 @@ class HuggingFaceModel(BaseLM):
         if self._dtype == "int8" or self._dtype == "int4":
             try:
                 with ipex.OnDevice(dtype=torch.float, device="meta"):
-                    self.model = AutoModelForCausalLM.from_config(self.config)
+                    self.model = model_class[0].from_config(self.config, trust_remote_code=True)
             except (RuntimeError, AttributeError) as e:
                 print('Warning: Loading model to meta device failed:', e)
                 self.model = model_class[0].from_pretrained(
@@ -283,6 +283,8 @@ class HuggingFaceModel(BaseLM):
             example_dict["past_key_values"]= past_key_values
             if has_position_ids:
                 example_dict["position_ids"] = position_ids_batched
+        if "return_last_logit" in model_inputs:
+            example_dict["return_last_logit"] = torch.tensor(True)
 
         with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
             enabled=True

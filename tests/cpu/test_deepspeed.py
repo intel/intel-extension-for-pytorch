@@ -396,8 +396,8 @@ class DeepspeedTester(JitTestCase):
         example_inputs = (
             input_ids.unsqueeze(0),
             attention_mask.unsqueeze(0),
-            position_ids.unsqueeze(0),
             past_key_values,
+            position_ids.unsqueeze(0),
         )
         with torch.no_grad():
             model(*example_inputs)

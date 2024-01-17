@@ -11,25 +11,42 @@ class FALCONConfig(LLMConfig):
         self.name = "falcon"
         self.model_id = model_id
         self.to_channels_last = True
-        self.example_inputs_mode = EXAMPLE_INPUTS_MODE.KV_MASK
+        self.example_inputs_mode = EXAMPLE_INPUTS_MODE.MASK_KV
         # for smooth quant
         self.default_dataset = "NeelNanda/pile-10k"
         self.use_global_past_key_value = True
         self.use_ipex_autotune = True
     def get_user_model(self, config, benchmark):
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_id,
-            torch_dtype=torch.float,
-            config=config,
-            low_cpu_mem_usage=True,
-            trust_remote_code=True,
-        )
-        if not isinstance(self.model, FalconForCausalLM) and not benchmark:
-            print(
-                "You're using a model from remote hub. To successfully save/load quantized model, \
-                please pass configuration file (example: --config-file=model_config/tiiuae_falcon-40b_config.json)."
+        if benchmark:
+            try:
+                with ipex.OnDevice(dtype=torch.float, device="meta"):
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        self.model_id,
+                        torch_dtype=torch.float,
+                        config=config,
+                        low_cpu_mem_usage=True,
+                        trust_remote_code=True,
+                    )
+            except (RuntimeError, AttributeError):
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    self.model_id,
+                    torch_dtype=torch.float,
+                    config=config,
+                    low_cpu_mem_usage=True,
+                    trust_remote_code=True,
+                )
+        else:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_id,
+                torch_dtype=torch.float,
+                config=config,
+                low_cpu_mem_usage=True,
+                trust_remote_code=True,
             )
-            exit(0)
+        input_ids = torch.ones(32).to(torch.long)
+        example_inputs = self.model.prepare_inputs_for_generation(input_ids)
+        if "position_ids" in example_inputs:
+            self.example_inputs_mode = EXAMPLE_INPUTS_MODE.MASK_KV_POS
         return self.model
 
     def get_tokenizer(self):

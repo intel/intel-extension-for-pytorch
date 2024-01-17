@@ -698,8 +698,8 @@ class GPTQLLMTester(TestCase):
             return (
                 input_ids.unsqueeze(0),
                 attention_mask.unsqueeze(0),
-                position_ids.unsqueeze(0),
                 past_key_values,
+                position_ids.unsqueeze(0),
             )
 
         dataloader = GPTQLLMDataLoader()

@@ -11,7 +11,7 @@ class BloomConfig(LLMConfig):
         self.name = "bloom"
         self.model_id = model_id
         self.to_channels_last = True
-        self.example_inputs_mode = EXAMPLE_INPUTS_MODE.KV_MASK
+        self.example_inputs_mode = EXAMPLE_INPUTS_MODE.MASK_KV
         # for smooth quant
         self.default_dataset = "NeelNanda/pile-10k"
         self.use_global_past_key_value = True

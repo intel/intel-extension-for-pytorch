@@ -194,6 +194,8 @@ class HuggingFaceModel(BaseLM):
         if re.search("gptbigcode", self.config.architectures[0], re.IGNORECASE):
             model_type = "gptbigcode"
 
+        # For now, Falcon, baichuan and gptbigcode have accuracy issue with from_config with deepspeed meta device load.
+        # TODO: we will change the scope once deepspeed providing the support
         if world_size == 1 or model_type in ["falcon", "baichuan", "gptbigcode"]:
             self.model = model_class[0].from_pretrained(
                 model_id,
@@ -448,6 +450,8 @@ class HuggingFaceModel(BaseLM):
             example_dict["return_dict"] = torch.tensor(False)
             if has_position_ids:
                 example_dict["position_ids"] = position_ids_batched
+        if "return_last_logit" in model_inputs:
+            example_dict["return_last_logit"] = torch.tensor(True)
 
         with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
             enabled=True

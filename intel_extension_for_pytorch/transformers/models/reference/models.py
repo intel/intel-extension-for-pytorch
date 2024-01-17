@@ -19,8 +19,8 @@ def GPTJForCausalLM_forward(
     self,
     input_ids: Optional[torch.LongTensor] = None,
     attention_mask: Optional[torch.FloatTensor] = None,
-    position_ids: Optional[torch.LongTensor] = None,
     past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None,
+    position_ids: Optional[torch.LongTensor] = None,
     token_type_ids: Optional[torch.LongTensor] = None,
     head_mask: Optional[torch.FloatTensor] = None,
     inputs_embeds: Optional[torch.FloatTensor] = None,
@@ -84,8 +84,8 @@ def LlamaForCausalLM_forward(
     self,
     input_ids: torch.LongTensor = None,
     attention_mask: Optional[torch.Tensor] = None,
-    position_ids: Optional[torch.LongTensor] = None,
     past_key_values: Optional[List[torch.FloatTensor]] = None,
+    position_ids: Optional[torch.LongTensor] = None,
     inputs_embeds: Optional[torch.FloatTensor] = None,
     labels: Optional[torch.LongTensor] = None,
     use_cache: Optional[bool] = None,
@@ -149,8 +149,8 @@ def GPTNeoXForCausalLM_forward(
     self,
     input_ids: Optional[torch.LongTensor] = None,
     attention_mask: Optional[torch.FloatTensor] = None,
-    position_ids: Optional[torch.LongTensor] = None,
     past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None,
+    position_ids: Optional[torch.LongTensor] = None,
     inputs_embeds: Optional[torch.FloatTensor] = None,
     head_mask: Optional[torch.FloatTensor] = None,
     labels: Optional[torch.LongTensor] = None,
@@ -201,8 +201,8 @@ def GPTNeoXForCausalLM_forward(
 def OPTForCausalLM_forward(
     self,
     input_ids: torch.LongTensor = None,
-    past_key_values: Optional[List[torch.FloatTensor]] = None,
     attention_mask: Optional[torch.Tensor] = None,
+    past_key_values: Optional[List[torch.FloatTensor]] = None,
     head_mask: Optional[torch.Tensor] = None,
     inputs_embeds: Optional[torch.FloatTensor] = None,
     labels: Optional[torch.LongTensor] = None,
@@ -262,8 +262,8 @@ def OPTForCausalLM_forward(
 def BloomForCausalLM_forward(
     self,
     input_ids: Optional[torch.LongTensor] = None,
-    past_key_values: Optional[Tuple[Tuple[torch.Tensor, torch.Tensor], ...]] = None,
     attention_mask: Optional[torch.Tensor] = None,
+    past_key_values: Optional[Tuple[Tuple[torch.Tensor, torch.Tensor], ...]] = None,
     head_mask: Optional[torch.Tensor] = None,
     inputs_embeds: Optional[torch.Tensor] = None,
     labels: Optional[torch.Tensor] = None,
@@ -332,8 +332,8 @@ def BloomForCausalLM_forward(
 def FalconForCausalLM_forward(
     self,
     input_ids: Optional[torch.LongTensor] = None,
-    past_key_values: Optional[Tuple[Tuple[torch.Tensor, torch.Tensor], ...]] = None,
     attention_mask: Optional[torch.Tensor] = None,
+    past_key_values: Optional[Tuple[Tuple[torch.Tensor, torch.Tensor], ...]] = None,
     position_ids: Optional[torch.LongTensor] = None,
     head_mask: Optional[torch.Tensor] = None,
     inputs_embeds: Optional[torch.Tensor] = None,
@@ -401,8 +401,8 @@ def CodeGenForCausalLM_forward(
     self,
     input_ids: Optional[torch.LongTensor] = None,
     attention_mask: Optional[torch.FloatTensor] = None,
-    position_ids: Optional[torch.LongTensor] = None,
     past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None,
+    position_ids: Optional[torch.LongTensor] = None,
     token_type_ids: Optional[torch.LongTensor] = None,
     head_mask: Optional[torch.FloatTensor] = None,
     inputs_embeds: Optional[torch.FloatTensor] = None,
@@ -835,8 +835,8 @@ def ChatGLMForConditionalGeneration_forward(
     self,
     input_ids: Optional[torch.Tensor] = None,
     attention_mask: Optional[torch.Tensor] = None,
-    position_ids: Optional[torch.Tensor] = None,
     past_key_values: Optional[Tuple[torch.FloatTensor]] = None,
+    position_ids: Optional[torch.Tensor] = None,
     return_last_logit: Optional[bool] = False,
     inputs_embeds: Optional[torch.Tensor] = None,
     labels: Optional[torch.Tensor] = None,
@@ -859,7 +859,13 @@ def ChatGLMForConditionalGeneration_forward(
     )
 
     hidden_states = transformer_outputs[0]
-    if return_last_logit:
+    if (
+        return_last_logit
+        and hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and hidden_states.size(1) != 1
+    ):
         hidden_states = hidden_states[-1:]
     lm_logits = self.transformer.output_layer(hidden_states)
     lm_logits = lm_logits.transpose(0, 1).contiguous()
@@ -1092,8 +1098,8 @@ def GPTBigCodeForCausalLM_forward(
     self,
     input_ids: Optional[torch.Tensor] = None,
     attention_mask: Optional[torch.Tensor] = None,
-    position_ids: Optional[torch.Tensor] = None,
     past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None,
+    position_ids: Optional[torch.Tensor] = None,
     token_type_ids: Optional[torch.Tensor] = None,
     head_mask: Optional[torch.Tensor] = None,
     inputs_embeds: Optional[torch.Tensor] = None,
@@ -1301,8 +1307,8 @@ def MistralForCausalLM_forward(
     self,
     input_ids: torch.LongTensor = None,
     attention_mask: Optional[torch.Tensor] = None,
-    position_ids: Optional[torch.LongTensor] = None,
     past_key_values: Optional[List[torch.FloatTensor]] = None,
+    position_ids: Optional[torch.LongTensor] = None,
     inputs_embeds: Optional[torch.FloatTensor] = None,
     labels: Optional[torch.LongTensor] = None,
     use_cache: Optional[bool] = None,
@@ -1365,8 +1371,8 @@ def MistralForCausalLM_forward(
 def MptForCausalLM_forward(
     self,
     input_ids: Optional[torch.LongTensor] = None,
-    past_key_values: Optional[Tuple[Tuple[torch.Tensor, torch.Tensor], ...]] = None,
     attention_mask: Optional[torch.Tensor] = None,
+    past_key_values: Optional[Tuple[Tuple[torch.Tensor, torch.Tensor], ...]] = None,
     inputs_embeds: Optional[torch.Tensor] = None,
     labels: Optional[torch.Tensor] = None,
     use_cache: Optional[bool] = True,

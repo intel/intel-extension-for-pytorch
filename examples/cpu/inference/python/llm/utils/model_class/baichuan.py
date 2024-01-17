@@ -19,13 +19,32 @@ class BaichuanConfig(LLMConfig):
         self.use_global_past_key_value = True
         self.use_ipex_autotune = True
     def get_user_model(self, config, benchmark):
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_id,
-            torch_dtype=torch.float,
-            config=config,
-            low_cpu_mem_usage=True,
-            trust_remote_code=True,
-        )
+        if benchmark:
+            try:
+                with ipex.OnDevice(dtype=torch.float, device="meta"):
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        self.model_id,
+                        torch_dtype=torch.float,
+                        config=config,
+                        low_cpu_mem_usage=True,
+                        trust_remote_code=True,
+                    )
+            except (RuntimeError, AttributeError):
+                self.model = AutoModelForCausalLM.from_pretrained(
+                        self.model_id,
+                        torch_dtype=torch.float,
+                        config=config,
+                        low_cpu_mem_usage=True,
+                        trust_remote_code=True,
+                    )
+        else:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                        self.model_id,
+                        torch_dtype=torch.float,
+                        config=config,
+                        low_cpu_mem_usage=True,
+                        trust_remote_code=True,
+                    )
         input_ids = torch.ones(32).to(torch.long)
         example_inputs = self.model.prepare_inputs_for_generation(input_ids)
         if "position_ids" in example_inputs:

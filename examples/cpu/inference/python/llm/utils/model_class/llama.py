@@ -10,7 +10,7 @@ class LLAMAConfig(LLMConfig):
         self.name = "llama"
         self.model_id = model_id
         self.to_channels_last = False
-        self.example_inputs_mode = EXAMPLE_INPUTS_MODE.MASK_POS_KV
+        self.example_inputs_mode = EXAMPLE_INPUTS_MODE.MASK_KV_POS
 
         # for smooth quant
         self.default_dataset = "NeelNanda/pile-10k"

@@ -49,8 +49,8 @@ def _get_gptj_example_inputs():
     return (
         input_ids.unsqueeze(0),
         attention_mask.unsqueeze(0),
-        position_ids.unsqueeze(0),
         past_key_values,
+        position_ids.unsqueeze(0),
     )
 
 
@@ -282,7 +282,7 @@ class OptimizeTransformersTester(TestCase):
             y_ref = orig_woq_model(
                 input_ids=example_inputs[0],
                 attention_mask=example_inputs[1],
-                position_ids=example_inputs[2],
+                position_ids=example_inputs[3],
                 use_cache=True,
             )
             self.assertEqual(y[0], y_ref[0], prec=1e-4)

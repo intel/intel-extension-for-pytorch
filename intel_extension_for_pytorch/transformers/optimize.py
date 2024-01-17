@@ -343,11 +343,6 @@ def model_convert_reference(_model):
             distributed=distributed,
         )
         convert_function(
-            _model,
-            "prepare_inputs_for_generation",
-            prepare_inputs_for_generation,
-        )
-        convert_function(
             _model.transformer,
             "_prepare_attn_mask",
             _prepare_attn_mask_falcon,
@@ -509,15 +504,15 @@ def get_dummy_input(_model, return_dict=False):
             {
                 "input_ids": input_ids.unsqueeze(0),
                 "attention_mask": attention_mask.unsqueeze(0),
-                "position_ids": position_ids.unsqueeze(0),
                 "past_key_values": past_key_values,
+                "position_ids": position_ids.unsqueeze(0),
             }
             if return_dict
             else (
                 input_ids.unsqueeze(0),
                 attention_mask.unsqueeze(0),
-                position_ids.unsqueeze(0),
                 past_key_values,
+                position_ids.unsqueeze(0),
             )
         )
     elif _model.config.architectures[0] == "T5ForConditionalGeneration":
@@ -543,14 +538,18 @@ def get_dummy_input(_model, return_dict=False):
         sample_inputs = (
             {
                 "input_ids": input_ids.unsqueeze(0),
-                "past_key_values": past_key_values,
                 "attention_mask": attention_mask.unsqueeze(0),
+                "past_key_values": past_key_values,
             }
             if return_dict
-            else (input_ids.unsqueeze(0), past_key_values, attention_mask.unsqueeze(0))
+            else (input_ids.unsqueeze(0), attention_mask.unsqueeze(0), past_key_values)
         )
+
     if "return_last_logit" in model_inputs:
-        sample_inputs["return_last_logit"] = torch.tensor(True)
+        if return_dict:
+            sample_inputs["return_last_logit"] = torch.tensor(True)
+        else:
+            sample_inputs = sample_inputs + (torch.tensor(True),)
     return sample_inputs
 
 

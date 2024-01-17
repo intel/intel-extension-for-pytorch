@@ -11,7 +11,7 @@ import transformers
 from transformers import AutoConfig
 
 import intel_extension_for_pytorch as ipex
-
+from ast import literal_eval
 import sys
 
 sys.path.append(sys.path[0] + "/../../")
@@ -507,7 +507,7 @@ if args.ipex_smooth_quant:
                 }
             
             smoothquant_args = {"alpha": args.alpha if args.alpha == "auto" \
-                                else eval(args.alpha), "folding": args.folding}
+                                else literal_eval(args.alpha), "folding": args.folding}
             if args.alpha == "auto":
                 smoothquant_args["auto_alpha_args"] = {
                         "init_alpha": float(args.init_alpha),
