@@ -40,8 +40,12 @@ Tensor& leaky_relu_backward_out(
     Tensor& grad_input) {
   auto iter = TensorIterator::binary_op(grad_input, grad_output, self);
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16, iter.dtype(), "LeakyReLU_backward", [&]() {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "LeakyReLU_backward",
+      [&]() {
         auto negval = negative_slope.to<scalar_t>();
 
         dpcpp_kernel_for_tensor_iter(

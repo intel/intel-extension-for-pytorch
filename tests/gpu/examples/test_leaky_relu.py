@@ -13,28 +13,33 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
-    def test_LeakyReLU(self, Xelu=nn.LeakyReLU(0.1), dtype=torch.float):
-        x_cpu = torch.randn([1, 2, 3, 4], device=cpu_device, requires_grad=True)
-        grad_x = torch.randn(1, 2, 3, 4, device=cpu_device, requires_grad=True)
-        y_cpu = Xelu(x_cpu)
-        y_cpu.backward(grad_x)
+    def test_LeakyReLU(self, Xelu=nn.LeakyReLU(0.1)):
+        for dtype in [torch.float16, torch.float32]:
+            x_cpu = torch.randn(
+                [1, 2, 3, 4], device=cpu_device, requires_grad=True, dtype=dtype
+            )
+            grad_x = torch.randn(
+                1, 2, 3, 4, device=cpu_device, requires_grad=True, dtype=dtype
+            )
+            y_cpu = Xelu(x_cpu)
+            y_cpu.backward(grad_x)
 
-        print("cpu output ", y_cpu)
-        print("cpu grad ", x_cpu.grad)
+            print("cpu output ", y_cpu)
+            print("cpu grad ", x_cpu.grad)
 
-        Xelu.to("xpu")
-        Xelu.zero_grad()
+            Xelu.to("xpu")
+            Xelu.zero_grad()
 
-        x_dpcpp = Variable(x_cpu.to("xpu"), requires_grad=True)
-        grad_dpcpp = Variable(grad_x.to("xpu"), requires_grad=True)
+            x_dpcpp = Variable(x_cpu.to("xpu"), requires_grad=True)
+            grad_dpcpp = Variable(grad_x.to("xpu"), requires_grad=True)
 
-        y_dpcpp = Xelu(x_dpcpp)
-        y_dpcpp.backward(grad_dpcpp)
+            y_dpcpp = Xelu(x_dpcpp)
+            y_dpcpp.backward(grad_dpcpp)
 
-        print("dpcpp output", y_dpcpp.cpu())
-        print("dpcpp grad ", x_dpcpp.grad.cpu())
-        self.assertEqual(y_cpu, y_dpcpp.cpu())
-        self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+            print("dpcpp output", y_dpcpp.cpu())
+            print("dpcpp grad ", x_dpcpp.grad.cpu())
+            self.assertEqual(y_cpu, y_dpcpp.cpu())
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_LeakyReLU_channels_last_fwd(
         self, Xelu=nn.LeakyReLU(0.1), dtype=torch.float
