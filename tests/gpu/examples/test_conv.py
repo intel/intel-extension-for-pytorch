@@ -64,6 +64,31 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
 
+    def test_conv2d_half(self, dtype=torch.float16):
+        x = torch.randn(
+            [1, 64, 256, 256], dtype=dtype, device=cpu_device, requires_grad=True
+        ).to(dpcpp_device)
+        grad = torch.full(
+            [1, 64, 256, 256], 1e-3, dtype=dtype, device=cpu_device, requires_grad=True
+        ).to(dpcpp_device)
+        conv = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, bias=False).to(
+            dpcpp_device
+        )
+        y_fp32 = conv(x)
+        y_fp32.backward(grad)
+        y_gw = conv.weight.grad.detach().clone()
+
+        conv.zero_grad()
+
+        x_fp16 = x.to(dtype).requires_grad_()
+        grad_fp16 = grad.to(dtype)
+        y_fp16 = conv(x_fp16)
+        y_fp16.backward(grad_fp16)
+        y_fp16_gw = conv.weight.grad.detach().clone()
+
+        self.assertEqual(y_fp16, y_fp32, atol=1e-3, rtol=1e-3)
+        self.assertEqual(y_gw, y_fp16_gw, atol=1e-3, rtol=1e-3)
+
     @pytest.mark.skipif(
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )

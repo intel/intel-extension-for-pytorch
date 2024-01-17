@@ -950,8 +950,9 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
   TORCH_CHECK(
       grad_output.scalar_type() == ScalarType::Float ||
           grad_output.scalar_type() == ScalarType::BFloat16 ||
+          grad_output.scalar_type() == ScalarType::Half ||
           grad_output.scalar_type() == ScalarType::Double,
-      "so far only support float, bfloat16 and double convolution backward in XPU backend, your data type is ",
+      "so far only support float, bfloat16, half and double convolution backward in XPU backend, your data type is ",
       grad_output.scalar_type());
 
   auto memory_layout_for_conv =
