@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
+import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -90,6 +91,47 @@ class TestNNMethod(TestCase):
         output_dpcpp = y_dpcpp.backward(grad_dpcpp)
         print("x_dpcpp.grad", x_dpcpp.grad.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
+
+    def test_adaptive_avg_pool_half(self, dtype=torch.float16):
+        x = torch.ones([1, 1, 8, 8], device=dpcpp_device)
+        grad = torch.ones([1, 1, 2, 2], device=dpcpp_device)
+        x_half = x.to(dtype)
+        grad_half = grad.to(dtype)
+        avg_pool = nn.AdaptiveAvgPool2d((2, 2))
+        avg_pool.to(dpcpp_device)
+
+        x.requires_grad_(True)
+
+        y = avg_pool(x)
+        output = y.backward(grad)
+
+        x_half.requires_grad_(True)
+        y_half = avg_pool(x_half)
+        output_half = y_half.backward(grad_half)
+        self.assertEqual(y, y_half.float(), atol=1e-3, rtol=1e-3)
+        self.assertEqual(x.grad, x_half.grad.float(), atol=1e-3, rtol=1e-3)
+
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
+    def test_adaptive_avg_pool_fp64(self, dtype=torch.float64):
+        x = torch.ones([1, 1, 8, 8], device=dpcpp_device)
+        grad = torch.ones([1, 1, 2, 2], device=dpcpp_device)
+        x_fp64 = x.to(dtype)
+        grad_fp64 = grad.to(dtype)
+        avg_pool = nn.AdaptiveAvgPool2d((2, 2))
+        avg_pool.to(dpcpp_device)
+
+        x.requires_grad_(True)
+
+        y = avg_pool(x)
+        output = y.backward(grad)
+
+        x_fp64.requires_grad_(True)
+        y_fp64 = avg_pool(x_fp64)
+        output_fp64 = y_fp64.backward(grad_fp64)
+        self.assertEqual(y, y_fp64.float(), atol=1e-3, rtol=1e-3)
+        self.assertEqual(x.grad, x_fp64.grad.float(), atol=1e-3, rtol=1e-3)
 
     def test_adaptive_avg_pool_3D(self, dtype=torch.float):
         x = torch.randn([30, 40, 50])

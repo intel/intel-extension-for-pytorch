@@ -62,9 +62,9 @@ static at::Tensor pooling(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   prop_kind prop_kind = dnnl::prop_kind::forward_training;
-  auto data_t = get_onednn_dtype(src);
-  if (data_t == memory::data_type::f16 || data_t == memory::data_type::s8 ||
-      data_t == memory::data_type::u8 || data_t == memory::data_type::s32) {
+  auto data_t = get_onednn_dtype_include_double(src);
+  if (data_t == memory::data_type::s8 || data_t == memory::data_type::u8 ||
+      data_t == memory::data_type::s32) {
     prop_kind = dnnl::prop_kind::forward_inference;
   }
 
@@ -205,9 +205,9 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto prop_kind = dnnl::prop_kind::forward_training;
-  auto data_t = get_onednn_dtype(src);
-  if (data_t == memory::data_type::f16 || data_t == memory::data_type::s8 ||
-      data_t == memory::data_type::u8 || data_t == memory::data_type::s32) {
+  auto data_t = get_onednn_dtype_include_double(src);
+  if (data_t == memory::data_type::s8 || data_t == memory::data_type::u8 ||
+      data_t == memory::data_type::s32) {
     prop_kind = dnnl::prop_kind::forward_inference;
   }
 
@@ -386,10 +386,14 @@ static at::Tensor pooling_backward(
   auto strm = GpuStreamManager::Instance().get_stream();
   prop_kind prop_kind = dnnl::prop_kind::forward_training;
 
-  auto data_t = get_onednn_dtype(diff_dst);
+  auto data_t = get_onednn_dtype_include_double(diff_dst);
   TORCH_CHECK(
-      data_t == memory::data_type::f32 || data_t == memory::data_type::bf16,
-      "oneDNN only supports pooling backward with fp32 and bf16 datatype");
+      dpcppSupportFP64() || data_t != memory::data_type::f64,
+      "pooling backward with fp64 is not supported on this device");
+  TORCH_CHECK(
+      data_t == memory::data_type::f32 || data_t == memory::data_type::f16 ||
+          data_t == memory::data_type::bf16 || data_t == memory::data_type::f64,
+      "oneDNN only supports pooling backward with fp32, fp64, fp16 and bf16 datatype");
 
   memory::format_tag format;
 
@@ -552,10 +556,15 @@ static at::Tensor pooling_backward(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto prop_kind = dnnl::prop_kind::forward_training;
-  auto data_t = get_onednn_dtype(diff_dst);
+  auto data_t = get_onednn_dtype_include_double(diff_dst);
+
   TORCH_CHECK(
-      data_t == memory::data_type::f32 || data_t == memory::data_type::bf16,
-      "oneDNN only supports pooling backward with fp32 and bf16 datatype");
+      dpcppSupportFP64() || data_t != memory::data_type::f64,
+      "pooling backward with fp64 is not supported on this device");
+  TORCH_CHECK(
+      data_t == memory::data_type::f32 || data_t == memory::data_type::f16 ||
+          data_t == memory::data_type::bf16 || data_t == memory::data_type::f64,
+      "oneDNN only supports pooling backward with fp32, fp64, fp16 and bf16 datatype");
 
   memory::format_tag format;
   memory::dims diff_src_tz;
