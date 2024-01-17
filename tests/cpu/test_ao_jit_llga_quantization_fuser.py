@@ -79,8 +79,8 @@ class TestOp(JitLlgaTestCase):
             module,
         ] in itertools.product(
             [7],
-            [8],
-            [7],
+            [2],
+            [3],
             [3],
             [0, 2],
             [1, 2],

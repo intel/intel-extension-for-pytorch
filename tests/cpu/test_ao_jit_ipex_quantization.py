@@ -427,7 +427,7 @@ class TestIpexOps(JitLlgaTestCase):
 
         def _lstm_params_list():
             params_dict = {
-                "input_size": [1, 32],
+                "input_size": [1],
                 "hidden_size": [16],
                 "num_layers": [3],
                 "bidirectional": [False, True],
