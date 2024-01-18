@@ -128,6 +128,43 @@ void indexSelect(
   return;
 }
 
+struct NonzeroKernelFunctor {
+  void operator()(sycl::nd_item<1> item_id) const {
+    auto global_id = item_id.get_global_linear_id();
+
+    if (global_id < N) {
+      auto index = global_id / num_dim;
+      auto dim = global_id % num_dim;
+      tensor_begin[global_id] =
+          idx_flat_begin[index] / divisor[dim] % sizes[dim];
+    }
+  }
+  NonzeroKernelFunctor(
+      int64_t N_,
+      const int64_t num_dim_,
+      int64_t* tensor_begin_,
+      int64_t* idx_flat_begin_,
+      int64_t* divisor_,
+      int64_t* sizes_)
+      : N(N_),
+        num_dim(num_dim_),
+        tensor_begin(tensor_begin_),
+        idx_flat_begin(idx_flat_begin_) {
+    for (auto dim = num_dim - 1; dim >= 0; dim--) {
+      sizes[dim] = sizes_[dim];
+      divisor[dim] = divisor_[dim];
+    }
+  }
+
+ private:
+  int64_t N;
+  const int64_t num_dim;
+  int64_t* tensor_begin;
+  int64_t* idx_flat_begin;
+  int64_t divisor[MAX_TENSORINFO_DIMS];
+  int64_t sizes[MAX_TENSORINFO_DIMS];
+};
+
 template <typename scalar_t>
 void nonzero(Tensor& tensor, const Tensor& self_) {
   Tensor self = self_.contiguous();
@@ -176,17 +213,8 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
 
       // restore flatten idx to indices
       auto cgf = DPCPP_Q_CGF(__cgh) {
-        auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item_id) {
-          auto global_id = item_id.get_global_linear_id();
-
-          if (global_id < N) {
-            auto index = global_id / num_dim;
-            auto dim = global_id % num_dim;
-            tensor_begin[global_id] =
-                idx_flat_begin[index] / divisor[dim] % sizes[dim];
-          }
-        };
-
+        NonzeroKernelFunctor kfn(
+            N, num_dim, tensor_begin, idx_flat_begin, divisor, sizes);
         __cgh.parallel_for<decltype(kfn)>(
             sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
       };
@@ -409,6 +437,66 @@ void _index_copy(
 }
 
 template <typename scalar_t>
+struct DiagKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    size_t id = item_id.get_id(0);
+    const int64_t bOffset = start + (stride0 + stride1) * id;
+    out[strideSelf * id] = in[bOffset];
+  }
+  DiagKernelFunctor(
+      scalar_t* in_,
+      scalar_t* out_,
+      int64_t strideSelf_,
+      int64_t start_,
+      int64_t stride0_,
+      int64_t stride1_)
+      : in(in_),
+        out(out_),
+        strideSelf(strideSelf_),
+        start(start_),
+        stride0(stride0_),
+        stride1(stride1_) {}
+
+ private:
+  scalar_t* in;
+  scalar_t* out;
+  int64_t strideSelf;
+  int64_t start;
+  int64_t stride0;
+  int64_t stride1;
+};
+
+template <typename scalar_t>
+struct DiagKernelFunctor2 {
+  void operator()(sycl::item<1> item_id) const {
+    size_t id = item_id.get_id(0);
+    const int64_t aOffset = start + (stride0 + stride1) * id;
+    out[aOffset] = in[strideSrc * id];
+  }
+  DiagKernelFunctor2(
+      scalar_t* in_,
+      scalar_t* out_,
+      int64_t strideSrc_,
+      int64_t start_,
+      int64_t stride0_,
+      int64_t stride1_)
+      : in(in_),
+        out(out_),
+        strideSrc(strideSrc_),
+        start(start_),
+        stride0(stride0_),
+        stride1(stride1_) {}
+
+ private:
+  scalar_t* in;
+  scalar_t* out;
+  int64_t strideSrc;
+  int64_t start;
+  int64_t stride0;
+  int64_t stride1;
+};
+
+template <typename scalar_t>
 void Diag(Tensor& dst, const Tensor& src, int64_t k) {
   int nDimension = src.dim() == 0 ? 1 : src.dim();
   TORCH_CHECK(
@@ -430,11 +518,8 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
       auto& dpcpp_queue = dpcppGetCurrentQueue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-          size_t id = item_id.get_id(0);
-          const int64_t bOffset = start + (stride0 + stride1) * id;
-          out[strideSelf * id] = in[bOffset];
-        };
+        DiagKernelFunctor<scalar_t> kfn(
+            in, out, strideSelf, start, stride0, stride1);
         cgh.parallel_for<decltype(kfn)>(sycl::range<1>(dst.numel()), kfn);
       };
       DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -454,17 +539,44 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
       auto& dpcpp_queue = dpcppGetCurrentQueue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-          size_t id = item_id.get_id(0);
-          const int64_t aOffset = start + (stride0 + stride1) * id;
-          out[aOffset] = in[strideSrc * id];
-        };
+        DiagKernelFunctor2<scalar_t> kfn(
+            in, out, strideSrc, start, stride0, stride1);
         cgh.parallel_for<decltype(kfn)>(sycl::range<1>(src.numel()), kfn);
       };
       DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     }
   }
 }
+
+template <typename scalar_t, typename mask_t>
+struct MaskedScatterKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int64_t linear_index = item.get_global_linear_id();
+    if (linear_index < size) {
+      if (mask_data[linear_index]) {
+        tensor_data[linear_index] = src_data[maskPrefixSum_data[linear_index]];
+      }
+    }
+  }
+  MaskedScatterKernelFunctor(
+      int64_t size_,
+      scalar_t* src_data_,
+      mask_t* mask_data_,
+      int64_t* maskPrefixSum_data_,
+      scalar_t* tensor_data_)
+      : size(size_),
+        src_data(src_data_),
+        mask_data(mask_data_),
+        maskPrefixSum_data(maskPrefixSum_data_),
+        tensor_data(tensor_data_) {}
+
+ private:
+  int64_t size;
+  scalar_t* src_data;
+  mask_t* mask_data;
+  int64_t* maskPrefixSum_data;
+  scalar_t* tensor_data;
+};
 
 template <typename scalar_t, typename mask_t>
 void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
@@ -533,17 +645,10 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
     auto tensor_data = tensor.data_ptr<scalar_t>();
 
     // kernel function
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      int64_t linear_index = item.get_global_linear_id();
-      if (linear_index < size) {
-        if (mask_data[linear_index]) {
-          tensor_data[linear_index] =
-              src_data[maskPrefixSum_data[linear_index]];
-        }
-      }
-    };
+    MaskedScatterKernelFunctor<scalar_t, mask_t> kfn(
+        size, src_data, mask_data, maskPrefixSum_data, tensor_data);
 
-    cgh.parallel_for<decltype(kfn)>(
+    cgh.parallel_for(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
         kfn);
@@ -552,6 +657,54 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
   // submit to DPCPP queue
   DPCPP_Q_SUBMIT(dpcpp_queue, cgfMaskedScatter);
 }
+
+template <typename scalar_t, typename mask_t>
+struct MaskedSelectKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    int64_t linear_index = item.get_global_linear_id();
+
+    auto src_ptr = acc_src_data;
+    auto mask_ptr = acc_mask_data;
+    auto maskPrefix_ptr = acc_maskPrefixSum_data;
+    auto tensor_ptr = acc_tensor_data;
+
+    if (linear_index < size) {
+      // The mask tensor maybe not contiguos.
+      auto mask_offset =
+          IndexToOffset<mask_t, uint64_t>().get(linear_index, mask_info);
+      if (mask_ptr[mask_offset]) {
+        // The src tensor maybe not contiguos.
+        auto src_offset =
+            IndexToOffset<scalar_t, uint64_t>().get(linear_index, src_info);
+        tensor_ptr[maskPrefix_ptr[linear_index] - 1] = src_ptr[src_offset];
+      }
+    }
+  }
+  MaskedSelectKernelFunctor(
+      scalar_t* acc_src_data_,
+      mask_t* acc_mask_data_,
+      int64_t* acc_maskPrefixSum_data_,
+      scalar_t* acc_tensor_data_,
+      int64_t size_,
+      TensorInfo<scalar_t, uint64_t> src_info_,
+      TensorInfo<mask_t, uint64_t> mask_info_)
+      : acc_src_data(acc_src_data_),
+        acc_mask_data(acc_mask_data_),
+        acc_maskPrefixSum_data(acc_maskPrefixSum_data_),
+        acc_tensor_data(acc_tensor_data_),
+        size(size_),
+        src_info(src_info_),
+        mask_info(mask_info_) {}
+
+ private:
+  scalar_t* acc_src_data;
+  mask_t* acc_mask_data;
+  int64_t* acc_maskPrefixSum_data;
+  scalar_t* acc_tensor_data;
+  int64_t size;
+  TensorInfo<scalar_t, uint64_t> src_info;
+  TensorInfo<mask_t, uint64_t> mask_info;
+};
 
 template <typename scalar_t, typename mask_t>
 void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
@@ -618,26 +771,14 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
     auto acc_tensor_data = tensorContig.data_ptr<scalar_t>();
 
     // kernel function per work-item
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      int64_t linear_index = item.get_global_linear_id();
-
-      auto src_ptr = acc_src_data;
-      auto mask_ptr = acc_mask_data;
-      auto maskPrefix_ptr = acc_maskPrefixSum_data;
-      auto tensor_ptr = acc_tensor_data;
-
-      if (linear_index < size) {
-        // The mask tensor maybe not contiguos.
-        auto mask_offset =
-            IndexToOffset<mask_t, uint64_t>().get(linear_index, mask_info);
-        if (mask_ptr[mask_offset]) {
-          // The src tensor maybe not contiguos.
-          auto src_offset =
-              IndexToOffset<scalar_t, uint64_t>().get(linear_index, src_info);
-          tensor_ptr[maskPrefix_ptr[linear_index] - 1] = src_ptr[src_offset];
-        }
-      }
-    };
+    MaskedSelectKernelFunctor<scalar_t, mask_t> kfn(
+        acc_src_data,
+        acc_mask_data,
+        acc_maskPrefixSum_data,
+        acc_tensor_data,
+        size,
+        src_info,
+        mask_info);
     cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
@@ -655,6 +796,67 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
 template <int N>
 struct alignas(N) OpaqueType {
   char data[N];
+};
+
+template <typename scalar_t, typename Func>
+struct PutKernelFunctor {
+  void operator()(sycl::item<1> item_id) const {
+    auto out_ptr = (char*)out_data;
+    auto indices_ptr = indices_data;
+    auto source_ptr = (char*)source_data;
+
+    auto linear_idx = item_id.get_id(0);
+    auto idx_offset =
+        IndexToOffset<int64_t, uint64_t>::get(linear_idx, indices_info);
+
+    auto index = indices_ptr[idx_offset];
+    if (index < 0) {
+      index += out_numel;
+    }
+
+    if (index > out_numel) {
+      /*error handle*/
+      return;
+    }
+
+    auto src_offset =
+        IndexToOffset<scalar_t, uint64_t>::get(linear_idx, source_info);
+    src_offset *= scalar_bytes;
+    auto out_offset = IndexToOffset<scalar_t, uint64_t>::get(index, out_info);
+    out_offset *= scalar_bytes;
+
+    f(out_ptr, source_ptr + src_offset, out_offset);
+  }
+  PutKernelFunctor(
+      Func f_,
+      int64_t out_numel_,
+      size_t scalar_bytes_,
+      TensorInfo<scalar_t, uint64_t> out_info_,
+      TensorInfo<int64_t, uint64_t> indices_info_,
+      TensorInfo<scalar_t, uint64_t> source_info_,
+      scalar_t* out_data_,
+      int64_t* indices_data_,
+      scalar_t* source_data_)
+      : f(f_),
+        out_numel(out_numel_),
+        scalar_bytes(scalar_bytes_),
+        out_info(out_info_),
+        indices_info(indices_info_),
+        source_info(source_info_),
+        out_data(out_data_),
+        indices_data(indices_data_),
+        source_data(source_data_) {}
+
+ private:
+  Func f;
+  int64_t out_numel;
+  size_t scalar_bytes;
+  TensorInfo<scalar_t, uint64_t> out_info;
+  TensorInfo<int64_t, uint64_t> indices_info;
+  TensorInfo<scalar_t, uint64_t> source_info;
+  scalar_t* out_data;
+  int64_t* indices_data;
+  scalar_t* source_data;
 };
 
 template <typename scalar_t, typename Func>
@@ -685,33 +887,16 @@ void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
     auto indices_data = index.data_ptr<int64_t>();
     auto source_data = source.data_ptr<scalar_t>();
 
-    auto kfn = DPCPP_Q_KFN(sycl::item<1> item_id) {
-      auto out_ptr = (char*)out_data;
-      auto indices_ptr = indices_data;
-      auto source_ptr = (char*)source_data;
-
-      auto linear_idx = item_id.get_id(0);
-      auto idx_offset =
-          IndexToOffset<int64_t, uint64_t>::get(linear_idx, indices_info);
-
-      auto index = indices_ptr[idx_offset];
-      if (index < 0) {
-        index += out_numel;
-      }
-
-      if (index > out_numel) {
-        /*error handle*/
-        return;
-      }
-
-      auto src_offset =
-          IndexToOffset<scalar_t, uint64_t>::get(linear_idx, source_info);
-      src_offset *= scalar_bytes;
-      auto out_offset = IndexToOffset<scalar_t, uint64_t>::get(index, out_info);
-      out_offset *= scalar_bytes;
-
-      f(out_ptr, source_ptr + src_offset, out_offset);
-    };
+    PutKernelFunctor<scalar_t, Func> kfn(
+        f,
+        out_numel,
+        scalar_bytes,
+        out_info,
+        indices_info,
+        source_info,
+        out_data,
+        indices_data,
+        source_data);
 
     __cgh.parallel_for<decltype(kfn)>(sycl::range</*dim=*/1>(numel), kfn);
   };
@@ -744,6 +929,80 @@ void index(
       });
 }
 
+template <typename scalar_t, typename accscalar_t>
+struct IndexPutDeterministicKernelFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    auto id = cfg.get_item_desc(item);
+
+    if (id.glb_batch >= cfg.problem_batch_ || id.glb_problem >= cfg.problem_)
+      return;
+
+    int64_t idx = sorted_indices[id.glb_batch];
+    if (id.glb_batch != 0 && idx == sorted_indices[id.glb_batch - 1])
+      return;
+
+    int64_t pi_ = id.glb_problem;
+    int64_t si_ = pi_ % stride;
+    int64_t bi_ = pi_ / stride;
+    int64_t s_gid = si_ + idx * stride + bi_ * stride_before;
+    int64_t v_stride = si_ + bi_ * v_stride_before;
+
+    accscalar_t acc;
+    if (accumulate)
+      acc = self[s_gid];
+    for (int64_t inner_idx = id.glb_batch;
+         sorted_indices[inner_idx] == idx && inner_idx < cfg.problem_batch_;
+         inner_idx++) {
+      int64_t idx_orig = indices[inner_idx];
+      int64_t v_gid = idx_orig * stride + v_stride;
+      if (accumulate) {
+        acc += (accscalar_t)value[v_gid];
+      } else {
+        self[s_gid] = value[v_gid];
+        break;
+      }
+    }
+    if (accumulate)
+      self[s_gid] = acc;
+  }
+  IndexPutDeterministicKernelFunctor(
+      int64_t* sorted_indices_,
+      int64_t* indices_,
+      scalar_t* value_,
+      scalar_t* self_,
+      int64_t numel_,
+      int64_t stride_,
+      int64_t stride_before_,
+      int64_t outer_dim_,
+      bool accumulate_,
+      int64_t v_stride_before_,
+      BatchKernelConfig cfg_)
+      : sorted_indices(sorted_indices_),
+        indices(indices_),
+        value(value_),
+        self(self_),
+        numel(numel_),
+        stride(stride_),
+        stride_before(stride_before_),
+        outer_dim(outer_dim_),
+        accumulate(accumulate_),
+        v_stride_before(v_stride_before_),
+        cfg(cfg_) {}
+
+ private:
+  int64_t* sorted_indices;
+  int64_t* indices;
+  scalar_t* value;
+  scalar_t* self;
+  int64_t numel;
+  int64_t stride;
+  int64_t stride_before;
+  int64_t outer_dim;
+  bool accumulate;
+  int64_t v_stride_before;
+  BatchKernelConfig cfg;
+};
+
 template <typename scalar_t>
 void index_put_deterministic_kernel(
     int64_t* sorted_indices,
@@ -771,40 +1030,18 @@ void index_put_deterministic_kernel(
   // align with precision of CPU backend.
   using accscalar_t = scalar_t; /* acc_type<scalar_t>; */
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item) {
-      auto id = cfg.get_item_desc(item);
-
-      if (id.glb_batch >= cfg.problem_batch_ || id.glb_problem >= cfg.problem_)
-        return;
-
-      int64_t idx = sorted_indices[id.glb_batch];
-      if (id.glb_batch != 0 && idx == sorted_indices[id.glb_batch - 1])
-        return;
-
-      int64_t pi_ = id.glb_problem;
-      int64_t si_ = pi_ % stride;
-      int64_t bi_ = pi_ / stride;
-      int64_t s_gid = si_ + idx * stride + bi_ * stride_before;
-      int64_t v_stride = si_ + bi_ * v_stride_before;
-
-      accscalar_t acc;
-      if (accumulate)
-        acc = self[s_gid];
-      for (int64_t inner_idx = id.glb_batch;
-           sorted_indices[inner_idx] == idx && inner_idx < cfg.problem_batch_;
-           inner_idx++) {
-        int64_t idx_orig = indices[inner_idx];
-        int64_t v_gid = idx_orig * stride + v_stride;
-        if (accumulate) {
-          acc += (accscalar_t)value[v_gid];
-        } else {
-          self[s_gid] = value[v_gid];
-          break;
-        }
-      }
-      if (accumulate)
-        self[s_gid] = acc;
-    };
+    IndexPutDeterministicKernelFunctor<scalar_t, accscalar_t> kfn(
+        sorted_indices,
+        indices,
+        value,
+        self,
+        numel,
+        stride,
+        stride_before,
+        outer_dim,
+        accumulate,
+        v_stride_before,
+        cfg);
     cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };
@@ -1015,6 +1252,61 @@ void index_put_deterministic_impl(
       self.copy_(src_.permute(inversePerm));
   }
 }
+
+template <typename scalar_t>
+struct TakeDpcppKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto linear_idx = item.get_global_linear_id();
+    if (linear_idx < dst_num_elem) {
+      auto idx_offset = IndexToOffset<int64_t, int64_t>::get(
+          linear_idx,
+          idx_info,
+          IndexToOffset<int64_t, int64_t>::NON_STRICT_CONTIGUOUS);
+      auto src_idx = idx_data[idx_offset];
+      if (src_idx < 0) {
+        src_idx += src_num_elem;
+      }
+      auto source_offset = IndexToOffset<scalar_t, int64_t>::get(
+          src_idx,
+          src_info,
+          IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+      auto dst_offset = IndexToOffset<scalar_t, int64_t>::get(
+          linear_idx,
+          dst_info,
+          IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+
+      dst_data[dst_offset] = src_data[source_offset];
+    }
+  }
+  TakeDpcppKernelFunctor(
+      ptrdiff_t src_num_elem_,
+      ptrdiff_t dst_num_elem_,
+      TensorInfo<scalar_t, int64_t> src_info_,
+      TensorInfo<scalar_t, int64_t> dst_info_,
+      TensorInfo<int64_t, int64_t> idx_info_,
+      scalar_t* src_data_,
+      scalar_t* dst_data_,
+      int64_t* idx_data_)
+      : src_num_elem(src_num_elem_),
+        dst_num_elem(dst_num_elem_),
+        src_info(src_info_),
+        dst_info(dst_info_),
+        idx_info(idx_info_),
+        src_data(src_data_),
+        dst_data(dst_data_),
+        idx_data(idx_data_) {}
+
+ private:
+  ptrdiff_t src_num_elem;
+  ptrdiff_t dst_num_elem;
+  TensorInfo<scalar_t, int64_t> src_info;
+  TensorInfo<scalar_t, int64_t> dst_info;
+  TensorInfo<int64_t, int64_t> idx_info;
+  scalar_t* src_data;
+  scalar_t* dst_data;
+  int64_t* idx_data;
+};
+
 template <typename scalar_t>
 void take_dpcpp(Tensor& dst, const Tensor& src, const Tensor& index) {
   ptrdiff_t src_num_elem = src.numel();
@@ -1055,31 +1347,17 @@ void take_dpcpp(Tensor& dst, const Tensor& src, const Tensor& index) {
     auto dst_data = dst.data_ptr<scalar_t>();
     auto idx_data = index.data_ptr<int64_t>();
 
-    auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-      auto linear_idx = item.get_global_linear_id();
-      if (linear_idx < dst_num_elem) {
-        auto idx_offset = IndexToOffset<int64_t, int64_t>::get(
-            linear_idx,
-            idx_info,
-            IndexToOffset<int64_t, int64_t>::NON_STRICT_CONTIGUOUS);
-        auto src_idx = idx_data[idx_offset];
-        if (src_idx < 0) {
-          src_idx += src_num_elem;
-        }
-        auto source_offset = IndexToOffset<scalar_t, int64_t>::get(
-            src_idx,
-            src_info,
-            IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
-        auto dst_offset = IndexToOffset<scalar_t, int64_t>::get(
-            linear_idx,
-            dst_info,
-            IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+    TakeDpcppKernelFunctor<scalar_t> kfn(
+        src_num_elem,
+        dst_num_elem,
+        src_info,
+        dst_info,
+        idx_info,
+        src_data,
+        dst_data,
+        idx_data);
 
-        dst_data[dst_offset] = src_data[source_offset];
-      }
-    };
-
-    cgh.parallel_for<decltype(kfn)>(
+    cgh.parallel_for(
         sycl::nd_range<1>({wgroup_range * wgroup_size}, {wgroup_size}), kfn);
   };
 
