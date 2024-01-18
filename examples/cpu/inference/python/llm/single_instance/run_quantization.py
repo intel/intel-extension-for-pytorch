@@ -319,7 +319,7 @@ def get_example_inputs(model):
 
 if args.ipex_smooth_quant:
     if args.qconfig_summary_file != "":
-        qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=args.alpha)
+        qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
         user_model = ipex.llm.optimize(
             user_model.eval(),
             dtype=amp_dtype,
