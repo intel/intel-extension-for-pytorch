@@ -42,7 +42,15 @@ Tensor& addmm_out(
   result.resize_(result_shape);
   if (result.numel() == 0)
     return result;
-
+  if (mat1.numel() == 0) {
+    // By definition, when beta==0, values in self should be ignored. nans and
+    // infs should not propagate
+    if (beta.toComplexDouble() == 0.) {
+      return result.zero_();
+    }
+    return at::mul_out(
+        result, self, at::native::wrapped_scalar_tensor(at::Scalar(beta)));
+  }
   TORCH_CHECK(
       are_expandable(self.sizes(), result_shape),
       "addmm_out input must be expanable to:",
@@ -439,10 +447,23 @@ Tensor& addmv_out(
         vec.size(0));
     self_v = self;
   }
-
-  Tensor vec_v = vec.view({vec.size(0), 1});
-  at::AtenIpexTypeXPU::addmm_out(self_v, mat, vec_v, beta, alpha, out);
-  out.resize_({mat.size(0)});
+  if (mat.numel() == 0) {
+    // shortcut for an empty matrix
+    // By definition, when beta==0, values in self should be ignored. nans and
+    // infs should not propagate
+    if (beta.toComplexDouble() == 0.0) {
+      out.zero_();
+    } else {
+      at::mul_out(
+          const_cast<Tensor&>(out),
+          self,
+          at::native::wrapped_scalar_tensor(at::Scalar(beta)));
+    }
+  } else {
+    Tensor vec_v = vec.view({vec.size(0), 1});
+    at::AtenIpexTypeXPU::addmm_out(self_v, mat, vec_v, beta, alpha, out);
+    out.resize_({mat.size(0)});
+  }
   return out;
 }
 

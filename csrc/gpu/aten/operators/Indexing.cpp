@@ -1779,6 +1779,9 @@ Tensor& masked_scatter_(
 
 Tensor& masked_select_out(const Tensor& self, const Tensor& mask, Tensor& out) {
   TORCH_CHECK(
+      mask.scalar_type() == ScalarType::Bool,
+      "masked_select: expected BoolTensor for mask");
+  TORCH_CHECK(
       self.scalar_type() == out.scalar_type(),
       "masked_select(): self and result must have the same scalar type")
 

@@ -17,6 +17,8 @@ Tensor& cauchy_(
     double median_,
     double sigma_,
     c10::optional<Generator> generator) {
+  TORCH_CHECK(
+      sigma_ > 0.0, "cauchy_ expects sigma > 0.0, but found sigma=", sigma_);
   auto iter = TensorIterator::nullary_op(self);
   auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
       generator, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
