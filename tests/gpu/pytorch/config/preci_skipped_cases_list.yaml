@@ -1,0 +1,5 @@
+
+# This yaml file is for collecting cases should be skipped while in CI test
+- !!omap
+  - reason: ""
+  - cases: []

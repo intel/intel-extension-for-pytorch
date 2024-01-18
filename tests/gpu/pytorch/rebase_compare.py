@@ -20,7 +20,10 @@ def parse_arguments():
 
 args = parse_arguments()
 
-finished_tests_ref = os.listdir(args.ref)
+if args.ref:
+    finished_tests_ref = os.listdir(args.ref)
+else:
+    finished_tests_ref = []
 finished_tests_cur = os.listdir(args.cur)
 total_results_ref = {}
 total_results_cur = {}
@@ -49,13 +52,21 @@ for test in finished_tests_cur:
         total_results_cur[testcase] = []
     total_results_cur[testcase].append((duration, cases_result))
 
+    #print(cases_result)
+
     for tag, cases in check_reference(cases_result).items():
         if tag not in checked_cases:
             checked_cases[tag] = []
         checked_cases[tag].extend(cases)
-        if "=> PASSED" not in tag and tag != "New PASSED" and tag != "New XFAIL":
+        print(tag)
+        #print(cases)
+        print("----------------------------------")
+        if "=> PASSED" not in tag and tag != "New PASSED" and tag != "New SKIPPED":
             #details_msg_list.extend(collect_detailed_issues(cases, os.path.join(args.cur, test), True))
-            subdetails, subcasenames = collect_detailed_issues(cases, os.path.join(args.cur, test), True, False)       
+            subdetails, subcasenames = collect_detailed_issues(cases, os.path.join(args.cur, test), False, True)
+            #print(subdetails)
+            #print(subcasenames)
+            #print("+++++++++++++++++++++++++++++++++")
             if "New ERROR" in tag or "=> ERROR" in tag:
                 tagy = "Error"
             elif "New FAILED" in tag or "=> FAILED" in tag:
@@ -68,6 +79,8 @@ for test in finished_tests_cur:
                     details_total[tagx] = []
                 details_total[tagx].extend(detail)
             for tag1, subcase in subcasenames.items():
+                #print(subcase)
+                #print(tag1)
                 tagx = tag1 + "_" + tagy
                 if tagx not in casenames_total:
                     casenames_total[tagx] = []
@@ -78,7 +91,8 @@ for test in finished_tests_cur:
 header = "========================= COMPARE DONE OF PORTED UT ==========================\n"
 tail =   "==================================== SUMMARY FINISH ====================================\n"
 report_summary(total_results_cur, header, tail, "cur.compare.summary")
-report_summary(total_results_ref, header, tail, "ref.compare.summary")
+if args.ref:
+    report_summary(total_results_ref, header, tail, "ref.compare.summary")
 header = "============================ STATUS CHANGED CASES IN WEEKLY ============================\n"
 tail =   "================================== DIFFERENCE FINISH ===================================\n"
 report_diffs(checked_cases, header, tail, "compare.diffs")
@@ -89,12 +103,47 @@ for tag, detail in details_total.items():
     header = f'=========================== DETAILED FAILED on {tag} CASES IN WEEKLY ============================\n'
     tail =   "=================================== DETAILS FINISH =====================================\n"
     report_details(detail, header, tail, "details/" + tag + ".log")
+    #print(detail)
 msg = ''
+
 for tag, cases in casenames_total.items():
-    msg += f'=========================== FAILED on {tag} CASES ============================\n'
+    num = len(cases)
+    msg += f'=========================== FAILED on {tag} CASES total {num} ============================\n'
     for case in cases:
         msg += case
 report_details(msg, header, tail, "casekind.log")
 
+from openpyxl import Workbook
+wb = Workbook()
+sheet = wb.active
 
+sheet.append(("casename", "classname", "subcasename", "wholecasename", "kind", "totalnum", "details"))
+i = 0
+tot = 0
+for tag, cases in casenames_total.items():
+    num=len(cases)
+    tot = tot + num
+    for eachcase in cases:
+        eachcase = eachcase.rstrip('\n')
+        casename = eachcase.split("::")[0]
+        clsname = eachcase.split("::")[1]
+        subname = eachcase.split("::")[2]
+        mtag = 0
+        for detail in details_total[tag]:
+            detail = detail.replace("=", "_", 2)
+            if clsname in detail and subname in detail:
+                i = i + 1
+                mtag = 1
+                #print(f'{casename}, {clsname}, {subname}, {eachcase}, {tag}, {num}, {detail}')
+                sheet.append((casename, clsname, subname, eachcase, tag, num, detail))
+                break
+        if mtag == 0:
+            print(f'{casename}, {clsname}, {subname}, {eachcase}, {tag}, {num}')
+            print(f'{details_total[tag]}')
+
+
+
+
+print(f'tot = {tot}, i={i}')
+wb.save("ptcase.xlsx")
 

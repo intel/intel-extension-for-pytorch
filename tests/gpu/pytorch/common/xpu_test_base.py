@@ -31,6 +31,7 @@ sys.path.append(test_suite_root)
 from tool.file_utils import load_from_yaml, save_to_yaml
 from tool.case_utils import match_name, match_dtype
 
+USE_PRECI_SKIP = os.environ.get("USE_PRECI_SKIP")
 
 static_skipped_cases_list = []
 static_skipped_dicts = load_from_yaml(
@@ -57,6 +58,7 @@ unsupported_dtypes = [
     torch.cdouble,
 ]
 
+
 def reload_dyn_skip_list():
     global dynamic_skipped_cases_list
     dynamic_skipped_cases_list = []
@@ -66,10 +68,21 @@ def reload_dyn_skip_list():
         for dynamic_skipped_dict in dynamic_skipped_dicts:
             dynamic_skipped_cases_list.extend(dynamic_skipped_dict['cases'])
 
+preci_skipped_cases_list = []
+def reload_preci_skip_list():
+    global preci_skipped_cases_list
+    preci_skipped_dicts = load_from_yaml(
+        os.path.join(test_suite_root, "config/preci_skipped_cases_list.yaml"))
+    if preci_skipped_dicts:
+        for preci_skipped_dict in preci_skipped_dicts:
+            preci_skipped_cases_list.extend(preci_skipped_dict['cases'])
+
 def customized_skipper():
     start_config_time = time.perf_counter()
     # load dynamic skipped cases list every time we start a run
     reload_dyn_skip_list()
+    if USE_PRECI_SKIP:
+        reload_preci_skip_list()
     suite = unittest.TestLoader().loadTestsFromModule(__main__)
     test_cases = discover_test_cases_recursively(suite)
     for test in test_cases:
@@ -83,6 +96,12 @@ def customized_skipper():
         @wraps(test)
         def unsupported_test(self, *args, **kwargs):
             raise unittest.SkipTest("not ready on XPU")
+            return test(self, *args, **kwargs)
+
+        # preci skip. Should be fixed if necessary
+        @wraps(test)
+        def unsupported_preci_test(self, *args, **kwargs):
+            raise unittest.SkipTest("not ready on XPU PRECI")
             return test(self, *args, **kwargs)
 
         @wraps(test)
@@ -99,6 +118,9 @@ def customized_skipper():
         elif match_name(test_case_full_name, dynamic_skipped_cases_list) and USE_DYNAMIC_SKIP:
             setattr(test_class, case_name, unsupported_test)
             print(f"[INFO] trying to skip dynamic case {test_case_full_name}")
+        elif USE_PRECI_SKIP and match_name(test_case_full_name, preci_skipped_cases_list):
+            setattr(test_class, case_name, unsupported_preci_test)
+            print(f"[INFO] trying to skip preci case {test_case_full_name}")
         elif match_dtype(test_case_full_name, unsupported_dtypes):
             setattr(test_class, case_name, unsupported_dtype_test)
             print(f"[INFO] trying to skip unsupported dtype case {test_case_full_name}")
