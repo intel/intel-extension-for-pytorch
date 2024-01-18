@@ -480,6 +480,16 @@ def get_xpu_compliers():
         return "icx", "icpx"
 
 
+def get_cpu_compliers():
+    if shutil.which("icx") is None or shutil.which("icpx") is None:
+        # For CPU build, Intel Compiler is optional.
+        return None, None
+    if IS_WINDOWS:
+        return "icx", "icx"
+    else:
+        return "icx", "icpx"
+
+
 def get_ipex_python_dir():
     project_root_dir = os.path.dirname(__file__)
     python_root_dir = os.path.join(project_root_dir, PACKAGE_NAME, "csrc")
@@ -778,7 +788,16 @@ class IPEXCPPLibBuild(build_clib, object):
 
         if build_with_cpu:
             # Generate cmake for CPU module:
-            build_option_cpu = {**build_option_common, "BUILD_MODULE_TYPE": "CPU"}
+            cpu_cc, cpu_cxx = get_cpu_compliers()
+            if cpu_cc is not None and cpu_cxx is not None:
+                build_option_cpu = {
+                    **build_option_common,
+                    "BUILD_MODULE_TYPE": "CPU",
+                    "CMAKE_C_COMPILER": cpu_cc,
+                    "CMAKE_CXX_COMPILER": cpu_cxx,
+                }
+            else:
+                build_option_cpu = {**build_option_common, "BUILD_MODULE_TYPE": "CPU"}
 
             cmake_args_cpu = []
             define_build_options(cmake_args_cpu, **build_option_cpu)

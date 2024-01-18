@@ -10,7 +10,7 @@ include(CMakeDependentOption)
 option(BUILD_LIBXSMM_VIA_CMAKE "Build LIBXSMM via CMake" ON)
 option(USE_LIBXSMM "Enable LIBXSMM" ON)
 if(WIN32)
-  set(USE_LIBXSMM OFF)
+  set(USE_LIBXSMM ON)
 endif()
 
 cmake_dependent_option(BUILD_STATIC_ONEMKL "Static link with oneMKL" OFF "BUILD_WITH_XPU" ON)

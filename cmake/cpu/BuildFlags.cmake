@@ -16,6 +16,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(MSVC)
+  set(CMAKE_COMPILE_WARNING_AS_ERROR OFF)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MD")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DNOMINMAX")
@@ -32,9 +33,7 @@ if(MSVC)
   
   # Need check again:
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4273")
-endif(MSVC)
-
-if(NOT MSVC)
+else(MSVC)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-narrowing")
@@ -64,7 +63,7 @@ if(NOT MSVC)
   if (CMAKE_COMPILER_IS_GNUCXX AND NOT (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0.0))
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-stringop-overflow")
   endif()
-endif(NOT MSVC)
+endif(MSVC)
 
 # These flags are not available in GCC-4.8.5. Set only when using clang.
 # Compared against https://gcc.gnu.org/onlinedocs/gcc-4.8.5/gcc/Option-Summary.html
