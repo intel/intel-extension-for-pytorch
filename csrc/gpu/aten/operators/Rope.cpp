@@ -28,6 +28,69 @@ template <
     EmbeddingAlgorithm Algo>
 struct RotaryEmbedding {};
 
+template <
+    typename scalar_t,
+    int N,
+    typename emb_scalar_t,
+    int noutput,
+    int sin_offset,
+    int cos_offset,
+    typename OffsetCalculatorType>
+struct RotaryEmbeddingKernelFunctor {
+  void operator()(sycl::nd_item<2> item_id) const {
+    auto item_idx = item_id.get_local_id(1);
+    auto item_range = item_id.get_local_range(1);
+    auto group_idx = item_id.get_group(1);
+    auto group_id = item_id.get_group(0);
+    auto sg = item_id.get_sub_group();
+
+    for (int group_num = group_idx; group_num < total_group_num;
+         group_num += max_group_num) {
+      for (int i = item_idx; i < problem_size; i += item_range) {
+#pragma unroll
+        for (int j = 0; j < noutput; ++j) {
+          scalar_t* output_ptr = static_cast<scalar_t*>(data_ptr[j]);
+          scalar_t* input_ptr = static_cast<scalar_t*>(data_ptr[j + noutput]);
+          emb_scalar_t* sin_ptr =
+              static_cast<emb_scalar_t*>(data_ptr[sin_offset]);
+          emb_scalar_t* cos_ptr =
+              static_cast<emb_scalar_t*>(data_ptr[cos_offset]);
+          auto global_offset = group_num * problem_size + i;
+          const auto offset = offset_calc.get(global_offset);
+          scalar_t val = *(input_ptr + offset[j + noutput]);
+          scalar_t scale = i % 2 == 0 ? -1 : 1;
+          scalar_t shift_val = sg.shuffle_xor(val, 1) * scale;
+          float sin_val = static_cast<float>(*(sin_ptr + offset[sin_offset]));
+          float cos_val = static_cast<float>(*(cos_ptr + offset[cos_offset]));
+          *(output_ptr + offset[j]) =
+              (scalar_t)((float)shift_val * sin_val + (float)val * cos_val);
+        }
+      }
+    }
+  }
+  RotaryEmbeddingKernelFunctor(
+      int64_t problem_size_,
+      int64_t max_group_num_,
+      int64_t total_group_num_,
+      OffsetCalculatorType offset_calc_,
+      void** data_ptr_)
+      : problem_size(problem_size_),
+        max_group_num(max_group_num_),
+        total_group_num(total_group_num_),
+        offset_calc(offset_calc_) {
+    for (int i = 0; i < N; ++i) {
+      data_ptr[i] = data_ptr_[i];
+    }
+  }
+
+ private:
+  int64_t problem_size;
+  int64_t max_group_num;
+  int64_t total_group_num;
+  OffsetCalculatorType offset_calc;
+  void* data_ptr[N];
+};
+
 template <typename scalar_t, int N, typename emb_scalar_t>
 struct RotaryEmbedding<
     scalar_t,
@@ -56,40 +119,19 @@ struct RotaryEmbedding<
     }
     TORCH_INTERNAL_ASSERT(2 * noutput + 2 == iter.ntensors());
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
-        auto item_idx = item_id.get_local_id(1);
-        auto item_range = item_id.get_local_range(1);
-        auto group_idx = item_id.get_group(1);
-        auto group_id = item_id.get_group(0);
-        auto sg = item_id.get_sub_group();
-
-        for (int group_num = group_idx; group_num < total_group_num;
-             group_num += max_group_num) {
-          for (int i = item_idx; i < problem_size; i += item_range) {
-#pragma unroll
-            for (int j = 0; j < noutput; ++j) {
-              scalar_t* output_ptr = static_cast<scalar_t*>(data_ptr[j]);
-              scalar_t* input_ptr =
-                  static_cast<scalar_t*>(data_ptr[j + noutput]);
-              emb_scalar_t* sin_ptr =
-                  static_cast<emb_scalar_t*>(data_ptr[sin_offset]);
-              emb_scalar_t* cos_ptr =
-                  static_cast<emb_scalar_t*>(data_ptr[cos_offset]);
-              auto global_offset = group_num * problem_size + i;
-              const auto offset = offset_calc.get(global_offset);
-              scalar_t val = *(input_ptr + offset[j + noutput]);
-              scalar_t scale = i % 2 == 0 ? -1 : 1;
-              scalar_t shift_val = sg.shuffle_xor(val, 1) * scale;
-              float sin_val =
-                  static_cast<float>(*(sin_ptr + offset[sin_offset]));
-              float cos_val =
-                  static_cast<float>(*(cos_ptr + offset[cos_offset]));
-              *(output_ptr + offset[j]) =
-                  (scalar_t)((float)shift_val * sin_val + (float)val * cos_val);
-            }
-          }
-        }
-      };
+      RotaryEmbeddingKernelFunctor<
+          scalar_t,
+          N,
+          emb_scalar_t,
+          noutput,
+          sin_offset,
+          cos_offset,
+          decltype(offset_calc)>
+          kfn(problem_size,
+              max_group_num,
+              total_group_num,
+              offset_calc,
+              data_ptr);
       cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<2>(
               sycl::range<2>({1, max_group_num * wg_size}),
@@ -98,6 +140,83 @@ struct RotaryEmbedding<
     };
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
   }
+};
+
+template <
+    typename scalar_t,
+    int N,
+    typename emb_scalar_t,
+    int noutput,
+    typename OffsetCalculatorType>
+struct RotaryEmbeddingKernelFunctor2 {
+  void operator()(sycl::nd_item<2> item_id) const {
+    auto item_idx = item_id.get_local_id(1);
+    auto group_idx = item_id.get_group(1);
+    auto group_id = item_id.get_group(0);
+
+    for (int group_num = group_idx; group_num < total_group_num;
+         group_num += max_group_num) {
+      for (int64_t i = item_idx; i < problem_half; i += wg_size) {
+#pragma unroll
+        for (int j = 0; j < noutput; ++j) {
+          scalar_t* output_ptr = static_cast<scalar_t*>(data_ptr[j]);
+          scalar_t* input_ptr = static_cast<scalar_t*>(data_ptr[j + noutput]);
+          int64_t global_offset1 = group_num * problem_size + i;
+          int64_t global_offset2 = global_offset1 + problem_half;
+          const auto offset1 = offset_calc.get(global_offset1);
+          const auto offset2 = offset_calc.get(global_offset2);
+          float x1 = static_cast<float>(*(input_ptr + offset1[j + noutput]));
+          float x2 = static_cast<float>(*(input_ptr + offset2[j + noutput]));
+          float rotate_x1 = -x2;
+          float rotate_x2 = x1;
+          float sin_val = static_cast<float>(*(sin_ptr + offset1[2 * noutput]));
+          float cos_val =
+              static_cast<float>(*(cos_ptr + offset1[2 * noutput + 1]));
+          float sin_val_half =
+              static_cast<float>(*(sin_ptr + offset2[2 * noutput]));
+          float cos_val_half =
+              static_cast<float>(*(cos_ptr + offset2[2 * noutput + 1]));
+          *(output_ptr + offset1[j]) =
+              static_cast<scalar_t>(x1 * cos_val + rotate_x1 * sin_val);
+          *(output_ptr + offset2[j]) = static_cast<scalar_t>(
+              x2 * cos_val_half + rotate_x2 * sin_val_half);
+        }
+      }
+    }
+  }
+  RotaryEmbeddingKernelFunctor2(
+      int64_t problem_size_,
+      int64_t problem_half_,
+      int64_t wg_size_,
+      int64_t max_group_num_,
+      int64_t total_group_num_,
+      OffsetCalculatorType offset_calc_,
+      void** data_ptr_,
+      emb_scalar_t* sin_ptr_,
+      emb_scalar_t* cos_ptr_)
+      : problem_size(problem_size_),
+        problem_half(problem_half_),
+        wg_size(wg_size_),
+        max_group_num(max_group_num_),
+        total_group_num(total_group_num_),
+        offset_calc(offset_calc_),
+        sin_ptr(sin_ptr_),
+        cos_ptr(cos_ptr_) {
+    for (int i = 0; i < N; ++i) {
+      data_ptr[i] = data_ptr_[i];
+    }
+  }
+
+ private:
+  int64_t problem_size;
+  int64_t problem_half;
+  int64_t wg_size;
+  int64_t max_group_num;
+  int64_t total_group_num;
+  OffsetCalculatorType offset_calc;
+  void* data_ptr[N];
+  emb_scalar_t* sin_ptr;
+  emb_scalar_t* cos_ptr;
 };
 
 template <typename scalar_t, int N, typename emb_scalar_t>
@@ -132,45 +251,21 @@ struct RotaryEmbedding<
     TORCH_INTERNAL_ASSERT(2 * noutput + 2 == iter.ntensors());
     TORCH_INTERNAL_ASSERT(2 * noutput + 2 == iter.ntensors());
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto kfn = DPCPP_Q_KFN(sycl::nd_item<2> item_id) {
-        auto item_idx = item_id.get_local_id(1);
-        auto group_idx = item_id.get_group(1);
-        auto group_id = item_id.get_group(0);
-
-        for (int group_num = group_idx; group_num < total_group_num;
-             group_num += max_group_num) {
-          for (int64_t i = item_idx; i < problem_half; i += wg_size) {
-#pragma unroll
-            for (int j = 0; j < noutput; ++j) {
-              scalar_t* output_ptr = static_cast<scalar_t*>(data_ptr[j]);
-              scalar_t* input_ptr =
-                  static_cast<scalar_t*>(data_ptr[j + noutput]);
-              int64_t global_offset1 = group_num * problem_size + i;
-              int64_t global_offset2 = global_offset1 + problem_half;
-              const auto offset1 = offset_calc.get(global_offset1);
-              const auto offset2 = offset_calc.get(global_offset2);
-              float x1 =
-                  static_cast<float>(*(input_ptr + offset1[j + noutput]));
-              float x2 =
-                  static_cast<float>(*(input_ptr + offset2[j + noutput]));
-              float rotate_x1 = -x2;
-              float rotate_x2 = x1;
-              float sin_val =
-                  static_cast<float>(*(sin_ptr + offset1[2 * noutput]));
-              float cos_val =
-                  static_cast<float>(*(cos_ptr + offset1[2 * noutput + 1]));
-              float sin_val_half =
-                  static_cast<float>(*(sin_ptr + offset2[2 * noutput]));
-              float cos_val_half =
-                  static_cast<float>(*(cos_ptr + offset2[2 * noutput + 1]));
-              *(output_ptr + offset1[j]) =
-                  static_cast<scalar_t>(x1 * cos_val + rotate_x1 * sin_val);
-              *(output_ptr + offset2[j]) = static_cast<scalar_t>(
-                  x2 * cos_val_half + rotate_x2 * sin_val_half);
-            }
-          }
-        }
-      };
+      RotaryEmbeddingKernelFunctor2<
+          scalar_t,
+          N,
+          emb_scalar_t,
+          noutput,
+          decltype(offset_calc)>
+          kfn(problem_size,
+              problem_half,
+              wg_size,
+              max_group_num,
+              total_group_num,
+              offset_calc,
+              data_ptr,
+              sin_ptr,
+              cos_ptr);
 
       cgh.parallel_for<decltype(kfn)>(
           sycl::nd_range<2>(

@@ -339,6 +339,65 @@ inline void roi_align_backward_kernel_impl(
   }
 }
 
+template <typename scalar_t>
+struct ROIAlignForwardKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    roi_align_forward_kernel_impl<scalar_t>(
+        item,
+        output_size,
+        input_ptr,
+        spatial_scale_,
+        channels,
+        height,
+        width,
+        pooled_height,
+        pooled_width,
+        sampling_ratio,
+        aligned,
+        rois_ptr,
+        output_ptr);
+  }
+  ROIAlignForwardKernelFunctor(
+      int output_size_,
+      scalar_t* input_ptr_,
+      scalar_t spatial_scale_,
+      int channels_,
+      int height_,
+      int width_,
+      int pooled_height_,
+      int pooled_width_,
+      int sampling_ratio_,
+      bool aligned_,
+      scalar_t* rois_ptr_,
+      scalar_t* output_ptr_)
+      : output_size(output_size_),
+        input_ptr(input_ptr_),
+        spatial_scale_(spatial_scale_),
+        channels(channels_),
+        height(height_),
+        width(width_),
+        pooled_height(pooled_height_),
+        pooled_width(pooled_width_),
+        sampling_ratio(sampling_ratio_),
+        aligned(aligned_),
+        rois_ptr(rois_ptr_),
+        output_ptr(output_ptr_) {}
+
+ private:
+  int output_size;
+  scalar_t* input_ptr;
+  scalar_t spatial_scale_;
+  int channels;
+  int height;
+  int width;
+  int pooled_height;
+  int pooled_width;
+  int sampling_ratio;
+  bool aligned;
+  scalar_t* rois_ptr;
+  scalar_t* output_ptr;
+};
+
 at::Tensor roi_align_forward_kernel(
     const at::Tensor& input,
     const at::Tensor& rois,
@@ -386,22 +445,19 @@ at::Tensor roi_align_forward_kernel(
           auto input_ptr = (scalar_t*)input_.data_ptr();
           auto rois_ptr = (scalar_t*)rois_.data_ptr();
           auto output_ptr = (scalar_t*)output.data_ptr();
-          auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-            roi_align_forward_kernel_impl<scalar_t>(
-                item,
-                output_size,
-                input_ptr,
-                spatial_scale_,
-                channels,
-                height,
-                width,
-                pooled_height,
-                pooled_width,
-                sampling_ratio,
-                aligned,
-                rois_ptr,
-                output_ptr);
-          };
+          ROIAlignForwardKernelFunctor<scalar_t> kfn(
+              output_size,
+              input_ptr,
+              spatial_scale_,
+              channels,
+              height,
+              width,
+              pooled_height,
+              pooled_width,
+              sampling_ratio,
+              aligned,
+              rois_ptr,
+              output_ptr);
           cgh.parallel_for<decltype(kfn)>(
               sycl::nd_range<1>(
                   sycl::range<1>(num_groups * items_per_group),
@@ -412,6 +468,81 @@ at::Tensor roi_align_forward_kernel(
       });
   return output;
 }
+
+template <typename scalar_t>
+struct ROIAlignBackwardKernelFunctor {
+  void operator()(sycl::nd_item<1> item) const {
+    roi_align_backward_kernel_impl<scalar_t>(
+        item,
+        grad_numel,
+        grad_ptr,
+        spatial_scale_,
+        channels,
+        height,
+        width,
+        pooled_height,
+        pooled_width,
+        sampling_ratio,
+        aligned,
+        grad_input_ptr,
+        rois_ptr,
+        n_stride,
+        c_stride,
+        h_stride,
+        w_stride);
+  }
+  ROIAlignBackwardKernelFunctor(
+      int grad_numel_,
+      scalar_t* grad_ptr_,
+      scalar_t spatial_scale_,
+      int channels_,
+      int height_,
+      int width_,
+      int pooled_height_,
+      int pooled_width_,
+      int sampling_ratio_,
+      bool aligned_,
+      scalar_t* grad_input_ptr_,
+      scalar_t* rois_ptr_,
+      int n_stride_,
+      int c_stride_,
+      int h_stride_,
+      int w_stride_)
+      : grad_numel(grad_numel_),
+        grad_ptr(grad_ptr_),
+        spatial_scale_(spatial_scale_),
+        channels(channels_),
+        height(height_),
+        width(width_),
+        pooled_height(pooled_height_),
+        pooled_width(pooled_width_),
+        sampling_ratio(sampling_ratio_),
+        aligned(aligned_),
+        grad_input_ptr(grad_input_ptr_),
+        rois_ptr(rois_ptr_),
+        n_stride(n_stride_),
+        c_stride(c_stride_),
+        h_stride(h_stride_),
+        w_stride(w_stride_) {}
+
+ private:
+  int grad_numel;
+  scalar_t* grad_ptr;
+  scalar_t spatial_scale_;
+  int channels;
+  int height;
+  int width;
+  int pooled_height;
+  int pooled_width;
+  int sampling_ratio;
+  bool aligned;
+  scalar_t* grad_input_ptr;
+  scalar_t* rois_ptr;
+  int n_stride;
+  int c_stride;
+  int h_stride;
+  int w_stride;
+};
 
 at::Tensor roi_align_backward_kernel(
     const at::Tensor& grad,
@@ -465,26 +596,23 @@ at::Tensor roi_align_backward_kernel(
           auto grad_input_ptr = (scalar_t*)grad_input.data_ptr();
           auto rois_ptr = (scalar_t*)rois_.data_ptr();
           auto grad_numel = grad.numel();
-          auto kfn = DPCPP_Q_KFN(sycl::nd_item<1> item) {
-            roi_align_backward_kernel_impl<scalar_t>(
-                item,
-                grad_numel,
-                grad_ptr,
-                spatial_scale_,
-                channels,
-                height,
-                width,
-                pooled_height,
-                pooled_width,
-                sampling_ratio,
-                aligned,
-                grad_input_ptr,
-                rois_ptr,
-                n_stride,
-                c_stride,
-                h_stride,
-                w_stride);
-          };
+          ROIAlignBackwardKernelFunctor<scalar_t> kfn(
+              grad_numel,
+              grad_ptr,
+              spatial_scale_,
+              channels,
+              height,
+              width,
+              pooled_height,
+              pooled_width,
+              sampling_ratio,
+              aligned,
+              grad_input_ptr,
+              rois_ptr,
+              n_stride,
+              c_stride,
+              h_stride,
+              w_stride);
           cgh.parallel_for<decltype(kfn)>(
               sycl::nd_range<1>(
                   sycl::range<1>(num_groups * items_per_group),
