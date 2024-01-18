@@ -183,7 +183,8 @@ def set_device(device: _device_t) -> None:
     r"""Sets the current device.
 
     Usage of this function is discouraged in favor of :any:`device`. In most
-    cases it's better to use ``xpu_VISIBLE_DEVICES`` environmental variable.
+    cases it's better to use ``ZE_AFFINITY_MASK`` environmental variable to restrict
+    which devices are visible.
 
     Arguments:
         device (torch.device or int): selected device. This function is a no-op

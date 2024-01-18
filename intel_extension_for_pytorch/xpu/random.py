@@ -221,13 +221,10 @@ def fork_rng(
                     "have used {caller} without explicitly specifying which devices are being used. "
                     "For safety, we initialize *every* XPU device by default, which "
                     "can be quite slow if you have a lot of GPUs.  If you know that you are only "
-                    "making use of a few XPU devices, set the environment variable XPU_VISIBLE_DEVICES "
+                    "making use of a few XPU devices, set the environment variable ZE_AFFINITY_MASK  "
                     "or the '{devices_kw}' keyword argument of {caller} with the set of devices "
-                    "you are actually using.  For example, if you are using CPU only, "
-                    "set XPU_VISIBLE_DEVICES= or devices=[]; if you are using "
-                    "GPU 0 only, set XPU_VISIBLE_DEVICES=0 or devices=[0].  To initialize "
-                    "all devices and suppress this warning, set the '{devices_kw}' keyword argument "
-                    "to `range(torch.xpu.device_count())`."
+                    "you are actually using.  For more details about ZE_AFFINITY_MASK, please refer to "
+                    "https://spec.oneapi.io/level-zero/latest/core/PROG.html#affinity-mask"
                 ).format(
                     num_devices=num_devices, caller=_caller, devices_kw=_devices_kw
                 )
