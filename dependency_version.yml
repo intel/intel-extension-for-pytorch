@@ -22,7 +22,7 @@ oneCCL:
   repo: https://github.com/oneapi-src/oneCCL.git
   commit: '2021.10'
 pytorch:
-  version: 2.3.0.dev20231219+cpu
+  version: 2.3.0.dev20240116+cpu
 torch-ccl:
   version: 2.2.0+cpu
   repo: https://github.com/intel/torch-ccl.git

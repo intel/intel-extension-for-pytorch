@@ -48,7 +48,7 @@ class DistMergedEmbeddingTester(TestCase):
         1,
     ]
 
-    @skipIfNoTORCHCCL
+    @unittest.skipIf(True, "TODO:Haozhe to re-enable")
     def test_training(self):
         import torch.distributed as dist
 

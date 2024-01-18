@@ -1726,7 +1726,7 @@ class TestModule(torch.nn.Module):
             10, 49, mode="sum", sparse=has_sparse_grad
         )
         self.input = (
-            torch.ones(10, 1, 5, 5),
+            torch.ones(100, 1, 5, 5),
             torch.ones(10, 5),
             torch.arange(0, 10).long(),
             torch.arange(0, 10).long(),
@@ -1734,7 +1734,7 @@ class TestModule(torch.nn.Module):
 
     def forward(self, x, y, indices, offsets):
         x = self.conv(x)
-        x = self.bn(x)
+        x = self.bn(x).sum()
         y = self.linear(y)
         z = self.embeddingbag(indices, offsets)
         return x + y + z
