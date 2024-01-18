@@ -1,13 +1,13 @@
 # Intel® Extension for PyTorch\*
 
-Intel® Extension for PyTorch\* extends PyTorch\* with up-to-date features optimizations for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel X<sup>e</sup> Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch\* `xpu` device, Intel® Extension for PyTorch\* provides easy GPU acceleration for Intel discrete GPUs with PyTorch\*.
+Intel® Extension for PyTorch\* extends PyTorch\* with up-to-date features optimizations for an extra performance boost on Intel hardware. Optimizations take advantage of Intel® Advanced Vector Extensions 512 (Intel® AVX-512) Vector Neural Network Instructions (VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel X<sup>e</sup> Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, Intel® Extension for PyTorch\* provides easy GPU acceleration for Intel discrete GPUs through the PyTorch\* xpu device.
 
-Intel® Extension for PyTorch\* provides optimizations for both eager mode and graph mode, however, compared to eager mode, graph mode in PyTorch\* normally yields better performance from optimization techniques, such as operation fusion. Intel® Extension for PyTorch\* amplifies them with more comprehensive graph optimizations. Therefore we recommend you to take advantage of Intel® Extension for PyTorch\* with [TorchScript](https://pytorch.org/docs/stable/jit.html) whenever your workload supports it. You could choose to run with `torch.jit.trace()` function or `torch.jit.script()` function, but based on our evaluation, `torch.jit.trace()` supports more workloads so we recommend you to use `torch.jit.trace()` as your first choice.
+Intel® Extension for PyTorch\* provides optimizations both for eager and graph modes. However,  compared to the eager mode, the graph mode in PyTorch\* normally yields better performance from the optimization techniques like operation fusion. Intel® Entension for PyTorch\* amplifies them with more comprehensive graph optimizations. Both PyTorch `Torchscript` and `TorchDynamo` graph modes are supported. With `Torchscript`, we recommend using `torch.jit.trace()` as your preferred option, as it generally supports a wider range of workloads compared to `torch.jit.script()`.
 
-The extension can be loaded as a Python module for Python programs or linked as a C++ library for C++ programs. In Python scripts users can enable it dynamically by importing `intel_extension_for_pytorch`.
+The extension can be loaded as a Python module for Python programs or linked as a C++ library for C++ programs. In Python scripts, you can enable it dynamically by importing `intel_extension_for_pytorch`.
 
-* Check [CPU tutorial](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® CPUs. Source code is available at the [main branch](https://github.com/intel/intel-extension-for-pytorch/tree/main).
-* Check [GPU tutorial](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® GPUs. Source code is available at the [xpu-main branch](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main).
+* **CPU**: [main branch](https://github.com/intel/intel-extension-for-pytorch/tree/main) | [Installation](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=cpu&version=v2.2.0%2Bcpu) | [Quick Start](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/getting_started.html) | [Documentation](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/).
+* **XPU**: [xpu-main branch](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main) | [Installation](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&version=v2.1.10%2Bxpu>) | [Quick Start](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/getting_started.html) | [Documentation](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/).
 
 ## Large Language Models (LLMs) Optimization
 
@@ -17,7 +17,7 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 
 ### CPU version
 
-You can use either of the following 2 commands to install Intel® Extension for PyTorch\* CPU version.
+Use one of the following commands to install the CPU version of Intel® Extension for PyTorch\*.
 
 ```python
 python -m pip install intel_extension_for_pytorch
@@ -27,73 +27,38 @@ python -m pip install intel_extension_for_pytorch
 python -m pip install intel_extension_for_pytorch --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
 ```
 
-**Note:** Intel® Extension for PyTorch\* has PyTorch version requirement. Please check more detailed information via the URL below.
+**Note:** Intel® Extension for PyTorch\* has PyTorch version requirement. Intel® Extension for PyTorch\* [v2.2.0+cpu](https://github.com/intel/intel-extension-for-pytorch/tree/v2.2.0%2Bcpu) requires PyTorch\*/libtorch [v2.2.\*](https://github.com/pytorch/pytorch/tree/v2.2.0) to be installed.
 
-More installation methods can be found at [CPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/installation.html).
-
-Compilation instruction of the latest CPU code base `main` branch can be found at [Installation Guide](https://github.com/intel/intel-extension-for-pytorch/blob/main/docs/tutorials/installation.md#install-via-compiling-from-source).
+For more installation methods and installation guidance for previous versions, refer to [Installation](https://intel.github.io/intel-extension-for-pytorch/#installation).
 
 ### GPU version
 
-You can install Intel® Extension for PyTorch\* for GPU via command below.
+Use the command below to install Intel® Extension for PyTorch\* for GPU:
 
 ```python
-python -m pip install torch==2.0.1a0 torchvision==0.15.2a0 intel_extension_for_pytorch==2.0.110+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
+python -m pip install torch==2.1.0a0 torchvision==0.16.0a0 torchaudio==2.1.0a0 intel-extension-for-pytorch==2.1.10+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 ```
 
-**Note:** The patched PyTorch 2.0.1a0 is required to work with Intel® Extension for PyTorch\* on Intel® graphics card for now.
-
-More installation methods can be found at [GPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/installation.html).
-
-Compilation instruction of the latest GPU code base `xpu-main` branch can be found at [Installation Guide](https://github.com/intel/intel-extension-for-pytorch/blob/xpu-main/docs/tutorials/installation.md#install-via-compiling-from-source).
+For more installation methods and installation guidance for previous versions, refer to [Installation](https://intel.github.io/intel-extension-for-pytorch/#installation).
 
 ## Getting Started
 
-Minor code changes are required for users to get start with Intel® Extension for PyTorch\*. Both PyTorch imperative mode and TorchScript mode are supported. You just need to import Intel® Extension for PyTorch\* package and apply its optimize function against the model object. If it is a training workload, the optimize function also needs to be applied against the optimizer object.
+The following resources will help you get started with the Intel® Extension for PyTorch\*:
 
-The following code snippet shows an inference code with FP32 data type. More examples on CPU, including training and C++ examples, are available at [CPU Example page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/examples.html). More examples on GPU are available at [GPU Example page](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/examples.html).
-
-**NOTE:** More detailed information about `torch.compile()` with `ipex` backend can be found at [Tutorial features page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/features.html#torch-compile-experimental-new-feature-from-2-0-0).
-
-### Inference on CPU
-
-```python
-import torch
-import torchvision.models as models
-
-model = models.resnet50(pretrained=True)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-import intel_extension_for_pytorch as ipex
-model = ipex.optimize(model)
-
-with torch.no_grad():
-  model(data)
-```
-
-### Inference on GPU
-
-```python
-import torch
-import torchvision.models as models
-
-model = models.resnet50(pretrained=True)
-model.eval()
-data = torch.rand(1, 3, 224, 224)
-
-import intel_extension_for_pytorch as ipex
-model = model.to('xpu')
-data = data.to('xpu')
-model = ipex.optimize(model)
-
-with torch.no_grad():
-  model(data)
-```
+* **CPU**: [Quick Start](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/getting_started.html) | [Examples](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/examples.html) 
+* **XPU**: [Quick Start](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/getting_started.html) | [Examples](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/examples.html)
 
 ## Intel® AI Reference Models
 
-Use cases that had already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/pytorch-r2.1.100-models) (former Model Zoo). A bunch of PyTorch use cases for benchmarking are also available on the [Github page](https://github.com/IntelAI/models/tree/pytorch-r2.1.100-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running the scripts in the Reference Models.
+Use cases that have already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/pytorch-r2.2-models). A bunch of PyTorch use cases for benchmarking are also available on the [Github page](https://github.com/IntelAI/models/tree/pytorch-r2.2-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running scripts in the Intel® AI Reference Models.
+
+## Support
+
+The team tracks bugs and enhancement requests using [GitHub issues](https://github.com/intel/intel-extension-for-pytorch/issues/). Before submitting a suggestion or bug report, search the existing GitHub issues to see if your issue has already been reported.
+
+## Intel® AI Reference Models
+
+Use cases that had already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/pytorch-r2.2.0-models) (former Model Zoo). A bunch of PyTorch use cases for benchmarking are also available on the [Github page](https://github.com/IntelAI/models/tree/pytorch-r2.2.0-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running the scripts in the Reference Models.
 
 ## License
 
