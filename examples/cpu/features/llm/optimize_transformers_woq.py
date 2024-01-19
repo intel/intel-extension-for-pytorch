@@ -111,7 +111,7 @@ if args.low_precision_checkpoint != "":
     low_precision_checkpoint = torch.load(args.low_precision_checkpoint)
 else:
     low_precision_checkpoint = None
-model = ipex.optimize_transformers(
+model = ipex.llm.optimize(
     model.eval(),
     dtype=amp_dtype,
     quantization_config=qconfig,

@@ -4,10 +4,19 @@ API Documentation
 General
 *******
 
-.. currentmodule:: intel_extension_for_pytorch
+`ipex.optimize` is generally used for generic PyTorch models.
+.. automodule:: intel_extension_for_pytorch
 .. autofunction:: optimize
-.. autofunction:: optimize_transformers
+
+
+`ipex.llm.optimize` is used for Large Language Models (LLM).
+.. automodule:: intel_extension_for_pytorch.llm
+.. autofunction:: optimize
+
+.. automodule:: intel_extension_for_pytorch
 .. autoclass:: verbose
+
+
 
 Fast Bert (Experimental)
 ************************

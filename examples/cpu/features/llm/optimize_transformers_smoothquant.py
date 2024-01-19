@@ -166,7 +166,7 @@ if args.calibration:
             (input_ids, attention_mask, position_ids, past_key_values)
         break
     from intel_extension_for_pytorch.quantization import prepare, convert
-    model = ipex.optimize_transformers(
+    model = ipex.llm.optimize(
         model.eval(),
         dtype=amp_dtype,
         quantization_config=qconfig,
@@ -194,7 +194,7 @@ if args.calibration:
     print("calibration Done! Will exit and please launch model quantization and benchmark")
     exit(0)
 else:
-    model = ipex.optimize_transformers(
+    model = ipex.llm.optimize(
         model.eval(),
         dtype=amp_dtype,
         quantization_config=qconfig,
