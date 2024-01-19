@@ -406,6 +406,21 @@ class TestOp(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
     @llga_fp32_bf16_test_env
+    def test_max_two_outputs(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x):
+                # max is unary, and would have 2 outputs
+                return torch.max(x, dim=1)
+
+        m = M()
+        x = torch.rand(8, 12, 12, 12)
+        graph, _ = self.checkTrace(m, [x])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+
+    @llga_fp32_bf16_test_env
     def test_bmm_div(self):
         class M(nn.Module):
             def __init__(self):
