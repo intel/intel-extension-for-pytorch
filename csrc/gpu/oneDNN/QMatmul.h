@@ -172,6 +172,9 @@ static inline void quantized_matmul(
   attr.extract_post_ops(po, dst);
   auto is_onednn_layout_suggested = using_onednn_layout_for_matmul(m1);
   bool m1_need_zp = (m1.q_zero_point() != 0);
+  // wgh should never have zero point
+  bool wgh_is_per_channel =
+      (m2.is_quantized() && (m2.qscheme() != kPerTensorAffine));
 
   lru_key_t key_primitive;
 #ifdef USE_PRIMITIVE_CACHE
@@ -192,6 +195,7 @@ static inline void quantized_matmul(
       dims,
       is_onednn_layout_suggested,
       m1_need_zp,
+      wgh_is_per_channel,
       attr);
 #endif
 
@@ -234,11 +238,8 @@ static inline void quantized_matmul(
         memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
     memory m2_sc_m, m2_zp_m;
     if (m2.is_quantized()) {
-      bool wgh_need_zp = (m2.q_zero_point() != 0);
-      if (m2.qscheme() == kPerTensorAffine) {
+      if (!wgh_is_per_channel) {
         pattr.set_scales_mask(DNNL_ARG_WEIGHTS, 0);
-        if (wgh_need_zp)
-          pattr.set_zero_points_mask(DNNL_ARG_WEIGHTS, 0);
       } else {
         pattr.set_scales_mask(DNNL_ARG_WEIGHTS, 1 << 1);
       }

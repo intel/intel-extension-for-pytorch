@@ -284,6 +284,7 @@ static at::Tensor quantized_convolution(
   //      b. If zp is not zero, using asymmetric kernel. Perf regression
   //      should then happen
   bool src_need_zp = requires_runtime_zp(src);
+  bool wgh_is_per_channel = (wgh.qscheme() != kPerTensorAffine);
 
 #ifdef USE_PRIMITIVE_CACHE
   create_key(
@@ -300,6 +301,7 @@ static at::Tensor quantized_convolution(
       is_onednn_layout_suggested,
       is_channels_last_suggested,
       src_need_zp,
+      wgh_is_per_channel,
       attr);
 #endif
 
@@ -445,7 +447,7 @@ static at::Tensor quantized_convolution(
   args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_m});
 #endif
 
-  if (wgh.qscheme() == kPerTensorAffine) {
+  if (!wgh_is_per_channel) {
     memory wgh_sc_m;
     wgh_sc_m = q_get_wgh_sc_gpu_mem(wgh, engine);
     args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, wgh_sc_m});

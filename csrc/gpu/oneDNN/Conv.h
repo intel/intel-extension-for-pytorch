@@ -6,7 +6,6 @@
 #include <core/MemoryFormat.h>
 
 #include <oneDNN/Runtime.h>
-#include <quantized/Quantizer.h>
 #include <runtime/Utils.h>
 #include <tensor/Tensor.h>
 #include <utils/LRUCache.h>
@@ -19,7 +18,6 @@
 using namespace dnnl;
 using namespace xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU;
-using namespace at::AtenIpexTypeQuantizedXPU;
 
 namespace xpu {
 namespace oneDNN {
