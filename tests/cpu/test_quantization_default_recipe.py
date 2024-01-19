@@ -811,6 +811,10 @@ class WeightOnlyQuantizationTester(TestCase):
                     ipex.nn.modules.weight_only_quantization.IpexWoqLinear
                 )
                 assert isinstance(woq_model.linear, woq_linear_class)
+                assert (
+                    woq_model.linear.weight is not None
+                    and woq_model.linear.weight.dtype == torch.int8
+                )
 
                 output2 = woq_model(data)
                 torch.testing.assert_close(output1, output2)
@@ -1046,6 +1050,10 @@ class WeightOnlyQuantizationTester(TestCase):
                     ipex.nn.modules.weight_only_quantization.IpexWoqLinear
                 )
                 assert isinstance(woq_model.linear, woq_linear_class)
+                assert (
+                    woq_model.linear.weight is not None
+                    and woq_model.linear.weight.dtype == torch.uint8
+                )
 
                 output2 = woq_model(data)
                 torch.testing.assert_close(output1, output2)
