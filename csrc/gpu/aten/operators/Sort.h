@@ -71,6 +71,20 @@ std::vector<int64_t> infer_dense_strides_dim_last(
 
 } // namespace impl
 
+template <typename offset_t>
+struct sort_out_stable_segmented_device_radix_sort_kernel_offset_calc_functor {
+  offset_t operator()(offset_t slice) const {
+    return slice * nsort;
+  }
+
+  sort_out_stable_segmented_device_radix_sort_kernel_offset_calc_functor(
+      int64_t nsort)
+      : nsort(nsort) {}
+
+ private:
+  int64_t nsort;
+};
+
 std::tuple<Tensor&, Tensor&> sort_out_stable(
     const Tensor& self,
     c10::optional<bool> stable,
@@ -211,13 +225,16 @@ std::tuple<Tensor&, Tensor&> sort_out_stable(
               self_.sizes(), self_.strides(), self_.options());
           auto sorting_tmp_v = at::empty_strided(
               self_.sizes(), self_.strides(), self_.options().dtype(kLong));
+          sort_out_stable_segmented_device_radix_sort_kernel_offset_calc_functor<
+              offset_t>
+              functor(nsort);
           segmented_device_radix_sort_kernel<scalar_t, int64_t>(
               desc,
               self_ptr,
               (scalar_t*)values_ptr_,
               nullptr,
               (int64_t*)indices_ptr,
-              [=](offset_t slice) -> offset_t { return slice * nsort; },
+              functor,
               (scalar_t*)sorting_tmp_k.data_ptr(),
               (int64_t*)sorting_tmp_v.data_ptr());
         }

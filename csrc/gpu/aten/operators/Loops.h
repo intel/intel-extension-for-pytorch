@@ -570,6 +570,63 @@ static inline bool can_use_broadcast_vectorize(
   return vec_size > 1;
 }
 
+template <
+    typename func_t,
+    typename arg0_t,
+    typename offset_calc_t,
+    int ntensors>
+struct dpcpp_loops_launch_legacy_kernel_functor {
+  void operator()(int idx) const {
+    auto offsets = offset_calc.get(idx);
+    arg0_t* out = (arg0_t*)(data[0] + offsets[0]);
+    *out = invoke(f, &data.data[1], &offsets.data[1], 1);
+  }
+
+  dpcpp_loops_launch_legacy_kernel_functor(
+      xpu::dpcpp::Array<char*, ntensors> data_,
+      offset_calc_t offset_calc_,
+      const func_t f_)
+      : data(data_), offset_calc(offset_calc_), f(f_) {}
+
+ private:
+  xpu::dpcpp::Array<char*, ntensors> data;
+  offset_calc_t offset_calc;
+  const func_t f;
+};
+
+template <
+    typename func_t,
+    typename arg0_t,
+    typename offset_calc_t,
+    int ntensors,
+    bool REMOVE_DOUBLE>
+struct dpcpp_loops_launch_legacy_kernel_dynamic_casting_functor {
+  void operator()(int idx) const {
+    auto offsets = offset_calc.get(idx);
+    void* out = data[0] + offsets[0];
+    arg0_t result = invoke_with_cast<REMOVE_DOUBLE>(
+        f, &data.data[1], &offsets.data[1], &dtypes.data[1], 1);
+    if constexpr (REMOVE_DOUBLE)
+      at::native::Memory::no_double_cast_and_store<arg0_t>(
+          dtypes[0], out, result);
+    else
+      c10::cast_and_store<arg0_t>(dtypes[0], out, result);
+  }
+
+  dpcpp_loops_launch_legacy_kernel_dynamic_casting_functor(
+      xpu::dpcpp::Array<char*, ntensors> data_,
+      at::detail::Array<ScalarType, ntensors> dtypes_,
+      offset_calc_t offset_calc_,
+      const func_t f_)
+      : data(data_), dtypes(dtypes_), offset_calc(offset_calc_), f(f_) {}
+
+ private:
+  xpu::dpcpp::Array<char*, ntensors> data;
+  at::detail::Array<ScalarType, ntensors> dtypes;
+  offset_calc_t offset_calc;
+  const func_t f;
+};
+
 template <typename func_t, bool signed_strides = false, bool fast_mode = false>
 void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
   using traits = function_traits<func_t>;
@@ -615,11 +672,13 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
       }
       auto offset_calc =
           make_offset_calculator<traits::arity + 1, signed_strides>(iter);
-      launch_legacy_kernel(numel, [=](int idx) {
-        auto offsets = offset_calc.get(idx);
-        arg0_t* out = (arg0_t*)(data[0] + offsets[0]);
-        *out = invoke(f, &data.data[1], &offsets.data[1], 1);
-      });
+      dpcpp_loops_launch_legacy_kernel_functor<
+          func_t,
+          arg0_t,
+          decltype(offset_calc),
+          ntensors>
+          functor(data, offset_calc, f);
+      launch_legacy_kernel(numel, functor);
     }
   } else {
     xpu::dpcpp::Array<ScalarType, traits::arity> dtypes;
@@ -652,17 +711,14 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
       }                                                                        \
       auto offset_calc =                                                       \
           make_offset_calculator<traits::arity + 1, signed_strides>(iter);     \
-      launch_legacy_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(numel, [=](int idx) {  \
-        auto offsets = offset_calc.get(idx);                                   \
-        void* out = data[0] + offsets[0];                                      \
-        arg0_t result = invoke_with_cast<REMOVE_DOUBLE>(                       \
-            f, &data.data[1], &offsets.data[1], &dtypes.data[1], 1);           \
-        if constexpr (REMOVE_DOUBLE)                                           \
-          at::native::Memory::no_double_cast_and_store<arg0_t>(                \
-              dtypes[0], out, result);                                         \
-        else                                                                   \
-          c10::cast_and_store<arg0_t>(dtypes[0], out, result);                 \
-      });                                                                      \
+      dpcpp_loops_launch_legacy_kernel_dynamic_casting_functor<                \
+          func_t,                                                              \
+          arg0_t,                                                              \
+          decltype(offset_calc),                                               \
+          ntensors,                                                            \
+          REMOVE_DOUBLE>                                                       \
+          functor(data, dtypes, offset_calc, f);                               \
+      launch_legacy_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(numel, functor);       \
     }                                                                          \
   }
 
