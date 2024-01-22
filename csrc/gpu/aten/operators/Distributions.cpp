@@ -112,6 +112,18 @@ void launch_gamma_kernel(
       });
 }
 
+template <typename scalar_t>
+struct launch_dirichlet_kernel_functor {
+  scalar_t operator()(scalar_t gamma, scalar_t gamma_sum) const {
+    auto ret_val = gamma / gamma_sum;
+    auto min_value = std::numeric_limits<scalar_t>::min();
+    auto max_value = 1 - std::numeric_limits<scalar_t>::epsilon();
+    ret_val = (min_value > ret_val) ? min_value : ret_val;
+    ret_val = (max_value < ret_val) ? max_value : ret_val;
+    return ret_val;
+  }
+};
+
 void launch_dirichlet_kernel(at::TensorIteratorBase& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
@@ -119,30 +131,26 @@ void launch_dirichlet_kernel(at::TensorIteratorBase& iter) {
       iter.input_dtype(),
       "dirichlet_dpcpp",
       [&] {
-        at::AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter(
-            iter, [](scalar_t gamma, scalar_t gamma_sum) {
-              auto ret_val = gamma / gamma_sum;
-              auto min_value = std::numeric_limits<scalar_t>::min();
-              auto max_value = 1 - std::numeric_limits<scalar_t>::epsilon();
-              ret_val = (min_value > ret_val) ? min_value : ret_val;
-              ret_val = (max_value < ret_val) ? max_value : ret_val;
-              return ret_val;
-            });
+        launch_dirichlet_kernel_functor<scalar_t> f;
+        at::AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t, typename accscalar_t>
+struct launch_dirichlet_grad_kernel_functor {
+  scalar_t operator()(scalar_t x_val, scalar_t alpha_val, scalar_t total_val)
+      const {
+    return dirichlet_grad_one<scalar_t, accscalar_t>(
+        x_val, alpha_val, total_val);
+  }
+};
 
 void launch_dirichlet_grad_kernel(TensorIteratorBase& iter) {
   IPEX_DISPATCH_FLOATING_TYPES(
       iter.input_dtype(), "_dirichlet_grad_dpcpp", [&] {
         using accscalar_t = acc_type<scalar_t>;
-        dpcpp_kernel_for_tensor_iter(
-            iter,
-            [](scalar_t x_val,
-               scalar_t alpha_val,
-               scalar_t total_val) -> scalar_t {
-              return dirichlet_grad_one<scalar_t, accscalar_t>(
-                  x_val, alpha_val, total_val);
-            });
+        launch_dirichlet_grad_kernel_functor<scalar_t, accscalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 

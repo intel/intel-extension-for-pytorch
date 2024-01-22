@@ -28,17 +28,30 @@ Tensor& sgn_out(const Tensor& self, Tensor& out) {
   }
 }
 
+struct sign_out_functor {
+  bool operator()(bool a) const {
+    return a;
+  }
+};
+
+template <typename scalar_t>
+struct sign_out_functor_2 {
+  scalar_t operator()(scalar_t a) const {
+    scalar_t zero = scalar_t(0);
+    return (zero < a) - (a < zero);
+  }
+};
+
 Tensor& sign_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_op(out, self);
   if (iter.dtype() == ScalarType::Bool) {
-    dpcpp_kernel_for_tensor_iter(iter, [](bool a) { return a; });
+    sign_out_functor f;
+    dpcpp_kernel_for_tensor_iter(iter, f);
   } else {
     IPEX_DISPATCH_ALL_TYPES_AND2(
         ScalarType::Half, ScalarType::BFloat16, iter.dtype(), "sign_xpu", [&] {
-          dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-            scalar_t zero = scalar_t(0);
-            return (zero < a) - (a < zero);
-          });
+          sign_out_functor_2<scalar_t> f;
+          dpcpp_kernel_for_tensor_iter(iter, f);
         });
   }
   return out;

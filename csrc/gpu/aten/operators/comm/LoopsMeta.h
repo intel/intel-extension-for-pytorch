@@ -12,54 +12,78 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 // Unary
-#define IPEX_UNARY_AND_ALL_OPS(op, func, creator, types)             \
-  Tensor& op(const Tensor& self, Tensor& out) {                      \
-    auto iter = TensorIterator::creator(out, self);                  \
-    IPEX_DISPATCH_##types##_AND2(                                    \
-        at::ScalarType::Half,                                        \
-        at::ScalarType::BFloat16,                                    \
-        iter.dtype(),                                                \
-        #op,                                                         \
-        [&]() {                                                      \
-          dpcpp_kernel_for_tensor_iter(                              \
-              iter, [](scalar_t a) -> scalar_t { return func(a); }); \
-        });                                                          \
-    return out;                                                      \
+#define IPEX_UNARY_AND_ALL_OPS(op, func, creator, types) \
+  template <typename scalar_t>                           \
+  struct op##_functor {                                  \
+    scalar_t operator()(scalar_t a) const {              \
+      return func(a);                                    \
+    }                                                    \
+  };                                                     \
+  Tensor& op(const Tensor& self, Tensor& out) {          \
+    auto iter = TensorIterator::creator(out, self);      \
+    IPEX_DISPATCH_##types##_AND2(                        \
+        at::ScalarType::Half,                            \
+        at::ScalarType::BFloat16,                        \
+        iter.dtype(),                                    \
+        #op,                                             \
+        [&]() {                                          \
+          op##_functor<scalar_t> f;                      \
+          dpcpp_kernel_for_tensor_iter(iter, f);         \
+        });                                              \
+    return out;                                          \
   }
 
-#define IPEX_UNARY_BASE_OPS(op, func, creator, types)            \
-  Tensor& op(const Tensor& self, Tensor& out) {                  \
-    auto iter = TensorIterator::creator(out, self);              \
-    IPEX_DISPATCH_##types(iter.dtype(), #op, [&]() {             \
-      dpcpp_kernel_for_tensor_iter(                              \
-          iter, [](scalar_t a) -> scalar_t { return func(a); }); \
-    });                                                          \
-    return out;                                                  \
+#define IPEX_UNARY_BASE_OPS(op, func, creator, types) \
+  template <typename scalar_t>                        \
+  struct op##_functor {                               \
+    scalar_t operator()(scalar_t a) const {           \
+      return func(a);                                 \
+    }                                                 \
+  };                                                  \
+  Tensor& op(const Tensor& self, Tensor& out) {       \
+    auto iter = TensorIterator::creator(out, self);   \
+    IPEX_DISPATCH_##types(iter.dtype(), #op, [&]() {  \
+      op##_functor<scalar_t> f;                       \
+      dpcpp_kernel_for_tensor_iter(iter, f);          \
+    });                                               \
+    return out;                                       \
   }
 
-#define IPEX_UNARY_AND_ALL_OPS_COMMON(op, func, creator, types)      \
-  Tensor& op(const Tensor& self, Tensor& out) {                      \
-    auto iter = TensorIterator::creator(out, self);                  \
-    IPEX_DISPATCH_##types##_AND2(                                    \
-        at::ScalarType::Half,                                        \
-        at::ScalarType::BFloat16,                                    \
-        iter.common_dtype(),                                         \
-        #op,                                                         \
-        [&]() {                                                      \
-          dpcpp_kernel_for_tensor_iter(                              \
-              iter, [](scalar_t a) -> scalar_t { return func(a); }); \
-        });                                                          \
-    return out;                                                      \
+#define IPEX_UNARY_AND_ALL_OPS_COMMON(op, func, creator, types) \
+  template <typename scalar_t>                                  \
+  struct op##_functor {                                         \
+    scalar_t operator()(scalar_t a) const {                     \
+      return func(a);                                           \
+    }                                                           \
+  };                                                            \
+  Tensor& op(const Tensor& self, Tensor& out) {                 \
+    auto iter = TensorIterator::creator(out, self);             \
+    IPEX_DISPATCH_##types##_AND2(                               \
+        at::ScalarType::Half,                                   \
+        at::ScalarType::BFloat16,                               \
+        iter.common_dtype(),                                    \
+        #op,                                                    \
+        [&]() {                                                 \
+          op##_functor<scalar_t> f;                             \
+          dpcpp_kernel_for_tensor_iter(iter, f);                \
+        });                                                     \
+    return out;                                                 \
   }
 
-#define IPEX_UNARY_BASE_OPS_COMMON(op, func, creator, types)     \
-  Tensor& op(const Tensor& self, Tensor& out) {                  \
-    auto iter = TensorIterator::creator(out, self);              \
-    IPEX_DISPATCH_##types(iter.common_dtype(), #op, [&]() {      \
-      dpcpp_kernel_for_tensor_iter(                              \
-          iter, [](scalar_t a) -> scalar_t { return func(a); }); \
-    });                                                          \
-    return out;                                                  \
+#define IPEX_UNARY_BASE_OPS_COMMON(op, func, creator, types) \
+  template <typename scalar_t>                               \
+  struct op##_functor {                                      \
+    scalar_t operator()(scalar_t a) const {                  \
+      return func(a);                                        \
+    }                                                        \
+  };                                                         \
+  Tensor& op(const Tensor& self, Tensor& out) {              \
+    auto iter = TensorIterator::creator(out, self);          \
+    IPEX_DISPATCH_##types(iter.common_dtype(), #op, [&]() {  \
+      op##_functor<scalar_t> f;                              \
+      dpcpp_kernel_for_tensor_iter(iter, f);                 \
+    });                                                      \
+    return out;                                              \
   }
 
 #define IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL(op, func, creator) \
@@ -118,28 +142,33 @@ namespace AtenIpexTypeXPU {
   IPEX_UNARY_BASE_OPS_COMMON(op, func, creator, COMPLEX_TYPES)
 
 // Binary
-#define IPEX_BINARY_AND_ALL_OPS(op, func, creator, types)                     \
-  Tensor& op(const Tensor& self, const Tensor& other, Tensor& out) {          \
-    /* to handle op(tensor, scalar) redispatch path. */                       \
-    /* by default, scalar will be wrapped as a CPU tensor in default */       \
-    /* catchall implememtation. here convert to XPU lazily. */                \
-    Tensor other_maybe_scalar = other;                                        \
-    if (other.device().type() == at::kCPU && other.numel() == 1) {            \
-      other_maybe_scalar = other.to("xpu");                                   \
-    }                                                                         \
-                                                                              \
-    auto iter = TensorIterator::creator(out, self, other_maybe_scalar);       \
-    IPEX_DISPATCH_##types##_AND2(                                             \
-        at::ScalarType::Half,                                                 \
-        at::ScalarType::BFloat16,                                             \
-        iter.dtype(),                                                         \
-        #op,                                                                  \
-        [&]() {                                                               \
-          dpcpp_kernel_for_tensor_iter(                                       \
-              iter,                                                           \
-              [](scalar_t a, scalar_t b) -> scalar_t { return func(a, b); }); \
-        });                                                                   \
-    return out;                                                               \
+#define IPEX_BINARY_AND_ALL_OPS(op, func, creator, types)               \
+  template <typename scalar_t>                                          \
+  struct op##_functor {                                                 \
+    scalar_t operator()(scalar_t a, scalar_t b) const {                 \
+      return func(a, b);                                                \
+    }                                                                   \
+  };                                                                    \
+  Tensor& op(const Tensor& self, const Tensor& other, Tensor& out) {    \
+    /* to handle op(tensor, scalar) redispatch path. */                 \
+    /* by default, scalar will be wrapped as a CPU tensor in default */ \
+    /* catchall implememtation. here convert to XPU lazily. */          \
+    Tensor other_maybe_scalar = other;                                  \
+    if (other.device().type() == at::kCPU && other.numel() == 1) {      \
+      other_maybe_scalar = other.to("xpu");                             \
+    }                                                                   \
+                                                                        \
+    auto iter = TensorIterator::creator(out, self, other_maybe_scalar); \
+    IPEX_DISPATCH_##types##_AND2(                                       \
+        at::ScalarType::Half,                                           \
+        at::ScalarType::BFloat16,                                       \
+        iter.dtype(),                                                   \
+        #op,                                                            \
+        [&]() {                                                         \
+          op##_functor<scalar_t> f;                                     \
+          dpcpp_kernel_for_tensor_iter(iter, f);                        \
+        });                                                             \
+    return out;                                                         \
   }
 
 // Binary
@@ -167,23 +196,28 @@ namespace AtenIpexTypeXPU {
     return out;                                                               \
   }
 
-#define IPEX_BINARY_BASE_OPS(op, func, creator, types)                    \
-  Tensor& op(const Tensor& self, const Tensor& other, Tensor& out) {      \
-    /* to handle op(tensor, scalar) redispatch path. */                   \
-    /* by default, scalar will be wrapped as a CPU tensor in default */   \
-    /* catchall implememtation. here convert to XPU lazily. */            \
-    Tensor other_maybe_scalar = other;                                    \
-    if (other.device().type() == at::kCPU && other.numel() == 1) {        \
-      other_maybe_scalar = other.to("xpu");                               \
-    }                                                                     \
-                                                                          \
-    auto iter = TensorIterator::creator(out, self, other_maybe_scalar);   \
-    IPEX_DISPATCH_##types(iter.dtype(), #op, [&]() {                      \
-      dpcpp_kernel_for_tensor_iter(                                       \
-          iter,                                                           \
-          [](scalar_t a, scalar_t b) -> scalar_t { return func(a, b); }); \
-    });                                                                   \
-    return out;                                                           \
+#define IPEX_BINARY_BASE_OPS(op, func, creator, types)                  \
+  template <typename scalar_t>                                          \
+  struct op##_functor {                                                 \
+    scalar_t operator()(scalar_t a, scalar_t b) const {                 \
+      return func(a, b);                                                \
+    }                                                                   \
+  };                                                                    \
+  Tensor& op(const Tensor& self, const Tensor& other, Tensor& out) {    \
+    /* to handle op(tensor, scalar) redispatch path. */                 \
+    /* by default, scalar will be wrapped as a CPU tensor in default */ \
+    /* catchall implememtation. here convert to XPU lazily. */          \
+    Tensor other_maybe_scalar = other;                                  \
+    if (other.device().type() == at::kCPU && other.numel() == 1) {      \
+      other_maybe_scalar = other.to("xpu");                             \
+    }                                                                   \
+                                                                        \
+    auto iter = TensorIterator::creator(out, self, other_maybe_scalar); \
+    IPEX_DISPATCH_##types(iter.dtype(), #op, [&]() {                    \
+      op##_functor<scalar_t> f;                                         \
+      dpcpp_kernel_for_tensor_iter(iter, f);                            \
+    });                                                                 \
+    return out;                                                         \
   }
 
 #define IPEX_BINARY_LOOPS_FUNC_FLOAT_ALL(op, func, creator) \

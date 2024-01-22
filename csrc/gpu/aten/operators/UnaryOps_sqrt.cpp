@@ -17,6 +17,13 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t>
+struct sqrt_kernel_xpu_functor {
+  scalar_t operator()(scalar_t a) const {
+    return Numerics<scalar_t>::sqrt(a);
+  }
+};
+
 void sqrt_kernel_xpu(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
       at::ScalarType::Half,
@@ -24,11 +31,17 @@ void sqrt_kernel_xpu(TensorIterator& iter) {
       iter.common_dtype(),
       "sqrt",
       [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          return Numerics<scalar_t>::sqrt(a);
-        });
+        sqrt_kernel_xpu_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct sqrt_out_functor {
+  scalar_t operator()(scalar_t a) const {
+    return Numerics<scalar_t>::sqrt(a);
+  }
+};
 
 Tensor& sqrt_out(const Tensor& self, Tensor& result) {
   return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_sqrt>(
@@ -42,12 +55,18 @@ Tensor& sqrt_out(const Tensor& self, Tensor& result) {
             iter.common_dtype(),
             "sqrt",
             [&]() {
-              dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-                return Numerics<scalar_t>::sqrt(a);
-              });
+              sqrt_out_functor<scalar_t> f;
+              dpcpp_kernel_for_tensor_iter(iter, f);
             });
       });
 }
+
+template <typename scalar_t>
+struct rsqrt_kernel_xpu_functor {
+  scalar_t operator()(scalar_t a) const {
+    return Numerics<scalar_t>::rsqrt(a);
+  }
+};
 
 void rsqrt_kernel_xpu(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
@@ -56,9 +75,8 @@ void rsqrt_kernel_xpu(TensorIterator& iter) {
       iter.common_dtype(),
       "rsqrt",
       [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          return Numerics<scalar_t>::rsqrt(a);
-        });
+        rsqrt_kernel_xpu_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 

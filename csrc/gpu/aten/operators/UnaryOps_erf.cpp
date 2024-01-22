@@ -13,6 +13,13 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t>
+struct erf_out_functor {
+  scalar_t operator()(scalar_t a) const {
+    return Numerics<scalar_t>::erf(a);
+  }
+};
+
 Tensor& erf_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_float_op(out, self);
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -21,12 +28,18 @@ Tensor& erf_out(const Tensor& self, Tensor& out) {
       iter.common_dtype(),
       "erf",
       [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          return Numerics<scalar_t>::erf(a);
-        });
+        erf_out_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
   return out;
 }
+
+template <typename scalar_t>
+struct erfc_out_functor {
+  scalar_t operator()(scalar_t a) const {
+    return Numerics<scalar_t>::erfc(a);
+  }
+};
 
 Tensor& erfc_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_float_op(out, self);
@@ -36,12 +49,20 @@ Tensor& erfc_out(const Tensor& self, Tensor& out) {
       iter.common_dtype(),
       "erfc",
       [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          return Numerics<scalar_t>::erfc(a);
-        });
+        erfc_out_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
   return out;
 }
+
+template <typename scalar_t>
+struct erfinv_out_functor {
+  scalar_t operator()(scalar_t a) const {
+    scalar_t b;
+    TensorErfinvOp<scalar_t>()(b, a);
+    return b;
+  }
+};
 
 Tensor& erfinv_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_float_op(out, self);
@@ -51,11 +72,8 @@ Tensor& erfinv_out(const Tensor& self, Tensor& out) {
       iter.common_dtype(),
       "erfinv",
       [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          scalar_t b;
-          TensorErfinvOp<scalar_t>()(b, a);
-          return b;
-        });
+        erfinv_out_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
   return out;
 }

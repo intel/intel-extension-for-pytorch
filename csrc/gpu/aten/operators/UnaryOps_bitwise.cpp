@@ -15,13 +15,27 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t>
+struct bitwise_not_kernel_dpcpp_functor {
+  scalar_t operator()(scalar_t a) const {
+    return ~a;
+  }
+};
+
+struct bitwise_not_kernel_dpcpp_functor_2 {
+  bool operator()(bool a) const {
+    return !a;
+  }
+};
+
 void bitwise_not_kernel_dpcpp(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
-    dpcpp_kernel_for_tensor_iter(iter, [](bool a) -> bool { return !a; });
+    bitwise_not_kernel_dpcpp_functor_2 f;
+    dpcpp_kernel_for_tensor_iter(iter, f);
   } else {
     IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "bitwise_not_dpcpp", [&]() {
-      dpcpp_kernel_for_tensor_iter(
-          iter, [](scalar_t a) -> scalar_t { return ~a; });
+      bitwise_not_kernel_dpcpp_functor<scalar_t> f;
+      dpcpp_kernel_for_tensor_iter(iter, f);
     });
   }
 }

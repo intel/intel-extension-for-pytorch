@@ -14,6 +14,18 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t>
+struct sinc_kernel_xpu_functor {
+  scalar_t operator()(scalar_t a) const {
+    if (a == scalar_t(0)) {
+      return scalar_t(1);
+    } else {
+      scalar_t product = Numerics<scalar_t>::pi() * a;
+      return Numerics<scalar_t>::sin(product) / product;
+    }
+  }
+};
+
 void sinc_kernel_xpu(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
       at::ScalarType::Half,
@@ -21,14 +33,8 @@ void sinc_kernel_xpu(TensorIterator& iter) {
       iter.common_dtype(),
       "sinc",
       [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          if (a == scalar_t(0)) {
-            return scalar_t(1);
-          } else {
-            scalar_t product = Numerics<scalar_t>::pi() * a;
-            return Numerics<scalar_t>::sin(product) / product;
-          }
-        });
+        sinc_kernel_xpu_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 

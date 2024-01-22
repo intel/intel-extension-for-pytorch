@@ -37,6 +37,18 @@ std::tuple<Tensor, Tensor> sort(
 
 namespace impl {
 
+template <typename scalar_t, typename accscalar_t>
+struct mul_add_kernel_dpcpp_functor {
+  scalar_t operator()(scalar_t a, scalar_t b, scalar_t c) const {
+    return a * b + alpha * c;
+  }
+
+  mul_add_kernel_dpcpp_functor(accscalar_t alpha) : alpha(alpha) {}
+
+ private:
+  accscalar_t alpha;
+};
+
 static void mul_add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
       at::ScalarType::Half,
@@ -46,10 +58,8 @@ static void mul_add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
       [&]() {
         using accscalar_t = acc_type<scalar_t>;
         auto alpha = alpha_scalar.to<accscalar_t>();
-        dpcpp_kernel_for_tensor_iter(
-            iter, [=](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
-              return a * b + alpha * c;
-            });
+        mul_add_kernel_dpcpp_functor<scalar_t, accscalar_t> f(alpha);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 
@@ -125,6 +135,22 @@ bool check_opaque(std::vector<Tensor> tensor_list) {
   return false;
 }
 
+template <typename scalar_t, typename accscalar_t>
+struct mul_scalar_add_scalar_functor {
+  scalar_t operator()(scalar_t a) const {
+    return a * other_scalar + add_scalar;
+  }
+
+  mul_scalar_add_scalar_functor(
+      accscalar_t add_scalar,
+      accscalar_t other_scalar)
+      : add_scalar(add_scalar), other_scalar(other_scalar) {}
+
+ private:
+  accscalar_t add_scalar;
+  accscalar_t other_scalar;
+};
+
 Tensor mul_scalar_add_scalar(
     const Tensor& self,
     Scalar other,
@@ -151,9 +177,9 @@ Tensor mul_scalar_add_scalar(
           using accscalar_t = acc_type<scalar_t>;
           auto add_scalar = alpha.to<accscalar_t>() * accumu.to<accscalar_t>();
           auto other_scalar = other.to<accscalar_t>();
-          dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
-            return a * other_scalar + add_scalar;
-          });
+          mul_scalar_add_scalar_functor<scalar_t, accscalar_t> f(
+              add_scalar, other_scalar);
+          dpcpp_kernel_for_tensor_iter(iter, f);
         });
   }
   return result;
@@ -167,6 +193,17 @@ Tensor mul_scalar_add_scalar_autocast(
   c10::impl::ExcludeDispatchKeyGuard no_autocast(c10::DispatchKey::AutocastXPU);
   return mul_scalar_add_scalar(self, other, accumu, alpha);
 }
+
+template <typename scalar_t, typename accscalar_t>
+struct mul_add_scalar_functor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return a * b + add_scalar;
+  }
+  mul_add_scalar_functor(accscalar_t add_scalar) : add_scalar(add_scalar) {}
+
+ private:
+  accscalar_t add_scalar;
+};
 
 Tensor mul_add_scalar(
     const Tensor& self,
@@ -198,10 +235,8 @@ Tensor mul_add_scalar(
       [&]() {
         using accscalar_t = acc_type<scalar_t>;
         auto add_scalar = alpha.to<accscalar_t>() * accumu.to<accscalar_t>();
-        dpcpp_kernel_for_tensor_iter(
-            iter, [=](scalar_t a, scalar_t b) -> scalar_t {
-              return a * b + add_scalar;
-            });
+        mul_add_scalar_functor<scalar_t, accscalar_t> f(add_scalar);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
   result = iter.output();
   return result;
@@ -224,6 +259,19 @@ Tensor mul_add_scalar_autocast(
       accumu,
       alpha);
 }
+
+template <typename scalar_t, typename accscalar_t>
+struct mul_scalar_add_functor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return a * other_scalar + b * alpha_scalar;
+  }
+  mul_scalar_add_functor(accscalar_t alpha_scalar, accscalar_t other_scalar)
+      : alpha_scalar(alpha_scalar), other_scalar(other_scalar) {}
+
+ private:
+  accscalar_t alpha_scalar;
+  accscalar_t other_scalar;
+};
 
 Tensor mul_scalar_add(
     const Tensor& self,
@@ -256,10 +304,9 @@ Tensor mul_scalar_add(
           using accscalar_t = acc_type<scalar_t>;
           auto alpha_scalar = alpha.to<accscalar_t>();
           auto other_scalar = other.to<accscalar_t>();
-          dpcpp_kernel_for_tensor_iter(
-              iter, [=](scalar_t a, scalar_t b) -> scalar_t {
-                return a * other_scalar + b * alpha_scalar;
-              });
+          mul_scalar_add_functor<scalar_t, accscalar_t> f(
+              alpha_scalar, other_scalar);
+          dpcpp_kernel_for_tensor_iter(iter, f);
         });
     result = iter.output();
   }

@@ -38,12 +38,20 @@ namespace impl {
                   .check_all_same_dtype(false)  \
                   .check_all_same_device(false) \
                   .build();
+
+template <typename scalar_t>
+struct direct_copy_kernel_gpu_functor {
+  scalar_t operator()(scalar_t src_val) const {
+    return src_val;
+  }
+};
+
 void direct_copy_kernel_gpu(TensorIteratorBase& iter) {
   ScalarType dtype = iter.common_dtype();
   if (isQIntType(dtype)) {
     IPEX_DISPATCH_QINT_TYPES(dtype, "direct_copy_kernel_gpu", [&] {
-      dpcpp_fast_mode_kernel_for_tensor_iter(
-          iter, [=](scalar_t src_val) { return src_val; });
+      direct_copy_kernel_gpu_functor<scalar_t> f;
+      dpcpp_fast_mode_kernel_for_tensor_iter(iter, f);
     });
   } else {
     IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND6(
@@ -56,11 +64,19 @@ void direct_copy_kernel_gpu(TensorIteratorBase& iter) {
         dtype,
         "direct_copy_kernel_gpu",
         [&] {
-          dpcpp_fast_mode_kernel_for_tensor_iter(
-              iter, [=](scalar_t src_val) { return src_val; });
+          direct_copy_kernel_gpu_functor<scalar_t> f;
+          dpcpp_fast_mode_kernel_for_tensor_iter(iter, f);
         });
   }
 }
+
+template <typename scalar_t>
+struct conj_kernel_gpu_functor {
+  scalar_t operator()(scalar_t src_val) const {
+    return std::conj(src_val);
+  }
+};
+
 void conj_kernel_gpu(TensorIterator& iter) {
   AT_DISPATCH_SWITCH(
       iter.common_dtype(),
@@ -75,17 +91,32 @@ void conj_kernel_gpu(TensorIterator& iter) {
           })
           AT_DISPATCH_CASE_COMPLEX_TYPES_AND(
               kComplexHalf, iter.common_dtype(), "conj_kernel_gpu", [&] {
-                dpcpp_fast_mode_kernel_for_tensor_iter(
-                    iter, [=](scalar_t src_val) { return std::conj(src_val); });
+                conj_kernel_gpu_functor<scalar_t> f;
+                dpcpp_fast_mode_kernel_for_tensor_iter(iter, f);
               }));
 }
 
+template <typename scalar_t>
+struct neg_conj_kernel_gpu_functor {
+  scalar_t operator()(scalar_t src_val) const {
+    return std::conj(-src_val);
+  }
+};
+
 void neg_conj_kernel_gpu(TensorIteratorBase& iter) {
   IPEX_DISPATCH_COMPLEX_TYPES(iter.common_dtype(), "neg_conj_kernel_gpu", [&] {
-    dpcpp_fast_mode_kernel_for_tensor_iter(
-        iter, [=](scalar_t src_val) { return std::conj(-src_val); });
+    neg_conj_kernel_gpu_functor<scalar_t> f;
+    dpcpp_fast_mode_kernel_for_tensor_iter(iter, f);
   });
 }
+
+template <typename scalar_t>
+struct neg_kernel_gpu_functor {
+  scalar_t operator()(scalar_t src_val) const {
+    return -src_val;
+  }
+};
+
 void neg_kernel_gpu(TensorIteratorBase& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       kHalf,
@@ -94,8 +125,8 @@ void neg_kernel_gpu(TensorIteratorBase& iter) {
       iter.common_dtype(),
       "neg_kernel_gpu",
       [&] {
-        dpcpp_fast_mode_kernel_for_tensor_iter(
-            iter, [=](scalar_t src_val) { return -src_val; });
+        neg_kernel_gpu_functor<scalar_t> f;
+        dpcpp_fast_mode_kernel_for_tensor_iter(iter, f);
       });
 }
 
@@ -168,6 +199,13 @@ void dpcpp_kernel_loops_memcpy_for_tensor_iter(
   dpcpp_loops_memcpy_kernel<func_t>(iter, f);
 }
 
+template <typename scalar_t>
+struct memcpyAsync_functor {
+  scalar_t operator()(scalar_t src_val) const {
+    return src_val;
+  }
+};
+
 void memcpyAsync(
     TensorIteratorBase& iter,
     DPCPPStream& copy_stream,
@@ -178,8 +216,8 @@ void memcpyAsync(
   if (dst_device == src_device) {
     if (isQIntType(dtype)) {
       IPEX_DISPATCH_QINT_TYPES(dtype, "copy_loops_memcpy", [&] {
-        dpcpp_kernel_loops_memcpy_for_tensor_iter(
-            iter, [=](scalar_t src_val) { return src_val; });
+        memcpyAsync_functor<scalar_t> f;
+        dpcpp_kernel_loops_memcpy_for_tensor_iter(iter, f);
       });
     } else {
       IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND6(
@@ -192,8 +230,8 @@ void memcpyAsync(
           dtype,
           "copy_loops_memcpy",
           [&] {
-            dpcpp_kernel_loops_memcpy_for_tensor_iter(
-                iter, [=](scalar_t src_val) { return src_val; });
+            memcpyAsync_functor<scalar_t> f;
+            dpcpp_kernel_loops_memcpy_for_tensor_iter(iter, f);
           });
     }
   } else {

@@ -23,6 +23,64 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
+struct launch_vec_kernel_Lamb_functor {
+  float operator()(float weight_elem, float adam_step_elem) const {
+    weight_elem -= adam_step_elem * learning_rate * true_ratio;
+    return weight_elem;
+  }
+
+  launch_vec_kernel_Lamb_functor(const double learning_rate, float true_ratio)
+      : learning_rate(learning_rate), true_ratio(true_ratio) {}
+
+ private:
+  const double learning_rate;
+  float true_ratio;
+};
+
+struct launch_vec_kernel_Lamb_functor_2 {
+  std::tuple<float, float, float, float, float> operator()(
+      float weight_elem,
+      float grad_elem,
+      float exp_avg_elem,
+      float exp_avg_sq_elem) const {
+    exp_avg_elem = exp_avg_elem * beta1 + (1 - beta1) * grad_elem;
+    exp_avg_sq_elem =
+        exp_avg_sq_elem * beta2 + grad_elem * grad_elem * (1 - beta2);
+    auto adam_step_elem = exp_avg_elem / bias_correction1 /
+        (Numerics<float>::sqrt(exp_avg_sq_elem / bias_correction2) + eps);
+    adam_step_elem = adam_step_elem + weight_elem * weight_decay;
+
+    return std::tuple<float, float, float, float, float>{
+        weight_elem * weight_elem,
+        adam_step_elem * adam_step_elem,
+        adam_step_elem,
+        exp_avg_elem,
+        exp_avg_sq_elem};
+  }
+
+  launch_vec_kernel_Lamb_functor_2(
+      const double beta1_,
+      const double beta2_,
+      const double bias_correction1_,
+      const double bias_correction2_,
+      const double weight_decay_,
+      const double eps_)
+      : beta1(beta1_),
+        beta2(beta2_),
+        bias_correction1(bias_correction1_),
+        bias_correction2(bias_correction2_),
+        weight_decay(weight_decay_),
+        eps(eps_) {}
+
+ private:
+  const double beta1;
+  const double beta2;
+  const double bias_correction1;
+  const double bias_correction2;
+  const double weight_decay;
+  const double eps;
+};
+
 void launch_vec_kernel_Lamb(
     Tensor& weight,
     Tensor& grad,
@@ -55,27 +113,9 @@ void launch_vec_kernel_Lamb(
                                 .check_all_same_dtype(false)
                                 .build();
 
-  dpcpp_kernel_multiple_outputs_for_tensor_iter(
-      iter,
-      [=](float weight_elem,
-          float grad_elem,
-          float exp_avg_elem,
-          float exp_avg_sq_elem)
-          -> std::tuple<float, float, float, float, float> {
-        exp_avg_elem = exp_avg_elem * beta1 + (1 - beta1) * grad_elem;
-        exp_avg_sq_elem =
-            exp_avg_sq_elem * beta2 + grad_elem * grad_elem * (1 - beta2);
-        auto adam_step_elem = exp_avg_elem / bias_correction1 /
-            (Numerics<float>::sqrt(exp_avg_sq_elem / bias_correction2) + eps);
-        adam_step_elem = adam_step_elem + weight_elem * weight_decay;
-
-        return std::tuple<float, float, float, float, float>{
-            weight_elem * weight_elem,
-            adam_step_elem * adam_step_elem,
-            adam_step_elem,
-            exp_avg_elem,
-            exp_avg_sq_elem};
-      });
+  launch_vec_kernel_Lamb_functor_2 f2(
+      beta1, beta2, bias_correction1, bias_correction2, weight_decay, eps);
+  dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f2);
 
   auto param_norm_sum = at::sum(param_norm_tensor).item().to<float>();
   auto rtw_norm_sum = at::sum(rtw_norm_tensor).item().to<float>();
@@ -87,12 +127,82 @@ void launch_vec_kernel_Lamb(
                                        .add_input(grad)
                                        .check_all_same_dtype(true)
                                        .build();
-  dpcpp_kernel_for_tensor_iter(
-      update_iter, [=](float weight_elem, float adam_step_elem) -> float {
-        weight_elem -= adam_step_elem * learning_rate * true_ratio;
-        return weight_elem;
-      });
+  launch_vec_kernel_Lamb_functor f(learning_rate, true_ratio);
+  dpcpp_kernel_for_tensor_iter(update_iter, f);
 }
+
+template <typename scalar_t>
+struct launch_vec_kernel_Lamb_master_weight_functor {
+  std::tuple<float, float, float, float, float> operator()(
+      scalar_t weight,
+      scalar_t grad_elem,
+      float master_weight_elem,
+      float exp_avg_elem,
+      float exp_avg_sq_elem) const {
+    grad_elem = static_cast<float>(grad_elem);
+    exp_avg_elem = exp_avg_elem * beta1 + (1 - beta1) * grad_elem;
+    exp_avg_sq_elem =
+        exp_avg_sq_elem * beta2 + grad_elem * grad_elem * (1 - beta2);
+    auto adam_step_elem = exp_avg_elem / bias_correction1 /
+        (Numerics<float>::sqrt(exp_avg_sq_elem / bias_correction2) + eps);
+    adam_step_elem = adam_step_elem + master_weight_elem * weight_decay;
+
+    return std::tuple<float, float, float, float, float>{
+        master_weight_elem * master_weight_elem,
+        adam_step_elem * adam_step_elem,
+        adam_step_elem,
+        exp_avg_elem,
+        exp_avg_sq_elem};
+  }
+
+  launch_vec_kernel_Lamb_master_weight_functor(
+      const int step_,
+      const double beta1_,
+      const double beta2_,
+      const double bias_correction1_,
+      const double bias_correction2_,
+      const double learning_rate_,
+      const double weight_decay_,
+      const double eps_)
+      : step(step_),
+        beta1(beta1_),
+        beta2(beta2_),
+        bias_correction1(bias_correction1_),
+        bias_correction2(bias_correction2_),
+        learning_rate(learning_rate_),
+        weight_decay(weight_decay_),
+        eps(eps_) {}
+
+ private:
+  const int step;
+  const double beta1;
+  const double beta2;
+  const double bias_correction1;
+  const double bias_correction2;
+  const double learning_rate;
+  const double weight_decay;
+  const double eps;
+};
+
+template <typename scalar_t>
+struct launch_vec_kernel_Lamb_master_weight_functor_2 {
+  std::tuple<scalar_t, float> operator()(
+      scalar_t weight_elem,
+      float master_weight_elem,
+      float adam_step_elem) const {
+    weight_elem -= adam_step_elem * learning_rate * true_ratio;
+    return std::tuple<scalar_t, float>{
+        static_cast<scalar_t>(weight_elem), weight_elem};
+  }
+  launch_vec_kernel_Lamb_master_weight_functor_2(
+      const double learning_rate,
+      float true_ratio)
+      : learning_rate(learning_rate), true_ratio(true_ratio) {}
+
+ private:
+  const double learning_rate;
+  float true_ratio;
+};
 
 template <typename scalar_t>
 void launch_vec_kernel_Lamb_master_weight(
@@ -129,29 +239,16 @@ void launch_vec_kernel_Lamb_master_weight(
                                 .check_all_same_dtype(false)
                                 .build();
 
-  dpcpp_kernel_multiple_outputs_for_tensor_iter(
-      iter,
-      [=](scalar_t weight,
-          scalar_t grad_elem,
-          float master_weight_elem,
-          float exp_avg_elem,
-          float exp_avg_sq_elem)
-          -> std::tuple<float, float, float, float, float> {
-        grad_elem = static_cast<float>(grad_elem);
-        exp_avg_elem = exp_avg_elem * beta1 + (1 - beta1) * grad_elem;
-        exp_avg_sq_elem =
-            exp_avg_sq_elem * beta2 + grad_elem * grad_elem * (1 - beta2);
-        auto adam_step_elem = exp_avg_elem / bias_correction1 /
-            (Numerics<float>::sqrt(exp_avg_sq_elem / bias_correction2) + eps);
-        adam_step_elem = adam_step_elem + master_weight_elem * weight_decay;
-
-        return std::tuple<float, float, float, float, float>{
-            master_weight_elem * master_weight_elem,
-            adam_step_elem * adam_step_elem,
-            adam_step_elem,
-            exp_avg_elem,
-            exp_avg_sq_elem};
-      });
+  launch_vec_kernel_Lamb_master_weight_functor<scalar_t> f(
+      step,
+      beta1,
+      beta2,
+      bias_correction1,
+      bias_correction2,
+      learning_rate,
+      weight_decay,
+      eps);
+  dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
 
   auto param_norm_sum = at::sum(param_norm_tensor).item().to<float>();
   auto rtw_norm_sum = at::sum(rtw_norm_tensor).item().to<float>();
@@ -165,15 +262,9 @@ void launch_vec_kernel_Lamb_master_weight(
                                        .add_input(adam_step_tensor)
                                        .check_all_same_dtype(false)
                                        .build();
-  dpcpp_kernel_multiple_outputs_for_tensor_iter(
-      update_iter,
-      [=](scalar_t weight_elem,
-          float master_weight_elem,
-          float adam_step_elem) -> std::tuple<scalar_t, float> {
-        weight_elem -= adam_step_elem * learning_rate * true_ratio;
-        return std::tuple<scalar_t, float>{
-            static_cast<scalar_t>(weight_elem), weight_elem};
-      });
+  launch_vec_kernel_Lamb_master_weight_functor_2<scalar_t> f2(
+      learning_rate, true_ratio);
+  dpcpp_kernel_multiple_outputs_for_tensor_iter(update_iter, f2);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step(

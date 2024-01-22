@@ -16,6 +16,13 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t>
+struct tanh_backward_out_functor {
+  scalar_t operator()(scalar_t output, scalar_t z) const {
+    return output * (scalar_t{1} - z * z);
+  }
+};
+
 Tensor& tanh_backward_out(
     const Tensor& grad_output,
     const Tensor& output,
@@ -33,10 +40,8 @@ Tensor& tanh_backward_out(
             iter.dtype(),
             "tanh_backward_out",
             [&]() {
-              dpcpp_kernel_for_tensor_iter(
-                  iter, [](scalar_t output, scalar_t z) -> scalar_t {
-                    return output * (scalar_t{1} - z * z);
-                  });
+              tanh_backward_out_functor<scalar_t> f;
+              dpcpp_kernel_for_tensor_iter(iter, f);
             });
       });
 }
@@ -47,6 +52,13 @@ Tensor tanh_backward(const Tensor& grad_output, const Tensor& output) {
       grad_output, output, grad_input);
 }
 
+template <typename scalar_t>
+struct atan2_kernel_functor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return Numerics<scalar_t>::atan2(a, b);
+  }
+};
+
 void atan2_kernel(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
@@ -54,10 +66,8 @@ void atan2_kernel(TensorIterator& iter) {
       iter.common_dtype(),
       "atan2",
       [&]() {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [](scalar_t a, scalar_t b) -> scalar_t {
-              return Numerics<scalar_t>::atan2(a, b);
-            });
+        atan2_kernel_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 

@@ -709,6 +709,18 @@ void batch_norm_elemt_channels_last_template(
 #undef DISPATCH_TRANSFORM_ACC_INPUT_IMPL
 }
 
+template <typename scalar_t, typename acc_t>
+struct batch_norm_elementwise_functor {
+  scalar_t operator()(
+      scalar_t input,
+      acc_t weight,
+      acc_t bias,
+      acc_t mean,
+      acc_t invstd) const {
+    return ((input - mean) * invstd) * weight + bias;
+  }
+};
+
 void batch_norm_elementwise(
     Tensor& out,
     const Tensor& self,
@@ -792,15 +804,8 @@ void batch_norm_elementwise(
       IPEX_DISPATCH_FLOATING_TYPES_AND2(
           kBFloat16, kHalf, self.scalar_type(), "batch_norm_elementwise", [&] {
             using acc_t = acc_type<scalar_t>;
-            dpcpp_kernel_for_tensor_iter(
-                iter,
-                [](scalar_t input,
-                   acc_t weight,
-                   acc_t bias,
-                   acc_t mean,
-                   acc_t invstd) -> scalar_t {
-                  return ((input - mean) * invstd) * weight + bias;
-                });
+            batch_norm_elementwise_functor<scalar_t, acc_t> f;
+            dpcpp_kernel_for_tensor_iter(iter, f);
           });
       return;
     }
@@ -1584,6 +1589,31 @@ static inline at::Tensor condition_contiguous(const at::Tensor& t) {
   return t.contiguous(cl_tag);
 }
 
+template <typename scalar_t, typename acc_t>
+struct batch_norm_update_stats_functor {
+  std::tuple<scalar_t, scalar_t> operator()(
+      acc_t mean,
+      acc_t var,
+      scalar_t running_mean,
+      scalar_t running_var) const {
+    const auto unbiased_var = var * bessel_correction_factor;
+    return std::tuple<scalar_t, scalar_t>{
+        mean * momentum + (1 - momentum) * running_mean,
+        unbiased_var * momentum + (1 - momentum) * running_var,
+    };
+  }
+
+  batch_norm_update_stats_functor(
+      const acc_t bessel_correction_factor,
+      const acc_t momentum)
+      : bessel_correction_factor(bessel_correction_factor),
+        momentum(momentum) {}
+
+ private:
+  const acc_t bessel_correction_factor;
+  const acc_t momentum;
+};
+
 void batch_norm_update_stats(
     const Tensor& save_mean,
     const Tensor& save_var,
@@ -1612,21 +1642,39 @@ void batch_norm_update_stats(
         const auto bessel_correction_factor = static_cast<acc_t>(
             static_cast<double>(N) / static_cast<double>(N - 1));
         const auto momentum = static_cast<acc_t>(momentum_);
-
-        dpcpp_kernel_multiple_outputs_for_tensor_iter(
-            iter,
-            [=](acc_t mean,
-                acc_t var,
-                scalar_t running_mean,
-                scalar_t running_var) -> std::tuple<scalar_t, scalar_t> {
-              const auto unbiased_var = var * bessel_correction_factor;
-              return std::tuple<scalar_t, scalar_t>{
-                  mean * momentum + (1 - momentum) * running_mean,
-                  unbiased_var * momentum + (1 - momentum) * running_var,
-              };
-            });
+        batch_norm_update_stats_functor<scalar_t, acc_t> f(
+            bessel_correction_factor, momentum);
+        dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t, typename acc_t>
+struct batch_norm_update_stats_and_invert_functor {
+  std::tuple<scalar_t, scalar_t, acc_t> operator()(
+      acc_t mean,
+      acc_t var,
+      scalar_t running_mean,
+      scalar_t running_var) const {
+    const auto unbiased_var = var * bessel_correction_factor;
+    return std::tuple<scalar_t, scalar_t, scalar_t>{
+        mean * momentum + (1 - momentum) * running_mean,
+        unbiased_var * momentum + (1 - momentum) * running_var,
+        Numerics<acc_t>::rsqrt(var + eps)};
+  }
+
+  batch_norm_update_stats_and_invert_functor(
+      const acc_t bessel_correction_factor,
+      const acc_t eps,
+      const acc_t momentum)
+      : bessel_correction_factor(bessel_correction_factor),
+        eps(eps),
+        momentum(momentum) {}
+
+ private:
+  const acc_t bessel_correction_factor;
+  const acc_t eps;
+  const acc_t momentum;
+};
 
 void batch_norm_update_stats_and_invert(
     const Tensor& save_mean,
@@ -1659,21 +1707,23 @@ void batch_norm_update_stats_and_invert(
             static_cast<double>(N) / static_cast<double>(N - 1));
         const auto eps = static_cast<acc_t>(epsilon);
         const auto momentum = static_cast<acc_t>(momentum_);
-
-        dpcpp_kernel_multiple_outputs_for_tensor_iter(
-            iter,
-            [=](acc_t mean,
-                acc_t var,
-                scalar_t running_mean,
-                scalar_t running_var) -> std::tuple<scalar_t, scalar_t, acc_t> {
-              const auto unbiased_var = var * bessel_correction_factor;
-              return std::tuple<scalar_t, scalar_t, scalar_t>{
-                  mean * momentum + (1 - momentum) * running_mean,
-                  unbiased_var * momentum + (1 - momentum) * running_var,
-                  Numerics<acc_t>::rsqrt(var + eps)};
-            });
+        batch_norm_update_stats_and_invert_functor<scalar_t, acc_t> f(
+            bessel_correction_factor, eps, momentum);
+        dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t, typename acc_t>
+struct batch_norm_calc_invstd_functor {
+  acc_t operator()(scalar_t var) const {
+    return Numerics<acc_t>::rsqrt(var + eps);
+  }
+
+  batch_norm_calc_invstd_functor(acc_t eps) : eps(eps) {}
+
+ private:
+  acc_t eps;
+};
 
 void batch_norm_calc_invstd(
     const Tensor& out_invstd,
@@ -1693,9 +1743,8 @@ void batch_norm_calc_invstd(
       [&] {
         using acc_t = acc_type<scalar_t>;
         auto eps = static_cast<acc_t>(epsilon);
-        dpcpp_kernel_for_tensor_iter(iter, [eps](scalar_t var) -> acc_t {
-          return Numerics<acc_t>::rsqrt(var + eps);
-        });
+        batch_norm_calc_invstd_functor<scalar_t, acc_t> f(eps);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 
@@ -3807,6 +3856,29 @@ at::Tensor batch_norm_backward_elemt_channels_last_template(
   return grad_input;
 }
 
+template <typename scalar_t, typename accscalar_t>
+struct batch_norm_elementwise_backward_train_functor {
+  scalar_t operator()(
+      scalar_t gO,
+      scalar_t input,
+      accscalar_t weight,
+      accscalar_t mean,
+      accscalar_t invstd,
+      accscalar_t xmu,
+      accscalar_t dy) const {
+    auto factor_1_c = invstd * invstd * xmu * norm_fct;
+    auto factor_2_c = weight * invstd;
+    auto m_dy_c = dy * norm_fct;
+    return (gO - m_dy_c - (input - mean) * factor_1_c) * factor_2_c;
+  }
+
+  batch_norm_elementwise_backward_train_functor(accscalar_t norm_fct)
+      : norm_fct(norm_fct) {}
+
+ private:
+  accscalar_t norm_fct;
+};
+
 Tensor batch_norm_elementwise_backward_train(
     const Tensor& grad_out,
     const Tensor& input,
@@ -3887,27 +3959,29 @@ Tensor batch_norm_elementwise_backward_train(
             using accscalar_t = acc_type<scalar_t>;
             auto norm_fct =
                 static_cast<accscalar_t>(1.0 / (input.numel() / input.size(1)));
-            dpcpp_kernel_for_tensor_iter(
-                iter,
-                [norm_fct](
-                    scalar_t gO,
-                    scalar_t input,
-                    accscalar_t weight,
-                    accscalar_t mean,
-                    accscalar_t invstd,
-                    accscalar_t xmu,
-                    accscalar_t dy) -> scalar_t {
-                  auto factor_1_c = invstd * invstd * xmu * norm_fct;
-                  auto factor_2_c = weight * invstd;
-                  auto m_dy_c = dy * norm_fct;
-                  return (gO - m_dy_c - (input - mean) * factor_1_c) *
-                      factor_2_c;
-                });
+            batch_norm_elementwise_backward_train_functor<scalar_t, accscalar_t>
+                f(norm_fct);
+            dpcpp_kernel_for_tensor_iter(iter, f);
           });
       return grad_input;
     }
   }
 }
+
+template <typename scalar_t, typename accscalar_t>
+struct batch_norm_elementwise_backward_eval_functor {
+  scalar_t operator()(scalar_t gO, accscalar_t invstd, accscalar_t weight)
+      const {
+    return gO * weight * invstd;
+  }
+};
+
+template <typename scalar_t, typename accscalar_t>
+struct batch_norm_elementwise_backward_eval_functor_2 {
+  scalar_t operator()(scalar_t gO, accscalar_t invstd) const {
+    return gO * invstd;
+  }
+};
 
 Tensor batch_norm_elementwise_backward_eval(
     const Tensor& grad_out,
@@ -3940,10 +4014,8 @@ Tensor batch_norm_elementwise_backward_eval(
         "batch_norm_eval_backward",
         [&] {
           using accscalar_t = acc_type<scalar_t>;
-          dpcpp_kernel_for_tensor_iter(
-              iter,
-              [](scalar_t gO, accscalar_t invstd, accscalar_t weight)
-                  -> scalar_t { return gO * weight * invstd; });
+          batch_norm_elementwise_backward_eval_functor<scalar_t, accscalar_t> f;
+          dpcpp_kernel_for_tensor_iter(iter, f);
         });
   } else {
     auto iter = TensorIteratorConfig()
@@ -3961,10 +4033,9 @@ Tensor batch_norm_elementwise_backward_eval(
         "batch_norm_eval_backward",
         [&] {
           using accscalar_t = acc_type<scalar_t>;
-          dpcpp_kernel_for_tensor_iter(
-              iter, [](scalar_t gO, accscalar_t invstd) -> scalar_t {
-                return gO * invstd;
-              });
+          batch_norm_elementwise_backward_eval_functor_2<scalar_t, accscalar_t>
+              f;
+          dpcpp_kernel_for_tensor_iter(iter, f);
         });
   }
   return grad_input;

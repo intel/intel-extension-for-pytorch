@@ -12,6 +12,15 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t>
+struct frexp_kernel_dpcpp_functor {
+  std::tuple<scalar_t, int32_t> operator()(scalar_t a) const {
+    int32_t exponent;
+    scalar_t mantissa = std::frexp(a, &exponent);
+    return {mantissa, exponent};
+  }
+};
+
 void frexp_kernel_dpcpp(TensorIteratorBase& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
@@ -21,12 +30,8 @@ void frexp_kernel_dpcpp(TensorIteratorBase& iter) {
       iter.dtype(),
       "frexp_dpcpp",
       [&]() {
-        dpcpp_kernel_multiple_outputs_for_tensor_iter(
-            iter, [=](scalar_t a) -> std::tuple<scalar_t, int32_t> {
-              int32_t exponent;
-              scalar_t mantissa = std::frexp(a, &exponent);
-              return {mantissa, exponent};
-            });
+        frexp_kernel_dpcpp_functor<scalar_t> f;
+        dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
       });
 }
 } // namespace impl

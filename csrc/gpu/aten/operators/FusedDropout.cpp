@@ -466,6 +466,18 @@ std::tuple<Tensor, Tensor> dropout_template(
 }
 
 template <typename mask_t, typename scalar_t, typename accscalar_t>
+struct masked_scale_kernel_functor {
+  scalar_t operator()(const scalar_t src_val, const mask_t mask_val) const {
+    return (float)mask_val * src_val * scale;
+  }
+
+  masked_scale_kernel_functor(accscalar_t scale) : scale(scale) {}
+
+ private:
+  accscalar_t scale;
+};
+
+template <typename mask_t, typename scalar_t, typename accscalar_t>
 void masked_scale_kernel(
     at::Tensor& ret,
     const at::Tensor& src,
@@ -477,11 +489,8 @@ void masked_scale_kernel(
                   .add_input(src)
                   .add_input(mask)
                   .build();
-
-  dpcpp_kernel_for_tensor_iter(
-      iter, [=](const scalar_t src_val, const mask_t mask_val) -> scalar_t {
-        return (float)mask_val * src_val * scale;
-      });
+  masked_scale_kernel_functor<mask_t, scalar_t, accscalar_t> f(scale);
+  dpcpp_kernel_for_tensor_iter(iter, f);
 }
 
 template <typename mask_t>

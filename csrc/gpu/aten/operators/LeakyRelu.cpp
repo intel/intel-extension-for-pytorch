@@ -11,6 +11,19 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t>
+struct leaky_relu_out_functor {
+  scalar_t operator()(scalar_t x) const {
+    x = (x >= 0) ? x : x * negval;
+    return x;
+  }
+
+  leaky_relu_out_functor(scalar_t negval) : negval(negval) {}
+
+ private:
+  scalar_t negval;
+};
+
 Tensor& leaky_relu_out(
     const Tensor& self,
     const Scalar& negative_slope,
@@ -24,13 +37,26 @@ Tensor& leaky_relu_out(
       "LeakyReLU",
       [&]() {
         auto negval = negative_slope.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t x) -> scalar_t {
-          x = (x >= 0) ? x : x * negval;
-          return x;
-        });
+        leaky_relu_out_functor<scalar_t> f(negval);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
   return out;
 }
+
+template <typename scalar_t>
+struct leaky_relu_backward_out_functor {
+  scalar_t operator()(scalar_t grad_output, scalar_t x) const {
+    if (x > 0)
+      return grad_output;
+    else
+      return grad_output * negval;
+  }
+
+  leaky_relu_backward_out_functor(scalar_t negval) : negval(negval) {}
+
+ private:
+  scalar_t negval;
+};
 
 Tensor& leaky_relu_backward_out(
     const Tensor& grad_output,
@@ -47,14 +73,8 @@ Tensor& leaky_relu_backward_out(
       "LeakyReLU_backward",
       [&]() {
         auto negval = negative_slope.to<scalar_t>();
-
-        dpcpp_kernel_for_tensor_iter(
-            iter, [=](scalar_t grad_output, scalar_t x) -> scalar_t {
-              if (x > 0)
-                return grad_output;
-              else
-                return grad_output * negval;
-            });
+        leaky_relu_backward_out_functor<scalar_t> f(negval);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
   return grad_input;
 }

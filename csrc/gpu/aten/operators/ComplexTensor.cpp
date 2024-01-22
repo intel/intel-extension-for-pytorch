@@ -42,18 +42,30 @@ void complex_check_dtype(
       " for argument 'out'");
 }
 
+template <typename scalar_t>
+struct polar_dpcpp_functor {
+  c10::complex<scalar_t> operator()(scalar_t a, scalar_t b) const {
+    return c10::complex<scalar_t>(
+        a * Numerics<scalar_t>::cos(b), a * Numerics<scalar_t>::sin(b));
+  }
+};
+
 void polar_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES(iter.input_dtype(0), "polar", [&]() {
-    AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter(
-        iter, [=](scalar_t a, scalar_t b) -> c10::complex<scalar_t> {
-          return c10::complex<scalar_t>(
-              a * Numerics<scalar_t>::cos(b), a * Numerics<scalar_t>::sin(b));
-        });
+    polar_dpcpp_functor<scalar_t> f;
+    AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter(iter, f);
   });
 }
 } // namespace impl
 
 namespace AtenIpexTypeXPU {
+
+template <typename scalar_t>
+struct complex_out_functor {
+  c10::complex<scalar_t> operator()(scalar_t a, scalar_t b) const {
+    return c10::complex<scalar_t>(a, b);
+  }
+};
 
 Tensor& complex_out(const Tensor& real, const Tensor& imag, Tensor& result) {
   impl::complex_check_dtype(result, real, imag);
@@ -65,10 +77,8 @@ Tensor& complex_out(const Tensor& real, const Tensor& imag, Tensor& result) {
                   .build();
   IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       iter.input_dtype(), "complex_out", [&]() {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [](scalar_t a, scalar_t b) -> c10::complex<scalar_t> {
-              return c10::complex<scalar_t>(a, b);
-            });
+        complex_out_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 
   return result;

@@ -28,6 +28,14 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 template <typename scalar_t>
+struct ema_fused_impl_functor {
+  scalar_t operator()(scalar_t model, scalar_t ema, scalar_t decay) const {
+    ema = ema * decay + (1 - decay) * model;
+    return ema;
+  }
+};
+
+template <typename scalar_t>
 void ema_fused_impl(Tensor model_param, Tensor ema_param, Tensor decay) {
   at::TensorIterator iter = TensorIteratorConfig()
                                 .add_output(ema_param)
@@ -35,12 +43,8 @@ void ema_fused_impl(Tensor model_param, Tensor ema_param, Tensor decay) {
                                 .add_input(ema_param)
                                 .add_input(decay)
                                 .build();
-
-  dpcpp_kernel_for_tensor_iter(
-      iter, [=](scalar_t model, scalar_t ema, scalar_t decay) {
-        ema = ema * decay + (1 - decay) * model;
-        return ema;
-      });
+  ema_fused_impl_functor<scalar_t> f;
+  dpcpp_kernel_for_tensor_iter(iter, f);
 }
 
 void ema_fused_step(

@@ -23,6 +23,14 @@ IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
     Numerics<scalar_t>::tan,
     unary_float_op);
 
+template <typename scalar_t>
+struct tanh_out_functor {
+  scalar_t operator()(scalar_t a) const {
+    using opmath_t = at::opmath_type<scalar_t>;
+    return Numerics<opmath_t>::tanh(static_cast<opmath_t>(a));
+  }
+};
+
 Tensor& tanh_out(const Tensor& self, Tensor& result) {
   return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_tanh>(
       TensorIterator::unary_float_op,
@@ -35,10 +43,8 @@ Tensor& tanh_out(const Tensor& self, Tensor& result) {
             iter.common_dtype(),
             "tanh",
             [&]() {
-              dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-                using opmath_t = at::opmath_type<scalar_t>;
-                return Numerics<opmath_t>::tanh(static_cast<opmath_t>(a));
-              });
+              tanh_out_functor<scalar_t> f;
+              dpcpp_kernel_for_tensor_iter(iter, f);
             });
       });
 }

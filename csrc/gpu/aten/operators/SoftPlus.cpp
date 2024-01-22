@@ -14,6 +14,23 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t, typename accscalar_t>
+struct softplus_out_functor {
+  scalar_t operator()(accscalar_t a) const {
+    return scalar_t(
+        a * b > t
+            ? a
+            : Numerics<accscalar_t>::log1p(Numerics<accscalar_t>::exp(a * b)) /
+                b);
+  }
+
+  softplus_out_functor(accscalar_t b, accscalar_t t) : b(b), t(t) {}
+
+ private:
+  accscalar_t b;
+  accscalar_t t;
+};
+
 Tensor& softplus_out(
     const Tensor& self,
     const Scalar& beta,
@@ -29,13 +46,8 @@ Tensor& softplus_out(
         using accscalar_t = acc_type<scalar_t>;
         auto b = beta.to<accscalar_t>();
         auto t = threshold.to<accscalar_t>();
-        dpcpp_kernel_for_tensor_iter(iter, [=](accscalar_t a) -> scalar_t {
-          return scalar_t(
-              a * b > t ? a
-                        : Numerics<accscalar_t>::log1p(
-                              Numerics<accscalar_t>::exp(a * b)) /
-                      b);
-        });
+        softplus_out_functor<scalar_t, accscalar_t> f(b, t);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 
   return out;
@@ -48,6 +60,22 @@ Tensor softplus(
   Tensor out = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::softplus_out(self, beta, threshold, out);
 }
+
+template <typename scalar_t>
+struct softplus_backward_out_functor {
+  scalar_t operator()(scalar_t grad_output_data, scalar_t output_data) const {
+    scalar_t beta_out = b * output_data;
+    scalar_t exp_bo = Numerics<scalar_t>::exp(beta_out);
+    return beta_out > t ? grad_output_data
+                        : grad_output_data * exp_bo / (exp_bo + 1);
+  }
+
+  softplus_backward_out_functor(scalar_t b, scalar_t t) : b(b), t(t) {}
+
+ private:
+  scalar_t b;
+  scalar_t t;
+};
 
 Tensor& softplus_backward_out(
     const Tensor& grad_output,
@@ -65,14 +93,8 @@ Tensor& softplus_backward_out(
       [&]() {
         auto b = beta.to<scalar_t>();
         auto t = threshold.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter(
-            iter,
-            [=](scalar_t grad_output_data, scalar_t output_data) -> scalar_t {
-              scalar_t beta_out = b * output_data;
-              scalar_t exp_bo = Numerics<scalar_t>::exp(beta_out);
-              return beta_out > t ? grad_output_data
-                                  : grad_output_data * exp_bo / (exp_bo + 1);
-            });
+        softplus_backward_out_functor<scalar_t> f(b, t);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 
   return grad_input;

@@ -30,13 +30,19 @@ Tensor& where_out(
     Tensor& out);
 namespace impl {
 
+template <typename scalar_t>
+struct where_kernel_functor {
+  scalar_t operator()(bool cond_val, scalar_t self_val, scalar_t other_val)
+      const {
+    return cond_val ? self_val : other_val;
+  }
+};
+
 void where_kernel(TensorIterator& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
       kComplexHalf, kHalf, kBFloat16, kBool, iter.dtype(), "where_dpcpp", [&] {
-        dpcpp_kernel_for_tensor_iter(
-            iter,
-            [=](bool cond_val, scalar_t self_val, scalar_t other_val)
-                -> scalar_t { return cond_val ? self_val : other_val; });
+        where_kernel_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 
@@ -144,6 +150,13 @@ void _assert_async(const Tensor& self_tensor, c10::string_view assert_msg) {
   at::AtenIpexTypeXPU::_assert_async(self_tensor);
 }
 
+template <typename scalar_t>
+struct isneginf_out_functor {
+  bool operator()(scalar_t a) const {
+    return a == Numerics<scalar_t>::lower_bound();
+  }
+};
+
 Tensor& isneginf_out(const Tensor& self, Tensor& out) {
   TORCH_CHECK(!self.is_complex(), "isneginf does not support complex inputs.");
   TORCH_CHECK(
@@ -160,13 +173,19 @@ Tensor& isneginf_out(const Tensor& self, Tensor& out) {
         iter.input_dtype(),
         "isneginf",
         [&]() {
-          dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> bool {
-            return a == Numerics<scalar_t>::lower_bound();
-          });
+          isneginf_out_functor<scalar_t> f;
+          dpcpp_kernel_for_tensor_iter(iter, f);
         });
   }
   return out;
 }
+
+template <typename scalar_t>
+struct isposinf_out_functor {
+  bool operator()(scalar_t a) const {
+    return a == Numerics<scalar_t>::upper_bound();
+  }
+};
 
 Tensor& isposinf_out(const Tensor& self, Tensor& out) {
   TORCH_CHECK(!self.is_complex(), "isposinf does not support complex inputs.");
@@ -184,9 +203,8 @@ Tensor& isposinf_out(const Tensor& self, Tensor& out) {
         iter.input_dtype(),
         "isposinf",
         [&]() {
-          dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> bool {
-            return a == Numerics<scalar_t>::upper_bound();
-          });
+          isposinf_out_functor<scalar_t> f;
+          dpcpp_kernel_for_tensor_iter(iter, f);
         });
   }
   return out;

@@ -75,6 +75,35 @@ void div_true_kernel(TensorIteratorBase& iter) {
   }
 }
 
+template <typename scalar_t, typename accscalar_t>
+struct div_floor_kernel_dpcpp_functor {
+  scalar_t operator()(scalar_t a) const {
+    auto mod = Numerics<scalar_t>::fmod(a, b);
+    auto div = (a - mod) * inv_b;
+    if ((mod != 0) && (b < 0) != (mod < 0)) {
+      div -= scalar_t(1);
+    }
+
+    scalar_t floordiv;
+    if (div != 0) {
+      floordiv = Numerics<scalar_t>::floor(div);
+      if (div - floordiv > scalar_t(0.5)) {
+        floordiv += scalar_t(1.0);
+      }
+    } else {
+      floordiv = Numerics<scalar_t>::copysign(scalar_t(0), a * inv_b);
+    }
+    return floordiv;
+  }
+
+  div_floor_kernel_dpcpp_functor(accscalar_t b, accscalar_t inv_b)
+      : b(b), inv_b(inv_b) {}
+
+ private:
+  accscalar_t b;
+  accscalar_t inv_b;
+};
+
 static void div_floor_kernel_dpcpp(TensorIterator& iter) {
   const auto dtype = iter.common_dtype();
   if (dtype == kByte) {
@@ -115,26 +144,8 @@ static void div_floor_kernel_dpcpp(TensorIterator& iter) {
 
           auto inv_b = accscalar_t(1.0) / b;
           iter.remove_operand(2);
-          dpcpp_kernel_for_tensor_iter(
-              iter, [b, inv_b](scalar_t a) -> scalar_t {
-                auto mod = Numerics<scalar_t>::fmod(a, b);
-                auto div = (a - mod) * inv_b;
-                if ((mod != 0) && (b < 0) != (mod < 0)) {
-                  div -= scalar_t(1);
-                }
-
-                scalar_t floordiv;
-                if (div != 0) {
-                  floordiv = Numerics<scalar_t>::floor(div);
-                  if (div - floordiv > scalar_t(0.5)) {
-                    floordiv += scalar_t(1.0);
-                  }
-                } else {
-                  floordiv =
-                      Numerics<scalar_t>::copysign(scalar_t(0), a * inv_b);
-                }
-                return floordiv;
-              });
+          div_floor_kernel_dpcpp_functor<scalar_t, accscalar_t> f(b, inv_b);
+          dpcpp_kernel_for_tensor_iter(iter, f);
         });
   } else {
     IPEX_DISPATCH_FLOATING_TYPES_AND2(

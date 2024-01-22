@@ -318,6 +318,20 @@ Tensor& norm_out(
       out, self, p, dim, keepdim, c10::nullopt);
 }
 
+template <typename scalar_t>
+struct renorm_out_functor {
+  scalar_t operator()(scalar_t norm) const {
+    if (norm > maxnorm_elm)
+      return maxnorm_elm / (norm + 1e-7);
+    return 1.;
+  }
+
+  renorm_out_functor(scalar_t maxnorm_elm) : maxnorm_elm(maxnorm_elm) {}
+
+ private:
+  scalar_t maxnorm_elm;
+};
+
 Tensor& renorm_out(
     const Tensor& self,
     const Scalar& p,
@@ -368,11 +382,8 @@ Tensor& renorm_out(
       "renorm_out_dpcpp",
       [&] {
         auto maxnorm_elm = maxnorm.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t norm) -> scalar_t {
-          if (norm > maxnorm_elm)
-            return maxnorm_elm / (norm + 1e-7);
-          return 1.;
-        });
+        renorm_out_functor<scalar_t> f(maxnorm_elm);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
   return at::mul_outf(self, factor, const_cast<Tensor&>(out));
 }

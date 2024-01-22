@@ -30,6 +30,126 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t>
+struct ComputeAdamKernelFunctor {
+  std::tuple<scalar_t, scalar_t, scalar_t, scalar_t> operator()(
+      scalar_t weight_elem,
+      scalar_t grad_elem,
+      scalar_t avg_elem,
+      scalar_t avg_sq_elem,
+      scalar_t max_avg_sq_elem) const {
+    if (use_weight_decay) {
+      grad_elem += weight_elem * weight_decay;
+    }
+    avg_elem = avg_elem * beta1_value + grad_elem * exp_avg_ele_coefficient;
+
+    avg_sq_elem = avg_sq_elem * beta2_value +
+        exp_avg_sq_ele_coefficient * grad_elem * grad_elem;
+
+    max_avg_sq_elem =
+        max_avg_sq_elem < avg_sq_elem ? avg_sq_elem : max_avg_sq_elem;
+
+    weight_elem = weight_elem -
+        step_size * avg_elem /
+            (Numerics<float>::sqrt(max_avg_sq_elem / bias_correlation2) +
+             eps_value);
+    return std::tuple<scalar_t, scalar_t, scalar_t, scalar_t>(
+        avg_elem, avg_sq_elem, max_avg_sq_elem, weight_elem);
+  }
+
+  ComputeAdamKernelFunctor(
+      const bool use_weight_decay_,
+      const float exp_avg_ele_coefficient_,
+      const float exp_avg_sq_ele_coefficient_,
+      const float beta1_value_,
+      const float beta2_value_,
+      const float bias_correlation1_,
+      const float bias_correlation2_,
+      const float step_size_,
+      const float weight_decay_,
+      const float eps_value_)
+      : use_weight_decay(use_weight_decay_),
+        exp_avg_ele_coefficient(exp_avg_ele_coefficient_),
+        exp_avg_sq_ele_coefficient(exp_avg_sq_ele_coefficient_),
+        beta1_value(beta1_value_),
+        beta2_value(beta2_value_),
+        bias_correlation1(bias_correlation1_),
+        bias_correlation2(bias_correlation2_),
+        step_size(step_size_),
+        weight_decay(weight_decay_),
+        eps_value(eps_value_) {}
+
+ private:
+  const bool use_weight_decay;
+  const float exp_avg_ele_coefficient;
+  const float exp_avg_sq_ele_coefficient;
+  const float beta1_value;
+  const float beta2_value;
+  const float bias_correlation1;
+  const float bias_correlation2;
+  const float step_size;
+  const float weight_decay;
+  const float eps_value;
+};
+
+template <typename scalar_t>
+struct ComputeAdamKernelFunctor2 {
+  std::tuple<scalar_t, scalar_t, scalar_t> operator()(
+      scalar_t weight_elem,
+      scalar_t grad_elem,
+      scalar_t avg_elem,
+      scalar_t avg_sq_elem) const {
+    if (use_weight_decay) {
+      grad_elem += weight_elem * weight_decay;
+    }
+    avg_elem = avg_elem * beta1_value + grad_elem * exp_avg_ele_coefficient;
+
+    avg_sq_elem = avg_sq_elem * beta2_value +
+        exp_avg_sq_ele_coefficient * grad_elem * grad_elem;
+
+    weight_elem = weight_elem -
+        step_size * avg_elem /
+            (Numerics<float>::sqrt(avg_sq_elem / bias_correlation2) +
+             eps_value);
+
+    return std::tuple<scalar_t, scalar_t, scalar_t>(
+        avg_elem, avg_sq_elem, weight_elem);
+  }
+  ComputeAdamKernelFunctor2(
+      const bool use_weight_decay_,
+      const float exp_avg_ele_coefficient_,
+      const float exp_avg_sq_ele_coefficient_,
+      const float beta1_value_,
+      const float beta2_value_,
+      const float bias_correlation1_,
+      const float bias_correlation2_,
+      const float step_size_,
+      const float weight_decay_,
+      const float eps_value_)
+      : use_weight_decay(use_weight_decay_),
+        exp_avg_ele_coefficient(exp_avg_ele_coefficient_),
+        exp_avg_sq_ele_coefficient(exp_avg_sq_ele_coefficient_),
+        beta1_value(beta1_value_),
+        beta2_value(beta2_value_),
+        bias_correlation1(bias_correlation1_),
+        bias_correlation2(bias_correlation2_),
+        step_size(step_size_),
+        weight_decay(weight_decay_),
+        eps_value(eps_value_) {}
+
+ private:
+  const bool use_weight_decay;
+  const float exp_avg_ele_coefficient;
+  const float exp_avg_sq_ele_coefficient;
+  const float beta1_value;
+  const float beta2_value;
+  const float bias_correlation1;
+  const float bias_correlation2;
+  const float step_size;
+  const float weight_decay;
+  const float eps_value;
+};
+
+template <typename scalar_t>
 static void ComputeAdamKernel(
     Tensor& weight,
     Tensor& avg,
@@ -59,33 +179,18 @@ static void ComputeAdamKernel(
                                   .add_input(avg_sq)
                                   .add_input(max_avg_sq)
                                   .build();
-    dpcpp_kernel_multiple_outputs_for_tensor_iter(
-        iter,
-        [=](scalar_t weight_elem,
-            scalar_t grad_elem,
-            scalar_t avg_elem,
-            scalar_t avg_sq_elem,
-            scalar_t max_avg_sq_elem)
-            -> std::tuple<scalar_t, scalar_t, scalar_t, scalar_t> {
-          if (use_weight_decay) {
-            grad_elem += weight_elem * weight_decay;
-          }
-          avg_elem =
-              avg_elem * beta1_value + grad_elem * exp_avg_ele_coefficient;
-
-          avg_sq_elem = avg_sq_elem * beta2_value +
-              exp_avg_sq_ele_coefficient * grad_elem * grad_elem;
-
-          max_avg_sq_elem =
-              max_avg_sq_elem < avg_sq_elem ? avg_sq_elem : max_avg_sq_elem;
-
-          weight_elem = weight_elem -
-              step_size * avg_elem /
-                  (Numerics<float>::sqrt(max_avg_sq_elem / bias_correlation2) +
-                   eps_value);
-          return std::tuple<scalar_t, scalar_t, scalar_t, scalar_t>(
-              avg_elem, avg_sq_elem, max_avg_sq_elem, weight_elem);
-        });
+    ComputeAdamKernelFunctor<scalar_t> f(
+        use_weight_decay,
+        exp_avg_ele_coefficient,
+        exp_avg_sq_ele_coefficient,
+        beta1_value,
+        beta2_value,
+        bias_correlation1,
+        bias_correlation2,
+        step_size,
+        weight_decay,
+        eps_value);
+    dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
   } else {
     at::TensorIterator iter = TensorIteratorConfig()
                                   .add_output(avg)
@@ -96,31 +201,151 @@ static void ComputeAdamKernel(
                                   .add_input(avg)
                                   .add_input(avg_sq)
                                   .build();
-    dpcpp_kernel_multiple_outputs_for_tensor_iter(
-        iter,
-        [=](scalar_t weight_elem,
-            scalar_t grad_elem,
-            scalar_t avg_elem,
-            scalar_t avg_sq_elem) -> std::tuple<scalar_t, scalar_t, scalar_t> {
-          if (use_weight_decay) {
-            grad_elem += weight_elem * weight_decay;
-          }
-          avg_elem =
-              avg_elem * beta1_value + grad_elem * exp_avg_ele_coefficient;
-
-          avg_sq_elem = avg_sq_elem * beta2_value +
-              exp_avg_sq_ele_coefficient * grad_elem * grad_elem;
-
-          weight_elem = weight_elem -
-              step_size * avg_elem /
-                  (Numerics<float>::sqrt(avg_sq_elem / bias_correlation2) +
-                   eps_value);
-
-          return std::tuple<scalar_t, scalar_t, scalar_t>(
-              avg_elem, avg_sq_elem, weight_elem);
-        });
+    ComputeAdamKernelFunctor2<scalar_t> f(
+        use_weight_decay,
+        exp_avg_ele_coefficient,
+        exp_avg_sq_ele_coefficient,
+        beta1_value,
+        beta2_value,
+        bias_correlation1,
+        bias_correlation2,
+        step_size,
+        weight_decay,
+        eps_value);
+    dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
   }
 }
+
+template <typename scalar_t>
+struct ComputeAdamKernelMasterWeightFunctor {
+  std::tuple<float, float, float, float, scalar_t> operator()(
+      scalar_t grad_elem,
+      float avg_elem,
+      float avg_sq_elem,
+      float max_avg_sq_elem,
+      float master_weight_elem) const {
+    auto grad_float_elem = static_cast<float>(grad_elem);
+    if (use_weight_decay) {
+      grad_float_elem += master_weight_elem * weight_decay;
+    }
+    avg_elem =
+        avg_elem * beta1_value + grad_float_elem * exp_avg_ele_coefficient;
+
+    avg_sq_elem = avg_sq_elem * beta2_value +
+        exp_avg_sq_ele_coefficient * grad_float_elem * grad_float_elem;
+
+    // amsgrad
+    max_avg_sq_elem =
+        max_avg_sq_elem < avg_sq_elem ? avg_sq_elem : max_avg_sq_elem;
+
+    master_weight_elem = master_weight_elem -
+        step_size * avg_elem /
+            (Numerics<float>::sqrt(max_avg_sq_elem / bias_correction2) +
+             eps_value);
+
+    return std::tuple<float, float, float, float, scalar_t>(
+        avg_elem,
+        avg_sq_elem,
+        max_avg_sq_elem,
+        master_weight_elem,
+        static_cast<scalar_t>(master_weight_elem));
+  }
+  ComputeAdamKernelMasterWeightFunctor(
+      const bool use_weight_decay_,
+      const float exp_avg_ele_coefficient_,
+      const float exp_avg_sq_ele_coefficient_,
+      const float beta1_value_,
+      const float beta2_value_,
+      const float bias_correction1_,
+      const float bias_correction2_,
+      const float step_size_,
+      const float weight_decay_,
+      const float eps_value_)
+      : use_weight_decay(use_weight_decay_),
+        exp_avg_ele_coefficient(exp_avg_ele_coefficient_),
+        exp_avg_sq_ele_coefficient(exp_avg_sq_ele_coefficient_),
+        beta1_value(beta1_value_),
+        beta2_value(beta2_value_),
+        bias_correction1(bias_correction1_),
+        bias_correction2(bias_correction2_),
+        step_size(step_size_),
+        weight_decay(weight_decay_),
+        eps_value(eps_value_) {}
+
+ private:
+  const bool use_weight_decay;
+  const float exp_avg_ele_coefficient;
+  const float exp_avg_sq_ele_coefficient;
+  const float beta1_value;
+  const float beta2_value;
+  const float bias_correction1;
+  const float bias_correction2;
+  const float step_size;
+  const float weight_decay;
+  const float eps_value;
+};
+
+template <typename scalar_t>
+struct ComputeAdamKernelMasterWeightFunctor2 {
+  std::tuple<float, float, float, scalar_t> operator()(
+      scalar_t grad_elem,
+      float avg_elem,
+      float avg_sq_elem,
+      float master_weight_elem) const {
+    auto grad_float_elem = static_cast<float>(grad_elem);
+    if (use_weight_decay) {
+      grad_float_elem += master_weight_elem * weight_decay;
+    }
+    avg_elem =
+        avg_elem * beta1_value + grad_float_elem * exp_avg_ele_coefficient;
+
+    avg_sq_elem = avg_sq_elem * beta2_value +
+        exp_avg_sq_ele_coefficient * grad_float_elem * grad_float_elem;
+
+    master_weight_elem = master_weight_elem -
+        step_size * avg_elem /
+            (Numerics<float>::sqrt(avg_sq_elem / bias_correction2) + eps_value);
+
+    return std::tuple<float, float, float, scalar_t>(
+        avg_elem,
+        avg_sq_elem,
+        master_weight_elem,
+        static_cast<scalar_t>(master_weight_elem));
+  }
+  ComputeAdamKernelMasterWeightFunctor2(
+      const bool use_weight_decay_,
+      const float exp_avg_ele_coefficient_,
+      const float exp_avg_sq_ele_coefficient_,
+      const float beta1_value_,
+      const float beta2_value_,
+      const float bias_correction1_,
+      const float bias_correction2_,
+      const float step_size_,
+      const float weight_decay_,
+      const float eps_value_)
+      : use_weight_decay(use_weight_decay_),
+        exp_avg_ele_coefficient(exp_avg_ele_coefficient_),
+        exp_avg_sq_ele_coefficient(exp_avg_sq_ele_coefficient_),
+        beta1_value(beta1_value_),
+        beta2_value(beta2_value_),
+        bias_correction1(bias_correction1_),
+        bias_correction2(bias_correction2_),
+        step_size(step_size_),
+        weight_decay(weight_decay_),
+        eps_value(eps_value_) {}
+
+ private:
+  const bool use_weight_decay;
+  const float exp_avg_ele_coefficient;
+  const float exp_avg_sq_ele_coefficient;
+  const float beta1_value;
+  const float beta2_value;
+  const float bias_correction1;
+  const float bias_correction2;
+  const float step_size;
+  const float weight_decay;
+  const float eps_value;
+};
 
 // scalar_t is for fp16 or bf16, master weight is fp32
 template <typename scalar_t>
@@ -156,41 +381,18 @@ static void ComputeAdamKernelMasterWeight(
                                   .add_input(master_weight)
                                   .check_all_same_dtype(false)
                                   .build();
-
-    dpcpp_kernel_multiple_outputs_for_tensor_iter(
-        iter,
-        [=](scalar_t grad_elem,
-            float avg_elem,
-            float avg_sq_elem,
-            float max_avg_sq_elem,
-            float master_weight_elem)
-            -> std::tuple<float, float, float, float, scalar_t> {
-          auto grad_float_elem = static_cast<float>(grad_elem);
-          if (use_weight_decay) {
-            grad_float_elem += master_weight_elem * weight_decay;
-          }
-          avg_elem = avg_elem * beta1_value +
-              grad_float_elem * exp_avg_ele_coefficient;
-
-          avg_sq_elem = avg_sq_elem * beta2_value +
-              exp_avg_sq_ele_coefficient * grad_float_elem * grad_float_elem;
-
-          // amsgrad
-          max_avg_sq_elem =
-              max_avg_sq_elem < avg_sq_elem ? avg_sq_elem : max_avg_sq_elem;
-
-          master_weight_elem = master_weight_elem -
-              step_size * avg_elem /
-                  (Numerics<float>::sqrt(max_avg_sq_elem / bias_correction2) +
-                   eps_value);
-
-          return std::tuple<float, float, float, float, scalar_t>(
-              avg_elem,
-              avg_sq_elem,
-              max_avg_sq_elem,
-              master_weight_elem,
-              static_cast<scalar_t>(master_weight_elem));
-        });
+    ComputeAdamKernelMasterWeightFunctor<scalar_t> f(
+        use_weight_decay,
+        exp_avg_ele_coefficient,
+        exp_avg_sq_ele_coefficient,
+        beta1_value,
+        beta2_value,
+        bias_correction1,
+        bias_correction2,
+        step_size,
+        weight_decay,
+        eps_value);
+    dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
   } else {
     at::TensorIterator iter = TensorIteratorConfig()
                                   .add_output(avg)
@@ -203,35 +405,18 @@ static void ComputeAdamKernelMasterWeight(
                                   .add_input(master_weight)
                                   .check_all_same_dtype(false)
                                   .build();
-
-    dpcpp_kernel_multiple_outputs_for_tensor_iter(
-        iter,
-        [=](scalar_t grad_elem,
-            float avg_elem,
-            float avg_sq_elem,
-            float master_weight_elem)
-            -> std::tuple<float, float, float, scalar_t> {
-          auto grad_float_elem = static_cast<float>(grad_elem);
-          if (use_weight_decay) {
-            grad_float_elem += master_weight_elem * weight_decay;
-          }
-          avg_elem = avg_elem * beta1_value +
-              grad_float_elem * exp_avg_ele_coefficient;
-
-          avg_sq_elem = avg_sq_elem * beta2_value +
-              exp_avg_sq_ele_coefficient * grad_float_elem * grad_float_elem;
-
-          master_weight_elem = master_weight_elem -
-              step_size * avg_elem /
-                  (Numerics<float>::sqrt(avg_sq_elem / bias_correction2) +
-                   eps_value);
-
-          return std::tuple<float, float, float, scalar_t>(
-              avg_elem,
-              avg_sq_elem,
-              master_weight_elem,
-              static_cast<scalar_t>(master_weight_elem));
-        });
+    ComputeAdamKernelMasterWeightFunctor2<scalar_t> f(
+        use_weight_decay,
+        exp_avg_ele_coefficient,
+        exp_avg_sq_ele_coefficient,
+        beta1_value,
+        beta2_value,
+        bias_correction1,
+        bias_correction2,
+        step_size,
+        weight_decay,
+        eps_value);
+    dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
   }
 }
 } // namespace impl

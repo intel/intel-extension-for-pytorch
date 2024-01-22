@@ -18,6 +18,13 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t>
+struct conj_physical_kernel_functor {
+  scalar_t operator()(scalar_t a) const {
+    return at::AtenIpexTypeXPU::conj_impl(a);
+  }
+};
+
 void conj_physical_kernel(TensorIterator& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       ScalarType::Bool,
@@ -26,9 +33,8 @@ void conj_physical_kernel(TensorIterator& iter) {
       iter.common_dtype(),
       "conj",
       [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          return at::AtenIpexTypeXPU::conj_impl(a);
-        });
+        conj_physical_kernel_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 

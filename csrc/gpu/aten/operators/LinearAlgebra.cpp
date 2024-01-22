@@ -232,6 +232,60 @@ Tensor chain_matmul_recursion(
         chain_matmul_recursion(matrices, order, order[i][j] + 1, j));
 }
 
+template <typename scalar_t>
+struct addr_kernel_functor {
+  scalar_t operator()(scalar_t self_val, scalar_t vec1_val, scalar_t vec2_val)
+      const {
+    return alpha_val && vec1_val && vec2_val;
+  }
+  addr_kernel_functor(scalar_t alpha_val) : alpha_val(alpha_val) {}
+
+ private:
+  scalar_t alpha_val;
+};
+
+template <typename scalar_t>
+struct addr_kernel_functor_2 {
+  scalar_t operator()(scalar_t self_val, scalar_t vec1_val, scalar_t vec2_val)
+      const {
+    return (beta_val && self_val) || (alpha_val && vec1_val && vec2_val);
+  }
+
+  addr_kernel_functor_2(scalar_t alpha_val, scalar_t beta_val)
+      : alpha_val(alpha_val), beta_val(beta_val) {}
+
+ private:
+  scalar_t alpha_val;
+  scalar_t beta_val;
+};
+
+template <typename scalar_t>
+struct addr_kernel_functor_3 {
+  scalar_t operator()(scalar_t self_val, scalar_t vec1_val, scalar_t vec2_val)
+      const {
+    return alpha_val * vec1_val * vec2_val;
+  }
+  addr_kernel_functor_3(scalar_t alpha_val) : alpha_val(alpha_val) {}
+
+ private:
+  scalar_t alpha_val;
+};
+
+template <typename scalar_t>
+struct addr_kernel_functor_4 {
+  scalar_t operator()(scalar_t self_val, scalar_t vec1_val, scalar_t vec2_val)
+      const {
+    return beta_val * self_val + alpha_val * vec1_val * vec2_val;
+  }
+
+  addr_kernel_functor_4(scalar_t alpha_val, scalar_t beta_val)
+      : alpha_val(alpha_val), beta_val(beta_val) {}
+
+ private:
+  scalar_t alpha_val;
+  scalar_t beta_val;
+};
+
 void addr_kernel(
     TensorIterator& iter,
     const Scalar& beta,
@@ -244,19 +298,11 @@ void addr_kernel(
     // when beta is false, values in self should be ignored,
     // nans and infs in self should not propagate.
     if (beta_val == false) {
-      dpcpp_kernel_for_tensor_iter(
-          iter,
-          [=](scalar_t self_val, scalar_t vec1_val, scalar_t vec2_val)
-              -> scalar_t { return alpha_val && vec1_val && vec2_val; });
+      addr_kernel_functor<scalar_t> f(alpha_val);
+      dpcpp_kernel_for_tensor_iter(iter, f);
     } else {
-      dpcpp_kernel_for_tensor_iter(
-          iter,
-          [=](scalar_t self_val,
-              scalar_t vec1_val,
-              scalar_t vec2_val) -> scalar_t {
-            return (beta_val && self_val) ||
-                (alpha_val && vec1_val && vec2_val);
-          });
+      addr_kernel_functor_2<scalar_t> f(alpha_val, beta_val);
+      dpcpp_kernel_for_tensor_iter(iter, f);
     }
     return;
   }
@@ -270,18 +316,11 @@ void addr_kernel(
         // when beta==0, values in self should be ignored,
         // nans and infs in self should not propagate.
         if (beta_val == zero_val) {
-          dpcpp_kernel_for_tensor_iter(
-              iter,
-              [=](scalar_t self_val, scalar_t vec1_val, scalar_t vec2_val)
-                  -> scalar_t { return alpha_val * vec1_val * vec2_val; });
+          addr_kernel_functor_3<scalar_t> f(alpha_val);
+          dpcpp_kernel_for_tensor_iter(iter, f);
         } else {
-          dpcpp_kernel_for_tensor_iter(
-              iter,
-              [=](scalar_t self_val,
-                  scalar_t vec1_val,
-                  scalar_t vec2_val) -> scalar_t {
-                return beta_val * self_val + alpha_val * vec1_val * vec2_val;
-              });
+          addr_kernel_functor_4<scalar_t> f(alpha_val, beta_val);
+          dpcpp_kernel_for_tensor_iter(iter, f);
         }
       });
 }

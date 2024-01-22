@@ -21,6 +21,13 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t>
+struct digamma_kernel_xpu_functor {
+  scalar_t operator()(scalar_t a) const {
+    return calc_digamma(a);
+  }
+};
+
 void digamma_kernel_xpu(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
@@ -28,10 +35,17 @@ void digamma_kernel_xpu(TensorIterator& iter) {
       iter.common_dtype(),
       "digamma_xpu",
       [&]() {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [=](scalar_t a) -> scalar_t { return calc_digamma(a); });
+        digamma_kernel_xpu_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct igamma_kernel_xpu_functor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return calc_igamma(a, b);
+  }
+};
 
 void igamma_kernel_xpu(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -40,22 +54,32 @@ void igamma_kernel_xpu(TensorIterator& iter) {
       iter.common_dtype(),
       "igamma_xpu",
       [&]() {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [=](scalar_t a, scalar_t b) -> scalar_t {
-              return calc_igamma(a, b);
-            });
+        igamma_kernel_xpu_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct igammac_kernel_xpu_functor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return calc_igammac(a, b);
+  }
+};
 
 void igammac_kernel_xpu(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.common_dtype(), "igammac_xpu", [&]() {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [=](scalar_t a, scalar_t b) -> scalar_t {
-              return calc_igammac(a, b);
-            });
+        igammac_kernel_xpu_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct trigamma_kernel_xpu_functor {
+  scalar_t operator()(scalar_t a) const {
+    return calc_trigamma(a);
+  }
+};
 
 void trigamma_kernel_xpu(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -64,10 +88,22 @@ void trigamma_kernel_xpu(TensorIterator& iter) {
       iter.common_dtype(),
       "trigamma_xpu",
       [&]() {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [=](scalar_t a) -> scalar_t { return calc_trigamma(a); });
+        trigamma_kernel_xpu_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct polygamma_kernel_xpu_functor {
+  scalar_t operator()(scalar_t a) const {
+    return calc_polygamma(a, n);
+  }
+
+  polygamma_kernel_xpu_functor(int64_t n) : n(n) {}
+
+ private:
+  int64_t n;
+};
 
 void polygamma_kernel_xpu(TensorIterator& iter, int64_t n) {
   if (n == 0) {
@@ -81,9 +117,8 @@ void polygamma_kernel_xpu(TensorIterator& iter, int64_t n) {
         iter.common_dtype(),
         "polygamma_xpu",
         [&]() {
-          dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
-            return calc_polygamma(a, n);
-          });
+          polygamma_kernel_xpu_functor<scalar_t> f(n);
+          dpcpp_kernel_for_tensor_iter(iter, f);
         });
   }
 }
@@ -96,13 +131,19 @@ static inline void lgamma_check(const Tensor& self) {
       "Only support floating data type for now.");
 }
 
+template <typename scalar_t>
+struct lgamma_out_functor {
+  scalar_t operator()(scalar_t a) const {
+    return Numerics<scalar_t>::lgamma(a);
+  }
+};
+
 Tensor& lgamma_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_float_op(out, self);
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       kHalf, kBFloat16, iter.common_dtype(), "lgamma", [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          return Numerics<scalar_t>::lgamma(a);
-        });
+        lgamma_out_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
   return out;
 }

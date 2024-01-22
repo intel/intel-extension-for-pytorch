@@ -14,12 +14,18 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t>
+struct frac_kernel_functor {
+  scalar_t operator()(scalar_t a) const {
+    return a - Numerics<scalar_t>::trunc(a);
+  }
+};
+
 void frac_kernel(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       ScalarType::Half, ScalarType::BFloat16, iter.dtype(), "frac_xpu", [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          return a - Numerics<scalar_t>::trunc(a);
-        });
+        frac_kernel_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 
@@ -31,6 +37,13 @@ Tensor& frac_out(const Tensor& self, Tensor& result) {
   return result;
 }
 
+template <typename scalar_t>
+struct trunc_out_functor {
+  scalar_t operator()(scalar_t a) const {
+    return Numerics<scalar_t>::trunc(a);
+  }
+};
+
 Tensor& trunc_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_op(out, self);
   IPEX_DISPATCH_ALL_TYPES_AND2(
@@ -39,9 +52,8 @@ Tensor& trunc_out(const Tensor& self, Tensor& out) {
       iter.dtype(),
       "trunc_out",
       [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          return Numerics<scalar_t>::trunc(a);
-        });
+        trunc_out_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
   return out;
 }

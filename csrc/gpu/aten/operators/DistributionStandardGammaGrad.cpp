@@ -171,6 +171,14 @@ scalar_t standard_gamma_grad_one(scalar_t alpha_, scalar_t x_) {
 
 } // namespace impl
 
+template <typename scalar_t, typename accscalar_t>
+struct _standard_gamma_grad_functor {
+  scalar_t operator()(scalar_t self_val, scalar_t output_val) const {
+    return impl::standard_gamma_grad_one<scalar_t, accscalar_t>(
+        self_val, output_val);
+  }
+};
+
 Tensor _standard_gamma_grad(const Tensor& self, const Tensor& output) {
   Tensor ret = at::empty(self.sizes(), self.options());
   TensorIterator iter = TensorIteratorConfig()
@@ -185,11 +193,8 @@ Tensor _standard_gamma_grad(const Tensor& self, const Tensor& output) {
       "_standard_gamma_grad",
       [&] {
         using accscalar_t = acc_type<scalar_t>;
-        dpcpp_fast_mode_kernel_for_tensor_iter(
-            iter, [=](scalar_t self_val, scalar_t output_val) {
-              return impl::standard_gamma_grad_one<scalar_t, accscalar_t>(
-                  self_val, output_val);
-            });
+        _standard_gamma_grad_functor<scalar_t, accscalar_t> f;
+        dpcpp_fast_mode_kernel_for_tensor_iter(iter, f);
       });
   return ret;
 }

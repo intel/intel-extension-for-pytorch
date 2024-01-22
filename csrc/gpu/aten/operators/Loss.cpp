@@ -45,6 +45,20 @@ static inline at::Tensor apply_loss_reduction(
 
 namespace impl {
 
+template <typename scalar_t>
+struct bce_kernel_functor {
+  scalar_t operator()(scalar_t input, scalar_t target) const {
+    SYCL_KERNEL_ASSERT(input >= 0 && input <= 1);
+    return (target - scalar_t(1)) *
+        Numerics<scalar_t>::max(
+               scalar_t(Numerics<scalar_t>::log(scalar_t(1) - input)),
+               scalar_t(-100)) -
+        target *
+        Numerics<scalar_t>::max(
+            scalar_t(Numerics<scalar_t>::log(input)), scalar_t(-100));
+  }
+};
+
 void bce_kernel(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
@@ -52,34 +66,35 @@ void bce_kernel(TensorIterator& iter) {
       iter.dtype(),
       "bce_kernel",
       [&iter]() {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [](scalar_t input, scalar_t target) -> scalar_t {
-              SYCL_KERNEL_ASSERT(input >= 0 && input <= 1);
-              return (target - scalar_t(1)) *
-                  Numerics<scalar_t>::max(
-                         scalar_t(Numerics<scalar_t>::log(scalar_t(1) - input)),
-                         scalar_t(-100)) -
-                  target *
-                  Numerics<scalar_t>::max(
-                      scalar_t(Numerics<scalar_t>::log(input)), scalar_t(-100));
-            });
+        bce_kernel_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct bce_backward_kernel_functor {
+  scalar_t operator()(scalar_t input, scalar_t target, scalar_t grad_output)
+      const {
+    return grad_output * (input - target) /
+        (scalar_t(std::max((scalar_t(1) - input) * input, scalar_t(1e-12))));
+  }
+};
 
 void bce_backward_kernel(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "bce_backward_kernel", [&iter] {
-        dpcpp_kernel_for_tensor_iter(
-            iter,
-            [](scalar_t input,
-               scalar_t target,
-               scalar_t grad_output) -> scalar_t {
-              return grad_output * (input - target) /
-                  (scalar_t(std::max(
-                      (scalar_t(1) - input) * input, scalar_t(1e-12))));
-            });
+        bce_backward_kernel_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct soft_margin_kernel_functor {
+  scalar_t operator()(scalar_t input, scalar_t target) const {
+    return Numerics<scalar_t>::log(
+        scalar_t(1.) + Numerics<scalar_t>::exp(-input * target));
+  }
+};
 
 void soft_margin_kernel(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -88,13 +103,24 @@ void soft_margin_kernel(TensorIterator& iter) {
       iter.dtype(),
       "soft_margin_kernel",
       [&iter]() {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [](scalar_t input, scalar_t target) -> scalar_t {
-              return Numerics<scalar_t>::log(
-                  scalar_t(1.) + Numerics<scalar_t>::exp(-input * target));
-            });
+        soft_margin_kernel_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct soft_margin_backward_kernel_functor {
+  scalar_t operator()(scalar_t input, scalar_t target, scalar_t grad_output)
+      const {
+    auto z = Numerics<scalar_t>::exp(-target * input);
+    return -norm_val * target * z / (scalar_t(1.) + z) * grad_output;
+  }
+
+  soft_margin_backward_kernel_functor(scalar_t norm_val) : norm_val(norm_val) {}
+
+ private:
+  scalar_t norm_val;
+};
 
 void soft_margin_backward_kernel(TensorIterator& iter, Scalar norm) {
   IPEX_DISPATCH_FLOATING_TYPES_AND(
@@ -103,15 +129,23 @@ void soft_margin_backward_kernel(TensorIterator& iter, Scalar norm) {
       "soft_margin_backward_kernel",
       [&iter, &norm] {
         auto norm_val = norm.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter(
-            iter,
-            [norm_val](scalar_t input, scalar_t target, scalar_t grad_output)
-                -> scalar_t {
-              auto z = Numerics<scalar_t>::exp(-target * input);
-              return -norm_val * target * z / (scalar_t(1.) + z) * grad_output;
-            });
+        soft_margin_backward_kernel_functor<scalar_t> f(norm_val);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct smooth_l1_kernel_functor {
+  scalar_t operator()(scalar_t input, scalar_t target) const {
+    auto z = Numerics<scalar_t>::abs(input - target);
+    return z < beta_val ? scalar_t(0.5) * z * z / beta_val
+                        : z - scalar_t(0.5) * beta_val;
+  }
+  smooth_l1_kernel_functor(scalar_t beta_val) : beta_val(beta_val) {}
+
+ private:
+  scalar_t beta_val;
+};
 
 void smooth_l1_kernel(TensorIterator& iter, double beta) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -121,14 +155,30 @@ void smooth_l1_kernel(TensorIterator& iter, double beta) {
       "smooth_l1_kernel",
       [&iter, beta]() {
         scalar_t beta_val(beta);
-        dpcpp_kernel_for_tensor_iter(
-            iter, [beta_val](scalar_t input, scalar_t target) -> scalar_t {
-              auto z = Numerics<scalar_t>::abs(input - target);
-              return z < beta_val ? scalar_t(0.5) * z * z / beta_val
-                                  : z - scalar_t(0.5) * beta_val;
-            });
+        smooth_l1_kernel_functor<scalar_t> f(beta_val);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct smooth_l1_backward_kernel_functor {
+  scalar_t operator()(scalar_t input, scalar_t target, scalar_t grad_output)
+      const {
+    const auto x = input - target;
+    if (x < -beta_val)
+      return -norm_val * grad_output;
+    else if (x > beta_val)
+      return norm_val * grad_output;
+    else
+      return norm_val * x * grad_output / beta_val;
+  }
+  smooth_l1_backward_kernel_functor(scalar_t norm_val, scalar_t beta_val)
+      : norm_val(norm_val), beta_val(beta_val) {}
+
+ private:
+  scalar_t norm_val;
+  scalar_t beta_val;
+};
 
 void smooth_l1_backward_kernel(TensorIterator& iter, Scalar norm, double beta) {
   IPEX_DISPATCH_FLOATING_TYPES_AND(
@@ -138,22 +188,17 @@ void smooth_l1_backward_kernel(TensorIterator& iter, Scalar norm, double beta) {
       [&iter, &norm, beta] {
         auto norm_val = norm.to<scalar_t>();
         scalar_t beta_val(beta);
-        dpcpp_kernel_for_tensor_iter(
-            iter,
-            [norm_val, beta_val](
-                scalar_t input,
-                scalar_t target,
-                scalar_t grad_output) -> scalar_t {
-              const auto x = input - target;
-              if (x < -beta_val)
-                return -norm_val * grad_output;
-              else if (x > beta_val)
-                return norm_val * grad_output;
-              else
-                return norm_val * x * grad_output / beta_val;
-            });
+        smooth_l1_backward_kernel_functor<scalar_t> f(norm_val, beta_val);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct mse_kernel_functor {
+  scalar_t operator()(scalar_t input, scalar_t target) const {
+    return (input - target) * (input - target);
+  }
+};
 
 void mse_kernel(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -162,12 +207,23 @@ void mse_kernel(TensorIterator& iter) {
       iter.dtype(),
       "mse_kernel",
       [&iter]() {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [](scalar_t input, scalar_t target) -> scalar_t {
-              return (input - target) * (input - target);
-            });
+        mse_kernel_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct mse_backward_kernel_functor {
+  scalar_t operator()(scalar_t input, scalar_t target, scalar_t grad_output)
+      const {
+    return norm_val * (input - target) * grad_output;
+  }
+
+  mse_backward_kernel_functor(scalar_t norm_val) : norm_val(norm_val) {}
+
+ private:
+  scalar_t norm_val;
+};
 
 void mse_backward_kernel(TensorIterator& iter, Scalar norm) {
   IPEX_DISPATCH_FLOATING_TYPES_AND(
@@ -176,28 +232,54 @@ void mse_backward_kernel(TensorIterator& iter, Scalar norm) {
       "mse_backward_kernel",
       [&iter, &norm] {
         auto norm_val = norm.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter(
-            iter,
-            [norm_val](scalar_t input, scalar_t target, scalar_t grad_output)
-                -> scalar_t {
-              return norm_val * (input - target) * grad_output;
-            });
+        mse_backward_kernel_functor<scalar_t> f(norm_val);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct huber_kernel_functor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    auto z = Numerics<scalar_t>::abs(a - b);
+    return z < delta_val ? scalar_t(0.5) * z * z
+                         : delta_val * (z - scalar_t(0.5) * delta_val);
+  }
+
+  huber_kernel_functor(scalar_t delta_val) : delta_val(delta_val) {}
+
+ private:
+  scalar_t delta_val;
+};
 
 void huber_kernel(TensorIterator& iter, double delta) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       kBFloat16, kHalf, iter.dtype(), "huber", [&iter, delta] {
         scalar_t delta_val(delta);
-        dpcpp_kernel_for_tensor_iter(
-            iter, [delta_val](scalar_t a, scalar_t b) -> scalar_t {
-              auto z = Numerics<scalar_t>::abs(a - b);
-              return z < delta_val
-                  ? scalar_t(0.5) * z * z
-                  : delta_val * (z - scalar_t(0.5) * delta_val);
-            });
+        huber_kernel_functor<scalar_t> f(delta_val);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct huber_backward_kernel_functor {
+  scalar_t operator()(scalar_t input, scalar_t target, scalar_t grad_output)
+      const {
+    const auto x = input - target;
+    if (x < -delta_val) {
+      return -norm_val * grad_output * delta_val;
+    } else if (x > delta_val) {
+      return norm_val * grad_output * delta_val;
+    } else {
+      return norm_val * x * grad_output;
+    }
+  }
+  huber_backward_kernel_functor(scalar_t norm_val, scalar_t delta_val)
+      : norm_val(norm_val), delta_val(delta_val) {}
+
+ private:
+  scalar_t norm_val;
+  scalar_t delta_val;
+};
 
 void huber_backward_kernel(
     TensorIterator& iter,
@@ -207,21 +289,8 @@ void huber_backward_kernel(
       kBFloat16, kHalf, iter.dtype(), "huber_backward", [&iter, &norm, delta] {
         auto norm_val = norm.to<scalar_t>();
         scalar_t delta_val(delta);
-        dpcpp_kernel_for_tensor_iter(
-            iter,
-            [norm_val, delta_val](
-                scalar_t input,
-                scalar_t target,
-                scalar_t grad_output) -> scalar_t {
-              const auto x = input - target;
-              if (x < -delta_val) {
-                return -norm_val * grad_output * delta_val;
-              } else if (x > delta_val) {
-                return norm_val * grad_output * delta_val;
-              } else {
-                return norm_val * x * grad_output;
-              }
-            });
+        huber_backward_kernel_functor<scalar_t> f(norm_val, delta_val);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 

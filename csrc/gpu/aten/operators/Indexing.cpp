@@ -1677,6 +1677,21 @@ Tensor trace(const Tensor& self) {
   return out;
 }
 
+template <typename scalar_t, typename mask_t>
+struct masked_fill_kernel_functor {
+  scalar_t operator()(scalar_t self, mask_t mask) const {
+    if (mask) {
+      return value_;
+    }
+    return self;
+  }
+
+  masked_fill_kernel_functor(scalar_t value_) : value_(value_) {}
+
+ private:
+  scalar_t value_;
+};
+
 template <typename mask_t>
 void masked_fill_kernel(TensorIterator& iter, const Scalar& value) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
@@ -1687,13 +1702,8 @@ void masked_fill_kernel(TensorIterator& iter, const Scalar& value) {
       "masked_fill_",
       [&] {
         const auto value_ = value.to<scalar_t>();
-        dpcpp_fast_mode_kernel_for_tensor_iter(
-            iter, [=](scalar_t self, mask_t mask) -> scalar_t {
-              if (mask) {
-                return value_;
-              }
-              return self;
-            });
+        masked_fill_kernel_functor<scalar_t, mask_t> f(value_);
+        dpcpp_fast_mode_kernel_for_tensor_iter(iter, f);
       });
 }
 

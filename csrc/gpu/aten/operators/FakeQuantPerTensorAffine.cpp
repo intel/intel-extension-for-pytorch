@@ -67,6 +67,40 @@ Tensor fake_quantize_per_tensor_affine(
   return std::get<0>(res);
 }
 
+template <typename scalar_t>
+struct fake_quantize_tensor_cachemask_dpcpp_functor {
+  std::tuple<scalar_t, bool> operator()(scalar_t input_val) const {
+    const auto qval = static_cast<int64_t>(
+        std::nearbyint(input_val * inv_scale) + zero_point);
+    return {// fake_quantized value
+            (Numerics<int64_t>::min(
+                 quant_max, Numerics<int64_t>::max(quant_min, qval)) -
+             zero_point) *
+                scale,
+            // mask for grad
+            ((quant_min <= qval) && (qval <= quant_max))};
+  }
+
+  fake_quantize_tensor_cachemask_dpcpp_functor(
+      float inv_scale,
+      int64_t zero_point,
+      int64_t quant_min,
+      int64_t quant_max,
+      float scale)
+      : inv_scale(inv_scale),
+        zero_point(zero_point),
+        quant_min(quant_min),
+        quant_max(quant_max),
+        scale(scale) {}
+
+ private:
+  float inv_scale;
+  int64_t zero_point;
+  int64_t quant_min;
+  int64_t quant_max;
+  float scale;
+};
+
 void fake_quantize_tensor_cachemask_dpcpp(
     Tensor& output,
     Tensor& mask,
@@ -88,20 +122,63 @@ void fake_quantize_tensor_cachemask_dpcpp(
       input.scalar_type(),
       "fake_quantize_tensor_cachemask_dpcpp",
       [&] {
-        dpcpp_kernel_multiple_outputs_for_tensor_iter(
-            iter, [=](scalar_t input_val) -> std::tuple<scalar_t, bool> {
-              const auto qval = static_cast<int64_t>(
-                  std::nearbyint(input_val * inv_scale) + zero_point);
-              return {// fake_quantized value
-                      (Numerics<int64_t>::min(
-                           quant_max, Numerics<int64_t>::max(quant_min, qval)) -
-                       zero_point) *
-                          scale,
-                      // mask for grad
-                      ((quant_min <= qval) && (qval <= quant_max))};
-            });
+        fake_quantize_tensor_cachemask_dpcpp_functor<scalar_t> f(
+            inv_scale, zero_point, quant_min, quant_max, scale);
+        dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
       });
 }
+
+struct _fake_quantize_grad_learnable_tensor_dpcpp_functor {
+  std::tuple<float, float, float> operator()(float XInput, float dYInput)
+      const {
+    float dXOutput, dZeroPointOutput, dScaleOutput;
+    int64_t xq = std::nearbyint(XInput * inv_scale) + zero_point;
+    dXOutput = dYInput * (xq >= quant_min && xq <= quant_max);
+    float xfq = static_cast<float>(
+        (Numerics<int64_t>::max(
+             Numerics<int64_t>::min(xq, quant_max), quant_min) -
+         zero_point) *
+        scale);
+    if (xq < quant_min || xq > quant_max) {
+      dZeroPointOutput = (dYInput) * (-1) * scale * grad_factor;
+      dScaleOutput = ((xq < quant_min) ? (dYInput * dscale_small)
+                                       : (dYInput * dscale_big)) *
+          grad_factor;
+    } else {
+      dZeroPointOutput = 0;
+      dScaleOutput = (dYInput) * (xfq - (XInput)) * inv_scale * grad_factor;
+    }
+    return {dXOutput, dScaleOutput, dZeroPointOutput};
+  }
+
+  _fake_quantize_grad_learnable_tensor_dpcpp_functor(
+      float inv_scale,
+      int64_t zero_point,
+      int64_t quant_min,
+      int64_t quant_max,
+      float scale,
+      float grad_factor,
+      float dscale_small,
+      float dscale_big)
+      : inv_scale(inv_scale),
+        zero_point(zero_point),
+        quant_min(quant_min),
+        quant_max(quant_max),
+        scale(scale),
+        grad_factor(grad_factor),
+        dscale_small(dscale_small),
+        dscale_big(dscale_big) {}
+
+ private:
+  float inv_scale;
+  int64_t zero_point;
+  int64_t quant_min;
+  int64_t quant_max;
+  float scale;
+  float grad_factor;
+  float dscale_small;
+  float dscale_big;
+};
 
 void _fake_quantize_grad_learnable_tensor_dpcpp(
     TensorIterator& iter,
@@ -113,29 +190,55 @@ void _fake_quantize_grad_learnable_tensor_dpcpp(
     float grad_factor) {
   float dscale_small = quant_min - zero_point;
   float dscale_big = quant_max - zero_point;
-  dpcpp_kernel_multiple_outputs_for_tensor_iter(
-      iter,
-      [=](float XInput, float dYInput) -> std::tuple<float, float, float> {
-        float dXOutput, dZeroPointOutput, dScaleOutput;
-        int64_t xq = std::nearbyint(XInput * inv_scale) + zero_point;
-        dXOutput = dYInput * (xq >= quant_min && xq <= quant_max);
-        float xfq = static_cast<float>(
-            (Numerics<int64_t>::max(
-                 Numerics<int64_t>::min(xq, quant_max), quant_min) -
-             zero_point) *
-            scale);
-        if (xq < quant_min || xq > quant_max) {
-          dZeroPointOutput = (dYInput) * (-1) * scale * grad_factor;
-          dScaleOutput = ((xq < quant_min) ? (dYInput * dscale_small)
-                                           : (dYInput * dscale_big)) *
-              grad_factor;
-        } else {
-          dZeroPointOutput = 0;
-          dScaleOutput = (dYInput) * (xfq - (XInput)) * inv_scale * grad_factor;
-        }
-        return {dXOutput, dScaleOutput, dZeroPointOutput};
-      });
+  _fake_quantize_grad_learnable_tensor_dpcpp_functor f(
+      inv_scale,
+      zero_point,
+      quant_min,
+      quant_max,
+      scale,
+      grad_factor,
+      dscale_small,
+      dscale_big);
+  dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
 }
+
+template <typename scalar_t>
+struct _fake_quantize_tensor_cachemask_tensor_qparams_dpcpp_functor {
+  std::tuple<scalar_t, bool> operator()(scalar_t input_val) const {
+    if (*fake_quant_on == 0) {
+      return {input_val, 1};
+    }
+    float inv_scale = 1.0f / (*scale_ptr);
+    const auto qval =
+        static_cast<int64_t>(std::nearbyint(input_val * inv_scale) + (*zp_ptr));
+    return {// fake_quantized value
+            (Numerics<int64_t>::min(
+                 quant_max, Numerics<int64_t>::max(quant_min, qval)) -
+             (*zp_ptr)) *
+                (*scale_ptr),
+            // mask for grad
+            ((quant_min <= qval) && (qval <= quant_max))};
+  }
+
+  _fake_quantize_tensor_cachemask_tensor_qparams_dpcpp_functor(
+      int64_t quant_min,
+      int64_t quant_max,
+      float* scale_ptr,
+      int32_t* zp_ptr,
+      int64_t* fake_quant_on)
+      : quant_min(quant_min),
+        quant_max(quant_max),
+        scale_ptr(scale_ptr),
+        zp_ptr(zp_ptr),
+        fake_quant_on(fake_quant_on) {}
+
+ private:
+  int64_t quant_min;
+  int64_t quant_max;
+  float* scale_ptr;
+  int32_t* zp_ptr;
+  int64_t* fake_quant_on;
+};
 
 void _fake_quantize_tensor_cachemask_tensor_qparams_dpcpp(
     Tensor& output,
@@ -161,22 +264,9 @@ void _fake_quantize_tensor_cachemask_tensor_qparams_dpcpp(
       input.scalar_type(),
       "fake_quantize_tensor_cachemask_tensor_qparams_dpcpp",
       [&] {
-        dpcpp_kernel_multiple_outputs_for_tensor_iter(
-            iter, [=](scalar_t input_val) -> std::tuple<scalar_t, bool> {
-              if (*fake_quant_on == 0) {
-                return {input_val, 1};
-              }
-              float inv_scale = 1.0f / (*scale_ptr);
-              const auto qval = static_cast<int64_t>(
-                  std::nearbyint(input_val * inv_scale) + (*zp_ptr));
-              return {// fake_quantized value
-                      (Numerics<int64_t>::min(
-                           quant_max, Numerics<int64_t>::max(quant_min, qval)) -
-                       (*zp_ptr)) *
-                          (*scale_ptr),
-                      // mask for grad
-                      ((quant_min <= qval) && (qval <= quant_max))};
-            });
+        _fake_quantize_tensor_cachemask_tensor_qparams_dpcpp_functor<scalar_t>
+            f(quant_min, quant_max, scale_ptr, zp_ptr, fake_quant_on);
+        dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
       });
 }
 

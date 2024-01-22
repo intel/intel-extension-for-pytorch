@@ -14,6 +14,19 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t, typename opmath_t>
+struct lerp_tensor_kernel_functor {
+  scalar_t operator()(scalar_t self_val, scalar_t end_val, scalar_t weight_val)
+      const {
+    opmath_t self_val_f = self_val;
+    opmath_t end_val_f = end_val;
+    opmath_t weight_val_f = weight_val;
+    return (Numerics<scalar_t>::abs(weight_val_f) < 0.5f)
+        ? self_val_f + weight_val_f * (end_val_f - self_val_f)
+        : end_val_f - (end_val_f - self_val_f) * (opmath_t{1} - weight_val_f);
+  }
+};
+
 void lerp_tensor_kernel(at::TensorIteratorBase& iter) {
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
       at::ScalarType::Half,
@@ -22,19 +35,8 @@ void lerp_tensor_kernel(at::TensorIteratorBase& iter) {
       "lerp_tensor_kernel",
       [&] {
         using opmath_t = at::opmath_type<scalar_t>;
-        dpcpp_kernel_for_tensor_iter(
-            iter,
-            [](scalar_t self_val,
-               scalar_t end_val,
-               scalar_t weight_val) -> scalar_t {
-              opmath_t self_val_f = self_val;
-              opmath_t end_val_f = end_val;
-              opmath_t weight_val_f = weight_val;
-              return (Numerics<scalar_t>::abs(weight_val_f) < 0.5f)
-                  ? self_val_f + weight_val_f * (end_val_f - self_val_f)
-                  : end_val_f -
-                      (end_val_f - self_val_f) * (opmath_t{1} - weight_val_f);
-            });
+        lerp_tensor_kernel_functor<scalar_t, opmath_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 

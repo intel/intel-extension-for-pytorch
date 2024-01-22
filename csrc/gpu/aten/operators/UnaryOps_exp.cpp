@@ -24,6 +24,13 @@ IPEX_UNARY_AND_ALL_OPS_COMMON(
     unary_float_op,
     FLOATING_TYPES)
 
+template <typename scalar_t>
+struct exp_out_functor {
+  scalar_t operator()(scalar_t a) const {
+    return Numerics<scalar_t>::exp(a);
+  }
+};
+
 Tensor& exp_out(const Tensor& self, Tensor& out) {
   return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_exp>(
       TensorIterator::unary_float_op, out, self, [=](TensorIteratorBase& iter) {
@@ -33,9 +40,8 @@ Tensor& exp_out(const Tensor& self, Tensor& out) {
             iter.common_dtype(),
             "exp_out",
             [&]() {
-              dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-                return Numerics<scalar_t>::exp(a);
-              });
+              exp_out_functor<scalar_t> f;
+              dpcpp_kernel_for_tensor_iter(iter, f);
             });
       });
 }

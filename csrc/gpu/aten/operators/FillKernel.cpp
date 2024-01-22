@@ -26,6 +26,18 @@ struct TensorFillOp {
   const T val;
 };
 
+template <typename scalar_t>
+struct fill_kernel_dpcpp_functor {
+  scalar_t operator()() const {
+    return fill;
+  }
+
+  fill_kernel_dpcpp_functor(scalar_t fill) : fill(fill) {}
+
+ private:
+  scalar_t fill;
+};
+
 void fill_kernel_dpcpp(TensorIterator& iter, Scalar value) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND6(
       kComplexHalf,
@@ -38,7 +50,8 @@ void fill_kernel_dpcpp(TensorIterator& iter, Scalar value) {
       "fill_dpcpp",
       [&] {
         scalar_t fill = value.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter(iter, [=]() { return fill; });
+        fill_kernel_dpcpp_functor<scalar_t> f(fill);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 

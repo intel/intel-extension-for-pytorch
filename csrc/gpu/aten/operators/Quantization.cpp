@@ -17,6 +17,13 @@ using namespace xpu::oneDNN;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t, typename underlying_t>
+struct _make_per_tensor_quantized_tensor_functor {
+  scalar_t operator()(underlying_t value) const {
+    return scalar_t(value);
+  }
+};
+
 Tensor _make_per_tensor_quantized_tensor(
     const Tensor& self,
     double scale,
@@ -34,12 +41,18 @@ Tensor _make_per_tensor_quantized_tensor(
                         .add_input(self)
                         .check_all_same_dtype(false)
                         .build();
-        dpcpp_kernel_for_tensor_iter(iter, [=](underlying_t value) -> scalar_t {
-          return scalar_t(value);
-        });
+        _make_per_tensor_quantized_tensor_functor<scalar_t, underlying_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
   return dst;
 }
+
+template <typename scalar_t, typename underlying_t>
+struct _make_per_channel_quantized_tensor_functor {
+  scalar_t operator()(underlying_t value) const {
+    return scalar_t(value);
+  }
+};
 
 Tensor _make_per_channel_quantized_tensor(
     const Tensor& self,
@@ -60,9 +73,8 @@ Tensor _make_per_channel_quantized_tensor(
                         .add_input(self)
                         .check_all_same_dtype(false)
                         .build();
-        dpcpp_kernel_for_tensor_iter(iter, [=](underlying_t value) -> scalar_t {
-          return scalar_t(value);
-        });
+        _make_per_channel_quantized_tensor_functor<scalar_t, underlying_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
   return dst;
 }
@@ -70,6 +82,13 @@ Tensor _make_per_channel_quantized_tensor(
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {
+
+template <typename scalar_t, typename underlying_t>
+struct int_repr_functor {
+  underlying_t operator()(scalar_t value) const {
+    return value.val_;
+  }
+};
 
 Tensor int_repr(const Tensor& self) {
   Tensor dst;
@@ -83,8 +102,8 @@ Tensor int_repr(const Tensor& self) {
                     .add_input(self)
                     .check_all_same_dtype(false)
                     .build();
-    AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter(
-        iter, [=](scalar_t value) -> underlying_t { return value.val_; });
+    int_repr_functor<scalar_t, underlying_t> f;
+    AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter(iter, f);
   });
   return dst;
 }

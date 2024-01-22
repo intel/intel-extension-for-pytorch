@@ -114,6 +114,21 @@ Tensor glu_backward(
       grad_output, self, dim, grad_input);
 }
 
+template <typename scalar_t, typename opmath_t>
+struct glu_jvp_functor {
+  scalar_t operator()(scalar_t res_, scalar_t b_, scalar_t da_, scalar_t db_)
+      const {
+    const opmath_t res = res_;
+    const opmath_t b = b_;
+    const opmath_t da = da_;
+    const opmath_t db = db_;
+    const opmath_t one = opmath_t(1.0f);
+
+    const opmath_t sig_b = one / (one + Numerics<opmath_t>::exp(-b));
+    return (da * sig_b + res * (db - sig_b * db));
+  }
+};
+
 Tensor glu_jvp(
     const Tensor& glu,
     const Tensor& x,
@@ -135,19 +150,8 @@ Tensor glu_jvp(
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       kHalf, kBFloat16, iter.dtype(), "glu_jvp", [&]() {
         using opmath_t = at::opmath_type<scalar_t>;
-        dpcpp_kernel_for_tensor_iter(
-            iter,
-            [](scalar_t res_, scalar_t b_, scalar_t da_, scalar_t db_)
-                -> scalar_t {
-              const opmath_t res = res_;
-              const opmath_t b = b_;
-              const opmath_t da = da_;
-              const opmath_t db = db_;
-              const opmath_t one = opmath_t(1.0f);
-
-              const opmath_t sig_b = one / (one + Numerics<opmath_t>::exp(-b));
-              return (da * sig_b + res * (db - sig_b * db));
-            });
+        glu_jvp_functor<scalar_t, opmath_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
   return dglu;
 }

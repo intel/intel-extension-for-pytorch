@@ -19,6 +19,21 @@ namespace AtenIpexTypeQuantizedXPU {
 
 namespace impl {
 
+template <typename scalar_t, typename underlying_t>
+struct qclamp_kernel_functor {
+  scalar_t operator()(scalar_t in) const {
+    return scalar_t(Numerics<underlying_t>::min(
+        Numerics<underlying_t>::max(in.val_, min_q.val_), max_q.val_));
+  }
+
+  qclamp_kernel_functor(scalar_t min_q, scalar_t max_q)
+      : min_q(min_q), max_q(max_q) {}
+
+ private:
+  scalar_t min_q;
+  scalar_t max_q;
+};
+
 void qclamp_kernel(
     const Tensor& qx,
     const Scalar& min_scalar,
@@ -41,13 +56,22 @@ void qclamp_kernel(
         quantize_val<scalar_t>(qx.q_scale(), qx.q_zero_point(), min);
     scalar_t max_q =
         quantize_val<scalar_t>(qx.q_scale(), qx.q_zero_point(), max);
-    AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter(
-        iter, [=](scalar_t in) -> scalar_t {
-          return scalar_t(Numerics<underlying_t>::min(
-              Numerics<underlying_t>::max(in.val_, min_q.val_), max_q.val_));
-        });
+    qclamp_kernel_functor<scalar_t, underlying_t> f(min_q, max_q);
+    AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter(iter, f);
   });
 }
+
+template <typename scalar_t, typename underlying_t>
+struct qclamp_max_kernel_functor {
+  scalar_t operator()(scalar_t in) const {
+    return scalar_t(Numerics<underlying_t>::min(in.val_, max_q.val_));
+  }
+
+  qclamp_max_kernel_functor(scalar_t max_q) : max_q(max_q) {}
+
+ private:
+  scalar_t max_q;
+};
 
 void qclamp_max_kernel(const Tensor& qx, const Scalar& max_scalar, Tensor& qy) {
   IPEX_DISPATCH_QINT_TYPES(qx.scalar_type(), "qclamp_max", [&]() {
@@ -63,12 +87,22 @@ void qclamp_max_kernel(const Tensor& qx, const Scalar& max_scalar, Tensor& qy) {
     auto max = max_scalar.to<float>();
     scalar_t max_q =
         quantize_val<scalar_t>(qx.q_scale(), qx.q_zero_point(), max);
-    AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter(
-        iter, [=](scalar_t in) -> scalar_t {
-          return scalar_t(Numerics<underlying_t>::min(in.val_, max_q.val_));
-        });
+    qclamp_max_kernel_functor<scalar_t, underlying_t> f(max_q);
+    AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter(iter, f);
   });
 }
+
+template <typename scalar_t, typename underlying_t>
+struct qclamp_min_kernel_functor {
+  scalar_t operator()(scalar_t in) const {
+    return scalar_t(Numerics<underlying_t>::max(in.val_, min_q.val_));
+  }
+
+  qclamp_min_kernel_functor(scalar_t min_q) : min_q(min_q) {}
+
+ private:
+  scalar_t min_q;
+};
 
 void qclamp_min_kernel(const Tensor& qx, const Scalar& min_scalar, Tensor& qy) {
   IPEX_DISPATCH_QINT_TYPES(qx.scalar_type(), "qclamp_min", [&]() {
@@ -84,10 +118,8 @@ void qclamp_min_kernel(const Tensor& qx, const Scalar& min_scalar, Tensor& qy) {
     auto min = min_scalar.to<float>();
     scalar_t min_q =
         quantize_val<scalar_t>(qx.q_scale(), qx.q_zero_point(), min);
-    AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter(
-        iter, [=](scalar_t in) -> scalar_t {
-          return scalar_t(Numerics<underlying_t>::max(in.val_, min_q.val_));
-        });
+    qclamp_min_kernel_functor<scalar_t, underlying_t> f(min_q);
+    AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter(iter, f);
   });
 }
 

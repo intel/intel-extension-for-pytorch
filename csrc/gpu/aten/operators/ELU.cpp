@@ -14,6 +14,22 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t, typename opmath_t>
+struct elu_out_functor {
+  scalar_t operator()(scalar_t a) const {
+    opmath_t aop = static_cast<opmath_t>(a);
+    return aop > 0 ? aop * poscoef : std::expm1(aop * negiptcoef) * negcoef;
+  }
+
+  elu_out_functor(opmath_t negcoef, opmath_t poscoef, opmath_t negiptcoef)
+      : negcoef(negcoef), poscoef(poscoef), negiptcoef(negiptcoef) {}
+
+ private:
+  opmath_t negcoef;
+  opmath_t poscoef;
+  opmath_t negiptcoef;
+};
+
 Tensor& elu_out(
     const Tensor& self,
     const Scalar& alpha,
@@ -35,11 +51,9 @@ Tensor& elu_out(
               auto negcoef = alpha.to<opmath_t>() * scale.to<opmath_t>();
               auto poscoef = scale.to<opmath_t>();
               auto negiptcoef = input_scale.to<opmath_t>();
-              dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
-                opmath_t aop = static_cast<opmath_t>(a);
-                return aop > 0 ? aop * poscoef
-                               : std::expm1(aop * negiptcoef) * negcoef;
-              });
+              elu_out_functor<scalar_t, opmath_t> f(
+                  negcoef, poscoef, negiptcoef);
+              dpcpp_kernel_for_tensor_iter(iter, f);
             });
       },
       /* alpha = */ alpha.to<float>(),
@@ -56,6 +70,37 @@ Tensor elu(
   at::AtenIpexTypeXPU::elu_out(self, alpha, scale, input_scale, result);
   return result;
 }
+
+template <typename scalar_t, typename opmath_t>
+struct elu_backward_out_functor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    opmath_t aop = static_cast<opmath_t>(a);
+    opmath_t bop = static_cast<opmath_t>(b);
+
+    if (is_result) {
+      return bop <= 0 ? aop * negiptcoef * (bop + negcoef) : aop * poscoef;
+    } else {
+      return bop <= 0 ? aop * negiptcoef * negcoef * std::exp(bop * negiptcoef)
+                      : aop * poscoef;
+    }
+  }
+
+  elu_backward_out_functor(
+      opmath_t negcoef,
+      opmath_t poscoef,
+      opmath_t negiptcoef,
+      bool is_result)
+      : negcoef(negcoef),
+        poscoef(poscoef),
+        negiptcoef(negiptcoef),
+        is_result(is_result) {}
+
+ private:
+  opmath_t negcoef;
+  opmath_t poscoef;
+  opmath_t negiptcoef;
+  bool is_result;
+};
 
 Tensor& elu_backward_out(
     const Tensor& grad_output,
@@ -82,20 +127,9 @@ Tensor& elu_backward_out(
               auto negcoef = alpha.to<opmath_t>() * scale.to<opmath_t>();
               auto poscoef = scale.to<opmath_t>();
               auto negiptcoef = input_scale.to<opmath_t>();
-              dpcpp_kernel_for_tensor_iter(
-                  iter, [=](scalar_t a, scalar_t b) -> scalar_t {
-                    opmath_t aop = static_cast<opmath_t>(a);
-                    opmath_t bop = static_cast<opmath_t>(b);
-
-                    if (is_result) {
-                      return bop <= 0 ? aop * negiptcoef * (bop + negcoef)
-                                      : aop * poscoef;
-                    } else {
-                      return bop <= 0 ? aop * negiptcoef * negcoef *
-                              std::exp(bop * negiptcoef)
-                                      : aop * poscoef;
-                    }
-                  });
+              elu_backward_out_functor<scalar_t, opmath_t> f(
+                  negcoef, poscoef, negiptcoef, is_result);
+              dpcpp_kernel_for_tensor_iter(iter, f);
             });
       },
       /*alpha =*/alpha.to<float>(),

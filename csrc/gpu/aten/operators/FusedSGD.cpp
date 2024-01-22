@@ -27,6 +27,110 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+struct ComputeSplitSGDKernelFunctor {
+  std::tuple<at::BFloat16, at::BFloat16> operator()(
+      at::BFloat16 top_half_elem,
+      at::BFloat16 tail_half_elem,
+      at::BFloat16 grad_elem) const {
+    float weight_elem = pack_bloat16_float(top_half_elem, tail_half_elem);
+    auto grad_elem_fp32 = static_cast<float>(grad_elem);
+
+    // d_p = d_p.add(p.master_weight, alpha=weight_decay)
+    if (using_weight_decay) {
+      grad_elem_fp32 += weight_elem * weight_decay_value;
+    }
+
+    // p.master_weight.add_(d_p, alpha=-group['lr'])
+    auto res = static_cast<float>(weight_elem + grad_elem_fp32 * negative_lr);
+
+    return unpack_float_bfloat16(res);
+  }
+
+  ComputeSplitSGDKernelFunctor(
+      float weight_decay_value_,
+      bool using_weight_decay_,
+      float negative_lr_)
+      : weight_decay_value(weight_decay_value_),
+        using_weight_decay(using_weight_decay_),
+        negative_lr(negative_lr_) {}
+
+ private:
+  float weight_decay_value;
+  bool using_weight_decay;
+  float negative_lr;
+};
+
+struct ComputeSplitSGDKernelFunctor2 {
+  std::tuple<at::BFloat16, at::BFloat16, float> operator()(
+      at::BFloat16 top_elem,
+      at::BFloat16 tail_elem,
+      at::BFloat16 grad_elem,
+      float momentum_elem) const {
+    float weight_elem = pack_bloat16_float(top_elem, tail_elem);
+    // d_p = d_p.add(p, alpha=weight_decay)
+    auto grad_elem_fp32 = static_cast<float>(grad_elem);
+
+    auto temp_master_weight_value = weight_elem;
+
+    // d_p = d_p.add(p.master_weight, alpha=weight_decay)
+    if (using_weight_decay) {
+      grad_elem_fp32 += temp_master_weight_value * weight_decay_value;
+    }
+
+    // 'momentum_buffer' in param_state,
+    // param_state[momentum_buffer] has been created
+    auto temp_momentum_buffer_value = grad_elem_fp32;
+    if (momentum_buf_initialized) {
+      // buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
+      temp_momentum_buffer_value = momentum_elem;
+      temp_momentum_buffer_value = momentum_value * temp_momentum_buffer_value;
+      temp_momentum_buffer_value += grad_elem_fp32 * pre_dampening;
+    }
+
+    // nesterov
+    if (nesterov) {
+      // d_p = d_p.add(buf, alpha=momentum)
+      grad_elem_fp32 += momentum_value * temp_momentum_buffer_value;
+    } else {
+      // d_p = buf
+      grad_elem_fp32 = temp_momentum_buffer_value;
+    }
+
+    // p.master_weight.add_(d_p, alpha=-group['lr'])
+    auto res = static_cast<float>(
+        temp_master_weight_value + grad_elem_fp32 * negative_lr);
+
+    std::tie(top_elem, tail_elem) = unpack_float_bfloat16(res);
+    return std::tuple<at::BFloat16, at::BFloat16, float>(
+        top_elem, tail_elem, static_cast<float>(temp_momentum_buffer_value));
+  }
+
+  ComputeSplitSGDKernelFunctor2(
+      float weight_decay_value_,
+      bool using_weight_decay_,
+      float negative_lr_,
+      float momentum_value_,
+      float pre_dampening_,
+      const bool nesterov_,
+      const bool momentum_buf_initialized_)
+      : weight_decay_value(weight_decay_value_),
+        using_weight_decay(using_weight_decay_),
+        negative_lr(negative_lr_),
+        momentum_value(momentum_value_),
+        pre_dampening(pre_dampening_),
+        nesterov(nesterov_),
+        momentum_buf_initialized(momentum_buf_initialized_) {}
+
+ private:
+  float weight_decay_value;
+  bool using_weight_decay;
+  float negative_lr;
+  float momentum_value;
+  float pre_dampening;
+  const bool nesterov;
+  const bool momentum_buf_initialized;
+};
+
 // for SplitSGD Kernel, both top_half, grad, tail_half are at::BFloat16
 static void ComputeSplitSGDKernel(
     Tensor& top_half,
@@ -68,26 +172,9 @@ static void ComputeSplitSGDKernel(
                                   .add_input(tail_half)
                                   .add_input(grad)
                                   .build();
-
-    dpcpp_kernel_multiple_outputs_for_tensor_iter(
-        iter,
-        [=](at::BFloat16 top_half_elem,
-            at::BFloat16 tail_half_elem,
-            at::BFloat16 grad_elem) -> std::tuple<at::BFloat16, at::BFloat16> {
-          float weight_elem = pack_bloat16_float(top_half_elem, tail_half_elem);
-          auto grad_elem_fp32 = static_cast<float>(grad_elem);
-
-          // d_p = d_p.add(p.master_weight, alpha=weight_decay)
-          if (using_weight_decay) {
-            grad_elem_fp32 += weight_elem * weight_decay_value;
-          }
-
-          // p.master_weight.add_(d_p, alpha=-group['lr'])
-          auto res =
-              static_cast<float>(weight_elem + grad_elem_fp32 * negative_lr);
-
-          return unpack_float_bfloat16(res);
-        });
+    ComputeSplitSGDKernelFunctor f(
+        weight_decay_value, using_weight_decay, negative_lr);
+    dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
   } else {
     // use momentum
     at::TensorIterator iter = TensorIteratorConfig()
@@ -100,56 +187,122 @@ static void ComputeSplitSGDKernel(
                                   .add_input(grad)
                                   .add_input(momentum_buffer)
                                   .build();
-    dpcpp_kernel_multiple_outputs_for_tensor_iter(
-        iter,
-        [=](at::BFloat16 top_elem,
-            at::BFloat16 tail_elem,
-            at::BFloat16 grad_elem,
-            float momentum_elem)
-            -> std::tuple<at::BFloat16, at::BFloat16, float> {
-          float weight_elem = pack_bloat16_float(top_elem, tail_elem);
-          // d_p = d_p.add(p, alpha=weight_decay)
-          auto grad_elem_fp32 = static_cast<float>(grad_elem);
-
-          auto temp_master_weight_value = weight_elem;
-
-          // d_p = d_p.add(p.master_weight, alpha=weight_decay)
-          if (using_weight_decay) {
-            grad_elem_fp32 += temp_master_weight_value * weight_decay_value;
-          }
-
-          // 'momentum_buffer' in param_state,
-          // param_state[momentum_buffer] has been created
-          auto temp_momentum_buffer_value = grad_elem_fp32;
-          if (momentum_buf_initialized) {
-            // buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
-            temp_momentum_buffer_value = momentum_elem;
-            temp_momentum_buffer_value =
-                momentum_value * temp_momentum_buffer_value;
-            temp_momentum_buffer_value += grad_elem_fp32 * pre_dampening;
-          }
-
-          // nesterov
-          if (nesterov) {
-            // d_p = d_p.add(buf, alpha=momentum)
-            grad_elem_fp32 += momentum_value * temp_momentum_buffer_value;
-          } else {
-            // d_p = buf
-            grad_elem_fp32 = temp_momentum_buffer_value;
-          }
-
-          // p.master_weight.add_(d_p, alpha=-group['lr'])
-          auto res = static_cast<float>(
-              temp_master_weight_value + grad_elem_fp32 * negative_lr);
-
-          std::tie(top_elem, tail_elem) = unpack_float_bfloat16(res);
-          return std::tuple<at::BFloat16, at::BFloat16, float>(
-              top_elem,
-              tail_elem,
-              static_cast<float>(temp_momentum_buffer_value));
-        });
+    ComputeSplitSGDKernelFunctor2 f(
+        weight_decay_value,
+        using_weight_decay,
+        negative_lr,
+        momentum_value,
+        pre_dampening,
+        nesterov,
+        momentum_buf_initialized);
+    dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
   }
 }
+
+template <typename scalar_t>
+struct ComputeSGDKernelMasterWeightFunctor {
+  std::tuple<scalar_t, float> operator()(
+      scalar_t weight_elem,
+      scalar_t grad_elem,
+      float master_weight_elem) const {
+    auto grad_elem_fp32 = static_cast<float>(grad_elem);
+
+    // d_p = d_p.add(p.master_weight, alpha=weight_decay)
+    if (using_weight_decay) {
+      grad_elem_fp32 += master_weight_elem * weight_decay_value;
+    }
+
+    // p.master_weight.add_(d_p, alpha=-group['lr'])
+    auto res =
+        static_cast<float>(master_weight_elem + grad_elem_fp32 * negative_lr);
+
+    return std::tuple<scalar_t, float>(static_cast<scalar_t>(res), res);
+  }
+
+  ComputeSGDKernelMasterWeightFunctor(
+      float weight_decay_value_,
+      bool using_weight_decay_,
+      float negative_lr_)
+      : weight_decay_value(weight_decay_value_),
+        using_weight_decay(using_weight_decay_),
+        negative_lr(negative_lr_) {}
+
+ private:
+  float weight_decay_value;
+  bool using_weight_decay;
+  float negative_lr;
+};
+
+template <typename scalar_t>
+struct ComputeSGDKernelMasterWeightFunctor2 {
+  std::tuple<scalar_t, float, scalar_t> operator()(
+      scalar_t weight_elem,
+      scalar_t grad_elem,
+      float master_weight_elem,
+      scalar_t momentum_elem) const {
+    // d_p = d_p.add(p, alpha=weight_decay)
+    auto grad_elem_fp32 = static_cast<float>(grad_elem);
+
+    auto temp_master_weight_value = master_weight_elem;
+
+    // d_p = d_p.add(p.master_weight, alpha=weight_decay)
+    if (using_weight_decay) {
+      grad_elem_fp32 += temp_master_weight_value * weight_decay_value;
+    }
+
+    // 'momentum_buffer' in param_state,
+    // param_state[momentum_buffer] has been created
+    auto temp_momentum_buffer_value = grad_elem_fp32;
+    if (momentum_buf_initialized) {
+      // buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
+      temp_momentum_buffer_value = momentum_elem;
+      temp_momentum_buffer_value = momentum_value * temp_momentum_buffer_value;
+      temp_momentum_buffer_value += grad_elem_fp32 * pre_dampening;
+    }
+
+    // nesterov
+    if (nesterov) {
+      // d_p = d_p.add(buf, alpha=momentum)
+      grad_elem_fp32 += momentum_value * temp_momentum_buffer_value;
+    } else {
+      // d_p = buf
+      grad_elem_fp32 = temp_momentum_buffer_value;
+    }
+
+    // p.master_weight.add_(d_p, alpha=-group['lr'])
+    auto res = static_cast<float>(
+        temp_master_weight_value + grad_elem_fp32 * negative_lr);
+    return std::tuple<scalar_t, float, scalar_t>(
+        static_cast<scalar_t>(res),
+        res,
+        static_cast<float>(temp_momentum_buffer_value));
+  }
+
+  ComputeSGDKernelMasterWeightFunctor2(
+      float weight_decay_value_,
+      bool using_weight_decay_,
+      float negative_lr_,
+      float momentum_value_,
+      float pre_dampening_,
+      const bool nesterov_,
+      const bool momentum_buf_initialized_)
+      : weight_decay_value(weight_decay_value_),
+        using_weight_decay(using_weight_decay_),
+        negative_lr(negative_lr_),
+        momentum_value(momentum_value_),
+        pre_dampening(pre_dampening_),
+        nesterov(nesterov_),
+        momentum_buf_initialized(momentum_buf_initialized_) {}
+
+ private:
+  float weight_decay_value;
+  bool using_weight_decay;
+  float negative_lr;
+  float momentum_value;
+  float pre_dampening;
+  const bool nesterov;
+  const bool momentum_buf_initialized;
+};
 
 template <typename scalar_t>
 static void ComputeSGDKernelMasterWeight(
@@ -192,25 +345,9 @@ static void ComputeSGDKernelMasterWeight(
                                   .add_input(grad)
                                   .add_input(master_weight)
                                   .build();
-
-    dpcpp_kernel_multiple_outputs_for_tensor_iter(
-        iter,
-        [=](scalar_t weight_elem,
-            scalar_t grad_elem,
-            float master_weight_elem) -> std::tuple<scalar_t, float> {
-          auto grad_elem_fp32 = static_cast<float>(grad_elem);
-
-          // d_p = d_p.add(p.master_weight, alpha=weight_decay)
-          if (using_weight_decay) {
-            grad_elem_fp32 += master_weight_elem * weight_decay_value;
-          }
-
-          // p.master_weight.add_(d_p, alpha=-group['lr'])
-          auto res = static_cast<float>(
-              master_weight_elem + grad_elem_fp32 * negative_lr);
-
-          return std::tuple<scalar_t, float>(static_cast<scalar_t>(res), res);
-        });
+    ComputeSGDKernelMasterWeightFunctor<scalar_t> f(
+        weight_decay_value, using_weight_decay, negative_lr);
+    dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
   } else {
     // use momentum
     at::TensorIterator iter = TensorIteratorConfig()
@@ -223,52 +360,102 @@ static void ComputeSGDKernelMasterWeight(
                                   .add_input(master_weight)
                                   .add_input(momentum_buffer)
                                   .build();
-    dpcpp_kernel_multiple_outputs_for_tensor_iter(
-        iter,
-        [=](scalar_t weight_elem,
-            scalar_t grad_elem,
-            float master_weight_elem,
-            scalar_t momentum_elem) -> std::tuple<scalar_t, float, scalar_t> {
-          // d_p = d_p.add(p, alpha=weight_decay)
-          auto grad_elem_fp32 = static_cast<float>(grad_elem);
-
-          auto temp_master_weight_value = master_weight_elem;
-
-          // d_p = d_p.add(p.master_weight, alpha=weight_decay)
-          if (using_weight_decay) {
-            grad_elem_fp32 += temp_master_weight_value * weight_decay_value;
-          }
-
-          // 'momentum_buffer' in param_state,
-          // param_state[momentum_buffer] has been created
-          auto temp_momentum_buffer_value = grad_elem_fp32;
-          if (momentum_buf_initialized) {
-            // buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
-            temp_momentum_buffer_value = momentum_elem;
-            temp_momentum_buffer_value =
-                momentum_value * temp_momentum_buffer_value;
-            temp_momentum_buffer_value += grad_elem_fp32 * pre_dampening;
-          }
-
-          // nesterov
-          if (nesterov) {
-            // d_p = d_p.add(buf, alpha=momentum)
-            grad_elem_fp32 += momentum_value * temp_momentum_buffer_value;
-          } else {
-            // d_p = buf
-            grad_elem_fp32 = temp_momentum_buffer_value;
-          }
-
-          // p.master_weight.add_(d_p, alpha=-group['lr'])
-          auto res = static_cast<float>(
-              temp_master_weight_value + grad_elem_fp32 * negative_lr);
-          return std::tuple<scalar_t, float, scalar_t>(
-              static_cast<scalar_t>(res),
-              res,
-              static_cast<float>(temp_momentum_buffer_value));
-        });
+    ComputeSGDKernelMasterWeightFunctor2<scalar_t> f(
+        weight_decay_value,
+        using_weight_decay,
+        negative_lr,
+        momentum_value,
+        pre_dampening,
+        nesterov,
+        momentum_buf_initialized);
+    dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
   }
 }
+
+template <typename scalar_t>
+struct ComputeSGDKernelFunctor {
+  scalar_t operator()(scalar_t weight_elem, scalar_t grad_elem) const {
+    if (using_weight_decay) {
+      grad_elem += weight_elem * weight_decay_value;
+    }
+    return weight_elem + grad_elem * negative_lr;
+  }
+
+  ComputeSGDKernelFunctor(
+      bool using_weight_decay,
+      float weight_decay_value,
+      float negative_lr)
+      : using_weight_decay(using_weight_decay),
+        weight_decay_value(weight_decay_value),
+        negative_lr(negative_lr) {}
+
+ private:
+  bool using_weight_decay;
+  float weight_decay_value;
+  float negative_lr;
+};
+
+template <typename scalar_t>
+struct ComputeSGDKernelFunctor2 {
+  std::tuple<scalar_t, scalar_t> operator()(
+      scalar_t weight_elem,
+      scalar_t grad_elem,
+      scalar_t momentum_elem) const {
+    // d_p = d_p.add(p, alpha=weight_decay)
+    if (using_weight_decay) {
+      grad_elem += weight_elem * weight_decay_value;
+    }
+
+    // 'momentum_buffer' in param_state,
+    // param_state[momentum_buffer] has been created
+    auto temp_momentum_buffer_value = grad_elem;
+    if (momentum_buf_initialized) {
+      // buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
+      temp_momentum_buffer_value = momentum_elem;
+      temp_momentum_buffer_value = momentum_value * temp_momentum_buffer_value;
+      temp_momentum_buffer_value += grad_elem * pre_dampening;
+    }
+
+    // nesterov
+    if (nesterov) {
+      // d_p = d_p.add(buf, alpha=momentum)
+      grad_elem += momentum_value * temp_momentum_buffer_value;
+    } else {
+      // d_p = buf
+      grad_elem = temp_momentum_buffer_value;
+    }
+
+    // p.add_(d_p, alpha=-group['lr'])
+    auto res = weight_elem + grad_elem * negative_lr;
+
+    return std::tuple<scalar_t, scalar_t>(res, temp_momentum_buffer_value);
+  }
+
+  ComputeSGDKernelFunctor2(
+      float weight_decay_value_,
+      bool using_weight_decay_,
+      float negative_lr_,
+      float momentum_value_,
+      float pre_dampening_,
+      const bool nesterov_,
+      const bool momentum_buf_initialized_)
+      : weight_decay_value(weight_decay_value_),
+        using_weight_decay(using_weight_decay_),
+        negative_lr(negative_lr_),
+        momentum_value(momentum_value_),
+        pre_dampening(pre_dampening_),
+        nesterov(nesterov_),
+        momentum_buf_initialized(momentum_buf_initialized_) {}
+
+ private:
+  float weight_decay_value;
+  bool using_weight_decay;
+  float negative_lr;
+  float momentum_value;
+  float pre_dampening;
+  const bool nesterov;
+  const bool momentum_buf_initialized;
+};
 
 template <typename scalar_t>
 static void ComputeSGDKernel(
@@ -306,14 +493,9 @@ static void ComputeSGDKernel(
                                   .add_input(weight)
                                   .add_input(grad)
                                   .build();
-
-    dpcpp_kernel_for_tensor_iter(
-        iter, [=](scalar_t weight_elem, scalar_t grad_elem) -> scalar_t {
-          if (using_weight_decay) {
-            grad_elem += weight_elem * weight_decay_value;
-          }
-          return weight_elem + grad_elem * negative_lr;
-        });
+    ComputeSGDKernelFunctor<scalar_t> f(
+        using_weight_decay, weight_decay_value, negative_lr);
+    dpcpp_kernel_for_tensor_iter(iter, f);
   } else {
     // use momentum
     at::TensorIterator iter = TensorIteratorConfig()
@@ -323,42 +505,15 @@ static void ComputeSGDKernel(
                                   .add_input(grad)
                                   .add_input(momentum_buffer)
                                   .build();
-    dpcpp_kernel_multiple_outputs_for_tensor_iter(
-        iter,
-        [=](scalar_t weight_elem,
-            scalar_t grad_elem,
-            scalar_t momentum_elem) -> std::tuple<scalar_t, scalar_t> {
-          // d_p = d_p.add(p, alpha=weight_decay)
-          if (using_weight_decay) {
-            grad_elem += weight_elem * weight_decay_value;
-          }
-
-          // 'momentum_buffer' in param_state,
-          // param_state[momentum_buffer] has been created
-          auto temp_momentum_buffer_value = grad_elem;
-          if (momentum_buf_initialized) {
-            // buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
-            temp_momentum_buffer_value = momentum_elem;
-            temp_momentum_buffer_value =
-                momentum_value * temp_momentum_buffer_value;
-            temp_momentum_buffer_value += grad_elem * pre_dampening;
-          }
-
-          // nesterov
-          if (nesterov) {
-            // d_p = d_p.add(buf, alpha=momentum)
-            grad_elem += momentum_value * temp_momentum_buffer_value;
-          } else {
-            // d_p = buf
-            grad_elem = temp_momentum_buffer_value;
-          }
-
-          // p.add_(d_p, alpha=-group['lr'])
-          auto res = weight_elem + grad_elem * negative_lr;
-
-          return std::tuple<scalar_t, scalar_t>(
-              res, temp_momentum_buffer_value);
-        });
+    ComputeSGDKernelFunctor2<scalar_t> f(
+        weight_decay_value,
+        using_weight_decay,
+        negative_lr,
+        momentum_value,
+        pre_dampening,
+        nesterov,
+        momentum_buf_initialized);
+    dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
   }
 }
 

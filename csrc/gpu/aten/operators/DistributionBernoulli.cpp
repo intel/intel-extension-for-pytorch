@@ -12,6 +12,13 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t>
+struct bernoulli_functor {
+  scalar_t operator()(scalar_t self_float, scalar_t p) const {
+    return static_cast<scalar_t>(self_float < p);
+  }
+};
+
 Tensor& bernoulli_(
     Tensor& self,
     const Tensor& p_,
@@ -38,10 +45,8 @@ Tensor& bernoulli_(
       iter.common_dtype(),
       "bernoulli_tensor_dpcpp_",
       [&] {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [](scalar_t self_float, scalar_t p) -> scalar_t {
-              return static_cast<scalar_t>(self_float < p);
-            });
+        bernoulli_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
   return self;
 }
@@ -68,6 +73,13 @@ Tensor& bernoulli_(Tensor& self, double p_, c10::optional<Generator> gen_) {
   return self;
 }
 
+template <typename scalar_t>
+struct bernoulli_out_functor {
+  scalar_t operator()(scalar_t out, scalar_t p) const {
+    return static_cast<scalar_t>(out < p);
+  }
+};
+
 Tensor& bernoulli_out(
     const Tensor& self,
     c10::optional<Generator> generator,
@@ -92,10 +104,8 @@ Tensor& bernoulli_out(
       iter.common_dtype(),
       "bernoulli_tensor_dpcpp_",
       [&] {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [](scalar_t out, scalar_t p) -> scalar_t {
-              return static_cast<scalar_t>(out < p);
-            });
+        bernoulli_out_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
   return out;
 }

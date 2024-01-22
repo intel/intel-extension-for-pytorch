@@ -69,6 +69,13 @@ static T abs_impl(T v) {
   return Numerics<T>::abs(v);
 }
 
+template <typename scalar_t>
+struct abs_kernel_functor {
+  scalar_t operator()(scalar_t a) const {
+    return abs_impl<scalar_t>(a);
+  }
+};
+
 void abs_kernel(TensorIteratorBase& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       ScalarType::Half,
@@ -77,19 +84,56 @@ void abs_kernel(TensorIteratorBase& iter) {
       iter.common_dtype(),
       "abs",
       [&]() {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [](scalar_t a) -> scalar_t { return abs_impl<scalar_t>(a); });
+        abs_kernel_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct angle_kernel_functor {
+  scalar_t operator()(scalar_t a) const {
+    return at::AtenIpexTypeXPU::angle_impl(a);
+  }
+};
 
 void angle_kernel(TensorIteratorBase& iter) {
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
       kBFloat16, kHalf, iter.common_dtype(), "angle", [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          return at::AtenIpexTypeXPU::angle_impl(a);
-        });
+        angle_kernel_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct nan_to_num_kernel_functor {
+  scalar_t operator()(scalar_t a) const {
+    // TODO: evaluate the root cause of strange behavior with +inf/-inf on
+    // Windows only: When a is inf, a ==
+    // std::numeric_limits<scalar_t>::infinity() evaluates incorrectly to
+    // false, while std::isinf(a) evaluates correctly to true. As a
+    // workaround, we use 'Numerics<scalar_t>::isinf(a) && a<0' to check
+    // if a is -inf, and 'Numerics<scalar_t>::isinf(a)' to check if a is
+    // +inf.
+    return (
+        at::_isnan(a)
+            ? nan_replacement
+            : (Numerics<scalar_t>::isinf(a) && a < 0
+                   ? neg_inf_replacement
+                   : (Numerics<scalar_t>::isinf(a) ? pos_inf_replacement : a)));
+  }
+  nan_to_num_kernel_functor(
+      scalar_t nan_replacement,
+      scalar_t pos_inf_replacement,
+      scalar_t neg_inf_replacement)
+      : nan_replacement(nan_replacement),
+        pos_inf_replacement(pos_inf_replacement),
+        neg_inf_replacement(neg_inf_replacement) {}
+
+ private:
+  scalar_t nan_replacement;
+  scalar_t pos_inf_replacement;
+  scalar_t neg_inf_replacement;
+};
 
 void nan_to_num_kernel(
     TensorIteratorBase& iter,
@@ -105,22 +149,9 @@ void nan_to_num_kernel(
         scalar_t neg_inf_replacement = neg_inf.has_value()
             ? static_cast<scalar_t>(neg_inf.value())
             : std::numeric_limits<scalar_t>::lowest();
-        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
-          // TODO: evaluate the root cause of strange behavior with +inf/-inf on
-          // Windows only: When a is inf, a ==
-          // std::numeric_limits<scalar_t>::infinity() evaluates incorrectly to
-          // false, while std::isinf(a) evaluates correctly to true. As a
-          // workaround, we use 'Numerics<scalar_t>::isinf(a) && a<0' to check
-          // if a is -inf, and 'Numerics<scalar_t>::isinf(a)' to check if a is
-          // +inf.
-          return (
-              at::_isnan(a)
-                  ? nan_replacement
-                  : (Numerics<scalar_t>::isinf(a) && a < 0
-                         ? neg_inf_replacement
-                         : (Numerics<scalar_t>::isinf(a) ? pos_inf_replacement
-                                                         : a)));
-        });
+        nan_to_num_kernel_functor<scalar_t> f(
+            nan_replacement, pos_inf_replacement, neg_inf_replacement);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 

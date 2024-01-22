@@ -22,6 +22,13 @@ namespace AtenIpexTypeXPU {
 IPEX_OUT_ALL_UNARY_FUNC_OPS(floor_out, Numerics<scalar_t>::floor, Real);
 IPEX_OUT_ALL_UNARY_FUNC_OPS(ceil_out, Numerics<scalar_t>::ceil, Real);
 
+template <typename scalar_t>
+struct round_out_functor {
+  scalar_t operator()(scalar_t a) const {
+    return std::nearbyintf(static_cast<float>(a));
+  }
+};
+
 Tensor& round_out(const Tensor& self, Tensor& out) {
   return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_round>(
       TensorIterator::unary_op,
@@ -34,9 +41,8 @@ Tensor& round_out(const Tensor& self, Tensor& out) {
             iter.dtype(),
             "round",
             [&]() {
-              dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-                return std::nearbyintf(static_cast<float>(a));
-              });
+              round_out_functor<scalar_t> f;
+              dpcpp_kernel_for_tensor_iter(iter, f);
             });
       },
       0.0f,
@@ -44,6 +50,21 @@ Tensor& round_out(const Tensor& self, Tensor& out) {
       /*Onednn round only support float type*/ self.scalar_type() ==
           at::ScalarType::Float);
 }
+
+template <typename scalar_t>
+struct round_decimals_out_functor {
+  scalar_t operator()(scalar_t a) const {
+    return neg_flag ? std::nearbyint(a / ten_pow_decimals) * ten_pow_decimals
+                    : std::nearbyint(a * ten_pow_decimals) / ten_pow_decimals;
+  }
+
+  round_decimals_out_functor(bool neg_flag, scalar_t ten_pow_decimals)
+      : neg_flag(neg_flag), ten_pow_decimals(ten_pow_decimals) {}
+
+ private:
+  bool neg_flag;
+  scalar_t ten_pow_decimals;
+};
 
 void round_decimals_out(const Tensor& self, int64_t decimals, Tensor& out) {
   auto iter = TensorIterator::unary_float_op(out, self);
@@ -60,11 +81,8 @@ void round_decimals_out(const Tensor& self, int64_t decimals, Tensor& out) {
           neg_flag = true;
         }
         ten_pow_decimals = static_cast<scalar_t>(std::pow(10, decimals));
-        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
-          return neg_flag
-              ? std::nearbyint(a / ten_pow_decimals) * ten_pow_decimals
-              : std::nearbyint(a * ten_pow_decimals) / ten_pow_decimals;
-        });
+        round_decimals_out_functor<scalar_t> f(neg_flag, ten_pow_decimals);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 

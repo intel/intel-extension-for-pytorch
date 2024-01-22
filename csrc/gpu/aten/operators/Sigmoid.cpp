@@ -18,6 +18,14 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t>
+struct sigmoid_out_functor {
+  scalar_t operator()(scalar_t a) const {
+    scalar_t one = (scalar_t)1.0;
+    return one / (one + Numerics<scalar_t>::exp(-static_cast<scalar_t>(a)));
+  }
+};
+
 Tensor& sigmoid_out(const Tensor& self, Tensor& out) {
   return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_logistic>(
       TensorIterator::unary_float_op, out, self, [=](TensorIteratorBase& iter) {
@@ -27,14 +35,28 @@ Tensor& sigmoid_out(const Tensor& self, Tensor& out) {
             iter.common_dtype(),
             "_sigmoid_out",
             [&]() {
-              dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
-                scalar_t one = (scalar_t)1.0;
-                return one /
-                    (one + Numerics<scalar_t>::exp(-static_cast<scalar_t>(a)));
-              });
+              sigmoid_out_functor<scalar_t> f;
+              dpcpp_kernel_for_tensor_iter(iter, f);
             });
       });
 }
+
+template <typename scalar_t>
+struct sigmoid_backward_out_functor {
+  at::Half operator()(at::Half go, at::Half in) const {
+    float in_float = (float)in;
+    float go_float = (float)go;
+    return (at::Half)(go * (1.f - in_float) * in_float);
+  }
+};
+
+template <typename scalar_t>
+struct sigmoid_backward_out_functor_2 {
+  scalar_t operator()(scalar_t go, scalar_t in) const {
+    scalar_t one = (scalar_t)1.0;
+    return go * (one - in) * in;
+  }
+};
 
 Tensor& sigmoid_backward_out(
     const Tensor& grad_output,
@@ -55,18 +77,11 @@ Tensor& sigmoid_backward_out(
             "sigmoid_backward_out",
             [&]() {
               if (iter.dtype() == ScalarType::Half) {
-                dpcpp_kernel_for_tensor_iter(
-                    iter, [=](at::Half go, at::Half in) -> at::Half {
-                      float in_float = (float)in;
-                      float go_float = (float)go;
-                      return (at::Half)(go * (1.f - in_float) * in_float);
-                    });
+                sigmoid_backward_out_functor<scalar_t> f;
+                dpcpp_kernel_for_tensor_iter(iter, f);
               } else {
-                dpcpp_kernel_for_tensor_iter(
-                    iter, [=](scalar_t go, scalar_t in) -> scalar_t {
-                      scalar_t one = (scalar_t)1.0;
-                      return go * (one - in) * in;
-                    });
+                sigmoid_backward_out_functor_2<scalar_t> f;
+                dpcpp_kernel_for_tensor_iter(iter, f);
               }
             });
       });

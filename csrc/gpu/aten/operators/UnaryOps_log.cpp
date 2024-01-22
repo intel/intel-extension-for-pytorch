@@ -17,6 +17,13 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t>
+struct log_out_functor {
+  scalar_t operator()(scalar_t a) const {
+    return Numerics<scalar_t>::log(a);
+  }
+};
+
 Tensor& log_out(const Tensor& self, Tensor& out) {
   return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_log>(
       TensorIterator::unary_float_op, out, self, [=](TensorIteratorBase& iter) {
@@ -26,9 +33,8 @@ Tensor& log_out(const Tensor& self, Tensor& out) {
             iter.common_dtype(),
             "log_out",
             [&]() {
-              dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-                return Numerics<scalar_t>::log(a);
-              });
+              log_out_functor<scalar_t> f;
+              dpcpp_kernel_for_tensor_iter(iter, f);
             });
       });
 }

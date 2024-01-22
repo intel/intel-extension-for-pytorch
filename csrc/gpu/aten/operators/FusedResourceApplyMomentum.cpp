@@ -26,6 +26,39 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t>
+struct ComputeFusedResourceApplyMomentumKernelFunctor {
+  std::tuple<scalar_t, scalar_t> operator()(
+      scalar_t weight_elem,
+      scalar_t momentum_buffer_elem,
+      scalar_t grad_elem) const {
+    // mom_t = mom * self.momentum - grad * scaled_lr
+    auto temp_momentum_buffer =
+        momentum_buffer_elem * momentum - grad_elem * lr;
+    if (nesterov) {
+      // var_t = var + mom_t * self.momentum - grad * scaled_lr
+      weight_elem += temp_momentum_buffer * momentum - grad_elem * lr;
+    } else {
+      // var_t = var + mom_t
+      weight_elem += temp_momentum_buffer;
+    }
+    return std::tuple<scalar_t, scalar_t>(
+        static_cast<scalar_t>(weight_elem),
+        static_cast<scalar_t>(temp_momentum_buffer));
+  }
+
+  ComputeFusedResourceApplyMomentumKernelFunctor(
+      float momentum_,
+      float lr_,
+      bool nesterov_)
+      : momentum(momentum_), lr(lr_), nesterov(nesterov_) {}
+
+ private:
+  const float momentum;
+  const float lr;
+  const bool nesterov;
+};
+
 void ComputeFusedResourceApplyMomentumKernel(
     Tensor& weight,
     Tensor& momentum_buffer,
@@ -46,25 +79,9 @@ void ComputeFusedResourceApplyMomentumKernel(
       iter.dtype(),
       "ComputeFusedResourceApplyMomentumKernel",
       [&]() {
-        dpcpp_kernel_multiple_outputs_for_tensor_iter(
-            iter,
-            [=](scalar_t weight_elem,
-                scalar_t momentum_buffer_elem,
-                scalar_t grad_elem) -> std::tuple<scalar_t, scalar_t> {
-              // mom_t = mom * self.momentum - grad * scaled_lr
-              auto temp_momentum_buffer =
-                  momentum_buffer_elem * momentum - grad_elem * lr;
-              if (nesterov) {
-                // var_t = var + mom_t * self.momentum - grad * scaled_lr
-                weight_elem += temp_momentum_buffer * momentum - grad_elem * lr;
-              } else {
-                // var_t = var + mom_t
-                weight_elem += temp_momentum_buffer;
-              }
-              return std::tuple<scalar_t, scalar_t>(
-                  static_cast<scalar_t>(weight_elem),
-                  static_cast<scalar_t>(temp_momentum_buffer));
-            });
+        ComputeFusedResourceApplyMomentumKernelFunctor<scalar_t> f(
+            momentum, lr, nesterov);
+        dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
       });
 }
 } // namespace impl

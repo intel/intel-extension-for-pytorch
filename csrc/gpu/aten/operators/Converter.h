@@ -48,6 +48,13 @@ static inline std::tuple<at::BFloat16, at::BFloat16> unpack_float_bfloat16(
   return std::make_tuple(*hip, *lop);
 }
 
+template <typename scalar_t>
+struct cat_bfloat16_float_xpu_functor {
+  float operator()(scalar_t top_elem, scalar_t bot_elem) const {
+    return pack_bloat16_float(top_elem, bot_elem);
+  }
+};
+
 Tensor cat_bfloat16_float_xpu(
     const at::Tensor top_half,
     const at::Tensor bottom_half) {
@@ -74,14 +81,19 @@ Tensor cat_bfloat16_float_xpu(
       iter.input_dtype(),
       "cat_bfloat16_float_kernel",
       [&] {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [=](scalar_t top_elem, scalar_t bot_elem) -> float {
-              return pack_bloat16_float(top_elem, bot_elem);
-            });
+        cat_bfloat16_float_xpu_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 
   return fp32_tensor;
 }
+
+template <typename scalar_t>
+struct split_float_bfloat16_xpu_functor {
+  std::tuple<at::BFloat16, at::BFloat16> operator()(scalar_t fp32_elem) const {
+    return unpack_float_bfloat16(fp32_elem);
+  }
+};
 
 std::tuple<at::Tensor, at::Tensor> split_float_bfloat16_xpu(
     at::Tensor fp32_tensor) {
@@ -110,11 +122,8 @@ std::tuple<at::Tensor, at::Tensor> split_float_bfloat16_xpu(
 
   IPEX_DISPATCH_FLOATING_TYPES(
       iter.input_dtype(), "split_float_bfloat16_kernel", [&] {
-        dpcpp_kernel_multiple_outputs_for_tensor_iter(
-            iter,
-            [=](scalar_t fp32_elem) -> std::tuple<at::BFloat16, at::BFloat16> {
-              return unpack_float_bfloat16(fp32_elem);
-            });
+        split_float_bfloat16_xpu_functor<scalar_t> f;
+        dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
       });
 
   return std::tuple<at::Tensor, at::Tensor>{top_half, bottom_half};

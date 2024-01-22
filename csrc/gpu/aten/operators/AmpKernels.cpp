@@ -12,6 +12,29 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t, typename opmath_t>
+struct _amp_non_finite_check_and_unscale_dpcpp_functor {
+  scalar_t operator()(scalar_t val_in) const {
+    auto val = static_cast<opmath_t>(val_in);
+    if (Numerics<opmath_t>::isinf(val) || Numerics<opmath_t>::isnan(val)) {
+      *found_inf_ptr = 1.f;
+    }
+    // Every thread accesses inv_scale, but it will hit in cache.
+    const auto inv_scale_val = *inv_scale_ptr;
+    return static_cast<scalar_t>(
+        inv_scale_val == 1.f ? val : val * inv_scale_val);
+  }
+
+  _amp_non_finite_check_and_unscale_dpcpp_functor(
+      float* found_inf_ptr,
+      float* inv_scale_ptr)
+      : found_inf_ptr(found_inf_ptr), inv_scale_ptr(inv_scale_ptr) {}
+
+ private:
+  float* found_inf_ptr;
+  float* inv_scale_ptr;
+};
+
 // Single-tensor fallback for _amp_foreach_non_finite_check_and_unscale_dpcpp_.
 // Handles individual tensors that are acceptable to unscale but not MTA-safe.
 void _amp_non_finite_check_and_unscale_dpcpp_(
@@ -34,19 +57,9 @@ void _amp_non_finite_check_and_unscale_dpcpp_(
         auto* inv_scale_ptr = inv_scale.data_ptr<float>();
 
         using opmath_t = at::opmath_type<scalar_t>;
-
-        dpcpp_kernel_for_tensor_iter(
-            iter, [found_inf_ptr, inv_scale_ptr](scalar_t val_in) -> scalar_t {
-              auto val = static_cast<opmath_t>(val_in);
-              if (Numerics<opmath_t>::isinf(val) ||
-                  Numerics<opmath_t>::isnan(val)) {
-                *found_inf_ptr = 1.f;
-              }
-              // Every thread accesses inv_scale, but it will hit in cache.
-              const auto inv_scale_val = *inv_scale_ptr;
-              return static_cast<scalar_t>(
-                  inv_scale_val == 1.f ? val : val * inv_scale_val);
-            });
+        _amp_non_finite_check_and_unscale_dpcpp_functor<scalar_t, opmath_t> f(
+            found_inf_ptr, inv_scale_ptr);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 

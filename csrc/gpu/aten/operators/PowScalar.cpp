@@ -19,27 +19,71 @@ void rsqrt_kernel_xpu(TensorIterator& iter);
 void reciprocal_kernel_xpu(TensorIterator& iter);
 
 template <typename scalar_t>
+struct pow_tensor_scalar_kernel_impl_functor {
+  scalar_t operator()(scalar_t base) const {
+    return base * base;
+  }
+};
+
+template <typename scalar_t>
+struct pow_tensor_scalar_kernel_impl_functor_2 {
+  scalar_t operator()(scalar_t base) const {
+    return base * base * base;
+  }
+};
+
+template <typename scalar_t>
+struct pow_tensor_scalar_kernel_impl_functor_3 {
+  scalar_t operator()(scalar_t base) const {
+    return 1.0 / (base * base);
+  }
+};
+
+template <typename scalar_t, typename opmath_t>
+struct pow_tensor_scalar_kernel_impl_functor_4 {
+  scalar_t operator()(scalar_t base) const {
+    return Numerics<scalar_t>::pow(base, exp_);
+  }
+
+  pow_tensor_scalar_kernel_impl_functor_4(opmath_t exp_) : exp_(exp_) {}
+
+ private:
+  opmath_t exp_;
+};
+
+template <typename scalar_t>
 void pow_tensor_scalar_kernel_impl(TensorIterator& iter, const Scalar& exp) {
   const auto double_exp = exp.to<double>();
   // 0.5 (sqrt), -0.5 (rsqrt) and -1 (reciprocal) specializations are handled
   // in pow_tensor_scalar_kernel
   if (double_exp == 2) {
-    dpcpp_kernel_for_tensor_iter(
-        iter, [](scalar_t base) -> scalar_t { return base * base; });
+    pow_tensor_scalar_kernel_impl_functor<scalar_t> f;
+    dpcpp_kernel_for_tensor_iter(iter, f);
   } else if (double_exp == 3) {
-    dpcpp_kernel_for_tensor_iter(
-        iter, [](scalar_t base) -> scalar_t { return base * base * base; });
+    pow_tensor_scalar_kernel_impl_functor_2<scalar_t> f;
+    dpcpp_kernel_for_tensor_iter(iter, f);
   } else if (double_exp == -2) {
-    dpcpp_kernel_for_tensor_iter(
-        iter, [](scalar_t base) -> scalar_t { return 1.0 / (base * base); });
+    pow_tensor_scalar_kernel_impl_functor_3<scalar_t> f;
+    dpcpp_kernel_for_tensor_iter(iter, f);
   } else {
     using opmath_t = at::opmath_type<scalar_t>;
     const auto exp_ = static_cast<opmath_t>(double_exp);
-    dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t base) -> scalar_t {
-      return Numerics<scalar_t>::pow(base, exp_);
-    });
+    pow_tensor_scalar_kernel_impl_functor_4<scalar_t, opmath_t> f(exp_);
+    dpcpp_kernel_for_tensor_iter(iter, f);
   }
 }
+
+template <typename scalar_t>
+struct pow_tensor_scalar_kernel_functor {
+  scalar_t operator()(scalar_t base) const {
+    return Numerics<scalar_t>::pow(base, exp);
+  }
+
+  pow_tensor_scalar_kernel_functor(scalar_t exp) : exp(exp) {}
+
+ private:
+  scalar_t exp;
+};
 
 void pow_tensor_scalar_kernel(TensorIterator& iter, const Scalar& exp_scalar) {
   // Dispatch to fast specialization for sqrt, rsqrt and reciprocal
@@ -56,9 +100,8 @@ void pow_tensor_scalar_kernel(TensorIterator& iter, const Scalar& exp_scalar) {
   if (isComplexType(iter.common_dtype()) || exp_scalar.isComplex()) {
     IPEX_DISPATCH_COMPLEX_TYPES(iter.common_dtype(), "pow", [&]() {
       const auto exp = exp_scalar.to<scalar_t>();
-      dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t base) -> scalar_t {
-        return Numerics<scalar_t>::pow(base, exp);
-      });
+      pow_tensor_scalar_kernel_functor<scalar_t> f(exp);
+      dpcpp_kernel_for_tensor_iter(iter, f);
     });
   } else if (
       isFloatingType(iter.common_dtype()) || exp_scalar.isIntegral(false)) {

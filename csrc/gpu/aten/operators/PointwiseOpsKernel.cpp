@@ -13,6 +13,18 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t>
+struct addcmul_kernel_functor {
+  scalar_t operator()(scalar_t a, scalar_t b, scalar_t c) const {
+    return a + alpha * b * c;
+  }
+
+  addcmul_kernel_functor(scalar_t alpha) : alpha(alpha) {}
+
+ private:
+  scalar_t alpha;
+};
+
 static void addcmul_kernel(TensorIterator& iter, Scalar value) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
       at::ScalarType::Half,
@@ -21,12 +33,22 @@ static void addcmul_kernel(TensorIterator& iter, Scalar value) {
       "addcmul_dpcpp",
       [&]() {
         auto alpha = value.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter(
-            iter, [alpha](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
-              return a + alpha * b * c;
-            });
+        addcmul_kernel_functor<scalar_t> f(alpha);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct addcdiv_kernel_functor {
+  scalar_t operator()(scalar_t a, scalar_t b, scalar_t c) const {
+    return a + alpha * (b / c);
+  }
+
+  addcdiv_kernel_functor(scalar_t alpha) : alpha(alpha) {}
+
+ private:
+  scalar_t alpha;
+};
 
 static void addcdiv_kernel(TensorIterator& iter, Scalar value) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
@@ -36,10 +58,8 @@ static void addcdiv_kernel(TensorIterator& iter, Scalar value) {
       "addcdiv_dpcpp",
       [&]() {
         auto alpha = value.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter(
-            iter, [alpha](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
-              return a + alpha * (b / c);
-            });
+        addcdiv_kernel_functor<scalar_t> f(alpha);
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 

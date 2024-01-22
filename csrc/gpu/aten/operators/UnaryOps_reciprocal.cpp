@@ -49,6 +49,13 @@ static inline c10::complex<T> reciprocal_wrapper(c10::complex<T> v) {
   return one / v;
 }
 
+template <typename scalar_t>
+struct reciprocal_kernel_xpu_functor {
+  scalar_t operator()(scalar_t a) const {
+    return reciprocal_wrapper(a);
+  }
+};
+
 void reciprocal_kernel_xpu(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
       at::ScalarType::Half,
@@ -56,9 +63,8 @@ void reciprocal_kernel_xpu(TensorIterator& iter) {
       iter.common_dtype(),
       "reciprocal_xpu",
       [&] {
-        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
-          return reciprocal_wrapper(a);
-        });
+        reciprocal_kernel_xpu_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
       });
 }
 

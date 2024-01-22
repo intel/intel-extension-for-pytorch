@@ -26,6 +26,40 @@ namespace AtenIpexTypeXPU {
 
 namespace impl {
 
+struct ComputeAdagradKernelFunctor {
+  std::tuple<float, float> operator()(
+      float weight_elem,
+      float grad_elem,
+      float state_sum_elem) const {
+    if (use_weight_decay) {
+      grad_elem += weight_elem * weight_decay;
+    }
+    state_sum_elem += grad_elem * grad_elem;
+
+    float std_val = Numerics<float>::sqrt(state_sum_elem) + eps_value;
+
+    weight_elem = weight_elem - grad_elem / std_val * clr;
+
+    return std::tuple(weight_elem, state_sum_elem);
+  }
+
+  ComputeAdagradKernelFunctor(
+      const bool use_weight_decay,
+      const float weight_decay,
+      const float eps_value,
+      double clr)
+      : use_weight_decay(use_weight_decay),
+        weight_decay(weight_decay),
+        eps_value(eps_value),
+        clr(clr) {}
+
+ private:
+  const bool use_weight_decay;
+  const float weight_decay;
+  const float eps_value;
+  double clr;
+};
+
 // no master weight, all tensor are fp32
 static void ComputeAdagradKernel(
     Tensor& weight,
@@ -48,23 +82,50 @@ static void ComputeAdagradKernel(
                                 .add_input(state_sum)
                                 .build();
 
-  dpcpp_kernel_multiple_outputs_for_tensor_iter(
-      iter,
-      [=](float weight_elem,
-          float grad_elem,
-          float state_sum_elem) -> std::tuple<float, float> {
-        if (use_weight_decay) {
-          grad_elem += weight_elem * weight_decay;
-        }
-        state_sum_elem += grad_elem * grad_elem;
-
-        float std_val = Numerics<float>::sqrt(state_sum_elem) + eps_value;
-
-        weight_elem = weight_elem - grad_elem / std_val * clr;
-
-        return std::tuple(weight_elem, state_sum_elem);
-      });
+  ComputeAdagradKernelFunctor f(use_weight_decay, weight_decay, eps_value, clr);
+  dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
 }
+
+template <typename scalar_t>
+struct ComputeAdagradKernelMasterWeightFunctor {
+  std::tuple<scalar_t, float, float> operator()(
+      scalar_t weight_elem,
+      float master_weight_elem,
+      scalar_t grad_elem,
+      float state_sum_elem) const {
+    float fp32_grad_elem = static_cast<float>(grad_elem);
+
+    if (use_weight_decay) {
+      fp32_grad_elem += master_weight_elem * weight_decay;
+    }
+    state_sum_elem += fp32_grad_elem * fp32_grad_elem;
+
+    float std_val = Numerics<float>::sqrt(state_sum_elem) + eps_value;
+
+    master_weight_elem = master_weight_elem - fp32_grad_elem / std_val * clr;
+
+    return std::tuple(
+        static_cast<scalar_t>(master_weight_elem),
+        master_weight_elem,
+        state_sum_elem);
+  }
+
+  ComputeAdagradKernelMasterWeightFunctor(
+      const bool use_weight_decay,
+      const float weight_decay,
+      const float eps_value,
+      double clr)
+      : use_weight_decay(use_weight_decay),
+        weight_decay(weight_decay),
+        eps_value(eps_value),
+        clr(clr) {}
+
+ private:
+  const bool use_weight_decay;
+  const float weight_decay;
+  const float eps_value;
+  double clr;
+};
 
 template <typename scalar_t>
 void ComputeAdagradKernelMasterWeight(
@@ -90,30 +151,9 @@ void ComputeAdagradKernelMasterWeight(
                                 .add_input(grad)
                                 .add_input(state_sum)
                                 .build();
-
-  dpcpp_kernel_multiple_outputs_for_tensor_iter(
-      iter,
-      [=](scalar_t weight_elem,
-          float master_weight_elem,
-          scalar_t grad_elem,
-          float state_sum_elem) -> std::tuple<scalar_t, float, float> {
-        float fp32_grad_elem = static_cast<float>(grad_elem);
-
-        if (use_weight_decay) {
-          fp32_grad_elem += master_weight_elem * weight_decay;
-        }
-        state_sum_elem += fp32_grad_elem * fp32_grad_elem;
-
-        float std_val = Numerics<float>::sqrt(state_sum_elem) + eps_value;
-
-        master_weight_elem =
-            master_weight_elem - fp32_grad_elem / std_val * clr;
-
-        return std::tuple(
-            static_cast<scalar_t>(master_weight_elem),
-            master_weight_elem,
-            state_sum_elem);
-      });
+  ComputeAdagradKernelMasterWeightFunctor<scalar_t> f(
+      use_weight_decay, weight_decay, eps_value, clr);
+  dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
 }
 
 } // namespace impl
