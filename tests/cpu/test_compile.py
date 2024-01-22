@@ -36,7 +36,7 @@ class TestCompile(TestCase):
             ), torch.no_grad():
                 y1 = model(x)
                 fx_model = torch.fx.symbolic_trace(model)
-                compiled_model = ipex.compile(fx_model, [x])
+                compiled_model = torch.compile(fx_model, backend="ipex")
                 # warm up
                 for _ in range(2):
                     compiled_model(x)

@@ -19,4 +19,7 @@ void InitIpexBindings(py::module& m) {
 #else
   m.def("_has_xpu", []() { return false; });
 #endif
+
+  // For IPEX CPU, the SynGraph availability is always false
+  m.def("_is_syngraph_available", []() { return false; });
 }
