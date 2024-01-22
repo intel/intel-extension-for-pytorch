@@ -1,14 +1,15 @@
 #include <ATen/ATen.h>
 #include <ATen/TensorSubclassLikeUtils.h>
 #include <ATen/record_function.h>
+#include <core/Generator.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "../Blas.h"
+#include "../DistributionTemplates.h"
+#include "../RandomEngine.h"
 #include "../comm/ATDispatch.h"
 #include "sdp_utils.h"
 #include "utils/CustomOperatorRegistration.h"
-
-#include "../xetla/mha.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -18,17 +19,40 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
     const Tensor& _key,
     const Tensor& _value,
     const c10::optional<Tensor>& attn_mask,
+    Tensor& seed_t,
+    Tensor& offset_t,
+    Tensor& softmax_lse,
     bool is_causal,
+    bool is_training,
     double dropout_p,
     c10::optional<double> scale) {
 #if defined(USE_XETLA)
   // check attn_mask padded
   uint32_t attn_mask_padded_block_size = 0;
+  Tensor attn_mask_c;
   if (attn_mask.has_value()) {
-    attn_mask_padded_block_size = attn_mask.value().size(-1);
+    attn_mask_c = attn_mask.value();
+    // xetla kernel only supports [bs, 1, q_len, k_len]
+    // but we got expanded tensor [bs, head_dim, q_len, k_len]
     TORCH_CHECK(
-        (attn_mask_padded_block_size * _key.itemsize() % 8 == 0),
-        "XeTLA SDP Attention mask needs 8bytes aligned on leading dimension ...");
+        attn_mask.value().stride(1) == 0 || attn_mask.value().size(1) == 1,
+        "XPU efficient attention requires attn mask second dim is 1");
+
+    // broadcast attn_mask at the 3nd dim
+    if (attn_mask.value().stride(-2) == 0) {
+      attn_mask_c = attn_mask.value()
+                        .as_strided(
+                            {attn_mask.value().size(0),
+                             1,
+                             attn_mask.value().size(2),
+                             attn_mask.value().size(3)},
+                            attn_mask.value().strides())
+                        .contiguous();
+      if (attn_mask_c.stride(-2) % 16 != 0) {
+        attn_mask_c = sdp::pad_bias<16>(attn_mask_c);
+      }
+    }
+    attn_mask_padded_block_size = attn_mask_c.stride(-2);
   }
 
   // make q, k, v strided
@@ -45,15 +69,19 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
   const double softmax_scale =
       scale.has_value() ? scale.value() : (1.0 / std::sqrt(query.size(-1)));
 
-  gpu::xetla::fmha_forward_kernel(
+  const bool use_dropout = std::fpclassify(dropout_p) != FP_ZERO;
+  XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
+  fmha_forward_kernel(
+      xeType,
       dpcpp_queue,
       query.data_ptr(),
       key.data_ptr(),
       value.data_ptr(),
       /* alibi */ nullptr,
-      attn_mask.has_value() ? attn_mask.value().data_ptr() : (void*)nullptr,
+      attn_mask.has_value() ? attn_mask_c.data_ptr() : (void*)nullptr,
       /* dropout_mask */ nullptr,
       output.data_ptr(),
+      softmax_lse.data_ptr(),
       softmax_scale,
       /* beta */ 1.0f,
       dropout_p,
@@ -65,7 +93,11 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
       /* ablibi padded size */ 0,
       attn_mask_padded_block_size,
       is_causal,
-      false);
+      false,
+      is_training,
+      use_dropout,
+      (uint64_t)*seed_t.data_ptr<int64_t>(),
+      (uint64_t)*offset_t.data_ptr<int64_t>());
 
   return output;
 #else
@@ -74,6 +106,74 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
   // auto result = naive_scaled_dot_product(query, key, value, is_causal);
   // return std::forward_as_tuple(std::get<0>(result), std::get<1>(result));
 #endif
+}
+
+std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math_native_impl(
+    const Tensor& query_,
+    const Tensor& key,
+    const Tensor& value,
+    const c10::optional<Tensor>& attn_mask_,
+    double dropout_p,
+    bool is_causal,
+    const c10::optional<Tensor>& dropout_mask,
+    c10::optional<double> scale) {
+  if (query_.is_nested() || key.is_nested() || value.is_nested()) {
+    TORCH_CHECK(
+        query_.is_contiguous() && key.is_contiguous() && value.is_contiguous(),
+        "scaled_dot_product_attention: If inputs are nested tensors they must be contiguous");
+  }
+  auto attn_mask = attn_mask_;
+  // Naive, composite implementation defined here.
+
+  // Scale q, k before matmul for stability see https://tinyurl.com/sudb9s96 for
+  // math
+  bool is_negative_scaling = scale.has_value() && scale.value() < 0.0;
+  const auto scaling_factor =
+      sdp::native_calculate_scale(
+          query_, is_negative_scaling ? std::abs(scale.value()) : scale)
+          .sqrt();
+
+  const auto query = query_ *
+      (is_negative_scaling ? c10::SymFloat(0.0) - scaling_factor
+                           : scaling_factor);
+  if (is_causal) {
+    TORCH_CHECK(
+        !attn_mask.has_value(),
+        "_scaled_dot_product_attention: Explicit attn_mask should not be set when is_causal=True");
+    TORCH_CHECK(
+        !query.is_nested() && !key.is_nested(),
+        "_scaled_dot_product_attention: Nested tensors for query / key are not supported when is_causal=True");
+
+    // Replace attn_mask with causal mask; lower triangular elements take part
+    // in attention.
+    const auto L = query.sym_size(-2), S = key.sym_size(-2);
+    attn_mask =
+        at::ones_symint({L, S}, query.options().dtype(at::kBool)).tril();
+    attn_mask = sdp::convert_boolean_attn_mask(attn_mask, query.dtype());
+  }
+  auto attn = at::matmul(query, key.transpose(-2, -1) * scaling_factor);
+  if (attn_mask.has_value()) {
+    if (at::areAnyTensorSubclassLike({attn, *attn_mask})) {
+      attn = attn.add(*attn_mask);
+    } else {
+      attn.add_(*attn_mask);
+    }
+  }
+  attn = at::softmax(attn, -1);
+  if (dropout_p > 0.0) {
+    if (dropout_mask.has_value()) {
+      // In order to validate the correctness of the fused kernels, we need to
+      // use the same dropout mask in order to compare the results.
+      TORCH_WARN_ONCE("Dropout mask should only be used for testing purposes.");
+      attn = attn.masked_fill(dropout_mask->logical_not(), 0.0);
+      auto dropout_scaling = 1.0 / (1 - dropout_p);
+      return std::make_tuple(at::matmul(attn, value * dropout_scaling), attn);
+    } else {
+      attn = at::dropout(attn, dropout_p, true);
+    }
+  }
+
+  return std::make_tuple(at::matmul(attn, value), attn);
 }
 
 std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math_impl(
@@ -180,40 +280,78 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math(
   // on ATSM, the efficient_attention path is not available
   // With naive math path, oneDNN matmul has overflow issue with fp16 inputs
   // as a WA, convert fp16 inputs to fp32
-  return IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::kHalf,
-      at::kBFloat16,
-      query_.scalar_type(),
-      "scaled_dot_product_attention_math",
-      [&] {
-        bool is_half = std::is_same<scalar_t, at::Half>::value;
-        if (is_half) {
-          Tensor query_fp32 = query_.to(at::kFloat);
-          Tensor key_fp32 = key.to(at::kFloat);
-          Tensor value_fp32 = value.to(at::kFloat);
-          auto [attn_output, attn_weight] =
-              _scaled_dot_product_attention_math_impl(
-                  query_fp32,
-                  key_fp32,
-                  value_fp32,
-                  attn_mask_,
-                  dropout_p,
-                  is_causal,
-                  dropout_mask,
-                  scale);
-          return std::make_tuple(
-              attn_output.to(at::kHalf), attn_weight.to(at::kHalf));
-        }
-        return _scaled_dot_product_attention_math_impl(
-            query_,
-            key,
-            value,
-            attn_mask_,
-            dropout_p,
-            is_causal,
-            dropout_mask,
-            scale);
-      });
+  if (query_.requires_grad() || key.requires_grad() || value.requires_grad()) {
+    return IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::kHalf,
+        at::kBFloat16,
+        query_.scalar_type(),
+        "scaled_dot_product_attention_math",
+        [&] {
+          bool is_half = std::is_same<scalar_t, at::Half>::value;
+          if (is_half) {
+            Tensor query_fp32 = query_.to(at::kFloat);
+            Tensor key_fp32 = key.to(at::kFloat);
+            Tensor value_fp32 = value.to(at::kFloat);
+            auto [attn_output, attn_weight] =
+                _scaled_dot_product_attention_math_native_impl(
+                    query_fp32,
+                    key_fp32,
+                    value_fp32,
+                    attn_mask_,
+                    dropout_p,
+                    is_causal,
+                    dropout_mask,
+                    scale);
+            return std::make_tuple(
+                attn_output.to(at::kHalf), attn_weight.to(at::kHalf));
+          }
+          return _scaled_dot_product_attention_math_native_impl(
+              query_,
+              key,
+              value,
+              attn_mask_,
+              dropout_p,
+              is_causal,
+              dropout_mask,
+              scale);
+        });
+  } else {
+    // accelerate for inference
+    return IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::kHalf,
+        at::kBFloat16,
+        query_.scalar_type(),
+        "scaled_dot_product_attention_math",
+        [&] {
+          bool is_half = std::is_same<scalar_t, at::Half>::value;
+          if (is_half) {
+            Tensor query_fp32 = query_.to(at::kFloat);
+            Tensor key_fp32 = key.to(at::kFloat);
+            Tensor value_fp32 = value.to(at::kFloat);
+            auto [attn_output, attn_weight] =
+                _scaled_dot_product_attention_math_impl(
+                    query_fp32,
+                    key_fp32,
+                    value_fp32,
+                    attn_mask_,
+                    dropout_p,
+                    is_causal,
+                    dropout_mask,
+                    scale);
+            return std::make_tuple(
+                attn_output.to(at::kHalf), attn_weight.to(at::kHalf));
+          }
+          return _scaled_dot_product_attention_math_impl(
+              query_,
+              key,
+              value,
+              attn_mask_,
+              dropout_p,
+              is_causal,
+              dropout_mask,
+              scale);
+        });
+  }
 }
 
 std::tuple<Tensor, Tensor, Tensor, Tensor>
@@ -226,13 +364,43 @@ _scaled_dot_product_efficient_attention(
     double dropout_p,
     bool is_causal,
     c10::optional<double> scale) {
-  auto out = _scaled_dot_product_efficient_attention_impl(
-      query, key, value, attn_bias, is_causal, dropout_p, scale);
+  int64_t B = query.size(0);
+  int64_t num_heads = query.size(1);
+  int64_t M = query.size(-2);
+  int64_t N = key.size(-2);
+
+  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
+      c10::nullopt, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+  std::pair<uint64_t, uint64_t> philox_state;
+  {
+    // See Note [Acquire lock when using random generators]
+    std::lock_guard<std::mutex> lock(gen->mutex_);
+    philox_state = gen->philox_engine_inputs(B * num_heads * M * N);
+  }
+  PhiloxState rng_engine_inputs(
+      std::get<0>(philox_state), std::get<1>(philox_state));
+  auto [seed, offset] = philox_unpack(rng_engine_inputs);
+  Tensor seed_t = at::scalar_tensor(
+      at::Scalar(static_cast<int64_t>(seed)), at::dtype(at::kLong));
+  Tensor offset_t = at::scalar_tensor(
+      at::Scalar(static_cast<int64_t>(offset)), at::dtype(at::kLong));
+
   auto softmax_lse = at::empty(
       {query.size(0), query.size(1), query.size(2)},
       query.options().dtype(at::kFloat));
-  Tensor seed_t = at::empty({}, at::dtype(at::kLong).device(at::kXPU));
-  Tensor offset_t = at::empty({}, at::dtype(at::kLong).device(at::kXPU));
+
+  auto out = _scaled_dot_product_efficient_attention_impl(
+      query,
+      key,
+      value,
+      attn_bias,
+      seed_t,
+      offset_t,
+      softmax_lse,
+      is_causal,
+      compute_log_sumexp,
+      dropout_p,
+      scale);
   return std::make_tuple(
       std::move(out),
       std::move(softmax_lse),
@@ -240,16 +408,26 @@ _scaled_dot_product_efficient_attention(
       std::move(offset_t));
 }
 
-inline bool xetla_supported(Tensor q, Tensor k, Tensor v, bool is_training) {
+inline bool xetla_supported(
+    Tensor q,
+    Tensor k,
+    Tensor v,
+    const c10::optional<Tensor>& b) {
   bool is_supported = false;
 #if defined(USE_XETLA)
   DeviceId curDevID;
   AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  if (q.dtype() == at::kHalf && k.dtype() == at::kHalf &&
-      v.dtype() == at::kHalf && !is_training &&
-      Settings::I().has_2d_block_array(curDevID)) {
-    if ((q.size(-1) * sizeof(at::Half) % 128 == 0) &&
-        (v.size(-1) * sizeof(at::Half) % 128 == 0))
+  bool bias_support = true;
+  if (b.has_value()) {
+    if (b.value().sym_size(0) != q.sym_size(0))
+      bias_support = false;
+    if (b.value().sym_size(1) != 1)
+      bias_support = false;
+  }
+  if ((q.dtype() == at::kHalf || q.dtype() == at::kBFloat16) &&
+      Settings::I().has_2d_block_array(curDevID) && bias_support == true) {
+    if ((q.sym_size(-1) * q.itemsize() % 128 == 0) &&
+        (v.sym_size(-1) * v.itemsize() % 128 == 0))
       is_supported = true;
   }
 #endif
@@ -264,12 +442,10 @@ int64_t _fused_sdp_choice(
     double dropout_p,
     bool is_causal,
     c10::optional<double> scale) {
-  bool is_training =
-      (query.requires_grad() || key.requires_grad() || value.requires_grad());
   // We have implemented efficient_attention backend with xetla, flash_attention
   // backend is not supported now, which will be implemented in the future. So
   // we provide two backends here.
-  sdp::SDPBackend backend = xetla_supported(query, key, value, is_training)
+  sdp::SDPBackend backend = xetla_supported(query, key, value, attn_mask_)
       ? sdp::SDPBackend::efficient_attention
       : sdp::SDPBackend::math;
   if (backend == sdp::SDPBackend::error) {
@@ -373,9 +549,12 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
         (attn_mask_padded_block_size * key.itemsize() % 8 == 0),
         "XeTLA SDP Attention mask needs 8bytes aligned on leading dimension ...");
   }
+  auto softmax_lse = at::empty({}, query.options().dtype(at::kFloat));
 
 #if defined(USE_XETLA)
+  XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
   gpu::xetla::fmha_forward_kernel(
+      xeType,
       dpcpp_queue,
       query.data_ptr(),
       key.data_ptr(),
@@ -384,6 +563,7 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
       attn_mask.has_value() ? attn_mask.value().data_ptr() : (void*)nullptr,
       nullptr,
       output.data_ptr(),
+      softmax_lse.data_ptr(),
       alpha,
       beta,
       dropout_p,
@@ -395,7 +575,11 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
       alibi_padded_block_size,
       attn_mask_padded_block_size,
       is_causal,
-      seq_last);
+      seq_last,
+      false, // is_training
+      false, // use_dropout
+      (int)0,
+      (int)0);
 #else
   AT_ERROR("SDP: xetla library not found in compilation");
 #endif

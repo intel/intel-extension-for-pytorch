@@ -870,8 +870,9 @@ supported:
   - pad_sequence
   - _fused_sdp_choice
   - _scaled_dot_product_efficient_attention
-  - _scaled_dot_product_attention_math
+  - _scaled_dot_product_efficient_attention_backward
 autograd:
   - cdist
   - lstm.input
   - gru.input
+  - _scaled_dot_product_attention_math
