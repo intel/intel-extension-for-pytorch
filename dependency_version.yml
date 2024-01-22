@@ -32,9 +32,9 @@ torchaudio:
 torchvision:
   version: 0.17.0+cpu
 deepspeed:
-  version: 
+  version: 0.13.0
   repo: https://github.com/microsoft/DeepSpeed.git
-  commit: v0.12.6
+  commit: v0.13.0
 transformers:
   version: 4.35.2
 protobuf:
