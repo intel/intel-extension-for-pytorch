@@ -388,6 +388,7 @@ void cpu_flash_attention(
   int64_t qSplitSize = q_split_size > qSize ? qSize : q_split_size;
   int64_t kvSplitSize = kv_split_size > kvSize ? kvSize : kv_split_size;
   int64_t qSlice = (qSize - 1) / qSplitSize + 1;
+  int64_t qTail = (qSize - 1) % qSplitSize + 1;
   int64_t kvSlice = (kvSize - 1) / kvSplitSize + 1;
   int64_t kvTail = (kvSize - 1) % kvSplitSize + 1;
   int64_t num_thread = at::get_num_threads();
@@ -436,8 +437,32 @@ void cpu_flash_attention(
       /*beta*/ 0.0,
       /*a_trans*/ 0,
       /*unroll_hint*/ 1)));
-  auto qk_gemm_tail = SCOPEITGEMM((BrgemmTPP<at::BFloat16, float>(
+  auto qk_gemm_ktail = SCOPEITGEMM((BrgemmTPP<at::BFloat16, float>(
       /*M*/ qSplitSize,
+      /*N*/ kvTail,
+      /*K*/ qk_gemm_K,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ qStrideM,
+      /*ldb*/ kvTail,
+      /*ldc*/ kvTail,
+      /*beta*/ 0.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1)));
+  auto qk_gemm_qtail = SCOPEITGEMM((BrgemmTPP<at::BFloat16, float>(
+      /*M*/ qTail,
+      /*N*/ kvSplitSize,
+      /*K*/ qk_gemm_K,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ qStrideM,
+      /*ldb*/ kvSplitSize,
+      /*ldc*/ kvSplitSize,
+      /*beta*/ 0.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1)));
+  auto qk_gemm_qktail = SCOPEITGEMM((BrgemmTPP<at::BFloat16, float>(
+      /*M*/ qTail,
       /*N*/ kvTail,
       /*K*/ qk_gemm_K,
       /*str_a*/ 1,
@@ -643,22 +668,42 @@ void cpu_flash_attention(
             // Calculate scale * q @ k.T
             if constexpr (is_reduced_type) {
               if (headSize % 2 == 0 && !is_causal) {
-                if (n + kvSplitSize < kvSize) {
-                  // main
-                  qk_gemm(
-                      q_data + i * qStrideB + j * qStrideH + m * qStrideM,
-                      key_reorder_ptr + i * num_head * headSize * kvSize +
-                          j * headSize * kvSize + n * headSize,
-                      qk_data,
-                      1);
+                if (qBlockSize == qSplitSize) {
+                  if (n + kvSplitSize < kvSize) {
+                    // main
+                    qk_gemm(
+                        q_data + i * qStrideB + j * qStrideH + m * qStrideM,
+                        key_reorder_ptr + i * num_head * headSize * kvSize +
+                            j * headSize * kvSize + n * headSize,
+                        qk_data,
+                        1);
+                  } else {
+                    // tail
+                    qk_gemm_ktail(
+                        q_data + i * qStrideB + j * qStrideH + m * qStrideM,
+                        key_reorder_ptr + i * num_head * headSize * kvSize +
+                            j * headSize * kvSize + n * headSize,
+                        qk_data,
+                        1);
+                  }
                 } else {
-                  // tail
-                  qk_gemm_tail(
-                      q_data + i * qStrideB + j * qStrideH + m * qStrideM,
-                      key_reorder_ptr + i * num_head * headSize * kvSize +
-                          j * headSize * kvSize + n * headSize,
-                      qk_data,
-                      1);
+                  if (n + kvSplitSize < kvSize) {
+                    // main
+                    qk_gemm_qtail(
+                        q_data + i * qStrideB + j * qStrideH + m * qStrideM,
+                        key_reorder_ptr + i * num_head * headSize * kvSize +
+                            j * headSize * kvSize + n * headSize,
+                        qk_data,
+                        1);
+                  } else {
+                    // tail
+                    qk_gemm_qktail(
+                        q_data + i * qStrideB + j * qStrideH + m * qStrideM,
+                        key_reorder_ptr + i * num_head * headSize * kvSize +
+                            j * headSize * kvSize + n * headSize,
+                        qk_data,
+                        1);
+                  }
                 }
               }
             }
