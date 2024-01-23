@@ -617,7 +617,12 @@ def _gen_build_cfg_from_cmake(
                 )
             else:
                 check_call(
-                    [cmake_exec, project_root_dir, "-G Visual Studio 17 2022"]
+                    [
+                        cmake_exec,
+                        project_root_dir,
+                        "-G Visual Studio 17 2022",
+                        "-T Intel C++ Compiler 2024",
+                    ]
                     + cmake_args,
                     cwd=build_dir,
                     env=build_env,
