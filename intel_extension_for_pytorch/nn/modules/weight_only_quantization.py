@@ -17,8 +17,6 @@ class IpexWoqLinear(nn.Module):
     A weight-only quantized (WOQ) linear module with floating point tensor as inputs and outputs.
     Weight is dequantized at runtime for computation.
     """
-    # version used in this class is different from the parent class nnq.Linear
-    _version = 4
 
     def __init__(self, in_features, out_features, bias_=True, dtype=torch.qint8):
         super().__init__()
@@ -26,6 +24,11 @@ class IpexWoqLinear(nn.Module):
         self.out_features = out_features
         self.bias = bias_
         self.dtype = dtype
+        # This weight attribute is for queries of dtype, shape, etc.
+        # It is a reference of the packed weight in self._op_context
+        # The shape is not necessarily = [out_features, in_features] due to packing
+        # Its dtype is torch.int8 for INT8 and torch.uint8 for INT4
+        self.weight = None
         self._op_context = None
         self._lowp_mode = 0
         self._num_concats = 1
@@ -199,6 +202,7 @@ class IpexWoqLinear(nn.Module):
             num_concats,
             act_quant_mode,
         )
+        qlinear.weight = qlinear._op_context.get_weight()
         qlinear._lowp_mode = lowp_mode
         qlinear._num_concats = num_concats
         qlinear._act_quant_mode = act_quant_mode
@@ -236,6 +240,7 @@ class IpexWoqLinear(nn.Module):
             num_concats,
             act_quant_mode,
         )
+        qlinear.weight = qlinear._op_context.get_weight()
         qlinear._lowp_mode = lowp_mode
         qlinear._num_concats = num_concats
         qlinear._act_quant_mode = act_quant_mode
@@ -298,6 +303,7 @@ class IpexWoqLinearAllreduce(IpexWoqLinear):
             num_concats,
             act_quant_mode,
         )
+        qlinear.weight = qlinear._op_context.get_weight()
 
         return qlinear
 
