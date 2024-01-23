@@ -174,6 +174,19 @@ Tensor& special_erfcx_out(const Tensor& self, Tensor& out) {
   return out;
 }
 
+template <typename scalar_t>
+struct xlogy_OutFunctor {
+  scalar_t operator()(scalar_t x, scalar_t y) const {
+    if (at::_isnan(y)) {
+      return NAN;
+    }
+    if (x == 0) {
+      return 0;
+    }
+    return x * Numerics<scalar_t>::log(y);
+  }
+};
+
 Tensor& xlogy_out(const Tensor& self, const Tensor& other, at::Tensor& out) {
   auto iter = TensorIterator::binary_float_op(out, self, other);
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -182,18 +195,24 @@ Tensor& xlogy_out(const Tensor& self, const Tensor& other, at::Tensor& out) {
       iter.common_dtype(),
       "xlogy",
       [&]() {
-        dpcpp_kernel_with_scalars(iter, [](scalar_t x, scalar_t y) -> scalar_t {
-          if (at::_isnan(y)) {
-            return NAN;
-          }
-          if (x == 0) {
-            return 0;
-          }
-          return x * Numerics<scalar_t>::log(y);
-        });
+        xlogy_OutFunctor<scalar_t> f;
+        dpcpp_kernel_with_scalars(iter, f);
       });
   return out;
 }
+
+template <typename scalar_t>
+struct special_xlog1py_OutFunctor {
+  scalar_t operator()(scalar_t x, scalar_t y) const {
+    if (at::_isnan(y)) {
+      return NAN;
+    }
+    if (x == 0) {
+      return 0;
+    }
+    return x * Numerics<scalar_t>::log1p(y);
+  }
+};
 
 Tensor& special_xlog1py_out(
     const Tensor& self,
@@ -206,15 +225,8 @@ Tensor& special_xlog1py_out(
       iter.common_dtype(),
       "xlog1py",
       [&]() {
-        dpcpp_kernel_with_scalars(iter, [](scalar_t x, scalar_t y) -> scalar_t {
-          if (at::_isnan(y)) {
-            return NAN;
-          }
-          if (x == 0) {
-            return 0;
-          }
-          return x * Numerics<scalar_t>::log1p(y);
-        });
+        special_xlog1py_OutFunctor<scalar_t> f;
+        dpcpp_kernel_with_scalars(iter, f);
       });
   return out;
 }
@@ -382,13 +394,19 @@ Tensor& special_chebyshev_polynomial_w_out(
   return out;
 }
 
+template <typename scalar_t>
+struct SpecialZetaOutFunctor {
+  scalar_t operator()(scalar_t x, scalar_t q) const {
+    return zeta<scalar_t>(x, q);
+  }
+};
+
 Tensor& special_zeta_out(const Tensor& self, const Tensor& other, Tensor& out) {
   auto iter = TensorIterator::binary_float_op(out, self, other);
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.common_dtype(), "zeta", [&]() {
-        dpcpp_kernel_with_scalars(iter, [](scalar_t x, scalar_t q) -> scalar_t {
-          return zeta<scalar_t>(x, q);
-        });
+        SpecialZetaOutFunctor<scalar_t> f;
+        dpcpp_kernel_with_scalars(iter, f);
       });
   return out;
 }
@@ -413,6 +431,13 @@ Tensor& special_spherical_bessel_j0_out(const Tensor& self, at::Tensor& out) {
   return out;
 }
 
+template <typename scalar_t>
+struct SpecialHermitePolynomialHeOutFunctor {
+  scalar_t operator()(scalar_t x, scalar_t n) const {
+    return hermite_polynomial_he_forward<scalar_t>(x, n);
+  }
+};
+
 Tensor& special_hermite_polynomial_he_out(
     const Tensor& self,
     const Tensor& other,
@@ -423,12 +448,18 @@ Tensor& special_hermite_polynomial_he_out(
       iter.common_dtype(),
       "hermite_polynomial_he",
       [&]() {
-        dpcpp_kernel_with_scalars(iter, [](scalar_t x, scalar_t n) -> scalar_t {
-          return hermite_polynomial_he_forward<scalar_t>(x, n);
-        });
+        SpecialHermitePolynomialHeOutFunctor<scalar_t> f;
+        dpcpp_kernel_with_scalars(iter, f);
       });
   return out;
 }
+
+template <typename scalar_t>
+struct SpecialHermitePolynomialHOutFunctor {
+  scalar_t operator()(scalar_t x, scalar_t n) const {
+    return hermite_polynomial_h_forward<scalar_t>(x, n);
+  }
+};
 
 Tensor& special_hermite_polynomial_h_out(
     const Tensor& self,
@@ -437,12 +468,18 @@ Tensor& special_hermite_polynomial_h_out(
   auto iter = TensorIterator::binary_float_op(out, self, other);
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.common_dtype(), "", [&]() {
-        dpcpp_kernel_with_scalars(iter, [](scalar_t x, scalar_t n) -> scalar_t {
-          return hermite_polynomial_h_forward<scalar_t>(x, n);
-        });
+        SpecialHermitePolynomialHOutFunctor<scalar_t> f;
+        dpcpp_kernel_with_scalars(iter, f);
       });
   return out;
 }
+
+template <typename scalar_t>
+struct SpecialHermitePolynomialLOutFunctor {
+  scalar_t operator()(scalar_t x, scalar_t n) const {
+    return laguerre_polynomial_l_forward<scalar_t>(x, n);
+  }
+};
 
 Tensor& special_laguerre_polynomial_l_out(
     const Tensor& self,
@@ -454,12 +491,18 @@ Tensor& special_laguerre_polynomial_l_out(
       iter.common_dtype(),
       "laguerre_polynomial_l",
       [&]() {
-        dpcpp_kernel_with_scalars(iter, [](scalar_t x, scalar_t n) -> scalar_t {
-          return laguerre_polynomial_l_forward<scalar_t>(x, n);
-        });
+        SpecialHermitePolynomialLOutFunctor<scalar_t> f;
+        dpcpp_kernel_with_scalars(iter, f);
       });
   return out;
 }
+
+template <typename scalar_t>
+struct SpecialHermitePolynomialPOutFunctor {
+  scalar_t operator()(scalar_t x, scalar_t n) const {
+    return legendre_polynomial_p_forward<scalar_t>(x, n);
+  }
+};
 
 Tensor& special_legendre_polynomial_p_out(
     const Tensor& self,
@@ -471,9 +514,8 @@ Tensor& special_legendre_polynomial_p_out(
       iter.common_dtype(),
       "legendre_polynomial_p",
       [&]() {
-        dpcpp_kernel_with_scalars(iter, [](scalar_t x, scalar_t n) -> scalar_t {
-          return legendre_polynomial_p_forward<scalar_t>(x, n);
-        });
+        SpecialHermitePolynomialPOutFunctor<scalar_t> f;
+        dpcpp_kernel_with_scalars(iter, f);
       });
   return out;
 }

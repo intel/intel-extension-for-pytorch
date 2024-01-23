@@ -17,6 +17,13 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t>
+struct LtKernelDpcppFunctor {
+  bool operator()(scalar_t a, scalar_t b) const {
+    return Numerics<scalar_t>::lt(a, b);
+  }
+};
+
 void lt_kernel_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
@@ -25,9 +32,8 @@ void lt_kernel_dpcpp(TensorIterator& iter) {
       iter.common_dtype(),
       "lt_dpcpp",
       [&]() {
-        dpcpp_kernel_with_scalars(iter, [=](scalar_t a, scalar_t b) -> bool {
-          return Numerics<scalar_t>::lt(a, b);
-        });
+        LtKernelDpcppFunctor<scalar_t> f;
+        dpcpp_kernel_with_scalars(iter, f);
       });
 }
 

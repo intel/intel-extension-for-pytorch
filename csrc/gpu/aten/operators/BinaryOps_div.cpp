@@ -18,6 +18,13 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t>
+struct DivKernelDpcppFunctor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return a / b;
+  }
+};
+
 static void div_kernel_dpcpp(TensorIteratorBase& iter) {
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
       at::ScalarType::BFloat16,
@@ -25,8 +32,8 @@ static void div_kernel_dpcpp(TensorIteratorBase& iter) {
       iter.dtype(),
       "div",
       [&]() {
-        dpcpp_fast_mode_kernel_with_scalars(
-            iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
+        DivKernelDpcppFunctor<scalar_t> kfn;
+        dpcpp_fast_mode_kernel_with_scalars(iter, kfn);
       });
 }
 

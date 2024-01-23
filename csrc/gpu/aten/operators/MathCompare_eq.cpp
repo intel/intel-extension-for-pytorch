@@ -21,6 +21,13 @@ Tensor min(const Tensor& self);
 
 namespace impl {
 
+template <typename scalar_t>
+struct EqKernelDpcppFunctor {
+  bool operator()(scalar_t a, scalar_t b) const {
+    return Numerics<scalar_t>::eq(a, b);
+  }
+};
+
 void eq_kernel_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
@@ -29,9 +36,8 @@ void eq_kernel_dpcpp(TensorIterator& iter) {
       iter.common_dtype(),
       "eq_dpcpp",
       [&]() {
-        dpcpp_kernel_with_scalars(iter, [=](scalar_t a, scalar_t b) -> bool {
-          return Numerics<scalar_t>::eq(a, b);
-        });
+        EqKernelDpcppFunctor<scalar_t> f;
+        dpcpp_kernel_with_scalars(iter, f);
       });
 }
 

@@ -17,10 +17,23 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+struct minimum_kernel_functor {
+  bool operator()(bool a, bool b) const {
+    return a && b;
+  }
+};
+
+template <typename scalar_t>
+struct minimum_kernel_functor_2 {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return Numerics<scalar_t>::min(a, b);
+  }
+};
+
 void minimum_kernel(TensorIteratorBase& iter) {
   if (iter.dtype() == ScalarType::Bool) {
-    opmath_symmetric_gpu_kernel_with_scalars<bool>(
-        iter, [](bool a, bool b) -> bool { return a && b; });
+    minimum_kernel_functor f;
+    opmath_symmetric_gpu_kernel_with_scalars<bool>(iter, f);
   } else {
     IPEX_DISPATCH_ALL_TYPES_AND2(
         at::ScalarType::Half,
@@ -28,10 +41,8 @@ void minimum_kernel(TensorIteratorBase& iter) {
         iter.dtype(),
         "min_elementwise_dpcpp",
         [&]() {
-          opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(
-              iter, [](scalar_t a, scalar_t b) -> scalar_t {
-                return Numerics<scalar_t>::min(a, b);
-              });
+          minimum_kernel_functor_2<scalar_t> f;
+          opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(iter, f);
         });
   }
 }
@@ -64,6 +75,13 @@ Tensor minimum(const Tensor& self, const Tensor& other) {
       [=](TensorIteratorBase& iter) { impl::minimum_kernel(iter); });
 }
 
+template <typename scalar_t>
+struct fmin_out_functor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return Numerics<scalar_t>::fmin(a, b);
+  }
+};
+
 Tensor& fmin_out(const Tensor& self, const Tensor& other, Tensor& result) {
   auto iter = TensorIterator::binary_op(result, self, other);
   if (isFloatingType(iter.common_dtype())) {
@@ -73,10 +91,8 @@ Tensor& fmin_out(const Tensor& self, const Tensor& other, Tensor& result) {
         iter.common_dtype(),
         "fmin",
         [&]() {
-          opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(
-              iter, [](scalar_t a, scalar_t b) -> scalar_t {
-                return Numerics<scalar_t>::fmin(a, b);
-              });
+          fmin_out_functor<scalar_t> f;
+          opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(iter, f);
         });
   } else {
     impl::minimum_kernel(iter);

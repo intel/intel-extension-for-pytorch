@@ -21,6 +21,18 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace impl {
 
+template <typename scalar_t>
+struct AddKernelDpcppFunctor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return a + alpha * b;
+  }
+
+  AddKernelDpcppFunctor(scalar_t alpha) : alpha(alpha) {}
+
+ private:
+  scalar_t alpha;
+};
+
 void add_kernel_dpcpp(TensorIteratorBase& iter, Scalar alpha_scalar) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
@@ -30,9 +42,8 @@ void add_kernel_dpcpp(TensorIteratorBase& iter, Scalar alpha_scalar) {
       "add",
       [&]() {
         auto alpha = alpha_scalar.to<scalar_t>();
-        dpcpp_fast_mode_kernel_with_scalars(
-            iter,
-            [=](scalar_t a, scalar_t b) -> scalar_t { return a + alpha * b; });
+        AddKernelDpcppFunctor<scalar_t> kfn(alpha);
+        dpcpp_fast_mode_kernel_with_scalars(iter, kfn);
       });
 }
 

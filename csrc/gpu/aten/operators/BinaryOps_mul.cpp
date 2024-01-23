@@ -17,6 +17,13 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t>
+struct mul_kernel_dpcpp_functor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return a * b;
+  }
+};
+
 static void mul_kernel_dpcpp(TensorIteratorBase& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::BFloat16,
@@ -25,8 +32,8 @@ static void mul_kernel_dpcpp(TensorIteratorBase& iter) {
       iter.dtype(),
       "mul",
       [&]() {
-        fast_mode_opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(
-            iter, [=](scalar_t a, scalar_t b) -> scalar_t { return a * b; });
+        mul_kernel_dpcpp_functor<scalar_t> f;
+        fast_mode_opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(iter, f);
       });
 }
 } // namespace impl

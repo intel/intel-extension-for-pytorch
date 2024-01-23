@@ -40,6 +40,22 @@ void lerp_tensor_kernel(at::TensorIteratorBase& iter) {
       });
 }
 
+template <typename scalar_t, typename opmath_t>
+struct LerpScalarKernelFunctor {
+  scalar_t operator()(scalar_t self_val, scalar_t end_val) const {
+    opmath_t self_val_f = self_val;
+    opmath_t end_val_f = end_val;
+    return (Numerics<scalar_t>::abs(weight_val) < 0.5f)
+        ? self_val_f + weight_val * (end_val_f - self_val_f)
+        : end_val_f - (end_val_f - self_val_f) * (opmath_t{1} - weight_val);
+  }
+
+  LerpScalarKernelFunctor(opmath_t weight_val_) : weight_val(weight_val_) {}
+
+ private:
+  opmath_t weight_val;
+};
+
 void lerp_scalar_kernel(
     at::TensorIteratorBase& iter,
     const c10::Scalar& weight) {
@@ -51,15 +67,8 @@ void lerp_scalar_kernel(
       [&] {
         using opmath_t = at::opmath_type<scalar_t>;
         auto weight_val = weight.to<opmath_t>();
-        dpcpp_kernel_with_scalars(
-            iter, [=](scalar_t self_val, scalar_t end_val) {
-              opmath_t self_val_f = self_val;
-              opmath_t end_val_f = end_val;
-              return (Numerics<scalar_t>::abs(weight_val) < 0.5f)
-                  ? self_val_f + weight_val * (end_val_f - self_val_f)
-                  : end_val_f -
-                      (end_val_f - self_val_f) * (opmath_t{1} - weight_val);
-            });
+        LerpScalarKernelFunctor<scalar_t, opmath_t> f(weight_val);
+        dpcpp_kernel_with_scalars(iter, f);
       });
 }
 

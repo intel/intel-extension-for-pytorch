@@ -18,46 +18,52 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t, typename accscalar_t>
+struct LogAddExpKernelDpcppFunctor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    if (Numerics<accscalar_t>::isinf(static_cast<accscalar_t>(a)) && a == b) {
+      return a;
+    } else {
+      scalar_t m = Numerics<scalar_t>::max(a, b);
+      return m +
+          Numerics<scalar_t>::log(
+                 (scalar_t)(1.0) +
+                 Numerics<scalar_t>::exp(-Numerics<scalar_t>::abs(a - b)));
+    }
+  }
+};
+
 static void logaddexp_kernel_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "logaddexp_xpu", [&]() {
         using accscalar_t = acc_type<scalar_t>;
-        dpcpp_fast_mode_kernel_with_scalars(
-            iter, [=](scalar_t a, scalar_t b) -> scalar_t {
-              if (Numerics<accscalar_t>::isinf(static_cast<accscalar_t>(a)) &&
-                  a == b) {
-                return a;
-              } else {
-                scalar_t m = Numerics<scalar_t>::max(a, b);
-                return m +
-                    Numerics<scalar_t>::log(
-                           (scalar_t)(1.0) +
-                           Numerics<scalar_t>::exp(
-                               -Numerics<scalar_t>::abs(a - b)));
-              }
-            });
+        LogAddExpKernelDpcppFunctor<scalar_t, accscalar_t> kfn;
+        dpcpp_fast_mode_kernel_with_scalars(iter, kfn);
       });
 }
+
+template <typename scalar_t, typename accscalar_t>
+struct LogAddExp2KernelDpcppFunctor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    if (Numerics<accscalar_t>::isinf(static_cast<accscalar_t>(a)) && a == b) {
+      return a;
+    } else {
+      scalar_t m = Numerics<scalar_t>::max(a, b);
+      return m +
+          Numerics<scalar_t>::log2(
+                 (scalar_t)(1.0) +
+                 Numerics<scalar_t>::pow(
+                     (scalar_t)(2.0), -Numerics<scalar_t>::abs(a - b)));
+    }
+  }
+};
 
 static void logaddexp2_kernel_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "logaddexp2_xpu", [&]() {
         using accscalar_t = acc_type<scalar_t>;
-        dpcpp_fast_mode_kernel_with_scalars(
-            iter, [=](scalar_t a, scalar_t b) -> scalar_t {
-              if (Numerics<accscalar_t>::isinf(static_cast<accscalar_t>(a)) &&
-                  a == b) {
-                return a;
-              } else {
-                scalar_t m = Numerics<scalar_t>::max(a, b);
-                return m +
-                    Numerics<scalar_t>::log2(
-                           (scalar_t)(1.0) +
-                           Numerics<scalar_t>::pow(
-                               (scalar_t)(2.0),
-                               -Numerics<scalar_t>::abs(a - b)));
-              }
-            });
+        LogAddExp2KernelDpcppFunctor<scalar_t, accscalar_t> kfn;
+        dpcpp_fast_mode_kernel_with_scalars(iter, kfn);
       });
 }
 } // namespace impl

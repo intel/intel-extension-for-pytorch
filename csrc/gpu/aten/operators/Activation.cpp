@@ -825,6 +825,20 @@ Tensor gelu(const Tensor& self, c10::string_view approximate) {
   return gelu_out(self, approximate, result);
 }
 
+template <typename scalar_t>
+struct GeluTanhBackwardOutKernelFunctor {
+  scalar_t operator()(scalar_t self, scalar_t grad) const {
+    return impl::gelu_tanh_backward<scalar_t>(grad, self);
+  }
+};
+
+template <typename scalar_t>
+struct GeluErfBackwardOutKernelFunctor {
+  scalar_t operator()(scalar_t self, scalar_t grad) const {
+    return impl::gelu_erf_backward<scalar_t>(grad, self);
+  }
+};
+
 Tensor& gelu_backward_out(
     const Tensor& grad,
     const Tensor& self,
@@ -845,10 +859,8 @@ Tensor& gelu_backward_out(
               iter.dtype(),
               "gelu_backward",
               [&]() {
-                dpcpp_kernel_with_scalars(
-                    iter, [=](scalar_t self, scalar_t grad) -> scalar_t {
-                      return impl::gelu_tanh_backward<scalar_t>(grad, self);
-                    });
+                GeluTanhBackwardOutKernelFunctor<scalar_t> f;
+                dpcpp_kernel_with_scalars(iter, f);
               });
         });
   } else {
@@ -865,10 +877,8 @@ Tensor& gelu_backward_out(
               iter.dtype(),
               "gelu_backward",
               [&]() {
-                dpcpp_kernel_with_scalars(
-                    iter, [=](scalar_t self, scalar_t grad) -> scalar_t {
-                      return impl::gelu_erf_backward<scalar_t>(grad, self);
-                    });
+                GeluErfBackwardOutKernelFunctor<scalar_t> f;
+                dpcpp_kernel_with_scalars(iter, f);
               });
         });
   }

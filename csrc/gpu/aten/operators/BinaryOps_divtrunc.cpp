@@ -16,11 +16,25 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t>
+struct DivTruncKernelDpcppFunctor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return a / b;
+  }
+};
+
+template <typename scalar_t>
+struct DivTruncKernelDpcppFunctor2 {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return trunc_impl(a / b);
+  }
+};
+
 static void div_trunc_kernel_dpcpp(TensorIterator& iter) {
   if (isIntegralType(iter.dtype(), false)) {
     IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "div_trunc_dpcpp", [&] {
-      dpcpp_kernel_with_scalars(
-          iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
+      DivTruncKernelDpcppFunctor<scalar_t> f;
+      dpcpp_kernel_with_scalars(iter, f);
     });
   } else {
     IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
@@ -29,10 +43,8 @@ static void div_trunc_kernel_dpcpp(TensorIterator& iter) {
         iter.dtype(),
         "div_trunc_dpcpp",
         [&]() {
-          dpcpp_kernel_with_scalars(
-              iter, [](scalar_t a, scalar_t b) -> scalar_t {
-                return trunc_impl(a / b);
-              });
+          DivTruncKernelDpcppFunctor2<scalar_t> f;
+          dpcpp_kernel_with_scalars(iter, f);
         });
   }
 }

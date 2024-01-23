@@ -104,6 +104,48 @@ struct div_floor_kernel_dpcpp_functor {
   accscalar_t inv_b;
 };
 
+template <typename scalar_t>
+struct DivFloorKernelDpcppFunctor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    if (c10::signs_differ(a, b)) {
+      // Subtracts one from the results of truncation division if the
+      // divisor and dividend have different sign(bit)s and the
+      // remainder of the division is nonzero
+      const auto quot = a / b;
+      const auto rem = a % b;
+      return rem ? quot - 1 : quot;
+    }
+
+    return a / b;
+  }
+};
+
+template <typename scalar_t>
+struct DivFloorKernelDpcppFunctor2 {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    if (DPCPP_UNLIKELY(b == 0)) {
+      return a / b;
+    }
+
+    auto mod = Numerics<scalar_t>::fmod(a, b);
+    auto div = (a - mod) / b;
+    if ((mod != 0) && (b < 0) != (mod < 0)) {
+      div -= scalar_t(1);
+    }
+
+    scalar_t floordiv;
+    if (div != 0) {
+      floordiv = Numerics<scalar_t>::floor(div);
+      if (div - floordiv > scalar_t(0.5)) {
+        floordiv += scalar_t(1.0);
+      }
+    } else {
+      floordiv = Numerics<scalar_t>::copysign(scalar_t(0), a / b);
+    }
+    return floordiv;
+  }
+};
+
 static void div_floor_kernel_dpcpp(TensorIterator& iter) {
   const auto dtype = iter.common_dtype();
   if (dtype == kByte) {
@@ -113,18 +155,8 @@ static void div_floor_kernel_dpcpp(TensorIterator& iter) {
     return at::AtenIpexTypeXPU::div_trunc_kernel(iter);
   } else if (isIntegralType(dtype, /*includeBool*/ false)) {
     IPEX_DISPATCH_INTEGRAL_TYPES(dtype, "div_floor_dpcpp", [&]() {
-      dpcpp_kernel_with_scalars(iter, [](scalar_t a, scalar_t b) -> scalar_t {
-        if (c10::signs_differ(a, b)) {
-          // Subtracts one from the results of truncation division if the
-          // divisor and dividend have different sign(bit)s and the
-          // remainder of the division is nonzero
-          const auto quot = a / b;
-          const auto rem = a % b;
-          return rem ? quot - 1 : quot;
-        }
-
-        return a / b;
-      });
+      DivFloorKernelDpcppFunctor<scalar_t> f;
+      dpcpp_kernel_with_scalars(iter, f);
     });
   } else if (iter.is_cpu_scalar(2)) {
     // optimization for floating-point types: if the second operand is a CPU
@@ -154,29 +186,8 @@ static void div_floor_kernel_dpcpp(TensorIterator& iter) {
         dtype,
         "div_floor_dpcpp",
         [&]() {
-          dpcpp_kernel_with_scalars(
-              iter, [](scalar_t a, scalar_t b) -> scalar_t {
-                if (DPCPP_UNLIKELY(b == 0)) {
-                  return a / b;
-                }
-
-                auto mod = Numerics<scalar_t>::fmod(a, b);
-                auto div = (a - mod) / b;
-                if ((mod != 0) && (b < 0) != (mod < 0)) {
-                  div -= scalar_t(1);
-                }
-
-                scalar_t floordiv;
-                if (div != 0) {
-                  floordiv = Numerics<scalar_t>::floor(div);
-                  if (div - floordiv > scalar_t(0.5)) {
-                    floordiv += scalar_t(1.0);
-                  }
-                } else {
-                  floordiv = Numerics<scalar_t>::copysign(scalar_t(0), a / b);
-                }
-                return floordiv;
-              });
+          DivFloorKernelDpcppFunctor2<scalar_t> f;
+          dpcpp_kernel_with_scalars(iter, f);
         });
   }
 }

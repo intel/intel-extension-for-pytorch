@@ -15,15 +15,21 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t>
+struct BitwiseLeftShiftOutFunctor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return static_cast<std::make_unsigned_t<scalar_t>>(a) << b;
+  }
+};
+
 Tensor& bitwise_left_shift_out(
     const Tensor& self,
     const Tensor& other,
     Tensor& out) {
   auto iter = TensorIterator::binary_op(out, self, other);
   IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "lshift", [&]() {
-    dpcpp_kernel_with_scalars(iter, [](scalar_t a, scalar_t b) -> scalar_t {
-      return static_cast<std::make_unsigned_t<scalar_t>>(a) << b;
-    });
+    BitwiseLeftShiftOutFunctor<scalar_t> f;
+    dpcpp_kernel_with_scalars(iter, f);
   });
   return out;
 }
@@ -51,14 +57,21 @@ Tensor bitwise_left_shift(const Scalar& self, const Tensor& other) {
       wrapped_scalar_tensor(self).toType(other.scalar_type()), other);
 }
 
+template <typename scalar_t>
+struct BitwiseRightShiftOutFunctor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return a >> b;
+  }
+};
+
 Tensor& bitwise_right_shift_out(
     const Tensor& self,
     const Tensor& other,
     Tensor& out) {
   auto iter = TensorIterator::binary_op(out, self, other);
   IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "rshift", [&]() {
-    dpcpp_kernel_with_scalars(
-        iter, [](scalar_t a, scalar_t b) -> scalar_t { return a >> b; });
+    BitwiseRightShiftOutFunctor<scalar_t> f;
+    dpcpp_kernel_with_scalars(iter, f);
   });
   return out;
 }

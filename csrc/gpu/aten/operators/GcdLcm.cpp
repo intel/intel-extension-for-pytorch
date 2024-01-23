@@ -16,21 +16,32 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t>
+struct GcdKernelDpcppFunctor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return calc_gcd(a, b);
+  }
+};
+
 static void gcd_kernel_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_INTEGRAL_TYPES(iter.common_dtype(), "gcd", [&]() {
-    dpcpp_fast_mode_kernel_with_scalars(
-        iter,
-        [=](scalar_t a, scalar_t b) -> scalar_t { return calc_gcd(a, b); });
+    GcdKernelDpcppFunctor<scalar_t> kfn;
+    dpcpp_fast_mode_kernel_with_scalars(iter, kfn);
   });
 }
 
+template <typename scalar_t>
+struct LcmKernelDpcppFunctor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    scalar_t g = calc_gcd(a, b);
+    return (g == 0) ? 0 : Numerics<scalar_t>::abs(a / g * b);
+  }
+};
+
 static void lcm_kernel_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_INTEGRAL_TYPES(iter.common_dtype(), "lcm", [&]() {
-    dpcpp_fast_mode_kernel_with_scalars(
-        iter, [=](scalar_t a, scalar_t b) -> scalar_t {
-          scalar_t g = calc_gcd(a, b);
-          return (g == 0) ? 0 : Numerics<scalar_t>::abs(a / g * b);
-        });
+    LcmKernelDpcppFunctor<scalar_t> kfn;
+    dpcpp_fast_mode_kernel_with_scalars(iter, kfn);
   });
 }
 

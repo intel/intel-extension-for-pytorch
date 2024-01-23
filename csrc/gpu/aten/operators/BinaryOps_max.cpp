@@ -17,10 +17,23 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+struct maximum_kernel_functor {
+  bool operator()(bool a, bool b) const {
+    return a || b;
+  }
+};
+
+template <typename scalar_t>
+struct maximum_kernel_functor_2 {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return Numerics<scalar_t>::max(a, b);
+  }
+};
+
 void maximum_kernel(TensorIteratorBase& iter) {
   if (iter.dtype() == ScalarType::Bool) {
-    opmath_symmetric_gpu_kernel_with_scalars<bool>(
-        iter, [](bool a, bool b) -> bool { return a || b; });
+    maximum_kernel_functor f;
+    opmath_symmetric_gpu_kernel_with_scalars<bool>(iter, f);
   } else {
     IPEX_DISPATCH_ALL_TYPES_AND2(
         at::ScalarType::Half,
@@ -28,10 +41,8 @@ void maximum_kernel(TensorIteratorBase& iter) {
         iter.dtype(),
         "max_elementwise_dpcpp",
         [&]() {
-          opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(
-              iter, [](scalar_t a, scalar_t b) -> scalar_t {
-                return Numerics<scalar_t>::max(a, b);
-              });
+          maximum_kernel_functor_2<scalar_t> f;
+          opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(iter, f);
         });
   }
 }
@@ -65,6 +76,13 @@ Tensor maximum(const Tensor& self, const Tensor& other) {
       [=](TensorIteratorBase& iter) { impl::maximum_kernel(iter); });
 }
 
+template <typename scalar_t>
+struct fmax_out_functor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return Numerics<scalar_t>::fmax(a, b);
+  }
+};
+
 Tensor& fmax_out(const Tensor& self, const Tensor& other, Tensor& result) {
   auto iter = TensorIterator::binary_op(result, self, other);
   if (isFloatingType(iter.common_dtype())) {
@@ -74,10 +92,8 @@ Tensor& fmax_out(const Tensor& self, const Tensor& other, Tensor& result) {
         iter.common_dtype(),
         "fmax",
         [&]() {
-          opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(
-              iter, [](scalar_t a, scalar_t b) -> scalar_t {
-                return Numerics<scalar_t>::fmax(a, b);
-              });
+          fmax_out_functor<scalar_t> f;
+          opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(iter, f);
         });
   } else {
     impl::maximum_kernel(iter);

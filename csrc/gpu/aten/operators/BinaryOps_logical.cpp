@@ -15,6 +15,13 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t>
+struct logical_and_kernel_dpcpp_functor {
+  bool operator()(scalar_t a, scalar_t b) const {
+    return a && b;
+  }
+};
+
 void logical_and_kernel_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       kBool,
@@ -23,18 +30,32 @@ void logical_and_kernel_dpcpp(TensorIterator& iter) {
       iter.common_dtype(),
       "logical_and_kernel",
       [&]() {
-        opmath_symmetric_gpu_kernel_with_scalars<scalar_t, bool>(
-            iter, [](scalar_t a, scalar_t b) -> bool { return a && b; });
+        logical_and_kernel_dpcpp_functor<scalar_t> f;
+        opmath_symmetric_gpu_kernel_with_scalars<scalar_t, bool>(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct logical_or_kernel_dpcpp_functor {
+  bool operator()(scalar_t a, scalar_t b) const {
+    return a || b;
+  }
+};
 
 void logical_or_kernel_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       kBool, kHalf, kBFloat16, iter.common_dtype(), "logical_or_kernel", [&]() {
-        opmath_symmetric_gpu_kernel_with_scalars<scalar_t, bool>(
-            iter, [](scalar_t a, scalar_t b) -> bool { return a || b; });
+        logical_or_kernel_dpcpp_functor<scalar_t> f;
+        opmath_symmetric_gpu_kernel_with_scalars<scalar_t, bool>(iter, f);
       });
 }
+
+template <typename scalar_t>
+struct logical_xor_kernel_dpcpp_functor {
+  bool operator()(scalar_t a, scalar_t b) const {
+    return bool(a) != bool(b);
+  }
+};
 
 void logical_xor_kernel_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
@@ -44,9 +65,8 @@ void logical_xor_kernel_dpcpp(TensorIterator& iter) {
       iter.common_dtype(),
       "logical_xor_kernel",
       [&]() {
-        opmath_symmetric_gpu_kernel_with_scalars<scalar_t, bool>(
-            iter,
-            [](scalar_t a, scalar_t b) -> bool { return bool(a) != bool(b); });
+        logical_xor_kernel_dpcpp_functor<scalar_t> f;
+        opmath_symmetric_gpu_kernel_with_scalars<scalar_t, bool>(iter, f);
       });
 }
 
