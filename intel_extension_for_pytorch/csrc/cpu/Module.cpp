@@ -31,7 +31,6 @@
 #include <torch/csrc/api/include/torch/python.h>
 #include <torch/csrc/jit/passes/pass_manager.h>
 #include "autocast/autocast_kernels.h"
-#include "autocast/autocast_mode.h"
 
 #include "TaskModule.h"
 #include "aten/EmbeddingBag.h"
@@ -91,20 +90,6 @@ void InitIpexModuleBindings(py::module m) {
   m.def("onednn_has_fp16_support", []() {
     return torch_ipex::utils::onednn_has_fp16_type_support();
   });
-
-  // ipex amp autocast
-  m.def("get_autocast_dtype", []() {
-    at::ScalarType current_dtype = torch_ipex::autocast::get_autocast_dtype();
-    auto dtype = (PyObject*)torch::getTHPDtype(current_dtype);
-    Py_INCREF(dtype);
-    return py::reinterpret_steal<py::object>(dtype);
-  });
-  m.def("set_autocast_dtype", [](py::object dtype) {
-    at::ScalarType target_dtype =
-        torch::python::detail::py_object_to_dtype(dtype);
-    torch_ipex::autocast::set_autocast_dtype(target_dtype);
-  });
-  m.def("clear_autocast_cache", &torch_ipex::autocast::clear_autocast_cache);
 
   m.def("set_fp32_math_mode", [](FP32MathMode mode) {
     torch_ipex::setFP32MathModeCpu(mode);

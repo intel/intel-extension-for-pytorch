@@ -10,7 +10,6 @@ from torch.ao.quantization.quantization_mappings import (
 import torch.fx.experimental.optimization as optimization
 from torch.ao.nn.quantized.modules.utils import _quantize_weight
 import torch.ao.nn.quantized.dynamic as nnqd
-import intel_extension_for_pytorch._C as core
 from intel_extension_for_pytorch.cpu.utils.linear_bn_folding import linear_bn_fuse
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     may_import_deepspeed_modules,
@@ -469,7 +468,10 @@ def convert(model, inplace=False):
     # Convert linear, conv, and Embedding's weight dtype when use autocast,
     # which will reduce the dtype conversion.
     # TODO: check whether can be removed or not?
-    if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
+    if (
+        torch.is_autocast_cpu_enabled()
+        and torch.get_autocast_cpu_dtype() == torch.bfloat16
+    ):
         convert_model = nn.utils._model_convert.convert_model_data_type(
             convert_model, torch.bfloat16
         )[1]

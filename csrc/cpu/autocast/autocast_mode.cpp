@@ -1,68 +1,16 @@
 #include "autocast_mode.h"
-
-#include "library.h"
-
 #include <exception>
-#include <iostream>
+#include "library.h"
 
 namespace torch_ipex {
 namespace autocast {
 
-namespace {
-
-using weakref_type =
-    c10::weak_intrusive_ptr<c10::TensorImpl, c10::UndefinedTensorImpl>;
-using val_type = std::tuple<weakref_type, at::Tensor>;
-thread_local std::unordered_map<c10::TensorImpl*, val_type> cached_casts;
-
-thread_local at::ScalarType current_target_dtype = at::kBFloat16;
-} // namespace
-
 at::ScalarType get_autocast_dtype() {
-  return current_target_dtype;
-}
-
-void set_autocast_dtype(at::ScalarType dtype) {
-  current_target_dtype = dtype;
-}
-
-void clear_autocast_cache() {
-  cached_casts.clear();
+  return at::autocast::get_autocast_cpu_dtype();
 }
 
 Tensor cpu_cached_cast(at::ScalarType to_type, const Tensor& arg) {
-  if (is_eligible_cpu(arg) && (arg.scalar_type() != to_type)) {
-    bool can_try_cache =
-        (to_type == current_target_dtype && arg.scalar_type() == at::kFloat &&
-         arg.requires_grad() && arg.is_leaf() && !arg.is_view() &&
-         at::autocast::is_autocast_cache_enabled());
-
-    if (can_try_cache) {
-      auto it = cached_casts.find(arg.unsafeGetTensorImpl());
-      if (it != cached_casts.end()) {
-        return std::get<1>(it->second);
-      }
-    }
-    auto casted_arg = arg;
-    if (arg.scalar_type() == at::kFloat && to_type == current_target_dtype) {
-      // This path works for fp32 to bf16
-      casted_arg = arg.to(current_target_dtype);
-      // casted_arg = arg.to_mkldnn(at::kBFloat16);
-    } else if (
-        arg.scalar_type() == current_target_dtype && to_type == at::kFloat) {
-      // This path works for bf16 to fp32
-      casted_arg = arg.to(at::kFloat);
-      // casted_arg = arg.to_dense(at::kFloat);
-    }
-    if (can_try_cache) {
-      cached_casts.emplace(
-          arg.unsafeGetTensorImpl(),
-          val_type{weakref_type(arg.getIntrusivePtr()), casted_arg});
-    }
-    return casted_arg;
-  } else {
-    return arg;
-  }
+  return at::autocast::cached_cast(to_type, arg, c10::DeviceType::CPU);
 }
 
 template <

@@ -5,7 +5,6 @@ import torch.nn.functional as F
 import torch.nn.quantized.dynamic as nnqd
 from intel_extension_for_pytorch.nn.functional import interaction
 from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
-import intel_extension_for_pytorch._C as core
 
 
 functions_supported_by_quantization = set(
@@ -410,10 +409,9 @@ def iterate_and_apply_convert(
                     str(torch.conv_transpose3d),
                 ]:
                     ch_axis = 1
-                # core.get_autocast_dtype() will be removed after fully use pytorch autocast
                 if (
                     torch.is_autocast_cpu_enabled()
-                    and core.get_autocast_dtype() == torch.bfloat16
+                    and torch.get_autocast_cpu_dtype() == torch.bfloat16
                 ):
                     # do autocast in Python side
                     if args.dtype == torch.float32:
@@ -440,7 +438,7 @@ def iterate_and_apply_convert(
                 ):
                     if (
                         torch.is_autocast_cpu_enabled()
-                        and core.get_autocast_dtype() == torch.bfloat16
+                        and torch.get_autocast_cpu_dtype() == torch.bfloat16
                     ):
                         if args.dtype == torch.bfloat16:
                             args = args.to(dtype=torch.float32)

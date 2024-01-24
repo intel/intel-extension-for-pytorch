@@ -60,9 +60,9 @@ class TestFunction(TestCase):
 
     def test_set_autocast_dtype(self):
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
-            self.assertEqual(core.get_autocast_dtype(), torch.bfloat16)
+            self.assertEqual(torch.get_autocast_cpu_dtype(), torch.bfloat16)
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.float16):
-            self.assertEqual(core.get_autocast_dtype(), torch.float16)
+            self.assertEqual(torch.get_autocast_cpu_dtype(), torch.float16)
 
     def test_forward_dtype(self):
         rand_seed = int(get_rand_seed())

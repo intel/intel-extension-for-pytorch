@@ -1,7 +1,6 @@
 from typing import Callable, List, Tuple, Any, Optional, Dict
 import torch
 import torch.nn.functional as F
-import intel_extension_for_pytorch._C as core
 from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
 
 from ._utils import (
@@ -474,7 +473,7 @@ class AutoQuantizationState(torch.nn.Module):
                             weight = weight.to(w_dtype)
                 if (
                     torch.is_autocast_cpu_enabled()
-                    and core.get_autocast_dtype() == torch.bfloat16
+                    and torch.get_autocast_cpu_dtype() == torch.bfloat16
                 ):
                     if weight.dtype == torch.bfloat16:
                         weight = weight.to(dtype=torch.float32)
@@ -512,7 +511,7 @@ class AutoQuantizationState(torch.nn.Module):
                 weight = op.weight
                 if (
                     torch.is_autocast_cpu_enabled()
-                    and core.get_autocast_dtype() == torch.bfloat16
+                    and torch.get_autocast_cpu_dtype() == torch.bfloat16
                 ):
                     if weight.dtype == torch.bfloat16:
                         weight = weight.to(dtype=torch.float32)
@@ -540,7 +539,7 @@ class AutoQuantizationState(torch.nn.Module):
                     scale, zp, dtype = quant_info
                     if (
                         torch.is_autocast_cpu_enabled()
-                        and core.get_autocast_dtype() == torch.bfloat16
+                        and torch.get_autocast_cpu_dtype() == torch.bfloat16
                     ):
                         if weights[tensor_arg_idx].dtype == torch.bfloat16:
                             weights[tensor_arg_idx] = weights[tensor_arg_idx].to(
@@ -576,7 +575,7 @@ class AutoQuantizationState(torch.nn.Module):
                     ]
                     if (
                         torch.is_autocast_cpu_enabled()
-                        and core.get_autocast_dtype() == torch.bfloat16
+                        and torch.get_autocast_cpu_dtype() == torch.bfloat16
                     ):
                         weight_if_bf16 = w_ih.dtype == torch.bfloat16
                         if weight_if_bf16:
