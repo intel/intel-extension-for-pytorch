@@ -500,27 +500,29 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
         with torch.inference_mode():
             # latency
             for i in range(cycles):
-                with torch.autograd.profiler_legacy.profile(enabled=do_profiling, use_xpu=True, record_shapes=True) as prof:
+                enable_profile = do_profiling and i == cycles - 1
+                with torch.autograd.profiler_legacy.profile(enabled=enable_profile, use_xpu=True, record_shapes=True) as prof:
                     t0 = time.time()
                     gen_ids, outputs = generate()
                     if args.cuda:
                         torch.cuda.synchronize()
                     t1 = time.time()
 
-                if do_profiling:
-                    torch.save(prof.key_averages().table(sort_by="self_xpu_time_total"), "./profile_{}.pt".format(local_rank))
-                    torch.save(prof.table(sort_by="id", row_limit=-1), './profile_{}_id.pt'.format(local_rank))
-                    torch.save(prof.key_averages(group_by_input_shape=True).table(), "./profile_{}_detail.pt".format(local_rank))
-                    prof.export_chrome_trace("./trace.json")
+                if enable_profile:
+                    with open("./profile_{}_{}.log".format(num_beams, local_rank), "w") as f:
+                        f.write(prof.key_averages().table(sort_by="self_xpu_time_total"))
+                    #with open('./profile_{}_{}_id.log'.format(num_beams, local_rank), "w") as f:
+                    #    f.write(prof.table(sort_by="id", row_limit=-1))
+                    with open("./profile_{}_{}_detail.log".format(num_beams, local_rank), "w") as f:
+                        f.write(prof.key_averages(group_by_input_shape=True).table())
+                    #prof.export_chrome_trace(f"./trace_{local_rank}.json")
 
                 gen_ids = list(gen_ids)
                 for p, o, _ in gen_ids:
                     print_rank0(f"*** In: {p}\n*** Out: {o[len(p):]}")
                 print_rank0("Iteration: %d, Time: %.6f sec" % (i, t1 - t0))
                 print_mem_usage("post-iteration-%d" % i)
-                # if model.config.model_type != 't5':
-                #     assert gen_ids[0][-1] == args.max_new_tokens, "Generated new tokens != max new tokens"
-                if i >= warmup:
+                if i >= warmup and i < cycles - int(do_profiling):
                     total_time += (t1 - t0)
                     if args.token_latency:
                         total_list.append(outputs[1])
@@ -529,7 +531,7 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
                 elif ref_prompt_cuda is not None and ref_prompt_cuda in gen_ids[0][1:]:
                     acc_pass += 1
 
-        latency = total_time / (cycles - warmup)
+        latency = total_time / (cycles - warmup - int(do_profiling))
         print_rank0("\n", "-" * 10, "Summary:", "-" * 10)
         print_rank0("Inference latency: %.5f sec." % latency)
         if args.token_latency:

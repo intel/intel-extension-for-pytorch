@@ -65,7 +65,11 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
         impl = self.ipex_config.impl
         attn_type = IPEXTransformerAttn
         attn_type_str = "IPEXTransformerAttn"
-        for elem in [impl.name, dtype, "Grouped"]:
+        attn_list = [impl.name, dtype]
+        if self.ipex_config.num_attention_head > self.ipex_config.num_key_value_head:
+            attn_list.append("Grouped")
+
+        for elem in attn_list:
             attn_type_str = attn_type_str + elem.capitalize()
             if hasattr(sys.modules[__name__], attn_type_str):
                 attn_type = getattr(sys.modules[__name__], attn_type_str)
