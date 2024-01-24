@@ -741,7 +741,10 @@ def _lamb_impl(
 
         weight_norm = param.norm(p=2)
         rtw_norm = adam_step.norm(p=2)
-        true_ratio = weight_norm / rtw_norm
+        if weight_norm == 0 or rtw_norm == 0:
+            true_ratio = 1
+        else:
+            true_ratio = weight_norm / rtw_norm
 
         param.add_(adam_step, alpha=-lr * true_ratio)
 

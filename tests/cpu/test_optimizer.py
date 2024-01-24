@@ -318,6 +318,18 @@ class TestFusedSteps(TestCase):
         exp_avg5 = exp_avg.clone().t().contiguous().t()
         exp_avg_sq5 = exp_avg_sq.clone().t().contiguous().t()
 
+        # fused fp32 zero params
+        param6 = torch.zeros(31, 33)
+        grad6 = torch.zeros(31, 33)
+        exp_avg6 = torch.zeros(31, 33).abs()
+        exp_avg_sq6 = torch.zeros(31, 33).abs()
+
+        # non-fused fp32 zero params
+        param7 = param6.clone()
+        grad7 = grad6.clone()
+        exp_avg7 = exp_avg6.clone()
+        exp_avg_sq7 = exp_avg_sq6.clone()
+
         step = 10
         beta1 = 0.8
         beta2 = 0.9
@@ -389,6 +401,31 @@ class TestFusedSteps(TestCase):
             weight_decay,
             eps,
         )
+        fused(
+            param6,
+            exp_avg6,
+            exp_avg_sq6,
+            grad6,
+            trail,
+            step,
+            beta1,
+            beta2,
+            learning_rate,
+            weight_decay,
+            eps,
+        )
+        non_fused(
+            param7,
+            exp_avg7,
+            exp_avg_sq7,
+            grad7,
+            step,
+            beta1,
+            beta2,
+            learning_rate,
+            weight_decay,
+            eps,
+        )
 
         # compare fused and non-fused
         self.assertEqual(param, param4)
@@ -410,6 +447,10 @@ class TestFusedSteps(TestCase):
         self.assertEqual(exp_avg, exp_avg5)
         self.assertEqual(exp_avg_sq, exp_avg_sq5)
 
+        # compare param6 and param7 has no nan
+        self.assertFalse(param6.isnan().any())
+        self.assertFalse(param7.isnan().any())
+
         # fused double args
         param = torch.randn(31, 33).double()
         grad = torch.randn(31, 33).double()
@@ -422,6 +463,18 @@ class TestFusedSteps(TestCase):
         grad2 = grad.clone()
         exp_avg2 = exp_avg.clone()
         exp_avg_sq2 = exp_avg_sq.clone()
+
+        # fused double zero args
+        param3 = torch.zeros(31, 33).double()
+        grad3 = torch.zeros(31, 33).double()
+        exp_avg3 = torch.zeros(31, 33).double().abs()
+        exp_avg_sq3 = torch.zeros(31, 33).double().abs()
+
+        # non-fused double zero params
+        param4 = param3.clone()
+        grad4 = grad3.clone()
+        exp_avg4 = exp_avg3.clone()
+        exp_avg_sq4 = exp_avg_sq3.clone()
 
         fused(
             param,
@@ -448,11 +501,38 @@ class TestFusedSteps(TestCase):
             weight_decay,
             eps,
         )
+        fused(
+            param3,
+            exp_avg3,
+            exp_avg_sq3,
+            grad3,
+            trail,
+            step,
+            beta1,
+            beta2,
+            learning_rate,
+            weight_decay,
+            eps,
+        )
+        non_fused(
+            param4,
+            exp_avg4,
+            exp_avg_sq4,
+            grad4,
+            step,
+            beta1,
+            beta2,
+            learning_rate,
+            weight_decay,
+            eps,
+        )
 
         # compare fused and non-fused for double
         self.assertEqual(param, param2)
         self.assertEqual(exp_avg, exp_avg2)
         self.assertEqual(exp_avg_sq, exp_avg_sq2)
+        self.assertFalse(param3.isnan().any())
+        self.assertFalse(param4.isnan().any())
 
     def test_adam_step(self):
         fused = torch.ops.torch_ipex.adam_fused_step

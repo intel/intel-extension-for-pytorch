@@ -128,7 +128,12 @@ void lamb_fused_step_kernel(
     param_norm_sum += param_norm_acc[tid];
     rtw_norm_sum += rtw_norm_acc[tid];
   }
-  scalar_t true_ratio = std::sqrt(param_norm_sum) / std::sqrt(rtw_norm_sum);
+  scalar_t true_ratio = scalar_t(1);
+  scalar_t param_norm = std::sqrt(param_norm_sum);
+  scalar_t rtw_norm = std::sqrt(rtw_norm_sum);
+  if (param_norm != scalar_t(0) && rtw_norm != scalar_t(0)) {
+    true_ratio = param_norm / rtw_norm;
+  }
 
   // update param
   at::parallel_for(
@@ -303,7 +308,12 @@ void lamb_fused_step_kernel<at::BFloat16, at::BFloat16>(
     param_norm_sum += param_norm_acc[tid];
     rtw_norm_sum += rtw_norm_acc[tid];
   }
-  float true_ratio = std::sqrt(param_norm_sum) / std::sqrt(rtw_norm_sum);
+  float true_ratio = float(1);
+  float param_norm = std::sqrt(param_norm_sum);
+  float rtw_norm = std::sqrt(rtw_norm_sum);
+  if (param_norm != float(0) && rtw_norm != float(0)) {
+    true_ratio = param_norm / rtw_norm;
+  }
 
   // update param
   at::parallel_for(0, numel, grain_size, [&](int64_t begin, int64_t end) {
@@ -488,7 +498,12 @@ void lamb_fused_step_kernel<float, at::BFloat16>(
     param_norm_sum += param_norm_acc[tid];
     rtw_norm_sum += rtw_norm_acc[tid];
   }
-  float true_ratio = std::sqrt(param_norm_sum) / std::sqrt(rtw_norm_sum);
+  float true_ratio = float(1);
+  float param_norm = std::sqrt(param_norm_sum);
+  float rtw_norm = std::sqrt(rtw_norm_sum);
+  if (param_norm != float(0) && rtw_norm != float(0)) {
+    true_ratio = param_norm / rtw_norm;
+  }
 
   // update param
   at::parallel_for(0, numel, grain_size, [&](int64_t begin, int64_t end) {
