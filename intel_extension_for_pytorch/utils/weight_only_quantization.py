@@ -1,7 +1,10 @@
 import copy
 import torch
-from intel_extension_for_pytorch.nn.modules import IpexWoqLinear
 from torch.ao.quantization import PlaceholderObserver, QConfigMapping
+from intel_extension_for_pytorch.utils.utils import has_cpu
+
+if has_cpu():
+    from intel_extension_for_pytorch.nn.modules import IpexWoqLinear
 
 # The config describes how to load low precision checkpoint for weight only quantization.
 # Weight shape is N by K if transposed is False otherwise K by N.
@@ -107,7 +110,7 @@ def _convert_woq_with_low_precision_checkpoint(
     assert all(keys_found), "Error: Format of checkpoint and config do not match"
 
     def _convert(mod, attr_name):
-        if isinstance(mod, torch.nn.Linear):
+        if isinstance(mod, torch.nn.Linear) and has_cpu():
             mod.qconfig = qconfig_mapping.global_qconfig
             qweight, scales, qzeros, bias = _get_linear_parameters(
                 attr_name, state_dict, checkpoint_config
