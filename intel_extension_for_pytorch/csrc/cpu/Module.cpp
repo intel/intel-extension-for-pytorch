@@ -24,6 +24,7 @@
 #include "jit/auto_opt_config.h"
 #include "jit/cpu/tensorexpr/nnc_fuser_register.h"
 #include "utils/fpmath_mode.h"
+#include "utils/module_version.h"
 #include "utils/onednn_utils.h"
 
 #include <c10/core/DeviceType.h>
@@ -237,6 +238,17 @@ void InitIpexModuleBindings(py::module m) {
   m.def("tpp_clip_grad_norm", &torch_ipex::tpp::clip_grad_norm);
   m.def("tpp_fused_lamb", &torch_ipex::tpp::fused_lamb);
   m.def("tpp_fused_lamb_v2", &torch_ipex::tpp::fused_lamb_v2);
+
+  // Module version
+  m.def("_get_mkl_version", []() {
+    return torch_ipex::utils::get_mkl_version();
+  });
+  m.def("_get_libxsmm_version", []() {
+    return torch_ipex::utils::get_libxsmm_version();
+  });
+  m.def("_get_ideep_version", []() {
+    return torch_ipex::utils::get_ideep_version();
+  });
 }
 } // namespace
 
