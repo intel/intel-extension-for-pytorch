@@ -55,14 +55,12 @@ Function(GEN_NATIVE_IMPL file_yaml file_impl file_head)
                 ${source_file})
 endfunction(GEN_NATIVE_IMPL)
 
-GEN_NATIVE_IMPL(nestedtensorxpu_functions.yaml NestedTensorNativeImplOps.cpp NestedTensorXPUNativeFunctions.h)
 
 list(APPEND gpu_generated_src ${BUILD_IPEX_GPU_ATEN_GENERATED}/RegisterXPU.cpp
         ${BUILD_IPEX_GPU_ATEN_GENERATED}/RegisterAutogradXPU.cpp
         ${BUILD_IPEX_GPU_ATEN_GENERATED}/RegisterQuantizedXPU.cpp
         ${BUILD_IPEX_GPU_ATEN_GENERATED}/RegisterSparseXPU.cpp
-        ${BUILD_IPEX_GPU_ATEN_GENERATED}/RegisterNestedTensorXPU.cpp
-        ${BUILD_IPEX_GPU_ATEN_GENERATED}/NestedTensorNativeImplOps.cpp)
+        ${BUILD_IPEX_GPU_ATEN_GENERATED}/RegisterNestedTensorXPU.cpp)
 
 add_custom_target(IPEX_GPU_GEN_TARGET DEPENDS ${gpu_generated_src})
 set(IPEX_GPU_GEN_FILES ${gpu_generated_src})

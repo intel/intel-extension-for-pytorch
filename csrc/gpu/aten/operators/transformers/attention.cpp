@@ -689,6 +689,33 @@ Tensor xetla_fsdp_index_forward(
   return output;
 }
 } // namespace AtenIpexTypeXPU
+
+namespace AtenIpexTypeNestedTensorXPU {
+int64_t _fused_sdp_choice(
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const c10::optional<Tensor>& attn_mask_,
+    double dropout_p,
+    bool is_causal,
+    c10::optional<double> scale) {
+  // We have implemented efficient_attention backend with xetla, flash_attention
+  // backend is not supported now, which will be implemented in the future. So
+  // we provide two backends here.
+  sdp::SDPBackend backend =
+      AtenIpexTypeXPU::xetla_supported(query, key, value, attn_mask_)
+      ? sdp::SDPBackend::efficient_attention
+      : sdp::SDPBackend::math;
+  if (backend == sdp::SDPBackend::error) {
+    TORCH_CHECK(
+        false,
+        "No viable backend for scaled_dot_product_attention was found. ",
+        "This is likely due to turning off both the math kernel and the fused kernels.");
+  }
+  return static_cast<int64_t>(backend);
+}
+
+} // namespace AtenIpexTypeNestedTensorXPU
 } // namespace at
 
 namespace {
