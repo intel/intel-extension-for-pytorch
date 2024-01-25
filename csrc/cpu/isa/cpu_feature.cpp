@@ -105,6 +105,8 @@ void CPUFeature::detect_intel_cpu_feature() {
 
       MICRO_CLASS_MEMBER(avx_vnni) = check_reg_bit(eax, 4);
       MICRO_CLASS_MEMBER(avx512_bf16) = check_reg_bit(eax, 5);
+
+      MICRO_CLASS_MEMBER(amx_fp16) = check_reg_bit(eax, 21);
     }
   }
 
@@ -376,6 +378,11 @@ bool CPUFeature::isa_level_avx512_fp16() {
   return b_is_support;
 }
 
+bool CPUFeature::isa_level_amx_fp16() {
+  static bool b_is_support = isa_level_avx512_fp16() && cpuid_amx_fp16();
+  return b_is_support;
+}
+
 __forceinline void print_bool_status(const char* p_name, bool b_status) {
   printf("%s:\t\t\t%s\n", p_name, (b_status ? "true" : "false"));
 }
@@ -424,6 +431,7 @@ void CPUFeature::show_features() {
   MICRO_CLASS_PRINT_BOOL_STATUS(amx_bf16);
   MICRO_CLASS_PRINT_BOOL_STATUS(amx_tile);
   MICRO_CLASS_PRINT_BOOL_STATUS(amx_int8);
+  MICRO_CLASS_PRINT_BOOL_STATUS(amx_fp16);
 
   MICRO_CLASS_PRINT_BOOL_STATUS(prefetchw);
   MICRO_CLASS_PRINT_BOOL_STATUS(prefetchwt1);

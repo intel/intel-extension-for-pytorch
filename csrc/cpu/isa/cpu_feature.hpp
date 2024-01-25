@@ -113,6 +113,9 @@ class CPUFeature {
   MICRO_CLASS_MEMBER_DECL(amx_bf16);
   MICRO_CLASS_MEMBER_DECL(amx_tile);
   MICRO_CLASS_MEMBER_DECL(amx_int8);
+
+  // Add since GNR
+  MICRO_CLASS_MEMBER_DECL(amx_fp16);
   bool init_amx();
   bool _do_check_and_init_amx();
 
@@ -120,6 +123,7 @@ class CPUFeature {
   MICRO_CLASS_CHECK_FUNC(amx_bf16);
   MICRO_CLASS_CHECK_FUNC(amx_tile);
   MICRO_CLASS_CHECK_FUNC(amx_int8);
+  MICRO_CLASS_CHECK_FUNC(amx_fp16);
 
   // prefetch
  private:
@@ -151,6 +155,8 @@ class CPUFeature {
   bool isa_level_amx();
 
   bool isa_level_avx512_fp16();
+
+  bool isa_level_amx_fp16();
 };
 } // namespace cpu
 } // namespace torch_ipex
