@@ -1,2 +1,5 @@
+from ..utils.utils import has_xpu
 from ._lars import Lars
-from .ResourceApplyMomentum import FusedResourceApplyMomentum
+
+if has_xpu():
+    from .xpu.ResourceApplyMomentum import FusedResourceApplyMomentum

@@ -9,7 +9,7 @@ from torch._dynamo.allowed_functions import (
 from torch._dynamo.utils import is_safe_constant
 from torch._dynamo.config import allowed_functions_module_string_ignorelist
 
-from ..utils.utils import has_xpu
+from ...utils.utils import has_xpu
 
 # key: id(obj)
 # value: obj(Module/Function)
@@ -23,7 +23,7 @@ def _is_allowed_module_prefix(obj):
         "intel_extension_for_pytorch.xpu.FP32MathMode",
         "intel_extension_for_pytorch.xpu.utils",
         "intel_extension_for_pytorch._C",
-        "intel_extension_for_pytorch._dynamo.register",
+        "intel_extension_for_pytorch._dynamo.xpu.register",
     )
     allowed_modules_dot = tuple([x + "." for x in allowed_modules])
     module = inspect.getmodule(obj)

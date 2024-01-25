@@ -4,7 +4,9 @@ from torch import nn as nn
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
-from intel_extension_for_pytorch.jit._trace import need_to_disable_check_trace_for_XPU
+from intel_extension_for_pytorch.jit.xpu._trace import (
+    need_to_disable_check_trace_for_XPU,
+)
 import pytest  # noqa
 
 
