@@ -5,6 +5,7 @@ import logging
 import operator
 import os.path
 import re
+import warnings
 from typing import Any, Callable, Dict, List, Optional
 
 import torch
@@ -13,15 +14,42 @@ from torch._inductor import config
 from torch._inductor.ir import ReductionHint, TileHint
 from torch._inductor.triton_heuristics import AutotuneHint  # noqa
 from torch._inductor.utils import get_num_bytes, create_bandwidth_info_str
+from torch._dynamo.utils import dynamo_timed, get_first_attr
+from torch._dynamo.device_interface import get_interface_for_device
+from torch.utils._triton import has_triton_package
 
 from .utils import do_bench, has_triton
-from intel_extension_for_pytorch._C import _getCurrentRawStream as get_xpu_stream
+
 
 log = logging.getLogger(__name__)
+
+
+if has_triton_package():
+    import triton
+    from triton import Config
+    from triton.runtime.jit import KernelInterface
+
+    try:
+        from triton.compiler.compiler import ASTSource
+    except ImportError:
+        warnings.warn("XPU: Import error on ASTSource, if this is not the case, \
+                      please comment out this")
+        ASTSource = None
+else:
+    Config = object
+    triton = None
+    KernelInterface = object
+    OutOfResources = object
+    ASTSource = None
+
+
 
 if has_triton():
     import triton
     from triton import Config
+    from intel_extension_for_pytorch._C import _getCurrentRawStream as get_xpu_stream
+else:
+    get_xpu_stream = None
 
 from torch._inductor.triton_heuristics import (
     CachingAutotuner,
@@ -78,22 +106,53 @@ class XPUCachingAutotuner(CachingAutotuner):
         compile_meta["device_type"] = "xpu"
 
         if warm_cache_only_with_cc:
-            triton.compile(
-                self.fn,
-                warm_cache_only=True,
-                cc=warm_cache_only_with_cc,
-                **compile_meta,
+            cc = warm_cache_only_with_cc
+        else:
+            # Use device_type 'cuda' for both cuda and hip devices to retrieve
+            # the compute capability.
+            device_type = "xpu"
+            device_id = compile_meta["device"]
+            device_interface = get_interface_for_device(device_type)
+            device = torch.device(device_type, device_id)
+            cc = device_interface.get_compute_capability(device)
+
+        compile_meta["cc"] = cc
+
+        if ASTSource:
+            compile_args = (
+                ASTSource(
+                    self.fn,
+                    compile_meta["signature"],
+                    compile_meta["constants"],
+                    compile_meta["configs"][0],
+                ),
             )
-            return
+
+            target = (compile_meta["device_type"], cc)
+            options = {
+                "num_warps": compile_meta["num_warps"],
+                "num_stages": compile_meta["num_stages"],
+                "debug": compile_meta["debug"],
+            }
+            compile_kwargs = {
+                "target": target,
+                "options": options,
+            }
+        else:
+            compile_args = (self.fn,)
+            compile_kwargs = compile_meta
+
+        if warm_cache_only_with_cc:
+            return (
+                triton.compile(*compile_args, **compile_kwargs),
+                None,
+            )
 
         # load binary to the correct device
         with torch.xpu.device(compile_meta["device"]):
             # need to initialize context
             torch.xpu.synchronize(torch.xpu.current_device())
-            binary = triton.compile(
-                self.fn,
-                **compile_meta,
-            )
+            binary = triton.compile(*compile_args, **compile_kwargs)
             binary._init_handles()
 
         call_args = [
@@ -112,6 +171,28 @@ class XPUCachingAutotuner(CachingAutotuner):
             "set_device": torch.xpu.set_device,
             "current_device": torch.xpu.current_device,
         }
+
+        scope["runner"] = get_first_attr(binary, "run", "c_wrapper")
+        scope["function"] = get_first_attr(binary, "function", "cu_function")
+        cluster_dims = get_first_attr(binary, "cluster_dims", "clusterDims")
+        scope["cta_args"] = (
+            (binary.num_ctas, *get_first_attr(binary, "cluster_dims", "clusterDims"))
+            if hasattr(binary, "num_ctas")
+            else (
+                (binary.metadata.num_ctas, *binary.metadata.cluster_dims)
+                if hasattr(binary, "metadata")
+                else ()
+            )
+        )
+        scope["num_warps"] = (
+            binary.num_warps
+            if hasattr(binary, "num_warps")
+            else binary.metadata.num_warps
+        )
+        scope["shared"] = (
+            binary.shared if hasattr(binary, "shared") else binary.metadata.shared
+        )
+
         exec(
             f"""
             def launcher({', '.join(def_args)}, grid, stream):
@@ -120,15 +201,11 @@ class XPUCachingAutotuner(CachingAutotuner):
                 else:
                     grid_0, grid_1, grid_2 = grid
 
-                if hasattr(bin, "num_ctas"):
-                    bin.c_wrapper(grid_0, grid_1, grid_2, bin.num_warps,
-                                bin.num_ctas, *bin.clusterDims, bin.shared,
-                                stream, bin.cu_function, None, None, None,
-                                {', '.join(call_args)})
-                else:
-                    bin.c_wrapper(grid_0, grid_1, grid_2, bin.num_warps, bin.shared,
-                                stream, bin.cu_function, None, None, None,
-                                {', '.join(call_args)})
+               runner(grid_0, grid_1, grid_2, bin.num_warps,
+                            *cta_args, bin.shared,
+                            stream, function, None, None, None,
+                            {', '.join(call_args)})
+                return bin
             """.lstrip(),
             scope,
         )
@@ -146,7 +223,7 @@ class XPUCachingAutotuner(CachingAutotuner):
 
         return launcher
 
-    def bench(self, launcher, *args, grid):
+    def bench(self, launcher, *args, grid, **kwargs):
         """Measure the performance of a given launcher"""
         if launcher.n_spills > config.triton.spill_threshold:
             log.debug(
@@ -164,9 +241,10 @@ class XPUCachingAutotuner(CachingAutotuner):
                     {**dict(zip(self.arg_names, args)), **launcher.config.kwargs}
                 )
 
-            cloned_args = self.clone_args(*args)
+            cloned_args, cloned_kwargs = self.clone_args(*args, **kwargs)
             launcher(
                 *cloned_args,
+                **cloned_kwargs,
                 grid=grid,
                 stream=stream,
             )

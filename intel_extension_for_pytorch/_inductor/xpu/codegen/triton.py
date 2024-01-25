@@ -2,7 +2,7 @@ import itertools
 import sympy
 
 import torch  # noqa
-
+import textwrap
 from torch.utils._sympy.value_ranges import ValueRanges
 from torch._dynamo.utils import counters
 from torch._inductor.ir import ReductionHint
@@ -171,6 +171,16 @@ class XPUTritonKernel(TritonKernel):
 
         return sympy_symbol(str(var))
 
+    def imports_for_benchmark_kernel(self):
+        return textwrap.dedent(
+            """
+            import torch
+            from torch._dynamo.testing import rand_strided
+            from intel_extension_for_pytorch._C import _getCurrentRawStream as get_xpu_stream
+            from torch._inductor.triton_heuristics import grid
+        """
+        )
+
     def codegen_kernel_benchmark(self):
         result = IndentedBuffer()
         argdefs, call_args, signature = self.args.python_argdefs()
@@ -297,6 +307,9 @@ class XPUTritonKernel(TritonKernel):
                     from torch._inductor import triton_helpers
                 """
             )
+            if self.gen_attr_descriptor_import():
+                code.splice(self.gen_attr_descriptor_import())
+
             if config.benchmark_kernel:
                 code.splice(
                     """

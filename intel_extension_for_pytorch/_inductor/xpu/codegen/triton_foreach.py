@@ -1,6 +1,6 @@
 from torch._inductor.codegen.common import IndentedBuffer
 from torch._inductor.codegen.triton_foreach import ForeachKernel
-
+from torch._inductor.codegen.triton import TritonKernel
 
 class XPUForeachKernel(ForeachKernel):
     def __init__(self):
@@ -18,6 +18,8 @@ class XPUForeachKernel(ForeachKernel):
                 from torch._inductor import triton_helpers
             """
         )
+        if TritonKernel.gen_attr_descriptor_import():
+            code.splice(TritonKernel.gen_attr_descriptor_import())
         argdefs, _, _ = self.args.python_argdefs()
         code.writeline(self.jit_line())
         code.writeline(f"def {name or 'KERNEL_NAME'}({', '.join(argdefs)}):")
