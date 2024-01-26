@@ -16,10 +16,10 @@ def inference(model, data):
         print('Inference took {:.2f} ms in average'.format((end - start) / 100 * 1000))
 
 def main(args):
-    model = models.resnet50(pretrained=False)
+    model = models.resnet50(weights='ResNet50_Weights.DEFAULT')
     model.eval()
 
-    data = torch.rand(1, 3, 224, 224)
+    data = torch.rand(128, 3, 224, 224)
 
     import intel_extension_for_pytorch as ipex
 
@@ -33,21 +33,21 @@ def main(args):
     else:  # int8
         from intel_extension_for_pytorch.quantization import prepare, convert
 
-        qconfig = ipex.quantization.default_static_qconfig
+        qconfig = ipex.quantization.default_static_qconfig_mapping
         model = prepare(model, qconfig, example_inputs=data, inplace=False)
 
         # calibration
         n_iter = 100
-        for i in range(n_iter):
-            model(data)
+        with torch.no_grad():
+            for i in range(n_iter):
+                model(data)
 
         model = convert(model)
 
     with torch.cpu.amp.autocast(enabled=args.dtype == 'bfloat16'):
-        if args.torchscript:
-            with torch.no_grad():
-                model = torch.jit.trace(model, data)
-                model = torch.jit.freeze(model)
+        with torch.no_grad():
+            model = torch.jit.trace(model, data)
+            model = torch.jit.freeze(model)
 
         inference(model, data)
 
@@ -55,7 +55,6 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--dtype', default='float32', choices=['float32', 'bfloat16', 'int8'])
-    parser.add_argument("--torchscript", default=False, action="store_true")
 
     main(parser.parse_args())
 
