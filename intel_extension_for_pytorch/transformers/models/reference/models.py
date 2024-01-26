@@ -1268,7 +1268,7 @@ def T5ForConditionalGeneration_forward(
         labels = labels.to(lm_logits.device)
         loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
 
-    output = (lm_logits,) + decoder_outputs[1:] + encoder_outputs
+    output = (lm_logits,) + decoder_outputs[1:] + tuple(encoder_outputs)
     return ((loss,) + output) if loss is not None else output
 
 
