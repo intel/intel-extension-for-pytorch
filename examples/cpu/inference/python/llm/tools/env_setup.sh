@@ -12,7 +12,7 @@ cd ${BASEFOLDER}/..
 # High bit: 8 7 6 5 4 3 2 1 :Low bit
 #           | | | | | | | └- Install wheel files
 #           | | | | | | └--- Compile wheel files
-#           | | | | | └----- Install from prebuilt wheel files
+#           | | | | | └----- Install from prebuilt wheel files for ipex, torch-ccl, ds
 #           | | | | └------- Undefined
 #           | | | └--------- Undefined
 #           | | └----------- Undefined

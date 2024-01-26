@@ -26,7 +26,9 @@ The scripts cover model generation inference with low precions cases for differe
 
 # Environment Setup
 
-## Building Docker with Intel® Extension for PyTorch\* installed via Prebuilt Wheel Files
+There are several environment setup methodologies provided. You can choose either of them according to your usage scenario. The Docker-based ones are recommended.
+
+## [RECOMMENDED] Docker-based environment setup with pre-built wheels
 
 ```bash
 # Get the Intel® Extension for PyTorch\* source code
@@ -49,13 +51,13 @@ cd llm
 source ./tools/env_activate.sh
 ```
 
-## Building Docker with Intel® Extension for PyTorch\* installed via Source Code Building
+## Docker-based environment setup with compilation from source
 
 ```bash
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-# Optional: checkout code to the desired branch or commit
+git checkout v2.2.0+cpu
 git submodule sync
 git submodule update --init --recursive
 
@@ -72,7 +74,7 @@ cd llm
 source ./tools/env_activate.sh
 ```
 
-## Conda Environment Setup with the Configuration Script
+## Conda-based environment setup with pre-built wheels
 
 ```bash
 # Get the Intel® Extension for PyTorch\* source code
@@ -91,6 +93,30 @@ conda activate llm
 # A sample "prompt.json" file for benchmarking is also downloaded
 cd examples/cpu/inference/python/llm
 bash ./tools/env_setup.sh 7
+
+# Activate environment variables
+source ./tools/env_activate.sh
+```
+
+## Conda-based environment setup with compilation from source
+
+```bash
+# Get the Intel® Extension for PyTorch\* source code
+git clone https://github.com/intel/intel-extension-for-pytorch.git
+cd intel-extension-for-pytorch
+git checkout v2.2.0+cpu
+git submodule sync
+git submodule update --init --recursive
+
+# GCC 12.3 is required. Installation can be taken care of by the environment configuration script.
+# Create a conda environment
+conda create -n llm python=3.10 -y
+conda activate llm
+
+# Setup the environment with the provided script
+# A sample "prompt.json" file for benchmarking is also downloaded
+cd examples/cpu/inference/python/llm
+bash ./tools/env_setup.sh
 
 # Activate environment variables
 source ./tools/env_activate.sh

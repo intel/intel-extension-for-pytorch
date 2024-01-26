@@ -1216,6 +1216,12 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         seed(string): The seed used for the libxsmm kernel. In general it should be same
             to the torch.seed
 
+    .. note::
+
+        Currently ``ipex.fast_bert`` API is well optimized for training tasks.
+        It works for inference tasks, though, please use the ``ipex.optimize``
+        API with TorchScript to achieve the peak performance.
+
     .. warning::
 
         Please invoke ``fast_bert`` function AFTER loading weights to model via
@@ -1223,7 +1229,7 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
 
     .. warning::
 
-        This API can't be used when you have applied the ipex.optimize.
+        This API can't be used when you have applied the ``ipex.optimize``.
 
     .. warning::
 
@@ -1290,8 +1296,8 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         )
     except BaseException:
         warnings.warn(
-            "Set seed failed for libxsmm which may impact the training loss, you can call \
-                torch.manual_seed(N) before invoking fast_bert."
+            "Set seed failed for libxsmm which may impact the training loss, you can call " +
+            "torch.manual_seed(N) before invoking fast_bert."
         )
     # replace the original transfomers module object with tpp module which has the same functionality but with more
     # operator fusion optimization
@@ -1337,6 +1343,10 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     )  # copy the original params into the tpp module
     block(new_model)  # get block format weights/bias
     if optimizer is None:
+        warnings.warn(
+            "Currently ipex.fast_bert API is well optimized for training tasks. It works for inference tasks, " +
+            "though, please use the ipex.optimize API with TorchScript to achieve the peak performance."
+        )
         return new_model
     # replace the original pytorch/transformer optimizer with tpp optimizer for SGD/AdamW
     # keep the original optimizer state and replace the params with the blocked tpp params
