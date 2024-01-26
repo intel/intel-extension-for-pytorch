@@ -42,7 +42,7 @@ DECL_VLA_PTR_PT(T, grad_gelu, [Nk][S2 * Hk], t_grad_gelu);
 DECL_VLA_PTR_PT(T, grad_out, [Nk][S2 * Hk], t_grad_out);
 DECL_VLA_PTR_PT(T, grad_gelu_V, [S2 * Hk], t_grad_gelu_V);
 
-constexpr long BS = 8;
+constexpr int64_t BS = 8;
 auto Nkb = Nk;
 if (Nk > Nc && Nk % Nc == 0) {
   Nkb = Nc;
@@ -173,7 +173,7 @@ auto dw_gemm_tpp = SCOPEITGEMM((BrgemmExtTPP<T, T>(
   }
 #else
   auto dw_loop = ThreadedLoop<3>(
-      {LoopSpecs{0, S1, BS}, LoopSpecs{Nk}, LoopSpecs{Nc}}, "aBC");
+      {LoopSpecs{0, S1, BS, true}, LoopSpecs{Nk}, LoopSpecs{Nc}}, "aBC");
   dw_loop(
       [&](int* ind) {
         int s1 = ind[0], nk = ind[1], nc = ind[2];

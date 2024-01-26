@@ -10,7 +10,7 @@ auto t_word_emb = inputs[i++]; // [*][NH]
 auto t_pos_emb = inputs[i++]; // [*][NH]
 auto t_tt_emb = inputs[i++]; // [*][NH]
 
-long B, S1, N, S2;
+int64_t B, S1, N, S2;
 bool in_ids_null = t_in_ids.numel() == 0;
 bool tt_ids_null = t_tt_ids.numel() == 0;
 bool pos_ids_null = t_pos_ids.numel() == 0;
@@ -32,7 +32,7 @@ if (in_emb_null == false) {
   B = in_sizes[0];
   S1 = in_sizes[1];
   S2 = in_sizes[2];
-  long NH = t_gamma.size(0);
+  int64_t NH = t_gamma.size(0);
   N = NH / H;
 }
 
@@ -49,9 +49,9 @@ auto t_dp_mask = at::empty({0}, at::kShort);
 if (p > 0)
   t_dp_mask = at::empty({B, S1, (N * S2 * H + 15) / 16}, at::kShort);
 
-DECL_VLA_PTR_PT(long, in_ids, [S1][S2], t_in_ids);
-DECL_VLA_PTR_PT(long, pos_ids, [S1][S2], t_pos_ids);
-DECL_VLA_PTR_PT(long, tt_ids, [S1][S2], t_tt_ids);
+DECL_VLA_PTR_PT(int64_t, in_ids, [S1][S2], t_in_ids);
+DECL_VLA_PTR_PT(int64_t, pos_ids, [S1][S2], t_pos_ids);
+DECL_VLA_PTR_PT(int64_t, tt_ids, [S1][S2], t_tt_ids);
 DECL_VLA_PTR_PT(T, in_emb, [S1][N][S2][H], t_in_emb);
 DECL_VLA_PTR_PT(T, gamma, [H], t_gamma);
 DECL_VLA_PTR_PT(T, beta, [H], t_beta);
@@ -76,7 +76,7 @@ auto dropout_fwd_tpp = SCOPEIT(DropOutFwdTPP<T>(N * S2 * H, p), DROPOUT);
     for (int b = 0; b < B; b++) {
       for (int s1 = 0; s1 < S1; s1++) {
         for (int s2 = 0; s2 < S2; s2++) {
-          long w_id = -1, pos_id = s1 * S2 + s2, tt_id = 0;
+          int64_t w_id = -1, pos_id = s1 * S2 + s2, tt_id = 0;
           if (!in_ids_null)
             w_id = in_ids[b][s1][s2];
           if (!pos_ids_null)

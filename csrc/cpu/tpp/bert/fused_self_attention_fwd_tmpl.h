@@ -17,14 +17,14 @@ auto t_EAM = inputs[10]; // Optional [B][S]
 auto t_offs = inputs[11]; // [B+1]
 auto t_offs2 = inputs[12]; // [B+1]
 
-long B = t_offs.sizes()[0] - 1;
-long SS1 = t_offs2[B].item().to<long>();
+int64_t B = t_offs.sizes()[0] - 1;
+int64_t SS1 = t_offs2[B].item().to<int64_t>();
 auto sizes = t_HS.sizes();
-long S1 = sizes[0];
-long N = sizes[1];
-long S2 = sizes[2];
-long H = sizes[3];
-// long NH = N*H;
+int64_t S1 = sizes[0];
+int64_t N = sizes[1];
+int64_t S2 = sizes[2];
+int64_t H = sizes[3];
+// int64_t NH = N*H;
 float one_by_sqrt_H = 1.0 / sqrt(H);
 bool null_EHS = false;
 bool dt_bf16 = (t_HS.dtype() == at::kBFloat16);
@@ -111,8 +111,8 @@ if (training) {
   DECL_VLA_PTR_PT(T, EHS, [N][S2 * H], t_EHS);
   // DECL_VLA_PTR_PT(T, EHS_T, [N][H * S2], t_EHS_T); // for BWD only
   DECL_VLA_PTR_PT(T, AM, [S2], t_AM);
-  auto offs = t_offs.data_ptr<long>();
-  auto offs2 = t_offs2.data_ptr<long>();
+  auto offs = t_offs.data_ptr<int64_t>();
+  auto offs2 = t_offs2.data_ptr<int64_t>();
 
   auto copy_bias_tpp = SCOPEIT(CpyBiasTPP<T>(S2, H), BIAS);
   auto qkv_gemm_tpp = SCOPEITGEMM((BrgemmExtTPP<T, T>(
@@ -164,9 +164,9 @@ if (training) {
         }
       }
 #else
-      long BN = N;
+      int64_t BN = N;
       auto qkv_loop = ThreadedLoop<3>(
-          {LoopSpecs{0L, N, BN}, LoopSpecs{S1}, LoopSpecs{N}}, "acB");
+          {LoopSpecs{0L, N, BN, true}, LoopSpecs{S1}, LoopSpecs{N}}, "acB");
       // ThreadedLoop<3>({LoopSpecs{0L,N,BN}, LoopSpecs{S1}, LoopSpecs{N}},
       // "acB");  ThreadedLoop<3>({LoopSpecs{0L,N,BN}, LoopSpecs{S1},
       // LoopSpecs{N}}, "aBC");  ThreadedLoop<3>({LoopSpecs{0L,N,BN},
@@ -301,17 +301,21 @@ if (training) {
     RECORD_SCOPE(ac_gemm, {t_QL, t_KL_TV});
     {
       RECORD_FUNCTION("parallel_for", std::vector<c10::IValue>());
+#ifndef _WIN32 // TODO: Fix crash on ICX Windows.
 #pragma omp parallel for collapse(2) schedule(static, 1)
+#else
+#pragma omp for
+#endif
       for (int b = 0; b < B; b++) {
         for (int n = 0; n < N; n++) {
-          long start = offs[b];
-          long ss1 = offs2[b];
-          long end = offs[b + 1];
-          long len = end - start;
+          int64_t start = offs[b];
+          int64_t ss1 = offs2[b];
+          int64_t end = offs[b + 1];
+          int64_t len = end - start;
           for (int s11 = start; s11 < end; s11++, ss1 += len) {
             float AS[len][S2][S2];
             for (int s21 = start; s21 < end; s21++) {
-              long ls21 = s21 - start;
+              int64_t ls21 = s21 - start;
               a_gemm_tpp(QL[s11][n], KL_TV[s21][n], AS[ls21][0], 1);
               scale_tpp(AS[ls21][0], AS[ls21][0], one_by_sqrt_H);
               if (t_AM.numel() != 0)
@@ -333,8 +337,8 @@ if (training) {
               // t_APD[b][s11][n] *= t_HM[b][s11][n];
             }
             if (training) {
-              long l = s11 - start;
-              long ss = offs2[b];
+              int64_t l = s11 - start;
+              int64_t ss = offs2[b];
               // xpose S1xS1 part as well here to allow fix stride in GEMM in
               // bwd
               a_xpose_tpp(

@@ -14,7 +14,7 @@ auto t_var = inputs[i++]; // [N][H]
 auto t_emb_out = inputs[i++]; // [N][H]
 auto t_dp_mask = inputs[i++];
 
-long B, S1, N, S2, H;
+int64_t B, S1, N, S2, H;
 // bool in_ids_null = t_in_ids.numel() == 0;
 bool tt_ids_null = t_tt_ids.numel() == 0;
 bool pos_ids_null = t_pos_ids.numel() == 0;
@@ -39,9 +39,9 @@ if (p > 0) {
   t_grad_dp_out = t_grad_emb_out;
 }
 
-DECL_VLA_PTR_PT(long, in_ids, [S1][S2], t_in_ids);
-DECL_VLA_PTR_PT(long, pos_ids, [S1][S2], t_pos_ids);
-DECL_VLA_PTR_PT(long, tt_ids, [S1][S2], t_tt_ids);
+DECL_VLA_PTR_PT(int64_t, in_ids, [S1][S2], t_in_ids);
+DECL_VLA_PTR_PT(int64_t, pos_ids, [S1][S2], t_pos_ids);
+DECL_VLA_PTR_PT(int64_t, tt_ids, [S1][S2], t_tt_ids);
 DECL_VLA_PTR_PT(T, grad_in_emb, [S1][N][S2][H], t_grad_in_emb);
 DECL_VLA_PTR_PT(T, gamma, [H], t_gamma);
 DECL_VLA_PTR_PT(T, grad_gamma, [H], t_grad_gamma);
@@ -121,7 +121,7 @@ auto set_zero_tpp = SCOPEIT(SetZeroTPP<float>(N * H), EW_ZERO);
   for (int b = 0; b < B; b++) {
     for (int s1 = 0; s1 < S1; s1++) {
       for (int s2 = 0; s2 < S2; s2++) {
-        long w_id = -1, pos_id = s1 * S2 + s2, tt_id = 0;
+        int64_t w_id = -1, pos_id = s1 * S2 + s2, tt_id = 0;
         if (in_emb_null)
           w_id = in_ids[b][s1][s2];
         if (!pos_ids_null)

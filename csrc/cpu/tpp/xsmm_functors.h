@@ -1895,7 +1895,7 @@ class BrgemmTPP {
       Tin* A,
       Tin* B,
       Tout* C,
-      unsigned long long count,
+      uint64_t count,
       bool no_tile_cfg = false) {
     libxsmm_gemm_param gemm_param;
     memset(&gemm_param, 0, sizeof(libxsmm_gemm_param));
@@ -1909,12 +1909,7 @@ class BrgemmTPP {
       k_gemm_no_tc(&gemm_param);
     }
   }
-  void ref(
-      Tin* A,
-      Tin* B,
-      Tout* C,
-      unsigned long long count,
-      bool no_tile_cfg = false) {
+  void ref(Tin* A, Tin* B, Tout* C, uint64_t count, bool no_tile_cfg = false) {
     auto dtype = XsmmDtype<Tin>();
     for (uint64_t c = 0; c < count; c++) {
       auto A_ = &A[c * str_a];
@@ -4465,7 +4460,7 @@ class SplitSGDTPP : public BaseTPP {
     arg_array[3].primary = (void*)grad;
     eqn_param.inputs = arg_array;
     eqn_param.output.primary = (void*)lo;
-    auto offset = (long long)((char*)hi - (char*)lo);
+    auto offset = (int64_t)((char*)hi - (char*)lo);
     eqn_param.output.secondary = (void*)offset;
 
     kernel(&eqn_param);
@@ -4562,7 +4557,7 @@ class EmbBagFwdTPP {
             (libxsmm_meltw_unary_flags)(sizeof(Tind) == 8 ? LIBXSMM_MELTW_FLAG_UNARY_IDX_SIZE_8BYTES : LIBXSMM_MELTW_FLAG_UNARY_IDX_SIZE_4BYTES),
             LIBXSMM_MELTW_TYPE_UNARY_REDUCE_COLS_IDX_OP_ADD) {}
   void operator()(Tout* output, Tin* weight, Tind* input, int N) {
-    unsigned long long _N = N;
+    uint64_t _N = N;
     kernel((void*)weight, (void*)input, (void*)&_N, (void*)output, NULL);
   }
   void ref(Tout* output, Tin* weight, Tind* input, int N) {
@@ -4916,7 +4911,7 @@ class FusedSplitAdamWTPP {
     arg_array[5].primary = (void*)hi;
     arg_array[6].primary = (void*)&lrwd_1;
     eqn_param.output.primary = (void*)lo;
-    auto offset = (long long)((char*)hi - (char*)lo);
+    auto offset = (int64_t)((char*)hi - (char*)lo);
     eqn_param.output.secondary = (void*)offset;
     eqn2(&eqn_param);
   }

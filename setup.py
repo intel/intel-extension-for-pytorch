@@ -609,7 +609,7 @@ def _gen_build_cfg_from_cmake(
                         cmake_exec,
                         project_root_dir,
                         "-G Visual Studio 17 2022",
-                        "-T Intel C++ Compiler 2023",
+                        "-T Intel C++ Compiler 2024",
                     ]
                     + cmake_args,
                     cwd=build_dir,
