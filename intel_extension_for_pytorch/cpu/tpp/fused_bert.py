@@ -1296,8 +1296,8 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         )
     except BaseException:
         warnings.warn(
-            "Set seed failed for libxsmm which may impact the training loss, you can call " +
-            "torch.manual_seed(N) before invoking fast_bert."
+            "Set seed failed for libxsmm which may impact the training loss, you can call "
+            + "torch.manual_seed(N) before invoking fast_bert."
         )
     # replace the original transfomers module object with tpp module which has the same functionality but with more
     # operator fusion optimization
@@ -1344,8 +1344,8 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     block(new_model)  # get block format weights/bias
     if optimizer is None:
         warnings.warn(
-            "Currently ipex.fast_bert API is well optimized for training tasks. It works for inference tasks, " +
-            "though, please use the ipex.optimize API with TorchScript to achieve the peak performance."
+            "Currently ipex.fast_bert API is well optimized for training tasks. It works for inference tasks, "
+            + "though, please use the ipex.optimize API with TorchScript to achieve the peak performance."
         )
         return new_model
     # replace the original pytorch/transformer optimizer with tpp optimizer for SGD/AdamW
