@@ -221,6 +221,7 @@ There are some model-specific requirements to be aware of, as follows:
 - For ChatGLM models, the default torch_dtype is float16 in config.json. We need to replace the "float16" with "float32" in config.json.
 - For MPT models from the remote hub, we need to modify the config.json to use the modeling_mpt.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/mosaicml_mpt-7b_config.json".
 - For GPT-NEOX (model id "EleutherAI/gpt-neox-20b") quantizations path, do not use "--quant-with-amp" flag due to accuracy loss.
+- For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for FP32/BF16 but needed for quantizations.
 ### Single Instance inference
 
 #### FP32:
@@ -244,7 +245,7 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/
 ```
 
 #### Static quantization (int8):
-By default, for static quantization, we use quantization mixed fp32 (non-quantized OPs run with fp32 dtype) inference, to get peak performance, please add "--quant-with-amp" to enable quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) (while may affect the accuracy).
+We use the SmoothQuant algorithm to get good accuracy of static quantization, which is a popular method for LLM models. Besides, by default, we enable quantization mixed fp32 inference (non-quantized OPs run with fp32 dtype). To get better performance, please add "--quant-with-amp" to enable quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference (non-quantized OPs run with bf16 dtype, which may affect the accuracy).
 - Command:
 ```bash
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-smooth-quant --qconfig-summary-file <path to the qconfig of the model_id> --output-dir "saved_results" 
@@ -254,20 +255,12 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list
 ```bash
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-smooth-quant --qconfig-summary-file <path to "llama-2-7b_qconfig.json"> --output-dir "saved_results"
 ```
+- We provide the downloading links of tuned static quantization qconfig summary files with good quality: ["meta-llama/Llama-2-7b-hf"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/llama-2-7b_qconfig.json), ["meta-llama/Llama-2-7b-chat-hf"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/llama-2-7b-chat_qconfig.json), ["meta-llama/Llama-2-13b-hf"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/llama-2-13b_qconfig.json) and ["EleutherAI/gpt-j-6b"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/gpt-j-6b_qconfig.json). We've verified these qconfig files with the certain codebase of Transformers/PyTorch/IPEX to make sure their ease of use.
 
-- We provide the downloading links of tuned static quantization qconfig summary files with good quality: ["meta-llama/Llama-2-7b-hf"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/llama-2-7b_qconfig.json), ["meta-llama/Llama-2-7b-chat-hf"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/llama-2-7b-chat_qconfig.json), ["meta-llama/Llama-2-13b-hf"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/llama-2-13b_qconfig.json) and ["EleutherAI/gpt-j-6b"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/gpt-j-6b_qconfig.json). We verify these qconfig files with the certain codebase of Transformers/PyTorch/IPEX to make sure their ease of use, while their compatibility may change due to the changes on codebases. If you meet any failure when you adopt these existing qconfig files, please refer to [Intel® Neural Compressor scripts](https://github.com/intel/neural-compressor/tree/master/examples/pytorch/nlp/huggingface_models/language-modeling/quantization/llm/ipex) to generate them based on your environment of codebases.
+- If you meet compatibility issues due to the changes on codebases, or want to generate other models' qconfig recipes, you can refer to [llm-sq-recipes](llm_sq_recipes.md) to use the autotune API by removing "--qconfig-summary-file <path to specific model qconfig>". The [autotune API](../../../../../docs/tutorials/features/sq_recipe_tuning_api.md) allows automatic global alpha tuning, and automatic layer-by-layer alpha tuning provided by Intel® Neural Compressor for the best INT8 accuracy.
 
-- For other models' qconfig recipes, you can just try to run your model_id and use IPEX default recipes by removing "--qconfig-summary-file <path to specific model qconfig>". If IPEX default recipes are not good enough for accuracy requirements, please refer to the [Intel® Neural Compressor tutorial](https://github.com/intel/neural-compressor/blob/master/docs/source/smooth_quant.md#validated-models) and [scripts](https://github.com/intel/neural-compressor/tree/master/examples/pytorch/nlp/huggingface_models/language-modeling/quantization/llm/ipex) for more tuned recipes.
+- If the model you want to try is out of the validated model scope in [llm-sq-recipes](llm_sq_recipes.md), you can just try to run your model_id and use IPEX default recipes by removing "--qconfig-summary-file <path to specific model qconfig>". If IPEX's default recipes are not good enough for accuracy requirements, please refer to the [Intel® Neural Compressor tutorial](https://github.com/intel/neural-compressor/blob/master/docs/source/smooth_quant.md#validated-models) and [scripts](https://github.com/intel/intel-extension-for-transformers/blob/main/examples/huggingface/pytorch/text-generation/quantization/) for more tuned recipes.
 
-#### Smooth Quantization Autotune:
-SmoothQuant is a popular method to improve the accuracy of int8 quantization. The [autotune API](../../../../../docs/tutorials/features/sq_recipe_tuning_api.md) allows automatic global alpha tuning, and automatic layer-by-layer alpha tuning provided by Intel® Neural Compressor for the best INT8 accuracy.
-```bash
-# general command:
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-smooth-quant --alpha auto  --output-dir "saved_results"
-
-# An example of llama2 7b model:
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-smooth-quant --alpha auto
-```
 #### Weight-only quantization:
 By default, for weight-only quantization, we use quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference ("--quant-with-amp") to get peak performance and fair accuracy.
 - Command (Int8):
