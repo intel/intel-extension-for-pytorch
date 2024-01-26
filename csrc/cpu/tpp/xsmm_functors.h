@@ -1787,27 +1787,32 @@ class XformExtTPP {
       PCL_ASSERT(false, "Should not come here\n");
     }
   }
-  void operator()(int count, long str_in, long str_out, T* in, T* out) {
+  void operator()(int count, int64_t str_in, int64_t str_out, T* in, T* out) {
     for (int i = 0; i < count; i++) {
       this->operator()(&in[i * str_in], &out[i * str_out]);
     }
   }
-  void ref(int count, long str_in, long str_out, T* in, T* out) {
+  void ref(int count, int64_t str_in, int64_t str_out, T* in, T* out) {
     for (int i = 0; i < count; i++) {
       this->ref(&in[i * str_in], &out[i * str_out]);
     }
   }
   void operator()(
       int count,
-      long str_in,
-      long str_out,
+      int64_t str_in,
+      int64_t str_out,
       float* in,
       bfloat16* out) {
     for (int i = 0; i < count; i++) {
       this->operator()(&in[i * str_in], &out[i * str_out]);
     }
   }
-  void ref(int count, long str_in, long str_out, float* in, bfloat16* out) {
+  void ref(
+      int count,
+      int64_t str_in,
+      int64_t str_out,
+      float* in,
+      bfloat16* out) {
     for (int i = 0; i < count; i++) {
       this->ref(&in[i * str_in], &out[i * str_out]);
     }
@@ -1836,11 +1841,11 @@ class BrgemmTPP {
  public:
   BrgemmTPP() {}
   BrgemmTPP(
-      long M,
-      long N,
-      long K,
-      long str_a,
-      long str_b,
+      int64_t M,
+      int64_t N,
+      int64_t K,
+      int64_t str_a,
+      int64_t str_b,
       float beta = 1.0,
       int a_trans = 0,
       int unroll_hint = 0)
@@ -1857,14 +1862,14 @@ class BrgemmTPP {
             a_trans,
             unroll_hint) {}
   BrgemmTPP(
-      long M,
-      long N,
-      long K,
-      long str_a,
-      long str_b,
-      long lda,
-      long ldb,
-      long ldc,
+      int64_t M,
+      int64_t N,
+      int64_t K,
+      int64_t str_a,
+      int64_t str_b,
+      int64_t lda,
+      int64_t ldb,
+      int64_t ldc,
       float beta,
       int a_trans,
       int unroll_hint,
@@ -1952,7 +1957,7 @@ class BrgemmTPP {
     }
   }
 
-  long flops() {
+  int64_t flops() {
     return 2L * M * N * K;
   }
 
@@ -1962,7 +1967,7 @@ class BrgemmTPP {
     BrgemmKernel(BrgemmTPP* p, int config) : p(p), config(config) {
       auto dt_in = XsmmDtype<Tin>();
       auto dt_out = XsmmDtype<Tout>();
-      long type = -1;
+      int64_t type = -1;
       if (dt_in == LIBXSMM_DATATYPE_F32) {
         PCL_ASSERT(dt_out == LIBXSMM_DATATYPE_F32, "BRGEMM Assert\n");
         type = 0;
@@ -2071,7 +2076,7 @@ class BrgemmTPP {
     void print_error() override {
       fprintf(
           stderr,
-          "Unable to get JIT kernel for brgemm. Params: M=%d, N=%d, K=%d, str_a=%d, str_b=%d, brgemm_type=%d, beta=%d, a_trans=%d, unroll_hint=%d, lda=%d, ldb=%d, ldc=%d, config=%d, b_vnni=%d",
+          "Unable to get JIT kernel for brgemm. Params: M=%lld, N=%lld, K=%lld, str_a=%lld, str_b=%lld, brgemm_type=%lld, beta=%d, a_trans=%d, unroll_hint=%d, lda=%d, ldb=%d, ldc=%d, config=%d, b_vnni=%d",
           p->M,
           p->N,
           p->K,
@@ -2092,17 +2097,17 @@ class BrgemmTPP {
     BrgemmTPP* p;
     int config;
     libxsmm_xmmfunction kernel;
-    long brgemm_type = -1;
+    int64_t brgemm_type = -1;
   };
 
  private:
-  long M, N, K, str_a, str_b;
+  int64_t M, N, K, str_a, str_b;
   libxsmm_blasint lda;
   libxsmm_blasint ldb;
   libxsmm_blasint ldc;
   float beta;
   int a_trans;
-  long brgemm_type = -1;
+  int64_t brgemm_type = -1;
   int unroll_hint;
   int b_vnni;
   BrgemmKernel k_gemm_with_tc;
@@ -3473,7 +3478,7 @@ class VarSoftMaxBwdTPP {
   VarSoftMaxBwdTPP() {}
   VarSoftMaxBwdTPP(int S2, int S3) : S2(S2), S3(S3), eqn0(S3, 0), eqn1(S3, 1) {}
   void operator()(int S1, T1* gin, T2* gout, T3* out) {
-    long S23 = S2 * S3;
+    int64_t S23 = S2 * S3;
     for (int s2 = 0; s2 < S2; s2++) {
       float tmp = 0.0f;
       libxsmm_matrix_eqn_param eqn_param;
@@ -3482,13 +3487,13 @@ class VarSoftMaxBwdTPP {
       eqn_param.inputs = arg_array;
       eqn_param.output.primary = (void*)&tmp;
       for (int s1 = 0; s1 < S1; s1++) {
-        long ind = s1 * S23 + s2 * S3;
+        int64_t ind = s1 * S23 + s2 * S3;
         arg_array[0].primary = (void*)&gout[ind];
         arg_array[1].primary = (void*)&out[ind];
         eqn0(&eqn_param);
       }
       for (int s1 = 0; s1 < S1; s1++) {
-        long ind = s1 * S23 + s2 * S3;
+        int64_t ind = s1 * S23 + s2 * S3;
         arg_array[0].primary = (void*)&gout[ind];
         arg_array[1].primary = (void*)&out[ind];
         eqn_param.output.primary = (void*)&gin[ind];
@@ -4482,9 +4487,9 @@ class SplitSGDTPP : public BaseTPP {
       out_hi[i] = bf16_hp.i[1];
     }
 #else
-    long sz = N;
+    int64_t sz = N;
     auto vlr = _mm512_set1_ps(lr);
-    long i;
+    int64_t i;
     for (i = 0; i < ALIGNDOWN(sz, 16); i += 16) {
       auto grad_i = _mm512_loadu_ps_auto(&grad[i]);
       auto data_i = _mm512_split_loadu_ps(&hi[i], &lo[i]);
@@ -4561,11 +4566,11 @@ class EmbBagFwdTPP {
     kernel((void*)weight, (void*)input, (void*)&_N, (void*)output, NULL);
   }
   void ref(Tout* output, Tin* weight, Tind* input, int N) {
-    for (long v = 0; v < E; v++)
+    for (int64_t v = 0; v < E; v++)
       output[v] = 0;
-    for (long s = 0; s < N; s++) {
+    for (int64_t s = 0; s < N; s++) {
       auto ind = input[s];
-      for (long v = 0; v < E; v++)
+      for (int64_t v = 0; v < E; v++)
         output[v] += weight[ind * E + v];
     }
   }
@@ -4664,11 +4669,11 @@ class FusedAdamWTPP {
       T* exp_avg_sq,
       float step_size,
       float lr) {
-    long sz = N;
+    int64_t sz = N;
     float beta1_1 = 1.0f - beta1;
     float beta2_1 = 1.0f - beta2;
 #ifndef __AVX512F__
-    for (long i = 0; i < sz; i++) {
+    for (int64_t i = 0; i < sz; i++) {
       auto avg_i = exp_avg[i];
       auto avg_sq_i = exp_avg_sq[i];
       auto grad_i = grad[i];
@@ -4691,7 +4696,7 @@ class FusedAdamWTPP {
     auto veps = _mm512_set1_ps(eps);
     auto vstep_size = _mm512_set1_ps(step_size);
     auto vweight_decay = _mm512_set1_ps(lr * weight_decay);
-    long i;
+    int64_t i;
     for (i = 0; i < ALIGNDOWN(sz, 16); i += 16) {
       auto avg_i = _mm512_loadu_ps(&exp_avg[i]);
       auto avg_sq_i = _mm512_loadu_ps(&exp_avg_sq[i]);
@@ -4924,11 +4929,11 @@ class FusedSplitAdamWTPP {
       T* exp_avg_sq,
       float step_size,
       float lr) {
-    long sz = N;
+    int64_t sz = N;
     float beta1_1 = 1.0f - beta1;
     float beta2_1 = 1.0f - beta2;
 #ifndef __AVX512F__
-    for (long i = 0; i < sz; i++) {
+    for (int64_t i = 0; i < sz; i++) {
       union libxsmm_bfloat16_f32 data_hp;
       float avg_i = exp_avg[i];
       float avg_sq_i = exp_avg_sq[i];
@@ -4957,7 +4962,7 @@ class FusedSplitAdamWTPP {
     auto veps = _mm512_set1_ps(eps);
     auto vstep_size = _mm512_set1_ps(step_size);
     auto vweight_decay = _mm512_set1_ps(lr * weight_decay);
-    long i;
+    int64_t i;
     for (i = 0; i < ALIGNDOWN(sz, 16); i += 16) {
       auto avg_i = _mm512_loadu_ps(&exp_avg[i]);
       auto avg_sq_i = _mm512_loadu_ps(&exp_avg_sq[i]);
@@ -5206,11 +5211,11 @@ class FusedAdamStepTPP {
       float weight_decay = 0.0,
       float exp_avg_scale = 1.0,
       float exp_avg_sq_scale = 1.0) {
-    long sz = N;
+    int64_t sz = N;
     float beta1_1 = 1.0f - beta1;
     float beta2_1 = 1.0f - beta2;
 #ifndef __AVX512F__
-    for (long i = 0; i < sz; i++) {
+    for (int64_t i = 0; i < sz; i++) {
       float avg_i = exp_avg[i];
       float avg_sq_i = exp_avg_sq[i];
       float grad_i = grad[i];
@@ -5240,7 +5245,7 @@ class FusedAdamStepTPP {
     auto vweight_decay = _mm512_set1_ps(weight_decay);
     auto vexp_avg_scale = _mm512_set1_ps(exp_avg_scale);
     auto vexp_avg_sq_scale = _mm512_set1_ps(exp_avg_sq_scale);
-    long i;
+    int64_t i;
     for (i = 0; i < ALIGNDOWN(sz, 16); i += 16) {
       auto avg_i = _mm512_loadu_ps_auto(&exp_avg[i]);
       auto avg_sq_i = _mm512_loadu_ps_auto(&exp_avg_sq[i]);
