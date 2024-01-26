@@ -207,7 +207,7 @@ print_rank0("*** model config:", config)
 if args.benchmark:
     print_mem_usage("pre-from-pretrained")
 
-is_meta_support = model_type not in ["falcon", "auto"]
+is_meta_support = model_type not in ["auto"]
 
 # Construct model with fake meta tensors, later will be replaced during ds-inference ckpt load
 with deepspeed.OnDevice(dtype=load_dtype, device="meta", enabled=is_meta_support):
