@@ -3,7 +3,7 @@ import torchvision.models as models
 
 model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
 model.eval()
-data = torch.rand(1, 3, 224, 224)
+data = torch.rand(128, 3, 224, 224)
 
 # Experimental Feature
 #################### code changes ####################  # noqa F401

@@ -11,7 +11,7 @@ model = BertModel.from_pretrained("bert-base-uncased")
 model.eval()
 
 vocab_size = model.config.vocab_size
-batch_size = 1
+batch_size = 128
 seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 #########################  # noqa F401

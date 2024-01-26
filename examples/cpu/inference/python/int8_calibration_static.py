@@ -8,7 +8,7 @@ from intel_extension_for_pytorch.quantization import prepare, convert
 import torchvision.models as models
 model = models.resnet50(weights='ResNet50_Weights.DEFAULT')
 model.eval()
-data = torch.rand(1, 3, 224, 224)
+data = torch.rand(128, 3, 224, 224)
 #########################  # noqa F401
 
 qconfig_mapping = ipex.quantization.default_static_qconfig_mapping
