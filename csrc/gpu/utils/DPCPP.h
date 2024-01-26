@@ -48,9 +48,6 @@ enum DPCPP_STATUS {
 #define DPCPP_UNLIKELY(expr) (expr)
 #endif
 
-// Kernel function implementation
-#define DPCPP_Q_KFN(...) [=](__VA_ARGS__)
-
 // Command group function implementation
 #define DPCPP_Q_CGF(h) [&](sycl::handler & h)
 
