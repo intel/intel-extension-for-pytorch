@@ -39,10 +39,10 @@ git submodule sync
 git submodule update --init --recursive
 
 # Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch\* prebuilt wheel files
-DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:main .
+DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:2.2.0 .
 
 # Run the container with command below
-docker run --rm -it --privileged ipex-llm:main bash
+docker run --rm -it --privileged ipex-llm:2.2.0 bash
 
 # When the command prompt shows inside the docker container, enter llm examples directory
 cd llm
@@ -62,10 +62,10 @@ git submodule sync
 git submodule update --init --recursive
 
 # Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch\* from source
-DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile --build-arg COMPILE=ON -t ipex-llm:main .
+DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile --build-arg COMPILE=ON -t ipex-llm:2.2.0 .
 
 # Run the container with command below
-docker run --rm -it --privileged ipex-llm:main bash
+docker run --rm -it --privileged ipex-llm:2.2.0 bash
 
 # When the command prompt shows inside the docker container, enter llm examples directory
 cd llm
