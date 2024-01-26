@@ -274,6 +274,18 @@ By default, for weight-only quantization, we use quantization with [Automatic Mi
 ```bash
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list>  python run.py  --benchmark -m <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results" 
 ```
+The command above works for most models we listed. However, to get better accuracy for the following models, some changes to the command are needed.
+| Model ID | Changes to command |
+| - | - |
+| bigcode/starcoder | Add "`--group-size 128`" |
+| Baichuan-inc/Baichuan-13B-Chat | Remove "`--quant-with-amp`" |
+| Baichuan-inc/Baichuan2-13B-Chat | Add "`--group-size 64`" |
+| bigscience/bloom-1b7 | Remove "`--quant-with-amp`"; add "`--group-size 128`" |
+| EleutherAI/gpt-neox-20b | Remove "`--quant-with-amp`" |
+| facebook/opt-30b | Remove "`--quant-with-amp`" |
+| databricks/dolly-v2-12b | Remove "`--quant-with-amp`" |
+
+
 - Command (Int4):
 ```bash
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT4 --gptq --quant-with-amp --output-dir "saved_results" 
