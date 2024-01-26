@@ -11,7 +11,7 @@ from intel_extension_for_pytorch.quantization import prepare, convert
 from collections import namedtuple
 import itertools
 
-# from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
+from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
 from hf_configs.chatglm.modeling_chatglm import ChatGLMForConditionalGeneration
 
 try:
@@ -108,15 +108,13 @@ supported_models = [
         lambda m: m.transformer.h[0].attn.__class__,
         lambda m: m.transformer.h[0].__class__,
     ),
-    # Disable baichuan here because it fails randomly and will block ci.
-    # We will re-enable this case after resolving this random issue.
-    # model_info(
-    #     "baichuan",
-    #     BaichuanForCausalLM,
-    #     False,
-    #     lambda m: m.model.layers[0].self_attn.__class__,
-    #     lambda m: m.model.layers[0].__class__,
-    # ),
+    model_info(
+        "baichuan",
+        BaichuanForCausalLM,
+        False,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
     model_info(
         "chatglm",
         ChatGLMForConditionalGeneration,
@@ -170,6 +168,25 @@ class OptimizeTransformersTester(TestCase):
                 ipex.nn.utils._model_convert.replace_customized_linear_with_linear(
                     model.eval()
                 )
+        elif m.name == "chatglm":
+            state_dict = model.state_dict()
+            for weight in [
+                "transformer.encoder.layers.0.input_layernorm.weight",
+                "transformer.encoder.layers.0.post_attention_layernorm.weight",
+                "transformer.encoder.final_layernorm.weight",
+            ]:
+                state_dict[weight] = torch.rand(state_dict[weight].shape)
+            model.load_state_dict(state_dict)
+        elif m.name == "baichuan":
+            state_dict = model.state_dict()
+            for weight in [
+                "model.layers.0.input_layernorm.weight",
+                "model.layers.0.post_attention_layernorm.weight",
+                "model.norm.weight",
+            ]:
+                state_dict[weight] = torch.rand(state_dict[weight].shape)
+            model.load_state_dict(state_dict)
+        model.eval()
         ref_m = copy.deepcopy(model)
         ipex_m = copy.deepcopy(model)
         ipex_m = ipex.llm.optimize(

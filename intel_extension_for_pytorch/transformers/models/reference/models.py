@@ -554,7 +554,9 @@ def BaichuanModel_forward(
         inverted_mask = inverted_mask.masked_fill(
             inverted_mask.to(torch.bool), torch.finfo(alibi_mask.dtype).min
         )
-        attention_mask = inverted_mask + alibi_mask.unsqueeze(0)
+        attention_mask = torch.tensor(inverted_mask) + torch.tensor(
+            alibi_mask.unsqueeze(0)
+        )
     else:
         attention_mask = alibi_mask
 
