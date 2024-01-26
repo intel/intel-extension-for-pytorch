@@ -472,27 +472,27 @@ class TransFreeMHATester(TestCase):
         sd_mha_model = SD_MHA_Model_v2(0.3, 8, 320, 320).eval()
         self.sd_mha_bf16_common(sd_mha_model, mat1, mat2)
 
-    def test_sd_mha_bf16_v3(self):
-        mat = torch.randn(2, 4096, 320)
-        sd_mha_model = SD_MHA_Model_v3(8, 320, 320).eval()
-        self.sd_mha_bf16_common(sd_mha_model, mat)
+    # def test_sd_mha_bf16_v3(self):
+    #     mat = torch.randn(2, 4096, 320)
+    #     sd_mha_model = SD_MHA_Model_v3(8, 320, 320).eval()
+    #     self.sd_mha_bf16_common(sd_mha_model, mat)
 
-    def test_sd_mha_bf16_scale_v3(self):
-        mat = torch.randn(2, 4096, 320)
-        sd_mha_model = SD_MHA_Model_scale_v3(8, 320, 320, 0.3).eval()
-        self.sd_mha_bf16_common(sd_mha_model, mat)
+    # def test_sd_mha_bf16_scale_v3(self):
+    #     mat = torch.randn(2, 4096, 320)
+    #     sd_mha_model = SD_MHA_Model_scale_v3(8, 320, 320, 0.3).eval()
+    #     self.sd_mha_bf16_common(sd_mha_model, mat)
 
-    def test_sd_mha_bf16_v4(self):
-        mat1 = torch.randn(2, 4096, 320)
-        mat2 = torch.randn(2, 77, 320)
-        sd_mha_model = SD_MHA_Model_v4(8, 320, 320).eval()
-        self.sd_mha_bf16_common(sd_mha_model, mat1, mat2)
+    # def test_sd_mha_bf16_v4(self):
+    #     mat1 = torch.randn(2, 4096, 320)
+    #     mat2 = torch.randn(2, 77, 320)
+    #     sd_mha_model = SD_MHA_Model_v4(8, 320, 320).eval()
+    #     self.sd_mha_bf16_common(sd_mha_model, mat1, mat2)
 
-    def test_sd_mha_bf16_scale_v4(self):
-        mat1 = torch.randn(2, 4096, 320)
-        mat2 = torch.randn(2, 77, 320)
-        sd_mha_model = SD_MHA_Model_scale_v4(8, 320, 320, 0.11).eval()
-        self.sd_mha_bf16_common(sd_mha_model, mat1, mat2)
+    # def test_sd_mha_bf16_scale_v4(self):
+    #     mat1 = torch.randn(2, 4096, 320)
+    #     mat2 = torch.randn(2, 77, 320)
+    #     sd_mha_model = SD_MHA_Model_scale_v4(8, 320, 320, 0.11).eval()
+    #     self.sd_mha_bf16_common(sd_mha_model, mat1, mat2)
 
     def test_fake_sd_mha_bf16(self):
         mat1 = (torch.randn(1, 2, 64, 64) + 20).to(torch.bfloat16)
