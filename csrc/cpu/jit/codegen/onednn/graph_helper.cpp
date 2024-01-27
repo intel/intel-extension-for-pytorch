@@ -407,12 +407,19 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
     auto rounding_type = Operator::Bool(node, 4) ? "ceil" : "floor";
     auto divisor_override = toIValue(node->input(6));
     REQ(divisor_override->isNone());
+    size_t strides_offset = 2;
+    auto strides = toIValue(node->input(strides_offset))->toIntVector();
+    // according to avg_pool2d spec: "Default value is kernel_size". So use
+    // kernel offset to get strides when strides is None
+    if (strides.empty()) {
+      strides_offset = 1;
+    }
     return Operator(node, opkind::AvgPool)
         .setInput(0)
         .setOutput(0)
         .setAttr(dnnl::graph::op::attr::data_format, std::string("NCX"))
         .setAttr(dnnl::graph::op::attr::kernel, Operator::Ints, 1)
-        .setAttr(dnnl::graph::op::attr::strides, Operator::Ints, 2)
+        .setAttr(dnnl::graph::op::attr::strides, Operator::Ints, strides_offset)
         .setAttr(dnnl::graph::op::attr::pads_begin, Operator::Ints, 3)
         .setAttr(dnnl::graph::op::attr::pads_end, Operator::Ints, 3)
         .setAttr(dnnl::graph::op::attr::exclude_pad, !Operator::Bool(node, 5))

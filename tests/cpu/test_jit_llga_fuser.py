@@ -166,6 +166,19 @@ class TestOp(JitLlgaTestCase):
             graph, _ = self.checkTrace(m, [x])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
+            stride = []
+            m = nn.AvgPool2d(
+                kernel_size=kernel,
+                stride=stride,
+                padding=padding,
+                ceil_mode=ceil_mode,
+                count_include_pad=count_include_pad,
+            )
+
+            x = torch.rand(1, 4, spatial, spatial)
+            graph, _ = self.checkTrace(m, [x])
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+
     @llga_fp32_bf16_test_env
     @unittest.skipIf(True, "Enable once size peephole is supported")
     def test_variable_kernel_avg_pool2d(self):
