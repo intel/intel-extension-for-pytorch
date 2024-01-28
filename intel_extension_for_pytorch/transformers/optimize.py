@@ -113,6 +113,7 @@ def model_convert_reference(_model):
     # generation length or model forward order
     from .models.reference.models import (
         GPTJForCausalLM_forward,
+        LlamaModel_forward,
         LlamaForCausalLM_forward,
         GPTNeoXForCausalLM_forward,
         OPTForCausalLM_forward,
@@ -130,6 +131,7 @@ def model_convert_reference(_model):
         T5DenseGatedActDense_forward,
         T5DenseActDense_forward,
         MistralForCausalLM_forward,
+        MistralModel_forward,
         MptForCausalLM_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptbigcode,
@@ -181,6 +183,11 @@ def model_convert_reference(_model):
             _model,
             "forward",
             LlamaForCausalLM_forward,
+        )
+        convert_function(
+            _model.model,
+            "forward",
+            LlamaModel_forward,
         )
     elif (
         hasattr(_model, "__class__")
@@ -404,6 +411,7 @@ def model_convert_reference(_model):
         convert_function(_model.transformer, "get_masks", GLM2_get_masks)
     elif _model.config.architectures[0] == "MistralForCausalLM":
         convert_function(_model, "forward", MistralForCausalLM_forward)
+        convert_function(_model.model, "forward", MistralModel_forward)
         convert_class(
             _model,
             transformers.models.mistral.modeling_mistral.MistralAttention,
@@ -634,6 +642,12 @@ def model_convert_lowering(
                     woq=False,
                 )
 
+        for model_name in ["model", "transformer"]:
+            if hasattr(_model, model_name) and hasattr(
+                getattr(_model, model_name), "_use_sdpa"
+            ):
+                getattr(_model, model_name)._use_sdpa = False
+
         for supported_mlp_class in [_IPEXDecoderLayerRef]:
             lowering_class_cpu(
                 _model,
@@ -774,7 +788,7 @@ def optimize(
     try:
         installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
         min_version = "4.28.1"
-        validated_version = "4.35.2"
+        validated_version = "4.37.0"
         if "transformers" not in installed_pkg:
             raise RuntimeError(
                 "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(

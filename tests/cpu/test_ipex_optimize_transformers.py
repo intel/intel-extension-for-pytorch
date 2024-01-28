@@ -19,7 +19,7 @@ try:
     from transformers import AutoConfig
 except ImportError:
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.35.2"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.37.0"]
     )
     import transformers
     from transformers import AutoConfig
@@ -210,12 +210,15 @@ class OptimizeTransformersTester(TestCase):
             enabled=True if dtype is torch.bfloat16 else False
         ):
             key_ipex = ipex_m(**input_dict)
+        error_message = f"model={m.name}, deployment_mode={deployment_mode}, torchcompile={torchcompile}, return_dict={return_dict}"
         if return_dict:
             assert isinstance(key_ipex, dict)
-            self.assertEqual(key_hf["logits"], key_ipex["logits"], prec=0.1)
+            self.assertEqual(
+                key_hf["logits"], key_ipex["logits"], prec=0.1, message=error_message
+            )
         else:
             assert isinstance(key_ipex, tuple)
-            self.assertEqual(key_hf[0], key_ipex[0], prec=0.1)
+            self.assertEqual(key_hf[0], key_ipex[0], prec=0.1, message=error_message)
 
     def test_model_replacement(self):
         dtypes = [torch.bfloat16]

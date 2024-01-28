@@ -12,7 +12,7 @@ except ImportError:
     import subprocess
 
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.35.2"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.37.0"]
     )
     import transformers
 from common_utils import TestCase

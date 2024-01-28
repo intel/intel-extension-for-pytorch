@@ -38,4 +38,4 @@ torchaudio:
 torchvision:
   version: 0.18.0.dev20240117+cpu
 transformers:
-  version: 4.35.2
+  version: 4.37.0
