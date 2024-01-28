@@ -20,7 +20,6 @@
   $ cd intel-extension-for-pytorch
   $ git submodule sync
   $ git submodule update --init --recursive
-  $ cd ..
   $ DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile.compile -t intel-extension-for-pytorch:main .
   ```
 

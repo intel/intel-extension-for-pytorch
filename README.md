@@ -1,7 +1,7 @@
 <div align="center">
   
-Intel® Extension for Pytorch*
-===========================
+Intel® Extension for PyTorch\*
+==============================
 
 </div>
 
@@ -9,11 +9,9 @@ Intel® Extension for Pytorch*
 **GPU** [💻main branch](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[🌱Quick Start](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/getting_started.html)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[📖Documentations](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[🏃Installation](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&version=v2.1.10%2Bxpu)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[💻LLM Example](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main/examples/gpu/inference/python/llm)<br>  
 
 
-
 Intel® Extension for PyTorch\* extends PyTorch\* with up-to-date features optimizations for an extra performance boost on Intel hardware. Optimizations take advantage of Intel® Advanced Vector Extensions 512 (Intel® AVX-512) Vector Neural Network Instructions (VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel X<sup>e</sup> Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, Intel® Extension for PyTorch\* provides easy GPU acceleration for Intel discrete GPUs through the PyTorch\* xpu device.
 
-
-
+Intel® Extension for PyTorch\* provides optimizations both for eager and graph modes. However,  compared to the eager mode, the graph mode in PyTorch\* normally yields better performance from the optimization techniques like operation fusion. Intel® Extension for PyTorch\* amplifies them with more comprehensive graph optimizations. Both PyTorch `Torchscript` and `TorchDynamo` graph modes are supported. With `Torchscript`, we recommend using `torch.jit.trace()` as your preferred option, as it generally supports a wider range of workloads compared to `torch.jit.script()`.
 
 ## ipex.llm - Large Language Models (LLMs) Optimization
 
