@@ -146,15 +146,11 @@ class CPUPoolList:
             """
             if lscpu_txt.strip() == "":
                 args = ["lscpu", "--all", "--extended"]
-                env_lang = os.getenv("LANG", "UNSET")
-                os.environ["LANG"] = "C"
+                my_env = os.environ.copy()
+                my_env["LC_ALL"] = "C"
                 lscpu_info = subprocess.check_output(
-                    args, env=os.environ, universal_newlines=True
+                    args, env=my_env, universal_newlines=True
                 )
-                if env_lang == "UNSET":
-                    del os.environ["LANG"]
-                else:
-                    os.environ["LANG"] = env_lang
             else:
                 lscpu_info = lscpu_txt
 

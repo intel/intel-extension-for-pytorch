@@ -55,8 +55,10 @@ SystemEnv = namedtuple(
 
 def run(command):
     """Returns (return-code, stdout, stderr)"""
+    my_env = os.environ.copy()
+    my_env["LC_ALL"] = "C"
     p = subprocess.Popen(
-        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
+        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env, shell=True
     )
     raw_output, raw_err = p.communicate()
     rc = p.returncode
