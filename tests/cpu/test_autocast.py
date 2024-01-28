@@ -291,12 +291,12 @@ class TestPyTorchOps(TestCase):
             out2 = torch.bernoulli(input_bf16, 0.5)
         self.assertEqual(out1.dtype, torch.bfloat16)
         self.assertEqual(out2.dtype, torch.bfloat16)
-        # Does not support fp16 yet
+
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.float16):
             out1 = torch.bernoulli(input_fp16)
             out2 = torch.bernoulli(input_fp16, 0.5)
-        self.assertEqual(out1.dtype, torch.float32)
-        self.assertEqual(out2.dtype, torch.float32)
+        self.assertEqual(out1.dtype, torch.float16)
+        self.assertEqual(out2.dtype, torch.float16)
 
 
 class TestCustomerOps(TestCase):
@@ -1103,17 +1103,6 @@ class TestAutocastOperations(TestCase):
                 add_kwargs=maybe_kwargs,
             )
 
-    def test_autocast_nn_fallthrough_bf16(self):
-        for op_with_args in self.autocast_lists.nn_fallthrough_bf16:
-            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
-            self._run_autocast_outofplace(
-                op,
-                args,
-                torch.bfloat16,
-                module=torch._C._nn,
-                add_kwargs=maybe_kwargs,
-            )
-
     def test_autocast_torch_fallthrough_fp16(self):
         for op_with_args in self.autocast_lists.torch_fallthrough_fp16:
             op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
@@ -1122,6 +1111,17 @@ class TestAutocastOperations(TestCase):
                 args,
                 torch.float16,
                 autocast_type=torch.float16,
+                add_kwargs=maybe_kwargs,
+            )
+
+    def test_autocast_nn_fallthrough_bf16(self):
+        for op_with_args in self.autocast_lists.nn_fallthrough_bf16:
+            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
+            self._run_autocast_outofplace(
+                op,
+                args,
+                torch.bfloat16,
+                module=torch._C._nn,
                 add_kwargs=maybe_kwargs,
             )
 

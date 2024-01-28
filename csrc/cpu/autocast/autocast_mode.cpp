@@ -111,25 +111,7 @@ struct CPU_WrapFunction_<
 
 IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
   // low precision policy for bf16 and fp32 cast policy for fp16
-  MAKE_REGISTER_FUNC_TWO_POLICIES(conv1d, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(conv2d, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(conv3d, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(bmm, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(mm, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(baddbmm, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(addmm, user_defined_dtype, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(_addmm_activation, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(addbmm, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(linear, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(
-      _convolution, deprecated, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(matmul, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(conv_tbc, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(conv_transpose1d, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(
-      conv_transpose2d, input, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(
-      conv_transpose3d, input, user_defined_dtype, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
       _native_multi_head_attention, user_defined_dtype, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
@@ -143,29 +125,10 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
   MAKE_REGISTER_FUNC_TWO_POLICIES(_adaptive_avg_pool3d, fp32, fp32)
 
   // fallthrough and fp32 cast policies
-  MAKE_REGISTER_FUNC_TWO_POLICIES(batch_norm, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(avg_pool1d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(avg_pool2d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(max_pool1d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(max_pool2d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(max_pool3d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(layer_norm, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(bernoulli, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(bernoulli, p, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(dropout, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(topk, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(cumsum, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(cumsum, dimname, fallthrough, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
       scaled_dot_product_attention, fallthrough, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
       _scaled_dot_product_attention_math, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(addcdiv, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(addcmul, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(softmax, int, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(softmax, Dimname, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(log_softmax, int, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(log_softmax, Dimname, fallthrough, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_linear1d, fallthrough, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_bilinear2d, fallthrough, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(_upsample_bilinear2d_aa, fallthrough, fp32)
@@ -195,10 +158,6 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
   MAKE_REGISTER_FUNC2_TWO_POLICIES(upsample_nearest3d, vec, fallthrough, fp32)
   MAKE_REGISTER_FUNC2_TWO_POLICIES(
       _upsample_nearest_exact3d, vec, fallthrough, fp32)
-
-  MAKE_REGISTER_FUNC_TWO_POLICIES(adaptive_avg_pool1d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(adaptive_avg_pool2d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(_adaptive_avg_pool2d, fallthrough, fp32)
 
   // promote cast policies
   MAKE_REGISTER_FUNC_TWO_POLICIES(cat, promote, promote)

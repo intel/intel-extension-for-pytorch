@@ -341,7 +341,7 @@ class TestPrepackCases(TestCase):
                 self.assertTrue(ipex_model2.conv.weight.dtype == dtype)
 
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
-                # original fp32 path
+                # original path
                 y1 = origin_model1(x1)
                 # ipex path with inplace=False
                 y2 = ipex_model1(x2)
