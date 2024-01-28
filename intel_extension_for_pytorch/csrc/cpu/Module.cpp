@@ -91,6 +91,9 @@ void InitIpexModuleBindings(py::module m) {
   m.def("onednn_has_fp16_support", []() {
     return torch_ipex::utils::onednn_has_fp16_type_support();
   });
+  m.def("onednn_has_fp8_support", []() {
+    return torch_ipex::utils::onednn_has_fp8_type_support();
+  });
 
   m.def("set_fp32_math_mode", [](FP32MathMode mode) {
     torch_ipex::setFP32MathModeCpu(mode);

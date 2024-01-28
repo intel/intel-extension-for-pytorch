@@ -1,0 +1,4 @@
+from intel_extension_for_pytorch.quantization.fp8.fp8 import fp8_autocast
+from intel_extension_for_pytorch.quantization.fp8.recipe import DelayedScaling, Format
+from intel_extension_for_pytorch.quantization.fp8.util import prepare_fp8
+from intel_extension_for_pytorch.quantization.fp8.linear import FP8Linear
