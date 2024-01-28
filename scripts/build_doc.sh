@@ -187,15 +187,17 @@ if [[ ${DEVICE} == "cpu" ]]; then
     parse_example "../examples/cpu/inference/python/bert_torchscript_mode_inference_bf16.py" ${MDEXAMPLE} "(marker_inf_bert_ts_bf16)" "python"
     parse_example "../examples/cpu/inference/python/resnet50_torchdynamo_mode_inference_bf16.py" ${MDEXAMPLE} "(marker_inf_rn50_dynamo_bf16)" "python"
     parse_example "../examples/cpu/inference/python/bert_torchdynamo_mode_inference_bf16.py" ${MDEXAMPLE} "(marker_inf_bert_dynamo_bf16)" "python"
-    parse_example "../examples/cpu/inference/python/bert_fast_inference_bf16.py" ${MDEXAMPLE} "(marker_inf_bert_fast_bf16)" "python"
+    parse_example "../examples/cpu/features/fast_bert/fast_bert_inference_bf16.py" ${MDEXAMPLE} "(marker_feature_fastbert_bf16)" "python"
     parse_example "../examples/cpu/inference/python/int8_calibration_static.py" ${MDEXAMPLE} "(marker_int8_static)" "python"
     parse_example "../examples/cpu/inference/python/int8_calibration_dynamic.py" ${MDEXAMPLE} "(marker_int8_dynamic)" "python"
     parse_example "../examples/cpu/inference/python/int8_deployment.py" ${MDEXAMPLE} "(marker_int8_deploy)" "python"
     parse_example "../examples/cpu/inference/cpp/example-app.cpp" ${MDEXAMPLE} "(marker_cppsdk_sample)" "cpp"
     parse_example "../examples/cpu/inference/cpp/CMakeLists.txt" ${MDEXAMPLE} "(marker_cppsdk_cmake)" "cmake"
+	VER_TRANS=$(python ../tools/yaml_utils.py -f ../dependency_version.yml -d transformers -k version)
+	sed -i "s/<VER_TRANSFORMERS>/${VER_TRANS}/g" ${MDEXAMPLE}
 
     cp tutorials/features/fast_bert.md tutorials/features/fast_bert.md.bk
-    parse_example "../examples/cpu/inference/python/bert_fast_inference_bf16.py" tutorials/features/fast_bert.md "(marker_inf_bert_fast_bf16)" "python"
+    parse_example "../examples/cpu/features/fast_bert/fast_bert_inference_bf16.py" tutorials/features/fast_bert.md "(marker_feature_fastbert_bf16)" "python"
     cp tutorials/features/graph_optimization.md tutorials/features/graph_optimization.md.bk
     parse_example "../examples/cpu/features/graph_optimization/fp32_bf16.py" tutorials/features/graph_optimization.md "(marker_feature_graph_optimization_fp32_bf16)" "python"
     parse_example "../examples/cpu/features/graph_optimization/int8.py" tutorials/features/graph_optimization.md "(marker_feature_graph_optimization_int8)" "python"

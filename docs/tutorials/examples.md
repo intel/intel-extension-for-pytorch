@@ -18,7 +18,6 @@ The source code for these examples, as well as the feature examples, can be foun
 **Prerequisites**:
 Before running these examples, please note the following:
 
-- To run the examples, install the `torchvision` and `transformers` Python packages.
 - Examples using the BFloat16 data type require machines with the  Intel® Advanced Vector Extensions 512 (Intel® AVX-512) BF16 and Intel® Advanced Matrix Extensions (Intel® AMX) BF16 instruction sets.
 
 
@@ -59,10 +58,14 @@ Below you can find complete code examples demonstrating how to use the extension
 
 ##### Float32
 
+**Note:** You need to install `torchvision` Python package to run the following example.
+
 [//]: # (marker_train_single_fp32_complete)
 [//]: # (marker_train_single_fp32_complete)
 
 ##### BFloat16
+
+**Note:** You need to install `torchvision` Python package to run the following example.
 
 [//]: # (marker_train_single_bf16_complete)
 [//]: # (marker_train_single_bf16_complete)
@@ -70,6 +73,8 @@ Below you can find complete code examples demonstrating how to use the extension
 #### Distributed Training
 
 Distributed training with PyTorch DDP is accelerated by oneAPI Collective Communications Library Bindings for Pytorch\* (oneCCL Bindings for Pytorch\*). The extension supports FP32 and BF16 data types. More detailed information and examples are available at the [Github repo](https://github.com/intel/torch-ccl).
+
+**Note:** You need to install `torchvision` Python package to run the following example.
 
 [//]: # (marker_train_ddp_complete)
 ```python
@@ -141,10 +146,14 @@ The `optimize` function of Intel® Extension for PyTorch\* applies optimizations
 
 ###### Resnet50
 
+**Note:** You need to install `torchvision` Python package to run the following example.
+
 [//]: # (marker_inf_rn50_imp_fp32)
 [//]: # (marker_inf_rn50_imp_fp32)
 
 ###### BERT
+
+**Note:** You need to install `transformers` Python package to run the following example.
 
 [//]: # (marker_inf_bert_imp_fp32)
 [//]: # (marker_inf_bert_imp_fp32)
@@ -155,10 +164,14 @@ We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://py
 
 ###### Resnet50
 
+**Note:** You need to install `torchvision` Python package to run the following example.
+
 [//]: # (marker_inf_rn50_ts_fp32)
 [//]: # (marker_inf_rn50_ts_fp32)
 
 ###### BERT
+
+**Note:** You need to install `transformers` Python package to run the following example.
 
 [//]: # (marker_inf_bert_ts_fp32)
 [//]: # (marker_inf_bert_ts_fp32)
@@ -167,10 +180,14 @@ We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://py
 
 ###### Resnet50
 
+**Note:** You need to install `torchvision` Python package to run the following example.
+
 [//]: # (marker_inf_rn50_dynamo_fp32)
 [//]: # (marker_inf_rn50_dynamo_fp32)
 
 ###### BERT
+
+**Note:** You need to install `transformers` Python package to run the following example.
 
 [//]: # (marker_inf_bert_dynamo_fp32)
 [//]: # (marker_inf_bert_dynamo_fp32)
@@ -186,10 +203,14 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.
 
 ###### Resnet50
 
+**Note:** You need to install `torchvision` Python package to run the following example.
+
 [//]: # (marker_inf_rn50_imp_bf16)
 [//]: # (marker_inf_rn50_imp_bf16)
 
 ###### BERT
+
+**Note:** You need to install `transformers` Python package to run the following example.
 
 [//]: # (marker_inf_bert_imp_bf16)
 [//]: # (marker_inf_bert_imp_bf16)
@@ -200,10 +221,14 @@ We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://py
 
 ###### Resnet50
 
+**Note:** You need to install `torchvision` Python package to run the following example.
+
 [//]: # (marker_inf_rn50_ts_bf16)
 [//]: # (marker_inf_rn50_ts_bf16)
 
 ###### BERT
+
+**Note:** You need to install `transformers` Python package to run the following example.
 
 [//]: # (marker_inf_bert_ts_bf16)
 [//]: # (marker_inf_bert_ts_bf16)
@@ -212,18 +237,24 @@ We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://py
 
 ###### Resnet50
 
+**Note:** You need to install `torchvision` Python package to run the following example.
+
 [//]: # (marker_inf_rn50_dynamo_bf16)
 [//]: # (marker_inf_rn50_dynamo_bf16)
 
 ###### BERT
+
+**Note:** You need to install `transformers` Python package to run the following example.
 
 [//]: # (marker_inf_bert_dynamo_bf16)
 [//]: # (marker_inf_bert_dynamo_bf16)
 
 #### Fast Bert (*Experimental*)
 
-[//]: # (marker_inf_bert_fast_bf16)
-[//]: # (marker_inf_bert_fast_bf16)
+**Note:** You need to install `transformers` Python package to run the following example.
+
+[//]: # (marker_feature_fastbert_bf16)
+[//]: # (marker_feature_fastbert_bf16)
 
 #### INT8
 
@@ -243,6 +274,7 @@ Please follow the steps below to perform static calibration:
 6. Invoke `ipex.quantization.convert` function to apply the calibration configure object to the fp32 model object to get an INT8 model.
 7. Save the INT8 model into a `pt` file.
 
+**Note:** You need to install `torchvision` Python package to run the following example.
 
 [//]: # (marker_int8_static)
 [//]: # (marker_int8_static)
@@ -258,6 +290,8 @@ Please follow the steps below to perform static calibration:
 5. Convert the model.
 6. Run inference to perform dynamic quantization.
 7. Save the INT8 model into a `pt` file.
+
+**Note:** You need to install `transformers` Python package to run the following example.
 
 [//]: # (marker_int8_dynamic)
 [//]: # (marker_int8_dynamic)
@@ -276,6 +310,13 @@ Follow the steps below:
 [//]: # (marker_int8_deploy)
 
 oneDNN provides [oneDNN Graph Compiler](https://github.com/oneapi-src/oneDNN/tree/dev-graph-preview4/doc#onednn-graph-compiler) as a prototype feature that could boost performance for selective topologies. No code change is required. Install <a class="reference external" href="installation.md#installation_onednn_graph_compiler">a binary</a> with this feature enabled. We verified this feature with `Bert-large`, `bert-base-cased`, `roberta-base`, `xlm-roberta-base`, `google-electra-base-generator` and `google-electra-base-discriminator`.
+
+### Large Language Model (LLM)
+
+**Note:** You need to install `transformers==<VER_TRANSFORMERS>` Python package to run the following example.
+
+[//]: # (marker_llm_optimize)
+[//]: # (marker_llm_optimize)
 
 ## C++
 
@@ -348,5 +389,5 @@ $ ldd example-app
 
 ## Intel® AI Reference Models
 
-Use cases that have already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/pytorch-r2.1.100-models) (former Model Zoo). A number of PyTorch use cases for benchmarking are also available in the [benchmarks](https://github.com/IntelAI/models/tree/pytorch-r2.1.100-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-the-box by simply running scripts in the Intel® AI Reference Models.
+Use cases that have already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/pytorch-r2.2.0-models) (former Model Zoo). A number of PyTorch use cases for benchmarking are also available in the [benchmarks](https://github.com/IntelAI/models/tree/pytorch-r2.2.0-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-the-box by simply running scripts in the Intel® AI Reference Models.
 

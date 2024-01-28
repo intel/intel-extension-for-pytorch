@@ -15,5 +15,5 @@ The Implementation is integrated into Intel® Extension for PyTorch\*. BERT coul
 
 An API `ipex.fast_bert` is provided for a simple usage. Usage of this API follows the pattern of `ipex.optimize` function. More detailed description of API is available at [Fast BERT API doc](../api_doc)
 
-[//]: # (marker_inf_bert_fast_bf16)
-[//]: # (marker_inf_bert_fast_bf16)
+[//]: # (marker_feature_fastbert_bf16)
+[//]: # (marker_feature_fastbert_bf16)

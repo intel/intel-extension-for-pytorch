@@ -22,7 +22,7 @@ fi
 
 ONECCL_PATH=${BASEFOLDER}/../oneCCL_release
 if [ ! -d ${ONECCL_PATH} ]; then
-    echo "oneCCL is not available."
+    echo "Warning: oneCCL is not available."
 else
     source ${ONECCL_PATH}/env/setvars.sh
 fi
