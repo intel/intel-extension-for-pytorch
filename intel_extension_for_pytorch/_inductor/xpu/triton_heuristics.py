@@ -16,7 +16,7 @@ from torch._inductor.triton_heuristics import AutotuneHint  # noqa
 from torch._inductor.utils import get_num_bytes, create_bandwidth_info_str
 from torch._dynamo.utils import dynamo_timed, get_first_attr
 from torch._dynamo.device_interface import get_interface_for_device
-from torch.utils._triton import has_triton_package
+from torch._inductor.utils import has_triton_package
 
 from .utils import do_bench, has_triton
 
@@ -174,7 +174,6 @@ class XPUCachingAutotuner(CachingAutotuner):
 
         scope["runner"] = get_first_attr(binary, "run", "c_wrapper")
         scope["function"] = get_first_attr(binary, "function", "cu_function")
-        cluster_dims = get_first_attr(binary, "cluster_dims", "clusterDims")
         scope["cta_args"] = (
             (binary.num_ctas, *get_first_attr(binary, "cluster_dims", "clusterDims"))
             if hasattr(binary, "num_ctas")
@@ -201,8 +200,9 @@ class XPUCachingAutotuner(CachingAutotuner):
                 else:
                     grid_0, grid_1, grid_2 = grid
 
-               runner(grid_0, grid_1, grid_2, bin.num_warps,
-                            *cta_args, bin.shared,
+
+                runner(grid_0, grid_1, grid_2, num_warps,
+                            *cta_args, shared,
                             stream, function, None, None, None,
                             {', '.join(call_args)})
                 return bin
@@ -258,16 +258,16 @@ class XPUDebugAutotuner(XPUCachingAutotuner):
         super().__init__(*args, **kwargs)
         self.cached = None
 
-    def run(self, *args, grid, stream):
+    def run(self, *args, grid, stream, **kwargs):
         possible_names = _find_names(self)
         kernel_name = f"{max(possible_names, key=lambda x: len(x))}"
         if not re.match(self.regex_filter, kernel_name):
             return
-        super().run(*args, grid=grid, stream=stream)
+        super().run(*args, grid=grid, stream=stream, **kwargs)
         (launcher,) = self.launchers
 
         if self.cached is None:
-            ms = self.bench(launcher, *args, grid=grid)
+            ms = self.bench(launcher, *args, grid=grid, **kwargs)
             num_in_out_ptrs = len(
                 [
                     arg_name
