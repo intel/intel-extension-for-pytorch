@@ -5,3 +5,4 @@ sphinx-markdown-tables
 sphinx_md
 sphinxemoji
 recommonmark
+pyyaml
