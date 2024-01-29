@@ -187,52 +187,57 @@ class MaskedMHATest(TestCase):
                         attention_mask + casual_mask
                     )  # combine the attention mask and causal mask
                     # UT for first token with fp32
-                    naive_output, _, key_cache, value_cache, _ = mha(
-                        input_t, None, None, max_seq_len, attention_mask, None, None
-                    )
-                    (
-                        indirect_access_kv_cache_output,
-                        _,
-                        key_cache_iakv,
-                        value_cache_iakv,
-                        beam_idx,
-                    ) = mha(
-                        input_t,
-                        key_cache_iakv,
-                        value_cache_iakv,
-                        max_seq_len,
-                        attention_mask,
-                        beam_idx,
-                        True,
-                        torch.tensor(offset),
-                    )
-                    # self.assertEqual(naive_output, indirect_access_kv_cache_output)
-                    key_cache = key_cache.repeat_interleave(beam_size, dim=0)
-                    value_cache = value_cache.repeat_interleave(beam_size, dim=0)
-                    for i in range(batch_size):
-                        self.assertEqual(
-                            key_cache.transpose(0, 1)[:, i * beam_size, :, :],
-                            key_cache_iakv[0:first_seq_len, i * beam_size, :, :],
+                    with torch.inference_mode(), torch.no_grad():
+                        naive_output, _, key_cache, value_cache, _ = mha(
+                            input_t, None, None, max_seq_len, attention_mask, None, None
                         )
-                        self.assertEqual(
-                            value_cache.transpose(0, 1)[:, i * beam_size, :, :],
-                            value_cache_iakv[0:first_seq_len, i * beam_size, :, :],
+                        (
+                            indirect_access_kv_cache_output,
+                            _,
+                            key_cache_iakv,
+                            value_cache_iakv,
+                            beam_idx,
+                        ) = mha(
+                            input_t,
+                            key_cache_iakv,
+                            value_cache_iakv,
+                            max_seq_len,
+                            attention_mask,
+                            beam_idx,
+                            True,
+                            torch.tensor(offset),
                         )
-                    if beam_size == 4:
-                        beam_idx_t = torch.zeros(
-                            beam_size * batch_size, dtype=torch.int64
-                        )
-                        for i in range(1, batch_size):
-                            beam_idx_t[i * beam_size : i * beam_size + beam_size] = (
-                                beam_idx_t[i * beam_size : i * beam_size + beam_size]
-                                + i * beam_size
+                        # self.assertEqual(naive_output, indirect_access_kv_cache_output)
+                        key_cache = key_cache.repeat_interleave(beam_size, dim=0)
+                        value_cache = value_cache.repeat_interleave(beam_size, dim=0)
+                        for i in range(batch_size):
+                            self.assertEqual(
+                                key_cache.transpose(0, 1)[:, i * beam_size, :, :],
+                                key_cache_iakv[0:first_seq_len, i * beam_size, :, :],
                             )
-                    elif beam_size == 1:
-                        beam_idx_t = torch.arange(batch_size)
-                    beam_idx[offset] = beam_idx_t
-                    # reorder cache for naive impelementation
-                    key_cache = torch.index_select(key_cache, 0, beam_idx_t)
-                    value_cache = torch.index_select(value_cache, 0, beam_idx_t)
+                            self.assertEqual(
+                                value_cache.transpose(0, 1)[:, i * beam_size, :, :],
+                                value_cache_iakv[0:first_seq_len, i * beam_size, :, :],
+                            )
+                        if beam_size == 4:
+                            beam_idx_t = torch.zeros(
+                                beam_size * batch_size, dtype=torch.int64
+                            )
+                            for i in range(1, batch_size):
+                                beam_idx_t[
+                                    i * beam_size : i * beam_size + beam_size
+                                ] = (
+                                    beam_idx_t[
+                                        i * beam_size : i * beam_size + beam_size
+                                    ]
+                                    + i * beam_size
+                                )
+                        elif beam_size == 1:
+                            beam_idx_t = torch.arange(batch_size)
+                        beam_idx[offset] = beam_idx_t
+                        # reorder cache for naive impelementation
+                        key_cache = torch.index_select(key_cache, 0, beam_idx_t)
+                        value_cache = torch.index_select(value_cache, 0, beam_idx_t)
 
                     # # #UT for first token with bf16
                     input_t_bf16 = input_t.bfloat16()
@@ -313,40 +318,41 @@ class MaskedMHATest(TestCase):
                     attention_mask = torch.zeros(
                         beam_size * batch_size, 1, 1, offset + 1, dtype=torch.float32
                     )
-                    naive_output, _, key_cache, value_cache, _ = mha(
-                        input_t,
-                        key_cache,
-                        value_cache,
-                        max_seq_len,
-                        attention_mask,
-                        None,
-                        None,
-                    )
-                    (
-                        indirect_access_kv_cache_output,
-                        _,
-                        key_cache_iakv,
-                        value_cache_iakv,
-                        beam_idx,
-                    ) = mha(
-                        input_t,
-                        key_cache_iakv,
-                        value_cache_iakv,
-                        max_seq_len,
-                        attention_mask,
-                        beam_idx,
-                        True,
-                        torch.tensor(offset),
-                    )
-                    self.assertEqual(naive_output, indirect_access_kv_cache_output)
-                    self.assertEqual(
-                        key_cache.transpose(0, 1)[offset],
-                        key_cache_iakv[offset, :, :, :],
-                    )
-                    self.assertEqual(
-                        value_cache.transpose(0, 1)[offset],
-                        value_cache_iakv[offset, :, :, :],
-                    )
+                    with torch.inference_mode(), torch.no_grad():
+                        naive_output, _, key_cache, value_cache, _ = mha(
+                            input_t,
+                            key_cache,
+                            value_cache,
+                            max_seq_len,
+                            attention_mask,
+                            None,
+                            None,
+                        )
+                        (
+                            indirect_access_kv_cache_output,
+                            _,
+                            key_cache_iakv,
+                            value_cache_iakv,
+                            beam_idx,
+                        ) = mha(
+                            input_t,
+                            key_cache_iakv,
+                            value_cache_iakv,
+                            max_seq_len,
+                            attention_mask,
+                            beam_idx,
+                            True,
+                            torch.tensor(offset),
+                        )
+                        self.assertEqual(naive_output, indirect_access_kv_cache_output)
+                        self.assertEqual(
+                            key_cache.transpose(0, 1)[offset],
+                            key_cache_iakv[offset, :, :, :],
+                        )
+                        self.assertEqual(
+                            value_cache.transpose(0, 1)[offset],
+                            value_cache_iakv[offset, :, :, :],
+                        )
                     # #UT for next token with bf16
                     input_t_bf16 = input_t.bfloat16()
                     attention_mask_bf16 = attention_mask.bfloat16()
@@ -427,40 +433,41 @@ class MaskedMHATest(TestCase):
                     attention_mask = torch.zeros(
                         beam_size * batch_size, 1, 1, offset + 1, dtype=torch.float32
                     )
-                    naive_output, _, key_cache, value_cache, _ = mha(
-                        input_t,
-                        key_cache,
-                        value_cache,
-                        max_seq_len,
-                        attention_mask,
-                        None,
-                        None,
-                    )
-                    (
-                        indirect_access_kv_cache_output,
-                        _,
-                        key_cache_iakv,
-                        value_cache_iakv,
-                        beam_idx,
-                    ) = mha(
-                        input_t,
-                        key_cache_iakv,
-                        value_cache_iakv,
-                        max_seq_len,
-                        attention_mask,
-                        beam_idx,
-                        True,
-                        torch.tensor(offset),
-                    )
-                    self.assertEqual(naive_output, indirect_access_kv_cache_output)
-                    self.assertEqual(
-                        key_cache.transpose(0, 1)[offset],
-                        key_cache_iakv[offset, :, :, :],
-                    )
-                    self.assertEqual(
-                        value_cache.transpose(0, 1)[offset],
-                        value_cache_iakv[offset, :, :, :],
-                    )
+                    with torch.inference_mode(), torch.no_grad():
+                        naive_output, _, key_cache, value_cache, _ = mha(
+                            input_t,
+                            key_cache,
+                            value_cache,
+                            max_seq_len,
+                            attention_mask,
+                            None,
+                            None,
+                        )
+                        (
+                            indirect_access_kv_cache_output,
+                            _,
+                            key_cache_iakv,
+                            value_cache_iakv,
+                            beam_idx,
+                        ) = mha(
+                            input_t,
+                            key_cache_iakv,
+                            value_cache_iakv,
+                            max_seq_len,
+                            attention_mask,
+                            beam_idx,
+                            True,
+                            torch.tensor(offset),
+                        )
+                        self.assertEqual(naive_output, indirect_access_kv_cache_output)
+                        self.assertEqual(
+                            key_cache.transpose(0, 1)[offset],
+                            key_cache_iakv[offset, :, :, :],
+                        )
+                        self.assertEqual(
+                            value_cache.transpose(0, 1)[offset],
+                            value_cache_iakv[offset, :, :, :],
+                        )
                     # #UT for next token with bf16
                     input_t_bf16 = input_t.bfloat16()
                     attention_mask_bf16 = attention_mask.bfloat16()
