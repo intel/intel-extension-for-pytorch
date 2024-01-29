@@ -1,7 +1,5 @@
 import torch
 import unittest
-import sys
-import time
 
 from intel_extension_for_pytorch.quantization.fp8 import (
     fp8_autocast,
@@ -13,10 +11,6 @@ import intel_extension_for_pytorch._C as core
 
 from torch.testing._internal.common_utils import TestCase
 from torch.optim import SGD
-
-
-def get_rand_seed():
-    return int(time.time() * 1000000000)
 
 
 class TestFP8Cases(TestCase):
@@ -41,9 +35,7 @@ class TestFP8Cases(TestCase):
                 z = self.dropout(x)
                 return z
 
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
+        torch.manual_seed(2024)
 
         my_linear = MyModel()
         my_linear.train()
@@ -60,14 +52,14 @@ class TestFP8Cases(TestCase):
             device="cpu",
         ):
             for i in range(10):
-                torch.manual_seed(rand_seed)
+                torch.manual_seed(2024)
                 out = fp8_linear(inp2[i])
                 ipex_optimizer.zero_grad()
                 out.mean().backward()
                 ipex_optimizer.step()
 
         for i in range(10):
-            torch.manual_seed(rand_seed)
+            torch.manual_seed(2024)
             out_nn = my_linear(inp1[i])
             origin_optimizer.zero_grad()
             out_nn.mean().backward()
