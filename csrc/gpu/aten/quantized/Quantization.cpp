@@ -282,41 +282,5 @@ Tensor _empty_per_channel_affine_quantized(
           scales, zero_points, axis, typeMetaToScalarType(options.dtype())));
 }
 
-Tensor quantize_per_tensor(
-    const Tensor& self,
-    double scale,
-    int64_t zero_point,
-    ScalarType dtype) {
-  if (self.is_quantized()) {
-    return self;
-  }
-  auto quantizer = dpcpp_make_per_tensor_affine_quantizer(scale, 0, dtype);
-  return quantizer->quantize(self);
-}
-
-Tensor quantize_per_tensor(
-    const Tensor& self,
-    const Tensor& scale,
-    const Tensor& zero_point,
-    ScalarType dtype) {
-  if (self.is_quantized()) {
-    return self;
-  }
-  auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
-      scale.item().toDouble(), zero_point.item().toLong(), dtype);
-  return quantizer->quantize(self);
-}
-
-Tensor quantize_per_channel(
-    const Tensor& self,
-    const Tensor& scales,
-    const Tensor& zero_points,
-    int64_t axis,
-    ScalarType dtype) {
-  auto quantizer =
-      dpcpp_make_per_channel_affine_quantizer(scales, zero_points, axis, dtype);
-  return quantizer->quantize(self);
-}
-
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at
