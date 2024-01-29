@@ -5,7 +5,7 @@ Fast BERT (Experimental)
 
 Intel proposed a technique to speed up BERT workloads. Implementation leverages the idea from [*Tensor Processing Primitives: A Programming Abstraction for Efficiency and Portability in Deep Learning & HPC Workloads*](https://arxiv.org/pdf/2104.05755.pdf).
 
-The Implementation is integrated into Intel® Extension for PyTorch\*. BERT could benefit from this new technique, for both training and inference.
+Currently `ipex.fast_bert` API is only well optimized for training. For inference, it ensures functionality, while to get peak perf, please use `ipex.optimize` API + torchscript.
 
 ### Prerequisite
 

@@ -222,6 +222,8 @@ Fast BERT Optimization (Experimental, *NEW feature from 2.0.0*)
 
 Intel proposed a technique to speed up BERT workloads. Implementation is integrated into Intel® Extension for PyTorch\*. An API `ipex.fast_bert()` is provided for a simple usage.
 
+Currently `ipex.fast_bert` API is well optimized for training tasks. It works for inference tasks, though, please use the `ipex.optimize` API with graph mode to achieve the peak performance.
+
 For more detailed information, check `Fast BERT <features/fast_bert.md>`_.
 
 .. toctree::

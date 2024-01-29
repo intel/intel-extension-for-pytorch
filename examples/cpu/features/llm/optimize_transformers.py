@@ -54,7 +54,7 @@ model = model.to(memory_format=torch.channels_last)
 
 # Intel(R) Extension for PyTorch*
 #################### code changes ####################  # noqa F401
-model = ipex.optimize_transformers(
+model = ipex.llm.optimize(
     model,
     dtype=amp_dtype,
     inplace=True,

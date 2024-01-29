@@ -1,7 +1,6 @@
-# Text Generation
+# LLM Optimizations Overview
 
-We provide the inference benchmarking scripts for large language models text generation.<br/>
-Support large language model families, including GPT-J, LLaMA, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode, T5, Mistral, MPT.<br/>
+We have achieved various optimizations for Large Language Models (LLMs) in IPEX, and provided the inference benchmarking scripts for LLM performance and accuracy tests.<br/>
 The scripts include both single instance and distributed (DeepSpeed) use cases.<br/>
 The scripts cover model generation inference with low precions cases for different models with best perf and accuracy (bf16 AMP，static quantization and weight only quantization).<br/>
 
@@ -24,7 +23,6 @@ The scripts cover model generation inference with low precions cases for differe
 |MPT|"mosaicml/mpt-7b"| ✅ | ✅ |  ✅ | ✅ |
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM model families, we are working in progress to cover those optimizations, which will expand the model list above.
-
 
 # Environment Setup
 
