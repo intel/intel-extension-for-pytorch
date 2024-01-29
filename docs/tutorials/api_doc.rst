@@ -5,11 +5,13 @@ General
 *******
 
 `ipex.optimize` is generally used for generic PyTorch models.
+
 .. automodule:: intel_extension_for_pytorch
 .. autofunction:: optimize
 
 
 `ipex.llm.optimize` is used for Large Language Models (LLM).
+
 .. automodule:: intel_extension_for_pytorch.llm
 .. autofunction:: optimize
 
