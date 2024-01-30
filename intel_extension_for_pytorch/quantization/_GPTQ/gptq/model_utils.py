@@ -113,14 +113,9 @@ def find_layers(
     module, layers=(nn.Conv2d, nn.Conv1d, nn.Linear, transformers.Conv1D), name=""
 ):
     """Get all layers with target types."""
-    if type(module) in layers:
-        return {name: module}
-    else:
-        # use string type to find name:
-        if type(module).__name__ in ["Linear"]:
+    for layer in layers:
+        if isinstance(module, layer):
             return {name: module}
-        else:
-            pass
     res = {}
     for name1, child in module.named_children():
         res.update(
@@ -135,8 +130,9 @@ def find_layers_name(
     module, layers=(nn.Conv2d, nn.Conv1d, nn.Linear, transformers.Conv1D), name=""
 ):
     """Get all layers with target types."""
-    if type(module) in layers:
-        return [name]
+    for layer in layers:
+        if isinstance(module, layer):
+            return [name]
     res = []
     for name1, child in module.named_children():
         res += find_layers_name(
