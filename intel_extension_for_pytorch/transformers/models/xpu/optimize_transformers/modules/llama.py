@@ -1,4 +1,5 @@
 import torch
+import intel_extension_for_pytorch as ipex
 from typing import Optional, Tuple
 from .transformer_modules.RoPE import LlamaRotaryEmbedding
 from .transformer_modules.Norm import LlamaRMSNorm
@@ -252,7 +253,7 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
             hidden_states = hidden_states.view(bs, 1, seq, hidden_size).expand(
                 [bs, beam, seq, hidden_size]
             )
-        else:
+        elif ipex._C._has_2d_block_array(0) or (beam > 1 and not first_token):
             # for 2nd to last token, we convert the layout back
             # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
             hidden_states = hidden_states.transpose(0, 1)
