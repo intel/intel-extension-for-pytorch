@@ -64,5 +64,8 @@ class XPUInterface(DeviceInterface):
         return torch.xpu.is_available()
 
     @staticmethod
-    def get_compute_capability(device: _device_t = None) -> Dict:
-        return torch.xpu.get_device_capability(device)
+    def get_compute_capability(device: _device_t = None) -> int:
+        # TODO :Return 0x80860001 for ATSM
+        # Currently return 0x80860002 for PVC
+        return 0x80860002
+        # return torch.xpu.get_device_capability(device)
