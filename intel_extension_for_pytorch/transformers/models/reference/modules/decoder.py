@@ -10,6 +10,8 @@ from ...reference.fusions.linear_fusion import (
     _IPEXlinearMulRef,
     _IPEXlinearSiluMulRef,
 )
+from torch.nn import functional as F
+import warnings
 
 
 def LlamaDecoderLayer_forward(
@@ -690,6 +692,153 @@ def MistralDecoderLayer_forward(
     return outputs
 
 
+def MixtralDecoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: Optional[bool] = False,
+    output_router_logits: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+    **kwargs,
+) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    if "padding_mask" in kwargs:
+        warnings.warn(
+            "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
+        )
+    """
+    Args:
+        hidden_states (`torch.FloatTensor`): input to the layer of shape `(batch, seq_len, embed_dim)`
+        attention_mask (`torch.FloatTensor`, *optional*): attention mask of size
+            `(batch, sequence_length)` where padding elements are indicated by 0.
+        past_key_value (`Tuple(torch.FloatTensor)`, *optional*): cached past key and value projection states
+        output_attentions (`bool`, *optional*):
+            Whether or not to return the attentions tensors of all attention layers. See `attentions` under
+            returned tensors for more detail.
+        output_router_logits (`bool`, *optional*):
+            Whether or not to return the logits of all the routers. They are useful for computing the router loss, and
+            should not be returned during inference.
+        use_cache (`bool`, *optional*):
+            If set to `True`, `past_key_values` key value states are returned and can be used to speed up decoding
+            (see `past_key_values`).
+    """
+
+    residual = hidden_states
+
+    hidden_states = self.input_layernorm(hidden_states)
+
+    # Self Attention
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        position_ids=position_ids,
+        past_key_value=past_key_value,
+        output_attentions=output_attentions,
+        use_cache=use_cache,
+    )
+    if not self.distributed:
+        hidden_states = self.mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.self_attn.o_proj(hidden_states)
+        hidden_states = residual + hidden_states
+
+    # Fully Connected
+    residual = hidden_states
+    hidden_states = self.post_attention_layernorm(hidden_states)
+
+    # hidden_states, router_logits = self.block_sparse_moe(hidden_states)
+
+    batch_size, sequence_length, hidden_dim = hidden_states.shape
+    hidden_states = hidden_states.view(-1, hidden_dim)
+    # router_logits: (batch * sequence_length, n_experts)
+    router_logits = self.block_sparse_moe.gate(hidden_states)
+
+    routing_weights = F.softmax(router_logits, dim=1, dtype=torch.float)
+    routing_weights, selected_experts = torch.topk(
+        routing_weights, self.block_sparse_moe.top_k, dim=-1
+    )
+    routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
+    # we cast back to the input dtype
+    routing_weights = routing_weights.to(hidden_states.dtype)
+
+    final_hidden_states = torch.zeros(
+        (batch_size * sequence_length, hidden_dim),
+        dtype=hidden_states.dtype,
+        device=hidden_states.device,
+    )
+
+    # One hot encode the selected experts to create an expert mask
+    # this will be used to easily index which expert is going to be sollicitated
+    expert_mask = torch.nn.functional.one_hot(
+        selected_experts, num_classes=self.block_sparse_moe.num_experts
+    ).permute(2, 1, 0)
+
+    # Loop over all available experts in the model and perform the computation on each expert
+    for expert_idx in range(self.block_sparse_moe.num_experts):
+        expert_layer = self.block_sparse_moe.experts[expert_idx]
+        idx, top_x = torch.where(expert_mask[expert_idx])
+        if expert_layer.w1.weight.dtype in [torch.qint8, torch.int8, torch.uint8]:
+            final_hidden_states = torch.ops.torch_ipex.mixtral_moe_woq(
+                hidden_states,
+                top_x,
+                idx,
+                expert_layer.w1._op_context.get_data_handle(),
+                expert_layer.w3._op_context.get_data_handle(),
+                expert_layer.w2._op_context.get_data_handle(),
+                routing_weights,
+                final_hidden_states,
+            )
+        elif hasattr(expert_layer.w1, "use_dnnl") and expert_layer.w1.use_dnnl:
+            final_hidden_states = torch.ops.torch_ipex.mixtral_moe(
+                hidden_states,
+                top_x,
+                idx,
+                expert_layer.w1._get_forward_weight(),
+                expert_layer.w1.ctx.get_data_handle(),
+                expert_layer.w3._get_forward_weight(),
+                expert_layer.w3.ctx.get_data_handle(),
+                expert_layer.w2._get_forward_weight(),
+                expert_layer.w2.ctx.get_data_handle(),
+                hasattr(expert_layer.w1, "use_dnnl") and expert_layer.w1.use_dnnl,
+                routing_weights,
+                final_hidden_states,
+            )
+        else:
+            final_hidden_states = torch.ops.torch_ipex.mixtral_moe_tpp(
+                hidden_states,
+                top_x,
+                idx,
+                expert_layer.w1.weight,
+                expert_layer.w3.weight,
+                expert_layer.w2.weight,
+                expert_layer.w1.tpp_fallback
+                if hasattr(expert_layer.w1, "tpp_fallback")
+                else True,
+                routing_weights,
+                final_hidden_states,
+            )
+    final_hidden_states = final_hidden_states.reshape(
+        batch_size, sequence_length, hidden_dim
+    )
+    hidden_states, router_logits = final_hidden_states, router_logits
+
+    hidden_states = residual + hidden_states
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (self_attn_weights,)
+
+    if use_cache:
+        outputs += (present_key_value,)
+
+    if output_router_logits:
+        outputs += (router_logits,)
+
+    return outputs
+
+
 def MptBlock_forward(
     self,
     hidden_states: torch.Tensor,
@@ -836,6 +985,10 @@ class _IPEXDecoderLayerRef(nn.Module):
             if not self.distributed:
                 self.linear_add = _IPEXlinearAddRef(module.ffn.down_proj)
                 del self.__dict__["_modules"]["ffn"].down_proj
+        elif self.model_backbone == "MixtralForCausalLM":
+            if not self.distributed:
+                self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
+                del self.__dict__["_modules"]["self_attn"].o_proj
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -858,6 +1011,7 @@ class _IPEXDecoderLayerRef(nn.Module):
         position_bias: Optional[torch.Tensor] = None,
         encoder_decoder_position_bias: Optional[torch.Tensor] = None,
         cross_attn_layer_head_mask: Optional[torch.Tensor] = None,
+        output_router_logits: Optional[bool] = False,
     ):
         if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
             return GPTJBlock_forward(
@@ -975,6 +1129,17 @@ class _IPEXDecoderLayerRef(nn.Module):
                 layer_past,
                 use_cache,
                 output_attentions,
+            )
+        elif self.model_backbone == "MixtralForCausalLM":
+            return MixtralDecoderLayer_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                output_router_logits,
+                use_cache,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

@@ -6,7 +6,6 @@
 namespace torch_ipex {
 namespace cpu {
 
-namespace {
 at::Tensor tpp_linear_nobias_forward_cpu(
     const at::Tensor& t_in,
     const at::Tensor& t_wt,
@@ -67,8 +66,6 @@ at::Tensor tpp_linear_add_add_forward_cpu(
     const at::Tensor& t_bias,
     double scale,
     c10::optional<int64_t> out_features);
-
-} // namespace
 
 using tpp_linear_nobias_impl_fn =
     at::Tensor (*)(const at::Tensor&, const at::Tensor&);

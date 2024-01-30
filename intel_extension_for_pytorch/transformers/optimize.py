@@ -133,6 +133,8 @@ def model_convert_reference(_model):
         MistralForCausalLM_forward,
         MistralModel_forward,
         MptForCausalLM_forward,
+        MixtralForCausalLM_forward,
+        MixtralModel_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptbigcode,
     )
@@ -442,6 +444,23 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+    elif _model.config.architectures[0] == "MixtralForCausalLM":
+        convert_function(_model, "forward", MixtralForCausalLM_forward)
+        convert_function(_model.model, "forward", MixtralModel_forward)
+        convert_class(
+            _model,
+            transformers.models.mixtral.modeling_mixtral.MixtralAttention,
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            transformers.models.mixtral.modeling_mixtral.MixtralDecoderLayer,
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
     return _model
 
 
@@ -631,7 +650,10 @@ def model_convert_lowering(
                 supported_classes.append(
                     transformers.models.mistral.modeling_mistral.MistralRMSNorm
                 )
-
+            if hasattr(transformers.models, "mixtral"):
+                supported_classes.append(
+                    transformers.models.mixtral.modeling_mixtral.MixtralRMSNorm
+                )
             for supported_class in supported_classes:
                 lowering_class_cpu(
                     _model,
@@ -726,7 +748,7 @@ def optimize(
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
     This API focus on transformers models, especially for generation tasks inference.
     Well supported model family:
-    Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode, T5, Mistral, MPT.
+    Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode, T5, Mistral, MPT, Mixtral.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
@@ -830,12 +852,13 @@ def optimize(
             "GPTBigCodeForCausalLM",
             "T5ForConditionalGeneration",
             "MistralForCausalLM",
+            "MixtralForCausalLM",
             "MptForCausalLM",
         ]
         if not well_supported_model:
             warnings.warn(
-                "ipex.llm.optimize supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, Baichuan, ChatGLM, \
-                    GPTBigCode, T5, Mistral, and MPT, fallback to origin model"
+                "ipex.llm.optimize supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, Baichuan, ChatGLM, "
+                + "GPTBigCode, T5, Mistral, Mixtral and MPT, fallback to origin model"
             )
             return model
 

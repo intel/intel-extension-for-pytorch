@@ -149,7 +149,11 @@ class _IPEXRopeRef(nn.Module):
                 x = torch.cat([x_rot, x_pass], dim=-1)
             else:
                 x = self.apply_rotary_pos_emb_gptj(x, sin, cos)
-        elif self.model_backbone in ["LlamaForCausalLM", "MistralForCausalLM"]:
+        elif self.model_backbone in [
+            "LlamaForCausalLM",
+            "MistralForCausalLM",
+            "MixtralForCausalLM",
+        ]:
             x = x.transpose(1, 2)
             x = self.apply_rotary_pos_emb_llama(x, _cos, _sin, position_ids)
         elif self.model_backbone == "BaichuanForCausalLM":
@@ -252,7 +256,11 @@ class _IPEXScaleDotProductRef(nn.Module):
             self.bias = module.bias
             self.scale_attn = module.scale_attn
             self.attn_dropout = module.attn_dropout
-        elif self.model_backbone in ["LlamaForCausalLM", "MistralForCausalLM"]:
+        elif self.model_backbone in [
+            "LlamaForCausalLM",
+            "MistralForCausalLM",
+            "MixtralForCausalLM",
+        ]:
             self.num_key_value_groups = (
                 module.num_key_value_groups
                 if hasattr(module, "num_key_value_groups")
@@ -417,7 +425,11 @@ class _IPEXScaleDotProductRef(nn.Module):
             attn_output, attn_weights = self._attn(
                 query, key, value, attention_mask, head_mask
             )
-        elif self.model_backbone in ["LlamaForCausalLM", "MistralForCausalLM"]:
+        elif self.model_backbone in [
+            "LlamaForCausalLM",
+            "MistralForCausalLM",
+            "MixtralForCausalLM",
+        ]:
             # repeat k/v heads if n_kv_heads < n_heads
             key = self._repeat_kv(key, self.num_key_value_groups)
             value = self._repeat_kv(value, self.num_key_value_groups)

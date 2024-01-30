@@ -28,6 +28,7 @@ MODEL_CLASSES = {
     "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
     "t5": (T5ForConditionalGeneration, AutoTokenizer),
     "mistral": (AutoModelForCausalLM, AutoTokenizer),
+    "mixtral": (AutoModelForCausalLM, AutoTokenizer),
     "mpt": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }

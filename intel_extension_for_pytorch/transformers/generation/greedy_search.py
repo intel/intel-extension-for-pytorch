@@ -165,6 +165,7 @@ def _greedy_search(
             "GPTBigCodeForCausalLM",
             "T5ForConditionalGeneration",
             "MistralForCausalLM",
+            "MixtralForCausalLM",
             "MptForCausalLM",
         ]:
             first_token = False

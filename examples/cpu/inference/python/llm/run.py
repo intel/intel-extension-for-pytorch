@@ -440,6 +440,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "starcoder": ("/starcoder_local_shard"),
                 "t5": ("/t5_local_shard"),
                 "mistral": ("/mistral_local_shard"),
+                "mixtral": ("/mixtral_local_shard"),
                 "mpt": ("/mpt_local_shard"),
                 "dolly": ("/dolly_local_shard"),
             }

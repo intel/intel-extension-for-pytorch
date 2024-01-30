@@ -150,6 +150,13 @@ supported_models = [
         lambda m: m.transformer.blocks[0].attn.__class__,
         lambda m: m.transformer.blocks[0].__class__,
     ),
+    model_info(
+        "mixtral",
+        transformers.models.mixtral.modeling_mixtral.MixtralForCausalLM,
+        True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
 ]
 
 

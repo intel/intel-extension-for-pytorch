@@ -30,6 +30,7 @@ from llm.utils.model_class.chatglm import ChatGLMConfig
 from llm.utils.model_class.gptbigcode import GPTJBigCodeConfig
 from llm.utils.model_class.t5 import T5Config
 from llm.utils.model_class.mistral import MistralConfig
+from llm.utils.model_class.mixtral import MixtralConfig
 from llm.utils.model_class.mpt import MPTConfig
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
@@ -212,6 +213,8 @@ elif re.search("mistral", config.architectures[0], re.IGNORECASE):
     model = MistralConfig(args.model_id)
 elif re.search("mpt", config.architectures[0], re.IGNORECASE):
     model = MPTConfig(args.model_id)
+elif re.search("mixtral", config.architectures[0], re.IGNORECASE):
+    model = MixtralConfig(args.model_id)
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 

@@ -11,6 +11,10 @@
 namespace torch_ipex {
 namespace cpu {
 
+at::Tensor woq_linear_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context);
+
 void linear_kernel_output(
     const at::Tensor& self,
     const ideep::tensor& mkldnn_weight,

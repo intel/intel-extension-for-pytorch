@@ -1085,6 +1085,109 @@ def _MistralAttention_forward(
     return attn_output, attn_weights, past_key_value
 
 
+def _MixtralAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+    **kwargs,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    bsz, q_len, _ = hidden_states.size()
+    concat_qkv = None
+    if hasattr(self, "concat_qkv"):
+        concat_qkv = self.concat_qkv(hidden_states)
+    else:
+        query = self.q_proj(hidden_states)
+        key = self.k_proj(hidden_states)
+        value = self.v_proj(hidden_states)
+
+    kv_seq_len = (
+        q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
+    )
+    if concat_qkv is not None and type(concat_qkv) is not tuple:
+        query, key, value = self._IPEXROPE(
+            concat_qkv,
+            position_ids,
+            self.num_heads,
+            self.head_dim,
+            self.head_dim // 2,
+            self.head_dim,
+            kv_seq_len,
+            self.concat_qkv._num_concats,
+        )
+    else:
+        if concat_qkv is not None:
+            query, key, value = concat_qkv
+        query = query.view(bsz, q_len, self.num_heads, self.head_dim)
+        key = key.view(bsz, q_len, self.num_key_value_heads, self.head_dim)
+        value = value.view(bsz, q_len, self.num_key_value_heads, self.head_dim)
+        key = self._IPEXROPE(
+            key,
+            position_ids,
+            self.num_key_value_heads,
+            self.head_dim,
+            self.head_dim // 2,
+            self.head_dim,
+            kv_seq_len,
+        )
+        query = self._IPEXROPE(
+            query,
+            position_ids,
+            self.num_heads,
+            self.head_dim,
+            self.head_dim // 2,
+            self.head_dim,
+            kv_seq_len,
+        )
+    if use_cache:
+        (attn_output, attn_weights, past_key_value) = self._IPEXScaleDotProduct(
+            query,
+            key,
+            value,
+            math.sqrt(self.head_dim),
+            past_key_value,
+            None,
+            attention_mask,
+        )
+    else:
+        value_states = value.transpose(1, 2)
+        query_states = query.transpose(1, 2)
+        key_states = key.transpose(1, 2)
+        kv_seq_len = key_states.shape[-2]
+
+        past_key_value = None
+        # repeat k/v heads if n_kv_heads < n_heads
+        key_states = _repeat_kv(key_states, self.num_key_value_groups)
+        value_states = _repeat_kv(value_states, self.num_key_value_groups)
+
+        attn_weights = torch.matmul(
+            query_states, key_states.transpose(2, 3)
+        ) / math.sqrt(self.head_dim)
+
+        if attention_mask is not None:
+            attn_weights = torch.tensor(attn_weights) + torch.tensor(attention_mask)
+            attn_weights = torch.max(
+                attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min)
+            )
+
+        # upcast attention to fp32
+        attn_weights = nn.functional.softmax(
+            attn_weights, dim=-1, dtype=torch.float32
+        ).to(query_states.dtype)
+        attn_output = torch.matmul(attn_weights, value_states)
+
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+    # attn_output = self.o_proj(attn_output)
+    if not output_attentions:
+        attn_weights = None
+
+    return attn_output, attn_weights, past_key_value
+
+
 def _MptAttention_forward(
     self,
     hidden_states: torch.Tensor,
@@ -1388,6 +1491,7 @@ class _IPEXAttentionRef(nn.Module):
             self.model_backbone == "GPTJForCausalLM"
             or self.model_backbone == "LlamaForCausalLM"
             or self.model_backbone == "MistralForCausalLM"
+            or self.model_backbone == "MixtralForCausalLM"
         ):
             if (
                 hasattr(module, "q_proj")
@@ -1716,6 +1820,16 @@ class _IPEXAttentionRef(nn.Module):
         elif self.model_backbone == "MptForCausalLM":
             return _MptAttention_forward(
                 self, hidden_states, position_bias, past_key_value, attention_mask
+            )
+        elif self.model_backbone == "MixtralForCausalLM":
+            return _MixtralAttention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
