@@ -24,6 +24,7 @@ void adagrad_fused_step_kernel(
   scalar_t* param_data = param.data_ptr<scalar_t>();
   scalar_t* grad_data = grad.data_ptr<scalar_t>();
   scalar_t* state_sum_data = state_sum.data_ptr<scalar_t>();
+  bool _w_decay = weight_decay == 0.0 ? false : true;
 
   // update learning rate
   double clr = learning_rate / (1 + (step - 1) * lr_decay);
@@ -45,8 +46,9 @@ void adagrad_fused_step_kernel(
         int64_t d = 0;
         for (; d < size - (size % Vec::size()); d += Vec::size()) {
           Vec param_vec = Vec::loadu(param_ptr + d);
-          Vec grad_vec = Vec::loadu(grad_ptr + d) +
-              param_vec * Vec(scalar_t(weight_decay));
+          Vec grad_vec = Vec::loadu(grad_ptr + d);
+          if (_w_decay)
+            grad_vec += param_vec * Vec(scalar_t(weight_decay));
 
           Vec sum_vec = Vec::loadu(state_sum_ptr + d) + grad_vec * grad_vec;
           sum_vec.store(state_sum_ptr + d);
@@ -56,7 +58,9 @@ void adagrad_fused_step_kernel(
           param_vec.store(param_ptr + d);
         }
         for (; d < size; d++) {
-          scalar_t grad_val = grad_ptr[d] + param_ptr[d] * weight_decay;
+          scalar_t grad_val = grad_ptr[d];
+          if (_w_decay)
+            grad_val += param_ptr[d] * weight_decay;
           state_sum_ptr[d] += grad_val * grad_val;
 
           scalar_t std_val = std::sqrt(state_sum_ptr[d]) + eps;
@@ -93,6 +97,7 @@ void adagrad_fused_step_kernel<at::BFloat16, at::BFloat16>(
   at::BFloat16* grad_data = grad.data_ptr<at::BFloat16>();
   float* state_sum_data = state_sum.data_ptr<float>();
   at::BFloat16* param2_data = param2.data_ptr<at::BFloat16>();
+  bool _w_decay = weight_decay == 0.0 ? false : true;
 
   // update learning rate
   double clr = learning_rate / (1 + (step - 1) * lr_decay);
@@ -125,8 +130,10 @@ void adagrad_fused_step_kernel<at::BFloat16, at::BFloat16>(
           fVec grad_fvec, grad_fvec2;
           std::tie(grad_fvec, grad_fvec2) = convert_bfloat16_float(grad_bvec);
 
-          grad_fvec = grad_fvec + param_fvec * fVec(float(weight_decay));
-          grad_fvec2 = grad_fvec2 + param_fvec2 * fVec(float(weight_decay));
+          if (_w_decay) {
+            grad_fvec = grad_fvec + param_fvec * fVec(float(weight_decay));
+            grad_fvec2 = grad_fvec2 + param_fvec2 * fVec(float(weight_decay));
+          }
 
           fVec sum_fvec =
               fVec::loadu(state_sum_ptr + d) + grad_fvec * grad_fvec;
@@ -148,7 +155,9 @@ void adagrad_fused_step_kernel<at::BFloat16, at::BFloat16>(
         for (; d < size; d++) {
           float param_val =
               at::vec::pack_bfloat16_float(param_ptr[d], param2_ptr[d]);
-          float grad_val = float(grad_ptr[d]) + param_val * weight_decay;
+          float grad_val = float(grad_ptr[d]);
+          if (_w_decay)
+            grad_val += param_ptr[d] * weight_decay;
           state_sum_ptr[d] += grad_val * grad_val;
 
           float std_val = std::sqrt(state_sum_ptr[d]) + eps;
@@ -187,6 +196,7 @@ void adagrad_fused_step_kernel<float, at::BFloat16>(
   at::BFloat16* grad_data = grad.data_ptr<at::BFloat16>();
   float* state_sum_data = state_sum.data_ptr<float>();
   at::BFloat16* param2_data = param2.data_ptr<at::BFloat16>();
+  bool _w_decay = weight_decay == 0.0 ? false : true;
 
   // update learning rate
   double clr = learning_rate / (1 + (step - 1) * lr_decay);
@@ -216,8 +226,10 @@ void adagrad_fused_step_kernel<float, at::BFloat16>(
           fVec grad_fvec, grad_fvec2;
           std::tie(grad_fvec, grad_fvec2) = convert_bfloat16_float(grad_bvec);
 
-          grad_fvec = grad_fvec + param_fvec * fVec(float(weight_decay));
-          grad_fvec2 = grad_fvec2 + param_fvec2 * fVec(float(weight_decay));
+          if (_w_decay) {
+            grad_fvec = grad_fvec + param_fvec * fVec(float(weight_decay));
+            grad_fvec2 = grad_fvec2 + param_fvec2 * fVec(float(weight_decay));
+          }
 
           fVec sum_fvec =
               fVec::loadu(state_sum_ptr + d) + grad_fvec * grad_fvec;
@@ -240,7 +252,9 @@ void adagrad_fused_step_kernel<float, at::BFloat16>(
         for (; d < size; d++) {
           float param_val =
               at::vec::pack_bfloat16_float(param_ptr[d], param2_ptr[d]);
-          float grad_val = float(grad_ptr[d]) + param_val * weight_decay;
+          float grad_val = float(grad_ptr[d]);
+          if (_w_decay)
+            grad_val += param_ptr[d] * weight_decay;
           state_sum_ptr[d] += grad_val * grad_val;
 
           float std_val = std::sqrt(state_sum_ptr[d]) + eps;
