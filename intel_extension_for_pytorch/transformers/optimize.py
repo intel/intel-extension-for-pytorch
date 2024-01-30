@@ -844,6 +844,12 @@ def optimize(
         else:
             _model = model
 
+        # profiling mode is disabled in ChatGLM (https://huggingface.co/THUDM/chatglm3-6b/blob/main/modeling_chatglm.py#L33-L34)
+        # Enable profiling mode to apply jit optimizations
+        if model.config.architectures[0] == "ChatGLMModel":
+            torch._C._jit_set_profiling_mode(True)
+            torch._C._jit_set_profiling_executor(True)
+
         is_quantization = False
         is_woq = False
         if quantization_config is not None:

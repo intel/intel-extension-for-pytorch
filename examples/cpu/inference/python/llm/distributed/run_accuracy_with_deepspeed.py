@@ -286,7 +286,7 @@ class HuggingFaceModel(BaseLM):
 
         repo_root = get_repo_root(model_id)
         write_checkpoints_json()
-
+        dist.barrier()
         self.model = deepspeed.init_inference(
             self.model,
             mp_size=tp_number,

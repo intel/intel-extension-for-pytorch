@@ -263,14 +263,11 @@ class HuggingFaceModel(BaseLM):
             past_key_values = self._get_past_key_values(input_bs, example_inputs["encoder_outputs"]["last_hidden_state"])
             if self.num_beams == 1:
                 decoder_input_ids = self.base_model._shift_right(labels['input_ids'])
-                _labels = labels['input_ids']
             else:
                 decoder_input_ids = self.base_model._shift_right(labels['input_ids'].repeat_interleave(self.num_beams, dim=0))
-                _labels = labels['input_ids'].repeat_interleave(self.num_beams, dim=0)
             example_dict = {
                 "decoder_input_ids": decoder_input_ids,
                 "encoder_outputs": (example_inputs["encoder_outputs"]["last_hidden_state"],),
-                "labels": _labels,
             }
         else:
             past_key_values = self._get_past_key_values(input_bs)
@@ -311,8 +308,6 @@ class HuggingFaceModel(BaseLM):
             output = self.model(**example_dict)
 
         if isinstance(output, tuple):
-            if labels is not None:
-                return output[1]
             return output[0]
 
         return output["logits"]

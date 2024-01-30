@@ -701,7 +701,9 @@ def BaichuanModel_forward(
         inverted_mask = inverted_mask.masked_fill(
             inverted_mask.to(torch.bool), torch.finfo(alibi_mask.dtype).min
         )
-        attention_mask = inverted_mask + alibi_mask.unsqueeze(0)
+        attention_mask = torch.tensor(inverted_mask) + torch.tensor(
+            alibi_mask.unsqueeze(0)
+        )
     else:
         attention_mask = alibi_mask
 
@@ -1413,7 +1415,7 @@ def T5ForConditionalGeneration_forward(
         labels = labels.to(lm_logits.device)
         loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
 
-    output = (lm_logits,) + decoder_outputs[1:] + encoder_outputs
+    output = (lm_logits,) + decoder_outputs[1:] + tuple(encoder_outputs)
     return ((loss,) + output) if loss is not None else output
 
 
