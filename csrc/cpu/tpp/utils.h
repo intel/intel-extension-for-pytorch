@@ -5,6 +5,12 @@
 #include <torch/csrc/autograd/VariableTypeUtils.h>
 //#include <torch/extension.h>
 
+#ifdef _WIN32
+#include <intrin.h>
+#include <stdint.h>
+#include <stdexcept>
+#endif
+
 #include <iostream>
 #include <vector>
 #ifdef _OPENMP
@@ -55,6 +61,22 @@ typedef at::Half half;
   type(*name) dims = (type(*) dims)(t.data_ptr<type>())
 #endif
 
+#ifdef _WIN32
+struct drand48_data {
+  uint16_t __x[3] = {0}; /* Current state.  */
+  uint16_t __old_x[3] = {0}; /* Old state.  */
+  uint16_t __c = 0; /* Additive const. in congruential formula.  */
+  uint16_t __init = 0; /* Flag for initializing.  */
+  uint64_t __a = 0; /* Factor in congruential formula.  */
+};
+
+int srand48_r(uint64_t seed_val, struct drand48_data* buffer) {
+  throw std::runtime_error("not implemented.");
+
+  return 0;
+}
+#endif
+
 // defined in init.cpp
 extern double ifreq;
 extern thread_local unsigned int* rng_state;
@@ -64,11 +86,17 @@ void init_libxsmm();
 void xsmm_manual_seed(unsigned int seed);
 
 #ifdef __x86_64__
+#ifdef _WIN32
+inline uint64_t rdtsc() {
+  return __rdtsc();
+}
+#else
 static __inline__ unsigned long long rdtsc(void) {
   unsigned hi, lo;
   __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
   return ((unsigned long long)lo) | (((unsigned long long)hi) << 32);
 }
+#endif
 #elif defined(__aarch64__)
 static __inline__ unsigned long long rdtsc(void) {
   unsigned long long val;
@@ -88,8 +116,8 @@ static __inline__ unsigned long long rdtsc(void) {
 #error "Unsupported architecture for rdtsc"
 #endif
 inline double getFreq() {
-  long long int s = rdtsc();
-  long long int e = rdtsc();
+  uint64_t s = rdtsc();
+  uint64_t e = rdtsc();
   return (e - s) * 1.0;
 }
 

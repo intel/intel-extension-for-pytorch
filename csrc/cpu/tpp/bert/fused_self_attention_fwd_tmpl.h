@@ -301,7 +301,7 @@ if (training) {
     RECORD_SCOPE(ac_gemm, {t_QL, t_KL_TV});
     {
       RECORD_FUNCTION("parallel_for", std::vector<c10::IValue>());
-#ifndef _WIN32 // TODO: Fix crash on ICX Windows.
+#ifndef _WIN32 // TODO: Fix crash on ICX Windows. CMPLRLLVM-55384
 #pragma omp parallel for collapse(2) schedule(static, 1)
 #else
 #pragma omp for

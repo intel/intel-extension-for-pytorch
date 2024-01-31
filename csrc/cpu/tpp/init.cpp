@@ -35,7 +35,12 @@ thread_local struct drand48_data drng_state; // For non AVX512 version
 unsigned int saved_seed = 0;
 void xsmm_manual_seed(unsigned int seed) {
   saved_seed = seed;
+#ifndef _WIN32
 #pragma omp parallel
+#else
+// TODO: Fix crash on ICX Windows. CMPLRLLVM-55384 ?
+//#pragma omp parallel
+#endif
   {
     int tid = omp_get_thread_num();
 #ifdef __x86_64__
