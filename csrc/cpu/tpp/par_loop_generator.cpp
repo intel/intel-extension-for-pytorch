@@ -1,10 +1,13 @@
 #include <ctype.h>
-#include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <functional>
 #include <string>
+
+#ifndef _WIN32
+#include <dlfcn.h>
+#endif
 
 #define MAX_CODE_SIZE 1048576
 //#define STAND_ALONE
