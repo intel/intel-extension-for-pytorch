@@ -274,9 +274,9 @@ The command above works for most models we listed. However, to get better accura
 | Baichuan-inc/Baichuan-13B-Chat | Remove "`--quant-with-amp`" |
 | Baichuan-inc/Baichuan2-13B-Chat | Add "`--group-size 64`" |
 | bigscience/bloom-1b7 | Remove "`--quant-with-amp`"; add "`--group-size 128`" |
-| EleutherAI/gpt-neox-20b | Remove "`--quant-with-amp`" |
+| EleutherAI/gpt-neox-20b | Remove "`--quant-with-amp`"; add "`--group-size 256`" |
 | facebook/opt-30b | Remove "`--quant-with-amp`" |
-| databricks/dolly-v2-12b | Remove "`--quant-with-amp`" |
+| databricks/dolly-v2-12b | Remove "`--quant-with-amp`"; add "`--lowp-mode FP32`" |
 
 
 - Command (Int4):
