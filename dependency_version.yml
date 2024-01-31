@@ -26,7 +26,7 @@ pytorch:
 torch-ccl:
   version: 2.2.0+cpu
   repo: https://github.com/intel/torch-ccl.git
-  commit: ccl_torch_2.2.0_rc1
+  commit: v2.2.0+cpu
 torchaudio:
   version: 2.2.0+cpu
 torchvision:
