@@ -224,6 +224,11 @@ elif re.search("t5", config.architectures[0], re.IGNORECASE):
     generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
     generate_kwargs.pop("max_new_tokens")
     model = T5Config(args.model_id)
+    if int(args.input_tokens) < int(args.calib_len):
+        print("warning: calib_len needs to <= input len. "
+        + f"The current calib_len: {args.calib_len} > input len: {args.input_tokens}."
+        + f"Reset calib_len to {args.input_tokens}.")
+        args.calib_len = args.input_tokens
 elif re.search("mistral", config.architectures[0], re.IGNORECASE):
     model = MistralConfig(args.model_id)
 elif re.search("mpt", config.architectures[0], re.IGNORECASE):
