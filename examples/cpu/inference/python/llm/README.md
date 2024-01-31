@@ -405,7 +405,7 @@ The performance results on AWS instances can be found [here](../../../../../docs
 
 Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 probably results in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a dataset by such algorithms. The low precision checkpoint is saved as a `state_dict` in a `.pt` file and can be loaded later for weight only quantization. We provide an example here to run GPTQ.
 
-*Note:* Currently GPTQ API is verified on the following models: gpt-j, opt, llama, Llama-2, bloom, bloomz, dolly-v1, dolly-v2, gpt-neo, gpt-neox, mpt, falcon. Some of them are not in the list of optimized models. Please use with care.
+*Note:* Currently GPTQ API is verified on the following models: gpt-j, opt, llama, Llama-2, bloom, bloomz, dolly-v1, dolly-v2, gpt-neo, gpt-neox, mpt, falcon, starcoder. Some of them are not in the list of optimized models. Please use with care.
 
 Here is how to use it:
 
