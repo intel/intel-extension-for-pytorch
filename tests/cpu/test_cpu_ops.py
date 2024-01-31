@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import random
 import itertools
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
 from common_utils import TestCase
 import torch.autograd.functional as autogradF
 from copy import deepcopy
@@ -1403,20 +1404,26 @@ class CPUOPsTester(TestCase):
             self.assertTrue(y7.dtype == datatype)
 
     def test_flash_attention(self):
-        for dtype in [torch.float32, torch.double, torch.bfloat16]:
+        dtypes = [torch.float, torch.double, torch.bfloat16]
+        if core.isa_has_amx_fp16_support():
+            dtypes.append(torch.float16)
+        for dtype in dtypes:
             for causal, has_attention_mask in [
                 [False, False],
                 [True, False],
                 [False, True],
             ]:
                 for batch_size, seq_len, n_head, head_dim in itertools.product(
-                    [2, 12], [1, 129, 267, 1030], [1, 3], [8, 16]
+                    [2, 12], [1, 129, 267, 533, 1030], [1, 3, 4], [7, 8, 16]
                 ):
                     atol = 1e-5
                     rtol = 5e-6
                     if dtype is torch.bfloat16:
                         atol = 2e-2
                         rtol = 2e-2
+                    if dtype is torch.float16:
+                        atol = 1e-2
+                        rtol = 1e-2
 
                     n_embd = n_head * head_dim
                     x = torch.randn(
@@ -1430,7 +1437,7 @@ class CPUOPsTester(TestCase):
                     q, k, v = x.split(n_embd, dim=2)
                     q2, k2, v2 = x2.split(n_embd, dim=2)
 
-                    if dtype is torch.bfloat16:
+                    if dtype in [torch.bfloat16, torch.float16]:
                         q2 = q2.float()
                         k2 = k2.float()
                         v2 = v2.float()
@@ -1472,8 +1479,8 @@ class CPUOPsTester(TestCase):
                         )
                     )[0]
 
-                    if dtype is torch.bfloat16:
-                        math_ref = math_ref.bfloat16()
+                    if dtype in [torch.bfloat16, torch.float16]:
+                        math_ref = math_ref.to(dtype)
                     torch.testing.assert_close(actual, math_ref, atol=atol, rtol=rtol)
 
 

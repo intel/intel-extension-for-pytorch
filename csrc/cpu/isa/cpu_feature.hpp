@@ -148,7 +148,7 @@ class CPUFeature {
   bool isa_level_avx2();
   bool isa_level_avx2_vnni();
 
-  bool isa_level_avx512_core();
+  bool isa_level_avx512();
   bool isa_level_avx512_vnni();
   bool isa_level_avx512_bf16();
 

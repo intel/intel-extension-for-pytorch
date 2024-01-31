@@ -1972,12 +1972,15 @@ class BrgemmTPP {
         PCL_ASSERT(dt_out == LIBXSMM_DATATYPE_F32, "BRGEMM Assert\n");
         type = 0;
       } else if (dt_out == LIBXSMM_DATATYPE_F32) {
-        type = 1;
+        if (dt_in == LIBXSMM_DATATYPE_F16) {
+          type = 1;
+        } else if (dt_in == LIBXSMM_DATATYPE_BF16) {
+          type = 2;
+        }
       } else if (dt_in == LIBXSMM_DATATYPE_F16) {
-        PCL_ASSERT(dt_out == LIBXSMM_DATATYPE_F16, "BRGEMM Assert\n");
-        type = 2;
-      } else {
         type = 3;
+      } else {
+        type = 4;
       }
       // if (type != 0)
       //   PCL_ASSERT(

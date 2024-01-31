@@ -340,7 +340,7 @@ bool CPUFeature::isa_level_avx2_vnni() {
   return b_is_support;
 }
 
-bool CPUFeature::isa_level_avx512_core() {
+bool CPUFeature::isa_level_avx512() {
   static bool b_is_support = isa_level_avx2() && os_avx512() &&
       cpuid_avx512_vl() && cpuid_avx512_bw() && cpuid_avx512_dq() &&
       cpuid_avx512_f();
@@ -348,7 +348,7 @@ bool CPUFeature::isa_level_avx512_core() {
 }
 
 bool CPUFeature::isa_level_avx512_vnni() {
-  static bool b_is_support = isa_level_avx512_core() && cpuid_avx512_vnni();
+  static bool b_is_support = isa_level_avx512() && cpuid_avx512_vnni();
   return b_is_support;
 }
 

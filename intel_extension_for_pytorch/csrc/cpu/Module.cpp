@@ -24,6 +24,7 @@
 #include "jit/auto_opt_config.h"
 #include "jit/cpu/tensorexpr/nnc_fuser_register.h"
 #include "utils/fpmath_mode.h"
+#include "utils/isa_utils.h"
 #include "utils/module_version.h"
 #include "utils/onednn_utils.h"
 
@@ -93,6 +94,31 @@ void InitIpexModuleBindings(py::module m) {
   });
   m.def("onednn_has_fp8_support", []() {
     return torch_ipex::utils::onednn_has_fp8_type_support();
+  });
+
+  m.def("isa_has_amx_fp16_support", []() {
+    return torch_ipex::utils::isa_has_amx_fp16_support();
+  });
+  m.def("isa_has_avx512_fp16_support", []() {
+    return torch_ipex::utils::isa_has_avx512_fp16_support();
+  });
+  m.def("isa_has_amx_support", []() {
+    return torch_ipex::utils::isa_has_amx_support();
+  });
+  m.def("isa_has_avx512_bf16_support", []() {
+    return torch_ipex::utils::isa_has_avx512_bf16_support();
+  });
+  m.def("isa_has_avx512_vnni_support", []() {
+    return torch_ipex::utils::isa_has_avx512_vnni_support();
+  });
+  m.def("isa_has_avx512_support", []() {
+    return torch_ipex::utils::isa_has_avx512_support();
+  });
+  m.def("isa_has_avx2_vnni_support", []() {
+    return torch_ipex::utils::isa_has_avx2_vnni_support();
+  });
+  m.def("isa_has_avx2_support", []() {
+    return torch_ipex::utils::isa_has_avx2_support();
   });
 
   m.def("set_fp32_math_mode", [](FP32MathMode mode) {
