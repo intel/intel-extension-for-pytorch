@@ -1,5 +1,6 @@
 #include "LayerNorm.h"
 #include <torch/all.h>
+#include "../cpu/utils/isa_utils.h"
 #include "ideep/IDeepConversions.h"
 #include "utils/library.h"
 
@@ -173,7 +174,10 @@ at::Tensor layer_norm(
       weight_opt.value().scalar_type() == at::kFloat && bias_opt.has_value() &&
       bias_opt.value().defined() &&
       bias_opt.value().scalar_type() == at::kFloat &&
-      !at::GradMode::is_enabled() && input.dim() >= 2 && input.dim() <= 5) {
+      !at::GradMode::is_enabled() && input.dim() >= 2 && input.dim() <= 5 &&
+      (input.scalar_type() != at::kHalf ||
+       (input.scalar_type() == at::kHalf &&
+        utils::isa_has_avx512_fp16_support()))) {
     return layer_norm_forward(
         input, normalized_shape, weight_opt.value(), bias_opt.value(), eps);
   }
@@ -184,20 +188,9 @@ at::Tensor layer_norm(
   c10::MaybeOwned<at::Tensor> bias_maybe_owned =
       at::borrow_from_optional_tensor(bias_opt);
   const at::Tensor& bias = *bias_maybe_owned;
-  // for pytorch layernorm, input, weight and bias need have same dtype,
-  // so for bfloat16 path(autocast), if input is bfloat16, we need convert it to
-  // float.
-  auto input_ = input;
-  if (input.scalar_type() == at::kBFloat16 &&
-      weight.scalar_type() == at::kFloat && bias.scalar_type() == at::kFloat) {
-    input_ = input.to(at::kFloat);
-  }
+
   at::Tensor output = std::get<0>(
-      at::native_layer_norm(input_, normalized_shape, weight, bias, eps));
-  if (input.scalar_type() == at::kBFloat16 &&
-      weight.scalar_type() == at::kFloat && bias.scalar_type() == at::kFloat) {
-    return output.to(at::kBFloat16);
-  }
+      at::native_layer_norm(input, normalized_shape, weight, bias, eps));
   return output;
 }
 

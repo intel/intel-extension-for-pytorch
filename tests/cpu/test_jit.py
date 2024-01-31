@@ -2022,30 +2022,35 @@ class Tester(TestCase):
                 self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
                 self.assertEqual(jit_res, ori_res)
 
-                # input bf16, weight fp32
-                a_bf16 = a.to(torch.bfloat16)
-                b_bf16 = b.to(torch.bfloat16)
-                with torch.cpu.amp.autocast():
-                    ori_res = model(a_bf16, b_bf16)
-                    model_jit = jit_model = torch.jit.trace(model, (a, b))
-                    trace_graph = jit_model.graph_for(a, b)
-                    jit_res = jit_model(a_bf16, b_bf16)
+                # input bf16/fp16, weight fp32
+                for dtype in [torch.bfloat16, torch.float16]:
+                    model = AddLayerNorm(dim)
+                    prec = 5e-2 if dtype == torch.bfloat16 else 5e-3
+                    a_lowp = a.to(dtype)
+                    b_lowp = b.to(dtype)
+                    with torch.cpu.amp.autocast(dtype=dtype):
+                        ori_res = model(a_lowp, b_lowp)
+                        model_jit = jit_model = torch.jit.trace(model, (a, b))
+                        trace_graph = jit_model.graph_for(a, b)
+                        jit_res = jit_model(a_lowp, b_lowp)
+                        node = "ipex::add_layernorm"
+                        self.assertTrue(
+                            any(n.kind() == node for n in trace_graph.nodes())
+                        )
+                        self.assertEqual(jit_res, ori_res, prec=prec)
+
+                    # input weight both bf16/fp16
+                    a_lowp = a.to(dtype)
+                    b_lowp = b.to(dtype)
+                    w_lowp = w.to(dtype)
+                    model = AddLayerNorm_v2(dim)
+                    jit_model = torch.jit.trace(model, (a, b, w))
+                    ori_res = model(a_lowp, b_lowp, w)
+                    trace_graph = jit_model.graph_for(a_lowp, b_lowp, w_lowp)
+                    jit_res = jit_model(a_lowp, b_lowp, w_lowp)
                     node = "ipex::add_layernorm"
                     self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
-                    self.assertEqual(jit_res, ori_res, prec=5e-2)
-
-                # input weight both bf16
-                a_bf16 = a.to(torch.bfloat16)
-                b_bf16 = b.to(torch.bfloat16)
-                w_bf16 = w.to(torch.bfloat16)
-                model = AddLayerNorm_v2(dim)
-                jit_model = torch.jit.trace(model, (a, b, w))
-                ori_res = model(a_bf16, b_bf16, w)
-                trace_graph = jit_model.graph_for(a_bf16, b_bf16, w_bf16)
-                jit_res = jit_model(a_bf16, b_bf16, w_bf16)
-                node = "ipex::add_layernorm"
-                self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
-                self.assertEqual(jit_res, ori_res, prec=5e-2)
+                    self.assertEqual(jit_res, ori_res, prec=prec)
 
                 model = AddLayerNorm_v1(dim)
                 c = torch.randn(bs, seq_len, dim)
