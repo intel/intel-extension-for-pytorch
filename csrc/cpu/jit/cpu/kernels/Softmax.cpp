@@ -11,6 +11,7 @@
 #include <limits>
 
 #include <ideep.hpp>
+#include "utils/onednn_utils.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -48,16 +49,18 @@ at::Tensor dil_softmax(
     const at::IValue& dtype) {
   RECORD_FUNCTION("dil_softmax", c10::ArrayRef<c10::IValue>({}));
 
-  auto half_to_float = false;
-
   if (!dtype.isNone()) {
     auto outtype = dtype.toScalarType();
-    auto intype = input.scalar_type();
-    AT_ASSERTM(
-        intype != at::ScalarType::Half,
-        "softmax with half to float conversion is not supported on Mkldnn");
     at::Tensor converted = input.toType(outtype);
+    if (converted.scalar_type() == at::ScalarType::Half and
+        !torch_ipex::utils::onednn_has_fp16_type_support()) {
+      return at::softmax(converted, dim);
+    }
     return softmax_impl(converted, dim);
+  }
+  if (input.scalar_type() == at::ScalarType::Half and
+      !torch_ipex::utils::onednn_has_fp16_type_support()) {
+    return at::softmax(input, dim);
   }
   return softmax_impl(input, dim);
 }
@@ -69,15 +72,20 @@ at::Tensor& dil_softmax_(
     const at::IValue& dtype) {
   RECORD_FUNCTION("dil_softmax_", c10::ArrayRef<c10::IValue>({}));
 
-  auto half_to_float = false;
   if (!dtype.isNone()) {
     auto outtype = dtype.toScalarType();
-    auto intype = input.scalar_type();
-    AT_ASSERTM(
-        intype != at::ScalarType::Half,
-        "softmax with half to float conversion is not supported on Mkldnn");
     input = input.toType(outtype);
+    if (input.scalar_type() == at::ScalarType::Half and
+        !torch_ipex::utils::onednn_has_fp16_type_support()) {
+      at::softmax_out(input, input, dim);
+      return input;
+    }
     softmax_impl_(input, dim);
+    return input;
+  }
+  if (input.scalar_type() == at::ScalarType::Half and
+      !torch_ipex::utils::onednn_has_fp16_type_support()) {
+    at::softmax_out(input, input, dim);
     return input;
   }
   softmax_impl_(input, dim);

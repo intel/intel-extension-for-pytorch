@@ -12,6 +12,7 @@
 #include <ideep.hpp>
 #include "ideep/IDeepConversions.h"
 #include "mkl.h"
+#include "utils/onednn_utils.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -185,21 +186,27 @@ at::Tensor bmm_impl(
         ? tensor2
         : tensor2.contiguous();
 
-    const ideep::tensor mkldnn_input = itensor_view_from_dense(tensor1_);
-    const ideep::tensor mkldnn_tensor2 = itensor_view_from_dense(tensor2_);
-    ideep::tensor mkldnn_output = itensor_view_from_dense(output);
+    if (tensor1.dtype() == at::kHalf &&
+        !torch_ipex::utils::onednn_has_fp16_type_support()) {
+      at::matmul_out(output, tensor1, tensor2);
+      output.div_(dst_coeff);
+    } else {
+      const ideep::tensor mkldnn_input = itensor_view_from_dense(tensor1_);
+      const ideep::tensor mkldnn_tensor2 = itensor_view_from_dense(tensor2_);
+      ideep::tensor mkldnn_output = itensor_view_from_dense(output);
 
-    ideep::matmul_forward::compute(
-        mkldnn_input,
-        mkldnn_tensor2,
-        mkldnn_output,
-        dst_coeff,
-        1.0,
-        ideep::scale_t(),
-        ideep::scale_t(),
-        ideep::scale_t(),
-        attr,
-        postop_tensors);
+      ideep::matmul_forward::compute(
+          mkldnn_input,
+          mkldnn_tensor2,
+          mkldnn_output,
+          dst_coeff,
+          1.0,
+          ideep::scale_t(),
+          ideep::scale_t(),
+          ideep::scale_t(),
+          attr,
+          postop_tensors);
+    }
   } else {
     auto tensor1_ =
         check_tensor_layout(tensor1) ? tensor1 : tensor1.contiguous();

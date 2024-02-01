@@ -2164,21 +2164,13 @@ class Tester(TestCase):
             prec=3e-2,
             node="ipex::mha_scores_calc",
         ):
-            mat1_bf16 = mat1.to(torch.bfloat16)
-            mat2_bf16 = mat2.to(torch.bfloat16)
-            bias_bf16 = bias.to(torch.bfloat16)
-            res_ref = model(mat1_bf16, mat2_bf16, bias_bf16)
-            res_jit = trace_model(mat1_bf16, mat2_bf16, bias_bf16)
-            self.assertEqual(res_ref, res_jit, prec=prec)
-            _check_match_mha(trace_model, mat1, mat2, bias, node)
-
-            if core.onednn_has_fp16_support():
-                mat1_f16 = mat1.to(torch.float16)
-                mat2_f16 = mat2.to(torch.float16)
-                bias_f16 = bias.to(torch.float16)
-                res_ref = model(mat1_f16.float(), mat2_f16.float(), bias_f16.float())
-                res_jit = trace_model(mat1_f16, mat2_f16, bias_f16)
-                self.assertEqual(res_ref.half(), res_jit, prec=prec)
+            for dtype in [torch.bfloat16, torch.float16]:
+                mat1_lowp = mat1.to(dtype)
+                mat2_lowp = mat2.to(dtype)
+                bias_lowp = bias.to(dtype)
+                res_ref = model(mat1_lowp, mat2_lowp, bias_lowp)
+                res_jit = trace_model(mat1_lowp, mat2_lowp, bias_lowp)
+                self.assertEqual(res_ref, res_jit, prec=prec)
                 _check_match_mha(trace_model, mat1, mat2, bias, node)
 
         # shape case from bert-large
@@ -2347,38 +2339,23 @@ class Tester(TestCase):
             self.assertTrue(any(n.kind() == node for n in graph.nodes()))
 
         def _test_pure_lowp(model, trace_model, mat1, mat2, mask, prec=3e-2):
-            mat1_bf16 = mat1.to(torch.bfloat16)
-            mat2_bf16 = mat2.to(torch.bfloat16)
-            mask_bf16 = mask.to(torch.bfloat16)
-            res_ref = model(mat1_bf16, mat2_bf16, mask_bf16)
-            res_jit = trace_model(mat1_bf16, mat2_bf16, mask_bf16)
-            self.assertEqual(res_ref, res_jit, prec=prec)
-            _check_match_mha(trace_model, mat1, mat2, mask)
-
-            if core.onednn_has_fp16_support():
-                mat1_f16 = mat1.to(torch.float16)
-                mat2_f16 = mat2.to(torch.float16)
-                mask_f16 = mask.to(torch.float16)
-                res_ref = model(mat1_f16.float(), mat2_f16.float(), mask_f16.float())
-                res_jit = trace_model(mat1_f16, mat2_f16, mask_f16)
-                self.assertEqual(res_ref.half(), res_jit, prec=prec)
+            for dtype in [torch.bfloat16, torch.float16]:
+                mat1_lowp = mat1.to(dtype)
+                mat2_lowp = mat2.to(dtype)
+                mask_lowp = mask.to(dtype)
+                res_ref = model(mat1_lowp, mat2_lowp, mask_lowp)
+                res_jit = trace_model(mat1_lowp, mat2_lowp, mask_lowp)
+                self.assertEqual(res_ref, res_jit, prec=prec)
                 _check_match_mha(trace_model, mat1, mat2, mask)
 
         def _test_pure_lowp_parts(model, trace_model, qk, mask, prec=3e-2):
-            qk_bf16 = qk.to(torch.bfloat16)
-            mask_bf16 = mask.to(torch.bfloat16)
-            res_ref = model(qk_bf16, mask_bf16)
-            res_jit = trace_model(qk_bf16, mask_bf16)
-            self.assertEqual(res_ref, res_jit, prec=prec)
-            _check_match_mha_parts(trace_model, qk_bf16, mask)
-
-            if core.onednn_has_fp16_support():
-                qk_f16 = qk.to(torch.float16)
-                mask_f16 = mask.to(torch.float16)
-                res_ref = model(qk_f16.float(), mask_f16.float())
-                res_jit = trace_model(qk_f16, mask_f16)
-                self.assertEqual(res_ref.half(), res_jit, prec=prec)
-                _check_match_mha_parts(trace_model, qk_f16, mask)
+            for dtype in [torch.bfloat16, torch.float16]:
+                qk_lowp = qk.to(dtype)
+                mask_lowp = mask.to(dtype)
+                res_ref = model(qk_lowp, mask_lowp)
+                res_jit = trace_model(qk_lowp, mask_lowp)
+                self.assertEqual(res_ref, res_jit, prec=prec)
+                _check_match_mha_parts(trace_model, qk_lowp, mask)
 
         for sequence_length in [128, 100]:
             mat1 = torch.randn(56, 12, sequence_length, sequence_length)

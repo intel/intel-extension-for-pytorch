@@ -106,7 +106,7 @@ class inplace_softmax_dtype(torch.nn.Module):
 
 class SoftmaxTester(JitTestCase):
     def test_softmax(self):
-        for dtype in ["fp32", "bf16"]:
+        for dtype in [torch.float32, torch.bfloat16, torch.float16]:
             test1 = torch.tensor([[2.0, 2.0], [2.0, 2.0]])
             test2 = torch.tensor([[2.0, 2.0], [2.0, 2.0]])
             test3 = torch.tensor([[1.0, 1.0], [1.0, 1.0]])
@@ -118,16 +118,16 @@ class SoftmaxTester(JitTestCase):
             test9 = test8 - 1
             test10 = torch.tensor([[1.0, 1.0], [1.0, 1.0]])
 
-            if dtype == "bf16":
-                test1 = test1.bfloat16()
-                test2 = test2.bfloat16()
-                test3 = test3.bfloat16()
-                test4 = test4.bfloat16()
-                test5 = test5.bfloat16()
-                test7 = test7.bfloat16()
-                test8 = test8.bfloat16()
-                test9 = test9.bfloat16()
-                test10 = test10.bfloat16()
+            if dtype in [torch.bfloat16, torch.float16]:
+                test1 = test1.to(dtype=dtype)
+                test2 = test2.to(dtype=dtype)
+                test3 = test3.to(dtype=dtype)
+                test4 = test4.to(dtype=dtype)
+                test5 = test5.to(dtype=dtype)
+                test7 = test7.to(dtype=dtype)
+                test8 = test8.to(dtype=dtype)
+                test9 = test9.to(dtype=dtype)
+                test10 = test10.to(dtype=dtype)
 
             model1 = softmax_with_multiuse_input().eval()
             model2 = softmax_with_alias_input().eval()
