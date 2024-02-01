@@ -19,24 +19,30 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 
 ### Optimized Model List
 
-| MODEL FAMILY | Verified <MODEL ID> (Huggingface hub)| FP32/BF16 | Weight only quantzation INT8 | Weight only quantization INT4| Static quantization INT8 |
-|---|:---:|:---:|:---:|:---:|:---:|
-|LLAMA| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" | ✅ | ✅ | ✅ | ✅ | 
-|GPT-J| "EleutherAI/gpt-j-6b" | ✅ | ✅ | ✅ | ✅ | 
-|GPT-NEOX| "EleutherAI/gpt-neox-20b", "databricks/dolly-v2-12b" | ✅ | ✅ | ✅ | ✅ | 
-|FALCON|"tiiuae/falcon-40b" | ✅ | ✅ |  ✅ | ✅ | 
-|OPT|"facebook/opt-30b", "facebook/opt-1.3b"| ✅ | ✅ |  ✅ | ✅ | 
-|Bloom|"bigscience/bloom", "bigscience/bloom-1b7"| ✅ | ✅ |  ✅ | ✅ |
-|CodeGen|"Salesforce/codegen-2B-multi"| ✅ | ✅ |  ✅ | ✅ |
-|Baichuan|"baichuan-inc/Baichuan2-13B-Chat", "baichuan-inc/Baichuan2-7B-Chat", "baichuan-inc/Baichuan-13B-Chat"| ✅ | ✅ |  ✅ | ✅ |
-|ChatGLM|"THUDM/chatglm3-6b", "THUDM/chatglm2-6b"| ✅ | ✅ |  ✅ | ✅ |
-|GPTBigCode|"bigcode/starcoder"| ✅ | ✅ |  ✅ | ✅ |
-|T5|"google/flan-t5-xl"| ✅ | ✅ |  ✅ | ✅ |
-|Mistral|"mistralai/Mistral-7B-v0.1"| ✅ | ✅ |  ✅ | ✅ |
-|MPT|"mosaicml/mpt-7b"| ✅ | ✅ |  ✅ | ✅ |
+| MODEL FAMILY | MODEL NAME (Huggingface hub) | FP32 | BF16 | Static quantization INT8 | Weight only quantization INT8 | Weight only quantization INT4 |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|LLAMA| meta-llama/Llama-2-7b-hf | ✅ | ✅ | ✅ | ✅ | ☑️ | 
+|LLAMA| meta-llama/Llama-2-13b-hf | ✅ | ✅ | ✅ | ✅ | ☑️ | 
+|LLAMA| meta-llama/Llama-2-70b-hf | ✅ | ✅ | ✅ | ✅ | ☑️ | 
+|GPT-J| EleutherAI/gpt-j-6b | ✅ | ✅ | ✅ | ✅ | ✅ | 
+|GPT-NEOX| EleutherAI/gpt-neox-20b | ✅ | ✅ | ☑️ | ✅ | ☑️ | 
+|DOLLY| databricks/dolly-v2-12b | ✅ | ✅ | ☑️ | ☑️ | ☑️ | 
+|FALCON| tiiuae/falcon-40b | ✅ | ✅ | ✅ |  ✅ | ✅ | 
+|OPT| facebook/opt-30b | ✅ | ✅ | ✅ |    | ☑️ | 
+|OPT| facebook/opt-1.3b | ✅ | ✅ | ✅ |  ✅ | ☑️ | 
+|Bloom| bigscience/bloom-1b7 | ✅ | ☑️ | ✅ |    | ☑️ |
+|CodeGen| Salesforce/codegen-2B-multi | ✅ | ✅ | ☑️ |  ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan2-7B-Chat | ✅ | ✅ | ✅ | ✅  |    |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | ✅ | ✅ |    |  ✅ |    |
+|Baichuan| baichuan-inc/Baichuan-13B-Chat | ✅ | ☑️ | ✅ |    |    |
+|ChatGLM| THUDM/chatglm3-6b | ✅ | ✅ | ☑️ |  ✅ |    |
+|ChatGLM| THUDM/chatglm2-6b | ✅ | ☑️ | ☑️ |  ☑️ |    |
+|GPTBigCode| bigcode/starcoder | ✅ | ✅ | ☑️ |  ✅ | ☑️ |
+|T5| google/flan-t5-xl | ✅ | ✅ | ☑️ |  ✅ |    |
+|Mistral| mistralai/Mistral-7B-v0.1 | ✅ | ✅ | ☑️ |  ✅ | ☑️ |
+|MPT| mosaicml/mpt-7b | ✅ | ✅ | ☑️ |  ✅ | ✅ |
 
-*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM model families, we are working in progress to cover those optimizations, which will expand the model list above.
-
+*Note*: All above models have undergone thorough optimization and verification processes for both performance and accuracy. In the context of the optimized model list table above, the symbol ✅ signifies that the model can achieve an accuracy drop of less than 1% when using a specific data type compared to FP32, whereas the accuracy drop may exceed 1% for ☑️ marked ones. We are working in progress to better support the models in the table with various data types. In addition, more models will be optimized, which will expand the table.
 
 ## Support
 

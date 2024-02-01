@@ -3,7 +3,6 @@
 # Setup environment variables for performance on Xeon
 export KMP_BLOCKTIME=1
 export KMP_TPAUSE=0
-export KMP_SETTINGS=1
 export KMP_FORKJOIN_BARRIER_PATTERN=dist,dist
 export KMP_PLAIN_BARRIER_PATTERN=dist,dist
 export KMP_REDUCTION_BARRIER_PATTERN=dist,dist
