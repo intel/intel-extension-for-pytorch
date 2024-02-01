@@ -167,6 +167,7 @@ def _greedy_search(
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "MptForCausalLM",
+            "StableLMEpochForCausalLM",
         ]:
             first_token = False
             input_bs = input_ids.size()[0]

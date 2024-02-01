@@ -135,6 +135,8 @@ def model_convert_reference(_model):
         MptForCausalLM_forward,
         MixtralForCausalLM_forward,
         MixtralModel_forward,
+        StableLMEpochForCausalLM_forward,
+        StableLMEpochModel_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptbigcode,
     )
@@ -461,6 +463,23 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+    elif _model.config.architectures[0] == "StableLMEpochForCausalLM":
+        convert_function(_model, "forward", StableLMEpochForCausalLM_forward)
+        convert_function(_model.model, "forward", StableLMEpochModel_forward)
+        convert_class(
+            _model,
+            type(_model.model.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
     return _model
 
 
@@ -748,7 +767,7 @@ def optimize(
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
     This API focus on transformers models, especially for generation tasks inference.
     Well supported model family:
-    Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode, T5, Mistral, MPT, Mixtral.
+    Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode, T5, Mistral, MPT, Mixtral, StableLM.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
@@ -854,11 +873,12 @@ def optimize(
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "MptForCausalLM",
+            "StableLMEpochForCausalLM",
         ]
         if not well_supported_model:
             warnings.warn(
                 "ipex.llm.optimize supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, Baichuan, ChatGLM, "
-                + "GPTBigCode, T5, Mistral, Mixtral and MPT, fallback to origin model"
+                + "GPTBigCode, T5, Mistral, Mixtral, MPT, and StableLM, fallback to origin model"
             )
             return model
 

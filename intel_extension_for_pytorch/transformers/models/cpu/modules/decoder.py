@@ -31,6 +31,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
             "LlamaForCausalLM",
             "BaichuanForCausalLM",
             "MistralForCausalLM",
+            "StableLMEpochForCausalLM",
         ]:
             if not self.distributed:
                 self.mha_linear_add = _IPEXlinearAddCPU(

@@ -203,6 +203,17 @@ class _IPEXRopeRef(nn.Module):
                 .transpose(1, 2)
             )
             x = torch.cat([x_rot, x_pass], dim=-1)
+        elif self.model_backbone == "StableLMEpochForCausalLM":
+            x = x.transpose(1, 2)
+            x_rot = x[..., :rotary_ndims]
+            x_pass = x[..., rotary_ndims:]
+            x = torch.cat(
+                (
+                    self.apply_rotary_pos_emb_llama(x_rot, _cos, _sin, position_ids),
+                    x_pass,
+                ),
+                dim=-1,
+            )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
         return x
@@ -260,6 +271,7 @@ class _IPEXScaleDotProductRef(nn.Module):
             "LlamaForCausalLM",
             "MistralForCausalLM",
             "MixtralForCausalLM",
+            "StableLMEpochForCausalLM",
         ]:
             self.num_key_value_groups = (
                 module.num_key_value_groups
@@ -429,6 +441,7 @@ class _IPEXScaleDotProductRef(nn.Module):
             "LlamaForCausalLM",
             "MistralForCausalLM",
             "MixtralForCausalLM",
+            "StableLMEpochForCausalLM",
         ]:
             # repeat k/v heads if n_kv_heads < n_heads
             key = self._repeat_kv(key, self.num_key_value_groups)

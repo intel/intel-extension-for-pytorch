@@ -442,6 +442,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "mistral": ("/mistral_local_shard"),
                 "mixtral": ("/mixtral_local_shard"),
                 "mpt": ("/mpt_local_shard"),
+                "stablelm": ("/stablelm_local_shard"),
                 "dolly": ("/dolly_local_shard"),
             }
             model_type = next(

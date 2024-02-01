@@ -13,6 +13,7 @@ import itertools
 
 from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
 from hf_configs.chatglm.modeling_chatglm import ChatGLMForConditionalGeneration
+from hf_configs.stablelm.modeling_stablelm_epoch import StableLMEpochForCausalLM
 
 try:
     import transformers
@@ -153,6 +154,13 @@ supported_models = [
     model_info(
         "mixtral",
         transformers.models.mixtral.modeling_mixtral.MixtralForCausalLM,
+        True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
+    model_info(
+        "stablelm",
+        StableLMEpochForCausalLM,
         True,
         lambda m: m.model.layers[0].self_attn.__class__,
         lambda m: m.model.layers[0].__class__,

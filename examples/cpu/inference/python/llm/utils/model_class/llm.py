@@ -40,14 +40,14 @@ class LLMConfig(ABC):
         if benchmark:
             try:
                 with ipex.OnDevice(dtype=torch.float, device="meta"):
-                    self.model = AutoModelForCausalLM.from_config(config)
+                    self.model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
             except (RuntimeError, AttributeError):
-                self.model = AutoModelForCausalLM.from_config(config)
+                self.model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
         else:
             self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_id, torch_dtype=torch.float, config=config, low_cpu_mem_usage=True
+                self.model_id, torch_dtype=torch.float, config=config, low_cpu_mem_usage=True, trust_remote_code=True
             )
         return self.model
 
     def get_tokenizer(self):
-        return AutoTokenizer.from_pretrained(self.model_id)
+        return AutoTokenizer.from_pretrained(self.model_id, trust_remote_code=True)

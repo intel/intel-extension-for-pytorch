@@ -32,6 +32,7 @@ from llm.utils.model_class.t5 import T5Config
 from llm.utils.model_class.mistral import MistralConfig
 from llm.utils.model_class.mixtral import MixtralConfig
 from llm.utils.model_class.mpt import MPTConfig
+from llm.utils.model_class.stablelm import StableLMConfig
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -215,6 +216,8 @@ elif re.search("mpt", config.architectures[0], re.IGNORECASE):
     model = MPTConfig(args.model_id)
 elif re.search("mixtral", config.architectures[0], re.IGNORECASE):
     model = MixtralConfig(args.model_id)
+elif re.search("stablelm", config.architectures[0], re.IGNORECASE):
+    model = StableLMConfig(args.model_id)
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 

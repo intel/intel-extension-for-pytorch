@@ -186,6 +186,7 @@ def _beam_search(
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "MptForCausalLM",
+            "StableLMEpochForCausalLM",
         ]:
             first_token = False
             has_position_id = "position_ids" in model_inputs
