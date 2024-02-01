@@ -169,6 +169,7 @@ args = parser.parse_args()
 # disable
 try:
     ipex._C.disable_jit_linear_repack()
+    torch._C._jit_set_texpr_fuser_enabled(False)
 except Exception:
     pass
 
@@ -484,14 +485,16 @@ if args.ipex_smooth_quant:
         calib_dataset = load_dataset(
             args.dataset if args.dataset else model.default_dataset, split="train"
         )
+        if args.calib_shuffle:
+            calib_dataset = calib_dataset.shuffle(seed=42)
         user_model.eval()
         calib_evaluator = Evaluator(
             calib_dataset, tokenizer, args, batch_size=args.batch_size, pad_max=int(args.input_tokens) if model.name=="t5" else 512
         )
         calib_dataloader = DataLoader(
             calib_evaluator.dataset,
-            batch_size=args.batch_size,
-            shuffle=args.calib_shuffle,
+            batch_size=1,
+            shuffle=False,
             collate_fn=calib_evaluator.collate_batch,
         )
 
@@ -519,24 +522,6 @@ if args.ipex_smooth_quant:
                 op_type_dict["add"] = {
                     "weight": {"dtype": ["fp32"]},
                     "activation": {"dtype": ["fp32"]},
-                }
-            if re.search("chatglm", config.architectures[0], re.IGNORECASE):
-                op_type_dict = {
-                    "add": {"weight": {"dtype": ["fp32"]}, "activation": {"dtype": ["fp32"]}},
-                    "linear": {
-                        "weight": {
-                            "dtype": ["int8"],
-                            "scheme": ["sym"],
-                            "granularity": ["per_channel"],
-                            "algorithm": ["minmax"],
-                        },
-                        "activation": {
-                            "dtype": ["uint8"],
-                            "scheme": ["asym"],
-                            "granularity": ["per_tensor"],
-                            "algorithm": ["kl"],
-                        },
-                    },
                 }
             
             smoothquant_args = {"alpha": args.alpha if args.alpha == "auto" \
