@@ -319,11 +319,21 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-smooth-quant --qconfig-summary-file <path to "llama-2-7b_qconfig.json"> --output-dir "saved_results"
 ```
 
-- We provide the downloading links of tuned static quantization qconfig summary files with good quality: ["meta-llama/Llama-2-7b-hf"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/llama-2-7b_qconfig.json), ["meta-llama/Llama-2-7b-chat-hf"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/llama-2-7b-chat_qconfig.json), ["meta-llama/Llama-2-13b-hf"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/llama-2-13b_qconfig.json) and ["EleutherAI/gpt-j-6b"](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/gpt-j-6b_qconfig.json). We've verified these qconfig files with the certain codebase of Transformers/PyTorch/IPEX to make sure their ease of use.
+We provide the following qconfig summary files with good quality (calibration on "NeelNanda/pile-10k" dataset and evaluate accuracy on "lambada_openai" dataset):
+| Model ID | Download links |
+|---|:---:|
+| meta-llama/Llama-2-7b-hf | link |
+| meta-llama/Llama-2-13b-hf | link |
+| meta-llama/Llama-2-70b-hf | link |
+| EleutherAI/gpt-j-6b | link |
+| tiiuae/falcon-40b | link |
+| facebook/opt-30b | link |
+| facebook/opt-1.3b | link |
+| baichuan-inc/Baichuan2-7B-Chat | link |
+| baichuan-inc/Baichuan2-13B-Chat | link |
+| THUDM/chatglm2-6b | link |
 
-- If you meet compatibility issues due to the changes on codebases, or want to generate other models' qconfig recipes, you can refer to [llm-sq-recipes](llm_sq_recipes.md) to use the autotune API by removing "--qconfig-summary-file <path to specific model qconfig>". The [autotune API](../../../../../docs/tutorials/features/sq_recipe_tuning_api.md) allows automatic global alpha tuning, and automatic layer-by-layer alpha tuning provided by Intel® Neural Compressor for the best INT8 accuracy.
-
-- If the model you want to try is out of the validated model scope in [llm-sq-recipes](llm_sq_recipes.md), you can just try to run your model_id and use IPEX default recipes by removing "--qconfig-summary-file <path to specific model qconfig>". If IPEX's default recipes are not good enough for accuracy requirements, please refer to the [Intel® Neural Compressor tutorial](https://github.com/intel/neural-compressor/blob/master/docs/source/smooth_quant.md#validated-models) and [scripts](https://github.com/intel/intel-extension-for-transformers/blob/main/examples/huggingface/pytorch/text-generation/quantization/) for more tuned recipes.
+If you would like to generate qconfig summary files (due to changes on model variants or calibration dataset), we provide the [autotune API](../../../../../docs/tutorials/features/sq_recipe_tuning_api.md) and its [tuning examples](llm_sq_recipes.md), which allows an automatic global smoothquant tuning, and automatic layer-by-layer tuning provided by Intel® Neural Compressor for the best accuracy.
 
 #### 4.2.1.4 Weight-only quantization:
 
@@ -365,8 +375,7 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama
 
 (2) The _\<MODEL_ID\>_ (e.g., "meta-llama/Llama-2-13b-hf") specifies the model you will run. we provide some _Verified \<MODEL ID\>_ in the [Optimized Model List](#2-ipexllm-optimized-model-list). You can also try other models from [HuggingFace Models](https://huggingface.co/models).
 
-(3) <a name="generation_sq">for all quantization benchmarks</a>, both quantization and inference stages will be triggered by default. For quantization stage, it will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, and for inference stage, it will launch the inference with the quantized model "best_model.pt".  For inference-only benchmarks (avoid the repeating quantization stage), you can also reuse these quantized models for by adding "--quantized-model-path <output_dir + "best_model.pt">" . Besides, specific for static quantization, if not using "--qconfig-summary-file", a qconfig recipe will also be generated in the "--output-dir" path, which could be reused as well (to generate the quantized model "best_model.pt").
-
+(3) <a name="generation_sq">for all quantization benchmarks</a>, both quantization and inference stages will be triggered by default. For quantization stage, it will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, and for inference stage, it will launch the inference with the quantized model "best_model.pt".  For inference-only benchmarks (avoid the repeating quantization stage), you can also reuse these quantized models for by adding "--quantized-model-path <output_dir + "best_model.pt">" . 
 ### 4.2.2 Run generation in distributed way
 
 #### 4.2.2.1 Prepare:
