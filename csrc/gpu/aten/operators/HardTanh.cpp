@@ -103,8 +103,12 @@ Tensor& hardtanh_backward_out(
                   .add_input(self)
                   .build();
 
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::BFloat16, iter.dtype(), "hardtanh_backward", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      iter.dtype(),
+      "hardtanh_backward",
+      [&]() {
         auto min_ = min_val.to<scalar_t>();
         auto max_ = max_val.to<scalar_t>();
         hardtanh_backward_out_functor<scalar_t> f(min_, max_);
