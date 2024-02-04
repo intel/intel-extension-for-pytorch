@@ -7,8 +7,6 @@ from transformers.modeling_outputs import (
     CausalLMOutputWithCrossAttentions,
     BaseModelOutputWithPastAndCrossAttentions,
     Seq2SeqLMOutput,
-    MoeCausalLMOutputWithPast,
-    MoeModelOutputWithPast,
 )
 
 from transformers.utils import logging
@@ -24,6 +22,10 @@ try:
         from transformers.models.mixtral.modeling_mixtral import (
             load_balancing_loss_func,
         )
+    from transformers.modeling_outputs import (
+        MoeCausalLMOutputWithPast,
+        MoeModelOutputWithPast,
+    )
 except ImportError:
     pass
 logger = logging.get_logger(__name__)
@@ -1763,7 +1765,7 @@ def MixtralForCausalLM_forward(
     output_hidden_states: Optional[bool] = None,
     output_router_logits: Optional[bool] = None,
     return_dict: Optional[bool] = False,
-) -> Union[Tuple, MoeCausalLMOutputWithPast]:
+):
     output_attentions = (
         output_attentions
         if output_attentions is not None
@@ -1844,7 +1846,7 @@ def MixtralModel_forward(
     output_hidden_states: Optional[bool] = None,
     output_router_logits: Optional[bool] = None,
     return_dict: Optional[bool] = None,
-) -> Union[Tuple, MoeModelOutputWithPast]:
+):
     output_attentions = (
         output_attentions
         if output_attentions is not None
