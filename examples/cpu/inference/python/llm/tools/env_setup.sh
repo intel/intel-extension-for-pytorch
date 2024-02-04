@@ -133,12 +133,13 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
             echo "         Found GCC version $(gcc -dumpfullversion)"
             echo "         Installing gcc and g++ 12.3 with conda"
             echo ""
+            conda install -y sysroot_linux-64
             conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
-            conda update -y sysroot_linux-64
-            export CC=${CONDA_PREFIX}/bin/gcc
-            export CXX=${CONDA_PREFIX}/bin/g++
-            export PATH=${CONDA_PREFIX}/bin:${PATH}
-            export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
+            if [ -z ${CONDA_BUILD_SYSROOT} ]; then
+                source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gcc_linux-64.sh
+                source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gxx_linux-64.sh
+                source ${CONDA_PREFIX}/etc/conda/activate.d/activate-binutils_linux-64.sh
+            fi
         fi
 
         set +e

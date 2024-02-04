@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-VER_IPEX=main
+VER_IPEX=v2.2.0+cpu
 
 # Mode: Select which components to install. PyTorch and Intel® Extension for PyTorch* are always installed.
 # High bit: 8 7 6 5 4 3 2 1 :Low bit
@@ -149,9 +149,11 @@ ABI=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")
 if [ ${GCC_CONDA} -eq 1 ]; then
     conda install -y sysroot_linux-64
     conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
-    export CC=${CONDA_PREFIX}/bin/gcc
-    export CXX=${CONDA_PREFIX}/bin/g++
-    export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
+    if [ -z ${CONDA_BUILD_SYSROOT} ]; then
+        source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gcc_linux-64.sh
+        source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gxx_linux-64.sh
+        source ${CONDA_PREFIX}/etc/conda/activate.d/activate-binutils_linux-64.sh
+    fi
 fi
 set +e
 command -v make > /dev/null
