@@ -9,13 +9,15 @@
 #endif
 
 #include <utils/Helpers.h>
+#include <utils/LogImpl.h>
 #include <utils/Macros.h>
 #include <utils/Profiler.h>
 #include <utils/Settings.h>
-#include <utils/Timer.h>
 
 #include <c10/macros/Macros.h>
 #include <c10/util/Exception.h>
+
+#define LOG_LEVEL_DEBUG 1
 
 enum DPCPP_STATUS {
   DPCPP_SUCCESS = 0,
@@ -87,17 +89,18 @@ inline constexpr std::string_view OUT_OF_RESOURCES("PI_ERROR_OUT_OF_RESOURCES");
 #define DPCPP_EXT_SUBMIT(q, str, ker_submit)                                  \
   {                                                                           \
     DPCPP_EXCEP_TRY                                                           \
-    static auto verbose = xpu::dpcpp::Settings::I().get_verbose_level();      \
-    if (verbose) {                                                            \
-      IPEX_TIMER(t, verbose, __func__);                                       \
+    auto log_level = xpu::dpcpp::Settings::I().get_log_level();               \
+    if (log_level >= LOG_LEVEL_DEBUG) {                                       \
+      EventLogger l;                                                          \
+      l.add_event("OPS", "", "", "begin", "event name:{}", __func__);         \
       auto start_evt = xpu::dpcpp::queue_barrier(q);                          \
-      t.now("start barrier");                                                 \
+      l.add_event("OPS", "", "", "start barrier", "");                        \
       auto e = (ker_submit);                                                  \
-      t.now("submit");                                                        \
+      l.add_event("OPS", "", "", "submit", "submit event end");               \
       auto end_evt = xpu::dpcpp::queue_barrier(q);                            \
-      t.now("end barrier");                                                   \
+      l.add_event("OPS", "", "", "end barrier", "");                          \
       e.wait_and_throw();                                                     \
-      t.now("event wait");                                                    \
+      l.add_event("OPS", "", "", "event wait", "event wait end");             \
       xpu::dpcpp::dpcpp_log((str), start_evt, end_evt);                       \
       start_evt.wait_and_throw();                                             \
       end_evt.wait_and_throw();                                               \
@@ -105,7 +108,7 @@ inline constexpr std::string_view OUT_OF_RESOURCES("PI_ERROR_OUT_OF_RESOURCES");
           start_evt.template get_profiling_info<dpcpp_event_profiling_end>(); \
       auto ee_start =                                                         \
           end_evt.template get_profiling_info<dpcpp_event_profiling_start>(); \
-      t.event_duration((ee_start - se_end) / 1000.0);                         \
+      l.print_verbose_ext(1, __func__, ((se_end - ee_start) / 1000.0));       \
     } else if (is_profiler_enabled()) {                                       \
       auto start_evt = xpu::dpcpp::queue_barrier(q);                          \
       auto e = (ker_submit);                                                  \
@@ -123,18 +126,19 @@ inline constexpr std::string_view OUT_OF_RESOURCES("PI_ERROR_OUT_OF_RESOURCES");
 #define DPCPP_Q_SUBMIT(q, cgf, ...)                                            \
   {                                                                            \
     DPCPP_EXCEP_TRY                                                            \
-    static auto verbose = xpu::dpcpp::Settings::I().get_verbose_level();       \
-    if (verbose) {                                                             \
-      IPEX_TIMER(t, verbose, __func__);                                        \
+    auto log_level = xpu::dpcpp::Settings::I().get_log_level();                \
+    if (log_level >= LOG_LEVEL_DEBUG) {                                        \
+      EventLogger l;                                                           \
+      l.add_event("OPS", "", "", "begin", "event name:{}", __func__);          \
       auto e = (q).submit((cgf), ##__VA_ARGS__);                               \
-      t.now("submit");                                                         \
+      l.add_event("OPS", "", "", "submit", "submit event end");                \
       e.wait_and_throw();                                                      \
-      t.now("event wait");                                                     \
+      l.add_event("OPS", "", "", "event wait", "event wait end");              \
       xpu::dpcpp::dpcpp_log("dpcpp_kernel", e);                                \
       auto e_start =                                                           \
           e.template get_profiling_info<dpcpp_event_profiling_start>();        \
       auto e_end = e.template get_profiling_info<dpcpp_event_profiling_end>(); \
-      t.event_duration((e_end - e_start) / 1000.0);                            \
+      l.print_verbose(1, __func__, ((e_end - e_start) / 1000.0));              \
     } else {                                                                   \
       auto e = (q).submit((cgf), ##__VA_ARGS__);                               \
       (q).throw_asynchronous();                                                \

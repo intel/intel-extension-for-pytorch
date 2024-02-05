@@ -160,7 +160,7 @@ class LogLevel(EnumBase):
 
 
 def get_log_level():
-    return LogLevel.get_value(_C.get_log_level)
+    return LogLevel.get_value(_C._get_log_level)
 
 
 def set_log_level(level):
@@ -168,7 +168,7 @@ def set_log_level(level):
 
 
 def get_log_output_file_path():
-    return _C._get_log_output_file_path
+    return _C._get_log_output_file_path()
 
 
 def set_log_output_file_path(path):
@@ -176,7 +176,7 @@ def set_log_output_file_path(path):
 
 
 def get_log_rotate_file_size():
-    return _C._get_log_rotate_file_size
+    return _C._get_log_rotate_file_size()
 
 
 def set_log_rotate_file_size(size):
@@ -185,7 +185,7 @@ def set_log_rotate_file_size(size):
 
 
 def get_log_split_file_size():
-    return _C._get_log_split_file_size
+    return _C._get_log_split_file_size()
 
 
 def set_log_split_file_size(size):
@@ -193,8 +193,8 @@ def set_log_split_file_size(size):
     _C._set_log_split_file_size(size)
 
 
-def _get_log_component():
-    return _C._get_log_component
+def get_log_component():
+    return _C._get_log_component()
 
 
 def set_log_component(component):

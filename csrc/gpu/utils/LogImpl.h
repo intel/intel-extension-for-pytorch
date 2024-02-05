@@ -17,6 +17,8 @@
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/sinks/stdout_sinks.h"
 
+using namespace std::chrono;
+
 spdlog::level::level_enum get_log_level_from_int(int level);
 
 void log_result(int log_level, std::string message);
@@ -91,13 +93,15 @@ inline const std::set<std::string> COMPONENT_SET =
 
 template <typename... Args>
 inline std::string& pre_format(
+    std::string& s,
     spdlog::format_string_t<Args...> fmt_message,
     Args&&... args) {
   auto out = std::vector<char>();
   fmt::format_to(
       std::back_inserter(out), fmt_message, std::forward<Args>(args)...);
 
-  std::string s = std::string{out.begin(), out.end()};
+  s += std::string{out.begin(), out.end()};
+
   return s;
 }
 
@@ -108,8 +112,11 @@ class EventMessage {
       std::string& _event_id,
       std::string& _step_id,
       std::string& _message,
-      uint64_t timestamp)
-      : event_id(_event_id), step_id(_step_id), message(_message) {}
+      uint64_t _timestamp)
+      : event_id(_event_id),
+        step_id(_step_id),
+        message(_message),
+        timestamp(_timestamp) {}
 
   std::string event_id;
   std::string step_id;
@@ -133,23 +140,35 @@ class EventLogger {
       spdlog::format_string_t<Args...> fmt_message,
       Args&&... args) {
     {
-      auto log_message = pre_format(fmt_message, std::forward<Args>(args)...);
-      uint64_t millisec =
-          std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::string log_message = "";
+      pre_format(log_message, fmt_message, std::forward<Args>(args)...);
+
+      uint64_t nanoseconds =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
               std::chrono::system_clock::now().time_since_epoch())
               .count();
 
       auto should_log = should_output(log_component, log_sub_component);
 
       if (should_log) {
-        this->message_queue.push(
-            EventMessage(event_id, step_id, log_message, millisec));
+        this->message_queue.push_back(
+            EventMessage(event_id, step_id, log_message, nanoseconds));
       }
     }
   }
   void print_result(int log_level);
 
-  std::queue<EventMessage> message_queue;
+  void print_verbose(
+      int log_level,
+      const std::string& kernel_name,
+      const uint64_t event_duration);
+
+  void print_verbose_ext(
+      int log_level,
+      const std::string& kernel_name,
+      const uint64_t event_duration);
+
+  std::deque<EventMessage> message_queue;
 };
 
 class BasicLogger {
@@ -231,7 +250,7 @@ inline void put_event_logger(EventLogger event_logger, std::string event_id) {
 }
 
 template <typename... Args>
-inline std::string& log_result_with_args(
+inline void log_result_with_args(
     int log_level,
     spdlog::format_string_t<Args...> fmt_message,
     Args&&... args) {
@@ -279,6 +298,8 @@ inline void log_info(
 
   if (IPEXLoggingSetting::get_instance().enable_logging) {
     auto should_log = should_output(log_component, log_subComponent);
-    log_result_with_args(log_level, fmt_message, std::forward<Args>(args)...);
+    if (should_log) {
+      log_result_with_args(log_level, fmt_message, std::forward<Args>(args)...);
+    }
   }
 }

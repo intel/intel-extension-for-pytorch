@@ -4,6 +4,7 @@
 #include <utils/LogUtils.h>
 #include <utils/Settings.h>
 #include <utils/oneMKLUtils.h>
+#include "utils/LogImpl.h"
 
 #include <iostream>
 #include <mutex>
@@ -244,6 +245,8 @@ bool Settings::set_log_level(int level) {
   std::lock_guard<std::mutex> lock(s_mutex);
   if (level >= LOG_LEVEL::LOG_LEVEL_MIN && level <= LOG_LEVEL::LOG_LEVEL_MAX) {
     log_level = static_cast<LOG_LEVEL>(level);
+    IPEXLoggingSetting::get_instance().logging_level =
+        static_cast<spdlog::level::level_enum>(level);
 
     // re-trigger backend setting
     BasicLogger::update_logger();
@@ -252,7 +255,7 @@ bool Settings::set_log_level(int level) {
   return false;
 }
 
-int Settings::get_log_level() const {
+int Settings::get_log_level() {
   std::lock_guard<std::mutex> lock(s_mutex);
   return static_cast<int>(log_level);
 }
@@ -266,6 +269,7 @@ std::string Settings::get_log_output_file_path() {
 bool Settings::set_log_output_file_path(std::string path) {
   std::lock_guard<std::mutex> lock(s_mutex);
   log_output = path;
+  IPEXLoggingSetting::get_instance().output_file_path = path;
   // re-trigger backend setting
   BasicLogger::update_logger();
   return true;
@@ -274,8 +278,9 @@ bool Settings::set_log_output_file_path(std::string path) {
 bool Settings::set_log_rotate_file_size(int size) {
   std::lock_guard<std::mutex> lock(s_mutex);
   if (size > 0) {
-    log_split_size = size;
+    log_rotate_size = size;
     // re-trigger backend setting
+    IPEXLoggingSetting::get_instance().rotate_file_size = size;
     BasicLogger::update_logger();
     return true;
   }
@@ -292,6 +297,7 @@ bool Settings::set_log_split_file_size(int size) {
   if (size > 0) {
     log_split_size = size;
     // re-trigger backend setting
+    IPEXLoggingSetting::get_instance().split_file_size = size;
     BasicLogger::update_logger();
     return true;
   }
@@ -303,10 +309,85 @@ int Settings::get_log_split_file_size() {
   return log_split_size;
 }
 
+void split_string_to_log_component(std::string& log_component_str) {
+  // For the smallest validate log_component is "ALL" or "OPS", should be larger
+  // than 3
+  if (log_component_str.size() > 3) {
+    auto index = log_component_str.find("/");
+
+    if (index != std::string::npos) {
+      // need to collect the log_sub_component
+      std::string log_component_sub_str = log_component_str.substr(0, index);
+      std::string log_sub_component_sub_str =
+          log_component_str.substr(index + 1, log_component_str.size());
+
+      IPEXLoggingSetting::get_instance().log_component =
+          std::vector<std::string>();
+      IPEXLoggingSetting::get_instance().log_sub_component =
+          std::vector<std::string>();
+
+      int log_component_sub_num = std::count(
+          log_component_sub_str.begin(), log_component_sub_str.end(), ';');
+      int log_sub_component_sub_num = std::count(
+          log_sub_component_sub_str.begin(),
+          log_sub_component_sub_str.end(),
+          ';');
+
+      for (int i = 0; i < log_component_sub_num; i++) {
+        index = log_component_sub_str.find(";");
+        IPEXLoggingSetting::get_instance().log_component.push_back(
+            log_component_sub_str.substr(0, index));
+        log_component_sub_str = log_component_sub_str.substr(
+            index + 1, log_component_sub_str.size());
+      }
+      IPEXLoggingSetting::get_instance().log_component.push_back(
+          log_component_sub_str);
+
+      for (int i = 0; i < log_sub_component_sub_num; i++) {
+        index = log_sub_component_sub_str.find(";");
+        IPEXLoggingSetting::get_instance().log_sub_component.push_back(
+            log_sub_component_sub_str.substr(0, index));
+        log_sub_component_sub_str = log_sub_component_sub_str.substr(
+            index + 1, log_sub_component_sub_str.size());
+      }
+      IPEXLoggingSetting::get_instance().log_sub_component.push_back(
+          log_sub_component_sub_str);
+
+    } else {
+      // without log sub component
+      IPEXLoggingSetting::get_instance().log_component =
+          std::vector<std::string>();
+
+      int log_component_sub_num =
+          std::count(log_component_str.begin(), log_component_str.end(), ';');
+      for (int i = 0; i < log_component_sub_num; i++) {
+        index = log_component_str.find(";");
+        IPEXLoggingSetting::get_instance().log_component.push_back(
+            log_component_str.substr(0, index));
+        log_component_str =
+            log_component_str.substr(index + 1, log_component_str.size());
+      }
+      IPEXLoggingSetting::get_instance().log_component.push_back(
+          log_component_str);
+    }
+  } else {
+    // set default log_component = ALL, and without sub_component
+    IPEXLoggingSetting::get_instance().log_component =
+        IPEXLoggingSetting::get_instance().log_component.size() == 0
+        ? std::vector<std::string>{std::string("ALL")}
+        : IPEXLoggingSetting::get_instance().log_component;
+    IPEXLoggingSetting::get_instance().log_sub_component =
+        IPEXLoggingSetting::get_instance().log_sub_component.size() == 0
+        ? std::vector<std::string>{std::string("")}
+        : IPEXLoggingSetting::get_instance().log_sub_component;
+  }
+}
+
 bool Settings::set_log_component(std::string component) {
   std::lock_guard<std::mutex> lock(s_mutex);
   log_component = component;
   // re-trigger backend setting
+  split_string_to_log_component(component);
   BasicLogger::update_logger();
   return true;
 }
