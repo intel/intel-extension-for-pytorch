@@ -113,9 +113,7 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
   // low precision policy for bf16 and fp32 cast policy for fp16
   MAKE_REGISTER_FUNC_TWO_POLICIES(_addmm_activation, user_defined_dtype, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(
-      _native_multi_head_attention, user_defined_dtype, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      _transform_bias_rescale_qkv, user_defined_dtype, fp32)
+      _transform_bias_rescale_qkv, user_defined_dtype, user_defined_dtype)
 
   // bf16 and fallthrough
   MAKE_REGISTER_FUNC_TWO_POLICIES(group_norm, user_defined_dtype, fallthrough)
@@ -123,41 +121,6 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
   MAKE_REGISTER_FUNC_TWO_POLICIES(avg_pool3d, fp32, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(adaptive_avg_pool3d, fp32, fp32)
   MAKE_REGISTER_FUNC_TWO_POLICIES(_adaptive_avg_pool3d, fp32, fp32)
-
-  // fallthrough and fp32 cast policies
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      scaled_dot_product_attention, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(
-      _scaled_dot_product_attention_math, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_linear1d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_bilinear2d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(_upsample_bilinear2d_aa, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_bicubic2d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(_upsample_bicubic2d_aa, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_trilinear3d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_nearest1d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(_upsample_nearest_exact1d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_nearest2d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(_upsample_nearest_exact2d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(upsample_nearest3d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC_TWO_POLICIES(_upsample_nearest_exact3d, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(upsample_linear1d, vec, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(upsample_bilinear2d, vec, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(
-      _upsample_bilinear2d_aa, vec, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(upsample_trilinear3d, vec, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(upsample_bicubic2d, vec, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(
-      _upsample_bicubic2d_aa, vec, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(upsample_nearest1d, vec, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(
-      _upsample_nearest_exact1d, vec, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(upsample_nearest2d, vec, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(
-      _upsample_nearest_exact2d, vec, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(upsample_nearest3d, vec, fallthrough, fp32)
-  MAKE_REGISTER_FUNC2_TWO_POLICIES(
-      _upsample_nearest_exact3d, vec, fallthrough, fp32)
 
   // promote cast policies
   MAKE_REGISTER_FUNC_TWO_POLICIES(cat, promote, promote)

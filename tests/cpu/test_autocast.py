@@ -1017,11 +1017,18 @@ class TestAutocastOperations(TestCase):
         for op, args in self.autocast_lists.blacklist_non_float_output_pass_test:
             self._run_autocast_pass_test(op, args, torch.float32)
 
-    def test_autocast_torch_bf16_multi_output(self):
-        for op_with_args in self.autocast_lists.torch_bf16_multi_output:
+    def test_autocast_torch_x16_multi_output(self):
+        for op_with_args in self.autocast_lists.torch_x16_multi_output:
             op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
             self._run_autocast_pass_test(
                 op, args, torch.bfloat16, add_kwargs=maybe_kwargs
+            )
+            self._run_autocast_pass_test(
+                op,
+                args,
+                torch.float16,
+                autocast_type=torch.float16,
+                add_kwargs=maybe_kwargs,
             )
 
     def test_autocast_torch_bf16_fp32_multi_output(self):
@@ -1079,17 +1086,6 @@ class TestAutocastOperations(TestCase):
                 torch.float32,
                 autocast_type=torch.float16,
                 module=torch._C._nn,
-                add_kwargs=maybe_kwargs,
-            )
-
-    def test_autocast_torch_fp16_fp32_multi_output(self):
-        for op_with_args in self.autocast_lists.torch_fp16_fp32_multi_output:
-            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
-            self._run_autocast_pass_test(
-                op,
-                args,
-                torch.float32,
-                autocast_type=torch.float16,
                 add_kwargs=maybe_kwargs,
             )
 
