@@ -729,14 +729,6 @@ class GPTQLLMTester(TestCase):
             self.assertTrue(torch.allclose(out0[0], out1[0], atol=1e-05))
 
             low_precision_checkpoint = torch.load(work_dir + "/gptq_checkpoint_g128.pt")
-            config_dict = {
-                "weight_key": "qweight",
-                "scale_key": "scales",
-                "zero_point_key": "qzeros",
-                "bias_key": "bias",
-                "g_idx_key": "g_idx",
-            }
-            state_dict_and_config = (low_precision_checkpoint, config_dict)
             qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
                 weight_dtype=torch.quint4x2,
                 lowp_mode=ipex.quantization.WoqLowpMode.INT8,
@@ -748,7 +740,7 @@ class GPTQLLMTester(TestCase):
                 dtype=torch.float,
                 quantization_config=qconfig,
                 inplace=True,
-                low_precision_checkpoint=state_dict_and_config,
+                low_precision_checkpoint=low_precision_checkpoint,
                 deployment_mode=False,
             )
             _IPEXAttentionCPU = (

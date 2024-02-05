@@ -130,7 +130,14 @@ def main(args_in: Optional[List[str]] = None) -> None:
         "--gptq",
         action="store_true",
         help="Run GPTQ calibration to generate optimized INT4 weight for weight-only quantization."
-        "This is recommended for INT4 to minimize accuracy drop after quantization."
+        " This is recommended for INT4 to minimize accuracy drop after quantization."
+    )
+    parser.add_argument(
+        "--gptq-legacy-format",
+        action="store_true",
+        help="Indicate that the low-precision checkpoint is in the legacy format rather than the"
+        " HuggingFace Optimum format for backward compatibility. It must be used with"
+        " --low-precision-checkpoint. Otherwise, it has no effect."
     )
     parser.add_argument(
         "--group-size",
@@ -357,6 +364,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                                     str(args.low_precision_checkpoint),
                                 ]
                             )
+                            if args.gptq_legacy_format:
+                                quant_cmd.extend(["--gptq-legacy-format"])
                     else:
                         # No need to set group size if args.gptq is true
                         # Group size is read from the checkpoint

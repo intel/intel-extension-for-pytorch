@@ -112,7 +112,7 @@ def gptq_export(
             compression_dim=compression_dim,
             scale_dtype=scale_dtype,
             device=torch.device("cpu"),
-            use_optimum_format=False,
+            use_optimum_format=True,
         )
         new_module.pack(int_weight, gptq_scale, gptq_zp, m.bias, gptq_perm)
         set_module(model, k, new_module)

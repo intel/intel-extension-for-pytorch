@@ -7,7 +7,18 @@ from torch.ao.quantization import PlaceholderObserver, QConfigMapping
 # Weight shape is N by K if transposed is False otherwise K by N.
 # Bias is optional. If bias is not provided in the checkpoint, we read the original model.
 DEFAULT_LOWP_CHECKPOINT_CONFIG = {
-    "name": "default",
+    "name": "optimum",
+    "use_optimum_format": True,
+    "weight_key": "qweight",
+    "scale_key": "scales",
+    "zero_point_key": "qzeros",
+    "bias_key": "bias",
+    "g_idx_key": "g_idx",
+}
+
+LEGACY_LOWP_CHECKPOINT_CONFIG = {
+    "name": "legacy",
+    "use_optimum_format": False,
     "weight_key": "packed_weight",
     "scale_key": "scale",
     "zero_point_key": "packed_zp",
@@ -31,12 +42,73 @@ def _default_lowp_checkpoint_config():
     return DEFAULT_LOWP_CHECKPOINT_CONFIG
 
 
+def _legacy_lowp_checkpoint_config():
+    return LEGACY_LOWP_CHECKPOINT_CONFIG
+
+
 def _get_keys_from_config(checkpoint_config):
-    weight_key = checkpoint_config.get("weight_key", "weight")
-    scales_key = checkpoint_config.get("scale_key", "scale")
-    zeros_key = checkpoint_config.get("zero_point_key", "zero")
+    weight_key = checkpoint_config.get("weight_key", "qweight")
+    scales_key = checkpoint_config.get("scale_key", "scales")
+    zeros_key = checkpoint_config.get("zero_point_key", "qzeros")
     bias_key = checkpoint_config.get("bias_key", "bias")
     return weight_key, scales_key, zeros_key, bias_key
+
+
+def _convert_optimum_format_to_desired(qweight, scales, qzeros):
+    """
+    Optimum format:
+        qweight: (math.ceil(IC / comp_ratio), OC)
+        scales: (n_groups, OC)
+        qzeros: (n_groups, math.ceil(OC / comp_ratio))
+        qzeros are substracted by 1 before packing
+
+    Desired format:
+        compression_dim = 1
+        qweight: (OC, math.ceil(IC / comp_ratio))
+        scales: (OC, n_groups)
+        qzeros: (OC, math.ceil(n_groups / comp_ratio))
+
+    Note:
+        IC = input channels or input features
+        OC = output channels or output features
+        n_groups = math.ceil(IC / group_size)
+        comp_ratio = compression data type bits // weight or zeros data type bits
+        E.g., compression dtype = int32, weight dtype = int4, comp_ratio = 32 / 4 = 8
+
+    """
+    if qweight is None:
+        return qweight, scales, qzeros
+    oc = qweight.shape[1]
+    assert oc == scales.shape[1]
+    n_groups = scales.shape[0]
+    qweight = qweight.t_().contiguous()
+    scales = scales.t_().contiguous()
+    if qzeros is None:
+        return qweight, scales, qzeros
+    zp_dtype = torch.int32
+    zp = torch.empty((n_groups, oc), dtype=zp_dtype)
+    # Steps to convert qzeros:
+    # (1) unpack qzeros to (n_groups, OC)
+    # (2) take transpose
+    # (3) plus one and handle overflow
+    zp_bits = 4  # int4
+    comp_dtype_bits = 32  # int32
+    comp_ratio = comp_dtype_bits // zp_bits
+    mask = torch.tensor(2**zp_bits - 1, dtype=zp_dtype)
+    for j in range(qzeros.shape[1]):
+        packed_data = qzeros[:, j]
+        for e in range(comp_ratio):
+            index = j * comp_ratio + e
+            if index >= zp.shape[1]:
+                continue
+            data = (packed_data >> (zp_bits * e)) & mask
+            zp[:, index] = data.type(zp_dtype)
+    zp = zp.t_().contiguous()
+    zp += 1
+    # it may overflow after adding one
+    zp = torch.where(zp > (2**zp_bits - 1), 0, zp)
+
+    return qweight, scales, zp
 
 
 def _get_linear_parameters(attr_name, state_dict, checkpoint_config):
@@ -52,6 +124,13 @@ def _get_linear_parameters(attr_name, state_dict, checkpoint_config):
     scales = state_dict.get(s_key, None)
     qzeros = state_dict.get(z_key, None)
     bias = state_dict.get(b_key, None)
+
+    use_optimum_format = checkpoint_config.get("use_optimum_format", True)
+    if use_optimum_format:
+        qweight, scales, qzeros = _convert_optimum_format_to_desired(
+            qweight, scales, qzeros
+        )
+
     group_size = -1
     if qweight is not None and scales is not None:
         assert scales.dim() == 2, "Unexpected scales tensor dimension"

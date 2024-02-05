@@ -149,6 +149,13 @@ parser.add_argument(
     "PER_BATCH_IC_BLOCK(3): quantize per block of size 1 x IC_BLOCK. "
     "IC_BLOCK is determined by IC automatically.",
 )
+parser.add_argument(
+    "--gptq-legacy-format",
+    action="store_true",
+    help="Indicate that the low-precision checkpoint is in the legacy format rather than the"
+    " HuggingFace Optimum format for backward compatibility. It must be used with"
+    " --low-precision-checkpoint. Otherwise, it has no effect."
+)
 args = parser.parse_args()
 
 
@@ -605,15 +612,11 @@ elif args.ipex_weight_only_quantization:
     )
     if args.low_precision_checkpoint != "":
         low_precision_checkpoint = torch.load(args.low_precision_checkpoint)
-        config_dict = {
-            "weight_key": "qweight",
-            "scale_key": "scales",
-            "zero_point_key": "qzeros",
-            "bias_key": "bias",
-            "g_idx_key": "g_idx"
-        }
-        state_dict_and_config = (low_precision_checkpoint, config_dict)
-        low_precision_checkpoint = state_dict_and_config
+        if args.gptq_legacy_format:
+            config_dict = (
+                ipex.utils.weight_only_quantization._legacy_lowp_checkpoint_config()
+            )
+            low_precision_checkpoint = (low_precision_checkpoint, config_dict)
     else:
         low_precision_checkpoint = None
     user_model = ipex.llm.optimize(
