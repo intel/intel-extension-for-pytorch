@@ -2067,10 +2067,13 @@ class Tester(TestCase):
     def test_concat_bn_relu(self):
         batch_size = 3
         image_size = 16
+        dtypes = [torch.float32, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         options = itertools.product(
             [2, 3],
             [[32, 32, 32], [60, 60, 60], [17, 27, 32], [16, 32, 48]],
-            [torch.float32, torch.bfloat16],
+            dtypes,
             ["O0", "O1"],
             [True, False],
         )
@@ -2105,7 +2108,8 @@ class Tester(TestCase):
                 model = ipex.optimize(model, dtype=dtype, level=level)
 
                 with torch.cpu.amp.autocast(
-                    enabled=True if dtype == torch.bfloat16 else False
+                    enabled=True if dtype in [torch.bfloat16, torch.half] else False,
+                    dtype=dtype,
                 ), torch.no_grad():
                     result = model(a[0], a[1], a[2])
                     trace_model = torch.jit.trace(model, (a[0], a[1], a[2])).eval()
@@ -2139,7 +2143,6 @@ class Tester(TestCase):
                                 for n in trace_graph.nodes()
                             )
                         )
-
             model = ipex.optimize(model3, dtype=dtype, level=level)
             trace_model = torch.jit.trace(model, (a[0], a[1], a[2])).eval()
             trace_model = torch.jit.freeze(trace_model)

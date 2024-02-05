@@ -1,6 +1,9 @@
 #pragma once
 #include <ATen/ATen.h>
 #include <ATen/cpu/vec/vec512/vec512.h>
+
+#include "utils/SysUtil.h"
+
 using namespace at::vec;
 
 #include <immintrin.h>

@@ -1084,7 +1084,8 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
     auto check_type_channelsize = [](c10::TensorType tensor) {
       return (
           (tensor.scalarType().value() == at::kFloat ||
-           tensor.scalarType().value() == at::kBFloat16) &&
+           tensor.scalarType().value() == at::kBFloat16 ||
+           tensor.scalarType().value() == at::kHalf) &&
           tensor.sizes()[1].value() % 16 == 0 &&
           utils::is_channelslast(tensor));
     };
