@@ -1,6 +1,6 @@
 # Quick Start
 
-The following instructions assume you have installed the Intel® Extension for PyTorch\*. For installation instructions, refer to [Installation](../../../index.html#installation?platform=cpu&version=v2.1.0%2Bcpu).
+The following instructions assume you have installed the Intel® Extension for PyTorch\*. For installation instructions, refer to [Installation](../../../index.html#installation?platform=cpu&version=v2.2.0%2Bcpu).
 
 To start using the Intel® Extension for PyTorch\* in your code, you need to make the following changes:
 

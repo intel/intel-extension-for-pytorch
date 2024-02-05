@@ -1,8 +1,6 @@
-# 1. LLM Optimizations Overview
+# 1. LLM Optimization Overview
 
-We have achieved various optimizations for Large Language Models (LLMs) in IPEX, and provided the inference benchmarking scripts for LLM performance and accuracy tests.<br/>
-The scripts include both single instance and distributed (DeepSpeed) use cases.<br/>
-The scripts cover model generation inference with low precions cases for different models with best perf and accuracy (bf16 AMP，static quantization and weight only quantization).<br/>
+ipex.llm provides dedicated optimization for running Large Language Models (LLM) faster, including technical points like paged attention, ROPE fusion, etc. And a set of data types are supported for various scenarios, including FP32, BF16, Smooth Quantization INT8, Weight Only Quantization INT8/INT4 (experimental).
 
 <br>
 
@@ -12,53 +10,58 @@ The scripts cover model generation inference with low precions cases for differe
 
 | MODEL FAMILY | MODEL NAME (Huggingface hub) | FP32 | BF16 | Static quantization INT8 | Weight only quantization INT8 | Weight only quantization INT4 |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|LLAMA| meta-llama/Llama-2-7b-hf | ✅ | ✅ | ✅ | ✅ | ☑️ | 
-|LLAMA| meta-llama/Llama-2-13b-hf | ✅ | ✅ | ✅ | ✅ | ☑️ | 
-|LLAMA| meta-llama/Llama-2-70b-hf | ✅ | ✅ | ✅ | ✅ | ☑️ | 
-|GPT-J| EleutherAI/gpt-j-6b | ✅ | ✅ | ✅ | ✅ | ✅ | 
-|GPT-NEOX| EleutherAI/gpt-neox-20b | ✅ | ✅ | ☑️ | ✅ | ☑️ | 
-|DOLLY| databricks/dolly-v2-12b | ✅ | ✅ | ☑️ | ☑️ | ☑️ | 
-|FALCON| tiiuae/falcon-40b | ✅ | ✅ | ✅ |  ✅ | ✅ | 
-|OPT| facebook/opt-30b | ✅ | ✅ | ✅ |    | ☑️ | 
-|OPT| facebook/opt-1.3b | ✅ | ✅ | ✅ |  ✅ | ☑️ | 
-|Bloom| bigscience/bloom-1b7 | ✅ | ☑️ | ✅ |    | ☑️ |
-|CodeGen| Salesforce/codegen-2B-multi | ✅ | ✅ | ☑️ |  ✅ | ✅ |
-|Baichuan| baichuan-inc/Baichuan2-7B-Chat | ✅ | ✅ | ✅ | ✅  |    |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | ✅ | ✅ |    |  ✅ |    |
-|Baichuan| baichuan-inc/Baichuan-13B-Chat | ✅ | ☑️ | ✅ |    |    |
-|ChatGLM| THUDM/chatglm3-6b | ✅ | ✅ | ☑️ |  ✅ |    |
-|ChatGLM| THUDM/chatglm2-6b | ✅ | ☑️ | ☑️ |  ☑️ |    |
-|GPTBigCode| bigcode/starcoder | ✅ | ✅ | ☑️ |  ✅ | ☑️ |
-|T5| google/flan-t5-xl | ✅ | ✅ | ☑️ |  ✅ |    |
-|Mistral| mistralai/Mistral-7B-v0.1 | ✅ | ✅ | ☑️ |  ✅ | ☑️ |
-|MPT| mosaicml/mpt-7b | ✅ | ✅ | ☑️ |  ✅ | ✅ |
+|LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 
+|LLAMA| meta-llama/Llama-2-13b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 
+|LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 
+|GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 
+|GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 | 
+|DOLLY| databricks/dolly-v2-12b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 | 
+|FALCON| tiiuae/falcon-40b | 🟩 | 🟩 | 🟩 |  🟩 | 🟩 | 
+|OPT| facebook/opt-30b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 
+|OPT| facebook/opt-1.3b | 🟩 | 🟩 | 🟩 |  🟩 | 🟨 | 
+|Bloom| bigscience/bloom-1b7 | 🟩 | 🟨 | 🟩 | 🟩  | 🟨 |
+|CodeGen| Salesforce/codegen-2B-multi | 🟩 | 🟩 | 🟨 |  🟩 | 🟩 |
+|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩  |    |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟩 |  🟩 |    |
+|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟨 | 🟩 | 🟩 |    |
+|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 |  🟩 |    |
+|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟨 |  🟩 |    |
+|GPTBigCode| bigcode/starcoder | 🟩 | 🟩 | 🟨 |  🟩 | 🟨 |
+|T5| google/flan-t5-xl | 🟩 | 🟩 | 🟨 |  🟩 |    |
+|Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 | 🟨 |  🟩 | 🟨 |
+|MPT| mosaicml/mpt-7b | 🟩 | 🟩 | 🟨 |  🟩 | 🟩 |
 
 ## 2.2 Verified for distributed inference mode via DeepSpeed
 
 | MODEL FAMILY | MODEL NAME (Huggingface hub) | BF16 | Weight only quantization INT8 |
 |:---:|:---:|:---:|:---:|
-|LLAMA| meta-llama/Llama-2-7b-hf | ✅ | ✅ |
-|LLAMA| meta-llama/Llama-2-13b-hf | ✅ | ✅ |
-|LLAMA| meta-llama/Llama-2-70b-hf | ✅ | ✅ |
-|GPT-J| EleutherAI/gpt-j-6b | ☑️ | ☑️ |
-|GPT-NEOX| EleutherAI/gpt-neox-20b | ✅ | ✅ |
-|DOLLY| databricks/dolly-v2-12b | ☑️ | ☑️ |
-|FALCON| tiiuae/falcon-40b | ☑️ | ☑️ |
-|OPT| facebook/opt-30b | ☑️ | ☑️ |
-|OPT| facebook/opt-1.3b | ✅ | ✅ |
-|Bloom| bigscience/bloom-1b7 | ☑️ | ✅ |
-|CodeGen| Salesforce/codegen-2B-multi |  ✅ | ✅ |
-|Baichuan| baichuan-inc/Baichuan2-7B-Chat | ✅ | ✅ |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | ☑️ | ☑️ |
-|Baichuan| baichuan-inc/Baichuan-13B-Chat | ☑️ | ✅ |
-|GPTBigCode| bigcode/starcoder | ✅ | ✅ |
-|T5| google/flan-t5-xl | ✅ | ✅ |
-|Mistral| mistralai/Mistral-7B-v0.1 | ✅ | ✅ |
-|MPT| mosaicml/mpt-7b | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 |
+|LLAMA| meta-llama/Llama-2-13b-hf | 🟩 | 🟩 |
+|LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 |
+|GPT-J| EleutherAI/gpt-j-6b | 🟨 | 🟩 |
+|GPT-NEOX| EleutherAI/gpt-neox-20b | 🟨 | 🟩 |
+|DOLLY| databricks/dolly-v2-12b | 🟨 | 🟩 |
+|FALCON| tiiuae/falcon-40b | 🟨 | 🟨 |
+|OPT| facebook/opt-30b | 🟨 | 🟩 |
+|OPT| facebook/opt-1.3b | 🟩 | 🟩 |
+|Bloom| bigscience/bloom-1b7 | 🟨 | 🟩 |
+|CodeGen| Salesforce/codegen-2B-multi |  🟩 | 🟩 |
+|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟨 | 🟩 |
+|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟨 | 🟩 |
+|GPTBigCode| bigcode/starcoder | 🟩 | 🟩 |
+|T5| google/flan-t5-xl | 🟩 | 🟩 |
+|Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 |
+|MPT| mosaicml/mpt-7b | 🟩 | 🟩 |
+
+- 🟩 signifies that the model can perform well and with good accuracy (<1% difference as compared with FP32).
+
+- 🟨 signifies that the model can perform well while accuracy may not been in a perfect state (>1% difference as compared with FP32).
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16).
+We are working in progress to better support the models in the tables with various data types. In addition, more models will be optimized in the future.
 
-*Note*: All above models have undergone thorough optimization and verification processes for both performance and accuracy. In the context of the optimized model list tables above, the symbol ✅ signifies that the model can achieve an accuracy drop of less than 1% when using a specific data type compared to FP32, whereas the accuracy drop may exceed 1% for ☑️ marked ones.  We are working in progress to better support the models in the tables with various data types. In addition, more models will be optimized, which will expand the tables.
+*Note*: The accuracy drop issue in distributed inference mode for "tiiuae/falcon-40b" has been fixed by DeepSpeed in a recent patch release [v0.13.1](https://github.com/microsoft/DeepSpeed/tree/v0.13.1).
 
 <br>
 
@@ -169,8 +172,9 @@ source ./tools/env_activate.sh
 ```
 python run.py --help # for more detailed usages
 ```
+
 | Key args of run.py | Notes |
-|---|:---:|
+|---|---|
 | generation | default: beam search (beam size = 4), "--greedy" for greedy search |
 | input tokens | default: 32, provide fixed sizes for input prompt size, use "--input-tokens" for [32, 64, 128, 256, 512, 1024, 2016, 2017, 2048, 4096, 8192]; if "--input-tokens" is not used, use "--prompt" to choose other strings as inputs|
 | output tokens | default: 32, use "--max-new-tokens" to choose any other size |
@@ -186,49 +190,49 @@ python run.py --help # for more detailed usages
 
 *Note:* The following "OMP_NUM_THREADS" and "numactl" settings are based on the assumption that the target server has 56 physical cores per numa socket, and we benchmark with 1 socket. Please adjust the settings per your hardware.
 
-#### 4.1.1.1 Running FP32 model
+#### 4.1.1.1 Run in FP32 with stock PyTorch
 
 ```bash
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Llama-2-7b-hf --dtype float32
 ```
 
-#### 4.1.1.2 Running FP32 model with IPEX
+#### 4.1.1.2 Run in FP32 with ipex.llm
 
 ```bash
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Llama-2-7b-hf --dtype float32 --ipex 
 ```
 
-#### 4.1.1.3 Running BF16 model with IPEX
+#### 4.1.1.3 Run in BF16 with ipex.llm
 
 ```bash
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex 
 ```
 
-#### 4.1.1.4 INT8 static quantization
+#### 4.1.1.4 Run in static quantization INT8 with ipex.llm
 
 ```bash
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-smooth-quant --qconfig-summary-file <path to "llama-2-7b_qconfig.json"> --output-dir "saved_results"
 ```
 
-#### 4.1.1.5 INT8 weight-only quantization
+#### 4.1.1.5 Run in weight-only quantization INT8 with ipex.llm
 
 ```bash
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results" 
 ```
 
-#### 4.1.1.6 INT4 weight-only quantization
+#### 4.1.1.6 Run in weight-only quantization INT4 with ipex.llm
 
 ```bash
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT4  --gptq --quant-with-amp --output-dir "saved_results" 
 ```
 
-#### 4.1.1.7 Distributed inference in BF16
+#### 4.1.1.7 Run in BF16 with ipex.llm in distributed way
 
 ```bash
 deepspeed --bind_cores_to_rank  run.py --benchmark -m meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex  --autotp --shard-model
 ```
 
-#### 4.1.1.8 Distributed inference in weight-only quantization INT8
+#### 4.1.1.8 Run in weight-only quantization INT8 with ipex.llm in distributed way
 
 ```bash
 deepspeed --bind_cores_to_rank  run.py --benchmark -m meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp  --autotp --shard-model --output-dir "saved_results"
@@ -320,35 +324,39 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama
 ```
 
 We provide the following qconfig summary files with good quality (calibration on "NeelNanda/pile-10k" dataset and evaluate accuracy on "lambada_openai" dataset):
+
 | Model ID | Download links |
 |---|:---:|
-| meta-llama/Llama-2-7b-hf | link |
-| meta-llama/Llama-2-13b-hf | link |
-| meta-llama/Llama-2-70b-hf | link |
-| EleutherAI/gpt-j-6b | link |
-| tiiuae/falcon-40b | link |
-| facebook/opt-30b | link |
-| facebook/opt-1.3b | link |
-| baichuan-inc/Baichuan2-7B-Chat | link |
-| baichuan-inc/Baichuan2-13B-Chat | link |
-| THUDM/chatglm2-6b | link |
+| meta-llama/Llama-2-7b-hf | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-7b_qconfig.json) |
+| meta-llama/Llama-2-13b-hf | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-13b_qconfig.json) |
+| meta-llama/Llama-2-70b-hf | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-70b_qconfig.json) |
+| EleutherAI/gpt-j-6b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/gpt-j-6b_qconfig.json) |
+| tiiuae/falcon-40b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/falcon-40b_qconfig.json) |
+| facebook/opt-30b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/opt-30b_qconfig.json) |
+| facebook/opt-1.3b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/opt-1b3_qconfig.json) |
+| baichuan-inc/Baichuan2-7B-Chat | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/baichuan2-7b_qconfig.json) |
+| baichuan-inc/Baichuan2-13B-Chat | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/baichuan2-13b_qconfig.json) |
+| baichuan-inc/Baichuan-13B-Chat | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/baichuan-13b_qconfig.json) |
+| bigscience/bloom-1b7 | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/bloom-1b7_qconfig.json) |
 
 If you would like to generate qconfig summary files (due to changes on model variants or calibration dataset), we provide the [autotune API](../../../../../docs/tutorials/features/sq_recipe_tuning_api.md) and its [tuning examples](llm_sq_recipes.md), which allows an automatic global smoothquant tuning, and automatic layer-by-layer tuning provided by Intel® Neural Compressor for the best accuracy.
 
 #### 4.2.1.4 Weight-only quantization:
 
 By default, for weight-only quantization, we use quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference ("--quant-with-amp") to get peak performance and fair accuracy.
+
 - Command (INT8):
 ```bash
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list>  python run.py  --benchmark -m <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results" 
 ```
+
 The command above works for most models we listed. However, to get better accuracy for the following models, some changes to the command are needed.
 
 | Model ID | Changes to command |
 | - | - |
 | bigcode/starcoder | Add "`--group-size 128`" |
-| Baichuan-inc/Baichuan-13B-Chat | Remove "`--quant-with-amp`" |
-| Baichuan-inc/Baichuan2-13B-Chat | Add "`--group-size 64`" |
+| baichuan-inc/Baichuan-13B-Chat | Remove "`--quant-with-amp`" |
+| baichuan-inc/Baichuan2-13B-Chat | Add "`--group-size 64`" |
 | bigscience/bloom-1b7 | Remove "`--quant-with-amp`"; add "`--group-size 128`" |
 | EleutherAI/gpt-neox-20b | Remove "`--quant-with-amp`"; add "`--group-size 256`" |
 | facebook/opt-30b | Remove "`--quant-with-amp`" |
@@ -375,7 +383,8 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama
 
 (2) The _\<MODEL_ID\>_ (e.g., "meta-llama/Llama-2-13b-hf") specifies the model you will run. we provide some _Verified \<MODEL ID\>_ in the [Optimized Model List](#2-ipexllm-optimized-model-list). You can also try other models from [HuggingFace Models](https://huggingface.co/models).
 
-(3) <a name="generation_sq">for all quantization benchmarks</a>, both quantization and inference stages will be triggered by default. For quantization stage, it will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, and for inference stage, it will launch the inference with the quantized model "best_model.pt".  For inference-only benchmarks (avoid the repeating quantization stage), you can also reuse these quantized models for by adding "--quantized-model-path <output_dir + "best_model.pt">" . 
+(3) <a name="generation_sq">for all quantization benchmarks</a>, both quantization and inference stages will be triggered by default. For quantization stage, it will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, and for inference stage, it will launch the inference with the quantized model "best_model.pt".  For inference-only benchmarks (avoid the repeating quantization stage), you can also reuse these quantized models for by adding "--quantized-model-path <output_dir + "best_model.pt">" .
+
 ### 4.2.2 Run generation in distributed way
 
 #### 4.2.2.1 Prepare:
@@ -425,6 +434,19 @@ For weight-only quantization with deepspeed, we quantize the model then run the 
 deepspeed --bind_cores_to_rank run.py  --benchmark -m <MODEL_ID> --ipex --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp  --autotp --shard-model --output-dir "saved_results"
 ```
 
+Similar to single instance usage, we need to update some arguments of the running command specifically for some models to achieve better accuracy.
+
+| Model ID | Changes to command |
+| - | - |
+| EleutherAI/gpt-j-6b | Remove "`--quant-with-amp`"; add "`--dtype float32`" |
+| EleutherAI/gpt-neox-20b | Remove "`--quant-with-amp`"; add "`--lowp-mode FP32 --dtype float32 --group-size 256`" |
+| bigcode/starcoder | Add "`--group-size 128`" |
+| baichuan-inc/Baichuan-13B-Chat | Remove "`--quant-with-amp`"; add "`--dtype float32`" |
+| baichuan-inc/Baichuan2-13B-Chat | Add "`--group-size 64`" |
+| bigscience/bloom-1b7 | Remove "`--quant-with-amp`"; add "`--group-size 128`" |
+| facebook/opt-30b | Remove "`--quant-with-amp`"; add "`--dtype float32`" |
+| databricks/dolly-v2-12b | Remove "`--quant-with-amp`"; add "`--lowp-mode FP32 --dtype float32`" |
+
 - An example of llama2 7b model:
 ```bash
 deepspeed --bind_cores_to_rank  run.py --benchmark -m meta-llama/Llama-2-7b-hf --ipex --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --autotp --shard-model --output-dir "saved_results"
@@ -435,8 +457,9 @@ deepspeed --bind_cores_to_rank  run.py --benchmark -m meta-llama/Llama-2-7b-hf -
 There are some model-specific requirements to be aware of, as follows:
 
 - For ChatGLM models, the default torch_dtype is float16 in config.json. We need to replace the "float16" with "float32" in config.json.
+
 - For MPT models from the remote hub, we need to modify the config.json to use the modeling_mpt.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/mosaicml_mpt-7b_config.json".
-- For GPT-NEOX (model id "EleutherAI/gpt-neox-20b") quantizations path, do not use "--quant-with-amp" flag due to accuracy loss.
+
 - For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for FP32/BF16 but needed for quantizations.
 
 ## 4.3 Instructions for Running LLM with Intel® Xeon® CPU Max Series
@@ -571,7 +594,9 @@ IPEX now only supports some certain cases. Weights must be N by K and asymmetric
 
 We leverage [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness) for the accuracy test.
 
-We verify and recommend to test "lambada_openai" task, for more choice, see {TASK_NAME} in this [link](https://github.com/EleutherAI/lm-evaluation-harness/blob/master/docs/task_table.md).
+We verify and recommend to test accuracy of most models with "lambada_openai" task.
+For some models, like `Salesforce/codegen-2B-multi` and `mosaicml/mpt-7b`, we verify and recommend to test their accuracy with "hellaswag" task.
+For more candidate tasks for accuracy validation, please check [lm-evaluation-harness task table](https://github.com/EleutherAI/lm-evaluation-harness/blob/master/docs/task_table.md).
 
 ### 5.2.1 Run with one instance
 
@@ -655,6 +680,20 @@ deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_
 ```bash
 deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --ipex --tasks <TASK_NAME>  
 ```
+
+Similar to script usage for performance benchmarking, we need to update some arguments of the running command specifically for some models to achieve better accuracy.
+
+| Model ID | Changes to command |
+| - | - |
+| EleutherAI/gpt-j-6b | Remove "`--quant-with-amp`"; add "`--dtype float32`" |
+| EleutherAI/gpt-neox-20b | Remove "`--quant-with-amp`"; add "`--lowp-mode FP32 --dtype float32 --group-size 256`" |
+| bigcode/starcoder | Add "`--group-size 128`" |
+| baichuan-inc/Baichuan-13B-Chat | Remove "`--quant-with-amp`"; add "`--dtype float32`" |
+| baichuan-inc/Baichuan2-13B-Chat | Add "`--group-size 64`" |
+| bigscience/bloom-1b7 | Remove "`--quant-with-amp`"; add "`--group-size 128`" |
+| facebook/opt-30b | Remove "`--quant-with-amp`"; add "`--dtype float32`" |
+| databricks/dolly-v2-12b | Remove "`--quant-with-amp`"; add "`--lowp-mode FP32 --dtype float32`" |
+
 - An example of llama2 7b model:
 ```bash
 deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --ipex --tasks <TASK_NAME>  

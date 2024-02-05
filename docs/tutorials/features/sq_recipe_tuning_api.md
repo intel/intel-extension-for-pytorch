@@ -1,5 +1,5 @@
-Smooth Quant Recipe Tuning API
-====================================
+Smooth Quant Recipe Tuning API (Experimental)
+=============================================
 Smooth Quantization is a popular method to improve the accuracy of int8 quantization. The [autotune API](../api_doc.html#ipex.quantization.autotune) allows automatic global alpha tuning, and automatic layer-by-layer alpha tuning provided by Intel® Neural Compressor for the best INT8 accuracy.
 
 SmoothQuant will introduce alpha to calculate the ratio of input and weight updates to reduce quantization error. SmoothQuant arguments are as below:

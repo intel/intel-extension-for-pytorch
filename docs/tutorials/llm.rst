@@ -1,69 +1,195 @@
-Large Language Models (LLM) Optimizations Overview
+Large Language Models (LLM) Optimization Overview
 ==================================================
 
 In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Most of LLMs are GPT-like architectures that consist of multiple Decoder layers. 
 The MultiHeadAttention and FeedForward layer are two key components of every Decoder layer. The generation task is memory bound because iterative decode and kv_cache require special management to reduce memory overheads. Intel® Extension for PyTorch* provides a lot of specific optimizations for these LLMs. 
 On the operator level, the extension provides highly efficient GEMM kernel to speed up Linear layer and customized operators to reduce the memory footprint. To better trade-off the performance and accuracy, different low-precision solutions e.g., smoothQuant and weight-only-quantization are also enabled. Besides, tensor parallel can also adopt to get lower latency for LLMs.
 
-These LLM-specific optimizations can be automatically applied with a single frontend API function in Python interface, `ipex.optimize_transformers()`. Check `optimize_transformers <./llm/llm_optimize_transformers.md>`_ for more details.
+These LLM-specific optimizations can be automatically applied with a single frontend API function in Python interface, `ipex.llm.optimize()`. Check `llm.optimize <./llm/llm_optimize.md>`_ for more details.
 
 .. toctree::
    :hidden:
    :maxdepth: 1
 
-   llm/llm_optimize_transformers
+   llm/llm_optimize
 
-Optimized Models
-----------------
+ipex.llm Optimized Model List
+-----------------------------
 
-.. list-table::
-   :widths: auto
-   :header-rows: 1
+Verified for single instance mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   * - Model Family
-     - LLAMA
-     - GPT-J
-     - GPT-NEOX
-     - FALCON*
-     - OPT
-   * - Verified < MODEL ID > (Huggingface hub)
-     - "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf"
-     - "EleutherAI/gpt-j-6b"
-     - "EleutherAI/gpt-neox-20b"
-     - "tiiuae/falcon-40b"
-     - "facebook/opt-30b", "facebook/opt-1.3b"
-   * - FP32/BF16
-     - ✅
-     - ✅
-     - ✅
-     - ✅
-     - ✅
-   * - Weight only quantzation INT8
-     - ✅
-     - ✅
-     - ✅
-     - ✅
-     - ✅
-   * - Weight only quantization INT4
-     - ✅
-     - ✅
-     - ✅
-     - ✅
-     - ✅
-   * - Static quantization INT8
-     - ✅
-     - ✅
-     - ❎\*\*
-     - ❎\*\*
-     - ❎\*\*
++------------+---------+---------+---------+---------+---------+---------+
+| MODEL      | MODEL   | FP32    | BF16    | Static  | Weight  | Weight  |
+| FAMILY     | NAME    |         |         | quant   | only    | only    |
+|            | (Hugg   |         |         | ization | quant   | quant   |
+|            | ingface |         |         | INT8    | ization | ization |
+|            | hub)    |         |         |         | INT8    | INT4    |
++============+=========+=========+=========+=========+=========+=========+
+| LLAMA      | met     | 🟩      | 🟩      | 🟩      | 🟩      | 🟨      |
+|            | a-llama |         |         |         |         |         |
+|            | /Llama- |         |         |         |         |         |
+|            | 2-7b-hf |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| LLAMA      | meta    | 🟩      | 🟩      | 🟩      | 🟩      | 🟨      |
+|            | -llama/ |         |         |         |         |         |
+|            | Llama-2 |         |         |         |         |         |
+|            | -13b-hf |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| LLAMA      | meta    | 🟩      | 🟩      | 🟩      | 🟩      | 🟨      |
+|            | -llama/ |         |         |         |         |         |
+|            | Llama-2 |         |         |         |         |         |
+|            | -70b-hf |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| GPT-J      | Eleut   | 🟩      | 🟩      | 🟩      | 🟩      | 🟩      |
+|            | herAI/g |         |         |         |         |         |
+|            | pt-j-6b |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| GPT-NEOX   | El      | 🟩      | 🟨      | 🟨      | 🟩      | 🟨      |
+|            | eutherA |         |         |         |         |         |
+|            | I/gpt-n |         |         |         |         |         |
+|            | eox-20b |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| DOLLY      | da      | 🟩      | 🟨      | 🟨      | 🟩      | 🟨      |
+|            | tabrick |         |         |         |         |         |
+|            | s/dolly |         |         |         |         |         |
+|            | -v2-12b |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| FALCON     | tii     | 🟩      | 🟩      | 🟩      | 🟩      | 🟩      |
+|            | uae/fal |         |         |         |         |         |
+|            | con-40b |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| OPT        | fa      | 🟩      | 🟩      | 🟩      | 🟩      | 🟨      |
+|            | cebook/ |         |         |         |         |         |
+|            | opt-30b |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| OPT        | fac     | 🟩      | 🟩      | 🟩      | 🟩      | 🟨      |
+|            | ebook/o |         |         |         |         |         |
+|            | pt-1.3b |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| Bloom      | bigsci  | 🟩      | 🟨      | 🟩      | 🟩      | 🟨      |
+|            | ence/bl |         |         |         |         |         |
+|            | oom-1b7 |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| CodeGen    | Salesf  | 🟩      | 🟩      | 🟨      | 🟩      | 🟩      |
+|            | orce/co |         |         |         |         |         |
+|            | degen-2 |         |         |         |         |         |
+|            | B-multi |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| Baichuan   | ba      | 🟩      | 🟩      | 🟩      | 🟩      |         |
+|            | ichuan- |         |         |         |         |         |
+|            | inc/Bai |         |         |         |         |         |
+|            | chuan2- |         |         |         |         |         |
+|            | 7B-Chat |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| Baichuan   | bai     | 🟩      | 🟩      | 🟩      | 🟩      |         |
+|            | chuan-i |         |         |         |         |         |
+|            | nc/Baic |         |         |         |         |         |
+|            | huan2-1 |         |         |         |         |         |
+|            | 3B-Chat |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| Baichuan   | ba      | 🟩      | 🟨      | 🟩      | 🟩      |         |
+|            | ichuan- |         |         |         |         |         |
+|            | inc/Bai |         |         |         |         |         |
+|            | chuan-1 |         |         |         |         |         |
+|            | 3B-Chat |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| ChatGLM    | THU     | 🟩      | 🟩      | 🟨      | 🟩      |         |
+|            | DM/chat |         |         |         |         |         |
+|            | glm3-6b |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| ChatGLM    | THU     | 🟩      | 🟩      | 🟨      | 🟩      |         |
+|            | DM/chat |         |         |         |         |         |
+|            | glm2-6b |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| GPTBigCode | big     | 🟩      | 🟩      | 🟨      | 🟩      | 🟨      |
+|            | code/st |         |         |         |         |         |
+|            | arcoder |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| T5         | goo     | 🟩      | 🟩      | 🟨      | 🟩      |         |
+|            | gle/fla |         |         |         |         |         |
+|            | n-t5-xl |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| Mistral    | mist    | 🟩      | 🟩      | 🟨      | 🟩      | 🟨      |
+|            | ralai/M |         |         |         |         |         |
+|            | istral- |         |         |         |         |         |
+|            | 7B-v0.1 |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
+| MPT        | m       | 🟩      | 🟩      | 🟨      | 🟩      | 🟩      |
+|            | osaicml |         |         |         |         |         |
+|            | /mpt-7b |         |         |         |         |         |
++------------+---------+---------+---------+---------+---------+---------+
 
-\* For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for FP32/BF16 but needed for quantizations.
+Verified for distributed inference mode via DeepSpeed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-\*\* For GPT-NEOX/FALCON/OPT models, the accuracy recipes of static quantization INT8 are not ready, thus, they will be skipped in our coverage.
++-----------------+-----------------+-----------------+-----------------+
+| MODEL FAMILY    | MODEL NAME      | BF16            | Weight only     |
+|                 | (Huggingface    |                 | quantization    |
+|                 | hub)            |                 | INT8            |
++=================+=================+=================+=================+
+| LLAMA           | meta-llam       | 🟩              | 🟩              |
+|                 | a/Llama-2-7b-hf |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| LLAMA           | meta-llama      | 🟩              | 🟩              |
+|                 | /Llama-2-13b-hf |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| LLAMA           | meta-llama      | 🟩              | 🟩              |
+|                 | /Llama-2-70b-hf |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| GPT-J           | Eleu            | 🟨              | 🟩              |
+|                 | therAI/gpt-j-6b |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| GPT-NEOX        | Eleuther        | 🟨              | 🟩              |
+|                 | AI/gpt-neox-20b |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| DOLLY           | databric        | 🟨              | 🟩              |
+|                 | ks/dolly-v2-12b |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| FALCON          | ti              | 🟨              | 🟨              |
+|                 | iuae/falcon-40b |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| OPT             | f               | 🟨              | 🟩              |
+|                 | acebook/opt-30b |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| OPT             | fa              | 🟩              | 🟩              |
+|                 | cebook/opt-1.3b |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| Bloom           | bigsc           | 🟨              | 🟩              |
+|                 | ience/bloom-1b7 |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| CodeGen         | Salesforce/c    | 🟩              | 🟩              |
+|                 | odegen-2B-multi |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| Baichuan        | baichuan-inc/Ba | 🟩              | 🟩              |
+|                 | ichuan2-7B-Chat |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| Baichuan        | b               | 🟨              | 🟩              |
+|                 | aichuan-inc/Bai |                 |                 |
+|                 | chuan2-13B-Chat |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| Baichuan        | baichuan-inc/Ba | 🟨              | 🟩              |
+|                 | ichuan-13B-Chat |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| GPTBigCode      | bi              | 🟩              | 🟩              |
+|                 | gcode/starcoder |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| T5              | go              | 🟩              | 🟩              |
+|                 | ogle/flan-t5-xl |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| Mistral         | mistralai/      | 🟩              | 🟩              |
+|                 | Mistral-7B-v0.1 |                 |                 |
++-----------------+-----------------+-----------------+-----------------+
+| MPT             | mosaicml/mpt-7b | 🟩              | 🟩              |
++-----------------+-----------------+-----------------+-----------------+
 
-*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well optimized with all approaches like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM families, we are working in progress to cover those optimizations, which will expand the model list above.
+-  🟩 signifies that the model can perform well and with good accuracy (<1% difference as compared with FP32).
+-  🟨 signifies that the model can perform well while accuracy may not been in a perfect state (>1% difference as compared with FP32).
 
-Check `LLM best known practice <../../examples/cpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts..
+*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). We are working in progress to better support the models in the tables with various data types. In addition, more models will be optimized in the future.
+*Note*: The accuracy drop issue in distributed inference mode for "tiiuae/falcon-40b" has been fixed by DeepSpeed in a recent patch release `v0.13.1 <https://github.com/microsoft/DeepSpeed/tree/v0.13.1>`_.
+
+Please check `LLM best known practice <../../examples/cpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts..
 
 Demos
 -----

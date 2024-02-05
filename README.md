@@ -21,28 +21,33 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 
 | MODEL FAMILY | MODEL NAME (Huggingface hub) | FP32 | BF16 | Static quantization INT8 | Weight only quantization INT8 | Weight only quantization INT4 |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|LLAMA| meta-llama/Llama-2-7b-hf | ✅ | ✅ | ✅ | ✅ | ☑️ | 
-|LLAMA| meta-llama/Llama-2-13b-hf | ✅ | ✅ | ✅ | ✅ | ☑️ | 
-|LLAMA| meta-llama/Llama-2-70b-hf | ✅ | ✅ | ✅ | ✅ | ☑️ | 
-|GPT-J| EleutherAI/gpt-j-6b | ✅ | ✅ | ✅ | ✅ | ✅ | 
-|GPT-NEOX| EleutherAI/gpt-neox-20b | ✅ | ✅ | ☑️ | ✅ | ☑️ | 
-|DOLLY| databricks/dolly-v2-12b | ✅ | ✅ | ☑️ | ☑️ | ☑️ | 
-|FALCON| tiiuae/falcon-40b | ✅ | ✅ | ✅ |  ✅ | ✅ | 
-|OPT| facebook/opt-30b | ✅ | ✅ | ✅ |    | ☑️ | 
-|OPT| facebook/opt-1.3b | ✅ | ✅ | ✅ |  ✅ | ☑️ | 
-|Bloom| bigscience/bloom-1b7 | ✅ | ☑️ | ✅ |    | ☑️ |
-|CodeGen| Salesforce/codegen-2B-multi | ✅ | ✅ | ☑️ |  ✅ | ✅ |
-|Baichuan| baichuan-inc/Baichuan2-7B-Chat | ✅ | ✅ | ✅ | ✅  |    |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | ✅ | ✅ |    |  ✅ |    |
-|Baichuan| baichuan-inc/Baichuan-13B-Chat | ✅ | ☑️ | ✅ |    |    |
-|ChatGLM| THUDM/chatglm3-6b | ✅ | ✅ | ☑️ |  ✅ |    |
-|ChatGLM| THUDM/chatglm2-6b | ✅ | ☑️ | ☑️ |  ☑️ |    |
-|GPTBigCode| bigcode/starcoder | ✅ | ✅ | ☑️ |  ✅ | ☑️ |
-|T5| google/flan-t5-xl | ✅ | ✅ | ☑️ |  ✅ |    |
-|Mistral| mistralai/Mistral-7B-v0.1 | ✅ | ✅ | ☑️ |  ✅ | ☑️ |
-|MPT| mosaicml/mpt-7b | ✅ | ✅ | ☑️ |  ✅ | ✅ |
+|LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 
+|LLAMA| meta-llama/Llama-2-13b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 
+|LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 
+|GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 
+|GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 | 
+|DOLLY| databricks/dolly-v2-12b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 | 
+|FALCON| tiiuae/falcon-40b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 
+|OPT| facebook/opt-30b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 
+|OPT| facebook/opt-1.3b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 
+|Bloom| bigscience/bloom-1b7 | 🟩 | 🟨 | 🟩 | 🟩  | 🟨 |
+|CodeGen| Salesforce/codegen-2B-multi | 🟩 | 🟩 | 🟨 | 🟩 | 🟩 |
+|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 |    |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟩 | 🟩 |    |
+|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟨 | 🟩 | 🟩 |    |
+|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 | 🟩 |    |
+|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟨 | 🟩 |    |
+|GPTBigCode| bigcode/starcoder | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|T5| google/flan-t5-xl | 🟩 | 🟩 | 🟨 | 🟩 |    |
+|Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|MPT| mosaicml/mpt-7b | 🟩 | 🟩 | 🟨 | 🟩 | 🟩 |
 
-*Note*: All above models have undergone thorough optimization and verification processes for both performance and accuracy. In the context of the optimized model list table above, the symbol ✅ signifies that the model can achieve an accuracy drop of less than 1% when using a specific data type compared to FP32, whereas the accuracy drop may exceed 1% for ☑️ marked ones. We are working in progress to better support the models in the table with various data types. In addition, more models will be optimized, which will expand the table.
+- 🟩 signifies that the model can perform well and with good accuracy (<1% difference as compared with FP32).
+
+- 🟨 signifies that the model can perform well while accuracy may not been in a perfect state (>1% difference as compared with FP32).
+
+*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16).
+We are working in progress to better support the models in the tables with various data types. In addition, more models will be optimized in the future.
 
 ## Support
 
@@ -50,7 +55,7 @@ The team tracks bugs and enhancement requests using [GitHub issues](https://gith
 
 ## Intel® AI Reference Models
 
-Use cases that had already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/pytorch-r2.2.0-models) (former Model Zoo). A bunch of PyTorch use cases for benchmarking are also available on the [Github page](https://github.com/IntelAI/models/tree/pytorch-r2.2.0-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running the scripts in the Reference Models.
+Use cases that had already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/pytorch-r2.2-models) (former Model Zoo). A bunch of PyTorch use cases for benchmarking are also available on the [Github page](https://github.com/IntelAI/models/tree/pytorch-r2.2-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running the scripts in the Reference Models.
 
 ## License
 

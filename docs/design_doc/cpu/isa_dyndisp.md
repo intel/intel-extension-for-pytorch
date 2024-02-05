@@ -14,6 +14,7 @@ PyTorch & IPEX CPU ISA support statement:
  | IPEX-1.12 | ✘ | ✔ | ✘ | ✔ | ✔ | ✔ | ✔ | ✘ |
  | IPEX-1.13 | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✘ |
  | IPEX-2.1 | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
+ | IPEX-2.2 | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 
 \* Current IPEX DEFAULT level implemented as same as AVX2 level.
 
