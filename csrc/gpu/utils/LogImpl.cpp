@@ -152,17 +152,69 @@ IPEXLoggingSetting::IPEXLoggingSetting() {
   return;
 }
 
+void EventLogger::print_verbose_ext(
+    int log_level,
+    const std::string& kernel_name,
+    const uint64_t event_duration) {
+  auto start_msg = this->message_queue[0];
+  auto start_barrier_msg = this->message_queue[1];
+  auto submit_msg = this->message_queue[2];
+  auto end_barrier_msg = this->message_queue[3];
+  auto event_wait_msg = this->message_queue[4];
+
+  std::stringstream ss;
+  ss << kernel_name << ": submit = "
+     << static_cast<float>(
+            (submit_msg.timestamp - start_msg.timestamp) / 1000.0);
+  ss << " us , event wait = "
+     << static_cast<float>(
+            (event_wait_msg.timestamp - submit_msg.timestamp) / 1000.0);
+  ss << " us , event duration = " << event_duration;
+  ss << " us , total = "
+     << static_cast<float>(
+            (event_wait_msg.timestamp - start_msg.timestamp) / 1000);
+  ss << " us , barrier wait time = "
+     << static_cast<float>(
+            (end_barrier_msg.timestamp - start_barrier_msg.timestamp) / 1000);
+  ss << " us";
+  auto log_str = ss.str();
+  log_result_with_args(log_level, log_str);
+}
+
+// this is for log message format as previous IPEX_VERBOSE
+void EventLogger::print_verbose(
+    int log_level,
+    const std::string& kernel_name,
+    const uint64_t event_duration) {
+  auto start_msg = this->message_queue[0];
+  auto submit_msg = this->message_queue[1];
+  auto event_wait_msg = this->message_queue[2];
+
+  std::stringstream ss;
+  ss << kernel_name << ": submit = "
+     << static_cast<float>(
+            (submit_msg.timestamp - start_msg.timestamp) / 1000.0);
+  ss << " us , event wait = "
+     << static_cast<float>(
+            (event_wait_msg.timestamp - submit_msg.timestamp) / 1000.0);
+  ss << " us , event duration = " << event_duration;
+  ss << " us , total = "
+     << static_cast<float>(
+            (event_wait_msg.timestamp - start_msg.timestamp) / 1000);
+  ss << " us";
+  auto log_str = ss.str();
+  log_result_with_args(log_level, log_str);
+}
+
 void EventLogger::print_result(int log_level) {
   assert(this->message_queue.size() >= 2);
   auto first = this->message_queue.front();
   auto last = this->message_queue.back();
   auto cost_time = last.timestamp - first.timestamp;
   auto event_id = this->message_queue.front().event_id;
-
   std::ostringstream stringStream;
-  stringStream << "Total event cost time is:" << cost_time << " ms."
-               << std::endl;
-
+  stringStream << "Total event cost time is:"
+               << static_cast<float>(cost_time / 1000.0) << " us.";
   log_result(log_level, stringStream.str());
   while (!this->message_queue.empty()) {
     auto msg = this->message_queue.front().message;
@@ -170,14 +222,17 @@ void EventLogger::print_result(int log_level) {
     log_result(log_level, this->message_queue.front().message);
     auto this_time = this->message_queue.front().timestamp;
     auto this_step = this->message_queue.front().step_id;
-    message_queue.pop();
-    if (!this->message_queue.empty()) {
+    message_queue.pop_front();
+    // have more than 2 step, need to calculate timestamp between each step.
+    if (this->message_queue.size() >= 2) {
       auto next_time = this->message_queue.front().timestamp;
       auto next_step = this->message_queue.front().step_id;
-      auto time_step = next_time - this_time;
+      // inside IPEX_LOGGING we are using nanoseconds, 1ns = 0.001us, cast to us
+      // here
+      auto time_step = static_cast<float>((next_time - this_time) / 1000);
       log_result_with_args(
           log_level,
-          "{} between step:{} and step:{} usage time {}ms",
+          "{} between step:{} and step:{} usage time {} us",
           event_id,
           this_step,
           next_step,

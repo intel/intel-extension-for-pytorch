@@ -5,6 +5,9 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include "utils/LogUtils.h"
+
+#define LOG_LEVEL_TRACE 0
 
 namespace xpu {
 namespace dpcpp {
@@ -13,23 +16,17 @@ int thread_local SimpleTrace::gindent = -1;
 int thread_local SimpleTrace::gindex = -1;
 
 SimpleTrace::SimpleTrace(const char* name)
-    : _name(name), _enabled(Settings::I().is_simple_trace_enabled()) {
+    : _name(name), _enabled(Settings::I().get_log_level() >= LOG_LEVEL_TRACE) {
   if (_enabled) {
     gindent++;
     gindex++;
 
-    std::stringstream ps;
-
-    ps << "[" << std::setfill(' ') << std::setw(13)
-       << std::to_string(sys_getpid()) + "." + std::to_string(sys_gettid())
-       << "] " << std::setw(gindent * 2 + 1) << " ";
-
-    _pre_str = ps.str();
-
     _index = gindex;
-    std::cout << _pre_str << "Call  into  OP: " << _name << " (#" << _index
-              << ")" << std::endl;
-    fflush(stdout);
+    std::stringstream ss;
+    ss << "Call  into  OP: " << _name << " (#" << _index << ")";
+    std::string s = ss.str();
+
+    IPEX_TRACE_LOG("OPS", "", s);
   }
 }
 
@@ -39,9 +36,10 @@ SimpleTrace::~SimpleTrace() {
       auto& dpcpp_queue = dpcppGetCurrentQueue();
       dpcpp_queue.wait();
     }
-    std::cout << _pre_str << "Step out of OP: " << _name << " (#" << _index
-              << ")" << std::endl;
-    fflush(stdout);
+    std::stringstream ss;
+    ss << "Step out of OP: " << _name << " (#" << _index << ")";
+    IPEX_TRACE_LOG("OPS", "", ss.str());
+
     gindent--;
   }
 }

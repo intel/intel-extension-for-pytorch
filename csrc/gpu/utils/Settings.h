@@ -72,7 +72,7 @@ class IPEX_API Settings final {
   int get_verbose_level() const;
   bool set_verbose_level(int level);
 
-  int get_log_level() const;
+  int get_log_level();
   bool set_log_level(int level);
 
   std::string get_log_output_file_path();

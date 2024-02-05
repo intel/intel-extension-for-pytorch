@@ -7,7 +7,6 @@
 #include <core/Stream.h>
 #include <runtime/Utils.h>
 #include <utils/Profiler.h>
-#include <utils/Timer.h>
 
 #include <oneapi/dnnl/dnnl.hpp>
 #include <oneapi/dnnl/dnnl_sycl.hpp>
