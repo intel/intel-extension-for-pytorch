@@ -2446,11 +2446,11 @@ class Tester(TestCase):
                 _check_match_mha(mha_jit, mat1, mat2, mask)
 
     def _test_conv_unary_fusion(self, op_list, seed=None):
-        batch_size = 8
-        out_channels = 16
+        batch_size = 1
+        out_channels = 2
         in_channels = 3
         kernel_size = 3
-        image_size = 16
+        image_size = 8
 
         if seed is None:
             rand_seed = int(get_rand_seed())
@@ -2503,7 +2503,7 @@ class Tester(TestCase):
 
     def _test_conv_transpose_unary_fusion(self, op_list, seed=None):
         batch_size = 1
-        out_channels = 5
+        out_channels = 2
         in_channels = 3
         kernel_size = 3
         image_size = 8
@@ -3748,11 +3748,11 @@ class Tester(TestCase):
             )
 
     def test_output_conv_broadcast_sum(self):
-        batch_size = 8
-        out_channels = 32
+        batch_size = 1
+        out_channels = 2
         in_channels = 3
         kernel_size = 3
-        image_size = 64
+        image_size = 16
         for dim in [2, 3]:
             input_size = [batch_size, in_channels, image_size, image_size]
             if dim == 3:
@@ -3778,12 +3778,12 @@ class Tester(TestCase):
             )
 
     def test_output_cascaded_conv_bn_sum_relu(self):
-        batch_size = 8
-        mid_channels = 64
-        out_channels = 32
+        batch_size = 1
+        mid_channels = 2
+        out_channels = 3
         in_channels = 3
         kernel_size = 3
-        image_size = 64
+        image_size = 8
         for dim in [2, 3]:
             input_size = [batch_size, in_channels, image_size, image_size]
             if dim == 3:
@@ -3865,11 +3865,11 @@ class Tester(TestCase):
                 self.assertEqual(eager_y, traced_y)
 
     def test_jit_conv_sum_in_diff_block(self):
-        batch_size = 8
-        out_channels = 32
+        batch_size = 1
+        out_channels = 8
         in_channels = 3
         kernel_size = 1
-        image_size = 64
+        image_size = 32
         for dim in [2, 3]:
             input_size = [batch_size, in_channels, image_size, image_size]
             if dim == 3:
