@@ -85,17 +85,7 @@ static inline scalar_t area_pixel_compute_scale(
 }
 
 template <typename accscalar_t>
-static inline accscalar_t compute_scales_value(
-    const c10::optional<double> scale,
-    int64_t src_size,
-    int64_t dst_size) {
-  return (scale.has_value() && scale.value() > 0.f)
-      ? (accscalar_t)scale.value()
-      : (accscalar_t)src_size / dst_size;
-}
-
-template <typename accscalar_t>
-static accscalar_t nearest_compute_scales_value(
+static inline accscalar_t nearest_compute_scales_value(
     const c10::optional<double> scale,
     int64_t src_size,
     int64_t dst_size) {
@@ -127,21 +117,25 @@ static inline accscalar_t area_pixel_compute_scale(
       return static_cast<accscalar_t>(0);
     }
   } else {
-    return compute_scales_value<accscalar_t>(scale, input_size, output_size);
+    return nearest_compute_scales_value<accscalar_t>(
+        scale, input_size, output_size);
   }
 }
 
-template <typename scalar_t>
-static inline scalar_t area_pixel_compute_source_index(
-    scalar_t scale,
+template <typename accscalar_t>
+static inline accscalar_t area_pixel_compute_source_index(
+    accscalar_t scale,
     int dst_index,
     bool align_corners,
     bool cubic) {
   if (align_corners) {
     return scale * dst_index;
   } else {
-    scalar_t src_idx = scale * (dst_index + 0.5f) - 0.5f;
-    return (!cubic && src_idx < 0.f) ? scalar_t(0.f) : src_idx;
+    accscalar_t src_idx = scale * (dst_index + static_cast<accscalar_t>(0.5)) -
+        static_cast<accscalar_t>(0.5);
+    return (!cubic && src_idx < static_cast<accscalar_t>(0))
+        ? static_cast<accscalar_t>(0)
+        : src_idx;
   }
 }
 
@@ -205,6 +199,22 @@ static inline void get_cubic_upsample_coefficients(
   coeffs[3] = cubic_convolution2<scalar_t>(x2 + 1.0f, A);
 }
 
+template <typename accscalar_t>
+static inline void get_cubic_upsampling_coefficients(
+    accscalar_t coeffs[4],
+    accscalar_t t) {
+  accscalar_t A = -0.75;
+
+  accscalar_t x1 = t;
+  coeffs[0] = cubic_convolution2<accscalar_t>(x1 + 1.0, A);
+  coeffs[1] = cubic_convolution1<accscalar_t>(x1, A);
+
+  // opposite coefficients
+  accscalar_t x2 = 1.0 - t;
+  coeffs[2] = cubic_convolution1<accscalar_t>(x2, A);
+  coeffs[3] = cubic_convolution2<accscalar_t>(x2 + 1.0, A);
+}
+
 template <typename scalar_t>
 static inline scalar_t cubic_interp1d(
     scalar_t x0,
@@ -214,6 +224,19 @@ static inline scalar_t cubic_interp1d(
     scalar_t t) {
   scalar_t coeffs[4];
   get_cubic_upsample_coefficients<scalar_t>(coeffs, t);
+
+  return x0 * coeffs[0] + x1 * coeffs[1] + x2 * coeffs[2] + x3 * coeffs[3];
+}
+
+template <typename scalar_t, typename accscalar_t>
+static inline accscalar_t cubic_interp1d(
+    scalar_t x0,
+    scalar_t x1,
+    scalar_t x2,
+    scalar_t x3,
+    accscalar_t t) {
+  accscalar_t coeffs[4];
+  get_cubic_upsampling_coefficients<accscalar_t>(coeffs, t);
 
   return x0 * coeffs[0] + x1 * coeffs[1] + x2 * coeffs[2] + x3 * coeffs[3];
 }

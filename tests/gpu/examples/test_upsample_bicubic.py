@@ -6,7 +6,7 @@ import intel_extension_for_pytorch  # noqa
 
 
 class TestNNMethod(TestCase):
-    def test_upsample_bicubic_2d(self, dtype=torch.float):
+    def test_upsample_bicubic2d(self, dtype=torch.float):
         input_cpu = torch.randn((1, 3, 5, 5), dtype=torch.float32)
         input_xpu = input_cpu.to("xpu")
         scales = 1
@@ -42,7 +42,7 @@ class TestNNMethod(TestCase):
         grad_xpu = input_xpu.grad
         self.assertEqual(grad_cpu, grad_xpu.cpu())
 
-    def test_test_upsample_bicubic_2d_half(self, dtype=torch.float):
+    def test_test_upsample_bicubic2d_half(self, dtype=torch.float):
         input_cpu = torch.randn((1, 3, 5, 5), dtype=torch.float32)
         input_xpu = input_cpu.to("xpu", dtype=torch.float16)
         scales = 1
@@ -82,7 +82,7 @@ class TestNNMethod(TestCase):
             grad_cpu, grad_xpu.to("cpu", dtype=torch.float32), atol=1e-3, rtol=1e-3
         )
 
-    def test_upsample_bicubic_2d_align_corners(self, dtype=torch.float):
+    def test_upsample_bicubic2d_align_corners(self, dtype=torch.float):
         input_cpu = torch.randn((1, 3, 5, 5), dtype=torch.float32)
         input_xpu = input_cpu.to("xpu")
         scales = 1

@@ -6,6 +6,7 @@
 #include <utils/DPCPP.h>
 #include <utils/Helpers.h>
 #include "comm/ATDispatch.h"
+#include "comm/AccumulateType.h"
 #include "comm/RegistrationDeclarations.h"
 
 #include "UpSample.h"
@@ -17,7 +18,7 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-template <typename scalar_t>
+template <typename scalar_t, typename accscalar_t>
 struct UpsampleBicubic2dOutFrameKernelFunctor {
   void operator()(sycl::nd_item<1> item) const {
     auto in_ptr = in_data;
@@ -43,27 +44,22 @@ struct UpsampleBicubic2dOutFrameKernelFunctor {
         return;
       }
 
-      const scalar_t height_scale = area_pixel_compute_scale<scalar_t>(
-          input_height, output_height, align_corners);
-      const scalar_t width_scale = area_pixel_compute_scale<scalar_t>(
-          input_width, output_width, align_corners);
-
       // Interpolation kernel
-      scalar_t real_x = area_pixel_compute_source_index(
+      accscalar_t real_x = area_pixel_compute_source_index(
           width_scale, output_x, align_corners, /*cubic=*/true);
       // TODO: floor should support at dispatch to half type
-      int in_x = Numerics<scalar_t>::floor(real_x);
-      scalar_t t_x = real_x - in_x;
+      int in_x = Numerics<accscalar_t>::floor(real_x);
+      accscalar_t t_x = real_x - in_x;
 
-      scalar_t real_y = area_pixel_compute_source_index(
+      accscalar_t real_y = area_pixel_compute_source_index(
           height_scale, output_y, align_corners, /*cubic=*/true);
-      int in_y = Numerics<scalar_t>::floor(real_y);
-      scalar_t t_y = real_y - in_y;
+      int in_y = Numerics<accscalar_t>::floor(real_y);
+      accscalar_t t_y = real_y - in_y;
       for (int n = 0; n < nbatch; n++) {
         for (int c = 0; c < channels; c++) {
-          scalar_t coefficients[4];
+          accscalar_t coefficients[4];
           for (int k = 0; k < 4; k++) {
-            coefficients[k] = cubic_interp1d(
+            coefficients[k] = cubic_interp1d<scalar_t, accscalar_t>(
                 upsample_get_value_bounded<scalar_t>(
                     in_ptr,
                     n,
@@ -103,7 +99,7 @@ struct UpsampleBicubic2dOutFrameKernelFunctor {
               [n * output_height * output_width * channels +
                c * output_height * output_width + output_y * output_width +
                output_x] =
-                  static_cast<scalar_t>(cubic_interp1d(
+                  static_cast<scalar_t>(cubic_interp1d<scalar_t, accscalar_t>(
                       coefficients[0],
                       coefficients[1],
                       coefficients[2],
@@ -123,7 +119,9 @@ struct UpsampleBicubic2dOutFrameKernelFunctor {
       int64_t nbatch_,
       int64_t channels_,
       int64_t onum_,
-      bool align_corners_)
+      bool align_corners_,
+      const accscalar_t height_scale_,
+      const accscalar_t width_scale_)
       : out_data(out_data_),
         in_data(in_data_),
         input_height(input_height_),
@@ -133,7 +131,9 @@ struct UpsampleBicubic2dOutFrameKernelFunctor {
         nbatch(nbatch_),
         channels(channels_),
         onum(onum_),
-        align_corners(align_corners_) {}
+        align_corners(align_corners_),
+        height_scale(height_scale_),
+        width_scale(width_scale_) {}
 
  private:
   scalar_t* out_data;
@@ -146,9 +146,11 @@ struct UpsampleBicubic2dOutFrameKernelFunctor {
   int64_t channels;
   int64_t onum;
   bool align_corners;
+  const accscalar_t height_scale;
+  const accscalar_t width_scale;
 };
 
-template <typename scalar_t>
+template <typename scalar_t, typename accscalar_t>
 static void upsample_bicubic2d_out_frame(
     scalar_t* odata,
     scalar_t* idata,
@@ -159,7 +161,9 @@ static void upsample_bicubic2d_out_frame(
     int64_t nbatch,
     int64_t channels,
     int64_t onum,
-    bool align_corners) {
+    bool align_corners,
+    const accscalar_t height_scale,
+    const accscalar_t width_scale) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t local_range = static_cast<int64_t>(1);
   int64_t global_range = static_cast<int64_t>(1);
@@ -173,7 +177,7 @@ static void upsample_bicubic2d_out_frame(
     auto in_data = idata;
     auto out_data = odata;
 
-    UpsampleBicubic2dOutFrameKernelFunctor<scalar_t> kfn(
+    UpsampleBicubic2dOutFrameKernelFunctor<scalar_t, accscalar_t> kfn(
         out_data,
         in_data,
         input_height,
@@ -183,7 +187,9 @@ static void upsample_bicubic2d_out_frame(
         nbatch,
         channels,
         onum,
-        align_corners);
+        align_corners,
+        height_scale,
+        width_scale);
     cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
@@ -192,7 +198,7 @@ static void upsample_bicubic2d_out_frame(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename scalar_t>
+template <typename scalar_t, typename accscalar_t>
 struct UpsampleBicubic2dBackwardOutFrameKernelFunctor {
   void operator()(sycl::nd_item<1> item) const {
     auto in_ptr = in_data;
@@ -219,23 +225,18 @@ struct UpsampleBicubic2dBackwardOutFrameKernelFunctor {
         return;
       }
 
-      const scalar_t height_scale = area_pixel_compute_scale<scalar_t>(
-          input_height, output_height, align_corners);
-      const scalar_t width_scale = area_pixel_compute_scale<scalar_t>(
-          input_width, output_width, align_corners);
-
-      scalar_t real_x = area_pixel_compute_source_index(
+      accscalar_t real_x = area_pixel_compute_source_index(
           width_scale, output_x, align_corners, /*cubic=*/true);
-      int input_x = Numerics<scalar_t>::floor(real_x);
-      scalar_t t_x = real_x - input_x;
+      int input_x = Numerics<accscalar_t>::floor(real_x);
+      accscalar_t t_x = real_x - input_x;
 
-      scalar_t real_y = area_pixel_compute_source_index(
+      accscalar_t real_y = area_pixel_compute_source_index(
           height_scale, output_y, align_corners, /*cubic=*/true);
-      int input_y = Numerics<scalar_t>::floor(real_y);
-      scalar_t t_y = real_y - input_y;
+      int input_y = Numerics<accscalar_t>::floor(real_y);
+      accscalar_t t_y = real_y - input_y;
 
-      scalar_t x_coeffs[4];
-      scalar_t y_coeffs[4];
+      accscalar_t x_coeffs[4];
+      accscalar_t y_coeffs[4];
 
       get_cubic_upsample_coefficients(x_coeffs, t_x);
       get_cubic_upsample_coefficients(y_coeffs, t_y);
@@ -273,7 +274,9 @@ struct UpsampleBicubic2dBackwardOutFrameKernelFunctor {
       int64_t nbatch_,
       int64_t channels_,
       int64_t onum_,
-      bool align_corners_)
+      bool align_corners_,
+      const accscalar_t height_scale_,
+      const accscalar_t width_scale_)
       : out_data(out_data_),
         in_data(in_data_),
         input_height(input_height_),
@@ -283,7 +286,9 @@ struct UpsampleBicubic2dBackwardOutFrameKernelFunctor {
         nbatch(nbatch_),
         channels(channels_),
         onum(onum_),
-        align_corners(align_corners_) {}
+        align_corners(align_corners_),
+        height_scale(height_scale_),
+        width_scale(width_scale_) {}
 
  private:
   scalar_t* out_data;
@@ -296,10 +301,12 @@ struct UpsampleBicubic2dBackwardOutFrameKernelFunctor {
   int64_t channels;
   int64_t onum;
   bool align_corners;
+  const accscalar_t height_scale;
+  const accscalar_t width_scale;
 };
 
 // Backward (adjoint) operation 1 <- 2 (accumulates)
-template <typename scalar_t>
+template <typename scalar_t, typename accscalar_t>
 static void upsample_bicubic2d_backward_out_frame(
     scalar_t* odata,
     scalar_t* idata,
@@ -310,7 +317,9 @@ static void upsample_bicubic2d_backward_out_frame(
     int64_t nbatch,
     int64_t channels,
     int64_t onum,
-    bool align_corners) {
+    bool align_corners,
+    const accscalar_t height_scale,
+    const accscalar_t width_scale) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t local_range = static_cast<int64_t>(1);
   int64_t global_range = static_cast<int64_t>(1);
@@ -323,7 +332,7 @@ static void upsample_bicubic2d_backward_out_frame(
     auto in_data = idata;
     auto out_data = odata;
 
-    UpsampleBicubic2dBackwardOutFrameKernelFunctor<scalar_t> kfn(
+    UpsampleBicubic2dBackwardOutFrameKernelFunctor<scalar_t, accscalar_t> kfn(
         out_data,
         in_data,
         input_height,
@@ -333,7 +342,9 @@ static void upsample_bicubic2d_backward_out_frame(
         nbatch,
         channels,
         onum,
-        align_corners);
+        align_corners,
+        height_scale,
+        width_scale);
     cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
@@ -346,7 +357,9 @@ static void upsample_bicubic2d_out_template(
     Tensor& output,
     const Tensor& input_,
     IntArrayRef output_size,
-    bool align_corners) {
+    bool align_corners,
+    c10::optional<double> scales_h,
+    c10::optional<double> scales_w) {
   TORCH_CHECK(
       output_size.size() == 2,
       "It is expected output_size equals to 2, but got size ",
@@ -385,7 +398,14 @@ static void upsample_bicubic2d_out_template(
         auto* odata = output.data_ptr<scalar_t>();
         auto onum = output.numel();
 
-        upsample_bicubic2d_out_frame<scalar_t>(
+        // Get scaling factors
+        using accscalar_t = at::AtenIpexTypeXPU::acc_type<scalar_t>;
+        const accscalar_t rheight = area_pixel_compute_scale<accscalar_t>(
+            input_height, output_height, align_corners, scales_h);
+        const accscalar_t rwidth = area_pixel_compute_scale<accscalar_t>(
+            input_width, output_width, align_corners, scales_w);
+
+        upsample_bicubic2d_out_frame<scalar_t, accscalar_t>(
             odata,
             idata,
             input_height,
@@ -395,7 +415,9 @@ static void upsample_bicubic2d_out_template(
             nbatch,
             channels,
             onum,
-            align_corners);
+            align_corners,
+            rheight,
+            rwidth);
       });
 }
 
@@ -404,7 +426,9 @@ static void upsample_bicubic2d_backward_out_template(
     const Tensor& grad_output_,
     IntArrayRef output_size,
     IntArrayRef input_size,
-    bool align_corners) {
+    bool align_corners,
+    c10::optional<double> scales_h,
+    c10::optional<double> scales_w) {
   TORCH_CHECK(
       output_size.size() == 2,
       "It is expected output_size equals to 2, but got size ",
@@ -444,7 +468,13 @@ static void upsample_bicubic2d_backward_out_template(
         scalar_t* odata = grad_output.data_ptr<scalar_t>();
         auto onum = grad_output.numel();
 
-        upsample_bicubic2d_backward_out_frame<scalar_t>(
+        using accscalar_t = at::AtenIpexTypeXPU::acc_type<scalar_t>;
+        const accscalar_t rheight = area_pixel_compute_scale<accscalar_t>(
+            input_height, output_height, align_corners, scales_h);
+        const accscalar_t rwidth = area_pixel_compute_scale<accscalar_t>(
+            input_width, output_width, align_corners, scales_w);
+
+        upsample_bicubic2d_backward_out_frame<scalar_t, accscalar_t>(
             odata,
             idata,
             input_height,
@@ -454,7 +484,9 @@ static void upsample_bicubic2d_backward_out_template(
             nbatch,
             channels,
             onum,
-            align_corners);
+            align_corners,
+            rheight,
+            rwidth);
       });
 }
 } // namespace impl
@@ -469,7 +501,8 @@ Tensor& upsample_bicubic2d_out(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w,
     Tensor& out) {
-  impl::upsample_bicubic2d_out_template(out, self, output_size, align_corners);
+  impl::upsample_bicubic2d_out_template(
+      out, self, output_size, align_corners, scales_h, scales_w);
   return out;
 }
 
@@ -481,7 +514,7 @@ Tensor upsample_bicubic2d(
     c10::optional<double> scales_w) {
   auto output = at::empty({0}, self.options());
   impl::upsample_bicubic2d_out_template(
-      output, self, output_size, align_corners);
+      output, self, output_size, align_corners, scales_h, scales_w);
   return output;
 }
 
@@ -494,7 +527,8 @@ Tensor upsample_bicubic2d(
   auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
   auto scale_h = get_scale_value(scale_factors, 0);
   auto scale_w = get_scale_value(scale_factors, 1);
-  impl::upsample_bicubic2d_out_template(output, input, osize, align_corners);
+  impl::upsample_bicubic2d_out_template(
+      output, input, osize, align_corners, scale_h, scale_w);
   return output;
 }
 
@@ -507,7 +541,13 @@ Tensor& upsample_bicubic2d_backward_out(
     c10::optional<double> scales_w,
     Tensor& grad_input) {
   impl::upsample_bicubic2d_backward_out_template(
-      grad_input, grad_output, output_size, input_size, align_corners);
+      grad_input,
+      grad_output,
+      output_size,
+      input_size,
+      align_corners,
+      scales_h,
+      scales_w);
   return grad_input;
 }
 
@@ -520,7 +560,13 @@ Tensor upsample_bicubic2d_backward(
     c10::optional<double> scales_w) {
   auto grad_input = at::zeros(input_size, grad_output.options());
   impl::upsample_bicubic2d_backward_out_template(
-      grad_input, grad_output, output_size, input_size, align_corners);
+      grad_input,
+      grad_output,
+      output_size,
+      input_size,
+      align_corners,
+      scales_h,
+      scales_w);
   return grad_input;
 }
 
@@ -535,7 +581,13 @@ Tensor upsample_bicubic2d_backward(
   auto scale_w = get_scale_value(scale_factors, 1);
   auto grad_input = at::zeros(input_size, grad_output.options());
   impl::upsample_bicubic2d_backward_out_template(
-      grad_input, grad_output, osize, input_size, align_corners);
+      grad_input,
+      grad_output,
+      osize,
+      input_size,
+      align_corners,
+      scale_h,
+      scale_w);
   return grad_input;
 }
 
