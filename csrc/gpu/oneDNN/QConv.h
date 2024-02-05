@@ -121,8 +121,7 @@ static memory qconv_get_expected_src_memory(
     at::Tensor& src_blocked,
     memory::desc& src_usr_md,
     memory::desc& expected_src_md,
-    dnnl::engine& engine,
-    bool load_from_cache) {
+    dnnl::engine& engine) {
   memory src_m;
   if (src_usr_md != expected_src_md) {
     // avoid reorder in case of, [n][C][1][1][16c] <==> [n][c][1][1]
@@ -388,7 +387,7 @@ static at::Tensor quantized_convolution(
     auto expected_wgh_md = conv_fwd_pd.weights_desc();
     auto expected_dst_md = conv_fwd_pd.dst_desc();
     src_m = qconv_get_expected_src_memory(
-        src, src_blocked, src_usr_md, expected_src_md, engine, load_from_cache);
+        src, src_blocked, src_usr_md, expected_src_md, engine);
     wgh_m = qconv_get_expected_wgh_memory(
         wgh,
         wgh_blocked,
@@ -419,7 +418,7 @@ static at::Tensor quantized_convolution(
 
   std::unordered_map<int, memory> args;
   if (attr.with_binary())
-    attr.construct_post_binary(conv_fwd_pd, po, args);
+    attr.construct_post_binary(conv_fwd_pd, args);
   args.insert({DNNL_ARG_SRC, src_m});
   args.insert({DNNL_ARG_WEIGHTS, wgh_m});
   args.insert({DNNL_ARG_DST, dst_m});

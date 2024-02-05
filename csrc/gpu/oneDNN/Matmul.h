@@ -326,7 +326,7 @@ static inline void matmul(
       xpu::oneDNN::reorder(dst, dst_);
   }
   if (attr.with_binary())
-    attr.construct_post_binary(matmul_pd, po, args);
+    attr.construct_post_binary(matmul_pd, args);
 
 #ifdef USE_SCRATCHPAD_MODE
   size_t scratchpad_size = matmul_pd.scratchpad_desc().get_size();

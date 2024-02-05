@@ -419,7 +419,7 @@ static void deconvolution(
     args.insert({DNNL_ARG_BIAS, bia_m});
   }
   if (attr.with_binary())
-    attr.construct_post_binary(deconv_fwd_pd, po, args);
+    attr.construct_post_binary(deconv_fwd_pd, args);
 
 #ifdef USE_SCRATCHPAD_MODE
   size_t scratchpad_size = deconv_fwd_pd.scratchpad_desc().get_size();

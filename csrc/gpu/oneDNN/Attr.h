@@ -341,7 +341,6 @@ class Attr {
 
   void construct_post_binary(
       primitive_desc& pd,
-      post_ops& dnnl_post_ops,
       std::unordered_map<int, memory>& args) {
     // This function is used to construct binary memory desc in binary post ops.
     // According to oneDNN doc, the binary tensor can be in shape of

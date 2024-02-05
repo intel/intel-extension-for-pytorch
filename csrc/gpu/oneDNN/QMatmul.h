@@ -349,7 +349,7 @@ static inline void quantized_matmul(
       xpu::oneDNN::reorder(dst, dst_);
   }
   if (attr.with_binary())
-    attr.construct_post_binary(matmul_pd, po, args);
+    attr.construct_post_binary(matmul_pd, args);
 
   args.insert({DNNL_ARG_SRC, m1_m});
   args.insert({DNNL_ARG_WEIGHTS, m2_m});
