@@ -892,6 +892,8 @@ def optimize(
         if model.config.architectures[0] == "ChatGLMModel":
             torch._C._jit_set_profiling_mode(True)
             torch._C._jit_set_profiling_executor(True)
+            torch._C._jit_override_can_fuse_on_cpu(False)
+            torch._C._jit_override_can_fuse_on_gpu(False)
 
         is_quantization = False
         is_woq = False

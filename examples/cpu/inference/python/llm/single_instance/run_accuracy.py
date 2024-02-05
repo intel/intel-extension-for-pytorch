@@ -238,6 +238,10 @@ class HuggingFaceModel(BaseLM):
         _position_ids = []
         if self.is_t5:
             inputs = inputs['input_ids']
+        elif hasattr(self.config, "_name_or_path") and self.config._name_or_path == "THUDM/chatglm2-6b":
+            input_bs, input_len = inputs.shape
+            bos = torch.tensor([64790, 64792]).repeat(input_bs, 1)
+            inputs = torch.cat((bos, inputs), 1)
         for text in inputs:
             input_ids = text.to(self._device)
             input_bs = inputs.shape[0] * self.num_beams
