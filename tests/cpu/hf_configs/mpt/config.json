@@ -14,7 +14,7 @@
         "qk_ln": false,
         "softmax_scale": null
     },
-    "d_model": 4096,
+    "d_model": 2048,
     "emb_pdrop": 0,
     "embedding_fraction": 1.0,
     "expansion_ratio": 4,
@@ -34,7 +34,7 @@
     "logit_scale": null,
     "max_seq_len": 2048,
     "model_type": "mpt",
-    "n_heads": 32,
+    "n_heads": 16,
     "n_layers": 1,
     "no_bias": true,
     "norm_type": "low_precision_layernorm",

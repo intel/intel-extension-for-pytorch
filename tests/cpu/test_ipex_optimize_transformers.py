@@ -11,10 +11,6 @@ from intel_extension_for_pytorch.quantization import prepare, convert
 from collections import namedtuple
 import itertools
 
-from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
-from hf_configs.chatglm.modeling_chatglm import ChatGLMForConditionalGeneration
-from hf_configs.stablelm.modeling_stablelm_epoch import StableLMEpochForCausalLM
-
 try:
     import transformers
     from transformers import AutoConfig
@@ -24,6 +20,7 @@ except ImportError:
     )
     import transformers
     from transformers import AutoConfig
+from intel_extension_for_pytorch.cpu._auto_kernel_selection import _disable_tpp
 
 from common_utils import TestCase
 
@@ -70,97 +67,6 @@ supported_models = [
     model_info(
         "llama",
         transformers.models.llama.modeling_llama.LlamaForCausalLM,
-        True,
-        lambda m: m.model.layers[0].self_attn.__class__,
-        lambda m: m.model.layers[0].__class__,
-    ),
-    model_info(
-        "gptneox",
-        transformers.models.gpt_neox.modeling_gpt_neox.GPTNeoXForCausalLM,
-        True,
-        lambda m: m.gpt_neox.layers[0].attention.__class__,
-        None,
-    ),
-    model_info(
-        "opt",
-        transformers.models.opt.modeling_opt.OPTForCausalLM,
-        False,
-        lambda m: m.model.decoder.layers[0].self_attn.__class__,
-        lambda m: m.model.decoder.layers[0].__class__,
-    ),
-    model_info(
-        "falcon",
-        transformers.models.falcon.modeling_falcon.FalconForCausalLM,
-        False,
-        lambda m: m.transformer.h[0].self_attention.__class__,
-        lambda m: m.transformer.h[0].__class__,
-    ),
-    model_info(
-        "bloom",
-        transformers.models.bloom.modeling_bloom.BloomForCausalLM,
-        False,
-        lambda m: m.transformer.h[0].self_attention.__class__,
-        lambda m: m.transformer.h[0].__class__,
-    ),
-    model_info(
-        "codegen",
-        transformers.models.codegen.modeling_codegen.CodeGenForCausalLM,
-        True,
-        lambda m: m.transformer.h[0].attn.__class__,
-        lambda m: m.transformer.h[0].__class__,
-    ),
-    model_info(
-        "baichuan",
-        BaichuanForCausalLM,
-        False,
-        lambda m: m.model.layers[0].self_attn.__class__,
-        lambda m: m.model.layers[0].__class__,
-    ),
-    model_info(
-        "chatglm",
-        ChatGLMForConditionalGeneration,
-        False,
-        lambda m: m.transformer.encoder.layers[0].self_attention.__class__,
-        lambda m: m.transformer.encoder.layers[0].__class__,
-    ),
-    model_info(
-        "gptbigcode",
-        transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeForCausalLM,
-        True,
-        lambda m: m.transformer.h[0].attn.__class__,
-        lambda m: m.transformer.h[0].__class__,
-    ),
-    model_info(
-        "t5",
-        transformers.models.t5.modeling_t5.T5ForConditionalGeneration,
-        False,
-        lambda m: m.decoder.block[0].layer[0].SelfAttention.__class__,
-        lambda m: m.decoder.block[0].__class__,
-    ),
-    model_info(
-        "mistral",
-        transformers.models.mistral.modeling_mistral.MistralForCausalLM,
-        True,
-        lambda m: m.model.layers[0].self_attn.__class__,
-        lambda m: m.model.layers[0].__class__,
-    ),
-    model_info(
-        "mpt",
-        transformers.models.mpt.modeling_mpt.MptForCausalLM,
-        False,
-        lambda m: m.transformer.blocks[0].attn.__class__,
-        lambda m: m.transformer.blocks[0].__class__,
-    ),
-    model_info(
-        "mixtral",
-        transformers.models.mixtral.modeling_mixtral.MixtralForCausalLM,
-        True,
-        lambda m: m.model.layers[0].self_attn.__class__,
-        lambda m: m.model.layers[0].__class__,
-    ),
-    model_info(
-        "stablelm",
-        StableLMEpochForCausalLM,
         True,
         lambda m: m.model.layers[0].self_attn.__class__,
         lambda m: m.model.layers[0].__class__,
@@ -263,6 +169,7 @@ class OptimizeTransformersTester(TestCase):
             if torchcompile and deployment_mode:
                 continue
             self.model_replacement_check(m, dtype, jit, torchcompile, return_dict)
+        _disable_tpp()
 
     def _model_replacement_check_woq(self, model):
         qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping()
