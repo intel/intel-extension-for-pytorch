@@ -2482,8 +2482,7 @@ at::Tensor dequantize_nf4(const at::Tensor& qt) {
     dequant_loop([&](int* idx) {
       int a = idx[0];
       int b = idx[1];
-      t.index({a, b}) =
-          dequantize_nf4_scalar(qt.index({a, b}).item<u_int8_t>());
+      t.index({a, b}) = dequantize_nf4_scalar(qt.index({a, b}).item<uint8_t>());
     });
   } else if (qt_dim == 3) {
     auto A = qt.sizes()[0];
@@ -2495,7 +2494,7 @@ at::Tensor dequantize_nf4(const at::Tensor& qt) {
       int b = idx[1];
       int c = idx[2];
       t.index({a, b, c}) =
-          dequantize_nf4_scalar(qt.index({a, b, c}).item<u_int8_t>());
+          dequantize_nf4_scalar(qt.index({a, b, c}).item<uint8_t>());
     });
   } else {
     auto A = qt.sizes()[0];
@@ -2509,7 +2508,7 @@ at::Tensor dequantize_nf4(const at::Tensor& qt) {
       int c = idx[2];
       int d = idx[3];
       t.index({a, b, c, d}) =
-          dequantize_nf4_scalar(qt.index({a, b, c, d}).item<u_int8_t>());
+          dequantize_nf4_scalar(qt.index({a, b, c, d}).item<uint8_t>());
     });
   }
   return t;
@@ -3392,7 +3391,7 @@ at::Tensor qlinear_woq_affine(
               int i = idx[0];
               int j = idx[1];
               w_ret.index({i, j}) =
-                  dequantize_nf4_scalar(w_int8.index({i, j}).item<u_int8_t>());
+                  dequantize_nf4_scalar(w_int8.index({i, j}).item<uint8_t>());
             });
             at::Tensor dqw;
             if (quant_w_mode == 0) {
@@ -3541,7 +3540,7 @@ at::Tensor qlinear_woq_affine(
             int i = idx[0];
             int j = idx[1];
             w_ret.index({i, j}) =
-                dequantize_nf4_scalar(w_int8.index({i, j}).item<u_int8_t>());
+                dequantize_nf4_scalar(w_int8.index({i, j}).item<uint8_t>());
           });
           at::Tensor dqw;
           if (quant_w_mode == 0) {
