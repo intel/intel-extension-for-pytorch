@@ -91,8 +91,6 @@ class TestFunction(TestCase):
                 model,
                 optimizer=optimizer,
                 dtype=torch.half,
-                auto_kernel_selection=True,
-                weights_prepack=True,
             )
             optimizer.zero_grad()
             for _ in range(niters):

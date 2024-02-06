@@ -2,6 +2,7 @@
 # !/usr/bin/env python
 import torch
 import intel_extension_for_pytorch as ipex  # flake8: noqa
+import intel_extension_for_pytorch._C as core
 import itertools
 import unittest
 from torch.testing._internal.common_utils import TestCase
@@ -18,6 +19,10 @@ class TestOptimizers(TestCase):
         atol, rtol = None, None
         if dtype == torch.bfloat16:
             atol, rtol = 1e-2, 1e-2
+        scaler = None
+        if dtype == torch.float16:
+            split_master_weight_for_bf16 = False
+            scaler = torch.cpu.amp.GradScaler(init_scale=1)
         ipex_module, ipex_optimizer = ipex.optimize(
             module,
             dtype=dtype,
@@ -35,34 +40,47 @@ class TestOptimizers(TestCase):
                 # ipex optimizer
                 y1 = ipex_module(*ipex_module.input).sum()
                 ipex_optimizer.zero_grad(set_to_none=set_to_none)
-                y1.backward()
-                ipex_optimizer.step()
+                if dtype == torch.float16:
+                    scaler.scale(y1).backward()
+                    scaler.step(ipex_optimizer)
+                    scaler.update(new_scale=1.0)
+                else:
+                    y1.backward()
+                    ipex_optimizer.step()
+        gradscaler_inf = torch.float16 == dtype and sum(
+            v.item() for v in scaler._check_inf_per_device(ipex_optimizer).values()
+        )
         origin_model_state = module.state_dict()
         ipex_model_state = ipex_module.state_dict()
-        for var_name in origin_model_state:
-            self.assertEqual(
-                origin_model_state[var_name],
-                ipex_model_state[var_name],
-                atol=atol,
-                rtol=rtol,
-            )
-        origin_optimizer_state = optimizer.state_dict()
-        ipex_optimizer_state = ipex_optimizer.state_dict()
-        for var_name in origin_optimizer_state:
-            if var_name == "state":
+        if not gradscaler_inf:
+            for var_name in origin_model_state:
                 self.assertEqual(
-                    origin_optimizer_state[var_name],
-                    ipex_optimizer_state[var_name],
+                    origin_model_state[var_name],
+                    ipex_model_state[var_name],
                     atol=atol,
                     rtol=rtol,
                 )
+        origin_optimizer_state = optimizer.state_dict()
+        ipex_optimizer_state = ipex_optimizer.state_dict()
+        if not gradscaler_inf:
+            for var_name in origin_optimizer_state:
+                if var_name == "state":
+                    self.assertEqual(
+                        origin_optimizer_state[var_name],
+                        ipex_optimizer_state[var_name],
+                        atol=atol,
+                        rtol=rtol,
+                    )
 
     def test_sgd(self):
         M = TestModule()
+        dtypes = [torch.float, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         options = itertools.product(
             [True, False],
             [True, False],
-            [torch.float, torch.bfloat16],
+            dtypes,
             [0.1, 0],
             [0.1, 0],
             [0.1, 0],
@@ -103,10 +121,13 @@ class TestOptimizers(TestCase):
     def test_sgd_fallback(self):
         # for sparse grad with weight_decay/momentum !=0, stock pytorch will also failed
         M = TestModule(has_sparse_grad=True)
+        dtypes = [torch.float, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         options = itertools.product(
             [True, False],
             [True, False],
-            [torch.float, torch.bfloat16],
+            dtypes,
             [0.1, 0],
             [True, False],
             [True, False],
@@ -135,10 +156,13 @@ class TestOptimizers(TestCase):
 
     def test_adagrad(self):
         M = TestModule()
+        dtypes = [torch.float, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         options = itertools.product(
             [True, False],
             [True, False],
-            [torch.float, torch.bfloat16],
+            dtypes,
             [0.1, 0],
             [0.1, 0],
             [0.1, 0],
@@ -175,10 +199,13 @@ class TestOptimizers(TestCase):
 
     def test_adagrad_fallback(self):
         M = TestModule(has_sparse_grad=True)
+        dtypes = [torch.float, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         options = itertools.product(
             [True, False],
             [True, False],
-            [torch.float, torch.bfloat16],
+            dtypes,
             [0.1, 0],
             [0.1, 0],
             [1e-5, 0],
@@ -207,10 +234,13 @@ class TestOptimizers(TestCase):
 
     def test_lamb(self):
         M = TestModule()
+        dtypes = [torch.float, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         options = itertools.product(
             [True, False],
             [True, False],
-            [torch.float, torch.bfloat16],
+            dtypes,
             [(0.1, 0.111), (0.9, 0.999)],
             [1e-8],
             [0, 0.1],
@@ -239,11 +269,14 @@ class TestOptimizers(TestCase):
 
     def test_adam(self):
         M = TestModule()
+        dtypes = [torch.float, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         options = itertools.product(
             [True, False],
             [True, False],
             [True, False],
-            [torch.float, torch.bfloat16],
+            dtypes,
             [(0.1, 0.111), (0.9, 0.999)],
             [1e-8],
             [0, 0.1],
@@ -279,6 +312,157 @@ class TestOptimizers(TestCase):
             self._test_update(
                 M, adam, dtype, split_master_weight_for_bf16, set_to_none, fused
             )
+
+    def test_grad_scaling_unscale(self):
+        inv_scale = torch.full((1,), 0.25, dtype=torch.float)
+        found_inf = torch.full((1,), 0.0, dtype=torch.float)
+
+        size = 20
+        g = torch.full((size, size), 4.0, dtype=torch.float)
+        ginf = g.clone()
+        ginf[2, 2] = float("inf")
+        gnan = g.clone()
+        gnan[2, 2] = float("nan")
+
+        # Tries selected combinations of
+        #  - contiguous grads
+        #  - g.clone().t() which is not contiguous but still non overlapping and dense
+        #  - variants of g.clone()[:, :5] which are not non overlapping and dense
+        # Non overlapping and dense grads route into a multi tensor apply kernel,
+        # others use a fallback per-tensor kernel, so we should try both.
+        cases = (
+            ([g.clone(), g.clone()], False),
+            ([g.clone(), g.clone().t()], False),
+            ([g.clone(), g.clone()[:, :5]], False),
+            ([g.clone()[:, :5], g.clone()[:, :5]], False),
+            ([g.clone(), ginf.clone()], True),
+            ([g.clone(), gnan.clone()], True),
+            ([g.clone(), ginf.clone()[:, :5]], True),
+            ([g.clone(), gnan.clone()[:, :5]], True),
+            ([ginf.clone(), g.clone()[:, :5]], True),
+            ([ginf.clone()[:, :5], g.clone()[:, :5]], True),
+        )
+
+        for grads, has_inf in cases:
+            found_inf.zero_()
+            core._amp_foreach_non_finite_check_and_unscale_(grads, found_inf, inv_scale)
+            if has_inf:
+                self.assertEqual(found_inf, 1.0)
+            else:
+                self.assertEqual(found_inf, 0.0)
+                for grad in grads:
+                    self.assertEqual(grad, torch.ones_like(grad), rtol=1e-5, atol=1e-7)
+
+        grads = [g.clone(), g.to(dtype=torch.float16)]
+        core._amp_foreach_non_finite_check_and_unscale_(grads, found_inf, inv_scale)
+        for grad in grads:
+            self.assertEqual(grad, torch.ones_like(grad), rtol=1e-5, atol=1e-7)
+
+        # If inject_inf >= 0, writes an inf into one grad for _unscale_grads_ to find.
+        def perfect_storm_grads(inject_inf):
+            grads = [
+                g.clone(),
+                g.clone()[:, :5],
+                g.to(dtype=torch.float16),
+                g.to(dtype=torch.float16),
+            ]
+            if inject_inf >= 0:
+                grads[inject_inf][2, 2] = float("inf")
+            return grads
+
+        scaler = torch.cpu.amp.GradScaler()
+        dummy_params = [torch.empty_like(g) for g in perfect_storm_grads(-1)]
+        dummy_opt = torch.optim.SGD(dummy_params, lr=1.0)
+
+        # Ensures the inf/nan checking can find an inf injected onto any grad in the perfect storm.
+        for inject_inf in range(-1, len(dummy_params)):
+            found_inf = torch.full((1,), 0.0, dtype=torch.float)
+            grads = perfect_storm_grads(inject_inf)
+            for i, p in enumerate(dummy_params):
+                p.grad = grads[i]
+            found_inf_per_device = scaler._unscale_grads_(
+                dummy_opt, inv_scale, found_inf, True
+            )
+            if inject_inf < 0:
+                # No inf was injected, ensures unscaling worked normally.
+                self.assertTrue(
+                    sum(v.item() for v in found_inf_per_device.values()) == 0
+                )
+                for grad in grads:
+                    self.assertEqual(grad, torch.ones_like(grad), rtol=1e-5, atol=1e-7)
+            else:
+                # inf was injected, ensures inf was found.
+                self.assertTrue(
+                    sum(v.item() for v in found_inf_per_device.values()) == 1
+                )
+
+    def test_grad_scaling_unscale_sparse(self):
+        scaler = torch.cpu.amp.GradScaler()
+
+        inv_scale = torch.full((1,), 0.25, dtype=torch.float)
+        found_inf = torch.empty((1,), dtype=torch.float)
+        cur = found_inf.device
+
+        i = torch.tensor([[0, 1, 1], [2, 0, 2]], dtype=torch.int64)
+        v = torch.tensor([16.0, 32.0, 64.0], dtype=torch.float)
+        s = torch.sparse_coo_tensor(i, v, torch.Size([2, 3]), dtype=torch.float)
+
+        p = s.clone()
+        assert p.is_sparse
+        opt = torch.optim.SGD([p], lr=1.0)
+
+        p.grad = s.clone()
+        found_inf.zero_()
+        found_inf = scaler._unscale_grads_(opt, inv_scale, found_inf, False)[cur]
+        self.assertEqual(found_inf, 0.0)
+        self.assertEqual(p.grad.to_dense(), (s / 4).to_dense())
+
+        v = torch.FloatTensor([16.0, 32.0, float("inf")])
+        p.grad = torch.sparse_coo_tensor(i, v, torch.Size([2, 3]), dtype=torch.float)
+        found_inf.zero_()
+        found_inf = scaler._unscale_grads_(opt, inv_scale, found_inf, False)[cur]
+        self.assertEqual(found_inf, 1.0)
+
+        v = torch.FloatTensor([16.0, 32.0, float("nan")])
+        p.grad = torch.sparse_coo_tensor(i, v, torch.Size([2, 3]), dtype=torch.float)
+        found_inf.zero_()
+        found_inf = scaler._unscale_grads_(opt, inv_scale, found_inf, False)[cur]
+        self.assertEqual(found_inf, 1.0)
+
+        p = s.clone().half()
+        assert p.is_sparse
+        opt = torch.optim.SGD([p], lr=1.0)
+
+        p.grad = s.clone().half()
+        found_inf.zero_()
+        found_inf = scaler._unscale_grads_(opt, inv_scale, found_inf, True)[cur]
+        self.assertEqual(found_inf, 0.0)
+        self.assertEqual(p.grad.to_dense(), (s.half() / 4).to_dense())
+
+        # Creates fp16 sparse tensor with duplicated indices (uncoalesced).  The uncoalesced representation
+        # does not overflow in fp16, but the coalesced representation would, because 64000 + 64000 > fp16 max.
+        # _amp_non_finite_check_and_unscale_ should report an overflow here.
+        i = torch.LongTensor([[0, 1, 0], [2, 0, 2]])
+        v = torch.FloatTensor([64000.0, 32.0, 64000.0])
+        p.grad = torch.sparse_coo_tensor(i, v, torch.Size([2, 3]), dtype=torch.float16)
+        found_inf.zero_()
+        found_inf = scaler._unscale_grads_(opt, inv_scale, found_inf, True)[cur]
+        self.assertEqual(found_inf, 1.0)
+
+    def test_grad_scale_will_not_overflow(self):
+        model = torch.nn.Linear(5, 1)
+        optimizer = torch.optim.Adam(model.parameters())
+        scaler = torch.cpu.amp.GradScaler(
+            growth_interval=1, growth_factor=2**4, init_scale=1e38
+        )
+        optimizer.zero_grad()
+        x = torch.randn(1, 5)
+        y = 1e-30 * torch.randn(1, 1)
+        l = ((model(x) - y) ** 2).mean()
+        scaler.scale(l).backward()
+        scaler.step(optimizer)
+        scaler.update()
+        assert scaler._scale != float("inf") and scaler._scale != float("nan")
 
 
 class TestFusedSteps(TestCase):

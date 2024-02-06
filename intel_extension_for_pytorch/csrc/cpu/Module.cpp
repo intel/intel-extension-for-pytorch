@@ -32,7 +32,7 @@
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/api/include/torch/python.h>
 #include <torch/csrc/jit/passes/pass_manager.h>
-#include "autocast/autocast_kernels.h"
+#include "aten/GradScaler.h"
 
 #include "TaskModule.h"
 #include "aten/EmbeddingBag.h"
@@ -127,10 +127,10 @@ void InitIpexModuleBindings(py::module m) {
 
   m.def("get_fp32_math_mode", &torch_ipex::getFP32MathModeCpu);
 
-  m.def("_amp_update_scale_", &torch_ipex::autocast::_amp_update_scale_cpu_);
+  m.def("_amp_update_scale_", &torch_ipex::cpu::_amp_update_scale_cpu_);
   m.def(
       "_amp_foreach_non_finite_check_and_unscale_",
-      &torch_ipex::autocast::_amp_foreach_non_finite_check_and_unscale_cpu_);
+      &torch_ipex::cpu::_amp_foreach_non_finite_check_and_unscale_cpu_);
 
   // llga path
   m.def(
