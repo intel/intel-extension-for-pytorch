@@ -537,5 +537,17 @@ int dpcppPrefetchDeviceHasFP64Dtype(int device_id, bool& has_fp64) noexcept {
   return xpu::dpcpp::dpcppGetDeviceHasFP64DtypeFork(device_id, has_fp64);
 }
 
+uint64_t dpcppGetDeviceFreeMemory(DeviceId device_id) {
+  const auto device = dpcppGetRawDevice(device_id);
+
+  if (device.has(sycl::aspect::ext_intel_free_memory)) {
+    return device.get_info<sycl::ext::intel::info::device::free_memory>();
+  } else {
+    TORCH_WARN_ONCE(
+        "This device does not support free memory information. You can try again with ZES_ENABLE_SYSMAN=1.");
+    return 0;
+  }
+}
+
 } // namespace dpcpp
 } // namespace xpu
