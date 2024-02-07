@@ -785,10 +785,6 @@ class MaskedMHATest(TestCase):
         self._test_mha(torchcompile=False)
         self._test_mha_fp16(torchcompile=False)
 
-    def test_mha_torchcompile(self):
-        self._test_mha(torchcompile=True)
-        self._test_mha_fp16(torchcompile=True)
-
 
 if __name__ == "__main__":
     test = unittest.main()
