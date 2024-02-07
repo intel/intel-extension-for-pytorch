@@ -174,6 +174,18 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     parent_path = Path(__file__).parent.absolute()
 
+    group_size = args.group_size
+    if group_size == 0:
+        # weight dtype is ignored if gptq is true
+        if args.weight_dtype == "INT4":
+            group_size = 128
+        else:
+            group_size = -1
+    assert group_size == -1 or (
+        group_size > 0 and
+        (group_size & (group_size-1) == 0)
+    ), f"Invalid group size for WOQ: {group_size}"
+
     if not args.autotp:
         if not args.ipex_weight_only_quantization and not args.ipex_smooth_quant:
             path = Path(parent_path, "single_instance/run_generation.py")
@@ -228,17 +240,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--ipex-weight-only-quantization"])
                 infer_cmd.extend(["--weight-dtype", str(args.weight_dtype)])
                 infer_cmd.extend(["--lowp-mode", str(args.lowp_mode)])
-                group_size = args.group_size
-                if group_size == 0:
-                    # weight dtype is ignored if gptq is true
-                    if args.weight_dtype == "INT4" or args.gptq:
-                        group_size = 128
-                    else:
-                        group_size = -1
-                assert group_size == -1 or (
-                    group_size > 0 and
-                    (group_size & (group_size-1) == 0)
-                ), f"Invalid GPTQ group size: {group_size}"
                 if args.gptq:
                     print("LLM RUNTIME INFO: Weight dtype set to INT4 since `--gptq` is sepcified and `--weight-dtype` is ignored.")
                     if args.low_precision_checkpoint == "":
@@ -323,17 +324,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     quant_cmd.extend(["--ipex-weight-only-quantization"])
                     quant_cmd.extend(["--weight-dtype", str(args.weight_dtype)])
                     quant_cmd.extend(["--lowp-mode", str(args.lowp_mode)])
-                    group_size = args.group_size
-                    if group_size == 0:
-                        # weight dtype is ignored if gptq is true
-                        if args.weight_dtype == "INT4" or args.gptq:
-                            group_size = 128
-                        else:
-                            group_size = -1
-                    assert group_size == -1 or (
-                        group_size > 0 and
-                        (group_size & (group_size-1) == 0)
-                    ), f"Invalid GPTQ group size: {group_size}"
                     if args.gptq:
                         print("LLM RUNTIME INFO: Weight dtype set to INT4 since `--gptq` is sepcified and `--weight-dtype` is ignored.")
                         if args.low_precision_checkpoint == "":
@@ -509,6 +499,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--ipex-weight-only-quantization"])
             infer_cmd.extend(["--weight-dtype", str(args.weight_dtype)])
             infer_cmd.extend(["--lowp-mode", str(args.lowp_mode)])
+            infer_cmd.extend(["--group-size", str(group_size)])
             if args.quant_with_amp:
                 infer_cmd.extend(["--quant-with-amp"])
 

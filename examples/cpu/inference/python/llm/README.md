@@ -272,6 +272,18 @@ By default, for weight-only quantization, we use quantization with [Automatic Mi
 ```bash
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list>  python run.py  --benchmark -m <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results" 
 ```
+The command above works for most models we listed. However, to get better accuracy for the following models, some changes to the command are needed.
+| Model ID | Changes to command |
+| - | - |
+| bigcode/starcoder | Add "`--group-size 128`" |
+| Baichuan-inc/Baichuan-13B-Chat | Remove "`--quant-with-amp`" |
+| Baichuan-inc/Baichuan2-13B-Chat | Add "`--group-size 64`" |
+| bigscience/bloom-1b7 | Remove "`--quant-with-amp`"; add "`--group-size 128`" |
+| EleutherAI/gpt-neox-20b | Remove "`--quant-with-amp`"; add "`--group-size 256`" |
+| facebook/opt-30b | Remove "`--quant-with-amp`" |
+| databricks/dolly-v2-12b | Remove "`--quant-with-amp`"; add "`--lowp-mode FP32`" |
+
+
 - Command (Int4):
 ```bash
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT4 --gptq --quant-with-amp --output-dir "saved_results" 
@@ -398,7 +410,7 @@ The performance results on AWS instances can be found [here](../../../../../docs
 
 Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 probably results in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a dataset by such algorithms. The low precision checkpoint is saved as a `state_dict` in a `.pt` file and can be loaded later for weight only quantization. We provide an example here to run GPTQ.
 
-*Note:* Currently GPTQ API is verified on the following models: gpt-j, opt, llama, Llama-2, bloom, bloomz, dolly-v1, dolly-v2, gpt-neo, gpt-neox, mpt, falcon. Some of them are not in the list of optimized models. Please use with care.
+*Note:* Currently GPTQ API is verified on the following models: gpt-j, opt, llama, Llama-2, bloom, bloomz, dolly-v1, dolly-v2, gpt-neo, gpt-neox, mpt, falcon, starcoder. Some of them are not in the list of optimized models. Please use with care.
 
 Here is how to use it:
 
