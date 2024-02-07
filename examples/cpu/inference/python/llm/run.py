@@ -66,6 +66,22 @@ def main(args_in: Optional[List[str]] = None) -> None:
         default="NeelNanda/pile-10k",
         help="Calibration dataset for static quantization and GPTQ")
     parser.add_argument("--ipex-smooth-quant", action="store_true", help="smoothquant forstatic quantization")
+    parser.add_argument(
+        "--calib-len", default=512, type=int, help="calibration dataset max or padding max length for SmoothQuant autotuning"
+    )
+    parser.add_argument("--calib-iters", default=512, type=int, help="calibration iters for SmoothQuant autotuning")
+    parser.add_argument(
+        "--calib-shuffle", action="store_true", help="whether to shuffle on calibration dataset for SmoothQuant autotuning"
+    )
+    parser.add_argument(
+        "--calib-padding", action="store_true", help="whether to pad on calibration dataset for SmoothQuant autotuning"
+    )
+    parser.add_argument(
+        "--calib-pad-val", default=1, type=int, help="calibration dataset padding value for SmoothQuant autotuning"
+    )
+    parser.add_argument(
+        "--fallback-add", action="store_true", help="whether to fallback add ops to fp32 for SmoothQuant autotuning"
+    )
     parser.add_argument("--alpha", default=0.5, help="alpha value for smoothquant")
     parser.add_argument(
     "--folding", default=False, type=bool, help="whether to fold mul into the previous layer"
@@ -274,6 +290,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     infer_cmd.extend(["--group-size", str(group_size)])
             else:
                 infer_cmd.extend(["--ipex-smooth-quant"])
+                infer_cmd.extend(["--calib-len", str(args.calib_len)])
+                infer_cmd.extend(["--calib-iters", str(args.calib_iters)])
+                if args.calib_shuffle:
+                    infer_cmd.extend(["--calib-shuffle"])
+                if args.calib_padding:
+                    infer_cmd.extend(["--calib-padding"])
+                infer_cmd.extend(["--calib-pad-val", str(args.calib_pad_val)])
+                if args.fallback_add:
+                    infer_cmd.extend(["--fallback-add"])
                 infer_cmd.extend(["--alpha", str(args.alpha)])
                 if args.folding:
                     infer_cmd.extend(["--folding"])
@@ -362,6 +387,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         quant_cmd.extend(["--group-size", str(group_size)])
                 else:
                     quant_cmd.extend(["--ipex-smooth-quant"])
+                    quant_cmd.extend(["--calib-len", str(args.calib_len)])
+                    quant_cmd.extend(["--calib-iters", str(args.calib_iters)])
+                    if args.calib_shuffle:
+                        quant_cmd.extend(["--calib-shuffle"])
+                    if args.calib_padding:
+                        quant_cmd.extend(["--calib-padding"])
+                    quant_cmd.extend(["--calib-pad-val", str(args.calib_pad_val)])
+                    if args.fallback_add:
+                        quant_cmd.extend(["--fallback-add"])
                     quant_cmd.extend(["--alpha", str(args.alpha)])
                     if args.folding:
                         quant_cmd.extend(["--folding"])

@@ -64,6 +64,22 @@ parser.add_argument("--prompt", default=None, type=str)
 parser.add_argument("--num-iter", default=100, type=int, help="num iter")
 parser.add_argument("--num-warmup", default=10, type=int, help="num warmup")
 parser.add_argument("--batch-size", default=1, type=int, help="batch size")
+parser.add_argument(
+    "--calib-len", default=512, type=int, help="calibration dataset max or padding max length for SmoothQuant autotuning"
+)
+parser.add_argument("--calib-iters", default=512, type=int, help="calibration iters for SmoothQuant autotuning")
+parser.add_argument(
+    "--calib-shuffle", action="store_true", help="whether to shuffle on calibration dataset for SmoothQuant autotuning"
+)
+parser.add_argument(
+    "--calib-padding", action="store_true", help="whether to pad on calibration dataset for SmoothQuant autotuning"
+)
+parser.add_argument(
+    "--calib-pad-val", default=1, type=int, help="calibration dataset padding value for SmoothQuant autotuning"
+)
+parser.add_argument(
+    "--fallback-add", action="store_true", help="whether to fallback add ops to fp32 for SmoothQuant autotuning"
+)
 parser.add_argument("--alpha", default=0.5, help="alpha value for smoothquant")
 parser.add_argument(
     "--folding", action="store_true", help="whether to fold mul into the previous layer"
@@ -162,6 +178,7 @@ args = parser.parse_args()
 # disable
 try:
     ipex._C.disable_jit_linear_repack()
+    torch._C._jit_set_texpr_fuser_enabled(False)
 except Exception:
     pass
 
@@ -378,11 +395,18 @@ if args.ipex_smooth_quant:
                 attention_mask_padded = []
                 for text in batch:
                     input_ids = text["input_ids"]
-                    input_ids = (
-                        input_ids[: int(self.pad_max)]
-                        if len(input_ids) > int(self.pad_max)
-                        else input_ids
-                    )
+                    if not args.calib_padding:
+                        input_ids = (
+                            input_ids[: int(args.calib_len)]
+                            if len(input_ids) > int(args.calib_len)
+                            else input_ids
+                        )
+                    else:
+                        from torch.nn.functional import pad
+                        pad_len = int(args.calib_len) - input_ids.shape[0]
+                        input_ids = pad(
+                            input_ids, (0, pad_len), value=int(args.calib_pad_val)
+                        )
                     last_ind.append(input_ids.shape[0] - 1)
                     attention_mask = torch.ones(len(input_ids))
                     position_ids = torch.arange(len(input_ids))
@@ -469,20 +493,22 @@ if args.ipex_smooth_quant:
         calib_dataset = load_dataset(
             args.dataset if args.dataset else model.default_dataset, split="train"
         )
+        if args.calib_shuffle:
+            calib_dataset = calib_dataset.shuffle(seed=42)
         user_model.eval()
         calib_evaluator = Evaluator(
             calib_dataset, tokenizer, args, batch_size=args.batch_size, pad_max=int(args.input_tokens) if model.name=="t5" else 512
         )
         calib_dataloader = DataLoader(
             calib_evaluator.dataset,
-            batch_size=args.batch_size,
+            batch_size=1,
             shuffle=False,
             collate_fn=calib_evaluator.collate_batch,
         )
 
         def calib_func(prepared_model):
             for i, (model_inputs, last_ind) in enumerate(calib_dataloader):
-                if i == 512:
+                if i >= int(args.calib_iters):
                     break
                 prepared_model(*model_inputs)
 
@@ -500,23 +526,10 @@ if args.ipex_smooth_quant:
                 deployment_mode=False,
             )
             op_type_dict = {}
-            if re.search("chatglm", config.architectures[0], re.IGNORECASE):
-                op_type_dict = {
-                    "add": {"weight": {"dtype": ["fp32"]}, "activation": {"dtype": ["fp32"]}},
-                    "linear": {
-                        "weight": {
-                            "dtype": ["int8"],
-                            "scheme": ["sym"],
-                            "granularity": ["per_channel"],
-                            "algorithm": ["minmax"],
-                        },
-                        "activation": {
-                            "dtype": ["uint8"],
-                            "scheme": ["asym"],
-                            "granularity": ["per_tensor"],
-                            "algorithm": ["kl"],
-                        },
-                    },
+            if args.fallback_add:
+                op_type_dict["add"] = {
+                    "weight": {"dtype": ["fp32"]},
+                    "activation": {"dtype": ["fp32"]},
                 }
             
             smoothquant_args = {"alpha": args.alpha if args.alpha == "auto" \
