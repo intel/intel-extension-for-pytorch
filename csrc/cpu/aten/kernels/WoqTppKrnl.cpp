@@ -751,7 +751,7 @@ struct GemmMicroKernel<
         if constexpr (scale_as_post_op) {
           vc[i] = V::fmadd(vscales[col / CBLOCK][col % CBLOCK], vc[i], vc_old);
         } else {
-          vc[i] = V::fmadd(V::set1(1.0f), vc[i], vc_old);
+          vc[i] = V::fmadd(V::set1(static_cast<_Float16>(1.0f)), vc[i], vc_old);
         }
       } else if constexpr (scale_as_post_op) {
         vc[i] = V::mul(vscales[col / CBLOCK][col % CBLOCK], vc[i]);

@@ -425,7 +425,7 @@ void mul_attenion_weights_and_value_of_head_half(
   auto hsi = 0;
   auto vec_size = 32; // 512/16
   for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
-    auto attn_w_vec = _mm512_set1_ph(attn_w);
+    auto attn_w_vec = _mm512_set1_ph(static_cast<_Float16>(static_cast<float>(attn_w)));
     auto v_vec = _mm512_loadu_ph(v_ptr_start + hsi);
     if (accumulate) {
       auto attn_out_vec = _mm512_loadu_ph(attn_out_start + hsi);
