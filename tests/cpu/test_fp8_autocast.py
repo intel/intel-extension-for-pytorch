@@ -207,6 +207,24 @@ class TestFP8Cases(TestCase):
             out_fp8_iter5 = fp8_linear_with_calibration(inp2[4])
         self.assertEqual(out_fp8_iter5, out_nn_iter5, atol=0.01, rtol=0.1)
 
+    @unittest.skipIf(
+        not core.onednn_has_fp8_support(),
+        "IPEX FP8 is not supported on this CPU device",
+    )
+    def test_fp8_non_contiguous_weight(self):
+        nn_linear = torch.nn.Linear(2, 2)
+        nn_linear.weight = torch.nn.Parameter(nn_linear.weight.transpose(0, 1))
+        inp = torch.ones(3, 2)
+        fp8_linear = prepare_fp8(nn_linear)
+        with fp8_autocast(
+            enabled=True,
+            fp8_recipe=DelayedScaling(fp8_format=Format.E4M3),
+            device="cpu",
+        ):
+            fp8_out = fp8_linear(inp)
+        nn_out = nn_linear(inp)
+        self.assertEqual(nn_out, fp8_out, atol=0.01, rtol=0.1)
+
 
 if __name__ == "__main__":
     test = unittest.main()

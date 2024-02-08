@@ -88,7 +88,7 @@ at::Tensor cast_to_fp8(
     int64_t fp8_tensor_index,
     int64_t otype) {
   at::ScalarType out_type = convert_to_dtype(otype);
-  auto output = at::empty(input.sizes(), input.options().dtype(out_type));
+  auto output = at::empty_like(input, out_type);
   AT_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
