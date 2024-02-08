@@ -272,6 +272,7 @@ using dpcpp_dev_ext_intel_gpu_eu_count =
     sycl::ext::intel::info::device::gpu_eu_count;
 using dpcpp_dev_ext_intel_gpu_eu_count_per_subslice =
     sycl::ext::intel::info::device::gpu_eu_count_per_subslice;
+using dpcpp_dev_ext_intel_device_id = sycl::ext::intel::info::device::device_id;
 
 // aspects for extensions
 static constexpr auto dpcpp_dev_aspect_gpu_eu_simd_width =

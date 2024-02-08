@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/TensorSubclassLikeUtils.h>
 #include <ATen/record_function.h>
+#include <runtime/Device.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "../comm/ATDispatch.h"
@@ -21,6 +22,9 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
     double dropout_p,
     c10::optional<double> scale) {
 #if defined(USE_XETLA)
+  TORCH_CHECK(
+      dpcppGetDeviceHasXMX(),
+      "SDP kernel requires XMX, but the current platform has no XMX ...");
   // check attn_mask padded
   uint32_t attn_mask_padded_block_size = 0;
   if (attn_mask.has_value()) {
@@ -220,24 +224,26 @@ inline bool xetla_supported(
     const c10::optional<Tensor>& b) {
   bool is_supported = false;
 #if defined(USE_XETLA)
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  bool bias_support = true;
-  // bias size requires [batch_size, 1, q_len, k_len]
-  if (b.has_value()) {
-    if (b.value().size(0) != q.size(0))
-      bias_support = false;
-    if (b.value().size(1) != 1)
-      bias_support = false;
-    if (b.value().size(2) != q.size(2))
-      bias_support = false;
-  }
-  if (q.dtype() == at::kHalf && k.dtype() == at::kHalf &&
-      v.dtype() == at::kHalf && !is_training &&
-      Settings::I().has_2d_block_array(curDevID) && bias_support == true) {
-    if ((q.size(-1) * sizeof(at::Half) % 128 == 0) &&
-        (v.size(-1) * sizeof(at::Half) % 128 == 0))
-      is_supported = true;
+  if (dpcppGetDeviceHasXMX()) {
+    DeviceId curDevID;
+    AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+    bool bias_support = true;
+    // bias size requires [batch_size, 1, q_len, k_len]
+    if (b.has_value()) {
+      if (b.value().size(0) != q.size(0))
+        bias_support = false;
+      if (b.value().size(1) != 1)
+        bias_support = false;
+      if (b.value().size(2) != q.size(2))
+        bias_support = false;
+    }
+    if (q.dtype() == at::kHalf && k.dtype() == at::kHalf &&
+        v.dtype() == at::kHalf && !is_training &&
+        Settings::I().has_2d_block_array(curDevID) && bias_support == true) {
+      if ((q.size(-1) * sizeof(at::Half) % 128 == 0) &&
+          (v.size(-1) * sizeof(at::Half) % 128 == 0))
+        is_supported = true;
+    }
   }
 #endif
   return is_supported;
@@ -363,6 +369,9 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   }
 
 #if defined(USE_XETLA)
+  TORCH_CHECK(
+      dpcppGetDeviceHasXMX(),
+      "SDP kernel requires XMX, but the current platform has no XMX ...");
   gpu::xetla::fmha_forward_kernel(
       dpcpp_queue,
       query.data_ptr(),
@@ -463,6 +472,9 @@ Tensor xetla_fsdp_index_forward(
   RECORD_FUNCTION("xetla_fsdp_index_forward", {});
 
 #if defined(USE_XETLA)
+  TORCH_CHECK(
+      dpcppGetDeviceHasXMX(),
+      "SDP kernel requires XMX, but the current platform has no XMX ...");
   gpu::xetla::fmha_forward_index_kernel(
       dpcpp_queue,
       query.data_ptr(),
