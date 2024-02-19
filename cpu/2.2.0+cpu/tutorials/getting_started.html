@@ -130,7 +130,7 @@
 <p>The example below demostrates how to use the Intel® Extension for PyTorch*:</p>
 <section id="generic-model-quick-start">
 <h2>Generic Model Quick Start<a class="headerlink" href="#generic-model-quick-start" title="Permalink to this heading"></a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> is generally used for generic PyTorch models.</p>
+<p><code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> coworks with <span class="pre">TorchScript</span>.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="c1">############## import ipex ###############</span>
 <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
@@ -148,6 +148,18 @@
   <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
   <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
 <span class="c1">##########################################</span>
+</pre></div>
+</div>
+<p></p>
+<p><code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> coworks with <span class="pre">TorchDynamo</span>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="c1">############## import ipex ###############</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="c1">##########################################</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">data</span> <span class="o">=</span> <span class="o">...</span>
 
 <span class="c1">############## TorchDynamo ###############</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">weights_prepack</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
