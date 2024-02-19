@@ -89,7 +89,7 @@
 <li class="toctree-l6"><a class="reference internal" href="#id3">BERT</a></li>
 </ul>
 </li>
-<li class="toctree-l5"><a class="reference internal" href="#torchdynamo-mode-experimental-new-feature-from-2-0-0">TorchDynamo Mode (Experimental, <em>NEW feature from 2.0.0</em>)</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#torchdynamo-mode-beta-new-feature-from-2-0-0">TorchDynamo Mode (Beta, <em>NEW feature from 2.0.0</em>)</a><ul>
 <li class="toctree-l6"><a class="reference internal" href="#id4">Resnet50</a></li>
 <li class="toctree-l6"><a class="reference internal" href="#id5">BERT</a></li>
 </ul>
@@ -107,14 +107,14 @@
 <li class="toctree-l6"><a class="reference internal" href="#id12">BERT</a></li>
 </ul>
 </li>
-<li class="toctree-l5"><a class="reference internal" href="#id13">TorchDynamo Mode (Experimental, <em>NEW feature from 2.0.0</em>)</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#id13">TorchDynamo Mode (Beta, <em>NEW feature from 2.0.0</em>)</a><ul>
 <li class="toctree-l6"><a class="reference internal" href="#id14">Resnet50</a></li>
 <li class="toctree-l6"><a class="reference internal" href="#id15">BERT</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li class="toctree-l4"><a class="reference internal" href="#fast-bert-experimental">Fast Bert (<em>Experimental</em>)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#fast-bert-beta">Fast Bert (<em>Beta</em>)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#int8">INT8</a><ul>
 <li class="toctree-l5"><a class="reference internal" href="#calibration">Calibration</a><ul>
 <li class="toctree-l6"><a class="reference internal" href="#static-quantization">Static Quantization</a></li>
@@ -217,7 +217,7 @@ Before running these examples, please note the following:</p>
 <span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">)</span>
 <span class="c1"># For BFloat16</span>
 <span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
-<span class="c1"># Invoke the code below to enable experimental feature torch.compile</span>
+<span class="c1"># Invoke the code below to enable beta feature torch.compile</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;ipex&quot;</span><span class="p">)</span>
 <span class="o">...</span>
 <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
@@ -259,7 +259,7 @@ Before running these examples, please note the following:</p>
 <span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 
 <span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">)</span>
-<span class="c1"># Uncomment the code below to enable experimental feature torch.compile</span>
+<span class="c1"># Uncomment the code below to enable beta feature torch.compile</span>
 <span class="c1"># model = torch.compile(model, backend=&quot;ipex&quot;)</span>
 
 <span class="k">for</span> <span class="n">batch_idx</span><span class="p">,</span> <span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">train_loader</span><span class="p">):</span>
@@ -312,7 +312,7 @@ Before running these examples, please note the following:</p>
 <span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 
 <span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
-<span class="c1"># Uncomment the code below to enable experimental feature torch.compile</span>
+<span class="c1"># Uncomment the code below to enable beta feature torch.compile</span>
 <span class="c1"># model = torch.compile(model, backend=&quot;ipex&quot;)</span>
 
 <span class="k">for</span> <span class="n">batch_idx</span><span class="p">,</span> <span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">train_loader</span><span class="p">):</span>
@@ -513,8 +513,8 @@ Before running these examples, please note the following:</p>
 </div>
 </section>
 </section>
-<section id="torchdynamo-mode-experimental-new-feature-from-2-0-0">
-<h5>TorchDynamo Mode (Experimental, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#torchdynamo-mode-experimental-new-feature-from-2-0-0" title="Permalink to this heading"></a></h5>
+<section id="torchdynamo-mode-beta-new-feature-from-2-0-0">
+<h5>TorchDynamo Mode (Beta, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#torchdynamo-mode-beta-new-feature-from-2-0-0" title="Permalink to this heading"></a></h5>
 <section id="id4">
 <h6>Resnet50<a class="headerlink" href="#id4" title="Permalink to this heading"></a></h6>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">torchvision</span></code> Python package to run the following example.</p>
@@ -525,7 +525,7 @@ Before running these examples, please note the following:</p>
 <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 <span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span>
 
-<span class="c1"># Experimental Feature</span>
+<span class="c1"># Beta Feature</span>
 <span class="c1">#################### code changes ####################  # noqa F401</span>
 <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">weights_prepack</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
@@ -553,7 +553,7 @@ Before running these examples, please note the following:</p>
 <span class="n">seq_length</span> <span class="o">=</span> <span class="mi">512</span>
 <span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">vocab_size</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">[</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">seq_length</span><span class="p">])</span>
 
-<span class="c1"># Experimental Feature</span>
+<span class="c1"># Beta Feature</span>
 <span class="c1">#################### code changes ####################  # noqa F401</span>
 <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">weights_prepack</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
@@ -685,7 +685,7 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 </section>
 </section>
 <section id="id13">
-<h5>TorchDynamo Mode (Experimental, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#id13" title="Permalink to this heading"></a></h5>
+<h5>TorchDynamo Mode (Beta, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#id13" title="Permalink to this heading"></a></h5>
 <section id="id14">
 <h6>Resnet50<a class="headerlink" href="#id14" title="Permalink to this heading"></a></h6>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">torchvision</span></code> Python package to run the following example.</p>
@@ -696,7 +696,7 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 <span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span>
 
-<span class="c1"># Experimental Feature</span>
+<span class="c1"># Beta Feature</span>
 <span class="c1">#################### code changes ####################  # noqa F401</span>
 <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span> <span class="n">weights_prepack</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
@@ -724,7 +724,7 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 <span class="n">seq_length</span> <span class="o">=</span> <span class="mi">512</span>
 <span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">vocab_size</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">[</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">seq_length</span><span class="p">])</span>
 
-<span class="c1"># Experimental Feature</span>
+<span class="c1"># Beta Feature</span>
 <span class="c1">#################### code changes ####################  # noqa F401</span>
 <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span> <span class="n">weights_prepack</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
@@ -740,8 +740,8 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 </section>
 </section>
 </section>
-<section id="fast-bert-experimental">
-<h4>Fast Bert (<em>Experimental</em>)<a class="headerlink" href="#fast-bert-experimental" title="Permalink to this heading"></a></h4>
+<section id="fast-bert-beta">
+<h4>Fast Bert (<em>Beta</em>)<a class="headerlink" href="#fast-bert-beta" title="Permalink to this heading"></a></h4>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">transformers</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>

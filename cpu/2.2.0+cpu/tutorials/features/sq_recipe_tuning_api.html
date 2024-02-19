@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smooth Quant Recipe Tuning API (Experimental) &mdash; Intel&amp;#174 Extension for PyTorch* 2.2.0+cpu documentation</title>
+  <title>Smooth Quant Recipe Tuning API (Prototype) &mdash; Intel&amp;#174 Extension for PyTorch* 2.2.0+cpu documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
@@ -96,7 +96,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Smooth Quant Recipe Tuning API (Experimental)</li>
+      <li class="breadcrumb-item active">Smooth Quant Recipe Tuning API (Prototype)</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../_sources/tutorials/features/sq_recipe_tuning_api.md.txt" rel="nofollow"> View page source</a>
       </li>
@@ -106,8 +106,8 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="smooth-quant-recipe-tuning-api-experimental">
-<h1>Smooth Quant Recipe Tuning API (Experimental)<a class="headerlink" href="#smooth-quant-recipe-tuning-api-experimental" title="Permalink to this heading"></a></h1>
+  <section id="smooth-quant-recipe-tuning-api-prototype">
+<h1>Smooth Quant Recipe Tuning API (Prototype)<a class="headerlink" href="#smooth-quant-recipe-tuning-api-prototype" title="Permalink to this heading"></a></h1>
 <p>Smooth Quantization is a popular method to improve the accuracy of int8 quantization. The <a class="reference external" href="../api_doc.html#ipex.quantization.autotune">autotune API</a> allows automatic global alpha tuning, and automatic layer-by-layer alpha tuning provided by Intel® Neural Compressor for the best INT8 accuracy.</p>
 <p>SmoothQuant will introduce alpha to calculate the ratio of input and weight updates to reduce quantization error. SmoothQuant arguments are as below:</p>
 <table border="1" class="docutils">

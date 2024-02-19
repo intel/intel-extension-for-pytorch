@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HyperTune (Experimental) &mdash; Intel&amp;#174 Extension for PyTorch* 2.2.0+cpu documentation</title>
+  <title>HyperTune (Prototype) &mdash; Intel&amp;#174 Extension for PyTorch* 2.2.0+cpu documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
@@ -24,8 +24,8 @@
 
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Fast BERT (Experimental)" href="fast_bert.html" />
-    <link rel="prev" title="Graph Capture (Experimental)" href="graph_capture.html" /> 
+    <link rel="next" title="Fast BERT (Prototype)" href="fast_bert.html" />
+    <link rel="prev" title="Graph Capture (Prototype)" href="graph_capture.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -57,7 +57,7 @@
 <li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#large-language-models-llm-new-feature-from-2-1-0">Large Language Models (LLM, <em>NEW feature from 2.1.0</em>)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../features.html#torch-compile-experimental-new-feature-from-2-0-0">torch.compile (Experimental, <em>NEW feature from 2.0.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#torch-compile-beta-new-feature-from-2-0-0">torch.compile (Beta, <em>NEW feature from 2.0.0</em>)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#isa-dynamic-dispatching">ISA Dynamic Dispatching</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#auto-channels-last">Auto Channels Last</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
@@ -66,10 +66,10 @@
 <li class="toctree-l2"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#runtime-extension">Runtime Extension</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#int8-quantization">INT8 Quantization</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../features.html#codeless-optimization-experimental-new-feature-from-1-13-0">Codeless Optimization (Experimental, <em>NEW feature from 1.13.0</em>)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-capture-experimental-new-feature-from-1-13-0">Graph Capture (Experimental, <em>NEW feature from 1.13.0</em>)</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="../features.html#hypertune-experimental-new-feature-from-1-13-0">HyperTune (Experimental, <em>NEW feature from 1.13.0</em>)</a><ul class="current">
-<li class="toctree-l3 current"><a class="current reference internal" href="#">HyperTune (Experimental)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#codeless-optimization-prototype-new-feature-from-1-13-0">Codeless Optimization (Prototype, <em>NEW feature from 1.13.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-capture-prototype-new-feature-from-1-13-0">Graph Capture (Prototype, <em>NEW feature from 1.13.0</em>)</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#hypertune-prototype-new-feature-from-1-13-0">HyperTune (Prototype, <em>NEW feature from 1.13.0</em>)</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">HyperTune (Prototype)</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#usage-of-hypertune">Usage of Hypertune</a><ul>
 <li class="toctree-l5"><a class="reference internal" href="#your-conf-file"><code class="docutils literal notranslate"><span class="pre">your_conf_file</span></code></a></li>
 <li class="toctree-l5"><a class="reference internal" href="#hyperparameters">Hyperparameters</a><ul>
@@ -91,7 +91,7 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../features.html#fast-bert-optimization-experimental-new-feature-from-2-0-0">Fast BERT Optimization (Experimental, <em>NEW feature from 2.0.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#fast-bert-optimization-prototype-new-feature-from-2-0-0">Fast BERT Optimization (Prototype, <em>NEW feature from 2.0.0</em>)</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
@@ -138,7 +138,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../features.html">Features</a></li>
-      <li class="breadcrumb-item active">HyperTune (Experimental)</li>
+      <li class="breadcrumb-item active">HyperTune (Prototype)</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../_sources/tutorials/features/hypertune.md.txt" rel="nofollow"> View page source</a>
       </li>
@@ -148,10 +148,10 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="hypertune-experimental">
-<h1>HyperTune (Experimental)<a class="headerlink" href="#hypertune-experimental" title="Permalink to this heading"></a></h1>
+  <section id="hypertune-prototype">
+<h1>HyperTune (Prototype)<a class="headerlink" href="#hypertune-prototype" title="Permalink to this heading"></a></h1>
 <p><img alt="HyperTune" src="../../_images/hypertune.png" /></p>
-<p>HyperTune is an experimental feature to perform hyperparameter/execution configuration searching. The searching is used in various areas such as optimization of hyperparameters of deep learning models. The searching is extremely useful in real situations when the number of hyperparameters, including configuration of script execution, and their search spaces are huge that manually tuning these hyperparameters/configuration is impractical and time consuming. Hypertune automates this process of execution configuration searching for the <a class="reference internal" href="../performance_tuning/launch_script.html"><span class="doc">launcher</span></a> and Intel® Extension for PyTorch*.</p>
+<p>HyperTune is an prototype feature to perform hyperparameter/execution configuration searching. The searching is used in various areas such as optimization of hyperparameters of deep learning models. The searching is extremely useful in real situations when the number of hyperparameters, including configuration of script execution, and their search spaces are huge that manually tuning these hyperparameters/configuration is impractical and time consuming. Hypertune automates this process of execution configuration searching for the <a class="reference internal" href="../performance_tuning/launch_script.html"><span class="doc">launcher</span></a> and Intel® Extension for PyTorch*.</p>
 <section id="usage-of-hypertune">
 <h2>Usage of Hypertune<a class="headerlink" href="#usage-of-hypertune" title="Permalink to this heading"></a></h2>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">intel_extension_for_pytorch</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">hypertune</span> <span class="o">--</span><span class="n">conf</span><span class="o">-</span><span class="n">file</span> <span class="o">&lt;</span><span class="n">your_conf_file</span><span class="o">&gt;</span> <span class="o">&lt;</span><span class="n">your_python_script</span><span class="o">&gt;</span> <span class="p">[</span><span class="n">args</span><span class="p">]</span>
@@ -317,8 +317,8 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="graph_capture.html" class="btn btn-neutral float-left" title="Graph Capture (Experimental)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="fast_bert.html" class="btn btn-neutral float-right" title="Fast BERT (Experimental)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="graph_capture.html" class="btn btn-neutral float-left" title="Graph Capture (Prototype)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="fast_bert.html" class="btn btn-neutral float-right" title="Fast BERT (Prototype)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

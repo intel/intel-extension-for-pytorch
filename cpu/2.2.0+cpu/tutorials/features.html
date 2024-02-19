@@ -57,7 +57,7 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Features</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#easy-to-use-python-api">Easy-to-use Python API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#large-language-models-llm-new-feature-from-2-1-0">Large Language Models (LLM, <em>NEW feature from 2.1.0</em>)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#torch-compile-experimental-new-feature-from-2-0-0">torch.compile (Experimental, <em>NEW feature from 2.0.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#torch-compile-beta-new-feature-from-2-0-0">torch.compile (Beta, <em>NEW feature from 2.0.0</em>)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#isa-dynamic-dispatching">ISA Dynamic Dispatching</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="features/isa_dynamic_dispatch.html">ISA Dynamic Dispatching</a></li>
 </ul>
@@ -93,23 +93,23 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#int8-quantization">INT8 Quantization</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="features/int8_overview.html">Intel® Extension for PyTorch* optimizations for quantization</a></li>
-<li class="toctree-l3"><a class="reference internal" href="features/int8_recipe_tuning_api.html">INT8 Recipe Tuning API (Experimental)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="features/int8_recipe_tuning_api.html">INT8 Recipe Tuning API (Prototype)</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#codeless-optimization-experimental-new-feature-from-1-13-0">Codeless Optimization (Experimental, <em>NEW feature from 1.13.0</em>)</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="features/codeless_optimization.html">Codeless Optimization (Experimental)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#codeless-optimization-prototype-new-feature-from-1-13-0">Codeless Optimization (Prototype, <em>NEW feature from 1.13.0</em>)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/codeless_optimization.html">Codeless Optimization (Prototype)</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#graph-capture-experimental-new-feature-from-1-13-0">Graph Capture (Experimental, <em>NEW feature from 1.13.0</em>)</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="features/graph_capture.html">Graph Capture (Experimental)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#graph-capture-prototype-new-feature-from-1-13-0">Graph Capture (Prototype, <em>NEW feature from 1.13.0</em>)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/graph_capture.html">Graph Capture (Prototype)</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#hypertune-experimental-new-feature-from-1-13-0">HyperTune (Experimental, <em>NEW feature from 1.13.0</em>)</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="features/hypertune.html">HyperTune (Experimental)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#hypertune-prototype-new-feature-from-1-13-0">HyperTune (Prototype, <em>NEW feature from 1.13.0</em>)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/hypertune.html">HyperTune (Prototype)</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#fast-bert-optimization-experimental-new-feature-from-2-0-0">Fast BERT Optimization (Experimental, <em>NEW feature from 2.0.0</em>)</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="features/fast_bert.html">Fast BERT (Experimental)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#fast-bert-optimization-prototype-new-feature-from-2-0-0">Fast BERT Optimization (Prototype, <em>NEW feature from 2.0.0</em>)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/fast_bert.html">Fast BERT (Prototype)</a></li>
 </ul>
 </li>
 </ul>
@@ -188,8 +188,8 @@ correct package name depending on the version you are using.</p>
 introduced in the Intel® Extension for PyTorch*.</p>
 <p>For more detailed information, check <a class="reference external" href="./llm.html">LLM Optimizations Overview</a>.</p>
 </section>
-<section id="torch-compile-experimental-new-feature-from-2-0-0">
-<h2>torch.compile (Experimental, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#torch-compile-experimental-new-feature-from-2-0-0" title="Permalink to this heading"></a></h2>
+<section id="torch-compile-beta-new-feature-from-2-0-0">
+<h2>torch.compile (Beta, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#torch-compile-beta-new-feature-from-2-0-0" title="Permalink to this heading"></a></h2>
 <p>PyTorch* 2.0 introduces a new feature <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> to speed up PyTorch* code. It makes PyTorch code run faster by JIT-compiling of PyTorch code into optimized kernels. Intel® Extension for PyTorch* enables a backend, <code class="docutils literal notranslate"><span class="pre">ipex</span></code>, in the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> to optimize generation of the graph model.</p>
 <p>To use the feature, import the Intel® Extension for PyTorch* and set the backend parameter of the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> to <code class="docutils literal notranslate"><span class="pre">ipex</span></code>.</p>
 <p>With <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> backend set to <code class="docutils literal notranslate"><span class="pre">ipex</span></code>, the following will happen:</p>
@@ -376,7 +376,7 @@ happen on cache more than on memory.</p>
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Intel® Extension for PyTorch* Runtime extension is still in the experimental stage. The API is subject to change. More detailed descriptions are available in the <a class="reference external" href="api_doc.html">API Documentation</a>.</p>
+<p>Intel® Extension for PyTorch* Runtime extension is still in the prototype stage. The API is subject to change. More detailed descriptions are available in the <a class="reference external" href="api_doc.html">API Documentation</a>.</p>
 </div>
 <p>For more detailed information, check <a class="reference external" href="features/runtime_extension.html">Runtime Extension</a>.</p>
 <div class="toctree-wrapper compound">
@@ -386,33 +386,33 @@ happen on cache more than on memory.</p>
 <h2>INT8 Quantization<a class="headerlink" href="#int8-quantization" title="Permalink to this heading"></a></h2>
 <p>Intel® Extension for PyTorch* provides built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models.</p>
 <p>Users are always recommended to try quantization with the built-in quantization recipe first with Intel® Extension for PyTorch* quantization APIs. For even higher accuracy demandings, users can try with separate <a class="reference external" href="features/int8_recipe_tuning_api.html">recipe tuning APIs</a>. The APIs are powered by Intel® Neural Compressor to take advantage of its tuning feature.</p>
-<p>Check more detailed information for <a class="reference external" href="features/int8_overview.html">INT8 Quantization</a> and <a class="reference external" href="features/int8_recipe_tuning_api.html">INT8 recipe tuning API guide (Experimental, *NEW feature in 1.13.0*)</a>.</p>
+<p>Check more detailed information for <a class="reference external" href="features/int8_overview.html">INT8 Quantization</a> and <a class="reference external" href="features/int8_recipe_tuning_api.html">INT8 recipe tuning API guide (Prototype, *NEW feature in 1.13.0*)</a>.</p>
 <div class="toctree-wrapper compound">
 </div>
 </section>
-<section id="codeless-optimization-experimental-new-feature-from-1-13-0">
-<h2>Codeless Optimization (Experimental, <em>NEW feature from 1.13.0</em>)<a class="headerlink" href="#codeless-optimization-experimental-new-feature-from-1-13-0" title="Permalink to this heading"></a></h2>
+<section id="codeless-optimization-prototype-new-feature-from-1-13-0">
+<h2>Codeless Optimization (Prototype, <em>NEW feature from 1.13.0</em>)<a class="headerlink" href="#codeless-optimization-prototype-new-feature-from-1-13-0" title="Permalink to this heading"></a></h2>
 <p>This feature enables users to get performance benefits from Intel® Extension for PyTorch* without changing Python scripts. It hopefully eases the usage and has been verified working well with broad scope of models, though in few cases there could be small overhead comparing to applying optimizations with Intel® Extension for PyTorch* APIs.</p>
 <p>For more detailed information, check <a class="reference external" href="features/codeless_optimization.html">Codeless Optimization</a>.</p>
 <div class="toctree-wrapper compound">
 </div>
 </section>
-<section id="graph-capture-experimental-new-feature-from-1-13-0">
-<h2>Graph Capture (Experimental, <em>NEW feature from 1.13.0</em>)<a class="headerlink" href="#graph-capture-experimental-new-feature-from-1-13-0" title="Permalink to this heading"></a></h2>
+<section id="graph-capture-prototype-new-feature-from-1-13-0">
+<h2>Graph Capture (Prototype, <em>NEW feature from 1.13.0</em>)<a class="headerlink" href="#graph-capture-prototype-new-feature-from-1-13-0" title="Permalink to this heading"></a></h2>
 <p>Since graph mode is key for deployment performance, this feature automatically captures graphs based on set of technologies that PyTorch supports, such as TorchScript and TorchDynamo. Users won’t need to learn and try different PyTorch APIs to capture graphs, instead, they can turn on a new boolean flag <cite>–graph_mode</cite> (default off) in <cite>ipex.optimize()</cite> to get the best of graph optimization.</p>
 <p>For more detailed information, check <a class="reference external" href="features/graph_capture.html">Graph Capture</a>.</p>
 <div class="toctree-wrapper compound">
 </div>
 </section>
-<section id="hypertune-experimental-new-feature-from-1-13-0">
-<h2>HyperTune (Experimental, <em>NEW feature from 1.13.0</em>)<a class="headerlink" href="#hypertune-experimental-new-feature-from-1-13-0" title="Permalink to this heading"></a></h2>
-<p>HyperTune is an experimental feature to perform hyperparameter/execution configuration searching. The searching is used in various areas such as optimization of hyperparameters of deep learning models. The searching is extremely useful in real situations when the number of hyperparameters, including configuration of script execution, and their search spaces are huge that manually tuning these hyperparameters/configuration is impractical and time consuming. Hypertune automates this process of execution configuration searching for the <a class="reference external" href="performance_tuning/launch_script.html">launcher</a> and Intel® Extension for PyTorch*.</p>
+<section id="hypertune-prototype-new-feature-from-1-13-0">
+<h2>HyperTune (Prototype, <em>NEW feature from 1.13.0</em>)<a class="headerlink" href="#hypertune-prototype-new-feature-from-1-13-0" title="Permalink to this heading"></a></h2>
+<p>HyperTune is an prototype feature to perform hyperparameter/execution configuration searching. The searching is used in various areas such as optimization of hyperparameters of deep learning models. The searching is extremely useful in real situations when the number of hyperparameters, including configuration of script execution, and their search spaces are huge that manually tuning these hyperparameters/configuration is impractical and time consuming. Hypertune automates this process of execution configuration searching for the <a class="reference external" href="performance_tuning/launch_script.html">launcher</a> and Intel® Extension for PyTorch*.</p>
 <p>For more detailed information, check <a class="reference external" href="features/hypertune.html">HyperTune</a>.</p>
 <div class="toctree-wrapper compound">
 </div>
 </section>
-<section id="fast-bert-optimization-experimental-new-feature-from-2-0-0">
-<h2>Fast BERT Optimization (Experimental, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#fast-bert-optimization-experimental-new-feature-from-2-0-0" title="Permalink to this heading"></a></h2>
+<section id="fast-bert-optimization-prototype-new-feature-from-2-0-0">
+<h2>Fast BERT Optimization (Prototype, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#fast-bert-optimization-prototype-new-feature-from-2-0-0" title="Permalink to this heading"></a></h2>
 <p>Intel proposed a technique to speed up BERT workloads. Implementation is integrated into Intel® Extension for PyTorch*. An API <cite>ipex.fast_bert()</cite> is provided for a simple usage.</p>
 <p>Currently <cite>ipex.fast_bert</cite> API is well optimized for training tasks. It works for inference tasks, though, please use the <cite>ipex.optimize</cite> API with graph mode to achieve the peak performance.</p>
 <p>For more detailed information, check <a class="reference external" href="features/fast_bert.html">Fast BERT</a>.</p>

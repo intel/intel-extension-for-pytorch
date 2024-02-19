@@ -182,7 +182,7 @@
 <ul class="simple">
 <li><p><strong>Problem</strong>: A workload that uses <code class="docutils literal notranslate"><span class="pre">torch.compile()</span></code> fails to run or demonstrates poor performance.</p>
 <ul>
-<li><p><strong>Cause</strong>: The support of <code class="docutils literal notranslate"><span class="pre">torch.compile()</span></code> with <code class="docutils literal notranslate"><span class="pre">ipex</span></code> as the backend is still an experimental feature. Currently, the following HuggingFace models fail to run using <code class="docutils literal notranslate"><span class="pre">torch.compile()</span></code> with <code class="docutils literal notranslate"><span class="pre">ipex</span></code> backend due to memory issues:</p>
+<li><p><strong>Cause</strong>: The support of <code class="docutils literal notranslate"><span class="pre">torch.compile()</span></code> with <code class="docutils literal notranslate"><span class="pre">ipex</span></code> as the backend is still an beta feature. Currently, the following HuggingFace models fail to run using <code class="docutils literal notranslate"><span class="pre">torch.compile()</span></code> with <code class="docutils literal notranslate"><span class="pre">ipex</span></code> backend due to memory issues:</p>
 <ul>
 <li><p>masked-language-modeling+xlm-roberta-base</p></li>
 <li><p>casual-language-modeling+gpt2</p></li>

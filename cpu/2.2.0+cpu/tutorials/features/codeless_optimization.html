@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Codeless Optimization (Experimental) &mdash; Intel&amp;#174 Extension for PyTorch* 2.2.0+cpu documentation</title>
+  <title>Codeless Optimization (Prototype) &mdash; Intel&amp;#174 Extension for PyTorch* 2.2.0+cpu documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
@@ -24,8 +24,8 @@
 
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Graph Capture (Experimental)" href="graph_capture.html" />
-    <link rel="prev" title="INT8 Recipe Tuning API (Experimental)" href="int8_recipe_tuning_api.html" /> 
+    <link rel="next" title="Graph Capture (Prototype)" href="graph_capture.html" />
+    <link rel="prev" title="INT8 Recipe Tuning API (Prototype)" href="int8_recipe_tuning_api.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -57,7 +57,7 @@
 <li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#large-language-models-llm-new-feature-from-2-1-0">Large Language Models (LLM, <em>NEW feature from 2.1.0</em>)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../features.html#torch-compile-experimental-new-feature-from-2-0-0">torch.compile (Experimental, <em>NEW feature from 2.0.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#torch-compile-beta-new-feature-from-2-0-0">torch.compile (Beta, <em>NEW feature from 2.0.0</em>)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#isa-dynamic-dispatching">ISA Dynamic Dispatching</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#auto-channels-last">Auto Channels Last</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
@@ -66,8 +66,8 @@
 <li class="toctree-l2"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#runtime-extension">Runtime Extension</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#int8-quantization">INT8 Quantization</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="../features.html#codeless-optimization-experimental-new-feature-from-1-13-0">Codeless Optimization (Experimental, <em>NEW feature from 1.13.0</em>)</a><ul class="current">
-<li class="toctree-l3 current"><a class="current reference internal" href="#">Codeless Optimization (Experimental)</a><ul>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#codeless-optimization-prototype-new-feature-from-1-13-0">Codeless Optimization (Prototype, <em>NEW feature from 1.13.0</em>)</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Codeless Optimization (Prototype)</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#motivation">Motivation</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#example-usage-with-huggingface">Example Usage with HuggingFace</a><ul>
 <li class="toctree-l5"><a class="reference internal" href="#the-origin-command-with-ipex-launch">The origin command with ipex launch</a></li>
@@ -85,9 +85,9 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-capture-experimental-new-feature-from-1-13-0">Graph Capture (Experimental, <em>NEW feature from 1.13.0</em>)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../features.html#hypertune-experimental-new-feature-from-1-13-0">HyperTune (Experimental, <em>NEW feature from 1.13.0</em>)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../features.html#fast-bert-optimization-experimental-new-feature-from-2-0-0">Fast BERT Optimization (Experimental, <em>NEW feature from 2.0.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-capture-prototype-new-feature-from-1-13-0">Graph Capture (Prototype, <em>NEW feature from 1.13.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#hypertune-prtotype-new-feature-from-1-13-0">HyperTune (Prototype, <em>NEW feature from 1.13.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#fast-bert-optimization-prototype-new-feature-from-2-0-0">Fast BERT Optimization (Prototype, <em>NEW feature from 2.0.0</em>)</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
@@ -134,7 +134,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../features.html">Features</a></li>
-      <li class="breadcrumb-item active">Codeless Optimization (Experimental)</li>
+      <li class="breadcrumb-item active">Codeless Optimization (Prototype)</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../_sources/tutorials/features/codeless_optimization.md.txt" rel="nofollow"> View page source</a>
       </li>
@@ -144,8 +144,8 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="codeless-optimization-experimental">
-<h1>Codeless Optimization (Experimental)<a class="headerlink" href="#codeless-optimization-experimental" title="Permalink to this heading"></a></h1>
+  <section id="codeless-optimization-prototype">
+<h1>Codeless Optimization (Prototype)<a class="headerlink" href="#codeless-optimization-prototype" title="Permalink to this heading"></a></h1>
 <p>This feature aims to get inference performance benefits from Intel® Extension for PyTorch* without changing code in your python scripts, which can raise Out-of-Box (OOB) experience to get started with Intel® Extension for PyTorch* easily. Users who already known how to apply optimizations with Intel® Extension for PyTorch* APIs are not targeted for this feature, due to the inevitable overhead and limitations we mentioned below.</p>
 <section id="motivation">
 <h2>Motivation<a class="headerlink" href="#motivation" title="Permalink to this heading"></a></h2>
@@ -267,8 +267,8 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="int8_recipe_tuning_api.html" class="btn btn-neutral float-left" title="INT8 Recipe Tuning API (Experimental)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="graph_capture.html" class="btn btn-neutral float-right" title="Graph Capture (Experimental)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="int8_recipe_tuning_api.html" class="btn btn-neutral float-left" title="INT8 Recipe Tuning API (Prototype)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="graph_capture.html" class="btn btn-neutral float-right" title="Graph Capture (Prototype)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

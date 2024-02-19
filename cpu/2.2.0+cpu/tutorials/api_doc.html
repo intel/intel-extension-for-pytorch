@@ -78,7 +78,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#ipex.verbose"><code class="docutils literal notranslate"><span class="pre">verbose</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#fast-bert-experimental">Fast Bert (Experimental)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#fast-bert-prototype">Fast Bert (Prototype)</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#ipex.fast_bert"><code class="docutils literal notranslate"><span class="pre">fast_bert()</span></code></a></li>
 </ul>
 </li>
@@ -232,7 +232,7 @@ kernel selection for better performance if this knob is set to
 <code class="docutils literal notranslate"><span class="pre">True</span></code>. You might get better performance at the cost of extra memory usage.
 The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites the
 configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
-<li><p><strong>graph_mode</strong> – (bool) [experimental]: It will automatically apply a combination of methods
+<li><p><strong>graph_mode</strong> – (bool) [prototype]: It will automatically apply a combination of methods
 to generate graph or multiple subgraphs if True. The default value is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
 <li><p><strong>concat_linear</strong> (<em>bool</em>) – Whether to perform <code class="docutils literal notranslate"><span class="pre">concat_linear</span></code>. It only
 works for inference model. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly
@@ -387,12 +387,12 @@ will be dumped out for the second inference only.</p>
 </dd></dl>
 
 </section>
-<section id="fast-bert-experimental">
-<h2>Fast Bert (Experimental)<a class="headerlink" href="#fast-bert-experimental" title="Permalink to this heading"></a></h2>
+<section id="fast-bert-prototype">
+<h2>Fast Bert (Prototype)<a class="headerlink" href="#fast-bert-prototype" title="Permalink to this heading"></a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="ipex.fast_bert">
 <span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">fast_bert</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.float32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unpad</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.fast_bert" title="Permalink to this definition"></a></dt>
-<dd><p>Use TPP to speedup training/inference. fast_bert API is still a experimental
+<dd><p>Use TPP to speedup training/inference. fast_bert API is still a prototype
 feature and now only optimized for bert model.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -556,7 +556,7 @@ before a quantizable module or operator.</p>
 </dl>
 </dd></dl>
 
-<p>Experimental API, introduction is avaiable at <a class="reference external" href="./features/int8_recipe_tuning_api.html">feature page</a>.</p>
+<p>Prototype API, introduction is avaiable at <a class="reference external" href="./features/int8_recipe_tuning_api.html">feature page</a>.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="ipex.quantization.autotune">
 <span class="sig-prename descclassname"><span class="pre">ipex.quantization.</span></span><span class="sig-name descname"><span class="pre">autotune</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">calib_dataloader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">calib_func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eval_func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">op_type_dict</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">smoothquant_args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sampling_sizes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">accuracy_criterion</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tuning_time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.quantization.autotune" title="Permalink to this definition"></a></dt>

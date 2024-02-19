@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fast BERT (Experimental) &mdash; Intel&amp;#174 Extension for PyTorch* 2.2.0+cpu documentation</title>
+  <title>Fast BERT (Prototype) &mdash; Intel&amp;#174 Extension for PyTorch* 2.2.0+cpu documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
@@ -25,7 +25,7 @@
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
     <link rel="next" title="Large Language Models (LLM) Optimization Overview" href="../llm.html" />
-    <link rel="prev" title="HyperTune (Experimental)" href="hypertune.html" /> 
+    <link rel="prev" title="HyperTune (Prototype)" href="hypertune.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -57,7 +57,7 @@
 <li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#large-language-models-llm-new-feature-from-2-1-0">Large Language Models (LLM, <em>NEW feature from 2.1.0</em>)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../features.html#torch-compile-experimental-new-feature-from-2-0-0">torch.compile (Experimental, <em>NEW feature from 2.0.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#torch-compile-beta-new-feature-from-2-0-0">torch.compile (Beta, <em>NEW feature from 2.0.0</em>)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#isa-dynamic-dispatching">ISA Dynamic Dispatching</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#auto-channels-last">Auto Channels Last</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
@@ -66,11 +66,11 @@
 <li class="toctree-l2"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#runtime-extension">Runtime Extension</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../features.html#int8-quantization">INT8 Quantization</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../features.html#codeless-optimization-experimental-new-feature-from-1-13-0">Codeless Optimization (Experimental, <em>NEW feature from 1.13.0</em>)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-capture-experimental-new-feature-from-1-13-0">Graph Capture (Experimental, <em>NEW feature from 1.13.0</em>)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../features.html#hypertune-experimental-new-feature-from-1-13-0">HyperTune (Experimental, <em>NEW feature from 1.13.0</em>)</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="../features.html#fast-bert-optimization-experimental-new-feature-from-2-0-0">Fast BERT Optimization (Experimental, <em>NEW feature from 2.0.0</em>)</a><ul class="current">
-<li class="toctree-l3 current"><a class="current reference internal" href="#">Fast BERT (Experimental)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#codeless-optimization-prototype-new-feature-from-1-13-0">Codeless Optimization (Prototype, <em>NEW feature from 1.13.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-capture-prototype-new-feature-from-1-13-0">Graph Capture (Prototype, <em>NEW feature from 1.13.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#hypertune-prototype-new-feature-from-1-13-0">HyperTune (Prototype, <em>NEW feature from 1.13.0</em>)</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#fast-bert-optimization-prototype-new-feature-from-2-0-0">Fast BERT Optimization (Prototype, <em>NEW feature from 2.0.0</em>)</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Fast BERT (Prototype)</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#feature-description">Feature Description</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#prerequisite">Prerequisite</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#usage-example">Usage Example</a></li>
@@ -124,7 +124,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../features.html">Features</a></li>
-      <li class="breadcrumb-item active">Fast BERT (Experimental)</li>
+      <li class="breadcrumb-item active">Fast BERT (Prototype)</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../_sources/tutorials/features/fast_bert.md.txt" rel="nofollow"> View page source</a>
       </li>
@@ -134,8 +134,8 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="fast-bert-experimental">
-<h1>Fast BERT (Experimental)<a class="headerlink" href="#fast-bert-experimental" title="Permalink to this heading"></a></h1>
+  <section id="fast-bert-prototype">
+<h1>Fast BERT (Prototype)<a class="headerlink" href="#fast-bert-prototype" title="Permalink to this heading"></a></h1>
 <section id="feature-description">
 <h2>Feature Description<a class="headerlink" href="#feature-description" title="Permalink to this heading"></a></h2>
 <p>Intel proposed a technique to speed up BERT workloads. Implementation leverages the idea from <a class="reference external" href="https://arxiv.org/pdf/2104.05755.pdf"><em>Tensor Processing Primitives: A Programming Abstraction for Efficiency and Portability in Deep Learning &amp; HPC Workloads</em></a>.</p>
@@ -180,7 +180,7 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="hypertune.html" class="btn btn-neutral float-left" title="HyperTune (Experimental)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="hypertune.html" class="btn btn-neutral float-left" title="HyperTune (Prototype)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="../llm.html" class="btn btn-neutral float-right" title="Large Language Models (LLM) Optimization Overview" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
