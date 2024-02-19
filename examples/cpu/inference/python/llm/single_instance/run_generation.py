@@ -36,6 +36,7 @@ MODEL_CLASSES = {
     "mixtral": (AutoModelForCausalLM, AutoTokenizer),
     "mpt": (AutoModelForCausalLM, AutoTokenizer),
     "stablelm": (AutoModelForCausalLM, AutoTokenizer),
+    "qwen": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 

@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, List
 from ...reference.fusions.linear_fusion import (
     _IPEXlinearAddRef,
     _IPEXlinearAddAddRef,
@@ -938,6 +938,59 @@ def StableLMEpochDecoderLayer_forward(
     return outputs
 
 
+def QWenBlock_forward(
+    self,
+    hidden_states: Optional[Tuple[torch.FloatTensor]],
+    rotary_pos_emb_list: Optional[List[List[torch.Tensor]]] = None,
+    layer_past: Optional[Tuple[torch.Tensor]] = None,
+    attention_mask: Optional[torch.FloatTensor] = None,
+    head_mask: Optional[torch.FloatTensor] = None,
+    use_cache: Optional[bool] = False,
+    output_attentions: Optional[bool] = False,
+):
+    layernorm_output = self.ln_1(hidden_states)
+
+    attn_outputs = self.attn(
+        hidden_states=layernorm_output,
+        rotary_pos_emb=rotary_pos_emb_list,
+        layer_past=layer_past,
+        attention_mask=attention_mask,
+        head_mask=head_mask,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+    )
+    attn_output = attn_outputs[0]
+
+    outputs = attn_outputs[1:]
+
+    residual = hidden_states
+    if not self.distributed:
+        layernorm_input = self.mha_linear_add(attn_output, residual)
+    else:
+        attn_output = self.attn.c_proj(attn_output)
+        layernorm_input = attn_output + residual
+
+    layernorm_output = self.ln_2(layernorm_input)
+
+    residual = layernorm_input
+    # mlp_output = self.mlp(layernorm_output)
+
+    mlp_gate = self.linear_silu_mul(layernorm_output)
+
+    if not self.distributed:
+        hidden_states = self.mlp_linear_add(mlp_gate, residual)
+    else:
+        hidden_states = self.mlp.down_proj(mlp_gate)
+        hidden_states = residual + hidden_states
+
+    if use_cache:
+        outputs = (hidden_states,) + outputs
+    else:
+        outputs = (hidden_states,) + outputs[1:]
+
+    return outputs
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -1041,6 +1094,15 @@ class _IPEXDecoderLayerRef(nn.Module):
             if not self.distributed:
                 self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
                 del self.__dict__["_modules"]["self_attn"].o_proj
+        elif self.model_backbone == "QWenLMHeadModel":
+            if not self.distributed:
+                self.mha_linear_add = _IPEXlinearAddRef(module.attn.c_proj)
+                del self.__dict__["_modules"]["attn"].c_proj
+                self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.c_proj)
+                del self.__dict__["_modules"]["mlp"].c_proj
+            self.linear_silu_mul = _IPEXlinearSiluMulRef(module.mlp.w2, module.mlp.w1)
+            del self.__dict__["_modules"]["mlp"].w2
+            del self.__dict__["_modules"]["mlp"].w1
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -1202,6 +1264,17 @@ class _IPEXDecoderLayerRef(nn.Module):
                 past_key_value,
                 output_attentions,
                 use_cache,
+            )
+        elif self.model_backbone == "QWenLMHeadModel":
+            return QWenBlock_forward(
+                self,
+                hidden_states,
+                rotary_pos_emb,
+                layer_past,
+                attention_mask,
+                head_mask,
+                use_cache,
+                output_attentions,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

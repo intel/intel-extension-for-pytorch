@@ -477,6 +477,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "mpt": ("/mpt_local_shard"),
                 "stablelm": ("/stablelm_local_shard"),
                 "dolly": ("/dolly_local_shard"),
+                "qwen": ("/qwen_local_shard"),
             }
             model_type = next(
                 (x for x in MODEL_CLASSES.keys() if x in args.model_name_or_path.lower()), "auto"

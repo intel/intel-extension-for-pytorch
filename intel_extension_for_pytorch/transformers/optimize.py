@@ -137,6 +137,8 @@ def model_convert_reference(_model):
         MixtralModel_forward,
         StableLMEpochForCausalLM_forward,
         StableLMEpochModel_forward,
+        QWenLMHeadModel_forward,
+        QWenModel_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptbigcode,
     )
@@ -480,6 +482,29 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+    elif _model.config.architectures[0] == "QWenLMHeadModel":
+        convert_function(_model, "forward", QWenLMHeadModel_forward)
+        convert_function(_model.transformer, "forward", QWenModel_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation,
+        )
+        convert_class(
+            _model,
+            type(_model.transformer.h[0].attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.transformer.h[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+
     return _model
 
 
@@ -665,6 +690,8 @@ def model_convert_lowering(
                 supported_classes.append(
                     type(_model.transformer.encoder.layers[0].input_layernorm)
                 )
+            if _model.config.architectures[0] == "QWenLMHeadModel":
+                supported_classes.append(type(_model.transformer.h[0].ln_1))
             if hasattr(transformers.models, "mistral"):
                 supported_classes.append(
                     transformers.models.mistral.modeling_mistral.MistralRMSNorm
@@ -767,7 +794,7 @@ def optimize(
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
     This API focus on transformers models, especially for generation tasks inference.
     Well supported model family:
-    Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode, T5, Mistral, MPT, Mixtral, StableLM.
+    Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode, T5, Mistral, MPT, Mixtral, StableLM, QWen.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
@@ -829,7 +856,7 @@ def optimize(
     try:
         installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
         min_version = "4.28.1"
-        validated_version = "4.37.0"
+        validated_version = "4.37.2"
         if "transformers" not in installed_pkg:
             raise RuntimeError(
                 "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
@@ -874,11 +901,12 @@ def optimize(
             "MixtralForCausalLM",
             "MptForCausalLM",
             "StableLMEpochForCausalLM",
+            "QWenLMHeadModel",
         ]
         if not well_supported_model:
             warnings.warn(
                 "ipex.llm.optimize supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, Baichuan, ChatGLM, "
-                + "GPTBigCode, T5, Mistral, Mixtral, MPT, and StableLM, fallback to origin model"
+                + "GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, and QWen, fallback to origin model"
             )
             return model
 

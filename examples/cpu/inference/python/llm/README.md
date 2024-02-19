@@ -23,6 +23,7 @@ The scripts cover model generation inference with low precions cases for differe
 |MPT|"mosaicml/mpt-7b"| ✅ | ✅ |  ✅ | ✅ |
 |Mixtral|"mistralai/Mixtral-8x7B-v0.1"| ✅ | ✅ |  ✅ | ✅ |
 |StableLM|"stabilityai/stablelm-2-1_6b"| ✅ | ✅ |  ✅ | ✅ |
+|Qwen|"Qwen/Qwen-7B-Chat"| ✅ | ✅ |  ✅ | ✅ |
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM model families, we are working in progress to cover those optimizations, which will expand the model list above.
 

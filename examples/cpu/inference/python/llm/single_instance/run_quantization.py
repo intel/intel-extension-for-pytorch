@@ -33,6 +33,7 @@ from llm.utils.model_class.mistral import MistralConfig
 from llm.utils.model_class.mixtral import MixtralConfig
 from llm.utils.model_class.mpt import MPTConfig
 from llm.utils.model_class.stablelm import StableLMConfig
+from llm.utils.model_class.qwen import QwenConfig
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -242,6 +243,8 @@ elif re.search("mixtral", config.architectures[0], re.IGNORECASE):
     model = MixtralConfig(args.model_id)
 elif re.search("stablelm", config.architectures[0], re.IGNORECASE):
     model = StableLMConfig(args.model_id)
+elif re.search("qwen", config.architectures[0], re.IGNORECASE):
+    model = QwenConfig(args.model_id)
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 

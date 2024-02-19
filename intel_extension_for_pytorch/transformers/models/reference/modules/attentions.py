@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, List
 import math
 from ...reference.fusions.mha_fusion import (
     _IPEXRopeRef,
@@ -1502,6 +1502,52 @@ def _StableLMEpochAttention_forward(
     return attn_output, attn_weights, past_key_value
 
 
+def _QWenAttention_forward(
+    self,
+    hidden_states: Optional[Tuple[torch.FloatTensor]],
+    rotary_pos_emb_list: Optional[List[List[torch.Tensor]]] = None,
+    layer_past: Optional[Tuple[torch.Tensor]] = None,
+    attention_mask: Optional[torch.FloatTensor] = None,
+    head_mask: Optional[torch.FloatTensor] = None,
+    output_attentions: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+):
+    mixed_x_layer = self.c_attn(hidden_states)
+
+    past_len = layer_past[0].shape[-2] if layer_past is not None else 0
+    query, key, value = self._IPEXROPE(
+        mixed_x_layer,
+        torch.tensor(past_len),
+        self.num_key_value_heads,
+        self.head_dim,
+        self.pos_embd_dim // 2,
+        self.pos_embd_dim,
+        past_len + hidden_states.shape[1],
+        3,
+    )
+
+    if use_cache:
+        (attn_output, attn_weights, present) = self._IPEXScaleDotProduct(
+            query,
+            key,
+            value,
+            math.sqrt(self.head_dim) if self.scale_attn_weights else 1,
+            layer_past,
+            None,
+            attention_mask,
+        )
+    attn_output = attn_output.transpose(1, 2)
+    attn_output = self._merge_heads(attn_output, self.num_heads, self.head_dim)
+
+    # attn_output = self.c_proj(context_layer)
+
+    outputs = (attn_output, present)
+    if output_attentions:
+        outputs += (attn_weights,)
+
+    return outputs
+
+
 class _IPEXAttentionRef(nn.Module):
     def __init__(self, module, config, sdp_module_ref, distributed=False):
         super().__init__()
@@ -1943,6 +1989,17 @@ class _IPEXAttentionRef(nn.Module):
                 attention_mask,
                 position_ids,
                 past_key_value,
+                output_attentions,
+                use_cache,
+            )
+        elif self.model_backbone == "QWenLMHeadModel":
+            return _QWenAttention_forward(
+                self,
+                hidden_states,
+                rotary_pos_emb,
+                layer_past,
+                attention_mask,
+                head_mask,
                 output_attentions,
                 use_cache,
             )

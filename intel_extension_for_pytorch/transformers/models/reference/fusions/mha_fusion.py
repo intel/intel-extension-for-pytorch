@@ -214,6 +214,26 @@ class _IPEXRopeRef(nn.Module):
                 ),
                 dim=-1,
             )
+        elif self.model_backbone == "QWenLMHeadModel":
+            x = x.view(x.size(0), x.size(1), num_head, head_dim)
+            b, sq, np, hn = x.size(0), x.size(1), x.size(2), x.size(3)
+            x_float = x.float()
+            x_rot = x_float[..., :rotary_ndims]
+            x_pass = x_float[..., rotary_ndims:]
+            sin = (
+                _sin.squeeze(1)
+                .squeeze(0)[position_ids : position_ids + sq, :]
+                .unsqueeze(1)
+                .unsqueeze(0)
+            )
+            cos = (
+                _cos.squeeze(1)
+                .squeeze(0)[position_ids : position_ids + sq, :]
+                .unsqueeze(1)
+                .unsqueeze(0)
+            )
+            x_rot = (x_rot * cos) + (self.rotate_half(x_rot) * sin)
+            x = torch.cat((x_rot, x_pass), dim=-1).type_as(x)
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
         return x
@@ -348,6 +368,10 @@ class _IPEXScaleDotProductRef(nn.Module):
             self.head_dim = module.head_dim
             self.softmax_scale = module.softmax_scale
             self.attn_dropout_p = module.attn_dropout_p
+        elif self.model_backbone == "QWenLMHeadModel":
+            self.softmax_in_fp32 = config.softmax_in_fp32
+            self.head_dim = module.head_dim
+            self.num_heads = module.num_heads
 
         for k, v in module.__class__.__dict__.items():
             if k.startswith("__") or k.startswith("forward"):
@@ -406,6 +430,7 @@ class _IPEXScaleDotProductRef(nn.Module):
                     "GPTBigCodeForCausalLM",
                     "T5ForConditionalGeneration",
                     "MptForCausalLM",
+                    "QWenLMHeadModel",
                 ]
                 else key
             )
@@ -421,9 +446,14 @@ class _IPEXScaleDotProductRef(nn.Module):
                     "ChatGLMModel",
                     "T5ForConditionalGeneration",
                     "MptForCausalLM",
+                    "QWenLMHeadModel",
                 ]
                 else query
             )
+            if self.model_backbone == "QWenLMHeadModel":
+                value = value.view(
+                    value.size(0), value.size(1), self.num_heads, self.head_dim
+                )
             value = value.permute(0, 2, 1, 3)
 
         if layer_past is not None:
@@ -695,6 +725,37 @@ class _IPEXScaleDotProductRef(nn.Module):
             attn_weights = nn.functional.dropout(
                 attn_weights, p=self.attn_dropout_p, training=self.training
             )
+
+            attn_output = torch.matmul(attn_weights, value)
+        elif self.model_backbone == "QWenLMHeadModel":
+            key_size = key.size(2)
+            if query.size(2) == key.size(2):
+                causal_mask = torch.tril(
+                    torch.ones(
+                        (key_size, key_size), dtype=torch.bool, device=query.device
+                    )
+                ).view(1, 1, key_size, key_size)
+            else:
+                causal_mask = None
+            attn_weights = torch.matmul(query, key.transpose(-1, -2)) / scale_attn
+            mask_value = torch.finfo(attn_weights.dtype).min
+            if causal_mask is not None:
+                attn_weights = torch.where(
+                    causal_mask, attn_weights.to(attn_weights.dtype), mask_value
+                )
+
+            if attention_mask is not None:
+                attn_weights = attn_weights + attention_mask
+
+            if self.softmax_in_fp32:
+                attn_weights = nn.functional.softmax(attn_weights.float(), dim=-1)
+            else:
+                attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+
+            attn_weights = attn_weights.type(query.dtype)
+
+            if head_mask is not None:
+                attn_weights = attn_weights * head_mask
 
             attn_output = torch.matmul(attn_weights, value)
         else:
