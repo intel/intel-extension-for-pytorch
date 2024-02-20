@@ -71,7 +71,12 @@ static void initDPCPPStreamsOnce() {
   // initialized in dpcppInitDeviceQueueOnce for the specified device.
   current_streams = std::make_unique<StreamId[]>(num_devices);
   for (auto i = 0; i < num_devices; i++) {
-    current_streams[i] = makeStreamId(QueueType::RESERVED, 0);
+    // Assigning the current stream to the last one in the pool can be
+    // beneficial in certain scenarios, particularly when users initialize their
+    // workload to perform computations with the current stream (the last one)
+    // and utilize stream (the first one) from the pool for communication, it
+    // allows for different streams to overlap in computation and communication.
+    current_streams[i] = makeStreamId(QueueType::RESERVED, kQueuesPerPool - 1);
   }
 }
 
