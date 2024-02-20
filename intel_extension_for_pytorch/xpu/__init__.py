@@ -712,17 +712,16 @@ def get_device_type() -> str:
     return "xpu"
 
 
-_StorageBase.xpu = _xpu
+if _is_compiled():
+    _StorageBase.xpu = _xpu
 
-serialization.register_package(30, _xpu_tag, _xpu_deserialize)
+    serialization.register_package(30, _xpu_tag, _xpu_deserialize)
 
-torch._register_device_module("xpu", current_module)
+    torch._register_device_module("xpu", current_module)
 
-# post initial
-if hasattr(intel_extension_for_pytorch._C, "_postInitExtension"):
+    # post initial
     intel_extension_for_pytorch._C._postInitExtension()
 
-if intel_extension_for_pytorch._C._has_xpu():
     if is_available():
         if not has_fp64_dtype():
             override_tensor_totype()
