@@ -2,7 +2,7 @@ import torch
 from torch.nn.modules.utils import _pair
 from torch import nn, Tensor
 from torch.jit.annotations import BroadcastingList2
-from typing import List, Union
+from typing import List, Union, Dict
 from .modules import EMA
 from .modules import TransducerLoss, clip_grad_norm_, clip_grad_norm
 import intel_extension_for_pytorch
@@ -21,6 +21,8 @@ __all__ = [
     "reshape_and_cache",
     "paged_attention_v1",
     "paged_attention_v2",
+    "copy_blocks",
+    "swap_blocks",
 ]
 
 
@@ -338,3 +340,39 @@ def paged_attention_v1(
         max_context_len,
         alibi_scopes,
     )
+
+
+def copy_blocks(key_caches, value_caches, block_mapping):
+    assert isinstance(block_mapping, Dict) or isinstance(
+        block_mapping, torch.Tensor
+    ), "We only support block_mapping as dict or torch tensor"
+    if isinstance(block_mapping, Dict):
+        block_mapping_tensor = []
+        for key, values in block_mapping.items():
+            if hasattr(values, "__iter__"):
+                for value in values:
+                    block_mapping_tensor.append([key, value])
+            else:
+                block_mapping_tensor.append([key, value])
+        block_mapping = torch.tensor(
+            block_mapping_tensor, device="xpu", dtype=torch.int64
+        )
+    return torch.ops.torch_ipex.copy_blocks(key_caches, value_caches, block_mapping)
+
+
+def swap_blocks(src, dst, block_mapping):
+    assert isinstance(block_mapping, Dict) or isinstance(
+        block_mapping, torch.Tensor
+    ), "We only support block_mapping as dict or torch tensor"
+    if isinstance(block_mapping, Dict):
+        block_mapping_tensor = []
+        for key, values in block_mapping.items():
+            if hasattr(values, "__iter__"):
+                for value in values:
+                    block_mapping_tensor.append([key, value])
+            else:
+                block_mapping_tensor.append([key, value])
+        block_mapping = torch.tensor(
+            block_mapping_tensor, device="xpu", dtype=torch.int64
+        )
+    return torch.ops.torch_ipex.swap_blocks(src, dst, block_mapping)
