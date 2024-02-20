@@ -266,7 +266,7 @@ struct BeamSearchTopkStage2KernelFunctor {
         TopK<scalar_t, MAX_K>,
         decltype(item),
         decltype(combine),
-        1>(item, num_wg_per_beam, shared, value, combine);
+        1>(item, item.get_local_range(0), shared, value, combine);
     TopK<scalar_t, MAX_K> total = value[0];
 
     if (wi_id == 0) {
@@ -323,6 +323,8 @@ void beam_search_topk_stage2(
     int64_t batch_size,
     int32_t num_wg_per_beam) {
   int slm_size = (sizeof(int) + sizeof(scalar_t)) * MAX_K * num_wg_per_beam;
+  int sub_wg_size = dpcppMaxSubGroupSize();
+  int wg_size = (num_wg_per_beam + sub_wg_size - 1) / sub_wg_size * sub_wg_size;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgh) {
     dpcpp_local_acc_t<char> shared(slm_size, cgh);
@@ -338,8 +340,8 @@ void beam_search_topk_stage2(
         shared);
     cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
-            sycl::range<1>(batch_size * beam_size * num_wg_per_beam),
-            sycl::range<1>(num_wg_per_beam)),
+            sycl::range<1>(batch_size * beam_size * wg_size),
+            sycl::range<1>(wg_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -1079,7 +1081,7 @@ struct FinalizeKernelFunctor {
     const int32_t wi_id = item.get_local_id(0);
     const int32_t wg_id = item.get_group(0);
     if (wi_id < beam_hyps_num_beams[wg_id]) {
-      s_score[wi_id] = beam_hyps_normed_scores[wg_id * wg_size + wi_id];
+      s_score[wi_id] = beam_hyps_normed_scores[wg_id * 2 * beam_size + wi_id];
     } else {
       s_score[wi_id] = std::numeric_limits<scalar_t>::lowest();
     }
@@ -1200,7 +1202,9 @@ void finalize(
     const int64_t out_sentence_num,
     const int64_t pad_token_id) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int32_t wg_size = 2 * beam_size;
+  int32_t sub_wg_size = dpcppMaxSubGroupSize();
+  int32_t wg_size =
+      (2 * beam_size + sub_wg_size - 1) / sub_wg_size * sub_wg_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto s_score = dpcpp_local_acc_t<scalar_t>(wg_size, cgh);
