@@ -329,6 +329,31 @@ class TestNNMethod(TestCase):
         self.assertEqual(output_cpu[0], output_xpu[0].to(cpu_device))
         self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
 
+    def test_max_pool_4D_global_pooling(self, dtype=torch.float):
+        for s in [2, 3]:
+            x = torch.randn([1, 1, s, s])
+            grad = torch.randn([1, 1, 1, 1])
+            m = nn.MaxPool2d(kernel_size=2, return_indices=True)
+
+            # 4D contiguous input
+            # CPU
+            input_cpu = x.clone()
+            input_cpu.requires_grad_(True)
+            grad_cpu = grad.clone()
+            output_cpu = m(input_cpu)
+            output_cpu[0].backward(grad_cpu)
+
+            # XPU
+            input_xpu = x.clone().to(dpcpp_device)
+            input_xpu.requires_grad_(True)
+            grad_xpu = grad.clone().to(dpcpp_device)
+            output_xpu = m(input_xpu)
+            output_xpu[0].backward(grad_xpu)
+            self.assertEqual(output_cpu[0], output_xpu[0].to(cpu_device))
+            self.assertEqual(output_cpu[1], output_xpu[1].to(cpu_device))
+            self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
+            self.assertEqual(input_cpu.shape, input_xpu.shape)
+
     def test_max_pool_4D_ceil_mode(self, dtype=torch.float):
         x = torch.randn([1, 3, 40, 40])
         grad = torch.randn([1, 3, 20, 20])

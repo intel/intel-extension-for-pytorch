@@ -531,7 +531,8 @@ void max_pool2d_with_indices_out_template(
         padding_vec_r);
   } else {
     // if it's global max pooling, reuse max op for better parallelism
-    if (outputHeight == 1 && outputWidth == 1) {
+    if (outputHeight == 1 && outputWidth == 1 && inputHeight <= kH &&
+        inputWidth <= kW) {
       if (input.ndimension() == 4) {
         input_.resize_({nbatch, nInputPlane, 1, inputHeight * inputWidth}, smf);
         output.resize_(
@@ -541,6 +542,7 @@ void max_pool2d_with_indices_out_template(
       }
       at::AtenIpexTypeXPU::max_out(input_, 3, true, output, indices);
       if (input.ndimension() == 4) {
+        input_.resize_({nbatch, nInputPlane, inputHeight, inputWidth}, smf);
         output.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
         indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
       }
