@@ -2,6 +2,7 @@
 #include <ATen/TensorSubclassLikeUtils.h>
 #include <ATen/record_function.h>
 #include <core/Generator.h>
+#include <runtime/Device.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "../Blas.h"
@@ -27,6 +28,9 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
     double dropout_p,
     c10::optional<double> scale) {
 #if defined(USE_XETLA)
+  TORCH_CHECK(
+      dpcppGetDeviceHasXMX(),
+      "SDP kernel requires XMX, but the current platform has no XMX ...");
   // check attn_mask padded
   uint32_t attn_mask_padded_block_size = 0;
   Tensor attn_mask_c;
@@ -415,20 +419,22 @@ inline bool xetla_supported(
     const c10::optional<Tensor>& b) {
   bool is_supported = false;
 #if defined(USE_XETLA)
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  bool bias_support = true;
-  if (b.has_value()) {
-    if (b.value().sym_size(0) != q.sym_size(0))
-      bias_support = false;
-    if (b.value().sym_size(1) != 1)
-      bias_support = false;
-  }
-  if ((q.dtype() == at::kHalf || q.dtype() == at::kBFloat16) &&
-      Settings::I().has_2d_block_array(curDevID) && bias_support == true) {
-    if ((q.sym_size(-1) * q.itemsize() % 128 == 0) &&
-        (v.sym_size(-1) * v.itemsize() % 128 == 0))
-      is_supported = true;
+  if (dpcppGetDeviceHasXMX()) {
+    DeviceId curDevID;
+    AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+    bool bias_support = true;
+    if (b.has_value()) {
+      if (b.value().sym_size(0) != q.sym_size(0))
+        bias_support = false;
+      if (b.value().sym_size(1) != 1)
+        bias_support = false;
+    }
+    if ((q.dtype() == at::kHalf || q.dtype() == at::kBFloat16) &&
+        Settings::I().has_2d_block_array(curDevID) && bias_support == true) {
+      if ((q.sym_size(-1) * q.itemsize() % 128 == 0) &&
+          (v.sym_size(-1) * v.itemsize() % 128 == 0))
+        is_supported = true;
+    }
   }
 #endif
   return is_supported;
@@ -552,6 +558,9 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   auto softmax_lse = at::empty({}, query.options().dtype(at::kFloat));
 
 #if defined(USE_XETLA)
+  TORCH_CHECK(
+      dpcppGetDeviceHasXMX(),
+      "SDP kernel requires XMX, but the current platform has no XMX ...");
   XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
   gpu::xetla::fmha_forward_kernel(
       xeType,
@@ -657,6 +666,9 @@ Tensor xetla_fsdp_index_forward(
   RECORD_FUNCTION("xetla_fsdp_index_forward", {});
 
 #if defined(USE_XETLA)
+  TORCH_CHECK(
+      dpcppGetDeviceHasXMX(),
+      "SDP kernel requires XMX, but the current platform has no XMX ...");
   gpu::xetla::fmha_forward_index_kernel(
       dpcpp_queue,
       query.data_ptr(),

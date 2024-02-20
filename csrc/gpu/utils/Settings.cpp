@@ -527,6 +527,8 @@ bool Settings::is_channels_last_1d_enabled() const {
 
 bool Settings::is_xetla_enabled() const {
 #if defined(USE_XETLA)
+  if (!dpcppGetDeviceHasXMX())
+    return false;
   return true;
 #else
   return false;

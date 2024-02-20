@@ -86,6 +86,7 @@ struct DeviceProp {
       gpu_eu_simd_width;
   dpcpp_info_t<sycl::info::device, dpcpp_dev_ext_intel_gpu_hw_threads_per_eu>
       gpu_hw_threads_per_eu;
+  dpcpp_info_t<sycl::info::device, dpcpp_dev_ext_intel_device_id> device_id;
 #else
   dpcpp_info_t<dpcpp_dev_name> dev_name;
   dpcpp_info_t<dpcpp_dev_type> dev_type;
@@ -136,6 +137,7 @@ struct DeviceProp {
       gpu_eu_count_per_subslice;
   dpcpp_info_t<dpcpp_dev_ext_intel_gpu_eu_simd_width> gpu_eu_simd_width;
   dpcpp_info_t<dpcpp_dev_ext_intel_gpu_hw_threads_per_eu> gpu_hw_threads_per_eu;
+  dpcpp_info_t<dpcpp_dev_ext_intel_device_id> device_id;
 #endif
   bool support_fp64;
   bool support_atomic64;

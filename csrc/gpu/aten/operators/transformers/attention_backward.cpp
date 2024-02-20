@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <runtime/Device.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "sdp_utils.h"
@@ -24,6 +25,10 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _efficient_attention_backward_impl(
   if (!_grad_out.defined()) {
     return std::make_tuple(Tensor{}, Tensor{}, Tensor{}, Tensor{});
   }
+
+  TORCH_CHECK(
+      dpcppGetDeviceHasXMX(),
+      "SDP backward kernel requires XMX, but the current platform has no XMX ...");
 
   auto grad_out = _grad_out.transpose(1, 2).contiguous().transpose(1, 2);
   auto query = _query.transpose(1, 2).contiguous().transpose(1, 2);

@@ -5,6 +5,7 @@
 #include <ATen/record_function.h>
 #include <dnnl.hpp>
 #include <oneDNN/oneDNN.h>
+#include <runtime/Device.h>
 #include <torch/autograd.h>
 #include <torch/custom_class.h>
 #include <utils/Settings.h>
@@ -765,7 +766,7 @@ std::tuple<Tensor, Tensor> gru(
   }
 #if defined(USE_XETLA)
   else if (
-      compute_eng == xpu::COMPUTE_ENG::XETLA &&
+      dpcppGetDeviceHasXMX() && compute_eng == xpu::COMPUTE_ENG::XETLA &&
       is_xetla_gru_available(
           input_.size(0), input_.size(2), hx_.size(2), input_.scalar_type())) {
     int num_bias_gate = 4;

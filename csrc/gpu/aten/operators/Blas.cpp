@@ -1,6 +1,7 @@
 #include "Blas.h"
 #include <ATen/WrapDimUtilsMulti.h>
 #include <ATen/native/Resize.h>
+#include <runtime/Device.h>
 #include "BlasImpl.h"
 #include "utils/CustomOperatorRegistration.h"
 
@@ -81,36 +82,38 @@ Tensor& addmm_out(
   }
 
 #if defined(USE_XETLA)
-  if (alpha.to<float>() == 1.f && self.dim() == 1) {
-    auto policy =
-        HGEMM_XETLA()
-            .add_matrix_c(result)
-            .add_matrix_a(mat1)
-            .add_matrix_b(mat2)
-            .add_epilogue(
-                self, HGEMM_XETLA::EpilogueType::BIAS, beta.to<float>())
-            .build();
-    if (policy.valid()) {
-      auto status = policy.run();
-      if (status == xpu::xetla::GemmStatus::kSuccess)
-        return result;
-    }
-  } else if (
-      self.dim() == 2 && self.sizes()[0] == mat1.sizes()[0] &&
-      self.sizes()[1] == mat2.sizes()[1]) {
-    auto policy =
-        HGEMM_XETLA()
-            .add_alpha(alpha.to<float>())
-            .add_matrix_c(result)
-            .add_matrix_a(mat1)
-            .add_matrix_b(mat2)
-            .add_epilogue(
-                self, HGEMM_XETLA::EpilogueType::RES_ADD, beta.to<float>())
-            .build();
-    if (policy.valid()) {
-      auto status = policy.run();
-      if (status == xpu::xetla::GemmStatus::kSuccess)
-        return result;
+  if (dpcppGetDeviceHasXMX()) {
+    if (alpha.to<float>() == 1.f && self.dim() == 1) {
+      auto policy =
+          HGEMM_XETLA()
+              .add_matrix_c(result)
+              .add_matrix_a(mat1)
+              .add_matrix_b(mat2)
+              .add_epilogue(
+                  self, HGEMM_XETLA::EpilogueType::BIAS, beta.to<float>())
+              .build();
+      if (policy.valid()) {
+        auto status = policy.run();
+        if (status == xpu::xetla::GemmStatus::kSuccess)
+          return result;
+      }
+    } else if (
+        self.dim() == 2 && self.sizes()[0] == mat1.sizes()[0] &&
+        self.sizes()[1] == mat2.sizes()[1]) {
+      auto policy =
+          HGEMM_XETLA()
+              .add_alpha(alpha.to<float>())
+              .add_matrix_c(result)
+              .add_matrix_a(mat1)
+              .add_matrix_b(mat2)
+              .add_epilogue(
+                  self, HGEMM_XETLA::EpilogueType::RES_ADD, beta.to<float>())
+              .build();
+      if (policy.valid()) {
+        auto status = policy.run();
+        if (status == xpu::xetla::GemmStatus::kSuccess)
+          return result;
+      }
     }
   }
 #endif
@@ -197,15 +200,17 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
   }
 
 #if defined(USE_XETLA)
-  auto policy = HGEMM_XETLA()
-                    .add_matrix_c(result)
-                    .add_matrix_a(self)
-                    .add_matrix_b(mat2)
-                    .build();
-  if (policy.valid()) {
-    auto status = policy.run();
-    if (status == xpu::xetla::GemmStatus::kSuccess)
-      return result;
+  if (dpcppGetDeviceHasXMX()) {
+    auto policy = HGEMM_XETLA()
+                      .add_matrix_c(result)
+                      .add_matrix_a(self)
+                      .add_matrix_b(mat2)
+                      .build();
+    if (policy.valid()) {
+      auto status = policy.run();
+      if (status == xpu::xetla::GemmStatus::kSuccess)
+        return result;
+    }
   }
 #endif
 

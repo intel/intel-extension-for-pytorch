@@ -317,6 +317,7 @@ static void initDeviceProperty(DeviceId device_id) {
       device.has(dpcpp_dev_aspect_hw_threads_per_eu)
       ? device.get_info<dpcpp_dev_ext_intel_gpu_hw_threads_per_eu>()
       : 8;
+  device_prop.device_id = device.get_info<dpcpp_dev_ext_intel_device_id>();
   device_prop.support_atomic64 = device.has(dpcpp_dev_aspect_atomic64);
   device_prop.support_fp64 = device.has(dpcpp_dev_aspect_fp64);
 
@@ -350,6 +351,7 @@ static void initDeviceProperty(DeviceId device_id) {
   dev_info.max_num_sub_groups = device_prop.max_num_subgroup;
   dev_info.sub_group_sizes = device_prop.subgroup_sizes;
   dev_info.support_fp64 = device_prop.support_fp64;
+  dev_info.device_id = device_prop.device_id;
 
   device_info[device_id] = dev_info;
 }
@@ -500,6 +502,25 @@ int dpcppGetDeviceHasFP64DtypeFork(int device_id, bool& has_fp64) noexcept {
 #else
   return -1;
 #endif
+}
+
+// XXX: The integrity approach should be querying ISA info whether XMX
+// is supported in the specified platform. Querying `device_id` is a WA since
+// it is not feasible to maintain a list of all candidates. We will replace
+// the WA with querying ISA info once SYCL runtime supports it.
+static const std::array has_no_xmx_device_list = {
+    0xbd4,
+};
+bool dpcppGetDeviceHasXMX(DeviceId device_id) noexcept {
+  bool has_xmx = true;
+  DeviceInfo* dinfo = dpcppGetDeviceInfo(device_id);
+  for (uint32_t has_no_xmx_device_id : has_no_xmx_device_list) {
+    if (dinfo->device_id == has_no_xmx_device_id) {
+      has_xmx = false;
+      break;
+    }
+  }
+  return has_xmx;
 }
 
 // This function can be used to get device count and no execption. It is used in
