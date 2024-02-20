@@ -179,6 +179,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument("--greedy", action="store_true")
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--disable-deployment-mode", action="store_true")
+    parser.add_argument(
+        "--image-url", default=None, type=str, help="image url for image-to-text task"
+    )
 
     # deepspeed inference related arguments.
     parser.add_argument("--autotp", action="store_true")
@@ -231,6 +234,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--prompt", str(args.prompt)])
             if args.config_file is not None:
                 infer_cmd.extend(["--config-file", str(args.config_file)])
+            if args.image_url is not None:
+                infer_cmd.extend(["--image-url", str(args.image_url)])
 
             print("LLM RUNTIME INFO: running model geneartion...")
             result = subprocess.run(infer_cmd)
@@ -345,6 +350,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     quant_cmd.extend(["--quant-with-amp"])
                 if args.greedy:
                     quant_cmd.extend(["--greedy"])
+                if args.image_url is not None:
+                    quant_cmd.extend(["--image-url", str(args.image_url)])
                 if args.ipex_weight_only_quantization:
                     quant_cmd.extend(["--ipex-weight-only-quantization"])
                     quant_cmd.extend(["--weight-dtype", str(args.weight_dtype)])
@@ -440,6 +447,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--benchmark"])
             if args.token_latency:
                 infer_cmd.extend(["--token-latency"])
+            if args.image_url is not None:
+                infer_cmd.extend(["--image-url", str(args.image_url)])
 
             if args.prompt is not None:
                 infer_cmd.extend(["--prompt", str(args.prompt)])
@@ -478,6 +487,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "stablelm": ("/stablelm_local_shard"),
                 "dolly": ("/dolly_local_shard"),
                 "qwen": ("/qwen_local_shard"),
+                "git": ("/git_local_shard"),
             }
             model_type = next(
                 (x for x in MODEL_CLASSES.keys() if x in args.model_name_or_path.lower()), "auto"
@@ -524,6 +534,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--benchmark"])
         if args.token_latency:
             infer_cmd.extend(["--token-latency"])
+        if args.image_url is not None:
+            infer_cmd.extend(["--image-url", str(args.image_url)])
 
         if args.prompt is not None:
             infer_cmd.extend(["--prompt", str(args.prompt)])

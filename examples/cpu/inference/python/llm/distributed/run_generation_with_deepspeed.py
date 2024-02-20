@@ -8,7 +8,8 @@ from argparse import ArgumentParser
 from pathlib import Path
 import torch
 import re
-
+from PIL import Image
+import requests
 import deepspeed
 from deepspeed.accelerator import get_accelerator
 import deepspeed.comm as dist
@@ -20,6 +21,7 @@ from transformers import (
     AutoTokenizer,
     LlamaTokenizer,
     T5ForConditionalGeneration,
+    AutoProcessor,
 )
 
 import sys
@@ -47,6 +49,7 @@ MODEL_CLASSES = {
     "mpt": (AutoModelForCausalLM, AutoTokenizer),
     "stablelm": (AutoModelForCausalLM, AutoTokenizer),
     "qwen": (AutoModelForCausalLM, AutoTokenizer),
+    "git": (AutoModelForCausalLM, AutoProcessor),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -104,6 +107,9 @@ parser.add_argument(
     "--quant-with-amp",
     action="store_true",
     help="by default it is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
+)
+parser.add_argument(
+    "--image-url", default="http://images.cocodataset.org/val2017/000000039769.jpg", type=str, help="image url for image-to-text task"
 )
 parser.add_argument("--print-memory", action="store_true")
 parser.add_argument("--token-latency", action="store_true")
@@ -295,7 +301,9 @@ if model_type == "mpt" and args.prompt is None:
 
 if not hasattr(config, "lm_head_generation"):
     config.lm_head_generation = True
-
+num_beams = 1 if args.greedy else 4
+if model_type == "git":
+    config.batch_size = int(args.batch_size) * num_beams
 # XXX: can't automatically derive dtype via config's `from_pretrained`
 # dtype = torch.bfloat16 if model_name in ["bigscience/bloom", "bigscience/bigscience-small-testing"] else torch.float16
 
@@ -312,7 +320,7 @@ if args.benchmark:
 
 # For now, Falcon, baichuan, baichuan2, and gptbigcode have accuracy issue with from_config with deepspeed meta device load.
 # TODO: we will change the scope once deepspeed providing the support
-if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "gptbigcode"]:
+if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "gptbigcode", "git"]:
     model = model_class[0].from_pretrained(
         model_name,
         config=config,
@@ -435,7 +443,6 @@ if use_ipex:
 # Generate
 print_rank0(f"*** Starting to generate {num_tokens} tokens with bs={args.batch_size}")
 
-num_beams = 1 if args.greedy else 4
 generate_kwargs = dict(do_sample=False, num_beams=num_beams, max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens)
 
 if args.token_latency:
@@ -447,47 +454,55 @@ if re.search("t5", model.config.architectures[0], re.IGNORECASE):
     generate_kwargs.pop("max_new_tokens")
 print_rank0(f"Generate args {generate_kwargs}")
 
-# input tokens
-input_sentences = []
-current_path = pathlib.Path(__file__).parent.resolve()
-with open(str(current_path) + "/prompt.json") as f:
-    prompt_pool = json.load(f)
-if model_type == "gptj":
-    model_type = "gpt-j"
-if model_type == "gptneox":
-    model_type = "gpt-neox"
-if args.prompt is not None:
-    input_sentences.append(args.prompt)
-elif model_type == "auto":
-    raise SystemExit(
-        "[ERROR] model prompt is not supported, please use --prompt for this model: "
-        + args.model_id
-    )
-elif int(args.input_tokens) > 8192:
-    input_sentences.append(
-        prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
-    )
-elif args.input_tokens in prompt_pool[model_type]:
-    input_sentences.append(prompt_pool[model_type][args.input_tokens])
+if model_type == "git":
+    prompt = Image.open(requests.get(args.image_url, stream=True).raw)
+    inputs = [prompt] * args.batch_size
+    generate_kwargs.pop("min_new_tokens", None)
 else:
-    raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
+    # input tokens
+    input_sentences = []
+    current_path = pathlib.Path(__file__).parent.resolve()
+    with open(str(current_path) + "/prompt.json") as f:
+        prompt_pool = json.load(f)
+    if model_type == "gptj":
+        model_type = "gpt-j"
+    if model_type == "gptneox":
+        model_type = "gpt-neox"
+    if args.prompt is not None:
+        input_sentences.append(args.prompt)
+    elif model_type == "auto":
+        raise SystemExit(
+            "[ERROR] model prompt is not supported, please use --prompt for this model: "
+            + args.model_id
+        )
+    elif int(args.input_tokens) > 8192:
+        input_sentences.append(
+            prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
+        )
+    elif args.input_tokens in prompt_pool[model_type]:
+        input_sentences.append(prompt_pool[model_type][args.input_tokens])
+    else:
+        raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
+    if args.batch_size > len(input_sentences):
+        # dynamically extend to support larger bs by repetition
+        input_sentences *= math.ceil(args.batch_size / len(input_sentences))
 
-
-if args.batch_size > len(input_sentences):
-    # dynamically extend to support larger bs by repetition
-    input_sentences *= math.ceil(args.batch_size / len(input_sentences))
-
-inputs = input_sentences[: args.batch_size]
-input_size = tokenizer.batch_encode_plus(inputs, return_tensors="pt").input_ids.size(
-    dim=1
-)
-print("*** Prompt size: ", input_size)
+    inputs = input_sentences[: args.batch_size]
+    input_size = tokenizer.batch_encode_plus(inputs, return_tensors="pt").input_ids.size(
+        dim=1
+    )
+    print("*** Prompt size: ", input_size)
 
 
 def generate():
     """returns a list of zipped inputs, outputs and number of new tokens"""
 
-    input_tokens = tokenizer.batch_encode_plus(inputs, return_tensors="pt")
+    if model_type == "git":
+        input_tokens = tokenizer(images=inputs, return_tensors="pt")
+        input_ids = input_tokens.pixel_values
+    else:
+        input_tokens = tokenizer.batch_encode_plus(inputs, return_tensors="pt")
+        input_ids = input_tokens.input_ids
     for t in input_tokens:
         if torch.is_tensor(input_tokens[t]):
             input_tokens[t] = input_tokens[t].to(
@@ -497,7 +512,7 @@ def generate():
     outputs = model.generate(**input_tokens, **generate_kwargs)
     gen_ids = outputs[0] if args.token_latency else outputs
 
-    input_tokens_lengths = [x.shape[0] for x in input_tokens.input_ids]
+    input_tokens_lengths = [x.shape[0] for x in input_ids]
     output_tokens_lengths = [x.shape[0] for x in gen_ids]
 
     total_new_tokens = [

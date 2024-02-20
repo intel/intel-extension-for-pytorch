@@ -188,6 +188,7 @@ def _beam_search(
             "MptForCausalLM",
             "StableLMEpochForCausalLM",
             "QWenLMHeadModel",
+            "GitForCausalLM",
         ]:
             first_token = False
             has_position_id = "position_ids" in model_inputs
@@ -238,6 +239,32 @@ def _beam_search(
                                     .EncDecAttention.key_value_proj_dim,
                                 )
                                 .transpose(0, 1),
+                                beam_idx_tmp,
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
+                elif self.model_backbone == "GitForCausalLM":
+                    first_token = False
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(batch_size * num_beams)), dtype=torch.long
+                    ).contiguous()
+                    num_head = self.git.encoder.layer[
+                        0
+                    ].attention.self.num_attention_heads
+                    head_dim = int(
+                        self.git.encoder.layer[0].attention.self.hidden_size / num_head
+                    )
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros(
+                                    [int(batch_size * num_beams), num_head, 1, head_dim]
+                                ).contiguous(),
+                                torch.zeros(
+                                    [int(batch_size * num_beams), num_head, 1, head_dim]
+                                ).contiguous(),
                                 beam_idx_tmp,
                             )
                             for i in range(self.config.num_hidden_layers)

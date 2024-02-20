@@ -1,7 +1,7 @@
 import torch
 import argparse
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaTokenizer, T5ForConditionalGeneration
+from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaTokenizer, T5ForConditionalGeneration, AutoProcessor
 # Here import ipex for Baichuan loading compatibility, for other models we can ignore this import
 import intel_extension_for_pytorch
 
@@ -23,6 +23,7 @@ MODEL_CLASSES = {
     "mpt": (AutoModelForCausalLM, AutoTokenizer),
     "stablelm": (AutoModelForCausalLM, AutoTokenizer),
     "qwen": (AutoModelForCausalLM, AutoTokenizer),
+    "git": (AutoModelForCausalLM, AutoProcessor),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 

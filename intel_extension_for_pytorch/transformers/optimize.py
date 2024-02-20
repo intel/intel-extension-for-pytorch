@@ -105,6 +105,7 @@ def model_convert_reference(_model):
         GLM2_get_masks,
         _relative_position_bucket,
         _to_4d,
+        _create_attention_mask_for_git,
     )
 
     # model wise optimization for Feedforward and Decoder layer modules
@@ -139,6 +140,10 @@ def model_convert_reference(_model):
         StableLMEpochModel_forward,
         QWenLMHeadModel_forward,
         QWenModel_forward,
+        GitForCausalLM_forward,
+        GitEncoder_forward,
+        GitVisionEncoder_forward,
+        GitModel_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptbigcode,
     )
@@ -504,6 +509,46 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+    elif _model.config.architectures[0] == "GitForCausalLM":
+        convert_function(_model, "forward", GitForCausalLM_forward)
+        convert_function(_model.git.encoder, "forward", GitEncoder_forward)
+        convert_function(_model.git, "forward", GitModel_forward)
+        convert_function(
+            _model.git, "create_attention_mask", _create_attention_mask_for_git
+        )
+        convert_function(
+            _model.git.image_encoder.vision_model.encoder,
+            "forward",
+            GitVisionEncoder_forward,
+        )
+        convert_class(
+            _model,
+            type(_model.git.encoder.layer[0].attention.self),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.git.image_encoder.vision_model.encoder.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.git.encoder.layer[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.git.image_encoder.vision_model.encoder.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
 
     return _model
 
@@ -615,6 +660,41 @@ def get_dummy_input(_model, return_dict=False):
             if return_dict
             else (input_ids.unsqueeze(0), attention_mask.unsqueeze(0), past_key_values)
         )
+    if _model.config.architectures[0] == "GitForCausalLM":
+        batch_size = (
+            _model.config.batch_size if hasattr(_model.config, "batch_size") else 1
+        )
+        num_head = _model.git.encoder.layer[0].attention.self.num_attention_heads
+        head_dim = int(
+            _model.git.encoder.layer[0].attention.self.hidden_size / num_head
+        )
+        past_key_values = tuple(
+            [
+                (
+                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                    torch.zeros([batch_size, num_head, 1, head_dim]).contiguous(),
+                    torch.zeros([batch_size, num_head, 1, head_dim]).contiguous(),
+                    torch.zeros(1, 4, dtype=torch.long),
+                )
+                for i in range(model_num_layers)
+            ]
+        )
+        if return_dict:
+            sample_inputs["input_ids"] = sample_inputs["input_ids"].repeat(
+                batch_size, 1
+            )
+            sample_inputs["attention_mask"] = sample_inputs["attention_mask"].repeat(
+                batch_size, 1
+            )
+            sample_inputs["pixel_values"] = torch.zeros(batch_size, 3, 224, 224)
+            sample_inputs["past_key_values"] = past_key_values
+        else:
+            sample_inputs = (
+                input_ids.unsqueeze(0).repeat(_model.config.batch_size, 1),
+                attention_mask.unsqueeze(0).repeat(_model.config.batch_size, 1),
+                past_key_values,
+                torch.zeros(_model.config.batch_size, 3, 224, 224),
+            )
 
     if "return_last_logit" in model_inputs:
         if return_dict:
@@ -794,7 +874,8 @@ def optimize(
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
     This API focus on transformers models, especially for generation tasks inference.
     Well supported model family:
-    Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode, T5, Mistral, MPT, Mixtral, StableLM, QWen.
+    Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode,
+    T5, Mistral, MPT, Mixtral, StableLM, QWen, Git.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
@@ -902,11 +983,12 @@ def optimize(
             "MptForCausalLM",
             "StableLMEpochForCausalLM",
             "QWenLMHeadModel",
+            "GitForCausalLM",
         ]
         if not well_supported_model:
             warnings.warn(
                 "ipex.llm.optimize supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, Baichuan, ChatGLM, "
-                + "GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, and QWen, fallback to origin model"
+                + "GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, and Git, fallback to origin model"
             )
             return model
 

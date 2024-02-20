@@ -4,6 +4,8 @@ import json
 import pathlib
 import argparse
 import re
+from PIL import Image
+import requests
 
 from transformers import (
     AutoConfig,
@@ -11,6 +13,7 @@ from transformers import (
     AutoTokenizer,
     LlamaTokenizer,
     T5ForConditionalGeneration,
+    AutoProcessor,
 )
 
 
@@ -37,6 +40,7 @@ MODEL_CLASSES = {
     "mpt": (AutoModelForCausalLM, AutoTokenizer),
     "stablelm": (AutoModelForCausalLM, AutoTokenizer),
     "qwen": (AutoModelForCausalLM, AutoTokenizer),
+    "git": (AutoModelForCausalLM, AutoProcessor),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -67,6 +71,9 @@ parser.add_argument(
 )
 parser.add_argument(
     "--prompt", default=None, type=str, help="input prompt for self-defined if needed"
+)
+parser.add_argument(
+    "--image-url", default="http://images.cocodataset.org/val2017/000000039769.jpg", type=str, help="image url for image-to-text task"
 )
 parser.add_argument(
     "--config-file", default=None, type=str, help="specific configuration file"
@@ -132,6 +139,22 @@ model = model_class[0].from_pretrained(
 tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
 model = model.eval()
 model = model.to(memory_format=torch.channels_last)
+
+num_beams = 1 if args.greedy else 4
+# generate args
+generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams, max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens)
+
+if re.search("gptbigcode", model.config.architectures[0], re.IGNORECASE):
+    model_type = "gptbigcode"
+if re.search("gptneox", model.config.architectures[0], re.IGNORECASE):
+    model_type = "gpt-neox"
+elif re.search("t5", model.config.architectures[0], re.IGNORECASE):
+    generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
+    generate_kwargs.pop("max_new_tokens")
+elif re.search("git", model.config.architectures[0], re.IGNORECASE):
+    model.config.batch_size = int(args.batch_size) * num_beams
+def trace_handler(prof):
+    print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=-1))
 # to ipex
 if args.ipex:
     model = ipex.llm.optimize(
@@ -146,45 +169,35 @@ if args.torch_compile:
         raise SystemExit("[ERROR] deployment_mode cannot co-work with torch.compile, please set deployment_mode to False if want to use torch.compile.")
     model.forward = torch.compile(model.forward, dynamic=True, backend=args.backend)
 
-num_beams = 1 if args.greedy else 4
-# generate args
-generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams, max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens)
-
-if re.search("gptbigcode", model.config.architectures[0], re.IGNORECASE):
-    model_type = "gptbigcode"
-if re.search("gptneox", model.config.architectures[0], re.IGNORECASE):
-    model_type = "gpt-neox"
-elif re.search("t5", model.config.architectures[0], re.IGNORECASE):
-    generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
-    generate_kwargs.pop("max_new_tokens")
-def trace_handler(prof):
-    print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=-1))
-
 
 if args.benchmark:
     if args.token_latency:
         if not hasattr(model.config, "token_latency"):
             model.config.token_latency = True
-    # input prompt
-    current_path = pathlib.Path(__file__).parent.resolve()
-    with open(str(current_path) + "/prompt.json") as f:
-        prompt_pool = json.load(f)
-    if args.prompt is not None:
-        prompt = args.prompt
-    elif model_type == "auto":
-        raise SystemExit(
-            "[ERROR] model prompt is not supported, please use --prompt for this model: "
-            + args.model_id
-        )
-    elif int(args.input_tokens) > 8192:
-        prompt = prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
-    elif args.input_tokens in prompt_pool[model_type]:
-        prompt = prompt_pool[model_type][args.input_tokens]
+    if model_type == "git":
+        prompt = Image.open(requests.get(args.image_url, stream=True).raw)
+        generate_kwargs.pop("min_new_tokens", None)
     else:
-        raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
+        # input prompt
+        current_path = pathlib.Path(__file__).parent.resolve()
+        with open(str(current_path) + "/prompt.json") as f:
+            prompt_pool = json.load(f)
+        if args.prompt is not None:
+            prompt = args.prompt
+        elif model_type == "auto":
+            raise SystemExit(
+                "[ERROR] model prompt is not supported, please use --prompt for this model: "
+                + args.model_id
+            )
+        elif int(args.input_tokens) > 8192:
+            prompt = prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
+        elif args.input_tokens in prompt_pool[model_type]:
+            prompt = prompt_pool[model_type][args.input_tokens]
+        else:
+            raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
 
-    input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
-    print("---- Prompt size:", input_size)
+        input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
+        print("---- Prompt size:", input_size)
 
     # start
     total_time = 0.0
@@ -202,13 +215,21 @@ if args.benchmark:
                 on_trace_ready=trace_handler,
             ) as prof:
                 for i in range(5):
-                    input_ids = tokenizer(prompt, return_tensors="pt").input_ids
-                    output = model.generate(input_ids, **generate_kwargs)
+                    if model_type == "git":
+                        input_ids=tokenizer(images=prompt, return_tensors="pt").pixel_values
+                        output = model.generate(pixel_values=input_ids, **generate_kwargs)
+                    else:
+                        input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+                        output = model.generate(input_ids, **generate_kwargs)
                     prof.step()
         for i in range(num_iter):
             tic = time.time()
-            input_ids = tokenizer(prompt, return_tensors="pt").input_ids
-            output = model.generate(input_ids, **generate_kwargs)
+            if model_type == "git":
+                input_ids=tokenizer(images=prompt, return_tensors="pt").pixel_values
+                output = model.generate(pixel_values=input_ids, max_length=50)
+            else:
+                input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+                output = model.generate(input_ids, **generate_kwargs)
             gen_ids = output[0] if args.token_latency else output
             gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
             toc = time.time()

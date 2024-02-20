@@ -1548,6 +1548,199 @@ def _QWenAttention_forward(
     return outputs
 
 
+def _GitSelfAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.FloatTensor] = None,
+    head_mask: Optional[torch.FloatTensor] = None,
+    past_key_value: Optional[Tuple[Tuple[torch.FloatTensor]]] = None,
+    output_attentions: Optional[bool] = False,
+    pixel_values_present: Optional[bool] = False,
+) -> Tuple[torch.Tensor]:
+    bsz, q_len, _ = hidden_states.size()
+    query = self.query(hidden_states).view(
+        bsz, q_len, self.num_attention_heads, self.attention_head_size
+    )
+    key = self.key(hidden_states).view(
+        bsz, q_len, self.num_attention_heads, self.attention_head_size
+    )
+    value = self.value(hidden_states).view(
+        bsz, q_len, self.num_attention_heads, self.attention_head_size
+    )
+
+    relative_position_scores = None
+    if (
+        self.position_embedding_type == "relative_key"
+        or self.position_embedding_type == "relative_key_query"
+    ):
+        query_length, key_length = query.shape[2], key.shape[2]
+        if past_key_value is not None:
+            position_ids_l = torch.tensor(
+                key_length - 1, dtype=torch.long, device=hidden_states.device
+            ).view(-1, 1)
+        else:
+            position_ids_l = torch.arange(
+                query_length, dtype=torch.long, device=hidden_states.device
+            ).view(-1, 1)
+        position_ids_r = torch.arange(
+            key_length, dtype=torch.long, device=hidden_states.device
+        ).view(1, -1)
+        distance = position_ids_l - position_ids_r
+
+        positional_embedding = self.distance_embedding(
+            distance + self.max_position_embeddings - 1
+        )
+        positional_embedding = positional_embedding.to(
+            dtype=query.dtype
+        )  # fp16 compatibility
+
+        if self.position_embedding_type == "relative_key":
+            relative_position_scores = torch.einsum(
+                "bhld,lrd->bhlr", query, positional_embedding
+            )
+        elif self.position_embedding_type == "relative_key_query":
+            relative_position_scores_query = torch.einsum(
+                "bhld,lrd->bhlr", query, positional_embedding
+            )
+            relative_position_scores_key = torch.einsum(
+                "bhrd,lrd->bhlr", key, positional_embedding
+            )
+            relative_position_scores = (
+                relative_position_scores_query + relative_position_scores_key
+            )
+    if relative_position_scores is not None:
+        relative_position_scores = relative_position_scores / math.sqrt(
+            self.attention_head_size
+        )
+        if attention_mask is not None:
+            # Apply the attention mask is (precomputed for all layers in GitModel forward() function)
+            attention_mask = relative_position_scores + attention_mask
+        else:
+            attention_mask = relative_position_scores
+
+    cutoff = self.image_patch_tokens if pixel_values_present else 0
+    (context_layer, attn_weights, present) = self._IPEXScaleDotProduct(
+        query,
+        key,
+        value,
+        math.sqrt(self.attention_head_size),
+        past_key_value,
+        head_mask,
+        attention_mask,
+        cutoff=cutoff,
+    )
+
+    context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+    new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
+    context_layer = context_layer.view(new_context_layer_shape)
+
+    outputs = (context_layer, attn_weights) if output_attentions else (context_layer,)
+
+    outputs = outputs + (present,)
+    return outputs
+
+
+def _GitVisionAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    output_attentions: Optional[bool] = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    """Input shape: Batch x Time x Channel"""
+
+    bsz, tgt_len, embed_dim = hidden_states.size()
+
+    query = (
+        self.q_proj(hidden_states).view(bsz, -1, self.num_heads, self.head_dim)
+        * self.scale
+    )
+    key = self.k_proj(hidden_states).view(bsz, -1, self.num_heads, self.head_dim)
+    value = self.v_proj(hidden_states).view(bsz, -1, self.num_heads, self.head_dim)
+    if attention_mask is None:
+        attention_mask = torch.zeros([bsz, self.num_heads, tgt_len, tgt_len])
+
+    (context_layer, attn_weights, _) = self._IPEXScaleDotProduct(
+        query,
+        key,
+        value,
+        1,
+        None,
+        None,
+        attention_mask,
+        vision=True,
+        add_casual_mask=False,
+    )
+    if not output_attentions:
+        attn_weights = None
+
+    attn_output = context_layer.view(bsz, self.num_heads, tgt_len, self.head_dim)
+    attn_output = attn_output.transpose(1, 2)
+    attn_output = attn_output.reshape(bsz, tgt_len, -1)
+
+    # attn_output = self.out_proj(attn_output)
+
+    return attn_output, attn_weights
+
+
+def _create_attention_mask_for_git(
+    self, tgt, memory, tgt_mask, past_key_values_length, memory_key_padding_mask=None
+):
+    num_tgt = tgt.shape[1]
+    num_memory = memory.shape[1]
+    device = tgt.device
+    dtype = tgt.dtype
+    top_left = torch.zeros((num_memory, num_memory), device=device, dtype=dtype)
+    top_right = torch.full(
+        (num_memory, num_tgt + past_key_values_length),
+        float("-inf"),
+        device=tgt.device,
+        dtype=dtype,
+    )
+    bottom_left = torch.zeros(
+        (num_tgt, num_memory),
+        dtype=dtype,
+        device=tgt_mask.device,
+    )
+
+    tgt_mask = torch.zeros(
+        (tgt_mask.shape[0], tgt_mask.shape[0] + past_key_values_length),
+        dtype=dtype,
+        device=tgt_mask.device,
+    )
+
+    left = torch.cat((top_left, bottom_left), dim=0)
+    right = torch.cat((top_right, tgt_mask.to(dtype)), dim=0)
+
+    full_attention_mask = torch.cat((left, right), dim=1)[None, :]
+
+    if memory_key_padding_mask is None:
+        # memory_key_padding_mask = torch.full((memory.shape[0], memory.shape[1]), fill_value=False, device=device)
+        memory_key_padding_mask = torch.zeros(
+            (memory.shape[0], memory.shape[1]), dtype=torch.bool, device=device
+        )
+    # if it is False, it means valid. That is, it is not a padding
+    if memory_key_padding_mask.dtype != torch.bool:
+        raise ValueError("Memory key padding mask must be a boolean tensor.")
+    zero_negative_infinity = torch.zeros_like(memory_key_padding_mask, dtype=tgt.dtype)
+    zero_negative_infinity[memory_key_padding_mask] = float("-inf")
+    full_attention_mask = full_attention_mask.expand(
+        (
+            memory_key_padding_mask.shape[0],
+            num_memory + num_tgt,
+            num_memory + past_key_values_length + num_tgt,
+        )
+    )
+    full_attention_mask = full_attention_mask.clone()
+    origin_left = full_attention_mask[:, :, :num_memory]
+    update = zero_negative_infinity[:, None, :]
+    full_attention_mask[:, :, :num_memory] = origin_left + update
+
+    # add axis for multi-head
+    full_attention_mask = full_attention_mask[:, None, :, :]
+
+    return full_attention_mask
+
+
 class _IPEXAttentionRef(nn.Module):
     def __init__(self, module, config, sdp_module_ref, distributed=False):
         super().__init__()
@@ -1571,6 +1764,8 @@ class _IPEXAttentionRef(nn.Module):
             self.hidden_size = module.inner_dim
         elif hasattr(module, "d_model"):
             self.hidden_size = module.d_model
+        elif hasattr(module, "all_head_size"):
+            self.hidden_size = module.all_head_size
 
         # common known as num of attention_heads
         if hasattr(module, "num_attention_heads"):
@@ -1608,6 +1803,7 @@ class _IPEXAttentionRef(nn.Module):
                 "BloomForCausalLM",
                 "T5ForConditionalGeneration",
                 "MptForCausalLM",
+                "GitForCausalLM",
             ]
             or self.model_backbone == "BaichuanForCausalLM"
             and hasattr(module, "rotary_emb")
@@ -1837,6 +2033,8 @@ class _IPEXAttentionRef(nn.Module):
         position_bias: Optional[torch.Tensor] = None,
         query_length: Optional[int] = None,
         mask: Optional[torch.FloatTensor] = None,
+        pixel_values_present: Optional[bool] = False,
+        vision: Optional[bool] = False,
     ):
         if self.model_backbone == "GPTJForCausalLM":
             return _GPTJAttention_forward(
@@ -2002,6 +2200,23 @@ class _IPEXAttentionRef(nn.Module):
                 head_mask,
                 output_attentions,
                 use_cache,
+            )
+        elif self.model_backbone == "GitForCausalLM":
+            if vision is not None and vision:
+                return _GitVisionAttention_forward(
+                    self,
+                    hidden_states,
+                    attention_mask,
+                    output_attentions,
+                )
+            return _GitSelfAttention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                head_mask,
+                past_key_value,
+                output_attentions,
+                pixel_values_present,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

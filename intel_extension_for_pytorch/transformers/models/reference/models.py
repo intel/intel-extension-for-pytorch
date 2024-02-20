@@ -7,6 +7,7 @@ from transformers.modeling_outputs import (
     CausalLMOutputWithCrossAttentions,
     BaseModelOutputWithPastAndCrossAttentions,
     Seq2SeqLMOutput,
+    BaseModelOutput,
 )
 
 from transformers.utils import logging
@@ -2426,6 +2427,341 @@ def QWenLMHeadModel_forward(
 
     output = (lm_logits,) + transformer_outputs[1:]
     return ((loss,) + output) if loss is not None else output
+
+
+def GitEncoder_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.FloatTensor] = None,
+    head_mask: Optional[torch.FloatTensor] = None,
+    past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None,
+    use_cache: Optional[bool] = None,
+    output_attentions: Optional[bool] = False,
+    output_hidden_states: Optional[bool] = False,
+    pixel_values_present: Optional[bool] = False,
+    return_dict: Optional[bool] = True,
+) -> Union[Tuple[torch.Tensor], BaseModelOutputWithPast]:
+    if self.gradient_checkpointing and self.training:
+        if use_cache:
+            logger.warning_once(
+                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+            )
+            use_cache = False
+
+    all_hidden_states = () if output_hidden_states else None
+    all_self_attentions = () if output_attentions else None
+
+    next_decoder_cache = () if use_cache else None
+    for i, layer_module in enumerate(self.layer):
+        if output_hidden_states:
+            all_hidden_states = all_hidden_states + (hidden_states,)
+
+        layer_head_mask = head_mask[i] if head_mask is not None else None
+        past_key_value = past_key_values[i] if past_key_values is not None else None
+
+        if self.gradient_checkpointing and self.training:
+            layer_outputs = self._gradient_checkpointing_func(
+                layer_module.__call__,
+                hidden_states,
+                attention_mask,
+                layer_head_mask,
+                past_key_value,
+                output_attentions,
+            )
+        else:
+            layer_outputs = layer_module(
+                hidden_states,
+                attention_mask=attention_mask,
+                head_mask=layer_head_mask,
+                past_key_value=past_key_value,
+                output_attentions=output_attentions,
+                pixel_values_present=pixel_values_present,
+            )
+
+        hidden_states = layer_outputs[0]
+        if use_cache:
+            next_decoder_cache += (layer_outputs[-1],)
+        if output_attentions:
+            all_self_attentions = all_self_attentions + (layer_outputs[1],)
+
+    if output_hidden_states:
+        all_hidden_states = all_hidden_states + (hidden_states,)
+
+    if not return_dict:
+        return tuple(
+            v
+            for v in [
+                hidden_states,
+                next_decoder_cache,
+                all_hidden_states,
+                all_self_attentions,
+            ]
+            if v is not None
+        )
+    return BaseModelOutputWithPast(
+        last_hidden_state=hidden_states,
+        past_key_values=next_decoder_cache,
+        hidden_states=all_hidden_states,
+        attentions=all_self_attentions,
+    )
+
+
+def GitForCausalLM_forward(
+    self,
+    input_ids: Optional[torch.Tensor] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    past_key_values: Optional[List[torch.Tensor]] = None,
+    pixel_values: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.Tensor] = None,
+    head_mask: Optional[torch.Tensor] = None,
+    inputs_embeds: Optional[torch.Tensor] = None,
+    labels: Optional[torch.Tensor] = None,
+    use_cache: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+) -> Union[Tuple[torch.Tensor], CausalLMOutputWithPast]:
+    if labels is not None:
+        use_cache = False
+
+    outputs = self.git(
+        input_ids,
+        attention_mask=attention_mask,
+        position_ids=position_ids,
+        pixel_values=pixel_values,
+        head_mask=head_mask,
+        inputs_embeds=inputs_embeds,
+        past_key_values=past_key_values,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+        output_hidden_states=output_hidden_states,
+        return_dict=False,
+    )
+
+    sequence_output = outputs[0]
+    if (
+        hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and sequence_output.size(1) != 1
+    ):
+        sequence_output = sequence_output[:, -1:, :]
+    logits = self.output(sequence_output)
+
+    loss = None
+    if labels is not None:
+        # we are doing next-token prediction; shift prediction scores and input ids by one
+        num_image_tokens = self.git.encoder.layer[0].attention.self.image_patch_tokens
+        shifted_logits = logits[:, num_image_tokens:-1, :].contiguous()
+        labels = labels[:, 1:].contiguous()
+        loss_fct = CrossEntropyLoss()
+        loss = loss_fct(
+            shifted_logits.view(-1, self.config.vocab_size), labels.view(-1)
+        )
+
+    output = (logits,) + outputs[1:]
+    return ((loss,) + output) if loss is not None else output
+
+
+def GitVisionEncoder_forward(
+    self,
+    inputs_embeds,
+    attention_mask: Optional[torch.Tensor] = None,
+    causal_attention_mask: Optional[torch.Tensor] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+) -> Union[Tuple, BaseModelOutput]:
+    output_attentions = (
+        output_attentions
+        if output_attentions is not None
+        else self.config.output_attentions
+    )
+    output_hidden_states = (
+        output_hidden_states
+        if output_hidden_states is not None
+        else self.config.output_hidden_states
+    )
+    return_dict = (
+        return_dict if return_dict is not None else self.config.use_return_dict
+    )
+
+    encoder_states = () if output_hidden_states else None
+    all_attentions = () if output_attentions else None
+
+    bias = None
+    if causal_attention_mask is not None:
+        bias += causal_attention_mask
+    if attention_mask is not None:
+        bias += attention_mask
+    hidden_states = inputs_embeds
+    for idx, encoder_layer in enumerate(self.layers):
+        if output_hidden_states:
+            encoder_states = encoder_states + (hidden_states,)
+        if self.gradient_checkpointing and self.training:
+            layer_outputs = self._gradient_checkpointing_func(
+                encoder_layer.__call__,
+                hidden_states,
+                attention_mask,
+                causal_attention_mask,
+                output_attentions,
+            )
+        else:
+            layer_outputs = encoder_layer(
+                hidden_states,
+                attention_mask=bias,
+                output_attentions=output_attentions,
+                vision=True,
+            )
+
+        hidden_states = layer_outputs[0]
+
+        if output_attentions:
+            all_attentions = all_attentions + (layer_outputs[1],)
+
+    if output_hidden_states:
+        encoder_states = encoder_states + (hidden_states,)
+
+    if not return_dict:
+        return tuple(
+            v for v in [hidden_states, encoder_states, all_attentions] if v is not None
+        )
+    return BaseModelOutput(
+        last_hidden_state=hidden_states,
+        hidden_states=encoder_states,
+        attentions=all_attentions,
+    )
+
+
+def GitModel_forward(
+    self,
+    input_ids: Optional[torch.Tensor] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.Tensor] = None,
+    pixel_values: Optional[torch.Tensor] = None,
+    head_mask: Optional[torch.Tensor] = None,
+    inputs_embeds: Optional[torch.Tensor] = None,
+    past_key_values: Optional[List[torch.FloatTensor]] = None,
+    use_cache: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+):
+    output_attentions = (
+        output_attentions
+        if output_attentions is not None
+        else self.config.output_attentions
+    )
+    output_hidden_states = (
+        output_hidden_states
+        if output_hidden_states is not None
+        else self.config.output_hidden_states
+    )
+    use_cache = use_cache if use_cache is not None else self.config.use_cache
+    return_dict = (
+        return_dict if return_dict is not None else self.config.use_return_dict
+    )
+
+    if input_ids is not None and inputs_embeds is not None:
+        raise ValueError(
+            "You cannot specify both input_ids and inputs_embeds at the same time"
+        )
+    elif input_ids is not None:
+        self.warn_if_padding_and_no_attention_mask(input_ids, attention_mask)
+        input_shape = input_ids.size()
+    elif inputs_embeds is not None:
+        input_shape = inputs_embeds.size()[:-1]
+    else:
+        raise ValueError("You have to specify either input_ids or inputs_embeds")
+
+    seq_length = input_shape[1]
+
+    # past_key_values_length
+    past_key_values_length = (
+        past_key_values[0][0].shape[2] if past_key_values is not None else 0
+    )
+
+    # Prepare head mask if needed
+    # 1.0 in head_mask indicate we keep the head
+    # attention_probs has shape bsz x n_heads x N x N
+    # input head_mask has shape [num_heads] or [num_hidden_layers x num_heads]
+    # and head_mask is converted to shape [num_hidden_layers x batch x num_heads x seq_length x seq_length]
+    head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers)
+
+    projected_visual_features = None
+    if pixel_values is not None:
+        if pixel_values.ndim == 4:
+            # here we assume pixel_values is of shape (batch_size, num_channels, height, width)
+            visual_features = self.image_encoder(pixel_values).last_hidden_state
+
+        elif pixel_values.ndim == 5:
+            # here we assume pixel_values is of shape (batch_size, num_frames, num_channels, height, width)
+            visual_features = []
+            for frame_idx in range(pixel_values.shape[1]):
+                visual_features_frame = self.image_encoder(
+                    pixel_values[:, frame_idx, :, :]
+                ).last_hidden_state
+                visual_features_frame += self.img_temperal_embedding[frame_idx]
+                visual_features.append(visual_features_frame)
+
+            # finally, concatenate all features along sequence dimension
+            visual_features = torch.cat(visual_features, dim=1)
+
+        else:
+            raise ValueError("pixel_values must be of rank 4 or 5")
+
+        projected_visual_features = self.visual_projection(visual_features)
+
+    embedding_output = self.embeddings(
+        input_ids=input_ids,
+        position_ids=position_ids,
+        inputs_embeds=inputs_embeds,
+        past_key_values_length=past_key_values_length,
+    )
+
+    if projected_visual_features is None:
+        projected_visual_features = torch.zeros(
+            (embedding_output.shape[0], 0, embedding_output.shape[2]),
+            dtype=embedding_output.dtype,
+            device=embedding_output.device,
+        )
+
+    # Repeat visual features to match embedding batch size.
+    projected_visual_features = projected_visual_features.repeat(
+        embedding_output.size(0) // projected_visual_features.size(0), 1, 1
+    )
+
+    # concatenate patch token and text token embeddings
+    hidden_states = torch.cat((projected_visual_features, embedding_output), dim=1)
+
+    # By default, an additive causal mask is created
+    # for masking the future (one direction).
+    tgt_mask = self._generate_future_mask(
+        seq_length, embedding_output.dtype, embedding_output.device
+    )
+
+    # Create an attention mask of shape (batch_size, 1, tgt_seq_len, src_seq_len)
+    combined_attention_mask = self.create_attention_mask(
+        tgt=embedding_output,
+        memory=projected_visual_features,
+        tgt_mask=tgt_mask,
+        past_key_values_length=past_key_values_length,
+    )
+
+    encoder_outputs = self.encoder(
+        hidden_states,
+        attention_mask=combined_attention_mask,
+        head_mask=head_mask,
+        past_key_values=past_key_values,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+        output_hidden_states=output_hidden_states,
+        return_dict=return_dict,
+        pixel_values_present=pixel_values is not None,
+    )
+    sequence_output = encoder_outputs[0]
+
+    return (sequence_output,) + encoder_outputs[1:]
 
 
 def output_hook(module: torch.nn.Module, args, kwargs, outputs: Any):

@@ -991,6 +991,94 @@ def QWenBlock_forward(
     return outputs
 
 
+def GitLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.FloatTensor] = None,
+    head_mask: Optional[torch.FloatTensor] = None,
+    past_key_value: Optional[Tuple[Tuple[torch.FloatTensor]]] = None,
+    output_attentions: Optional[bool] = False,
+    pixel_values_present: Optional[bool] = False,
+) -> Tuple[torch.Tensor]:
+    self_attn_past_key_value = None
+    if past_key_value is not None:
+        if len(past_key_value) == 4:
+            self_attn_past_key_value = past_key_value
+        else:
+            self_attn_past_key_value = past_key_value[:2]
+    self_attention_outputs = self.attention.self(
+        hidden_states,
+        attention_mask=attention_mask,
+        head_mask=head_mask,
+        output_attentions=output_attentions,
+        past_key_value=self_attn_past_key_value,
+        pixel_values_present=pixel_values_present,
+    )
+    if not self.distributed:
+        attention_output = self.mha_linear_add(self_attention_outputs[0], hidden_states)
+    else:
+        attention_output = self.attention.output.dense(self_attention_outputs[0])
+        attention_output = attention_output + hidden_states
+    attention_output = self.attention.output.LayerNorm(attention_output)
+
+    # if decoder, the last output is tuple of self-attn cache
+    outputs = self_attention_outputs[1:-1]
+    present_key_value = self_attention_outputs[-1]
+    intermediate_output = self.linear_gelu(attention_output)
+    if not self.distributed:
+        layer_output = self.mlp_linear_add(intermediate_output, attention_output)
+    else:
+        layer_output = self.output.dense(intermediate_output)
+        layer_output = layer_output + attention_output
+    layer_output = self.output.LayerNorm(layer_output)
+    outputs = (layer_output,) + outputs
+
+    # if decoder, return the attn key/values as the last output
+    outputs = outputs + (present_key_value,)
+
+    return outputs
+
+
+def GitVisionEncoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: torch.Tensor,
+    output_attentions: Optional[bool] = False,
+) -> Tuple[torch.FloatTensor]:
+    residual = hidden_states
+
+    hidden_states = self.layer_norm1(hidden_states)
+    hidden_states, attn_weights = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        output_attentions=output_attentions,
+        vision=True,
+    )
+    if not self.distributed:
+        hidden_states = self.vision_mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.self_attn.out_proj(hidden_states)
+        hidden_states = residual + hidden_states
+
+    residual = hidden_states
+    hidden_states = self.layer_norm2(hidden_states)
+    # hidden_states = self.vision_linear_gelu(hidden_states)
+    hidden_states = self.mlp.fc1(hidden_states)
+    hidden_states = self.mlp.activation_fn(hidden_states)
+    if not self.distributed:
+        hidden_states = self.vision_mlp_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.mlp.fc2(hidden_states)
+        hidden_states = residual + hidden_states
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (attn_weights,)
+
+    return outputs
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -1103,6 +1191,30 @@ class _IPEXDecoderLayerRef(nn.Module):
             self.linear_silu_mul = _IPEXlinearSiluMulRef(module.mlp.w2, module.mlp.w1)
             del self.__dict__["_modules"]["mlp"].w2
             del self.__dict__["_modules"]["mlp"].w1
+        elif self.model_backbone == "GitForCausalLM":
+            if not self.distributed:
+                if hasattr(module, "attention"):
+                    self.mha_linear_add = _IPEXlinearAddRef(
+                        module.attention.output.dense
+                    )
+                    del self.__dict__["_modules"]["attention"].output.dense
+                if hasattr(module, "output"):
+                    self.mlp_linear_add = _IPEXlinearAddRef(module.output.dense)
+                    del self.__dict__["_modules"]["output"].dense
+                if hasattr(module, "self_attn"):
+                    self.vision_mha_linear_add = _IPEXlinearAddRef(
+                        module.self_attn.out_proj
+                    )
+                    del self.__dict__["_modules"]["self_attn"].out_proj
+                if hasattr(module, "mlp"):
+                    self.vision_mlp_linear_add = _IPEXlinearAddRef(module.mlp.fc2)
+                    del self.__dict__["_modules"]["mlp"].fc2
+            if hasattr(module, "intermediate"):
+                self.linear_gelu = _IPEXlinearGeluRef(module.intermediate.dense)
+                del self.__dict__["_modules"]["intermediate"].dense
+            # if hasattr(module, "mlp"):
+            #     self.vision_linear_gelu = _IPEXlinearGeluRef(module.mlp.fc1)
+            #     del self.__dict__["_modules"]["mlp"].fc1
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -1126,6 +1238,8 @@ class _IPEXDecoderLayerRef(nn.Module):
         encoder_decoder_position_bias: Optional[torch.Tensor] = None,
         cross_attn_layer_head_mask: Optional[torch.Tensor] = None,
         output_router_logits: Optional[bool] = False,
+        pixel_values_present: Optional[bool] = False,
+        vision: Optional[bool] = False,
     ):
         if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
             return GPTJBlock_forward(
@@ -1275,6 +1389,23 @@ class _IPEXDecoderLayerRef(nn.Module):
                 head_mask,
                 use_cache,
                 output_attentions,
+            )
+        elif self.model_backbone == "GitForCausalLM":
+            if vision is not None and vision:
+                return GitVisionEncoderLayer_forward(
+                    self,
+                    hidden_states,
+                    attention_mask,
+                    output_attentions,
+                )
+            return GitLayer_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                head_mask,
+                past_key_value,
+                output_attentions,
+                pixel_values_present,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

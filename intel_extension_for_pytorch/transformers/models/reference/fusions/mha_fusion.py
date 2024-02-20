@@ -372,6 +372,11 @@ class _IPEXScaleDotProductRef(nn.Module):
             self.softmax_in_fp32 = config.softmax_in_fp32
             self.head_dim = module.head_dim
             self.num_heads = module.num_heads
+        elif self.model_backbone == "GitForCausalLM":
+            if hasattr(module, "num_heads"):
+                self.num_heads = module.num_heads
+            if hasattr(module, "head_dim"):
+                self.head_dim = module.head_dim
 
         for k, v in module.__class__.__dict__.items():
             if k.startswith("__") or k.startswith("forward"):
@@ -403,6 +408,8 @@ class _IPEXScaleDotProductRef(nn.Module):
         alibi: Optional[torch.Tensor] = None,
         add_casual_mask: Optional[bool] = True,
         seq_info: Optional[torch.Tensor] = None,
+        cutoff: Optional[torch.Tensor] = None,
+        vision: Optional[torch.Tensor] = False,
     ):
         if (
             self.model_backbone == "FalconForCausalLM"
@@ -431,6 +438,7 @@ class _IPEXScaleDotProductRef(nn.Module):
                     "T5ForConditionalGeneration",
                     "MptForCausalLM",
                     "QWenLMHeadModel",
+                    "GitForCausalLM",
                 ]
                 else key
             )
@@ -447,6 +455,7 @@ class _IPEXScaleDotProductRef(nn.Module):
                     "T5ForConditionalGeneration",
                     "MptForCausalLM",
                     "QWenLMHeadModel",
+                    "GitForCausalLM",
                 ]
                 else query
             )
@@ -456,12 +465,27 @@ class _IPEXScaleDotProductRef(nn.Module):
                 )
             value = value.permute(0, 2, 1, 3)
 
-        if layer_past is not None:
-            past_key = layer_past[0]
-            past_value = layer_past[1]
-            key = torch.cat((past_key, key), dim=-2)
-            value = torch.cat((past_value, value), dim=-2)
-        present = (key, value)
+        if self.model_backbone == "GitForCausalLM":
+            if not (vision is not None and vision):
+                if layer_past is not None:
+                    key = torch.cat(
+                        [key[:, :, :cutoff, :], layer_past[0], key[:, :, -1:, :]], dim=2
+                    )
+                    value = torch.cat(
+                        [value[:, :, :cutoff, :], layer_past[1], value[:, :, -1:, :]],
+                        dim=2,
+                    )
+            present = (
+                key[:, :, cutoff:, :],
+                value[:, :, cutoff:, :],
+            )
+        else:
+            if layer_past is not None:
+                past_key = layer_past[0]
+                past_value = layer_past[1]
+                key = torch.cat((past_key, key), dim=-2)
+                value = torch.cat((past_value, value), dim=-2)
+            present = (key, value)
 
         if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
             attn_output, attn_weights = self._attn(
@@ -757,6 +781,18 @@ class _IPEXScaleDotProductRef(nn.Module):
             if head_mask is not None:
                 attn_weights = attn_weights * head_mask
 
+            attn_output = torch.matmul(attn_weights, value)
+        elif self.model_backbone == "GitForCausalLM":
+            # Take the dot product between "query" and "key" to get the raw attention scores.
+            attention_scores = torch.matmul(query, key.transpose(-1, -2))
+            attention_scores = attention_scores / scale_attn
+            if attention_mask is not None:
+                attention_scores = attention_scores + attention_mask
+            # Normalize the attention scores to probabilities.
+            attn_weights = nn.functional.softmax(attention_scores, dim=-1)
+            # Mask heads if we want to
+            if head_mask is not None:
+                attn_weights = attn_weights * head_mask
             attn_output = torch.matmul(attn_weights, value)
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

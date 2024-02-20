@@ -482,7 +482,7 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
             all_reduce_bias = m.bias
             if isinstance(new_m, (_IPEXLinearAllreduce, _IPEXLmHeadLinearAllreduce)):
                 m.bias = None
-            if _using_tpp():
+            if _using_tpp() and hasattr(m, "tpp_fallback"):
                 weight_key = m.weight
                 param_wrapper.prepack(m, is_training)
                 if m.tpp_fallback:

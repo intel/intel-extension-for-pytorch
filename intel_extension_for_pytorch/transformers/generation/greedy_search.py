@@ -169,6 +169,7 @@ def _greedy_search(
             "MptForCausalLM",
             "StableLMEpochForCausalLM",
             "QWenLMHeadModel",
+            "GitForCausalLM",
         ]:
             first_token = False
             input_bs = input_ids.size()[0]
@@ -236,17 +237,40 @@ def _greedy_search(
                 beam_idx_tmp = torch.zeros(
                     (2048, int(input_bs)), dtype=torch.long
                 ).contiguous()
-                model_inputs["past_key_values"] = tuple(
-                    [
-                        (
-                            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                            torch.zeros([1, 1, 1, 1]).contiguous(),
-                            torch.zeros([1, 1, 1, 1]).contiguous(),
-                            beam_idx_tmp,
-                        )
-                        for i in range(num_hidden_layers)
-                    ]
-                )
+                if self.model_backbone == "GitForCausalLM":
+                    num_head = self.git.encoder.layer[
+                        0
+                    ].attention.self.num_attention_heads
+                    head_dim = int(
+                        self.git.encoder.layer[0].attention.self.hidden_size / num_head
+                    )
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros(
+                                    [input_bs, num_head, 1, head_dim]
+                                ).contiguous(),
+                                torch.zeros(
+                                    [input_bs, num_head, 1, head_dim]
+                                ).contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(num_hidden_layers)
+                        ]
+                    )
+                else:
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(num_hidden_layers)
+                        ]
+                    )
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)

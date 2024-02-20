@@ -5,6 +5,8 @@ import pathlib
 import re
 from datasets import load_dataset
 
+from PIL import Image
+import requests
 import torch
 from torch.utils.data import DataLoader
 import transformers
@@ -34,6 +36,7 @@ from llm.utils.model_class.mixtral import MixtralConfig
 from llm.utils.model_class.mpt import MPTConfig
 from llm.utils.model_class.stablelm import StableLMConfig
 from llm.utils.model_class.qwen import QwenConfig
+from llm.utils.model_class.git import GitConfig
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -56,6 +59,9 @@ parser.add_argument(
     "--quant-with-amp",
     action="store_true",
     help="by default it is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
+)
+parser.add_argument(
+    "--image-url", default="http://images.cocodataset.org/val2017/000000039769.jpg", type=str, help="image url for image-to-text task"
 )
 parser.add_argument("--qconfig-summary-file", default="", help="qconfig for static quantization")
 parser.add_argument("--quantized-model-path", default="./saved_results/best_model.pt")
@@ -245,6 +251,9 @@ elif re.search("stablelm", config.architectures[0], re.IGNORECASE):
     model = StableLMConfig(args.model_id)
 elif re.search("qwen", config.architectures[0], re.IGNORECASE):
     model = QwenConfig(args.model_id)
+elif re.search("git", config.architectures[0], re.IGNORECASE):
+    model = GitConfig(args.model_id)
+    generate_kwargs.pop("min_new_tokens")
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 
@@ -252,6 +261,8 @@ if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 if model.name == "mpt" and not hasattr(config, "max_seq_len") and args.prompt is None:
     config.max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
+if model.name == "git":
+    config.batch_size = int(args.batch_size) * num_beams
 
 user_model = model.get_user_model(config, args.benchmark)
 
@@ -343,6 +354,24 @@ def get_example_inputs(model):
             attention_mask.unsqueeze(0),
             tuple(global_past_key_value),
             (last_hidden_state,),
+        )
+    elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_KV_PIXEL:
+        batch_size = int(args.batch_size) * num_beams
+        past_key_value = [
+            (
+                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                torch.zeros([batch_size, n_heads, 1, head_dim]).contiguous(),
+                torch.zeros([batch_size, n_heads, 1, head_dim]).contiguous(),
+                beam_idx_tmp,
+            )
+            for i in range(n_layers)
+        ]
+        pixel_inputs = torch.ones(batch_size, 3, 224, 224)
+        example_inputs = (
+            input_ids.unsqueeze(0).repeat(batch_size,1),
+            attention_mask.unsqueeze(0).repeat(batch_size,1),
+            tuple(past_key_value),
+            pixel_inputs,
         )
     else:
         raise RuntimeError("Your model does not match existing example inputs used in ipex quantization, exiting...")
@@ -676,21 +705,24 @@ if args.benchmark:
             self_jit = quant_model
         ipex._set_optimized_model_for_generation(user_model, optimized_model=self_jit)
 
-    # input prompt
-    current_path = pathlib.Path(__file__).parent.resolve()
-    with open(str(current_path) + "/prompt.json") as f:
-        prompt_pool = json.load(f)
-    if args.prompt is not None:
-        prompt = args.prompt
-    elif int(args.input_tokens) > 8192:
-        prompt = prompt_pool[model.name]["8192"] * int(int(args.input_tokens) / 8192)
-    elif args.input_tokens in prompt_pool[model.name]:
-        prompt = prompt_pool[model.name][args.input_tokens]
+    if model.name == "git":
+        prompt = Image.open(requests.get(args.image_url, stream=True).raw)
     else:
-        raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
+        # input prompt
+        current_path = pathlib.Path(__file__).parent.resolve()
+        with open(str(current_path) + "/prompt.json") as f:
+            prompt_pool = json.load(f)
+        if args.prompt is not None:
+            prompt = args.prompt
+        elif int(args.input_tokens) > 8192:
+            prompt = prompt_pool[model.name]["8192"] * int(int(args.input_tokens) / 8192)
+        elif args.input_tokens in prompt_pool[model.name]:
+            prompt = prompt_pool[model.name][args.input_tokens]
+        else:
+            raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
 
-    input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
-    print("---- Prompt size:", input_size)
+        input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
+        print("---- Prompt size:", input_size)
 
     if args.token_latency:
         if not hasattr(user_model.config, "token_latency"):
@@ -707,8 +739,12 @@ if args.benchmark:
     ):
         for i in range(num_iter):
             tic = time.time()
-            input_ids = tokenizer(prompt, return_tensors="pt").input_ids
-            output = user_model.generate(input_ids, **generate_kwargs)
+            if model.name == "git":
+                input_ids = tokenizer(images=prompt, return_tensors="pt").pixel_values
+                output = user_model.generate(pixel_values=input_ids, **generate_kwargs)
+            else:
+                input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+                output = user_model.generate(input_ids, **generate_kwargs)
             gen_ids = output[0] if args.token_latency else output
             gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
             toc = time.time()
@@ -738,8 +774,12 @@ if args.benchmark:
             on_trace_ready=trace_handler,
         ) as prof:
             for i in range(5):
-                input_ids = tokenizer(prompt, return_tensors="pt").input_ids
-                output = user_model.generate(input_ids, **generate_kwargs)
+                if model.name == "git":
+                    input_ids = tokenizer(images=prompt, return_tensors="pt").pixel_values
+                    output = user_model.generate(pixel_values=input_ids, **generate_kwargs)
+                else:
+                    input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+                    output = user_model.generate(input_ids, **generate_kwargs)
                 gen_ids = output[0] if args.token_latency else output
                 gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
                 prof.step()

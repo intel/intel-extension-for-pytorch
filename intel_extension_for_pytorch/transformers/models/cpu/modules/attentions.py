@@ -25,6 +25,7 @@ class _IPEXAttentionCPU(nn.Module):
                 "BloomForCausalLM",
                 "T5ForConditionalGeneration",
                 "MptForCausalLM",
+                "GitForCausalLM",
             ]
             or self.model_backbone == "BaichuanForCausalLM"
             and hasattr(module, "rotary_emb")

@@ -134,6 +134,13 @@ supported_models = [
         lambda m: m.transformer.h[0].attn.__class__,
         lambda m: m.transformer.h[0].__class__,
     ),
+    model_info(
+        "git",
+        transformers.models.git.modeling_git.GitForCausalLM,
+        False,
+        lambda m: m.git.encoder.layer[0].attention.self.__class__,
+        lambda m: m.git.encoder.layer[0].__class__,
+    ),
 ]
 
 
@@ -205,6 +212,9 @@ class OptimizeTransformersNightlyTester(TestCase):
             input_dict["position_ids"] = position_ids.unsqueeze(0)
         if re.search("t5", model.config.architectures[0], re.IGNORECASE):
             input_dict["decoder_input_ids"] = decoder_input_ids.unsqueeze(0)
+        if m.name == "git":
+            input_dict["pixel_values"] = torch.zeros(1, 3, 224, 224)
+
         with torch.no_grad():
             key_hf = ref_m(**input_dict)
         with torch.no_grad(), torch.cpu.amp.autocast(

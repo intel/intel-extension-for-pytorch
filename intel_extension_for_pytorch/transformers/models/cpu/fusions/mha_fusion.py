@@ -71,7 +71,52 @@ class _IPEXScaleDotProductCPU(nn.Module):
         alibi: Optional[torch.Tensor] = None,
         add_casual_mask: Optional[bool] = True,
         seq_info: Optional[torch.Tensor] = None,
+        cutoff: Optional[torch.Tensor] = None,
+        vision: Optional[torch.Tensor] = False,
     ):
+        if cutoff is not None:
+            if layer_past is None:
+                layer_past = (
+                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                    torch.zeros(
+                        [key.size(0), key.size(2), 1, key.size(-1)]
+                    ).contiguous(),
+                    torch.zeros(
+                        [value.size(0), value.size(2), 1, value.size(-1)]
+                    ).contiguous(),
+                    torch.zeros(1, int(query.size(0)), dtype=torch.long).contiguous(),
+                )
+            query = query.permute(0, 2, 1, 3)
+            key = key.permute(0, 2, 1, 3)
+            value = value.permute(0, 2, 1, 3)
+            kc = torch.cat([layer_past[1].to(query.dtype), key[:, :, -1:, :]], dim=2)
+            vc = torch.cat([layer_past[2].to(query.dtype), value[:, :, -1:, :]], dim=2)
+            key = torch.cat([key[:, :, :cutoff, :], kc[:, :, 1:, :]], dim=2)
+            value = torch.cat(
+                [value[:, :, :cutoff, :], vc[:, :, 1:, :]],
+                dim=2,
+            )
+            attn_output, _ = torch.ops.torch_ipex.flash_attention(
+                query,
+                key,
+                value,
+                dropout_p=0.0,
+                is_causal=False,
+                attention_mask=attention_mask,
+            )
+            present = (
+                torch.empty(
+                    1,
+                    (layer_past[0].size(-2) + 1),
+                    (layer_past[0].size(-2) + 1),
+                    1,
+                    dtype=torch.long,
+                ).contiguous(),
+                key[:, :, cutoff - 1 :, :],
+                value[:, :, cutoff - 1 :, :],
+                layer_past[3].contiguous(),
+            )
+            return attn_output, None, present
         if layer_past is None:
             layer_past = (
                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
