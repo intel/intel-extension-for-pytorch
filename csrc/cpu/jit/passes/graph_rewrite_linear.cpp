@@ -139,7 +139,11 @@ void replaceAtenLinearWithPrepackNode(
   bool should_pack_for_bf16 = weight_dtype_option.has_value() &&
       weight_dtype_option.value() == at::ScalarType::BFloat16 &&
       ideep::has_bf16_type_support();
-  bool should_pack = should_repack || should_pack_for_bf16;
+  bool should_pack_for_fp16 = weight_dtype_option.has_value() &&
+      weight_dtype_option.value() == at::ScalarType::Half &&
+      ideep::has_fp16_type_support();
+  bool should_pack =
+      should_repack || should_pack_for_bf16 || should_pack_for_fp16;
   if (!(should_pack))
     return;
 
@@ -153,7 +157,7 @@ void replaceAtenLinearWithPrepackNode(
   // refer to
   // https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/ir/alias_analysis.cpp#L1956
   auto use_mkl_sgemm_ =
-      use_mkl_sgemm && weight_dtype_option.value() != at::ScalarType::BFloat16;
+      use_mkl_sgemm && weight_dtype_option.value() == at::ScalarType::Float;
   auto prepack_node = graph->create(
       use_mkl_sgemm_ ? Symbol::fromQualString("ipex_prepack::mkl_sgemm_prepack")
                      : Symbol::fromQualString("ipex_prepack::linear_prepack"),

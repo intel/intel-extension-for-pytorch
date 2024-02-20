@@ -1688,7 +1688,7 @@ class Tester(TestCase):
                     )
                 )
 
-    def _test_output_bf16(
+    def _test_output_lowp(
         self,
         base_model,
         x,
@@ -1698,6 +1698,8 @@ class Tester(TestCase):
         levels=None,
         use_channels_last=None,
         use_te=None,
+        dtype=None,
+        explicit_cast=False,
     ):
         def _graph_check_helper(kind_in_graph, kind_not_in_graph):
             # ipex will not prepack for BF16 if onednn not support it
@@ -1717,9 +1719,14 @@ class Tester(TestCase):
             use_channels_last = [True, False]
         if use_te is None:
             use_te = [True, False]
+        if dtype is None:
+            dtype = [torch.bfloat16, torch.float16]
         modelName = base_model.__class__.__name__
-        options = itertools.product(levels, use_channels_last, use_te)
-        for level, use_channels_last, use_te in options:
+        options = itertools.product(levels, use_channels_last, use_te, dtype)
+        for level, use_channels_last, use_te, dtype in options:
+            if dtype == torch.float16 and not ipex._C.onednn_has_fp16_support():
+                # skip float16 test while not supported
+                continue
             with self._texpr_enable(use_te):
                 ipex.enable_onednn_fusion(True)
                 model = copy.deepcopy(base_model).eval()
@@ -1729,6 +1736,9 @@ class Tester(TestCase):
                         model = optimization.fuse(model)
                     except BaseException:
                         warnings.warn("Conv BatchNorm folding failed.")
+                if explicit_cast:
+                    # some ops are fallthrough ops
+                    x = x.to(dtype)
                 if x.dim() == 4 and use_channels_last:
                     x = x.to(memory_format=torch.channels_last)
                     model = model.to(memory_format=torch.channels_last)
@@ -1736,13 +1746,11 @@ class Tester(TestCase):
                     x = x.to(memory_format=torch.channels_last_3d)
                     model = model.to(memory_format=torch.channels_last_3d)
 
-                model = ipex.optimize(model, dtype=torch.bfloat16, level=level)
+                model = ipex.optimize(model, dtype=dtype, level=level)
                 x2 = x.clone()
                 x3 = x.clone()
 
-                with torch.cpu.amp.autocast(
-                    enabled=True, dtype=torch.bfloat16
-                ), torch.no_grad():
+                with torch.cpu.amp.autocast(enabled=True, dtype=dtype), torch.no_grad():
                     # bf16, native path
                     result = model(x)
                     trace_fused_model = torch.jit.trace(copy.deepcopy(model), x3)
@@ -1754,7 +1762,7 @@ class Tester(TestCase):
                     fused_tresult = trace_fused_model(x3)
                 self.assertEqual(fused_tresult, result, prec=prec)
                 if not torch._C._jit_texpr_fuser_enabled():
-                    self.assertEqual(fused_tresult.dtype, torch.bfloat16)
+                    self.assertEqual(fused_tresult.dtype, dtype)
 
                 # check if the fused node exists in the graph
                 if kind_in_graph is not None:
@@ -2494,7 +2502,7 @@ class Tester(TestCase):
                     % ipex_eltwise_op,
                 )
                 if bf16_supported:
-                    self._test_output_bf16(
+                    self._test_output_lowp(
                         m,
                         x,
                         kind_in_graph="ipex_prepack::convolution_%s_run"
@@ -2551,7 +2559,7 @@ class Tester(TestCase):
                 )
                 # temporary disable before https://github.com/pytorch/pytorch/pull/92530 merged
                 # if bf16_supported:
-                #     self._test_output_bf16(
+                #     self._test_output_lowp(
                 #         m,
                 #         x,
                 #         kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
@@ -2642,7 +2650,7 @@ class Tester(TestCase):
                         kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
                     )
                     # temporary disable before https://github.com/pytorch/pytorch/pull/92530 merged
-                    # self._test_output_bf16(
+                    # self._test_output_lowp(
                     #     m,
                     #     x,
                     #     kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
@@ -2656,7 +2664,7 @@ class Tester(TestCase):
                         % ipex_eltwise_op,
                     )
                     # temporary disable before https://github.com/pytorch/pytorch/pull/92530 merged
-                    # self._test_output_bf16(
+                    # self._test_output_lowp(
                     #     m,
                     #     x,
                     #     kind_not_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
@@ -2710,7 +2718,7 @@ class Tester(TestCase):
                     kind_in_graph="ipex_prepack::conv_transpose_add_relu_run",
                     kind_not_in_graph="ipex_prepack::conv_transpose_add_run",
                 )
-                # self._test_output_bf16(
+                # self._test_output_lowp(
                 #     m,
                 #     x,
                 #     kind_in_graph="ipex_prepack::conv_transpose_add_relu_run",
@@ -2736,7 +2744,7 @@ class Tester(TestCase):
                 kind_in_graph="ipex_prepack::convolution_swish_run",
                 kind_not_in_graph="ipex_prepack::convolution_swish_prepack",
             )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 ConvSwishOutplace(
                     dim, in_channels, out_channels, kernel_size, image_size
                 ),
@@ -2753,7 +2761,7 @@ class Tester(TestCase):
                 kind_in_graph="ipex_prepack::convolution_swish_run",
                 kind_not_in_graph="ipex_prepack::convolution_swish_prepack",
             )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 ConvSwishInplace(
                     dim, in_channels, out_channels, kernel_size, image_size
                 ),
@@ -2770,7 +2778,7 @@ class Tester(TestCase):
                 kind_in_graph="ipex_prepack::convolution_swish_add_run",
                 kind_not_in_graph="ipex_prepack::convolution_swish_add_prepack",
             )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 ConvSwishOutplaceSumOutplace(
                     dim, in_channels, out_channels, kernel_size, image_size
                 ),
@@ -2787,7 +2795,7 @@ class Tester(TestCase):
                 kind_in_graph="ipex_prepack::convolution_swish_add_run",
                 kind_not_in_graph="ipex_prepack::convolution_swish_add_prepack",
             )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 ConvSwishInplaceSumInplace(
                     dim, in_channels, out_channels, kernel_size, image_size
                 ),
@@ -2817,7 +2825,7 @@ class Tester(TestCase):
                 kind_not_in_graph="ipex::batch_norm",
                 levels=["O1"],
             )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 ConvBatchNorm_Fixed(
                     dim, in_channels, out_channels, kernel_size=kernel_size, stride=1
                 ),
@@ -3061,7 +3069,7 @@ class Tester(TestCase):
                     kind_not_in_graph="aten::div",
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Scalar_Binary(
                         torch.add,
                         dim,
@@ -3077,7 +3085,7 @@ class Tester(TestCase):
                     prec=0.1,
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Scalar_Binary(
                         torch.sub,
                         dim,
@@ -3093,7 +3101,7 @@ class Tester(TestCase):
                     prec=0.1,
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Scalar_Binary(
                         torch.mul,
                         dim,
@@ -3109,7 +3117,7 @@ class Tester(TestCase):
                     prec=0.1,
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Scalar_Binary(
                         torch.div,
                         dim,
@@ -3197,7 +3205,7 @@ class Tester(TestCase):
                     kind_not_in_graph="aten::div",
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Scalar_Binary_Add(
                         torch.add,
                         dim,
@@ -3213,7 +3221,7 @@ class Tester(TestCase):
                     prec=0.1,
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Scalar_Binary_Add(
                         torch.sub,
                         dim,
@@ -3229,7 +3237,7 @@ class Tester(TestCase):
                     prec=0.1,
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Scalar_Binary_Add(
                         torch.mul,
                         dim,
@@ -3245,7 +3253,7 @@ class Tester(TestCase):
                     prec=0.1,
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Scalar_Binary_Add(
                         torch.div,
                         dim,
@@ -3348,7 +3356,7 @@ class Tester(TestCase):
                     prec=2e-5,
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Tensor_Binary(
                         torch.add,
                         dim,
@@ -3364,7 +3372,7 @@ class Tester(TestCase):
                     prec=0.1,
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Tensor_Binary(
                         torch.sub,
                         dim,
@@ -3380,7 +3388,7 @@ class Tester(TestCase):
                     prec=0.1,
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Tensor_Binary(
                         torch.mul,
                         dim,
@@ -3396,7 +3404,7 @@ class Tester(TestCase):
                     prec=0.1,
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Tensor_Binary(
                         torch.div,
                         dim,
@@ -3485,7 +3493,7 @@ class Tester(TestCase):
                     prec=2e-5,
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Tensor_Binary_Add(
                         torch.add,
                         dim,
@@ -3501,7 +3509,7 @@ class Tester(TestCase):
                     prec=0.1,
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Tensor_Binary_Add(
                         torch.sub,
                         dim,
@@ -3517,7 +3525,7 @@ class Tester(TestCase):
                     prec=0.1,
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Tensor_Binary_Add(
                         torch.mul,
                         dim,
@@ -3533,7 +3541,7 @@ class Tester(TestCase):
                     prec=0.1,
                 )
 
-                self._test_output_bf16(
+                self._test_output_lowp(
                     Conv_Tensor_Binary_Add(
                         torch.div,
                         dim,
@@ -3648,7 +3656,7 @@ class Tester(TestCase):
                 kind_in_graph="ipex_prepack::convolution_add_run",
                 kind_not_in_graph="ipex_prepack::convolution_add_prepack",
             )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 ConvSum(
                     dim, in_channels, out_channels, kernel_size=kernel_size, stride=1
                 ),
@@ -3665,7 +3673,7 @@ class Tester(TestCase):
                 kind_in_graph="ipex_prepack::convolution_add_run",
                 kind_not_in_graph="ipex_prepack::convolution_add_prepack",
             )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 ConvSum_v2(
                     dim, in_channels, out_channels, kernel_size=kernel_size, stride=1
                 ),
@@ -3697,7 +3705,7 @@ class Tester(TestCase):
                 m.conv = m.conv.to(memory_format=torch.channels_last)
             else:
                 m.conv = m.conv.to(memory_format=torch.channels_last_3d)
-            self._test_output_bf16(
+            self._test_output_lowp(
                 m,
                 x,
                 kind_in_graph="ipex_prepack::convolution_add_run",
@@ -3740,7 +3748,7 @@ class Tester(TestCase):
                 kind_in_graph="ipex_prepack::convolution_run",
                 kind_not_in_graph="ipex_prepack::convolution_add_run",
             )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 ConvScalarSum(
                     dim, in_channels, out_channels, kernel_size=kernel_size, stride=1
                 ),
@@ -3770,7 +3778,7 @@ class Tester(TestCase):
                 kind_in_graph="ipex_prepack::convolution_run",
                 kind_not_in_graph="ipex_prepack::convolution_add_run",
             )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 ConvBroadcastSum(
                     dim, in_channels, out_channels, kernel_size=kernel_size, stride=1
                 ),
@@ -3806,7 +3814,7 @@ class Tester(TestCase):
                 kind_in_graph="ipex_prepack::convolution_add_relu_run",
                 kind_not_in_graph="ipex::batch_norm",
             )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 CascadedConvBnSumRelu(
                     dim,
                     in_channels,
@@ -3830,7 +3838,7 @@ class Tester(TestCase):
             use_channels_last=[True],
             levels=["O1"],
         )
-        self._test_output_bf16(
+        self._test_output_lowp(
             Bottleneck_v1(),
             x1,
             kind_in_graph="ipex_prepack::convolution_bottleneck_run",
@@ -3845,7 +3853,7 @@ class Tester(TestCase):
             use_channels_last=[True],
             levels=["O1"],
         )
-        self._test_output_bf16(
+        self._test_output_lowp(
             Bottleneck_v2(),
             x1,
             kind_in_graph="ipex_prepack::convolution_bottleneck_run",
@@ -3891,7 +3899,7 @@ class Tester(TestCase):
                 x,
                 kind_not_in_graph="ipex_prepack::convolution_add_run",
             )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 ConvSumInDiffBlock(
                     dim,
                     in_channels,
@@ -4021,7 +4029,7 @@ class Tester(TestCase):
                         levels=["O0"],
                     )
                     # temporary disable before https://github.com/pytorch/pytorch/pull/92530 merged
-                    # self._test_output_bf16(
+                    # self._test_output_lowp(
                     #     model,
                     #     x,
                     #     kind_in_graph="ipex_prepack::conv_transpose_run",
@@ -4036,7 +4044,7 @@ class Tester(TestCase):
                         levels=["O1"],
                     )
                     # temporary disable before https://github.com/pytorch/pytorch/pull/92530 merged
-                    # self._test_output_bf16(
+                    # self._test_output_lowp(
                     #     model,
                     #     x,
                     #     kind_in_graph="ipex_prepack::conv_transpose_run",
@@ -4119,7 +4127,7 @@ class Tester(TestCase):
                     kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
                 )
                 # temporary disable before https://github.com/pytorch/pytorch/pull/92530 merged
-                # self._test_output_bf16(
+                # self._test_output_lowp(
                 #     m,
                 #     x,
                 #     kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
@@ -4271,7 +4279,7 @@ class Tester(TestCase):
                 kind_not_in_graph="aten::div",
             )
 
-            self._test_output_bf16(
+            self._test_output_lowp(
                 Linear_Scalar_Binary(torch.add, 3, 32, bias=bias),
                 torch.randn(52, 3),
                 kind_in_graph="ipex_prepack::linear_run",
@@ -4279,7 +4287,7 @@ class Tester(TestCase):
                 prec=0.1,
             )
 
-            self._test_output_bf16(
+            self._test_output_lowp(
                 Linear_Scalar_Binary(torch.sub, 3, 32, bias=bias),
                 torch.randn(52, 3),
                 kind_in_graph="ipex_prepack::linear_run",
@@ -4287,7 +4295,7 @@ class Tester(TestCase):
                 prec=0.1,
             )
 
-            self._test_output_bf16(
+            self._test_output_lowp(
                 Linear_Scalar_Binary(torch.mul, 3, 32, bias=bias),
                 torch.randn(52, 3),
                 kind_in_graph="ipex_prepack::linear_run",
@@ -4295,7 +4303,7 @@ class Tester(TestCase):
                 prec=0.1,
             )
 
-            self._test_output_bf16(
+            self._test_output_lowp(
                 Linear_Scalar_Binary(torch.div, 3, 32, bias=bias),
                 torch.randn(52, 3),
                 kind_in_graph="ipex_prepack::linear_run",
@@ -4345,7 +4353,7 @@ class Tester(TestCase):
                 kind_not_in_graph="aten::div",
             )
 
-            self._test_output_bf16(
+            self._test_output_lowp(
                 Linear_Tensor_Binary(torch.add, 3, 32, bias=bias),
                 torch.randn(52, 3),
                 kind_in_graph="ipex_prepack::linear_run",
@@ -4353,7 +4361,7 @@ class Tester(TestCase):
                 prec=0.1,
             )
 
-            self._test_output_bf16(
+            self._test_output_lowp(
                 Linear_Tensor_Binary(torch.sub, 3, 32, bias=bias),
                 torch.randn(52, 3),
                 kind_in_graph="ipex_prepack::linear_run",
@@ -4361,7 +4369,7 @@ class Tester(TestCase):
                 prec=0.1,
             )
 
-            self._test_output_bf16(
+            self._test_output_lowp(
                 Linear_Tensor_Binary(torch.mul, 3, 32, bias=bias),
                 torch.randn(52, 3),
                 kind_in_graph="ipex_prepack::linear_run",
@@ -4369,7 +4377,7 @@ class Tester(TestCase):
                 prec=0.1,
             )
 
-            self._test_output_bf16(
+            self._test_output_lowp(
                 Linear_Tensor_Binary(torch.div, 3, 32, bias=bias),
                 torch.randn(52, 3),
                 kind_in_graph="ipex_prepack::linear_run",
@@ -4410,7 +4418,7 @@ class Tester(TestCase):
                     m, x, kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op
                 )
                 if bf16_supported:
-                    self._test_output_bf16(
+                    self._test_output_lowp(
                         m,
                         x,
                         kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op,
@@ -4466,7 +4474,7 @@ class Tester(TestCase):
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_add_run",
         )
-        self._test_output_bf16(
+        self._test_output_lowp(
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
             kind_not_in_graph="aten::linear",
@@ -4483,7 +4491,7 @@ class Tester(TestCase):
             self._test_dnnl_fp32(
                 m, x, kind_in_graph="ipex_prepack::linear_add_relu_run"
             )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 m,
                 x,
                 kind_in_graph="ipex_prepack::linear_add_relu_run",
@@ -4497,7 +4505,7 @@ class Tester(TestCase):
         self._test_output(m, x, kind_in_graph="aten::linear")
         self._test_mkl_fp32(m, x, kind_in_graph="ipex_prepack::mkl_sgemm_run")
         self._test_dnnl_fp32(m, x, kind_in_graph="ipex_prepack::linear_mul_add_run")
-        self._test_output_bf16(
+        self._test_output_lowp(
             m,
             x,
             kind_in_graph="ipex_prepack::linear_mul_add_run",
@@ -4511,7 +4519,7 @@ class Tester(TestCase):
         self._test_output(m, x, kind_in_graph="aten::linear")
         self._test_mkl_fp32(m, x, kind_in_graph="ipex_prepack::mkl_sgemm_run")
         self._test_dnnl_fp32(m, x, kind_in_graph="ipex_prepack::linear_mul_run")
-        self._test_output_bf16(
+        self._test_output_lowp(
             m,
             x,
             kind_in_graph="ipex_prepack::linear_mul_run",
@@ -4567,13 +4575,13 @@ class Tester(TestCase):
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_swish_run",
         )
-        self._test_output_bf16(
+        self._test_output_lowp(
             LinearSigmoidMul(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_swish_run",
             prec=5e-3,
         )
-        self._test_output_bf16(
+        self._test_output_lowp(
             LinearSigmoidMul(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_swish_run",
@@ -4634,19 +4642,13 @@ class Tester(TestCase):
                 kind_in_graph=None,
                 kind_not_in_graph="ipex::matmul_mul",
             )
-            self._test_output_bf16(
-                MatmulMul(mul_scalar=True, with_out=False),
-                x.to(torch.bfloat16),
-                kind_in_graph="ipex::matmul_mul",
-                kind_not_in_graph=None,
-                prec=5e-2,
-            )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 MatmulMul(mul_scalar=True, with_out=True),
-                x.to(torch.bfloat16),
+                x,
                 kind_in_graph="ipex::matmul_mul",
                 kind_not_in_graph=None,
                 prec=5e-2,
+                explicit_cast=True,
             )
 
             self._test_output(
@@ -4673,33 +4675,21 @@ class Tester(TestCase):
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None,
             )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 MatmulDivOutplace(div_scalar=True, with_out=True),
-                x.to(torch.bfloat16),
+                x,
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None,
                 prec=5e-2,
+                explicit_cast=True,
             )
-            self._test_output_bf16(
-                MatmulDivOutplace(div_scalar=True, with_out=False),
-                x.to(torch.bfloat16),
-                kind_in_graph="ipex::matmul_div",
-                kind_not_in_graph=None,
-                prec=5e-2,
-            )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 MatmulDivOutplace(div_scalar=False, with_out=True),
-                x.to(torch.bfloat16),
+                x,
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None,
                 prec=5e-3,
-            )
-            self._test_output_bf16(
-                MatmulDivOutplace(div_scalar=False, with_out=False),
-                x.to(torch.bfloat16),
-                kind_in_graph="ipex::matmul_div",
-                kind_not_in_graph=None,
-                prec=5e-3,
+                explicit_cast=True,
             )
             self._test_output(
                 MatmulDivInplace(div_scalar=True, with_out=True),
@@ -4725,33 +4715,21 @@ class Tester(TestCase):
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None,
             )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 MatmulDivInplace(div_scalar=True, with_out=True),
-                x.to(torch.bfloat16),
+                x,
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None,
                 prec=5e-2,
+                explicit_cast=True,
             )
-            self._test_output_bf16(
-                MatmulDivInplace(div_scalar=True, with_out=False),
-                x.to(torch.bfloat16),
-                kind_in_graph="ipex::matmul_div",
-                kind_not_in_graph=None,
-                prec=5e-2,
-            )
-            self._test_output_bf16(
+            self._test_output_lowp(
                 MatmulDivInplace(div_scalar=False, with_out=True),
-                x.to(torch.bfloat16),
+                x,
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None,
                 prec=5e-3,
-            )
-            self._test_output_bf16(
-                MatmulDivInplace(div_scalar=False, with_out=False),
-                x.to(torch.bfloat16),
-                kind_in_graph="ipex::matmul_div",
-                kind_not_in_graph=None,
-                prec=5e-3,
+                explicit_cast=True,
             )
             # When the div is outplace and out parameter be modified with an inplace op not in this pattern,
             # but we didn't observe it's value.
@@ -5122,11 +5100,12 @@ class Tester(TestCase):
         self._test_output(
             AtenSoftmaxRepalce(), torch.rand(3, 4, 4), kind_in_graph="ipex::softmax"
         )
-        self._test_output_bf16(
+        self._test_output_lowp(
             AtenSoftmaxRepalce(),
-            torch.rand(3, 4, 4, dtype=torch.bfloat16),
+            torch.rand(3, 4, 4),
             kind_in_graph="ipex::softmax",
             prec=5e-3,
+            explicit_cast=True,
         )
 
     def test_ipex_batch_norm(self):
@@ -5135,11 +5114,12 @@ class Tester(TestCase):
             torch.rand(10, 10, 4, 4),
             kind_in_graph="ipex::batch_norm",
         )
-        self._test_output_bf16(
+        self._test_output_lowp(
             AtenBatchNormRepalce(),
-            torch.rand(10, 10, 4, 4, dtype=torch.bfloat16),
+            torch.rand(10, 10, 4, 4),
             kind_in_graph="ipex::batch_norm",
             prec=5e-3,
+            explicit_cast=True,
         )
 
     def test_max_pool2d_int8(self):
@@ -5382,7 +5362,7 @@ class Tester(TestCase):
             kind_not_in_graph="aten::mul",
         )
 
-        self._test_output_bf16(
+        self._test_output_lowp(
             model,
             torch.randn(1, 3, 1200, 1200),
             kind_in_graph="ipex_prepack::convolution_relu_run",
@@ -5390,7 +5370,7 @@ class Tester(TestCase):
             prec=0.1,
         )
 
-        self._test_output_bf16(
+        self._test_output_lowp(
             model,
             torch.randn(1, 3, 1200, 1200),
             kind_in_graph="ipex_prepack::convolution_relu_run",
@@ -5489,12 +5469,13 @@ class Tester(TestCase):
                 kind_not_in_graph="aten::tanh_",
             )
 
-            self._test_output_bf16(
+            self._test_output_lowp(
                 model_v1,
-                input.to(torch.bfloat16),
+                input,
                 kind_in_graph="aten::gelu",
                 kind_not_in_graph="aten::tanh_",
                 prec=0.02,
+                explicit_cast=True,
             )
 
             model_v2 = Python_GELU_Tanh_v2().eval()
@@ -5506,12 +5487,13 @@ class Tester(TestCase):
                 kind_not_in_graph="aten::tanh_",
             )
 
-            self._test_output_bf16(
+            self._test_output_lowp(
                 model_v2,
-                input.to(torch.bfloat16),
+                input,
                 kind_in_graph="aten::gelu",
                 kind_not_in_graph="aten::tanh_",
                 prec=0.02,
+                explicit_cast=True,
             )
 
     def test_empty_weight_bias_inference(self):

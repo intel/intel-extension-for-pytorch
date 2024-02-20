@@ -46,9 +46,12 @@ void insertPrePackedConvTransposeOpForATen(Block* b) {
         continue;
       }
       const auto dtype = weight_tensor_type->scalarType();
-      if (dtype.has_value() && *dtype == at::ScalarType::BFloat16 &&
-          !ideep::has_bf16_type_support()) {
-        continue;
+      if (dtype.has_value()) {
+        if (*dtype == at::ScalarType::BFloat16 &&
+            !ideep::has_bf16_type_support())
+          continue;
+        if (*dtype == at::ScalarType::Half && !ideep::has_fp16_type_support())
+          continue;
       }
       // # padding - output_padding + stride <= 0 unsupported in mkldnn
       auto stride = toIValue(n->input(3))->toIntList();
