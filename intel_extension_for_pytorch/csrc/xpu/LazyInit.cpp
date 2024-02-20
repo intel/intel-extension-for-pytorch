@@ -32,8 +32,6 @@ void lazy_init() {
         THPObjectPtr(PyObject_CallMethod(module.get(), "_lazy_init", ""));
     if (!res) {
       throw python_error();
-      run_yet =
-          false; // if python API's execution fails, restore tun_yet to FALSE.
     }
   }
 }
