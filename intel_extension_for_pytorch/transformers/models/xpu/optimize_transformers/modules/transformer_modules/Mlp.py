@@ -316,3 +316,10 @@ class IPEXTransformerMLPOptimizedFp16SiluLlama(IPEXTransformerMLPOptimizedFp16Si
             hidden_states, self.up_proj.weight, hidden_states1
         )
         return hidden_states
+
+
+class IPEXTransformerMLPOptimizedFp16SiluBaichuan(
+    IPEXTransformerMLPOptimizedFp16SiluLlama
+):
+    def __init__(self, config):
+        super().__init__(config)

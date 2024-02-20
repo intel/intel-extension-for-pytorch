@@ -52,6 +52,11 @@ def falcon_forward_hook(model):
         pad_for_gptj_lm_head(model, is_int4(model))
 
 
+def baichuan_forward_hook(model):
+    if model.__class__.__name__ == "BaichuanForCausalLM":
+        pad_for_gptj_lm_head(model, is_int4(model))
+
+
 def bloom_forward_hook(model):
     import transformers
 

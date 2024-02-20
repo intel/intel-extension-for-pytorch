@@ -8,6 +8,7 @@ from .modules.Functions import (
     bloom_forward_hook,
     opt_forward_hook,
     falcon_forward_hook,
+    baichuan_forward_hook,
     ipex_build_bloom_alibi_tensor,
 )
 from .modules.utils import is_int4
@@ -18,6 +19,7 @@ from .modules.Layers import (
     IpexFastLinear,
     IpexFastAllReduceLinear,
     IPEXLmHeadLinearAllreduceWithPadding,
+    IPEXLmHeadLinearAllreduceWithPaddingBaichuan,
 )
 from .modules.gptj import NewIPEXGPTJBlock
 from .modules.bloom import NewIPEXBloomBlock
@@ -72,6 +74,7 @@ def default_override_function_list() -> List:
         bloom_forward_hook,
         opt_forward_hook,
         falcon_forward_hook,
+        baichuan_forward_hook,
         ipex_build_bloom_alibi_tensor,
     ]
     return default_fn_list
@@ -132,6 +135,23 @@ class ModuleReplacer:
                     # IPEXLLMResourceContrainer.push(new_module)
                     setattr(model, name, new_module)
                     is_replace_success = True
+            # BaichuanLayer is a custom model in transformers
+            elif child.__class__.__name__ == "BaichuanLayer":
+                from .modules.baichuan import NewIPEXBaichuanBlock
+
+                new_module = NewIPEXBaichuanBlock(
+                    child,
+                    config,
+                    dtype=dtype,
+                    device="xpu",
+                    module_name=module_name + name,
+                    impl_mode=impl_mode,
+                    tp_size=self.tp_size,
+                    tp_group=self.tp_group,
+                )
+                if new_module is not None:
+                    setattr(model, name, new_module)
+                    is_replace_success = True
             else:
                 is_replace_success = is_replace_success or self.replace_module(
                     child, dtype, config, module_name + name
@@ -140,10 +160,18 @@ class ModuleReplacer:
 
     def replace_op(self, model):
         for name, child in model.named_children():
-            if type(child) in self.module_dict.keys():
+            if (
+                type(child) in self.module_dict.keys()
+                or child.__class__.__name__ == "BaichuanLayer"
+            ):
                 continue
             if name == "lm_head" and (not is_int4(model)):
-                setattr(model, name, IPEXLmHeadLinearAllreduceWithPadding(child))
+                if model.__class__.__name__ == "BaichuanForCausalLM":
+                    setattr(
+                        model, name, IPEXLmHeadLinearAllreduceWithPaddingBaichuan(child)
+                    )
+                else:
+                    setattr(model, name, IPEXLmHeadLinearAllreduceWithPadding(child))
             elif type(child) in self.layer_dict.keys():
                 new_layer = self.layer_dict[type(child)](child)
                 setattr(model, name, new_layer)

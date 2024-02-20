@@ -85,7 +85,7 @@ def pad_for_gptj_lm_head(model, is_int4=False):
             model.lm_head.bias.data = int4_gemm_bias_padding(model.lm_head.bias)
 
     else:
-        if model.lm_head.bias is not None:
+        if hasattr(model.lm_head, "bias") and model.lm_head.bias is not None:
             model.lm_head.weight.data, model.lm_head.bias.data = gemm_padding(
                 model.lm_head.weight, model.lm_head.bias
             )

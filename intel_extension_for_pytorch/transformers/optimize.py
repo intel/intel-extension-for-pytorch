@@ -603,6 +603,7 @@ def optimize_transformers(
                 or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
                 or re.search("Bloom", model.config.architectures[0], re.IGNORECASE)
                 or re.search("Falcon", model.config.architectures[0], re.IGNORECASE)
+                or re.search("Baichuan", model.config.architectures[0], re.IGNORECASE)
             ) and device == "xpu"
 
         if not (well_supported_model or xpu_supported_model):

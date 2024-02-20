@@ -26,6 +26,7 @@ MODEL_CLASSES = {
     "opt": (AutoModelForCausalLM, AutoTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
     "bloom": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan2": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -151,7 +152,7 @@ else:
 model = model_class[0].from_pretrained(
     args.model_id, torch_dtype=load_dtype, config=config, low_cpu_mem_usage=True, trust_remote_code=True
 )
-tokenizer = model_class[1].from_pretrained(args.model_id)
+tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
 
 woq_weight_path = args.woq_checkpoint_path
 if args.woq and args.woq_checkpoint_path == "":

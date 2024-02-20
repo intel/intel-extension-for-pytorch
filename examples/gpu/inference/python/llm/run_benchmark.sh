@@ -113,10 +113,23 @@ Run_benchmark_bloom-7b() {
     mv trace.json ${dir}
 }
 
+Run_benchmark_baichuan2-13b-chat() {
+    model=baichuan-inc/Baichuan2-13B-Chat
+    sub_model_name=baichuan2-13b
+    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}_fused
+    mkdir -p ${dir}
+    python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee optimize
+    mv log_e2e ${dir}
+    PROFILE=1 python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16
+    mv profile*pt ${dir}
+    mv trace.json ${dir}
+}
+
+
 main() {
 
     export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2
-    
+
     Run_benchmark_gpt-j-6b
     Run_benchmark_llama-7b
     Run_benchmark_llama-13b
@@ -124,6 +137,7 @@ main() {
     Run_benchmark_llama2-13b
     Run_benchmark_opt-6.7b
     Run_benchmark_bloom-7b
+    Run_benchmark_baichuan2-13b-chat
 }
 
 main

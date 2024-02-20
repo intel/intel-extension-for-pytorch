@@ -754,3 +754,67 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
 
     def is_naive_implementation():  # noqa
         return False
+
+
+class IPEXTransformerAttnOptimizedFp16Baichuan(IPEXTransformerAttnOptimizedFp16):
+    def __init__(self, config: IPEXTransformerConfig) -> None:
+        super().__init__(config)
+
+    def post_qkv(self, query, key, value, position_ids, layer_past, **kwargs):
+        bs_beam, seq, _ = self.get_runtime_shape(query)
+        seq = seq if layer_past is None else layer_past[0].size(2) + 1
+        query, key, value = self.combine_kv_cache_interface(query, key, value)
+        return query, key, value
+
+    def sdp(self, query, key, value, attention_mask, head_mask, alibi):
+        if attention_mask is not None:
+            if query.size()[2] == 1:  # inference with cache
+                if len(attention_mask.size()) == 4:
+                    attention_mask = attention_mask[:, :, -1:, :]
+                else:
+                    attention_mask = attention_mask[:, -1:, :]
+        key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
+        (
+            dropout,
+            alpha,
+            beta,
+            is_casual,
+            blocked_attn_mask,
+            blocked_alibi,
+        ) = self.prepare_sdp_input(query, key, value, attention_mask, alibi)
+        if not self.is_1st_token() and self.is_beam_search():
+            key, value = self.reorder_cache(
+                key_prompt, value_prompt, key, value, self.beam_idx
+            )
+
+        attention_output = torch.nn.functional.scaled_dot_product_attention(
+            query, key, value, attention_mask, dropout, is_casual
+        )
+        attn_weight = None
+        attention_output = self.process_sdp_output(attention_output)
+        attention_output = attention_output.reshape(
+            attention_output.size()[:-2] + (self.head_dim * self.num_attn_head,)
+        )
+        return attention_output, attn_weight
+
+    def load_parameter(self, qkv_proj, out_proj):
+        self.qkv_proj.weight = qkv_proj.weight
+        self.out_proj.weight = out_proj.weight
+
+        self.qkv_proj.bias = qkv_proj.bias
+        self.out_proj.bias = out_proj.bias
+
+    def transpose_parameter(self):
+        self.qkv_proj.weight.data = (
+            self.qkv_proj.weight.view(
+                3, self.num_attn_head * self.head_dim, self.embed_dim
+            )
+            .permute(0, 2, 1)
+            .contiguous()
+        )
+        self.out_proj.weight.data = self.out_proj.weight.transpose(0, 1).contiguous()
+        # Note: synchronize to ensure the completion of contiguous
+        torch.xpu.synchronize()
+
+    def cat_qkv(self):
+        pass
