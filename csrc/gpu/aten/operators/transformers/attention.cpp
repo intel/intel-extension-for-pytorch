@@ -293,15 +293,21 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math(
         [&] {
           bool is_half = std::is_same<scalar_t, at::Half>::value;
           if (is_half) {
+            c10::optional<Tensor> attn_mask_fp32;
             Tensor query_fp32 = query_.to(at::kFloat);
             Tensor key_fp32 = key.to(at::kFloat);
             Tensor value_fp32 = value.to(at::kFloat);
+            if (attn_mask_.has_value()) {
+              attn_mask_fp32 = attn_mask_.value().to(at::kFloat);
+            } else {
+              attn_mask_fp32 = attn_mask_;
+            }
             auto [attn_output, attn_weight] =
                 _scaled_dot_product_attention_math_native_impl(
                     query_fp32,
                     key_fp32,
                     value_fp32,
-                    attn_mask_,
+                    attn_mask_fp32,
                     dropout_p,
                     is_causal,
                     dropout_mask,
@@ -329,15 +335,21 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math(
         [&] {
           bool is_half = std::is_same<scalar_t, at::Half>::value;
           if (is_half) {
+            c10::optional<Tensor> attn_mask_fp32;
             Tensor query_fp32 = query_.to(at::kFloat);
             Tensor key_fp32 = key.to(at::kFloat);
             Tensor value_fp32 = value.to(at::kFloat);
+            if (attn_mask_.has_value()) {
+              attn_mask_fp32 = attn_mask_.value().to(at::kFloat);
+            } else {
+              attn_mask_fp32 = attn_mask_;
+            }
             auto [attn_output, attn_weight] =
                 _scaled_dot_product_attention_math_impl(
                     query_fp32,
                     key_fp32,
                     value_fp32,
-                    attn_mask_,
+                    attn_mask_fp32,
                     dropout_p,
                     is_causal,
                     dropout_mask,
@@ -412,34 +424,6 @@ _scaled_dot_product_efficient_attention(
       std::move(offset_t));
 }
 
-inline bool xetla_supported(
-    Tensor q,
-    Tensor k,
-    Tensor v,
-    const c10::optional<Tensor>& b) {
-  bool is_supported = false;
-#if defined(USE_XETLA)
-  if (dpcppGetDeviceHasXMX()) {
-    DeviceId curDevID;
-    AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-    bool bias_support = true;
-    if (b.has_value()) {
-      if (b.value().sym_size(0) != q.sym_size(0))
-        bias_support = false;
-      if (b.value().sym_size(1) != 1)
-        bias_support = false;
-    }
-    if ((q.dtype() == at::kHalf || q.dtype() == at::kBFloat16) &&
-        Settings::I().has_2d_block_array(curDevID) && bias_support == true) {
-      if ((q.sym_size(-1) * q.itemsize() % 128 == 0) &&
-          (v.sym_size(-1) * v.itemsize() % 128 == 0))
-        is_supported = true;
-    }
-  }
-#endif
-  return is_supported;
-}
-
 int64_t _fused_sdp_choice(
     const Tensor& query,
     const Tensor& key,
@@ -451,7 +435,9 @@ int64_t _fused_sdp_choice(
   // We have implemented efficient_attention backend with xetla, flash_attention
   // backend is not supported now, which will be implemented in the future. So
   // we provide two backends here.
-  sdp::SDPBackend backend = xetla_supported(query, key, value, attn_mask_)
+  sdp::sdp_params kernel_params{
+      query, key, value, attn_mask_, dropout_p, is_causal};
+  sdp::SDPBackend backend = sdp::use_mem_efficient_attention(kernel_params)
       ? sdp::SDPBackend::efficient_attention
       : sdp::SDPBackend::math;
   if (backend == sdp::SDPBackend::error) {
@@ -714,8 +700,9 @@ int64_t _fused_sdp_choice(
   // We have implemented efficient_attention backend with xetla, flash_attention
   // backend is not supported now, which will be implemented in the future. So
   // we provide two backends here.
-  sdp::SDPBackend backend =
-      AtenIpexTypeXPU::xetla_supported(query, key, value, attn_mask_)
+  sdp::sdp_params kernel_params{
+      query, key, value, attn_mask_, dropout_p, is_causal};
+  sdp::SDPBackend backend = sdp::use_mem_efficient_attention(kernel_params)
       ? sdp::SDPBackend::efficient_attention
       : sdp::SDPBackend::math;
   if (backend == sdp::SDPBackend::error) {
