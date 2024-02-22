@@ -521,14 +521,28 @@ struct DpcppSmallIndexKernelImplFunctor {
          local_index += wgroup_size) {
       int64_t offset = 0;
       for (size_t i = 0; i < num_indices; i++) {
-        int64_t index =
-            *(int64_t*)(index_ptrs[i] + local_index * indice_size_bytes);
-        SYCL_KERNEL_ASSERT(
-            index >= -sizes[i] && index < sizes[i] && "index out of bounds");
-        if (index < 0) {
-          index += sizes[i];
+        // handle int32 index tensor according to the indice_size_bytes.
+        // we didn't use template parametor to avoid too many kernels' creation
+        // with numbers of input datatypes.
+        if (indice_size_bytes == 4) {
+          int32_t index =
+              *(int32_t*)(index_ptrs[i] + local_index * indice_size_bytes);
+          SYCL_KERNEL_ASSERT(
+              index >= -sizes[i] && index < sizes[i] && "index out of bounds");
+          if (index < 0) {
+            index += sizes[i];
+          }
+          offset += index * strides[i];
+        } else {
+          int64_t index =
+              *(int64_t*)(index_ptrs[i] + local_index * indice_size_bytes);
+          SYCL_KERNEL_ASSERT(
+              index >= -sizes[i] && index < sizes[i] && "index out of bounds");
+          if (index < 0) {
+            index += sizes[i];
+          }
+          offset += index * strides[i];
         }
-        offset += index * strides[i];
       }
       local_offset[local_index] = offset;
     }
@@ -731,19 +745,33 @@ struct DpcppIndexKernelImplFunctor {
     int64_t offset = 0;
     //#pragma unroll
     for (size_t i = 0; i < num_indices; i++) {
-      int64_t index = *(int64_t*)(index_ptrs[i] + offsets[2]);
-      SYCL_KERNEL_ASSERT(
-          index >= -sizes[i] && index < sizes[i] && "index out of bounds");
-      if (index < 0) {
-        index += sizes[i];
+      // handle int32 index tensor according to the indice_size_bytes.
+      // we didn't use template parametor to avoid too many kernels' creation
+      // with numbers of input datatypes.
+      if (indice_size_bytes == 4) {
+        int32_t index = *(int32_t*)(index_ptrs[i] + offsets[2]);
+        SYCL_KERNEL_ASSERT(
+            index >= -sizes[i] && index < sizes[i] && "index out of bounds");
+        if (index < 0) {
+          index += sizes[i];
+        }
+        offset += index * strides[i];
+      } else {
+        int64_t index = *(int64_t*)(index_ptrs[i] + offsets[2]);
+        SYCL_KERNEL_ASSERT(
+            index >= -sizes[i] && index < sizes[i] && "index out of bounds");
+        if (index < 0) {
+          index += sizes[i];
+        }
+        offset += index * strides[i];
       }
-      offset += index * strides[i];
     }
     f(out_ptr, in_ptr, offset);
   }
   DpcppIndexKernelImplFunctor(
       const func_t f_,
       OffsetCalculatorType offset_calc_,
+      int64_t indice_size_bytes_,
       char* out_data_,
       char* in_data_,
       size_t num_indices_,
@@ -752,6 +780,7 @@ struct DpcppIndexKernelImplFunctor {
       at::detail::Array<int64_t, MAX_TENSORINFO_DIMS> strides_)
       : f(f_),
         offset_calc(offset_calc_),
+        indice_size_bytes(indice_size_bytes_),
         out_data(out_data_),
         in_data(in_data_),
         num_indices(num_indices_),
@@ -762,6 +791,7 @@ struct DpcppIndexKernelImplFunctor {
  private:
   const func_t f;
   OffsetCalculatorType offset_calc;
+  int64_t indice_size_bytes;
   char* out_data;
   char* in_data;
   size_t num_indices;
@@ -785,6 +815,8 @@ void dpcpp_index_kernel_impl(
     strides[i] = index_stride[i];
   }
 
+  int64_t indice_size_bytes = iter.tensor(2).element_size();
+
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
@@ -800,6 +832,7 @@ void dpcpp_index_kernel_impl(
     DpcppIndexKernelImplFunctor<func_t, index_buf_type, decltype(offset_calc)>
         kfn(f,
             offset_calc,
+            indice_size_bytes,
             out_data,
             in_data,
             num_indices,
@@ -831,19 +864,19 @@ void dpcpp_index_kernel(
       num_indices == static_cast<size_t>(iter.ntensors()) - 2);
   TORCH_INTERNAL_ASSERT(num_indices <= MAX_TENSORINFO_DIMS);
 
-  // the dpcpp_small_index_kernel_impl is applied for last several successive
-  // dims indexing of an input tensor Taking 3-dims tensor input
+  // the dpcpp_small_index_kernel_impl is applied for last several
+  // successive dims indexing of an input tensor Taking 3-dims tensor input
   // (input.shape=[x,y,z]) for example: input[:,:,idx] or input[:,idx1,idx2]
   // when input tensor satisfies the following conditions, the
-  // small_index_kernel path will be selected: 1.there are common indices such
-  // as input[:,:,idx] and input[:,idx1,idx2] instead of
+  // small_index_kernel path will be selected: 1.there are common indices
+  // such as input[:,:,idx] and input[:,idx1,idx2] instead of
   //   input[idx0,idx1,idx2], input[idx0,idx1,:], input[idx0,:,idx2],
   //   input[idx0,:,:], input[:,idx1,:]
   // 2.the common indices numel should larger than 2 times of the
   // dpcppMaxComputeUnitSize (then we can get memory access benifit) 3.the
-  // workloads in each group should larger than the maximum number of workitem
-  // (ensure all the workitem activate) 4.the indices_table size should
-  // satisfied the SLM limit condition
+  // workloads in each group should larger than the maximum number of
+  // workitem (ensure all the workitem activate) 4.the indices_table size
+  // should satisfied the SLM limit condition
 
   // check whether the current case satisfying the condition 1
   // for 3-dims input:
