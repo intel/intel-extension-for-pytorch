@@ -6,3 +6,26 @@
 - !!omap
   - reason: ""
   - cases: []
+- reason: Skipped due to the TypedStorage is deprecated.
+  cases:
+  - test_torch.py::TestTorchDeviceTypeXPU::test_tensor_storage_type_xpu_bfloat16
+  - test_torch.py::TestTorchDeviceTypeXPU::test_tensor_storage_type_xpu_bool
+  - test_torch.py::TestTorchDeviceTypeXPU::test_tensor_storage_type_xpu_float16
+  - test_torch.py::TestTorchDeviceTypeXPU::test_tensor_storage_type_xpu_float32
+  - test_torch.py::TestTorchDeviceTypeXPU::test_tensor_storage_type_xpu_float64
+  - test_torch.py::TestTorchDeviceTypeXPU::test_tensor_storage_type_xpu_int16
+  - test_torch.py::TestTorchDeviceTypeXPU::test_tensor_storage_type_xpu_int32
+  - test_torch.py::TestTorchDeviceTypeXPU::test_tensor_storage_type_xpu_int64
+  - test_torch.py::TestTorchDeviceTypeXPU::test_tensor_storage_type_xpu_int8
+  - test_torch.py::TestTorchDeviceTypeXPU::test_tensor_storage_type_xpu_uint8
+- reason: Skipped due to only for cpu
+  cases:
+  - test_torch::TestTorchDeviceTypeXPU::test_broadcast_fn_map2_xpu
+  - test_torch::TestTorchDeviceTypeXPU::test_broadcast_fn_map_xpu
+  - test_torch::TestTorchDeviceTypeXPU::test_module_share_memory_xpu
+  - test_fx_experimental::TestFXExperimental::test_optimize_for_inference_cpu
+  - test_fx_experimental::TestFXExperimental::test_optimize_for_inference_cpu_torchvision
+- reason: Skipped due to not in xpu scope
+  cases:
+  - test_ops::TestCommonXPU::test_pointwise_tag_coverage_xpu
+

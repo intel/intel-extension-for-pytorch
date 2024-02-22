@@ -62,9 +62,6 @@
   - test_indexing.py::TestIndexingXPU::test_advancedindex_xpu_float64
   - test_indexing.py::TestIndexingXPU::test_index_ind_dtype_xpu
   - test_linalg.py::TestLinalgXPU::test_addmm_sizes_xpu_float32
-  - test_linalg.py::TestLinalgXPU::test_blas_alpha_beta_empty_xpu_bfloat16
-  - test_linalg.py::TestLinalgXPU::test_blas_alpha_beta_empty_xpu_float16
-  - test_linalg.py::TestLinalgXPU::test_blas_alpha_beta_empty_xpu_float32
   - test_linalg.py::TestLinalgXPU::test_cholesky_errors_and_warnings_xpu_float32
   - test_linalg.py::TestLinalgXPU::test_cholesky_errors_and_warnings_xpu_float64
   - test_linalg.py::TestLinalgXPU::test_cholesky_ex_non_pd_xpu_float32
