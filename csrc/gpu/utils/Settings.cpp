@@ -81,37 +81,37 @@ Settings& Settings::I() {
 }
 
 Settings::Settings() {
-#define DPCPP_INIT_ENV_VAL(name, var, etype, show)    \
-  do {                                                \
-    auto env = std::getenv(name);                     \
-    if (env) {                                        \
-      try {                                           \
-        int _ival = std::stoi(env, 0, 10);            \
-        if (_ival <= etype##_MAX && _ival >= 0) {     \
-          var = static_cast<decltype(var)>(_ival);    \
-        }                                             \
-      } catch (...) {                                 \
-        try {                                         \
-          std::string _sval(env);                     \
-          for (int i = 0; i <= etype##_MAX; i++) {    \
-            if (_sval == etype##_STR[i]) {            \
-              var = static_cast<decltype(var)>(i);    \
-              break;                                  \
-            }                                         \
-          }                                           \
-        } catch (...) {                               \
-        }                                             \
-      }                                               \
-    }                                                 \
-    if (show) {                                       \
-      std::cerr << " ** " << name << ": ";            \
-      if (var <= etype##_MAX && var >= 0) {           \
-        std::cerr << etype##_STR[var];                \
-      } else {                                        \
-        std::cerr << "UNKNOW";                        \
-      }                                               \
-      std::cerr << " (= " << var << ")" << std::endl; \
-    }                                                 \
+#define DPCPP_INIT_ENV_VAL(name, var, etype, show)           \
+  do {                                                       \
+    auto env = std::getenv(name);                            \
+    if (env) {                                               \
+      try {                                                  \
+        int _ival = std::stoi(env, 0, 10);                   \
+        if (_ival <= etype##_MAX && _ival >= etype##_MIN) {  \
+          var = static_cast<decltype(var)>(_ival);           \
+        }                                                    \
+      } catch (...) {                                        \
+        try {                                                \
+          std::string _sval(env);                            \
+          for (int i = etype##_MIN; i <= etype##_MAX; i++) { \
+            if (_sval == etype##_STR[i]) {                   \
+              var = static_cast<decltype(var)>(i);           \
+              break;                                         \
+            }                                                \
+          }                                                  \
+        } catch (...) {                                      \
+        }                                                    \
+      }                                                      \
+    }                                                        \
+    if (show) {                                              \
+      std::cerr << " ** " << name << ": ";                   \
+      if (var <= etype##_MAX && var >= etype##_MIN) {        \
+        std::cerr << etype##_STR[var];                       \
+      } else {                                               \
+        std::cerr << "UNKNOW";                               \
+      }                                                      \
+      std::cerr << " (= " << var << ")" << std::endl;        \
+    }                                                        \
   } while (0)
 
   ENV_VAL show_opt = ENV_VAL::OFF;

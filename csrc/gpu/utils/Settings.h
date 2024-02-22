@@ -5,10 +5,15 @@
 
 namespace xpu {
 
-enum ENV_VAL { OFF = 0, ON = 1, ENV_VAL_MAX = ON };
+enum ENV_VAL { OFF = 0, ON = 1, ENV_VAL_MIN = OFF, ENV_VAL_MAX = ON };
 static const char* ENV_VAL_STR[]{"OFF", "ON"};
 
-enum VERBOSE_LEVEL { DISABLE = 0, XXX = 1, VERBOSE_LEVEL_MAX = XXX };
+enum VERBOSE_LEVEL {
+  DISABLE = 0,
+  XXX = 1,
+  VERBOSE_LEVEL_MIN = DISABLE,
+  VERBOSE_LEVEL_MAX = XXX
+};
 static const char* VERBOSE_LEVEL_STR[]{"DISABLE", "DEBUG"};
 
 enum LOG_LEVEL {
@@ -31,7 +36,13 @@ static const char* LOG_LEVEL_STR[]{
     "ERR",
     "CRITICAL"};
 
-enum XPU_BACKEND { GPU = 0, CPU = 1, AUTO = 2, XPU_BACKEND_MAX = AUTO };
+enum XPU_BACKEND {
+  GPU = 0,
+  CPU = 1,
+  AUTO = 2,
+  XPU_BACKEND_MIN = GPU,
+  XPU_BACKEND_MAX = AUTO
+};
 static const char* XPU_BACKEND_STR[]{"GPU", "CPU", "AUTO"};
 
 enum COMPUTE_ENG {
@@ -40,6 +51,7 @@ enum COMPUTE_ENG {
   ONEDNN = 2,
   ONEMKL = 3,
   XETLA = 4,
+  COMPUTE_ENG_MIN = RECOMMEND,
   COMPUTE_ENG_MAX = XETLA
 };
 static const char* COMPUTE_ENG_STR[]{
@@ -53,6 +65,7 @@ enum DEVICE_HIERARCHY {
   COMPOSITE = 0,
   FLAT = 1,
   COMBINED = 2,
+  DEVICE_HIERARCHY_MIN = COMPOSITE,
   DEVICE_HIERARCHY_MAX = COMBINED
 };
 static const char* DEVICE_HIERARCHY_STR[]{"COMPOSITE", "FLAT", "COMBINED"};

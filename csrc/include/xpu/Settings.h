@@ -28,6 +28,7 @@ enum FP32_MATH_MODE {
   FP32 = 0, ///< set floating-point math mode to FP32.
   TF32 = 1, ///< set floating-point math mode to TF32.
   BF32 = 2, ///< set floating-point math mode to BF32.
+  FP32_MATH_MODE_MIN = FP32,
   FP32_MATH_MODE_MAX = BF32 ///< set floating-point math mode.
 };
 static const char* FP32_MATH_MODE_STR[]{"FP32", "TF32", "BF32"};
