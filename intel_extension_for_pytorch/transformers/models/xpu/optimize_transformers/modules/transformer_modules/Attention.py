@@ -442,7 +442,12 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
                 if query.shape[2] != 1:
                     is_causal = True
             else:
-                blocked_attn_mask = self.get_blocked_attn_mask(attention_mask, seq_len)
+                blocked_attn_mask = self.get_blocked_attn_mask(
+                    attention_mask.expand(
+                        [query.size(0), query.size(1), query.size(2), seq_len]
+                    ),
+                    seq_len,
+                )
         blocked_alibi = None
         if alibi is not None:
             blocked_alibi = self.get_blocked_alibi(alibi, seq_len)
@@ -682,9 +687,10 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
             IPEXTransformerAttnOptimizedFp16.blocked_alibi[:, :, 0:kv_len] = alibi
         return IPEXTransformerAttnOptimizedFp16.blocked_alibi
 
-    def get_blocked_attn_mask(self, attn_mask, seq_len):
+    def get_blocked_attn_mask(self, attn_mask_, seq_len):
         alignment = 8
         if self.layer_id == 0:
+            attn_mask = attn_mask_.contiguous()
             cache_len = (
                 self.max_position
                 if self.max_position > seq_len

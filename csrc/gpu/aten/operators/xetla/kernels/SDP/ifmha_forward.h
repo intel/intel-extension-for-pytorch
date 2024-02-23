@@ -52,7 +52,7 @@ class ifmha_forward_t {
     scalar_t* V1_ptr; // [T1,B,Bm,N,H] - value1
     index_t* I_ptr; // [T1,B,Bm] - index
     scalar_t* A_ptr = nullptr; // [B,Bm,N,1,T] - alibi
-    scalar_t* B_ptr = nullptr; // [B,Bm,1,F,PT] - bias
+    scalar_t* B_ptr = nullptr; // [B,Bm,N,F,PT] - bias
     uint8_t* Dp_ptr = nullptr; // [B,Bm,N,F,T] - dropout mask
     scalar_t* O_ptr; // [B,Bm,1,N,H] - output
 
@@ -265,9 +265,10 @@ class ifmha_forward_t {
         alibi_base_offset = batch_id * Beams * args.uN * args.uAT +
             beam_id * args.uN * args.uAT + head_id * args.uAT;
       }
-      // (b, bm, 1, 1, t)
+      // (b, bm, N, 1, t)
       if constexpr (kUseBias) {
-        bias_base_offset = batch_id * Beams * args.uPT + beam_id * args.uPT;
+        bias_base_offset = batch_id * Beams * args.uN * args.uPT +
+            beam_id * args.uN * args.uPT + head_id * args.uPT;
       };
     }
 

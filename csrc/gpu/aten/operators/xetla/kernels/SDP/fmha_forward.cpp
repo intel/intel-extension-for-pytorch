@@ -39,7 +39,7 @@ class fmha_forward_t {
     scalar_t* K_ptr; // [B, T, N, H] - key
     scalar_t* V_ptr; // [B, T, N, H] - value
     scalar_t* A_ptr = nullptr; // [B, N, 1, T] - Alibi
-    scalar_t* B_ptr = nullptr; // [B, 1, F, T] - bias
+    scalar_t* B_ptr = nullptr; // [1/B, 1/N, 1/F, M] - bias
     uint8_t* Dp_ptr = nullptr; // [B, N, F, T] - dropout mask
     // Output tensor
     scalar_t* O_ptr; // raw: [B, F, N, H]; permute: [B, N, F, H] - output
@@ -53,6 +53,10 @@ class fmha_forward_t {
     // Softmax scale is the reciprocal square root of head size by default
     accum_t sm_scale;
 
+    uint32_t bias_strideB;
+    uint32_t bias_strideN;
+    uint32_t bias_strideF;
+
     // Dropout scale is computed from dropout prob
     accum_t dp_prob;
     accum_t dp_scale;
@@ -60,6 +64,7 @@ class fmha_forward_t {
     uint32_t uMT;
     uint64_t seed;
     uint64_t offset;
+    bool is_bias_add;
 
     inline arguments_t() = default;
     inline arguments_t(
@@ -76,6 +81,9 @@ class fmha_forward_t {
         uint32_t head_size,
         uint32_t num_queries,
         uint32_t num_keys,
+        uint32_t bias_strideB,
+        uint32_t bias_strideN,
+        uint32_t bias_strideF,
         accum_t sm_scale,
         accum_t dropout_prob,
         uint32_t alibi_padded_block_size,
@@ -95,13 +103,17 @@ class fmha_forward_t {
           uH(head_size),
           uF(num_queries),
           uT(num_keys),
+          bias_strideB(bias_strideB),
+          bias_strideN(bias_strideN),
+          bias_strideF(bias_strideF),
           sm_scale(sm_scale),
           dp_prob(dropout_prob),
           dp_scale(1.f / (1.f - dropout_prob)),
           uAT(alibi_padded_block_size),
           uMT(attn_mask_padded_block_size),
           seed(seed_t),
-          offset(offset_t) {}
+          offset(offset_t),
+          is_bias_add(bias_strideF == 0) {}
   };
 
  private:
@@ -341,9 +353,13 @@ class fmha_forward_t {
         uint32_t boundary_x = args.uMT;
         end_x = end_x > boundary_x ? boundary_x : end_x;
 
-        int32_t start_y = batch_id * args.uF + ei.get_group(1) * kBr;
-        uint32_t end_y = start_y + kBr;
-        uint32_t boundary_y = (batch_id + 1) * args.uF;
+        int32_t offset =
+            (batch_id * args.bias_strideB + head_id * args.bias_strideN) /
+            args.uMT;
+        int32_t start_y =
+            offset + (args.is_bias_add ? 0 : ei.get_group(1) * kBr);
+        uint32_t end_y = args.is_bias_add ? start_y : start_y + kBr;
+        uint32_t boundary_y = args.is_bias_add ? start_y : offset + args.uF;
         end_y = end_y > boundary_y ? boundary_y : end_y;
 
         mem_desc_Bij.init(
@@ -410,17 +426,27 @@ class fmha_forward_t {
 
     // Add attn_mask if needed
     if constexpr (kUseBias && !kIsCausal) {
-      using bias_op_t = subgroup::
-          elemwise_reduce_op_t<reduce_op::sum, scalar_t, gpu_arch::Xe>;
-      using bias_args_t = typename bias_op_t::arguments_t;
+      if (args.is_bias_add) {
+        using mask_op_t = bias_add_op_t<scalar_t, gpu_arch::Xe>;
+        using mask_args_t = typename mask_op_t::arguments_t;
+        int32_t tile_offset_x = ctx.sg_idx * kSgBc;
+        ctx.mem_desc_Bij.update_coord_x(tile_offset_x);
+        mask_op_t mask_op;
+        mask_args_t mask_args(ctx.mem_desc_Bij.base, ctx.mem_desc_Bij.shape);
+        mask_op(matAccSij, ctx.mem_desc_Bij.coord, mask_args);
+      } else {
+        using mask_op_t = subgroup::
+            elemwise_reduce_op_t<reduce_op::sum, scalar_t, gpu_arch::Xe>;
+        using mask_args_t = typename mask_op_t::arguments_t;
 
-      int32_t tile_offset_x = ctx.sg_idx * kSgBc;
-      int32_t tile_offset_y = ctx.sg_idy * kSgBr;
-      ctx.mem_desc_Bij.update_coord(tile_offset_x, tile_offset_y);
+        int32_t tile_offset_x = ctx.sg_idx * kSgBc;
+        int32_t tile_offset_y = ctx.sg_idy * kSgBr;
+        ctx.mem_desc_Bij.update_coord(tile_offset_x, tile_offset_y);
 
-      bias_op_t bias_op;
-      bias_args_t bias_args(ctx.mem_desc_Bij.base, ctx.mem_desc_Bij.shape);
-      bias_op(matAccSij, ctx.mem_desc_Bij.coord, bias_args);
+        mask_op_t mask_op;
+        mask_args_t mask_args(ctx.mem_desc_Bij.base, ctx.mem_desc_Bij.shape);
+        mask_op(matAccSij, ctx.mem_desc_Bij.coord, mask_args);
+      }
     }
 
     // Add attn_mask if needed
@@ -798,6 +824,9 @@ struct FmhaForwardKernelFunctor {
         head_size,
         num_queries,
         num_keys,
+        bias_strideB,
+        bias_strideN,
+        bias_strideF,
         (accscalar_t)alpha,
         (accscalar_t)dropout_prob,
         alibi_padded_block_size,
@@ -822,6 +851,9 @@ struct FmhaForwardKernelFunctor {
       uint32_t head_size_,
       uint32_t num_queries_,
       uint32_t num_keys_,
+      uint32_t bias_strideB_,
+      uint32_t bias_strideN_,
+      uint32_t bias_strideF_,
       float alpha_,
       float dropout_prob_,
       uint32_t alibi_padded_block_size_,
@@ -841,6 +873,9 @@ struct FmhaForwardKernelFunctor {
         head_size(head_size_),
         num_queries(num_queries_),
         num_keys(num_keys_),
+        bias_strideB(bias_strideB_),
+        bias_strideN(bias_strideN_),
+        bias_strideF(bias_strideF_),
         alpha(alpha_),
         dropout_prob(dropout_prob_),
         alibi_padded_block_size(alibi_padded_block_size_),
@@ -862,6 +897,9 @@ struct FmhaForwardKernelFunctor {
   uint32_t head_size;
   uint32_t num_queries;
   uint32_t num_keys;
+  uint32_t bias_strideB;
+  uint32_t bias_strideN;
+  uint32_t bias_strideF;
   float alpha;
   float dropout_prob;
   uint32_t alibi_padded_block_size;
@@ -897,13 +935,16 @@ void xetla_fmha_forward_kernel(
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,
+    uint32_t bias_strideB,
+    uint32_t bias_strideN,
+    uint32_t bias_strideF,
     uint32_t alibi_padded_block_size,
     uint32_t attn_mask_padded_block_size,
     uint64_t seed_t,
     uint64_t offset_t) {
 #ifdef SDP_DBG
   printf(
-      "B, N, F, T, H: %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d, IsDropout: %d, alibi @ 0x%llx, uAT %d, uMT %d, dropout_prob %f, kSeqLast %d\n",
+      "B, N, F, T, H: %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d, IsDropout: %d, alibi @ 0x%llx, uAT %d, uMT %d, strideB %d, strideN %d, strideF %d, dropout_prob %f, kSeqLast %d\n",
       num_batches,
       num_heads,
       num_queries,
@@ -917,6 +958,9 @@ void xetla_fmha_forward_kernel(
       (unsigned long long)alibi,
       alibi_padded_block_size,
       attn_mask_padded_block_size,
+      bias_strideB,
+      bias_strideN,
+      bias_strideF,
       dropout_prob,
       kSeqLast);
 #endif
@@ -949,6 +993,9 @@ void xetla_fmha_forward_kernel(
         head_size,
         num_queries,
         num_keys,
+        bias_strideB,
+        bias_strideN,
+        bias_strideF,
         alpha,
         dropout_prob,
         alibi_padded_block_size,
@@ -988,6 +1035,9 @@ void xetla_fmha_forward_kernel(
       head_size,                   \
       num_queries,                 \
       num_keys,                    \
+      bias_strideB,                \
+      bias_strideN,                \
+      bias_strideF,                \
       alibi_padded_block_size,     \
       attn_mask_padded_block_size, \
       seed_t,                      \
@@ -1019,6 +1069,9 @@ void fmha_forward_kernel_policy(
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,
+    uint32_t bias_strideB,
+    uint32_t bias_strideN,
+    uint32_t bias_strideF,
     uint32_t alibi_padded_block_size,
     uint32_t attn_mask_padded_block_size,
     uint64_t seed_t,
@@ -1077,6 +1130,9 @@ void dispatch_fmha_forward(
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,
+    uint32_t bias_strideB,
+    uint32_t bias_strideN,
+    uint32_t bias_strideF,
     uint32_t alibi_padded_block_size,
     uint32_t attn_mask_padded_block_size,
     uint64_t seed_t,
@@ -1098,6 +1154,9 @@ void dispatch_fmha_forward(
       head_size,
       num_queries,
       num_keys,
+      bias_strideB,
+      bias_strideN,
+      bias_strideF,
       alibi_padded_block_size,
       attn_mask_padded_block_size,
       seed_t,
@@ -1123,6 +1182,9 @@ void dispatch_fmha_forward(
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,
+    uint32_t bias_strideB,
+    uint32_t bias_strideN,
+    uint32_t bias_strideF,
     uint32_t alibi_padded_block_size,
     uint32_t attn_mask_padded_block_size,
     uint64_t seed_t,
@@ -1147,6 +1209,9 @@ void dispatch_fmha_forward(
         head_size,
         num_queries,
         num_keys,
+        bias_strideB,
+        bias_strideN,
+        bias_strideF,
         alibi_padded_block_size,
         attn_mask_padded_block_size,
         seed_t,
@@ -1170,6 +1235,9 @@ void dispatch_fmha_forward(
         head_size,
         num_queries,
         num_keys,
+        bias_strideB,
+        bias_strideN,
+        bias_strideF,
         alibi_padded_block_size,
         attn_mask_padded_block_size,
         seed_t,
@@ -1196,6 +1264,9 @@ void fmha_forward_kernel_impl(
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,
+    uint32_t bias_strideB,
+    uint32_t bias_strideN,
+    uint32_t bias_strideF,
     uint32_t alibi_padded_block_size,
     uint32_t attn_mask_padded_block_size,
     bool is_causal,
@@ -1224,6 +1295,9 @@ void fmha_forward_kernel_impl(
       head_size,
       num_queries,
       num_keys,
+      bias_strideB,
+      bias_strideN,
+      bias_strideF,
       alibi_padded_block_size,
       attn_mask_padded_block_size,
       seed_t,
@@ -1256,6 +1330,9 @@ void fmha_forward_kernel(
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,
+    uint32_t bias_strideB,
+    uint32_t bias_strideN,
+    uint32_t bias_strideF,
     uint32_t alibi_padded_block_size,
     uint32_t attn_mask_padded_block_size,
     bool is_causal,
@@ -1282,6 +1359,9 @@ void fmha_forward_kernel(
         head_size,
         num_queries,
         num_keys,
+        bias_strideB,
+        bias_strideN,
+        bias_strideF,
         alibi_padded_block_size,
         attn_mask_padded_block_size,
         is_causal,
@@ -1308,6 +1388,9 @@ void fmha_forward_kernel(
         head_size,
         num_queries,
         num_keys,
+        bias_strideB,
+        bias_strideN,
+        bias_strideF,
         alibi_padded_block_size,
         attn_mask_padded_block_size,
         is_causal,

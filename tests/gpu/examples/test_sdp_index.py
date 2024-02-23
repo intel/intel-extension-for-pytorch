@@ -72,9 +72,9 @@ class TestTorchMethod(TestCase):
         v = torch.randn([t, b, n, h], dtype=dtype, device=torch.device("xpu"))
         k_cache = torch.randn([t_max, b, n, h], dtype=dtype, device=torch.device("xpu"))
         v_cache = torch.randn([t_max, b, n, h], dtype=dtype, device=torch.device("xpu"))
-        attn_mask = torch.randn([b, 1, f, t], dtype=dtype, device=torch.device("xpu"))
+        attn_mask = torch.randn([b, n, f, t], dtype=dtype, device=torch.device("xpu"))
         attn_mask_padded = torch.zeros(
-            [b, 1, f, t_max], dtype=dtype, device=torch.device("xpu")
+            [b, n, f, t_max], dtype=dtype, device=torch.device("xpu")
         )
         index = torch.randint(
             0, beam, [t_out, bs, beam], dtype=torch.int, device=torch.device("xpu")

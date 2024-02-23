@@ -33,30 +33,11 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
       "SDP kernel requires XMX, but the current platform has no XMX ...");
   // check attn_mask padded
   uint32_t attn_mask_padded_block_size = 0;
-  Tensor attn_mask_c;
   if (attn_mask.has_value()) {
-    attn_mask_c = attn_mask.value();
-    // xetla kernel only supports [bs, 1, q_len, k_len]
-    // but we got expanded tensor [bs, head_dim, q_len, k_len]
-    TORCH_CHECK(
-        attn_mask.value().stride(1) == 0 || attn_mask.value().size(1) == 1,
-        "XPU efficient attention requires attn mask second dim is 1");
-
-    // broadcast attn_mask at the 3nd dim
-    if (attn_mask.value().stride(-2) == 0) {
-      attn_mask_c = attn_mask.value()
-                        .as_strided(
-                            {attn_mask.value().size(0),
-                             1,
-                             attn_mask.value().size(2),
-                             attn_mask.value().size(3)},
-                            attn_mask.value().strides())
-                        .contiguous();
-      if (attn_mask_c.stride(-2) % 16 != 0) {
-        attn_mask_c = sdp::pad_bias<16>(attn_mask_c);
-      }
-    }
-    attn_mask_padded_block_size = attn_mask_c.stride(-2);
+    std::vector<int64_t> sz = attn_mask->sizes().vec();
+    int64_t lastDim = sz[sz.size() - 1];
+    int64_t alignTo = 16;
+    attn_mask_padded_block_size = alignTo * ((lastDim + alignTo - 1) / alignTo);
   }
 
   // make q, k, v strided
@@ -82,7 +63,7 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
       key.data_ptr(),
       value.data_ptr(),
       /* alibi */ nullptr,
-      attn_mask.has_value() ? attn_mask_c.data_ptr() : (void*)nullptr,
+      attn_mask.has_value() ? attn_mask->data_ptr() : (void*)nullptr,
       /* dropout_mask */ nullptr,
       output.data_ptr(),
       softmax_lse.data_ptr(),
@@ -94,6 +75,9 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
       query.size(3),
       query.size(2),
       key.size(2),
+      attn_mask.has_value() ? attn_mask->stride(0) : -1,
+      attn_mask.has_value() ? attn_mask->stride(1) : -1,
+      attn_mask.has_value() ? attn_mask->stride(2) : -1,
       /* ablibi padded size */ 0,
       attn_mask_padded_block_size,
       is_causal,
@@ -535,8 +519,16 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
 
   // check attn_mask padded
   uint32_t attn_mask_padded_block_size = 0;
+  Tensor attn_mask_bc;
   if (attn_mask.has_value()) {
     attn_mask_padded_block_size = attn_mask.value().size(-1);
+    // align PyTorch mask preprocess (broadcast without memory change)
+    // TODO: align padding strategy
+    attn_mask_bc = attn_mask.value().expand(
+        {query.size(0),
+         query.size(1),
+         query.size(2),
+         attn_mask_padded_block_size});
     TORCH_CHECK(
         (attn_mask_padded_block_size * key.itemsize() % 8 == 0),
         "XeTLA SDP Attention mask needs 8bytes aligned on leading dimension ...");
@@ -555,7 +547,7 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
       key.data_ptr(),
       value.data_ptr(),
       alibi.has_value() ? alibi.value().data_ptr() : (void*)nullptr,
-      attn_mask.has_value() ? attn_mask.value().data_ptr() : (void*)nullptr,
+      attn_mask.has_value() ? attn_mask_bc.data_ptr() : (void*)nullptr,
       nullptr,
       output.data_ptr(),
       softmax_lse.data_ptr(),
@@ -567,6 +559,9 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
       query.size(3),
       query.size(2),
       key.size(2),
+      attn_mask.has_value() ? attn_mask_bc.stride(0) : -1,
+      attn_mask.has_value() ? attn_mask_bc.stride(1) : -1,
+      attn_mask.has_value() ? attn_mask_bc.stride(2) : -1,
       alibi_padded_block_size,
       attn_mask_padded_block_size,
       is_causal,
@@ -636,6 +631,11 @@ Tensor xetla_fsdp_index_forward(
   uint32_t attn_mask_padding = 0;
   if (attn_mask.has_value()) {
     attn_mask_padding = attn_mask.value().size(-1);
+    TORCH_CHECK(
+        attn_mask->size(0) == query.size(0) &&
+            attn_mask->size(1) == query.size(1) &&
+            attn_mask->size(2) == query.size(2),
+        "unsupported attention mask size");
     TORCH_CHECK(
         (attn_mask_padding * key.itemsize() % 8 == 0),
         "XeTLA SDP Attention mask needs 8bytes aligned on leading dimension ...");

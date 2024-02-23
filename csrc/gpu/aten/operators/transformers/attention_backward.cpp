@@ -41,44 +41,24 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _efficient_attention_backward_impl(
   grad_k = at::empty_like(key);
   grad_v = at::empty_like(value);
 
-  // TODO: broadcast support
   uint32_t attn_mask_padded_block_size = 0;
-  Tensor attn_mask_c;
   if (bias.has_value()) {
-    TORCH_CHECK(
-        bias.value().stride(1) == 0 || bias.value().size(1) == 1,
-        "XPU efficient attention requires attn mask second dim is 1");
+    std::vector<int64_t> sz = bias->sizes().vec();
+    int64_t lastDim = sz[sz.size() - 1];
+    int64_t alignTo = 16;
+    attn_mask_padded_block_size = alignTo * ((lastDim + alignTo - 1) / alignTo);
+  }
 
-    attn_mask_c = bias.value();
-    attn_mask_padded_block_size = bias->stride(-2);
-    // broadcast attn_mask at the 3nd dim
-    if (bias.value().stride(-2) == 0) {
-      // attn_mask_c shape [batchsize, 1, q_len, k_len]
-      attn_mask_c = bias.value()
-                        .as_strided(
-                            {bias.value().size(0),
-                             1,
-                             bias.value().size(2),
-                             bias.value().size(3)},
-                            bias.value().strides())
-                        .contiguous();
-      // padding will be removed after contiguous
-      if (attn_mask_c.stride(-2) % 16 != 0) {
-        attn_mask_c = sdp::pad_bias<16>(attn_mask_c);
-      }
-      attn_mask_padded_block_size = attn_mask_c.size(-1);
-    }
-
-    if (bias_requires_grad) {
-      // force alignment for the last dim
-      std::vector<int64_t> sz = bias->sizes().vec();
-      int64_t lastDim = sz[sz.size() - 1];
-      sz[sz.size() - 1] = attn_mask_padded_block_size;
-      // grad_bias shape [batchsize, head_size, q_len, k_len]
-      //          layout [batchsize, head_size, q_len, padding_size]
-      grad_bias = at::empty(sz, bias->options())
-                      .slice(/*dim=*/-1, /*start=*/0, /*end=*/lastDim);
-    }
+  if (bias_requires_grad) {
+    // force alignment for the last dim
+    std::vector<int64_t> sz = bias->sizes().vec();
+    int64_t lastDim = sz[sz.size() - 1];
+    int64_t alignTo = 16;
+    sz[sz.size() - 1] = alignTo * ((lastDim + alignTo - 1) / alignTo);
+    // grad_bias shape [batchsize, head_size, q_len, k_len]
+    //          layout [batchsize, head_size, q_len, padding_size]
+    grad_bias = at::empty(sz, bias->options())
+                    .slice(/*dim=*/-1, /*start=*/0, /*end=*/lastDim);
   }
 
   Tensor workspace = at::empty_like(logsumexp);
@@ -96,7 +76,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _efficient_attention_backward_impl(
       query.data_ptr(),
       key.data_ptr(),
       value.data_ptr(),
-      bias.has_value() ? attn_mask_c.data_ptr() : (void*)nullptr,
+      bias.has_value() ? bias.value().data_ptr() : (void*)nullptr,
       out.data_ptr(),
       logsumexp.data_ptr(),
       workspace.data_ptr(),
@@ -111,6 +91,9 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _efficient_attention_backward_impl(
       query.size(3),
       query.size(2),
       key.size(2),
+      bias.has_value() ? bias->stride(0) : -1,
+      bias.has_value() ? bias->stride(1) : -1,
+      bias.has_value() ? bias->stride(2) : -1,
       attn_mask_padded_block_size,
       is_causal,
       use_dropout,

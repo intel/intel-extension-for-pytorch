@@ -95,26 +95,19 @@ inline bool xetla_supported(sdp::sdp_params params) {
   if (dpcppGetDeviceHasXMX()) {
     DeviceId curDevID;
     AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-    bool bias_support = true;
-    if (params.attn_mask.has_value()) {
-      if (params.attn_mask.value().sym_size(0) != params.query.sym_size(0))
-        bias_support = false;
-      if (params.attn_mask.value().sym_size(1) != 1)
-        bias_support = false;
-    }
     if ((params.query.dtype() == at::kHalf ||
          params.query.dtype() == at::kBFloat16) &&
-        Settings::I().has_2d_block_array(curDevID) && bias_support == true) {
+        Settings::I().has_2d_block_array(curDevID)) {
       if ((params.query.sym_size(-1) * params.query.itemsize() % 128 == 0) &&
           (params.value.sym_size(-1) * params.value.itemsize() % 128 == 0))
         is_supported = true;
     }
-    if (!is_supported) {
-      IPEX_DEBUG_LOG(
-          "OPS", "", "Your IPEX version currently doesn't support xetla.");
-    }
   }
 #endif
+  if (!is_supported) {
+    IPEX_DEBUG_LOG(
+        "OPS", "", "Your IPEX version currently doesn't support xetla.");
+  }
   return is_supported;
 }
 
