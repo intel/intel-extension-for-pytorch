@@ -400,6 +400,42 @@ class OptimizeTransformersTester(TestCase):
                 # the optimized model is ipex_m.trace_graph
                 ipex_m.trace_graph(*example_inputs)
 
+    def test_generate_functions(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/gptj", return_dict=False
+        )
+        m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
+        ref_m = copy.deepcopy(m)
+        ipex_m = ipex.llm.optimize(
+            m, dtype=torch.bfloat16, deployment_mode=True, inplace=True
+        )
+        input_ids = torch.ones(8).unsqueeze(0).to(torch.long)
+        # beam_search, beam=4
+        generate_kwargs_beam = dict(
+            do_sample=False,
+            temperature=0.9,
+            num_beams=4,
+            max_new_tokens=2,
+            min_new_tokens=2,
+        )
+        # greedy_search
+        generate_kwargs_greedy = dict(
+            do_sample=False, temperature=0.9, max_new_tokens=2, min_new_tokens=2
+        )
+        # sample, use a temperature of 0.01 to constrain text generation diversity in UT.
+        generate_kwargs_sample = dict(
+            do_sample=True, temperature=0.01, max_new_tokens=2, min_new_tokens=2
+        )
+        for generate_kwargs in [
+            generate_kwargs_beam,
+            generate_kwargs_greedy,
+            generate_kwargs_sample,
+        ]:
+            with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast():
+                ipex_res = ipex_m.generate(input_ids, **generate_kwargs)
+                ref_res = ref_m.generate(input_ids, **generate_kwargs)
+                self.assertEqual(ipex_res, ref_res)
+
 
 if __name__ == "__main__":
     test = unittest.main()

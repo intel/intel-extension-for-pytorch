@@ -91,6 +91,7 @@ def model_convert_reference(_model):
     from .generation import (
         _beam_search,
         _greedy_search,
+        _sample,
     )
 
     # model wise optimization for MHA module
@@ -157,6 +158,7 @@ def model_convert_reference(_model):
     convert_function(_model, "_reorder_cache", _reorder_cache)
     convert_function(_model, "beam_search", _beam_search)
     convert_function(_model, "greedy_search", _greedy_search)
+    convert_function(_model, "sample", _sample)
     convert_function(
         _model,
         "_extract_past_from_model_output",
