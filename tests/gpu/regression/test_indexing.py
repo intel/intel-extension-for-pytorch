@@ -67,3 +67,12 @@ class TestTorchMethod(TestCase):
         result_cpu = vertices_cpu[vert_filter_cpu_rand]
         result_xpu = vertices_xpu[vert_filter_xpu_rand]
         self.assertEqual(result_cpu, result_xpu.cpu())
+
+    def test_index_int32(self):
+        probs = torch.ones((256, 50272), dtype=torch.float32)
+        indice = torch.range(0, 255, dtype=torch.int32)
+
+        out_cpu = probs[indice]
+        out_xpu = probs.xpu()[indice.xpu()]
+
+        self.assertEqual(out_xpu.to("cpu"), out_cpu)
