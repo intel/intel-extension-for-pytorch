@@ -16,6 +16,7 @@ from transformers import (
     AutoProcessor,
 )
 
+from transformers import TextStreamer
 
 import sys
 
@@ -71,6 +72,9 @@ parser.add_argument(
 )
 parser.add_argument(
     "--prompt", default=None, type=str, help="input prompt for self-defined if needed"
+)
+parser.add_argument(
+    "--streaming", action="store_true", help="enable streaming mode for generation output (greedy search only)"
 )
 parser.add_argument(
     "--image-url", default="http://images.cocodataset.org/val2017/000000039769.jpg", type=str, help="image url for image-to-text task"
@@ -142,7 +146,11 @@ model = model.to(memory_format=torch.channels_last)
 
 num_beams = 1 if args.greedy else 4
 # generate args
-generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams, max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens)
+if args.streaming:
+    streamer = TextStreamer(tokenizer)
+else:
+    streamer = None
+generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams, max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens, streamer=streamer)
 
 if re.search("gptbigcode", model.config.architectures[0], re.IGNORECASE):
     model_type = "gptbigcode"

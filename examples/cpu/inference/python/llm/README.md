@@ -142,6 +142,7 @@ python run.py --help # for more detailed usages
 | batch size |  default: 1, use "--batch-size" to choose any other size |
 | token latency |  enable "--token-latency" to print out the first or next token latency |
 | generation iterations |  use "--num-iter" and "--num-warmup" to control the repeated iterations of generation, default: 100-iter/10-warmup |
+| streaming mode output | greedy search only (work with "--greedy"), use "--streaming" to enable the streaming generation output |
 
 *Note:* You may need to log in your HuggingFace account to access the model files. Please refer to [HuggingFace login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
 

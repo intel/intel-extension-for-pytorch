@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import DataLoader
 import transformers
 from transformers import AutoConfig
-
+from transformers import TextStreamer
 import intel_extension_for_pytorch as ipex
 from ast import literal_eval
 import sys
@@ -44,6 +44,9 @@ parser.add_argument(
 )
 parser.add_argument(
     "--max-new-tokens", default=32, type=int, help="output max new tokens"
+)
+parser.add_argument(
+    "--streaming", action="store_true", help="enable streaming mode for generation output (greedy search only)"
 )
 parser.add_argument("--dataset", nargs="?", default="")
 parser.add_argument("--split", nargs="?", default="validation", const="validation")
@@ -198,15 +201,6 @@ else:
     amp_dtype = torch.float32
 
 
-num_beams = 1 if args.greedy else 4
-generate_kwargs = dict(
-    do_sample=False,
-    temperature=0.9,
-    num_beams=num_beams,
-    max_new_tokens=args.max_new_tokens,
-    min_new_tokens=args.max_new_tokens,
-)
-
 if args.config_file is None:
     config = AutoConfig.from_pretrained(
         args.model_id, torchscript=True, trust_remote_code=True
@@ -268,6 +262,19 @@ user_model = model.get_user_model(config, args.benchmark)
 
 tokenizer = model.get_tokenizer()
 print("Data type of the model:", user_model.dtype)
+num_beams = 1 if args.greedy else 4
+if args.streaming:
+    streamer = TextStreamer(tokenizer)
+else:
+    streamer = None
+generate_kwargs = dict(
+    do_sample=False,
+    temperature=0.9,
+    num_beams=num_beams,
+    max_new_tokens=args.max_new_tokens,
+    min_new_tokens=args.max_new_tokens,
+    streamer=streamer
+)
 
 if model.to_channels_last:
     user_model = user_model.to(memory_format=torch.channels_last)

@@ -22,6 +22,7 @@ from transformers import (
     LlamaTokenizer,
     T5ForConditionalGeneration,
     AutoProcessor,
+    TextStreamer
 )
 
 import sys
@@ -91,6 +92,9 @@ parser.add_argument("--deployment-mode", action="store_true")
 parser.add_argument("--ki", action="store_true")
 parser.add_argument(
     "--max-new-tokens", default=32, type=int, help="output max new tokens"
+)
+parser.add_argument(
+    "--streaming", action="store_true", help="enable streaming mode for generation output (greedy search only)"
 )
 parser.add_argument("--input-tokens", default="32", type=str)
 parser.add_argument("--prompt", default=None, type=str)
@@ -443,7 +447,11 @@ if use_ipex:
 # Generate
 print_rank0(f"*** Starting to generate {num_tokens} tokens with bs={args.batch_size}")
 
-generate_kwargs = dict(do_sample=False, num_beams=num_beams, max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens)
+if args.streaming:
+    streamer = TextStreamer(tokenizer)
+else:
+    streamer = None
+generate_kwargs = dict(do_sample=False, num_beams=num_beams, max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens, streamer=streamer)
 
 if args.token_latency:
     if not hasattr(model.config, "token_latency"):

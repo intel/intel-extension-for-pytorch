@@ -171,6 +171,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
     )
     parser.add_argument("--benchmark", action="store_true")
     parser.add_argument("--input-tokens", default="32", type=str)
+    parser.add_argument(
+        "--streaming", action="store_true", help="enable streaming mode for generation output (greedy search only)"
+    )
     parser.add_argument("--prompt", default=None, type=str)
     parser.add_argument("--num-iter", default=100, type=int, help="num iter")
     parser.add_argument("--num-warmup", default=10, type=int, help="num warmup")
@@ -219,6 +222,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
             if args.greedy:
                 infer_cmd.extend(["--greedy"])
+            if args.streaming:
+                infer_cmd.extend(["--streaming"])
             if args.ipex:
                 infer_cmd.extend(["--ipex"])
             if not args.disable_deployment_mode:
@@ -319,6 +324,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--quant-with-amp"])
             if args.greedy:
                 infer_cmd.extend(["--greedy"])
+            if args.streaming:
+                infer_cmd.extend(["--streaming"])
             if args.profile:
                 infer_cmd.extend(["--profile"])
             if args.benchmark:
@@ -441,6 +448,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--quant-with-amp"])
             if args.greedy:
                 infer_cmd.extend(["--greedy"])
+            if args.streaming:
+                infer_cmd.extend(["--streaming"])
             if args.profile:
                 infer_cmd.extend(["--profile"])
             if args.benchmark:
@@ -524,6 +533,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
         infer_cmd.extend(["--local_rank", str(args.local_rank)])
         if args.greedy:
             infer_cmd.extend(["--greedy"])
+        if args.streaming:
+            infer_cmd.extend(["--streaming"])
         if args.ipex:
             infer_cmd.extend(["--ipex"])
         if not args.disable_deployment_mode:
