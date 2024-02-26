@@ -52,6 +52,7 @@ All rights reserved.
 
 import math
 import unittest
+import os
 import time
 import sys
 import warnings
@@ -1701,6 +1702,11 @@ class Tester(TestCase):
         dtype=None,
         explicit_cast=False,
     ):
+        # This is for CI testing. By adding export SKIP_BF16_IN_TEST_JIT=1, we could skip BF16 test on CLX if it takes too long.
+        skip_bf16 = os.environ.get("SKIP_BF16_IN_TEST_JIT", False)
+        if skip_bf16:
+            return
+
         def _graph_check_helper(kind_in_graph, kind_not_in_graph):
             # ipex will not prepack for BF16 if onednn not support it
             # use this helper function to update kind_in_graph, kind_not_in_graph if onednn do not support bf16
