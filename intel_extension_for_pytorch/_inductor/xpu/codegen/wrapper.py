@@ -179,7 +179,7 @@ class XPUTritonWrapperCodeGen(WrapperCodeGen):
 
             self.generate_return(output_refs)
 
-        self.append_precomputed_sizes_to_prefix()
+        # self.append_precomputed_sizes_to_prefix()
         result.splice(self.prefix)
 
         with result.indent():
