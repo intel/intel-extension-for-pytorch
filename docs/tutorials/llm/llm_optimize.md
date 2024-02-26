@@ -1,15 +1,15 @@
 Transformers Optimization Frontend API
 ======================================
 
-The new API function, `ipex.optimize_transformers`, is designed to optimize transformer-based models within frontend Python modules, with a particular focus on Large Language Models (LLMs). It provides optimizations for both model-wise and content-generation-wise. You just need to invoke the `ipex.optimize_transformers` function instead of the `ipex.optimize` function to apply all optimizations transparently.
+The new API function, `ipex.llm.optimize`, is designed to optimize transformer-based models within frontend Python modules, with a particular focus on Large Language Models (LLMs). It provides optimizations for both model-wise and content-generation-wise. You just need to invoke the `ipex.llm.optimize` function instead of the `ipex.optimize` function to apply all optimizations transparently.
 
-This API currently works for inference workloads. Support for training is undergoing. Currently, this API supports certain models. Supported model list can be found at [Overview](../llm.html#supported-models).
+This API currently works for inference workloads. Support for training is undergoing. Currently, this API supports certain models. Supported model list can be found at [Overview](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/llm.html#ipexllm-optimized-model-list).
 
-API documentation is available at [API Docs page](../api_doc.html#ipex.optimize_transformers).
+API documentation is available at [API Docs page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/api_doc.html#ipex.llm.optimize).
 
 ## Pseudocode of Common Usage Scenarios
 
-The following sections show pseudocode snippets to invoke Intel® Extension for PyTorch\* APIs to work with LLM models. Complete examples can be found at [the Example directory](https://github.com/intel/intel-extension-for-pytorch/tree/v2.1.0%2Bcpu/examples/cpu/inference/python/llm).
+The following sections show pseudocode snippets to invoke Intel® Extension for PyTorch\* APIs to work with LLM models. Complete examples can be found at [the Example directory](https://github.com/intel/intel-extension-for-pytorch/tree/v2.2.0%2Bcpu/examples/cpu/inference/python/llm).
 
 ### FP32/BF16
 
@@ -21,7 +21,7 @@ import transformers
 model= transformers.AutoModelForCausalLM(model_name_or_path).eval()
 
 dtype = torch.float # or torch.bfloat16
-model = ipex.optimize_transformers(model, dtype=dtype)
+model = ipex.llm.optimize(model, dtype=dtype)
 
 # inference with model.generate()
 ...
@@ -46,7 +46,7 @@ qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
 # prepare your calibration dataset samples
 calib_dataset = DataLoader(your_calibration_dataset)
 example_inputs = ... # get one sample input from calib_samples
-calibration_model = ipex.optimize_transformers(
+calibration_model = ipex.llm.optimize(
   model.eval(),
   quantization_config=qconfig,
 )
@@ -59,7 +59,7 @@ with torch.no_grad():
 prepared_model.save_qconf_summary(qconf_summary=qconfig_summary_file_path)
 
 # stage 2: quantization
-model = ipex.optimize_transformers(
+model = ipex.llm.ptimize(
   model.eval(),
   quantization_config=qconfig,
   qconfig_summary_file=qconfig_summary_file_path,
@@ -88,7 +88,7 @@ qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
 )
 
 checkpoint = None # optionally load int4 or int8 checkpoint
-model = ipex.optimize_transformers(model, quantization_config=qconfig, low_precision_checkpoint=checkpoint)
+model = ipex.llm.optimize(model, quantization_config=qconfig, low_precision_checkpoint=checkpoint)
 
 # inference with model.generate()
 ...
@@ -98,7 +98,7 @@ model = ipex.optimize_transformers(model, quantization_config=qconfig, low_preci
 
 Distributed inference can be performed with `DeepSpeed`. Based on original Intel® Extension for PyTorch\* scripts, the following code changes are required.
 
-Check [LLM example](https://github.com/intel/intel-extension-for-pytorch/tree/v2.1.0%2Bcpu/examples/cpu/inference/python/llm/distributed) for complete codes.
+Check [LLM distributed inference examples](https://github.com/intel/intel-extension-for-pytorch/tree/v2.2.0%2Bcpu/examples/cpu/inference/python/llm/distributed) for complete codes.
 
 ``` python
 import torch
@@ -122,7 +122,7 @@ model = deepspeed.init_inference(
 )
 model = model.module
 
-model = ipex.optimize_transformers(model, dtype=dtype)
+model = ipex.llm.optimize(model, dtype=dtype)
 
 # inference
 ...

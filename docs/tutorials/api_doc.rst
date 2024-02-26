@@ -20,7 +20,7 @@ General
 
 
 
-Fast Bert (Experimental)
+Fast Bert (Prototype)
 ************************
 
 .. currentmodule:: intel_extension_for_pytorch
@@ -40,7 +40,7 @@ Quantization
 .. autofunction:: prepare
 .. autofunction:: convert
 
-Experimental API, introduction is avaiable at `feature page <./features/int8_recipe_tuning_api.md>`_.
+Prototype API, introduction is avaiable at `feature page <./features/int8_recipe_tuning_api.md>`_.
 
 .. autofunction:: autotune
 

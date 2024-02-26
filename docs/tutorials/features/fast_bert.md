@@ -1,4 +1,4 @@
-Fast BERT (Experimental)
+Fast BERT (Prototype)
 ========================
 
 ### Feature Description

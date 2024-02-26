@@ -46,7 +46,7 @@ model.train()
 model, optimizer = ipex.optimize(model, optimizer=optimizer)
 # For BFloat16
 model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
-# Invoke the code below to enable experimental feature torch.compile
+# Invoke the code below to enable beta feature torch.compile
 model = torch.compile(model, backend="ipex")
 ...
 optimizer.zero_grad()
@@ -176,7 +176,7 @@ We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://py
 [//]: # (marker_inf_bert_ts_fp32)
 [//]: # (marker_inf_bert_ts_fp32)
 
-##### TorchDynamo Mode (Experimental, _NEW feature from 2.0.0_)
+##### TorchDynamo Mode (Beta, _NEW feature from 2.0.0_)
 
 ###### Resnet50
 
@@ -233,7 +233,7 @@ We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://py
 [//]: # (marker_inf_bert_ts_bf16)
 [//]: # (marker_inf_bert_ts_bf16)
 
-##### TorchDynamo Mode (Experimental, _NEW feature from 2.0.0_)
+##### TorchDynamo Mode (Beta, _NEW feature from 2.0.0_)
 
 ###### Resnet50
 
@@ -249,7 +249,7 @@ We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://py
 [//]: # (marker_inf_bert_dynamo_bf16)
 [//]: # (marker_inf_bert_dynamo_bf16)
 
-#### Fast Bert (*Experimental*)
+#### Fast Bert (*Prototype*)
 
 **Note:** You need to install `transformers` Python package to run the following example.
 

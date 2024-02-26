@@ -26,7 +26,7 @@ introduced in the Intel® Extension for PyTorch*.
 
 For more detailed information, check `LLM Optimizations Overview <./llm.html>`_.
 
-torch.compile (Experimental, *NEW feature from 2.0.0*)
+torch.compile (Beta, *NEW feature from 2.0.0*)
 ------------------------------------------------------
 
 PyTorch* 2.0 introduces a new feature ``torch.compile`` to speed up PyTorch* code. It makes PyTorch code run faster by JIT-compiling of PyTorch code into optimized kernels. Intel® Extension for PyTorch\* enables a backend, ``ipex``, in the ``torch.compile`` to optimize generation of the graph model.
@@ -152,7 +152,7 @@ Intel® Extension for PyTorch* Runtime Extension provides PyTorch frontend APIs 
 - Spawn asynchronous tasks from both Python and C++ frontend.
 - Program core bindings for OpenMP threads from both Python and C++ frontend.
 
-.. note:: Intel® Extension for PyTorch* Runtime extension is still in the experimental stage. The API is subject to change. More detailed descriptions are available in the `API Documentation <api_doc.html>`_.
+.. note:: Intel® Extension for PyTorch* Runtime extension is still in the prototype stage. The API is subject to change. More detailed descriptions are available in the `API Documentation <api_doc.html>`_.
 
 For more detailed information, check `Runtime Extension <features/runtime_extension.md>`_.
 
@@ -169,7 +169,7 @@ Intel® Extension for PyTorch* provides built-in quantization recipes to deliver
 
 Users are always recommended to try quantization with the built-in quantization recipe first with Intel® Extension for PyTorch* quantization APIs. For even higher accuracy demandings, users can try with separate `recipe tuning APIs <features/int8_recipe_tuning_api.md>`_. The APIs are powered by Intel® Neural Compressor to take advantage of its tuning feature.
 
-Check more detailed information for `INT8 Quantization <features/int8_overview.md>`_ and `INT8 recipe tuning API guide (Experimental, *NEW feature in 1.13.0*) <features/int8_recipe_tuning_api.md>`_.
+Check more detailed information for `INT8 Quantization <features/int8_overview.md>`_ and `INT8 recipe tuning API guide (Prototype, *NEW feature in 1.13.0*) <features/int8_recipe_tuning_api.md>`_.
 
 .. toctree::
    :hidden:
@@ -178,7 +178,7 @@ Check more detailed information for `INT8 Quantization <features/int8_overview.m
    features/int8_overview
    features/int8_recipe_tuning_api
 
-Codeless Optimization (Experimental, *NEW feature from 1.13.0*)
+Codeless Optimization (Prototype, *NEW feature from 1.13.0*)
 ---------------------------------------------------------------
 
 This feature enables users to get performance benefits from Intel® Extension for PyTorch* without changing Python scripts. It hopefully eases the usage and has been verified working well with broad scope of models, though in few cases there could be small overhead comparing to applying optimizations with Intel® Extension for PyTorch* APIs.
@@ -191,7 +191,7 @@ For more detailed information, check `Codeless Optimization <features/codeless_o
 
    features/codeless_optimization.md
 
-Graph Capture (Experimental, *NEW feature from 1.13.0*)
+Graph Capture (Prototype, *NEW feature from 1.13.0*)
 -------------------------------------------------------
 
 Since graph mode is key for deployment performance, this feature automatically captures graphs based on set of technologies that PyTorch supports, such as TorchScript and TorchDynamo. Users won't need to learn and try different PyTorch APIs to capture graphs, instead, they can turn on a new boolean flag `--graph_mode` (default off) in `ipex.optimize()` to get the best of graph optimization.
@@ -204,10 +204,10 @@ For more detailed information, check `Graph Capture <features/graph_capture.md>`
 
    features/graph_capture
 
-HyperTune (Experimental, *NEW feature from 1.13.0*)
+HyperTune (Prototype, *NEW feature from 1.13.0*)
 ---------------------------------------------------
 
-HyperTune is an experimental feature to perform hyperparameter/execution configuration searching. The searching is used in various areas such as optimization of hyperparameters of deep learning models. The searching is extremely useful in real situations when the number of hyperparameters, including configuration of script execution, and their search spaces are huge that manually tuning these hyperparameters/configuration is impractical and time consuming. Hypertune automates this process of execution configuration searching for the `launcher <performance_tuning/launch_script.md>`_ and Intel® Extension for PyTorch*.
+HyperTune is an prototype feature to perform hyperparameter/execution configuration searching. The searching is used in various areas such as optimization of hyperparameters of deep learning models. The searching is extremely useful in real situations when the number of hyperparameters, including configuration of script execution, and their search spaces are huge that manually tuning these hyperparameters/configuration is impractical and time consuming. Hypertune automates this process of execution configuration searching for the `launcher <performance_tuning/launch_script.md>`_ and Intel® Extension for PyTorch*.
 
 For more detailed information, check `HyperTune <features/hypertune.md>`_.
 
@@ -217,7 +217,7 @@ For more detailed information, check `HyperTune <features/hypertune.md>`_.
 
    features/hypertune
 
-Fast BERT Optimization (Experimental, *NEW feature from 2.0.0*)
+Fast BERT Optimization (Prototype, *NEW feature from 2.0.0*)
 ---------------------------------------------------------------
 
 Intel proposed a technique to speed up BERT workloads. Implementation is integrated into Intel® Extension for PyTorch\*. An API `ipex.fast_bert()` is provided for a simple usage.

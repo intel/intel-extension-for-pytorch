@@ -1,69 +1,39 @@
-Large Language Models (LLM) Optimizations Overview
+Large Language Models (LLM) Optimization Overview
 ==================================================
 
 In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Most of LLMs are GPT-like architectures that consist of multiple Decoder layers. 
 The MultiHeadAttention and FeedForward layer are two key components of every Decoder layer. The generation task is memory bound because iterative decode and kv_cache require special management to reduce memory overheads. Intel® Extension for PyTorch* provides a lot of specific optimizations for these LLMs. 
 On the operator level, the extension provides highly efficient GEMM kernel to speed up Linear layer and customized operators to reduce the memory footprint. To better trade-off the performance and accuracy, different low-precision solutions e.g., smoothQuant and weight-only-quantization are also enabled. Besides, tensor parallel can also adopt to get lower latency for LLMs.
 
-These LLM-specific optimizations can be automatically applied with a single frontend API function in Python interface, `ipex.optimize_transformers()`. Check `optimize_transformers <./llm/llm_optimize_transformers.md>`_ for more details.
+These LLM-specific optimizations can be automatically applied with a single frontend API function in Python interface, `ipex.llm.optimize()`. Check `llm.optimize <./llm/llm_optimize.md>`_ for more details.
 
 .. toctree::
    :hidden:
    :maxdepth: 1
 
-   llm/llm_optimize_transformers
+   llm/llm_optimize
 
-Optimized Models
-----------------
+`ipex.llm` Optimized Model List
+-------------------------------
 
-.. list-table::
-   :widths: auto
-   :header-rows: 1
+Verified for single instance mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   * - Model Family
-     - LLAMA
-     - GPT-J
-     - GPT-NEOX
-     - FALCON*
-     - OPT
-   * - Verified < MODEL ID > (Huggingface hub)
-     - "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf"
-     - "EleutherAI/gpt-j-6b"
-     - "EleutherAI/gpt-neox-20b"
-     - "tiiuae/falcon-40b"
-     - "facebook/opt-30b", "facebook/opt-1.3b"
-   * - FP32/BF16
-     - ✅
-     - ✅
-     - ✅
-     - ✅
-     - ✅
-   * - Weight only quantzation INT8
-     - ✅
-     - ✅
-     - ✅
-     - ✅
-     - ✅
-   * - Weight only quantization INT4
-     - ✅
-     - ✅
-     - ✅
-     - ✅
-     - ✅
-   * - Static quantization INT8
-     - ✅
-     - ✅
-     - ❎\*\*
-     - ❎\*\*
-     - ❎\*\*
+.. raw:: html
+    :file: ../_static/htmls/tbl_single.html
 
-\* For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for FP32/BF16 but needed for quantizations.
+Verified for distributed inference mode via DeepSpeed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-\*\* For GPT-NEOX/FALCON/OPT models, the accuracy recipes of static quantization INT8 are not ready, thus, they will be skipped in our coverage.
+.. raw:: html
+    :file: ../_static/htmls/tbl_deepspeed.html
 
-*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well optimized with all approaches like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). For other LLM families, we are working in progress to cover those optimizations, which will expand the model list above.
+*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). We are working in progress to better support the models in the tables with various data types. In addition, more models will be optimized in the future.
 
-Check `LLM best known practice <../../examples/cpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts..
+*Note*: The accuracy drop issue in distributed inference mode for "tiiuae/falcon-40b" has been fixed by DeepSpeed in a recent patch release `v0.13.1 <https://github.com/microsoft/DeepSpeed/tree/v0.13.1>`_.
+
+Please check `LLM best known practice <../../examples/cpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts.
+
 
 Demos
 -----
@@ -137,7 +107,7 @@ The section below provides a brief introduction to LLM optimization methodologie
 Linear Operator Optimization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Linear operator is the most obvious hotspot in LLMs inference. There are three backend to speedup linear GEMM kernels in Intel® Extension for PyTorch*. They are oneDNN, Tensor Processing Primitives (TPP), which are used by `Fast BERT feature <./features/fast_bert.md>`_, and customized linear kernels for weight only quantization. All of them use specific block format to utilize hardware resources in a highly efficient way. 
+Linear operator is the most obvious hotspot in LLMs inference. Intel® Extension for PyTorch* provides dedicated optimization to speedup linear GEMM kernels, through oneDNN, customized linear kernels for weight only quantization, and some other specific tuning. All of them use specific block format to utilize hardware resources in a highly efficient way. 
 
 Low Precision Data Types
 ~~~~~~~~~~~~~~~~~~~~~~~~

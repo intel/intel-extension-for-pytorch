@@ -8,12 +8,11 @@ To start using the Intel® Extension for PyTorch\* in your code, you need to mak
 2. Invoke the `optimize()` function to apply optimizations.
 3. Convert the imperative model to a graph model.
     - For TorchScript, invoke `torch.jit.trace()` and `torch.jit.freeze()`
-    - For TorchDynamo, invoke `torch.compile(model, backend="ipex")`(*Experimental feature*)
+    - For TorchDynamo, invoke `torch.compile(model, backend="ipex")`(*Beta feature*)
 
 **Important:** It is highly recommended to `import intel_extension_for_pytorch` right after `import torch`, prior to importing other packages.
 
-The example below demostrates how to use the Intel® Extension for PyTorch\*:
-
+The example below demostrates how to use the Intel® Extension for PyTorch\* with TorchScript:
 
 ```python
 import torch
@@ -33,6 +32,19 @@ with torch.no_grad(), torch.cpu.amp.autocast():
   model = torch.jit.freeze(model)
   model(data)
 ##########################################
+```
+
+The example below demostrates how to use the Intel® Extension for PyTorch\* with TorchDynamo:
+
+```python
+import torch
+############## import ipex ###############
+import intel_extension_for_pytorch as ipex
+##########################################
+
+model = Model()
+model.eval()
+data = ...
 
 ############## TorchDynamo ###############
 model = ipex.optimize(model, weights_prepack=False)
@@ -129,7 +141,7 @@ print("---- Prompt size:", input_size)
 prompt = [prompt] * args.batch_size
 
 # inference
-with torch.no_grad(), torch.inference_mode(), torch.cpu.amp.autocast(enabled=amp_enabled):
+with torch.inference_mode(), torch.cpu.amp.autocast(enabled=amp_enabled):
     input_ids = tokenizer(prompt, return_tensors="pt").input_ids
     gen_ids = model.generate(
         input_ids,

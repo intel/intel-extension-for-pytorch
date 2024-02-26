@@ -7,6 +7,7 @@ This document explains the dynamic kernel dispatch mechanism for Intel® Extensi
 IPEX dyndisp is forked from **PyTorch:** `ATen/native/DispatchStub.h` and `ATen/native/DispatchStub.cpp`. IPEX adds additional CPU ISA level support, such as `AVX512_VNNI`, `AVX512_BF16` and `AMX`.
 
 PyTorch & IPEX CPU ISA support statement:
+
  | | DEFAULT | AVX2 | AVX2_VNNI | AVX512 | AVX512_VNNI | AVX512_BF16 | AMX | AVX512_FP16
  | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
  | PyTorch | ✔ | ✔ | ✘ | ✔ | ✘ | ✘ | ✘ | ✘ |
@@ -14,6 +15,7 @@ PyTorch & IPEX CPU ISA support statement:
  | IPEX-1.12 | ✘ | ✔ | ✘ | ✔ | ✔ | ✔ | ✔ | ✘ |
  | IPEX-1.13 | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✘ |
  | IPEX-2.1 | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
+ | IPEX-2.2 | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 
 \* Current IPEX DEFAULT level implemented as same as AVX2 level.
 
