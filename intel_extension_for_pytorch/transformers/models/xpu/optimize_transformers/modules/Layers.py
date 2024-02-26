@@ -75,7 +75,10 @@ class IpexFastLinear(IPEXOpForInference):
         self.bias = self.module.bias
 
     def forward(self, input_tensor):
-        shape = [input_tensor.shape[0], input_tensor.shape[1], self.weight.shape[1]]
+        if input_tensor.dim() == 3:
+            shape = [input_tensor.shape[0], input_tensor.shape[1], self.weight.shape[1]]
+        else:
+            shape = [input_tensor.shape[0], self.weight.shape[1]]
         if self.bias is not None:
             return torch.addmm(
                 self.bias, input_tensor.flatten(0, -2), self.weight

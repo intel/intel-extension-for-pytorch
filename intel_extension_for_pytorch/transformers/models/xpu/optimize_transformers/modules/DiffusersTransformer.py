@@ -133,13 +133,6 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
 
         self.only_cross_attention = self.ipex_config.only_cross_attention
 
-        self.use_ada_layer_norm_zero = (
-            self.ipex_config.num_embeds_ada_norm is not None
-        ) and self.ipex_config.norm_type == "ada_norm_zero"
-        self.use_ada_layer_norm = (
-            self.ipex_config.num_embeds_ada_norm is not None
-        ) and self.ipex_config.norm_type == "ada_norm"
-        self.use_ada_layer_norm_single = self.ipex_config.norm_type == "ada_norm_single"
         self.use_layer_norm = self.ipex_config.norm_type == "layer_norm"
 
         if (
@@ -168,18 +161,11 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
 
         # Define 3 blocks. Each block has its own normalization layer.
         # 1. Self-Attn
-        if self.use_ada_layer_norm:
-            self.norm1 = AdaLayerNorm(self.dim, self.ipex_config.num_embeds_ada_norm)
-        elif self.use_ada_layer_norm_zero:
-            self.norm1 = AdaLayerNormZero(
-                self.dim, self.ipex_config.num_embeds_ada_norm
-            )
-        else:
-            self.norm1 = nn.LayerNorm(
-                self.dim,
-                elementwise_affine=self.ipex_config.norm_elementwise_affine,
-                eps=self.ipex_config.norm_eps,
-            )
+        self.norm1 = nn.LayerNorm(
+            self.dim,
+            elementwise_affine=self.ipex_config.norm_elementwise_affine,
+            eps=self.ipex_config.norm_eps,
+        )
 
         self.attn1 = DiffusersAttention(
             query_dim=self.dim,
@@ -201,14 +187,10 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
             # We currently only use AdaLayerNormZero for self attention where there will only be one attention block.
             # I.e. the number of returned modulation chunks from AdaLayerZero would not make sense if returned during
             # the second cross attention block.
-            self.norm2 = (
-                AdaLayerNorm(self.dim, self.ipex_config.num_embeds_ada_norm)
-                if self.use_ada_layer_norm
-                else nn.LayerNorm(
-                    self.dim,
-                    elementwise_affine=self.ipex_config.norm_elementwise_affine,
-                    eps=self.ipex_config.norm_eps,
-                )
+            self.norm2 = nn.LayerNorm(
+                self.dim,
+                elementwise_affine=self.ipex_config.norm_elementwise_affine,
+                eps=self.ipex_config.norm_eps,
             )
             self.attn2 = DiffusersAttention(
                 query_dim=self.dim,
@@ -226,12 +208,11 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
             self.attn2 = None
 
         # 3. Feed-forward
-        if not self.use_ada_layer_norm_single:
-            self.norm3 = nn.LayerNorm(
-                self.dim,
-                elementwise_affine=self.ipex_config.norm_elementwise_affine,
-                eps=self.ipex_config.norm_eps,
-            )
+        self.norm3 = nn.LayerNorm(
+            self.dim,
+            elementwise_affine=self.ipex_config.norm_elementwise_affine,
+            eps=self.ipex_config.norm_eps,
+        )
 
         self.ff = FeedForward(
             self.dim,
@@ -253,10 +234,6 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
             )
 
         # 5. Scale-shift for PixArt-Alpha.
-        if self.use_ada_layer_norm_single:
-            self.scale_shift_table = nn.Parameter(
-                torch.randn(6, self.dim) / self.dim**0.5
-            )
 
         # let chunk size default to None
         self._chunk_size = None
@@ -348,13 +325,7 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
         # 0. Self-Attention
         batch_size = hidden_states.shape[0]
 
-        if self.use_ada_layer_norm:
-            norm_hidden_states = self.norm1(hidden_states, timestep)
-        elif self.use_ada_layer_norm_zero:
-            norm_hidden_states, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.norm1(
-                hidden_states, timestep, class_labels, hidden_dtype=hidden_states.dtype
-            )
-        elif self.use_layer_norm:
+        if self.use_layer_norm:
             # norm_hidden_states = self.norm1(hidden_states)
             norm_hidden_states = torch.ops.torch_ipex.fast_layer_norm(
                 hidden_states,
@@ -363,13 +334,6 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
                 self.norm1.bias,
                 self.norm1.eps,
             )
-        elif self.use_ada_layer_norm_single:
-            shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = (
-                self.scale_shift_table[None] + timestep.reshape(batch_size, 6, -1)
-            ).chunk(6, dim=1)
-            norm_hidden_states = self.norm1(hidden_states)
-            norm_hidden_states = norm_hidden_states * (1 + scale_msa) + shift_msa
-            norm_hidden_states = norm_hidden_states.squeeze(1)
         else:
             raise ValueError("Incorrect norm used")
 
@@ -397,10 +361,6 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
             attention_mask=attention_mask,
             **cross_attention_kwargs,
         )
-        if self.use_ada_layer_norm_zero:
-            attn_output = gate_msa.unsqueeze(1) * attn_output
-        elif self.use_ada_layer_norm_single:
-            attn_output = gate_msa * attn_output
 
         hidden_states = attn_output + hidden_states
         if hidden_states.ndim == 4:
@@ -412,11 +372,7 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
 
         # 3. Cross-Attention
         if self.attn2 is not None:
-            if self.use_ada_layer_norm:
-                norm_hidden_states = self.norm2(hidden_states, timestep)
-            elif self.use_ada_layer_norm_zero:
-                norm_hidden_states = self.norm2(hidden_states)
-            elif self.use_layer_norm:
+            if self.use_layer_norm:
                 norm_hidden_states = torch.ops.torch_ipex.fast_layer_norm(
                     hidden_states,
                     self.norm2.normalized_shape,
@@ -424,12 +380,10 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
                     self.norm2.bias,
                     self.norm2.eps,
                 )
-            elif self.use_ada_layer_norm_single:
-                norm_hidden_states = hidden_states
             else:
                 raise ValueError("Incorrect norm")
 
-            if self.pos_embed is not None and self.use_ada_layer_norm_single is False:
+            if self.pos_embed is not None:
                 norm_hidden_states = self.pos_embed(norm_hidden_states)
 
             attn_output = self.attn2(
@@ -441,17 +395,7 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
             hidden_states = attn_output + hidden_states
 
         # 4. Feed-forward
-        if not self.use_ada_layer_norm_single:
-            norm_hidden_states = self.norm3(hidden_states)
-
-        if self.use_ada_layer_norm_zero:
-            norm_hidden_states = (
-                norm_hidden_states * (1 + scale_mlp[:, None]) + shift_mlp[:, None]
-            )
-
-        if self.use_ada_layer_norm_single:
-            norm_hidden_states = self.norm2(hidden_states)
-            norm_hidden_states = norm_hidden_states * (1 + scale_mlp) + shift_mlp
+        norm_hidden_states = self.norm3(hidden_states)
 
         if self._chunk_size is not None:
             # "feed_forward_chunk_size" can be used to save memory
@@ -474,11 +418,6 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
             )
         else:
             ff_output = self.ff(norm_hidden_states, scale=lora_scale)
-
-        if self.use_ada_layer_norm_zero:
-            ff_output = gate_mlp.unsqueeze(1) * ff_output
-        elif self.use_ada_layer_norm_single:
-            ff_output = gate_mlp * ff_output
 
         hidden_states = ff_output + hidden_states
         if hidden_states.ndim == 4:
