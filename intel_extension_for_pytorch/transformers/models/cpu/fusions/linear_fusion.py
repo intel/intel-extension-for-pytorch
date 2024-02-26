@@ -232,13 +232,18 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
         self.linear_list = []
         self.woq = woq
         self.tpp = tpp
+        use_g_idx = False
         if woq:
             for i in range(self.num_concat):
                 attr_name = f"linear_{i}"
                 assert hasattr(module, attr_name)
                 self.linear_list.append(getattr(module, attr_name))
-        if woq and all(
-            isinstance(linear, IpexWoqLinear) for linear in self.linear_list
+                gidx = self.linear_list[-1]._op_context.get_g_idx()
+                use_g_idx = use_g_idx or (gidx is not None)
+        if (
+            woq
+            and (not use_g_idx)
+            and all(isinstance(linear, IpexWoqLinear) for linear in self.linear_list)
         ):
             # Quantization is done before lowering to CPU.
             # We assume weights are all in shape [N, K].

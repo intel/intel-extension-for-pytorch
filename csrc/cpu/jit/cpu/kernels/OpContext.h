@@ -366,6 +366,7 @@ using SerializationTypeWoqLinearPrePack = std::tuple<
     at::Tensor, // scales
     at::Tensor, // zero points
     c10::optional<at::Tensor>, // bias
+    c10::optional<at::Tensor>, // g_idx
     c10::optional<int64_t>, // batch size
     bool, // is_int4
     int64_t, // group size
@@ -384,12 +385,14 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
     auto orig_bias_ = this->get_context().at_bias_;
     auto scales = this->get_scales();
     auto zero_points = this->get_zero_points();
+    auto g_idx = this->get_g_idx();
     return std::make_tuple(
         orig_weight_,
         weight_shape_,
         scales,
         zero_points,
         orig_bias_,
+        g_idx,
         batch_size_,
         this->get_context().is_int4_,
         this->get_context().group_size_,
@@ -421,6 +424,8 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
   virtual at::Tensor get_at_packed_weight() = 0;
 
   virtual c10::optional<at::Tensor> get_at_bias() = 0;
+
+  virtual c10::optional<at::Tensor> get_g_idx() = 0;
 
   virtual at::Tensor get_scales() = 0;
 
@@ -478,6 +483,8 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
 
   virtual c10::optional<at::Tensor> get_at_bias() override;
 
+  virtual c10::optional<at::Tensor> get_g_idx() override;
+
   virtual at::Tensor get_scales() override;
 
   virtual at::Tensor get_zero_points() override;
@@ -494,6 +501,7 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
       at::Tensor&& scales_fp32,
       at::Tensor&& zp_fp32,
       c10::optional<at::Tensor>&& bias,
+      c10::optional<at::Tensor>&& g_idx,
       c10::optional<int64_t> batch_size,
       bool is_int4,
       int64_t group_size,

@@ -3,6 +3,7 @@
 #include <ideep.hpp>
 #include "aten/Linear.h"
 #include "aten/WeightPack.h"
+#include "csrc/cpu/tpp/woq/tla.h"
 #include "ideep/IDeepConversions.h"
 
 namespace torch_ipex {
@@ -16,6 +17,7 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
     at::Tensor&& scales,
     at::Tensor&& zero_points,
     c10::optional<at::Tensor>&& bias,
+    c10::optional<at::Tensor>&& g_idx,
     c10::optional<int64_t> batch_size,
     bool is_int4,
     int64_t group_size,
@@ -32,6 +34,7 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
       std::move(scales),
       std::move(zero_points),
       std::move(bias),
+      std::move(g_idx),
       batch_size,
       is_int4,
       group_size,
@@ -45,6 +48,7 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     at::Tensor&& scales,
     at::Tensor&& zero_points,
     c10::optional<at::Tensor>&& bias,
+    c10::optional<at::Tensor>&& g_idx,
     c10::optional<int64_t> batch_size,
     int64_t group_size, // group_size along input channel
     int64_t lowp_mode,
@@ -160,6 +164,7 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
       std::move(scales_fp32),
       std::move(zp_fp32),
       std::move(bias),
+      std::move(g_idx),
       batch_size,
       /*is_int4*/ true,
       group_size,
@@ -183,17 +188,29 @@ ContextLinearWoq create(
     at::Tensor& scales,
     at::Tensor& zero_points,
     const c10::optional<at::Tensor>& bias,
+    const c10::optional<at::Tensor>& g_idx,
     const c10::optional<int64_t> batch_size,
     bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
     int64_t num_concats,
     int64_t act_quant_mode) {
-  auto packed_weight = woq_linear_pack_weight(
-      weight, weight_shape, is_int4, group_size, lowp_mode);
+  at::Tensor packed_weight;
+  int64_t N = weight_shape[0];
+  int64_t K = weight_shape[1];
+  // GPTQ with act-order
+  // Shuffle weight along ic to make channels contiguous in group
+  if (is_int4 && group_size > 0 && g_idx.has_value()) {
+    // Shuffle weight along ic to make channels contiguous in group
+    auto shuffled_weight = woq_shuffle_tensor_by_group_idx</* is_int4 */ true>(
+        weight, weight_shape, g_idx.value(), group_size);
+    packed_weight = woq_linear_pack_weight(
+        shuffled_weight, weight_shape, is_int4, group_size, lowp_mode);
+  } else {
+    packed_weight = woq_linear_pack_weight(
+        weight, weight_shape, is_int4, group_size, lowp_mode);
+  }
   auto packed_shape = packed_weight.sizes();
-  int64_t N = weight.size(0);
-  int64_t K = weight.size(1);
   // If OC is not a multiple of BLOCK_N, it may be padded.
   bool oc_is_padded = (packed_shape.size() == 4 && is_int4 &&
                        packed_shape[0] * packed_shape[3] * 2 != N) ||
@@ -221,6 +238,7 @@ ContextLinearWoq create(
           std::move(scales_padded),
           std::move(zero_points_padded),
           c10::make_optional(bias_padded),
+          g_idx.has_value() ? c10::make_optional(*g_idx) : c10::nullopt,
           is_int4,
           group_size,
           lowp_mode,
@@ -233,6 +251,7 @@ ContextLinearWoq create(
           std::move(scales_padded),
           std::move(zero_points_padded),
           c10::nullopt,
+          g_idx.has_value() ? c10::make_optional(*g_idx) : c10::nullopt,
           is_int4,
           group_size,
           lowp_mode,
@@ -246,11 +265,28 @@ ContextLinearWoq create(
       std::move(scales),
       std::move(zero_points_float),
       bias.has_value() ? c10::make_optional(*bias) : c10::nullopt,
+      g_idx.has_value() ? c10::make_optional(*g_idx) : c10::nullopt,
       is_int4,
       group_size,
       lowp_mode,
       num_concats,
       act_quant_mode);
+}
+
+static at::Tensor _shuffle_input_channels_if_needed(
+    ContextLinearWoq& context,
+    const at::Tensor& input) {
+  // GPTQ with act-order
+  // Shuffle input channels to align with weight
+  if (context.is_int4_ && context.group_size_ > 0 &&
+      context.g_idx_.has_value()) {
+    auto& g_idx = context.g_idx_.value();
+    auto K = input.size(-1);
+    std::vector<int64_t> input_shape = {input.numel() / K, K};
+    return woq_shuffle_tensor_by_group_idx(
+        input, input_shape, g_idx, context.group_size_);
+  }
+  return input;
 }
 
 at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
@@ -264,6 +300,8 @@ at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
       w_k,
       " respectively.");
   auto input_ = input.contiguous();
+  // handle GPTQ with act-order
+  input_ = _shuffle_input_channels_if_needed(context, input_);
   auto res = woq_linear_kernel(
       input_,
       context.at_weight_,
@@ -299,6 +337,8 @@ at::Tensor run_eltwise(
       w_k,
       " respectively.");
   auto input_ = input.contiguous();
+  // handle GPTQ with act-order
+  input_ = _shuffle_input_channels_if_needed(context, input_);
   return woq_linear_eltwise_kernel(
       input_,
       context.at_weight_,
@@ -330,6 +370,8 @@ at::Tensor run_add(
       w_k,
       " respectively.");
   auto input_ = input.contiguous();
+  // handle GPTQ with act-order
+  input_ = _shuffle_input_channels_if_needed(context, input_);
   return woq_linear_add_kernel(
       input_,
       context.at_weight_,
@@ -359,6 +401,8 @@ at::Tensor run_add_add(
       w_k,
       " respectively.");
   auto input_ = input.contiguous();
+  // handle GPTQ with act-order
+  input_ = _shuffle_input_channels_if_needed(context, input_);
   return woq_linear_add_add_kernel(
       input_,
       context.at_weight_,
@@ -380,10 +424,19 @@ at::Tensor pack(ContextLinearWoq& context, const at::Tensor& tensor) {
 at::Tensor unpack(ContextLinearWoq& context, const at::Tensor& tensor) {
   // By using different kernels, the packed weight dim can be 2 or 4
   // Return result directly if dim == 2
-  // For dim == 4, make a new quantized tensor and return.
+  // For dim == 4, weight may be padded.
   // For padded weight (int4), make a slice of it.
   auto unpacked_weight =
       woq_linear_unpack_weight(tensor, context.is_int4_, context.lowp_mode_);
+  // With g_idx, weight's input channels are shuffled along ic so that
+  // those in the same group are contiguous.
+  // Here we need to shuffle them to the original order.
+  if (context.group_size_ > 0 && context.g_idx_.has_value()) {
+    auto group_size = context.group_size_;
+    auto& g_idx = context.g_idx_.value();
+    unpacked_weight = woq_shuffle_weight_back_by_group_idx(
+        unpacked_weight, context.weight_shape_, g_idx, group_size);
+  }
   if (tensor.dim() > 2) {
     auto scales = context.scales_list_[0];
     auto zero_points = context.zero_points_list_[0];
@@ -402,6 +455,185 @@ at::Tensor unpack(ContextLinearWoq& context, const at::Tensor& tensor) {
     }
   }
   return unpacked_weight;
+}
+
+template <typename T, typename Tg, bool is_int4 = false>
+at::Tensor woq_shuffle_tensor_by_group_idx_impl(
+    const at::Tensor& tensor,
+    const std::vector<int64_t>& tensor_shape,
+    const at::Tensor& g_idx,
+    int64_t group_size) {
+  // g_idx shape = [ic]
+  // i-th element indicates which group tensor[:][i] belongs to.
+  // Shuffle tensor along ic to make channels contiguous in group.
+  int64_t N = tensor_shape[0];
+  int64_t K = tensor_shape[1];
+  auto shuffled_tensor = at::zeros_like(tensor, tensor.dtype());
+  auto shuffled_tensor_data = reinterpret_cast<T*>(shuffled_tensor.data_ptr());
+  auto tensor_data = reinterpret_cast<T*>(tensor.data_ptr());
+  auto num_groups = (K + group_size - 1) / group_size;
+  auto g_idx_data = reinterpret_cast<Tg*>(g_idx.data_ptr());
+#pragma omp parallel for
+  for (int64_t i = 0; i < N; ++i) {
+    std::vector<int64_t> counts_per_group(num_groups, 0);
+    auto stride = is_int4 ? K / 2 : K;
+    auto tensor_row_data = tensor_data + i * stride;
+    auto shuffled_row_data = shuffled_tensor_data + i * stride;
+    for (int64_t j = 0; j < K; ++j) {
+      auto g = g_idx_data[j];
+      auto new_idx = g * group_size + counts_per_group[g];
+      constexpr bool T_is_int8 =
+          std::is_same<T, int8_t>() || std::is_same<T, uint8_t>();
+      if constexpr (is_int4 && T_is_int8) {
+        uint8_t mask = j % 2 ? 0xF0 : 0x0F;
+        size_t rshift = j % 2 ? 4 : 0;
+        T data = (tensor_row_data[j / 2] & mask) >> rshift;
+        shuffled_row_data[new_idx / 2] =
+            shuffled_row_data[new_idx / 2] | (new_idx % 2 ? (data << 4) : data);
+      } else {
+        T data = tensor_row_data[j];
+        shuffled_row_data[new_idx] = data;
+      }
+      ++counts_per_group[g];
+    }
+  }
+  return shuffled_tensor;
+}
+
+/**
+ * Shuffle activation or weight tensor along input channel according to group
+ * index (g_idx), so that input channels in the same group are contiguous to
+ * each other.
+ *
+ * @param is_int4 The tensor stores int4 data or not
+ * @param tensor The tensor to be shuffled. It must be 2d.
+ * @param tensor_shape The original shape of the tensor. It is different from
+ * tensor.shape() when dtype is int4 since 2 int4 data are packed as one int8.
+ * @param g_idx The g_idx tensor contains group index for each input channel.
+ * Its shape is [number of input channels]. Indices should be in [0, number of
+ * groups).
+ * @param group_size The group size of input channels. Used to determine number
+ * of groups.
+ * @return The shuffled tensor.
+ */
+template <bool is_int4>
+at::Tensor woq_shuffle_tensor_by_group_idx(
+    const at::Tensor& tensor,
+    const std::vector<int64_t>& tensor_shape,
+    const at::Tensor& g_idx,
+    int64_t group_size) {
+  at::Tensor out;
+  product_dispatcher<
+      std::tuple<at::ScalarType, at::ScalarType>,
+      std::tuple<
+          enumerate_dispatcher<
+              at::ScalarType,
+              at::kDouble,
+              at::kFloat,
+              at::kBFloat16,
+              at::kHalf,
+              at::kChar,
+              at::kByte>,
+          enumerate_dispatcher<at::ScalarType, at::kInt, at::kLong>>>::
+      call(
+          std::make_tuple(tensor.scalar_type(), g_idx.scalar_type()),
+          [&](auto dtype_tuple) {
+            auto tensor_dtype = std::get<0>(dtype_tuple);
+            auto g_idx_dtype = std::get<1>(dtype_tuple);
+            using t_cpp_type =
+                typename c10::impl::ScalarTypeToCPPType<tensor_dtype>::type;
+            using g_cpp_type =
+                typename c10::impl::ScalarTypeToCPPType<g_idx_dtype>::type;
+            out = woq_shuffle_tensor_by_group_idx_impl<
+                t_cpp_type,
+                g_cpp_type,
+                is_int4>(tensor, tensor_shape, g_idx, group_size);
+          },
+          [](auto dtype_tuple) {
+            TORCH_CHECK(
+                false, "Unsupported tensor data type for WOQ with g_idx");
+          });
+  return out;
+}
+
+template <typename T, typename Tg>
+at::Tensor woq_shuffle_weight_back_by_group_idx_impl(
+    const at::Tensor& qweight,
+    const std::vector<int64_t>& weight_shape,
+    const at::Tensor& g_idx,
+    int64_t group_size) {
+  auto N = weight_shape[0];
+  auto K = weight_shape[1];
+  auto shuffled_tensor = at::zeros_like(qweight, qweight.dtype());
+  auto shuffled_tensor_data = reinterpret_cast<T*>(shuffled_tensor.data_ptr());
+  auto tensor_data = reinterpret_cast<T*>(qweight.data_ptr());
+  auto num_groups = (K + group_size - 1) / group_size;
+  auto g_idx_data = reinterpret_cast<Tg*>(g_idx.data_ptr());
+#pragma omp parallel for
+  for (int64_t i = 0; i < N; ++i) {
+    std::vector<int64_t> counts_per_group(num_groups, 0);
+    auto stride = K / 2;
+    auto tensor_row_data = tensor_data + i * stride;
+    auto shuffled_row_data = shuffled_tensor_data + i * stride;
+    for (int64_t j = 0; j < K; ++j) {
+      auto g = g_idx_data[j];
+      T* data_pos =
+          tensor_row_data + g * group_size / 2 + counts_per_group[g] / 2;
+      uint8_t mask = counts_per_group[g] % 2 ? 0xF0 : 0x0F;
+      size_t rshift = counts_per_group[g] % 2 ? 4 : 0;
+      T data = (*data_pos & mask) >> rshift;
+      shuffled_row_data[j / 2] =
+          shuffled_row_data[j / 2] | (j % 2 ? (data << 4) : data);
+      ++counts_per_group[g];
+    }
+  }
+  return shuffled_tensor;
+}
+
+/**
+ * Shuffle weight tensor along input channel according to group index (g_idx)
+ * to its original order. It is used for unpacking weight. Data type is assumed
+ * INT4.
+ *
+ * @param qweight The weight to be shuffled. It must be 2d.
+ * @param weight_shape The original shape of the weight. It is different from
+ * tensor.shape() since 2 int4 data are packed as one int8.
+ * @param g_idx The g_idx tensor contains group index for each input channel.
+ * Its shape is [number of input channels]. Indices should be in [0, number of
+ * groups).
+ * @param group_size The group size of input channels. Used to determine number
+ * of groups.
+ * @return The shuffled tensor.
+ */
+at::Tensor woq_shuffle_weight_back_by_group_idx(
+    const at::Tensor& qweight,
+    const std::vector<int64_t>& weight_shape,
+    const at::Tensor& g_idx,
+    int64_t group_size) {
+  at::Tensor out;
+  product_dispatcher<
+      std::tuple<at::ScalarType, at::ScalarType>,
+      std::tuple<
+          enumerate_dispatcher<at::ScalarType, at::kChar, at::kByte>,
+          enumerate_dispatcher<at::ScalarType, at::kInt, at::kLong>>>::
+      call(
+          std::make_tuple(qweight.scalar_type(), g_idx.scalar_type()),
+          [&](auto dtype_tuple) {
+            auto tensor_dtype = std::get<0>(dtype_tuple);
+            auto g_idx_dtype = std::get<1>(dtype_tuple);
+            using t_cpp_type =
+                typename c10::impl::ScalarTypeToCPPType<tensor_dtype>::type;
+            using g_cpp_type =
+                typename c10::impl::ScalarTypeToCPPType<g_idx_dtype>::type;
+            out = woq_shuffle_weight_back_by_group_idx_impl<
+                t_cpp_type,
+                g_cpp_type>(qweight, weight_shape, g_idx, group_size);
+          },
+          [](auto dtype_tuple) {
+            TORCH_CHECK(
+                false, "Unsupported tensor data type for WOQ with g_idx");
+          });
+  return out;
 }
 
 } // namespace woq_linear

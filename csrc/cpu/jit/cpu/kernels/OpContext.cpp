@@ -367,6 +367,7 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
     at::Tensor&& scales_fp32,
     at::Tensor&& zp_fp32,
     c10::optional<at::Tensor>&& bias,
+    c10::optional<at::Tensor>&& g_idx,
     c10::optional<int64_t> batch_size,
     bool is_int4,
     int64_t group_size,
@@ -379,6 +380,7 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
       scales_fp32,
       zp_fp32,
       bias,
+      g_idx,
       batch_size,
       is_int4,
       group_size,
@@ -432,6 +434,10 @@ at::Tensor IpexWoqLinearOpContext::get_at_packed_weight() {
 
 c10::optional<at::Tensor> IpexWoqLinearOpContext::get_at_bias() {
   return op_context_.at_bias_;
+}
+
+c10::optional<at::Tensor> IpexWoqLinearOpContext::get_g_idx() {
+  return op_context_.g_idx_;
 }
 
 at::Tensor IpexWoqLinearOpContext::get_scales() {

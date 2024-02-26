@@ -9,6 +9,7 @@ struct ContextLinearWoq final {
   at::Tensor at_weight_;
   std::vector<int64_t> weight_shape_;
   c10::optional<at::Tensor> at_bias_;
+  c10::optional<at::Tensor> g_idx_;
   // The list contains three dtype versions of bias, scale and zp
   // i.e., fp32, fp16, bf16
   // If bias is not present, it contains empty tensors
@@ -29,6 +30,7 @@ struct ContextLinearWoq final {
       at::Tensor&& scales_float,
       at::Tensor&& zero_point_float,
       c10::optional<at::Tensor>&& bias,
+      c10::optional<at::Tensor>&& g_idx,
       bool is_int4 = false,
       int64_t group_size = -1,
       int64_t lowp_mode = 0,
@@ -37,6 +39,7 @@ struct ContextLinearWoq final {
       : at_weight_(std::move(at_weight)),
         weight_shape_(std::move(weight_shape)),
         at_bias_(std::move(bias)),
+        g_idx_(std::move(g_idx)),
         is_int4_(is_int4),
         group_size_(group_size),
         lowp_mode_(lowp_mode),

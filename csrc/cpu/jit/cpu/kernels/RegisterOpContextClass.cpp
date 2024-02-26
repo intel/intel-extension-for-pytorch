@@ -136,12 +136,13 @@ TORCH_LIBRARY(ipex_prepack, m) {
                 std::move(std::get<2>(state)), // scales
                 std::move(std::get<3>(state)), // zero points
                 std::move(std::get<4>(state)), // bias
-                std::move(std::get<5>(state)), // batch size
-                std::move(std::get<6>(state)), // is_int4
-                std::move(std::get<7>(state)), // group size
-                std::move(std::get<8>(state)), // lowp_mode
-                std::move(std::get<9>(state)), // num_concats
-                std::move(std::get<10>(state))); // act_quant_mode
+                std::move(std::get<5>(state)), // g_idx
+                std::move(std::get<6>(state)), // batch size
+                std::move(std::get<7>(state)), // is_int4
+                std::move(std::get<8>(state)), // group size
+                std::move(std::get<9>(state)), // lowp_mode
+                std::move(std::get<10>(state)), // num_concats
+                std::move(std::get<11>(state))); // act_quant_mode
           })
       .def(
           "get_weight",
@@ -154,6 +155,7 @@ TORCH_LIBRARY(ipex_prepack, m) {
       .def(
           "get_weight_shape",
           &torch_ipex::cpu::WoqLinearOpContext::get_weight_shape)
+      .def("get_g_idx", &torch_ipex::cpu::WoqLinearOpContext::get_g_idx)
       .def("pack", &torch_ipex::cpu::WoqLinearOpContext::pack)
       .def("to_public", &torch_ipex::cpu::WoqLinearOpContext::to_public)
       .def(
@@ -180,10 +182,10 @@ TORCH_LIBRARY(ipex_prepack, m) {
       "-> __torch__.torch.classes.ipex_prepack.ConvTransposeOpContext");
 #ifdef USE_LIBXSMM
   m.def(
-      "weight_only_qlinear_prepack(Tensor W, int[] W_shape, Tensor scales, Tensor zero_points, Tensor? B, int? batch_size, bool is_int4, int group_size, int lowp_mode, int num_concats, int act_quant_mode) "
+      "weight_only_qlinear_prepack(Tensor W, int[] W_shape, Tensor scales, Tensor zero_points, Tensor? B, Tensor? g_idx, int? batch_size, bool is_int4, int group_size, int lowp_mode, int num_concats, int act_quant_mode) "
       "-> __torch__.torch.classes.ipex_prepack.WoqLinearOpContext");
   m.def(
-      "weight_only_qlinear_prepack_int4(Tensor W, Tensor scales, Tensor zero_points, Tensor? B, int? batch_size, int group_size, int lowp_mode, int num_concats, int act_quant_mode) "
+      "weight_only_qlinear_prepack_int4(Tensor W, Tensor scales, Tensor zero_points, Tensor? B, Tensor? g_idx, int? batch_size, int group_size, int lowp_mode, int num_concats, int act_quant_mode) "
       "-> __torch__.torch.classes.ipex_prepack.WoqLinearOpContext");
 #endif
 }

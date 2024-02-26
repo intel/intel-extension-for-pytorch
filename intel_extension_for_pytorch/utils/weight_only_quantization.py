@@ -23,6 +23,7 @@ LEGACY_LOWP_CHECKPOINT_CONFIG = {
     "scale_key": "scale",
     "zero_point_key": "packed_zp",
     "bias_key": "bias",
+    "g_idx_key": "g_idx",
 }
 
 
@@ -51,7 +52,8 @@ def _get_keys_from_config(checkpoint_config):
     scales_key = checkpoint_config.get("scale_key", "scales")
     zeros_key = checkpoint_config.get("zero_point_key", "qzeros")
     bias_key = checkpoint_config.get("bias_key", "bias")
-    return weight_key, scales_key, zeros_key, bias_key
+    g_idx_key = checkpoint_config.get("g_idx_key", "bias")
+    return weight_key, scales_key, zeros_key, bias_key, g_idx_key
 
 
 def _convert_optimum_format_to_desired(qweight, scales, qzeros):
@@ -112,18 +114,20 @@ def _convert_optimum_format_to_desired(qweight, scales, qzeros):
 
 
 def _get_linear_parameters(attr_name, state_dict, checkpoint_config):
-    weight_key, scales_key, zeros_key, bias_key = _get_keys_from_config(
+    weight_key, scales_key, zeros_key, bias_key, g_idx_key = _get_keys_from_config(
         checkpoint_config
     )
     w_key = attr_name + "." + weight_key
     s_key = attr_name + "." + scales_key
     z_key = attr_name + "." + zeros_key
     b_key = attr_name + "." + bias_key
+    g_key = attr_name + "." + g_idx_key
     # all are tensors
     qweight = state_dict.get(w_key, None)
     scales = state_dict.get(s_key, None)
     qzeros = state_dict.get(z_key, None)
     bias = state_dict.get(b_key, None)
+    g_idx = state_dict.get(g_key, None)
 
     use_optimum_format = checkpoint_config.get("use_optimum_format", True)
     if use_optimum_format:
@@ -137,7 +141,7 @@ def _get_linear_parameters(attr_name, state_dict, checkpoint_config):
         if scales.size(-1) != 1:
             # qweight is compressed along the last dim int4 * 8 -> int32
             group_size = qweight.size(-1) * 8 // scales.size(-1)
-    return qweight, scales, qzeros, bias, group_size
+    return qweight, scales, qzeros, bias, group_size, g_idx
 
 
 def _convert_woq_with_low_precision_checkpoint(
@@ -176,8 +180,8 @@ def _convert_woq_with_low_precision_checkpoint(
         checkpoint_config = _default_lowp_checkpoint_config()
 
     state_dict = low_precision_checkpoint
-    # Check that keys can be found in the state dict. Bias is optional.
-    weight_key, scales_key, zeros_key, _ = _get_keys_from_config(checkpoint_config)
+    # Check that keys can be found in the state dict. Bias and g_idx are optional.
+    weight_key, scales_key, zeros_key, _, _ = _get_keys_from_config(checkpoint_config)
     keys_found = [False] * 3
     for k, _ in state_dict.items():
         if k.endswith("." + weight_key):
@@ -193,13 +197,13 @@ def _convert_woq_with_low_precision_checkpoint(
     def _convert(mod, attr_name):
         if isinstance(mod, torch.nn.Linear):
             mod.qconfig = qconfig_mapping.global_qconfig
-            qweight, scales, qzeros, bias, group_size = _get_linear_parameters(
+            qweight, scales, qzeros, bias, group_size, g_idx = _get_linear_parameters(
                 attr_name, state_dict, checkpoint_config
             )
             if any(i is None for i in [qweight, scales, qzeros]):
                 return mod
             mod_new = IpexWoqLinear.from_float_and_int4_weight(
-                mod, qweight, scales, qzeros, bias, group_size=group_size
+                mod, qweight, scales, qzeros, bias, group_size=group_size, g_idx=g_idx
             )
             return mod_new
 

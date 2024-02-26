@@ -21,6 +21,7 @@ parser.add_argument("--model", nargs="?", default="EleutherAI/gpt-j-6b")
 parser.add_argument("--dataset", nargs="?", default="NeelNanda/pile-10k")
 parser.add_argument("--output-dir", nargs="?", default="./saved_results")
 parser.add_argument("--group-size", default=128, type=int)
+parser.add_argument("--act-order", default=False, action=argparse.BooleanOptionalAction)
 parser.add_argument("--nsamples", default=128, type=int)
 parser.add_argument("--pad-max-length", default=2048, type=int)
 parser.add_argument("--use-max-length", default=False, type=bool)
@@ -167,6 +168,7 @@ compressed_model = ipex.quantization.gptq(
                         model=user_model,
                         dataloader=calib_dataloader,
                         group_size=args.group_size,
+                        act_order=args.act_order,
                         nsamples=args.nsamples,
                         use_max_length=args.use_max_length,
                         pad_max_length=args.pad_max_length,

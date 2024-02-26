@@ -16,6 +16,7 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
     at::Tensor&& scales,
     at::Tensor&& zero_points,
     c10::optional<at::Tensor>&& bias,
+    c10::optional<at::Tensor>&& g_idx,
     c10::optional<int64_t> batch_size,
     bool is_int4,
     int64_t group_size,
@@ -28,6 +29,7 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     at::Tensor&& scales,
     at::Tensor&& zero_points,
     c10::optional<at::Tensor>&& bias,
+    c10::optional<at::Tensor>&& g_idx,
     c10::optional<int64_t> batch_size,
     int64_t group_size,
     int64_t lowp_mode,
@@ -44,6 +46,7 @@ ContextLinearWoq create(
     at::Tensor& scales,
     at::Tensor& zero_points,
     const c10::optional<at::Tensor>& bias,
+    const c10::optional<at::Tensor>& g_idx,
     const c10::optional<int64_t> batch_size,
     bool is_int4,
     int64_t group_size,
@@ -70,21 +73,22 @@ at::Tensor run_add_add(
     const at::Tensor& input,
     const std::vector<at::Tensor>& others);
 
-at::Tensor woq_linear_add_run(
-    const at::Tensor& input,
-    at::Tensor& accumu,
-    const c10::optional<at::Scalar>& alpha,
-    const at::Tensor& op_context);
-
-at::Tensor woq_linear_add_relu_run(
-    const at::Tensor& input,
-    at::Tensor& accumu,
-    const c10::optional<at::Scalar>& alpha,
-    const at::Tensor& op_context);
-
 at::Tensor pack(ContextLinearWoq& context, const at::Tensor& tensor);
 
 at::Tensor unpack(ContextLinearWoq& context, const at::Tensor& tensor);
+
+template <bool is_int4 = false>
+at::Tensor woq_shuffle_tensor_by_group_idx(
+    const at::Tensor& input,
+    const std::vector<int64_t>& tensor_shape,
+    const at::Tensor& g_idx,
+    int64_t group_size);
+
+at::Tensor woq_shuffle_weight_back_by_group_idx(
+    const at::Tensor& qweight,
+    const std::vector<int64_t>& weight_shape,
+    const at::Tensor& g_idx,
+    int64_t group_size);
 
 } // namespace woq_linear
 } // namespace detail
