@@ -1106,8 +1106,8 @@ def optimize(
             is_quantization,
             is_woq,
         )
-        # do not register output hook when doing calibration
-        if not (is_quantization and qconfig_summary_file is None):
+        # do not register output hook when doing calibration in static int8
+        if not (is_quantization and not is_woq and qconfig_summary_file is None):
             from .models.reference.models import output_hook
 
             _model.register_forward_hook(output_hook, with_kwargs=True)
