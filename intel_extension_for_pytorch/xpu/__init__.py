@@ -531,32 +531,16 @@ def get_device_type() -> str:
     return "xpu"
 
 
-_StorageBase.xpu = _xpu
-
-serialization.register_package(30, _xpu_tag, _xpu_deserialize)
-
-torch._register_device_module("xpu", current_module)
-
-# post initial
-if hasattr(intel_extension_for_pytorch._C, "_postInitExtension"):
-    intel_extension_for_pytorch._C._postInitExtension()
-
-# class FloatTensor:
-#     def __new__(cls, e):
-#         return torch.tensor(e, device='xpu', dtype=torch.float)
-
-
-# class DoubleTensor:
-#     def __new__(cls, e):
-#         return torch.tensor(e, device='xpu', dtype=torch.float64)
-
 if intel_extension_for_pytorch._C._has_xpu():
+    _StorageBase.xpu = _xpu
+    serialization.register_package(30, _xpu_tag, _xpu_deserialize)
+    torch._register_device_module("xpu", current_module)
+    intel_extension_for_pytorch._C._postInitExtension()
     if is_available():
         override_get_stream()
         override_recursive_to()
         if not has_fp64_dtype():
             override_tensor_totype()
-
             exec_path = sys.argv[0].split("/")
             if len(exec_path) > 0 and "pytest" in exec_path:
                 override_assert_equal()

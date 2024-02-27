@@ -2984,7 +2984,7 @@ at::Tensor quantize_per_tensor<float>(
           auto tmp7 = at::vec::Vectorized<float>(static_cast<float>(255.0));
           auto tmp8 = at::vec::minimum(tmp6, tmp7);
           auto tmp9 = (tmp8);
-          auto tmp10 = at::vec::convert_float_to_uint8(tmp9);
+          auto tmp10 = at::vec::convert_float_to_int8<uint8_t>(tmp9);
           tmp10.store(out_ptr + i1, vecsize);
         }
         for (; i1 < end; i1++) {
@@ -3063,7 +3063,7 @@ at::Tensor quantize_per_tensor<bfloat16>(
           auto tmp10 = at::vec::Vectorized<float>(static_cast<float>(255.0));
           auto tmp11 = at::vec::minimum(tmp9, tmp10);
           auto tmp12 = (tmp11);
-          auto tmp13 = at::vec::convert_float_to_uint8(tmp12);
+          auto tmp13 = at::vec::convert_float_to_int8<uint8_t>(tmp12);
           tmp13.store(out_ptr + i1, vecsize);
         }
         for (; i1 < end; i1++) {
@@ -3192,7 +3192,7 @@ at::Tensor quantize_per_block<bfloat16>(
       auto tmp10 = at::vec::Vectorized<float>(static_cast<float>(255.0));
       auto tmp11 = at::vec::minimum(tmp9, tmp10);
       auto tmp12 = (tmp11);
-      auto tmp13 = at::vec::convert_float_to_uint8(tmp12);
+      auto tmp13 = at::vec::convert_float_to_int8<uint8_t>(tmp12);
       tmp13.store(out_ptr0, vecsize);
     }
     for (; k < block_k; k++) {
@@ -3297,7 +3297,7 @@ at::Tensor quantize_per_block<float>(
           auto tmp7 = at::vec::Vectorized<float>(static_cast<float>(255.0));
           auto tmp8 = at::vec::minimum(tmp6, tmp7);
           auto tmp9 = (tmp8);
-          auto tmp10 = at::vec::convert_float_to_uint8(tmp9);
+          auto tmp10 = at::vec::convert_float_to_int8<uint8_t>(tmp9);
           tmp10.store(out_ptr0, vecsize);
         }
         for (; k < block_k; k++) {
