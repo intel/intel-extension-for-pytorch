@@ -129,6 +129,7 @@ def IPEX_WEIGHT_CONVERT_MODULE_XPU(inference: bool, dtype: torch.bfloat16):
         torch.nn.ConvTranspose3d,
         torch.nn.Linear,
         torch.nn.Embedding,
+        torch.nn.EmbeddingBag,
         torch.nn.LSTM,
     ]
 
