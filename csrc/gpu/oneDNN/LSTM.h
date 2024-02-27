@@ -104,16 +104,18 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm(
   Tensor layer_y = at::empty({dst_layer_tz}, src.options());
 
   auto src_layer_md = memory::desc(
-      {i == 0 ? src_layer_0_tz : src_layer_tz}, src_data_t, format_any);
+      {i == 0 ? src_layer_0_tz : src_layer_tz}, src_data_t, format_tnc);
   auto wghs_layer_md = memory::desc(
-      {i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, src_data_t, format_any);
-  auto wghs_iter_md = memory::desc({wghs_iter_tz}, src_data_t, format_any);
-  auto bia_md = memory::desc({bia_tz}, bia_data_t, format_any);
-  auto src_iter_md = memory::desc({src_iter_tz}, src_data_t, format_any);
-  auto src_iter_c_md = memory::desc({src_iter_c_tz}, iter_c_data_t, format_any);
-  auto dst_layer_md = memory::desc({dst_layer_tz}, src_data_t, format_any);
-  auto dst_iter_md = memory::desc({dst_iter_tz}, src_data_t, format_any);
-  auto dst_iter_c_md = memory::desc({dst_iter_c_tz}, iter_c_data_t, format_any);
+      {i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, src_data_t, format_ldigo);
+  auto wghs_iter_md = memory::desc({wghs_iter_tz}, src_data_t, format_ldigo);
+  auto bia_md = memory::desc({bia_tz}, bia_data_t, format_ldgo);
+  auto src_iter_md = memory::desc({src_iter_tz}, src_data_t, format_ldnc);
+  auto src_iter_c_md =
+      memory::desc({src_iter_c_tz}, iter_c_data_t, format_ldnc);
+  auto dst_layer_md = memory::desc({dst_layer_tz}, src_data_t, format_tnc);
+  auto dst_iter_md = memory::desc({dst_iter_tz}, src_data_t, format_ldnc);
+  auto dst_iter_c_md =
+      memory::desc({dst_iter_c_tz}, iter_c_data_t, format_ldnc);
 
   primitive_attr pattr;
 #ifdef USE_SCRATCHPAD_MODE
@@ -140,36 +142,29 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm(
       dst_iter_c_md,
       pattr));
 
-  auto wghs_layer_usr_m = dpcpp_onednn_memory(
-      {{i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, src_data_t, format_ldigo},
-      engine,
-      wgh_i.data_ptr());
+  auto wghs_layer_usr_m =
+      dpcpp_onednn_memory(wghs_layer_md, engine, wgh_i.data_ptr());
 
-  auto wghs_iter_usr_m = dpcpp_onednn_memory(
-      {{wghs_iter_tz}, src_data_t, format_ldigo}, engine, wgh_h.data_ptr());
+  auto wghs_iter_usr_m =
+      dpcpp_onednn_memory(wghs_iter_md, engine, wgh_h.data_ptr());
 
-  auto bia_usr_m = dpcpp_onednn_memory(
-      {{bia_tz}, bia_data_t, format_ldgo}, engine, bia_.data_ptr());
+  auto bia_usr_m = dpcpp_onednn_memory(bia_md, engine, bia_.data_ptr());
 
-  auto src_layer_usr_m = dpcpp_onednn_memory(
-      {{i == 0 ? src_layer_0_tz : src_layer_tz}, src_data_t, format_tnc},
-      engine,
-      layer_x.data_ptr());
+  auto src_layer_usr_m =
+      dpcpp_onednn_memory(src_layer_md, engine, layer_x.data_ptr());
 
-  auto src_iter_usr_m = dpcpp_onednn_memory(
-      {{src_iter_tz}, src_data_t, format_ldnc}, engine, hx.data_ptr());
+  auto src_iter_usr_m = dpcpp_onednn_memory(src_iter_md, engine, hx.data_ptr());
 
-  auto src_iter_c_usr_m = dpcpp_onednn_memory(
-      {{src_iter_c_tz}, iter_c_data_t, format_ldnc}, engine, cx_.data_ptr());
+  auto src_iter_c_usr_m =
+      dpcpp_onednn_memory(src_iter_c_md, engine, cx_.data_ptr());
 
-  auto dst_layer_usr_m = dpcpp_onednn_memory(
-      {{dst_layer_tz}, src_data_t, format_tnc}, engine, layer_y.data_ptr());
+  auto dst_layer_usr_m =
+      dpcpp_onednn_memory(dst_layer_md, engine, layer_y.data_ptr());
 
-  auto dst_iter_usr_m = dpcpp_onednn_memory(
-      {{dst_iter_tz}, src_data_t, format_ldnc}, engine, hy.data_ptr());
+  auto dst_iter_usr_m = dpcpp_onednn_memory(dst_iter_md, engine, hy.data_ptr());
 
-  auto dst_iter_c_usr_m = dpcpp_onednn_memory(
-      {{dst_iter_c_tz}, iter_c_data_t, format_ldnc}, engine, cy.data_ptr());
+  auto dst_iter_c_usr_m =
+      dpcpp_onednn_memory(dst_iter_c_md, engine, cy.data_ptr());
 
   auto expected_wghs_layer_md = lstm_forward_pd->weights_layer_desc();
   auto wghs_layer_m = wghs_layer_usr_m;
@@ -440,31 +435,33 @@ lstm_backward(
       {i == 0 ? src_layer_0_tz : src_layer_tz}, diff_layer_y.options());
 
   auto src_layer_md = memory::desc(
-      {i == 0 ? src_layer_0_tz : src_layer_tz}, src_data_t, format_any);
+      {i == 0 ? src_layer_0_tz : src_layer_tz}, src_data_t, format_tnc);
   auto wghs_layer_md = memory::desc(
       {i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, src_data_t, format_any);
   auto wghs_iter_md = memory::desc({wghs_iter_tz}, src_data_t, format_any);
-  auto bia_md = memory::desc({bia_tz}, bia_data_t, format_any);
-  auto src_iter_md = memory::desc({src_iter_tz}, src_data_t, format_any);
-  auto src_iter_c_md = memory::desc({src_iter_c_tz}, iter_c_data_t, format_any);
-  auto dst_layer_md = memory::desc({dst_layer_tz}, src_data_t, format_any);
-  auto dst_iter_md = memory::desc({dst_iter_tz}, src_data_t, format_any);
-  auto dst_iter_c_md = memory::desc({dst_iter_c_tz}, iter_c_data_t, format_any);
+  auto bia_md = memory::desc({bia_tz}, bia_data_t, format_ldgo);
+  auto src_iter_md = memory::desc({src_iter_tz}, src_data_t, format_ldnc);
+  auto src_iter_c_md =
+      memory::desc({src_iter_c_tz}, iter_c_data_t, format_ldnc);
+  auto dst_layer_md = memory::desc({dst_layer_tz}, src_data_t, format_tnc);
+  auto dst_iter_md = memory::desc({dst_iter_tz}, src_data_t, format_ldnc);
+  auto dst_iter_c_md =
+      memory::desc({dst_iter_c_tz}, iter_c_data_t, format_ldnc);
   auto diff_src_layer_md = memory::desc(
-      {i == 0 ? src_layer_0_tz : src_layer_tz}, diff_data_t, format_any);
-  auto diff_src_iter_md = memory::desc({src_iter_tz}, diff_data_t, format_any);
+      {i == 0 ? src_layer_0_tz : src_layer_tz}, diff_data_t, format_tnc);
+  auto diff_src_iter_md = memory::desc({src_iter_tz}, diff_data_t, format_ldnc);
   auto diff_src_iter_c_md =
-      memory::desc({src_iter_c_tz}, diff_data_t, format_any);
+      memory::desc({src_iter_c_tz}, diff_data_t, format_ldnc);
   auto diff_wghs_layer_md = memory::desc(
-      {i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, diff_data_t, format_any);
+      {i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, diff_data_t, format_ldigo);
   auto diff_wghs_iter_md =
-      memory::desc({wghs_iter_tz}, diff_data_t, format_any);
-  auto diff_bia_md = memory::desc({bia_tz}, diff_data_t, format_any);
+      memory::desc({wghs_iter_tz}, diff_data_t, format_ldigo);
+  auto diff_bia_md = memory::desc({bia_tz}, diff_data_t, format_ldgo);
   auto diff_dst_layer_md =
-      memory::desc({dst_layer_tz}, diff_data_t, format_any);
-  auto diff_dst_iter_md = memory::desc({dst_iter_tz}, diff_data_t, format_any);
+      memory::desc({dst_layer_tz}, diff_data_t, format_tnc);
+  auto diff_dst_iter_md = memory::desc({dst_iter_tz}, diff_data_t, format_ldnc);
   auto diff_dst_iter_c_md =
-      memory::desc({dst_iter_c_tz}, diff_data_t, format_any);
+      memory::desc({dst_iter_c_tz}, diff_data_t, format_ldnc);
 
   rnn_direction dir = bidirectional ? rnn_direction::bidirectional_concat
                                     : rnn_direction::unidirectional_left2right;
@@ -494,25 +491,21 @@ lstm_backward(
       dst_iter_c_md,
       pattr));
 
-  auto src_layer_usr_m = dpcpp_onednn_memory(
-      {{i == 0 ? src_layer_0_tz : src_layer_tz}, src_data_t, format_tnc},
-      engine,
-      layer_x.data_ptr());
+  auto src_layer_usr_m =
+      dpcpp_onednn_memory(src_layer_md, engine, layer_x.data_ptr());
 
-  auto src_iter_usr_m = dpcpp_onednn_memory(
-      {{src_iter_tz}, src_data_t, format_ldnc}, engine, hx.data_ptr());
+  auto src_iter_usr_m = dpcpp_onednn_memory(src_iter_md, engine, hx.data_ptr());
 
-  auto src_iter_c_usr_m = dpcpp_onednn_memory(
-      {{src_iter_c_tz}, iter_c_data_t, format_ldnc}, engine, cx_.data_ptr());
+  auto src_iter_c_usr_m =
+      dpcpp_onednn_memory(src_iter_c_md, engine, cx_.data_ptr());
 
-  auto dst_layer_usr_m = dpcpp_onednn_memory(
-      {{dst_layer_tz}, src_data_t, format_tnc}, engine, layer_y.data_ptr());
+  auto dst_layer_usr_m =
+      dpcpp_onednn_memory(dst_layer_md, engine, layer_y.data_ptr());
 
-  auto dst_iter_usr_m = dpcpp_onednn_memory(
-      {{dst_iter_tz}, src_data_t, format_ldnc}, engine, hy.data_ptr());
+  auto dst_iter_usr_m = dpcpp_onednn_memory(dst_iter_md, engine, hy.data_ptr());
 
-  auto dst_iter_c_usr_m = dpcpp_onednn_memory(
-      {{dst_iter_c_tz}, iter_c_data_t, format_ldnc}, engine, cy.data_ptr());
+  auto dst_iter_c_usr_m =
+      dpcpp_onednn_memory(dst_iter_c_md, engine, cy.data_ptr());
 
   auto wghs_layer_usr_m = dpcpp_onednn_memory(
       {{i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, src_data_t, format_ldigo},
@@ -522,43 +515,34 @@ lstm_backward(
   auto wghs_iter_usr_m = dpcpp_onednn_memory(
       {{wghs_iter_tz}, src_data_t, format_ldigo}, engine, wgh_h.data_ptr());
 
-  auto bia_usr_m = dpcpp_onednn_memory(
-      {{bia_tz}, bia_data_t, format_ldgo}, engine, bia_.data_ptr());
+  auto bia_usr_m = dpcpp_onednn_memory(bia_md, engine, bia_.data_ptr());
 
-  auto diff_src_layer_usr_m = dpcpp_onednn_memory(
-      {{i == 0 ? src_layer_0_tz : src_layer_tz}, diff_data_t, format_tnc},
-      engine,
-      diff_layer_x.data_ptr());
+  auto diff_src_layer_usr_m =
+      dpcpp_onednn_memory(diff_src_layer_md, engine, diff_layer_x.data_ptr());
 
-  auto diff_src_iter_usr_m = dpcpp_onednn_memory(
-      {{src_iter_tz}, diff_data_t, format_ldnc}, engine, diff_hx.data_ptr());
+  auto diff_src_iter_usr_m =
+      dpcpp_onednn_memory(diff_src_iter_md, engine, diff_hx.data_ptr());
 
-  auto diff_src_iter_c_usr_m = dpcpp_onednn_memory(
-      {{src_iter_c_tz}, diff_data_t, format_ldnc}, engine, diff_cx.data_ptr());
+  auto diff_src_iter_c_usr_m =
+      dpcpp_onednn_memory(diff_src_iter_c_md, engine, diff_cx.data_ptr());
 
-  auto diff_dst_layer_usr_m = dpcpp_onednn_memory(
-      {{dst_layer_tz}, diff_data_t, format_tnc},
-      engine,
-      diff_layer_y.data_ptr());
+  auto diff_dst_layer_usr_m =
+      dpcpp_onednn_memory(diff_dst_layer_md, engine, diff_layer_y.data_ptr());
 
-  auto diff_dst_iter_usr_m = dpcpp_onednn_memory(
-      {{dst_iter_tz}, diff_data_t, format_ldnc}, engine, diff_hy.data_ptr());
+  auto diff_dst_iter_usr_m =
+      dpcpp_onednn_memory(diff_dst_iter_md, engine, diff_hy.data_ptr());
 
-  auto diff_dst_iter_c_usr_m = dpcpp_onednn_memory(
-      {{dst_iter_c_tz}, diff_data_t, format_ldnc}, engine, diff_cy.data_ptr());
+  auto diff_dst_iter_c_usr_m =
+      dpcpp_onednn_memory(diff_dst_iter_c_md, engine, diff_cy.data_ptr());
 
-  auto diff_wghs_layer_usr_m = dpcpp_onednn_memory(
-      {{i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, diff_data_t, format_ldigo},
-      engine,
-      diff_wgh_i.data_ptr());
+  auto diff_wghs_layer_usr_m =
+      dpcpp_onednn_memory(diff_wghs_layer_md, engine, diff_wgh_i.data_ptr());
 
-  auto diff_wghs_iter_usr_m = dpcpp_onednn_memory(
-      {{wghs_iter_tz}, diff_data_t, format_ldigo},
-      engine,
-      diff_wgh_h.data_ptr());
+  auto diff_wghs_iter_usr_m =
+      dpcpp_onednn_memory(diff_wghs_iter_md, engine, diff_wgh_h.data_ptr());
 
-  auto diff_bia_usr_m = dpcpp_onednn_memory(
-      {{bia_tz}, diff_data_t, format_ldgo}, engine, diff_bia.data_ptr());
+  auto diff_bia_usr_m =
+      dpcpp_onednn_memory(diff_bia_md, engine, diff_bia.data_ptr());
 
   std::shared_ptr<dnnl::lstm_backward::primitive_desc> lstm_backward_pd;
   lstm_backward_pd.reset(new dnnl::lstm_backward::primitive_desc(
