@@ -27,3 +27,30 @@ class LlamaRMSNorm(nn.Module):
         """
 
         return output[0]
+
+
+# QWen trying to import rms_norm from flash_attention
+# from flash_attn.ops.rms_norm import rms_norm as __rms_norm
+rms_norm = None
+
+
+class QWenRMSNorm(torch.nn.Module):
+    def __init__(self, dim: int, eps: float = 1e-6):
+        super().__init__()
+        self.eps = eps
+        self.hidden_size = dim
+        self.weight = nn.Parameter(torch.ones(dim))
+
+    def _norm(self, x):
+        return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
+
+    def forward(self, x):
+        # if rms_norm is not None and x.is_cuda:
+        #     return rms_norm(x, self.weight, self.eps)
+        # else:
+        #     output = self._norm(x.float()).type_as(x)
+        #     return output * self.weight
+        output = torch.ops.torch_ipex.rms_norm(
+            x, [self.hidden_size], self.weight, self.eps
+        )
+        return output[0]

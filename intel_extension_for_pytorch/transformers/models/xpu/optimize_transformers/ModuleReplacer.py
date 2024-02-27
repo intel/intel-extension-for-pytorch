@@ -9,6 +9,7 @@ from .modules.Functions import (
     opt_forward_hook,
     falcon_forward_hook,
     baichuan_forward_hook,
+    qwen_forward_hook,
     ipex_build_bloom_alibi_tensor,
 )
 from .modules.utils import is_int4
@@ -26,6 +27,7 @@ from .modules.bloom import NewIPEXBloomBlock
 from .modules.llama import NewIPEXLLAMABlock
 from .modules.opt import NewIPEXOPTBlock
 from .modules.falcon import NewIPEXFalconBlock
+from .modules.qwen import NewIPEXQWENBlock
 from .modules.DiffusersTransformer import NewIPEXBasicTransformerBlock
 
 import os
@@ -75,6 +77,7 @@ def default_override_function_list() -> List:
         opt_forward_hook,
         falcon_forward_hook,
         baichuan_forward_hook,
+        qwen_forward_hook,
         ipex_build_bloom_alibi_tensor,
     ]
     return default_fn_list
@@ -152,6 +155,21 @@ class ModuleReplacer:
                 if new_module is not None:
                     setattr(model, name, new_module)
                     is_replace_success = True
+            # QWenBlock is a customized model in transformers
+            elif child.__class__.__name__ == "QWenBlock":
+                new_module = NewIPEXQWENBlock(
+                    child,
+                    config,
+                    dtype=dtype,
+                    device="xpu",
+                    module_name=module_name + name,
+                    impl_mode=impl_mode,
+                    tp_size=self.tp_size,
+                    tp_group=self.tp_group,
+                )
+                if new_module is not None:
+                    setattr(model, name, new_module)
+                    is_replace_success = True
             else:
                 is_replace_success = is_replace_success or self.replace_module(
                     child, dtype, config, module_name + name
@@ -163,6 +181,7 @@ class ModuleReplacer:
             if (
                 type(child) in self.module_dict.keys()
                 or child.__class__.__name__ == "BaichuanLayer"
+                or child.__class__.__name__ == "QWenBlock"
             ):
                 continue
             if name == "lm_head" and (not is_int4(model)):

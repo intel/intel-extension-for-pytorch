@@ -603,12 +603,13 @@ def optimize_transformers(
                 or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
                 or re.search("Bloom", model.config.architectures[0], re.IGNORECASE)
                 or re.search("Falcon", model.config.architectures[0], re.IGNORECASE)
+                or re.search("QWen", model.config.architectures[0], re.IGNORECASE)
                 or re.search("Baichuan", model.config.architectures[0], re.IGNORECASE)
             ) and device == "xpu"
 
         if not (well_supported_model or xpu_supported_model):
             warnings.warn(
-                "optimize_transformers supports GPT-J/Llama/OPT/Bloom/Falcon"
+                "optimize_transformers supports GPT-J/Llama/OPT/Bloom/Falcon/QWen"
                 " of transformers model without `trust_remote_code=True` in XPU"
                 " and BasicTransformerBlock of diffusers in XPU"
                 " and Llama/GPT-J/GPT-Neox/Falcon/OPT"

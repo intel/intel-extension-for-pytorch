@@ -323,3 +323,41 @@ class IPEXTransformerMLPOptimizedFp16SiluBaichuan(
 ):
     def __init__(self, config):
         super().__init__(config)
+
+
+class IPEXTransformerMLPOptimizedFp16SiluQwen(IPEXTransformerMLPOptimizedFp16Silu):
+    def __init__(self, config):
+        super().__init__(config)
+        self.c_proj = IPEXTransformerLinear()
+
+    def load_parameter(self, fc_in, fc_out, c_proj):
+        #            QWenMLP
+        # fc_in   |    w1
+        # fc_out  |    w2
+        # c_proj  |    c_proj
+        super().load_parameter(fc_in, fc_out)
+        self.c_proj.weight = c_proj.weight
+        self.c_proj.bias = c_proj.bias
+
+    def transpose_parameter(self):
+        super().transpose_parameter()
+        self.c_proj.weight.data = self.c_proj.weight.transpose(0, 1).contiguous()
+        # Note: synchronize to ensure the completion of contiguous
+        torch.xpu.synchronize()
+
+    def inter_mm(self, hidden_states):
+        # hidden_states = self.fc_in(hidden_states) * self.act(self.fc_out(hidden_states))
+        hidden_states = self.fc_in(hidden_states) * torch.ops.torch_ipex.mm_silu(
+            hidden_states, self.fc_out.weight
+        )
+        return hidden_states
+
+    def out_mm(self, hidden_states, residual=None):
+        if self.c_proj.bias is None:
+            return torch.ops.torch_ipex.mm_resadd(
+                hidden_states, self.c_proj.weight, residual, 1.0
+            )
+        else:
+            return torch.ops.torch_ipex.mm_bias_resadd(
+                hidden_states, self.c_proj.weight, self.c_proj.bias, 1.0, residual, 1.0
+            )

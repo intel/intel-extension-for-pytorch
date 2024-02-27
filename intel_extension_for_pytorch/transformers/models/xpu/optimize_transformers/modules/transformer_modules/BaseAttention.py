@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from dataclasses import dataclass
 
 
@@ -40,6 +40,7 @@ class IPEXTransformerAttn(nn.Module):
         hidden_states: torch.FloatTensor,
         key_value_states: Optional[torch.Tensor] = None,
         layer_past: Optional[Tuple[torch.Tensor]] = None,
+        rotary_pos_emb_list: Optional[List[List[torch.Tensor]]] = None,
         attention_mask: Optional[torch.FloatTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
@@ -48,13 +49,13 @@ class IPEXTransformerAttn(nn.Module):
         residual: Optional[torch.Tensor] = None,
         alibi: torch.Tensor = None,
         first_token=False,
-        **kwargs
+        **kwargs,
     ):
         self.pre_qkv(
             hidden_states=hidden_states,
             key_value_states=key_value_states,
             layer_past=layer_past,
-            **kwargs
+            **kwargs,
         )
 
         query, key, value = self.qkv_gemm(
@@ -62,7 +63,13 @@ class IPEXTransformerAttn(nn.Module):
         )
 
         query, key, value = self.post_qkv(
-            query, key, value, position_ids, layer_past, **kwargs
+            query,
+            key,
+            value,
+            position_ids,
+            layer_past=layer_past,
+            rotary_pos_emb_list=rotary_pos_emb_list,
+            **kwargs,
         )
 
         present = self.get_present(query, key, value, use_cache)

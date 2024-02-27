@@ -64,6 +64,11 @@ def bloom_forward_hook(model):
         pad_for_gptj_lm_head(model, is_int4(model))
 
 
+def qwen_forward_hook(model):
+    if model.__class__.__name__ == "QWenLMHeadModel":
+        pad_for_gptj_lm_head(model, is_int4(model))
+
+
 def _convert_to_bloom_cache_ipex(
     past_key_value: Tuple[Tuple[torch.Tensor, torch.Tensor]]
 ) -> Tuple[Tuple[torch.Tensor, torch.Tensor]]:
