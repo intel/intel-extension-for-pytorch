@@ -147,8 +147,10 @@ static inline void quantized_reorder(
     memory::dims scale_zp_sz,
     memory::dims scale_zp_st,
     const ReorderAttr& rattr) {
-  auto engine =
-      GpuEngineManager::Instance().get_engine({kXPU, current_device()});
+  at::Device curDevice = at::Device(at::kXPU, current_device());
+  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
+  // engine index means the engine created on which device
+  auto engine_index = curDevice.index();
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
@@ -203,7 +205,15 @@ static inline void quantized_reorder(
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
   // Here change scale to scale_md
-  create_key(key, src_md, dst_md, src_sc_md, src_zp_md, dst_sc_md, dst_zp_md);
+  create_key(
+      key,
+      engine_index,
+      src_md,
+      dst_md,
+      src_sc_md,
+      src_zp_md,
+      dst_sc_md,
+      dst_zp_md);
   prim = fetch_or_create_m<dnnl::reorder>(key, src_mem, dst_mem, pattr);
 #else
   prim = dnnl::reorder(src_mem, dst_mem, pattr);

@@ -39,6 +39,8 @@ static inline void matmul(
 
   at::Device curDevice = at::Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
+  // engine index means the engine created on which device
+  auto engine_index = curDevice.index();
   auto strm = GpuStreamManager::Instance().get_stream();
 
   Tensor m1 =
@@ -184,6 +186,7 @@ static inline void matmul(
 #ifdef USE_PRIMITIVE_CACHE
   create_key(
       key_primitive,
+      engine_index,
       m1_dims,
       m2_dims,
       dst_dims,

@@ -5,6 +5,7 @@ from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
 import pytest
+import platform
 
 
 class TestNNMethod(TestCase):
@@ -106,3 +107,36 @@ class TestNNMethod(TestCase):
         self.assertEqual(weight, weight_sycl)
         self.assertEqual(y1_cpu, y1_sycl)
         self.assertEqual(y2_cpu, y2_sycl)
+
+    # FIXME: https://jira.devtools.intel.com/browse/PYTORCHDGQ-4046
+    # skip the case on Arc + windows because the device number of Arc is wrongly queried to be 2 on windows platform
+    @pytest.mark.skipif(
+        torch.xpu.device_count() < 2
+        or (not torch.xpu.has_2d_block_array() and platform.system() == "Windows"),
+        reason="doesn't support with one device",
+    )
+    def test_primitive_cache_for_different_devices(self):
+        BS = 1
+        linear0 = torch.nn.Linear(224, 224)
+        input0 = torch.rand(BS, 3, 224, 224)
+        linear1 = torch.nn.Linear(224, 224)
+        input1 = torch.rand(BS, 3, 224, 224)
+
+        linear1.weight.data = linear0.weight.data
+        linear1.bias.data = linear0.bias.data
+        input1.data = input0.data
+
+        linear0 = linear0.to("xpu:0")
+        input0 = input0.to("xpu:0")
+        linear1 = linear1.to("xpu:1")
+        input1 = input1.to("xpu:1")
+
+        output0 = linear0(input0)
+        print("Execution on device0")
+
+        # oneDNN primitive used below should not be hit from the primitive cache
+        # because here 2 linear op execute on different devices
+        output1 = linear1(input1)
+        print("Execution on device1")
+
+        self.assertEqual(output0.cpu(), output1.cpu())

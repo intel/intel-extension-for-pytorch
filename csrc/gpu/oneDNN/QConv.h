@@ -229,8 +229,11 @@ static at::Tensor quantized_convolution(
       3 == ndim || 4 == ndim || 5 == ndim,
       "convolution only supports 3D, 4D, 5D tensor");
   TORCH_CHECK(dst.defined(), "Quantized convlution should always define dst");
-  auto engine =
-      GpuEngineManager::Instance().get_engine({kXPU, current_device()});
+
+  auto curDevice = at::Device(at::kXPU, current_device());
+  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
+  // engine index means the engine created on which device
+  auto engine_index = curDevice.index();
   auto strm = GpuStreamManager::Instance().get_stream();
 
   // create usr_md for tensors, and md for conv primitive
@@ -288,6 +291,7 @@ static at::Tensor quantized_convolution(
 #ifdef USE_PRIMITIVE_CACHE
   create_key(
       key_primitive,
+      engine_index,
       src_dims,
       wgh_dims,
       src_data_t,
