@@ -336,6 +336,8 @@ static at::Tensor convolution(
   post_ops po;
   attr.extract_post_ops(po, dst);
   pattr.set_post_ops(po);
+  if (globalContext().deterministicAlgorithms())
+    pattr.set_deterministic(true);
 
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);

@@ -176,6 +176,7 @@ static inline void matmul(
   }
 
   auto is_onednn_layout_suggested = using_onednn_layout_for_matmul(m1);
+  auto use_deterministic = globalContext().deterministicAlgorithms();
 
   post_ops po;
   attr.extract_post_ops(po, dst);
@@ -198,7 +199,8 @@ static inline void matmul(
       bias_strides,
       dims,
       is_onednn_layout_suggested,
-      attr);
+      attr,
+      use_deterministic);
 #endif
 
   std::unordered_map<int, memory> args;
@@ -232,6 +234,8 @@ static inline void matmul(
     // STEP2: creat attribute
     primitive_attr pattr;
     pattr.set_post_ops(po);
+    if (globalContext().deterministicAlgorithms())
+      pattr.set_deterministic(true);
 
 #ifdef USE_SCRATCHPAD_MODE
     pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);

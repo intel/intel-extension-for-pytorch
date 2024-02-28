@@ -75,6 +75,8 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
+  if (globalContext().deterministicAlgorithms())
+    pattr.set_deterministic(true);
 
   auto ln_fwd_pd = training
       ? layer_normalization_forward::primitive_desc(
