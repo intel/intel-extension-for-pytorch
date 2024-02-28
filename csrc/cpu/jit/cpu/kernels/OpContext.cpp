@@ -372,7 +372,6 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
     bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t num_concats,
     int64_t act_quant_mode) {
   auto op_context = torch_ipex::cpu::detail::woq_linear::create(
       weight,
@@ -385,7 +384,6 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
       is_int4,
       group_size,
       lowp_mode,
-      num_concats,
       act_quant_mode);
   return c10::make_intrusive<IpexWoqLinearOpContext>(
       batch_size, std::move(op_context));

@@ -42,7 +42,7 @@ def _GPTJAttention_forward(
             1,  # neighbor elements
             64,
             None,
-            self.concat_qkv._num_concats,
+            self.concat_qkv.num_concat,
         )
     else:
         if concat_qkv is not None:
@@ -152,7 +152,7 @@ def _LlamaAttention_forward(
             self.head_dim // 2,
             self.head_dim,
             kv_seq_len,
-            self.concat_qkv._num_concats,
+            self.concat_qkv.num_concat,
         )
     else:
         if concat_qkv is not None:
@@ -1012,7 +1012,7 @@ def _MistralAttention_forward(
             self.head_dim // 2,
             self.head_dim,
             kv_seq_len,
-            self.concat_qkv._num_concats,
+            self.concat_qkv.num_concat,
         )
     else:
         if concat_qkv is not None:
@@ -1116,7 +1116,7 @@ def _MixtralAttention_forward(
             self.head_dim // 2,
             self.head_dim,
             kv_seq_len,
-            self.concat_qkv._num_concats,
+            self.concat_qkv.num_concat,
         )
     else:
         if concat_qkv is not None:
@@ -1429,7 +1429,7 @@ def _StableLMEpochAttention_forward(
             self.pos_embd_dim // 2,
             self.pos_embd_dim,
             kv_seq_len,
-            self.concat_qkv._num_concats,
+            self.concat_qkv.num_concat,
         )
     else:
         if concat_qkv is not None:

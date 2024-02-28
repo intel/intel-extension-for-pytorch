@@ -429,7 +429,6 @@ at::Tensor woq_linear_kernel(
     bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t num_concats,
     int64_t act_quant_mode) {
   int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
@@ -442,7 +441,6 @@ at::Tensor woq_linear_kernel(
       bias_list,
       w_dtype,
       lowp_mode,
-      num_concats,
       WOQ_FUSE_NONE, // no post op fusion
       std::vector<at::Tensor>(),
       act_quant_mode,
@@ -472,7 +470,6 @@ at::Tensor woq_linear_eltwise_kernel(
     bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t num_concats,
     int64_t act_quant_mode) {
   int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
   int64_t post_op_fusion_type = WOQ_FUSE_NONE;
@@ -493,7 +490,6 @@ at::Tensor woq_linear_eltwise_kernel(
       bias_list,
       w_dtype,
       lowp_mode,
-      num_concats,
       post_op_fusion_type,
       std::vector<at::Tensor>(),
       act_quant_mode,
@@ -532,7 +528,6 @@ at::Tensor woq_linear_add_kernel(
     bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t num_concats,
     const std::vector<at::Tensor>& others,
     int64_t act_quant_mode) {
   int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
@@ -546,7 +541,6 @@ at::Tensor woq_linear_add_kernel(
       bias_list,
       w_dtype,
       lowp_mode,
-      num_concats,
       WOQ_FUSE_ADD, // post op add
       others,
       act_quant_mode,
@@ -563,7 +557,6 @@ at::Tensor woq_linear_add_add_kernel(
     bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t num_concats,
     const std::vector<at::Tensor>& others,
     int64_t act_quant_mode) {
   int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
@@ -577,7 +570,6 @@ at::Tensor woq_linear_add_add_kernel(
       bias_list,
       w_dtype,
       lowp_mode,
-      num_concats,
       WOQ_FUSE_ADD_ADD, // post op add-add
       others,
       act_quant_mode,

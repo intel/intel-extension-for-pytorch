@@ -1152,50 +1152,6 @@ class WeightOnlyQuantizationTester(TestCase):
                 y_ref = y_ref.to(act_dtype)
                 torch.testing.assert_close(y, y_ref, atol=0.005, rtol=0.01)
 
-    def test_weight_only_quantization_num_concats(self):
-        class Mod(nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.q = nn.Linear(64, 64, bias=False)
-                self.k = nn.Linear(64, 64, bias=False)
-                self.v = nn.Linear(64, 64, bias=False)
-
-            def forward(self, x):
-                q = self.q(x)
-                k = self.k(x)
-                v = self.v(x)
-                return q, k, v
-
-        class Mod2(nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.qkv = nn.Linear(64, 64 * 3, bias=False)
-                self.qkv._num_concats = 3
-
-            def forward(self, x):
-                qkv = self.qkv(x).view(3, -1, 64)
-                q, k, v = qkv[0], qkv[1], qkv[2]
-                return q, k, v
-
-        m = Mod().eval()
-        m2 = Mod2().eval()
-        m2.qkv.weight = nn.Parameter(
-            torch.cat([m.q.weight, m.k.weight, m.v.weight], dim=0)
-        )
-        data = torch.rand(4, 64)
-        qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(lowp_mode=2)
-        prepared = prepare(m, qconfig, example_inputs=data, inplace=True)
-        prepared2 = prepare(m2, qconfig, example_inputs=data, inplace=True)
-        for bf16 in [False, True]:
-            with torch.no_grad(), torch.cpu.amp.autocast(
-                enabled=bf16, dtype=torch.bfloat16 if bf16 else None
-            ):
-                qm = convert(prepared)
-                qm2 = convert(prepared2)
-                output1 = qm(data)
-                output2 = qm2(data)
-                torch.testing.assert_close(output1, output2, atol=1e-2, rtol=1e-4)
-
     def _fakequant_by_group(self, t, quant_a_mode, groupsize):
         assert quant_a_mode >= 0 and quant_a_mode <= 3
         if quant_a_mode == 0:

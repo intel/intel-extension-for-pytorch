@@ -371,7 +371,6 @@ using SerializationTypeWoqLinearPrePack = std::tuple<
     bool, // is_int4
     int64_t, // group size
     int64_t, // lowp_mode
-    int64_t, // num_concats
     int64_t>; // act_quant_mode
 
 class WoqLinearOpContext : public torch::jit::CustomClassHolder {
@@ -397,7 +396,6 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
         this->get_context().is_int4_,
         this->get_context().group_size_,
         this->get_context().lowp_mode_,
-        this->get_context().num_concats_,
         this->get_context().act_quant_mode_);
   }
 
@@ -506,7 +504,6 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
       bool is_int4,
       int64_t group_size,
       int64_t lowp_mode,
-      int64_t num_concats,
       int64_t act_quant_mode);
 
   virtual void load_from_ctx(

@@ -105,7 +105,6 @@ at::Tensor woq_linear_kernel(
     bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t num_concats,
     int64_t act_quant_mode);
 
 at::Tensor woq_linear_eltwise_kernel(
@@ -120,7 +119,6 @@ at::Tensor woq_linear_eltwise_kernel(
     bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t num_concats,
     int64_t act_quant_mode);
 
 at::Tensor woq_linear_add_kernel(
@@ -132,7 +130,6 @@ at::Tensor woq_linear_add_kernel(
     bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t num_concats,
     const std::vector<at::Tensor>& others,
     int64_t act_quant_mode);
 
@@ -145,7 +142,6 @@ at::Tensor woq_linear_add_add_kernel(
     bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t num_concats,
     const std::vector<at::Tensor>& others,
     int64_t act_quant_mode);
 
@@ -218,7 +214,6 @@ using woq_tpp_gemm_kernel_fn = at::Tensor (*)(
     const std::vector<at::Tensor>&,
     const std::vector<at::Tensor>&,
     const int,
-    int64_t,
     int64_t,
     int64_t,
     const std::vector<at::Tensor>&,

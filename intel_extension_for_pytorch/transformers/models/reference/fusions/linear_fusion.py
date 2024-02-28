@@ -87,7 +87,6 @@ class _IPEXConcatLinearRef(nn.Module):
             attr_name = f"linear_{i}"
             setattr(self, attr_name, copy.deepcopy(linear_list[i]))
         self.concat_linear = None
-        self._num_concats = None
         if all(not isinstance(linear, IpexWoqLinear) for linear in linear_list):
             weights_list = []
             bias_list = []
@@ -103,7 +102,6 @@ class _IPEXConcatLinearRef(nn.Module):
             )
             self.concat_linear.weight = nn.Parameter(concat_weight)
             self.concat_linear.bias = nn.Parameter(concat_bias) if use_bias else None
-            self._num_concats = len(weights_list)
 
     def forward(self, x):
         output_list = []

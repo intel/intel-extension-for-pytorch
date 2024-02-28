@@ -317,8 +317,6 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                 mod.weight = nn.Parameter(concat_weight)
                 mod.bias = nn.Parameter(concat_bias) if use_bias else None
                 mod.qconfig = qconfig
-                mod._num_concats = len(weights_list)
-                self._num_concats = mod._num_concats
                 if w_dtype == torch.quint4x2:
                     self.concat_linear = IpexWoqLinear.from_float_and_int4_weight(
                         mod,
@@ -332,32 +330,20 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                     self.concat_linear = IpexWoqLinear.from_float(
                         mod, concat_scales, concat_zeros
                     )
+        elif (
+            self.tpp
+            and hasattr(module, "concat_linear")
+            and module.concat_linear is not None
+        ):
+            self.concat_linear = module.concat_linear
         else:
-            self._num_concats = module._num_concats
-            if (
-                self.tpp
-                and hasattr(module, "concat_linear")
-                and module.concat_linear is not None
-            ):
-                self.concat_linear = module.concat_linear
-            else:
-                for i in range(self.num_concat):
-                    attr_name = f"linear_{i}"
-                    setattr(self, attr_name, getattr(module, attr_name))
+            for i in range(self.num_concat):
+                attr_name = f"linear_{i}"
+                setattr(self, attr_name, getattr(module, attr_name))
 
     def forward(self, x):
         if self.concat_linear is not None:
-            concat_output = self.concat_linear(x)
-            if self.woq:
-                num_concats = self._num_concats
-                hidden_size = concat_output.shape[-1] // num_concats
-                concat_output = concat_output.view(num_concats, -1, hidden_size)
-                expected_shape = list(x.shape)[:-1] + [hidden_size]
-                return tuple(
-                    [concat_output[i].view(expected_shape) for i in range(num_concats)]
-                )
-            else:
-                return concat_output
+            return self.concat_linear(x)
 
         output_list = []
         for i in range(self.num_concat):

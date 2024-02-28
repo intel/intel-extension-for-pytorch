@@ -19,7 +19,6 @@ struct ContextLinearWoq final {
   bool is_int4_;
   int64_t group_size_;
   int64_t lowp_mode_;
-  int64_t num_concats_;
   int64_t act_quant_mode_;
 
   ContextLinearWoq() = delete;
@@ -34,7 +33,6 @@ struct ContextLinearWoq final {
       bool is_int4 = false,
       int64_t group_size = -1,
       int64_t lowp_mode = 0,
-      int64_t num_concats = 1,
       int64_t act_quant_mode = 0)
       : at_weight_(std::move(at_weight)),
         weight_shape_(std::move(weight_shape)),
@@ -43,7 +41,6 @@ struct ContextLinearWoq final {
         is_int4_(is_int4),
         group_size_(group_size),
         lowp_mode_(lowp_mode),
-        num_concats_(num_concats),
         act_quant_mode_(act_quant_mode) {
     // Make three dtype versions of scale, zp and bias
     // There is one more dtype for zp

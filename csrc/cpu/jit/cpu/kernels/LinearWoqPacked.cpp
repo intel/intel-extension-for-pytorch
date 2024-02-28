@@ -22,7 +22,6 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
     bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t num_concats,
     int64_t act_quant_mode) {
   RECORD_FUNCTION(
       "ipex_prepack::createWoqLinearPrePackOpContext",
@@ -39,7 +38,6 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
       is_int4,
       group_size,
       lowp_mode,
-      num_concats,
       act_quant_mode);
 }
 
@@ -52,7 +50,6 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     c10::optional<int64_t> batch_size,
     int64_t group_size, // group_size along input channel
     int64_t lowp_mode,
-    int64_t num_concats,
     int64_t act_quant_mode) {
   RECORD_FUNCTION(
       "ipex_prepack::createWoqLinearPrePackOpContextInt4",
@@ -169,7 +166,6 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
       /*is_int4*/ true,
       group_size,
       lowp_mode,
-      num_concats,
       act_quant_mode);
 }
 
@@ -193,7 +189,6 @@ ContextLinearWoq create(
     bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t num_concats,
     int64_t act_quant_mode) {
   at::Tensor packed_weight;
   int64_t N = weight_shape[0];
@@ -242,7 +237,6 @@ ContextLinearWoq create(
           is_int4,
           group_size,
           lowp_mode,
-          num_concats,
           act_quant_mode);
     } else {
       return ContextLinearWoq(
@@ -255,7 +249,6 @@ ContextLinearWoq create(
           is_int4,
           group_size,
           lowp_mode,
-          num_concats,
           act_quant_mode);
     }
   }
@@ -269,7 +262,6 @@ ContextLinearWoq create(
       is_int4,
       group_size,
       lowp_mode,
-      num_concats,
       act_quant_mode);
 }
 
@@ -311,7 +303,6 @@ at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
       context.is_int4_,
       context.group_size_,
       context.lowp_mode_,
-      context.num_concats_,
       context.act_quant_mode_);
   if (res.size(-1) != context.weight_shape_[0]) {
     int64_t N = context.weight_shape_[0];
@@ -351,7 +342,6 @@ at::Tensor run_eltwise(
       context.is_int4_,
       context.group_size_,
       context.lowp_mode_,
-      context.num_concats_,
       context.act_quant_mode_);
 }
 
@@ -381,7 +371,6 @@ at::Tensor run_add(
       context.is_int4_,
       context.group_size_,
       context.lowp_mode_,
-      context.num_concats_,
       others,
       context.act_quant_mode_);
 }
@@ -412,7 +401,6 @@ at::Tensor run_add_add(
       context.is_int4_,
       context.group_size_,
       context.lowp_mode_,
-      context.num_concats_,
       others,
       context.act_quant_mode_);
 }

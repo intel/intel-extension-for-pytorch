@@ -31,7 +31,6 @@ class IpexWoqLinear(nn.Module):
         self.weight = None
         self._op_context = None
         self._lowp_mode = 0
-        self._num_concats = 1
         self._act_quant_mode = 0
         self._group_size = -1
 
@@ -57,7 +56,6 @@ class IpexWoqLinear(nn.Module):
         )
         extra_repr_str += ", bias={}".format(self.bias)
         extra_repr_str += ", lowp_mode={}".format(self._lowp_mode)
-        extra_repr_str += ", num_concats={}".format(self._num_concats)
         extra_repr_str += ", act_quant_mode={}".format(self._act_quant_mode)
         extra_repr_str += ", group_size={}".format(self._group_size)
         return extra_repr_str
@@ -101,9 +99,6 @@ class IpexWoqLinear(nn.Module):
                 "Falling back to 2(BF16)."
             )
         act_quant_mode = qconfig.act_quant_mode
-        num_concats = 1
-        if hasattr(mod, "_num_concats"):
-            num_concats = mod._num_concats
         dtype = qconfig.weight_dtype
         is_int4 = dtype == torch.quint4x2
         group_size = qconfig.group_size
@@ -130,7 +125,6 @@ class IpexWoqLinear(nn.Module):
             None,  # g_idx
             group_size,
             lowp_mode,
-            num_concats,
             act_quant_mode,
         )
         del qweight
@@ -174,9 +168,6 @@ class IpexWoqLinear(nn.Module):
                 lowp_mode = mod.qconfig.lowp_mode
             if hasattr(mod.qconfig, "act_quant_mode"):
                 act_quant_mode = mod.qconfig.act_quant_mode
-        num_concats = 1
-        if hasattr(mod, "_num_concats"):
-            num_concats = mod._num_concats
 
         w_dtype = qweight.dtype
         supported_qw_dtype = [
@@ -208,12 +199,10 @@ class IpexWoqLinear(nn.Module):
             None,
             group_size,
             int(lowp_mode),
-            num_concats,
             act_quant_mode,
         )
         qlinear.weight = qlinear._op_context.get_weight()
         qlinear._lowp_mode = lowp_mode
-        qlinear._num_concats = num_concats
         qlinear._act_quant_mode = act_quant_mode
         qlinear._group_size = group_size
         del qweight
@@ -230,7 +219,6 @@ class IpexWoqLinear(nn.Module):
         g_idx,
         group_size,
         lowp_mode,
-        num_concats,
         act_quant_mode,
     ):
         qlinear = cls(
@@ -248,12 +236,10 @@ class IpexWoqLinear(nn.Module):
             is_int4,
             group_size,
             int(lowp_mode),
-            num_concats,
             act_quant_mode,
         )
         qlinear.weight = qlinear._op_context.get_weight()
         qlinear._lowp_mode = lowp_mode
-        qlinear._num_concats = num_concats
         qlinear._act_quant_mode = act_quant_mode
         qlinear._group_size = group_size
         return qlinear
@@ -296,7 +282,6 @@ class IpexWoqLinearAllreduce(IpexWoqLinear):
         g_idx,
         group_size,
         lowp_mode,
-        num_concats,
         act_quant_mode,
     ):
         qlinear = cls._init_from_mod(mod, dtype)
@@ -313,7 +298,6 @@ class IpexWoqLinearAllreduce(IpexWoqLinear):
             is_int4,
             group_size,
             lowp_mode,
-            num_concats,
             act_quant_mode,
         )
         qlinear.weight = qlinear._op_context.get_weight()
