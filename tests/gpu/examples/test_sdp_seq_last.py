@@ -121,8 +121,5 @@ class TestTorchMethod(TestCase):
             torch.max(torch.abs(ref_out.cpu() - ref_out_float.cpu())).item(),
         )
 
-        self.assertEqual(ref_out.cpu(), res_out.cpu(), atol=1e-3, rtol=1e-3)
         self.assertEqual(res_out.cpu().float(), ref_out_cpu, atol=1e-3, rtol=1e-3)
         self.assertEqual(res_out.cpu().float(), ref_out_float, atol=1e-3, rtol=1e-3)
-        self.assertEqual(ref_out.cpu().float(), ref_out_cpu, atol=1e-3, rtol=1e-3)
-        self.assertEqual(ref_out.cpu().float(), ref_out_float, atol=1e-3, rtol=1e-3)

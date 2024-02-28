@@ -1,4 +1,5 @@
 #include <ATen/Context.h>
+#include <ATen/OpMathType.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
 
@@ -32,7 +33,8 @@ static void mul_kernel_dpcpp(TensorIteratorBase& iter) {
       iter.dtype(),
       "mul",
       [&]() {
-        mul_kernel_dpcpp_functor<scalar_t> f;
+        using opmath_t = at::opmath_type<scalar_t>;
+        mul_kernel_dpcpp_functor<opmath_t> f;
         fast_mode_opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(iter, f);
       });
 }
