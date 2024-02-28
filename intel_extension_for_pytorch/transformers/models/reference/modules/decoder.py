@@ -1100,7 +1100,7 @@ class _IPEXDecoderLayerRef(nn.Module):
             "LlamaForCausalLM",
             "BaichuanForCausalLM",
             "MistralForCausalLM",
-            "StableLMEpochForCausalLM",
+            "StableLmForCausalLM",
         ]:
             if not self.distributed:
                 self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
@@ -1369,7 +1369,7 @@ class _IPEXDecoderLayerRef(nn.Module):
                 output_router_logits,
                 use_cache,
             )
-        elif self.model_backbone == "StableLMEpochForCausalLM":
+        elif self.model_backbone == "StableLmForCausalLM":
             return StableLMEpochDecoderLayer_forward(
                 self,
                 hidden_states,

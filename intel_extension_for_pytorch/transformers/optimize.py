@@ -147,6 +147,7 @@ def model_convert_reference(_model):
         GitModel_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptbigcode,
+        prepare_inputs_for_generation_llama,
     )
 
     if not hasattr(_model.config, "architectures"):
@@ -171,7 +172,9 @@ def model_convert_reference(_model):
         _prepare_decoder_attention_mask,
     )
 
-    if version.parse(transformers.__version__) > version.parse("4.34.1"):
+    if version.parse(transformers.__version__) > version.parse(
+        "4.34.1"
+    ) and version.parse(transformers.__version__) < version.parse("4.36.0"):
         from transformers.modeling_attn_mask_utils import AttentionMaskConverter
 
         AttentionMaskConverter.to_4d = _to_4d
@@ -201,6 +204,11 @@ def model_convert_reference(_model):
             _model.model,
             "forward",
             LlamaModel_forward,
+        )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
         )
     elif (
         hasattr(_model, "__class__")
@@ -472,7 +480,7 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
-    elif _model.config.architectures[0] == "StableLMEpochForCausalLM":
+    elif _model.config.architectures[0] == "StableLmForCausalLM":
         convert_function(_model, "forward", StableLMEpochForCausalLM_forward)
         convert_function(_model.model, "forward", StableLMEpochModel_forward)
         convert_class(
@@ -939,7 +947,7 @@ def optimize(
     try:
         installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
         min_version = "4.28.1"
-        validated_version = "4.37.2"
+        validated_version = "4.38.1"
         if "transformers" not in installed_pkg:
             raise RuntimeError(
                 "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
@@ -983,7 +991,7 @@ def optimize(
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "MptForCausalLM",
-            "StableLMEpochForCausalLM",
+            "StableLmForCausalLM",
             "QWenLMHeadModel",
             "GitForCausalLM",
         ]

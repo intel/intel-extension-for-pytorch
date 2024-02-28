@@ -11,7 +11,6 @@ import itertools
 
 from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
 from hf_configs.chatglm.modeling_chatglm import ChatGLMForConditionalGeneration
-from hf_configs.stablelm.modeling_stablelm_epoch import StableLMEpochForCausalLM
 from hf_configs.qwen.modeling_qwen import QWenLMHeadModel
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _disable_tpp
 
@@ -122,7 +121,7 @@ supported_models = [
     ),
     model_info(
         "stablelm",
-        StableLMEpochForCausalLM,
+        transformers.models.stablelm.modeling_stablelm.StableLmForCausalLM,
         True,
         lambda m: m.model.layers[0].self_attn.__class__,
         lambda m: m.model.layers[0].__class__,

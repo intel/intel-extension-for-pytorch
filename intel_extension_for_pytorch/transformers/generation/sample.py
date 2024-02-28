@@ -173,7 +173,7 @@ def _sample(
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "MptForCausalLM",
-            "StableLMEpochForCausalLM",
+            "StableLmForCausalLM",
             "QWenLMHeadModel",
             "GitForCausalLM",
         ]:

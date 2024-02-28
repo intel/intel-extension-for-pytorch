@@ -203,7 +203,7 @@ class _IPEXRopeRef(nn.Module):
                 .transpose(1, 2)
             )
             x = torch.cat([x_rot, x_pass], dim=-1)
-        elif self.model_backbone == "StableLMEpochForCausalLM":
+        elif self.model_backbone == "StableLmForCausalLM":
             x = x.transpose(1, 2)
             x_rot = x[..., :rotary_ndims]
             x_pass = x[..., rotary_ndims:]
@@ -291,7 +291,7 @@ class _IPEXScaleDotProductRef(nn.Module):
             "LlamaForCausalLM",
             "MistralForCausalLM",
             "MixtralForCausalLM",
-            "StableLMEpochForCausalLM",
+            "StableLmForCausalLM",
         ]:
             self.num_key_value_groups = (
                 module.num_key_value_groups
@@ -495,7 +495,7 @@ class _IPEXScaleDotProductRef(nn.Module):
             "LlamaForCausalLM",
             "MistralForCausalLM",
             "MixtralForCausalLM",
-            "StableLMEpochForCausalLM",
+            "StableLmForCausalLM",
         ]:
             # repeat k/v heads if n_kv_heads < n_heads
             key = self._repeat_kv(key, self.num_key_value_groups)

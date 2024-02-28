@@ -31,7 +31,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
             "LlamaForCausalLM",
             "BaichuanForCausalLM",
             "MistralForCausalLM",
-            "StableLMEpochForCausalLM",
+            "StableLmForCausalLM",
             "QWenLMHeadModel",
         ]:
             if not self.distributed:

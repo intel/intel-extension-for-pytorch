@@ -186,7 +186,7 @@ def _beam_search(
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "MptForCausalLM",
-            "StableLMEpochForCausalLM",
+            "StableLmForCausalLM",
             "QWenLMHeadModel",
             "GitForCausalLM",
         ]:

@@ -1819,6 +1819,8 @@ class _IPEXAttentionRef(nn.Module):
                     else config.kv_channels
                 )
                 self.pos_embd_dim = rotary_dim // 2
+            elif self.model_backbone == "StableLmForCausalLM":
+                self.pos_embd_dim = self.rotary_emb.dim
             else:
                 self.pos_embd_dim = self.head_dim
             self.rope_base = 10000
@@ -1838,7 +1840,7 @@ class _IPEXAttentionRef(nn.Module):
             "LlamaForCausalLM",
             "MistralForCausalLM",
             "MixtralForCausalLM",
-            "StableLMEpochForCausalLM",
+            "StableLmForCausalLM",
         ]:
             if (
                 hasattr(module, "q_proj")
@@ -2180,7 +2182,7 @@ class _IPEXAttentionRef(nn.Module):
                 output_attentions,
                 use_cache,
             )
-        elif self.model_backbone == "StableLMEpochForCausalLM":
+        elif self.model_backbone == "StableLmForCausalLM":
             return _StableLMEpochAttention_forward(
                 self,
                 hidden_states,
