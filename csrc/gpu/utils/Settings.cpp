@@ -33,7 +33,7 @@ namespace dpcpp {
  *      Default = 1 | Set 0 to disable tile partition and map per root device
  *      Only works when `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE`
  *   IPEX_LOG_LEVEL:
- *      Default = 3 | Set IPEX_LOG_LEVEL = WARN, it will log message level bigger than warn
+ *      Default = -1 | Set IPEX_LOG_LEVEL = Disabled
  *   IPEX_LOG_COMPONENT:
  *      Default = "ALL" | Set IPEX_LOG_COMPONENT = ALL, it will log all component message.
  *      If you would like to log several components pls use ';' as sepreator, 
@@ -129,7 +129,7 @@ Settings::Settings() {
   verbose_level = VERBOSE_LEVEL::DISABLE;
   DPCPP_INIT_ENV_VAL("IPEX_VERBOSE", verbose_level, VERBOSE_LEVEL, show_opt);
 
-  log_level = LOG_LEVEL::WARN;
+  log_level = LOG_LEVEL::DISABLED;
   DPCPP_INIT_ENV_VAL("IPEX_LOGGING_LEVEL", log_level, LOG_LEVEL, show_opt);
 
   // get IPEX_LOG_ROTATE_SIZE
