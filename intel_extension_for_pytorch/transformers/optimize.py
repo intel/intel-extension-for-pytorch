@@ -763,7 +763,16 @@ def model_convert_lowering(
         if not is_quantization:
             if dtype is torch.bfloat16:
                 _enable_tpp()
-            _model = ipex.optimize(_model.eval(), dtype=dtype, inplace=True)
+            if ipex._C.is_llga_fp32_bf16_enabled():
+                _disable_tpp()
+                _model = ipex.optimize(
+                    _model.eval(),
+                    dtype=dtype,
+                    inplace=True,
+                    weights_prepack=False,
+                )
+            else:
+                _model = ipex.optimize(_model.eval(), dtype=dtype, inplace=True)
 
         if not is_quantization or woq:
             import transformers
