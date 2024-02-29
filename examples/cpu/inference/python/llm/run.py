@@ -258,10 +258,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
             infer_cmd.extend(["--batch-size", str(args.batch_size)])
             infer_cmd.extend(["--output-dir", str(args.output_dir)])
-            if args.quant_with_amp:
-                infer_cmd.extend(["--quant-with-amp"])
-            if args.greedy:
-                infer_cmd.extend(["--greedy"])
             if args.ipex_weight_only_quantization:
                 infer_cmd.extend(["--ipex-weight-only-quantization"])
                 infer_cmd.extend(["--weight-dtype", str(args.weight_dtype)])

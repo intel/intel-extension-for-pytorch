@@ -5,8 +5,6 @@ import pathlib
 import re
 from datasets import load_dataset
 
-from PIL import Image
-import requests
 import torch
 from torch.utils.data import DataLoader
 import transformers
@@ -232,8 +230,6 @@ elif re.search("chatglm", config.architectures[0], re.IGNORECASE):
 elif re.search("gptbigcode", config.architectures[0], re.IGNORECASE):
     model = GPTJBigCodeConfig(args.model_id)
 elif re.search("t5", config.architectures[0], re.IGNORECASE):
-    generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
-    generate_kwargs.pop("max_new_tokens")
     model = T5Config(args.model_id)
 elif re.search("mistral", config.architectures[0], re.IGNORECASE):
     model = MistralConfig(args.model_id)
@@ -246,11 +242,13 @@ elif re.search("stablelm", config.architectures[0], re.IGNORECASE):
 elif re.search("qwen", config.architectures[0], re.IGNORECASE):
     model = QwenConfig(args.model_id)
 elif re.search("git", config.architectures[0], re.IGNORECASE):
+    from PIL import Image
+    import requests
     model = GitConfig(args.model_id)
-    generate_kwargs.pop("min_new_tokens")
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 
+num_beams = 1 if args.greedy else 4
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 if model.name == "mpt" and not hasattr(config, "max_seq_len") and args.prompt is None:
@@ -262,7 +260,6 @@ user_model = model.get_user_model(config, args.benchmark)
 
 tokenizer = model.get_tokenizer()
 print("Data type of the model:", user_model.dtype)
-num_beams = 1 if args.greedy else 4
 if args.streaming:
     streamer = TextStreamer(tokenizer)
 else:
@@ -275,6 +272,11 @@ generate_kwargs = dict(
     min_new_tokens=args.max_new_tokens,
     streamer=streamer
 )
+if re.search("t5", config.architectures[0], re.IGNORECASE):
+    generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
+    generate_kwargs.pop("max_new_tokens")
+elif re.search("git", config.architectures[0], re.IGNORECASE):
+    generate_kwargs.pop("min_new_tokens")
 
 if model.to_channels_last:
     user_model = user_model.to(memory_format=torch.channels_last)

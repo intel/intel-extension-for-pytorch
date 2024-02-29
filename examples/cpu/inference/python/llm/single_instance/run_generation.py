@@ -4,8 +4,6 @@ import json
 import pathlib
 import argparse
 import re
-from PIL import Image
-import requests
 
 from transformers import (
     AutoConfig,
@@ -160,6 +158,8 @@ elif re.search("t5", model.config.architectures[0], re.IGNORECASE):
     generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
     generate_kwargs.pop("max_new_tokens")
 elif re.search("git", model.config.architectures[0], re.IGNORECASE):
+    from PIL import Image
+    import requests
     model.config.batch_size = int(args.batch_size) * num_beams
 def trace_handler(prof):
     print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=-1))
@@ -234,7 +234,7 @@ if args.benchmark:
             tic = time.time()
             if model_type == "git":
                 input_ids=tokenizer(images=prompt, return_tensors="pt").pixel_values
-                output = model.generate(pixel_values=input_ids, max_length=50)
+                output = model.generate(pixel_values=input_ids, **generate_kwargs)
             else:
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                 output = model.generate(input_ids, **generate_kwargs)
