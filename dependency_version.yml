@@ -8,9 +8,9 @@
 #   branch:      Branch name of the Github repository. For human understanding only.
 
 deepspeed:
-  commit: gma/run-opt-branch
-  repo: https://github.com/delock/DeepSpeedSYCLSupport.git
-  version: 0.11.2+94873fe
+  commit: 'v0.13.4'
+  repo: https://github.com/microsoft/DeepSpeed.git
+  version: 0.13.4
 gcc:
   max-version: null
   min-version: 12.3.0
