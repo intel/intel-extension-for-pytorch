@@ -5,15 +5,15 @@ VER_IPEX=main
 
 # Mode: Select which components to install. PyTorch and Intel® Extension for PyTorch* are always installed.
 # High bit: 8 7 6 5 4 3 2 1 :Low bit
-#           | | | | | | | └- TorchAudio
-#           | | | | | | └--- TorchVision
-#           | | | | | └----- Rebuild LLVM
-#           | | | | └------- Undefined
+#           | | | | | | | └- torch-ccl
+#           | | | | | | └--- TorchAudio
+#           | | | | | └----- TorchVision
+#           | | | | └------- Rebuild LLVM
 #           | | | └--------- Undefined
 #           | | └----------- Undefined
 #           | └------------- Undefined
 #           └--------------- Undefined
-MODE=0x03
+MODE=0x07
 if [ $# -gt 0 ]; then
     if [[ ! $1 =~ ^[0-9]+$ ]] && [[ ! $1 =~ ^0x[0-9a-fA-F]+$ ]]; then
         echo "Warning: Unexpected argument. Using default value."
@@ -33,7 +33,7 @@ cd ${BASEFOLDER}
 
 # Checkout individual components
 if [ ! -d intel-extension-for-pytorch ]; then
-    git clone https://github.com/intel/intel-extension-for-pytorch.git
+    git clone https://github.com/intel/intel-extension-for-pytorch.git intel-extension-for-pytorch
 fi
 cd intel-extension-for-pytorch
 if [ ! -z "${VER_IPEX}" ]; then
@@ -50,6 +50,8 @@ python -m pip install pyyaml
 VER_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
 VER_TORCHVISION=$(python tools/yaml_utils.py -f dependency_version.yml -d torchvision -k version)
 VER_TORCHAUDIO=$(python tools/yaml_utils.py -f dependency_version.yml -d torchaudio -k version)
+REPO_TORCHCCL=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k repo)
+COMMIT_TORCHCCL=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k commit)
 REPO_LLVM=$(python tools/yaml_utils.py -f dependency_version.yml -d llvm -k repo)
 VER_LLVM=$(python tools/yaml_utils.py -f dependency_version.yml -d llvm -k commit)
 VER_GCC=$(python tools/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
@@ -117,6 +119,11 @@ else
         echo "         Installing gcc and g++ 12.3 from conda..."
         echo ""
         GCC_CONDA=1
+    else
+        DIR_GCC=$(which gcc)
+        if [[ ${DIR_GCC} =~ ${CONDA_PREFIX} ]]; then
+            GCC_CONDA=2
+        fi
     fi
 fi
 
@@ -127,7 +134,7 @@ fi
 
 # Install dependencies
 python -m pip install cmake
-python -m pip uninstall -y torch torchvision torchaudio intel-extension-for-pytorch
+python -m pip uninstall -y torch torchvision torchaudio intel-extension-for-pytorch oneccl_bind_pt
 set +e
 echo ${VER_TORCH} | grep "dev" > /dev/null
 TORCH_DEV=$?
@@ -137,11 +144,27 @@ if [ ${TORCH_DEV} -eq 0 ]; then
     URL_NIGHTLY="nightly/"
 fi
 python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu
-if [ $((${MODE} & 0x02)) -ne 0 ]; then
+if [ $((${MODE} & 0x04)) -ne 0 ]; then
     python -m pip install torchvision==${VER_TORCHVISION} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu
 fi
-if [ $((${MODE} & 0x01)) -ne 0 ]; then
+if [ $((${MODE} & 0x02)) -ne 0 ]; then
     python -m pip install torchaudio==${VER_TORCHAUDIO} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu
+fi
+if [ $((${MODE} & 0x01)) -ne 0 ]; then
+    if [ ! -d torch-ccl ]; then
+        git clone ${REPO_TORCHCCL} torch-ccl
+    fi
+    cd torch-ccl
+    if [ ! -z "${COMMIT_TORCHCCL}" ]; then
+        rm -rf * > /dev/null
+        git checkout . > /dev/null
+        git checkout master > /dev/null
+        git pull > /dev/null
+        git checkout ${COMMIT_TORCHCCL}
+    fi
+    git submodule sync
+    git submodule update --init --recursive
+    cd ..
 fi
 ABI=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")
 
@@ -149,9 +172,24 @@ ABI=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")
 if [ ${GCC_CONDA} -eq 1 ]; then
     conda install -y sysroot_linux-64
     conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
-    export CC=${CONDA_PREFIX}/bin/gcc
-    export CXX=${CONDA_PREFIX}/bin/g++
-    export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
+fi
+if [ ${GCC_CONDA} -ge 1 ]; then
+    if [ -z ${CONDA_BUILD_SYSROOT} ]; then
+        source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gcc_linux-64.sh
+        source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gxx_linux-64.sh
+        source ${CONDA_PREFIX}/etc/conda/activate.d/activate-binutils_linux-64.sh
+    fi
+fi
+if [[ ! -z ${LDFLAGS} ]]; then
+    read -a ldflags <<< "${LDFLAGS}"
+    for i in "${!ldflags[@]}"; do
+        if [[ "${ldflags[i]}" == "-Wl,--as-needed" ]]; then
+            unset 'ldflags[i]'
+            break
+        fi
+    done
+    function join { local IFS="$1"; shift; echo "$*"; }
+    export LDFLAGS=$(join ' ' "${ldflags[@]}")
 fi
 set +e
 command -v make > /dev/null
@@ -162,7 +200,7 @@ set -e
 
 #  LLVM
 LLVM_ROOT="$(pwd)/llvm-release"
-if [ $((${MODE} & 0x04)) -ne 0 ]; then
+if [ $((${MODE} & 0x08)) -ne 0 ]; then
     if [ -d ${LLVM_ROOT} ]; then
         rm -rf ${LLVM_ROOT}
     fi
@@ -186,6 +224,8 @@ if [ ! -d ${LLVM_ROOT} ]; then
     ln -s ${LLVM_ROOT}/bin/llvm-config ${LLVM_ROOT}/bin/llvm-config-13
 fi
 cd ..
+PATH_BK=${PATH}
+LD_LIBRARY_PATH_BK=${LD_LIBRARY_PATH}
 export PATH=${LLVM_ROOT}/bin:$PATH
 export LD_LIBRARY_PATH=${LLVM_ROOT}/lib:$LD_LIBRARY_PATH
 #  Intel® Extension for PyTorch*
@@ -200,21 +240,34 @@ python setup.py bdist_wheel 2>&1 | tee build.log
 export CXXFLAGS=${CXXFLAGS_BK}
 unset DNNL_GRAPH_BUILD_COMPILER_BACKEND
 unset LLVM_DIR
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH_BK}
+export PATH=${PATH_BK}
 python -m pip uninstall -y mkl-static mkl-include
 python -m pip install dist/*.whl
-export LD_PRELOAD=$(bash ./tools/get_libstdcpp_lib.sh)
 cd ..
+#  Torch-CCL
+if [ $((${MODE} & 0x01)) -ne 0 ]; then
+    cd torch-ccl
+    python setup.py clean
+    python setup.py bdist_wheel 2>&1 | tee build.log
+    python -m pip install dist/*.whl
+    cd ..
+fi
+export LD_PRELOAD=$(bash ./intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh)
 
 # Sanity Test
 echo "======================================================"
 echo "Note: Set environment variable \"export LD_PRELOAD=${LD_PRELOAD}\" to avoid the \"version \`GLIBCXX_N.N.NN' not found\" error."
 echo "======================================================"
 CMD="import torch; print(f'torch_cxx11_abi:     {torch._C._GLIBCXX_USE_CXX11_ABI}'); print(f'torch_version:       {torch.__version__}');"
-if [ $((${MODE} & 0x02)) -ne 0 ]; then
+if [ $((${MODE} & 0x04)) -ne 0 ]; then
     CMD="${CMD} import torchvision; print(f'torchvision_version: {torchvision.__version__}');"
 fi
-if [ $((${MODE} & 0x01)) -ne 0 ]; then
+if [ $((${MODE} & 0x02)) -ne 0 ]; then
     CMD="${CMD} import torchaudio; print(f'torchaudio_version:  {torchaudio.__version__}');"
 fi
 CMD="${CMD} import intel_extension_for_pytorch as ipex; print(f'ipex_version:        {ipex.__version__}');"
+if [ $((${MODE} & 0x01)) -ne 0 ]; then
+    CMD="${CMD} import oneccl_bindings_for_pytorch as torch_ccl; print(f'torchccl_version:    {torch_ccl.__version__}');"
+fi
 python -c "${CMD}"

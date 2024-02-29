@@ -13,7 +13,7 @@ cd ${BASEFOLDER}/..
 #           | | | | | | | └- Install wheel files
 #           | | | | | | └--- Compile wheel files
 #           | | | | | └----- Install from prebuilt wheel files for ipex, torch-ccl, ds
-#           | | | | └------- Undefined
+#           | | | | └------- Compile DeepSpeed from source
 #           | | | └--------- Undefined
 #           | | └----------- Undefined
 #           | └------------- Undefined
@@ -45,16 +45,14 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         exit 2
     fi
     python -m pip install pyyaml
-    LM_EVA_REPO=$(python tools/yaml_utils.py -f dependency_version.yml -d lm-evaluation-harness -k repo)
-    LM_EVA_COMMIT=$(python tools/yaml_utils.py -f dependency_version.yml -d lm-evaluation-harness -k commit)
-    DS_SYCL_REPO=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k repo)
-    DS_SYCL_COMMIT=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k commit)
+    REPO_LM_EVA=$(python tools/yaml_utils.py -f dependency_version.yml -d lm-evaluation-harness -k repo)
+    COMMIT_LM_EVA=$(python tools/yaml_utils.py -f dependency_version.yml -d lm-evaluation-harness -k commit)
+    REPO_DS_SYCL=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k repo)
+    COMMIT_DS_SYCL=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k commit)
     VER_DS_SYCL=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k version)
-    TORCHCCL_REPO=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k repo)
-    TORCHCCL_COMMIT=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k commit)
     VER_TORCHCCL=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k version)
-    ONECCL_REPO=$(python tools/yaml_utils.py -f dependency_version.yml -d oneCCL -k repo)
-    ONECCL_COMMIT=$(python tools/yaml_utils.py -f dependency_version.yml -d oneCCL -k commit)
+    REPO_ONECCL=$(python tools/yaml_utils.py -f dependency_version.yml -d oneCCL -k repo)
+    COMMIT_ONECCL=$(python tools/yaml_utils.py -f dependency_version.yml -d oneCCL -k commit)
     VER_GCC=$(python tools/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
     VER_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
     VER_TRANSFORMERS=$(python tools/yaml_utils.py -f dependency_version.yml -d transformers -k version)
@@ -133,12 +131,13 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
             echo "         Found GCC version $(gcc -dumpfullversion)"
             echo "         Installing gcc and g++ 12.3 with conda"
             echo ""
+            conda install -y sysroot_linux-64
             conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
-            conda update -y sysroot_linux-64
-            export CC=${CONDA_PREFIX}/bin/gcc
-            export CXX=${CONDA_PREFIX}/bin/g++
-            export PATH=${CONDA_PREFIX}/bin:${PATH}
-            export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
+            if [ -z ${CONDA_BUILD_SYSROOT} ]; then
+                source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gcc_linux-64.sh
+                source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gxx_linux-64.sh
+                source ${CONDA_PREFIX}/etc/conda/activate.d/activate-binutils_linux-64.sh
+            fi
         fi
 
         set +e
@@ -153,25 +152,10 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         # Install PyTorch and Intel® Extension for PyTorch*
         cp intel-extension-for-pytorch/scripts/compile_bundle.sh .
         sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
-        bash compile_bundle.sh 0
-        rm -rf compile_bundle.sh llvm-project llvm-release
+        bash compile_bundle.sh 1
         cp intel-extension-for-pytorch/dist/*.whl ${WHEELFOLDER}
-
-        # The following is only for DeepSpeed case
-        #Install oneccl-bind-pt(also named torch-ccl)
-        if [ -d torch-ccl ]; then
-            rm -rf torch-ccl
-        fi
-        git clone ${TORCHCCL_REPO} torch-ccl
-        cd torch-ccl
-        git checkout ${TORCHCCL_COMMIT}
-        git submodule sync
-        git submodule update --init --recursive
-        python setup.py bdist_wheel
-        cp dist/*.whl ${WHEELFOLDER}
-        python -m pip install dist/*.whl
-        cd ..
-        rm -rf torch-ccl
+        cp torch-ccl/dist/*.whl ${WHEELFOLDER}
+        rm -rf compile_bundle.sh llvm-project llvm-release torch-ccl
     fi
 
     echo "python -m pip install cpuid accelerate datasets sentencepiece protobuf==${VER_PROTOBUF} transformers==${VER_TRANSFORMERS} neural-compressor==${VER_INC}" >> ${AUX_INSTALL_SCRIPT}
@@ -180,42 +164,41 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     if [ -d lm-evaluation-harness ]; then
         rm -rf lm-evaluation-harness
     fi
-    git clone ${LM_EVA_REPO} lm-evaluation-harness
+    git clone ${REPO_LM_EVA} lm-evaluation-harness
     cd lm-evaluation-harness
-    git checkout ${LM_EVA_COMMIT}
+    git checkout ${COMMIT_LM_EVA}
     python setup.py bdist_wheel
     cp dist/*.whl ${WHEELFOLDER}
     cd ..
     rm -rf lm-evaluation-harness
 
     # Install DeepSpeed
-    if [ $((${MODE} & 0x04)) -ne 0 ]; then
-        echo "python -m pip install deepspeed==${VER_DS_SYCL}" >> ${AUX_INSTALL_SCRIPT}
-        python -m pip install deepspeed==${VER_DS_SYCL}
-    else
+    if [ $((${MODE} & 0x08)) -ne 0 ]; then
         if [ -d DeepSpeed ]; then
             rm -rf DeepSpeed
         fi
-        git clone ${DS_SYCL_REPO} DeepSpeed
+        git clone ${REPO_DS_SYCL} DeepSpeed
         cd DeepSpeed
-        git checkout ${DS_SYCL_COMMIT}
+        git checkout ${COMMIT_DS_SYCL}
         python -m pip install -r requirements/requirements.txt
         python setup.py bdist_wheel
         cp dist/*.whl ${WHEELFOLDER}
         cd ..
         rm -rf DeepSpeed
+    else
+        echo "python -m pip install deepspeed==${VER_DS_SYCL}" >> ${AUX_INSTALL_SCRIPT}
     fi
 
     # Install OneCCL
     if [ -d oneCCL ]; then
         rm -rf oneCCL
     fi
-    git clone ${ONECCL_REPO} oneCCL
+    git clone ${REPO_ONECCL} oneCCL
     cd oneCCL
-    git checkout ${ONECCL_COMMIT}
+    git checkout ${COMMIT_ONECCL}
     mkdir build
     cd build
-    cmake ..
+    cmake -DBUILD_EXAMPLES=FALSE -DBUILD_FT=FALSE ..
     make -j install
     cd ../..
     cp -r oneCCL/build/_install ${CCLFOLDER}
