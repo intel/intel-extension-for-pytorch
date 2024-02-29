@@ -104,4 +104,43 @@ void fmha_backward_kernel(
     uint64_t seed_t,
     uint64_t offset_t);
 
+void paged_attention_v1(
+    sycl::queue& q,
+    sycl::half* out,
+    sycl::half* query,
+    sycl::half* key_cache,
+    sycl::half* value_cache,
+    int32_t* head_mapping,
+    int32_t* block_tables,
+    int32_t* context_lens,
+    float sm_scale,
+    uint32_t num_seqs,
+    uint32_t num_heads,
+    uint32_t num_kv_heads,
+    uint32_t head_size,
+    uint32_t block_size,
+    uint32_t max_blocks_per_seq,
+    uint32_t max_context_len);
+
+void paged_attention_v2(
+    float* max_logits,
+    float* exp_sums,
+    sycl::half* tmp_out,
+    sycl::queue& q,
+    sycl::half* out,
+    sycl::half* query,
+    sycl::half* key_cache,
+    sycl::half* value_cache,
+    int32_t* head_mapping,
+    int32_t* block_tables,
+    int32_t* context_lens,
+    float sm_scale,
+    uint32_t num_seqs,
+    uint32_t num_heads,
+    uint32_t num_kv_heads,
+    uint32_t head_size,
+    uint32_t block_size,
+    uint32_t max_blocks_per_seq,
+    uint32_t max_context_len);
+
 } // namespace gpu::xetla

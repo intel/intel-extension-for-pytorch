@@ -146,6 +146,8 @@ class NewIPEXGPTJBlock(IPEXTransformerBlock):
         if self.ipex_config.transpose:
             self.transpose_parameter()
         self.attn.cat_qkv()
+        if self.framework == "vllm":
+            self.module.attn.qkv_proj.weight.data = self.attn.qkv_proj.weight.data
 
     def forward(
         self,
