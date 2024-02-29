@@ -43,88 +43,68 @@ constexpr bool is_sym_quant(const int qw_type) {
   return qw_type == NF4;
 }
 
-uint8_t quantize_nf4_scalar(float x) {
-  if (x > 0.03979014977812767f)
-    if (x > 0.3893125355243683f) // 1
-      if (x > 0.6427869200706482f) // 11
-        if (x > 0.8614784181118011f) // 111
-          return 0b1111;
-        else
-          return 0b1110;
-      else if (x > 0.5016634166240692f) // 110
-        return 0b1101;
-      else
-        return 0b1100;
-    else if (x > 0.2035212516784668f) // 10
-      if (x > 0.2920137718319893f) // 101
-        return 0b1011;
-      else
-        return 0b1010;
-    else if (x > 0.1202552504837513f) // 100
-      return 0b1001;
-    else
-      return 0b1000;
-  else if (x > -0.33967943489551544f) // 0
-    if (x > -0.13791173323988914f) // 01
-      if (x > -0.045525018125772476f) // 011
-        return 0b0111;
-      else
-        return 0b0110;
-    else if (x > -0.23460740596055984f) // 010
-      return 0b0101;
-    else
-      return 0b0100;
-  else if (x > -0.6106329262256622f) // 00
-    if (x > -0.4599952697753906f) // 001
-      return 0b0011;
-    else
-      return 0b0010;
-  else if (x > -0.8480964004993439f) // 000
-    return 0b0001;
-  else
-    return 0b0000;
+static constexpr std::array<float, 16> NF4_QUANT_TABLE = {
+    -1.0 - 1e-2, // 0b0000
+    -0.8480964004993439, // 0b0001
+    -0.6106329262256622, // 0b0010
+    -0.4599952697753906, // 0b0011
+    -0.33967943489551544, // 0b0100
+    -0.23460740596055984, // 0b0101
+    -0.13791173323988914, // 0b0110
+    -0.045525018125772476, // 0b0111
+    0.03979014977812767, // 0b1000
+    0.1202552504837513, // 0b1001
+    0.2035212516784668, // 0b1010
+    0.2920137718319893, // 0b1011
+    0.3893125355243683, // 0b1100
+    0.5016634166240692, // 0b1101
+    0.6427869200706482, // 0b1110
+    0.8614784181118011, // 0b1111
+};
+
+static constexpr std::array<float, 16> NF4_DEQUANT_TABLE = {
+    -1.0,
+    -0.6961928009986877,
+    -0.5250730514526367,
+    -0.39491748809814453,
+    -0.28444138169288635,
+    -0.18477343022823334,
+    -0.09105003625154495,
+    0.0,
+    0.07958029955625534,
+    0.16093020141124725,
+    0.24611230194568634,
+    0.33791524171829224,
+    0.44070982933044434,
+    0.5626170039176941,
+    0.7229568362236023,
+    1.0,
+};
+
+at::Tensor map_float_tensor_to_nf4(const at::Tensor& t) {
+  // Map [-1, 1] to nf4. Assume t in [-1, 1]
+  // Logic:
+  // for i in range(len(NF4_QUANT_TABLE)):
+  //     out_uint8[t > NF4_QUANT_TABLE[i]] = i
+  using namespace at::indexing;
+  auto out_uint8 = at::empty(t.sizes(), t.options().dtype(at::kByte));
+  for (size_t i = 0; i < NF4_QUANT_TABLE.size(); ++i) {
+    out_uint8.index_put_({t.greater(NF4_QUANT_TABLE[i])}, i);
+  }
+  return out_uint8;
 }
 
-float dequantize_nf4_scalar(uint8_t val) {
-  if ((val & 0b1000) == 8)
-    if ((val & 0b0100) == 4) // 1
-      if ((val & 0b0010) == 2) // 11
-        if ((val & 0b0001) == 1) // 111
-          return 1.0f;
-        else
-          return 0.7229568362236023f;
-      else if ((val & 0b0001) == 1) // 110
-        return 0.5626170039176941f;
-      else
-        return 0.44070982933044434f;
-    else if ((val & 0b0010) == 2) // 10
-      if ((val & 0b0001) == 1) // 101
-        return 0.33791524171829224f;
-      else
-        return 0.24611230194568634f;
-    else if ((val & 0b0001) == 1) // 100
-      return 0.16093020141124725f;
-    else
-      return 0.07958029955625534f;
-  else if ((val & 0b0100) == 4) // 0
-    if ((val & 0b0010) == 2) // 01
-      if ((val & 0b0001) == 1) // 011
-        return 0.0f;
-      else
-        return -0.09105003625154495f;
-    else if ((val & 0b0001) == 1) // 010
-      return -0.18477343022823334f;
-    else
-      return -0.28444138169288635f;
-  else if ((val & 0b0010) == 2) // 00
-    if ((val & 0b0001) == 1) // 001
-      return -0.39491748809814453f;
-    else
-      return -0.5250730514526367f;
-  else if ((val & 0b0001) == 1) // 000
-    return -0.6961928009986877f;
-  else
-    return -1.0f;
+at::Tensor map_nf4_tensor_to_float(const at::Tensor& t) {
+  // Map nf4 to [-1, 1], t is already unpacked as uint8
+  // Logic:
+  // for i in range(len(NF4_DEQUANT_TABLE)):
+  //     out_dq[t == i] = NF4_DEQUANT_TABLE[i]
+  using namespace at::indexing;
+  auto out_dq = at::empty(t.sizes(), t.options().dtype(at::kFloat));
+  for (size_t i = 0; i < NF4_DEQUANT_TABLE.size(); ++i) {
+    out_dq.index_put_({t.eq(i)}, NF4_DEQUANT_TABLE[i]);
+  }
+  return out_dq;
 }
 
 // We only build optimized kernels if AVX512_FP16 is supported and gcc>=12.3
@@ -2393,93 +2373,6 @@ at::Tensor qlinear_woq_unpack(
   }
 }
 
-at::Tensor quantize_nf4(const at::Tensor& t) {
-  auto t_dim = t.dim();
-  TLA_ASSERT(t_dim >= 2 && t_dim <= 4, "quantize_nf4 accepts dim 2, 3 or 4");
-  auto qt = at::empty_like(t, t.options().dtype(at::kByte));
-  if (t_dim == 2) {
-    auto A = t.sizes()[0];
-    auto B = t.sizes()[1];
-    auto quant_loop = ThreadedLoop<2>({{A}, {B}}, "AB");
-    quant_loop([&](int* idx) {
-      int a = idx[0];
-      int b = idx[1];
-      qt.index({a, b}) = quantize_nf4_scalar(t.index({a, b}).item<float>());
-    });
-  } else if (t_dim == 3) {
-    auto A = t.sizes()[0];
-    auto B = t.sizes()[1];
-    auto C = t.sizes()[2];
-    auto quant_loop = ThreadedLoop<3>({{A}, {B}, {C}}, "ABC");
-    quant_loop([&](int* idx) {
-      int a = idx[0];
-      int b = idx[1];
-      int c = idx[2];
-      qt.index({a, b, c}) =
-          quantize_nf4_scalar(t.index({a, b, c}).item<float>());
-    });
-  } else {
-    auto A = t.sizes()[0];
-    auto B = t.sizes()[1];
-    auto C = t.sizes()[2];
-    auto D = t.sizes()[3];
-    auto quant_loop = ThreadedLoop<4>({{A}, {B}, {C}, {D}}, "ABCD");
-    quant_loop([&](int* idx) {
-      int a = idx[0];
-      int b = idx[1];
-      int c = idx[2];
-      int d = idx[3];
-      qt.index({a, b, c, d}) =
-          quantize_nf4_scalar(t.index({a, b, c, d}).item<float>());
-    });
-  }
-  return qt;
-}
-
-at::Tensor dequantize_nf4(const at::Tensor& qt) {
-  auto qt_dim = qt.dim();
-  TLA_ASSERT(
-      qt_dim >= 2 && qt_dim <= 4, "dequantize_nf4 accepts dim 2, 3 or 4");
-  auto t = at::empty_like(qt, qt.options().dtype(at::kFloat));
-  if (qt_dim == 2) {
-    auto A = qt.sizes()[0];
-    auto B = qt.sizes()[1];
-    auto dequant_loop = ThreadedLoop<2>({{A}, {B}}, "AB");
-    dequant_loop([&](int* idx) {
-      int a = idx[0];
-      int b = idx[1];
-      t.index({a, b}) = dequantize_nf4_scalar(qt.index({a, b}).item<uint8_t>());
-    });
-  } else if (qt_dim == 3) {
-    auto A = qt.sizes()[0];
-    auto B = qt.sizes()[1];
-    auto C = qt.sizes()[2];
-    auto dequant_loop = ThreadedLoop<3>({{A}, {B}, {C}}, "ABC");
-    dequant_loop([&](int* idx) {
-      int a = idx[0];
-      int b = idx[1];
-      int c = idx[2];
-      t.index({a, b, c}) =
-          dequantize_nf4_scalar(qt.index({a, b, c}).item<uint8_t>());
-    });
-  } else {
-    auto A = qt.sizes()[0];
-    auto B = qt.sizes()[1];
-    auto C = qt.sizes()[2];
-    auto D = qt.sizes()[3];
-    auto dequant_loop = ThreadedLoop<4>({{A}, {B}, {C}, {D}}, "ABCD");
-    dequant_loop([&](int* idx) {
-      int a = idx[0];
-      int b = idx[1];
-      int c = idx[2];
-      int d = idx[3];
-      t.index({a, b, c, d}) =
-          dequantize_nf4_scalar(qt.index({a, b, c, d}).item<uint8_t>());
-    });
-  }
-  return t;
-}
-
 template <typename scalar_t>
 inline scalar_t max_propagate_nan(scalar_t a, scalar_t b) {
   if (at::_isnan(a)) {
@@ -3725,26 +3618,18 @@ at::Tensor qlinear_woq_affine(
     }
     auto w =
         [&]() {
+          at::Tensor dqw;
           if (qw_type == NF4) {
             TLA_ASSERT(
                 sym_quant, "Weight must be symmetrically quantized for NF4");
             using namespace at::indexing;
             auto w_int8 =
                 at::empty({N, qw.size(1) * 2}, qw.options().dtype(at::kByte));
-            auto w_ret =
-                at::empty({N, qw.size(1) * 2}, qw.options().dtype(at::kFloat));
             w_int8.index({Slice(), Slice(None, None, 2)})
                 .copy_(qw.bitwise_and(0xf));
             w_int8.index({Slice(), Slice(1, None, 2)})
                 .copy_(qw.bitwise_right_shift(4));
-            auto dequant_loop = ThreadedLoop<2>({{N}, {w_int8.size(1)}}, "AB");
-            dequant_loop([&](int* idx) {
-              int i = idx[0];
-              int j = idx[1];
-              w_ret.index({i, j}) =
-                  dequantize_nf4_scalar(w_int8.index({i, j}).item<uint8_t>());
-            });
-            at::Tensor dqw;
+            auto w_ret = map_nf4_tensor_to_float(w_int8);
             if (quant_w_mode == 0) {
               dqw = w_ret * scale;
             } else {
@@ -3753,7 +3638,6 @@ at::Tensor qlinear_woq_affine(
               dqw = w_int8_view * scale;
               dqw = dqw.view({N, -1});
             }
-            return dqw;
           } else if (qw_type == QINT4) {
             TLA_ASSERT(
                 !sym_quant, "Weight must be asymmetrically quantized for INT4");
@@ -3764,7 +3648,6 @@ at::Tensor qlinear_woq_affine(
                 .copy_(qw.bitwise_and(0xf));
             w_int8.index({Slice(), Slice(1, None, 2)})
                 .copy_(qw.bitwise_right_shift(4));
-            at::Tensor dqw;
             if (quant_w_mode == 0) {
               dqw = (w_int8.to(at::kFloat) - zp) * scale;
             } else {
@@ -3773,18 +3656,9 @@ at::Tensor qlinear_woq_affine(
               dqw = (w_int8_view.to(at::kFloat) - zp) * scale;
               dqw = dqw.view({N, -1});
             }
-            if (K != qw.size(1) * 2) {
-              TORCH_CHECK(
-                  K < qw.size(1) * 2,
-                  'WOQ Linear kernel: Unexpected weight shape');
-              auto dqw_narrowed = dqw.narrow(1, 0, K);
-              return dqw_narrowed;
-            }
-            return dqw;
           } else {
             TLA_ASSERT(
                 !sym_quant, "Weight must be asymmetrically quantized for INT8");
-            at::Tensor dqw;
             if (quant_w_mode == 0) {
               dqw = sym_quant ? qw.to(at::kFloat) * scale
                               : (qw.to(at::kFloat) - zp) * scale;
@@ -3795,8 +3669,14 @@ at::Tensor qlinear_woq_affine(
                               : (w_int8_view.to(at::kFloat) - zp) * scale;
               dqw = dqw.view({N, -1});
             }
-            return dqw;
           }
+          if (K != qw.size(1) * 2) {
+            TORCH_CHECK(
+                K < qw.size(1) * 2,
+                'WOQ Linear kernel: Unexpected weight shape');
+            dqw = dqw.narrow(1, 0, K);
+          }
+          return dqw;
         }()
             .to(compute_dtype);
     auto x_reshape = x.reshape({M, K});
@@ -3867,26 +3747,18 @@ at::Tensor qlinear_woq_affine(
   }
   auto w =
       [&]() {
+        at::Tensor dqw;
         if (qw_type == NF4) {
           TLA_ASSERT(
               sym_quant, "Weight must be symmetrically quantized for NF4");
           using namespace at::indexing;
           auto w_int8 =
               at::empty({N, qw.size(1) * 2}, qw.options().dtype(at::kByte));
-          auto w_ret =
-              at::empty({N, qw.size(1) * 2}, qw.options().dtype(at::kFloat));
           w_int8.index({Slice(), Slice(None, None, 2)})
               .copy_(qw.bitwise_and(0xf));
           w_int8.index({Slice(), Slice(1, None, 2)})
               .copy_(qw.bitwise_right_shift(4));
-          auto dequant_loop = ThreadedLoop<2>({{N}, {w_int8.size(1)}}, "AB");
-          dequant_loop([&](int* idx) {
-            int i = idx[0];
-            int j = idx[1];
-            w_ret.index({i, j}) =
-                dequantize_nf4_scalar(w_int8.index({i, j}).item<uint8_t>());
-          });
-          at::Tensor dqw;
+          auto w_ret = map_nf4_tensor_to_float(w_int8);
           if (quant_w_mode == 0) {
             dqw = w_ret * scale;
           } else {
@@ -3895,7 +3767,6 @@ at::Tensor qlinear_woq_affine(
             dqw = w_int8_view * scale;
             dqw = dqw.view({N, -1});
           }
-          return dqw;
         } else if (qw_type == QINT4) {
           TLA_ASSERT(
               !sym_quant, "Weight must be asymmetrically quantized for INT4");
@@ -3906,7 +3777,6 @@ at::Tensor qlinear_woq_affine(
               .copy_(qw.bitwise_and(0xf));
           w_int8.index({Slice(), Slice(1, None, 2)})
               .copy_(qw.bitwise_right_shift(4));
-          at::Tensor dqw;
           if (quant_w_mode == 0) {
             dqw = (w_int8.to(at::kFloat) - zp) * scale;
           } else {
@@ -3915,18 +3785,9 @@ at::Tensor qlinear_woq_affine(
             dqw = (w_int8_view.to(at::kFloat) - zp) * scale;
             dqw = dqw.view({N, -1});
           }
-          if (K != qw.size(1) * 2) {
-            TORCH_CHECK(
-                K < qw.size(1) * 2,
-                'WOQ Linear kernel: Unexpected weight shape');
-            auto dqw_narrowed = dqw.narrow(1, 0, K);
-            return dqw_narrowed;
-          }
-          return dqw;
         } else {
           TLA_ASSERT(
               !sym_quant, "Weight must be asymmetrically quantized for INT8");
-          at::Tensor dqw;
           if (quant_w_mode == 0) {
             dqw = sym_quant ? qw.to(at::kFloat) * scale
                             : (qw.to(at::kFloat) - zp) * scale;
@@ -3937,8 +3798,13 @@ at::Tensor qlinear_woq_affine(
                             : (w_int8_view.to(at::kFloat) - zp) * scale;
             dqw = dqw.view({N, -1});
           }
-          return dqw;
         }
+        if (K != qw.size(1) * 2) {
+          TORCH_CHECK(
+              K < qw.size(1) * 2, 'WOQ Linear kernel: Unexpected weight shape');
+          dqw = dqw.narrow(1, 0, K);
+        }
+        return dqw;
       }()
           .to(compute_dtype);
   auto x_reshape = x.reshape({M, K});

@@ -17,7 +17,6 @@ from common_utils import TestCase
 import intel_extension_for_pytorch as ipex
 from test_ao_jit_llga_utils import JitLlgaTestCase, LLGA_FUSION_GROUP
 from torch.testing._internal.common_utils import run_tests
-from torch.ao.nn.quantized.modules.utils import _quantize_weight
 from intel_extension_for_pytorch.quantization import (
     prepare,
     convert,
@@ -25,6 +24,8 @@ from intel_extension_for_pytorch.quantization import (
     dequantize_per_block,
     quantize_per_channel,
     quantize_per_block,
+    WoqWeightDtype,
+    WoqLowpMode,
 )
 
 
@@ -682,10 +683,15 @@ class WeightOnlyQuantizationTester(TestCase):
             m = model.eval()
             data = torch.rand(1, feature[0], feature[1])
             weight = model.linear.weight
-            is_int4 = False
-            weight_int8, w_scales, w_zero_points = quantize_per_channel(weight, is_int4)
+            weight_int8, w_scales, w_zero_points = quantize_per_channel(
+                weight, WoqWeightDtype.INT8
+            )
             weight_fp32 = dequantize_per_channel(
-                weight_int8, w_scales, w_zero_points.int(), is_int4, weight.shape
+                weight_int8,
+                w_scales,
+                w_zero_points.int(),
+                WoqWeightDtype.INT8,
+                weight.shape,
             )
             if has_bias:
                 bias = model.linear.bias
@@ -750,14 +756,13 @@ class WeightOnlyQuantizationTester(TestCase):
             )
             prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
 
-            is_int4 = w_dtype == torch.quint4x2
             with torch.no_grad():
                 weight = m.linear.weight
                 weight_int8, w_scales, w_zero_points = quantize_per_channel(
-                    weight, is_int4
+                    weight, w_dtype
                 )
                 weight_fp32 = dequantize_per_channel(
-                    weight_int8, w_scales, w_zero_points.int(), is_int4, weight.shape
+                    weight_int8, w_scales, w_zero_points.int(), w_dtype, weight.shape
                 )
                 weight_bf16 = weight_fp32.bfloat16()
                 weight_fp16 = weight_fp32.half()
@@ -815,7 +820,7 @@ class WeightOnlyQuantizationTester(TestCase):
             [196, 63, 255],
         ]
         use_bias_list = [True, False]
-        w_dtype_list = [torch.qint8, torch.quint4x2]
+        w_dtype_list = [WoqWeightDtype.INT8, WoqWeightDtype.INT4]
         cases = itertools.product(shape_list, use_bias_list, w_dtype_list)
         for shape, use_bias, w_dtype in cases:
             test(shape, use_bias, w_dtype)
@@ -834,7 +839,7 @@ class WeightOnlyQuantizationTester(TestCase):
             [8, 64, 64],
         ]
         use_bias_list = [True, False]
-        w_dtype_list = [torch.qint8, torch.quint4x2]
+        w_dtype_list = [WoqWeightDtype.INT8, WoqWeightDtype.INT4]
         model_dtype_list = [torch.bfloat16, torch.half]
         cases = itertools.product(
             shape_list, use_bias_list, w_dtype_list, model_dtype_list
@@ -896,12 +901,12 @@ class WeightOnlyQuantizationTester(TestCase):
             [196, 4095, 16383],
         ]
         use_bias_list = [True, False]
-        w_dtype_list = [torch.qint8, torch.quint4x2]
+        w_dtype_list = [WoqWeightDtype.INT8, WoqWeightDtype.INT4]
         cases = itertools.product(shape_list, use_bias_list, w_dtype_list)
         for shape, use_bias, w_dtype in cases:
             test(shape, use_bias, w_dtype)
 
-    def test_weight_only_quantization_quint4x2_weight(self):
+    def test_weight_only_quantization_int4_weight(self):
         class M(nn.Module):
             def __init__(self, input_channel, output_channel, has_bias):
                 super(M, self).__init__()
@@ -915,14 +920,11 @@ class WeightOnlyQuantizationTester(TestCase):
             m = model.eval()
             data = torch.rand(feature[0], feature[1])
             weight = model.linear.weight
-            weight_observer = ipex.quantization.get_weight_only_quant_qconfig_mapping(
-                weight_dtype=torch.quint4x2
-            ).global_qconfig.weight()
-            weight_observer(weight)
-            is_int4 = True
-            weight_int4, w_scales, w_zero_points = quantize_per_channel(weight, is_int4)
+            weight_int4, w_scales, w_zero_points = quantize_per_channel(
+                weight, WoqWeightDtype.INT4
+            )
             weight_fp32 = dequantize_per_channel(
-                weight_int4, w_scales, w_zero_points, is_int4, weight.shape
+                weight_int4, w_scales, w_zero_points, WoqWeightDtype.INT4, weight.shape
             )
             if has_bias:
                 bias = model.linear.bias
@@ -931,7 +933,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 output1 = torch.matmul(data, weight_fp32.T)
 
             qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
-                weight_dtype=torch.quint4x2
+                weight_dtype=WoqWeightDtype.INT4
             )
             prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
             with torch.no_grad():
@@ -954,6 +956,62 @@ class WeightOnlyQuantizationTester(TestCase):
             [4, 4096, 4095],
             [9, 4095, 4095],
             [196, 4095, 16383],
+        ]
+        use_bias_list = [True, False]
+        cases = itertools.product(shape_list, use_bias_list)
+        for shape, use_bias in cases:
+            test(shape, use_bias)
+
+    def test_weight_only_quantization_nf4_weight(self):
+        class M(nn.Module):
+            def __init__(self, input_channel, output_channel, has_bias):
+                super(M, self).__init__()
+                self.linear = torch.nn.Linear(input_channel, output_channel, has_bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        def test(feature, has_bias):
+            model = M(feature[1], feature[2], has_bias)
+            m = model.eval()
+            data = torch.rand(feature[0], feature[1])
+            weight = model.linear.weight
+            weight_int4, w_scales, w_zero_points = quantize_per_channel(
+                weight, WoqWeightDtype.NF4
+            )
+            weight_fp32 = dequantize_per_channel(
+                weight_int4, w_scales, w_zero_points, WoqWeightDtype.NF4, weight.shape
+            )
+            if has_bias:
+                bias = model.linear.bias
+                output1 = torch.matmul(data, weight_fp32.T) + bias
+            else:
+                output1 = torch.matmul(data, weight_fp32.T)
+
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=WoqWeightDtype.NF4
+            )
+            prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
+            with torch.no_grad():
+                woq_model = convert(prepared_model)
+                woq_linear_class = (
+                    ipex.nn.modules.weight_only_quantization.IpexWoqLinear
+                )
+                assert isinstance(woq_model.linear, woq_linear_class)
+                assert (
+                    woq_model.linear.weight is not None
+                    and woq_model.linear.weight.dtype == torch.uint8
+                )
+
+                output2 = woq_model(data)
+                torch.testing.assert_close(output1, output2)
+
+        shape_list = [
+            [3, 31, 31],
+            [4, 4096, 4096],
+            [4, 4096, 4095],
+            [9, 4095, 4095],
+            [196, 4095, 4095],
         ]
         use_bias_list = [True, False]
         cases = itertools.product(shape_list, use_bias_list)
@@ -1095,7 +1153,7 @@ class WeightOnlyQuantizationTester(TestCase):
         ]:
             kwargs = {"lowp_mode": mode}
             if mode == WoqLowpMode.INT8:
-                kwargs["weight_dtype"] = torch.quint4x2
+                kwargs["weight_dtype"] = WoqWeightDtype.INT4
             qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(**kwargs)
             prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
             with torch.no_grad():
@@ -1128,10 +1186,9 @@ class WeightOnlyQuantizationTester(TestCase):
         # lowp_mode does not affect weight observer for int8
         qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
         weight = copy.deepcopy(m.linear.weight)
-        weight_observer = qconfig.global_qconfig.weight()
-        weight_observer(weight)
-        weight_int8 = _quantize_weight(weight, weight_observer)
-        weight_fp32 = weight_int8.dequantize()
+        w_dtype = qconfig.global_qconfig.weight_dtype
+        weight_int8, w_scales, w_zps = quantize_per_channel(weight, w_dtype)
+        weight_fp32 = dequantize_per_channel(weight_int8, w_scales, w_zps, w_dtype)
         bias_fp32 = copy.deepcopy(m.linear.bias)
         for lowp_mode, act_dtype in cases:
             if lowp_mode == WoqLowpMode.NONE:
@@ -1139,7 +1196,7 @@ class WeightOnlyQuantizationTester(TestCase):
             compute_dtype = compute_dtype_list[int(lowp_mode)]
             qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
                 lowp_mode=lowp_mode,
-                weight_dtype=torch.qint8,
+                weight_dtype=WoqWeightDtype.INT8,
             )
             prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
             with torch.no_grad():
@@ -1251,8 +1308,8 @@ class WeightOnlyQuantizationTester(TestCase):
             m2 = copy.deepcopy(m)
             data = torch.rand(M, K) * 0.5
             qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
-                weight_dtype=torch.quint4x2,
-                lowp_mode=ipex.quantization.WoqLowpMode.INT8,
+                weight_dtype=WoqWeightDtype.INT4,
+                lowp_mode=WoqLowpMode.INT8,
                 act_quant_mode=act_quant_mode,
             )
             fake_quant_x = self._fakequant_by_group(data, act_quant_mode, groupsize)
@@ -1271,10 +1328,11 @@ class WeightOnlyQuantizationTester(TestCase):
                 w_scales = woq_model.linear._op_context.get_scales()
                 w_zero_points = woq_model.linear._op_context.get_zero_points()
                 w = copy.deepcopy(m.linear.weight.data)
-                is_int4 = True
-                qw, _, _ = quantize_per_channel(w, is_int4, w_scales, w_zero_points)
+                qw, _, _ = quantize_per_channel(
+                    w, WoqWeightDtype.INT4, w_scales, w_zero_points
+                )
                 fake_quant_w = dequantize_per_channel(
-                    qw, w_scales, w_zero_points.int(), is_int4, w.shape
+                    qw, w_scales, w_zero_points.int(), WoqWeightDtype.INT4, w.shape
                 )
                 m.linear.weight.data = fake_quant_w
                 y_ref = m(fake_quant_x).to(dtype)
@@ -1315,8 +1373,8 @@ class WeightOnlyQuantizationTester(TestCase):
                 # these cases are covered by another test case for act_quant_mode
                 return
             qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
-                weight_dtype=torch.quint4x2,
-                lowp_mode=ipex.quantization.WoqLowpMode.INT8,
+                weight_dtype=WoqWeightDtype.INT4,
+                lowp_mode=WoqLowpMode.INT8,
                 act_quant_mode=act_quant_mode,
                 group_size=group_size,
             )
@@ -1331,23 +1389,22 @@ class WeightOnlyQuantizationTester(TestCase):
                 # Quantize activation to int8 at runtime
                 # Convert weight and its zero points to INT8 for computation
                 w = copy.deepcopy(m.linear.weight.data)
-                is_int4 = True
                 if group_size == -1:
                     qw, w_scales, w_zero_points = quantize_per_channel(
-                        w, is_int4, None, None
+                        w, WoqWeightDtype.INT4, None, None
                     )
                     fake_quant_w = dequantize_per_channel(
-                        qw, w_scales, w_zero_points.int(), is_int4, w.shape
+                        qw, w_scales, w_zero_points.int(), WoqWeightDtype.INT4, w.shape
                     )
                 else:
                     qw, w_scales, w_zero_points = quantize_per_block(
-                        w, is_int4, group_size, None, None
+                        w, WoqWeightDtype.INT4, group_size, None, None
                     )
                     fake_quant_w = dequantize_per_block(
                         qw,
                         w_scales,
                         w_zero_points,
-                        is_int4,
+                        WoqWeightDtype.INT4,
                         group_size,
                         weight_shape=w.shape,
                     )
@@ -1412,7 +1469,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 b = m.linear.bias.detach() if has_bias else None
                 qconfig_mapping = (
                     ipex.quantization.get_weight_only_quant_qconfig_mapping(
-                        weight_dtype=torch.quint4x2,
+                        weight_dtype=WoqWeightDtype.INT4,
                         lowp_mode=ipex.quantization.WoqLowpMode.INT8,
                         act_quant_mode=ipex.quantization.WoqActQuantMode.PER_IC_BLOCK,
                         group_size=group_size,

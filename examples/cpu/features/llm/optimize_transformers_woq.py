@@ -88,7 +88,8 @@ model = model.to(memory_format=torch.channels_last)
 
 # Intel(R) Extension for PyTorch*
 #################### code changes ####################  # noqa F401
-weight_dtype = torch.quint4x2 if args.weight_dtype == "INT4" else torch.qint8
+from intel_extension_for_pytorch.quantization import WoqWeightDtype
+weight_dtype = WoqWeightDtype.INT4 if args.weight_dtype == "INT4" else WoqWeightDtype.INT8
 
 if args.lowp_mode == "INT8":
     lowp_mode = ipex.quantization.WoqLowpMode.INT8
@@ -99,7 +100,7 @@ elif args.lowp_mode == "FP16":
 elif args.lowp_mode == "BF16":
     lowp_mode = ipex.quantization.WoqLowpMode.BF16
 else:  # AUTO
-    if args.low_precision_checkpoint != "" or weight_dtype == torch.quint4x2:
+    if args.low_precision_checkpoint != "" or weight_dtype == WoqWeightDtype.INT4:
         lowp_mode = ipex.quantization.WoqLowpMode.INT8
     else:
         lowp_mode = ipex.quantization.WoqLowpMode.BF16

@@ -127,7 +127,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     )
     parser.add_argument(
         "--weight-dtype",
-        choices=["INT8", "INT4"],
+        choices=["INT8", "INT4", "NF4"],
         default="INT8",
         type=str,
         help="weight data type for weight only quantization. Unrelated to activation"
@@ -199,7 +199,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     group_size = args.group_size
     if group_size == 0:
         # weight dtype is ignored if gptq is true
-        if args.weight_dtype == "INT4":
+        if args.weight_dtype in ("INT4", "NF4"):
             group_size = 128
         else:
             group_size = -1

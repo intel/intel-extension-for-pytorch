@@ -408,7 +408,10 @@ if args.benchmark:
 if use_ipex:
     ipex_woq_enabled = args.ipex_weight_only_quantization
     if ipex_woq_enabled:
-        weight_dtype = torch.quint4x2 if args.weight_dtype == "INT4" else torch.qint8
+        from intel_extension_for_pytorch.quantization import WoqWeightDtype
+        weight_dtype = (
+            WoqWeightDtype.INT4 if args.weight_dtype == "INT4" else WoqWeightDtype.INT8
+        )
         if args.lowp_mode == "INT8":
             lowp_mode = ipex.quantization.WoqLowpMode.INT8
         elif args.lowp_mode == "FP32":
@@ -418,7 +421,7 @@ if use_ipex:
         elif args.lowp_mode == "BF16":
             lowp_mode = ipex.quantization.WoqLowpMode.BF16
         else:  # AUTO
-            if weight_dtype == torch.quint4x2:
+            if weight_dtype == WoqWeightDtype.INT4:
                 lowp_mode = ipex.quantization.WoqLowpMode.INT8
             else:
                 lowp_mode = ipex.quantization.WoqLowpMode.BF16

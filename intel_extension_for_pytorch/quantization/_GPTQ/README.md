@@ -139,8 +139,9 @@ config_dict = {
     "bias_key": "bias"
 }
 state_dict_and_config = (low_precision_checkpoint, config_dict)
+from intel_extension_for_pytorch.quantization import WoqWeightDtype
 qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
-    weight_dtype=torch.qint8, # or torch.quint4x2
+    weight_dtype=WoqWeightDtype.INT4, # or WoqWeightDtype.INT8
     lowp_mode=ipex.quantization.WoqLowpMode.NONE, # or FP16, BF16, INT8
 )
 model = ipex.optimize_transformers(

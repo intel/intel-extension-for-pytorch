@@ -30,6 +30,7 @@ from ._quantization_state import (
 )
 from ._recipe import get_default_recipe
 from ._module_swap_utils import swap_child_modules
+from ._qconfig import WoqWeightDtype
 
 
 # AutoQuantizationState lives in parent module's _modules.
@@ -785,7 +786,72 @@ def auto_convert(
     return module
 
 
-def quantize_per_channel(t: torch.Tensor, is_int4, scales=None, zero_points=None):
+NF4_QUANT_TABLE = [
+    -1.0 - 1e-2,  # 0b0000
+    -0.8480964004993439,  # 0b0001
+    -0.6106329262256622,  # 0b0010
+    -0.4599952697753906,  # 0b0011
+    -0.33967943489551544,  # 0b0100
+    -0.23460740596055984,  # 0b0101
+    -0.13791173323988914,  # 0b0110
+    -0.045525018125772476,  # 0b0111
+    0.03979014977812767,  # 0b1000
+    0.1202552504837513,  # 0b1001
+    0.2035212516784668,  # 0b1010
+    0.2920137718319893,  # 0b1011
+    0.3893125355243683,  # 0b1100
+    0.5016634166240692,  # 0b1101
+    0.6427869200706482,  # 0b1110
+    0.8614784181118011,  # 0b1111
+]
+
+
+NF4_DEQUANT_TABLE = [
+    -1.0,
+    -0.6961928009986877,
+    -0.5250730514526367,
+    -0.39491748809814453,
+    -0.28444138169288635,
+    -0.18477343022823334,
+    -0.09105003625154495,
+    0.0,
+    0.07958029955625534,
+    0.16093020141124725,
+    0.24611230194568634,
+    0.33791524171829224,
+    0.44070982933044434,
+    0.5626170039176941,
+    0.7229568362236023,
+    1.0,
+]
+
+
+def map_float_tensor_to_nf4(t, dtype=torch.uint8):
+    # Map [-1, 1] to nf4
+    # Assume t in [-1, 1]
+    out_uint8 = torch.empty(t.shape, dtype=dtype)
+    for i in range(len(NF4_QUANT_TABLE)):
+        out_uint8[t > NF4_QUANT_TABLE[i]] = i
+    return out_uint8
+
+
+def map_nf4_tensor_to_float(t, dtype=torch.float32):
+    # Map nf4 to [-1, 1]
+    out_dq = torch.empty(t.shape).to(dtype)
+    for i in range(len(NF4_DEQUANT_TABLE)):
+        out_dq[t == i] = NF4_DEQUANT_TABLE[i]
+    return out_dq
+
+
+def is_4bit(dtype):
+    return dtype in (WoqWeightDtype.INT4, WoqWeightDtype.NF4)
+
+
+def is_sym_quant(dtype):
+    return dtype in (WoqWeightDtype.NF4,)
+
+
+def quantize_per_channel(t: torch.Tensor, dtype, scales=None, zero_points=None):
     r"""
     Quantize a weight tensor of Linear modules per channel.
     Assume the tensor shape is [output channel, input channel],
@@ -793,7 +859,7 @@ def quantize_per_channel(t: torch.Tensor, is_int4, scales=None, zero_points=None
 
     Args:
         input: The tensor to be quantized
-        is_int4: int4 or int8
+        dtype: data type of the quantized tensor, int8, int4 or nf4
 
     Returns:
         A tuple of
@@ -802,6 +868,7 @@ def quantize_per_channel(t: torch.Tensor, is_int4, scales=None, zero_points=None
         - Zero points
     """
     assert t.ndim == 2
+    assert dtype in (WoqWeightDtype.INT8, WoqWeightDtype.INT4, WoqWeightDtype.NF4)
 
     def get_qparams(scales, zps):
         if scales is not None and zps is not None:
@@ -810,20 +877,37 @@ def quantize_per_channel(t: torch.Tensor, is_int4, scales=None, zero_points=None
         zeros = torch.zeros(t.shape[0], dtype=t.dtype, device=t.device)
         mins = torch.minimum(t.min(dim=1)[0], zeros)
         maxs = torch.maximum(t.max(dim=1)[0], zeros)
-        scales = (maxs - mins) / 15 if is_int4 else (maxs - mins) / 255
-        scales = torch.max(scales, eps)
-        zps = -torch.round(mins / scales)
-        if not is_int4:
+        if dtype == WoqWeightDtype.INT8:
+            scales = (maxs - mins) / 255
+            scales = torch.max(scales, eps)
+            zps = -torch.round(mins / scales)
             zps -= 128
+        elif dtype == WoqWeightDtype.INT4:
+            scales = (maxs - mins) / 15
+            scales = torch.max(scales, eps)
+            zps = -torch.round(mins / scales)
+        else:  # NF4
+            scales = torch.maximum(torch.abs(maxs), torch.abs(mins))
+            scales = torch.max(scales, eps)
         return scales, zps
 
     scales, zps = get_qparams(scales, zero_points)
-    qmin = 0 if is_int4 else -128
-    qmax = 15 if is_int4 else 127
     inv_scales = 1 / scales.unsqueeze(1)
-    qt = torch.clamp(torch.round(t * inv_scales) + zps.unsqueeze(1), min=qmin, max=qmax)
-    qt = qt.to(torch.uint8) if is_int4 else qt.to(torch.int8)
-    if is_int4:
+    if dtype == WoqWeightDtype.INT8:
+        qmin = -128
+        qmax = 127
+        qt = torch.clamp(
+            torch.round(t * inv_scales) + zps.unsqueeze(1), min=qmin, max=qmax
+        ).to(torch.int8)
+    elif dtype == WoqWeightDtype.INT4:
+        qmin = 0
+        qmax = 15
+        qt = torch.clamp(
+            torch.round(t * inv_scales) + zps.unsqueeze(1), min=qmin, max=qmax
+        ).to(torch.uint8)
+    else:  # NF4
+        qt = map_float_tensor_to_nf4(t * inv_scales)
+    if is_4bit(dtype):
         if qt.size(-1) % 2:
             qt = torch.nn.functional.pad(qt, (0, 1), value=0)
         qt = qt[:, 1::2].bitwise_left_shift(4).bitwise_or_(qt[:, ::2])
@@ -834,7 +918,7 @@ def dequantize_per_channel(
     qt: torch.Tensor,
     scales: torch.Tensor,
     zps: torch.Tensor,
-    is_int4,
+    dtype,
     weight_shape=None,
 ):
     r"""
@@ -846,7 +930,7 @@ def dequantize_per_channel(
         qt: The tensor to be dequantized
         scales: Scales for dequantization
         zps: Zero points for dequantization
-        is_int4: int4 or int8
+        dtype: data type of the quantized tensor, int8, int4 or nf4
         weight_shape: True weight shape. INT4 tensor's input channel may
             be padded to even, so we need this to return the correct weight.
 
@@ -854,9 +938,13 @@ def dequantize_per_channel(
         The dequantized tensor
     """
     assert qt.ndim == 2
+    assert dtype in (WoqWeightDtype.INT8, WoqWeightDtype.INT4, WoqWeightDtype.NF4)
     scales = scales.squeeze()
-    zps = zps.squeeze()
-    if is_int4:
+    if not is_sym_quant(dtype):
+        zps = zps.squeeze()
+    if dtype == WoqWeightDtype.INT8:
+        return (qt.to(torch.float) - zps.unsqueeze(-1)) * scales.unsqueeze(-1)
+    elif dtype == WoqWeightDtype.INT4:
         t = torch.empty(
             qt.shape[0], qt.shape[1] * 2, dtype=torch.uint8, device=qt.device
         )
@@ -866,12 +954,21 @@ def dequantize_per_channel(
         if weight_shape is not None:
             t = t[: weight_shape[0], : weight_shape[1]].contiguous()
         return t
-    else:
-        return (qt.to(torch.float) - zps.unsqueeze(-1)) * scales.unsqueeze(-1)
+    else:  # NF4
+        t = torch.empty(
+            qt.shape[0], qt.shape[1] * 2, dtype=torch.uint8, device=qt.device
+        )
+        t[:, ::2] = qt.bitwise_and(0xF)
+        t[:, 1::2] = qt.bitwise_right_shift(4)
+        t = map_nf4_tensor_to_float(t)
+        if weight_shape is not None:
+            t = t[: weight_shape[0], : weight_shape[1]].contiguous()
+        t = t * scales.unsqueeze(-1)
+        return t
 
 
 def quantize_per_block(
-    input: torch.Tensor, is_int4, group_size, scales=None, zero_points=None
+    input: torch.Tensor, dtype, group_size, scales=None, zero_points=None
 ):
     r"""
     Quantize a weight tensor of Linear modules per block.
@@ -880,7 +977,7 @@ def quantize_per_block(
 
     Args:
         input: The tensor to be quantized
-        is_int4: int4 or int8
+        dtype: data type of the quantized tensor, int8, int4 or nf4
         group_size: Size of group along input channel
         scales: Scales for quantization. If None, find by min/max.
         zero_points: zero points for quantization. If None, find by min/max.
@@ -895,6 +992,7 @@ def quantize_per_block(
         input.dim() == 2
     ), f"{__name__}: Expect input has 2 dimensions but got {input.dim()}"
     assert group_size > 0, f"{__name__}: Expect group_size > 0 but got {group_size}"
+    assert dtype in (WoqWeightDtype.INT8, WoqWeightDtype.INT4, WoqWeightDtype.NF4)
     N = input.size(0)
     K = input.size(1)
     k_rem = K % group_size
@@ -907,52 +1005,90 @@ def quantize_per_block(
         t_com = input[:, : K - k_rem].view(N, K // group_size, group_size)
         mins = torch.minimum(t_com.min(dim=-1)[0], torch.tensor([0]))
         maxs = torch.maximum(t_com.max(dim=-1)[0], torch.tensor([0]))
-        scales = (maxs - mins) / 15 if is_int4 else (maxs - mins) / 255
-        scales = torch.max(scales, eps)
-        zps = -torch.round(mins / scales)
+        if dtype == WoqWeightDtype.INT8:
+            scales = (maxs - mins) / 255
+            scales = torch.max(scales, eps)
+            zps = -torch.round(mins / scales)
+        elif dtype == WoqWeightDtype.INT4:
+            scales = (maxs - mins) / 15
+            scales = torch.max(scales, eps)
+            zps = -torch.round(mins / scales)
+        else:  # NF4
+            scales = torch.maximum(torch.abs(maxs), torch.abs(mins))
+            scales = torch.max(scales, eps)
         if k_rem != 0:
             t_rem = input[:, K - k_rem :].view(N, 1, k_rem)
             mins_rem = torch.minimum(t_rem.min(dim=-1)[0], torch.tensor([0]))
             maxs_rem = torch.maximum(t_rem.max(dim=-1)[0], torch.tensor([0]))
-            scales_rem = (
-                (maxs_rem - mins_rem) / 15 if is_int4 else (maxs_rem - mins_rem) / 255
-            )
-            zps_rem = -torch.round(mins_rem / scales_rem)
+            if dtype == WoqWeightDtype.INT8:
+                scales_rem = (maxs_rem - mins_rem) / 255
+                scales_rem = torch.max(scales_rem, eps)
+                zps_rem = -torch.round(mins_rem / scales_rem)
+            elif dtype == WoqWeightDtype.INT4:
+                scales_rem = (maxs_rem - mins_rem) / 15
+                scales_rem = torch.max(scales_rem, eps)
+                zps_rem = -torch.round(mins_rem / scales_rem)
+            else:  # NF4
+                scales_rem = torch.maximum(torch.abs(maxs_rem), torch.abs(mins_rem))
+                scales_rem = torch.max(scales_rem, eps)
             scales = torch.cat([scales, scales_rem], dim=-1)
-            zps = torch.cat([zps, zps_rem], dim=-1)
-        if not is_int4:
+            if not is_sym_quant(dtype):
+                zps = torch.cat([zps, zps_rem], dim=-1)
+        if not is_4bit(dtype):
             zps -= 128
         return scales, zps
 
     scales, zps = get_qparams(scales, zero_points)
-    qmin = 0 if is_int4 else -128
-    qmax = 15 if is_int4 else 127
     Kc = (K + group_size - 1) // group_size
     t_com = input[:, : K - k_rem].view(N, K // group_size, group_size)
     scales_com = scales[:, : Kc - has_rem]
-    zps_com = zps[:, : Kc - has_rem]
     inv_scales_com = 1 / scales_com.unsqueeze(-1)
-    qt = torch.clamp(
-        torch.round(t_com * inv_scales_com) + zps_com.unsqueeze(-1),
-        min=qmin,
-        max=qmax,
-    )
+    if not is_sym_quant(dtype):
+        zps_com = zps[:, : Kc - has_rem]
+    if dtype == WoqWeightDtype.INT8:
+        qmin = -128
+        qmax = 127
+        qt = torch.clamp(
+            torch.round(t_com * inv_scales_com) + zps_com.unsqueeze(-1),
+            min=qmin,
+            max=qmax,
+        )
+    elif dtype == WoqWeightDtype.INT4:
+        qmin = 0
+        qmax = 15
+        qt = torch.clamp(
+            torch.round(t_com * inv_scales_com) + zps_com.unsqueeze(-1),
+            min=qmin,
+            max=qmax,
+        )
+    else:  # NF4
+        qt = map_float_tensor_to_nf4(t_com * inv_scales_com)
     qt = qt.view(N, K // group_size * group_size)
     if k_rem != 0:
         t_rem = input[:, K - k_rem :].view(N, 1, k_rem)
         scales_rem = scales[:, Kc - has_rem :]
-        zps_rem = zps[:, Kc - has_rem :]
         inv_scales_rem = 1 / scales_rem.unsqueeze(-1)
-        qt_rem = torch.clamp(
-            torch.round(t_rem * inv_scales_rem) + zps_rem.unsqueeze(-1),
-            min=qmin,
-            max=qmax,
-        )
+        if not is_sym_quant(dtype):
+            zps_rem = zps[:, Kc - has_rem :]
+        if dtype == WoqWeightDtype.INT8:
+            qt_rem = torch.clamp(
+                torch.round(t_rem * inv_scales_rem) + zps_rem.unsqueeze(-1),
+                min=qmin,
+                max=qmax,
+            )
+        elif dtype == WoqWeightDtype.INT4:
+            qt_rem = torch.clamp(
+                torch.round(t_rem * inv_scales_rem) + zps_rem.unsqueeze(-1),
+                min=qmin,
+                max=qmax,
+            )
+        else:  # NF4
+            qt_rem = map_float_tensor_to_nf4(t_rem * inv_scales_rem)
         qt_rem = qt_rem.view(N, k_rem)
         qt = torch.cat([qt, qt_rem], dim=1).contiguous()
-    qt = qt.to(torch.uint8) if is_int4 else qt.to(torch.int8)
+    qt = qt.to(torch.uint8) if is_4bit(dtype) else qt.to(torch.int8)
     qt = qt.view(N, K)
-    if is_int4:
+    if is_4bit(dtype):
         if qt.size(-1) % 2:
             qt = torch.nn.functional.pad(qt, (0, 1), value=0)
         qt = qt[:, 1::2].bitwise_left_shift(4).bitwise_or_(qt[:, ::2])
@@ -963,7 +1099,7 @@ def dequantize_per_block(
     qt: torch.Tensor,
     scales: torch.Tensor,
     zps: torch.Tensor,
-    is_int4,
+    dtype,
     group_size,
     weight_shape=None,
 ):
@@ -976,7 +1112,7 @@ def dequantize_per_block(
         qt: The tensor to be dequantized
         scales: Scales in shape [N, #block_k]
         zps: Zero points in shape [N, #block_k]
-        is_int4: int4 or int8
+        dtype: data type of the quantized tensor, int8, int4 or nf4
         group_size: Size of group along input channel
         block_oc: Block size of output channel, should be the same for weight packing
 
@@ -984,11 +1120,11 @@ def dequantize_per_block(
         The dequantized tensor
     """
     N = qt.size(0)
-    K = qt.size(1) * 2 if is_int4 else qt.size(1)
+    K = qt.size(1) * 2 if is_4bit(dtype) else qt.size(1)
     if scales.dim() > 2:
         scales = scales.squeeze()
         zps = zps.squeeze()
-    if is_int4:
+    if is_4bit(dtype):
         t = torch.empty(
             qt.shape[0], qt.shape[1] * 2, dtype=torch.uint8, device=qt.device
         )
@@ -1000,24 +1136,41 @@ def dequantize_per_block(
     Kc = (K + group_size - 1) // group_size
     qt_com = qt[:, : K - k_rem].view(N, K // group_size, group_size)
     scales_com = scales[:, : Kc - has_rem]
-    zps_com = zps[:, : Kc - has_rem]
-    t = (
-        ((qt_com.to(torch.float) - zps_com.unsqueeze(-1)) * scales_com.unsqueeze(-1))
-        .view(N, K - k_rem)
-        .contiguous()
-    )
+    if dtype == WoqWeightDtype.NF4:
+        t = (
+            (map_nf4_tensor_to_float(qt_com) * scales_com.unsqueeze(-1))
+            .view(N, K - k_rem)
+            .contiguous()
+        )
+    else:
+        zps_com = zps[:, : Kc - has_rem]
+        t = (
+            (
+                (qt_com.to(torch.float) - zps_com.unsqueeze(-1))
+                * scales_com.unsqueeze(-1)
+            )
+            .view(N, K - k_rem)
+            .contiguous()
+        )
     if k_rem:
         qt_rem = qt[:, K - k_rem :].view(N, 1, k_rem)
         scales_rem = scales[:, Kc - has_rem :]
-        zps_rem = zps[:, Kc - has_rem :]
-        t_rem = (
-            (
-                (qt_rem.to(torch.float) - zps_rem.unsqueeze(-1))
-                * scales_rem.unsqueeze(-1)
+        if dtype == WoqWeightDtype.NF4:
+            t_rem = (
+                (map_nf4_tensor_to_float(qt_rem) * scales_rem.unsqueeze(-1))
+                .view(N, k_rem)
+                .contiguous()
             )
-            .view(N, k_rem)
-            .contiguous()
-        )
+        else:
+            zps_rem = zps[:, Kc - has_rem :]
+            t_rem = (
+                (
+                    (qt_rem.to(torch.float) - zps_rem.unsqueeze(-1))
+                    * scales_rem.unsqueeze(-1)
+                )
+                .view(N, k_rem)
+                .contiguous()
+            )
         t = torch.cat([t, t_rem], dim=1).contiguous()
     if weight_shape is not None:
         t = t[: weight_shape[0], : weight_shape[1]].contiguous()

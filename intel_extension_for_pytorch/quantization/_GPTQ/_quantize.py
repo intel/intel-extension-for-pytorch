@@ -31,7 +31,7 @@ def gptq(
     Args:
         model (torch.nn.Module): fp32 model to quantize
         dataloader (torch.utils.data.DataLoader): an iterable containing calibration datasets.
-        wbits (int): data type for weight. 8 for torch.qint8 (INT8); 4 for torch.quint4x2 (INT4).
+        wbits (int): number of bits of the data type for weight.
         group_size (int): control quantization granularity along input channel (IC) dimension of weight.
                         Must be a positive power of 2 or -1.
         sym (bool): scheme. Default to be asym per checkpoint requirement.

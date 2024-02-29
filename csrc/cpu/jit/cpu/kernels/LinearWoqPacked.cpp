@@ -13,13 +13,13 @@ namespace woq_linear {
 
 c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
     at::Tensor&& weight,
+    int64_t weight_dtype,
     std::vector<int64_t>&& weight_shape,
     at::Tensor&& scales,
-    at::Tensor&& zero_points,
+    c10::optional<at::Tensor>&& zero_points,
     c10::optional<at::Tensor>&& bias,
     c10::optional<at::Tensor>&& g_idx,
     c10::optional<int64_t> batch_size,
-    bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode) {
@@ -29,13 +29,13 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
 
   return IpexWoqLinearOpContext::create_context(
       std::move(weight),
+      weight_dtype,
       std::move(weight_shape),
       std::move(scales),
       std::move(zero_points),
       std::move(bias),
       std::move(g_idx),
       batch_size,
-      is_int4,
       group_size,
       lowp_mode,
       act_quant_mode);
@@ -157,13 +157,13 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
   }
   return IpexWoqLinearOpContext::create_context(
       std::move(weight_int4),
+      /*weight_dtype*/ WOQ_DTYPE_INT4,
       std::move(weight_shape),
       std::move(scales_fp32),
       std::move(zp_fp32),
       std::move(bias),
       std::move(g_idx),
       batch_size,
-      /*is_int4*/ true,
       group_size,
       lowp_mode,
       act_quant_mode);
@@ -180,86 +180,86 @@ at::Tensor woq_linear_run(
 
 ContextLinearWoq create(
     at::Tensor& weight,
+    int64_t weight_dtype,
     std::vector<int64_t>& weight_shape,
     at::Tensor& scales,
-    at::Tensor& zero_points,
-    const c10::optional<at::Tensor>& bias,
-    const c10::optional<at::Tensor>& g_idx,
+    c10::optional<at::Tensor>& zero_points,
+    c10::optional<at::Tensor>& bias,
+    c10::optional<at::Tensor>& g_idx,
     const c10::optional<int64_t> batch_size,
-    bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode) {
   at::Tensor packed_weight;
   int64_t N = weight_shape[0];
   int64_t K = weight_shape[1];
+  bool is_4bit =
+      (weight_dtype == WOQ_DTYPE_INT4 || weight_dtype == WOQ_DTYPE_NF4);
   // GPTQ with act-order
   // Shuffle weight along ic to make channels contiguous in group
-  if (is_int4 && group_size > 0 && g_idx.has_value()) {
+  if (is_4bit && group_size > 0 && g_idx.has_value()) {
     // Shuffle weight along ic to make channels contiguous in group
-    auto shuffled_weight = woq_shuffle_tensor_by_group_idx</* is_int4 */ true>(
+    auto shuffled_weight = woq_shuffle_tensor_by_group_idx</* is_4bit */ true>(
         weight, weight_shape, g_idx.value(), group_size);
     packed_weight = woq_linear_pack_weight(
-        shuffled_weight, weight_shape, is_int4, group_size, lowp_mode);
+        shuffled_weight, weight_dtype, weight_shape, group_size, lowp_mode);
   } else {
     packed_weight = woq_linear_pack_weight(
-        weight, weight_shape, is_int4, group_size, lowp_mode);
+        weight, weight_dtype, weight_shape, group_size, lowp_mode);
   }
   auto packed_shape = packed_weight.sizes();
   // If OC is not a multiple of BLOCK_N, it may be padded.
-  bool oc_is_padded = (packed_shape.size() == 4 && is_int4 &&
+  bool oc_is_padded = (packed_shape.size() == 4 && is_4bit &&
                        packed_shape[0] * packed_shape[3] * 2 != N) ||
-      (packed_shape.size() == 4 && !is_int4 &&
+      (packed_shape.size() == 4 && !is_4bit &&
        packed_shape[0] * packed_shape[3] != N) ||
       (packed_shape.size() == 2 && packed_shape[0] != N);
-  auto zero_points_float = zero_points.to(c10::kFloat);
   if (oc_is_padded) {
     int64_t padded_N = packed_shape.size() == 4
-        ? (is_int4 ? packed_shape[0] * packed_shape[3] * 2
+        ? (is_4bit ? packed_shape[0] * packed_shape[3] * 2
                    : packed_shape[0] * packed_shape[3])
         : packed_shape[0];
     std::vector<int64_t> pad_vec = scales.dim() == 1
         ? std::vector<int64_t>({0, padded_N - N})
         : std::vector<int64_t>({0, 0, 0, padded_N - N});
     auto scales_padded = at::pad(scales, pad_vec, "constant", 1.f);
-    auto zero_points_padded =
-        at::pad(zero_points_float, pad_vec, "constant", 0.f);
-    if (bias.has_value()) {
-      auto bias_padded =
-          at::pad(bias.value(), {0, padded_N - N}, "constant", 0.f);
-      return ContextLinearWoq(
-          std::move(packed_weight),
-          std::move(weight_shape),
-          std::move(scales_padded),
-          std::move(zero_points_padded),
-          c10::make_optional(bias_padded),
-          g_idx.has_value() ? c10::make_optional(*g_idx) : c10::nullopt,
-          is_int4,
-          group_size,
-          lowp_mode,
-          act_quant_mode);
-    } else {
-      return ContextLinearWoq(
-          std::move(packed_weight),
-          std::move(weight_shape),
-          std::move(scales_padded),
-          std::move(zero_points_padded),
-          c10::nullopt,
-          g_idx.has_value() ? c10::make_optional(*g_idx) : c10::nullopt,
-          is_int4,
-          group_size,
-          lowp_mode,
-          act_quant_mode);
+    c10::optional<at::Tensor> zero_points_padded = c10::nullopt;
+    if (zero_points.has_value() && zero_points.value().defined()) {
+      auto zero_points_float = zero_points.value().to(c10::kFloat);
+      auto zero_points_tensor_padded =
+          at::pad(zero_points_float, pad_vec, "constant", 0.f);
+      zero_points_padded = c10::make_optional(zero_points_tensor_padded);
     }
+    c10::optional<at::Tensor> bias_padded = c10::nullopt;
+    if (bias.has_value() && bias.value().defined()) {
+      auto bias_tensor_padded =
+          at::pad(bias.value(), {0, padded_N - N}, "constant", 0.f);
+      bias_padded = c10::make_optional(bias_tensor_padded);
+    }
+    return ContextLinearWoq(
+        std::move(packed_weight),
+        weight_dtype,
+        std::move(weight_shape),
+        std::move(scales_padded),
+        std::move(zero_points_padded),
+        std::move(bias_padded),
+        std::move(g_idx),
+        group_size,
+        lowp_mode,
+        act_quant_mode);
+  }
+  c10::optional<at::Tensor> zero_points_float = c10::nullopt;
+  if (zero_points.has_value() && zero_points.value().defined()) {
+    zero_points_float = c10::make_optional(zero_points.value().to(c10::kFloat));
   }
   return ContextLinearWoq(
       std::move(packed_weight),
+      weight_dtype,
       std::move(weight_shape),
       std::move(scales),
       std::move(zero_points_float),
-      bias.has_value() ? c10::make_optional(*bias) : c10::nullopt,
-      g_idx.has_value() ? c10::make_optional(*g_idx) : c10::nullopt,
-      is_int4,
+      std::move(bias),
+      std::move(g_idx),
       group_size,
       lowp_mode,
       act_quant_mode);
@@ -270,7 +270,7 @@ static at::Tensor _shuffle_input_channels_if_needed(
     const at::Tensor& input) {
   // GPTQ with act-order
   // Shuffle input channels to align with weight
-  if (context.is_int4_ && context.group_size_ > 0 &&
+  if (context.is_4bit_ && context.group_size_ > 0 &&
       context.g_idx_.has_value()) {
     auto& g_idx = context.g_idx_.value();
     auto K = input.size(-1);
@@ -297,10 +297,10 @@ at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
   auto res = woq_linear_kernel(
       input_,
       context.at_weight_,
+      context.weight_dtype_,
       context.scales_list_,
       context.zero_points_list_,
       context.bias_list_,
-      context.is_int4_,
       context.group_size_,
       context.lowp_mode_,
       context.act_quant_mode_);
@@ -333,13 +333,13 @@ at::Tensor run_eltwise(
   return woq_linear_eltwise_kernel(
       input_,
       context.at_weight_,
+      context.weight_dtype_,
       context.scales_list_,
       context.zero_points_list_,
       context.bias_list_,
       post_op,
       scalars,
       algorithm,
-      context.is_int4_,
       context.group_size_,
       context.lowp_mode_,
       context.act_quant_mode_);
@@ -365,10 +365,10 @@ at::Tensor run_add(
   return woq_linear_add_kernel(
       input_,
       context.at_weight_,
+      context.weight_dtype_,
       context.scales_list_,
       context.zero_points_list_,
       context.bias_list_,
-      context.is_int4_,
       context.group_size_,
       context.lowp_mode_,
       others,
@@ -395,10 +395,10 @@ at::Tensor run_add_add(
   return woq_linear_add_add_kernel(
       input_,
       context.at_weight_,
+      context.weight_dtype_,
       context.scales_list_,
       context.zero_points_list_,
       context.bias_list_,
-      context.is_int4_,
       context.group_size_,
       context.lowp_mode_,
       others,
@@ -414,8 +414,8 @@ at::Tensor unpack(ContextLinearWoq& context, const at::Tensor& tensor) {
   // Return result directly if dim == 2
   // For dim == 4, weight may be padded.
   // For padded weight (int4), make a slice of it.
-  auto unpacked_weight =
-      woq_linear_unpack_weight(tensor, context.is_int4_, context.lowp_mode_);
+  auto unpacked_weight = woq_linear_unpack_weight(
+      tensor, context.weight_dtype_, context.lowp_mode_);
   // With g_idx, weight's input channels are shuffled along ic so that
   // those in the same group are contiguous.
   // Here we need to shuffle them to the original order.
@@ -428,7 +428,7 @@ at::Tensor unpack(ContextLinearWoq& context, const at::Tensor& tensor) {
   if (tensor.dim() > 2) {
     auto scales = context.scales_list_[0];
     auto zero_points = context.zero_points_list_[0];
-    if (context.is_int4_) {
+    if (context.is_4bit_) {
       auto unpacked_shape = unpacked_weight.sizes().vec(); // = N * K/2
       auto shape = context.weight_shape_;
       shape.back() /= 2;
@@ -445,7 +445,7 @@ at::Tensor unpack(ContextLinearWoq& context, const at::Tensor& tensor) {
   return unpacked_weight;
 }
 
-template <typename T, typename Tg, bool is_int4 = false>
+template <typename T, typename Tg, bool is_4bit = false>
 at::Tensor woq_shuffle_tensor_by_group_idx_impl(
     const at::Tensor& tensor,
     const std::vector<int64_t>& tensor_shape,
@@ -464,7 +464,7 @@ at::Tensor woq_shuffle_tensor_by_group_idx_impl(
 #pragma omp parallel for
   for (int64_t i = 0; i < N; ++i) {
     std::vector<int64_t> counts_per_group(num_groups, 0);
-    auto stride = is_int4 ? K / 2 : K;
+    auto stride = is_4bit ? K / 2 : K;
     auto tensor_row_data = tensor_data + i * stride;
     auto shuffled_row_data = shuffled_tensor_data + i * stride;
     for (int64_t j = 0; j < K; ++j) {
@@ -472,7 +472,7 @@ at::Tensor woq_shuffle_tensor_by_group_idx_impl(
       auto new_idx = g * group_size + counts_per_group[g];
       constexpr bool T_is_int8 =
           std::is_same<T, int8_t>() || std::is_same<T, uint8_t>();
-      if constexpr (is_int4 && T_is_int8) {
+      if constexpr (is_4bit && T_is_int8) {
         uint8_t mask = j % 2 ? 0xF0 : 0x0F;
         size_t rshift = j % 2 ? 4 : 0;
         T data = (tensor_row_data[j / 2] & mask) >> rshift;
@@ -493,7 +493,7 @@ at::Tensor woq_shuffle_tensor_by_group_idx_impl(
  * index (g_idx), so that input channels in the same group are contiguous to
  * each other.
  *
- * @param is_int4 The tensor stores int4 data or not
+ * @param is_4bit The tensor stores 4bit data or not
  * @param tensor The tensor to be shuffled. It must be 2d.
  * @param tensor_shape The original shape of the tensor. It is different from
  * tensor.shape() when dtype is int4 since 2 int4 data are packed as one int8.
@@ -504,7 +504,7 @@ at::Tensor woq_shuffle_tensor_by_group_idx_impl(
  * of groups.
  * @return The shuffled tensor.
  */
-template <bool is_int4>
+template <bool is_4bit>
 at::Tensor woq_shuffle_tensor_by_group_idx(
     const at::Tensor& tensor,
     const std::vector<int64_t>& tensor_shape,
@@ -535,7 +535,7 @@ at::Tensor woq_shuffle_tensor_by_group_idx(
             out = woq_shuffle_tensor_by_group_idx_impl<
                 t_cpp_type,
                 g_cpp_type,
-                is_int4>(tensor, tensor_shape, g_idx, group_size);
+                is_4bit>(tensor, tensor_shape, g_idx, group_size);
           },
           [](auto dtype_tuple) {
             TORCH_CHECK(

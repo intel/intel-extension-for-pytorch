@@ -289,7 +289,7 @@ elif args.int4_model == "":
         )
         for i in range(user_model.config.num_hidden_layers)
     ]
-    weight_dtype = torch.quint4x2
+    weight_dtype = ipex.quantization.WoqWeightDtype.INT4
     lowp_mode = ipex.quantization.WoqLowpMode.INT8
     qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
         weight_dtype=weight_dtype, lowp_mode=lowp_mode

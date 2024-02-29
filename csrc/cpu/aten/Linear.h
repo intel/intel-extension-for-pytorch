@@ -86,23 +86,23 @@ at::Tensor ipex_linear_eltwise(
 // WOQ linear ops
 at::Tensor woq_linear_pack_weight(
     const at::Tensor& weight,
+    int64_t weight_dtype,
     std::vector<int64_t>& weight_shape,
-    bool is_4bit,
     int64_t group_size,
     int64_t lowp_mode);
 
 at::Tensor woq_linear_unpack_weight(
     const at::Tensor& weight,
-    bool is_int4,
+    int64_t weight_dtype,
     int64_t lowp_mode);
 
 at::Tensor woq_linear_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
+    int64_t weight_dtype,
     const std::vector<at::Tensor>& scales_list,
     const std::vector<at::Tensor>& zps_list,
     const std::vector<at::Tensor>& bias_list,
-    bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode);
@@ -110,13 +110,13 @@ at::Tensor woq_linear_kernel(
 at::Tensor woq_linear_eltwise_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
+    int64_t weight_dtype,
     const std::vector<at::Tensor>& scales_list,
     const std::vector<at::Tensor>& zps_list,
     const std::vector<at::Tensor>& bias_list,
     const c10::string_view& post_op,
     const torch::List<c10::optional<at::Scalar>>& scalars,
     const c10::optional<c10::string_view>& algorithm,
-    bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode);
@@ -124,10 +124,10 @@ at::Tensor woq_linear_eltwise_kernel(
 at::Tensor woq_linear_add_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
+    int64_t weight_dtype,
     const std::vector<at::Tensor>& scales_list,
     const std::vector<at::Tensor>& zps_list,
     const std::vector<at::Tensor>& bias_list,
-    bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
     const std::vector<at::Tensor>& others,
@@ -136,10 +136,10 @@ at::Tensor woq_linear_add_kernel(
 at::Tensor woq_linear_add_add_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
+    int64_t weight_dtype,
     const std::vector<at::Tensor>& scales_list,
     const std::vector<at::Tensor>& zps_list,
     const std::vector<at::Tensor>& bias_list,
-    bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
     const std::vector<at::Tensor>& others,
@@ -235,10 +235,6 @@ IPEX_DECLARE_DISPATCH(woq_tpp_gemm_unpackB_fn, woq_tpp_gemm_unpackB_stub);
 #define WOQ_FUSE_ADD 2
 #define WOQ_FUSE_ADD_ADD 3
 #define WOQ_FUSE_NEW_GELU 4
-
-#define WOQ_DTYPE_QINT8 1
-#define WOQ_DTYPE_QINT4 2
-#define WOQ_DTYPE_NF4 3
 
 #endif
 

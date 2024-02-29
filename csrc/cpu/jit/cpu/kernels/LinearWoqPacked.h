@@ -12,13 +12,13 @@ namespace woq_linear {
 // WOQ = weight-only quantization
 c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
     at::Tensor&& weight,
+    int64_t weight_dtype,
     std::vector<int64_t>&& weight_shape,
     at::Tensor&& scales,
-    at::Tensor&& zero_points,
+    c10::optional<at::Tensor>&& zero_points,
     c10::optional<at::Tensor>&& bias,
     c10::optional<at::Tensor>&& g_idx,
     c10::optional<int64_t> batch_size,
-    bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode);
@@ -40,13 +40,13 @@ at::Tensor woq_linear_run(
 
 ContextLinearWoq create(
     at::Tensor& weight,
+    int64_t weight_dtype,
     std::vector<int64_t>& weight_shape,
     at::Tensor& scales,
-    at::Tensor& zero_points,
-    const c10::optional<at::Tensor>& bias,
-    const c10::optional<at::Tensor>& g_idx,
+    c10::optional<at::Tensor>& zero_points,
+    c10::optional<at::Tensor>& bias,
+    c10::optional<at::Tensor>& g_idx,
     const c10::optional<int64_t> batch_size,
-    bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode);
@@ -74,7 +74,7 @@ at::Tensor pack(ContextLinearWoq& context, const at::Tensor& tensor);
 
 at::Tensor unpack(ContextLinearWoq& context, const at::Tensor& tensor);
 
-template <bool is_int4 = false>
+template <bool is_4bit = false>
 at::Tensor woq_shuffle_tensor_by_group_idx(
     const at::Tensor& input,
     const std::vector<int64_t>& tensor_shape,

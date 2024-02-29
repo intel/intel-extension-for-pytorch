@@ -133,7 +133,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--weight-dtype",
-    choices=["INT8", "INT4"],
+    choices=["INT8", "INT4", "NF4"],
     default="INT8",
     type=str,
     help="weight data type for weight only quantization. Unrelated to activation"
@@ -636,7 +636,14 @@ if args.ipex_smooth_quant:
             quant_model = self_jit
 
 elif args.ipex_weight_only_quantization:
-    weight_dtype = torch.quint4x2 if args.weight_dtype == "INT4" else torch.qint8
+    from intel_extension_for_pytorch.quantization import WoqWeightDtype
+    if args.weight_dtype == "INT8":
+        weight_dtype = WoqWeightDtype.INT8
+    elif args.weight_dtype == "INT4":
+        weight_dtype = WoqWeightDtype.INT4
+    else:
+        assert args.weight_dtype == "NF4"
+        weight_dtype = WoqWeightDtype.NF4
 
     if args.lowp_mode == "INT8":
         lowp_mode = ipex.quantization.WoqLowpMode.INT8
@@ -647,7 +654,7 @@ elif args.ipex_weight_only_quantization:
     elif args.lowp_mode == "BF16":
         lowp_mode = ipex.quantization.WoqLowpMode.BF16
     else:  # AUTO
-        if args.low_precision_checkpoint != "" or weight_dtype == torch.quint4x2:
+        if args.low_precision_checkpoint != "" or weight_dtype == WoqWeightDtype.INT4:
             lowp_mode = ipex.quantization.WoqLowpMode.INT8
         else:
             lowp_mode = ipex.quantization.WoqLowpMode.BF16

@@ -83,7 +83,7 @@ import transformers
 model= transformers.AutoModelForCausalLM(model_name_or_path).eval()
 
 qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
-  weight_dtype=torch.qint8, # or torch.quint4x2
+  weight_dtype=ipex.quantization.WoqWeightDtype.INT8, # or INT4/NF4
   lowp_mode=ipex.quantization.WoqLowpMode.NONE, # or FP16, BF16, INT8
 )
 

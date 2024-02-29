@@ -363,25 +363,25 @@ void IpexConvTransposeOpContext::load_from_ctx(
 // For weight-only quantization
 c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
     at::Tensor&& weight,
+    int64_t weight_dtype, // int8=1, int4=2, nf4=3
     std::vector<int64_t>&& weight_shape,
     at::Tensor&& scales_fp32,
-    at::Tensor&& zp_fp32,
+    c10::optional<at::Tensor>&& zp_fp32,
     c10::optional<at::Tensor>&& bias,
     c10::optional<at::Tensor>&& g_idx,
     c10::optional<int64_t> batch_size,
-    bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode) {
   auto op_context = torch_ipex::cpu::detail::woq_linear::create(
       weight,
+      weight_dtype,
       weight_shape,
       scales_fp32,
       zp_fp32,
       bias,
       g_idx,
       batch_size,
-      is_int4,
       group_size,
       lowp_mode,
       act_quant_mode);
@@ -456,7 +456,10 @@ at::Tensor IpexWoqLinearOpContext::get_scales() {
   return op_context_.scales_list_[0];
 }
 
-at::Tensor IpexWoqLinearOpContext::get_zero_points() {
+c10::optional<at::Tensor> IpexWoqLinearOpContext::get_zero_points() {
+  if (!op_context_.zero_points_list_[0].defined()) {
+    return c10::nullopt;
+  }
   if (op_context_.group_size_ > 0 && op_context_.at_weight_.dim() == 4) {
     // [#block_n, #block_k, n_block_size] -> [#block_n, n_block_size, #block_k]
     // -> [N, #block_k]
@@ -465,13 +468,13 @@ at::Tensor IpexWoqLinearOpContext::get_zero_points() {
     if (zp.size(0) > op_context_.weight_shape_[0]) {
       return zp.narrow(0, 0, op_context_.weight_shape_[0]);
     }
-    return zp;
+    return c10::make_optional(zp);
   }
   if (op_context_.zero_points_list_[0].size(0) > op_context_.weight_shape_[0]) {
     return op_context_.zero_points_list_[0].narrow(
         0, 0, op_context_.weight_shape_[0]);
   }
-  return op_context_.zero_points_list_[0];
+  return c10::make_optional(op_context_.zero_points_list_[0]);
 }
 
 std::vector<int64_t> IpexWoqLinearOpContext::get_weight_shape() {

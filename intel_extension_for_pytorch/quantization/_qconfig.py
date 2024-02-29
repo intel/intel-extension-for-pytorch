@@ -12,6 +12,7 @@ from ._smooth_quant import (
     SmoothQuantActivationObserver,
     SmoothQuantWeightObserver,
 )
+import warnings
 
 
 _default_weight_observer = PerChannelMinMaxObserver.with_args(
@@ -117,6 +118,13 @@ class WoqActQuantMode(IntEnum):
     PER_BATCH_IC_BLOCK = 3
 
 
+# Start from 1 to align with kernel
+class WoqWeightDtype(IntEnum):
+    INT8 = 1
+    INT4 = 2
+    NF4 = 3
+
+
 QConfigWoq = namedtuple(
     "QConfigWoq",
     [*QConfig._fields, "lowp_mode", "act_quant_mode", "weight_dtype", "group_size"],
@@ -125,15 +133,15 @@ QConfigWoq = namedtuple(
 
 def get_weight_only_quant_qconfig_mapping(
     *,
-    weight_dtype: torch.dtype = torch.qint8,
+    weight_dtype: int = WoqWeightDtype.INT8,
     lowp_mode: int = WoqLowpMode.NONE,
     act_quant_mode: int = WoqActQuantMode.PER_IC_BLOCK,
-    group_size: int = -1
+    group_size: int = -1,
 ):
     """
     Configuration for weight-only quantization (WOQ) for LLM.
     Arguments:
-        weight_dtype:   Data type for weight, torch.qint8 (INT8) or torch.quint4x2 (INT4)
+        weight_dtype:   Data type for weight, WoqWeightDtype.INT8/INT4/NF4, etc.
         lowp_mode:      specify the lowest precision data type for computation. Data types
                         that has even lower precision won't be used.
                         Not necessarily related to activation or weight dtype.
@@ -142,7 +150,7 @@ def get_weight_only_quant_qconfig_mapping(
                         - BF16(2): Use bfloat16 as the lowest precision for computation.
                         - INT8(3): Use INT8 as the lowest precision for computation.
                                    Activation is quantized to int8 at runtime in this case.
-                        Note that lowp_mode=INT8(3) is only available when weight_dtype=torch.quint4x2.
+                        Note that lowp_mode=INT8(3) is only available when weight_dtype=INT4.
                         In other cases, it will fall back to lowp_mode=BF16(2).
         act_quant_mode: Quantization granularity of activation. It only works for lowp_mode=INT8.
                         It has no effect in other cases. The tensor is divided into groups, and
@@ -170,17 +178,23 @@ def get_weight_only_quant_qconfig_mapping(
     assert group_size == -1 or (
         group_size > 0 and (group_size & (group_size - 1)) == 0
     ), "Group size must be -1 or a positive power of 2, but got {}".format(group_size)
-    dtype_to_qscheme = {
-        torch.qint8: torch.per_channel_affine,
-        # It is required to use per_channel_affine_float_qparams for quint4x2 by PyTorch
-        torch.quint4x2: torch.per_channel_affine_float_qparams,
-    }
-    weight_qscheme = dtype_to_qscheme[weight_dtype]
+    if weight_dtype in (torch.qint8, torch.quint4x2):
+        weight_dtype = (
+            WoqWeightDtype.INT8 if weight_dtype == torch.qint8 else WoqWeightDtype.INT4
+        )
+        warnings.warn(
+            "torch.qint8 and torch.quint4x2 are deprecated for weight only quantization "
+            "in IPEX. Please use data types defined by "
+            "intel_extension_for_pytorch.quantization.WoqWeightDtype. "
+            "For example, `WoqWeightDtype.INT8` and `WoqWeightDtype.INT4`."
+        )
+    valid_values = [item.value for item in WoqWeightDtype]
+    assert (
+        weight_dtype in valid_values
+    ), f"Invalid weight data type for weight only quantization: {weight_dtype}"
     _weight_only_quant_qconfig = QConfigWoq(
         activation=PlaceholderObserver.with_args(dtype=torch.float, is_dynamic=False),
-        weight=PerChannelMinMaxObserver.with_args(
-            dtype=weight_dtype, qscheme=weight_qscheme
-        ),
+        weight=PerChannelMinMaxObserver(),
         lowp_mode=lowp_mode,
         act_quant_mode=act_quant_mode,
         weight_dtype=weight_dtype,

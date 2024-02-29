@@ -12,6 +12,10 @@ from common_utils import TestCase
 import intel_extension_for_pytorch as ipex
 
 from torch.testing._internal.common_utils import run_tests
+from intel_extension_for_pytorch.quantization import (
+    WoqWeightDtype,
+    WoqLowpMode,
+)
 
 
 class GPTQLLMTester(TestCase):
@@ -77,8 +81,8 @@ class GPTQLLMTester(TestCase):
                     work_dir + "/gptq_checkpoint_g128.pt"
                 )
                 qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
-                    weight_dtype=torch.quint4x2,
-                    lowp_mode=ipex.quantization.WoqLowpMode.INT8,
+                    weight_dtype=WoqWeightDtype.INT4,
+                    lowp_mode=WoqLowpMode.INT8,
                 )
                 model = copy.deepcopy(gptj)
                 model.eval()

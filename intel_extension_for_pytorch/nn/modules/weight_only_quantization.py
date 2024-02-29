@@ -9,6 +9,7 @@ from intel_extension_for_pytorch.quantization import (
     QConfigWoq,
     quantize_per_channel,
     quantize_per_block,
+    WoqWeightDtype,
 )
 
 
@@ -18,7 +19,9 @@ class IpexWoqLinear(nn.Module):
     Weight is dequantized at runtime for computation.
     """
 
-    def __init__(self, in_features, out_features, bias_=True, dtype=torch.qint8):
+    def __init__(
+        self, in_features, out_features, bias_=True, dtype=WoqWeightDtype.INT8
+    ):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -89,27 +92,26 @@ class IpexWoqLinear(nn.Module):
             return mod
 
         lowp_mode = qconfig.lowp_mode
-        if qconfig.lowp_mode == 3 and qconfig.weight_dtype != torch.quint4x2:
-            # lowp_mode=3 (INT8) is enabled for INT4 weight only
-            # Fall back to lowp_mode=2 in other case
+        if qconfig.lowp_mode == 3 and qconfig.weight_dtype == WoqWeightDtype.INT8:
+            # lowp_mode=3 (INT8) is not supported for INT8 weight
+            # Fall back to lowp_mode=2 in such case
             # TODO(Weiwen) Support lowp_mode=3
             lowp_mode = 2
             print(
-                "Warning: lowp_mode=3(INT8) is not supported yet in this case. "
+                "Warning: lowp_mode=3(INT8) is not supported yet for INT8 weight. "
                 "Falling back to 2(BF16)."
             )
         act_quant_mode = qconfig.act_quant_mode
         dtype = qconfig.weight_dtype
-        is_int4 = dtype == torch.quint4x2
         group_size = qconfig.group_size
 
         if group_size == -1:
             qweight, scales, zero_points = quantize_per_channel(
-                mod.weight, is_int4, scales, zero_points
+                mod.weight, dtype, scales, zero_points
             )
         else:
             qweight, scales, zero_points = quantize_per_block(
-                mod.weight, is_int4, group_size, scales, zero_points
+                mod.weight, dtype, group_size, scales, zero_points
             )
         if not hasattr(mod, "in_features"):
             mod.in_features = mod.weight.size()[1]
@@ -187,7 +189,7 @@ class IpexWoqLinear(nn.Module):
         if not hasattr(mod, "out_features"):
             mod.out_features = mod.weight.size()[0]
 
-        qlinear = cls(mod.in_features, mod.out_features, dtype=torch.quint4x2)
+        qlinear = cls(mod.in_features, mod.out_features, dtype=WoqWeightDtype.INT4)
         if bias is None:
             bias = mod.bias
         qlinear._op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack_int4(
@@ -224,16 +226,15 @@ class IpexWoqLinear(nn.Module):
         qlinear = cls(
             mod.in_features, mod.out_features, mod.bias is not None, dtype=dtype
         )
-        is_int4 = dtype == torch.quint4x2
         qlinear._op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
             qweight,
+            dtype,
             [mod.out_features, mod.in_features],
             scales,
             zero_points,
             mod.bias,
             g_idx,
             None,
-            is_int4,
             group_size,
             int(lowp_mode),
             act_quant_mode,
@@ -253,7 +254,7 @@ class IpexWoqLinearAllreduce(IpexWoqLinear):
         mp_group,
         bias_value,
         bias_=True,
-        dtype=torch.qint8,
+        dtype=WoqWeightDtype.INT8,
     ):
         # Save the original bias here
         # For bias handling, please refer to the comment in __init__ of _IPEXLinearAllreduce
@@ -286,16 +287,15 @@ class IpexWoqLinearAllreduce(IpexWoqLinear):
     ):
         qlinear = cls._init_from_mod(mod, dtype)
 
-        is_int4 = dtype == torch.quint4x2
         qlinear._op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
             qweight,
+            dtype,
             [mod.out_features, mod.in_features],
             scales,
             zero_points,
             None,  # Set bias to None when prepacking. Please refer to the comment in __init__ of _IPEXLinearAllreduce
             g_idx,
             None,  # batch_size
-            is_int4,
             group_size,
             lowp_mode,
             act_quant_mode,
@@ -318,7 +318,7 @@ class IpexWoqLmHeadLinearAllreduce(IpexWoqLinearAllreduce):
         world_size,
         bias_value,
         bias_=True,
-        dtype=torch.qint8,
+        dtype=WoqWeightDtype.INT8,
     ):
         # Save the original bias here
         # For bias handling, please refer to the comment in __init__ of _IPEXLinearAllreduce

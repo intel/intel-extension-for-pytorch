@@ -40,7 +40,7 @@ parser.add_argument("-m", "--model", nargs="?", default="EleutherAI/gpt-j-6b")
 parser.add_argument("--output_dir", nargs="?", default="./saved_results")
 parser.add_argument("--device", default="cpu", type=str, help="cpu")
 parser.add_argument(
-    "--dtype", default="bfloat16", type=str, help="float32 or bfloat16 or int8 or int4"
+    "--dtype", default="bfloat16", type=str, help="float32 or bfloat16 or int8 or int4 or nf4"
 )
 parser.add_argument(
     "--batch-size", default=1, type=int, help="For accuracy measurement only."
@@ -120,7 +120,7 @@ class HuggingFaceModel(BaseLM):
         elif dtype == "bfloat16":
             load_dtype = torch.bfloat16
             infer_dtype = torch.bfloat16
-        elif dtype in ["int8", "int4"]:
+        elif dtype in ["int8", "int4", "nf4"]:
             load_dtype = torch.float32
             infer_dtype = torch.int8
 
@@ -135,7 +135,7 @@ class HuggingFaceModel(BaseLM):
             model_id if config is None else config, torchscript=with_jit, trust_remote_code=True
         )
 
-        if self._dtype == "int8" or self._dtype == "int4":
+        if self._dtype in ("int8", "int4", "nf4"):
             try:
                 with ipex.OnDevice(dtype=torch.float, device="meta"):
                     self.model = model_class[0].from_config(self.config, trust_remote_code=True)
@@ -159,7 +159,7 @@ class HuggingFaceModel(BaseLM):
 
         self.model = self.model.eval()
 
-        if with_ipex and dtype not in ["int8", "int4"]:
+        if with_ipex and dtype not in ["int8", "int4", "nf4"]:
             self.model = ipex.llm.optimize(
                 self.model.eval(),
                 dtype=infer_dtype,
@@ -168,8 +168,8 @@ class HuggingFaceModel(BaseLM):
             )
 
         if args.torch_compile:
-            if dtype in ["int8", "int4"]:
-                raise SystemExit("[ERROR] Currently this script does not support torch.compile with int8 or int4 datatype, please set dtype to float32 or bfloat16 if want to use torch.compile.")
+            if dtype in ["int8", "int4", "nf4"]:
+                raise SystemExit("[ERROR] Currently this script does not support torch.compile with int8/int4/nf4 datatype, please set dtype to float32 or bfloat16 if want to use torch.compile.")
             if with_jit:
                 raise SystemExit("[ERROR] JIT cannot co-work with torch.compile, please set jit to False if want to use torch.compile.")
             self.model.forward = torch.compile(self.model.forward, dynamic=True, backend=args.backend)
@@ -296,7 +296,7 @@ class HuggingFaceModel(BaseLM):
             else False,
         ):
             if self._with_jit and self.iter == 0:
-                if self._dtype not in ["int8", "int4"]:
+                if self._dtype not in ["int8", "int4", "nf4"]:
                     self.model = torch.jit.trace(
                         self.model.eval(),
                         example_kwarg_inputs=example_dict,

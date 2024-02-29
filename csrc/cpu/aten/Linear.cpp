@@ -360,14 +360,13 @@ at::Tensor ipex_linear_eltwise(
 IPEX_DEFINE_DISPATCH(woq_tpp_gemm_packB_stub);
 at::Tensor woq_linear_pack_weight(
     const at::Tensor& weight,
+    int64_t weight_dtype,
     std::vector<int64_t>& weight_shape,
-    bool is_int4,
     int64_t group_size,
     int64_t lowp_mode) {
   // TPP kernel does not support edge cases
   // It generates packed weight in 4d (Nc, Kc, block_k, block_n)
   auto N = weight_shape[0], K = weight_shape[1];
-  int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
   // For TPP kernel, we only consider even K
   if (K % 2 == 0) {
     size_t block_n = 32;
@@ -376,7 +375,7 @@ at::Tensor woq_linear_pack_weight(
       block_k /= 2;
     }
     assert(block_k > 0);
-    if (is_int4) {
+    if (weight_dtype == WOQ_DTYPE_INT4 || weight_dtype == WOQ_DTYPE_NF4) {
       if (block_k % 4 && lowp_mode == 3) {
         // This case is not supported by kernel
         return weight;
@@ -398,13 +397,13 @@ at::Tensor woq_linear_pack_weight(
           0,
           pad_size_bytes);
       return woq_tpp_gemm_packB_stub(
-          kCPU, weight_int4, w_dtype, block_n, block_k, lowp_mode);
+          kCPU, weight_int4, weight_dtype, block_n, block_k, lowp_mode);
     }
     if (N % block_n) {
       return weight;
     } else {
       return woq_tpp_gemm_packB_stub(
-          kCPU, weight, w_dtype, block_n, block_k, lowp_mode);
+          kCPU, weight, weight_dtype, block_n, block_k, lowp_mode);
     }
   }
   return weight;
@@ -413,24 +412,22 @@ at::Tensor woq_linear_pack_weight(
 IPEX_DEFINE_DISPATCH(woq_tpp_gemm_unpackB_stub);
 at::Tensor woq_linear_unpack_weight(
     const at::Tensor& weight,
-    bool is_int4,
+    int64_t weight_dtype,
     int64_t lowp_mode) {
-  int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
-  return woq_tpp_gemm_unpackB_stub(kCPU, weight, w_dtype, lowp_mode);
+  return woq_tpp_gemm_unpackB_stub(kCPU, weight, weight_dtype, lowp_mode);
 }
 
 IPEX_DEFINE_DISPATCH(woq_tpp_gemm_kernel_stub);
 at::Tensor woq_linear_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
+    int64_t weight_dtype,
     const std::vector<at::Tensor>& scales_list,
     const std::vector<at::Tensor>& zps_list,
     const std::vector<at::Tensor>& bias_list,
-    bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode) {
-  int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
   return woq_tpp_gemm_kernel_stub(
       kCPU,
@@ -439,7 +436,7 @@ at::Tensor woq_linear_kernel(
       scales_list,
       zps_list,
       bias_list,
-      w_dtype,
+      weight_dtype,
       lowp_mode,
       WOQ_FUSE_NONE, // no post op fusion
       std::vector<at::Tensor>(),
@@ -461,17 +458,16 @@ at::Tensor woq_linear_forward(
 at::Tensor woq_linear_eltwise_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
+    int64_t weight_dtype,
     const std::vector<at::Tensor>& scales_list,
     const std::vector<at::Tensor>& zps_list,
     const std::vector<at::Tensor>& bias_list,
     const c10::string_view& post_op,
     const torch::List<c10::optional<at::Scalar>>& scalars,
     const c10::optional<c10::string_view>& algorithm,
-    bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode) {
-  int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
   int64_t post_op_fusion_type = WOQ_FUSE_NONE;
   if (post_op == "gelu") {
     if (algorithm == "none") {
@@ -488,7 +484,7 @@ at::Tensor woq_linear_eltwise_kernel(
       scales_list,
       zps_list,
       bias_list,
-      w_dtype,
+      weight_dtype,
       lowp_mode,
       post_op_fusion_type,
       std::vector<at::Tensor>(),
@@ -522,15 +518,14 @@ at::Tensor woq_linear_new_gelu_forward(
 at::Tensor woq_linear_add_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
+    int64_t weight_dtype,
     const std::vector<at::Tensor>& scales_list,
     const std::vector<at::Tensor>& zps_list,
     const std::vector<at::Tensor>& bias_list,
-    bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
     const std::vector<at::Tensor>& others,
     int64_t act_quant_mode) {
-  int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
   return woq_tpp_gemm_kernel_stub(
       kCPU,
@@ -539,7 +534,7 @@ at::Tensor woq_linear_add_kernel(
       scales_list,
       zps_list,
       bias_list,
-      w_dtype,
+      weight_dtype,
       lowp_mode,
       WOQ_FUSE_ADD, // post op add
       others,
@@ -551,15 +546,14 @@ at::Tensor woq_linear_add_kernel(
 at::Tensor woq_linear_add_add_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
+    int64_t weight_dtype,
     const std::vector<at::Tensor>& scales_list,
     const std::vector<at::Tensor>& zps_list,
     const std::vector<at::Tensor>& bias_list,
-    bool is_int4,
     int64_t group_size,
     int64_t lowp_mode,
     const std::vector<at::Tensor>& others,
     int64_t act_quant_mode) {
-  int w_dtype = is_int4 ? WOQ_DTYPE_QINT4 : WOQ_DTYPE_QINT8;
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
   return woq_tpp_gemm_kernel_stub(
       kCPU,
@@ -568,7 +562,7 @@ at::Tensor woq_linear_add_add_kernel(
       scales_list,
       zps_list,
       bias_list,
-      w_dtype,
+      weight_dtype,
       lowp_mode,
       WOQ_FUSE_ADD_ADD, // post op add-add
       others,
