@@ -2,6 +2,7 @@
 #include <ATen/ATen.h>
 #include <ATen/CPUApplyUtils.h>
 #include <ATen/record_function.h>
+#include <runtime/Device.h>
 #include <runtime/Utils.h>
 #include <iostream>
 #include "Linear.h"
@@ -465,7 +466,7 @@ static void mm_qkv_out(
       out1_valid && out2_valid && input_valid && weight_valid && bias_valid &&
       shape_valid;
 
-  if (use_xetla) {
+  if (dpcppGetDeviceHasXMX() && use_xetla) {
     char str__[100];
     if (!has_bias) {
       sprintf(str__, "hgemm_qkv(%d, %d, %d)", m, n, k);

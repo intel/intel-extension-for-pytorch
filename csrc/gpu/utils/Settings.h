@@ -46,6 +46,7 @@ class IPEX_API Settings final {
   bool has_fp64_dtype(int device_id = -1);
   bool has_2d_block_array(int device_id = -1);
   bool has_atomic64(int device_id = -1);
+  bool has_xmx(int device_id = -1);
 
   static Settings& I(); // Singleton
 

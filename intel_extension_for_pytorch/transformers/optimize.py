@@ -586,17 +586,56 @@ def optimize_transformers(
             or re.search("falcon", model.config.architectures[0], re.IGNORECASE)
             or re.search("rw", model.config.architectures[0], re.IGNORECASE)
         ) and device == "cpu"
-        # bypass_ref_model = (re.search("Bloom", model.config.architectures[0], re.IGNORECASE)) or device == "xpu"
-        xpu_supported_model = (
-            re.search("GPTJ", model.config.architectures[0], re.IGNORECASE)
-            or re.search("llama", model.config.architectures[0], re.IGNORECASE)
-            or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
-            or re.search("Bloom", model.config.architectures[0], re.IGNORECASE)
-        ) and device == "xpu"
-        if not (well_supported_model or xpu_supported_model):
+
+        # If the XPU platform does not have XMX, such as PVC1550vg, ipex.optimize_transformers is not supported.
+        # If the XPU platform has XMX and 2D load instructions, such as PVC1100, PVC1100c, and PVC1550,
+        # ipex.optimize_transformers supports GPT-J, Llama, OPT, Bloom, Falcon, QWen
+        xpu_2d_load_supported_model = (
+            (
+                re.search("GPTJ", model.config.architectures[0], re.IGNORECASE)
+                or re.search("llama", model.config.architectures[0], re.IGNORECASE)
+                or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
+                or re.search("Bloom", model.config.architectures[0], re.IGNORECASE)
+                or re.search("Falcon", model.config.architectures[0], re.IGNORECASE)
+                or re.search("QWen", model.config.architectures[0], re.IGNORECASE)
+                or re.search("Baichuan", model.config.architectures[0], re.IGNORECASE)
+            )
+            and device == "xpu"
+            and ipex._C._has_2d_block_array(0)
+            and ipex._C._has_xmx(0)
+        )
+
+        # If the XPU platform has XMX but no 2D load instructions, such as ATS-M and ARC,
+        # ipex.optimize_transformers supports GPT-J, Llama, QWen.
+        xpu_non_2d_load_supported_model = (
+            (
+                re.search("GPTJ", model.config.architectures[0], re.IGNORECASE)
+                or re.search("llama", model.config.architectures[0], re.IGNORECASE)
+                or re.search("QWen", model.config.architectures[0], re.IGNORECASE)
+            )
+            and device == "xpu"
+            and not ipex._C._has_2d_block_array(0)
+            and ipex._C._has_xmx(0)
+        )
+
+        if not (
+            well_supported_model
+            or xpu_2d_load_supported_model
+            or xpu_non_2d_load_supported_model
+        ):
             warnings.warn(
-                "optimize_transformers supports GPT-J/Llama/OPT/Bloom in XPU and Llama/GPT-J/GPT-Neox/Falcon/OPT"
-                " in CPU, fallback to origin model"
+                "The compatibility of ipex.optimize_transformers depends on the CPU/XPU platform "
+                " and the transformer model. Here are the general rules: "
+                " If the XPU platform does not have XMX, such as PVC1550vg, "
+                " ipex.optimize_transformers is not supported. "
+                " If the XPU platform has XMX and 2D load instructions, such as PVC1100, PVC1100c, and PVC1550,"
+                " ipex.optimize_transformers supports GPT-J/Llama/OPT/Bloom/Falcon/QWen, "
+                " and BasicTransformerBlock of diffusers. "
+                " If the XPU platform has XMX but no 2D load instructions, such as ATS-M and ARC, "
+                " ipex.optimize_transformers supports GPT-J/Llama/QWen, "
+                " and BasicTransformerBlock of diffusers. "
+                " If the platform is CPU, "
+                " ipex.optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, and OPT."
             )
             return model
 
@@ -655,7 +694,9 @@ def optimize_transformers(
             xpu_woq = True
 
         # model reference conversion
-        if not (xpu_supported_model or xpu_woq):
+        if not (
+            xpu_2d_load_supported_model or xpu_non_2d_load_supported_model or xpu_woq
+        ):
             _model = model_convert_reference(_model)
 
         # model quantization if needed

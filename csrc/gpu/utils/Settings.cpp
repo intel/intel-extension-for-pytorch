@@ -175,6 +175,11 @@ bool Settings::has_atomic64(int device_id) {
   return dpcppGetDeviceProperties(device_id)->support_atomic64;
 }
 
+bool Settings::has_xmx(int device_id) {
+  // whether XMX is supported in the specified platform.
+  return dpcppGetDeviceHasXMX(device_id);
+}
+
 int Settings::get_verbose_level() const {
   std::lock_guard<std::mutex> lock(s_mutex);
   return static_cast<int>(verbose_level);
