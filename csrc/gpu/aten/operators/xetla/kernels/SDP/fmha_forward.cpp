@@ -12,8 +12,6 @@ This is an implementation of the Flash Attention algorithm
 #include "../../mha.h"
 #include "fmha_forward_policy.h"
 #include "fmha_utils.h"
-// Set to 1 to get raw output, not permuted
-#define _RAW_OUTPUT 1
 
 namespace gpu::xetla {
 
@@ -561,11 +559,10 @@ class fmha_forward_t {
     l_new += ctx.softmax_l;
 
     // rescale operands of matmuls
-    subgroup::tile_broadcast_op<subgroup::tile_div, matAccSij_t>(
-        matAccSij, l_new);
-    xetla_vector<accum_t, kSgBr> o_scale = l_new / ctx.softmax_l;
-    subgroup::tile_broadcast_op<subgroup::tile_div, matAccOi_t>(
-        matAccOi, o_scale);
+    xetla_vector<accum_t, kSgBr> o_scale =
+        xetla_exp<accum_t, kSgBr>(ctx.softmax_m - m_new);
+    ;
+    subgroup::tile_broadcast_op<tile_mul, matAccOi_t>(matAccOi, o_scale);
     // update m and l for the next step
     ctx.softmax_m = m_new;
     ctx.softmax_l = l_new;
@@ -618,7 +615,9 @@ class fmha_forward_t {
   // == == == == == == == == == == // raw_store_Oi // ====================== //
 
   /// @brief store raw Oi to global memory. [B,F,N,H]
-  inline void raw_store_Oi(matAccOi_t& matAccOi, arguments_t& args) {
+  inline void rescale_then_store_Oi(matAccOi_t& matAccOi, arguments_t& args) {
+    subgroup::tile_broadcast_op<tile_mul, matAccOi_t>(
+        matAccOi, 1 / ctx.softmax_l);
     using epilogue_t = group::epilogue_t<
         group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
         tile_shape_BrHm,
@@ -791,13 +790,8 @@ class fmha_forward_t {
     }
 
     // Store output to global
-#if _RAW_OUTPUT
-    raw_store_Oi(matAccOi, args);
+    rescale_then_store_Oi(matAccOi, args);
     store_for_backward(args);
-#else
-    permute_store_Oi(ei, matAccOi, args);
-    store_for_backward(args);
-#endif
   }
 }; // fmha_forward_t
 

@@ -303,6 +303,15 @@ struct bias_add_op_t<dtype_bias_, gpu_arch::Xe> {
   }
 };
 
+struct tile_mul {
+  template <typename dtype, int vec_len>
+  static xetla_vector<dtype, vec_len> inline func(
+      xetla_vector<dtype, vec_len> vec_data,
+      dtype data) {
+    return vec_data * data;
+  }
+};
+
 } // namespace fmha
 
 } // namespace gpu::xetla
