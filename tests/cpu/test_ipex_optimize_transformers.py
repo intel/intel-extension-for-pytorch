@@ -426,9 +426,18 @@ class OptimizeTransformersTester(TestCase):
         generate_kwargs_sample = dict(
             do_sample=True, temperature=0.01, max_new_tokens=2, min_new_tokens=2
         )
+        # beam_sample, use a temperature of 0.01 to constrain text generation diversity in UT.
+        generate_kwargs_sample = dict(
+            do_sample=True,
+            temperature=0.01,
+            num_beams=4,
+            max_new_tokens=2,
+            min_new_tokens=2,
+        )
         for generate_kwargs in [
             generate_kwargs_beam,
             generate_kwargs_greedy,
+            generate_kwargs_sample,
             generate_kwargs_sample,
         ]:
             with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast():
