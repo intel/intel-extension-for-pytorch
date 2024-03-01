@@ -13,7 +13,7 @@ from intel_extension_for_pytorch.quantization import (
 )
 
 
-class IpexWoqLinear(nn.Module):
+class WeightOnlyQuantizedLinear(nn.Module):
     r"""
     A weight-only quantized (WOQ) linear module with floating point tensor as inputs and outputs.
     Weight is dequantized at runtime for computation.
@@ -51,7 +51,7 @@ class IpexWoqLinear(nn.Module):
         return self.post_ipex_gemm(Y)
 
     def _get_name(self):
-        return "IpexWeightOnlyQuantizedLinear"
+        return "WeightOnlyQuantizedLinear"
 
     def extra_repr(self):
         extra_repr_str = "in_features={}, out_features={}, dtype={}".format(
@@ -82,7 +82,7 @@ class IpexWoqLinear(nn.Module):
             float_modules.extend([type(mod)])
 
         assert type(mod) in float_modules, (
-            "IpexWoqLinear.from_float only works for one of"
+            "WeightOnlyQuantizedLinear.from_float only works for one of"
             + str([float_mod.__name__ for float_mod in float_modules])
             + f" or their subclasses, but found {type(mod)}"
         )
@@ -157,7 +157,7 @@ class IpexWoqLinear(nn.Module):
             float_modules.extend([type(mod)])
 
         assert type(mod) in float_modules, (
-            "IpexWoqLinear.from_float only works for one of"
+            "WeightOnlyQuantizedLinear.from_float only works for one of"
             + str([float_mod.__name__ for float_mod in float_modules])
             + f" or their subclasses, but found {type(mod)}"
         )
@@ -246,7 +246,7 @@ class IpexWoqLinear(nn.Module):
         return qlinear
 
 
-class IpexWoqLinearAllreduce(IpexWoqLinear):
+class IpexWoqLinearAllreduce(WeightOnlyQuantizedLinear):
     def __init__(
         self,
         in_features,

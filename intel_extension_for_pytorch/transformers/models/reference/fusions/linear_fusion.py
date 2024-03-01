@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import math
 import copy
-from intel_extension_for_pytorch.nn.modules import IpexWoqLinear
+from intel_extension_for_pytorch.nn.modules import WeightOnlyQuantizedLinear
 
 
 class _IPEXlinearSiluRef(nn.Module):
@@ -87,7 +87,9 @@ class _IPEXConcatLinearRef(nn.Module):
             attr_name = f"linear_{i}"
             setattr(self, attr_name, copy.deepcopy(linear_list[i]))
         self.concat_linear = None
-        if all(not isinstance(linear, IpexWoqLinear) for linear in linear_list):
+        if all(
+            not isinstance(linear, WeightOnlyQuantizedLinear) for linear in linear_list
+        ):
             weights_list = []
             bias_list = []
             for i in range(self.num_concat):

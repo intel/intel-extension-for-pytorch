@@ -1,6 +1,6 @@
 import copy
 import torch
-from intel_extension_for_pytorch.nn.modules import IpexWoqLinear
+from intel_extension_for_pytorch.nn.modules import WeightOnlyQuantizedLinear
 from torch.ao.quantization import PlaceholderObserver, QConfigMapping
 
 # The config describes how to load low precision checkpoint for weight only quantization.
@@ -202,7 +202,7 @@ def _convert_woq_with_low_precision_checkpoint(
             )
             if any(i is None for i in [qweight, scales, qzeros]):
                 return mod
-            mod_new = IpexWoqLinear.from_float_and_int4_weight(
+            mod_new = WeightOnlyQuantizedLinear.from_float_and_int4_weight(
                 mod, qweight, scales, qzeros, bias, group_size=group_size, g_idx=g_idx
             )
             return mod_new

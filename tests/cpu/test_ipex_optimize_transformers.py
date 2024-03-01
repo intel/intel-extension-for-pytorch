@@ -191,12 +191,12 @@ class OptimizeTransformersTester(TestCase):
         _IPEXDecoderLayerCPU = (
             ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
         )
-        IpexWoqLinear = ipex.nn.modules.IpexWoqLinear
+        WeightOnlyQuantizedLinear = ipex.nn.modules.WeightOnlyQuantizedLinear
         if re.search("GPTJ", model.config.architectures[0]):
             assert model.transformer.h[0].attn.__class__ is _IPEXAttentionCPU
             assert model.transformer.h[0].__class__ is _IPEXDecoderLayerCPU
             assert all(
-                mod.__class__ is IpexWoqLinear
+                mod.__class__ is WeightOnlyQuantizedLinear
                 for mod in [
                     model.transformer.h[0].attn.concat_qkv.concat_linear,
                     model.transformer.h[0].attn.out_proj,
@@ -208,7 +208,7 @@ class OptimizeTransformersTester(TestCase):
             assert model.model.layers[0].self_attn.__class__ is _IPEXAttentionCPU
             assert model.model.layers[0].__class__ is _IPEXDecoderLayerCPU
             assert all(
-                mod.__class__ is IpexWoqLinear
+                mod.__class__ is WeightOnlyQuantizedLinear
                 for mod in [
                     model.model.layers[0].self_attn.concat_qkv.concat_linear,
                     model.model.layers[0].mha_linear_add.linear,

@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import math
 import warnings
-from intel_extension_for_pytorch.nn.modules import IpexWoqLinear
+from intel_extension_for_pytorch.nn.modules import WeightOnlyQuantizedLinear
 from intel_extension_for_pytorch.quantization import (
     get_weight_only_quant_qconfig_mapping,
     dequantize_per_channel,
@@ -244,7 +244,10 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
         if (
             woq
             and (not use_g_idx)
-            and all(isinstance(linear, IpexWoqLinear) for linear in self.linear_list)
+            and all(
+                isinstance(linear, WeightOnlyQuantizedLinear)
+                for linear in self.linear_list
+            )
         ):
             # Quantization is done before lowering to CPU.
             # We assume weights are all in shape [N, K].
@@ -325,16 +328,18 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                 mod.bias = nn.Parameter(concat_bias) if use_bias else None
                 mod.qconfig = qconfig
                 if w_dtype == WoqWeightDtype.INT4:
-                    self.concat_linear = IpexWoqLinear.from_float_and_int4_weight(
-                        mod,
-                        concat_weight,
-                        concat_scales,
-                        concat_zeros,
-                        group_size=group_size,
+                    self.concat_linear = (
+                        WeightOnlyQuantizedLinear.from_float_and_int4_weight(
+                            mod,
+                            concat_weight,
+                            concat_scales,
+                            concat_zeros,
+                            group_size=group_size,
+                        )
                     )
                 else:  # int8 or nf4
                     assert w_dtype in (WoqWeightDtype.INT8, WoqWeightDtype.NF4)
-                    self.concat_linear = IpexWoqLinear.from_float(
+                    self.concat_linear = WeightOnlyQuantizedLinear.from_float(
                         mod, concat_scales, concat_zeros
                     )
         elif (

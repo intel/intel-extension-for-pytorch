@@ -100,7 +100,7 @@ class GPTQLLMTester(TestCase):
                 _IPEXDecoderLayerCPU = (
                     ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
                 )
-                IpexWoqLinear = ipex.nn.modules.IpexWoqLinear
+                WeightOnlyQuantizedLinear = ipex.nn.modules.WeightOnlyQuantizedLinear
                 assert model.transformer.h[0].attn.__class__ is _IPEXAttentionCPU
                 assert model.transformer.h[0].__class__ is _IPEXDecoderLayerCPU
                 layers_to_check = [
@@ -113,7 +113,10 @@ class GPTQLLMTester(TestCase):
                     layers_to_check.append(
                         model.transformer.h[0].attn.concat_qkv.concat_linear
                     )
-                assert all(mod.__class__ is IpexWoqLinear for mod in layers_to_check)
+                assert all(
+                    mod.__class__ is WeightOnlyQuantizedLinear
+                    for mod in layers_to_check
+                )
 
                 # Ensure model can run without errors
                 with torch.no_grad():

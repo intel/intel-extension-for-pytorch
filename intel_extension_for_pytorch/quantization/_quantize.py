@@ -176,7 +176,7 @@ def IPEX_WEIGHT_ONLY_QUANTIZATION_MODULE_CPU():
     torch_modules = {}
     torch_modules = _may_insert_deepspeed_modules(
         torch_modules,
-        nn.modules.weight_only_quantization.IpexWoqLinear,
+        nn.modules.weight_only_quantization.WeightOnlyQuantizedLinear,
         nn.modules.weight_only_quantization.IpexWoqLinearAllreduce,
         nn.modules.weight_only_quantization.IpexWoqLmHeadLinearAllreduce,
     )
@@ -421,7 +421,7 @@ def convert(model, inplace=False):
         module_mappings = get_default_dynamic_quant_module_mappings().copy()
         module_mappings[
             torch.nn.Linear
-        ] = nn.modules.weight_only_quantization.IpexWoqLinear
+        ] = nn.modules.weight_only_quantization.WeightOnlyQuantizedLinear
 
         module_mappings, qconfig_spec = may_quantize_deepspeed_modules(
             IPEX_WEIGHT_ONLY_QUANTIZATION_MODULE_CPU(),

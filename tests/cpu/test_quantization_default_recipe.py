@@ -704,7 +704,7 @@ class WeightOnlyQuantizationTester(TestCase):
             with torch.no_grad():
                 woq_model = convert(prepared_model)
                 woq_linear_class = (
-                    ipex.nn.modules.weight_only_quantization.IpexWoqLinear
+                    ipex.nn.modules.weight_only_quantization.WeightOnlyQuantizedLinear
                 )
                 assert isinstance(woq_model.linear, woq_linear_class)
                 assert (
@@ -793,7 +793,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 ):
                     woq_model = convert(prepared_model)
                     woq_linear_class = (
-                        ipex.nn.modules.weight_only_quantization.IpexWoqLinear
+                        ipex.nn.modules.weight_only_quantization.WeightOnlyQuantizedLinear
                     )
                     assert isinstance(woq_model.linear, woq_linear_class)
 
@@ -939,7 +939,7 @@ class WeightOnlyQuantizationTester(TestCase):
             with torch.no_grad():
                 woq_model = convert(prepared_model)
                 woq_linear_class = (
-                    ipex.nn.modules.weight_only_quantization.IpexWoqLinear
+                    ipex.nn.modules.weight_only_quantization.WeightOnlyQuantizedLinear
                 )
                 assert isinstance(woq_model.linear, woq_linear_class)
                 assert (
@@ -995,7 +995,7 @@ class WeightOnlyQuantizationTester(TestCase):
             with torch.no_grad():
                 woq_model = convert(prepared_model)
                 woq_linear_class = (
-                    ipex.nn.modules.weight_only_quantization.IpexWoqLinear
+                    ipex.nn.modules.weight_only_quantization.WeightOnlyQuantizedLinear
                 )
                 assert isinstance(woq_model.linear, woq_linear_class)
                 assert (
@@ -1477,7 +1477,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 )
                 woq_m = copy.deepcopy(m)
                 woq_m.linear.qconfig = qconfig_mapping.global_qconfig
-                woq_m.linear = ipex.nn.modules.IpexWoqLinear.from_float_and_int4_weight(
+                woq_m.linear = ipex.nn.modules.WeightOnlyQuantizedLinear.from_float_and_int4_weight(
                     woq_m.linear,
                     packed_weight,
                     scales,
@@ -1552,7 +1552,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 b = m.linear.bias.detach() if has_bias else None
                 qconfig_mapping = (
                     ipex.quantization.get_weight_only_quant_qconfig_mapping(
-                        weight_dtype=torch.quint4x2,
+                        weight_dtype=WoqWeightDtype.INT4,
                         lowp_mode=ipex.quantization.WoqLowpMode.INT8,
                         act_quant_mode=ipex.quantization.WoqActQuantMode.PER_IC_BLOCK,
                         group_size=group_size,
@@ -1563,7 +1563,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 # path with g_idx
                 woq_m = copy.deepcopy(m)
                 woq_m.linear.qconfig = qconfig_mapping.global_qconfig
-                woq_m.linear = ipex.nn.modules.IpexWoqLinear.from_float_and_int4_weight(
+                woq_m.linear = ipex.nn.modules.WeightOnlyQuantizedLinear.from_float_and_int4_weight(
                     woq_m.linear,
                     packed_weight,
                     scales,
@@ -1582,16 +1582,14 @@ class WeightOnlyQuantizationTester(TestCase):
                 # reference: without g_idx
                 woq_m_2 = copy.deepcopy(m)
                 woq_m_2.linear.qconfig = qconfig_mapping.global_qconfig
-                woq_m_2.linear = (
-                    ipex.nn.modules.IpexWoqLinear.from_float_and_int4_weight(
-                        woq_m_2.linear,
-                        packed_weight,
-                        scales,
-                        packed_zeros,
-                        b,
-                        group_size=group_size,
-                        g_idx=None,
-                    )
+                woq_m_2.linear = ipex.nn.modules.WeightOnlyQuantizedLinear.from_float_and_int4_weight(
+                    woq_m_2.linear,
+                    packed_weight,
+                    scales,
+                    packed_zeros,
+                    b,
+                    group_size=group_size,
+                    g_idx=None,
                 )
                 qw_2 = woq_m_2.linear._op_context.to_public(
                     woq_m_2.linear._op_context.get_weight()

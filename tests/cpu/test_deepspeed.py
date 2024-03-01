@@ -328,7 +328,7 @@ class DeepspeedTester(JitTestCase):
         self._test_quantization(
             ipex.quantization.get_weight_only_quant_qconfig_mapping(),
             [
-                ipex.nn.modules.weight_only_quantization.IpexWoqLinear,
+                ipex.nn.modules.weight_only_quantization.WeightOnlyQuantizedLinear,
                 ipex.nn.modules.weight_only_quantization.IpexWoqLinearAllreduce,
             ],
             [ipex.nn.modules.weight_only_quantization.IpexWoqLmHeadLinearAllreduce],
