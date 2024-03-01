@@ -875,4 +875,3 @@ autograd:
   - cdist
   - lstm.input
   - gru.input
-  - _scaled_dot_product_attention_math
