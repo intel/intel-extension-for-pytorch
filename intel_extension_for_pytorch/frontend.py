@@ -262,14 +262,14 @@ def optimize(
             input, Intel® Extension for PyTorch* will pack the weight per some predefined heuristics.
             If feed a sample input with real input shape, Intel® Extension for PyTorch* can get
             best block format.
-        auto_kernel_selection (bool) [experimental]: Different backends may have
+        auto_kernel_selection (bool) [prototype]: Different backends may have
             different performances with different dtypes/shapes. Default value
             is False. Intel® Extension for PyTorch* will try to optimize the
             kernel selection for better performance if this knob is set to
             ``True``. You might get better performance at the cost of extra memory usage.
             The default value is ``None``. Explicitly setting this knob overwrites the
             configuration set by ``level`` knob.
-        graph_mode: (bool) [experimental]: It will automatically apply a combination of methods
+        graph_mode: (bool) [prototype]: It will automatically apply a combination of methods
             to generate graph or multiple subgraphs if True. The default value is ``False``.
         concat_linear (bool): Whether to perform ``concat_linear``. It only
             works for inference model. The default value is ``None``. Explicitly

@@ -1,4 +1,4 @@
-## Smooth Quantization Autotune Feature (Experimental):
+## Smooth Quantization Autotune Feature (Prototype):
 SmoothQuant is a popular method to improve the accuracy of int8 quantization. The [autotune API](../../../../../docs/tutorials/features/sq_recipe_tuning_api.md) allows automatic global alpha tuning, and automatic layer-by-layer alpha tuning provided by Intel® Neural Compressor for the best accuracy. Below is the basic command to generate the qconfig summary files (and quantized model ".pt" file) with the SmoothQuant autotune API.
 
 ```bash

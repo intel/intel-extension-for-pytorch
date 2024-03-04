@@ -28,7 +28,7 @@ optimizer = torch.optim.SGD(model.parameters(), lr=LR, momentum=0.9)
 model.train()
 
 model, optimizer = ipex.optimize(model, optimizer=optimizer)
-# Uncomment the code below to enable experimental feature torch.compile
+# Uncomment the code below to enable beta feature `torch.compile`
 # model = torch.compile(model, backend="ipex")
 
 for batch_idx, (data, target) in enumerate(train_loader):

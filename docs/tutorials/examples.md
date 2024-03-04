@@ -5,7 +5,7 @@ These examples will guide you through using the Intel® Extension for PyTorch\* 
 
 You can also refer to the [Features](./features.rst) section to get the examples and usage instructions related to particular features.
 
-The source code for these examples, as well as the feature examples, can be found in the GitHub source tree under the `examples` directory.
+The source code for these examples, as well as the feature examples, can be found in the GitHub source tree under the [examples](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu) directory.
 
 - [Python](#python) examples demonstrate usage of Python APIs:
 
@@ -77,63 +77,6 @@ Distributed training with PyTorch DDP is accelerated by oneAPI Collective Commun
 **Note:** You need to install `torchvision` Python package to run the following example.
 
 [//]: # (marker_train_ddp_complete)
-```python
-import os
-import torch
-import torch.distributed as dist
-import torchvision
-import oneccl_bindings_for_pytorch as torch_ccl
-import intel_extension_for_pytorch as ipex
-
-LR = 0.001
-DOWNLOAD = True
-DATA = 'datasets/cifar10/'
-
-transform = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((224, 224)),
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
-train_dataset = torchvision.datasets.CIFAR10(
-        root=DATA,
-        train=True,
-        transform=transform,
-        download=DOWNLOAD,
-)
-train_loader = torch.utils.data.DataLoader(
-        dataset=train_dataset,
-        batch_size=128
-)
-
-os.environ['MASTER_ADDR'] = '127.0.0.1'
-os.environ['MASTER_PORT'] = '29500'
-os.environ['RANK'] = os.environ.get('PMI_RANK', 0)
-os.environ['WORLD_SIZE'] = os.environ.get('PMI_SIZE', 1)
-dist.init_process_group(
-backend='ccl',
-init_method='env://'
-)
-
-model = torchvision.models.resnet50()
-criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
-model.train()
-model, optimizer = ipex.optimize(model, optimizer=optimizer)
-
-model = torch.nn.parallel.DistributedDataParallel(model)
-
-for batch_idx, (data, target) in enumerate(train_loader):
-    optimizer.zero_grad()
-    output = model(data)
-    loss = criterion(output, target)
-    loss.backward()
-    optimizer.step()
-    print('batch_id: {}'.format(batch_idx))
-torch.save({
-     'model_state_dict': model.state_dict(),
-     'optimizer_state_dict': optimizer.state_dict(),
-     }, 'checkpoint.pth')
-```
 [//]: # (marker_train_ddp_complete)
 
 ### Inference
@@ -142,7 +85,7 @@ The `optimize` function of Intel® Extension for PyTorch\* applies optimizations
 
 #### Float32
 
-##### Imperative Mode
+##### Eager Mode
 
 ###### Resnet50
 
@@ -192,14 +135,14 @@ We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://py
 [//]: # (marker_inf_bert_dynamo_fp32)
 [//]: # (marker_inf_bert_dynamo_fp32)
 
-*Note:* In TorchDynamo mode, since the native PyTorch operators like `aten::convolution` and `aten::linear` are well supported and optimized in `ipex` backend, we need to disable weights prepacking by setting `weights_prepack=False` in `ipex.optimize()`.
+**Note:** In TorchDynamo mode, since the native PyTorch operators like `aten::convolution` and `aten::linear` are well supported and optimized in `ipex` backend, we need to disable weights prepacking by setting `weights_prepack=False` in `ipex.optimize()`.
 
 #### BFloat16
 
 The `optimize` function works for both Float32 and BFloat16 data type. For BFloat16 data type, set the `dtype` parameter to `torch.bfloat16`.
 We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.
 
-##### Imperative Mode
+##### Eager Mode
 
 ###### Resnet50
 
@@ -260,11 +203,11 @@ We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://py
 
 Starting from Intel® Extension for PyTorch\* 1.12.0, quantization feature supports both static and dynamic modes.
 
-##### Calibration
+##### Static Quantization
 
-###### Static Quantization
+###### Calibration
 
-Please follow the steps below to perform static calibration:
+Please follow the steps below to perform calibration for static quantization:
 
 1. Import `intel_extension_for_pytorch` as `ipex`.
 2. Import `prepare` and `convert` from `intel_extension_for_pytorch.quantization`.
@@ -279,9 +222,22 @@ Please follow the steps below to perform static calibration:
 [//]: # (marker_int8_static)
 [//]: # (marker_int8_static)
 
-###### Dynamic Quantization
+###### Deployment
 
-Please follow the steps below to perform static calibration:
+For deployment, the INT8 model is loaded from the local file and can be used directly for sample inference.
+
+Follow the steps below:
+
+1. Import `intel_extension_for_pytorch` as `ipex`.
+2. Load the INT8 model from the saved file.
+3. Run inference.
+
+[//]: # (marker_int8_deploy)
+[//]: # (marker_int8_deploy)
+
+##### Dynamic Quantization
+
+Please follow the steps below to perform dynamic quantization:
 
 1. Import `intel_extension_for_pytorch` as `ipex`.
 2. Import `prepare` and `convert` from `intel_extension_for_pytorch.quantization`.
@@ -296,27 +252,41 @@ Please follow the steps below to perform static calibration:
 [//]: # (marker_int8_dynamic)
 [//]: # (marker_int8_dynamic)
 
-##### Deployment
-
-For deployment, the INT8 model is loaded from the local file and can be used directly on the inference.
-
-Follow the steps below:
-
-1. Import `intel_extension_for_pytorch` as `ipex`.
-2. Load the INT8 model from the saved file.
-3. Run inference.
-
-[//]: # (marker_int8_deploy)
-[//]: # (marker_int8_deploy)
-
-oneDNN provides [oneDNN Graph Compiler](https://github.com/oneapi-src/oneDNN/tree/dev-graph-preview4/doc#onednn-graph-compiler) as a prototype feature that could boost performance for selective topologies. No code change is required. Install <a class="reference external" href="installation.md#installation_onednn_graph_compiler">a binary</a> with this feature enabled. We verified this feature with `Bert-large`, `bert-base-cased`, `roberta-base`, `xlm-roberta-base`, `google-electra-base-generator` and `google-electra-base-discriminator`.
-
 ### Large Language Model (LLM)
 
+Intel® Extension for PyTorch\* provides dedicated optimization for running Large Language Models (LLM) faster.
+A set of data types are supported for various scenarios, including FP32, BF16, Smooth Quantization INT8, Weight Only Quantization INT8/INT4 (prototype).
+
 **Note:** You need to install `transformers==<VER_TRANSFORMERS>` Python package to run the following example.
+In addition, you may need to log in your HuggingFace account to access the pretrained model files. 
+Please refer to [HuggingFace login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
+
+#### FP32/BF16
 
 [//]: # (marker_llm_optimize)
 [//]: # (marker_llm_optimize)
+
+#### Smooth Quantization INT8
+
+The typical steps shown in the example are:
+
+1. Calibration process: Run the example script specifying `--calibration`, along with other related arguments.
+When the calibration process is completed, the quantization summary files would be generated.
+
+2. Model inference process: Run the example script without specifying `--calibration`. In this process the quantized model 
+will be generated via the original model and the quantization config and summary files, and will
+generate results for the input prompt.
+
+[//]: # (marker_llm_optimize_sq)
+[//]: # (marker_llm_optimize_sq)
+
+#### Weight Only Quantization INT8/INT4
+
+[//]: # (marker_llm_optimize_woq)
+[//]: # (marker_llm_optimize_woq)
+
+**Note:** Please check [LLM Best Known Practice Page](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/inference/python/llm)
+for detailed environment setup and LLM workload running instructions.
 
 ## C++
 

@@ -32,7 +32,7 @@ x = torch.rand(64, 64, 224, 224)
 y = model(x)
 ```
 
-### Inference with Imperative Path
+### Inference with Eager Path
 
 `torch.cpu.amp.autocast` is designed to be a context manager that allow scopes of your script to run with mixed precision. In these scopes, operations run in a data type chosen by the `autocast` class to improve performance while maintaining accuracy. See the operations category section for details on what precision the `autocast` class chooses for each operator, and under what circumstances.
 

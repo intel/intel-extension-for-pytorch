@@ -144,7 +144,7 @@ qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
     weight_dtype=WoqWeightDtype.INT4, # or WoqWeightDtype.INT8
     lowp_mode=ipex.quantization.WoqLowpMode.NONE, # or FP16, BF16, INT8
 )
-model = ipex.optimize_transformers(
+model = ipex.llm.optimize(
     model.eval(),
     dtype=amp_dtype,
     quantization_config=qconfig,

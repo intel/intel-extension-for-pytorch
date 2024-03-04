@@ -6,7 +6,7 @@ To start using the Intel® Extension for PyTorch\* in your code, you need to mak
 
 1. Import the extension with `import intel_extension_for_pytorch as ipex`.
 2. Invoke the `optimize()` function to apply optimizations.
-3. Convert the imperative model to a graph model.
+3. Convert the eager mode model to a graph mode model.
     - For TorchScript, invoke `torch.jit.trace()` and `torch.jit.freeze()`
     - For TorchDynamo, invoke `torch.compile(model, backend="ipex")`(*Beta feature*)
 

@@ -321,8 +321,8 @@ def disable_tile_as_device():
 
 
 ################################################################
-# EXPERIMENTAL options:
-# NOTE: Below options are under experimental.
+# PROTOTYPICAL options:
+# NOTE: Below options are prototypical.
 #       They are instable, and may be removed without notice!
 ################################################################
 

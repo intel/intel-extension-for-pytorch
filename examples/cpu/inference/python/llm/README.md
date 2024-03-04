@@ -1,6 +1,6 @@
 # 1. LLM Optimization Overview
 
-ipex.llm provides dedicated optimization for running Large Language Models (LLM) faster, including technical points like paged attention, ROPE fusion, etc. And a set of data types are supported for various scenarios, including FP32, BF16, Smooth Quantization INT8, Weight Only Quantization INT8/INT4 (experimental).
+ipex.llm provides dedicated optimization for running Large Language Models (LLM) faster, including technical points like paged attention, ROPE fusion, etc. And a set of data types are supported for various scenarios, including FP32, BF16, Smooth Quantization INT8, Weight Only Quantization INT8/INT4 (prototype).
 
 <br>
 
@@ -471,7 +471,7 @@ As the model has been sharded, we specify `SHARDED_MODEL_PATH` for `-m` argument
 
 # 5. Advanced Usage
 
-## 5.1 Weight-only quantization with low precision checkpoint (Experimental)
+## 5.1 Weight-only quantization with low precision checkpoint (Prototype)
 
 Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 probably results in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a dataset by such algorithms. The low precision checkpoint is saved as a `state_dict` in a `.pt` file and can be loaded later for weight only quantization. We provide an example here to run GPTQ.
 

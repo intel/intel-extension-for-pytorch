@@ -1,7 +1,7 @@
-# Hypertune (Experimental)
+# Hypertune (Prototype)
 <img width="482" alt="hypertune" src="https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/assets/93151422/7a65b2c1-c341-48f3-9d18-a136d684b3e0">
 
-Hypertune is an experimental feature to perform hyperparameter searching. Hyperparameter searching is used in various areas such as optimization of hyperparameters of deep learning models. Hyperparameter searching is extremely useful in real situations when the number of hyperparameters and their search spaces are huge that manually tuning these hyperparameters is impractical and time consuming. Hypertune automates this process of hyperparameter searching for the [launcher](https://github.com/intel/intel-extension-for-pytorch/blob/master/docs/tutorials/performance_tuning/launch_script.md) and Intel® Extension for PyTorch\* (IPEX)
+Hypertune is an prototype feature to perform hyperparameter searching. Hyperparameter searching is used in various areas such as optimization of hyperparameters of deep learning models. Hyperparameter searching is extremely useful in real situations when the number of hyperparameters and their search spaces are huge that manually tuning these hyperparameters is impractical and time consuming. Hypertune automates this process of hyperparameter searching for the [launcher](https://github.com/intel/intel-extension-for-pytorch/blob/master/docs/tutorials/performance_tuning/launch_script.md) and Intel® Extension for PyTorch\* (IPEX)
 
 ## Usage of Hypertune
 ```
