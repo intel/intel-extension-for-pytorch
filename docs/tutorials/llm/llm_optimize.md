@@ -33,14 +33,14 @@ Supports INT8.
 
 ``` python
 import torch
-#################### code changes ####################  # noqa F401
+#################### code changes ####################
 import intel_extension_for_pytorch as ipex
 from intel_extension_for_pytorch.quantization import prepare
-######################################################  # noqa F401
+######################################################
 import transformers
 # load model
 model = transformers.AutoModelForCausalLM.from_pretrained(...).eval()
-#################### code changes ####################  # noqa F401
+#################### code changes ####################
 qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
 # stage 1: calibration
 # prepare your calibration dataset samples
@@ -59,7 +59,7 @@ with torch.no_grad():
 prepared_model.save_qconf_summary(qconf_summary=qconfig_summary_file_path)
 
 # stage 2: quantization
-model = ipex.llm.ptimize(
+model = ipex.llm.optimize(
   model.eval(),
   quantization_config=qconfig,
   qconfig_summary_file=qconfig_summary_file_path,
