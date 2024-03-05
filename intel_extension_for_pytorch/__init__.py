@@ -121,6 +121,7 @@ from . import optim
 from . import fx
 from . import _dynamo
 from . import _inductor
+from . import llm
 
 # frontend
 from .transformers.optimize import optimize_transformers

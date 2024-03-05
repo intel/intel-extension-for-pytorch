@@ -2,7 +2,7 @@ import torch
 import random
 from typing import List, Optional, Tuple
 import pytest
-import intel_extension_for_pytorch  # noqa
+import intel_extension_for_pytorch as ipex  # noqa
 from torch.testing._internal.common_utils import (
     TestCase,
 )
@@ -198,6 +198,7 @@ class TestPagedAttention(TestCase):
 
         xpu_device = torch.device("xpu")
         output_xpu = output.to(xpu_device)
+        output_xpu_clone = output_xpu.clone()
         query_xpu = query.to(xpu_device)
         key_cache_xpu = key_cache.to(xpu_device)
         value_cache_xpu = value_cache.to(xpu_device)
@@ -222,6 +223,20 @@ class TestPagedAttention(TestCase):
                 block_size,
                 max_context_len,
                 alibi_slopes_xpu,
+            )
+
+            ipex.llm.modules.PagedAttention.single_query_cached_kv_attention(
+                output_xpu_clone,
+                query_xpu,
+                key_cache_xpu,
+                value_cache_xpu,
+                head_mapping_xpu,
+                scale,
+                block_tables_xpu,
+                context_lens_xpu,
+                block_size,
+                max_context_len,
+                alibi_slopes,
             )
         elif version == "v2":
             num_partitions = (max_context_len + PARTITION_SIZE - 1) // PARTITION_SIZE
@@ -261,6 +276,7 @@ class TestPagedAttention(TestCase):
 
         # Run the reference implementation.
         actual_output = output_xpu.cpu().float()
+        clone_output = output_xpu_clone.cpu().float()
         ref_output = torch.empty_like(query)
         self.ref_single_query_cached_kv_attention(
             ref_output,
@@ -276,6 +292,9 @@ class TestPagedAttention(TestCase):
         try:
             torch.testing.assert_close(
                 actual_output, ref_output.float(), atol=1e-3, rtol=1e-2
+            )
+            torch.testing.assert_close(
+                clone_output, ref_output.float(), atol=1e-3, rtol=1e-2
             )
             print(f"attention {version} accuracy test passed")
         except Exception as e:

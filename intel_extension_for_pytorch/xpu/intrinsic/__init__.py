@@ -23,6 +23,7 @@ __all__ = [
     "paged_attention_v2",
     "copy_blocks",
     "swap_blocks",
+    "IpexPaged_attention",
 ]
 
 

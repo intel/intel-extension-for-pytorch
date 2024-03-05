@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import intel_extension_for_pytorch  # noqa
+import intel_extension_for_pytorch as ipex  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -59,8 +59,13 @@ class TestNNMethod(TestCase):
             kernel_out = torch.ops.torch_ipex.apply_rotary_embedding_two_qk(
                 tensor, tensor1, sin, cos, out, out1
             )
+            ipex.llm.modules.RotaryEmbedding.apply(
+                tensor, tensor1, sin, cos, tensor.size(-1), False
+            )
             self.assertEqual(out, ref)
             self.assertEqual(out1, ref1)
+            self.assertEqual(tensor, ref)
+            self.assertEqual(tensor1, ref1)
 
     def test_rotary_embedding_half(self):
         test_tensor_size = [
@@ -90,5 +95,10 @@ class TestNNMethod(TestCase):
             kernel_out = torch.ops.torch_ipex.apply_rotary_embedding_half_qk(
                 tensor, tensor1, sin, cos, out, out1
             )
+            ipex.llm.modules.RotaryEmbedding.apply(
+                tensor, tensor1, sin, cos, tensor.size(-1), True
+            )
             self.assertEqual(out, ref)
             self.assertEqual(out1, ref1)
+            self.assertEqual(tensor, ref)
+            self.assertEqual(tensor1, ref1)

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import intel_extension_for_pytorch  # noqa
+import intel_extension_for_pytorch as ipex  # noqa
 from torch.testing._internal.common_utils import TestCase
 
 
@@ -38,7 +38,16 @@ class TestNNMethod(TestCase):
             layer_norm.bias.to("xpu"),
             layer_norm.eps,
         )
+        fast_ln_module = ipex.llm.modules.FastLayerNorm.apply(
+            embedding_xpu,
+            layer_norm.normalized_shape,
+            layer_norm.weight.to("xpu"),
+            layer_norm.bias.to("xpu"),
+            layer_norm.eps
+        )
+        fast_ln_llm_out = fast_ln_module(embedding_xpu)
         self.assertEqual(ref, fast_ln.cpu())
+        self.assertEqual(ref, fast_ln_llm_out.cpu())
 
     def test_fast_layer_norm_half(self, dtype=torch.half):
         batch, sentence_length, embedding_dim = 16, 128, 1024
@@ -53,7 +62,16 @@ class TestNNMethod(TestCase):
             layer_norm.bias.to(dtype).to("xpu"),
             layer_norm.eps,
         )
+        fast_ln_module = ipex.llm.modules.FastLayerNorm.apply(
+            embedding_xpu,
+            layer_norm.normalized_shape,
+            layer_norm.weight.to(dtype).to("xpu"),
+            layer_norm.bias.to(dtype).to("xpu"),
+            layer_norm.eps,
+        )
+        fast_ln_llm_out = fast_ln_module(embedding_xpu)
         self.assertEqual(ref, fast_ln.float().cpu(), atol=1e-3, rtol=1e-3)
+        self.assertEqual(ref, fast_ln_llm_out.float().cpu(), atol=1e-3, rtol=1e-3)
 
     def test_rms_norm_float(self, dtype=torch.float):
         batch, sentence_length, embedding_dim = 16, 128, 1024
