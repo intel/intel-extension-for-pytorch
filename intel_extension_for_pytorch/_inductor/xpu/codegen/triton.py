@@ -300,7 +300,7 @@ class XPUTritonKernel(TritonKernel):
                 f"""
                     import triton
                     import triton.language as tl
-                    from triton.language.extra.intel import libdevice
+                    {"" if os.environ.get("TRITON_XPU_USE_LEGACY_API", "") == "1" else "from triton.language.extra.intel import libdevice"}
                     from torch._inductor.ir import ReductionHint
                     from torch._inductor.ir import TileHint
                     from intel_extension_for_pytorch._inductor.xpu.triton_heuristics import AutotuneHint, {heuristics}
