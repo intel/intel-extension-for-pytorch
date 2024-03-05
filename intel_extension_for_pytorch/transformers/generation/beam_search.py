@@ -191,7 +191,7 @@ def _beam_search(
             "GitForCausalLM",
         ]:
             first_token = False
-            has_position_id = "position_ids" in model_inputs
+            has_position_id = model_inputs.get("position_ids", None) is not None
             if model_inputs["past_key_values"] is None:
                 first_token = True
                 if self.model_backbone == "T5ForConditionalGeneration":

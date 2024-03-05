@@ -280,8 +280,8 @@ class HuggingFaceModel(BaseLM):
             past_key_values = self._get_past_key_values(input_bs)
             example_dict = {"input_ids": inputs}
 
-        model_inputs = self.base_model.prepare_inputs_for_generation(inputs)
-        has_position_ids = "position_ids" in model_inputs
+        model_inputs = self.base_model.prepare_inputs_for_generation(inputs, attention_mask=attention_mask_batched)
+        has_position_ids = model_inputs.get("position_ids", None) is not None
         if self._with_jit:
             example_dict["attention_mask"]= attention_mask_batched
             example_dict["past_key_values"]= past_key_values

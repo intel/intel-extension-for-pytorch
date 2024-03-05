@@ -622,26 +622,25 @@ def get_dummy_input(_model, return_dict=False):
         ]
     )
 
-    input_ids = torch.ones(32).to(torch.long)
-    model_inputs = _model.prepare_inputs_for_generation(input_ids.unsqueeze(0))
-    has_position_ids = "position_ids" in model_inputs
-    attention_mask = torch.ones(len(input_ids))
-    position_ids = torch.arange(len(input_ids))
+    input_ids = torch.ones(32).to(torch.long).unsqueeze(0)
+    attention_mask = torch.ones_like(input_ids)
+    # prepare_inputs_for_generation is just for checking if position_ids should be in the model inputs,
+    # input input_ids and attention_mask to make sure this func can generate the correct position_ids.
+    model_inputs = _model.prepare_inputs_for_generation(
+        input_ids, attention_mask=attention_mask
+    )
+    has_position_ids = model_inputs.get("position_ids", None) is not None
+    position_ids = torch.arange(input_ids.shape[-1]).unsqueeze(0)
     if has_position_ids:
         sample_inputs = (
             {
-                "input_ids": input_ids.unsqueeze(0),
-                "attention_mask": attention_mask.unsqueeze(0),
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
                 "past_key_values": past_key_values,
-                "position_ids": position_ids.unsqueeze(0),
+                "position_ids": position_ids,
             }
             if return_dict
-            else (
-                input_ids.unsqueeze(0),
-                attention_mask.unsqueeze(0),
-                past_key_values,
-                position_ids.unsqueeze(0),
-            )
+            else (input_ids, attention_mask, past_key_values, position_ids)
         )
     elif _model.config.architectures[0] == "T5ForConditionalGeneration":
         last_hidden_state = torch.rand([1, 32, 2048])
@@ -649,7 +648,7 @@ def get_dummy_input(_model, return_dict=False):
             (
                 {
                     "decoder_input_ids": torch.ones(1).to(torch.long).unsqueeze(0),
-                    "attention_mask": attention_mask.unsqueeze(0),
+                    "attention_mask": attention_mask,
                     "past_key_values": past_key_values,
                     "encoder_outputs": (last_hidden_state,),
                 }
@@ -657,7 +656,7 @@ def get_dummy_input(_model, return_dict=False):
             if return_dict
             else (
                 torch.ones(1).to(torch.long).unsqueeze(0),
-                attention_mask.unsqueeze(0),
+                attention_mask,
                 past_key_values,
                 (last_hidden_state,),
             )
@@ -665,12 +664,12 @@ def get_dummy_input(_model, return_dict=False):
     else:
         sample_inputs = (
             {
-                "input_ids": input_ids.unsqueeze(0),
-                "attention_mask": attention_mask.unsqueeze(0),
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
                 "past_key_values": past_key_values,
             }
             if return_dict
-            else (input_ids.unsqueeze(0), attention_mask.unsqueeze(0), past_key_values)
+            else (input_ids, attention_mask, past_key_values)
         )
     if _model.config.architectures[0] == "GitForCausalLM":
         batch_size = (
@@ -702,8 +701,8 @@ def get_dummy_input(_model, return_dict=False):
             sample_inputs["past_key_values"] = past_key_values
         else:
             sample_inputs = (
-                input_ids.unsqueeze(0).repeat(_model.config.batch_size, 1),
-                attention_mask.unsqueeze(0).repeat(_model.config.batch_size, 1),
+                input_ids.repeat(_model.config.batch_size, 1),
+                attention_mask.repeat(_model.config.batch_size, 1),
                 past_key_values,
                 torch.zeros(_model.config.batch_size, 3, 224, 224),
             )

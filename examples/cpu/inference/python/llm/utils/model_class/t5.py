@@ -42,8 +42,9 @@ class T5Config(LLMConfig):
                 low_cpu_mem_usage=True,
                 trust_remote_code=True,
             )
-        input_ids = torch.ones(32).to(torch.long)
-        example_inputs = self.model.prepare_inputs_for_generation(input_ids)
-        if "position_ids" in example_inputs:
+        input_ids = torch.ones(32).to(torch.long).unsqueeze(0)
+        attention_mask = torch.ones_like(input_ids)
+        example_inputs = self.model.prepare_inputs_for_generation(input_ids, attention_mask=attention_mask)
+        if example_inputs.get("position_ids", None) is not None:
             self.example_inputs_mode = EXAMPLE_INPUTS_MODE.MASK_KV_POS
         return self.model
