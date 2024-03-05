@@ -33,28 +33,6 @@ std::vector<int64_t> conv_input_size(
   return input_size;
 }
 
-c10::SymDimVector conv_input_size(
-    c10::SymIntArrayRef output_size,
-    at::IntArrayRef weight_size,
-    at::IntArrayRef padding,
-    at::IntArrayRef output_padding,
-    at::IntArrayRef stride,
-    at::IntArrayRef dilation,
-    int64_t groups) {
-  // ASSERT(output_size.size() > 2)
-  // ASSERT(output_size.size() == weight_size.size())
-  auto dim = output_size.size();
-  c10::SymDimVector input_size(dim);
-  input_size[0] = output_size[output_batch_size_dim];
-  input_size[1] = weight_size[weight_input_channels_dim] * groups;
-  for (size_t d = 2; d < dim; ++d) {
-    int kernel = dilation[d - 2] * (weight_size[d] - 1) + 1;
-    input_size[d] = (output_size[d] - 1) * stride[d - 2] -
-        (2 * padding[d - 2]) + kernel + output_padding[d - 2];
-  }
-  return input_size;
-}
-
 static inline std::vector<int64_t> padding_r(
     at::IntArrayRef padding,
     at::IntArrayRef output_padding) {

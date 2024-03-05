@@ -51,13 +51,6 @@ std::vector<int64_t> calc_conv_output_size(
     at::IntArrayRef stride,
     at::IntArrayRef dilation);
 
-c10::SymDimVector calc_conv_output_size(
-    c10::SymIntArrayRef input_size,
-    at::IntArrayRef kernel_size,
-    at::IntArrayRef padding,
-    at::IntArrayRef stride,
-    at::IntArrayRef dilation);
-
 // IPEX customized convolution OP with n-D packed weight
 class IPEXConvolutionOp : public torch::autograd::Function<IPEXConvolutionOp> {
  public:
