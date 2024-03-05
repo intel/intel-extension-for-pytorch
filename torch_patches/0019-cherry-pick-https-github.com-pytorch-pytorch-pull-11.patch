@@ -1,0 +1,28 @@
+From 3731a06eaab6e67a70820ab6c8ffd5a7a15e81ac Mon Sep 17 00:00:00 2001
+From: min-jean-cho <min.jean.cho@intel.com>
+Date: Sun, 3 Mar 2024 19:00:59 -0800
+Subject: [PATCH 19/19] cherry pick
+ https://github.com/pytorch/pytorch/pull/117497 (#207) (#210)
+
+---
+ aten/src/ATen/cpu/vec/vec_base.h | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/aten/src/ATen/cpu/vec/vec_base.h b/aten/src/ATen/cpu/vec/vec_base.h
+index f68e9c6ebb3..f4881db4a0e 100644
+--- a/aten/src/ATen/cpu/vec/vec_base.h
++++ b/aten/src/ATen/cpu/vec/vec_base.h
+@@ -150,9 +150,8 @@ public:
+   // versions GCC/Clang have buggy determinations on whether or not an
+   // identifier is odr-used or not, and in any case it's hard to tell if
+   // a variable is odr-used or not.  So best to just cut the problem at the root.
+-  static constexpr size_type size_T = sizeof(T);  // Workaround to compile with VS2022.
+   static constexpr size_type size() {
+-    return VECTOR_WIDTH / size_T;
++    return VECTOR_WIDTH / sizeof(T);
+   }
+   Vectorized() : values{static_cast<T>(0)} {}
+   Vectorized(T val) {
+-- 
+2.34.1
+

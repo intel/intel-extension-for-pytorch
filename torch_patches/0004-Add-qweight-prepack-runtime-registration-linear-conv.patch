@@ -1,7 +1,7 @@
 From e396a88d893335c8c1221d3bde057fe9ca1cbeb4 Mon Sep 17 00:00:00 2001
 From: Zhiwei <532707544@qq.com>
 Date: Wed, 13 Sep 2023 13:31:06 +0800
-Subject: [PATCH 04/17] Add qweight prepack runtime registration(linear, conv)
+Subject: [PATCH 04/19] Add qweight prepack runtime registration(linear, conv)
  & Add QXPU QEngine (#147)
 
 Add qweight prepack runtime registration(linear, conv) & Add QXPU QEngine
