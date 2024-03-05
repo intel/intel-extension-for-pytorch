@@ -1,7 +1,7 @@
 From b5c6f139f0f7b3972d956e7246a88facee18e842 Mon Sep 17 00:00:00 2001
 From: zejun <zejun.chen@intel.com>
 Date: Wed, 29 Nov 2023 15:10:51 +0800
-Subject: [PATCH 19/20] Cherry pick PR to enable nested cos and sin (#198)
+Subject: [PATCH 19/26] Cherry pick PR to enable nested cos and sin (#198)
 
 Signed-off-by: Chen, Zejun <zejun.chen@intel.com>
 ---
@@ -11,7 +11,7 @@ Signed-off-by: Chen, Zejun <zejun.chen@intel.com>
  3 files changed, 14 insertions(+), 1 deletion(-)
 
 diff --git a/aten/src/ATen/native/native_functions.yaml b/aten/src/ATen/native/native_functions.yaml
-index f95e1ace6f..27d8a35eb6 100644
+index f95e1ace6fc..27d8a35eb61 100644
 --- a/aten/src/ATen/native/native_functions.yaml
 +++ b/aten/src/ATen/native/native_functions.yaml
 @@ -1720,6 +1720,8 @@
@@ -32,7 +32,7 @@ index f95e1ace6f..27d8a35eb6 100644
  
  - func: sin_(Tensor(a!) self) -> Tensor(a!)
 diff --git a/aten/src/ATen/native/nested/NestedTensorUnaryOps.cpp b/aten/src/ATen/native/nested/NestedTensorUnaryOps.cpp
-index 9cfc53b60a..e01535323e 100644
+index 9cfc53b60a2..e01535323ea 100644
 --- a/aten/src/ATen/native/nested/NestedTensorUnaryOps.cpp
 +++ b/aten/src/ATen/native/nested/NestedTensorUnaryOps.cpp
 @@ -124,5 +124,13 @@ Tensor& NestedTensor_silu_(Tensor& self){
@@ -50,7 +50,7 @@ index 9cfc53b60a..e01535323e 100644
  } // namespace native
  } // namespace at
 diff --git a/test/test_nestedtensor.py b/test/test_nestedtensor.py
-index 6582a49337..95aeed0b31 100644
+index 6582a493378..95aeed0b319 100644
 --- a/test/test_nestedtensor.py
 +++ b/test/test_nestedtensor.py
 @@ -865,7 +865,9 @@ class TestNestedTensorDeviceType(TestCase):

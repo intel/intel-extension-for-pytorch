@@ -1,14 +1,14 @@
 From dd9913ff2d889dd9dac05929c5a4aa7713dc741a Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Fri, 10 Nov 2023 16:43:43 +0800
-Subject: [PATCH 17/20] remove debug message (#182)
+Subject: [PATCH 17/26] remove debug message (#182)
 
 ---
  torch/autograd/profiler_legacy.py | 2 --
  1 file changed, 2 deletions(-)
 
 diff --git a/torch/autograd/profiler_legacy.py b/torch/autograd/profiler_legacy.py
-index 1a28b1f84b..7e8d99c0a7 100644
+index 1a28b1f84bd..7e8d99c0a7e 100644
 --- a/torch/autograd/profiler_legacy.py
 +++ b/torch/autograd/profiler_legacy.py
 @@ -349,7 +349,6 @@ def _parse_legacy_records(thread_records):

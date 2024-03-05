@@ -1,7 +1,7 @@
 From 0d61b020088d65064072b1cb4d64d249120a88fe Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Tue, 26 Sep 2023 20:49:36 +0800
-Subject: [PATCH 08/20] generalize inductor triton backend device agnostic
+Subject: [PATCH 08/26] generalize inductor triton backend device agnostic
  (#168)
 
 ---
@@ -21,7 +21,7 @@ Subject: [PATCH 08/20] generalize inductor triton backend device agnostic
 
 diff --git a/torch/_dynamo/device_interface.py b/torch/_dynamo/device_interface.py
 new file mode 100644
-index 0000000000..8d19cb92d5
+index 00000000000..8d19cb92d51
 --- /dev/null
 +++ b/torch/_dynamo/device_interface.py
 @@ -0,0 +1,162 @@
@@ -188,7 +188,7 @@ index 0000000000..8d19cb92d5
 +
 +register_interface_for_device("cuda", CudaInterface)
 diff --git a/torch/_inductor/codecache.py b/torch/_inductor/codecache.py
-index 2fd3e710fd..e68b83cf91 100644
+index 2fd3e710fdb..e68b83cf919 100644
 --- a/torch/_inductor/codecache.py
 +++ b/torch/_inductor/codecache.py
 @@ -35,7 +35,11 @@ from typing import Any, Callable, Dict, List, Set, Union
@@ -252,7 +252,7 @@ index 2fd3e710fd..e68b83cf91 100644
                  _worker_compile, kernel_name, source_code, cc, device
              )
 diff --git a/torch/_inductor/codegen/triton_foreach.py b/torch/_inductor/codegen/triton_foreach.py
-index 865a01f440..f0fa4c877f 100644
+index 865a01f440c..f0fa4c877fa 100644
 --- a/torch/_inductor/codegen/triton_foreach.py
 +++ b/torch/_inductor/codegen/triton_foreach.py
 @@ -226,7 +226,7 @@ class ForeachKernel(Kernel):
@@ -265,7 +265,7 @@ index 865a01f440..f0fa4c877f 100644
              )
              code.writeline(
 diff --git a/torch/_inductor/codegen/wrapper.py b/torch/_inductor/codegen/wrapper.py
-index 389e9e88d5..17c94e084f 100644
+index 389e9e88d5c..17c94e084f6 100644
 --- a/torch/_inductor/codegen/wrapper.py
 +++ b/torch/_inductor/codegen/wrapper.py
 @@ -304,8 +304,8 @@ class WrapperCodeGen(CodeGen):
@@ -317,7 +317,7 @@ index 389e9e88d5..17c94e084f 100644
              "launchKernel({}, {}, {}, {}, {}, {}, {}, {});".format(
 diff --git a/torch/_inductor/cuda_properties.py b/torch/_inductor/cuda_properties.py
 deleted file mode 100644
-index 59bcc4e912..0000000000
+index 59bcc4e9128..00000000000
 --- a/torch/_inductor/cuda_properties.py
 +++ /dev/null
 @@ -1,58 +0,0 @@
@@ -380,7 +380,7 @@ index 59bcc4e912..0000000000
 -    p = get_device_properties(device)
 -    return p.major, p.minor
 diff --git a/torch/_inductor/ir.py b/torch/_inductor/ir.py
-index 8077ede732..d66a5f4a28 100644
+index 8077ede7324..d66a5f4a280 100644
 --- a/torch/_inductor/ir.py
 +++ b/torch/_inductor/ir.py
 @@ -32,6 +32,7 @@ import torch._logging
@@ -412,7 +412,7 @@ index 8077ede732..d66a5f4a28 100644
          max_elements_per_thread = 512
          threads_per_sm = 2048
 diff --git a/torch/_inductor/select_algorithm.py b/torch/_inductor/select_algorithm.py
-index 7ff7492939..936792cf82 100644
+index 7ff74929391..936792cf827 100644
 --- a/torch/_inductor/select_algorithm.py
 +++ b/torch/_inductor/select_algorithm.py
 @@ -356,7 +356,7 @@ class TritonTemplateKernel(TritonKernel):
@@ -425,7 +425,7 @@ index 7ff7492939..936792cf82 100644
              )
  
 diff --git a/torch/_inductor/triton_heuristics.py b/torch/_inductor/triton_heuristics.py
-index 3e14c75226..7b21d63209 100644
+index 3e14c752263..7b21d632099 100644
 --- a/torch/_inductor/triton_heuristics.py
 +++ b/torch/_inductor/triton_heuristics.py
 @@ -16,6 +16,7 @@ from typing import Any, Callable, List, Optional, Set, Tuple
@@ -469,7 +469,7 @@ index 3e14c75226..7b21d63209 100644
  
  class HeuristicType(Enum):
 diff --git a/torch/_inductor/utils.py b/torch/_inductor/utils.py
-index 417defc24c..1b20878914 100644
+index 417defc24c2..1b208789146 100644
 --- a/torch/_inductor/utils.py
 +++ b/torch/_inductor/utils.py
 @@ -32,11 +32,11 @@ from unittest import mock
@@ -572,7 +572,7 @@ index 417defc24c..1b20878914 100644
      print(f"{took/baseline:.6f}")
      return took
 diff --git a/torch/sparse/_triton_ops.py b/torch/sparse/_triton_ops.py
-index 57c9ac0168..dea50b6432 100644
+index 57c9ac0168a..dea50b6432f 100644
 --- a/torch/sparse/_triton_ops.py
 +++ b/torch/sparse/_triton_ops.py
 @@ -1,18 +1,7 @@

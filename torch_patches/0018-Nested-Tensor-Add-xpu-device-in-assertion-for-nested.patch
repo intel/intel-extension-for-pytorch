@@ -1,7 +1,7 @@
 From 5c5feeef2804f452bda93462633be85cff9c8bcd Mon Sep 17 00:00:00 2001
 From: zejun <zejun.chen@intel.com>
 Date: Wed, 29 Nov 2023 15:10:32 +0800
-Subject: [PATCH 18/20] [Nested Tensor] Add xpu device in assertion for nested
+Subject: [PATCH 18/26] [Nested Tensor] Add xpu device in assertion for nested
  tensor creation (#197)
 
 * [Nested Tensor] Add xpu device in assertion for nested tensor creation
@@ -14,7 +14,7 @@ Signed-off-by: Chen, Zejun <zejun.chen@intel.com>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/aten/src/ATen/NestedTensorImpl.cpp b/aten/src/ATen/NestedTensorImpl.cpp
-index d4b4580b01..60f94cbc14 100644
+index d4b4580b015..60f94cbc149 100644
 --- a/aten/src/ATen/NestedTensorImpl.cpp
 +++ b/aten/src/ATen/NestedTensorImpl.cpp
 @@ -180,8 +180,8 @@ NestedTensorImpl::NestedTensorImpl(

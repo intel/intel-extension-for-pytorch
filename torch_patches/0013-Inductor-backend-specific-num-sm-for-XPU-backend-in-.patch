@@ -1,7 +1,7 @@
 From 00f48b6ff7b342a322098dbeec0b9488f52823df Mon Sep 17 00:00:00 2001
 From: Feng Yuan <feng1.yuan@intel.com>
 Date: Thu, 19 Oct 2023 09:49:25 +0800
-Subject: [PATCH 13/20] [Inductor] backend specific num sm for XPU backend in
+Subject: [PATCH 13/26] [Inductor] backend specific num sm for XPU backend in
  Triton reduction kernel (#176)
 
 Signed-off-by: Feng Yuan <feng1.yuan@intel.com>
@@ -10,7 +10,7 @@ Signed-off-by: Feng Yuan <feng1.yuan@intel.com>
  1 file changed, 14 insertions(+), 4 deletions(-)
 
 diff --git a/torch/_inductor/ir.py b/torch/_inductor/ir.py
-index d66a5f4a28..6589bd1055 100644
+index d66a5f4a280..6589bd1055e 100644
 --- a/torch/_inductor/ir.py
 +++ b/torch/_inductor/ir.py
 @@ -256,10 +256,18 @@ def get_device_type(x):
