@@ -59,6 +59,7 @@ The team tracks bugs and enhancement requests using `GitHub issues <https://gith
    tutorials/introduction
    tutorials/features
    Large Language Models (LLM)<tutorials/llm>
+   tutorials/performance
    tutorials/technical_details
    tutorials/releases
    tutorials/performance_tuning/known_issues
