@@ -216,7 +216,7 @@ ABI=1
 cd pytorch
 git apply ../intel-extension-for-pytorch/torch_patches/*.patch
 python -m pip install -r requirements.txt
-python -m pip install mkl-static mkl-include
+conda install --force-reinstall intel::mkl-static intel::mkl-include -y
 mv version.txt version.txt.bk
 echo "${VER_TORCH:1}a0" > version.txt
 # Ensure cmake can find python packages when using conda or virtualenv
@@ -240,7 +240,7 @@ unset _GLIBCXX_USE_CXX11_ABI
 unset USE_STATIC_MKL
 unset CMAKE_PREFIX_PATH
 mv version.txt.bk version.txt
-python -m pip uninstall -y mkl-static mkl-include
+conda remove mkl-static mkl-include -y
 python -m pip install dist/*.whl
 cd ..
 #  TorchVision
