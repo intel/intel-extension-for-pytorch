@@ -26,14 +26,14 @@ instance_group [
 ]
 
 dynamic_batching {
-  max_queue_delay_microseconds: queue_placeholder
+  max_queue_delay_microseconds: 1500
 }
 
 parameters [
   {
     # Origin BERT model name. Required
     key: "origin"
-    value: {string_value: 'model_placeholder'}
+    value: {string_value: 'bert-large-uncased-whole-word-masking-finetuned-squad'}
   },
   {
     # Batch sizes to split (e.g. "[1,2,4,8]"). Default: "[]" if "dynamic_shape" else "[1]"

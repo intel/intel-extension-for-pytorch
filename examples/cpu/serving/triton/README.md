@@ -6,53 +6,94 @@ This sample provide code to integrate Intel® Extension for PyTorch with Triton 
 ![graph](./graph.jpg)
 
 ## Preparation
-Make sure that Docker is installed on both host and client instance.
-In case of running on two separate instances edit config.properties and provide required variables.
+You'll need to install Docker Engine on your development system. Note that while **Docker Engine** is free to use, **Docker Desktop** may require you to purchase a license. See the [Docker Engine Server installation instructions](https://docs.docker.com/engine/install/#server) for details.
 ## Supported models
 Currently AI Inference samples support following Bert models finetuned on Squad dataset:
 - bert_base        - PyTorch+Intel® Extension for PyTorch [Bert Base uncased](https://huggingface.co/csarron/bert-base-uncased-squad-v1 "Bert Base uncased")
 - bert_large        - PyTorch+Intel® Extension for PyTorch [Bert Large uncased](https://huggingface.co/bert-large-uncased-whole-word-masking-finetuned-squad "Bert Large uncased")
 
-## Possible run scenarios
-AI Inference samples allow user to run inference on localhost or on remote Triton Server Host. 
-By default config.properties is filled with localhost run option. 
-### Execution on localhost
-To build, start Docker containers, run tests, stop and do cleanup on localhost execute scripts in following order:
+### Build Container
+To add Intel Extension for PyTorch to the Triton Inference Server Container Image, use the following command to build the container used in this example.
 
-`$ bash build.sh`  - builds Docker image for Triton Server Client and Host with name specified in config.properties
+```bash
+docker build -t triton:ipex .
+```
 
-`$ bash start.sh`  - runs Docker containers for Triton Server Client and Host for model specified in config.properties
+> [!TIP]
+> You can customize the PyTorch package versions that get installed by adding `--build-arg PYTORCH_VERSION=<new-version>` based on the arguments found in the [Dockerfile](Dockerfile#L12-15).
 
-`$ bash run_test.sh`  - sends requests to Triton Server Host for model specified in config.properties. Values for sequence length, number of iterations, run mode can be passed as an argument.
+> [!NOTE]
+> If you are working under a corporate proxy you will need to include the following parameters in your `docker build` command: `--build-arg http_proxy=${http_proxy} --build-arg https_proxy=${https_proxy}`.
 
-`$ sudo bash stop.sh`  - stops Docker containers for Triton Server Client and Host for model, and removes temporary files. 
+### Start Server
+Start the Inference Server.
 
-### Execution on two separate instances
+```bash
+docker run \
+    -d --rm --shm-size=1g \
+    --net host --name server \
+    -p 8000:8000 -p 8001:8001 -p 8002:8002 \
+    -v $PWD:/models \
+    triton:ipex
+```
 
-##### DISCLAIMER: This deployment is designed to be carried out on two distinct machines.
-Make sure that IP address for Triton Server Host instance is provided in config.properties on instance with Triton Server Client.
+> [!NOTE]
+> If you are working under a corporate proxy you will need to include the following parameters in your `docker run` command: `-e http_proxy=${http_proxy} -e https_proxy=${https_proxy}`
 
-Scripts to run on client Triton Server Host instance:
+Check the server logs and verify that both models have been registered successfully
+```bash
+docker logs server
+```
 
-`$ bash build.sh host`  - builds Docker image for Triton Server Host with name specified in config.properties
+Test the server connection, get model metadata, and make a test inference request to a model
 
-`$ bash start.sh host`  - runs Docker container for localhost Triton Server Host for model specified in config.properties
+```bash
+curl -v localhost:8000/v2
+curl -v localhost:8000/v2/health/ready
+curl -v localhost:8000/v2/models/bert_base/versions/1
+curl -v -X POST localhost:8000/v2/models/bert_base/versions/1/infer -d \
+    '{
+        "inputs": [ 
+            {
+                "name": "INPUT0",
+                "shape": [ 1, 4 ],
+                "datatype": "INT64",
+                "data": [ 1, 2, 3, 4 ]
+            }
+        ]
+    }'
+```
 
-`$ bash stop.sh host`  - (**run after inference is finished**) stops Docker container for Triton Server Host and removes temporary files. 
+> [!TIP]
+> For more information about the Triton Inference Server HTTP/REST and GRPC APIs see the [Predict Protocol v2](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2).
 
-Scripts to run on client Triton Server Client instance:
+### Run Client Benchmark
+Triton Inference Server comes with the tool `perf_analyzer`, that can be used to benchmark the inference server from any client. Use the docker run command below to benchmark the inference server from the same container image.
 
-`$ bash build.sh client`  - builds Docker image for Triton Server Client with name specified in config.properties
+```bash
+docker run \
+    -it --rm \
+    --net host --name client \
+    triton:ipex \
+    perf_analyzer \
+        -u localhost:8000 \
+        -m bert_base \
+        --shape INPUT0:128 \
+        --input-data zero \
+        --sync \
+        --concurrency-range 1 \
+        --measurement-mode count_windows \
+        --measurement-request-count 1000
+```
 
-`$ bash start.sh client`  - runs Docker container for Triton Server Client for model specified in config.properties
+Modify the perf_analyzer command to test different models with various concurrency, requests count, and input data.
 
-`$ bash run_test.sh`  - sends requests to remote Triton Server Host for model specified in config.properties. Values for sequence length, number of iterations, run mode can be passed as an argument.
+### Stop the Server
+When finished with benchmarking, stop the inference server with the following command:
 
-`$ bash stop.sh client`  - (**run after inference is finished**) stops Docker container for Triton Server Client. 
-
-## Additional info
-Downloading and loading models take some time, so please wait until you run run_test.sh script.
-Model loading progress can be tracked by following Triton Server Host docker container logs.
+```bash
+docker container stop server
+```
 
 ## License 
 AI Inference samples project is licensed under Apache License Version 2.0. Refer to the [LICENSE](../LICENSE) file for the full license text and copyright notice.
@@ -60,7 +101,8 @@ AI Inference samples project is licensed under Apache License Version 2.0. Refer
 This distribution includes third party software governed by separate license terms.
 
 3-clause BSD license:
-- [model.py](./model_utils/bert_common/1/model.py) -  for Intel® Extension for PyTorch optimized workload
+- [model.py](./bert_base/1/model.py) -  for Intel® Extension for PyTorch optimized workload
+- [model.py](./bert_large/1/model.py) -  for Intel® Extension for PyTorch optimized workload
 
 This third party software, even if included with the distribution of the Intel software, may be governed by separate license terms, including without limitation, third party license terms, other Intel software license terms, and open source software license terms. These separate license terms govern your use of the third party programs as set forth in the [THIRD-PARTY-PROGRAMS](./THIRD-PARTY-PROGRAMS) file.
 

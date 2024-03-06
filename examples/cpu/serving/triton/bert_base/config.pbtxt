@@ -1,0 +1,56 @@
+# Copyright (c) 2023 Intel Corporation
+# SPDX-License-Identifier: Apache 2.0
+
+max_batch_size: 32
+backend: "python"
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_INT64
+    dims: [ -1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [-1 ]
+  }
+  
+  ]
+instance_group [
+  {
+    count: 1
+    kind: KIND_CPU
+  }
+]
+
+dynamic_batching {
+  max_queue_delay_microseconds: 700
+}
+
+parameters [
+  {
+    # Origin BERT model name. Required
+    key: "origin"
+    value: {string_value: 'csarron/bert-base-uncased-squad-v1'}
+  },
+  {
+    # Batch sizes to split (e.g. "[1,2,4,8]"). Default: "[]" if "dynamic_shape" else "[1]"
+    # Set to "[]" if no split is needed. 
+    key: "batches"
+    value: {string_value: "[]"}
+  },
+  {
+    # Dynamic shape support. Default: "true"
+    # If set to "false" - INPUT0 shape to be defined
+    key: "dynamic_shape"
+    value: {string_value: "true"}
+  },
+  {
+    # Bfloat16 precision enablement. Default: "false"
+    # Make sure that your CPU has hardware support for bfloat16.
+    key: "bfloat16"
+    value: {string_value: "false"}
+  }
+] 
