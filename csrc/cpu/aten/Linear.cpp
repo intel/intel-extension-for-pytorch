@@ -87,7 +87,7 @@ void linear_kernel_output(
   if (self.dim() != 2) {
     output_ = output_.reshape(output_size);
   }
-  if (!out_is_contiguous || !output.is_same(output_)) {
+  if (!out_is_contiguous || output.data_ptr() != output_.data_ptr()) {
     output.copy_(output_);
   }
 }

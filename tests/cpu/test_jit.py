@@ -761,6 +761,18 @@ class LinearAdd(nn.Module):
         return torch.add(self.linear(x), self.linear1(x1))
 
 
+class LinearAdd2(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearAdd2, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x):
+        y = x.clone().unsqueeze(0).permute(2, 1, 0, 3).squeeze(0)
+        return self.linear(x) + y
+
+
 class LinearAddRelu(nn.Module):
     def __init__(self, in_channels, mid_channels, out_channels, inplace, **kwargs):
         super(LinearAddRelu, self).__init__()
@@ -4478,6 +4490,11 @@ class Tester(TestCase):
         self._test_dnnl_fp32(
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_add_run",
+        )
+        self._test_dnnl_fp32(
+            LinearAdd2(3, 3, bias=False),
+            torch.rand(3, 1, 3),
             kind_in_graph="ipex_prepack::linear_add_run",
         )
         self._test_output_lowp(
