@@ -31,14 +31,6 @@ if NOT EXIST "%ONEMKL_ENV%" (
     exit /b 3
 )
 
-rem Check existence of required Windows commands
-for %%A in (python git curl 7z) do (
-    where %%A >nul 2>&1 || (
-        echo Error: Command "%%A" not found.
-        exit /b 4
-    )
-)
-
 rem Save current directory path
 set "BASEFOLDER=%~dp0"
 cd "%BASEFOLDER%"
@@ -47,7 +39,7 @@ rem Be verbose now
 echo on
 
 rem Install Python dependencies
-python -m pip install cmake astunparse numpy ninja pyyaml mkl-include setuptools cffi typing_extensions future six requests dataclasses Pillow
+python -m pip install cmake astunparse numpy ninja pyyaml setuptools cffi typing_extensions future six requests dataclasses Pillow
 
 rem Checkout individual components
 if NOT EXIST pytorch (
@@ -123,23 +115,18 @@ rem Compile individual component
 
 rem PyTorch
 cd ..\pytorch
-
-rem Download MKL files
-echo :: NOTE: Downloading MKL file from https://s3.amazonaws.com/ossci-windows/mkl_2020.2.254.7z
-curl https://s3.amazonaws.com/ossci-windows/mkl_2020.2.254.7z -k -O
-7z x -aoa mkl_2020.2.254.7z -omkl
-
 for %%f in ("..\intel-extension-for-pytorch\torch_patches\*.patch") do git apply "%%f"
 python -m pip install -r requirements.txt
-call conda install -q --yes -c conda-forge libuv=1.39
+call conda install --force-reinstall intel::mkl-static intel::mkl-include -y
+call conda install conda-forge::libuv -y
 rem Ensure cmake can find python packages when using conda or virtualenv
 if defined CONDA_PREFIX (
     set "CMAKE_PREFIX_PATH=%CONDA_PREFIX%"
 ) else if defined VIRTUAL_ENV (
      set "CMAKE_PREFIX_PATH=%VIRTUAL_ENV%"
 )
-set "CMAKE_INCLUDE_PATH=%cd%\mkl\include"
-set "LIB=%cd%\mkl\lib;%LIB%"
+set "CMAKE_INCLUDE_PATH=%CONDA_PREFIX%\Library\include"
+set "LIB=%CONDA_PREFIX%\Library\lib;%LIB%"
 set "USE_NUMA=0"
 set "USE_CUDA=0"
 python setup.py clean
@@ -150,20 +137,19 @@ set "USE_NUMA="
 set "LIB="
 set "CMAKE_INCLUDE_PATH="
 set "CMAKE_PREFIX_PATH="
-python -m pip uninstall -y mkl-include
+call conda remove mkl-static mkl-include -y
+for %%f in ("dist\*.whl") do python -m pip install --force-reinstall --no-deps "%%f"
+
+rem TorchVision 
+cd ..\vision
+call conda install -y --force-reinstall libpng libjpeg-turbo -c conda-forge
+python setup.py clean
+python setup.py bdist_wheel
+
 for %%f in ("dist\*.whl") do python -m pip install --force-reinstall --no-deps "%%f"
 
 call "%DPCPP_ENV%"
 call "%ONEMKL_ENV%"
-
-rem TorchVision 
-cd ..\vision
-set "DISTUTILS_USE_SDK=1"
-python setup.py clean
-python setup.py bdist_wheel
-
-set "DISTUTILS_USE_SDK="
-for %%f in ("dist\*.whl") do python -m pip install --force-reinstall --no-deps "%%f"
 
 rem TorchAudio 
 cd ..\audio
@@ -175,7 +161,7 @@ python setup.py bdist_wheel
 set "DISTUTILS_USE_SDK="
 for %%f in ("dist\*.whl") do python -m pip install --force-reinstall --no-deps "%%f"
 
-rem Intel® Extension for PyTorch*
+rem IntelÂ® Extension for PyTorch*
 cd ..\intel-extension-for-pytorch
 python -m pip install -r requirements.txt
 if NOT "%AOT%"=="" (
@@ -184,11 +170,9 @@ if NOT "%AOT%"=="" (
 set "BUILD_WITH_CPU=0"
 set "USE_MULTI_CONTEXT=1"
 set "DISTUTILS_USE_SDK=1"
-set "CMAKE_CXX_COMPILER=icx"
 python setup.py clean
 python setup.py bdist_wheel
 
-set "CMAKE_CXX_COMPILER="
 set "DISTUTILS_USE_SDK="
 set "USE_MULTI_CONTEXT="
 set "BUILD_WITH_CPU="
