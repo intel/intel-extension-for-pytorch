@@ -13,7 +13,7 @@ class TestTorchMethod(TestCase):
         num_heads = 14  # (/rank=8, 14)
         head_dim = 128
         q_len = 1
-        kv_len = 1025  # 1152
+        kv_len = 513  # 1152
         alibi_max_len = 2048  # for alignment restriction of Xe2DLoad
 
         beta = 1.0

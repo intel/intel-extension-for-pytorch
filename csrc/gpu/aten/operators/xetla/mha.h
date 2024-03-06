@@ -31,6 +31,7 @@ void fmha_forward_kernel(
     float dropout_prob,
     uint32_t num_batches,
     uint32_t num_heads,
+    uint32_t num_kv_heads,
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,

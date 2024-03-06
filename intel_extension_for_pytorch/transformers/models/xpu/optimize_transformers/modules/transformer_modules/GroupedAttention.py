@@ -141,12 +141,18 @@ class IPEXTransformerAttnOptimizedFp16Grouped(IPEXTransformerAttnOptimizedFp16):
         return query, key, value
 
     def sdp_kv_preprocess_1st_token_beam_search(self, key, value):
-        key = self.repeat_kv(key, self.num_kv_group)
-        value = self.repeat_kv(value, self.num_kv_group)
-        key_prompt, value_prompt = key, value
-        return key, value, key_prompt, value_prompt
+        # first token will use IpexSDP which supports GQA and not need to repeat_kv
+        return key, value, key, value
 
     def sdp_kv_preprocess_2nd2last(self, key, value):
+        # next token for greedy will use IpexSDP which supports GQA and not need to repeat_kv
+        if not self.is_beam_search():
+            return (
+                key,
+                value,
+                self.runtime_cache.key_prompt,
+                self.runtime_cache.value_prompt,
+            )
         key = self.repeat_kv(key, self.num_kv_group)
         value = self.repeat_kv(value, self.num_kv_group)
         key_prompt = self.repeat_kv(self.runtime_cache.key_prompt, self.num_kv_group)

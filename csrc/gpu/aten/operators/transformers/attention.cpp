@@ -73,6 +73,7 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
       dropout_p,
       query.size(0),
       query.size(1),
+      key.size(1),
       query.size(3),
       query.size(2),
       key.size(2),
@@ -505,9 +506,24 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   TORCH_CHECK(
       value.scalar_type() == at::kHalf, "IPEX SDP only supports half datatype");
 
+  int64_t B = query.size(0);
+  int64_t num_heads_q = query.size(1);
+  int64_t num_heads_k = key.size(1);
+  int64_t head_dim = query.size(3);
+  int64_t M = query.size(-2);
+  int64_t N = key.size(-2);
+
   auto output = at::empty_like(query);
   auto dpcpp_queue = dpcppGetCurrentQueue();
-  RECORD_FUNCTION("xetla_fsdp_forward_atten_mask_alibi_strided", {});
+  char str__[100];
+  sprintf(
+      str__,
+      "xetla_fsdp_forward_atten_mask_alibi_strided(Nq=%d, Nkv=%d, M=%d, N=%d)",
+      num_heads_q,
+      num_heads_k,
+      M,
+      N);
+  RECORD_FUNCTION(str__, {});
 
   // check alibi padded
   uint32_t alibi_padded_block_size = 0;
@@ -555,11 +571,12 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
       alpha,
       beta,
       dropout_p,
-      query.size(0),
-      query.size(1),
-      query.size(3),
-      query.size(2),
-      key.size(2),
+      B,
+      num_heads_q,
+      num_heads_k,
+      head_dim,
+      M,
+      N,
       attn_mask.has_value() ? attn_mask_bc.stride(0) : -1,
       attn_mask.has_value() ? attn_mask_bc.stride(1) : -1,
       attn_mask.has_value() ? attn_mask_bc.stride(2) : -1,

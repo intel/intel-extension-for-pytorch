@@ -45,6 +45,7 @@ class fmha_forward_t {
     // Dimension size
     uint32_t uB;
     uint32_t uN;
+    uint32_t uNkv;
     uint32_t uH;
     uint32_t uF;
     uint32_t uT;
@@ -76,6 +77,7 @@ class fmha_forward_t {
         accum_t* logsumsoftmax,
         uint32_t num_batches,
         uint32_t num_heads,
+        uint32_t num_kv_heads,
         uint32_t head_size,
         uint32_t num_queries,
         uint32_t num_keys,
@@ -98,6 +100,7 @@ class fmha_forward_t {
           L_ptr(logsumsoftmax),
           uB(num_batches),
           uN(num_heads),
+          uNkv(num_kv_heads),
           uH(head_size),
           uF(num_queries),
           uT(num_keys),
@@ -123,7 +126,10 @@ class fmha_forward_t {
   using compute_attr = group::compute_attr_t<scalar_t, scalar_t, accum_t>;
   using perf_tuning_knob =
       group::perf_tuning_knob_t<accum_step, stages, sync_freq>;
-  using compute_policy = group::
+  using compute_policy_BrBc = group::
+      compute_policy_default_xmx<compute_attr, perf_tuning_knob, gpu_arch::Xe>;
+  // TODO: add k slicing
+  using compute_policy_BrBm = group::
       compute_policy_default_xmx<compute_attr, perf_tuning_knob, gpu_arch::Xe>;
   // ---------------- // Tile shape and Threads // ---------------- //
   static constexpr uint32_t kBr = fmha_policy::kBr;
@@ -180,7 +186,7 @@ class fmha_forward_t {
 
   static constexpr uint32_t nbarrier_cnt = (wg_size_x > 1) ? wg_size_y : 0;
   using brgemm_Sij_t = group::brgemm_t<
-      compute_policy,
+      compute_policy_BrBc,
       tile_shape_BrBc,
       mem_desc_Qi_L_t,
       mem_desc_Kj_T_t>;
@@ -291,6 +297,8 @@ class fmha_forward_t {
       uint32_t gid = ei.get_group(0);
       uint32_t batch_id = gid / args.uN; // get batch idx
       uint32_t head_id = gid % args.uN; // get head idx
+      uint32_t head_id_kv =
+          head_id / (args.uN / args.uNkv); // get head idx for kv
 
       // TODO: what's this startT for
 
@@ -301,8 +309,8 @@ class fmha_forward_t {
         end_x = end_x > boundary_x ? boundary_x : end_x;
 
         // XXX: code-gen crash
-        uint32_t b_stride = args.uN * args.uH;
-        int32_t start_acc = batch_id * b_stride + head_id * args.uH;
+        uint32_t b_stride = args.uNkv * args.uH;
+        int32_t start_acc = batch_id * b_stride + head_id_kv * args.uH;
         uint32_t end_y = start_acc + args.uH;
 
         mem_desc_Kj_T.init(
@@ -319,15 +327,15 @@ class fmha_forward_t {
         uint32_t boundary_x = (batch_id + 1) * args.uT;
         end_x = end_x > boundary_x ? boundary_x : end_x;
 
-        int32_t start_acc = head_id * args.uH;
+        int32_t start_acc = head_id_kv * args.uH;
 
         mem_desc_Kj_T.init(
             args.K_ptr,
-            {end_x, args.uH * args.uN, args.uH * args.uN},
+            {end_x, args.uH * args.uNkv, args.uH * args.uNkv},
             {start_x, start_acc});
         mem_desc_Vj.init(
             args.V_ptr,
-            {args.uH * args.uN, end_x, args.uH * args.uN},
+            {args.uH * args.uNkv, end_x, args.uH * args.uNkv},
             {start_acc, start_x});
       }
 
@@ -464,7 +472,7 @@ class fmha_forward_t {
   // ======================= // gemm_Oi // ======================= //
   // Define kernel to compute Oi += Pij x Vj
   using brgemm_Oi_t = group::brgemm_t<
-      compute_policy,
+      compute_policy_BrBm,
       tile_shape_BrHm,
       mem_desc_Pij_L_t,
       mem_desc_Vj_t>;
@@ -815,6 +823,7 @@ struct FmhaForwardKernelFunctor {
         (accscalar_t*)log_sumexp,
         num_batches,
         num_heads,
+        num_kv_heads,
         head_size,
         num_queries,
         num_keys,
@@ -842,6 +851,7 @@ struct FmhaForwardKernelFunctor {
       void* log_sumexp_,
       uint32_t num_batches_,
       uint32_t num_heads_,
+      uint32_t num_kv_heads_,
       uint32_t head_size_,
       uint32_t num_queries_,
       uint32_t num_keys_,
@@ -864,6 +874,7 @@ struct FmhaForwardKernelFunctor {
         log_sumexp(log_sumexp_),
         num_batches(num_batches_),
         num_heads(num_heads_),
+        num_kv_heads(num_kv_heads_),
         head_size(head_size_),
         num_queries(num_queries_),
         num_keys(num_keys_),
@@ -888,6 +899,7 @@ struct FmhaForwardKernelFunctor {
   void* log_sumexp;
   uint32_t num_batches;
   uint32_t num_heads;
+  uint32_t num_kv_heads;
   uint32_t head_size;
   uint32_t num_queries;
   uint32_t num_keys;
@@ -926,6 +938,7 @@ void xetla_fmha_forward_kernel(
     float dropout_prob,
     uint32_t num_batches,
     uint32_t num_heads,
+    uint32_t num_kv_heads,
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,
@@ -938,9 +951,10 @@ void xetla_fmha_forward_kernel(
     uint64_t offset_t) {
 #ifdef SDP_DBG
   printf(
-      "B, N, F, T, H: %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d, IsDropout: %d, alibi @ 0x%llx, uAT %d, uMT %d, strideB %d, strideN %d, strideF %d, dropout_prob %f, kSeqLast %d\n",
+      "B, N, Nkv, F, T, H: %d, %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d, IsDropout: %d, alibi @ 0x%llx, uAT %d, uMT %d, strideB %d, strideN %d, strideF %d, dropout_prob %f, kSeqLast %d\n",
       num_batches,
       num_heads,
+      num_kv_heads,
       num_queries,
       num_keys,
       head_size,
@@ -984,6 +998,7 @@ void xetla_fmha_forward_kernel(
         log_sumexp,
         num_batches,
         num_heads,
+        num_kv_heads,
         head_size,
         num_queries,
         num_keys,
@@ -1026,6 +1041,7 @@ void xetla_fmha_forward_kernel(
       dropout_prob,                \
       num_batches,                 \
       num_heads,                   \
+      num_kv_heads,                \
       head_size,                   \
       num_queries,                 \
       num_keys,                    \
@@ -1060,6 +1076,7 @@ void fmha_forward_kernel_policy(
     float dropout_prob,
     uint32_t num_batches,
     uint32_t num_heads,
+    uint32_t num_kv_heads,
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,
@@ -1084,17 +1101,38 @@ void fmha_forward_kernel_policy(
       return;
     }
   } else {
+    // roughly policy should match (num_queries)x(num_keys)x(head_size)
     if (head_size <= 64) {
-      CALL_IMPL_FUNC(fmha_policy_64x128x64);
-    } else if (head_size <= 128) {
-      CALL_IMPL_FUNC(fmha_policy_64x128x128);
-    } else if (head_size <= 256) {
-      if (num_keys < 64) {
-        CALL_IMPL_FUNC(fmha_policy_8x256x256);
-      } else if (num_keys < 128) {
-        CALL_IMPL_FUNC(fmha_policy_64x128x256);
+      if (num_queries < 64) {
+        // for short query length
+        CALL_IMPL_FUNC(fmha_policy_8x128x64);
       } else {
-        CALL_IMPL_FUNC(fmha_policy_64x256x256);
+        // for long query length
+        CALL_IMPL_FUNC(fmha_policy_64x128x64);
+      }
+    } else if (head_size <= 128) {
+      if (num_queries < 64) {
+        // for short query length
+        if (num_keys < 512) {
+          CALL_IMPL_FUNC(fmha_policy_8x256x128);
+        } else {
+          CALL_IMPL_FUNC(fmha_policy_8x512x128);
+        }
+      } else {
+        // for long query length
+        CALL_IMPL_FUNC(fmha_policy_64x128x128);
+      }
+    } else if (head_size <= 256) {
+      if (num_queries < 64) {
+        // for short query length
+        CALL_IMPL_FUNC(fmha_policy_8x256x256);
+      } else {
+        // for long query length
+        if (num_keys < 128) {
+          CALL_IMPL_FUNC(fmha_policy_64x128x256);
+        } else {
+          CALL_IMPL_FUNC(fmha_policy_64x256x256);
+        }
       }
     } else {
       std::cout << "No policy available for current head_size " << head_size
@@ -1121,6 +1159,7 @@ void dispatch_fmha_forward(
     float dropout_prob,
     uint32_t num_batches,
     uint32_t num_heads,
+    uint32_t num_kv_heads,
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,
@@ -1145,6 +1184,7 @@ void dispatch_fmha_forward(
       dropout_prob,
       num_batches,
       num_heads,
+      num_kv_heads,
       head_size,
       num_queries,
       num_keys,
@@ -1173,6 +1213,7 @@ void dispatch_fmha_forward(
     float dropout_prob,
     uint32_t num_batches,
     uint32_t num_heads,
+    uint32_t num_kv_heads,
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,
@@ -1200,6 +1241,7 @@ void dispatch_fmha_forward(
         dropout_prob,
         num_batches,
         num_heads,
+        num_kv_heads,
         head_size,
         num_queries,
         num_keys,
@@ -1226,6 +1268,7 @@ void dispatch_fmha_forward(
         dropout_prob,
         num_batches,
         num_heads,
+        num_kv_heads,
         head_size,
         num_queries,
         num_keys,
@@ -1255,6 +1298,7 @@ void fmha_forward_kernel_impl(
     float dropout_prob,
     uint32_t num_batches,
     uint32_t num_heads,
+    uint32_t num_kv_heads,
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,
@@ -1286,6 +1330,7 @@ void fmha_forward_kernel_impl(
       dropout_prob,
       num_batches,
       num_heads,
+      num_kv_heads,
       head_size,
       num_queries,
       num_keys,
@@ -1321,6 +1366,7 @@ void fmha_forward_kernel(
     float dropout_prob,
     uint32_t num_batches,
     uint32_t num_heads,
+    uint32_t num_kv_heads,
     uint32_t head_size,
     uint32_t num_queries,
     uint32_t num_keys,
@@ -1350,6 +1396,7 @@ void fmha_forward_kernel(
         dropout_prob,
         num_batches,
         num_heads,
+        num_kv_heads,
         head_size,
         num_queries,
         num_keys,
@@ -1379,6 +1426,7 @@ void fmha_forward_kernel(
         dropout_prob,
         num_batches,
         num_heads,
+        num_kv_heads,
         head_size,
         num_queries,
         num_keys,

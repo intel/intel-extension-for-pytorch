@@ -7,6 +7,8 @@ import pytest
 
 
 def naive_sdp(query, key, value, attention_mask, head_mask, alibi, alpha):
+    key = key.repeat_interleave(query.shape[1] // key.shape[1], dim=1)
+    value = value.repeat_interleave(query.shape[1] // value.shape[1], dim=1)
     attn_weights = torch.matmul(query, key.transpose(-1, -2))
 
     attn_weights *= alpha
@@ -28,6 +30,7 @@ def naive_sdp(query, key, value, attention_mask, head_mask, alibi, alpha):
 
 beam_width = 1
 num_heads = 14  # (/rank=8, 14)
+num_kv_heads = 2  # (/rank=8, 14)
 head_dim = 128
 q_len = 1023
 kv_len = 1023  # 1152
@@ -36,8 +39,8 @@ beta = 1.0
 max_len = 2048
 
 query_layer = torch.randn(q_len, beam_width, num_heads, head_dim).xpu().half()
-key_layer = torch.randn(kv_len, beam_width, num_heads, head_dim).xpu().half()
-value_layer = torch.randn(kv_len, beam_width, num_heads, head_dim).xpu().half()
+key_layer = torch.randn(kv_len, beam_width, num_kv_heads, head_dim).xpu().half()
+value_layer = torch.randn(kv_len, beam_width, num_kv_heads, head_dim).xpu().half()
 
 # attention_mask = torch.zeros(beam_width, 1, q_len, kv_len).half()
 # attention_mask[0][0][0] = -65504.
