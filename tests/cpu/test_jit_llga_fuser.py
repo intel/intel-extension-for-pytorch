@@ -451,6 +451,27 @@ class TestOp(JitLlgaTestCase):
         self.assertFused(graph, ["aten::matmul", "aten::div"])
 
     @llga_fp32_bf16_test_env
+    def test_bmm_div_with_double_dt(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.divisor = torch.randn(1, dtype=torch.float64)
+
+            def forward(self, x, y):
+                return x.matmul(y) / self.divisor
+
+        x = torch.randn(128, 16, 384, 64)
+        y = torch.randn(128, 16, 64, 384)
+        m = M()
+
+        graph, _ = self.checkTrace(m, [x, y])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        # no need to do data type promotion for `Double` which llga doesn't
+        # support
+        self.assertGraphContainsExactly(graph, "aten::to", 0)
+        self.assertFused(graph, ["aten::matmul"])
+
+    @llga_fp32_bf16_test_env
     def test_bmm_div_add(self):
         class M(nn.Module):
             def __init__(self):

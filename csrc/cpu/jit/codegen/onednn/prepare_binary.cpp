@@ -1,6 +1,7 @@
 #include "prepare_binary.h"
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 #include <torch/csrc/jit/passes/shape_analysis.h>
+#include "../LlgaTensorImpl.h"
 #include "utils.h"
 
 namespace torch_ipex {
@@ -9,6 +10,7 @@ namespace fuser {
 namespace onednn {
 
 using namespace torch::jit;
+using data_type = dnnl::graph::logical_tensor::data_type;
 
 void handleBinaryOpInputs(Node* node, int first_input, int second_input) {
   if (node->input(first_input)->type()->isSubtypeOf(TensorType::get()) &&
@@ -33,6 +35,10 @@ void handleBinaryOpInputs(Node* node, int first_input, int second_input) {
       // https://pytorch.org/docs/stable/tensor_attributes.html#type-promotion-doc
       // clang-format on
       auto promotedDtype = dtypeOfFirstInput;
+      // This tensor won't be added to oneDNN graph due to unsupported data
+      // type, so no need to do promotion for it.
+      if (getLlgaDataType(promotedDtype) == data_type::undef)
+        return;
       utils::convertInputTo0DTensor(node, second_input, promotedDtype);
       // dtype might have changed, so needs to be updated in IR as well
       utils::modifyDtypeOfNode(node, promotedDtype);
@@ -53,6 +59,10 @@ void handleBinaryOpInputs(Node* node, int first_input, int second_input) {
           // Type promotion is required
           auto promotedDtype =
               c10::promoteTypes(dtypeOfFirstInput, dtypeOfSecondInput);
+          // This tensor won't be added to oneDNN graph due to unsupported data
+          // type, so no need to do promotion for it.
+          if (getLlgaDataType(promotedDtype) == data_type::undef)
+            return;
           int input_to_replace;
           if (promotedDtype == dtypeOfFirstInput) {
             input_to_replace = second_input;
@@ -65,6 +75,10 @@ void handleBinaryOpInputs(Node* node, int first_input, int second_input) {
           utils::mark_original_output_dtype(node);
           utils::modifyDtypeOfNode(node, promotedDtype);
         } else {
+          // This tensor won't be added to oneDNN graph due to unsupported data
+          // type, so no need to do promotion for it.
+          if (getLlgaDataType(dtypeOfFirstInput) == data_type::undef)
+            return;
           // both dtypes are same
           // IR info of dtypes is missing sometimes in JIT IR,
           // and we shouldn't treat those tensors as FP32 tensors by default.

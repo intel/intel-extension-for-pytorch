@@ -13,6 +13,8 @@ namespace jit {
 namespace fuser {
 namespace onednn {
 
+dnnl::graph::logical_tensor::data_type getLlgaDataType(at::ScalarType dt);
+
 struct LlgaTensorDesc {
   using desc = dnnl::graph::logical_tensor;
 
@@ -105,9 +107,6 @@ struct LlgaTensorDesc {
   LlgaTensorDesc supplementTensorInfo(const at::Tensor& t) const;
 
   at::ScalarType aten_scalar_type() const;
-
-  dnnl::graph::logical_tensor::data_type getLlgaDataType(
-      at::ScalarType dt) const;
 
   const std::vector<int64_t>& sizes() const {
     return sizes_;
