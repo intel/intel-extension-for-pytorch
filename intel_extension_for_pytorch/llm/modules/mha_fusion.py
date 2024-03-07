@@ -203,17 +203,19 @@ class RMSNorm(nn.Module):
     runtime_ops: IPEXRuntimeCustomOps = IPEXRuntimeCustomOps()
 
     def __init__(
-        self, hidden_size: int, eps: float = 1e-6, weight: torch.Tensor = None
+        self,
+        weight: torch.Tensor = None,
+        eps: float = 1e-6,
     ):
         super().__init__()
         self.eps = eps
         self.weight = weight
 
     @classmethod
-    def apply(cls, hidden_states, shape, weight, eps):
+    def apply(cls, hidden_states, weight, eps):
         return cls.runtime_ops.get_module_from_device(
             hidden_states.device.type, IPEXCustomOpType.RMS_NORM, False
-        ).apply(hidden_states, shape, weight, eps)
+        ).apply(hidden_states, weight, eps)
 
     def forward(self, x: torch.Tensor):
         runtime_module = self.runtime_ops.get_module_from_device(

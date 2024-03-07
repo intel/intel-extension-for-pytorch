@@ -63,8 +63,10 @@ class _IPEXRMSNormXPU(nn.Module):
         self.eps = module.eps
 
     @classmethod
-    def apply(cls, hidden_states, shape, weight, eps):
-        return torch.ops.torch_ipex.rms_norm(hidden_states, shape, weight, eps)[0]
+    def apply(cls, hidden_states, weight, eps):
+        return torch.ops.torch_ipex.rms_norm(
+            hidden_states, [hidden_states.size(-1)], weight, eps
+        )[0]
 
     def forward(self, hidden_states):
         return torch.ops.torch_ipex.rms_norm(
