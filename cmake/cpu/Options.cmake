@@ -13,6 +13,14 @@ if(WIN32)
   set(USE_LIBXSMM ON)
 endif()
 
+option(USE_CCL "Enable oneCCL in IPEX" ON)
+option(USE_SHM "Enable shared memory communication in IPEX" ON)
+if(WIN32)
+  set(USE_SHM OFF)
+endif()
+#set USE_SHM to OFF if USE_CCL is OFF
+
+
 cmake_dependent_option(BUILD_STATIC_ONEMKL "Static link with oneMKL" OFF "BUILD_WITH_XPU" ON)
 
 function (print_cpu_config_summary)
@@ -49,6 +57,8 @@ function (print_cpu_config_summary)
     message(STATUS "  IPEX_DISP_OP          : ${IPEX_DISP_OP}")
     message(STATUS "  BUILD_XSMM_VIA_CMAKE  : ${BUILD_LIBXSMM_VIA_CMAKE}")
     message(STATUS "  USE_LIBXSMM           : ${USE_LIBXSMM}")
+    message(STATUS "  USE_CCL               : ${USE_CCL}")
+    message(STATUS "  USE_SHM               : ${USE_SHM}")
     message(STATUS "")
     message(STATUS "********************************")
 endfunction()

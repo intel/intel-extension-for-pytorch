@@ -13,6 +13,13 @@ from ..utils.weight_only_quantization import (
     _convert_woq_with_low_precision_checkpoint,
 )
 
+from .tensor_parallel import (
+    shard_lm_head_weights,
+    shard_mha_weights,
+    shard_mlp_weights,
+    update_heads_info,
+)
+
 
 def convert_functions(m, target_m, new_function_name, new_function):
     for _, sub_m in m.named_children():
@@ -300,6 +307,19 @@ def model_convert_reference(_model):
     except ImportError:
         # distributed uses default False
         pass
+    need_ipex_tp = False
+    if _model.device.type == "cpu":
+        from ..cpu import comm as ipex_comm
+
+        world_size = ipex_comm.get_world_size()
+        rank = ipex_comm.get_rank()
+        if world_size > 1:
+            global distributed
+            if distributed:
+                need_ipex_tp = False
+            else:
+                need_ipex_tp = True
+                distributed = True
 
     # model-wise optimizations - MHA module
     for supported_mha_class in [
@@ -312,6 +332,26 @@ def model_convert_reference(_model):
         transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeAttention,
         transformers.models.t5.modeling_t5.T5Attention,
     ]:
+        if need_ipex_tp and supported_mha_class in [
+            transformers.models.llama.modeling_llama.LlamaAttention,
+            transformers.models.gptj.modeling_gptj.GPTJAttention,
+        ]:
+            num_heads = _model.config.num_attention_heads
+            num_kv_heads = num_heads
+            for name in ["num_key_value_heads"]:
+                if hasattr(_model.config, name):
+                    num_kv_heads = getattr(_model.config, name)
+            head_dim = _model.config.hidden_size // num_heads
+            shard_mha_weights(
+                _model,
+                supported_mha_class,
+                num_heads,
+                num_kv_heads,
+                head_dim,
+                rank,
+                world_size,
+            )
+
         convert_class(
             _model,
             supported_mha_class,
@@ -319,6 +359,36 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+    if need_ipex_tp:
+        for supported_mlp_class in [
+            transformers.models.llama.modeling_llama.LlamaMLP,
+            transformers.models.gptj.modeling_gptj.GPTJMLP,
+        ]:
+            shard_mlp_weights(
+                _model,
+                supported_mlp_class,
+                num_heads,
+                num_kv_heads,
+                head_dim,
+                rank,
+                world_size,
+            )
+        for supported_model_class in [
+            transformers.models.llama.modeling_llama.LlamaForCausalLM,
+            transformers.models.gptj.modeling_gptj.GPTJForCausalLM,
+        ]:
+            if isinstance(_model, supported_model_class):
+                shard_lm_head_weights(
+                    _model,
+                    supported_model_class,
+                    num_heads,
+                    num_kv_heads,
+                    head_dim,
+                    rank,
+                    world_size,
+                )
+                update_heads_info(_model, rank, world_size)
+
     # model-wise optimizations - Feedforward/Decoder layer modules
     for supported_decoder_class in [
         transformers.models.llama.modeling_llama.LlamaDecoderLayer,

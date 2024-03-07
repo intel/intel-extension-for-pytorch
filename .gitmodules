@@ -7,6 +7,10 @@
 [submodule "third_party/libxsmm"]
 	path = third_party/libxsmm
 	url = https://github.com/libxsmm/libxsmm.git
+[submodule "third_party/oneCCL"]
+	path = third_party/oneCCL
+	url = https://github.com/oneapi-src/oneCCL
 [submodule "third_party/sleef"]
 	path = third_party/sleef
 	url = https://github.com/shibatch/sleef.git
+

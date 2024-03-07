@@ -1363,11 +1363,39 @@ void simplifyAllReduce(std::shared_ptr<Graph>& graph) {
       %r = aten::add_(%r5, %fc_out_bias, %alpha)
       return (%r) )";
 
-  SubgraphRewriter rewriter_v1, rewriter_v2;
+  std::string all_reduce_v3 = R"(
+    graph(%a, %weight, %out_features1, %out_features2, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha, %idx, %no, %dtype, %zero):
+      %r1 = torch_ipex::tpp_linear(%a, %weight, %out_features1)
+      %r2 = torch_ipex::inference_all_reduce_add(%r1)
+      %r2_1 = aten::to(%b, %idx, %no, %no, %dtype)
+      %r2_2 = aten::contiguous(%r2_1, %zero)
+      %r3 = torch_ipex::tpp_linear_gelu(%r2_2, %fc_in_weight, %fc_in_bias, %out_features2)
+      %r4 = aten::to(%r3, %idx, %no, %no, %dtype)
+      %r5 = aten::contiguous(%r4, %zero)
+      %r6 = torch_ipex::tpp_linear_bias(%r5, %fc_out_weight, %fc_out_bias, %out_features1)
+      %r7 = torch_ipex::inference_all_reduce_add(%r6)
+      %r = aten::add(%r2, %r7, %alpha)
+      return (%r) )";
+  std::string all_reduce_repl_v3 = R"(
+    graph(%a, %weight, %out_features1, %out_features2, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha, %idx, %no, %dtype, %zero):
+      %r1 = torch_ipex::tpp_linear(%a, %weight, %out_features1)
+      %r2_1 = aten::to(%b, %idx, %no, %no, %dtype)
+      %r2_2 = aten::contiguous(%r2_1, %zero)
+      %r2 = torch_ipex::tpp_linear_gelu(%r2_2, %fc_in_weight, %fc_in_bias, %out_features2)
+      %r3 = aten::to(%r2, %idx, %no, %no, %dtype)
+      %r4 = aten::contiguous(%r3, %zero)
+      %scale: float = prim::Constant[value=1.0]()
+      %r5 = torch_ipex::tpp_linear_add(%r4, %r1, %fc_out_weight, %fc_out_bias, %scale, %out_features1)
+      %r6 = torch_ipex::inference_all_reduce_add(%r5)
+      return (%r6) )";
+
+  SubgraphRewriter rewriter_v1, rewriter_v2, rewriter_v3;
   rewriter_v1.RegisterRewritePattern(all_reduce_v1, all_reduce_repl_v1);
   rewriter_v2.RegisterRewritePattern(all_reduce_v2, all_reduce_repl_v2);
+  rewriter_v3.RegisterRewritePattern(all_reduce_v3, all_reduce_repl_v3);
   rewriter_v1.runOnGraph(graph);
   rewriter_v2.runOnGraph(graph);
+  rewriter_v3.runOnGraph(graph);
 }
 
 } // namespace graph_rewrite
