@@ -50,7 +50,6 @@ fi
 # Save current directory path
 BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 WHEELFOLDER=${BASEFOLDER}/../wheels
-TORCH_INSTALL_SCRIPT=${WHEELFOLDER}/torch_install.sh
 AUX_INSTALL_SCRIPT=${WHEELFOLDER}/aux_install.sh
 cd ${BASEFOLDER}/..
 
@@ -99,6 +98,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     VER_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
     TRANSFORMERS_COMMIT=$(python tools/yaml_utils.py -f dependency_version.yml -d transformers -k commit)
     VER_PROTOBUF=$(python tools/yaml_utils.py -f dependency_version.yml -d protobuf -k version)
+    VER_LLM_EVAL=$(python tools/yaml_utils.py -f dependency_version.yml -d llm_eval -k version)
     VER_IPEX_MAJOR=$(grep "VERSION_MAJOR" version.txt | cut -d " " -f 2)
     VER_IPEX_MINOR=$(grep "VERSION_MINOR" version.txt | cut -d " " -f 2)
     VER_IPEX_PATCH=$(grep "VERSION_PATCH" version.txt | cut -d " " -f 2)
@@ -122,114 +122,29 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     conda install -y cmake ninja
 
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
-    echo "#!/bin/bash" > ${TORCH_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
-        echo "python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/" >> ${TORCH_INSTALL_SCRIPT}
+        echo "python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/" >> ${AUX_INSTALL_SCRIPT}
         python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
     else
         if [ ! -f ${ONECCL_ROOT}/env/vars.sh ]; then
             echo "oneCCL environment ${ONECCL_ROOT} doesn't seem to exist."
             exit 6
         fi
-        ONEAPIROOT=${ONEMKL_ROOT}/../..
 
         # Install PyTorch and Intel® Extension for PyTorch*
         cp intel-extension-for-pytorch/scripts/compile_bundle.sh .
         sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
-        bash compile_bundle.sh ${DPCPP_ROOT} ${ONEMKL_ROOT} ${AOT} 0
+        bash compile_bundle.sh ${DPCPP_ROOT} ${ONEMKL_ROOT} ${ONECCL_ROOT} ${AOT} 1
         cp pytorch/dist/*.whl ${WHEELFOLDER}
         cp intel-extension-for-pytorch/dist/*.whl ${WHEELFOLDER}
-        rm -rf compile_bundle.sh llvm-project llvm-release pytorch
+        cp torch-ccl/dist/*.whl ${WHEELFOLDER}
+        rm -rf compile_bundle.sh llvm-project llvm-release pytorch torch-ccl
         export LD_PRELOAD=$(bash intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh)
-
-        # The following is only for DeepSpeed case
-        #Install oneccl-bind-pt(also named torch-ccl)
-        set +e
-        function env_backup() {
-            key=$1
-            env | grep ${key} > /dev/null
-            if [ $? -gt 0 ]; then
-                echo "unset"
-            else
-                value=$(env | grep "^${key}=")
-                echo ${value#"${key}="}
-            fi
-        }
-        function env_recover() {
-            key=$1
-            value=$2
-            if [ "$value" == "unset" ]; then
-                unset ${key}
-            else
-                export ${key}=${value}
-            fi
-        }
-
-        PKG_CONFIG_PATH_BK=$(env_backup PKG_CONFIG_PATH)
-        ACL_BOARD_VENDOR_PATH_BK=$(env_backup ACL_BOARD_VENDOR_PATH)
-        FPGA_VARS_DIR_BK=$(env_backup FPGA_VARS_DIR)
-        DIAGUTIL_PATH_BK=$(env_backup DIAGUTIL_PATH)
-        MANPATH_BK=$(env_backup MANPATH)
-        CMAKE_PREFIX_PATH_BK=$(env_backup CMAKE_PREFIX_PATH)
-        CMPLR_ROOT_BK=$(env_backup CMPLR_ROOT)
-        FPGA_VARS_ARGS_BK=$(env_backup FPGA_VARS_ARGS)
-        LIBRARY_PATH_BK=$(env_backup LIBRARY_PATH)
-        OCL_ICD_FILENAMES_BK=$(env_backup OCL_ICD_FILENAMES)
-        INTELFPGAOCLSDKROOT_BK=$(env_backup INTELFPGAOCLSDKROOT)
-        LD_LIBRARY_PATH_BK=$(env_backup LD_LIBRARY_PATH)
-        MKLROOT_BK=$(env_backup MKLROOT)
-        NLSPATH_BK=$(env_backup NLSPATH)
-        PATH_BK=$(env_backup PATH)
-        CPATH_BK=$(env_backup CPATH)
-        set -e
-        source ${DPCPP_ROOT}/env/vars.sh
-        source ${ONEMKL_ROOT}/env/vars.sh
-
-        if [ -d torch-ccl ]; then
-            rm -rf torch-ccl
-        fi
-        git clone ${TORCHCCL_REPO}
-        cd torch-ccl
-        git checkout ${TORCHCCL_COMMIT}
-        git submodule sync
-        git submodule update --init --recursive
-        if [ -d ${CONDA_PREFIX}/lib/gcc/x86_64-conda-linux-gnu ]; then
-            export DPCPP_GCC_INSTALL_DIR="${CONDA_PREFIX}/lib/gcc/x86_64-conda-linux-gnu/12.3.0"
-        fi
-        export INTELONEAPIROOT=${ONEAPIROOT}
-        USE_SYSTEM_ONECCL=ON COMPUTE_BACKEND=dpcpp python setup.py bdist_wheel
-        unset INTELONEAPIROOT
-        if [ -d ${CONDA_PREFIX}/lib/gcc/x86_64-conda-linux-gnu ]; then
-            unset DPCPP_GCC_INSTALL_DIR
-        fi
-        cp dist/*.whl ${WHEELFOLDER}
-        python -m pip install dist/*.whl
-        cd ..
-        rm -rf torch-ccl
-
-        set +e
-        env_recover PKG_CONFIG_PATH ${PKG_CONFIG_PATH_BK}
-        env_recover ACL_BOARD_VENDOR_PATH ${ACL_BOARD_VENDOR_PATH_BK}
-        env_recover FPGA_VARS_DIR ${FPGA_VARS_DIR_BK}
-        env_recover DIAGUTIL_PATH ${DIAGUTIL_PATH_BK}
-        env_recover MANPATH ${MANPATH_BK}
-        env_recover CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH_BK}
-        env_recover CMPLR_ROOT ${CMPLR_ROOT_BK}
-        env_recover FPGA_VARS_ARGS ${FPGA_VARS_ARGS_BK}
-        env_recover LIBRARY_PATH ${LIBRARY_PATH_BK}
-        env_recover OCL_ICD_FILENAMES ${OCL_ICD_FILENAMES_BK}
-        env_recover INTELFPGAOCLSDKROOT ${INTELFPGAOCLSDKROOT_BK}
-        env_recover LD_LIBRARY_PATH ${LD_LIBRARY_PATH_BK}
-        env_recover MKLROOT ${MKLROOT_BK}
-        env_recover NLSPATH ${NLSPATH_BK}
-        env_recover PATH ${PATH_BK}
-        env_recover CPATH ${CPATH_BK}
-        set -e
     fi
 
     echo "python -m pip install impi-devel" >> ${AUX_INSTALL_SCRIPT}
-    echo "python -m pip install cpuid accelerate datasets sentencepiece protobuf==${VER_PROTOBUF} huggingface_hub mpi4py mkl" >> ${AUX_INSTALL_SCRIPT}
-    echo "python -m pip install lm_eval" >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install cpuid accelerate datasets sentencepiece diffusers protobuf==${VER_PROTOBUF} huggingface_hub mpi4py mkl" >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install llm_eval==${VER_LLM_EVAL}" >> ${AUX_INSTALL_SCRIPT}
     
 
     # Install Transformers
@@ -277,14 +192,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     rm -rf DeepSpeed
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
-    bash ${TORCH_INSTALL_SCRIPT}
     python -m pip install ${WHEELFOLDER}/*.whl
     bash ${AUX_INSTALL_SCRIPT}
     rm -rf ${WHEELFOLDER}
-    if [ -f ${TORCH_INSTALL_SCRIPT} ]; then
-        rm ${TORCH_INSTALL_SCRIPT}
-    fi
-    if [ -f ${AUX_INSTALL_SCRIPT} ]; then
-        rm ${AUX_INSTALL_SCRIPT}
-    fi
 fi

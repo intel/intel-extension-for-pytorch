@@ -98,7 +98,6 @@ import shutil
 import subprocess
 import sys
 import re
-import yaml
 import errno
 
 
@@ -204,20 +203,12 @@ def get_pytorch_install_dir():
 pytorch_install_dir = get_pytorch_install_dir()
 
 
-def _get_basekit_rt():
-    with open("dependency_version.yml", "r") as f:
-        result = yaml.load(f.read(), Loader=yaml.FullLoader)
-        return result["basekit"]
-
-
 def _build_installation_dependency():
     install_requires = []
     install_requires.append("psutil")
     install_requires.append("numpy")
     install_requires.append("packaging")
     install_requires.append("pydantic")
-    # for key, value in _get_basekit_rt().items():
-    #    install_requires.append(f"{key}=={value['version']}")
     return install_requires
 
 
@@ -498,25 +489,21 @@ def auto_format_python_code():
 
 
 def post_clean_third_party_patches(base_dir, submodule_dir):
-    print(
-        subprocess.check_output(
-            ["git", "submodule", "sync", submodule_dir], cwd=base_dir
+    try:
+        subprocess.run(
+            ["git", "submodule", "sync", submodule_dir],
+            cwd=base_dir,
+            capture_output=True,
         )
-        .decode("ascii")
-        .strip()
-    )
-    print(
-        subprocess.check_output(
-            ["git", "submodule", "update", "--init", submodule_dir], cwd=base_dir
+        subprocess.run(
+            ["git", "submodule", "update", "--init", submodule_dir],
+            cwd=base_dir,
+            capture_output=True,
         )
-        .decode("ascii")
-        .strip()
-    )
-    print(
-        subprocess.check_output(["git", "clean", "-fd"], cwd=submodule_dir)
-        .decode("ascii")
-        .strip()
-    )
+        subprocess.run(["git", "clean", "-fd"], cwd=submodule_dir, capture_output=True)
+    except Exception as e:
+        print(e)
+        sys.exit(1)
 
 
 # global setup modules
@@ -756,25 +743,21 @@ class IPEXCPPLibBuild(build_clib, object):
 
             cmake_args_gpu = []
             define_build_options(cmake_args_gpu, **build_option_gpu)
-            if "IPEX_GPU_EXTRA_BUILD_OPTION" in my_env:
-                exist_ldflags = "LDFLAGS" in my_env
-                ldflags = ""
-                if exist_ldflags:
-                    ldflags = my_env["LDFLAGS"]
-                my_env["LDFLAGS"] = f"{my_env['IPEX_GPU_EXTRA_BUILD_OPTION']} {ldflags}"
+            my_env_local = my_env.copy()
+            ldflags = ""
+            if "LDFLAGS" in my_env_local:
+                ldflags = f"{my_env_local['LDFLAGS']} "
+            my_env_local["LDFLAGS"] = f"{ldflags}-Wl,--no-as-needed"
+            if "IPEX_GPU_EXTRA_BUILD_OPTION" in my_env_local:
+                my_env_local["LDFLAGS"] = f"{my_env_local['IPEX_GPU_EXTRA_BUILD_OPTION']} {my_env_local['LDFLAGS']}"
             _gen_build_cfg_from_cmake(
                 cmake_exec,
                 project_root_dir,
                 cmake_args_gpu,
                 ipex_xpu_build_dir,
-                my_env,
+                my_env_local,
                 use_ninja,
             )
-            if "IPEX_GPU_EXTRA_BUILD_OPTION" in my_env:
-                if exist_ldflags:
-                    my_env["LDFLAGS"] = ldflags
-                else:
-                    del my_env["LDFLAGS"]
 
         if build_with_cpu:
             # Generate cmake for CPU module:

@@ -27,84 +27,75 @@ Here you can find the inference benchmarking scripts for large language models (
 
 ## Environment Setup
 
-1. Get the Intel® Extension for PyTorch\* source code:
+
+### [Recommended] Docker-based environment setup with compilation from source
+
+
 
 ```bash
+# Get the Intel® Extension for PyTorch* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout v2.1.10+xpu
+git checkout v2.1.20+xpu
 git submodule sync
 git submodule update --init --recursive
-```
 
-2. Do one of the following:
+# Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch* from source
+docker build -f examples/gpu/inference/python/llm/Dockerfile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') --build-arg COMPILE=ON -t ipex-llm:2.1.20 .
 
-   If you are planning to use DeepSpeed for execution, please use a bare-metal environment directly and follow 2.b session for the environment setup. Otherwise, we recommend you follow 2.a session with Docker, where the environment is already configured.
-    
-   a. (Recommended) Build a Docker container from the provided `Dockerfile` for single-instance executions.
+# Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch* prebuilt wheel files
+docker build -f examples/gpu/inference/python/llm/Dockerfile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') -t ipex-llm:2.1.20 .
 
-      ```bash
-      # Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch* from source
-      DOCKER_BUILDKIT=1 docker build -f examples/gpu/inference/python/llm/Dockerfile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') --build-arg COMPILE=ON -t ipex-llm:2.1.10 .
-
-      # Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch* prebuilt wheel files
-      DOCKER_BUILDKIT=1 docker build -f examples/gpu/inference/python/llm/Dockerfile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') -t ipex-llm:2.1.10 .
-
-      # Run the container with command below
-      docker run --rm -it --privileged --device=/dev/dri --ipc=host ipex-llm:2.1.10 bash
-
-      # When the command prompt shows inside the docker container, enter llm examples directory
-      cd llm
-      ```
-   b. Alternatively, use the provided environment configuration script to set up environment without using a docker container:
-
-      Make sure the driver and Base Toolkit are installed without using a docker container. Refer to [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/#installation?platform=gpu&version=v2.1.10%2Bxpu&os=linux%2Fwsl2&package=source).
-
-      OneCCL is also required if you run with DeepSpeed. We recommend to use apt/yum/dnf to install the oneCCL package. Refer to [Base Toolkit Installation](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html) for adding the APT/YUM/DNF key and sources for first-time users.
-
-      Example command:
-
-      ```bash
-      sudo apt install intel-oneapi-ccl-devel=2021.11.1-6
-      sudo yum install intel-oneapi-ccl-devel=2021.11.1-6
-      sudo dnf install intel-oneapi-ccl-devel=2021.11.1-6
-      ```
+# Run the container with command below
+docker run --privileged -it --rm --device /dev/dri:/dev/dri -v /dev/dri/by-path:/dev/dri/by-path \
+--ipc=host --net=host --cap-add=ALL -v /lib/modules:/lib/modules --workdir /workspace  \
+--volume `pwd`/examples/gpu/inference/python/llm/:/workspace/llm ipex-llm:2.1.20 /bin/bash
 
 
-      ```bash
-         # Make sure you have GCC >= 11 is installed on your system.
-         # Create a conda environment
-         conda create -n llm python=3.10 -y
-         conda activate llm
+# When the command prompt shows inside the docker container, enter llm examples directory
+cd llm
 
-         # Setup the environment with the provided script
-         cd examples/gpu/inference/python/llm
-         # If you want to install Intel® Extension for PyTorch\* from prebuilt wheel files, use the command below:
-         bash ./tools/env_setup.sh 7
-         # If you want to install Intel® Extension for PyTorch\* from source, use the commands below:
-         bash ./tools/env_setup.sh 3 <DPCPP_ROOT> <ONEMKL_ROOT> <ONECCL_ROOT> <AOT>
-         export LD_PRELOAD=$(bash ../../../../../tools/get_libstdcpp_lib.sh)
-         export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
-         source <DPCPP_ROOT>/env/vars.sh
-         source <ONEMKL_ROOT>/env/vars.sh
-         source <ONECCL_ROOT>/env/vars.sh
-         source <MPI_ROOT>/env/vars.sh
-     ```
-     where <br />
-     - `DPCPP_ROOT` is the path to the DPC++ compiler. By default, it is `/opt/intel/oneapi/compiler/latest`.<br />
-     - `ONEMKL_ROOT` is the path to oneMKL. By default, it is `/opt/intel/oneapi/mkl/latest`.<br />
-     - `ONECCL_ROOT` is the path to oneCCL. By default, it is `/opt/intel/oneapi/ccl/latest`.<br />
-     - `MPI_ROOT` is the path to oneAPI MPI library. By default, it is `/opt/intel/oneapi/mpi/latest`.<br />
-     - `AOT` is a text string to enable `Ahead-Of-Time` compilation for specific GPU models. Check [tutorial](../../../../../docs/tutorials/technical_details/AOT.md) for details.<br />
-
-3. Set necessary environment variables with the environment variables activation script.
-
-```bash
 # Activate environment variables
 source ./tools/env_activate.sh
 ```
 
+### Conda-based environment setup with compilation from source
 
+Make sure the driver and Base Toolkit are installed without using a docker container. Refer to [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/#installation?platform=gpu&version=v2.1.10%2Bxpu&os=linux%2Fwsl2&package=source).
+
+
+
+```bash
+
+# Get the Intel® Extension for PyTorch* source code
+git clone https://github.com/intel/intel-extension-for-pytorch.git
+cd intel-extension-for-pytorch
+git checkout v2.1.20+xpu
+git submodule sync
+git submodule update --init --recursive
+
+# Make sure you have GCC >= 11 is installed on your system.
+# Create a conda environment
+conda create -n llm python=3.10 -y
+conda activate llm
+conda install pkg-config
+# Setup the environment with the provided script
+cd examples/gpu/inference/python/llm
+# If you want to install Intel® Extension for PyTorch\* from prebuilt wheel files, use the command below:
+bash ./tools/env_setup.sh 7
+# If you want to install Intel® Extension for PyTorch\* from source, use the commands below:
+bash ./tools/env_setup.sh 3 <DPCPP_ROOT> <ONEMKL_ROOT> <ONECCL_ROOT> <AOT>
+export LD_PRELOAD=$(bash ../../../../../tools/get_libstdcpp_lib.sh)
+export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
+source ./tools/env_activate.sh
+
+```
+
+where <br />
+- `AOT` is a text string to enable `Ahead-Of-Time` compilation for specific GPU models. Check [tutorial](../../../../../docs/tutorials/technical_details/AOT.md) for details.<br />
+
+
+ 
 ## Run Models Generation
 
 | Benchmark mode | FP16 | Weight only quantization INT4 |
@@ -141,8 +132,6 @@ bash run_benchmark_ds.sh
 ```
 
 ```bash
-# distributed env setting
-source ${ONECCL_ROOT}/env/setvars.sh
 # fp16 benchmark
 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${output} --device xpu --ipex --dtype float16 --token-latency
 ```
@@ -190,9 +179,6 @@ LLM_ACC_TEST=1 python -u run_generation.py -m ${model} --ipex --dtype float16 --
 ### Distributed Accuracy with DeepSpeed
 
 ```bash
-# Run distributed accuracy with 2 ranks of one node for float16 with ipex
-source ${ONECCL_ROOT}/env/setvars.sh
-
 # one-click bash script
 bash run_accuracy_ds.sh
 

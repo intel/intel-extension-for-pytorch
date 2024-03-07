@@ -49,7 +49,7 @@ RUN cp ./intel-extension-for-pytorch/scripts/compile_bundle.sh ./ && \
     sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
 RUN . ./miniconda3/bin/activate && \
     conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
-    bash compile_bundle.sh /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest pvc,ats-m150,acm-g11 && \
+    bash compile_bundle.sh /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest /opt/intel/oneapi/ccl/latest pvc,ats-m150,acm-g11 && \
     mkdir wheels && cp pytorch/dist/*.whl vision/dist/*.whl audio/dist/*.whl intel-extension-for-pytorch/dist/*.whl ./wheels
 
 FROM base AS deploy
