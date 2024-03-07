@@ -41,5 +41,7 @@ int dpcppPrefetchDeviceHasFP64Dtype(int device_id, bool& has_fp64) noexcept;
 
 bool dpcppGetDeviceHasXMX(DeviceId device_id = -1) noexcept;
 
+uint64_t dpcppGetDeviceFreeMemory(DeviceId device_id);
+
 } // namespace dpcpp
 } // namespace xpu

@@ -395,6 +395,15 @@ PyObject* THPModule_memorySnapshot(PyObject* _unused, PyObject* noargs) {
   END_HANDLE_TH_ERRORS
 }
 
+PyObject* THPModule_getFreeMemory(PyObject* _unused, PyObject* arg) {
+  HANDLE_TH_ERRORS
+  THPUtils_assert(
+      THPUtils_checkLong(arg), "invalid argument to get_free_memory");
+  const int device = (int)THPUtils_unpackLong(arg);
+  return THPUtils_packUInt64(xpu::dpcpp::getDeviceFreeMemory(device));
+  END_HANDLE_TH_ERRORS
+}
+
 static PyObject* set_autocast_xpu_enabled(PyObject* _unused, PyObject* arg) {
   HANDLE_TH_ERRORS
   if (!PyBool_Check(arg)) {
@@ -530,6 +539,7 @@ static struct PyMethodDef _THPModule_methods[] = {
     {"get_autocast_xpu_dtype", get_autocast_xpu_dtype, METH_NOARGS, nullptr},
     {"_from_usm", THPModule_fromUSM, METH_VARARGS, nullptr},
     {"_to_usm", THPModule_toUSM, METH_O, nullptr},
+    {"_getFreeMemory", THPModule_getFreeMemory, METH_O, nullptr},
     {nullptr}};
 
 std::string get_dev_type(const DeviceInfo& info) {

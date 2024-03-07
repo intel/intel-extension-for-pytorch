@@ -94,5 +94,9 @@ int prefetch_device_has_fp64_dtype(int device_id, bool& has_fp64) noexcept {
   return xpu::dpcpp::dpcppPrefetchDeviceHasFP64Dtype(device_id, has_fp64);
 }
 
+uint64_t getDeviceFreeMemory(DeviceIndex device_id) {
+  return xpu::dpcpp::dpcppGetDeviceFreeMemory(device_id);
+}
+
 } // namespace dpcpp
 } // namespace xpu

@@ -1,5 +1,6 @@
 import collections
-from typing import Any, Dict, Union
+import os
+from typing import Any, Dict, Union, Tuple
 
 import intel_extension_for_pytorch
 from torch.types import Device
@@ -456,3 +457,43 @@ def memory_summary(device: Union[Device, int] = None, abbreviated: bool = False)
     for k, v in stats.items():
         fmt_dict[k.replace(".", "-")] = v
     return "|" + "|\n|".join(lines).format(**fmt_dict) + "|\n"
+
+
+def get_free_memory(device: Union[Device, int] = None) -> int:
+    r"""Return the global free GPU memory for a given device.
+
+    Args:
+        device (torch.device or int, optional): selected device. Returns
+            statistic for the current device, given by :func:`~torch.xpu.current_device`,
+            if :attr:`device` is ``None`` (default).
+    """
+
+    env_set = False
+
+    if os.getenv("ZES_ENABLE_SYSMAN") is None:
+        os.environ["ZES_ENABLE_SYSMAN"] = "1"
+        env_set = True
+
+    try:
+        device = _get_device_index(device, optional=True)
+        return intel_extension_for_pytorch._C._getFreeMemory(device)
+    finally:
+        if env_set:
+            del os.environ["ZES_ENABLE_SYSMAN"]
+
+
+def mem_get_info(device: Union[Device, int] = None) -> Tuple[int, int]:
+    r"""Return the global free and total GPU memory for a given device.
+
+    Args:
+        device (torch.device or int, optional): selected device. Returns
+            statistic for the current device, given by :func:`~torch.xpu.current_device`,
+            if :attr:`device` is ``None`` (default).
+    """
+
+    free_memory = get_free_memory(device)
+    device = _get_device_index(device, optional=True)
+    device_props = intel_extension_for_pytorch._C._get_device_properties(device)
+    total_memory = device_props.total_memory
+    
+    return free_memory, total_memory

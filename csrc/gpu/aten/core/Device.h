@@ -83,5 +83,7 @@ IPEX_API int prefetch_device_has_fp64_dtype(
     int device_id,
     bool& has_fp64) noexcept;
 
+IPEX_API uint64_t getDeviceFreeMemory(DeviceIndex device_id);
+
 } // namespace dpcpp
 } // namespace xpu
