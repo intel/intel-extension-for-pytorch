@@ -144,7 +144,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 
     echo "python -m pip install impi-devel" >> ${AUX_INSTALL_SCRIPT}
     echo "python -m pip install cpuid accelerate datasets sentencepiece diffusers protobuf==${VER_PROTOBUF} huggingface_hub mpi4py mkl" >> ${AUX_INSTALL_SCRIPT}
-    echo "python -m pip install llm_eval==${VER_LLM_EVAL}" >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install lm_eval==${VER_LLM_EVAL}" >> ${AUX_INSTALL_SCRIPT}
     
 
     # Install Transformers
