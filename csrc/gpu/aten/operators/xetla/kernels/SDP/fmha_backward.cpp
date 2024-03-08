@@ -130,19 +130,14 @@ class fmha_backward_t {
   static constexpr uint32_t kBr = fmha_policy::kBr;
   static constexpr uint32_t kBc = fmha_policy::kBc;
   static constexpr uint32_t kHm = fmha_policy::kHm;
-  // gemm brbc
-  static constexpr uint32_t kBrBc_SgBr = fmha_policy::kBrBc_SgBr;
-  static constexpr uint32_t kBrBc_SgBc = fmha_policy::kBrBc_SgBc;
-  // gemm brhm
-  static constexpr uint32_t kBrHm_SgBr = fmha_policy::kBrHm_SgBr;
-  static constexpr uint32_t kBrHm_SgHm = fmha_policy::kBrHm_SgHm;
-  // gemm bchm
+  static constexpr uint32_t kSgBr = fmha_policy::kSgBr;
+  static constexpr uint32_t kSgBc = fmha_policy::kSgBc;
+  static constexpr uint32_t kSgHm = fmha_policy::kSgHm;
   static constexpr uint32_t kBcHm_SgBc = fmha_policy::kBcHm_SgBc;
-  static constexpr uint32_t kBcHm_SgHm = fmha_policy::kBcHm_SgHm;
 
-  using tile_shape_BrBc = group::tile_shape_t<kBc, kBr, kBrBc_SgBc, kBrBc_SgBr>;
-  using tile_shape_BrHm = group::tile_shape_t<kHm, kBr, kBrHm_SgHm, kBrHm_SgBr>;
-  using tile_shape_BcHm = group::tile_shape_t<kHm, kBc, kBcHm_SgHm, kBcHm_SgBc>;
+  using tile_shape_BrBc = group::tile_shape_t<kBc, kBr, kSgBc, kSgBr>;
+  using tile_shape_BrHm = group::tile_shape_t<kHm, kBr, kSgHm, kSgBr>;
+  using tile_shape_BcHm = group::tile_shape_t<kHm, kBc, kSgHm, kBcHm_SgBc>;
 
   static constexpr uint32_t wg_size_x = tile_shape_BrBc::wg_size_x;
   static constexpr uint32_t wg_size_y = tile_shape_BrBc::wg_size_y;
@@ -151,6 +146,12 @@ class fmha_backward_t {
   using work_group_BcHm_t = typename tile_shape_BcHm::work_group_t;
   static constexpr uint32_t wg_size = work_group_BrBc_t::size;
 
+  static_assert(
+      kHm / kSgHm == kBc / kSgBc,
+      "wg_size_x must be the same between Hm and Bc");
+  static_assert(
+      kBr / kSgBr == kBc / kBcHm_SgBc,
+      "wg_size_y must be the same between Br and Bc_M");
   static_assert(wg_size <= 32, "The number of threads should be less than 32!");
 
   // --------------------- // Memory desc // ---------------------- //
@@ -173,9 +174,11 @@ class fmha_backward_t {
       mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Di_t =
       mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>;
-  using mem_desc_Pij_L_t =
+  using mem_desc_Pij_L_T_t =
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
   using mem_desc_dSij_L_t =
+      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
+  using mem_desc_dSij_L_T_t =
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
   using mem_desc_dQi_t =
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
@@ -191,11 +194,13 @@ class fmha_backward_t {
   // ------------------- // Slm and nbarrier // ------------------- //
   // Todo: consider parallel Q(Br) as fwd did
   static constexpr uint32_t slm_size_Pij = kBr * kBc * sizeof(scalar_t);
+  static constexpr uint32_t slm_size_Sij = kBr * kBc * sizeof(scalar_t);
   static constexpr uint32_t slm_size_D =
-      (wg_size_x > 1) ? wg_size * kBrBc_SgBr * sizeof(accum_t) : 0;
+      (wg_size_x > 1) ? wg_size * kSgBr * sizeof(accum_t) : 0;
   // Slm addr to store inermediate results
   static constexpr uint32_t Pij_slm = /* slm_base */ 0;
-  static constexpr uint32_t D_slm = Pij_slm + slm_size_Pij;
+  static constexpr uint32_t Sij_slm = Pij_slm + slm_size_Pij;
+  static constexpr uint32_t D_slm = Sij_slm + slm_size_Sij;
 
   static constexpr uint32_t nbarrier_cnt = wg_size_x + wg_size_y;
   // Define kernel to compute Sij = Qi x Kj.T
@@ -229,8 +234,9 @@ class fmha_backward_t {
     mem_desc_Bij_t mem_desc_Bij;
     mem_desc_Li_t mem_desc_Li;
     mem_desc_Di_t mem_desc_Di;
-    mem_desc_Pij_L_t mem_desc_Pij_L;
+    mem_desc_Pij_L_T_t mem_desc_Pij_L_T;
     mem_desc_dSij_L_t mem_desc_dSij_L;
+    mem_desc_dSij_L_T_t mem_desc_dSij_L_T;
     mem_desc_dQi_t mem_desc_dQi, mem_desc_dQi_tile;
     mem_desc_dKj_t mem_desc_dKj;
     mem_desc_dVj_t mem_desc_dVj;
@@ -277,15 +283,15 @@ class fmha_backward_t {
       mem_desc_Oi.init(
           args.O_ptr,
           {end_x, end_y, pitch},
-          {int32_t(start_x + sg_idx * kBrHm_SgHm),
-           int32_t(start_y + sg_idy * kBrHm_SgBr)});
+          {int32_t(start_x + sg_idx * kSgHm),
+           int32_t(start_y + sg_idy * kSgBr)});
       mem_desc_dOi.init(
           args.dO_ptr,
           {end_x, end_y, pitch},
-          {int32_t(start_x + sg_idx * kBrHm_SgHm),
-           int32_t(start_y + sg_idy * kBrHm_SgBr)});
+          {int32_t(start_x + sg_idx * kSgHm),
+           int32_t(start_y + sg_idy * kSgBr)});
 
-      int32_t start_x_ml = startF + sg_idy * kBrHm_SgBr;
+      int32_t start_x_ml = startF + sg_idy * kSgBr;
       int32_t start_y_ml = gid;
       mem_desc_Di.init(
           args.D_ptr,
@@ -315,7 +321,7 @@ class fmha_backward_t {
       mem_desc_dQi.init(args.dQ_ptr, {end_x, end_y, pitch}, {start_x, start_y});
       mem_desc_dOi.init(args.dO_ptr, {end_x, end_y, pitch}, {start_x, start_y});
 
-      int32_t start_x_ml = startF + sg_idy * kBrBc_SgBr;
+      int32_t start_x_ml = startF + sg_idy * kSgBr;
       int32_t start_y_ml = gid;
       mem_desc_Li.init(
           args.L_ptr,
@@ -328,15 +334,16 @@ class fmha_backward_t {
       mem_desc_dQi_tile.init(
           args.dQ_ptr,
           {end_x, end_y, pitch},
-          {int32_t(start_x + sg_idx * kBrHm_SgHm),
-           int32_t(start_y + sg_idy * kBrHm_SgBr)});
+          {int32_t(start_x + sg_idx * kSgHm),
+           int32_t(start_y + sg_idy * kSgBr)});
 
-      mem_desc_Pij_L.init(Pij_slm, {kBc, kBr, kBc}, {0, 0});
-      mem_desc_dSij_L.init(Pij_slm, {kBc, kBr, kBc}, {0, 0});
+      mem_desc_Pij_L_T.init(Pij_slm, {kBr, kBc, kBr}, {0, 0});
+      mem_desc_dSij_L.init(Sij_slm, {kBc, kBr, kBc}, {0, 0});
+      mem_desc_dSij_L_T.init(Sij_slm, {kBr, kBc, kBr}, {0, 0});
 
       if constexpr (kIsDropout) {
-        int coord_y = startF + sg_idy * kBrBc_SgBr;
-        int coord_x = startT + sg_idx * kBrBc_SgBc;
+        int coord_y = startF + sg_idy * kSgBr;
+        int coord_x = startT + sg_idx * kSgBc;
         uint64_t sg_subseq = uint64_t(coord_y) << 32 | uint64_t(coord_x);
         uint32_t threshold = uint32_t(args.dp_prob * float(4294967296));
         dropout_op.init(
@@ -423,7 +430,7 @@ class fmha_backward_t {
       if (args.is_bias_add) {
         using mask_op_t = bias_add_op_t<scalar_t, gpu_arch::Xe>;
         using mask_args_t = typename mask_op_t::arguments_t;
-        int32_t tile_offset_x = ctx.sg_idx * kBrBc_SgBc;
+        int32_t tile_offset_x = ctx.sg_idx * kSgBc;
         ctx.mem_desc_Bij.update_coord_x(tile_offset_x);
         mask_op_t mask_op;
         mask_args_t mask_args(ctx.mem_desc_Bij.base, ctx.mem_desc_Bij.shape);
@@ -433,8 +440,8 @@ class fmha_backward_t {
             elemwise_reduce_op_t<reduce_op::sum, scalar_t, gpu_arch::Xe>;
         using bias_args_t = typename bias_op_t::arguments_t;
 
-        int32_t tile_offset_x = ctx.sg_idx * kBrBc_SgBc;
-        int32_t tile_offset_y = ctx.sg_idy * kBrBc_SgBr;
+        int32_t tile_offset_x = ctx.sg_idx * kSgBc;
+        int32_t tile_offset_y = ctx.sg_idy * kSgBr;
         ctx.mem_desc_Bij.update_coord(tile_offset_x, tile_offset_y);
 
         bias_op_t bias_op;
@@ -454,15 +461,15 @@ class fmha_backward_t {
       uint32_t startT) {
     using tile_mask = tile_mask_t<matAcc_Sij_t>;
 
-    uint32_t sg_startT = startT + ctx.sg_idx * kBrBc_SgBc;
+    uint32_t sg_startT = startT + ctx.sg_idx * kSgBc;
     uint32_t remainT = std::max(int(args.uT) - int(sg_startT), 0);
-    if (remainT < kBrBc_SgBc) {
+    if (remainT < kSgBc) {
       tile_mask::padding_mask(matAcc_Sij, remainT);
     }
 
     if constexpr (kIsCausal) {
-      uint32_t sg_startF = startF + ctx.sg_idy * kBrBc_SgBr;
-      if (sg_startT + kBrBc_SgBc > sg_startF) {
+      uint32_t sg_startF = startF + ctx.sg_idy * kSgBr;
+      if (sg_startT + kSgBc > sg_startF) {
         tile_mask::causal_mask(matAcc_Sij, sg_startT, sg_startF);
       }
     }
@@ -476,7 +483,7 @@ class fmha_backward_t {
       matAcc_Sij_t* matAcc_Sij_drop,
       const arguments_t& args) {
     using load_desc =
-        subgroup::tile_desc_t<kBrBc_SgBr, 1, kBrBc_SgBr, 1, reg_layout::tiled>;
+        subgroup::tile_desc_t<kSgBr, 1, kSgBr, 1, reg_layout::tiled>;
     using load_tile_t = subgroup::tile_t<accum_t, load_desc>;
     using load_payload_t = subgroup::mem_payload_t<
         accum_t,
@@ -514,9 +521,9 @@ class fmha_backward_t {
             subgroup::chained_tile_op_t<>,
             gpu_arch::Xe>,
         tile_shape_BrBc,
-        mem_desc_Pij_L_t>;
+        mem_desc_Pij_L_T_t>;
     epilogue_p_t epilogue;
-    epilogue(ctx.g_brbc, *matAcc_Sij_drop, ctx.mem_desc_Pij_L);
+    epilogue(ctx.g_brbc, *matAcc_Sij_drop, ctx.mem_desc_Pij_L_T);
 
     xetla_fence<memory_kind::shared_local>();
     if constexpr (wg_size_x > 1)
@@ -529,7 +536,7 @@ class fmha_backward_t {
   using brgemm_dVj_t = group::brgemm_t<
       compute_policy,
       tile_shape_BcHm,
-      mem_desc_Pij_L_t,
+      mem_desc_Pij_L_T_t,
       mem_desc_dOi_t>;
   using matAcc_dVj_t = typename brgemm_dVj_t::matAcc_t;
   /// @brief gemm_dVj is used to compute dVj = P_dropped_ij_T x dOi
@@ -546,7 +553,8 @@ class fmha_backward_t {
 
     // Gemm to compute dVj
     brgemm_dVj_t brgemm;
-    brgemm_args_t brgemm_args(ctx.mem_desc_Pij_L, ctx.mem_desc_dOi, loop_count);
+    brgemm_args_t brgemm_args(
+        ctx.mem_desc_Pij_L_T, ctx.mem_desc_dOi, loop_count);
     brgemm(
         ctx.g_bchm,
         *matAcc_dVj,
@@ -595,7 +603,7 @@ class fmha_backward_t {
       matAcc_dPij_t* matAcc_dPij,
       const arguments_t& args) {
     using load_desc =
-        subgroup::tile_desc_t<kBrBc_SgBr, 1, kBrBc_SgBr, 1, reg_layout::tiled>;
+        subgroup::tile_desc_t<kSgBr, 1, kSgBr, 1, reg_layout::tiled>;
     using load_tile_t = subgroup::tile_t<accum_t, load_desc>;
     using load_payload_t = subgroup::mem_payload_t<
         accum_t,
@@ -698,8 +706,8 @@ class fmha_backward_t {
   // Define kernel to compute dKj = dKj + dSij_T x Qi
   using brgemm_dKj_t = group::brgemm_t<
       compute_policy,
-      tile_shape_BrHm,
-      mem_desc_dSij_L_t,
+      tile_shape_BcHm,
+      mem_desc_dSij_L_T_t,
       mem_desc_Qi_t>;
   using matAcc_dKj_t = typename brgemm_dKj_t::matAcc_t;
   /// @brief gemm_dKj is used to compute dKj = dKj + dSij_T x Qi
@@ -715,9 +723,9 @@ class fmha_backward_t {
             subgroup::chained_tile_op_t<>,
             gpu_arch::Xe>,
         tile_shape_BrBc,
-        mem_desc_dSij_L_t>;
+        mem_desc_dSij_L_T_t>;
     epilogue_s_t epilogue;
-    epilogue(ctx.g_brbc, *matAcc_dSij, ctx.mem_desc_dSij_L);
+    epilogue(ctx.g_brbc, *matAcc_dSij, ctx.mem_desc_dSij_L_T);
 
     xetla_fence<memory_kind::shared_local>();
     if constexpr (wg_size_x > 1)
@@ -727,12 +735,13 @@ class fmha_backward_t {
     using brgemm_args_t = typename brgemm_dKj_t::arguments_t;
 
     uint32_t remainF = args.uF - startF;
-    uint32_t boundary_k = remainF > kBc ? kBc : remainF;
+    uint32_t boundary_k = remainF > kBr ? kBr : remainF;
     uint32_t loop_count = (boundary_k + accum_step - 1) / accum_step;
 
     // Gemm to compute dKj
     brgemm_dKj_t brgemm;
-    brgemm_args_t brgemm_args(ctx.mem_desc_dSij_L, ctx.mem_desc_Qi, loop_count);
+    brgemm_args_t brgemm_args(
+        ctx.mem_desc_dSij_L_T, ctx.mem_desc_Qi, loop_count);
     brgemm(
         ctx.g_bchm,
         *matAcc_dKj,
@@ -790,7 +799,7 @@ class fmha_backward_t {
       const arguments_t& args) {
     // define matD
     using store_desc =
-        subgroup::tile_desc_t<kBrBc_SgBr, 1, kBrBc_SgBr, 1, reg_layout::tiled>;
+        subgroup::tile_desc_t<kSgBr, 1, kSgBr, 1, reg_layout::tiled>;
     using store_tile_t = subgroup::tile_t<accum_t, store_desc>;
     using store_payload_t = subgroup::mem_payload_t<
         accum_t,
@@ -826,7 +835,7 @@ class fmha_backward_t {
     using wg_row_sum_t =
         group_row_reduce_t<matAcc_dQi_t, wg_size_x, reduce_op::sum>;
     uint32_t reducer_slm =
-        D_slm + ctx.sg_idy * wg_size_x * kBrHm_SgBr * sizeof(accum_t);
+        D_slm + ctx.sg_idy * wg_size_x * kSgBr * sizeof(accum_t);
 
     wg_row_sum_t wg_row_sum(ctx.sg_idx, ctx.sg_idy, reducer_slm);
     matD_store.reg = wg_row_sum(matAcc_D);
@@ -856,7 +865,7 @@ class fmha_backward_t {
   /// Users query and get a local memory consumption size in compile time.
   /// @return The size of local memory required.
   inline static constexpr uint32_t get_slm_size() {
-    constexpr uint32_t size = slm_size_Pij + slm_size_D;
+    constexpr uint32_t size = slm_size_Pij + slm_size_D + slm_size_Sij;
     static_assert(
         size <= (128 * 1024),
         "The local memory size should be less than 128KB!");
@@ -1213,11 +1222,11 @@ void fmha_backward_kernel_policy(
     uint64_t seed = 0,
     uint64_t offset = 123) {
   if (head_size <= 64) {
-    CALL_IMPL_FUNC(fmha_policy_bwd_64x64x64);
+    CALL_IMPL_FUNC(fmha_bwd_policy_64x64x64);
   } else if (head_size <= 128) {
-    CALL_IMPL_FUNC(fmha_policy_bwd_128x128x128);
+    CALL_IMPL_FUNC(fmha_bwd_policy_128x128x128);
   } else if (head_size <= 256) {
-    CALL_IMPL_FUNC(fmha_policy_bwd_128x128x256);
+    CALL_IMPL_FUNC(fmha_bwd_policy_128x128x256);
   } else {
     std::cout << "No policy available for current head_size " << head_size
               << "\n";
