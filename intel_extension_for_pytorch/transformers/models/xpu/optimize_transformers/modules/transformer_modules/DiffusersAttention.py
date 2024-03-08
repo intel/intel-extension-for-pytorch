@@ -236,6 +236,13 @@ class DiffusersAttention(nn.Module):
         self.to_v.bias = to_v.bias
         self.to_out[0].bias = to_out.bias
 
+    def transpose_parameter(self):
+        self.to_q.weight.data = self.to_q.weight.transpose(0, 1).contiguous()
+        self.to_k.weight.data = self.to_k.weight.transpose(0, 1).contiguous()
+        self.to_v.weight.data = self.to_v.weight.transpose(0, 1).contiguous()
+        # Note: synchronize to ensure the completion of contiguous
+        torch.xpu.synchronize()
+
     def cat_qkv(self):
         shape = [3, -1, self.to_q.weight.shape[-1]]
         self.qkv_proj.weight = (
@@ -414,9 +421,6 @@ class AttnProcessor2_0:
         scale: float = 1.0,
     ) -> torch.FloatTensor:
         residual = hidden_states
-
-        args = (scale,)
-
         if attn.spatial_norm is not None:
             hidden_states = attn.spatial_norm(hidden_states, temb)
 
@@ -450,9 +454,8 @@ class AttnProcessor2_0:
             )
 
         if encoder_hidden_states is None:
-            encoder_hidden_states = hidden_states
-
             args = (scale,)
+            encoder_hidden_states = hidden_states
             query = torch.empty_like(hidden_states)
             key = torch.empty_like(hidden_states)
             value = torch.empty_like(hidden_states)
@@ -464,136 +467,52 @@ class AttnProcessor2_0:
                 key,
                 value,
             )
-
-            inner_dim = key.shape[-1]
-            head_dim = inner_dim // attn.heads
-
-            query = query.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
-
-            key = key.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
-            value = value.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
-
-            # the output of sdp = (batch, num_heads, seq_len, head_dim)
-            # TODO: add support for attn.scale when we move to Torch 2.1
-            hidden_states = F.scaled_dot_product_attention(
-                query,
-                key,
-                value,
-                attn_mask=attention_mask,
-                dropout_p=0.0,
-                is_causal=False,
-            )
-
-            hidden_states = hidden_states.transpose(1, 2).reshape(
-                batch_size, -1, attn.heads * head_dim
-            )
-            hidden_states = hidden_states.to(query.dtype)
-
-            # linear proj
-            hidden_states = attn.to_out[0](hidden_states, *args)
-            # dropout
-            hidden_states = attn.to_out[1](hidden_states)
-
-            if input_ndim == 4:
-                hidden_states = hidden_states.transpose(-1, -2).reshape(
-                    batch_size, channel, height, width
-                )
-
-            if attn.residual_connection:
-                hidden_states = hidden_states + residual
-
-            hidden_states = hidden_states / attn.rescale_output_factor
         elif attn.norm_cross:
             args = (scale,)
             query = attn.to_q(hidden_states, *args)
             encoder_hidden_states = attn.norm_encoder_hidden_states(
                 encoder_hidden_states
             )
-
             key = attn.to_k(encoder_hidden_states, *args)
             value = attn.to_v(encoder_hidden_states, *args)
-
-            inner_dim = key.shape[-1]
-            head_dim = inner_dim // attn.heads
-
-            query = query.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
-
-            key = key.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
-            value = value.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
-
-            # the output of sdp = (batch, num_heads, seq_len, head_dim)
-            # TODO: add support for attn.scale when we move to Torch 2.1
-            hidden_states = F.scaled_dot_product_attention(
-                query,
-                key,
-                value,
-                attn_mask=attention_mask,
-                dropout_p=0.0,
-                is_causal=False,
-            )
-
-            hidden_states = hidden_states.transpose(1, 2).reshape(
-                batch_size, -1, attn.heads * head_dim
-            )
-            hidden_states = hidden_states.to(query.dtype)
-
-            # linear proj
-            hidden_states = attn.to_out[0](hidden_states, *args)
-            # dropout
-            hidden_states = attn.to_out[1](hidden_states)
-
-            if input_ndim == 4:
-                hidden_states = hidden_states.transpose(-1, -2).reshape(
-                    batch_size, channel, height, width
-                )
-
-            if attn.residual_connection:
-                hidden_states = hidden_states + residual
-
-            hidden_states = hidden_states / attn.rescale_output_factor
         else:
             args = (scale,)
             query = attn.to_q(hidden_states, *args)
             key = attn.to_k(encoder_hidden_states, *args)
             value = attn.to_v(encoder_hidden_states, *args)
 
-            inner_dim = key.shape[-1]
-            head_dim = inner_dim // attn.heads
+        inner_dim = key.shape[-1]
+        head_dim = inner_dim // attn.heads
 
-            query = query.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
+        query = query.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
 
-            key = key.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
-            value = value.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
+        key = key.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
+        value = value.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
 
-            # the output of sdp = (batch, num_heads, seq_len, head_dim)
-            # TODO: add support for attn.scale when we move to Torch 2.1
-            hidden_states = F.scaled_dot_product_attention(
-                query,
-                key,
-                value,
-                attn_mask=attention_mask,
-                dropout_p=0.0,
-                is_causal=False,
+        # the output of sdp = (batch, num_heads, seq_len, head_dim)
+        # TODO: add support for attn.scale when we move to Torch 2.1
+        hidden_states = F.scaled_dot_product_attention(
+            query, key, value, attn_mask=attention_mask, dropout_p=0.0, is_causal=False
+        )
+
+        hidden_states = hidden_states.transpose(1, 2).reshape(
+            batch_size, -1, attn.heads * head_dim
+        )
+        hidden_states = hidden_states.to(query.dtype)
+
+        # linear proj
+        hidden_states = attn.to_out[0](hidden_states, *args)
+        # dropout
+        hidden_states = attn.to_out[1](hidden_states)
+
+        if input_ndim == 4:
+            hidden_states = hidden_states.transpose(-1, -2).reshape(
+                batch_size, channel, height, width
             )
 
-            hidden_states = hidden_states.transpose(1, 2).reshape(
-                batch_size, -1, attn.heads * head_dim
-            )
-            hidden_states = hidden_states.to(query.dtype)
+        if attn.residual_connection:
+            hidden_states = hidden_states + residual
 
-            # linear proj
-            hidden_states = attn.to_out[0](hidden_states, *args)
-            # dropout
-            hidden_states = attn.to_out[1](hidden_states)
-
-            if input_ndim == 4:
-                hidden_states = hidden_states.transpose(-1, -2).reshape(
-                    batch_size, channel, height, width
-                )
-
-            if attn.residual_connection:
-                hidden_states = hidden_states + residual
-
-            hidden_states = hidden_states / attn.rescale_output_factor
+        hidden_states = hidden_states / attn.rescale_output_factor
 
         return hidden_states

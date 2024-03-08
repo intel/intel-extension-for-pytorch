@@ -10,6 +10,43 @@ from .transformer_modules.DiffusersAttention import DiffusersAttention
 from .transformer_modules.lora import LoRACompatibleLinear
 
 
+def _chunked_feed_forward(
+    ff: nn.Module,
+    hidden_states: torch.Tensor,
+    chunk_dim: int,
+    chunk_size: int,
+    lora_scale: Optional[float] = None,
+):
+    # "feed_forward_chunk_size" can be used to save memory
+    if hidden_states.shape[chunk_dim] % chunk_size != 0:
+        raise ValueError(
+            f"`hidden_states` dimension to be chunked: {hidden_states.shape[chunk_dim]} "
+            " has to be divisible by chunk size: {chunk_size}. "
+            " Make sure to set an appropriate `chunk_size` when calling `unet.enable_forward_chunking`."
+        )
+
+    num_chunks = hidden_states.shape[chunk_dim] // chunk_size
+    if lora_scale is None:
+        ff_output = torch.cat(
+            [
+                ff(hid_slice)
+                for hid_slice in hidden_states.chunk(num_chunks, dim=chunk_dim)
+            ],
+            dim=chunk_dim,
+        )
+    else:
+        # TOOD(Patrick): LoRA scale can be removed once PEFT refactor is complete
+        ff_output = torch.cat(
+            [
+                ff(hid_slice, scale=lora_scale)
+                for hid_slice in hidden_states.chunk(num_chunks, dim=chunk_dim)
+            ],
+            dim=chunk_dim,
+        )
+
+    return ff_output
+
+
 class GatedSelfAttentionDense(nn.Module):
     r"""
     A gated self-attention dense layer that combines visual features and object features.
@@ -266,6 +303,10 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
     def port_mlp_parameter(self):
         pass
 
+    def transpose_parameter(self):
+        super().transpose_parameter()
+        self.attn1.transpose_parameter()
+
     def port_norm_parameter(self):
         self.norm1.weight = self.module.norm1.weight
         self.norm1.bias = self.module.norm1.bias
@@ -276,6 +317,7 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
 
     def port_all_parameters_to_new_module(self):
         super().port_all_parameters_to_new_module()
+        self.transpose_parameter()
         self.attn1.cat_qkv()
 
     def build_ipex_transformer_config(
@@ -399,25 +441,20 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
 
         if self._chunk_size is not None:
             # "feed_forward_chunk_size" can be used to save memory
-            if norm_hidden_states.shape[self._chunk_dim] % self._chunk_size != 0:
-                raise ValueError(
-                    "`hidden_states` dimension to be chunked: "
-                    f"{norm_hidden_states.shape[self._chunk_dim]} has to be divisible by chunk size: {self._chunk_size}."
-                    f"Make sure to set an appropriate `chunk_size` when calling `unet.enable_forward_chunking`."
-                )
-
-            num_chunks = norm_hidden_states.shape[self._chunk_dim] // self._chunk_size
-            ff_output = torch.cat(
-                [
-                    self.ff(hid_slice, scale=lora_scale)
-                    for hid_slice in norm_hidden_states.chunk(
-                        num_chunks, dim=self._chunk_dim
-                    )
-                ],
-                dim=self._chunk_dim,
+            ff_output = _chunked_feed_forward(
+                self.ff,
+                norm_hidden_states,
+                self._chunk_dim,
+                self._chunk_size,
+                lora_scale=lora_scale,
             )
         else:
             ff_output = self.ff(norm_hidden_states, scale=lora_scale)
+
+        # if self.norm_type == "ada_norm_zero":
+        #     ff_output = gate_mlp.unsqueeze(1) * ff_output
+        # elif self.norm_type == "ada_norm_single":
+        #     ff_output = gate_mlp * ff_output
 
         hidden_states = ff_output + hidden_states
         if hidden_states.ndim == 4:
@@ -437,6 +474,7 @@ class FeedForward(nn.Module):
         dropout (`float`, *optional*, defaults to 0.0): The dropout probability to use.
         activation_fn (`str`, *optional*, defaults to `"geglu"`): Activation function to be used in feed-forward.
         final_dropout (`bool` *optional*, defaults to False): Apply a final dropout.
+        bias (`bool`, defaults to True): Whether to use a bias in the linear layer.
     """
 
     def __init__(
@@ -447,20 +485,23 @@ class FeedForward(nn.Module):
         dropout: float = 0.0,
         activation_fn: str = "geglu",
         final_dropout: bool = False,
+        inner_dim=None,
+        bias: bool = True,
     ):
         super().__init__()
-        inner_dim = int(dim * mult)
+        if inner_dim is None:
+            inner_dim = int(dim * mult)
         dim_out = dim_out if dim_out is not None else dim
         linear_cls = LoRACompatibleLinear
 
         if activation_fn == "gelu":
-            act_fn = GELU(dim, inner_dim)
+            act_fn = GELU(dim, inner_dim, bias=bias)
         if activation_fn == "gelu-approximate":
-            act_fn = GELU(dim, inner_dim, approximate="tanh")
+            act_fn = GELU(dim, inner_dim, approximate="tanh", bias=bias)
         elif activation_fn == "geglu":
-            act_fn = GEGLU(dim, inner_dim)
+            act_fn = GEGLU(dim, inner_dim, bias=bias)
         elif activation_fn == "geglu-approximate":
-            act_fn = ApproximateGELU(dim, inner_dim)
+            act_fn = ApproximateGELU(dim, inner_dim, bias=bias)
 
         self.net = nn.ModuleList([])
         # project in
@@ -468,7 +509,7 @@ class FeedForward(nn.Module):
         # project dropout
         self.net.append(nn.Dropout(dropout))
         # project out
-        self.net.append(linear_cls(inner_dim, dim_out))
+        self.net.append(linear_cls(inner_dim, dim_out, bias=bias))
         # FF as used in Vision Transformer, MLP-Mixer, etc. have a final dropout
         if final_dropout:
             self.net.append(nn.Dropout(dropout))
@@ -476,6 +517,8 @@ class FeedForward(nn.Module):
     def load_parameter(self, net):
         self.net[2].weight = net[2].weight
         self.net[2].bias = net[2].bias
+        self.net[0].proj.weight = net[0].proj.weight
+        self.net[0].proj.bias = net[0].proj.bias
 
         self.net[0].load_parameter(
             self.net[0],
@@ -596,8 +639,6 @@ class GELU(nn.Module):
     def load_parameter(self, net):
         self.proj.weight = net.proj.weight
         self.proj.bias = net.proj.bias
-        print("GELU net.proj.weight", net.proj.weight)
-        print("GELU self.proj.weight", self.proj.weight)
 
     def gelu(self, gate: torch.Tensor) -> torch.Tensor:
         if gate.device.type != "mps":
@@ -620,13 +661,14 @@ class GEGLU(nn.Module):
     Parameters:
         dim_in (`int`): The number of channels in the input.
         dim_out (`int`): The number of channels in the output.
+        bias (`bool`, defaults to True): Whether to use a bias in the linear layer.
     """
 
-    def __init__(self, dim_in: int, dim_out: int):
+    def __init__(self, dim_in: int, dim_out: int, bias: bool = True):
         super().__init__()
         linear_cls = LoRACompatibleLinear
 
-        self.proj = linear_cls(dim_in, dim_out * 2)
+        self.proj = linear_cls(dim_in, dim_out * 2, bias=bias)
 
     def load_parameter(self, net):
         self.proj.weight.data = net.proj.weight.to("xpu").to(torch.float16)
@@ -661,8 +703,6 @@ class ApproximateGELU(nn.Module):
     def load_parameter(self, net):
         self.proj.weight = net.proj.weight
         self.proj.bias = net.proj.bias
-        print("ApproximateGELU net.proj.weight", net.proj.weight)
-        print("ApproximateGELU self.proj.weight", self.proj.weight)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.proj(x)

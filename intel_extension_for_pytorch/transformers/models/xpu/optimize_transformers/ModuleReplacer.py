@@ -118,10 +118,7 @@ class ModuleReplacer:
             ImplementMode.naive if enable_naive_path else ImplementMode.optimized
         )
         for name, child in model.named_children():
-            if (
-                str(type(child))
-                == "<class 'diffusers.models.transformer_2d.Transformer2DModel'>"
-            ):
+            if child.__class__.__name__ == "Transformer2DModel":
                 config = child.config
             if type(child) in self.module_dict.keys():
                 new_module = self.module_dict[type(child)](
