@@ -609,8 +609,8 @@ def optimize_transformers(
 
         if not (well_supported_model or xpu_supported_model):
             warnings.warn(
-                "optimize_transformers supports GPT-J/Llama/OPT/Bloom/Falcon/QWen"
-                " of transformers model without `trust_remote_code=True` in XPU"
+                "optimize_transformers supports GPT-J/Llama/OPT/Bloom/Falcon/QWen/Baichuan"
+                " of transformers model in XPU"
                 " and BasicTransformerBlock of diffusers in XPU"
                 " and Llama/GPT-J/GPT-Neox/Falcon/OPT"
                 " in CPU, fallback to origin model"

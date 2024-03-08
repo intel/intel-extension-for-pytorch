@@ -788,15 +788,22 @@ class IPEXTransformerAttnOptimizedFp16Baichuan(IPEXTransformerAttnOptimizedFp16)
             blocked_attn_mask,
             blocked_alibi,
         ) = self.prepare_sdp_input(query, key, value, attention_mask, alibi)
-        if not self.is_1st_token() and self.is_beam_search():
-            key, value = self.reorder_cache(
-                key_prompt, value_prompt, key, value, self.beam_idx
-            )
 
-        attention_output = torch.nn.functional.scaled_dot_product_attention(
-            query, key, value, attention_mask, dropout, is_casual
+        attention_output, attn_weight = self.compute_sdp(
+            query,
+            key,
+            value,
+            key_prompt,
+            value_prompt,
+            blocked_attn_mask,
+            blocked_alibi,
+            head_mask,
+            alpha,
+            beta,
+            dropout,
+            is_casual,
         )
-        attn_weight = None
+
         attention_output = self.process_sdp_output(attention_output)
         attention_output = attention_output.reshape(
             attention_output.size()[:-2] + (self.head_dim * self.num_attn_head,)
