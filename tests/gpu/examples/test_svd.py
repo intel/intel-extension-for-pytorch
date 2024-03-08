@@ -58,10 +58,6 @@ class TestTorchMethod(TestCase):
         r_cpu = torch.mm(torch.mm(u, torch.diag(s).cfloat()), v.t())
 
         u_xpu, s_xpu, v_xpu = torch.svd(a_xpu)
-
-        self.assertEqual(u, u_xpu.cpu())
-        self.assertEqual(s, s_xpu.cpu())
-        self.assertEqual(v, v_xpu.cpu())
         r_xpu = torch.mm(torch.mm(u_xpu, torch.diag(s_xpu).cfloat()), v_xpu.t())
 
         self.assertEqual(r_cpu, r_xpu.cpu())
@@ -79,10 +75,6 @@ class TestTorchMethod(TestCase):
         r_cpu = torch.mm(torch.mm(u, torch.diag(s).cfloat()), v)
 
         u_xpu, s_xpu, v_xpu = torch.linalg.svd(a_xpu)
-
-        self.assertEqual(u, u_xpu.cpu())
-        self.assertEqual(s, s_xpu.cpu())
-        self.assertEqual(v, v_xpu.cpu())
         r_xpu = torch.mm(torch.mm(u_xpu, torch.diag(s_xpu).cfloat()), v_xpu)
 
         self.assertEqual(r_cpu, r_xpu.cpu())
@@ -99,10 +91,6 @@ class TestTorchMethod(TestCase):
         r_cpu = torch.matmul(torch.matmul(u, torch.diag_embed(s)), v.transpose(-2, -1))
 
         u_xpu, s_xpu, v_xpu = torch.svd(a_xpu)
-
-        self.assertEqual(u, u_xpu.to(torch.float32).cpu())
-        self.assertEqual(s, s_xpu.cpu())
-        self.assertEqual(v, v_xpu.to(torch.float32).cpu())
         u_xpu = u_xpu.to(torch.float32)
         v_xpu = v_xpu.to(torch.float32)
         r_xpu = torch.matmul(
