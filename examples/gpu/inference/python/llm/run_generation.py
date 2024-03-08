@@ -106,6 +106,7 @@ parser.add_argument(
     type=str,
     help="tasks list for accuracy validation, only enabled lambada_standard and lambada_standard at present",
 )
+parser.add_argument("--acc-iter", default=-1, type=int)
 args = parser.parse_args()
 print(args)
 
@@ -318,10 +319,17 @@ def run_accuracy():
         dtype=args.dtype,
     )
 
-    results = evaluator.evaluate(
-        hfmodel,
-        task_dict,
-    )
+    if args.acc_iter == -1:
+        results = evaluator.evaluate(
+            hfmodel,
+            task_dict,
+        )
+    else:
+        results = evaluator.evaluate(
+            hfmodel,
+            task_dict,
+            limit=args.acc_iter
+        )
 
     print(evaluator.make_table(results))
 
