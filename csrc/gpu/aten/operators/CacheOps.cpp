@@ -217,14 +217,14 @@ void copy_blocks(
       });
 }
 
-template <typename scalar_t>
+template <typename scalar_t, typename slot_type>
 struct ReshapeAndCache {
   ReshapeAndCache(
       const scalar_t* key,
       const scalar_t* value,
       scalar_t* key_cache,
       scalar_t* value_cache,
-      const int64_t* slot_mapping,
+      const slot_type* slot_mapping,
       int num_tokens,
       int key_stride,
       int value_stride,
@@ -279,7 +279,7 @@ struct ReshapeAndCache {
   const scalar_t* value_;
   scalar_t* key_cache_;
   scalar_t* value_cache_;
-  const int64_t* slot_mapping_;
+  const slot_type* slot_mapping_;
   int num_tokens_;
   int key_stride_;
   int value_stride_;
@@ -289,13 +289,13 @@ struct ReshapeAndCache {
   int x_;
 };
 
-template <typename scalar_t>
+template <typename scalar_t, typename slot_type>
 void dpcpp_reshape_and_cache_kernel(
     const scalar_t* key,
     const scalar_t* value,
     scalar_t* key_cache,
     scalar_t* value_cache,
-    const int64_t* slot_mapping,
+    const slot_type* slot_mapping,
     int num_tokens,
     int key_stride,
     int value_stride,
@@ -308,7 +308,7 @@ void dpcpp_reshape_and_cache_kernel(
   int max_wg_size = dpcppMaxWorkGroupSize(dev_id);
   int wg = std::min(max_wg_size, int(num_head * head_size));
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = ReshapeAndCache<scalar_t>(
+    auto kfn = ReshapeAndCache<scalar_t, slot_type>(
         key,
         value,
         key_cache,
@@ -346,20 +346,36 @@ void reshape_and_cache(
   int key_stride = key.stride(0);
   int value_stride = value.stride(0);
   IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::kHalf, at::kBFloat16, key.scalar_type(), "reshape_and_cache", [&] {
-        dpcpp_reshape_and_cache_kernel(
-            key.data_ptr<scalar_t>(),
-            value.data_ptr<scalar_t>(),
-            key_cache.data_ptr<scalar_t>(),
-            value_cache.data_ptr<scalar_t>(),
-            slot_map.data_ptr<int64_t>(),
-            num_tokens,
-            key_stride,
-            value_stride,
-            num_heads,
-            head_size,
-            block_size,
-            x);
+      at::kHalf, at::kBFloat16, key.scalar_type(), "reshape_and_cache", 
+      [&] {
+        if (slot_map.scalar_type() == at::kLong)
+          dpcpp_reshape_and_cache_kernel(
+              key.data_ptr<scalar_t>(),
+              value.data_ptr<scalar_t>(),
+              key_cache.data_ptr<scalar_t>(),
+              value_cache.data_ptr<scalar_t>(),
+              slot_map.data_ptr<int64_t>(),
+              num_tokens,
+              key_stride,
+              value_stride,
+              num_heads,
+              head_size,
+              block_size,
+              x);
+        else
+          dpcpp_reshape_and_cache_kernel(
+              key.data_ptr<scalar_t>(),
+              value.data_ptr<scalar_t>(),
+              key_cache.data_ptr<scalar_t>(),
+              value_cache.data_ptr<scalar_t>(),
+              slot_map.data_ptr<int32_t>(),
+              num_tokens,
+              key_stride,
+              value_stride,
+              num_heads,
+              head_size,
+              block_size,
+              x);
       });
 }
 

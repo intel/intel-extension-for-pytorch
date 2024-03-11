@@ -164,9 +164,11 @@ def test_reshape_and_cache(
     cloned_value_cache_1 = value_cache.clone()
 
     # Call the reshape_and_cache kernel.
-    # torch.xpu.reshape_and_cache(key, value, key_cache, value_cache, slot_mapping)
     ipex.llm.modules.PagedAttention.reshape_and_cache(
         key, value, cloned_key_cache_1, cloned_value_cache_1, slot_mapping
+    )
+    ipex.llm.modules.PagedAttention.reshape_and_cache(
+        key, value, key_cache, value_cache, slot_mapping.to(torch.int32)
     )
 
     # Run the reference implementation.
@@ -181,8 +183,8 @@ def test_reshape_and_cache(
         cloned_key_cache[block_idx, :, :, block_offset, :] = reshaped_key[i]
         cloned_value_cache[block_idx, :, :, block_offset] = value[i]
 
-    # assert torch.allclose(key_cache, cloned_key_cache, atol=1e-2, rtol=1e-2)
-    # assert torch.allclose(value_cache, cloned_value_cache, atol=1e-2, rtol=1e-2)
+    assert torch.allclose(key_cache, cloned_key_cache, atol=1e-2, rtol=1e-2)
+    assert torch.allclose(value_cache, cloned_value_cache, atol=1e-2, rtol=1e-2)
     assert torch.allclose(cloned_key_cache_1, cloned_key_cache, atol=1e-2, rtol=1e-2)
     assert torch.allclose(
         cloned_value_cache_1, cloned_value_cache, atol=1e-2, rtol=1e-2
