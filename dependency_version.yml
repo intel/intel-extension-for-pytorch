@@ -8,9 +8,9 @@
 #   branch:      Branch name of the Github repository. For human understanding only.
 
 deepspeed:
-  commit: v0.13.5
+  commit: v0.14.0
   repo: https://github.com/microsoft/DeepSpeed.git
-  version: 0.13.5
+  version: 0.14.0
 gcc:
   max-version: null
   min-version: 12.3.0
@@ -28,14 +28,14 @@ oneCCL:
 protobuf:
   version: 3.20.3
 pytorch:
-  version: 2.3.0.dev20240307+cpu
+  version: 2.3.0.dev20240308+cpu
 torch-ccl:
   commit: ccl_torch_dev_0131
   repo: https://github.com/intel/torch-ccl.git
   version: 2.3.0+cpu
 torchaudio:
-  version: 2.2.0.dev20240307+cpu
+  version: 2.2.0.dev20240308+cpu
 torchvision:
-  version: 0.18.0.dev20240307+cpu
+  version: 0.18.0.dev20240308+cpu
 transformers:
   version: 4.38.1
