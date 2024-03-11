@@ -80,3 +80,4 @@ supported:
  - normal_
 #  - _pin_memory # not supported now in torch 2.1
  - _fused_sdp_choice
+ - bmm
