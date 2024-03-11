@@ -10,8 +10,7 @@ from transformers.modeling_outputs import (
     BaseModelOutput,
 )
 
-from transformers.utils import logging
-import warnings
+from ....utils._logger import logger, WarningType
 import transformers
 
 try:
@@ -29,7 +28,14 @@ try:
     )
 except ImportError:
     pass
-logger = logging.get_logger(__name__)
+
+# https://github.com/huggingface/transformers/blob/b647acdb53d251cec126b79e505bac11821d7c93/src/transformers/models/t5/modeling_t5.py#L1336  # noqa: B950
+__HEAD_MASK_WARNING_MSG = """
+The input argument `head_mask` was split into two arguments `head_mask` and `decoder_head_mask`. Currently,
+`decoder_head_mask` is set to copy `head_mask`, but this feature is deprecated and will be removed in future versions.
+If you do not want to use any `decoder_head_mask` now, please set `decoder_head_mask = torch.ones(num_layers,
+num_heads)`.
+"""
 
 
 def GPTJForCausalLM_forward(
@@ -176,7 +182,8 @@ def LlamaModel_forward(
     if self.gradient_checkpointing and self.training:
         if use_cache:
             logger.warning_once(
-                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`...",
+                _type=WarningType.WrongArgument,
             )
             use_cache = False
 
@@ -440,10 +447,10 @@ def BloomForCausalLM_forward(
         are ignored (masked), the loss is only computed for labels in `[0, ..., config.vocab_size]`
     """
     if deprecated_arguments.pop("position_ids", False) is not False:
-        warnings.warn(
+        logger.warning(
             "`position_ids` have no functionality in BLOOM and will be removed in v5.0.0. You can safely ignore"
             " passing `position_ids`.",
-            FutureWarning,
+            _type=WarningType.DeprecatedArgument,
         )
     if len(deprecated_arguments) > 0:
         raise ValueError(f"Got unexpected arguments: {deprecated_arguments}")
@@ -725,7 +732,8 @@ def BaichuanModel_forward(
     if self.gradient_checkpointing and self.training:
         if use_cache:
             logger.warning_once(
-                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`...",
+                _type=WarningType.WrongArgument,
             )
             use_cache = False
 
@@ -951,7 +959,8 @@ def GLMTransformer_forward(
     if self.gradient_checkpointing and self.training:
         if use_cache:
             logger.warning_once(
-                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`...",
+                _type=WarningType.WrongArgument,
             )
             use_cache = False
 
@@ -1344,7 +1353,9 @@ def T5ForConditionalGeneration_forward(
     # FutureWarning: head_mask was separated into two input args - head_mask, decoder_head_mask
     if head_mask is not None and decoder_head_mask is None:
         if self.config.num_layers == self.config.num_decoder_layers:
-            warnings.warn(__HEAD_MASK_WARNING_MSG, FutureWarning)
+            logger.warning(
+                __HEAD_MASK_WARNING_MSG, _type=WarningType.DeprecatedArgument
+            )
             decoder_head_mask = head_mask
 
     # Encode if needed (training, first prediction pass)
@@ -1566,7 +1577,8 @@ def MistralModel_forward(
     if self.gradient_checkpointing and self.training:
         if use_cache:
             logger.warning_once(
-                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`...",
+                _type=WarningType.WrongArgument,
             )
             use_cache = False
 
@@ -1888,7 +1900,8 @@ def MixtralModel_forward(
     if self.gradient_checkpointing and self.training:
         if use_cache:
             logger.warning_once(
-                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`...",
+                _type=WarningType.WrongArgument,
             )
             use_cache = False
 
@@ -2073,7 +2086,8 @@ def StableLMEpochModel_forward(
     if self.gradient_checkpointing and self.training:
         if use_cache:
             logger.warning_once(
-                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`...",
+                _type=WarningType.WrongArgument,
             )
             use_cache = False
 
@@ -2303,7 +2317,8 @@ def QWenModel_forward(
     if self.gradient_checkpointing and self.training:
         if use_cache:
             logger.warning_once(
-                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`...",
+                _type=WarningType.WrongArgument,
             )
             use_cache = False
 
@@ -2444,7 +2459,8 @@ def GitEncoder_forward(
     if self.gradient_checkpointing and self.training:
         if use_cache:
             logger.warning_once(
-                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`...",
+                _type=WarningType.WrongArgument,
             )
             use_cache = False
 

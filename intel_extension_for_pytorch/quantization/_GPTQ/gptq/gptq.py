@@ -1,4 +1,4 @@
-import logging
+from ....utils._logger import logger, WarningType
 import math
 import random
 import re
@@ -14,10 +14,6 @@ from .model_utils import (
     move_input_to_device,
     quantize,
 )
-
-format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-logging.basicConfig(level=logging.INFO, format=format_str)
-logger = logging.getLogger(__name__)
 
 DEBUG = False
 
@@ -100,19 +96,15 @@ class GPTQuantizer(object):
         else:
             # general selection, no padding, not GPTQ original implementation.
             self.obtain_first_n_samples()
-        try:
-            self.cache_key_arguments = {
-                "i": 0
-            }  # a dict of list, keyword arguments ("attention_masks", "position_ids", etc.)
-            # Note that the first elements in cache_positional_arguments is main input: hidden_states
-            if self.cache_positional_arguments is None:
-                self.cache_positional_arguments = (
-                    []
-                )  # a list of list, positional arguments ("rotary_pos_emb" in chatglm)
-            self.is_ready = True
-        except Exception:
-            logger.warning("GPTQ Quantizer initialization failed!")
-            pass
+        self.cache_key_arguments = {
+            "i": 0
+        }  # a dict of list, keyword arguments ("attention_masks", "position_ids", etc.)
+        # Note that the first elements in cache_positional_arguments is main input: hidden_states
+        if self.cache_positional_arguments is None:
+            self.cache_positional_arguments = (
+                []
+            )  # a list of list, positional arguments ("rotary_pos_emb" in chatglm)
+        self.is_ready = True
 
     def obtain_first_n_samples(self, seed=0):
         """Get first nsample data as the real calibration dataset."""
@@ -142,7 +134,8 @@ class GPTQuantizer(object):
                     length = batch["input_ids"].shape[-1]
                 except Exception:
                     logger.warning(
-                        "Please make sure your dict'like data contains key of 'input_ids'."
+                        "Please make sure your dict'like data contains key of 'input_ids'.",
+                        _type=WarningType.WrongArgument,
                     )
                     continue
                 batch_final = {}
@@ -170,7 +163,8 @@ class GPTQuantizer(object):
             self.dataloader.append(batch_final)
         if len(self.dataloader) < self.nsamples:
             logger.warning(
-                f"Try to use {self.nsamples} data, but entire dataset size is {len(self.dataloader)}."
+                f"Try to use {self.nsamples} data, but entire dataset size is {len(self.dataloader)}.",
+                _type=WarningType.WrongArgument,
             )
 
     def obtain_first_n_samples_fulllength(self, seed=0):
@@ -203,7 +197,8 @@ class GPTQuantizer(object):
                     length = batch["input_ids"].shape[-1]
                 except Exception:
                     logger.warning(
-                        "Please make sure your dict'like data contains key of 'input_ids'."
+                        "Please make sure your dict'like data contains key of 'input_ids'.",
+                        _type=WarningType.WrongArgument,
                     )
                     continue
                 batch_final = {}
@@ -237,8 +232,9 @@ class GPTQuantizer(object):
             self.dataloader.append(batch_final)
         if len(self.dataloader) < self.nsamples:  # pragma: no cover
             logger.warning(
-                f"Trying to allocate {self.nsamples} data with fixed length {unified_length}, \
-            but only {len(self.dataloader)} samples are found. Please use smaller 'self.pad_max_length' value."
+                f"Trying to allocate {self.nsamples} data with fixed length {unified_length},"
+                + f"but only {len(self.dataloader)} samples are found. Please use smaller 'self.pad_max_length' value.",
+                _type=WarningType.WrongArgument,
             )
 
     def get_full_layer_name(self, sub_layer_name, block_idx):

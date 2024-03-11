@@ -9,7 +9,7 @@ import importlib
 import os
 import shutil
 import typing
-import warnings
+from ..utils._logger import logger, WarningType
 from typing import Dict, Optional, Union
 from transformers.dynamic_module_utils import (
     check_imports,
@@ -23,11 +23,8 @@ from transformers.utils import (
     cached_file,
     extract_commit_hash,
     is_offline_mode,
-    logging,
     try_to_load_from_cache,
 )
-
-logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
 def _get_relative_imports(module_file):
@@ -181,9 +178,9 @@ def _get_cached_module_file(
     """
     use_auth_token = deprecated_kwargs.pop("use_auth_token", None)
     if use_auth_token is not None:
-        warnings.warn(
+        logger.warning(
             "The `use_auth_token` argument is deprecated and will be removed in v5 of Transformers. Please use `token` instead.",
-            FutureWarning,
+            _type=WarningType.DeprecatedArgument,
         )
         if token is not None:
             raise ValueError(
@@ -299,8 +296,8 @@ def _get_cached_module_file(
         url = f"https://huggingface.co/{repo_type_str}{pretrained_model_name_or_path}"
         logger.warning(
             f"A new version of the following files was downloaded from {url}:\n{new_files}"
-            "\n. Make sure to double-check they do not contain any added malicious code. To avoid downloading new "
-            "versions of the code file, you can pin a revision."
+            + "\n. Make sure to double-check they do not contain any added malicious code. To avoid downloading new "
+            + "versions of the code file, you can pin a revision."
         )
 
     return os.path.join(full_submodule, module_file)
@@ -396,9 +393,9 @@ def _get_class_from_dynamic_module(
     ```"""
     use_auth_token = kwargs.pop("use_auth_token", None)
     if use_auth_token is not None:
-        warnings.warn(
+        logger.warning(
             "The `use_auth_token` argument is deprecated and will be removed in v5 of Transformers. Please use `token` instead.",
-            FutureWarning,
+            _type=WarningType.DeprecatedArgument,
         )
         if token is not None:
             raise ValueError(

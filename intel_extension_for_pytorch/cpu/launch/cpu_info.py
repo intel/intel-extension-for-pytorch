@@ -3,6 +3,7 @@ import os
 import platform
 import re
 import subprocess
+from ...utils._logger import WarningType
 
 # lscpu Examples
 # # The following is the parsable format, which can be fed to other
@@ -206,7 +207,7 @@ class CPUPoolList:
                     if c.maxmhz in e_core_mhzs:
                         c.is_p_core = False
 
-    def verbose(self, level, msg):
+    def verbose(self, level, msg, warning_type=None):
         if self.logger:
             logging_fn = {
                 "warning": self.logger.warning,
@@ -215,7 +216,7 @@ class CPUPoolList:
             assert (
                 level in logging_fn.keys()
             ), f"Unrecognized logging level {level} is detected. Available levels are {logging_fn.keys()}."
-            logging_fn[level](msg)
+            logging_fn[level](msg, _type=warning_type)
         else:
             print(msg)
 
@@ -264,12 +265,18 @@ class CPUPoolList:
             if use_logical_cores:
                 self.verbose(
                     "warning",
-                    "Argument --use-logical-cores won't take effect when --cores-list is set.",
+                    "Argument --use-logical-cores won't take effect when --cores-list is set."
+                    + "please see https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/performance_tuning/launch_script.html#launch-script-usage-guide"  # noqa: B950
+                    + "for usage guide",
+                    warning_type=WarningType.AmbiguousArgument,
                 )
             if use_e_cores:
                 self.verbose(
                     "warning",
                     "Argument --use-e-cores won't take effect when --cores-list is set.",
+                    +"please see https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/performance_tuning/launch_script.html#launch-script-usage-guide"  # noqa: B950
+                    + "for usage guide",
+                    warning_type=WarningType.AmbiguousArgument,
                 )
             pool = [c for c in self.pool_all if c.cpu in cores_list]
             nodes = list(set([c.node for c in pool]))
@@ -284,6 +291,9 @@ class CPUPoolList:
                         self.verbose(
                             "warning",
                             "Argument --skip-cross-node-cores cannot take effect on the designated cores. Disabled.",
+                            +"please see https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/performance_tuning/launch_script.html#launch-script-usage-guide"  # noqa: B950
+                            + "for usage guide",
+                            warning_type=WarningType.WrongArgument,
                         )
                         break
         else:
@@ -302,7 +312,7 @@ class CPUPoolList:
                 e_cores = [c.cpu for c in pool if not c.is_p_core]
                 if len(e_cores) > 0:
                     self.verbose(
-                        "warning",
+                        "info",
                         f"Efficient-Cores are detected ({e_cores}). Disabled for performance consideration. \
                             You can enable them with argument --use-e-cores.",
                     )
@@ -348,8 +358,11 @@ class CPUPoolList:
             if skip_cross_node_cores:
                 self.verbose(
                     "warning",
-                    "Argument --skip-cross-node-cores won't take effect when both --ninstances and \
-                        --ncores-per-instance are explicitly set.",
+                    "Argument --skip-cross-node-cores won't take effect when both --ninstances and"
+                    + " --ncores-per-instance are explicitly set."
+                    + "please see https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/performance_tuning/launch_script.html#launch-script-usage-guide"  # noqa: B950
+                    + "for usage guide",
+                    warning_type=WarningType.AmbiguousArgument,
                 )
         assert (
             ninstances * ncores_per_instance > 0

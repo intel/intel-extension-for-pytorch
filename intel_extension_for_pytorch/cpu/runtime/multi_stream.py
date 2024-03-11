@@ -5,7 +5,7 @@ import intel_extension_for_pytorch._C as core
 from .cpupool import CPUPool
 from .task import Task
 import copy
-import warnings
+from ...utils._logger import logger, WarningType
 
 
 class MultiStreamModuleHint(object):
@@ -103,9 +103,10 @@ class MultiStreamModule(nn.Module):
             type(cpu_pool) is CPUPool
         ), "Input of cpu_pool must be provided with type of ipex.cpu.runtime.CPUPool"
         if not isinstance(model, torch.jit.ScriptModule):
-            warnings.warn(
+            logger.warning(
                 "Creating MultiStreamModule on an nn.Module. This can be slow due "
-                "to Python Global Interpreter Lock (GIL). Suggest to use JIT ScriptModule for better performance."
+                + "to Python Global Interpreter Lock (GIL). Suggest to use JIT ScriptModule for better performance.",
+                _type=WarningType.WrongArgument,
             )
         self.cpu_pool = cpu_pool
         self.core_list = cpu_pool.core_ids
@@ -127,10 +128,9 @@ class MultiStreamModule(nn.Module):
 
         if self.num_streams > self.core_list.__len__():
             self.num_streams = self.core_list.__len__()
-            warnings.warn(
-                "The number of streams is larger than number of cores. The number of streams changes to {}.".format(
-                    self.num_streams
-                )
+            logger.warning(
+                f"The number of streams is larger than number of cores. The number of streams changes to {self.num_streams}.",
+                _type=WarningType.WrongArgument,
             )
 
         if self.num_streams == 1:
@@ -502,7 +502,7 @@ class MultiStreamModule(nn.Module):
             results_raw_future.append(
                 self.tasks[stream_id](
                     *(self.args_streams_input[stream_id]),
-                    **(self.kwargs_streams_input[stream_id])
+                    **(self.kwargs_streams_input[stream_id]),
                 )
             )
 
@@ -563,10 +563,9 @@ class _MultiStreamBenchmarkModule(nn.Module):
 
         if self.num_streams > self.core_list.__len__():
             self.num_streams = self.core_list.__len__()
-            warnings.warn(
-                "The number of streams is larger than number of cores. The number of streams changes to {}.".format(
-                    self.num_streams
-                )
+            logger.warning(
+                f"The number of streams is larger than number of cores. The number of streams changes to {self.num_streams}.",
+                _type=WarningType.WrongArgument,
             )
 
         if self.num_streams == 1:

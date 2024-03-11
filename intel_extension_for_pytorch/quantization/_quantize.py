@@ -1,6 +1,6 @@
 import copy
 import functools
-import warnings
+from ..utils._logger import logger, WarningType
 
 import torch
 from torch.ao.quantization import PlaceholderObserver, QConfig, QConfigMapping
@@ -59,11 +59,12 @@ def prepare(
         configure, QConfig
     ), f"IPEX quantization: prepare configure should be an instance of QConfigMapping or QConfig, but got {type(configure)}"
     if isinstance(configure, QConfig):
-        warnings.warn(
+        logger.warning(
             "\nIPEX quantization: QConfig are deprecated. Please use QConfigMapping instead.\nUsage:"
-            "\n    qconfig_mapping = ipex.quantization.default_static_qconfig_mapping # for static quantization"
-            "\n    qconfig_mapping = ipex.quantization.default_dynamic_qconfig_mapping # for dynamic quantization"
-            "\n    prepared_model = ipex.quantization.prepare(model_fp32, qconfig_mapping, ...)"
+            + "\n    qconfig_mapping = ipex.quantization.default_static_qconfig_mapping # for static quantization"
+            + "\n    qconfig_mapping = ipex.quantization.default_dynamic_qconfig_mapping # for dynamic quantization"
+            + "\n    prepared_model = ipex.quantization.prepare(model_fp32, qconfig_mapping, ...)",
+            _type=WarningType.AmbiguousArgument,
         )
     if isinstance(configure, QConfigMapping):
         configure = configure.global_qconfig
@@ -94,7 +95,10 @@ def prepare(
             prepare_model = optimization.fuse(prepare_model, inplace=inplace)
             prepare_model = linear_bn_fuse(prepare_model, inplace=inplace)
         except BaseException:
-            warnings.warn("BatchNorm folding failed during the prepare process.")
+            logger.warning(
+                "BatchNorm folding failed during the prepare process.",
+                _type=WarningType.NotSupported,
+            )
 
     # replace dropout with identity to enable more fusion pattern.
     nn.utils._model_convert.replace_dropout_with_identity(prepare_model)

@@ -1,6 +1,6 @@
 import torch
 import torch.distributed as dist
-import warnings
+from ...utils._logger import logger, WarningType
 from typing import Optional, Tuple, Union, List
 from transformers.generation.stopping_criteria import (
     StoppingCriteriaList,
@@ -62,10 +62,10 @@ def _greedy_search(
         stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
     )
     if max_length is not None:
-        warnings.warn(
+        logger.warning(
             "`max_length` is deprecated in this function, use"
             " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead.",
-            UserWarning,
+            _type=WarningType.DeprecatedArgument,
         )
         stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
     pad_token_id = (

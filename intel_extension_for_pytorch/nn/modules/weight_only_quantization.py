@@ -11,6 +11,7 @@ from intel_extension_for_pytorch.quantization import (
     quantize_per_block,
     WoqWeightDtype,
 )
+from ...utils._logger import logger, WarningType
 
 
 class WeightOnlyQuantizedLinear(nn.Module):
@@ -97,9 +98,10 @@ class WeightOnlyQuantizedLinear(nn.Module):
             # Fall back to lowp_mode=2 in such case
             # TODO(Weiwen) Support lowp_mode=3
             lowp_mode = 2
-            print(
+            logger.warning(
                 "Warning: lowp_mode=3(INT8) is not supported yet for INT8 weight. "
-                "Falling back to 2(BF16)."
+                + "Falling back to 2(BF16).",
+                _type=WarningType.NotSupported,
             )
         act_quant_mode = qconfig.act_quant_mode
         dtype = qconfig.weight_dtype

@@ -5,7 +5,7 @@ from .lazy_init import _lazy_init, _lazy_call
 
 import contextlib
 from typing import Generator
-import warnings
+from ..utils._logger import logger, WarningType
 
 __all__ = [
     "get_rng_state",
@@ -215,7 +215,7 @@ def fork_rng(
     if devices is None:
         num_devices = torch.xpu.device_count()
         if num_devices > 1 and not _fork_rng_warned_already:
-            warnings.warn(
+            logger.warning(
                 (
                     "XPU reports that you have {num_devices} available devices, and you "
                     "have used {caller} without explicitly specifying which devices are being used. "
@@ -230,7 +230,8 @@ def fork_rng(
                     "to `range(torch.xpu.device_count())`."
                 ).format(
                     num_devices=num_devices, caller=_caller, devices_kw=_devices_kw
-                )
+                ),
+                _type=WarningType.AmbiguousArgument,
             )
             _fork_rng_warned_already = True
         devices = list(range(num_devices))

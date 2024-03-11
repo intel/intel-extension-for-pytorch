@@ -4,6 +4,7 @@ import subprocess
 import os
 import psutil
 from .launcher_base import Launcher
+from ...utils._logger import WarningType
 
 
 class DistributedTrainingLauncher(Launcher):
@@ -107,7 +108,10 @@ class DistributedTrainingLauncher(Launcher):
             ):
                 self.verbose(
                     "warning",
-                    "Argument --logical-cores-for-ccl is set but no enough logical cores are available. Disable this argument.",
+                    "Argument --logical-cores-for-ccl is set but no enough logical cores are available. Disable this argument."
+                    + "please see https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/performance_tuning/launch_script.html#launch-script-usage-guide"  # noqa: B950
+                    + "for usage guide",
+                    warning_type=WarningType.WrongArgument,
                 )
                 logical_cores_for_ccl = False
                 break
@@ -296,6 +300,7 @@ class DistributedTrainingLauncher(Launcher):
                         self.verbose(
                             "warning",
                             f'Failed to detect rank id from log file {log_name} at line "{line.strip()}".',
+                            warning_type=WarningType.NotSupported,
                         )
             for fn in log_fns:
                 fn.close()

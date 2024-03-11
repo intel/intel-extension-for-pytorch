@@ -1,7 +1,7 @@
 import sys
 import argparse
-import warnings
 from functools import partial
+from .utils._logger import logger, WarningType
 
 from .cpu.launch import (
     init_parser as cpu_init_parser,
@@ -99,10 +99,11 @@ def main():
         and sys.argv[1] != "cpu"
         and sys.argv[1] != "xpu"
     ):
-        warnings.warn(
-            "Backend is not specified, it will automatically default to cpu.",
-            UserWarning,
+        msg = (
+            "Backend is not specified, it will automatically default to cpu."
+            + "Please start with ipexrun <cpu or xpu> python_script args"
         )
+        logger.warning(msg, _type=WarningType.MissingArgument)
         sys.argv.insert(1, "cpu")
     args = parser.parse_args()
     if args.backend == "cpu":

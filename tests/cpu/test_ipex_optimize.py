@@ -323,10 +323,12 @@ class TestOptimizeCases(TestCase):
                 return self.conv(x)
 
         model = Conv().double()
-        with self.assertWarnsRegex(
-            UserWarning, "WARNING: Can't convert model's parameters dtype"
-        ):
+        with self.assertLogs("IPEX", level="WARNING") as cm:
             optimized_model = ipex.optimize(model.eval(), dtype=torch.bfloat16)
+        expected_msg = [
+            "WARNING:IPEX:[NotSupported]Can't convert model's parameters dtype from torch.float64 to torch.bfloat16"
+        ]
+        self.assertEqual(cm.output, expected_msg)
 
     def test_optimize_bf16_upsupported(self):
         class Conv(torch.nn.Module):

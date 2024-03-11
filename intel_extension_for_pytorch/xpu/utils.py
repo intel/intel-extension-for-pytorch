@@ -2,7 +2,7 @@
 import torch
 from .. import _C
 from enum import Enum
-import warnings
+from ..utils._logger import logger, WarningType
 from .. import frontend
 import intel_extension_for_pytorch  # noqa
 
@@ -30,7 +30,10 @@ def from_usm(src, dtype, shape, stride=None, device_id: int = -1) -> torch.Tenso
     Warning: This is decrepated. Please use torch.from_dlpack instead.
     """
 
-    warnings.warn("from_usm is decrepated. Please use torch.from_dlpack instead.")
+    logger.warning(
+        "from_usm is decrepated. Please use torch.from_dlpack instead.",
+        _type=WarningType.DeprecatedArgument,
+    )
     return _C._from_usm(src, dtype, shape, stride, device_id)
 
 
@@ -46,7 +49,10 @@ def to_usm(src: torch.Tensor):
     Warning: This is decrepated. Please use torch.to_dlpack instead.
     """
 
-    warnings.warn("to_usm is decrepated. Please use torch.to_dlpack instead.")
+    logger.warning(
+        "to_usm is decrepated. Please use torch.to_dlpack instead.",
+        _type=WarningType.DeprecatedArgument,
+    )
     return _C._to_usm(src)
 
 

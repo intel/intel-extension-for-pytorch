@@ -2,9 +2,8 @@ import torch
 from torch._subclasses import FakeTensor
 from torch.utils._mode_utils import no_dispatch
 import builtins
-import warnings
 from typing import Callable, Dict, Optional, Union, List
-
+from ..utils._logger import logger, WarningType
 
 _compiler_backend = "inductor"
 
@@ -66,7 +65,10 @@ def compile(
                     traced_model = torch.jit.freeze(traced_model)
                 return traced_model
         except Exception:
-            warnings.warn("JIT trace failed during the IPEX compile process.")
+            logger.warning(
+                "JIT trace failed during the IPEX compile process.",
+                _type=WarningType.NotSupported,
+            )
             return model
     else:
         raise RuntimeError(

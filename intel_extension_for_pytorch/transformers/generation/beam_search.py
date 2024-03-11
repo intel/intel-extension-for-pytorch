@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import torch.distributed as dist
-import warnings
+from ...utils._logger import logger, WarningType
 from typing import Optional, Tuple, Union, List
 from transformers.generation.stopping_criteria import (
     StoppingCriteriaList,
@@ -65,16 +65,16 @@ def _beam_search(
         stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
     )
     if max_length is not None:
-        warnings.warn(
+        logger.warning(
             "`max_length` is deprecated in this function, use"
             " `stopping_criteria=StoppingCriteriaList(MaxLengthCriteria(max_length=max_length))` instead.",
-            UserWarning,
+            _type=WarningType.DeprecatedArgument,
         )
         stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
     if len(stopping_criteria) == 0:
-        warnings.warn(
-            "You don't have defined any stopping_criteria, this will likely loop forever",
-            UserWarning,
+        logger.warning(
+            "You have not defined any stopping_criteria, this will likely loop forever",
+            _type=WarningType.WrongArgument,
         )
     pad_token_id = (
         pad_token_id

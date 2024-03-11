@@ -1,6 +1,6 @@
 import torch
 import copy
-import warnings
+from ..utils._logger import logger, WarningType
 import pkg_resources
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
     _enable_tpp,
@@ -1017,8 +1017,9 @@ def optimize(
     if isinstance(model, torch.jit.ScriptModule):
         return model
     if model.training or optimizer is not None:
-        warnings.warn(
-            "fail to apply ipex.llm.optimize, this API supports inference for now, fallback to default path"
+        logger.warning(
+            "fail to apply ipex.llm.optimize, this API supports inference for now, fallback to default path",
+            _type=WarningType.NotSupported,
         )
         return model, optimizer
 
@@ -1046,12 +1047,14 @@ def optimize(
                 )
             )
         if version.parse(trans_version) > version.parse(validated_version):
-            warnings.warn(
-                f"The transformers version is {trans_version}, bigger than validated {validated_version}, may have risks"
+            logger.warning(
+                f"The transformers version is {trans_version}, bigger than validated {validated_version}, may have risks",
+                _type=WarningType.MissingDependency,
             )
         if not hasattr(model, "config"):
-            warnings.warn(
-                "Can not check transformers model config to detect its model family, fallback to origin model"
+            logger.warning(
+                "Can not check transformers model config to detect its model family, fallback to origin model",
+                _type=WarningType.NotSupported,
             )
             return model
 
@@ -1076,9 +1079,10 @@ def optimize(
             "GitForCausalLM",
         ]
         if not well_supported_model:
-            warnings.warn(
+            logger.warning(
                 "ipex.llm.optimize supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, Baichuan, ChatGLM, "
-                + "GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, and Git, fallback to origin model"
+                + "GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, and Git, fallback to origin model",
+                _type=WarningType.NotSupported,
             )
             return model
 
@@ -1202,8 +1206,9 @@ def optimize(
         return _model
 
     except RuntimeError as e:
-        warnings.warn(
-            f"fail to apply ipex.llm.optimize due to: {e}, fallback to the origin model"
+        logger.warning(
+            f"fail to apply ipex.llm.optimize due to: {e}, fallback to the origin model",
+            _type=WarningType.NotSupported,
         )
         return model
 
@@ -1222,8 +1227,9 @@ def optimize_transformers(
     sample_inputs=None,
     deployment_mode=True,
 ):
-    warnings.warn(
-        "ipex.optimize_transformers API is going to be deprecated, please use ipex.llm.optimize instead."
+    logger.warning(
+        "ipex.optimize_transformers API is going to be deprecated, please use ipex.llm.optimize instead.",
+        _type=WarningType.DeprecatedArgument,
     )
     return optimize(
         model=model,

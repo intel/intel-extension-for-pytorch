@@ -2,7 +2,7 @@
 import re
 
 import torch
-import warnings
+
 
 try:
     import torchvision
@@ -128,12 +128,14 @@ from . import fx
 from . import _dynamo
 from . import _meta_registrations
 from ._init_on_device import OnDevice
+from .utils._logger import logger, WarningType
 
 try:
     from .cpu import tpp
 except BaseException:
-    warnings.warn(
-        "Please install transformers repo when you want to use fast_bert API."
+    logger.warn(
+        "Please install transformers repo when you want to use fast_bert API.",
+        _type=WarningType.MissingArgument,
     )
 
 from .frontend import optimize

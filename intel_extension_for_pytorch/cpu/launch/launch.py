@@ -8,6 +8,7 @@ from datetime import datetime
 import intel_extension_for_pytorch.cpu.auto_ipex as auto_ipex
 from .launcher_distributed import DistributedTrainingLauncher
 from .launcher_multi_instances import MultiInstancesLauncher
+from ...utils._logger import logger, WarningType
 
 """
 This is a script for launching PyTorch training and inference on Intel Xeon CPU with optimal configurations.
@@ -220,53 +221,72 @@ def add_deprecated_params(parser):
 
 def process_deprecated_params(args, logger):
     if args.nproc_per_node != -1:
-        logger.warning("Argument --nproc_per_node is deprecated by --nprocs-per-node.")
+        logger.warning(
+            "Argument --nproc_per_node is deprecated by --nprocs-per-node.",
+            _type=WarningType.DeprecatedArgument,
+        )
         args.nprocs_per_node = args.nproc_per_node
     if args.more_mpi_params != "":
         logger.warning(
-            "Argument --more_mpi_params is deprecated by --extra-mpi-params."
+            "Argument --more_mpi_params is deprecated by --extra-mpi-params.",
+            _type=WarningType.DeprecatedArgument,
         )
         args.extra_mpi_params = args.more_mpi_params
     if args.ncore_per_instance != -1:
         logger.warning(
-            "Argument --ncore_per_instance is deprecated by --ncores-per-instance."
+            "Argument --ncore_per_instance is deprecated by --ncores-per-instance.",
+            _type=WarningType.DeprecatedArgument,
         )
         args.ncores_per_instance = args.ncore_per_instance
     if args.node_id != -1:
-        logger.warning("Argument --node_id is deprecated by --nodes-list.")
+        logger.warning(
+            "Argument --node_id is deprecated by --nodes-list.",
+            _type=WarningType.DeprecatedArgument,
+        )
         args.nodes_list = str(args.node_id)
     if args.core_list != "":
-        logger.warning("Argument --core_list is deprecated by --cores-list.")
+        logger.warning(
+            "Argument --core_list is deprecated by --cores-list.",
+            _type=WarningType.DeprecatedArgument,
+        )
         args.cores_list = args.core_list
     if args.logical_core_for_ccl:
         logger.warning(
-            "Argument --logical_core_for_ccl is deprecated by --logical-cores-for-ccl."
+            "Argument --logical_core_for_ccl is deprecated by --logical-cores-for-ccl.",
+            _type=WarningType.DeprecatedArgument,
         )
         args.logical_cores_for_ccl = args.logical_core_for_ccl
     if args.use_logical_core:
         logger.warning(
-            "Argument --use_logical_core is deprecated by --use-logical-cores."
+            "Argument --use_logical_core is deprecated by --use-logical-cores.",
+            _type=WarningType.DeprecatedArgument,
         )
         args.use_logical_cores = args.use_logical_core
     if args.log_path != "":
-        logger.warning("Argument --log_path is deprecated by --log-dir.")
+        logger.warning(
+            "Argument --log_path is deprecated by --log-dir.",
+            _type=WarningType.DeprecatedArgument,
+        )
         args.log_dir = args.log_path
 
     if args.multi_instance:
         logger.info(
-            "Argument --multi_instance is deprecated. Will be removed. \
-                If you are using the deprecated argument, please update it to the new one."
+            "Argument --multi_instance is deprecated. Will be removed."
+            + "If you are using the deprecated argument, please update it to the new one.",
+            _type=WarningType.DeprecatedArgument,
         )
     if args.distributed:
         logger.info(
-            "Argument --distributed is deprecated. Will be removed. \
-                If you are using the deprecated argument, please update it to the new one."
+            "Argument --distributed is deprecated. Will be removed."
+            + "If you are using the deprecated argument, please update it to the new one.",
+            _type=WarningType.DeprecatedArgument,
         )
 
     if args.enable_tcmalloc or args.enable_jemalloc or args.use_default_allocator:
         logger.warning(
-            "Arguments --enable_tcmalloc, --enable_jemalloc and --use_default_allocator \
-                are deprecated by --memory-allocator."
+            "Arguments --enable_tcmalloc, --enable_jemalloc and --use_default_allocator"
+            + "are deprecated by --memory-allocator tcmalloc/jemalloc/auto.",
+            _type=WarningType.DeprecatedArgument,
         )
         if args.use_default_allocator:
             args.memory_allocator = "default"
@@ -276,16 +296,21 @@ def process_deprecated_params(args, logger):
             args.memory_allocator = "tcmalloc"
     if args.disable_numactl:
         logger.warning(
-            "Argument --disable_numactl is deprecated by --multi-task-manager."
+            "Argument --disable_numactl is deprecated by --multi-task-manager taskset.",
+            _type=WarningType.DeprecatedArgument,
         )
         args.multi_task_manager = "taskset"
     if args.disable_taskset:
         logger.warning(
-            "Argument --disable_taskset is deprecated by --multi-task-manager."
+            "Argument --disable_taskset is deprecated by --multi-task-manager numactl.",
+            _type=WarningType.DeprecatedArgument,
         )
         args.multi_task_manager = "numactl"
     if args.disable_iomp:
-        logger.warning("Argument --disable_iomp is deprecated by --omp-runtime.")
+        logger.warning(
+            "Argument --disable_iomp is deprecated by --omp-runtime default.",
+            _type=WarningType.DeprecatedArgument,
+        )
         args.omp_runtime = "default"
 
 
@@ -382,10 +407,6 @@ def init_parser(parser):
 def run_main_with_args(args):
     if platform.system() == "Windows":
         raise RuntimeError("Windows platform is not supported!!!")
-
-    format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    logging.basicConfig(level=logging.INFO, format=format_str)
-    logger = logging.getLogger(__name__)
 
     launcher_distributed = DistributedTrainingLauncher(logger)
     launcher_multi_instances = MultiInstancesLauncher(logger)

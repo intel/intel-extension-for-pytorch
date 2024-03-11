@@ -3,6 +3,7 @@ import subprocess
 import os
 import intel_extension_for_pytorch.cpu.auto_ipex as auto_ipex
 from .launcher_base import Launcher
+from ...utils._logger import WarningType
 
 
 class MultiInstancesLauncher(Launcher):
@@ -192,8 +193,9 @@ class MultiInstancesLauncher(Launcher):
             ):
                 self.verbose(
                     "warning",
-                    "--latency-mode is exclusive to --ninstances, --ncores-per-instance, --nodes-list and \
-                        --use-logical-cores. They won't take effect even if they are set explicitly.",
+                    "--latency-mode is exclusive to --ninstances, --ncores-per-instance, --nodes-list and"
+                    + "--use-logical-cores. They won't take effect even if they are set explicitly.",
+                    warning_type=WarningType.AmbiguousArgument,
                 )
             args.ncores_per_instance = 4
             args.ninstances = 0
@@ -207,8 +209,9 @@ class MultiInstancesLauncher(Launcher):
             ):
                 self.verbose(
                     "warning",
-                    "--throughput-mode is exclusive to --ninstances, --ncores-per-instance, --nodes-list and \
-                        --use-logical-cores. They won't take effect even if they are set explicitly.",
+                    "--throughput-mode is exclusive to --ninstances, --ncores-per-instance, --nodes-list and"
+                    + "--use-logical-cores. They won't take effect even if they are set explicitly.",
+                    warning_type=WarningType.AmbiguousArgument,
                 )
             args.ninstances = len(set([c.node for c in self.cpuinfo.pool_all]))
             args.ncores_per_instance = 0

@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import math
-import warnings
+from .....utils._logger import logger, WarningType
 from intel_extension_for_pytorch.nn.modules import WeightOnlyQuantizedLinear
 from intel_extension_for_pytorch.quantization import (
     get_weight_only_quant_qconfig_mapping,
@@ -270,10 +270,11 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
             for i in range(self.num_concat):
                 linear = self.linear_list[i]
                 if not hasattr(linear, "_op_context"):
-                    warnings.warn(
+                    logger.warning(
                         "Concat linear fusion for CPU WOQ failed "
-                        "because linear is not converted to WOQ Linear. "
-                        "Falling back to separate linears."
+                        + "because linear is not converted to WOQ Linear. "
+                        + "Falling back to separate linears.",
+                        _type=WarningType.NotSupported,
                     )
                     weights_list = []
                     break

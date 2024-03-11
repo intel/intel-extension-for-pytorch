@@ -4,7 +4,7 @@ import os
 import sys
 import copy
 import json
-import logging
+from ..utils._logger import logger
 import subprocess
 import torch
 import time
@@ -103,8 +103,8 @@ def autotune(
             try:
                 example_inputs = get_example_inputs(model, calib_dataloader)
             except Exception:
-                logging.info(
-                    "UserWarning: Wrong dataloader format. Please refer to autotune doc. Aborting..."
+                logger.critical(
+                    "Wrong dataloader format. Please refer to autotune doc. Aborting..."
                 )
                 exit()
 

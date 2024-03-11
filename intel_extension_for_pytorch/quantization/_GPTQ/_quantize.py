@@ -1,10 +1,7 @@
 import logging
 import torch
 from pathlib import Path
-
-format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-logging.basicConfig(level=logging.INFO, format=format_str)
-logger = logging.getLogger(__name__)
+from ...utils._logger import logger, WarningType
 
 
 @torch.no_grad()
@@ -67,8 +64,10 @@ def gptq(
             }
     if use_max_length and pad_max_length is None:
         logger.warning(
-            "You choose to use unified sequence length for calibration, \
-        but you have not set length value. Default sequence length is 2048 and this might cause inference error!"
+            "You choose to use unified sequence length for calibration"
+            + "but you have not set length value. Default sequence length"
+            + "is 2048 and this might cause inference error!",
+            _type=WarningType.WrongArgument,
         )
     model, gptq_config = gptq_quantize(
         model,

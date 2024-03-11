@@ -11,7 +11,7 @@ from ...reference.fusions.linear_fusion import (
     _IPEXlinearSiluMulRef,
 )
 from torch.nn import functional as F
-import warnings
+from .....utils._logger import logger, WarningType
 
 
 def LlamaDecoderLayer_forward(
@@ -704,8 +704,9 @@ def MixtralDecoderLayer_forward(
     **kwargs,
 ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
     if "padding_mask" in kwargs:
-        warnings.warn(
-            "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
+        logger.warning(
+            "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`",
+            _type=WarningType.DeprecatedArgument,
         )
     """
     Args:

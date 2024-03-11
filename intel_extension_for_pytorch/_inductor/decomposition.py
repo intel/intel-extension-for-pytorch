@@ -1,14 +1,14 @@
-import logging
 import torch._decomp as decomp
 
-log = logging.getLogger(__name__)
+from ..utils._logger import logger
+
 decomposition_overrides = {}
 
 
 def register_decomposition(ops):
     for op in [ops] if callable(ops) else ops:
         if op in decomposition_overrides:
-            log.warning(f"duplicate decomp: {ops}")
+            logger.warning(f"duplicate decomp: {ops}")
     return decomp.register_decomposition(ops, decomposition_overrides)
 
 

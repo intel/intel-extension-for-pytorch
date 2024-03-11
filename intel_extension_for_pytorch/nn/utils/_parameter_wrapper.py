@@ -3,7 +3,7 @@ from typing import Set
 import functools
 import contextlib
 import types
-import warnings
+from ...utils._logger import logger, WarningType
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
     _using_dnnl,
     _using_tpp,
@@ -302,8 +302,9 @@ class ParameterWrapper(object):
             return True
         ori_dtype = self.parameter.dtype
         if ori_dtype not in (torch.float, torch.float32, torch.bfloat16, torch.float16):
-            warnings.warn(
-                f"WARNING: Can't convert model's parameters dtype from {ori_dtype} to {dtype}"
+            logger.warning(
+                f"Can't convert model's parameters dtype from {ori_dtype} to {dtype}",
+                _type=WarningType.NotSupported,
             )
             return False
         module_cls = IPEX_WEIGHT_CONVERT_MODULE_CPU(True, dtype)
@@ -329,8 +330,9 @@ class ParameterWrapper(object):
             torch.float,
             torch.float32,
         ):
-            warnings.warn(
-                f"WARNING: Can't convert model's parameters dtype from {ori_dtype} to {dtype}"
+            logger.warning(
+                f"Can't convert model's parameters dtype from {ori_dtype} to {dtype}",
+                _type=WarningType.NotSupported,
             )
             return False
         module_cls = IPEX_WEIGHT_CONVERT_MODULE_CPU(False, dtype)
