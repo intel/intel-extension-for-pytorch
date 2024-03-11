@@ -749,7 +749,9 @@ class IPEXCPPLibBuild(build_clib, object):
                 ldflags = f"{my_env_local['LDFLAGS']} "
             my_env_local["LDFLAGS"] = f"{ldflags}-Wl,--no-as-needed"
             if "IPEX_GPU_EXTRA_BUILD_OPTION" in my_env_local:
-                my_env_local["LDFLAGS"] = f"{my_env_local['IPEX_GPU_EXTRA_BUILD_OPTION']} {my_env_local['LDFLAGS']}"
+                my_env_local[
+                    "LDFLAGS"
+                ] = f"{my_env_local['IPEX_GPU_EXTRA_BUILD_OPTION']} {my_env_local['LDFLAGS']}"
             _gen_build_cfg_from_cmake(
                 cmake_exec,
                 project_root_dir,
