@@ -31,5 +31,6 @@
 - torch.randn
 - torch.zeros_like
 - torch.bartlett_window
+- torch.as_tensor
 - torch.nested.nested_tensor
 - torch.nested.as_nested_tensor

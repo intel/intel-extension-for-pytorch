@@ -11,7 +11,11 @@ class WrapAPI:
             new_args = list(args)
 
             if device is not None and str(device).find("cuda") != -1:
+                # handle the "cuda:0" to "xpu:0"
                 kwargs["device"] = str(device).replace("cuda", "xpu")
+            elif device is not None and "device" in kwargs and type(kwargs["device"]) == int:
+                # handle the tensor.cuda(device=0) to tensor.to(device='xpu:0')
+                kwargs["device"] = "xpu:" + str(kwargs["device"])
             elif device is None and args_len > 1:
                 if str(args[1]).find("cuda") != -1:
                     new_device = str(args[1]).replace("cuda", "xpu")
@@ -19,6 +23,9 @@ class WrapAPI:
                 elif type(args[1]) == int:
                     new_device = "xpu:" + str(args[1])
                     new_args[1] = new_device
+                elif args[1] is None and 'pin_memory' in str(api):
+                    # handle the case torch.Tensor.pin_memory(None)
+                    new_args[1] = 'xpu'
             elif device is None and args_len == 1:
                 kwargs["device"] = "xpu"
             new_args = tuple(new_args)
@@ -64,7 +71,8 @@ class WrapAPI:
     def wrap_api_skip(cls, api):
         @wraps(api)
         def new_api(*args, **kwargs):
-            assert False, "Warning: this torch api xpu does not support"
+            api_schema = api.__module__ + '.' + api.__name__
+            assert False, "Error: the api " + api_schema + " is not supported by xpu"
 
         return new_api
 

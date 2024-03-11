@@ -187,8 +187,15 @@ class WrapHelper:
             self.torch_api_map.add(item)
         for item in self.torch_api_map:
             api = get_attr(item.api_mod, item.api_name)
+
+            # handle the interface for torch.Tensor.cuda and torch.nn.Module.cuda
             if item.api_name == "cuda":
                 api = get_attr(item.api_mod, "to")
+
+            # handle the interface for query cuda-related attribute
+            if hasattr(api, "__class__") and api.__class__.__name__ == "getset_descriptor":
+                item.api_name.replace("cuda", "xpu")
+
             full_api_name = "torch.cuda." + item.api_name
             if full_api_name in cuda_xpu_common_list:
                 if item.api_name in lazy_init_list:
@@ -215,6 +222,11 @@ class WrapHelper:
         torch.cuda.threading = torch.xpu.lazy_init.threading
         torch.cuda.traceback = torch.xpu.lazy_init.traceback
 
+        # set device property
+        device_property=torch.xpu.get_device_properties(torch.device('xpu'))
+        setattr(intel_extension_for_pytorch._C._DeviceProperties, 'multi_processor_count',
+                device_property.gpu_subslice_count)
+        # TODO: major, minor. Major means the arch, minor means the incremental imporvement
 
 def convert():
     helper.convert_var()

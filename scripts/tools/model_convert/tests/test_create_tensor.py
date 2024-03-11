@@ -210,6 +210,10 @@ class TorchCudaAPITests(unittest.TestCase):
         x = torch.bartlett_window(0, periodic=False, device=torch.device("cuda"))
         self.assertEqual(x.device.type, "xpu")
 
+    def test_as_tensor(self):
+        x = torch.randn(3, 3)
+        y = torch.as_tensor(x, device="cuda")
+        self.assertEqual(y.device.type, "xpu")
 
 if __name__ == "__main__":
     unittest.main()

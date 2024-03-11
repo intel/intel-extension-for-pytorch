@@ -1,4 +1,5 @@
 import collections
+import warnings
 from typing import Any, Dict, Union
 
 import intel_extension_for_pytorch
