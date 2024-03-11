@@ -733,6 +733,39 @@ static void _launch_kernel(int total_n_elems, func_t f) {
   _elementwise_kernel<n_elems_per_work_item, func_t>(total_n_elems, f);
 }
 
+template <typename offset_calculator_t>
+struct _unpack_pivots_internal_kernel_dpcpp_functor {
+  void operator()(int i) const {
+    auto offsets = offset_calculator.get(i);
+
+    auto* unpacked_pivots_data =
+        reinterpret_cast<int32_t*>(unpacked_pivots_ptr + offsets[0]);
+    const auto* const __restrict__ pivots_data =
+        reinterpret_cast<const int32_t*>(pivots_ptr + offsets[1]);
+
+    // QUESTION: can we mix 64bit offsets with 32bit Iterator indexing?
+    for (int64_t i = 0; i < dim_size; ++i) {
+      std::swap(unpacked_pivots_data[i], unpacked_pivots_data[pivots_data[i]]);
+    }
+  }
+
+  _unpack_pivots_internal_kernel_dpcpp_functor(
+      offset_calculator_t offset_calculator,
+      char* unpacked_pivots_ptr,
+      const char* const __restrict__ pivots_ptr,
+      int64_t dim_size)
+      : offset_calculator(offset_calculator),
+        unpacked_pivots_ptr(unpacked_pivots_ptr),
+        pivots_ptr(pivots_ptr),
+        dim_size(dim_size) {}
+
+ private:
+  offset_calculator_t offset_calculator;
+  char* unpacked_pivots_ptr;
+  const char* const __restrict__ pivots_ptr;
+  int64_t dim_size;
+};
+
 void _unpack_pivots_internal_kernel_dpcpp(
     TensorIterator& iter,
     int64_t dim_size) {
@@ -753,20 +786,8 @@ void _unpack_pivots_internal_kernel_dpcpp(
   const char* const __restrict__ pivots_ptr =
       reinterpret_cast<const char*>(iter.data_ptr(1));
 
-  auto loop = [=](int i) {
-    auto offsets = offset_calculator.get(i);
-
-    auto* unpacked_pivots_data =
-        reinterpret_cast<int32_t*>(unpacked_pivots_ptr + offsets[0]);
-    const auto* const __restrict__ pivots_data =
-        reinterpret_cast<const int32_t*>(pivots_ptr + offsets[1]);
-
-    // QUESTION: can we mix 64bit offsets with 32bit Iterator indexing?
-    for (int64_t i = 0; i < dim_size; ++i) {
-      std::swap(unpacked_pivots_data[i], unpacked_pivots_data[pivots_data[i]]);
-    }
-  };
-
+  _unpack_pivots_internal_kernel_dpcpp_functor<decltype(offset_calculator)>
+      loop(offset_calculator, unpacked_pivots_ptr, pivots_ptr, dim_size);
   _launch_kernel<n_elems_per_work_item>(iter.numel(), loop);
 }
 

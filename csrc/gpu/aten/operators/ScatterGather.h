@@ -328,6 +328,40 @@ static void _launch_scatter_gather_kernel(int64_t N, const func_t& f) {
   DPCPP_Q_SUBMIT(queue, cgf);
 }
 
+template <typename scalar_t, typename offset_calc_t, typename func_t>
+struct _dpcpp_scatter_fill_internal_kernel_loop_functor {
+  void operator()(int i) const {
+    auto offsets = offset_calc.get(i);
+
+    int64_t idx_dim = *(int64_t*)(index_ptr + offsets[1]);
+
+    char* self_data = self_ptr + offsets[0];
+
+    f((scalar_t*)self_data + idx_dim * index_stride, (scalar_t*)&src_val);
+  }
+  _dpcpp_scatter_fill_internal_kernel_loop_functor(
+      char* self_ptr_,
+      char* index_ptr_,
+      offset_calc_t offset_calc_,
+      int64_t index_stride_,
+      const func_t f_,
+      scalar_t src_val_)
+      : self_ptr(self_ptr_),
+        index_ptr(index_ptr_),
+        offset_calc(offset_calc_),
+        index_stride(index_stride_),
+        f(f_),
+        src_val(src_val_) {}
+
+ private:
+  char* self_ptr;
+  char* index_ptr;
+  offset_calc_t offset_calc;
+  int64_t index_stride;
+  const func_t f;
+  scalar_t src_val;
+};
+
 template <typename scalar_t>
 struct _dpcpp_scatter_fill_internal_kernel {
   template <typename func_t>
@@ -349,19 +383,64 @@ struct _dpcpp_scatter_fill_internal_kernel {
     char* index_ptr = (char*)iter.data_ptr(1);
 
     auto offset_calc = make_offset_calculator<2>(iter);
-    auto loop = [=](int i) {
-      auto offsets = offset_calc.get(i);
-
-      int64_t idx_dim = *(int64_t*)(index_ptr + offsets[1]);
-
-      char* self_data = self_ptr + offsets[0];
-
-      f((scalar_t*)self_data + idx_dim * index_stride, (scalar_t*)&src_val);
-    };
+    _dpcpp_scatter_fill_internal_kernel_loop_functor<
+        scalar_t,
+        decltype(offset_calc),
+        func_t>
+        loop(self_ptr, index_ptr, offset_calc, index_stride, f, src_val);
 
     _launch_scatter_gather_kernel(iter.numel(), loop);
   }
 }; // struct _dpcpp_scatter_fill_internal_kernel
+
+template <
+    bool is_scatter_like,
+    typename scalar_t,
+    typename offset_calc_t,
+    typename func_t>
+struct _dpcpp_scatter_gather_internal_kernel_loop_functor {
+  C10_DEVICE void operator()(int i) const {
+    auto offsets = offset_calc.get(i);
+
+    int64_t idx_dim = *(int64_t*)(index_ptr + offsets[2]);
+    SYCL_KERNEL_ASSERT(
+        idx_dim >= 0 && idx_dim < index_size && "index out of bounds");
+
+    f((scalar_t*)(self_ptr + offsets[0]),
+      is_scatter_like ? idx_dim * index_stride : 0,
+      numel,
+      (scalar_t*)(src_ptr + offsets[1]) +
+          (is_scatter_like ? 0 : idx_dim * index_stride));
+  }
+
+  _dpcpp_scatter_gather_internal_kernel_loop_functor(
+      char* self_ptr_,
+      char* src_ptr_,
+      char* index_ptr_,
+      offset_calc_t offset_calc_,
+      int64_t index_size_,
+      int64_t index_stride_,
+      int64_t numel_,
+      const func_t f_)
+      : self_ptr(self_ptr_),
+        src_ptr(src_ptr_),
+        index_ptr(index_ptr_),
+        offset_calc(offset_calc_),
+        index_size(index_size_),
+        index_stride(index_stride_),
+        numel(numel_),
+        f(f_) {}
+
+ private:
+  char* self_ptr;
+  char* src_ptr;
+  char* index_ptr;
+  offset_calc_t offset_calc;
+  int64_t index_size;
+  int64_t index_stride;
+  int64_t numel;
+  const func_t f;
+};
 
 template <bool is_scatter_like, typename scalar_t>
 struct _dpcpp_scatter_gather_internal_kernel {
@@ -385,19 +464,20 @@ struct _dpcpp_scatter_gather_internal_kernel {
     char* index_ptr = (char*)iter.data_ptr(2);
 
     auto offset_calc = make_offset_calculator<3>(iter);
-    auto loop = [=] C10_DEVICE(int i) {
-      auto offsets = offset_calc.get(i);
-
-      int64_t idx_dim = *(int64_t*)(index_ptr + offsets[2]);
-      SYCL_KERNEL_ASSERT(
-          idx_dim >= 0 && idx_dim < index_size && "index out of bounds");
-
-      f((scalar_t*)(self_ptr + offsets[0]),
-        is_scatter_like ? idx_dim * index_stride : 0,
-        numel,
-        (scalar_t*)(src_ptr + offsets[1]) +
-            (is_scatter_like ? 0 : idx_dim * index_stride));
-    };
+    _dpcpp_scatter_gather_internal_kernel_loop_functor<
+        is_scatter_like,
+        scalar_t,
+        decltype(offset_calc),
+        func_t>
+        loop(
+            self_ptr,
+            src_ptr,
+            index_ptr,
+            offset_calc,
+            index_size,
+            index_stride,
+            numel,
+            f);
 
     _launch_scatter_gather_kernel(iter.numel(), loop);
   }

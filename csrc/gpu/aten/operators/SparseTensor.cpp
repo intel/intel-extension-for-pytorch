@@ -360,6 +360,19 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   return at::native::copy_sparse_wrapper_(self, src, non_blocking);
 }
 
+struct _coalesce_lt_functor {
+  auto operator()(int64_t a, int64_t b) const {
+    return Numerics<int64_t>::lt(a, b);
+  }
+};
+
+struct _coalesce_eq_functor {
+  template <typename T>
+  auto operator()(T lhs, T rhs) const {
+    return Numerics<int64_t>::eq(lhs, rhs);
+  }
+};
+
 Tensor _coalesce(const Tensor& self) {
   int64_t nnz = self._nnz();
   if (self.is_coalesced()) {
@@ -393,20 +406,16 @@ Tensor _coalesce(const Tensor& self) {
       uniqueOffsets_ptr, uniqueOffsets_ptr + nnz, (int64_t)0);
 
   auto indices1D_ptr = indices1D.data_ptr<int64_t>();
+  _coalesce_lt_functor lt_functor;
   xpu::pstl::sort<int64_t, int64_t>(
-      indices1D_ptr,
-      origIndices_ptr,
-      indices1D.size(0),
-      [](int64_t a, int64_t b) { return Numerics<int64_t>::lt(a, b); });
+      indices1D_ptr, origIndices_ptr, indices1D.size(0), lt_functor);
 
   auto indices1D_end = indices1D_ptr;
   auto uniqueOffsets_end = uniqueOffsets_ptr;
+  _coalesce_eq_functor eq_functor;
   std::tie(indices1D_end, uniqueOffsets_end) =
       xpu::pstl::unique_with_zip<int64_t, int64_t, int64_t>(
-          indices1D_ptr,
-          indices1D_ptr + nnz,
-          uniqueOffsets_ptr,
-          [](auto lhs, auto rhs) { return Numerics<int64_t>::eq(lhs, rhs); });
+          indices1D_ptr, indices1D_ptr + nnz, uniqueOffsets_ptr, eq_functor);
   newNnz = std::distance(indices1D_ptr, indices1D_end);
 
   indices1D.resize_({1, newNnz});

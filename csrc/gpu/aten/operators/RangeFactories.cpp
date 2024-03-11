@@ -93,6 +93,66 @@ void dpcpp_elementwise_kernel_with_index(at::Tensor& output, func_t f) {
       output.data_ptr<scalar_t>(), N, f);
 }
 
+template <typename scalar_t>
+struct linspace_dpcpp_out_functor {
+  scalar_t operator()(int64_t ind) const {
+    if (ind < halfway) {
+      return scalar_start + (step * ind);
+    }
+
+    return scalar_end - step * (steps - ind - 1);
+  }
+
+  linspace_dpcpp_out_functor(
+      scalar_t scalar_start,
+      scalar_t scalar_end,
+      int64_t steps,
+      float step,
+      const int64_t halfway)
+      : scalar_start(scalar_start),
+        scalar_end(scalar_end),
+        steps(steps),
+        step(step),
+        halfway(halfway) {}
+
+ private:
+  scalar_t scalar_start;
+  scalar_t scalar_end;
+  int64_t steps;
+  float step;
+  const int64_t halfway;
+};
+
+template <typename scalar_t>
+struct linspace_dpcpp_out_functor_2 {
+  scalar_t operator()(int64_t ind) const {
+    if (ind < halfway) {
+      return scalar_start + (step * ind);
+    }
+
+    return scalar_end - step * (steps - ind - 1);
+  }
+
+  linspace_dpcpp_out_functor_2(
+      scalar_t scalar_start,
+      scalar_t scalar_end,
+      int64_t steps,
+      scalar_t step,
+      const int64_t halfway)
+      : scalar_start(scalar_start),
+        scalar_end(scalar_end),
+        steps(steps),
+        step(step),
+        halfway(halfway) {}
+
+ private:
+  scalar_t scalar_start;
+  scalar_t scalar_end;
+  int64_t steps;
+  scalar_t step;
+  const int64_t halfway;
+};
+
 Tensor& linspace_dpcpp_out(
     Tensor& result,
     Scalar start,
@@ -131,16 +191,9 @@ Tensor& linspace_dpcpp_out(
           (static_cast<float>(scalar_end) - static_cast<float>(scalar_start)) /
           (steps - 1);
       const int64_t halfway = steps / 2;
-      dpcpp_elementwise_kernel_with_index(
-          r,
-          [scalar_start, scalar_end, steps, step, halfway](
-              int64_t ind) -> scalar_t {
-            if (ind < halfway) {
-              return scalar_start + (step * ind);
-            }
-
-            return scalar_end - step * (steps - ind - 1);
-          });
+      linspace_dpcpp_out_functor<scalar_t> f(
+          scalar_start, scalar_end, steps, step, halfway);
+      dpcpp_elementwise_kernel_with_index(r, f);
     });
   } else {
     IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
@@ -150,16 +203,9 @@ Tensor& linspace_dpcpp_out(
           scalar_t step =
               (scalar_end - scalar_start) / static_cast<scalar_t>(steps - 1);
           const int64_t halfway = steps / 2;
-          dpcpp_elementwise_kernel_with_index(
-              r,
-              [scalar_start, scalar_end, steps, step, halfway](
-                  int64_t ind) -> scalar_t {
-                if (ind < halfway) {
-                  return scalar_start + (step * ind);
-                }
-
-                return scalar_end - step * (steps - ind - 1);
-              });
+          linspace_dpcpp_out_functor_2<scalar_t> f(
+              scalar_start, scalar_end, steps, step, halfway);
+          dpcpp_elementwise_kernel_with_index(r, f);
         });
   }
 
@@ -169,6 +215,70 @@ Tensor& linspace_dpcpp_out(
 
   return result;
 }
+
+template <typename scalar_t>
+struct logspace_dpcpp_out_functor {
+  scalar_t operator()(int64_t ind) const {
+    if (ind < halfway) {
+      return std::pow(scalar_base, scalar_start + step * ind);
+    }
+    return std::pow(scalar_base, scalar_end - step * (steps - ind - 1));
+  }
+
+  logspace_dpcpp_out_functor(
+      scalar_t scalar_start,
+      scalar_t scalar_end,
+      float scalar_base,
+      int64_t steps,
+      float step,
+      const int64_t halfway)
+      : scalar_start(scalar_start),
+        scalar_end(scalar_end),
+        scalar_base(scalar_base),
+        steps(steps),
+        step(step),
+        halfway(halfway) {}
+
+ private:
+  scalar_t scalar_start;
+  scalar_t scalar_end;
+  float scalar_base;
+  int64_t steps;
+  float step;
+  const int64_t halfway;
+};
+
+template <typename scalar_t>
+struct logspace_dpcpp_out_functor_2 {
+  scalar_t operator()(int64_t ind) const {
+    if (ind < halfway) {
+      return std::pow(scalar_base, scalar_start + step * ind);
+    }
+    return std::pow(scalar_base, scalar_end - step * (steps - ind - 1));
+  }
+
+  logspace_dpcpp_out_functor_2(
+      scalar_t scalar_start,
+      scalar_t scalar_end,
+      scalar_t scalar_base,
+      int64_t steps,
+      scalar_t step,
+      const int64_t halfway)
+      : scalar_start(scalar_start),
+        scalar_end(scalar_end),
+        scalar_base(scalar_base),
+        steps(steps),
+        step(step),
+        halfway(halfway) {}
+
+ private:
+  scalar_t scalar_start;
+  scalar_t scalar_end;
+  scalar_t scalar_base;
+  int64_t steps;
+  scalar_t step;
+  const int64_t halfway;
+};
 
 Tensor& logspace_dpcpp_out(
     Tensor& result,
@@ -212,15 +322,9 @@ Tensor& logspace_dpcpp_out(
       scalar_t scalar_end = end.to<scalar_t>();
       float step = static_cast<float>(scalar_end - scalar_start) / (steps - 1);
       const int64_t halfway = steps / 2;
-      dpcpp_elementwise_kernel_with_index(
-          r,
-          [scalar_start, scalar_end, scalar_base, steps, step, halfway](
-              int64_t ind) -> scalar_t {
-            if (ind < halfway) {
-              return std::pow(scalar_base, scalar_start + step * ind);
-            }
-            return std::pow(scalar_base, scalar_end - step * (steps - ind - 1));
-          });
+      logspace_dpcpp_out_functor<scalar_t> f(
+          scalar_start, scalar_end, scalar_base, steps, step, halfway);
+      dpcpp_elementwise_kernel_with_index(r, f);
     });
   } else {
     IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
@@ -231,16 +335,9 @@ Tensor& logspace_dpcpp_out(
           scalar_t step =
               (scalar_end - scalar_start) / static_cast<scalar_t>(steps - 1);
           const int64_t halfway = steps / 2;
-          dpcpp_elementwise_kernel_with_index(
-              r,
-              [scalar_start, scalar_end, scalar_base, steps, step, halfway](
-                  int64_t ind) -> scalar_t {
-                if (ind < halfway) {
-                  return std::pow(scalar_base, scalar_start + step * ind);
-                }
-                return std::pow(
-                    scalar_base, scalar_end - step * (steps - ind - 1));
-              });
+          logspace_dpcpp_out_functor_2<scalar_t> f(
+              scalar_start, scalar_end, scalar_base, steps, step, halfway);
+          dpcpp_elementwise_kernel_with_index(r, f);
         });
   }
 
@@ -250,6 +347,22 @@ Tensor& logspace_dpcpp_out(
 
   return result;
 }
+
+template <typename scalar_t, typename accscalar_t>
+struct range_dpcpp_out_functor {
+  scalar_t operator()(int64_t ind) const {
+    accscalar_t inc = xstep * static_cast<accscalar_t>(ind);
+    accscalar_t val = xstart + inc;
+    return static_cast<scalar_t>(val);
+  }
+
+  range_dpcpp_out_functor(accscalar_t xstart, accscalar_t xstep)
+      : xstart(xstart), xstep(xstep) {}
+
+ private:
+  accscalar_t xstart;
+  accscalar_t xstep;
+};
 
 Tensor& range_dpcpp_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
   IPEX_DISPATCH_ALL_TYPES_AND(
@@ -279,12 +392,8 @@ Tensor& range_dpcpp_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
         LinspaceOp<scalar_t, accscalar_t> linspace_method(xstart, xstep);
         auto& dpcpp_queue = dpcppGetCurrentQueue();
 
-        dpcpp_elementwise_kernel_with_index(
-            r, [xstart, xstep](int64_t ind) -> scalar_t {
-              accscalar_t inc = xstep * static_cast<accscalar_t>(ind);
-              accscalar_t val = xstart + inc;
-              return static_cast<scalar_t>(val);
-            });
+        range_dpcpp_out_functor<scalar_t, accscalar_t> f(xstart, xstep);
+        dpcpp_elementwise_kernel_with_index(r, f);
 
         if (!result.is_contiguous()) {
           result.copy_(r);

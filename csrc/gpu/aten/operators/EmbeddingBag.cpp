@@ -629,6 +629,13 @@ void EmbeddingBag_updateOutputKernel(
 #undef VEC_EMBBAG_KERNEL
 } // namespace AtenIpexTypeXPU
 
+template <typename index_t>
+struct embedding_bag_backward_dpcpp_sum_avg_functor {
+  auto operator()(index_t a, index_t b) const {
+    return Numerics<index_t>::eq(a, b);
+  }
+};
+
 template <typename scalar_t, typename index_t>
 Tensor embedding_bag_backward_dpcpp_sum_avg(
     const Tensor& grad,
@@ -677,11 +684,9 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
     // sorted: 2 5 5 5 7 7 8 9 9
     //  count: 1 3 3 3 2 2 1 2 2
     //
+    embedding_bag_backward_dpcpp_sum_avg_functor<index_t> f;
     xpu::pstl::count_by_segment<index_t, index_t, index_t>(
-        sorted_begin,
-        sorted_begin + numel,
-        count_begin,
-        [](index_t a, index_t b) { return Numerics<index_t>::eq(a, b); });
+        sorted_begin, sorted_begin + numel, count_begin, f);
   }
 
   return embedding_backward_deterministic_kernel<scalar_t, index_t>(

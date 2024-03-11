@@ -12,6 +12,21 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t, typename accscalar_t>
+struct geometric_scalar_dpcpp_functor {
+  scalar_t operator()(accscalar_t rand) const {
+    // https://en.wikipedia.org/wiki/Geometric_distribution#Related_distributions
+    return static_cast<scalar_t>(Numerics<accscalar_t>::ceil(
+        Numerics<accscalar_t>::log(rand) /
+        Numerics<accscalar_t>::log(static_cast<accscalar_t>(1.0) - p)));
+  }
+
+  geometric_scalar_dpcpp_functor(accscalar_t p) : p(p) {}
+
+ private:
+  accscalar_t p;
+};
+
 void geometric_scalar_dpcpp(
     TensorIterator& iter,
     double p_,
@@ -26,12 +41,7 @@ void geometric_scalar_dpcpp(
       [&] {
         using accscalar_t = DiscreteDistributionType<scalar_t>::type;
         auto p = static_cast<accscalar_t>(p_);
-        auto geometric_func = [p](accscalar_t rand) {
-          // https://en.wikipedia.org/wiki/Geometric_distribution#Related_distributions
-          return static_cast<scalar_t>(Numerics<accscalar_t>::ceil(
-              Numerics<accscalar_t>::log(rand) /
-              Numerics<accscalar_t>::log(static_cast<accscalar_t>(1.0) - p)));
-        };
+        geometric_scalar_dpcpp_functor<scalar_t, accscalar_t> geometric_func(p);
         uniform_and_transform<scalar_t, accscalar_t, PHILOX_ENGINE_CALLS>(
             iter, gen, geometric_func);
       });

@@ -786,32 +786,54 @@ inline void parallel_reflection_pad3d(
 }
 
 template <typename scalar_t>
+struct reflection_pad3d_out_kernel_functor {
+  void operator()(
+      PackedTensorAccessor64<scalar_t, 5> input,
+      PackedTensorAccessor64<scalar_t, 5> output,
+      int64_t plane,
+      int64_t batch,
+      int64_t output_z,
+      int64_t output_y,
+      int64_t output_x,
+      int64_t input_z,
+      int64_t input_y,
+      int64_t input_x) const {
+    auto value_to_copy = input[batch][plane][input_z][input_y][input_x];
+    output[batch][plane][output_z][output_y][output_x] = value_to_copy;
+  }
+};
+
+template <typename scalar_t>
 void reflection_pad3d_out_kernel(
     PackedTensorAccessor64<scalar_t, 5> input,
     PackedTensorAccessor64<scalar_t, 5> output,
     int64_t pad_left,
     int64_t pad_top,
     int64_t pad_front) {
-  parallel_reflection_pad3d(
-      input,
-      output,
-      pad_left,
-      pad_top,
-      pad_front,
-      [&](PackedTensorAccessor64<scalar_t, 5> input,
-          PackedTensorAccessor64<scalar_t, 5> output,
-          int64_t plane,
-          int64_t batch,
-          int64_t output_z,
-          int64_t output_y,
-          int64_t output_x,
-          int64_t input_z,
-          int64_t input_y,
-          int64_t input_x) {
-        auto value_to_copy = input[batch][plane][input_z][input_y][input_x];
-        output[batch][plane][output_z][output_y][output_x] = value_to_copy;
-      });
+  reflection_pad3d_out_kernel_functor<scalar_t> f;
+  parallel_reflection_pad3d(input, output, pad_left, pad_top, pad_front, f);
 }
+
+template <typename scalar_t>
+struct reflection_pad3d_backward_out_kernel_functor {
+  void operator()(
+      PackedTensorAccessor64<scalar_t, 5> grad_input,
+      PackedTensorAccessor64<scalar_t, 5> grad_output,
+      int64_t plane,
+      int64_t batch,
+      int64_t output_z,
+      int64_t output_y,
+      int64_t output_x,
+      int64_t input_z,
+      int64_t input_y,
+      int64_t input_x) const {
+    auto value_to_add = grad_output[batch][plane][output_z][output_y][output_x];
+    auto target =
+        (dpcpp_global_ptr_pt<scalar_t>)&grad_input[batch][plane][input_z]
+                                                  [input_y][input_x];
+    atomicAdd(target, value_to_add);
+  }
+};
 
 template <typename scalar_t>
 void reflection_pad3d_backward_out_kernel(
@@ -820,29 +842,9 @@ void reflection_pad3d_backward_out_kernel(
     int64_t pad_left,
     int64_t pad_top,
     int64_t pad_front) {
+  reflection_pad3d_backward_out_kernel_functor<scalar_t> f;
   parallel_reflection_pad3d(
-      grad_input,
-      grad_output,
-      pad_left,
-      pad_top,
-      pad_front,
-      [&](PackedTensorAccessor64<scalar_t, 5> grad_input,
-          PackedTensorAccessor64<scalar_t, 5> grad_output,
-          int64_t plane,
-          int64_t batch,
-          int64_t output_z,
-          int64_t output_y,
-          int64_t output_x,
-          int64_t input_z,
-          int64_t input_y,
-          int64_t input_x) {
-        auto value_to_add =
-            grad_output[batch][plane][output_z][output_y][output_x];
-        auto target =
-            (dpcpp_global_ptr_pt<scalar_t>)&grad_input[batch][plane][input_z]
-                                                      [input_y][input_x];
-        atomicAdd(target, value_to_add);
-      });
+      grad_input, grad_output, pad_left, pad_top, pad_front, f);
 }
 
 } // namespace impl

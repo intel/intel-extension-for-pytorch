@@ -61,6 +61,51 @@ void _lauch_kernel(int total_n_elems, const func_t& f) {
   _elemwise_kernel<n_elems_per_work_item, func_t>(total_n_elems, f);
 }
 
+template <typename scalar_t, typename offset_calc_t>
+struct _compute_linear_combination_internal_kernel_functor {
+  void operator()(int idx) const {
+    auto offsets = offset_calc.get(idx);
+
+    auto* __restrict__ out_data =
+        reinterpret_cast<scalar_t*>(out_ptr + offsets[0]);
+    auto* __restrict__ in_data =
+        reinterpret_cast<scalar_t*>(in_ptr + offsets[1]);
+    using primitive_t = typename scalar_value_type<scalar_t>::type;
+    auto* __restrict__ coeff_data =
+        reinterpret_cast<primitive_t*>(coeff_ptr + offsets[2]);
+
+    // perform summation
+    for (int32_t i = 0; i < num_summations; ++i) {
+      *out_data += in_data[i * in_stride] * coeff_data[i * coeff_stride];
+    }
+  }
+
+  _compute_linear_combination_internal_kernel_functor(
+      offset_calc_t offset_calc,
+      char* __restrict__ out_ptr,
+      char* __restrict__ in_ptr,
+      char* __restrict__ coeff_ptr,
+      int32_t num_summations,
+      int32_t in_stride,
+      int32_t coeff_stride)
+      : offset_calc(offset_calc),
+        out_ptr(out_ptr),
+        in_ptr(in_ptr),
+        coeff_ptr(coeff_ptr),
+        num_summations(num_summations),
+        in_stride(in_stride),
+        coeff_stride(coeff_stride) {}
+
+ private:
+  offset_calc_t offset_calc;
+  char* __restrict__ out_ptr;
+  char* __restrict__ in_ptr;
+  char* __restrict__ coeff_ptr;
+  int32_t num_summations;
+  int32_t in_stride;
+  int32_t coeff_stride;
+};
+
 template <typename scalar_t>
 void _compute_linear_combination_internal_kernel(
     TensorIterator& iter,
@@ -84,22 +129,17 @@ void _compute_linear_combination_internal_kernel(
   char* __restrict__ in_ptr = reinterpret_cast<char*>(iter.data_ptr(1));
   char* __restrict__ coeff_ptr = reinterpret_cast<char*>(iter.data_ptr(2));
 
-  auto loop = [=](int idx) {
-    auto offsets = offset_calc.get(idx);
-
-    auto* __restrict__ out_data =
-        reinterpret_cast<scalar_t*>(out_ptr + offsets[0]);
-    auto* __restrict__ in_data =
-        reinterpret_cast<scalar_t*>(in_ptr + offsets[1]);
-    using primitive_t = typename scalar_value_type<scalar_t>::type;
-    auto* __restrict__ coeff_data =
-        reinterpret_cast<primitive_t*>(coeff_ptr + offsets[2]);
-
-    // perform summation
-    for (int32_t i = 0; i < num_summations; ++i) {
-      *out_data += in_data[i * in_stride] * coeff_data[i * coeff_stride];
-    }
-  };
+  _compute_linear_combination_internal_kernel_functor<
+      scalar_t,
+      decltype(offset_calc)>
+      loop(
+          offset_calc,
+          out_ptr,
+          in_ptr,
+          coeff_ptr,
+          num_summations,
+          in_stride,
+          coeff_stride);
 
   _lauch_kernel<n_elems_per_work_item>(iter.numel(), loop);
 }

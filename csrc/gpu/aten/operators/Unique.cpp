@@ -17,6 +17,13 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename index_t>
+struct compute_inverse_lt_functor {
+  auto operator()(index_t a, index_t b) const {
+    return Numerics<index_t>::lt(a, b);
+  }
+};
+
 template <typename input_t, typename index_t, typename not_equal_t>
 Tensor compute_inverse(
     const Tensor& sorted,
@@ -50,12 +57,9 @@ Tensor compute_inverse(
         /*dim*/ 0,
         ScalarConvert<float, index_t>::to(0.0),
         AddOp<index_t>());
-
+    compute_inverse_lt_functor<index_t> f;
     xpu::pstl::sort<index_t, index_t>(
-        sorted_indices_ptr,
-        inv_loc_ptr,
-        sorted_indices.size(0),
-        [](index_t a, index_t b) { return Numerics<index_t>::lt(a, b); });
+        sorted_indices_ptr, inv_loc_ptr, sorted_indices.size(0), f);
     inverse_indices = inv_loc;
   }
 
@@ -99,6 +103,26 @@ std::tuple<Tensor, index_t> compute_unique(
   return std::tuple<Tensor, index_t>(counts, num_out);
 }
 
+struct unique_template_cmp_functor {
+  template <typename T>
+  bool operator()(T lhs, T rhs) const {
+    if (lhs != rhs) {
+      return true;
+    }
+    return false;
+  }
+};
+
+struct unique_template_cmp_functor_2 {
+  template <typename T>
+  bool operator()(T lhs, T rhs) const {
+    if (lhs != rhs) {
+      return false;
+    }
+    return true;
+  }
+};
+
 template <typename scalar_t>
 std::tuple<Tensor, Tensor, Tensor> unique_template(
     const Tensor& self,
@@ -131,31 +155,23 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
     int64_t num_out;
 
     scalar_t* output_data = output.data_ptr<scalar_t>();
+    unique_template_cmp_functor cmp_functor;
     inverse_indices = compute_inverse<scalar_t, int64_t>(
         output,
         num_inp,
         sorted_indices,
         return_inverse,
         index_options,
-        [](auto lhs, auto rhs) -> bool {
-          if (lhs != rhs) {
-            return true;
-          }
-          return false;
-        });
+        cmp_functor);
 
+    unique_template_cmp_functor_2 cmp_functor_2;
     std::tie(counts, num_out) = compute_unique<scalar_t, int64_t>(
         output_data,
         num_inp,
         sorted_indices,
         return_counts,
         index_options,
-        [](auto lhs, auto rhs) -> bool {
-          if (lhs != rhs) {
-            return false;
-          }
-          return true;
-        });
+        cmp_functor_2);
     output.resize_(num_out);
   }
 
@@ -165,6 +181,79 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
 
   return std::tuple<Tensor, Tensor, Tensor>(output, inverse_indices, counts);
 }
+
+template <typename scalar_t>
+struct unique_dim_template_less_comp_functor {
+  bool operator()(int64_t a, int64_t b) const {
+    // this is a must to bypass padding comparision in bitonic sort.
+    if (a >= num_inp || b >= num_inp)
+      return a < b;
+    // calculate the dictionary order
+    for (int64_t i = 0; i < n; ++i) {
+      scalar_t lhs = input_flat_ptr[i + a * n];
+      scalar_t rhs = input_flat_ptr[i + b * n];
+      if (lhs < rhs) {
+        return true;
+      } else if (lhs > rhs) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  unique_dim_template_less_comp_functor(
+      int64_t num_inp,
+      int64_t n,
+      scalar_t* input_flat_ptr)
+      : num_inp(num_inp), n(n), input_flat_ptr(input_flat_ptr) {}
+
+ private:
+  int64_t num_inp;
+  int64_t n;
+  scalar_t* input_flat_ptr;
+};
+
+template <typename scalar_t>
+struct unique_dim_template_eq_comp_functor {
+  template <typename T>
+  bool operator()(T a, T b) const {
+    for (int64_t i = 0; i < n; ++i) {
+      scalar_t lhs = input_flat_ptr[i + a * n];
+      scalar_t rhs = input_flat_ptr[i + b * n];
+      if (lhs != rhs) {
+        return false;
+      }
+    }
+    return true;
+  }
+  unique_dim_template_eq_comp_functor(int64_t n, scalar_t* input_flat_ptr)
+      : n(n), input_flat_ptr(input_flat_ptr) {}
+
+ private:
+  int64_t n;
+  scalar_t* input_flat_ptr;
+};
+
+template <typename scalar_t>
+struct unique_dim_template_noteq_comp_functor {
+  template <typename T>
+  bool operator()(T a, T b) const {
+    for (int64_t i = 0; i < n; ++i) {
+      scalar_t lhs = input_flat_ptr[i + a * n];
+      scalar_t rhs = input_flat_ptr[i + b * n];
+      if (lhs != rhs) {
+        return true;
+      }
+    }
+    return false;
+  }
+  unique_dim_template_noteq_comp_functor(int64_t n, scalar_t* input_flat_ptr)
+      : n(n), input_flat_ptr(input_flat_ptr) {}
+
+ private:
+  int64_t n;
+  scalar_t* input_flat_ptr;
+};
 
 template <typename scalar_t>
 std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
@@ -204,42 +293,11 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
   int64_t* indices_data = indices.data_ptr<int64_t>();
   auto indices_begin = indices_data;
 
-  auto less_comp = [=](int64_t a, int64_t b) -> bool {
-    // this is a must to bypass padding comparision in bitonic sort.
-    if (a >= num_inp || b >= num_inp)
-      return a < b;
-    // calculate the dictionary order
-    for (int64_t i = 0; i < n; ++i) {
-      scalar_t lhs = input_flat_ptr[i + a * n];
-      scalar_t rhs = input_flat_ptr[i + b * n];
-      if (lhs < rhs) {
-        return true;
-      } else if (lhs > rhs) {
-        return false;
-      }
-    }
-    return false;
-  };
-  auto equal_comp = [=](auto a, auto b) -> bool {
-    for (int64_t i = 0; i < n; ++i) {
-      scalar_t lhs = input_flat_ptr[i + a * n];
-      scalar_t rhs = input_flat_ptr[i + b * n];
-      if (lhs != rhs) {
-        return false;
-      }
-    }
-    return true;
-  };
-  auto not_equal_comp = [=](auto a, auto b) -> bool {
-    for (int64_t i = 0; i < n; ++i) {
-      scalar_t lhs = input_flat_ptr[i + a * n];
-      scalar_t rhs = input_flat_ptr[i + b * n];
-      if (lhs != rhs) {
-        return true;
-      }
-    }
-    return false;
-  };
+  unique_dim_template_less_comp_functor<scalar_t> less_comp(
+      num_inp, n, input_flat_ptr);
+  unique_dim_template_eq_comp_functor<scalar_t> equal_comp(n, input_flat_ptr);
+  unique_dim_template_noteq_comp_functor<scalar_t> not_equal_comp(
+      n, input_flat_ptr);
 
   if (!consecutive) {
     xpu::pstl::sort<int64_t, int64_t>(

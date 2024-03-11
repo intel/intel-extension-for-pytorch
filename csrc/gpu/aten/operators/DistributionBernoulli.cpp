@@ -51,6 +51,18 @@ Tensor& bernoulli_(
   return self;
 }
 
+template <typename scalar_t, typename accscalar_t>
+struct bernoulli_functor_2 {
+  scalar_t operator()(accscalar_t rand) const {
+    return static_cast<scalar_t>(rand < static_cast<accscalar_t>(p));
+  }
+
+  bernoulli_functor_2(accscalar_t p) : p(p) {}
+
+ private:
+  accscalar_t p;
+};
+
 Tensor& bernoulli_(Tensor& self, double p_, c10::optional<Generator> gen_) {
   auto iter = TensorIterator::nullary_op(self);
   auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
@@ -64,9 +76,7 @@ Tensor& bernoulli_(Tensor& self, double p_, c10::optional<Generator> gen_) {
       [&] {
         using accscalar_t = DiscreteDistributionType<scalar_t>::type;
         auto p = static_cast<accscalar_t>(p_);
-        auto bernoulli_func = [p](accscalar_t rand) {
-          return static_cast<scalar_t>(rand < static_cast<accscalar_t>(p));
-        };
+        bernoulli_functor_2<scalar_t, accscalar_t> bernoulli_func(p);
         uniform_and_transform<scalar_t, accscalar_t, PHILOX_ENGINE_CALLS>(
             iter, gen, bernoulli_func);
       });

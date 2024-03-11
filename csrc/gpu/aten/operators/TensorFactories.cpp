@@ -140,6 +140,13 @@ Tensor& eye_out_dpcpp(Tensor& result, int64_t n) {
 }
 
 template <typename scalar_t>
+struct randperm_dpcpp_lt_functor {
+  auto operator()(scalar_t a, scalar_t b) const {
+    return Numerics<scalar_t>::lt(a, b);
+  }
+};
+
+template <typename scalar_t>
 Tensor randperm_dpcpp(
     Tensor& result,
     int64_t n,
@@ -160,10 +167,9 @@ Tensor randperm_dpcpp(
   }
 
   xpu::pstl::iota(shuffled_data, shuffled_data + n, scalar_t(0));
+  randperm_dpcpp_lt_functor<scalar_t> f;
   xpu::pstl::merge_sort<scalar_t, scalar_t>(
-      keys_data, shuffled_data, keys.size(0), [](scalar_t a, scalar_t b) {
-        return Numerics<scalar_t>::lt(a, b);
-      });
+      keys_data, shuffled_data, keys.size(0), f);
 
   if (!result.is_contiguous()) {
     result.copy_(shuffled);

@@ -379,8 +379,13 @@ Tensor mul_add_autocast(
       alpha);
 }
 
-template <typename scalar_t, typename packed_bf16>
+template <typename scalar_t>
 struct PackedAddKernelFunctor {
+  union packed_bf16 {
+    unsigned short s[2];
+    float f;
+  };
+
   void operator()(sycl::item<1> item) const {
     int64_t gid = item.get_linear_id();
     auto MSB_p = MSB_data;
@@ -421,25 +426,26 @@ static inline void packed_add_kernel(
     const at::BFloat16* __restrict__ gw,
     int num_elem,
     float lr) {
-  union packed_bf16 {
-    unsigned short s[2];
-    float f;
-  };
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto MSB_data = w_MSB;
     auto LSB_data = w_LSB;
     auto gw_data = gw;
-    PackedAddKernelFunctor<scalar_t, packed_bf16> kfn(
+    PackedAddKernelFunctor<scalar_t> kfn(
         MSB_data, LSB_data, gw_data, num_elem, lr);
     cgh.parallel_for<decltype(kfn)>(sycl::range<1>(num_elem), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename scalar_t, typename accscalar_t, typename packed_bf16>
+template <typename scalar_t, typename accscalar_t>
 struct SparsePackedAddKernelFunctor {
+  union packed_bf16 {
+    unsigned short s[2];
+    float f;
+  };
+
   void operator()(sycl::nd_item<2> item) const {
     auto MSB_p = w_MSB;
     auto LSB_p = w_LSB;
@@ -512,6 +518,13 @@ struct SparsePackedAddKernelFunctor {
   int64_t newNnz;
 };
 
+struct sparse_packed_add_kernel_functor {
+  template <typename T>
+  auto operator()(T lhs, T rhs) const {
+    return lhs == rhs;
+  }
+};
+
 template <typename scalar_t>
 static inline void sparse_packed_add_kernel(
     unsigned short* __restrict__ w_MSB,
@@ -524,19 +537,15 @@ static inline void sparse_packed_add_kernel(
     int64_t nnz,
     float lr) {
   using accscalar_t = acc_type<scalar_t>;
-  union packed_bf16 {
-    unsigned short s[2];
-    float f;
-  };
+
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t newNnz;
   auto indices1D_end = indices1D;
   auto uniqueOffsets_end = uniqueOffsets;
+  sparse_packed_add_kernel_functor f;
   std::tie(indices1D_end, uniqueOffsets_end) =
       xpu::pstl::unique_with_zip<int64_t, int64_t, int64_t>(
-          indices1D, indices1D + nnz, uniqueOffsets, [](auto lhs, auto rhs) {
-            return lhs == rhs;
-          });
+          indices1D, indices1D + nnz, uniqueOffsets, f);
   newNnz = std::distance(indices1D, indices1D_end);
 
   const int num_group_0 = CeilDiv(newNnz, (int64_t)4);
@@ -544,7 +553,7 @@ static inline void sparse_packed_add_kernel(
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     // auto newValues_data = newValues.data_ptr<scalar_t>();
-    SparsePackedAddKernelFunctor<scalar_t, accscalar_t, packed_bf16> kfn(
+    SparsePackedAddKernelFunctor<scalar_t, accscalar_t> kfn(
         w_MSB,
         w_LSB,
         values,

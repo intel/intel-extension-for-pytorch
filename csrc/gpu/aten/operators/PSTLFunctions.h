@@ -875,10 +875,17 @@ OutputIt adjacent_difference(
   return d_first + N;
 }
 
+struct adjacent_difference_diff_functor {
+  template <typename input_t>
+  auto operator()(input_t l, input_t r) const {
+    return r - l;
+  }
+};
+
 template <typename output_t, class InputIt, class OutputIt>
 OutputIt adjacent_difference(InputIt first, InputIt last, OutputIt d_first) {
-  return adjacent_difference<output_t>(
-      first, last, d_first, [](auto l, auto r) { return r - l; });
+  adjacent_difference_diff_functor f;
+  return adjacent_difference<output_t>(first, last, d_first, f);
 }
 
 template <
@@ -923,6 +930,17 @@ struct CountBySegmentKernelFunctor2 {
   OutputIt d_first;
   output_t* range_ptr;
   index_t* tpos_ptr;
+};
+
+template <typename index_t, typename output_t>
+struct count_by_segment_copy_if_functor {
+  auto operator()(output_t a) const {
+    return gmask_ptr[a] != 0;
+  }
+  count_by_segment_copy_if_functor(index_t* gmask_ptr) : gmask_ptr(gmask_ptr) {}
+
+ private:
+  index_t* gmask_ptr;
 };
 
 template <
@@ -976,10 +994,9 @@ OutputIt count_by_segment(
   output_t* picked_range_ptr = picked_range.data_ptr<output_t>();
   auto picked_range_begin = picked_range_ptr;
   auto picked_range_end = picked_range_begin;
+  count_by_segment_copy_if_functor<index_t, output_t> functor(gmask_ptr);
   picked_range_end = copy_if<index_t>(
-      range_begin, range_begin + N, picked_range_begin, [=](output_t a) {
-        return gmask_ptr[a] != 0;
-      });
+      range_begin, range_begin + N, picked_range_begin, functor);
   auto num_out = std::distance(picked_range_begin, picked_range_end);
   picked_range[num_out] = N;
   // notice: the temp tensor `range` will be re-used to store the result of
@@ -1510,6 +1527,20 @@ void sort(
   merge_sort<KeyType, ValueType>(out_key, out_val, sort_sz, comp_t);
 }
 
+template <typename KeyType>
+struct sort_functor_gt {
+  auto operator()(KeyType a, KeyType b) const {
+    return Numerics<KeyType>::gt(a, b);
+  }
+};
+
+template <typename KeyType>
+struct sort_functor_lt {
+  auto operator()(KeyType a, KeyType b) const {
+    return Numerics<KeyType>::lt(a, b);
+  }
+};
+
 template <typename KeyType, typename ValueType>
 void sort(
     const KeyType* in_key,
@@ -1524,15 +1555,11 @@ void sort(
         in_key, out_key, nullptr, out_val, 1, sort_sz, descending);
   } else {
     if (descending) {
-      merge_sort<KeyType, ValueType>(
-          out_key, out_val, sort_sz, [](KeyType a, KeyType b) {
-            return Numerics<KeyType>::gt(a, b);
-          });
+      sort_functor_gt<KeyType> f;
+      merge_sort<KeyType, ValueType>(out_key, out_val, sort_sz, f);
     } else {
-      merge_sort<KeyType, ValueType>(
-          out_key, out_val, sort_sz, [](KeyType a, KeyType b) {
-            return Numerics<KeyType>::lt(a, b);
-          });
+      sort_functor_lt<KeyType> f;
+      merge_sort<KeyType, ValueType>(out_key, out_val, sort_sz, f);
     }
   }
 }

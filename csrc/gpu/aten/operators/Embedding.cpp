@@ -227,6 +227,13 @@ void renorm_kernel(
 
 } // namespace impl
 
+template <typename index_t>
+struct embedding_dense_backward_eq_functor {
+  auto operator()(index_t a, index_t b) const {
+    return Numerics<index_t>::eq(a, b);
+  }
+};
+
 Tensor embedding_dense_backward(
     const Tensor& grad_output,
     const Tensor& indices_,
@@ -277,13 +284,9 @@ Tensor embedding_dense_backward(
                 // sorted: 2 5 5 5 7 7 8 9 9
                 //  count: 1 3 3 3 2 2 1 2 2
                 //
+                embedding_dense_backward_eq_functor<index_t> f;
                 xpu::pstl::count_by_segment<index_t, index_t, index_t>(
-                    sorted_begin,
-                    sorted_begin + num_indices,
-                    count_begin,
-                    [](index_t a, index_t b) {
-                      return Numerics<index_t>::eq(a, b);
-                    });
+                    sorted_begin, sorted_begin + num_indices, count_begin, f);
               }
               grad_weight = impl::
                   embedding_backward_deterministic_kernel<scalar_t, index_t>(
@@ -297,6 +300,16 @@ Tensor embedding_dense_backward(
       });
   return grad_weight;
 }
+
+struct embedding_renorm_cmp_functor {
+  template <typename T>
+  bool operator()(T lhs, T rhs) const {
+    if (lhs != rhs) {
+      return false;
+    }
+    return true;
+  }
+};
 
 Tensor& embedding_renorm_(
     Tensor& self,
@@ -319,15 +332,11 @@ Tensor& embedding_renorm_(
     unique_indices.copy_(indices_contig);
 
     int64_t num_unique_indices;
+    embedding_renorm_cmp_functor f;
     num_unique_indices = xpu::pstl::unique<index_t, index_t>(
                              unique_indices.data_ptr<index_t>(),
                              unique_indices.data_ptr<index_t>() + num_indices,
-                             [](auto lhs, auto rhs) -> bool {
-                               if (lhs != rhs) {
-                                 return false;
-                               }
-                               return true;
-                             }) -
+                             f) -
         unique_indices.data_ptr<index_t>();
 
     int dim = self.stride(0);

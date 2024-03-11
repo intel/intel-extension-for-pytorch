@@ -24,6 +24,22 @@ struct rand_uniform_wrapper {
   }
 };
 
+template <typename scalar_t, typename accscalar_t>
+struct binomial_kernel_dpcpp_functor {
+  scalar_t operator()(
+      at::AtenIpexTypeXPU::randStatePhilox4_32_10_t& state,
+      scalar_t count,
+      scalar_t prob) const {
+    auto uniform_lambda = rand_uniform_wrapper(state);
+    BaseSampler<accscalar_t, decltype(uniform_lambda)> standard_uniform(
+        uniform_lambda);
+    auto sample =
+        sample_binomial<scalar_t, accscalar_t, decltype(uniform_lambda)>(
+            count, prob, standard_uniform);
+    return static_cast<scalar_t>(sample);
+  }
+};
+
 template <typename scalar_t>
 void binomial_kernel_dpcpp(
     at::Tensor& ret,
@@ -36,35 +52,16 @@ void binomial_kernel_dpcpp(
                                 .add_input(count)
                                 .add_input(prob)
                                 .build();
-
-  at::AtenIpexTypeXPU::distribution_binary_kernel(
-      iter,
-      philox_args,
-      [&](at::AtenIpexTypeXPU::randStatePhilox4_32_10_t& state,
-          scalar_t count,
-          scalar_t prob) {
-        auto uniform_lambda = rand_uniform_wrapper(state);
-        BaseSampler<accscalar_t, decltype(uniform_lambda)> standard_uniform(
-            uniform_lambda);
-        auto sample =
-            sample_binomial<scalar_t, accscalar_t, decltype(uniform_lambda)>(
-                count, prob, standard_uniform);
-        return static_cast<scalar_t>(sample);
-      });
+  binomial_kernel_dpcpp_functor<scalar_t, accscalar_t> f;
+  at::AtenIpexTypeXPU::distribution_binary_kernel(iter, philox_args, f);
 }
 
-template <typename scalar_t>
-void gamma_kernel_dpcpp(
-    at::Tensor& ret,
-    const at::Tensor& alpha,
-    at::AtenIpexTypeXPU::PhiloxState philox_args) {
-  using accscalar_t = at::AtenIpexTypeXPU::acc_type<scalar_t>;
-  at::TensorIterator iter =
-      at::TensorIteratorConfig().add_output(ret).add_input(alpha).build();
-  auto functor = [philox_args](
-                     at::AtenIpexTypeXPU::randStatePhilox4_32_10_t& state,
-                     scalar_t& ret_val,
-                     const scalar_t& alpha) {
+template <typename scalar_t, typename accscalar_t>
+struct gamma_kernel_dpcpp_functor {
+  void operator()(
+      at::AtenIpexTypeXPU::randStatePhilox4_32_10_t& state,
+      scalar_t& ret_val,
+      const scalar_t& alpha) const {
     auto seeds = philox_unpack(philox_args);
 
     auto uniform_lambda = [&state]() { return rand_uniform(&state); };
@@ -81,7 +78,24 @@ void gamma_kernel_dpcpp(
         decltype(normal_lambda)>(alpha, standard_uniform, standard_normal);
     auto min_value = std::numeric_limits<scalar_t>::min();
     ret_val = (min_value > sample) ? min_value : sample;
-  };
+  }
+
+  gamma_kernel_dpcpp_functor(at::AtenIpexTypeXPU::PhiloxState philox_args)
+      : philox_args(philox_args) {}
+
+ private:
+  at::AtenIpexTypeXPU::PhiloxState philox_args;
+};
+
+template <typename scalar_t>
+void gamma_kernel_dpcpp(
+    at::Tensor& ret,
+    const at::Tensor& alpha,
+    at::AtenIpexTypeXPU::PhiloxState philox_args) {
+  using accscalar_t = at::AtenIpexTypeXPU::acc_type<scalar_t>;
+  at::TensorIterator iter =
+      at::TensorIteratorConfig().add_output(ret).add_input(alpha).build();
+  gamma_kernel_dpcpp_functor<scalar_t, accscalar_t> functor(philox_args);
   at::AtenIpexTypeXPU::
       distribution_unary_kernel<scalar_t, scalar_t, decltype(functor)>(
           iter, philox_args, functor);

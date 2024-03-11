@@ -166,6 +166,17 @@ struct NonzeroKernelFunctor {
 };
 
 template <typename scalar_t>
+struct nonzero_copy_if_functor {
+  auto operator()(int64_t x) const {
+    return Numerics<scalar_t>::ne(self_begin[x], scalar_t(0));
+  }
+  nonzero_copy_if_functor(scalar_t* self_begin) : self_begin(self_begin) {}
+
+ private:
+  scalar_t* self_begin;
+};
+
+template <typename scalar_t>
 void nonzero(Tensor& tensor, const Tensor& self_) {
   Tensor self = self_.contiguous();
 
@@ -184,10 +195,9 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
     int64_t* idx_flat_begin = idx_flat.data_ptr<int64_t>();
     int64_t* range_begin = nullptr;
 
+    nonzero_copy_if_functor<scalar_t> f(self_begin);
     auto idx_flat_end = xpu::pstl::copy_if<int64_t>(
-        range_begin, range_begin + N, idx_flat_begin, [=](int64_t x) {
-          return Numerics<scalar_t>::ne(self_begin[x], scalar_t(0));
-        });
+        range_begin, range_begin + N, idx_flat_begin, f);
 
     auto num_nonzeros = std::distance(idx_flat_begin, idx_flat_end);
 
@@ -648,7 +658,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
     MaskedScatterKernelFunctor<scalar_t, mask_t> kfn(
         size, src_data, mask_data, maskPrefixSum_data, tensor_data);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
         kfn);
@@ -903,6 +913,13 @@ void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
+template <typename dtype>
+struct index_functor {
+  void operator()(char* out_data, char* in_data, int64_t offset) const {
+    *(dtype*)out_data = *(dtype*)(in_data + offset);
+  }
+};
+
 void index(
     TensorIterator& iter,
     IntArrayRef index_size,
@@ -917,15 +934,14 @@ void index(
       "index",
       [&] {
         using dtype = OpaqueType<sizeof(scalar_t)>;
+        index_functor<dtype> f;
         dpcpp_index_kernel(
             iter,
             index_size,
             index_stride,
             non_index_size,
             non_index_stride,
-            [](char* out_data, char* in_data, int64_t offset) {
-              *(dtype*)out_data = *(dtype*)(in_data + offset);
-            });
+            f);
       });
 }
 
@@ -1357,7 +1373,7 @@ void take_dpcpp(Tensor& dst, const Tensor& src, const Tensor& index) {
         dst_data,
         idx_data);
 
-    cgh.parallel_for(
+    cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>({wgroup_range * wgroup_size}, {wgroup_size}), kfn);
   };
 
@@ -1827,6 +1843,23 @@ Tensor masked_select(const Tensor& self, const Tensor& mask) {
   return at::AtenIpexTypeXPU::masked_select_out(self, mask, out);
 }
 
+template <typename scalar_t>
+struct put_f_functor {
+  void operator()(char* out_data, char* in_data, uint64_t offset) const {
+    dpcpp_global_ptr_pt<scalar_t> out_ptr =
+        (dpcpp_global_ptr_pt<scalar_t>)(out_data + offset);
+    auto in = *(scalar_t*)in_data;
+    atomicAdd(out_ptr, in);
+  }
+};
+
+template <typename dtype>
+struct put_f_functor_2 {
+  void operator()(char* out_data, char* in_data, uint64_t offset) const {
+    *(dtype*)(out_data + offset) = *(dtype*)in_data;
+  }
+};
+
 Tensor& put_(
     Tensor& self,
     const Tensor& index_,
@@ -1867,16 +1900,8 @@ Tensor& put_(
 
   if (accumulate) {
     IPEX_DISPATCH_ATOMIC_ALL_TYPES_AND_COMPLEX(self.scalar_type(), "put_", [&] {
-      impl::put<scalar_t>(
-          self,
-          index,
-          source,
-          [](char* out_data, char* in_data, uint64_t offset) {
-            dpcpp_global_ptr_pt<scalar_t> out_ptr =
-                (dpcpp_global_ptr_pt<scalar_t>)(out_data + offset);
-            auto in = *(scalar_t*)in_data;
-            atomicAdd(out_ptr, in);
-          });
+      put_f_functor<scalar_t> f;
+      impl::put<scalar_t>(self, index, source, f);
     });
   } else {
     IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
@@ -1887,13 +1912,8 @@ Tensor& put_(
         "put_",
         [&] {
           using dtype = impl::OpaqueType<sizeof(scalar_t)>;
-          impl::put<scalar_t>(
-              self,
-              index,
-              source,
-              [](char* out_data, char* in_data, uint64_t offset) {
-                *(dtype*)(out_data + offset) = *(dtype*)in_data;
-              });
+          put_f_functor_2<dtype> f;
+          impl::put<scalar_t>(self, index, source, f);
         });
   }
 
@@ -1965,6 +1985,23 @@ Tensor _unsafe_index(
   return at::AtenIpexTypeXPU::index(self, indices);
 }
 
+template <typename scalar_t>
+struct _index_put_impl_functor {
+  void operator()(char* out_data, char* in_data, int64_t offset) const {
+    dpcpp_global_ptr_pt<scalar_t> out_ptr =
+        (dpcpp_global_ptr_pt<scalar_t>)(out_data + offset);
+    auto in = *(scalar_t*)in_data;
+    atomicAdd(out_ptr, in);
+  }
+};
+
+template <typename dtype>
+struct _index_put_impl_functor_2 {
+  void operator()(char* out_data, char* in_data, int64_t offset) const {
+    *(dtype*)(out_data + offset) = *(dtype*)in_data;
+  }
+};
+
 Tensor& _index_put_impl_(
     Tensor& self,
     const c10::List<c10::optional<Tensor>>& indices,
@@ -2019,18 +2056,14 @@ Tensor& _index_put_impl_(
       auto iter = make_index_put_iterator(info, value);
       IPEX_DISPATCH_ATOMIC_ALL_TYPES_AND_COMPLEX(
           iter.dtype(), "index_put_non_deterministic_acc_kernel", [&] {
+            _index_put_impl_functor<scalar_t> f;
             dpcpp_index_kernel(
                 iter,
                 info.indexed_sizes,
                 info.indexed_strides,
                 IntArrayRef{},
                 IntArrayRef{},
-                [](char* out_data, char* in_data, int64_t offset) {
-                  dpcpp_global_ptr_pt<scalar_t> out_ptr =
-                      (dpcpp_global_ptr_pt<scalar_t>)(out_data + offset);
-                  auto in = *(scalar_t*)in_data;
-                  atomicAdd(out_ptr, in);
-                });
+                f);
           });
     }
   } else {
@@ -2044,15 +2077,14 @@ Tensor& _index_put_impl_(
         "index_put_non_deterministic_non_acc_kernel",
         [&] {
           using dtype = impl::OpaqueType<sizeof(scalar_t)>;
+          _index_put_impl_functor_2<dtype> f;
           dpcpp_index_kernel(
               iter,
               info.indexed_sizes,
               info.indexed_strides,
               IntArrayRef{},
               IntArrayRef{},
-              [](char* out_data, char* in_data, int64_t offset) {
-                *(dtype*)(out_data + offset) = *(dtype*)in_data;
-              });
+              f);
         });
   }
   return self;
@@ -2119,6 +2151,13 @@ static TensorIterator make_index_out_iterator(
   return config.build();
 }
 
+template <typename dtype>
+struct index_out_functor {
+  void operator()(char* out_data, char* in_data, int64_t offset) const {
+    *(dtype*)out_data = *(dtype*)(in_data + offset);
+  }
+};
+
 Tensor& index_out(
     const Tensor& self,
     const c10::List<c10::optional<Tensor>>& indices,
@@ -2147,15 +2186,14 @@ Tensor& index_out(
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
       kComplexHalf, kHalf, kBool, kBFloat16, iter.dtype(), "index_dpcpp", [&] {
         using dtype = impl::OpaqueType<sizeof(scalar_t)>;
+        index_out_functor<dtype> f;
         dpcpp_index_kernel(
             iter,
             info.indexed_sizes,
             info.indexed_strides,
             info.non_indexed_sizes,
             info.non_indexed_strides,
-            [](char* out_data, char* in_data, int64_t offset) {
-              *(dtype*)out_data = *(dtype*)(in_data + offset);
-            });
+            f);
       });
   return result;
 }

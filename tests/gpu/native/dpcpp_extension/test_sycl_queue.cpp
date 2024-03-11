@@ -8,6 +8,10 @@
 #include <torch/extension.h>
 #include <iostream>
 
+struct isSYCLQueueFunctor {
+  void operator()() const {}
+};
+
 // This routine is used to check if the pointer 'q_ptr' is a sycl queue.
 // NOTE: If the pointer is, this routine will return true. Otherwise, it will
 // causes a segmentation fault that we can NOT catch.
@@ -17,7 +21,8 @@ extern "C" bool isSYCLQueue(void* q_ptr) {
   auto dst = at::empty({2, 2}, at::dtype(at::kInt));
 
   // This code is used to test compiler linker.
-  auto cgf = [&](sycl::handler& cgh) { cgh.single_task([=]() {}); };
+  isSYCLQueueFunctor f;
+  auto cgf = [&](sycl::handler& cgh) { cgh.single_task<decltype(f)>(f); };
   sycl_queue.submit(cgf);
 
   sycl_queue.memcpy(dst.data_ptr(), src.data_ptr(), src.nbytes()).wait();

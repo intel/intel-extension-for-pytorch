@@ -83,7 +83,7 @@ void _assert_async_kernel(scalar_t* input) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgf) {
     AssertAsyncKernelFunctor1<scalar_t> kfn(input);
-    cgf.single_task(kfn);
+    cgf.single_task<decltype(kfn)>(kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -104,7 +104,7 @@ void _assert_async_kernel(c10::complex<float>* input) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgf) {
     AssertAsyncKernelFunctor2 kfn(input);
-    cgf.single_task(kfn);
+    cgf.single_task<decltype(kfn)>(kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -125,7 +125,7 @@ void _assert_async_kernel(c10::complex<double>* input) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgf) {
     AssertAsyncKernelFunctor3 kfn(input);
-    cgf.single_task(kfn);
+    cgf.single_task<decltype(kfn)>(kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

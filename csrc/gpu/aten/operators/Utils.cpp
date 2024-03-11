@@ -11,11 +11,18 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+struct dpcpp_q_barrier_functor {
+  void operator()() const {}
+};
+
 sycl::event dpcpp_q_barrier(sycl::queue& q) {
 #ifdef USE_QUEUE_BARRIER
   return q.ext_oneapi_submit_barrier();
 #else
-  auto cgf = [&](sycl::handler& cgh) { cgh.single_task([=]() {}); };
+  auto cgf = [&](sycl::handler& cgh) {
+    dpcpp_q_barrier_functor barrier_functor;
+    cgh.single_task<decltype(barrier_functor)>(barrier_functor);
+  };
   return q.submit(cgf);
 #endif
 }
@@ -26,7 +33,8 @@ sycl::event dpcpp_q_barrier(sycl::queue& q, std::vector<sycl::event>& events) {
 #else
   auto cgf = [&](sycl::handler& cgh) {
     cgh.depends_on(events);
-    cgh.single_task([=]() {});
+    dpcpp_q_barrier_functor barrier_functor;
+    cgh.single_task<decltype(barrier_functor)>(barrier_functor);
   };
   return q.submit(cgf);
 #endif

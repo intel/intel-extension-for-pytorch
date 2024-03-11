@@ -221,6 +221,115 @@ static void _launch_unfold_backward_kernel(int total_n_elems, func_t f) {
       total_n_elems, f);
 }
 
+template <typename scalar_t, typename offset_calc_t>
+struct _unfold_backward_internal_kernel_loop_functor {
+  void operator()(int i) const {
+    auto offsets = offset_calc.get(i);
+
+    auto* grad_out_data =
+        reinterpret_cast<scalar_t*>(grad_out_ptr + offsets[0]);
+    auto* grad_in_data = reinterpret_cast<scalar_t*>(grad_in_ptr + offsets[1]);
+
+    auto idx_dim = *reinterpret_cast<int64_t*>(idx_dim_ptr + offsets[2]);
+    auto idx_last_dim =
+        *reinterpret_cast<int64_t*>(idx_last_dim_ptr + offsets[3]);
+
+    auto grad_out_idx_dim = idx_dim * step + idx_last_dim;
+    grad_out_data[grad_out_idx_dim * grad_out_dim_stride] = *grad_in_data;
+  }
+  _unfold_backward_internal_kernel_loop_functor(
+      char* grad_out_ptr_,
+      char* grad_in_ptr_,
+      char* idx_dim_ptr_,
+      char* idx_last_dim_ptr_,
+      offset_calc_t offset_calc_,
+      int64_t step_,
+      int64_t grad_out_dim_stride_)
+      : grad_out_ptr(grad_out_ptr_),
+        grad_in_ptr(grad_in_ptr_),
+        idx_dim_ptr(idx_dim_ptr_),
+        idx_last_dim_ptr(idx_last_dim_ptr_),
+        offset_calc(offset_calc_),
+        step(step_),
+        grad_out_dim_stride(grad_out_dim_stride_) {}
+
+ private:
+  char* grad_out_ptr;
+  char* grad_in_ptr;
+  char* idx_dim_ptr;
+  char* idx_last_dim_ptr;
+  offset_calc_t offset_calc;
+  int64_t step;
+  int64_t grad_out_dim_stride;
+};
+
+template <typename scalar_t, typename offset_calc_t>
+struct _unfold_backward_internal_kernel_loop_functor_2 {
+  void operator()(int i) const {
+    auto offsets = offset_calc.get(i);
+
+    auto* grad_out_data =
+        reinterpret_cast<scalar_t*>(grad_out_ptr + offsets[0]);
+    auto* grad_in_data = reinterpret_cast<scalar_t*>(grad_in_ptr + offsets[1]);
+
+    auto idx_dim = *reinterpret_cast<int64_t*>(idx_dim_ptr + offsets[2]);
+
+    // left_fold potentially intersecting with idx_dim
+    // is either (idx_dim - size) / step or the next integer.
+    int64_t left_fold_idx = (idx_dim > size) ? (idx_dim - size) / step : 0;
+    if (!(left_fold_idx * step <= idx_dim &&
+          idx_dim < left_fold_idx * step + size)) {
+      ++left_fold_idx;
+    }
+
+    auto right_fold_idx = idx_dim / step;
+    right_fold_idx = (right_fold_idx >= grad_in_dim_size)
+        ? (grad_in_dim_size - 1)
+        : right_fold_idx;
+
+    for (auto fold_idx = left_fold_idx; fold_idx <= right_fold_idx;
+         ++fold_idx) {
+      auto idx_last_dim = idx_dim - fold_idx * step;
+      *grad_out_data += grad_in_data
+          [fold_idx * grad_in_dim_stride +
+           idx_last_dim * grad_in_last_dim_stride];
+    }
+  }
+  _unfold_backward_internal_kernel_loop_functor_2(
+      char* grad_out_ptr_,
+      char* grad_in_ptr_,
+      char* idx_dim_ptr_,
+      offset_calc_t offset_calc_,
+      int64_t size_,
+      int64_t step_,
+      int64_t grad_in_dim_stride_,
+      int64_t grad_in_last_dim_stride_,
+      int64_t grad_in_dim_size_,
+      int64_t grad_out_dim_stride_)
+      : grad_out_ptr(grad_out_ptr_),
+        grad_in_ptr(grad_in_ptr_),
+        idx_dim_ptr(idx_dim_ptr_),
+        offset_calc(offset_calc_),
+        size(size_),
+        step(step_),
+        grad_in_dim_stride(grad_in_dim_stride_),
+        grad_in_last_dim_stride(grad_in_last_dim_stride_),
+        grad_in_dim_size(grad_in_dim_size_),
+        grad_out_dim_stride(grad_out_dim_stride_) {}
+
+ private:
+  char* grad_out_ptr;
+  char* grad_in_ptr;
+  char* idx_dim_ptr;
+  offset_calc_t offset_calc;
+  int64_t size;
+  int64_t step;
+  int64_t grad_in_dim_stride;
+  int64_t grad_in_last_dim_stride;
+  int64_t grad_in_dim_size;
+  int64_t grad_out_dim_stride;
+};
+
 template <typename scalar_t>
 void _unfold_backward_internal_kernel(
     TensorIterator& iter,
@@ -261,21 +370,17 @@ void _unfold_backward_internal_kernel(
 
     // this loop simply copies the data
     // from proper places in grad_out to grad_in
-    auto loop = [=](int i) {
-      auto offsets = offset_calc.get(i);
-
-      auto* grad_out_data =
-          reinterpret_cast<scalar_t*>(grad_out_ptr + offsets[0]);
-      auto* grad_in_data =
-          reinterpret_cast<scalar_t*>(grad_in_ptr + offsets[1]);
-
-      auto idx_dim = *reinterpret_cast<int64_t*>(idx_dim_ptr + offsets[2]);
-      auto idx_last_dim =
-          *reinterpret_cast<int64_t*>(idx_last_dim_ptr + offsets[3]);
-
-      auto grad_out_idx_dim = idx_dim * step + idx_last_dim;
-      grad_out_data[grad_out_idx_dim * grad_out_dim_stride] = *grad_in_data;
-    };
+    _unfold_backward_internal_kernel_loop_functor<
+        scalar_t,
+        decltype(offset_calc)>
+        loop(
+            grad_out_ptr,
+            grad_in_ptr,
+            idx_dim_ptr,
+            idx_last_dim_ptr,
+            offset_calc,
+            step,
+            grad_out_dim_stride);
 
     _launch_unfold_backward_kernel<n_elems_per_work_item>(iter.numel(), loop);
   } else {
@@ -284,37 +389,20 @@ void _unfold_backward_internal_kernel(
     // The algorithm is: for each index in grad_out find
     // the elements contributing to it and sum them up.
     // Note: the algorithm does not require any synchronization.
-    auto loop = [=](int i) {
-      auto offsets = offset_calc.get(i);
-
-      auto* grad_out_data =
-          reinterpret_cast<scalar_t*>(grad_out_ptr + offsets[0]);
-      auto* grad_in_data =
-          reinterpret_cast<scalar_t*>(grad_in_ptr + offsets[1]);
-
-      auto idx_dim = *reinterpret_cast<int64_t*>(idx_dim_ptr + offsets[2]);
-
-      // left_fold potentially intersecting with idx_dim
-      // is either (idx_dim - size) / step or the next integer.
-      int64_t left_fold_idx = (idx_dim > size) ? (idx_dim - size) / step : 0;
-      if (!(left_fold_idx * step <= idx_dim &&
-            idx_dim < left_fold_idx * step + size)) {
-        ++left_fold_idx;
-      }
-
-      auto right_fold_idx = idx_dim / step;
-      right_fold_idx = (right_fold_idx >= grad_in_dim_size)
-          ? (grad_in_dim_size - 1)
-          : right_fold_idx;
-
-      for (auto fold_idx = left_fold_idx; fold_idx <= right_fold_idx;
-           ++fold_idx) {
-        auto idx_last_dim = idx_dim - fold_idx * step;
-        *grad_out_data += grad_in_data
-            [fold_idx * grad_in_dim_stride +
-             idx_last_dim * grad_in_last_dim_stride];
-      }
-    };
+    _unfold_backward_internal_kernel_loop_functor_2<
+        scalar_t,
+        decltype(offset_calc)>
+        loop(
+            grad_out_ptr,
+            grad_in_ptr,
+            idx_dim_ptr,
+            offset_calc,
+            size,
+            step,
+            grad_in_dim_stride,
+            grad_in_last_dim_stride,
+            grad_in_dim_size,
+            grad_out_dim_stride);
 
     _launch_unfold_backward_kernel<n_elems_per_work_item>(iter.numel(), loop);
   }

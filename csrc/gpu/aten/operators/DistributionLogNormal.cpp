@@ -15,6 +15,19 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t, typename accscalar_t>
+struct log_normal_functor {
+  scalar_t operator()(accscalar_t rand) const {
+    return static_cast<scalar_t>(Numerics<accscalar_t>::exp(rand * std + mean));
+  }
+  log_normal_functor(accscalar_t mean, accscalar_t std)
+      : mean(mean), std(std) {}
+
+ private:
+  accscalar_t mean;
+  accscalar_t std;
+};
+
 Tensor& log_normal_(
     Tensor& self,
     double mean_,
@@ -34,11 +47,8 @@ Tensor& log_normal_(
         using accscalar_t = dist_acctype<scalar_t>;
         auto mean = static_cast<accscalar_t>(mean_);
         auto std = static_cast<accscalar_t>(std_);
-        // define lambda to multiply std and add mean
-        auto log_normal_func = [mean, std](accscalar_t rand) {
-          return static_cast<scalar_t>(
-              Numerics<accscalar_t>::exp(rand * std + mean));
-        };
+        // define functor to multiply std and add mean
+        log_normal_functor<scalar_t, accscalar_t> log_normal_func(mean, std);
         normal_and_transform<scalar_t, accscalar_t, PHILOX_ENGINE_CALLS>(
             iter, gen, log_normal_func);
       });

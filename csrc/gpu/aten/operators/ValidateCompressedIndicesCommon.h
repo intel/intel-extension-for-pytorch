@@ -181,6 +181,63 @@ struct KernelLauncher {
   }
 };
 
+template <CDimName cdim_name, typename index_t>
+struct _validate_compressed_sparse_indices_kernel_functor {
+  index_t operator()(index_t idx) const {
+    _check_idx_bounds<cdim_name, index_t>(idx, zero, dim);
+    return 0;
+  }
+
+  _validate_compressed_sparse_indices_kernel_functor(
+      const int64_t dim,
+      index_t zero)
+      : dim(dim), zero(zero) {}
+
+ private:
+  const int64_t dim;
+  index_t zero;
+};
+
+template <CDimName cdim_name, typename index_t>
+struct _validate_compressed_sparse_indices_kernel_functor_2 {
+  index_t operator()(
+      index_t cidx_first,
+      index_t cidx_last,
+      index_t cidx_curr,
+      index_t cidx_next,
+      index_t batch_idx) const {
+    // Invariant 5.1
+    _check_first_cidx_is_zero<cdim_name, index_t>(cidx_first, zero);
+    // Invariant 5.2
+    _check_last_cidx_is_nnz<cdim_name, index_t>(cidx_last, nnz);
+    // Invariant 5.3
+    _check_cidx_nondecreasing_locally_bounded_sequence<cdim_name, index_t>(
+        cidx_curr, cidx_next, zero, dim);
+    // Invariant 5.6
+    // NOTE: the implementation below is sync-less, but,
+    // unfortunately, work is not guaranteed to be well-balanced
+    // between different threads. idx is contiguous and of shape
+    // (..., nnz), so batches are multiples of nnz apart.
+    const auto* RESTRICT ptr_idx_batch = ptr_idx + batch_idx * nnz;
+    _check_idx_sorted_distinct_vals_slices_with_cidx<cdim_name, index_t>(
+        ptr_idx_batch, cidx_curr, cidx_next);
+    return 0;
+  }
+
+  _validate_compressed_sparse_indices_kernel_functor_2(
+      const int64_t dim,
+      const int64_t nnz,
+      index_t zero,
+      const index_t* RESTRICT ptr_idx)
+      : dim(dim), nnz(nnz), zero(zero), ptr_idx(ptr_idx) {}
+
+ private:
+  const int64_t dim;
+  const int64_t nnz;
+  index_t zero;
+  const index_t* RESTRICT ptr_idx;
+};
+
 template <
     CDimName cdim_name,
     template <typename func_t>
@@ -245,10 +302,9 @@ void _validate_compressed_sparse_indices_kernel(
 
     IPEX_DISPATCH_INDEX_TYPES(idx.scalar_type(), NAME, [&iter, dim]() {
       const auto zero = index_t{0};
-      KernelLauncher::launch(iter, [zero, dim](index_t idx) -> index_t {
-        _check_idx_bounds<cdim_name, index_t>(idx, zero, dim);
-        return 0;
-      });
+      _validate_compressed_sparse_indices_kernel_functor<cdim_name, index_t> f(
+          dim, zero);
+      KernelLauncher::launch(iter, f);
     });
   }
 
@@ -279,33 +335,11 @@ void _validate_compressed_sparse_indices_kernel(
         idx.scalar_type(), NAME, [&iter, &idx, dim, nnz]() {
           const auto* RESTRICT ptr_idx = idx.data_ptr<index_t>();
           const auto zero = index_t{0};
-          KernelLauncher::launch(
-              iter,
-              [zero, dim, nnz, ptr_idx](
-                  index_t cidx_first,
-                  index_t cidx_last,
-                  index_t cidx_curr,
-                  index_t cidx_next,
-                  index_t batch_idx) -> index_t {
-                // Invariant 5.1
-                _check_first_cidx_is_zero<cdim_name, index_t>(cidx_first, zero);
-                // Invariant 5.2
-                _check_last_cidx_is_nnz<cdim_name, index_t>(cidx_last, nnz);
-                // Invariant 5.3
-                _check_cidx_nondecreasing_locally_bounded_sequence<
-                    cdim_name,
-                    index_t>(cidx_curr, cidx_next, zero, dim);
-                // Invariant 5.6
-                // NOTE: the implementation below is sync-less, but,
-                // unfortunately, work is not guaranteed to be well-balanced
-                // between different threads. idx is contiguous and of shape
-                // (..., nnz), so batches are multiples of nnz apart.
-                const auto* RESTRICT ptr_idx_batch = ptr_idx + batch_idx * nnz;
-                _check_idx_sorted_distinct_vals_slices_with_cidx<
-                    cdim_name,
-                    index_t>(ptr_idx_batch, cidx_curr, cidx_next);
-                return 0;
-              });
+          _validate_compressed_sparse_indices_kernel_functor_2<
+              cdim_name,
+              index_t>
+              f(dim, nnz, zero, ptr_idx);
+          KernelLauncher::launch(iter, f);
         });
   }
 }

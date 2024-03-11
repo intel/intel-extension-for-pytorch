@@ -164,6 +164,27 @@ void kernelHistogram1D(
       totalElements,                                               \
       WEIGHTS_OP);
 
+template <typename output_t, typename IndexType, typename info_t>
+struct dpcpp_tensor_histogram_functor {
+  auto operator()(output_t* cPtr, IndexType cIndex) const {
+    const IndexType cOffset =
+        IndexToOffset<output_t, IndexType>::get(cIndex, cInfo);
+    return cPtr[cOffset];
+  }
+
+  dpcpp_tensor_histogram_functor(info_t cInfo) : cInfo(cInfo) {}
+
+ private:
+  info_t cInfo;
+};
+
+template <typename output_t, typename IndexType>
+struct dpcpp_tensor_histogram_functor_2 {
+  auto operator()(output_t*, IndexType) const {
+    return static_cast<output_t>(1);
+  }
+};
+
 template <typename output_t, typename input_t, bool HasWeights>
 bool dpcpp_tensor_histogram(
     at::Tensor a, /* output */
@@ -184,19 +205,15 @@ bool dpcpp_tensor_histogram(
   auto bInfo = getTensorInfo<input_t, IndexType>(b);
   if (HasWeights) {
     auto cInfo = getTensorInfo<output_t, IndexType>(c);
-    const auto getWeightsOp = [cInfo](output_t* cPtr, IndexType cIndex) {
-      const IndexType cOffset =
-          IndexToOffset<output_t, IndexType>::get(cIndex, cInfo);
-      return cPtr[cOffset];
-    };
+    const dpcpp_tensor_histogram_functor<output_t, IndexType, decltype(cInfo)>
+        getWeightsOp(cInfo);
     HANDLE_CASE(getWeightsOp, true);
   } else {
     TensorInfo<output_t, IndexType> cInfo;
     // set the dummy cinfo with the ptr to the output
     cInfo.data = aInfo.data;
-    static const auto getDummyOp = [](output_t*, IndexType) {
-      return static_cast<output_t>(1);
-    };
+    static const dpcpp_tensor_histogram_functor_2<output_t, IndexType>
+        getDummyOp;
     HANDLE_CASE(getDummyOp, false);
   }
 

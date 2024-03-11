@@ -546,6 +546,30 @@ void sum_and_scatter(
   DPCPP_Q_SUBMIT(queue, cgf);
 }
 
+struct embedding_backward_deterministic_kernel_copy_if_functor {
+  template <typename T>
+  auto operator()(T x) const {
+    return x != -1;
+  }
+};
+
+struct embedding_backward_deterministic_kernel_transform_first_true_functor {
+  template <typename U, typename V>
+  auto operator()(U d, V idx) const {
+    return d ? idx : -1;
+  }
+};
+
+struct embedding_backward_deterministic_kernel_adjacent_difference_functor {
+  template <typename T>
+  bool operator()(T lhs, T rhs) const {
+    if (lhs != rhs) {
+      return true;
+    }
+    return false;
+  }
+};
+
 template <typename scalar_t, typename index_t>
 Tensor embedding_backward_deterministic_kernel(
     const Tensor& grad,
@@ -574,16 +598,13 @@ Tensor embedding_backward_deterministic_kernel(
     auto dummy_begin = dummy.data_ptr<index_t>();
     auto idx_tensor = at::empty_like(sorted_indices);
     auto idx_begin = idx_tensor.data_ptr<index_t>();
+    embedding_backward_deterministic_kernel_adjacent_difference_functor
+        adjacent_difference_functor;
     xpu::pstl::adjacent_difference<index_t>(
         sorted_indices_begin,
         sorted_indices_begin + numel,
         dummy_begin,
-        [](auto lhs, auto rhs) -> bool {
-          if (lhs != rhs) {
-            return true;
-          }
-          return false;
-        });
+        adjacent_difference_functor);
 
     // For algorithm adjacent difference, for output, its first element is
     // always equal to source first element. We need to set it as 1 manually.
@@ -592,16 +613,17 @@ Tensor embedding_backward_deterministic_kernel(
     auto count_begin = count_tensor.data_ptr<int64_t>();
     xpu::pstl::iota(count_begin, count_begin + numel, (int64_t)0);
     auto segment_offsets_begin = segment_offsets.data_ptr<index_t>();
+    embedding_backward_deterministic_kernel_transform_first_true_functor
+        transform_first_true_functor;
     xpu::pstl::transform_first_true<index_t>(
         dummy_begin,
         dummy_begin + numel,
         count_begin,
         idx_begin,
-        [](auto d, auto idx) { return d ? idx : -1; });
+        transform_first_true_functor);
+    embedding_backward_deterministic_kernel_copy_if_functor copy_if_functor;
     auto ends = xpu::pstl::copy_if<index_t>(
-        idx_begin, idx_begin + numel, segment_offsets_begin, [](auto x) {
-          return x != -1;
-        });
+        idx_begin, idx_begin + numel, segment_offsets_begin, copy_if_functor);
     num_of_segments = std::distance(segment_offsets_begin, ends);
   }
 

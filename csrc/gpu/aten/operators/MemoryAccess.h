@@ -269,9 +269,13 @@ struct aligned_element<8> {
   using element_type = uint64_t;
 };
 
+struct alignas(16) uint128_t {
+  char data[16];
+};
+
 template <>
 struct aligned_element<16> {
-  using element_type = struct alignas(16) { char data[16]; };
+  using element_type = uint128_t;
 };
 
 template <typename scalar_t, int vec_size>

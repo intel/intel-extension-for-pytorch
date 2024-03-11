@@ -12,6 +12,25 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t, typename accscalar_t>
+struct cauchy_functor {
+  scalar_t operator()(accscalar_t rand) const {
+    return static_cast<scalar_t>(
+        median +
+        sigma *
+            Numerics<accscalar_t>::tan(
+                Numerics<accscalar_t>::pi() *
+                (rand - static_cast<accscalar_t>(0.5))));
+  }
+
+  cauchy_functor(accscalar_t median, accscalar_t sigma)
+      : median(median), sigma(sigma) {}
+
+ private:
+  accscalar_t median;
+  accscalar_t sigma;
+};
+
 Tensor& cauchy_(
     Tensor& self,
     double median_,
@@ -31,14 +50,7 @@ Tensor& cauchy_(
         using accscalar_t = acc_type<scalar_t>;
         auto median = static_cast<accscalar_t>(median_);
         auto sigma = static_cast<accscalar_t>(sigma_);
-        auto cauchy_func = [median, sigma](accscalar_t rand) {
-          return static_cast<scalar_t>(
-              median +
-              sigma *
-                  Numerics<accscalar_t>::tan(
-                      Numerics<accscalar_t>::pi() *
-                      (rand - static_cast<accscalar_t>(0.5))));
-        };
+        cauchy_functor<scalar_t, accscalar_t> cauchy_func(median, sigma);
         uniform_and_transform<scalar_t, accscalar_t, PHILOX_ENGINE_CALLS>(
             iter, gen, cauchy_func);
       });

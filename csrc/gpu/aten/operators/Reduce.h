@@ -1277,6 +1277,12 @@ int get_output_vec_size(at::TensorIterator& iter) {
   return std::min(vec_size, vt1);
 }
 
+struct dpcpp_reduce_kernel_empty_functor {
+  char operator()() const {
+    return 0;
+  }
+};
+
 template <
     typename scalar_t,
     typename out_scalar_t,
@@ -1507,7 +1513,7 @@ inline void dpcpp_reduce_kernel(
         config.semaphore_size(), at::TensorOptions().dtype(kChar).device(kXPU));
     at::detail::Array<char*, 1> data;
     data[0] = (char*)semaphores.data_ptr();
-    auto fn = []() -> char { return 0; };
+    dpcpp_reduce_kernel_empty_functor fn;
     int vec_size = at::native::Memory::can_vectorize_up_to_loop<decltype(fn)>(
         dpcppGetDeviceIdOfCurrentQueue(), data);
     auto ic = TrivialOffsetCalculator<traits::arity>();

@@ -85,26 +85,44 @@ void parallel_replication_pad1d(
 }
 
 template <typename scalar_t>
+struct replication_pad1d_forward_kernel_functor {
+  void operator()(
+      PackedTensorAccessor64<scalar_t, 3> input,
+      PackedTensorAccessor64<scalar_t, 3> output,
+      int64_t plane,
+      int64_t batch,
+      int64_t output_x,
+      int64_t intput_x) const {
+    auto value_to_copy = input[batch][plane][intput_x];
+    output[batch][plane][output_x] = value_to_copy;
+  }
+};
+
+template <typename scalar_t>
 void replication_pad1d_forward_kernel(
     PackedTensorAccessor64<scalar_t, 3> input,
     PackedTensorAccessor64<scalar_t, 3> output,
     int64_t pad_left,
     int64_t pad_right) {
-  parallel_replication_pad1d(
-      input,
-      output,
-      pad_left,
-      pad_right,
-      [&](PackedTensorAccessor64<scalar_t, 3> input,
-          PackedTensorAccessor64<scalar_t, 3> output,
-          int64_t plane,
-          int64_t batch,
-          int64_t output_x,
-          int64_t intput_x) {
-        auto value_to_copy = input[batch][plane][intput_x];
-        output[batch][plane][output_x] = value_to_copy;
-      });
+  replication_pad1d_forward_kernel_functor<scalar_t> f;
+  parallel_replication_pad1d(input, output, pad_left, pad_right, f);
 }
+
+template <typename scalar_t>
+struct replication_pad1d_backward_kernel_functor {
+  void operator()(
+      PackedTensorAccessor64<scalar_t, 3> grad_input,
+      PackedTensorAccessor64<scalar_t, 3> grad_output,
+      int64_t plane,
+      int64_t batch,
+      int64_t output_x,
+      int64_t intput_x) const {
+    auto value_to_add = grad_output[batch][plane][output_x];
+    auto target =
+        (dpcpp_global_ptr_pt<scalar_t>)&grad_input[batch][plane][intput_x];
+    atomicAdd(target, value_to_add);
+  }
+};
 
 template <typename scalar_t>
 void replication_pad1d_backward_kernel(
@@ -112,22 +130,8 @@ void replication_pad1d_backward_kernel(
     PackedTensorAccessor64<scalar_t, 3> grad_output,
     int64_t pad_left,
     int64_t pad_right) {
-  parallel_replication_pad1d(
-      grad_input,
-      grad_output,
-      pad_left,
-      pad_right,
-      [&](PackedTensorAccessor64<scalar_t, 3> grad_input,
-          PackedTensorAccessor64<scalar_t, 3> grad_output,
-          int64_t plane,
-          int64_t batch,
-          int64_t output_x,
-          int64_t intput_x) {
-        auto value_to_add = grad_output[batch][plane][output_x];
-        auto target =
-            (dpcpp_global_ptr_pt<scalar_t>)&grad_input[batch][plane][intput_x];
-        atomicAdd(target, value_to_add);
-      });
+  replication_pad1d_backward_kernel_functor<scalar_t> f;
+  parallel_replication_pad1d(grad_input, grad_output, pad_left, pad_right, f);
 }
 
 template <typename scalar_t>
@@ -647,32 +651,54 @@ void parallel_replication_pad3d(
 }
 
 template <typename scalar_t>
+struct replication_pad3d_forward_kernel_functor {
+  void operator()(
+      PackedTensorAccessor64<scalar_t, 5> input,
+      PackedTensorAccessor64<scalar_t, 5> output,
+      int64_t plane,
+      int64_t batch,
+      int64_t output_z,
+      int64_t output_y,
+      int64_t output_x,
+      int64_t intput_z,
+      int64_t intput_y,
+      int64_t intput_x) const {
+    auto value_to_copy = input[batch][plane][intput_z][intput_y][intput_x];
+    output[batch][plane][output_z][output_y][output_x] = value_to_copy;
+  }
+};
+
+template <typename scalar_t>
 void replication_pad3d_forward_kernel(
     PackedTensorAccessor64<scalar_t, 5> input,
     PackedTensorAccessor64<scalar_t, 5> output,
     int64_t pad_left,
     int64_t pad_top,
     int64_t pad_front) {
-  parallel_replication_pad3d(
-      input,
-      output,
-      pad_left,
-      pad_top,
-      pad_front,
-      [&](PackedTensorAccessor64<scalar_t, 5> input,
-          PackedTensorAccessor64<scalar_t, 5> output,
-          int64_t plane,
-          int64_t batch,
-          int64_t output_z,
-          int64_t output_y,
-          int64_t output_x,
-          int64_t intput_z,
-          int64_t intput_y,
-          int64_t intput_x) {
-        auto value_to_copy = input[batch][plane][intput_z][intput_y][intput_x];
-        output[batch][plane][output_z][output_y][output_x] = value_to_copy;
-      });
+  replication_pad3d_forward_kernel_functor<scalar_t> f;
+  parallel_replication_pad3d(input, output, pad_left, pad_top, pad_front, f);
 }
+
+template <typename scalar_t>
+struct replication_pad3d_backward_kernel_functor {
+  void operator()(
+      PackedTensorAccessor64<scalar_t, 5> grad_input,
+      PackedTensorAccessor64<scalar_t, 5> grad_output,
+      int64_t plane,
+      int64_t batch,
+      int64_t output_z,
+      int64_t output_y,
+      int64_t output_x,
+      int64_t intput_z,
+      int64_t intput_y,
+      int64_t intput_x) const {
+    auto value_to_add = grad_output[batch][plane][output_z][output_y][output_x];
+    auto target =
+        (dpcpp_global_ptr_pt<scalar_t>)&grad_input[batch][plane][intput_z]
+                                                  [intput_y][intput_x];
+    atomicAdd(target, value_to_add);
+  }
+};
 
 template <typename scalar_t>
 void replication_pad3d_backward_kernel(
@@ -681,29 +707,9 @@ void replication_pad3d_backward_kernel(
     int64_t pad_left,
     int64_t pad_top,
     int64_t pad_front) {
+  replication_pad3d_backward_kernel_functor<scalar_t> f;
   parallel_replication_pad3d(
-      grad_input,
-      grad_output,
-      pad_left,
-      pad_top,
-      pad_front,
-      [&](PackedTensorAccessor64<scalar_t, 5> grad_input,
-          PackedTensorAccessor64<scalar_t, 5> grad_output,
-          int64_t plane,
-          int64_t batch,
-          int64_t output_z,
-          int64_t output_y,
-          int64_t output_x,
-          int64_t intput_z,
-          int64_t intput_y,
-          int64_t intput_x) {
-        auto value_to_add =
-            grad_output[batch][plane][output_z][output_y][output_x];
-        auto target =
-            (dpcpp_global_ptr_pt<scalar_t>)&grad_input[batch][plane][intput_z]
-                                                      [intput_y][intput_x];
-        atomicAdd(target, value_to_add);
-      });
+      grad_input, grad_output, pad_left, pad_top, pad_front, f);
 }
 
 static inline void shapeAndGradOutputCheck3d(

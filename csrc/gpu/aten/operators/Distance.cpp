@@ -15,10 +15,6 @@
 
 using namespace xpu::dpcpp;
 
-namespace at {
-namespace AtenIpexTypeXPU {
-namespace impl {
-
 template <typename scalar_t>
 static scalar_t device_sqrt(scalar_t val) {
   return Numerics<scalar_t>::sqrt(val);
@@ -30,137 +26,148 @@ class dists {
   static scalar_t sign(scalar_t val) {
     return (0 < val) - (val < 0);
   }
-
-  // Zero norm
-  struct zero {
-    static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
-      agg += diff != 0.0f;
-    }
-    static scalar_t finish(const scalar_t agg, const scalar_t p) {
-      return agg;
-    }
-    static void agg(scalar_t& update, const scalar_t other) {
-      update += other;
-    }
-  };
-
-  // One norm
-  struct one {
-    static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
-      agg += diff;
-    }
-    static scalar_t finish(const scalar_t agg, const scalar_t p) {
-      return agg;
-    }
-    static void agg(scalar_t& update, const scalar_t other) {
-      update += other;
-    }
-    static scalar_t backward(
-        const scalar_t diff,
-        const scalar_t grad,
-        const scalar_t dist,
-        const scalar_t p) {
-      return grad * sign(diff);
-    }
-  };
-
-  // Special case backward when p is less than two
-  struct lt_two {
-    static scalar_t backward(
-        const scalar_t diff,
-        const scalar_t grad,
-        const scalar_t dist,
-        const scalar_t p) {
-      return (dist == 0.0f || (diff == 0.0f && p < 1.f))
-          ? static_cast<scalar_t>(0)
-          : (sign(diff) * Numerics<scalar_t>::pow(std::abs(diff), p - 1) *
-             grad / Numerics<scalar_t>::pow(dist, p - 1));
-    }
-  };
-
-  // Two norm
-  struct two {
-    static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
-      agg += diff * diff;
-    }
-    static scalar_t finish(const scalar_t agg, const scalar_t p) {
-      return device_sqrt<scalar_t>(agg);
-    }
-    static void agg(scalar_t& update, const scalar_t other) {
-      update += other;
-    }
-    static scalar_t backward(
-        const scalar_t diff,
-        const scalar_t grad,
-        const scalar_t dist,
-        const scalar_t p) {
-      return dist == 0.0f ? static_cast<scalar_t>(0) : grad * diff / dist;
-    }
-  };
-
-  // General p norm
-  struct p {
-    static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
-      // TODO:
-      // Here had an unknown bug which affected other code segments
-      // unexpectedly. See Jira:
-      // https://jira.devtools.intel.com/browse/PYTORCHDGQ-958 for details Below
-      // is what code we wrote before and will trigger the bug
-      //
-      // agg += Numerics<scalar_t>::pow(diff, p);
-      agg += static_cast<scalar_t>(std::pow(static_cast<scalar_t>(diff), p));
-    }
-    static scalar_t finish(const scalar_t agg, const scalar_t p) {
-      // TODO:
-      // Here had an unknown bug which affected other code segments
-      // unexpectedly. See Jira:
-      // https://jira.devtools.intel.com/browse/PYTORCHDGQ-958 for details Below
-      // is what code we wrote before and will trigger the bug
-      //
-      // return Numerics<scalar_t>::pow(agg, static_cast<scalar_t>(1) / p);
-      return static_cast<scalar_t>(
-          std::pow(static_cast<scalar_t>(agg), 1.0f / p));
-    }
-    static void agg(scalar_t& update, const scalar_t other) {
-      update += other;
-    }
-    static scalar_t backward(
-        const scalar_t diff,
-        const scalar_t grad,
-        const scalar_t dist,
-        const scalar_t p) {
-      return dist == 0.0f ? static_cast<scalar_t>(0)
-                          : diff *
-              Numerics<scalar_t>::pow(Numerics<scalar_t>::abs(diff), p - 2) *
-              grad / Numerics<scalar_t>::pow(dist, p - 1);
-    }
-  };
-
-  // Inf norm
-  struct inf {
-    static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
-      if (diff > agg) {
-        agg = diff;
-      }
-    }
-    static scalar_t finish(const scalar_t agg, const scalar_t p) {
-      return agg;
-    }
-    static void agg(scalar_t& update, const scalar_t other) {
-      if (other > update) {
-        update = other;
-      }
-    }
-    static scalar_t backward(
-        const scalar_t diff,
-        const scalar_t grad,
-        const scalar_t dist,
-        const scalar_t p) {
-      return grad * sign(diff) * (Numerics<scalar_t>::abs(diff) == dist);
-    }
-  };
 };
 
+// Zero norm
+template <typename scalar_t>
+struct dists_zero {
+  static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
+    agg += diff != 0.0f;
+  }
+  static scalar_t finish(const scalar_t agg, const scalar_t p) {
+    return agg;
+  }
+  static void agg(scalar_t& update, const scalar_t other) {
+    update += other;
+  }
+};
+
+// One norm
+template <typename scalar_t>
+struct dists_one {
+  static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
+    agg += diff;
+  }
+  static scalar_t finish(const scalar_t agg, const scalar_t p) {
+    return agg;
+  }
+  static void agg(scalar_t& update, const scalar_t other) {
+    update += other;
+  }
+  static scalar_t backward(
+      const scalar_t diff,
+      const scalar_t grad,
+      const scalar_t dist,
+      const scalar_t p) {
+    return grad * dists<scalar_t>::sign(diff);
+  }
+};
+
+// Special case backward when p is less than two
+template <typename scalar_t>
+struct dists_lt_two {
+  static scalar_t backward(
+      const scalar_t diff,
+      const scalar_t grad,
+      const scalar_t dist,
+      const scalar_t p) {
+    return (dist == 0.0f || (diff == 0.0f && p < 1.f))
+        ? static_cast<scalar_t>(0)
+        : (dists<scalar_t>::sign(diff) *
+           Numerics<scalar_t>::pow(std::abs(diff), p - 1) * grad /
+           Numerics<scalar_t>::pow(dist, p - 1));
+  }
+};
+
+// Two norm
+template <typename scalar_t>
+struct dists_two {
+  static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
+    agg += diff * diff;
+  }
+  static scalar_t finish(const scalar_t agg, const scalar_t p) {
+    return device_sqrt<scalar_t>(agg);
+  }
+  static void agg(scalar_t& update, const scalar_t other) {
+    update += other;
+  }
+  static scalar_t backward(
+      const scalar_t diff,
+      const scalar_t grad,
+      const scalar_t dist,
+      const scalar_t p) {
+    return dist == 0.0f ? static_cast<scalar_t>(0) : grad * diff / dist;
+  }
+};
+
+// General p norm
+template <typename scalar_t>
+struct dists_p {
+  static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
+    // TODO:
+    // Here had an unknown bug which affected other code segments
+    // unexpectedly. See Jira:
+    // https://jira.devtools.intel.com/browse/PYTORCHDGQ-958 for details Below
+    // is what code we wrote before and will trigger the bug
+    //
+    // agg += Numerics<scalar_t>::pow(diff, p);
+    agg += static_cast<scalar_t>(std::pow(static_cast<scalar_t>(diff), p));
+  }
+  static scalar_t finish(const scalar_t agg, const scalar_t p) {
+    // TODO:
+    // Here had an unknown bug which affected other code segments
+    // unexpectedly. See Jira:
+    // https://jira.devtools.intel.com/browse/PYTORCHDGQ-958 for details Below
+    // is what code we wrote before and will trigger the bug
+    //
+    // return Numerics<scalar_t>::pow(agg, static_cast<scalar_t>(1) / p);
+    return static_cast<scalar_t>(
+        std::pow(static_cast<scalar_t>(agg), 1.0f / p));
+  }
+  static void agg(scalar_t& update, const scalar_t other) {
+    update += other;
+  }
+  static scalar_t backward(
+      const scalar_t diff,
+      const scalar_t grad,
+      const scalar_t dist,
+      const scalar_t p) {
+    return dist == 0.0f
+        ? static_cast<scalar_t>(0)
+        : diff * Numerics<scalar_t>::pow(Numerics<scalar_t>::abs(diff), p - 2) *
+            grad / Numerics<scalar_t>::pow(dist, p - 1);
+  }
+};
+
+// Inf norm
+template <typename scalar_t>
+struct dists_inf {
+  static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
+    if (diff > agg) {
+      agg = diff;
+    }
+  }
+  static scalar_t finish(const scalar_t agg, const scalar_t p) {
+    return agg;
+  }
+  static void agg(scalar_t& update, const scalar_t other) {
+    if (other > update) {
+      update = other;
+    }
+  }
+  static scalar_t backward(
+      const scalar_t diff,
+      const scalar_t grad,
+      const scalar_t dist,
+      const scalar_t p) {
+    return grad * dists<scalar_t>::sign(diff) *
+        (Numerics<scalar_t>::abs(diff) == dist);
+  }
+};
+
+namespace at {
+namespace AtenIpexTypeXPU {
+namespace impl {
 template <int SG_SIZE, typename scalar_t, typename F, typename nd_item>
 scalar_t subgroup_reduce_agg_impl(nd_item item, scalar_t value) {
   const auto sg = item.get_sub_group();
@@ -494,19 +501,19 @@ void pdist_forward(Tensor& result, const Tensor& self, double p) {
       "pdist_dpcpp",
       [&] {
         if (p == 0.0) {
-          pdist_kernel_impl<scalar_t, dists<scalar_t>::zero, 0>(
+          pdist_kernel_impl<scalar_t, dists_zero<scalar_t>, 0>(
               result, self, n, m, p, n2, n2_squared_minus_1);
         } else if (p == 1.0) {
-          pdist_kernel_impl<scalar_t, dists<scalar_t>::one, 1>(
+          pdist_kernel_impl<scalar_t, dists_one<scalar_t>, 1>(
               result, self, n, m, p, n2, n2_squared_minus_1);
         } else if (p == 2.0) {
-          pdist_kernel_impl<scalar_t, dists<scalar_t>::two, 2>(
+          pdist_kernel_impl<scalar_t, dists_two<scalar_t>, 2>(
               result, self, n, m, p, n2, n2_squared_minus_1);
         } else if (Numerics<scalar_t>::isinf(p)) {
-          pdist_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
+          pdist_kernel_impl<scalar_t, dists_inf<scalar_t>, 3>(
               result, self, n, m, p, n2, n2_squared_minus_1);
         } else {
-          pdist_kernel_impl<scalar_t, dists<scalar_t>::p, 4>(
+          pdist_kernel_impl<scalar_t, dists_p<scalar_t>, 4>(
               result, self, n, m, p, n2, n2_squared_minus_1);
         }
       });
@@ -535,7 +542,7 @@ void pdist_backward(
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, self.scalar_type(), "pdist_backward", [&] {
         if (p == 1.0) {
-          pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::one, 0>(
+          pdist_backward_kernel_impl<scalar_t, dists_one<scalar_t>, 0>(
               buffer,
               grad,
               self,
@@ -548,7 +555,7 @@ void pdist_backward(
               n2,
               n2_squared_minus_1);
         } else if (p < 2.0) {
-          pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::lt_two, 1>(
+          pdist_backward_kernel_impl<scalar_t, dists_lt_two<scalar_t>, 1>(
               buffer,
               grad,
               self,
@@ -561,7 +568,7 @@ void pdist_backward(
               n2,
               n2_squared_minus_1);
         } else if (p == 2.0) {
-          pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::two, 2>(
+          pdist_backward_kernel_impl<scalar_t, dists_two<scalar_t>, 2>(
               buffer,
               grad,
               self,
@@ -574,7 +581,7 @@ void pdist_backward(
               n2,
               n2_squared_minus_1);
         } else if (Numerics<scalar_t>::isinf(p)) {
-          pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
+          pdist_backward_kernel_impl<scalar_t, dists_inf<scalar_t>, 3>(
               buffer,
               grad,
               self,
@@ -587,7 +594,7 @@ void pdist_backward(
               n2,
               n2_squared_minus_1);
         } else {
-          pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::p, 4>(
+          pdist_backward_kernel_impl<scalar_t, dists_p<scalar_t>, 4>(
               buffer,
               grad,
               self,
@@ -775,7 +782,7 @@ static Tensor cdist_forward(
         "cdist_forward_dpcpp",
         [&] {
           if (p == 0.0) {
-            cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::zero, 0>(
+            cdist_forward_kernel_impl<scalar_t, dists_zero<scalar_t>, 0>(
                 result,
                 x1_expanded,
                 x2_expanded,
@@ -787,7 +794,7 @@ static Tensor cdist_forward(
                 r1 * m,
                 r2 * m);
           } else if (p == 1.0) {
-            cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::one, 1>(
+            cdist_forward_kernel_impl<scalar_t, dists_one<scalar_t>, 1>(
                 result,
                 x1_expanded,
                 x2_expanded,
@@ -799,7 +806,7 @@ static Tensor cdist_forward(
                 r1 * m,
                 r2 * m);
           } else if (p == 2.0) {
-            cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::two, 2>(
+            cdist_forward_kernel_impl<scalar_t, dists_two<scalar_t>, 2>(
                 result,
                 x1_expanded,
                 x2_expanded,
@@ -811,7 +818,7 @@ static Tensor cdist_forward(
                 r1 * m,
                 r2 * m);
           } else if (Numerics<scalar_t>::isinf(p)) {
-            cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
+            cdist_forward_kernel_impl<scalar_t, dists_inf<scalar_t>, 3>(
                 result,
                 x1_expanded,
                 x2_expanded,
@@ -823,7 +830,7 @@ static Tensor cdist_forward(
                 r1 * m,
                 r2 * m);
           } else {
-            cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::p, 4>(
+            cdist_forward_kernel_impl<scalar_t, dists_p<scalar_t>, 4>(
                 result,
                 x1_expanded,
                 x2_expanded,
@@ -1040,7 +1047,7 @@ static Tensor cdist_backward(
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, x1.scalar_type(), "cdist_backward_dpcpp", [&] {
         if (p == 1.0) {
-          cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::one, 0>(
+          cdist_backward_kernel_impl<scalar_t, dists_one<scalar_t>, 0>(
               buffer,
               grad,
               x1,
@@ -1056,7 +1063,7 @@ static Tensor cdist_backward(
               r1 * m,
               r2 * m);
         } else if (p < 2.0) {
-          cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::lt_two, 1>(
+          cdist_backward_kernel_impl<scalar_t, dists_lt_two<scalar_t>, 1>(
               buffer,
               grad,
               x1,
@@ -1072,7 +1079,7 @@ static Tensor cdist_backward(
               r1 * m,
               r2 * m);
         } else if (p == 2.0) {
-          cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::two, 2>(
+          cdist_backward_kernel_impl<scalar_t, dists_two<scalar_t>, 2>(
               buffer,
               grad,
               x1,
@@ -1088,7 +1095,7 @@ static Tensor cdist_backward(
               r1 * m,
               r2 * m);
         } else if (Numerics<scalar_t>::isinf(p)) {
-          cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
+          cdist_backward_kernel_impl<scalar_t, dists_inf<scalar_t>, 3>(
               buffer,
               grad,
               x1,
@@ -1104,7 +1111,7 @@ static Tensor cdist_backward(
               r1 * m,
               r2 * m);
         } else {
-          cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::p, 4>(
+          cdist_backward_kernel_impl<scalar_t, dists_p<scalar_t>, 4>(
               buffer,
               grad,
               x1,

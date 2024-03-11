@@ -689,6 +689,18 @@ void adagrad_fused_step_nocoalesced_kernel(
 
 } // namespace impl
 
+struct adagrad_fused_step_kernel_stub_lt_functor {
+  auto operator()(int64_t a, int64_t b) const {
+    return Numerics<int64_t>::lt(a, b);
+  }
+};
+
+struct adagrad_fused_step_kernel_stub_eq_functor {
+  auto operator()(int64_t lhs, int64_t rhs) const {
+    return Numerics<int64_t>::eq(lhs, rhs);
+  }
+};
+
 std::tuple<at::Tensor, at::Tensor> adagrad_fused_step_kernel_stub(
     at::Tensor& param_,
     at::Tensor& state_sum_,
@@ -759,20 +771,16 @@ std::tuple<at::Tensor, at::Tensor> adagrad_fused_step_kernel_stub(
         uniqueOffsets_ptr, uniqueOffsets_ptr + nnz, (int64_t)0);
 
     auto indices1D_ptr = indices1D.data_ptr<int64_t>();
+    adagrad_fused_step_kernel_stub_lt_functor lt_functor;
     xpu::pstl::sort<int64_t, int64_t>(
-        indices1D_ptr,
-        origIndices_ptr,
-        indices1D.size(0),
-        [](int64_t a, int64_t b) { return Numerics<int64_t>::lt(a, b); });
+        indices1D_ptr, origIndices_ptr, indices1D.size(0), lt_functor);
 
     auto indices1D_end = indices1D_ptr;
     auto uniqueOffsets_end = uniqueOffsets_ptr;
+    adagrad_fused_step_kernel_stub_eq_functor eq_functor;
     std::tie(indices1D_end, uniqueOffsets_end) =
         xpu::pstl::unique_with_zip<int64_t, int64_t, int64_t>(
-            indices1D_ptr,
-            indices1D_ptr + nnz,
-            uniqueOffsets_ptr,
-            [](auto lhs, auto rhs) { return Numerics<int64_t>::eq(lhs, rhs); });
+            indices1D_ptr, indices1D_ptr + nnz, uniqueOffsets_ptr, eq_functor);
     newNnz = std::distance(indices1D_ptr, indices1D_end);
 
     indices1D.resize_({1, newNnz});

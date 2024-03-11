@@ -28,6 +28,39 @@ struct KernelLauncher {
 
 } // anonymous namespace
 
+template <typename index_t, typename indices_stride_t, typename hash_coeffs_t>
+struct flatten_indices_impl_functor {
+  int64_t operator()(int64_t nnz_idx) const {
+    const auto* ptr_indices_dim = ptr_indices + nnz_idx * indices_nnz_stride;
+    auto hash = static_cast<int64_t>(0);
+    for (int64_t dim = 0; dim < sparse_dim; ++dim) {
+      const auto dim_hash_coeff = hash_coeffs[dim];
+      const auto dim_index = ptr_indices_dim[dim * indices_dim_stride];
+      hash += dim_index * dim_hash_coeff;
+    }
+    return hash;
+  }
+
+  flatten_indices_impl_functor(
+      const index_t* ptr_indices_,
+      size_t sparse_dim_,
+      indices_stride_t indices_dim_stride_,
+      indices_stride_t indices_nnz_stride_,
+      const hash_coeffs_t hash_coeffs_)
+      : ptr_indices(ptr_indices_),
+        sparse_dim(sparse_dim_),
+        indices_dim_stride(indices_dim_stride_),
+        indices_nnz_stride(indices_nnz_stride_),
+        hash_coeffs(hash_coeffs_) {}
+
+ private:
+  const index_t* ptr_indices;
+  size_t sparse_dim;
+  indices_stride_t indices_dim_stride;
+  indices_stride_t indices_nnz_stride;
+  const hash_coeffs_t hash_coeffs;
+};
+
 template <
     template <typename func_t>
     class kernel_t,
@@ -62,18 +95,16 @@ Tensor _flatten_indices_impl(const Tensor& indices, IntArrayRef size) {
 
     {
       const auto* ptr_indices = indices.data_ptr<index_t>();
-
-      KernelLauncher<kernel_t>::launch(iter, [=](int64_t nnz_idx) -> int64_t {
-        const auto* ptr_indices_dim =
-            ptr_indices + nnz_idx * indices_nnz_stride;
-        auto hash = static_cast<int64_t>(0);
-        for (int64_t dim = 0; dim < sparse_dim; ++dim) {
-          const auto dim_hash_coeff = hash_coeffs[dim];
-          const auto dim_index = ptr_indices_dim[dim * indices_dim_stride];
-          hash += dim_index * dim_hash_coeff;
-        }
-        return hash;
-      });
+      flatten_indices_impl_functor<
+          index_t,
+          decltype(indices_dim_stride),
+          decltype(hash_coeffs)>
+          f(ptr_indices,
+            sparse_dim,
+            indices_dim_stride,
+            indices_nnz_stride,
+            hash_coeffs);
+      KernelLauncher<kernel_t>::launch(iter, f);
     }
 
     return hash;

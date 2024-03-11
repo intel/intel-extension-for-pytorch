@@ -42,6 +42,22 @@ inline T Round(const T x) {
   return std::nearbyint(x);
 }
 
+struct u8tos8kernelfunctor {
+  void operator()(sycl::item<1> item) const {
+    auto id = item.get_linear_id();
+    auto s8_val = (float)Round(static_cast<float>(u8_ptr[id]) / 2.f);
+    s8_val = Numerics<float>::min(Numerics<float>::max(s8_val, -128.f), 127.f);
+    s8_ptr[id] = static_cast<int8_t>(s8_val);
+  }
+
+  u8tos8kernelfunctor(uint8_t* u8_ptr, int8_t* s8_ptr)
+      : u8_ptr(u8_ptr), s8_ptr(s8_ptr) {}
+
+ private:
+  uint8_t* u8_ptr;
+  int8_t* s8_ptr;
+};
+
 static inline at::Tensor u8tos8(const at::Tensor& u8) {
   auto s8 = at::_empty_affine_quantized(
       u8.sizes(),
@@ -57,13 +73,8 @@ static inline at::Tensor u8tos8(const at::Tensor& u8) {
   auto cgf = DPCPP_Q_CGF(cgh) {
     uint8_t* u8_ptr = (uint8_t*)u8.data_ptr();
     int8_t* s8_ptr = (int8_t*)s8.data_ptr();
-    cgh.parallel_for(sycl::range<1>(u8.numel()), [=](sycl::item<1> item) {
-      auto id = item.get_linear_id();
-      auto s8_val = (float)Round(static_cast<float>(u8_ptr[id]) / 2.f);
-      s8_val =
-          Numerics<float>::min(Numerics<float>::max(s8_val, -128.f), 127.f);
-      s8_ptr[id] = static_cast<int8_t>(s8_val);
-    });
+    u8tos8kernelfunctor kfn(u8_ptr, s8_ptr);
+    cgh.parallel_for<decltype(kfn)>(sycl::range<1>(u8.numel()), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
   return s8;
@@ -142,6 +153,32 @@ class XPUQuantizerBase {
   zp_ptr_t zp_ptr_;
 };
 
+struct fetch_cached_quantizer_base_sc_functor {
+  void operator()() const {
+    sc_ptr[0] = dnn_sc;
+  }
+
+  fetch_cached_quantizer_base_sc_functor(float* sc_ptr, float dnn_sc)
+      : sc_ptr(sc_ptr), dnn_sc(dnn_sc) {}
+
+ private:
+  float* sc_ptr;
+  float dnn_sc;
+};
+
+struct fetch_cached_quantizer_base_zp_functor {
+  void operator()() const {
+    zp_ptr[0] = dnn_zp;
+  }
+
+  fetch_cached_quantizer_base_zp_functor(int32_t* zp_ptr, int32_t dnn_zp)
+      : zp_ptr(zp_ptr), dnn_zp(dnn_zp) {}
+
+ private:
+  int32_t* zp_ptr;
+  int32_t dnn_zp;
+};
+
 static inline XPUQuantizerBase<float, int32_t, false>
 fetch_cached_quantizer_base(float dnn_sc, int32_t dnn_zp) {
   using key_t = xpu::dpcpp::lru_key_t;
@@ -169,10 +206,12 @@ fetch_cached_quantizer_base(float dnn_sc, int32_t dnn_zp) {
         key_t,
         /*capacity*/ 256>(key_sc_zp, /*size*/ 1, dpcppGetCurrentQueue());
     sc_ptr = quant_base.scale_ptr();
-    dpcppGetCurrentQueue().single_task([=]() { sc_ptr[0] = dnn_sc; });
+    fetch_cached_quantizer_base_sc_functor f_sc(sc_ptr, dnn_sc);
+    dpcppGetCurrentQueue().single_task<decltype(f_sc)>(f_sc);
 
     zp_ptr = quant_base.zero_point_ptr();
-    dpcppGetCurrentQueue().single_task([=]() { zp_ptr[0] = dnn_zp; });
+    fetch_cached_quantizer_base_zp_functor f_zp(zp_ptr, dnn_zp);
+    dpcppGetCurrentQueue().single_task<decltype(f_zp)>(f_zp);
   }
   return quant_base;
 }

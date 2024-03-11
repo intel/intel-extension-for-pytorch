@@ -91,6 +91,30 @@ static void _launch_kernel(int total_n_elems, func_t f) {
   _elementwise_kernel<func_t>(total_n_elems, f);
 }
 
+template <typename scalar_t, typename offset_calc_t>
+struct flip_kernel_impl_loop_functor {
+  void operator()(const int i) const {
+    const auto offsets = offset_calc.get(i);
+    // offsets can be negative here, but it's fine
+    scalar_t* const __restrict__ out_data =
+        reinterpret_cast<scalar_t*>(out_ptr + offsets[0]);
+    const scalar_t* const __restrict__ in_data =
+        reinterpret_cast<const scalar_t*>(in_ptr + offsets[1]);
+    *out_data = *in_data;
+  }
+
+  flip_kernel_impl_loop_functor(
+      char* const __restrict__ out_ptr,
+      const char* const __restrict__ in_ptr,
+      const offset_calc_t offset_calc)
+      : out_ptr(out_ptr), in_ptr(in_ptr), offset_calc(offset_calc) {}
+
+ private:
+  char* const __restrict__ out_ptr;
+  const char* const __restrict__ in_ptr;
+  const offset_calc_t offset_calc;
+};
+
 template <typename scalar_t>
 void flip_kernel_impl(TensorIterator& iter) {
   if (!iter.can_use_32bit_indexing()) {
@@ -107,15 +131,8 @@ void flip_kernel_impl(TensorIterator& iter) {
   const auto offset_calc =
       make_offset_calculator<2, /*signed_strides=*/true>(iter);
 
-  auto loop = [=](const int i) {
-    const auto offsets = offset_calc.get(i);
-    // offsets can be negative here, but it's fine
-    scalar_t* const __restrict__ out_data =
-        reinterpret_cast<scalar_t*>(out_ptr + offsets[0]);
-    const scalar_t* const __restrict__ in_data =
-        reinterpret_cast<const scalar_t*>(in_ptr + offsets[1]);
-    *out_data = *in_data;
-  };
+  flip_kernel_impl_loop_functor<scalar_t, decltype(offset_calc)> loop(
+      out_ptr, in_ptr, offset_calc);
   _launch_kernel(iter.numel(), loop);
 }
 

@@ -63,6 +63,30 @@ void _amp_non_finite_check_and_unscale_dpcpp_(
       });
 }
 
+template <typename opmath_t>
+struct _amp_foreach_non_finite_check_and_unscale_functor {
+  opmath_t operator()(opmath_t val) const {
+    // There is a slight asymmetry here with the TensorIterator kernel
+    // above. MTA Functors ensure val comes in as opmath_t rather than
+    // scalar_t.
+    if (Numerics<opmath_t>::isinf(val) || Numerics<opmath_t>::isnan(val)) {
+      *found_inf_ptr = 1.f;
+    }
+    // Every thread accesses inv_scale, but it will hit in cache.
+    const auto inv_scale_val = *inv_scale_ptr;
+    return static_cast<opmath_t>(
+        inv_scale_val == 1.f ? val : val * inv_scale_val);
+  }
+  _amp_foreach_non_finite_check_and_unscale_functor(
+      float* found_inf_ptr,
+      float* inv_scale_ptr)
+      : found_inf_ptr(found_inf_ptr), inv_scale_ptr(inv_scale_ptr) {}
+
+ private:
+  float* found_inf_ptr;
+  float* inv_scale_ptr;
+};
+
 // Multiplies each tensor in scaled_grads by inv_scale in-place.
 // If any element of any tensor in scaled_grads is inf or NaN, sets found_inf
 // to 1.0. Uses multi tensor apply (MTA) to process all MTA-safe tensors.
@@ -159,6 +183,8 @@ void _amp_foreach_non_finite_check_and_unscale_(
 
         // multi_tensor_apply guards onto tensor_lists[0][0], no need to guard
         // explicitly.
+        _amp_foreach_non_finite_check_and_unscale_functor<opmath_t> f(
+            found_inf_ptr, inv_scale_ptr);
         multi_tensor_apply<1>(
             tensor_lists,
             UnaryOpFunctor<
@@ -166,19 +192,7 @@ void _amp_foreach_non_finite_check_and_unscale_(
                 /* depth */ 1,
                 /* r_args_depth */ 1,
                 /* res_arg_index */ 0>(),
-            [found_inf_ptr, inv_scale_ptr](opmath_t val) -> opmath_t {
-              // There is a slight asymmetry here with the TensorIterator kernel
-              // above. MTA Functors ensure val comes in as opmath_t rather than
-              // scalar_t.
-              if (Numerics<opmath_t>::isinf(val) ||
-                  Numerics<opmath_t>::isnan(val)) {
-                *found_inf_ptr = 1.f;
-              }
-              // Every thread accesses inv_scale, but it will hit in cache.
-              const auto inv_scale_val = *inv_scale_ptr;
-              return static_cast<opmath_t>(
-                  inv_scale_val == 1.f ? val : val * inv_scale_val);
-            });
+            f);
       });
 }
 
@@ -241,7 +255,7 @@ void _amp_update_scale_kernel(
         growth_factor,
         backoff_factor,
         growth_interval);
-    cgf.single_task(kfn);
+    cgf.single_task<decltype(kfn)>(kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);

@@ -155,6 +155,27 @@ Tensor _logcumsumexp(const Tensor& self, int64_t dim) {
   return _logcumsumexp_out(self, dim, result);
 }
 
+template <typename scalar_t, typename accscalar_t>
+struct _logcumsumexp_out_log_add_exp_functor {
+  scalar_t operator()(const scalar_t x, const scalar_t y) const {
+    // sycl::min returns first arg if one of the args is nan
+    scalar_t min =
+        Numerics<scalar_t>::isnan(y) ? y : Numerics<scalar_t>::min(x, y);
+    // sycl::max returns first arg if one of the args is nan
+    scalar_t max =
+        Numerics<scalar_t>::isnan(y) ? y : Numerics<scalar_t>::max(x, y);
+    if (min != max ||
+        (!Numerics<accscalar_t>::isinf(static_cast<accscalar_t>(min)))) {
+      // nan will be propagated here
+      return Numerics<scalar_t>::log1p(Numerics<scalar_t>::exp(min - max)) +
+          max;
+    } else {
+      // special case to correctly handle infinite inputs
+      return x;
+    }
+  }
+};
+
 Tensor& _logcumsumexp_out(const Tensor& self, int64_t dim, Tensor& result) {
   const auto wrap_dim = maybe_wrap_dim(dim, self.dim());
   result.resize_(self.sizes());
@@ -175,24 +196,8 @@ Tensor& _logcumsumexp_out(const Tensor& self, int64_t dim, Tensor& result) {
       [&]() {
         using accscalar_t = acc_type<scalar_t>;
         scalar_t init = Numerics<scalar_t>::lower_bound();
-        auto log_add_exp = [](const scalar_t x, const scalar_t y) -> scalar_t {
-          // sycl::min returns first arg if one of the args is nan
-          scalar_t min =
-              Numerics<scalar_t>::isnan(y) ? y : Numerics<scalar_t>::min(x, y);
-          // sycl::max returns first arg if one of the args is nan
-          scalar_t max =
-              Numerics<scalar_t>::isnan(y) ? y : Numerics<scalar_t>::max(x, y);
-          if (min != max ||
-              (!Numerics<accscalar_t>::isinf(static_cast<accscalar_t>(min)))) {
-            // nan will be propagated here
-            return Numerics<scalar_t>::log1p(
-                       Numerics<scalar_t>::exp(min - max)) +
-                max;
-          } else {
-            // special case to correctly handle infinite inputs
-            return x;
-          }
-        };
+        _logcumsumexp_out_log_add_exp_functor<scalar_t, accscalar_t>
+            log_add_exp;
         scan<INCLUSIVE_TYPE, scalar_t, scalar_t>(
             result, self, wrap_dim, init, log_add_exp);
       });

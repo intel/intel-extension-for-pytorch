@@ -34,6 +34,43 @@ struct QAddImplKernelFunctor {
 };
 
 template <typename T>
+struct q_add_impl_func {
+  T operator()(T a, T b) const {
+    float fa = (a - azp) * ascale;
+    float fb = (b - bzp) * bscale;
+    float fo = fa + fb;
+    if (with_relu)
+      fo = fo >= 0.f ? fo : 0.f;
+    return quantize_val<T>((float)(oscale), zero_point, fo);
+  }
+
+  q_add_impl_func(
+      float oscale_,
+      float ascale_,
+      int32_t azp_,
+      float bscale_,
+      int32_t bzp_,
+      bool with_relu_,
+      int64_t zero_point_)
+      : oscale(oscale_),
+        ascale(ascale_),
+        azp(azp_),
+        bscale(bscale_),
+        bzp(bzp_),
+        with_relu(with_relu_),
+        zero_point(zero_point_) {}
+
+ private:
+  float oscale;
+  float ascale;
+  int32_t azp;
+  float bscale;
+  int32_t bzp;
+  bool with_relu;
+  int64_t zero_point;
+};
+
+template <typename T>
 Tensor q_add_impl(
     Tensor qa,
     Tensor qb,
@@ -59,14 +96,8 @@ Tensor q_add_impl(
   float bscale = qb_.q_scale();
   int32_t bzp = qb_.q_zero_point();
 
-  auto func = [=](T a, T b) -> T {
-    float fa = (a - azp) * ascale;
-    float fb = (b - bzp) * bscale;
-    float fo = fa + fb;
-    if (with_relu)
-      fo = fo >= 0.f ? fo : 0.f;
-    return quantize_val<T>((float)(oscale), zero_point, fo);
-  };
+  q_add_impl_func<T> func(
+      oscale, ascale, azp, bscale, bzp, with_relu, zero_point);
 
   auto& dpcpp_queue = xpu::dpcpp::dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgh) {

@@ -169,18 +169,24 @@ static inline double rand_poisson(
 }
 
 template <typename scalar_t>
+struct poisson_sycl_kernel_functor {
+  void operator()(
+      AtenIpexTypeXPU::randStatePhilox4_32_10_t& state,
+      scalar_t& ret,
+      scalar_t lambda) const {
+    ret = rand_poisson(&state, lambda);
+  }
+};
+
+template <typename scalar_t>
 void poisson_sycl_kernel(
     at::Tensor& ret,
     const at::Tensor& lambda,
     PhiloxState philox_args) {
   at::TensorIterator iter =
       at::TensorIteratorConfig().add_output(ret).add_input(lambda).build();
-  distribution_unary_kernel<scalar_t, scalar_t>(
-      iter,
-      philox_args,
-      [](AtenIpexTypeXPU::randStatePhilox4_32_10_t& state,
-         scalar_t& ret,
-         scalar_t lambda) { ret = rand_poisson(&state, lambda); });
+  poisson_sycl_kernel_functor<scalar_t> f;
+  distribution_unary_kernel<scalar_t, scalar_t>(iter, philox_args, f);
 }
 
 Tensor poisson(const Tensor& lambda, c10::optional<Generator> gen_) {

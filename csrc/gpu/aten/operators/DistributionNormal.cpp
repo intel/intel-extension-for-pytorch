@@ -74,6 +74,20 @@ bool resize_output_for_normal(
   }
 }
 
+template <typename scalar_t, typename accscalar_t>
+struct normal_dpcpp_functor {
+  scalar_t operator()(accscalar_t rand) const {
+    auto ret = static_cast<scalar_t>(rand * std + mean);
+    return ret;
+  }
+  normal_dpcpp_functor(accscalar_t mean, accscalar_t std)
+      : mean(mean), std(std) {}
+
+ private:
+  accscalar_t mean;
+  accscalar_t std;
+};
+
 void normal_dpcpp(
     TensorIterator& iter,
     double mean_,
@@ -91,10 +105,7 @@ void normal_dpcpp(
         auto mean = static_cast<accscalar_t>(mean_);
         auto std = static_cast<accscalar_t>(std_);
         // define lambda to multiply std and add mean
-        auto normal_func = [mean, std](accscalar_t rand) {
-          auto ret = static_cast<scalar_t>(rand * std + mean);
-          return ret;
-        };
+        normal_dpcpp_functor<scalar_t, accscalar_t> normal_func(mean, std);
         AtenIpexTypeXPU::
             normal_and_transform<scalar_t, accscalar_t, PHILOX_ENGINE_CALLS>(
                 iter, gen, normal_func);

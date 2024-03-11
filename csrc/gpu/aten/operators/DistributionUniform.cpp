@@ -12,6 +12,23 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t, typename accscalar_t>
+struct uniform_kernel_functor {
+  scalar_t operator()(accscalar_t rand) const {
+    auto reverse_bound_rand = rand == static_cast<accscalar_t>(1.0)
+        ? static_cast<accscalar_t>(0.0)
+        : rand;
+    return static_cast<scalar_t>(reverse_bound_rand * range + from);
+  }
+
+  uniform_kernel_functor(scalar_t from, accscalar_t range)
+      : from(from), range(range) {}
+
+ private:
+  scalar_t from;
+  accscalar_t range;
+};
+
 void uniform_kernel(
     TensorIterator& iter,
     double from_,
@@ -29,12 +46,7 @@ void uniform_kernel(
         auto to = static_cast<scalar_t>(to_);
         using accscalar_t = acc_type<scalar_t>;
         auto range = static_cast<accscalar_t>(to - from);
-        auto uniform_func = [range, from](accscalar_t rand) {
-          auto reverse_bound_rand = rand == static_cast<accscalar_t>(1.0)
-              ? static_cast<accscalar_t>(0.0)
-              : rand;
-          return static_cast<scalar_t>(reverse_bound_rand * range + from);
-        };
+        uniform_kernel_functor<scalar_t, accscalar_t> uniform_func(from, range);
         uniform_and_transform<scalar_t, accscalar_t, PHILOX_ENGINE_CALLS>(
             iter, gen, uniform_func);
       });

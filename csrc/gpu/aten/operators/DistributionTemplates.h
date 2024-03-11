@@ -671,6 +671,18 @@ void distribution_binary_kernel(
   }
 }
 
+struct uniform_and_transform_rand_uniform2_double_functor {
+  auto operator()(randStatePhilox4_32_10_t* state) const {
+    return rand_uniform2_double(state);
+  }
+};
+
+struct uniform_and_transform_rand_uniform4_functor {
+  auto operator()(randStatePhilox4_32_10_t* state) const {
+    return rand_uniform4(state);
+  }
+};
+
 template <
     typename scalar_t,
     typename accscalar_t,
@@ -683,21 +695,27 @@ void uniform_and_transform(
     transform_t transform) {
   // Distribution backbone only handle two accumulate type.
   if (std::is_same<scalar_t, double>::value) {
+    uniform_and_transform_rand_uniform2_double_functor f;
     distribution_nullary_kernel<scalar_t, accscalar_t, engine_calls / 2>(
-        iter,
-        gen,
-        [](randStatePhilox4_32_10_t* state) {
-          return rand_uniform2_double(state);
-        },
-        transform);
+        iter, gen, f, transform);
   } else {
+    uniform_and_transform_rand_uniform4_functor f;
     distribution_nullary_kernel<scalar_t, accscalar_t, engine_calls>(
-        iter,
-        gen,
-        [](randStatePhilox4_32_10_t* state) { return rand_uniform4(state); },
-        transform);
+        iter, gen, f, transform);
   }
 }
+
+struct normal_and_transform_rand_normal2_double_functor {
+  auto operator()(randStatePhilox4_32_10_t* state) const {
+    return rand_normal2_double(state);
+  }
+};
+
+struct normal_and_transform_rand_normal4_functor {
+  auto operator()(randStatePhilox4_32_10_t* state) const {
+    return rand_normal4(state);
+  }
+};
 
 template <
     typename scalar_t,
@@ -710,19 +728,13 @@ void normal_and_transform(
     RNG gen,
     transform_t transform) {
   if (std::is_same<scalar_t, double>::value) {
+    normal_and_transform_rand_normal2_double_functor f;
     distribution_nullary_kernel<scalar_t, accscalar_t, engine_calls / 2>(
-        iter,
-        gen,
-        [](randStatePhilox4_32_10_t* state) {
-          return rand_normal2_double(state);
-        },
-        transform);
+        iter, gen, f, transform);
   } else {
+    normal_and_transform_rand_normal4_functor f;
     distribution_nullary_kernel<scalar_t, accscalar_t, engine_calls>(
-        iter,
-        gen,
-        [](randStatePhilox4_32_10_t* state) { return rand_normal4(state); },
-        transform);
+        iter, gen, f, transform);
   }
 }
 
