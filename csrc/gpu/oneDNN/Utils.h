@@ -1,5 +1,13 @@
 #pragma once
 
+#if __has_include(<sycl/sycl.hpp>)
+#include <sycl/sycl.hpp>
+#elif __has_include(<CL/sycl.hpp>)
+#include <CL/sycl.hpp>
+#else
+#error "Unsupported compiler"
+#endif
+
 #include <iostream>
 
 #include <ATen/ATen.h>
@@ -13,6 +21,7 @@
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
 #include <utils/Macros.h>
+#include <utils/Profiler.h>
 #include <utils/Settings.h>
 
 using namespace dnnl;
@@ -25,6 +34,13 @@ using namespace dnnl;
         "onednn_kernel",                                               \
         dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__)); \
   }
+
+#define DPCPP_ONEDNN_EXEC_WITH_EVENT(prim, stream, args, deps) \
+  auto q = dnnl::sycl_interop::get_queue((stream));            \
+  DPCPP_ONEDNN_EXT_SUBMIT(                                     \
+      (q),                                                     \
+      "onednn_kernel_with_event",                              \
+      dnnl::sycl_interop::execute((prim), (stream), args, deps));
 
 // FIXME: In some cases, for example, concat, reorder, and etc.
 // oneDNN only supports dims <= 6 for now.

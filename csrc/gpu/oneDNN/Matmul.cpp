@@ -1,9 +1,16 @@
-#pragma once
+#if __has_include(<sycl/sycl.hpp>)
+#include <sycl/sycl.hpp>
+#elif __has_include(<CL/sycl.hpp>)
+#include <CL/sycl.hpp>
+#else
+#error "Unsupported compiler"
+#endif
 
 #include <ATen/ATen.h>
 
 #include <ATen/record_function.h>
 
+#include <oneDNN/Reorder.h>
 #include <oneDNN/Runtime.h>
 #include <quantized/QUtils.h>
 #include <runtime/Utils.h>
@@ -20,13 +27,14 @@ using namespace at::AtenIpexTypeXPU;
 
 namespace xpu {
 namespace oneDNN {
-static inline void matmul(
+sycl::event matmul(
     Tensor& result,
     const Tensor& mat1,
     const Tensor& mat2,
     const Tensor& b_raw,
     bool m2_trans,
-    Attr attr) {
+    Attr attr,
+    const std::vector<sycl::event>& deps) {
   size_t dims = result.dim();
   TORCH_CHECK(
       dims == 2 || dims == 3,
@@ -348,7 +356,7 @@ static inline void matmul(
     args.insert({DNNL_ARG_BIAS, bias_m});
   }
 
-  DPCPP_ONEDNN_EXEC(matmul_p, strm, args);
+  DPCPP_ONEDNN_EXEC_WITH_EVENT(matmul_p, strm, args, deps);
 
   if (is_onednn_layout_suggested && dst_m != dst_usr_m && dims == 2) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
@@ -357,6 +365,9 @@ static inline void matmul(
 
   if (!dst.is_same(result))
     result.copy_(dst);
+
+  // e is a sycl::event defined in DPCPP_ONEDNN_EXEC_WITH_EVENT
+  return e;
 }
 
 } // namespace oneDNN

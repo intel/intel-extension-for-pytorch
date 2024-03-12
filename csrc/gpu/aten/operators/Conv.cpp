@@ -811,7 +811,7 @@ Tensor _convolution_out(
           params.dilation);
       output = at::empty(dst_tz, input.options(), mfmt);
     }
-    output = xpu::oneDNN::convolution(
+    xpu::oneDNN::convolution(
         output,
         input,
         weight,
