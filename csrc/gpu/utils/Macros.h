@@ -1,7 +1,7 @@
 #pragma once
 
 #include <iostream>
-#include "include/xpu/Macros.h"
+#include "include/Macros.h"
 
 #define IPEX_DISABLE_COPY_AND_ASSIGN(classname) \
   classname(const classname&) = delete;         \

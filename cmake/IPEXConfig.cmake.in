@@ -30,9 +30,15 @@ else()
 endif()
 
 # Include directories.
-if(EXISTS "${IPEX_INSTALL_PREFIX}/include")
-  list(APPEND IPEX_INCLUDE_DIRS ${IPEX_INSTALL_PREFIX}/include)
-endif()
+function(header_files_search directory)
+  if(EXISTS "${IPEX_INSTALL_PREFIX}/include/${directory}")
+    set(IPEX_INCLUDE_DIRS ${IPEX_INCLUDE_DIRS} "${IPEX_INSTALL_PREFIX}/include/${directory}" PARENT_SCOPE)
+  endif()
+endfunction()
+
+header_files_search(".")
+header_files_search("cpu")
+header_files_search("xpu")
 
 # Library dependencies.
 if(@BUILD_WITH_CPU@)

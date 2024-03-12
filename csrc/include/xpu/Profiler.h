@@ -26,7 +26,7 @@
 #error "Unsupported compiler"
 #endif
 #include <c10/core/Device.h>
-#include "Macros.h"
+#include "../Macros.h"
 
 namespace xpu {
 
