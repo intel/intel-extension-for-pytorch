@@ -29,6 +29,10 @@ Running ResNet50 Float32 single precision training example:
 python single_instance_training_fp32.py
 ```
 
+We provided support for BFloat16 half precision training.
+Please refer to [Automatic Mixed Precision (AMP) introduction](https://pytorch.org/docs/stable/amp.html) for more details.
+BFloat16 calculations are further accelerated on the processors supporting [Intel® Advanced Matrix Extensions (AMX)](https://en.wikipedia.org/wiki/Advanced_Matrix_Extensions) instructions.
+
 Running ResNet50 BFloat16 half precision training example:
 
 ```bash
