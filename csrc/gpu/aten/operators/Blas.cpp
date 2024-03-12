@@ -2,6 +2,7 @@
 #include <ATen/WrapDimUtilsMulti.h>
 #include <ATen/native/Resize.h>
 #include <runtime/Device.h>
+#include <runtime/Utils.h>
 #include "BlasImpl.h"
 #include "utils/CustomOperatorRegistration.h"
 
@@ -38,6 +39,9 @@ Tensor& addmm_out(
       "x",
       mat2.sizes()[1],
       ")");
+  int m = mat1.sizes()[0];
+  int n = mat2.sizes()[1];
+  int k = mat2.sizes()[0];
 
   std::vector<int64_t> result_shape = {mat1.size(0), mat2.size(1)};
   result.resize_(result_shape);
@@ -81,7 +85,15 @@ Tensor& addmm_out(
 #endif
   }
 
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
+
 #if defined(USE_XETLA)
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, self, mat1, mat2);
+  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  bool xetla_valid = fp64_valid && compute_eng_valid;
   if (dpcppGetDeviceHasXMX()) {
     if (alpha.to<float>() == 1.f && self.dim() == 1) {
       auto policy =
@@ -92,7 +104,7 @@ Tensor& addmm_out(
               .add_epilogue(
                   self, HGEMM_XETLA::EpilogueType::BIAS, beta.to<float>())
               .build();
-      if (policy.valid()) {
+      if (xetla_valid && policy.valid()) {
         auto status = policy.run();
         if (status == xpu::xetla::GemmStatus::kSuccess)
           return result;
@@ -109,7 +121,7 @@ Tensor& addmm_out(
               .add_epilogue(
                   self, HGEMM_XETLA::EpilogueType::RES_ADD, beta.to<float>())
               .build();
-      if (policy.valid()) {
+      if (xetla_valid && policy.valid()) {
         auto status = policy.run();
         if (status == xpu::xetla::GemmStatus::kSuccess)
           return result;
@@ -119,6 +131,9 @@ Tensor& addmm_out(
 #endif
 
   // general case
+  char str__[100];
+  sprintf(str__, "onednn_addmm(%d, %d, %d)", m, n, k);
+  RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
   Tensor bias = at::Tensor();
   Attr attr;
   float beta_ = beta.to<float>();

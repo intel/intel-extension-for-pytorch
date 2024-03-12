@@ -4,6 +4,7 @@
 #include <ATen/record_function.h>
 #include <runtime/Utils.h>
 #include <iostream>
+#include "Blas.h"
 #include "Linear.h"
 #include "comm/ATDispatch.h"
 #include "utils/CustomOperatorRegistration.h"
@@ -14,6 +15,12 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 using namespace xpu::xetla;
+
+inline bool fp64_valid() {
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  return Settings::I().has_2d_block_array(curDevID);
+}
 
 #define RECORD_ONEDNN_FUNCTION_IMPL(F)                     \
   char str__[100];                                         \
@@ -26,13 +33,16 @@ static Tensor mm_common(const Tensor& a, const Tensor& b) {
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
+  xpu::COMPUTE_ENG real_eng = choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b);
+  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy = HGEMM_XETLA()
                     .add_matrix_c(output)
                     .add_matrix_a(a)
                     .add_matrix_b(b)
                     .build();
   GemmStatus status = GemmStatus::kError;
-  if (policy.valid()) {
+  if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
   if (status != GemmStatus::kSuccess) {
@@ -55,6 +65,10 @@ static Tensor mm_resadd(
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b, res);
+  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy =
       HGEMM_XETLA()
           .add_matrix_c(output)
@@ -63,7 +77,7 @@ static Tensor mm_resadd(
           .add_epilogue(res, HGEMM_XETLA::EpilogueType::RES_ADD, res_factor)
           .build();
   GemmStatus status = GemmStatus::kError;
-  if (policy.valid()) {
+  if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
   if (status != GemmStatus::kSuccess) {
@@ -92,6 +106,10 @@ static Tensor mm_resadd_resadd(
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b, res0, res1);
+  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy =
       HGEMM_XETLA()
           .add_matrix_c(output)
@@ -101,7 +119,7 @@ static Tensor mm_resadd_resadd(
           .add_epilogue(res1, HGEMM_XETLA::EpilogueType::RES_ADD, res1_factor)
           .build();
   GemmStatus status = GemmStatus::kError;
-  if (policy.valid()) {
+  if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
   if (status != GemmStatus::kSuccess) {
@@ -131,6 +149,10 @@ static Tensor mm_bias(
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b, bias);
+  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy =
       HGEMM_XETLA()
           .add_matrix_c(output)
@@ -139,7 +161,7 @@ static Tensor mm_bias(
           .add_epilogue(bias, HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
           .build();
   GemmStatus status = GemmStatus::kError;
-  if (policy.valid()) {
+  if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
   if (status != GemmStatus::kSuccess) {
@@ -168,6 +190,10 @@ static Tensor mm_bias_resadd(
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b, bias, res);
+  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy =
       HGEMM_XETLA()
           .add_matrix_c(output)
@@ -177,7 +203,7 @@ static Tensor mm_bias_resadd(
           .add_epilogue(res, HGEMM_XETLA::EpilogueType::RES_ADD, res_factor)
           .build();
   GemmStatus status = GemmStatus::kError;
-  if (policy.valid()) {
+  if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
   if (status != GemmStatus::kSuccess) {
@@ -210,6 +236,10 @@ static Tensor mm_bias_resadd_resadd(
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b, bias, res0, res1);
+  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy =
       HGEMM_XETLA()
           .add_matrix_c(output)
@@ -220,7 +250,7 @@ static Tensor mm_bias_resadd_resadd(
           .add_epilogue(res1, HGEMM_XETLA::EpilogueType::RES_ADD, res1_factor)
           .build();
   GemmStatus status = GemmStatus::kError;
-  if (policy.valid()) {
+  if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
   if (status != GemmStatus::kSuccess) {
@@ -249,6 +279,10 @@ static Tensor mm_resmul(const Tensor& a, const Tensor& b, const Tensor& res) {
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b, res);
+  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy = HGEMM_XETLA()
                     .add_matrix_c(output)
                     .add_matrix_a(a)
@@ -256,13 +290,19 @@ static Tensor mm_resmul(const Tensor& a, const Tensor& b, const Tensor& res) {
                     .add_epilogue(res, HGEMM_XETLA::EpilogueType::RES_MUL)
                     .build();
   GemmStatus status = GemmStatus::kError;
-  if (policy.valid()) {
+  if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_resmul)
-    xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, Attr());
-    output = output * res.flatten(0, -2);
+    bool is_fused;
+    Attr attr;
+    attr.append_post_binary(attr.kind_with_binary_mul, res);
+
+    output = impl::matmul_fusion_variants(output, a, b, true, attr, is_fused);
+    if (!is_fused) {
+      output = output * res.flatten(0, -2);
+    }
   }
   return matmul_resize(a, output);
 }
@@ -273,6 +313,9 @@ static Tensor mm_silu(const Tensor& a, const Tensor& b) {
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
+  xpu::COMPUTE_ENG real_eng = choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b);
+  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy = HGEMM_XETLA()
                     .add_matrix_c(output)
                     .add_matrix_a(a)
@@ -280,13 +323,13 @@ static Tensor mm_silu(const Tensor& a, const Tensor& b) {
                     .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::SILU)
                     .build();
   GemmStatus status = GemmStatus::kError;
-  if (policy.valid()) {
+  if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_silu)
-    xpu::oneDNN::matmul(output, af, b, at::Tensor(), true, Attr());
-    at::AtenIpexTypeXPU::silu_out(output, output);
+    auto result = matmul_silu(a, b);
+    return matmul_resize(a, result);
   }
   return matmul_resize(a, output);
 }
@@ -300,6 +343,10 @@ Tensor matmul_relu(
   int n = weight.sizes()[1];
   int k = weight.sizes()[0];
   auto output = at::empty({m, n}, input.options());
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, input);
+  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  bool xetla_valid = fp64_valid() && compute_eng_valid;
   GemmStatus status = GemmStatus::kError;
   if (bias.has_value()) {
     auto policy =
@@ -311,7 +358,7 @@ Tensor matmul_relu(
                 bias.value(), HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
             .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::RELU)
             .build();
-    if (policy.valid()) {
+    if (xetla_valid && policy.valid()) {
       status = policy.run();
       if (status == GemmStatus::kSuccess) {
         return matmul_resize(input, output);
@@ -343,6 +390,10 @@ Tensor matmul_gelu(
   int n = weight.sizes()[1];
   int k = weight.sizes()[0];
   auto output = at::empty({m, n}, input.options());
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, input);
+  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  bool xetla_valid = fp64_valid() && compute_eng_valid;
   if (bias.has_value() && approximate == "tanh") {
     auto policy =
         HGEMM_XETLA()
@@ -353,7 +404,7 @@ Tensor matmul_gelu(
                 bias.value(), HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
             .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::GELU)
             .build();
-    if (policy.valid()) {
+    if (xetla_valid && policy.valid()) {
       auto status = policy.run();
       if (status == GemmStatus::kSuccess)
         return matmul_resize(input, output);
@@ -442,9 +493,6 @@ static void mm_qkv_out(
   DeviceId curDevID;
   AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
   bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, input);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
   bool out0_valid =
       reinterpret_cast<uint64_t>(out0.data_ptr<scalar_t>()) % 8 == 0;
   bool out1_valid =
@@ -461,11 +509,10 @@ static void mm_qkv_out(
         reinterpret_cast<uint64_t>(bias_.value().data_ptr<scalar_t>()) % 8 == 0;
   }
   bool shape_valid = k % 4 == 0 && n % 4 == 0;
-  bool use_xetla = fp64_valid && compute_eng_valid && out0_valid &&
-      out1_valid && out2_valid && input_valid && weight_valid && bias_valid &&
-      shape_valid;
+  bool xetla_valid = fp64_valid && out0_valid && out1_valid && out2_valid &&
+      input_valid && weight_valid && bias_valid && shape_valid;
 
-  if (use_xetla) {
+  if (xetla_valid) {
     char str__[100];
     if (!has_bias) {
       sprintf(str__, "hgemm_qkv(%d, %d, %d)", m, n, k);
@@ -572,9 +619,6 @@ static void mm_qkv_group_out(
   DeviceId curDevID;
   AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
   bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, input);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
   bool out0_valid =
       reinterpret_cast<uint64_t>(out0.data_ptr<scalar_t>()) % 8 == 0;
   bool out1_valid =
@@ -591,11 +635,10 @@ static void mm_qkv_group_out(
         reinterpret_cast<uint64_t>(bias_.value().data_ptr<scalar_t>()) % 8 == 0;
   }
   bool shape_valid = k % 4 == 0 && n % 4 == 0;
-  bool use_xetla = fp64_valid && compute_eng_valid && out0_valid &&
-      out1_valid && out2_valid && input_valid && weight_valid && bias_valid &&
-      shape_valid;
+  bool xetla_valid = fp64_valid && out0_valid && out1_valid && out2_valid &&
+      input_valid && weight_valid && bias_valid && shape_valid;
 
-  if (use_xetla) {
+  if (xetla_valid) {
     char str__[100];
     if (!has_bias) {
       sprintf(str__, "hgemm_qkv_group(%d, %d, %d, g=%d)", m, n, k, group);

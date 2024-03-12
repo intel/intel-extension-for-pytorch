@@ -83,10 +83,6 @@ class HGEMM_XETLA final {
         a_->scalar_type() == kHalf && b_->scalar_type() == kHalf &&
         c_->scalar_type() == kHalf);
 
-    DeviceId curDevID;
-    AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-    __CHECK(Settings::I().has_2d_block_array(curDevID));
-
     using scalar_t =
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
     __CHECK(reinterpret_cast<uint64_t>(c_->data_ptr<scalar_t>()) % 8 == 0);
@@ -113,18 +109,8 @@ class HGEMM_XETLA final {
     __CHECK(is_a_row_major_);
     __CHECK(is_b_row_major_);
 
-    // check the input tensor
-    xpu::COMPUTE_ENG real_eng =
-        choose_compute_eng(xpu::COMPUTE_ENG::XETLA, *a_, *b_);
-    __CHECK(real_eng == xpu::COMPUTE_ENG::XETLA);
-
     for (int i = 0; i < num_epilogues_; i++) {
       auto eptensor = epilogue_tensors_[i];
-      // check all epilogues
-      xpu::COMPUTE_ENG real_eng =
-          choose_compute_eng(xpu::COMPUTE_ENG::XETLA, *eptensor);
-      __CHECK(real_eng == xpu::COMPUTE_ENG::XETLA);
-
       switch (epilogue_types_[i]) {
         case BIAS: {
           __CHECK(

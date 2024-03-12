@@ -4,6 +4,10 @@
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+// silu(m2 * m2)
+at::Tensor matmul_silu(const at::Tensor& tensor1, const at::Tensor& tensor2);
+
 // res = (m1 * m2.transpose()) / oscale
 at::Tensor trans_matmul_div_scalar(
     const at::Tensor& tensor2,
