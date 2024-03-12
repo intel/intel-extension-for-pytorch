@@ -9,6 +9,7 @@
 
 #include <oneapi/dnnl/dnnl.hpp>
 #include "Attr.h"
+#include "ConvUtils.h"
 
 using namespace xpu::dpcpp;
 

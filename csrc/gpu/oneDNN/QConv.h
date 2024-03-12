@@ -5,7 +5,6 @@
 #include <ATen/record_function.h>
 #include <core/MemoryFormat.h>
 
-#include <oneDNN/Conv.h>
 #include <oneDNN/Runtime.h>
 #include <quantized/QUtils.h>
 #include <quantized/Quantizer.h>
@@ -13,6 +12,7 @@
 #include <tensor/Tensor.h>
 #include <utils/LRUCache.h>
 #include "Attr.h"
+#include "ConvUtils.h"
 #include "Reorder.h"
 #include "Utils.h"
 

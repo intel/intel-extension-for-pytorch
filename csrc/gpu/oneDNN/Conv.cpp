@@ -1,4 +1,10 @@
-#pragma once
+#if __has_include(<sycl/sycl.hpp>)
+#include <sycl/sycl.hpp>
+#elif __has_include(<CL/sycl.hpp>)
+#include <CL/sycl.hpp>
+#else
+#error "Unsupported compiler"
+#endif
 
 #include <ATen/ATen.h>
 #include <ATen/core/grad_mode.h>
@@ -10,6 +16,7 @@
 #include <tensor/Tensor.h>
 #include <utils/LRUCache.h>
 #include "Attr.h"
+#include "ConvUtils.h"
 #include "Reorder.h"
 #include "Utils.h"
 
@@ -21,111 +28,6 @@ using namespace at::AtenIpexTypeXPU;
 
 namespace xpu {
 namespace oneDNN {
-
-constexpr int src_batch_size_dim = 0;
-constexpr int wgh_dst_channels_dim = 0;
-
-static inline memory::dims conv_dst_tz(
-    int64_t ndim,
-    IntArrayRef src_tz,
-    IntArrayRef wgh_tz,
-    IntArrayRef padding_front_top_left,
-    IntArrayRef padding_back_bottom_right,
-    IntArrayRef stride,
-    IntArrayRef dilation) {
-  bool has_dilation = dilation.size() > 0;
-  memory::dims dst_tz(ndim);
-  dst_tz[0] = src_tz[src_batch_size_dim];
-  dst_tz[1] = wgh_tz[wgh_dst_channels_dim];
-  for (size_t d = 2; d < ndim; ++d) {
-    auto dilate = has_dilation ? dilation[d - 2] : 1;
-    auto kernel = dilate * (wgh_tz[d] - 1) + 1;
-    dst_tz[d] =
-        (src_tz[d] +
-         (padding_front_top_left[d - 2] + padding_back_bottom_right[d - 2]) -
-         kernel) /
-            stride[d - 2] +
-        1;
-  }
-  return dst_tz;
-}
-
-static inline memory::dims compatible_dilation(IntArrayRef& dilation) {
-  memory::dims ret = dilation.vec();
-  for (auto it = ret.begin(); it != ret.end(); it++) {
-    *it -= 1;
-  }
-  return ret;
-}
-
-static inline memory::format_tag conv_src_fmt(
-    const int64_t ndim,
-    const bool is_channels_last = false) {
-  if (!is_channels_last) {
-    return (ndim == 3)
-        ? memory::format_tag::ncw
-        : ((ndim == 4) ? memory::format_tag::nchw
-                       : ((ndim == 5) ? memory::format_tag::ncdhw
-                                      : memory::format_tag::undef));
-  } else {
-    return (ndim == 3)
-        ? memory::format_tag::nwc
-        : ((ndim == 4) ? memory::format_tag::nhwc
-                       : ((ndim == 5) ? memory::format_tag::ndhwc
-                                      : memory::format_tag::undef));
-  }
-}
-
-static inline memory::format_tag conv_wgh_fmt(
-    const int64_t ndim,
-    const bool grouped = false,
-    const bool is_channels_last = false) {
-  if (!is_channels_last) {
-    return (ndim == 3)
-        ? (grouped ? memory::format_tag::goiw : memory::format_tag::oiw)
-        : (ndim == 4)
-        ? (grouped ? memory::format_tag::goihw : memory::format_tag::oihw)
-        : ((ndim == 5) ? (grouped ? memory::format_tag::goidhw
-                                  : memory::format_tag::oidhw)
-                       : memory::format_tag::undef);
-  } else {
-    return (ndim == 3)
-        ? (grouped ? memory::format_tag::gowi : memory::format_tag::owi)
-        : (ndim == 4)
-        ? (grouped ? memory::format_tag::gohwi : memory::format_tag::ohwi)
-        : ((ndim == 5) ? (grouped ? memory::format_tag::godhwi
-                                  : memory::format_tag::odhwi)
-                       : memory::format_tag::undef);
-  }
-}
-
-static inline memory::dims compatible_wgh_dims(
-    const int64_t ndim,
-    const int64_t groups,
-    const int64_t oc,
-    const int64_t ic,
-    const IntArrayRef wsizes) {
-  if (ndim == 3) {
-    auto kw = wsizes[2];
-    return (groups != 1) ? memory::dims({groups, oc / groups, ic / groups, kw})
-                         : memory::dims({oc, ic, kw});
-  } else if (ndim == 4) {
-    auto kh = wsizes[2];
-    auto kw = wsizes[3];
-    return (groups != 1)
-        ? memory::dims({groups, oc / groups, ic / groups, kh, kw})
-        : memory::dims({oc, ic, kh, kw});
-  } else if (ndim == 5) {
-    auto kd = wsizes[2];
-    auto kh = wsizes[3];
-    auto kw = wsizes[4];
-    return (groups != 1)
-        ? memory::dims({groups, oc / groups, ic / groups, kd, kh, kw})
-        : memory::dims({oc, ic, kd, kh, kw});
-  }
-
-  return {};
-}
 
 static std::tuple<
     memory::desc,
@@ -294,7 +196,7 @@ static memory conv_get_expected_dst_memory(
   return dst_m;
 }
 
-static at::Tensor convolution(
+sycl::event convolution(
     at::Tensor& dst,
     const at::Tensor& src,
     const at::Tensor& wgh,
@@ -304,7 +206,8 @@ static at::Tensor convolution(
     IntArrayRef stride,
     IntArrayRef dilation,
     int64_t groups,
-    Attr& attr) {
+    Attr& attr,
+    const std::vector<sycl::event>& deps) {
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -412,17 +315,17 @@ static at::Tensor convolution(
 #endif
 
   auto conv_forward = convolution_forward(conv_fwd_pd);
-  DPCPP_ONEDNN_EXEC(conv_forward, strm, args);
+  DPCPP_ONEDNN_EXEC_WITH_EVENT(conv_forward, strm, args, deps);
 
   if (is_onednn_layout_suggested && dst_blocked.data_ptr() != dst.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_blocked);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));
   }
 
-  return dst;
+  return e;
 }
 
-static void convolution_backward_weights(
+sycl::event convolution_backward_weights(
     at::Tensor& diff_wgh,
     at::Tensor& diff_bia,
     const at::Tensor& diff_dst,
@@ -432,7 +335,8 @@ static void convolution_backward_weights(
     IntArrayRef padding_back_bottom_right,
     IntArrayRef stride,
     IntArrayRef dilation,
-    int64_t groups) {
+    int64_t groups,
+    const std::vector<sycl::event>& deps) {
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -539,7 +443,7 @@ static void convolution_backward_weights(
 
   // execute primitive
   auto conv_bwd_w = dnnl::convolution_backward_weights(conv_bwd_w_pd);
-  DPCPP_ONEDNN_EXEC(conv_bwd_w, strm, args);
+  DPCPP_ONEDNN_EXEC_WITH_EVENT(conv_bwd_w, strm, args, deps);
 
   if (is_onednn_layout_suggested && diff_wgh_m.get_desc() != wgh_usr_md) {
     // expected_diff_wgh contains the result of gw backward in blk format.
@@ -563,9 +467,12 @@ static void convolution_backward_weights(
     }
     xpu::oneDNN::reorder(expected_diff_wgh, reshaped_diff_wgh);
   }
+
+  // e is a sycl::event defined in DPCPP_ONEDNN_EXEC_WITH_EVENT
+  return e;
 }
 
-static void convolution_backward_data(
+sycl::event convolution_backward_data(
     at::Tensor& diff_src,
     const at::Tensor& diff_dst,
     const at::Tensor& weight,
@@ -574,7 +481,8 @@ static void convolution_backward_data(
     IntArrayRef stride,
     IntArrayRef dilation,
     int64_t groups,
-    bool bias_defined) {
+    bool bias_defined,
+    const std::vector<sycl::event>& deps) {
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -675,7 +583,7 @@ static void convolution_backward_data(
   // execute primitive
   auto conv_backward_data =
       dnnl::convolution_backward_data(conv_backward_data_pd);
-  DPCPP_ONEDNN_EXEC(conv_backward_data, strm, args);
+  DPCPP_ONEDNN_EXEC_WITH_EVENT(conv_backward_data, strm, args, deps);
 
   // propagate blk format
   if (is_onednn_layout_suggested &&
@@ -683,6 +591,9 @@ static void convolution_backward_data(
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(expected_src);
     DPCPPTensorContext::set_tensor_ctx(diff_src, std::move(blk_ctx));
   }
+
+  // e is a sycl::event defined in DPCPP_ONEDNN_EXEC_WITH_EVENT
+  return e;
 }
 
 } // namespace oneDNN

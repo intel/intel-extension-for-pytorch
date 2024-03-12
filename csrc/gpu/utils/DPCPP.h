@@ -126,6 +126,42 @@ inline constexpr std::string_view OUT_OF_RESOURCES("PI_ERROR_OUT_OF_RESOURCES");
     DPCPP_EXCEP_CATCH                                                         \
   }
 
+#define DPCPP_ONEDNN_EXT_SUBMIT(q, str, ker_submit)                         \
+  sycl::event e;                                                            \
+  DPCPP_EXCEP_TRY                                                           \
+  auto log_level = xpu::dpcpp::Settings::I().get_log_level();               \
+  if (log_level >= LOG_LEVEL_DEBUG) {                                       \
+    EventLogger l;                                                          \
+    l.add_event("OPS", "", "", "begin", "event name:{}", __func__);         \
+    auto start_evt = xpu::dpcpp::queue_barrier(q);                          \
+    l.add_event("OPS", "", "", "start barrier", "");                        \
+    e = (ker_submit);                                                       \
+    l.add_event("OPS", "", "", "submit", "submit event end");               \
+    auto end_evt = xpu::dpcpp::queue_barrier(q);                            \
+    l.add_event("OPS", "", "", "end barrier", "");                          \
+    e.wait_and_throw();                                                     \
+    l.add_event("OPS", "", "", "event wait", "event wait end");             \
+    xpu::dpcpp::dpcpp_log((str), start_evt, end_evt);                       \
+    start_evt.wait_and_throw();                                             \
+    end_evt.wait_and_throw();                                               \
+    auto se_end =                                                           \
+        start_evt.template get_profiling_info<dpcpp_event_profiling_end>(); \
+    auto ee_start =                                                         \
+        end_evt.template get_profiling_info<dpcpp_event_profiling_start>(); \
+    l.print_verbose_ext(1, __func__, ((se_end - ee_start) / 1000.0));       \
+  } else if (is_profiler_enabled()) {                                       \
+    auto start_evt = xpu::dpcpp::queue_barrier(q);                          \
+    e = (ker_submit);                                                       \
+    auto end_evt = xpu::dpcpp::queue_barrier(q);                            \
+    dpcpp_mark((str), start_evt, end_evt);                                  \
+    DPCPP_E_SYNC_FOR_DEBUG(e);                                              \
+  } else {                                                                  \
+    e = (ker_submit);                                                       \
+    DPCPP_E_SYNC_FOR_DEBUG(e);                                              \
+  }                                                                         \
+  (q).throw_asynchronous();                                                 \
+  DPCPP_EXCEP_CATCH
+
 #define DPCPP_Q_SUBMIT(q, cgf, ...)                                            \
   {                                                                            \
     DPCPP_EXCEP_TRY                                                            \

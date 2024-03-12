@@ -7,6 +7,7 @@
 #include <oneapi/dnnl/dnnl_types.h>
 #include <tensor/Context.h>
 #include <utils/Macros.h>
+#include "Reorder.h"
 #include "Utils.h"
 
 using namespace dnnl;
