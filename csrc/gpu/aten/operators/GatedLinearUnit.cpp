@@ -97,8 +97,12 @@ Tensor& glu_backward_out(
     const Tensor& self,
     int64_t dim,
     Tensor& grad_input) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self.scalar_type(), "glu_backward_out", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      self.scalar_type(),
+      "glu_backward_out",
+      [&] {
         impl::GatedLinearUnit_updateGradInput<scalar_t>(
             grad_input, grad_output, self, dim);
       });

@@ -135,20 +135,21 @@ def _get_analytical_jacobian_forward_ad_backward(
 
 
 class TestNNMethod(TestCase):
-    def test_glu(self, dtype=torch.float):
-        input_cpu = torch.randn(4, 6)
-        input_dpcpp = input_cpu.to("xpu")
-        m = nn.GLU()
+    def test_glu(self):
+        for dt in [torch.float32, torch.bfloat16, torch.float16]:
+            input_cpu = torch.randn(4, 6, dtype=dt)
+            input_dpcpp = input_cpu.to("xpu")
+            m = nn.GLU()
 
-        input_cpu.requires_grad = True
-        output_cpu = m(input_cpu)
-        output_cpu.backward(torch.ones_like(output_cpu))
+            input_cpu.requires_grad = True
+            output_cpu = m(input_cpu)
+            output_cpu.backward(torch.ones_like(output_cpu).to(dt))
 
-        input_dpcpp.requires_grad = True
-        output_dpcpp = m(input_dpcpp)
-        output_dpcpp.backward(torch.ones_like(output_dpcpp).to("xpu"))
-        self.assertEqual(output_cpu, output_dpcpp)
-        self.assertEqual(input_cpu.grad, input_dpcpp.grad)
+            input_dpcpp.requires_grad = True
+            output_dpcpp = m(input_dpcpp)
+            output_dpcpp.backward(torch.ones_like(output_dpcpp).to(dt).to("xpu"))
+            self.assertEqual(output_cpu, output_dpcpp)
+            self.assertEqual(input_cpu.grad, input_dpcpp.grad)
 
     def test_glu_jvp(self, dtype=torch.float):
         input_cpu = torch.randn(12, 16, requires_grad=True)
