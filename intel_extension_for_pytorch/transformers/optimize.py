@@ -479,6 +479,122 @@ def model_convert_lowering(
     return _model
 
 
+# If the XPU platform does not have XMX, such as PVC1550vg,
+# ipex.optimize_transformers for diffusers is not supported.
+def check_xpu_diffusers_support(device, model):
+    xpu_supported_model = (
+        model.config.__contains__("_diffusers_version")
+        and device == "xpu"
+        and ipex._C._has_xmx(0)
+    )
+    if not xpu_supported_model:
+        warnings.warn(
+            "The compatibility of ipex.optimize_transformers depends on the CPU/XPU platform "
+            " and the transformer model."
+            " If the platform is XPU and has XMX, "
+            " ipex.optimize_transformers supports BasicTransformerBlock of diffusers."
+        )
+    return xpu_supported_model
+
+
+# On CPU platform, ipex.optimize_transformers supports GPT-J, Llama, gptneox, OPT, Falcon, rw
+def check_cpu_llm_support(model):
+    cpu_supported_pattern = r"GPTJ|llama|gptneox|OPT|falcon|rw"
+    cpu_supported_model = re.search(
+        cpu_supported_pattern, model.config.architectures[0], re.IGNORECASE
+    )
+    if not cpu_supported_model:
+        warnings.warn(
+            "The compatibility of ipex.optimize_transformers depends on the CPU/XPU platform "
+            " and the transformer model."
+            " If the platform is CPU, "
+            " ipex.optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, and OPT."
+        )
+    return cpu_supported_model
+
+
+def check_xpu_llm_support(model):
+    # If the XPU platform has XMX and 2D load instructions, such as PVC1100, PVC1100c, and PVC1550,
+    # ipex.optimize_transformers supports GPT-J, Llama, OPT, Bloom, Falcon, QWen
+    if ipex._C._has_2d_block_array(0) and ipex._C._has_xmx(0):
+        xpu_2d_load_and_xmx_supported_pattern = (
+            r"GPTJ|llama|OPT|Bloom|Falcon|QWen|Baichuan"
+        )
+        xpu_supported_model = re.search(
+            xpu_2d_load_and_xmx_supported_pattern,
+            model.config.architectures[0],
+            re.IGNORECASE,
+        )
+        if not xpu_supported_model:
+            warnings.warn(
+                "The compatibility of ipex.optimize_transformers depends on the CPU/XPU platform "
+                " and the transformer model."
+                " If the XPU platform has XMX and 2D load instructions, such as PVC1100, PVC1100c, and PVC1550,"
+                " ipex.optimize_transformers supports GPT-J/Llama/OPT/Bloom/Falcon/QWen "
+                " and BasicTransformerBlock of diffusers. "
+            )
+        return xpu_supported_model
+
+    # If the XPU platform has XMX but NO 2D load instructions, such as ATS-M and ARC,
+    # ipex.optimize_transformers supports GPT-J, Llama, QWen.
+    elif not ipex._C._has_2d_block_array(0) and ipex._C._has_xmx(0):
+        xpu_xmx_supported_pattern = r"GPTJ|llama|QWen"
+        xpu_supported_model = re.search(
+            xpu_xmx_supported_pattern, model.config.architectures[0], re.IGNORECASE
+        )
+        if not xpu_supported_model:
+            warnings.warn(
+                "The compatibility of ipex.optimize_transformers depends on the CPU/XPU platform "
+                " and the transformer model."
+                " If the XPU platform has XMX but NO 2D load instructions, such as ATS-M and ARC, "
+                " ipex.optimize_transformers supports GPT-J/Llama/QWen and BasicTransformerBlock of diffusers."
+            )
+        return xpu_supported_model
+
+    # If the XPU platform does NOT has XMX and NO 2D load instructions, such as meteorlake igpu,
+    # ipex.optimize_transformers supports Llama.
+    elif not ipex._C._has_2d_block_array(0) and not ipex._C._has_xmx(0):
+        xpu_well_supported_pattern = r"llama"
+        xpu_supported_model = re.search(
+            xpu_well_supported_pattern, model.config.architectures[0], re.IGNORECASE
+        )
+        if not xpu_supported_model:
+            warnings.warn(
+                "The compatibility of ipex.optimize_transformers depends on the CPU/XPU platform "
+                " and the transformer model."
+                " If the XPU platform does NOT has XMX and NO 2D load instructions, such as meteorlake igpu, "
+                " ipex.optimize_transformers supports Llama."
+            )
+        return xpu_supported_model
+
+    # If the XPU platform does not have XMX, such as PVC1550vg,
+    # ipex.optimize_transformers is not supported.
+    else:
+        warnings.warn(
+            " If the XPU platform does NOT have XMX, such as PVC1550vg, "
+            " ipex.optimize_transformers is NOT supported. "
+        )
+        return False
+
+
+def check_model_support(device, model):
+    cpu_supported_model, xpu_supported_model = False, False
+
+    # for stable-diffusion XPU only, which model.config is a dict
+    if isinstance(model.config, dict):
+        return cpu_supported_model, check_xpu_diffusers_support(device, model)
+
+    # check LLM support for CPU
+    elif device == "cpu":
+        return check_cpu_llm_support(model), xpu_supported_model
+
+    # check LLM support for XPU
+    elif device == "xpu":
+        return cpu_supported_model, check_xpu_llm_support(model)
+
+    return cpu_supported_model, xpu_supported_model
+
+
 def optimize_transformers(
     model,
     optimizer=None,
@@ -582,38 +698,22 @@ def optimize_transformers(
             )
             return model
 
-        if isinstance(model.config, dict):
-            well_supported_model = False
-            xpu_supported_model = (
-                model.config.__contains__("_diffusers_version") and device == "xpu"
-            )
-        else:
-            well_supported_model = (
-                re.search("GPTJ", model.config.architectures[0], re.IGNORECASE)
-                or re.search("llama", model.config.architectures[0], re.IGNORECASE)
-                or re.search("gptneox", model.config.architectures[0], re.IGNORECASE)
-                or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
-                or re.search("falcon", model.config.architectures[0], re.IGNORECASE)
-                or re.search("rw", model.config.architectures[0], re.IGNORECASE)
-            ) and device == "cpu"
-            # bypass_ref_model = (re.search("Bloom", model.config.architectures[0], re.IGNORECASE)) or device == "xpu"
-            xpu_supported_model = (
-                re.search("GPTJ", model.config.architectures[0], re.IGNORECASE)
-                or re.search("llama", model.config.architectures[0], re.IGNORECASE)
-                or re.search("OPT", model.config.architectures[0], re.IGNORECASE)
-                or re.search("Bloom", model.config.architectures[0], re.IGNORECASE)
-                or re.search("Falcon", model.config.architectures[0], re.IGNORECASE)
-                or re.search("QWen", model.config.architectures[0], re.IGNORECASE)
-                or re.search("Baichuan", model.config.architectures[0], re.IGNORECASE)
-            ) and device == "xpu"
+        well_supported_model, xpu_supported_model = check_model_support(device, model)
 
         if not (well_supported_model or xpu_supported_model):
             warnings.warn(
-                "optimize_transformers supports GPT-J/Llama/OPT/Bloom/Falcon/QWen/Baichuan"
-                " of transformers model in XPU"
-                " and BasicTransformerBlock of diffusers in XPU"
-                " and Llama/GPT-J/GPT-Neox/Falcon/OPT"
-                " in CPU, fallback to origin model"
+                "The compatibility of ipex.optimize_transformers depends on the CPU/XPU platform "
+                " and the transformer model. Here are the general rules: "
+                " If the XPU platform does not have XMX, such as PVC1550vg, "
+                " ipex.optimize_transformers is not supported. "
+                " If the XPU platform has XMX and 2D load instructions, such as PVC1100, PVC1100c, and PVC1550,"
+                " ipex.optimize_transformers supports GPT-J/Llama/OPT/Bloom/Falcon/QWen, "
+                " and BasicTransformerBlock of diffusers. "
+                " If the XPU platform has XMX but no 2D load instructions, such as ATS-M and ARC, "
+                " ipex.optimize_transformers supports GPT-J/Llama/QWen, "
+                " and BasicTransformerBlock of diffusers. "
+                " If the platform is CPU, "
+                " ipex.optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, and OPT."
             )
             return model
 

@@ -89,6 +89,11 @@ def has_2d_block_array(device: int = -1) -> bool:
     return _C._has_2d_block_array(device)
 
 
+def has_xmx(device: int = -1) -> bool:
+    r"""Returns a bool indicating if the platform supports xmx"""
+    return _C._has_xmx(device)
+
+
 # Basic OnOff
 class OnOff:
     def __init__(self, checker, enable, disable):

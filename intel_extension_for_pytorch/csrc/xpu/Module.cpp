@@ -663,6 +663,8 @@ void init_xpu_module(pybind11::module& m) {
     return Settings::I().has_2d_block_array(device);
   });
 
+  m.def("_has_xmx", [](int device) { return Settings::I().has_xmx(device); });
+
   m.def(
       "_get_verbose_level", []() { return Settings::I().get_verbose_level(); });
 
