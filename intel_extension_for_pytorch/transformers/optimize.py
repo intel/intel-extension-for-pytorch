@@ -654,39 +654,41 @@ def get_dummy_input(_model, return_dict=False):
     past_key_values = tuple(
         [
             (
-                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
-                torch.zeros(1, 4, dtype=torch.long),
-            )
-            if _model.config.architectures[0] != "T5ForConditionalGeneration"
-            else (
-                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
-                torch.zeros(1, 4, dtype=torch.long),
-                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                torch.zeros(
-                    [
-                        32,
-                        1,
-                        _model.decoder.block[i].layer[1].EncDecAttention.n_heads,
-                        _model.decoder.block[i]
-                        .layer[1]
-                        .EncDecAttention.key_value_proj_dim,
-                    ]
-                ).contiguous(),
-                torch.zeros(
-                    [
-                        32,
-                        1,
-                        _model.decoder.block[i].layer[1].EncDecAttention.n_heads,
-                        _model.decoder.block[i]
-                        .layer[1]
-                        .EncDecAttention.key_value_proj_dim,
-                    ]
-                ).contiguous(),
-                torch.zeros(1, 4, dtype=torch.long),
+                (
+                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros(1, 4, dtype=torch.long),
+                )
+                if _model.config.architectures[0] != "T5ForConditionalGeneration"
+                else (
+                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros(1, 4, dtype=torch.long),
+                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                    torch.zeros(
+                        [
+                            32,
+                            1,
+                            _model.decoder.block[i].layer[1].EncDecAttention.n_heads,
+                            _model.decoder.block[i]
+                            .layer[1]
+                            .EncDecAttention.key_value_proj_dim,
+                        ]
+                    ).contiguous(),
+                    torch.zeros(
+                        [
+                            32,
+                            1,
+                            _model.decoder.block[i].layer[1].EncDecAttention.n_heads,
+                            _model.decoder.block[i]
+                            .layer[1]
+                            .EncDecAttention.key_value_proj_dim,
+                        ]
+                    ).contiguous(),
+                    torch.zeros(1, 4, dtype=torch.long),
+                )
             )
             for i in range(model_num_layers)
         ]
@@ -843,7 +845,15 @@ def model_convert_lowering(
                     weights_prepack=False,
                 )
             else:
-                _model = ipex.optimize(_model.eval(), dtype=dtype, inplace=True)
+                if dtype is torch.float32:
+                    _model = ipex.optimize(
+                        _model.eval(),
+                        dtype=dtype,
+                        inplace=True,
+                        auto_kernel_selection=True,
+                    )
+                else:
+                    _model = ipex.optimize(_model.eval(), dtype=dtype, inplace=True)
 
         if not is_quantization or woq:
             import transformers
