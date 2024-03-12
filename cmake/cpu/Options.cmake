@@ -20,9 +20,6 @@ if(WIN32)
 endif()
 #set USE_SHM to OFF if USE_CCL is OFF
 
-
-cmake_dependent_option(BUILD_STATIC_ONEMKL "Static link with oneMKL" OFF "BUILD_WITH_XPU" ON)
-
 function (print_cpu_config_summary)
   # Fetch configurations of intel-ext-pt-cpu
   get_target_property(CPU_NATIVE_DEFINITIONS intel-ext-pt-cpu COMPILE_DEFINITIONS)

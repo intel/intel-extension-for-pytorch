@@ -31,7 +31,29 @@ set(ONEMKL_GPU_LIBS)
 set(ONEMKL_CPU_LIBS)
 
 set(mkl_root_hint)
-if(BUILD_WITH_XPU)
+
+# install mkl-include and mkl-static for CPU build
+function (install_mkl_packages)
+  set(REQ_MKL_VERSION 2021.0.0)
+  execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip install "mkl-include>=${REQ_MKL_VERSION}"
+      RESULT_VARIABLE mkl_iret COMMAND_ERROR_IS_FATAL ANY)
+  execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip install --no-deps "mkl-static>=${REQ_MKL_VERSION}"
+      RESULT_VARIABLE mkl_sret COMMAND_ERROR_IS_FATAL ANY)
+  execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip show mkl-include -f RESULT_VARIABLE mkl_show_ret
+      OUTPUT_VARIABLE mkl_show_out COMMAND_ERROR_IS_FATAL ANY)
+  if (${mkl_iret} OR ${mkl_sret} OR ${mkl_show_ret})
+    message(FATAL_ERROR "Failed to install/fetch mkl-include or mkl-static by pip!")
+  endif()
+  string(REGEX MATCH "Location: *([^\t\r\n]+)" mkl_prefix ${mkl_show_out})
+  set(mkl_prefix ${CMAKE_MATCH_1})
+  string(REGEX MATCH " *([^\t\r\n]*include[/\\]mkl.h)" mkl_h_rel ${mkl_show_out})
+  set(mkl_h_rel ${CMAKE_MATCH_1})
+  get_filename_component(mkl_inc "${mkl_prefix}/${mkl_h_rel}/" DIRECTORY)
+  get_filename_component(mkl_root_hint "${mkl_inc}/../" ABSOLUTE)
+  set(mkl_root_hint ${mkl_root_hint} PARENT_SCOPE)
+endfunction()
+
+function(get_mkl_from_env_var)
   if(DEFINED ENV{MKLROOT})
     set(mkl_root_hint $ENV{MKLROOT})
   elseif(DEFINED ENV{MKL_ROOT})
@@ -39,24 +61,24 @@ if(BUILD_WITH_XPU)
   elseif(MKL_ROOT)
     set(mkl_root_hint ${MKL_ROOT})
   else()
-    message(FATAL_ERROR "Please set oneMKL root path by MKLROOT, or MKL_ROOT.")
+    message(WARNING "Please set oneMKL root path by MKLROOT, or MKL_ROOT for IPEX build.")
+    return()
   endif()
-else()
-  # install mkl-include and mkl-static for CPU build
-  set(REQ_MKL_VERSION 2021.0.0)
-  execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip install "mkl-include>=${REQ_MKL_VERSION}" RESULT_VARIABLE mkl_iret)
-  execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip install --no-deps "mkl-static>=${REQ_MKL_VERSION}" RESULT_VARIABLE mkl_sret)
-  execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip show mkl-include -f RESULT_VARIABLE mkl_show_ret OUTPUT_VARIABLE mkl_show_out)
-  if (${mkl_iret} OR ${mkl_sret} OR ${mkl_show_ret})
-    message(FATAL_ERROR "Failed to install/fetch mkl-include or mkl-static by pip!")
-  endif()
+  set(mkl_root_hint ${mkl_root_hint} PARENT_SCOPE)
+endfunction()
 
-  string(REGEX MATCH "Location: *([^\t\r\n]+)" mkl_prefix ${mkl_show_out})
-  set(mkl_prefix ${CMAKE_MATCH_1})
-  string(REGEX MATCH " *([^\t\r\n]*include[/\\]mkl.h)" mkl_h_rel ${mkl_show_out})
-  set(mkl_h_rel ${CMAKE_MATCH_1})
-  get_filename_component(mkl_inc "${mkl_prefix}/${mkl_h_rel}/" DIRECTORY)
-  get_filename_component(mkl_root_hint "${mkl_inc}/../" ABSOLUTE)
+# IPEX XPU lib always use the dynamic linker for oneMKL lib if USE_ONEMKL is ON and oneMKL is available.
+# IPEX CPU lib always download and install mkl-static lib and use static linker for mkl-static lib.
+# IPEX CPU lib can manual config to use the dynamic link for oneMKL lib.
+if(BUILD_MODULE_TYPE STREQUAL "GPU")
+  get_mkl_from_env_var()
+else()
+  if(BUILD_STATIC_ONEMKL)
+    message(STATUS "Download and install mkl-include and mkl-static for IPEX CPU build automatically.")
+    install_mkl_packages()
+  else()
+    get_mkl_from_env_var()
+  endif()
 endif()
 
 # Try to find Intel MKL header
@@ -109,7 +131,7 @@ if(NOT MKL_CORE)
   message(FATAL_ERROR "oneMKL library ${MKL_CORE} not found")
 endif()
 
-if(BUILD_WITH_XPU)
+if(BUILD_MODULE_TYPE STREQUAL "GPU")
   set(MKL_SYCL "${LIB_PREFIX}mkl_sycl${LIB_SUFFIX}")
   find_library(MKL_LIB_SYCL ${MKL_SYCL} HINTS ${mkl_root_hint}
       PATH_SUFFIXES lib lib/intel64 NO_DEFAULT_PATH)
@@ -118,16 +140,22 @@ if(BUILD_WITH_XPU)
   endif()
 endif()
 
+# https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-link-line-advisor.html
 set(START_GROUP)
 set(END_GROUP)
 if(BUILD_STATIC_ONEMKL)
-set(START_GROUP "-Wl,--start-group")
-set(END_GROUP "-Wl,--end-group")
+  set(START_GROUP "-Wl,--start-group")
+  set(END_GROUP "-Wl,--end-group")
+else()
+  if(BUILD_WITH_CPU)
+    set(START_GROUP "-Wl,--push-state,--no-as-needed")
+    set(END_GROUP "-Wl,--pop-state")
+  endif()
 endif()
 
 set(ONEMKL_CPU_LIBS ${START_GROUP} ${MKL_LIB_LP64} ${MKL_LIB_CORE} ${MKL_LIB_THREAD} ${END_GROUP})
 
-if(BUILD_WITH_XPU)
+if(BUILD_MODULE_TYPE STREQUAL "GPU")
   set(ONEMKL_GPU_LIBS ${START_GROUP} ${MKL_LIB_LP64} ${MKL_LIB_CORE} ${MKL_LIB_THREAD} ${MKL_LIB_SYCL} ${END_GROUP})
 endif()
 
