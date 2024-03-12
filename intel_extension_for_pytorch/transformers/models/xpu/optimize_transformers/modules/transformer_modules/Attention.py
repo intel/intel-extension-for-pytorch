@@ -645,6 +645,9 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     def get_present(self, query, key, value, use_cache):
         if use_cache or self.is_decoder:
             if not self.is_beam_search():
+                # create KV cache on meta device to avoid device memory allocation for past_key_value
+                key = torch.empty_like(key, device="meta", dtype=key.dtype)
+                value = torch.empty_like(value, device="meta", dtype=key.dtype)
                 present = (key, value)
             else:
                 # key, value shape [bs*beam=1, head, seq, dim]
