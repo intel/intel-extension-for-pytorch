@@ -914,6 +914,13 @@ struct dequant_n_grouped {
             is_4bit_flag ? &qB[k * ldb / 2 + n / 2] : &qB[k * ldb + n],
             vscales,
             vzps);
+        // prefetch qB data
+        if constexpr (PREFETCH_K_DIST > 0) {
+          auto prefetch_addr = is_4bit_flag
+              ? &qB[(k + PREFETCH_K_DIST) * ldb / 2 + n / 2]
+              : &qB[(k + PREFETCH_K_DIST) * ldb + n];
+          _mm_prefetch(prefetch_addr, _MM_HINT_T0);
+        }
         // store vb to B
         store(B + k * N + n, vbs);
       }
@@ -1001,6 +1008,13 @@ struct dequant_n_grouped<bfloat16, ldb, N_GROUP_SIZE, qw_type> {
                          : &qB[(k + 1) * ldb + n],
             vscales,
             vzps);
+        // prefetch qB data
+        if constexpr (PREFETCH_K_DIST > 0) {
+          auto prefetch_addr = is_4bit_flag
+              ? &qB[(k + PREFETCH_K_DIST) * ldb / 2 + n / 2]
+              : &qB[(k + PREFETCH_K_DIST) * ldb + n];
+          _mm_prefetch(prefetch_addr, _MM_HINT_T0);
+        }
         typename VA::type vbs[2];
         compile_time_for<COLS>::op([&](auto i) {
           auto [low, high] = interleave(vbs_k0[i], vbs_k1[i]);
