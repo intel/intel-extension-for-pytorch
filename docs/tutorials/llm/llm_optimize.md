@@ -59,7 +59,7 @@ with torch.no_grad():
 prepared_model.save_qconf_summary(qconf_summary=qconfig_summary_file_path)
 
 # stage 2: quantization
-model = ipex.llm.ptimize(
+model = ipex.llm.optimize(
   model.eval(),
   quantization_config=qconfig,
   qconfig_summary_file=qconfig_summary_file_path,
