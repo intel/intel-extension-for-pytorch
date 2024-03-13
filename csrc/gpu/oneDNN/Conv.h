@@ -455,8 +455,6 @@ static void convolution_backward_weights(
   memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
   memory::dims _dilation = compatible_dilation(dilation);
   primitive_attr pattr;
-  if (globalContext().deterministicAlgorithms())
-    pattr.set_deterministic(true);
   if (src_usr_md.get_data_type() == memory::data_type::f32) {
     pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
   }
@@ -595,8 +593,6 @@ static void convolution_backward_data(
 
   // create fwd primitive desc hint
   primitive_attr pattr;
-  if (globalContext().deterministicAlgorithms())
-    pattr.set_deterministic(true);
   if (dst_usr_md.get_data_type() == memory::data_type::f32) {
     pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
   }
