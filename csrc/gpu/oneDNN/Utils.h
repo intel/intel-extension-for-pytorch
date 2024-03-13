@@ -12,6 +12,7 @@
 
 #include <ATen/ATen.h>
 #include <ATen/core/grad_mode.h>
+#include <aten/operators/fp8/fp8_utils.h>
 #include <aten/quantized/QUtils.h>
 #include <aten/quantized/Quantizer.h>
 #include <core/MemoryFormat.h>
@@ -142,6 +143,10 @@ static inline memory::data_type get_onednn_dtype(
       return memory::data_type::f32;
     case at::ScalarType::BFloat16:
       return memory::data_type::bf16;
+    case at::ScalarType::Float8_e4m3fn:
+      return memory::data_type::f8_e4m3;
+    case at::ScalarType::Float8_e5m2:
+      return memory::data_type::f8_e5m2;
     default:
       if (!allow_undef) {
         TORCH_CHECK(

@@ -18,17 +18,7 @@ Tensor fp8_gemm(
     const Tensor& scale,
     const Tensor& scale_inv,
     const Tensor& amax_history) {
-  // TODO: simulation with fp32/bf16 input, need to remove it after hardware
-  // support FP8.
-  Tensor m1 = at::empty(m1_.sizes().vec(), m1_.options().dtype(at::kBFloat16));
-  Tensor m2 = at::empty(m2_.sizes().vec(), m2_.options().dtype(at::kBFloat16));
-  fp8_dequantize_op(
-      m1_, m1, in_format, scale_inv[input_meta_index].data_ptr<float>());
-  fp8_dequantize_op(
-      m2_, m2, wei_format, scale_inv[weight_meta_index].data_ptr<float>());
-
-  auto result = at::linear(m1, m2, m3.to(m1.scalar_type()));
-
+  auto result = at::linear(m1_, m2_, m3.to(m1_.scalar_type()));
   return result;
 }
 

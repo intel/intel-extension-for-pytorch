@@ -149,6 +149,16 @@ sycl::event matmul(
       m1_dt == memory::data_type::f32 && m2_dt == memory::data_type::bf16) {
     m1_dt = memory::data_type::bf16;
     dst_dt = memory::data_type::bf16;
+  } else if (
+      m1_dt == memory::data_type::f8_e4m3 ||
+      m1_dt == memory::data_type::f8_e5m2) {
+    dst_dt = memory::data_type::f32;
+    dst_usr_dt = memory::data_type::f32;
+    b = b.to(at::kFloat);
+    result = result.to(at::kFloat);
+    // TODO: refine code to remove unnecessary datatype conversion for better
+    // performance.
+    dst = dst.to(at::kFloat);
   }
 
   memory::dims m1_dims, m2_dims, dst_dims, bias_dims;
