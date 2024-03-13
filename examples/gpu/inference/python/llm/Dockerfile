@@ -1,12 +1,7 @@
-# NOTE: To build this you will need a docker version >= 19.03 and DOCKER_BUILDKIT=1
-#
-#       If you do not use buildkit you are not going to have a good time
-#
-#       For reference:
-#           https://docs.docker.com/develop/develop-images/build_enhancements/
 
 ARG BASE_IMAGE=ubuntu:22.04
 FROM ${BASE_IMAGE} AS base
+SHELL ["/bin/bash", "-c"]
 RUN if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then rm /etc/apt/apt.conf.d/proxy.conf; fi && \
     if [ ! -z ${HTTP_PROXY} ]; then echo "Acquire::http::Proxy \"${HTTP_PROXY}\";" >> /etc/apt/apt.conf.d/proxy.conf; fi && \
     if [ ! -z ${HTTPS_PROXY} ]; then echo "Acquire::https::Proxy \"${HTTPS_PROXY}\";" >> /etc/apt/apt.conf.d/proxy.conf; fi
@@ -43,14 +38,15 @@ RUN curl -fsSL -v -o miniconda.sh -O https://repo.anaconda.com/miniconda/Minicon
     echo "source ~/miniconda3/bin/activate" >> ./.bashrc
 
 FROM base AS dev
+# --build-arg COMPILE=ON to compile from source
+ARG COMPILE
 RUN bash /basekit_driver_install_helper.sh dev
 COPY --chown=ubuntu:ubuntu . ./intel-extension-for-pytorch/
-RUN cp ./intel-extension-for-pytorch/scripts/compile_bundle.sh ./ && \
-    sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
 RUN . ./miniconda3/bin/activate && \
     conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
-    bash compile_bundle.sh /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest /opt/intel/oneapi/ccl/latest pvc,ats-m150,acm-g11 && \
-    mkdir wheels && cp pytorch/dist/*.whl vision/dist/*.whl audio/dist/*.whl intel-extension-for-pytorch/dist/*.whl ./wheels
+    cd intel-extension-for-pytorch/examples/gpu/inference/python/llm && \
+    if [ -z ${COMPILE} ]; then MODE=6; else MODE=2; fi && \
+    bash tools/env_setup.sh ${MODE} /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest /opt/intel/oneapi/ccl/latest pvc,ats-m150,acm-g11
 
 FROM base AS deploy
 RUN bash /basekit_driver_install_helper.sh runtime && \
@@ -58,14 +54,13 @@ RUN bash /basekit_driver_install_helper.sh runtime && \
     sudo rm -rf /var/lib/apt/lists/* && \
     if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then sudo rm /etc/apt/apt.conf.d/proxy.conf; fi && \
     sudo rm /basekit_driver_install_helper.sh
-COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/wheels ./wheels
+COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/examples/gpu/inference/python/llm ./llm
 COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh .
 RUN . ./miniconda3/bin/activate && \
     conda create -y -n py310 python=3.10 && conda activate py310 && \
-    conda install -y libstdcxx-ng=12 libpng libjpeg-turbo -c conda-forge && \
-    python -m pip install ./wheels/*.whl && \
-    python -m pip cache purge && \
-    conda clean -a -y && \
-    rm -rf ./wheels && \
     echo "conda activate py310" >> ./.bashrc && \
-    ldpreload=$(bash get_libstdcpp_lib.sh) && echo "export LD_PRELOAD=${ldpreload}" >> ./.bashrc && rm get_libstdcpp_lib.sh
+    ldpreload=$(bash get_libstdcpp_lib.sh) && echo "export LD_PRELOAD=${ldpreload}" >> ./.bashrc && rm get_libstdcpp_lib.sh && \
+    cd ./llm && \
+    bash tools/env_setup.sh 1 && \
+    python -m pip cache purge && \
+    conda clean -a -y
