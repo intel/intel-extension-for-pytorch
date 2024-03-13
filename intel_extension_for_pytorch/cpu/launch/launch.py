@@ -8,7 +8,7 @@ from datetime import datetime
 import intel_extension_for_pytorch.cpu.auto_ipex as auto_ipex
 from .launcher_distributed import DistributedTrainingLauncher
 from .launcher_multi_instances import MultiInstancesLauncher
-from ...utils._logger import logger, WarningType
+from ...utils._logger import logger, WarningType, format_str
 
 """
 This is a script for launching PyTorch training and inference on Intel Xeon CPU with optimal configurations.
