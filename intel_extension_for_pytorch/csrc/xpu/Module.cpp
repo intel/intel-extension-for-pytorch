@@ -207,12 +207,7 @@ PyObject* THPModule_getCurrentRawStream(
       THPUtils_checkLong(device_index),
       "invalid argument to getCurrentRawStream");
   int64_t device = THPUtils_unpackLong(device_index);
-  // NOTE: Here is a high dependency on the implementation of queue pool using
-  // smart pointer in runtime.
-  return PyCapsule_New(
-      xpu::dpcpp::getCurrentDPCPPStream(device).queue(),
-      "torch.xpu.Stream.sycl_queue",
-      nullptr);
+  return PyLong_FromVoidPtr(xpu::dpcpp::getCurrentDPCPPStream(device).queue());
   END_HANDLE_TH_ERRORS
 }
 

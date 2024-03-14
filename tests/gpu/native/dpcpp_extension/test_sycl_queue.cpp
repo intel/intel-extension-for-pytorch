@@ -30,10 +30,14 @@ extern "C" bool isSYCLQueue(void* q_ptr) {
 
   return false;
 }
+bool isSYCLQueue_raw(py::object object) {
+  void* q_ptr = PyLong_AsVoidPtr(object.ptr());
+  return isSYCLQueue(q_ptr);
+}
 
 PYBIND11_MODULE(mod_test_sycl_queue, m) {
   m.def(
       "is_sycl_queue",
-      &isSYCLQueue,
+      &isSYCLQueue_raw,
       "check sycl queue void pointer in a capsule");
 }

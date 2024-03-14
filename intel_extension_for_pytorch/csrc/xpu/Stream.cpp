@@ -72,10 +72,7 @@ static PyObject* THDPStream_get_device(THDPStream* self, void* unused) {
 
 static PyObject* THDPStream_get_sycl_queue(THDPStream* self, void* unused) {
   HANDLE_TH_ERRORS
-  // NOTE: Here is a high dependency on the implementation of queue pool using
-  // smart pointer in runtime.
-  return PyCapsule_New(
-      self->dpcpp_stream.queue(), "torch.xpu.Stream.sycl_queue", nullptr);
+  return PyLong_FromVoidPtr(self->dpcpp_stream.queue());
   END_HANDLE_TH_ERRORS
 }
 

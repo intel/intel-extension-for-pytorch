@@ -1,7 +1,6 @@
 import ctypes
 from torch._streambase import _EventBase, _StreamBase
 import intel_extension_for_pytorch
-from ..utils.capsule import get_pointer_from_capsule
 
 
 class Stream(intel_extension_for_pytorch._C._XPUStreamBase, _StreamBase):
@@ -15,11 +14,7 @@ class Stream(intel_extension_for_pytorch._C._XPUStreamBase, _StreamBase):
 
     @property
     def sycl_queue(self):
-        r"""sycl_queue(self): -> PyCapsule
-
-        Returns the sycl queue of the corresponding Stream in a ``PyCapsule``, which encapsules
-        a void pointer address. Its capsule name is ``torch.xpu.Stream.sycl_queue``.
-        """
+        r"""sycl_queue(self): -> sycl queue void pointer."""
         return super(Stream, self).sycl_queue
 
     @property
@@ -27,7 +22,7 @@ class Stream(intel_extension_for_pytorch._C._XPUStreamBase, _StreamBase):
         r"""Return the sycl queue void pointer address. Make it be easily used in
         C/C++ code.
         """
-        return ctypes.c_void_p(get_pointer_from_capsule(self.sycl_queue))
+        return ctypes.c_void_p(self.sycl_queue)
 
     def __eq__(self, o):
         if isinstance(o, Stream):
@@ -38,9 +33,7 @@ class Stream(intel_extension_for_pytorch._C._XPUStreamBase, _StreamBase):
         return hash((self.sycl_queue, self.device))
 
     def __repr__(self):
-        return "<torch.xpu.Stream device={0} sycl_queue={1}>".format(
-            self.device, self.sycl_queue
-        )
+        return f"torch.xpu.Stream(device={self.device} sycl_queue={self.sycl_queue:#x})"
 
     def wait_event(self, event):
         r"""Makes all future work submitted to the stream wait for an event.
