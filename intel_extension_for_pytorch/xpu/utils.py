@@ -84,12 +84,12 @@ def has_fp64_dtype(device: int = -1) -> bool:
         return has_fp64 if is_valid else _C._has_fp64_dtype(device)
 
 
-def has_2d_block_array(device: int = -1) -> bool:
+def has_2d_block_array(device: int = 0) -> bool:
     r"""Returns a bool indicating if the platform supports 2d block array load/store"""
     return _C._has_2d_block_array(device)
 
 
-def has_xmx(device: int = -1) -> bool:
+def has_xmx(device: int = 0) -> bool:
     r"""Returns a bool indicating if the platform supports xmx"""
     return _C._has_xmx(device)
 

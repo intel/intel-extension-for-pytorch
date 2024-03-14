@@ -504,23 +504,67 @@ int dpcppGetDeviceHasFP64DtypeFork(int device_id, bool& has_fp64) noexcept {
 #endif
 }
 
-// XXX: The integrity approach should be querying ISA info whether XMX
-// is supported in the specified platform. Querying `device_id` is a WA since
+// XXX: The integrity approach should be querying ISA info whether it
+// is supported in the specified platform. Querying `architecture` is a WA since
 // it is not feasible to maintain a list of all candidates. We will replace
 // the WA with querying ISA info once SYCL runtime supports it.
-static const std::array has_no_xmx_device_list = {
-    0xbd4,
-};
+// https://github.com/intel/llvm/blob/sycl/sycl/doc/extensions/experimental/sycl_ext_oneapi_device_architecture.asciidoc#feature-test-macro
+
+// PVC_VG not supported in SYCL architecture of OneAPI 2024.1
+static const std::array pvc_vg_device_list = {0xbd4};
+
+// MTL iGPU not supported in SYCL architecture of OneAPI 2024.1
+static const std::array mtl_device_list = {0x7D55, 0x7DD5, 0x7D57, 0x7DD7};
+
 bool dpcppGetDeviceHasXMX(DeviceId device_id) noexcept {
-  bool has_xmx = true;
   DeviceInfo* dinfo = dpcppGetDeviceInfo(device_id);
-  for (uint32_t has_no_xmx_device_id : has_no_xmx_device_list) {
-    if (dinfo->device_id == has_no_xmx_device_id) {
-      has_xmx = false;
-      break;
+  for (uint32_t pvc_vg_device_id : pvc_vg_device_list) {
+    if (dinfo->device_id == pvc_vg_device_id) {
+      return false;
     }
   }
-  return has_xmx;
+  for (uint32_t mtl_device_id : mtl_device_list) {
+    if (dinfo->device_id == mtl_device_id) {
+      return false;
+    }
+  }
+  sycl::device& device = dpcppGetRawDevice(device_id);
+  namespace ENS = sycl::ext::oneapi::experimental;
+  auto deviceArch = device.get_info<ENS::info::device::architecture>();
+  if (deviceArch <= ENS::architecture::intel_gpu_dg1) {
+    return false;
+  } else {
+    // currently PVC and DG2 all support XMX, will update after PVC_VG and MTL
+    return true;
+  }
+}
+
+bool dpcppGetDeviceHas2DBlock(DeviceId device_id) noexcept {
+  DeviceInfo* dinfo = dpcppGetDeviceInfo(device_id);
+  for (uint32_t pvc_vg_device_id : pvc_vg_device_list) {
+    if (dinfo->device_id == pvc_vg_device_id) {
+      return true;
+    }
+  }
+  for (uint32_t mtl_device_id : mtl_device_list) {
+    if (dinfo->device_id == mtl_device_id) {
+      return false;
+    }
+  }
+  sycl::device& device = dpcppGetRawDevice(device_id);
+  namespace ENS = sycl::ext::oneapi::experimental;
+  auto deviceArch = device.get_info<ENS::info::device::architecture>();
+  if (deviceArch <= ENS::architecture::intel_gpu_dg1) {
+    return false;
+  }
+  switch (deviceArch) {
+    case ENS::architecture::intel_gpu_dg2_g10:
+    case ENS::architecture::intel_gpu_dg2_g11:
+    case ENS::architecture::intel_gpu_dg2_g12:
+      return false;
+    default:
+      return true;
+  }
 }
 
 // This function can be used to get device count and no execption. It is used in

@@ -39,7 +39,9 @@ int dpcppPrefetchDeviceCount(int& device_count) noexcept;
 
 int dpcppPrefetchDeviceHasFP64Dtype(int device_id, bool& has_fp64) noexcept;
 
-bool dpcppGetDeviceHasXMX(DeviceId device_id = -1) noexcept;
+bool dpcppGetDeviceHasXMX(DeviceId device_id = 0) noexcept;
+
+bool dpcppGetDeviceHas2DBlock(DeviceId device_id = 0) noexcept;
 
 } // namespace dpcpp
 } // namespace xpu

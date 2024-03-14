@@ -218,9 +218,7 @@ bool Settings::has_fp64_dtype(int device_id) {
 }
 
 bool Settings::has_2d_block_array(int device_id) {
-  // FIXME: No avialble query to check 2d_block_array in sycl so far.
-  // Therefore, we check FP64 capability to guess the platform status.
-  return has_fp64_dtype(device_id);
+  return dpcppGetDeviceHas2DBlock(device_id);
 }
 
 bool Settings::has_atomic64(int device_id) {
@@ -532,8 +530,6 @@ bool Settings::is_channels_last_1d_enabled() const {
 
 bool Settings::is_xetla_enabled() const {
 #if defined(USE_XETLA)
-  if (!dpcppGetDeviceHasXMX())
-    return false;
   return true;
 #else
   return false;
