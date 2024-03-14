@@ -11,8 +11,7 @@ else
     export FI_PROVIDER_PATH=/opt/intel/oneapi/redist/opt/mpi/libfabric/lib/prov
 fi
 
-export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2
-export ENABLE_SDP_FUSION=1
+
 export TORCH_LLM_ALLREDUCE=1
 
 
