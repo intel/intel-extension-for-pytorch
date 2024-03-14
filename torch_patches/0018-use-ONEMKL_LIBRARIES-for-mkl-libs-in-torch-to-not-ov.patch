@@ -1,7 +1,7 @@
 From fd2f7070ba77dcf0990827a48307a0d49b8c52ee Mon Sep 17 00:00:00 2001
 From: min-jean-cho <min.jean.cho@intel.com>
 Date: Wed, 28 Feb 2024 16:49:42 -0800
-Subject: [PATCH 18/19] use ONEMKL_LIBRARIES for mkl libs in torch to not
+Subject: [PATCH 18/21] use ONEMKL_LIBRARIES for mkl libs in torch to not
  overwritten by oneMKL MKL_LIBRARIES cmake config (#208) (#209)
 
 ---

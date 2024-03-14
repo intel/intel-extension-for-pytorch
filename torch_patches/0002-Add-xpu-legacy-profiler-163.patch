@@ -1,7 +1,7 @@
 From ce8a0310e85e07270ef9f006ef9e974a3c5f0000 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Fri, 15 Sep 2023 00:16:02 +0800
-Subject: [PATCH 02/19] Add xpu legacy profiler (#163)
+Subject: [PATCH 02/21] Add xpu legacy profiler (#163)
 
 * Add xpu legacy profiler
 

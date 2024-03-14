@@ -1,0 +1,42 @@
+From ff97cc1420a67c0faa002cfa5eed23ba1cf1c17b Mon Sep 17 00:00:00 2001
+From: "Cui, Yifeng" <yifeng.cui@intel.com>
+Date: Mon, 11 Mar 2024 19:56:46 +0800
+Subject: [PATCH 21/21] Fix Windows Build (#214) (#215)
+
+---
+ cmake/public/mkl.cmake | 20 +++++++++++---------
+ 1 file changed, 11 insertions(+), 9 deletions(-)
+
+diff --git a/cmake/public/mkl.cmake b/cmake/public/mkl.cmake
+index d285a92600f..ebb178ce5e1 100644
+--- a/cmake/public/mkl.cmake
++++ b/cmake/public/mkl.cmake
+@@ -16,14 +16,16 @@ set_property(
+   TARGET caffe2::mkl PROPERTY INTERFACE_LINK_DIRECTORIES
+   ${MKL_ROOT}/lib ${MKL_ROOT}/lib/intel64 ${MKL_ROOT}/lib/intel64_win ${MKL_ROOT}/lib/win-x64)
+ 
+-if(${USE_STATIC_MKL})
+-  foreach(MKL_LIB_PATH IN LISTS ONEMKL_LIBRARIES)
+-    if(EXISTS "${MKL_LIB_PATH}")
+-      get_filename_component(MKL_LIB_NAME "${MKL_LIB_PATH}" NAME)
+-      # Match archive libraries starting with "libmkl_"
+-      if(MKL_LIB_NAME MATCHES "^libmkl_" AND MKL_LIB_NAME MATCHES ".a$")
+-        target_link_options(caffe2::mkl INTERFACE "-Wl,--exclude-libs,${MKL_LIB_NAME}")
++if(UNIX)
++  if(${USE_STATIC_MKL})
++    foreach(MKL_LIB_PATH IN LISTS ONEMKL_LIBRARIES)
++      if(EXISTS "${MKL_LIB_PATH}")
++        get_filename_component(MKL_LIB_NAME "${MKL_LIB_PATH}" NAME)
++        # Match archive libraries starting with "libmkl_"
++        if(MKL_LIB_NAME MATCHES "^libmkl_" AND MKL_LIB_NAME MATCHES ".a$")
++          target_link_options(caffe2::mkl INTERFACE "-Wl,--exclude-libs,${MKL_LIB_NAME}")
++        endif()
+       endif()
+-    endif()
+-  endforeach()
++    endforeach()
++  endif()
+ endif()
+-- 
+2.34.1
+

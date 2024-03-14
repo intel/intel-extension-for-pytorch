@@ -1,7 +1,7 @@
 From 96a7a8a2a953ab44aea30a774042b432b7b132df Mon Sep 17 00:00:00 2001
 From: "Wang, Chuanqi" <chuanqi.wang@intel.com>
 Date: Fri, 10 Nov 2023 16:40:18 +0800
-Subject: [PATCH 16/19] Fix dynamo benchmark random seed for xpu device (#181)
+Subject: [PATCH 16/21] Fix dynamo benchmark random seed for xpu device (#181)
 
 * Fix dynamo benchmark random seed for xpu device
 
