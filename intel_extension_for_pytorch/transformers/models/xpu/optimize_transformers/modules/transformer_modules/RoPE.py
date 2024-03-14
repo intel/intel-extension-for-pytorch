@@ -129,8 +129,8 @@ class GPTJRotaryEmbedding(PositionalEmbedding):
         )
 
         sin, cos = torch.split(embed_positions, embed_positions.shape[-1] // 2, dim=-1)
-        sin = torch.repeat_interleave(sin, 2, 1).to(torch.float).to(self.device)
-        cos = torch.repeat_interleave(cos, 2, 1).to(torch.float).to(self.device)
+        sin = torch.repeat_interleave(sin, 2, 1).to(self.dtype).to(self.device)
+        cos = torch.repeat_interleave(cos, 2, 1).to(self.dtype).to(self.device)
         GPTJRotaryEmbedding.sin_cached = sin
         GPTJRotaryEmbedding.cos_cached = cos
 

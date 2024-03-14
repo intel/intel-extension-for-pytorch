@@ -47,7 +47,8 @@ template <
     typename weight_vec_t,
     int Num,
     int vec_size,
-    bool one_moment = false>
+    bool one_moment = false,
+    bool add_back = false>
 struct FusedNormKernel1Functor {
   [[intel::reqd_sub_group_size(SIMD)]] void operator()(
       sycl::nd_item<1> item_id) const {
@@ -78,9 +79,14 @@ struct FusedNormKernel1Functor {
             }
             sum2 += Numerics<accscalar_t>::pow(X_val[i][v], 2);
           }
+          if constexpr (add_back) {
+            *(reinterpret_cast<vec_t*>(
+                add1_data + group_offset + plane_offset)) = X_val[i];
+          }
         } else if (add1_data != nullptr) {
           vec_t add1_val = *(reinterpret_cast<vec_t*>(
               add1_data + group_offset + plane_offset));
+#pragma unroll
           for (int v = 0; v < vec_size; ++v) {
             X_val[i][v] += add1_val[v];
             if constexpr (!one_moment) {
@@ -88,7 +94,10 @@ struct FusedNormKernel1Functor {
             }
             sum2 += Numerics<accscalar_t>::pow(X_val[i][v], 2);
           }
-
+          if constexpr (add_back) {
+            *(reinterpret_cast<vec_t*>(
+                add1_data + group_offset + plane_offset)) = X_val[i];
+          }
         } else {
 #pragma unroll(vec_size)
           for (int v = 0; v < vec_size; ++v) {
@@ -216,7 +225,8 @@ template <
     typename weight_t,
     typename index_t,
     int vec_size,
-    bool one_moment = false>
+    bool one_moment = false,
+    bool add_back = false>
 void fused_norm_kernel1(
     scalar_t* add1_data,
     scalar_t* add2_data,
@@ -260,7 +270,8 @@ void fused_norm_kernel1(
         weight_vec_t,
         Num,
         vec_size,
-        one_moment>
+        one_moment,
+        add_back>
         kfn(add1_data,
             add2_data,
             X_data,
@@ -285,7 +296,8 @@ template <
     typename scalar_t,
     typename mean_t,
     typename weight_t,
-    bool one_moment = false>
+    bool one_moment = false,
+    bool add_back = false>
 void launch_vectorized_fused_norm_kernel1(
     scalar_t* add1_data,
     scalar_t* add2_data,
@@ -312,7 +324,8 @@ void launch_vectorized_fused_norm_kernel1(
             weight_t,                                                          \
             uint32_t,                                                          \
             vec_size,                                                          \
-            one_moment>(                                                       \
+            one_moment,                                                        \
+            add_back>(                                                         \
             add1_data,                                                         \
             add2_data,                                                         \
             X_data,                                                            \
@@ -329,7 +342,8 @@ void launch_vectorized_fused_norm_kernel1(
             weight_t,                                                          \
             uint64_t,                                                          \
             vec_size,                                                          \
-            one_moment>(                                                       \
+            one_moment,                                                        \
+            add_back>(                                                         \
             add1_data,                                                         \
             add2_data,                                                         \
             X_data,                                                            \
@@ -367,7 +381,8 @@ template <
     typename scalar_t,
     typename mean_t,
     typename weight_t,
-    bool one_moment>
+    bool one_moment,
+    bool add_back>
 bool LayerNormKernelImplInternal(
     const Tensor& add1,
     const Tensor& add2,
@@ -396,11 +411,18 @@ bool LayerNormKernelImplInternal(
   scalar_t* Y_data = Y.data_ptr<scalar_t>();
   weight_t* gamma_data = gamma.defined() ? gamma.data_ptr<weight_t>() : nullptr;
   weight_t* beta_data = beta.defined() ? beta.data_ptr<weight_t>() : nullptr;
+  scalar_t* add1_data = add1.defined() ? add1.data_ptr<scalar_t>() : nullptr;
+  scalar_t* add2_data = add2.defined() ? add2.data_ptr<scalar_t>() : nullptr;
 
   bool can_use_32bit_index = canUse32BitIndexMath(X);
-  launch_vectorized_fused_norm_kernel1<scalar_t, mean_t, weight_t, one_moment>(
-      nullptr,
-      nullptr,
+  launch_vectorized_fused_norm_kernel1<
+      scalar_t,
+      mean_t,
+      weight_t,
+      one_moment,
+      add_back>(
+      add1_data,
+      add2_data,
       X_data,
       gamma_data,
       beta_data,
@@ -413,7 +435,7 @@ bool LayerNormKernelImplInternal(
   return true;
 }
 
-template <bool one_moment = false>
+template <bool one_moment = false, bool add_back = false>
 bool LayerNormKernelImpl(
     const Tensor& add1,
     const Tensor& add2,
@@ -435,9 +457,10 @@ bool LayerNormKernelImpl(
             scalar_t,
             scalar_t,
             scalar_t,
-            one_moment>(
-            Tensor(),
-            Tensor(),
+            one_moment,
+            add_back>(
+            add1,
+            add2,
             X,
             gamma,
             beta,
@@ -457,7 +480,8 @@ Tensor add_add_layer_norm(
     at::IntArrayRef normalized_shape,
     const c10::optional<at::Tensor>& weight_opt,
     const c10::optional<at::Tensor>& bias_opt,
-    double epsilon) {
+    double epsilon,
+    bool add_back = false) {
   c10::MaybeOwned<Tensor> weight_maybe_owned =
       at::borrow_from_optional_tensor(weight_opt);
   const Tensor& weight = *weight_maybe_owned;
@@ -481,8 +505,13 @@ Tensor add_add_layer_norm(
 
     bool fast_path_success = false;
     if (can_be_fused) {
-      fast_path_success = impl::LayerNormKernelImpl(
-          Tensor(), Tensor(), input_, weight_, bias_, M, N, epsilon, output);
+      if (add_back) {
+        fast_path_success = impl::LayerNormKernelImpl<false, true>(
+            add1, add2, input_, weight_, bias_, M, N, epsilon, output);
+      } else {
+        fast_path_success = impl::LayerNormKernelImpl<false, false>(
+            add1, add2, input_, weight_, bias_, M, N, epsilon, output);
+      }
     }
     if (!(can_be_fused && fast_path_success)) {
       Tensor mean, rstd;
@@ -496,15 +525,22 @@ Tensor add_add_layer_norm(
 
 Tensor add_layer_norm(
     const Tensor& add1,
-    const Tensor& add2,
     const Tensor& input,
     at::IntArrayRef normalized_shape,
     const c10::optional<at::Tensor>& weight_opt,
     const c10::optional<at::Tensor>& bias_opt,
-    double epsilon) {
+    double epsilon,
+    bool add_back = false) {
   RECORD_FUNCTION("add_layer_norm", std::vector<c10::IValue>({input}));
   return add_add_layer_norm(
-      add1, Tensor(), input, normalized_shape, weight_opt, bias_opt, epsilon);
+      add1,
+      Tensor(),
+      input,
+      normalized_shape,
+      weight_opt,
+      bias_opt,
+      epsilon,
+      add_back);
 }
 
 Tensor fast_layer_norm(
@@ -531,7 +567,8 @@ Tensor add_add_rms_norm(
     at::IntArrayRef normalized_shape,
     const c10::optional<at::Tensor>& weight_opt,
     const c10::optional<at::Tensor>& bias_opt,
-    double epsilon) {
+    double epsilon,
+    bool add_back = false) {
   c10::MaybeOwned<Tensor> weight_maybe_owned =
       at::borrow_from_optional_tensor(weight_opt);
   const Tensor& weight = *weight_maybe_owned;
@@ -555,8 +592,12 @@ Tensor add_add_rms_norm(
     bool can_be_fused = true;
     bool fast_path_success = false;
     if (can_be_fused) {
-      fast_path_success = impl::LayerNormKernelImpl<true>(
-          Tensor(), Tensor(), input_, weight_, bias_, M, N, epsilon, output);
+      if (add_back)
+        fast_path_success = impl::LayerNormKernelImpl<true, true>(
+            add1, add2, input_, weight_, bias_, M, N, epsilon, output);
+      else
+        fast_path_success = impl::LayerNormKernelImpl<true, false>(
+            add1, add2, input_, weight_, bias_, M, N, epsilon, output);
     }
 
     if (!(can_be_fused && fast_path_success)) {
@@ -571,15 +612,22 @@ Tensor add_add_rms_norm(
 
 Tensor add_rms_norm(
     const Tensor& add1,
-    const Tensor& add2,
     const Tensor& input,
     at::IntArrayRef normalized_shape,
     const c10::optional<at::Tensor>& weight_opt,
     const c10::optional<at::Tensor>& bias_opt,
-    double epsilon) {
+    double epsilon,
+    bool add_back = false) {
   RECORD_FUNCTION("add_rms_norm", std::vector<c10::IValue>({input}));
-  return add_add_layer_norm(
-      add1, Tensor(), input, normalized_shape, weight_opt, bias_opt, epsilon);
+  return add_add_rms_norm(
+      add1,
+      Tensor(),
+      input,
+      normalized_shape,
+      weight_opt,
+      bias_opt,
+      epsilon,
+      add_back);
 }
 
 Tensor fast_rms_norm(

@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Context.h>
 #include <ATen/autocast_mode.h>
+#include <ATen/native/Activation.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/SparseTensorUtils.h>
 #include <ATen/native/TensorIterator.h>
@@ -10,6 +11,7 @@
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
+#include "comm/Numerics.h"
 
 #include "Loops.h"
 #include "PSTLFunctions.h"
@@ -47,6 +49,34 @@ struct mul_add_kernel_dpcpp_functor {
 
  private:
   accscalar_t alpha;
+};
+
+template <typename scalar_t, typename accscalar_t>
+struct silu_mul_dpcpp_functor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return (accscalar_t(a)) / (1.0f + expf(accscalar_t(-a))) * accscalar_t(b);
+  }
+};
+
+template <typename scalar_t, typename accscalar_t>
+struct gelu_erf_mul_dpcpp_funcor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    return (accscalar_t(a) * accscalar_t(0.5) *
+            (accscalar_t(1) + ::erf(accscalar_t(a) * accscalar_t(M_SQRT1_2)))) *
+        accscalar_t(b);
+  }
+};
+
+template <typename scalar_t, typename accscalar_t>
+struct gelu_tanh_mul_dpcpp_funcor {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
+    constexpr accscalar_t kBeta = M_SQRT2 * M_2_SQRTPI * accscalar_t(0.5);
+    constexpr accscalar_t kKappa = 0.044715;
+    auto x_cube = accscalar_t(a) * accscalar_t(a) * accscalar_t(a);
+    auto inner = kBeta * (accscalar_t(a) + kKappa * x_cube);
+    return accscalar_t(0.5) * accscalar_t(a) *
+        (accscalar_t(1) + Numerics<accscalar_t>::tanh(inner));
+  }
 };
 
 static void mul_add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
@@ -150,6 +180,84 @@ struct mul_scalar_add_scalar_functor {
   accscalar_t add_scalar;
   accscalar_t other_scalar;
 };
+
+Tensor silu_mul(const Tensor& self, const Tensor& other, Tensor& out) {
+  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, self);
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+    AtenIpexTypeXPU::silu_out(self, out);
+    out = AtenIpexTypeXPU::mul(out, other);
+  } else {
+    auto iter = TensorIteratorConfig()
+                    .set_check_mem_overlap(true)
+                    .promote_inputs_to_common_dtype(true)
+                    .cast_common_dtype_to_outputs(true)
+                    .enforce_safe_casting_to_output(true)
+                    .promote_integer_inputs_to_float(true)
+                    .add_output(out)
+                    .add_input(self)
+                    .add_input(other)
+                    .build();
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        iter.dtype(),
+        "silu_mul",
+        [&]() {
+          using accscalar_t = acc_type<scalar_t>;
+          typename impl::silu_mul_dpcpp_functor<scalar_t, accscalar_t> f;
+          dpcpp_kernel_for_tensor_iter(iter, f);
+        });
+  }
+  return out;
+}
+
+Tensor gelu_mul(
+    const Tensor& self,
+    const Tensor& other,
+    Tensor& out,
+    c10::string_view approximate) {
+  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, self);
+  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+    AtenIpexTypeXPU::gelu_out(self, approximate, out);
+    out = AtenIpexTypeXPU::mul(out, other);
+  } else {
+    auto _approximate = at::native::get_gelutype_enum(approximate);
+    auto iter = TensorIteratorConfig()
+                    .set_check_mem_overlap(true)
+                    .promote_inputs_to_common_dtype(true)
+                    .cast_common_dtype_to_outputs(true)
+                    .enforce_safe_casting_to_output(true)
+                    .promote_integer_inputs_to_float(true)
+                    .add_output(out)
+                    .add_input(self)
+                    .add_input(other)
+                    .build();
+    if (_approximate == at::native::GeluType::Tanh) {
+      IPEX_DISPATCH_FLOATING_TYPES_AND2(
+          at::ScalarType::Half,
+          at::ScalarType::BFloat16,
+          iter.dtype(),
+          "gelu_mul_tanh",
+          [&]() {
+            using accscalar_t = acc_type<scalar_t>;
+            typename impl::gelu_tanh_mul_dpcpp_funcor<scalar_t, accscalar_t> f;
+            dpcpp_kernel_for_tensor_iter(iter, f);
+          });
+    } else {
+      IPEX_DISPATCH_ALL_TYPES_AND2(
+          at::ScalarType::Half,
+          at::ScalarType::BFloat16,
+          iter.dtype(),
+          "gelu_mul_erf",
+          [&]() {
+            using accscalar_t = acc_type<scalar_t>;
+            typename impl::gelu_erf_mul_dpcpp_funcor<scalar_t, accscalar_t> f;
+            dpcpp_kernel_for_tensor_iter(iter, f);
+          });
+    }
+  }
+  return out;
+}
 
 Tensor mul_scalar_add_scalar(
     const Tensor& self,
@@ -674,5 +782,9 @@ IPEX_LIBRARY_FRAGMENT() {
       "packed_add",
       at::AtenIpexTypeXPU::packed_add,
       c10::DispatchKey::SparseXPU)
+  IPEX_OP_REGISTER_DISPATCH(
+      "silu_mul", at::AtenIpexTypeXPU::silu_mul, c10::DispatchKey::XPU)
+  IPEX_OP_REGISTER_DISPATCH(
+      "gelu_mul", at::AtenIpexTypeXPU::gelu_mul, c10::DispatchKey::XPU)
 }
 } // namespace

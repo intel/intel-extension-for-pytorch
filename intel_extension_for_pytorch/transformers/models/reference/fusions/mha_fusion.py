@@ -6,14 +6,20 @@ from torch.nn import functional as F
 
 
 class RotaryEmbedding(torch.nn.Module):
-    def __init__(self, max_position_embeddings, dim, backbone, base=10000):
+    def __init__(
+        self, max_position_embeddings, dim, backbone, base=10000, device="cpu"
+    ):
         super().__init__()
-        inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
+        self.device = device
+        inv_freq = 1.0 / (
+            base ** (torch.arange(0, dim, 2, device=self.device).float() / dim)
+        )
         self.register_buffer("inv_freq", inv_freq, persistent=False)
         self.max_seq_len_cached = max_position_embeddings
         t = torch.arange(
             self.max_seq_len_cached,
             dtype=self.inv_freq.dtype,
+            device=self.device,
         )
         self.model_backbone = str(backbone)
         freqs = torch.einsum("i,j->ij", t, self.inv_freq)
@@ -40,7 +46,9 @@ class RotaryEmbedding(torch.nn.Module):
     def forward(self, seq_len=None):
         if seq_len is not None and seq_len > self.max_seq_len_cached:
             self.max_seq_len_cached = seq_len
-            t = torch.arange(self.max_seq_len_cached, dtype=self.inv_freq.dtype)
+            t = torch.arange(
+                self.max_seq_len_cached, dtype=self.inv_freq.dtype, device=self.device
+            )
             freqs = torch.einsum("i,j->ij", t, self.inv_freq)
             if (
                 self.model_backbone == "FalconForCausalLM"

@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from ...reference.fusions.mha_fusion import RotaryEmbedding
+from typing import Optional
 
 
 class _IPEXRopeXPU(nn.Module):
@@ -13,8 +14,51 @@ class _IPEXRopeXPU(nn.Module):
     ):
         super().__init__()
         self.embed_positions = RotaryEmbedding(
-            max_position_embeddings, pos_embd_dim, backbone, base
+            max_position_embeddings, pos_embd_dim, backbone, base, device="xpu"
         )
+        self.max_seqlen_cached = self.embed_positions.max_seq_len_cached
+        self.emb_dim = self.embed_positions.emb.size(-1)
+        self.cos_interleave_cached = torch.repeat_interleave(
+            self.embed_positions.cos_cached[:, :, :, : self.emb_dim // 2], 2, 3
+        )
+        self.sin_interleave_cached = torch.repeat_interleave(
+            self.embed_positions.sin_cached[:, :, :, : self.emb_dim // 2], 2, 3
+        )
+
+    def get_sin_cos(self, seqlen, offset):
+        _, sin, cos = self.embed_positions()
+        if offset == 1:
+            if seqlen is not None and seqlen > self.max_seqlen_cached:
+                self.max_seqlen_cached = seqlen
+                self.cos_interleave_cached = torch.repeat_interleave(
+                    self.embed_positions.cos_cached[:, :, :, : self.emb_dim // 2], 2, 3
+                )
+                self.sin_interleave_cached = torch.repeat_interleave(
+                    self.embed_positions.sin_cached[:, :, :, : self.emb_dim // 2], 2, 3
+                )
+            return self.sin_interleave_cached, self.cos_interleave_cached
+        return sin, cos
+
+    def apply_embedding(self, query, sin, cos, offset, key=None):
+        if key is not None and key.size() == query.size():
+            sin = sin.expand(query.size())
+            cos = cos.expand(query.size())
+            rope_kernel = (
+                torch.ops.torch_ipex.apply_rotary_embedding_two_qk
+                if offset == 1
+                else torch.ops.torch_ipex.apply_rotary_embedding_half_qk
+            )
+            rope_kernel(query, key, sin, cos, query, key)
+            return query, key
+        rope_kernel = (
+            torch.ops.torch_ipex.apply_rotary_embedding_two
+            if offset == 1
+            else torch.ops.torch_ipex.apply_rotary_embedding_half
+        )
+        rope_kernel(query, sin.expand(query.size()), cos.expand(query.size()), query)
+        if key is not None:
+            rope_kernel(key, sin.expand(key.size()), cos.expand(key.size()), key)
+        return query, key
 
     @classmethod
     def rotary_embedding(
@@ -44,16 +88,61 @@ class _IPEXRopeXPU(nn.Module):
 
     def forward(
         self,
-        query,
-        key,
-        sin,
-        cos,
-        rotary_dim,
-        rotary_half,
-        postion_ids=None,
-        seqlens=None,
+        x: torch.Tensor,
+        position_ids: torch.Tensor,
+        num_head: int,
+        head_dim: int,
+        offset: int,
+        rotary_ndims: int,
+        seq_len: Optional[int] = None,
+        num_concats: Optional[int] = None,
     ):
-        raise NotImplementedError
+        def expand_sin_and_cos(x, sin, cos):
+            return sin.expand(x.shape), cos.expand(x.shape)
+
+        sin, cos = self.get_sin_cos(seq_len, offset)
+        bs = x.size(0)
+        seqlen = x.size(1)
+        sin = sin.squeeze()[position_ids].unsqueeze(2).to(x.dtype)
+        cos = cos.squeeze()[position_ids].unsqueeze(2).to(x.dtype)
+        if num_concats is None:
+            hidden_size = num_head * head_dim
+            if hidden_size != x.size(2):
+                kv_head = x.size(2) // head_dim
+                x = x.view(bs, seqlen, kv_head, head_dim)
+            else:
+                x = x.view(bs, seqlen, num_head, head_dim)
+
+            # sin,cos = expand_sin_and_cos(x, sin, cos)
+            return self.apply_embedding(x, sin, cos, offset)[0]
+
+        elif num_concats == 2:
+            hidden_size = num_head * head_dim
+            kv_head = num_head
+            if hidden_size * 2 != x.size(2):
+                kv_head = (x.size(2) - hidden_size) // head_dim
+            q = x[:, :, :hidden_size].view(bs, seqlen, num_head, head_dim)
+            k = x[:, :, hidden_size:].view(bs, seqlen, kv_head, head_dim)
+            # sin, cos = expand_sin_and_cos(q, sin, cos)
+            return self.apply_embedding(q, sin, cos, offset, k)
+
+        elif num_concats == 3:
+            hidden_size = num_head * head_dim
+            kv_head = num_head
+            if num_head * head_dim * 3 != x.size(2):
+                kv_head = (x.size(2) - num_head * head_dim) // head_dim // 2
+            kv_size = kv_head * head_dim
+            q = x[:, :, :hidden_size].view(bs, seqlen, num_head, head_dim)
+            k = x[:, :, hidden_size : hidden_size + kv_size].view(
+                bs, seqlen, kv_head, head_dim
+            )
+            v = x[:, :, hidden_size + kv_size :].view(bs, seqlen, kv_head, head_dim)
+            # sin, cos = expand_sin_and_cos(q, sin, cos)
+            q, k = self.apply_embedding(q, sin, cos, offset, k)
+            v = self.apply_embedding(v, sin, cos, offset)
+            return q, k, v
+        else:
+            raise NotImplementedError
 
 
 class _IPEXRMSNormXPU(nn.Module):

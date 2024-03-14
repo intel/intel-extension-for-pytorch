@@ -13,7 +13,10 @@ class LlamaRMSNorm(nn.Module):
         self.weight = nn.Parameter(torch.ones(hidden_size))
         self.variance_epsilon = eps
 
-    def forward(self, hidden_states):
+    def forward(self, hidden_states, residual=None):
+        if residual is not None:
+            residual.add_(hidden_states)
+            hidden_states = residual
         variance = hidden_states.to(torch.float32).pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
 
@@ -94,3 +97,69 @@ class TestNNMethod(TestCase):
             hidden_states_xpu, [hsz], RMS.weight.to("xpu"), None, RMS.variance_epsilon
         )
         self.assertEqual(ref, fast_rms.cpu())
+
+    def test_add_rms_norm(self, dtype=torch.half):
+        batch, sentence_length, embedding_dim = 16, 128, 1024
+        hidden_states = torch.randn(batch, sentence_length, embedding_dim).to(dtype)
+        residual_ref = torch.randn(batch, sentence_length, embedding_dim).to(dtype)
+        residual_ref_ori = residual_ref.clone()
+        residual_kernel = residual_ref.clone().to("xpu")
+        hidden_states_xpu = hidden_states.to("xpu")
+        RMS = LlamaRMSNorm(embedding_dim).to(dtype)
+        ref = RMS(hidden_states, residual_ref)
+        hsz = hidden_states.shape[-1]
+        fast_rms1 = ipex.llm.functional.add_rms_norm(
+            residual_kernel,
+            hidden_states_xpu,
+            RMS.weight.to("xpu"),
+            None,
+            RMS.variance_epsilon,
+            False,
+        )
+        self.assertEqual(residual_ref_ori, residual_kernel.cpu())
+        self.assertEqual(ref, fast_rms1.cpu())
+        fast_rms2 = ipex.llm.functional.add_rms_norm(
+            residual_kernel,
+            hidden_states_xpu,
+            RMS.weight.to("xpu"),
+            None,
+            RMS.variance_epsilon,
+            True,
+        )
+        self.assertEqual(residual_ref, residual_kernel.cpu())
+        self.assertEqual(ref, fast_rms2.cpu())
+
+    def test_add_layernorm_norm(self, dtype=torch.half):
+        batch, sentence_length, embedding_dim = 16, 128, 1024
+        hidden_states = torch.randn(batch, sentence_length, embedding_dim).to(dtype)
+        residual_ref = torch.randn(batch, sentence_length, embedding_dim).to(dtype)
+        residual_ref_ori = residual_ref.clone()
+        residual_kernel = residual_ref.clone().to("xpu")
+        hidden_states_xpu = hidden_states.to("xpu")
+        layernorm = nn.LayerNorm(embedding_dim)
+        residual_ref = residual_ref.float()
+        residual_ref.add_(hidden_states.float())
+        ref = layernorm(residual_ref.float())
+        hsz = hidden_states.shape[-1]
+        fast_layernorm = ipex.llm.functional.add_layer_norm(
+            residual_kernel,
+            hidden_states_xpu,
+            layernorm.weight.to("xpu").half(),
+            None,
+            layernorm.eps,
+            False,
+        )
+        self.assertEqual(residual_ref_ori, residual_kernel.cpu())
+        self.assertEqual(ref, fast_layernorm.cpu().float(), atol=1e-2, rtol=1e-2)
+        fast_layernorm = ipex.llm.functional.add_layer_norm(
+            residual_kernel,
+            hidden_states_xpu,
+            layernorm.weight.to("xpu").half(),
+            None,
+            layernorm.eps,
+            True,
+        )
+        self.assertEqual(
+            residual_ref, residual_kernel.cpu().float(), atol=1e-2, rtol=1e-2
+        )
+        self.assertEqual(ref, fast_layernorm.cpu().float(), atol=1e-2, rtol=1e-2)
