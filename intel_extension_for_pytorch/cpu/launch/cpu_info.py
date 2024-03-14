@@ -216,7 +216,10 @@ class CPUPoolList:
             assert (
                 level in logging_fn.keys()
             ), f"Unrecognized logging level {level} is detected. Available levels are {logging_fn.keys()}."
-            logging_fn[level](msg, _type=warning_type)
+            if warning_type:
+                logging_fn[level](msg, _type=warning_type)
+            else:
+                logging_fn[level](msg)
         else:
             print(msg)
 

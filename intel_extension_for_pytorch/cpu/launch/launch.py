@@ -8,8 +8,10 @@ from datetime import datetime
 import intel_extension_for_pytorch.cpu.auto_ipex as auto_ipex
 from .launcher_distributed import DistributedTrainingLauncher
 from .launcher_multi_instances import MultiInstancesLauncher
-from ...utils._logger import logger, WarningType, format_str
+from ...utils._logger import WarningType, format_str
 
+logger = logging.getLogger("IPEX-launcher")
+logger.setLevel(logging.INFO)
 """
 This is a script for launching PyTorch training and inference on Intel Xeon CPU with optimal configurations.
 Now, single instance inference/training, multi-instance inference/training and distributed training
