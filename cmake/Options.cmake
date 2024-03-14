@@ -13,6 +13,7 @@ option(BUILD_WITH_XPU "Build XPU backend implementation" OFF)
 option(BUILD_NO_CLANGFORMAT "Build without force clang-format" OFF)
 option(BUILD_STATS "Count statistics for each component during build process" OFF)
 option(BUILD_STRIPPED_BIN "Strip all symbols after build" OFF)
+option(BUILD_STATIC_ONEMKL "build ipex cpu/gpu with static mkl." ON)
 
 if (BUILD_STATS)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "time -v")

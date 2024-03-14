@@ -53,10 +53,7 @@ function (install_mkl_packages)
   set(mkl_root_hint ${mkl_root_hint} PARENT_SCOPE)
 endfunction()
 
-# IPEX XPU lib always use the dynamic linker for oneMKL lib if USE_ONEMKL is ON and oneMKL is available.
-# IPEX CPU lib always download and install mkl-static lib and use static linker for mkl-static lib.
-if(BUILD_MODULE_TYPE STREQUAL "GPU")
-  set(BUILD_STATIC_ONEMKL OFF)
+function(get_mkl_from_env_var)
   if(DEFINED ENV{MKLROOT})
     set(mkl_root_hint $ENV{MKLROOT})
   elseif(DEFINED ENV{MKL_ROOT})
@@ -64,13 +61,28 @@ if(BUILD_MODULE_TYPE STREQUAL "GPU")
   elseif(MKL_ROOT)
     set(mkl_root_hint ${MKL_ROOT})
   else()
-    message(WARNING "Please set oneMKL root path by MKLROOT, or MKL_ROOT for IPEX XPU build.")
+    message(WARNING "Please set oneMKL root path by MKLROOT, or MKL_ROOT for IPEX build.")
     return()
   endif()
+  set(mkl_root_hint ${mkl_root_hint} PARENT_SCOPE)
+endfunction()
+
+# IPEX XPU lib always use the dynamic linker for oneMKL lib if USE_ONEMKL is ON and oneMKL is available.
+# IPEX CPU lib always download and install mkl-static lib and use static linker for mkl-static lib.
+# IPEX CPU lib can manual config to use the dynamic link for oneMKL lib.
+if(BUILD_MODULE_TYPE STREQUAL "GPU")
+  get_mkl_from_env_var()
 else()
-  set(BUILD_STATIC_ONEMKL ON)
-  message(STATUS "Download and install mkl-include and mkl-static for IPEX CPU build automatically.")
-  install_mkl_packages()
+  if(BUILD_WITH_XPU)
+    get_mkl_from_env_var()
+  else()
+    if(BUILD_STATIC_ONEMKL)
+      message(STATUS "Download and install mkl-include and mkl-static for IPEX CPU build automatically.")
+      install_mkl_packages()
+    else()
+      get_mkl_from_env_var()
+    endif()
+  endif()
 endif()
 
 # Try to find Intel MKL header
@@ -132,11 +144,17 @@ if(BUILD_MODULE_TYPE STREQUAL "GPU")
   endif()
 endif()
 
+# https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-link-line-advisor.html
 set(START_GROUP)
 set(END_GROUP)
 if(BUILD_STATIC_ONEMKL)
   set(START_GROUP "-Wl,--start-group")
   set(END_GROUP "-Wl,--end-group")
+else()
+  if(BUILD_MODULE_TYPE STREQUAL "CPU")
+    set(START_GROUP "-Wl,--push-state,--no-as-needed")
+    set(END_GROUP "-Wl,--pop-state")
+  endif()
 endif()
 
 set(ONEMKL_CPU_LIBS ${START_GROUP} ${MKL_LIB_LP64} ${MKL_LIB_CORE} ${MKL_LIB_THREAD} ${END_GROUP})

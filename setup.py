@@ -103,6 +103,7 @@ import errno
 
 # FIXME: always set BUILD_WITH_XPU = ON in XPU repo
 os.environ["BUILD_WITH_XPU"] = "ON"
+os.environ["BUILD_STATIC_ONEMKL"] = "OFF"
 
 PACKAGE_NAME = "intel_extension_for_pytorch"
 
@@ -763,7 +764,10 @@ class IPEXCPPLibBuild(build_clib, object):
 
         if build_with_cpu:
             # Generate cmake for CPU module:
-            build_option_cpu = {**build_option_common, "BUILD_MODULE_TYPE": "CPU"}
+            build_option_cpu = {
+                **build_option_common,
+                "BUILD_MODULE_TYPE": "CPU",
+            }
 
             cmake_args_cpu = []
             define_build_options(cmake_args_cpu, **build_option_cpu)
