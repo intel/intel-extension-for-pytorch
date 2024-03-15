@@ -242,7 +242,7 @@ sycl::event matmul(
     // STEP2: creat attribute
     primitive_attr pattr;
     pattr.set_post_ops(po);
-    if (globalContext().deterministicAlgorithms())
+    if (Settings::I().is_onednn_deterministic_enabled())
       pattr.set_deterministic(true);
 
 #ifdef USE_SCRATCHPAD_MODE

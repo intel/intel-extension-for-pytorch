@@ -357,7 +357,7 @@ static void deconvolution(
   post_ops po;
   attr.extract_post_ops(po, dst);
   pattr.set_post_ops(po);
-  if (globalContext().deterministicAlgorithms())
+  if (Settings::I().is_onednn_deterministic_enabled())
     pattr.set_deterministic(true);
 
 #ifdef USE_SCRATCHPAD_MODE
@@ -620,6 +620,11 @@ static void deconvolution_backward_weights(
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
+
+  if (globalContext().deterministicAlgorithms() ||
+      Settings::I().is_onednn_deterministic_enabled())
+    pattr.set_deterministic(true);
+  
   auto deconv_fwd_pd = deconvolution_forward::primitive_desc(
       engine,
       prop_kind::forward,

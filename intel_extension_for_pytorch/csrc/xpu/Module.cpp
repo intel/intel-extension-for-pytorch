@@ -752,6 +752,14 @@ void init_xpu_module(pybind11::module& m) {
   m.def(
       "_enable_onednn_layout", []() { Settings::I().enable_onednn_layout(); });
 
+  m.def("_enable_onednn_deterministic", []() {
+    Settings::I().enable_onednn_deterministic();
+  });
+
+  m.def("_disable_onednn_deterministic", []() {
+    Settings::I().disable_onednn_deterministic();
+  });
+
   m.def("_disable_onednn_layout", []() {
     Settings::I().disable_onednn_layout();
   });

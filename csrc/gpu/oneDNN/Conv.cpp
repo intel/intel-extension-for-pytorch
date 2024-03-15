@@ -239,7 +239,7 @@ sycl::event convolution(
   post_ops po;
   attr.extract_post_ops(po, dst);
   pattr.set_post_ops(po);
-  if (globalContext().deterministicAlgorithms())
+  if (Settings::I().is_onednn_deterministic_enabled())
     pattr.set_deterministic(true);
 
 #ifdef USE_SCRATCHPAD_MODE
@@ -365,6 +365,8 @@ sycl::event convolution_backward_weights(
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
+  if (globalContext().deterministicAlgorithms() || Settings::I().is_onednn_deterministic_enabled())
+    pattr.set_deterministic(true);
   auto conv_fwd_pd = convolution_forward::primitive_desc(
       engine,
       prop_kind::forward,
@@ -507,6 +509,8 @@ sycl::event convolution_backward_data(
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
+  if (globalContext().deterministicAlgorithms() || Settings::I().is_onednn_deterministic_enabled())
+    pattr.set_deterministic(true);
   memory::dims _stride = stride.vec();
   memory::dims _padding_front_top_left = padding_front_top_left.vec();
   memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
