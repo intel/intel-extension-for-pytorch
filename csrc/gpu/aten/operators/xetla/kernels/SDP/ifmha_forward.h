@@ -9,7 +9,7 @@
  *
  * Unless required by applicable law or agreed to in wriscalar_tg, software
  * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, itemther express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
@@ -232,11 +232,11 @@ class ifmha_forward_t {
     inline context_t() = default;
 
     /// @brief Initialize invariant variables in the ifmha loop
-    inline void init_context(xetla_exec_item<2>& ei, arguments_t& args) {
-      batch_id = ei.get_group(0);
-      head_id = ei.get_group(1);
-      beam_id = ei.get_local_id(0);
-      sg_idx = ei.get_local_id(1);
+    inline void init_context(nd_item<2>& item, arguments_t& args) {
+      batch_id = item.get_group(0);
+      head_id = item.get_group(1);
+      beam_id = item.get_local_id(0);
+      sg_idx = item.get_local_id(1);
       g.init(sg_idx);
 
       nbarrier.init_nbarrier(beam_id, nbarrier_role::producer_consumer);
@@ -292,11 +292,10 @@ class ifmha_forward_t {
       using index_tile_desc_t = subgroup::tile_desc_t<1, kSgBc, 1, 16>;
       using index_tile_t = subgroup::tile_t<index_t, index_tile_desc_t>;
       using index_payload_t = subgroup::mem_payload_t<
-          index_t,
+          mem_desc_t<index_t, mem_desc_Ij_t::layout, mem_desc_Ij_t::space>,
           index_tile_desc_t,
           msg_type::block_2d,
-          mem_desc_Ij_t::layout,
-          mem_desc_Ij_t::space>;
+          gpu_arch::Xe>;
       index_tile_t index_tile;
       index_payload_t index_payload;
 
@@ -332,9 +331,11 @@ class ifmha_forward_t {
 
   using perf_tuning_knob_bmbc =
       group::perf_tuning_knob_t<accum_step_bmbc, stages_bmbc, sync_freq_bmbc>;
-  using compute_policy_bmbc =
-      group::compute_policy_default_xmx<compute_attr, perf_tuning_knob_bmbc>;
-  using brgemm_Sij_t = group::brgemm_t<
+  using compute_policy_bmbc = group::compute_policy_default_xmx<
+      compute_attr,
+      perf_tuning_knob_bmbc,
+      gpu_arch::Xe>;
+  using brgemm_Sij_t = group::gemm_t<
       compute_policy_bmbc,
       tile_shape_BmBc,
       mem_desc_QiL_t,
@@ -488,17 +489,13 @@ class ifmha_forward_t {
         reg_layout::vnni_tiled>;
     using matB_t = subgroup::tile_t<scalar_t, matB_tile_desc_t>;
     using matB_payload_t = subgroup::mem_payload_t<
-        scalar_t,
+        mem_desc_t<scalar_t, layout_b, mem_space::global>,
         matB_tile_desc_t,
         subgroup::msg_type_v<matB_tile_desc_t, mem_space::global>,
-        layout_b,
-        mem_space::global,
         gpu_arch::Xe>;
-    using matB_prefetch_payload_t = subgroup::ext::prefetch_payload_t<
-        scalar_t,
+    using matB_prefetch_payload_t = subgroup::prefetch_payload_t<
+        mem_desc_t<scalar_t, layout_b, mem_space::global>,
         subgroup::tile_desc_t<kSgBc, accum_step_bmbc, 1, 1>,
-        layout_b,
-        mem_space::global,
         tile_shape_BmBc::wg_size_y,
         gpu_arch::Xe>;
 
@@ -519,7 +516,7 @@ class ifmha_forward_t {
     matB_t matB;
 #pragma unroll
     for (int i = 0; i < stages_bmbc; i++) {
-      subgroup::ext::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+      subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
           matB_prefetch_payload);
       matB_prefetch_payload.template update_tdesc<update_dir_b>(
           matB_t::tile_size_y);
@@ -538,7 +535,7 @@ class ifmha_forward_t {
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           matB, matB_payload);
       if constexpr (stages_bmbc != 0) {
-        subgroup::ext::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+        subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
             matB_prefetch_payload);
       }
       matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
@@ -567,11 +564,10 @@ class ifmha_forward_t {
 
     using matQi_tile_desc_t = subgroup::tile_desc_t<accum_step_1d, 1, 16, 1>;
     using matQi_payload_t = subgroup::mem_payload_t<
-        scalar_t,
+        mem_desc_t<scalar_t, mem_desc_QiL_t::layout, mem_desc_QiL_t::space>,
         matQi_tile_desc_t,
         msg_type::block_1d,
-        mem_desc_QiL_t::layout,
-        mem_desc_QiL_t::space>;
+        gpu_arch::Xe>;
     using matQi_t = subgroup::tile_t<scalar_t, matQi_tile_desc_t>;
     using matQi_acc_t = subgroup::tile_t<accum_t, matQi_tile_desc_t>;
 
@@ -634,9 +630,11 @@ class ifmha_forward_t {
   // ======================= // gemm_Oi // ======================= //
   using perf_tuning_knob_bmhm =
       group::perf_tuning_knob_t<accum_step_bmhm, stages_bmhm, sync_freq_bmhm>;
-  using compute_policy_bmhm =
-      group::compute_policy_default_xmx<compute_attr, perf_tuning_knob_bmhm>;
-  using brgemm_Oi_t = group::brgemm_t<
+  using compute_policy_bmhm = group::compute_policy_default_xmx<
+      compute_attr,
+      perf_tuning_knob_bmhm,
+      gpu_arch::Xe>;
+  using brgemm_Oi_t = group::gemm_t<
       compute_policy_bmhm,
       tile_shape_BmHm,
       mem_desc_Pij_t,
@@ -646,18 +644,17 @@ class ifmha_forward_t {
   // ====================== // prefetch_V0j // ===================== //
 
   inline void prefetch_V0() {
-    using matVj_prefetch_payload_t = subgroup::ext::prefetch_payload_t<
-        scalar_t,
+    using matVj_prefetch_payload_t = subgroup::prefetch_payload_t<
+        mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
         subgroup::tile_desc_t<kSgHm, stages_bmhm * accum_step_bmhm, 1, 1>,
-        mem_layout::row_major,
-        mem_space::global,
-        1>;
+        1,
+        gpu_arch::Xe>;
 
     mem_desc_Vj_t desc_pre_Vj(ctx.desc_Vj);
     desc_pre_Vj.update_coord_x(ctx.sg_idx * kSgHm);
     matVj_prefetch_payload_t matVj_prefetch_payload(desc_pre_Vj, 0);
 
-    subgroup::ext::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+    subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
         matVj_prefetch_payload);
   }
 
@@ -681,11 +678,10 @@ class ifmha_forward_t {
     using matPi_tile_desc_t = subgroup::tile_desc_t<kBc, 1, kBc, 1>;
     using matPi_t = subgroup::tile_t<scalar_t, matPi_tile_desc_t>;
     using matPi_load_t = subgroup::mem_payload_t<
-        scalar_t,
+        mem_desc_t<scalar_t, mem_desc_Pij_t::layout, mem_desc_Pij_t::space>,
         matPi_t,
         msg_type::block_1d,
-        mem_desc_Pij_t::layout,
-        mem_desc_Pij_t::space>;
+        gpu_arch::Xe>;
 
     mem_desc_Pij_t desc_Pi_load(ctx.desc_Pij);
     matPi_load_t matPi_load(desc_Pi_load);
@@ -723,17 +719,13 @@ class ifmha_forward_t {
         reg_layout::vnni_tiled>;
     using matB_t = subgroup::tile_t<scalar_t, matB_tile_desc_t>;
     using matB_payload_t = subgroup::mem_payload_t<
-        scalar_t,
+        mem_desc_t<scalar_t, layout_b, mem_space::global>,
         matB_tile_desc_t,
         msg_type::block_2d,
-        layout_b,
-        mem_space::global,
         gpu_arch::Xe>;
-    using matB_prefetch_payload_t = subgroup::ext::prefetch_payload_t<
-        scalar_t,
+    using matB_prefetch_payload_t = subgroup::prefetch_payload_t<
+        mem_desc_t<scalar_t, layout_b, mem_space::global>,
         subgroup::tile_desc_t<kSgBc, accum_step_bmhm, 1, 1>,
-        layout_b,
-        mem_space::global,
         tile_shape_BmHm::wg_size_y,
         gpu_arch::Xe>;
 
@@ -754,7 +746,7 @@ class ifmha_forward_t {
     matB_t matB;
 #pragma unroll
     for (int i = 0; i < stages_bmbc; i++) {
-      subgroup::ext::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+      subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
           matB_prefetch_payload);
       matB_prefetch_payload.template update_tdesc<update_dir_b>(
           matB_t::tile_size_y);
@@ -773,7 +765,7 @@ class ifmha_forward_t {
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           matB, matB_payload);
       if constexpr (stages_bmbc != 0) {
-        subgroup::ext::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+        subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
             matB_prefetch_payload);
       }
       matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
@@ -851,11 +843,10 @@ class ifmha_forward_t {
     if constexpr (wg_size_x > 1) {
       using matX_tile_desc_t = subgroup::tile_desc_t<kSgHm, 1, 16, 1>;
       using matX_payload_t = subgroup::mem_payload_t<
-          accum_t,
+          mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>,
           matX_tile_desc_t,
           msg_type::block_1d,
-          mem_layout::row_major,
-          mem_space::local>;
+          gpu_arch::Xe>;
       using matX_acc_t = subgroup::tile_t<accum_t, matX_tile_desc_t>;
 
       // xetla_nbarrier_t<1, 1> nbarrier_producer;
@@ -1024,7 +1015,7 @@ class ifmha_forward_t {
   /// @brief store Pij to local memory.
   inline void store_Pij(matPij_t& matPij) {
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
+        group::epilogue_policy_default<gpu_arch::Xe>,
         tile_shape_BmBc,
         mem_desc_Pij_t>;
     epilogue_t epilogue;
@@ -1040,7 +1031,7 @@ class ifmha_forward_t {
   /// @brief store Oi to global memory.
   inline void store_Oi(matOi_t& matOi) {
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
+        group::epilogue_policy_default<gpu_arch::Xe>,
         tile_shape_BmHm,
         mem_desc_Oi_t>;
     epilogue_t epilogue;
@@ -1053,11 +1044,10 @@ class ifmha_forward_t {
 
   inline void preload_Qi(matQ_t& matQ) {
     using matQi_load_t = subgroup::mem_payload_t<
-        scalar_t,
+        mem_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>,
         matQ_tile_desc_t,
         msg_type::block_1d,
-        mem_desc_Qi_t::layout,
-        mem_desc_Qi_t::space>;
+        gpu_arch::Xe>;
 
     mem_desc_Qi_t desc_Qi_load(ctx.desc_Qi);
 
@@ -1137,14 +1127,12 @@ class ifmha_forward_t {
     }
   }
 
-  inline KERNEL_FUNC void operator()(
-      xetla_exec_item<2>& ei,
-      arguments_t& args) {
+  inline KERNEL_FUNC void operator()(nd_item<2>& item, arguments_t& args) {
     // allocate slm and nbarrier resource
     xetla_local_init<get_slm_size()>();
     xetla_nbarrier_init<get_barrier_count()>();
 
-    ctx.init_context(ei, args);
+    ctx.init_context(item, args);
 
     matQ_t matQ;
     preload_Qi(matQ);

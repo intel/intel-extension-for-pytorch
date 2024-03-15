@@ -1,8 +1,6 @@
 #pragma once
 
 #include <utils/DPCPP.h>
-#include "../xetla.h"
-
 // clang-format off
 
 #define HGEMM_COMMA ,
@@ -80,9 +78,6 @@ static GemmPolicyT hgemm_policy_traits[HGEMM_NUM_POLICIES] = {
 #define HGEMM_POLICY_NAME_SYMBOL(                      \
     WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR) \
   _##WG_M##x##WG_N##_##SG_M##x##SG_N##x##SG_K##_##SLM_KS##_##B_ROW_MAJOR##_
-
-const char* hgemm_policy_names[HGEMM_NUM_POLICIES] = {
-    HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_POLICY_NAME)};
 
 enum hgemm_policy {
   NONE = -1,

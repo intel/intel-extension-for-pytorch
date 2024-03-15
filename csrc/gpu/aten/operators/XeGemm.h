@@ -9,6 +9,7 @@
 #include "comm/RegistrationDeclarations.h"
 #include "utils/ComputeEngine.h"
 #include "xetla/hgemm.h"
+#include "xetla/kernels/GEMM/hgemm_policy.h"
 
 using namespace xpu::xetla;
 
@@ -44,6 +45,97 @@ class HGEMM_XETLA final {
   bool valid_ = false;
   int m_, n_, k_;
   float alpha_ = 1.0f;
+
+  // template <uint32_t a, uint32_t b>
+  // struct gcd {
+  //   static constexpr uint32_t value = gcd<b, a % b>::value;
+  // };
+  // /// @brief
+  // ///
+  // /// @tparam a
+  // template <uint32_t a>
+  // struct gcd<a, 0> {
+  //   static constexpr uint32_t value = a;
+  // };
+
+  static size_t get_acc_size(uint32_t matrix_m, uint32_t matrix_n) {
+    return matrix_m * matrix_n;
+  };
+
+  static uint32_t find_ks_coop_num_y(uint32_t slm_kslicing, uint32_t sg_m) {
+    uint32_t ks_coop_num_y = sg_m;
+    while (slm_kslicing % sg_m != 0) {
+      ks_coop_num_y = slm_kslicing % sg_m;
+      slm_kslicing = sg_m;
+      sg_m = ks_coop_num_y;
+    }
+    return ks_coop_num_y;
+  }
+
+  // template <
+  //     uint32_t wg_m,
+  //     uint32_t wg_n,
+  //     uint32_t sg_n,
+  //     uint32_t sg_m,
+  //     uint32_t slm_kslicing>
+  static size_t get_cnt_size(
+      uint32_t matrix_m,
+      uint32_t matrix_n,
+      uint32_t wg_m,
+      uint32_t wg_n,
+      uint32_t sg_m,
+      uint32_t sg_n,
+      uint32_t slm_kslicing) {
+    // return matrix_m * matrix_n;
+    size_t group_range_m = (matrix_m + wg_m - 1) / wg_m;
+    size_t group_range_n = (matrix_n + wg_n - 1) / wg_n;
+
+    uint32_t wg_size_x = (wg_m + sg_m - 1) / sg_m;
+    uint32_t wg_size_y = (wg_n + sg_n - 1) / sg_n;
+    // uint32_t ks_coop_num_y = gcd<slm_kslicing, sg_m>::value;
+    uint32_t ks_coop_num_y = find_ks_coop_num_y(slm_kslicing, sg_m);
+    uint32_t coop_remain_num_x = slm_kslicing / ks_coop_num_y;
+    bool has_redundant_wg = (coop_remain_num_x * 16) > sg_n;
+    uint32_t tile_size_y = sg_m / ks_coop_num_y;
+    uint32_t tile_size_x = has_redundant_wg ? 16 : sg_n / coop_remain_num_x;
+    uint32_t ks_coop_num_x = sg_n / tile_size_x;
+
+    uint32_t counter_size = 8;
+    return group_range_m * group_range_n * wg_size_x * wg_size_y *
+        ks_coop_num_y * ks_coop_num_x * counter_size;
+  }
+
+  void get_acc_and_cnt_tensor(
+      uint32_t m_,
+      uint32_t n_,
+      uint32_t k_,
+      bool is_b_row_major_,
+      Tensor& acc_tensor_,
+      Tensor& cnt_tensor_) {
+    int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
+    if (policy_id == -1) {
+      acc_tensor_ = at::AtenIpexTypeXPU::empty(
+          {0}, a_->options().dtype(at::kFloat), c10::nullopt);
+      cnt_tensor_ = at::AtenIpexTypeXPU::empty(
+          {0}, a_->options().dtype(at::kByte), c10::nullopt);
+      return;
+    }
+
+    auto policy_config = hgemm_policy_traits[policy_id];
+    uint32_t wg_m = policy_config.wg_m_;
+    uint32_t wg_n = policy_config.wg_n_;
+    uint32_t sg_m = policy_config.sg_m_;
+    uint32_t sg_n = policy_config.sg_n_;
+    uint32_t slm_ks = policy_config.slm_ks_;
+    size_t acc_size = get_acc_size(m_, n_);
+    size_t cnt_size = get_cnt_size(m_, n_, wg_m, wg_n, sg_m, sg_n, slm_ks);
+
+    acc_tensor_ = at::AtenIpexTypeXPU::empty(
+        {acc_size}, a_->options().dtype(at::kFloat), c10::nullopt);
+    cnt_tensor_ = at::AtenIpexTypeXPU::empty(
+        {cnt_size}, a_->options().dtype(at::kByte), c10::nullopt);
+    return;
+  }
 
  public:
   HGEMM_XETLA() = default;
@@ -143,14 +235,19 @@ class HGEMM_XETLA final {
 
     xpu::xetla::GemmStatus status;
 
+    Tensor acc_tensor_, cnt_tensor_;
     if (num_epilogues_ == 0) {
       RECORD_FUNCTION_IMPL(hgemm_common, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
+      get_acc_and_cnt_tensor(
+          m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       status = hgemm_common(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+          acc_tensor_.data_ptr<float>(),
+          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
           m_,
           n_,
           k_,
@@ -158,6 +255,8 @@ class HGEMM_XETLA final {
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == RES_ADD) {
       if (alpha_ == 1.0f) {
         RECORD_FUNCTION_IMPL(hgemm_res, m_, n_, k_)
+        get_acc_and_cnt_tensor(
+            m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
         status = hgemm_res(
             q,
             reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -165,6 +264,8 @@ class HGEMM_XETLA final {
             reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
             reinterpret_cast<sycl::half*>(
                 epilogue_tensors_[0]->data_ptr<scalar_t>()),
+            acc_tensor_.data_ptr<float>(),
+            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
             m_,
             n_,
             k_,
@@ -172,6 +273,8 @@ class HGEMM_XETLA final {
             is_b_row_major_);
       } else {
         RECORD_FUNCTION_IMPL(hgemm_addmm, m_, n_, k_)
+        get_acc_and_cnt_tensor(
+            m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
         status = hgemm_addmm(
             q,
             reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -179,6 +282,8 @@ class HGEMM_XETLA final {
                 epilogue_tensors_[0]->data_ptr<scalar_t>()),
             reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
             reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+            acc_tensor_.data_ptr<float>(),
+            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
             m_,
             n_,
             k_,
@@ -190,6 +295,8 @@ class HGEMM_XETLA final {
         num_epilogues_ == 2 && epilogue_types_[0] == RES_ADD &&
         epilogue_types_[1] == RES_ADD) {
       RECORD_FUNCTION_IMPL(hgemm_res_res, m_, n_, k_)
+      get_acc_and_cnt_tensor(
+          m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       TORCH_CHECK(alpha_ == 1.0f);
       status = hgemm_res_res(
           q,
@@ -200,6 +307,8 @@ class HGEMM_XETLA final {
               epilogue_tensors_[0]->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(
               epilogue_tensors_[1]->data_ptr<scalar_t>()),
+          acc_tensor_.data_ptr<float>(),
+          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
           m_,
           n_,
           k_,
@@ -209,6 +318,8 @@ class HGEMM_XETLA final {
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == BIAS) {
       RECORD_FUNCTION_IMPL(hgemm_bias, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
+      get_acc_and_cnt_tensor(
+          m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       status = hgemm_bias(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -216,6 +327,8 @@ class HGEMM_XETLA final {
           reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(
               epilogue_tensors_[0]->data_ptr<scalar_t>()),
+          acc_tensor_.data_ptr<float>(),
+          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
           m_,
           n_,
           k_,
@@ -226,6 +339,8 @@ class HGEMM_XETLA final {
         epilogue_types_[1] == RES_ADD) {
       RECORD_FUNCTION_IMPL(hgemm_bias_res, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
+      get_acc_and_cnt_tensor(
+          m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       status = hgemm_bias_res(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -235,6 +350,8 @@ class HGEMM_XETLA final {
               epilogue_tensors_[0]->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(
               epilogue_tensors_[1]->data_ptr<scalar_t>()),
+          acc_tensor_.data_ptr<float>(),
+          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
           m_,
           n_,
           k_,
@@ -246,6 +363,8 @@ class HGEMM_XETLA final {
         epilogue_types_[1] == RES_ADD && epilogue_types_[2] == RES_ADD) {
       RECORD_FUNCTION_IMPL(hgemm_bias_res_res, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
+      get_acc_and_cnt_tensor(
+          m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       status = hgemm_bias_res_res(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -257,6 +376,8 @@ class HGEMM_XETLA final {
               epilogue_tensors_[1]->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(
               epilogue_tensors_[2]->data_ptr<scalar_t>()),
+          acc_tensor_.data_ptr<float>(),
+          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
           m_,
           n_,
           k_,
@@ -269,6 +390,8 @@ class HGEMM_XETLA final {
         epilogue_types_[1] == RELU) {
       RECORD_FUNCTION_IMPL(hgemm_bias_relu, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
+      get_acc_and_cnt_tensor(
+          m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       status = hgemm_bias_relu(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -276,6 +399,8 @@ class HGEMM_XETLA final {
           reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(
               epilogue_tensors_[0]->data_ptr<scalar_t>()),
+          acc_tensor_.data_ptr<float>(),
+          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
           m_,
           n_,
           k_,
@@ -286,6 +411,8 @@ class HGEMM_XETLA final {
         epilogue_types_[1] == GELU) {
       RECORD_FUNCTION_IMPL(hgemm_bias_gelu, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
+      get_acc_and_cnt_tensor(
+          m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       status = hgemm_bias_gelu(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -293,6 +420,8 @@ class HGEMM_XETLA final {
           reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(
               epilogue_tensors_[0]->data_ptr<scalar_t>()),
+          acc_tensor_.data_ptr<float>(),
+          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
           m_,
           n_,
           k_,
@@ -301,6 +430,8 @@ class HGEMM_XETLA final {
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == RES_MUL) {
       RECORD_FUNCTION_IMPL(hgemm_resmul, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
+      get_acc_and_cnt_tensor(
+          m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       status = hgemm_resmul(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
@@ -308,6 +439,8 @@ class HGEMM_XETLA final {
           reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(
               epilogue_tensors_[0]->data_ptr<scalar_t>()),
+          acc_tensor_.data_ptr<float>(),
+          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
           m_,
           n_,
           k_,
@@ -315,11 +448,15 @@ class HGEMM_XETLA final {
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == SILU) {
       RECORD_FUNCTION_IMPL(hgemm_silu, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
+      get_acc_and_cnt_tensor(
+          m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       status = hgemm_silu(
           q,
           reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+          acc_tensor_.data_ptr<float>(),
+          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
           m_,
           n_,
           k_,

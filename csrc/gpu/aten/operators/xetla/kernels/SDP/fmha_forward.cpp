@@ -185,12 +185,12 @@ class fmha_forward_t {
   static constexpr uint32_t softmax_slm = Pij_slm + slm_size_Pij;
 
   static constexpr uint32_t nbarrier_cnt = (wg_size_x > 1) ? wg_size_y : 0;
-  using brgemm_Sij_t = group::brgemm_t<
+  using gemm_Sij_t = group::gemm_t<
       compute_policy_BrBc,
       tile_shape_BrBc,
       mem_desc_Qi_L_t,
       mem_desc_Kj_T_t>;
-  using matAccSij_t = typename brgemm_Sij_t::matAcc_t;
+  using matAccSij_t = typename gemm_Sij_t::matAcc_t;
   using dropout_t = dropout_fwd_t<matAccSij_t::tile_elems>;
 
   // ======================== // Context // ======================= //
@@ -221,9 +221,9 @@ class fmha_forward_t {
     inline context_t() = default;
 
     /// @brief Initialize invariant variables in the flash mha loop
-    inline void init_context(xetla_exec_item<3>& ei, arguments_t& args) {
+    inline void init_context(nd_item<3>& item, arguments_t& args) {
       // thread id
-      uint32_t sg_id = ei.get_local_linear_id();
+      uint32_t sg_id = item.get_local_linear_id();
       g.init(sg_id);
       sg_idx = sg_id % wg_size_x;
       sg_idy = sg_id / wg_size_x;
@@ -234,13 +234,13 @@ class fmha_forward_t {
       softmax_l = 0.f;
 
       // mem desc variables
-      uint32_t gid = ei.get_group(0);
+      uint32_t gid = item.get_group(0);
       uint32_t batch_id = gid / args.uN; // get batch idx
       uint32_t head_id = gid % args.uN; // get head idx
 
       if constexpr (kSeqLast) { // 2d mem: [F, BxNxH]
         // startF
-        int32_t start_y = ei.get_group(1) * kBr;
+        int32_t start_y = item.get_group(1) * kBr;
         uint32_t end_y = start_y + kBr;
         // boundaryF
         uint32_t boundary_y = args.uF;
@@ -261,7 +261,7 @@ class fmha_forward_t {
             {start_acc, start_y});
       } else { // 2d mem: [BxF, NxH]
         // startF
-        int32_t start_y = batch_id * args.uF + ei.get_group(1) * kBr;
+        int32_t start_y = batch_id * args.uF + item.get_group(1) * kBr;
         uint32_t end_y = start_y + kBr;
         // boundaryF
         uint32_t boundary_y = (batch_id + 1) * args.uF;
@@ -279,7 +279,7 @@ class fmha_forward_t {
             {start_acc, start_y});
       }
 
-      int32_t start_x_ml = ei.get_group(1) * kBr + sg_idy * kSgBr;
+      int32_t start_x_ml = item.get_group(1) * kBr + sg_idy * kSgBr;
       int32_t start_y_ml = gid;
       mem_desc_Li.init(
           args.L_ptr,
@@ -291,10 +291,10 @@ class fmha_forward_t {
 
     /// @brief Update variables for each flash mha loop
     inline void update_context(
-        xetla_exec_item<3>& ei,
+        nd_item<3>& item,
         arguments_t& args,
         uint32_t startT) {
-      uint32_t gid = ei.get_group(0);
+      uint32_t gid = item.get_group(0);
       uint32_t batch_id = gid / args.uN; // get batch idx
       uint32_t head_id = gid % args.uN; // get head idx
       uint32_t head_id_kv =
@@ -363,7 +363,7 @@ class fmha_forward_t {
             (batch_id * args.bias_strideB + head_id * args.bias_strideN) /
             args.uMT;
         int32_t start_y =
-            offset + (args.is_bias_add ? 0 : ei.get_group(1) * kBr);
+            offset + (args.is_bias_add ? 0 : item.get_group(1) * kBr);
         uint32_t end_y = args.is_bias_add ? start_y : start_y + kBr;
         uint32_t boundary_y = args.is_bias_add ? start_y : offset + args.uF;
         end_y = end_y > boundary_y ? boundary_y : end_y;
@@ -387,7 +387,7 @@ class fmha_forward_t {
       }
 
       if constexpr (kIsDropout) {
-        int coord_y = ei.get_group(1) * kBr + sg_idy * kSgBr;
+        int coord_y = item.get_group(1) * kBr + sg_idy * kSgBr;
         int coord_x = startT + sg_idx * kSgBc;
         uint64_t sg_subseq = uint64_t(coord_y) << 32 | uint64_t(coord_x);
         uint32_t threshold = uint32_t(args.dp_prob * float(4294967296));
@@ -404,13 +404,13 @@ class fmha_forward_t {
   /// @brief gemm_Sij is used to compute Sij = Qi x Kj.T
   /// # [Br,H] x [H,Bc] = [Br,Bc]
   inline void gemm_Sij(matAccSij_t& matAccSij, arguments_t& args) {
-    using brgemm_args_t = typename brgemm_Sij_t::arguments_t;
+    using gemm_args_t = typename gemm_Sij_t::arguments_t;
 
     // Gemm to comput Sij
-    brgemm_Sij_t brgemm;
+    gemm_Sij_t gemm;
     uint32_t loop_count = (args.uH + accum_step - 1) / accum_step;
-    brgemm_args_t brgemm_args(ctx.mem_desc_Qi_L, ctx.mem_desc_Kj_T, loop_count);
-    brgemm(ctx.g, matAccSij, brgemm_args, 0, /* nbarrier_base */ nbarrier_cnt);
+    gemm_args_t gemm_args(ctx.mem_desc_Qi_L, ctx.mem_desc_Kj_T, loop_count);
+    gemm(ctx.g, matAccSij, gemm_args, 0, /* nbarrier_base */ nbarrier_cnt);
 
     // Multiply by softmax scaling factor
     // bmm * alpha
@@ -418,7 +418,7 @@ class fmha_forward_t {
 
     // + beta * alibi
     if constexpr (kUseAlibi) {
-      using alibi_op_t = subgroup::bias_add_op_t<scalar_t, gpu_arch::Xe>;
+      using alibi_op_t = bias_add_op_t<scalar_t, gpu_arch::Xe>;
       using alibi_args_t = typename alibi_op_t::arguments_t;
 
       int32_t tile_offset_x = ctx.sg_idx * kSgBc;
@@ -457,7 +457,7 @@ class fmha_forward_t {
 
     // Add attn_mask if needed
     if constexpr (kUseBias && kIsCausal) {
-      using bias_op_t = subgroup::bias_add_op_t<scalar_t, gpu_arch::Xe>;
+      using bias_op_t = bias_add_op_t<scalar_t, gpu_arch::Xe>;
       using bias_args_t = typename bias_op_t::arguments_t;
 
       int32_t tile_offset_x = ctx.sg_idx * kSgBc;
@@ -471,12 +471,12 @@ class fmha_forward_t {
   }
   // ======================= // gemm_Oi // ======================= //
   // Define kernel to compute Oi += Pij x Vj
-  using brgemm_Oi_t = group::brgemm_t<
+  using gemm_Oi_t = group::gemm_t<
       compute_policy_BrBm,
       tile_shape_BrHm,
       mem_desc_Pij_L_t,
       mem_desc_Vj_t>;
-  using matAccOi_t = typename brgemm_Oi_t::matAcc_t;
+  using matAccOi_t = typename gemm_Oi_t::matAcc_t;
 
   /// @brief gemm_Oi is used to compute Oi += Pij x Vj
   /// # [Br,Bc] x [Bc,H] = [Br,Hm]
@@ -484,16 +484,16 @@ class fmha_forward_t {
       matAccOi_t& matAccOi,
       arguments_t& args,
       uint32_t startT) {
-    using brgemm_args_t = typename brgemm_Oi_t::arguments_t;
+    using gemm_args_t = typename gemm_Oi_t::arguments_t;
 
     uint32_t remainT = args.uT - startT;
     uint32_t boundary_k = remainT > kBc ? kBc : remainT;
     uint32_t loop_count = (boundary_k + accum_step - 1) / accum_step;
 
     // Gemm to comput Oi
-    brgemm_Oi_t brgemm;
-    brgemm_args_t brgemm_args(ctx.mem_desc_Pij_L, ctx.mem_desc_Vj, loop_count);
-    brgemm(ctx.g, matAccOi, brgemm_args, 0, /* nbarrier_base */ nbarrier_cnt);
+    gemm_Oi_t gemm;
+    gemm_args_t gemm_args(ctx.mem_desc_Pij_L, ctx.mem_desc_Vj, loop_count);
+    gemm(ctx.g, matAccOi, gemm_args, 0, /* nbarrier_base */ nbarrier_cnt);
   }
 
   // ====================== // apply_mask // ====================== //
@@ -585,7 +585,7 @@ class fmha_forward_t {
 
     // save Pij to local memory
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
+        group::epilogue_policy_default<gpu_arch::Xe>,
         tile_shape_BrBc,
         mem_desc_Pij_L_t>;
     epilogue_t epilogue;
@@ -608,11 +608,10 @@ class fmha_forward_t {
     using store_tile_t = subgroup::tile_t<accum_t, store_desc>;
     // Note: use block_2d store as only block_2d supports boundary check
     using store_payload_t = subgroup::mem_payload_t<
-        accum_t,
+        mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
         store_desc,
         msg_type::block_2d,
-        mem_layout::row_major,
-        mem_space::global>;
+        gpu_arch::Xe>;
     store_tile_t mat_store;
     store_payload_t store_payload(ctx.mem_desc_Li);
     mat_store.reg = ctx.softmax_m + sycl::ext::intel::esimd::log(ctx.softmax_l);
@@ -627,7 +626,7 @@ class fmha_forward_t {
     subgroup::tile_broadcast_op<tile_mul, matAccOi_t>(
         matAccOi, 1 / ctx.softmax_l);
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
+        group::epilogue_policy_default<gpu_arch::Xe>,
         tile_shape_BrHm,
         mem_desc_Oi_t>;
     epilogue_t epilogue;
@@ -638,12 +637,12 @@ class fmha_forward_t {
 
   /// @brief permuted store Oi to global memory. [B,N,F,H]
   inline void permute_store_Oi(
-      xetla_exec_item<3>& ei,
+      nd_item<3>& item,
       matAccOi_t& matAccOi,
       arguments_t& args) {
-    uint32_t b = ei.get_group(0) / args.uN;
-    uint32_t n = ei.get_group(0) % args.uN;
-    uint32_t f = ctx.sg_idy * kSgBr + ei.get_group(1) * kBr;
+    uint32_t b = item.get_group(0) / args.uN;
+    uint32_t n = item.get_group(0) % args.uN;
+    uint32_t f = ctx.sg_idy * kSgBr + item.get_group(1) * kBr;
     uint32_t h = ctx.sg_idx * kSgHm;
 
     // Because Hm is greater than uH
@@ -683,21 +682,17 @@ class fmha_forward_t {
 
   /// @brief preload_Qi is used to load Qi from global to local memory.
   inline void preload_Qi(arguments_t& args) {
-    using matQi_tile_desc_t = typename brgemm_Oi_t::matAcc_tile_desc_t;
+    using matQi_tile_desc_t = typename gemm_Oi_t::matAcc_tile_desc_t;
     using matQi_t = subgroup::tile_t<scalar_t, matQi_tile_desc_t>;
     using matQi_load_t = subgroup::mem_payload_t<
-        scalar_t,
+        mem_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>,
         matQi_tile_desc_t,
         subgroup::msg_type_v<matQi_tile_desc_t, mem_desc_Qi_t::space>,
-        mem_desc_Qi_t::layout,
-        mem_desc_Qi_t::space,
         gpu_arch::Xe>;
     using matQi_store_t = subgroup::mem_payload_t<
-        scalar_t,
+        mem_desc_t<scalar_t, mem_desc_Qi_L_t::layout, mem_desc_Qi_L_t::space>,
         matQi_tile_desc_t,
         subgroup::msg_type_v<matQi_tile_desc_t, mem_desc_Qi_L_t::space>,
-        mem_desc_Qi_L_t::layout,
-        mem_desc_Qi_L_t::space,
         gpu_arch::Xe>;
 
     int32_t tile_offset_x = ctx.sg_idx * kSgHm;
@@ -726,8 +721,8 @@ class fmha_forward_t {
   /// Users query and get a named_barrier id consumption count in compile time.
   /// @return The count of named barriers required.
   inline static constexpr uint32_t get_barrier_count() {
-    constexpr uint32_t barrier_count_Sij = brgemm_Sij_t::barrier_count;
-    constexpr uint32_t barrier_count_Oi = brgemm_Oi_t::barrier_count;
+    constexpr uint32_t barrier_count_Sij = gemm_Sij_t::barrier_count;
+    constexpr uint32_t barrier_count_Oi = gemm_Oi_t::barrier_count;
     constexpr uint32_t count =
         std::max(barrier_count_Sij, barrier_count_Oi) + nbarrier_cnt;
     static_assert(
@@ -761,21 +756,19 @@ class fmha_forward_t {
   };
   // ================= // Entry of the functor // ================= //
 
-  inline KERNEL_FUNC void operator()(
-      xetla_exec_item<3>& ei,
-      arguments_t& args) {
+  inline KERNEL_FUNC void operator()(nd_item<3>& item, arguments_t& args) {
     // allocate slm and nbarrier resource
     xetla_local_init<get_slm_size()>();
     xetla_nbarrier_init<get_barrier_count()>();
 
     // initialize context for flash mha loops
-    ctx.init_context(ei, args);
+    ctx.init_context(item, args);
     // preload Qi to local memory
     preload_Qi(args);
     // initialize matAccOi for accumulate the output
     matAccOi_t matAccOi(0);
 
-    uint32_t startF = ei.get_group(1) /* 0 */ * kBr /* 64 */;
+    uint32_t startF = item.get_group(1) /* 0 */ * kBr /* 64 */;
     uint32_t endF = std::min(startF + kBr, args.uF);
 
     // iterate through the keys
@@ -785,7 +778,7 @@ class fmha_forward_t {
           break;
       }
       // update context for current loop
-      ctx.update_context(ei, args, startT);
+      ctx.update_context(item, args, startT);
       // compute Sij
       matAccSij_t matAccSij(0);
       gemm_Sij(matAccSij, args);
@@ -805,10 +798,7 @@ class fmha_forward_t {
 
 template <typename fmha_forward_op_t, typename T>
 struct FmhaForwardKernelFunctor {
-  SYCL_ESIMD_KERNEL void operator()(sycl::nd_item<3> item) const {
-    // exec item
-    xetla_exec_item<3> ei(item);
-
+  KERNEL_MAIN void operator()(sycl::nd_item<3> item) const {
     // init fmha forward op and arguments
     fmha_forward_op_t fmha_fwd_op;
     using accscalar_t = fmha_forward_op_t::accum_t;
@@ -838,7 +828,7 @@ struct FmhaForwardKernelFunctor {
         offset_t);
 
     // call the functor
-    fmha_fwd_op(ei, args);
+    fmha_fwd_op(item, args);
   }
   FmhaForwardKernelFunctor(
       T* query_,

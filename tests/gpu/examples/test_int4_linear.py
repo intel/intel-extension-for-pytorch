@@ -66,7 +66,6 @@ class TestTorchMethod(TestCase):
         input = torch.rand([3, 4096, 4096], device="xpu", dtype=torch.float16)
         bias = torch.rand([3, 16384], device="xpu", dtype=torch.float16)
         weight = (torch.rand([3, 4096, 8192], device="xpu") * 10).byte()
-        weight = weight.fill_(1)
 
         group_size = 128
         if per_channel:
@@ -99,7 +98,7 @@ class TestTorchMethod(TestCase):
 
         scales = torch.rand([group_num, 16384], device="xpu", dtype=torch.float16)
         zero_points = torch.rand([group_num, 8192], device="xpu").byte()
-        weight = torch.rand([4096, 8192], device="xpu").byte()
+        weight = (torch.rand([4096, 8192], device="xpu") * 10).byte()
 
         weight_fp16 = self.dequantize(weight, scales, zero_points, group_size)
 
@@ -139,7 +138,6 @@ class TestTorchMethod(TestCase):
         input = torch.rand([3, 4096, 4096], device="xpu", dtype=torch.float16)
         bias = torch.rand([3, 16384], device="xpu", dtype=torch.float16)
         weight = (torch.rand([3, 4096, 8192], device="xpu") * 10).byte()
-        weight = weight.fill_(1)
 
         group_size = 128
         if per_channel:

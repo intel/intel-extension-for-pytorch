@@ -116,7 +116,7 @@ struct gru_cell {
       sg_tile_n, //	subgroup size in N dim
       sg_tile_m>; //	subgroup size in M dim
   using brgemm_op_t =
-      brgemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
+      gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
 
   using worker_scope_t = typename brgemm_op_t::work_group_t;
 
@@ -129,7 +129,7 @@ struct gru_cell {
   // define arguments for each epilogue_tile_op in chained_tile_op_t<>
 
   using epilogue_t = epilogue_t<
-      epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
+      epilogue_policy_default<gpu_arch::Xe>,
       tile_shape,
       mem_desc_c_t>;
   using epilogue_args_t = typename epilogue_t::arguments_t;
@@ -143,32 +143,31 @@ struct gru_cell {
 
   using mat_t = tile_t<T, mat_tile_desc_t>;
   using mat_hidden_payload_t = mem_payload_t<
-      T,
+      mem_desc_t<T, layout_hidden, mem_loc_hidden>,
       mat_tile_desc_t,
       msg_type_v<mat_tile_desc_t, mem_loc_hidden>,
-      layout_hidden,
-      mem_loc_hidden,
       gpu_arch::Xe>;
 
   using matC_payload_t = mem_payload_t<
-      T,
+      mem_desc_t<T, layout_out, mem_loc_out>,
       mat_tile_desc_t,
       msg_type_v<mat_tile_desc_t, mem_loc_out>,
-      layout_out,
-      mem_loc_out,
       gpu_arch::Xe>;
 
   using mask_t = tile_t<Act_T, mat_tile_desc_t>;
 
   using mask_payload_t = mem_payload_t<
-      Act_T,
+      mem_desc_t<Act_T, layout_out, mem_loc_out>,
       mat_tile_desc_t,
       msg_type_v<mat_tile_desc_t, mem_loc_out>,
-      layout_out,
-      mem_loc_out,
       gpu_arch::Xe>;
 
-  static void inline call(xetla_exec_item<3> ei, fwd_config_t<T, Act_T>* args) {
+  using sigmoid_t = typename subgroup::sigmoid_op_t;
+  using tanh_t = typename subgroup::tanh_op_t;
+
+  static void inline call(
+      sycl::nd_item<3>& item,
+      fwd_config_t<T, Act_T>* args) {
     // matC_t matH;
     mat_t matC;
     mat_t mat_hidden;
@@ -187,13 +186,15 @@ struct gru_cell {
 
     brgemm_arguments brgemm_arg;
     brgemm_op_t brgemm_op;
+    sigmoid_t sigmoid;
+    tanh_t tanh;
     // brgemm_arguments_hidden brgemm_arg_1;
 
-    worker_scope_t g(ei.get_local_linear_id());
+    worker_scope_t g(item.get_local_linear_id());
     epilogue_t epilogue;
     epilogue_args_t epilogue_args{};
 
-    int start_m = ei.get_group(1) * wg_tile_m;
+    int start_m = item.get_group(1) * wg_tile_m;
     int start_n = args->group_offset * wg_tile_n;
     int start_k = 0;
     int boundary_m, boundary_n, boundary_k;
@@ -251,7 +252,7 @@ struct gru_cell {
         hidden_size,
         args->hx_ptr,
         args->W_hr_ptr);
-    subgroup::elemwise_op<matAcc_t, post_kind::sigmoid>(matAcc0);
+    sigmoid(matAcc0, 0);
     SW_BARRIER();
     MATC_STORE(0, args->reset_gate_ptr);
 
@@ -284,7 +285,7 @@ struct gru_cell {
         args->layer_ptr,
         args->W_in_ptr);
     matAcc2.reg = matAcc2.reg + matAcc0.reg;
-    subgroup::elemwise_op<matAcc_t, post_kind::tanh>(matAcc2);
+    tanh(matAcc2, 0);
     // caculate Mat_Wh_ * Mat_h(t)
     PART_BRGEMM_CALL(
         0,
@@ -303,13 +304,13 @@ struct gru_cell {
         hidden_size,
         args->hx_ptr,
         args->W_hz_ptr);
-    subgroup::elemwise_op<matAcc_t, post_kind::sigmoid>(matAcc1);
+    sigmoid(matAcc1, 0);
     SW_BARRIER();
     matC_base_desc.init(
         {args->hx_ptr},
         {boundary_n, boundary_m, hidden_size},
-        {start_n + ei.get_local_id(2) * sg_tile_n,
-         start_m + ei.get_local_id(1) * sg_tile_m});
+        {start_n + item.get_local_id(2) * sg_tile_n,
+         start_m + item.get_local_id(1) * sg_tile_m});
     mat_hidden_payload.init(matC_base_desc);
     tile_load<cache_hint::cached, cache_hint::cached>(
         mat_hidden, mat_hidden_payload);
@@ -340,8 +341,8 @@ struct gru_cell {
       mask_base_desc.init(
           {args->mask_ptr},
           {boundary_n, boundary_m, hidden_size},
-          {start_n + ei.get_local_id(2) * sg_tile_n,
-           start_m + ei.get_local_id(1) * sg_tile_m});
+          {start_n + item.get_local_id(2) * sg_tile_n,
+           start_m + item.get_local_id(1) * sg_tile_m});
       mask_payload.init(mask_base_desc);
       tile_load<cache_hint::cached, cache_hint::cached>(
           drop_mask, mask_payload);
@@ -370,11 +371,9 @@ struct gru_cell {
     using bias_t = tile_t<Act_T, bias_tile_desc_t>;
 
     using bias_payload_t = mem_payload_t<
-        Act_T,
+        mem_desc_t<Act_T, mem_layout::row_major, mem_space::global>,
         bias_tile_desc_t,
         msg_type_v<bias_tile_desc_t, mem_space::global>,
-        mem_layout::row_major,
-        mem_space::global,
         gpu_arch::Xe>;
 
     bias_t bias;
@@ -404,11 +403,9 @@ struct gru_cell {
     using bias_t = tile_t<Act_T, bias_tile_desc_t>;
 
     using bias_payload_t = mem_payload_t<
-        Act_T,
+        mem_desc_t<Act_T, mem_layout::row_major, mem_space::global>,
         bias_tile_desc_t,
         msg_type_v<bias_tile_desc_t, mem_space::global>,
-        mem_layout::row_major,
-        mem_space::global,
         gpu_arch::Xe>;
 
     bias_t bias1;
@@ -464,7 +461,7 @@ struct kernel_gru_cell_fusion {
       0>;
 
   /// @brief
-  /// @param ei
+  /// @param item
   /// input
   /// @param layer_ptr        input from previous layer i.e X_t
   /// @param hx_ptr           hx_ptr input i.e. h_{0}  shape = layer_size x
@@ -492,7 +489,7 @@ struct kernel_gru_cell_fusion {
   /// @param workspace_ptr    all of the output per gru cell
 
   static void inline call(
-      xetla_exec_item<3> ei,
+      sycl::nd_item<3>& item,
       input_T* layer_ptr,
       input_T* hx_ptr,
       input_T* i_weights,
@@ -571,7 +568,7 @@ struct kernel_gru_cell_fusion {
       for (unsigned j = 0; j < (hidden_size + wg_tile_n_t - 1) / wg_tile_n_t;
            ++j) {
         args.group_offset = j;
-        fused_cell_op::call(ei, &args);
+        fused_cell_op::call(item, &args);
         __esimd_barrier();
       }
       SW_BARRIER();
@@ -585,9 +582,8 @@ template <
     typename Act_T,
     typename gru_op>
 struct GruForwardImplKernelFunctor {
-  SYCL_ESIMD_KERNEL void operator()(nd_item<3> item) const {
-    xetla_exec_item ei(item);
-    int layer_idx = ei.get_group(0);
+  KERNEL_MAIN void operator()(nd_item<3> item) const {
+    int layer_idx = item.get_group(0);
     int hidden_io_size = batch_size * hidden_size;
     int input_weight_offset = layer_idx <= 1
         ? layer_idx * input_size * hidden_size * 3
@@ -599,7 +595,7 @@ struct GruForwardImplKernelFunctor {
     int workspace_base_offset =
         layer_idx * (sequence_size + 1) * hidden_io_size;
     gru_op::call(
-        ei,
+        item,
         layer_idx != 0 ? (input_T*)dropout_buffer +
                 (layer_idx - 1) * sequence_size * hidden_io_size
                        : (input_T*)layer_ptr, /* inputs*/

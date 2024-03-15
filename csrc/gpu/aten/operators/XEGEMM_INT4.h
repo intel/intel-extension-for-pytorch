@@ -11,12 +11,68 @@
 
 using namespace xpu::xetla;
 
-#define RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
-  char str__[100];                                                        \
-  sprintf(                                                                \
-      str__,                                                              \
-      "%s(%d, %d, %d, %d, %d, %d, %d, %d, %d, %d)",                       \
-      "" #F,                                                              \
+#define RECORD_FUNCTION_IMPL(                                       \
+    F,                                                              \
+    WG_M,                                                           \
+    WG_N,                                                           \
+    SG_M,                                                           \
+    SG_N,                                                           \
+    SG_K,                                                           \
+    GZ,                                                             \
+    SLM_KS,                                                         \
+    L3_KS,                                                          \
+    SYNC_FREQ,                                                      \
+    STAGES,                                                         \
+    ARCH)                                                           \
+  char str__[100];                                                  \
+  sprintf(                                                          \
+      str__,                                                        \
+      "%s(%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d)", \
+      "" #F,                                                        \
+      WG_M,                                                         \
+      WG_N,                                                         \
+      SG_M,                                                         \
+      SG_N,                                                         \
+      SG_K,                                                         \
+      GZ,                                                           \
+      SLM_KS,                                                       \
+      L3_KS,                                                        \
+      SYNC_FREQ,                                                    \
+      STAGES,                                                       \
+      ARCH,                                                         \
+      m_,                                                           \
+      n_,                                                           \
+      k_);                                                          \
+  RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+
+#define HGEMM_INT4_DISPATCH(                                              \
+    F,                                                                    \
+    WG_M,                                                                 \
+    WG_N,                                                                 \
+    SG_M,                                                                 \
+    SG_N,                                                                 \
+    SG_K,                                                                 \
+    GZ,                                                                   \
+    SLM_KS,                                                               \
+    L3_KS,                                                                \
+    SYNC_FREQ,                                                            \
+    STAGES,                                                               \
+    ARCH)                                                                 \
+  {                                                                       \
+    RECORD_FUNCTION_IMPL(                                                 \
+        F,                                                                \
+        WG_M,                                                             \
+        WG_N,                                                             \
+        SG_M,                                                             \
+        SG_N,                                                             \
+        SG_K,                                                             \
+        GZ,                                                               \
+        SLM_KS,                                                           \
+        L3_KS,                                                            \
+        SYNC_FREQ,                                                        \
+        STAGES,                                                           \
+        ARCH)                                                             \
+    F<sycl::half,                                                         \
       WG_M,                                                               \
       WG_N,                                                               \
       SG_M,                                                               \
@@ -24,47 +80,115 @@ using namespace xpu::xetla;
       SG_K,                                                               \
       GZ,                                                                 \
       SLM_KS,                                                             \
-      m_,                                                                 \
-      n_,                                                                 \
-      k_);                                                                \
-  RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
-
-#define HGEMM_INT4_DISPATCH(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)  \
-  {                                                                       \
-    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)     \
-    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(              \
+      L3_KS,                                                              \
+      SYNC_FREQ,                                                          \
+      STAGES,                                                             \
+      ARCH>(                                                              \
         q,                                                                \
         reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()), \
         reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),      \
         weight_->data_ptr<uint8_t>(),                                     \
         weight_zp_->data_ptr<uint8_t>(),                                  \
         reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()), \
+        acc_tensor_->data_ptr<float>(),                                   \
+        reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),             \
         m_,                                                               \
         n_,                                                               \
         k_);                                                              \
   }
 
-#define HGEMM_INT4_BIAS_DISPATCH(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
-  {                                                                           \
-    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)         \
-    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                  \
-        q,                                                                    \
-        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),     \
-        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),          \
-        weight_->data_ptr<uint8_t>(),                                         \
-        weight_zp_->data_ptr<uint8_t>(),                                      \
-        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),     \
-        reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()),   \
-        m_,                                                                   \
-        n_,                                                                   \
-        k_);                                                                  \
+#define HGEMM_INT4_BIAS_DISPATCH(                                           \
+    F,                                                                      \
+    WG_M,                                                                   \
+    WG_N,                                                                   \
+    SG_M,                                                                   \
+    SG_N,                                                                   \
+    SG_K,                                                                   \
+    GZ,                                                                     \
+    SLM_KS,                                                                 \
+    L3_KS,                                                                  \
+    SYNC_FREQ,                                                              \
+    STAGES,                                                                 \
+    ARCH)                                                                   \
+  {                                                                         \
+    RECORD_FUNCTION_IMPL(                                                   \
+        F,                                                                  \
+        WG_M,                                                               \
+        WG_N,                                                               \
+        SG_M,                                                               \
+        SG_N,                                                               \
+        SG_K,                                                               \
+        GZ,                                                                 \
+        SLM_KS,                                                             \
+        L3_KS,                                                              \
+        SYNC_FREQ,                                                          \
+        STAGES,                                                             \
+        ARCH)                                                               \
+    F<sycl::half,                                                           \
+      WG_M,                                                                 \
+      WG_N,                                                                 \
+      SG_M,                                                                 \
+      SG_N,                                                                 \
+      SG_K,                                                                 \
+      GZ,                                                                   \
+      SLM_KS,                                                               \
+      L3_KS,                                                                \
+      SYNC_FREQ,                                                            \
+      STAGES,                                                               \
+      ARCH>(                                                                \
+        q,                                                                  \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
+        weight_->data_ptr<uint8_t>(),                                       \
+        weight_zp_->data_ptr<uint8_t>(),                                    \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+        acc_tensor_->data_ptr<float>(),                                     \
+        reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
+        m_,                                                                 \
+        n_,                                                                 \
+        k_);                                                                \
   }
 
 #define HGEMM_INT4_BIAS_RES_RES_DISPATCH(                                   \
-    F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
+    F,                                                                      \
+    WG_M,                                                                   \
+    WG_N,                                                                   \
+    SG_M,                                                                   \
+    SG_N,                                                                   \
+    SG_K,                                                                   \
+    GZ,                                                                     \
+    SLM_KS,                                                                 \
+    L3_KS,                                                                  \
+    SYNC_FREQ,                                                              \
+    STAGES,                                                                 \
+    ARCH)                                                                   \
   {                                                                         \
-    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
-    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                \
+    RECORD_FUNCTION_IMPL(                                                   \
+        F,                                                                  \
+        WG_M,                                                               \
+        WG_N,                                                               \
+        SG_M,                                                               \
+        SG_N,                                                               \
+        SG_K,                                                               \
+        GZ,                                                                 \
+        SLM_KS,                                                             \
+        L3_KS,                                                              \
+        SYNC_FREQ,                                                          \
+        STAGES,                                                             \
+        ARCH)                                                               \
+    F<sycl::half,                                                           \
+      WG_M,                                                                 \
+      WG_N,                                                                 \
+      SG_M,                                                                 \
+      SG_N,                                                                 \
+      SG_K,                                                                 \
+      GZ,                                                                   \
+      SLM_KS,                                                               \
+      L3_KS,                                                                \
+      SYNC_FREQ,                                                            \
+      STAGES,                                                               \
+      ARCH>(                                                                \
         q,                                                                  \
         reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
         reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
@@ -74,16 +198,52 @@ using namespace xpu::xetla;
         reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
         reinterpret_cast<sycl::half*>(epilogues_[1]->data_ptr<scalar_t>()), \
         reinterpret_cast<sycl::half*>(epilogues_[2]->data_ptr<scalar_t>()), \
+        acc_tensor_->data_ptr<float>(),                                     \
+        reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
         m_,                                                                 \
         n_,                                                                 \
         k_);                                                                \
   }
 
 #define HGEMM_INT4_BIAS_GELU_DISPATCH(                                      \
-    F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
+    F,                                                                      \
+    WG_M,                                                                   \
+    WG_N,                                                                   \
+    SG_M,                                                                   \
+    SG_N,                                                                   \
+    SG_K,                                                                   \
+    GZ,                                                                     \
+    SLM_KS,                                                                 \
+    L3_KS,                                                                  \
+    SYNC_FREQ,                                                              \
+    STAGES,                                                                 \
+    ARCH)                                                                   \
   {                                                                         \
-    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
-    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                \
+    RECORD_FUNCTION_IMPL(                                                   \
+        F,                                                                  \
+        WG_M,                                                               \
+        WG_N,                                                               \
+        SG_M,                                                               \
+        SG_N,                                                               \
+        SG_K,                                                               \
+        GZ,                                                                 \
+        SLM_KS,                                                             \
+        L3_KS,                                                              \
+        SYNC_FREQ,                                                          \
+        STAGES,                                                             \
+        ARCH)                                                               \
+    F<sycl::half,                                                           \
+      WG_M,                                                                 \
+      WG_N,                                                                 \
+      SG_M,                                                                 \
+      SG_N,                                                                 \
+      SG_K,                                                                 \
+      GZ,                                                                   \
+      SLM_KS,                                                               \
+      L3_KS,                                                                \
+      SYNC_FREQ,                                                            \
+      STAGES,                                                               \
+      ARCH>(                                                                \
         q,                                                                  \
         reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
         reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
@@ -91,32 +251,105 @@ using namespace xpu::xetla;
         weight_zp_->data_ptr<uint8_t>(),                                    \
         reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
         reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+        acc_tensor_->data_ptr<float>(),                                     \
+        reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
         m_,                                                                 \
         n_,                                                                 \
         k_);                                                                \
   }
 
-#define HGEMM_INT4_RES_DISPATCH(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
-  {                                                                          \
-    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)        \
-    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                 \
-        q,                                                                   \
-        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),    \
-        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),         \
-        weight_->data_ptr<uint8_t>(),                                        \
-        weight_zp_->data_ptr<uint8_t>(),                                     \
-        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),    \
-        reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()),  \
-        m_,                                                                  \
-        n_,                                                                  \
-        k_);                                                                 \
+#define HGEMM_INT4_RES_DISPATCH(                                            \
+    F,                                                                      \
+    WG_M,                                                                   \
+    WG_N,                                                                   \
+    SG_M,                                                                   \
+    SG_N,                                                                   \
+    SG_K,                                                                   \
+    GZ,                                                                     \
+    SLM_KS,                                                                 \
+    L3_KS,                                                                  \
+    SYNC_FREQ,                                                              \
+    STAGES,                                                                 \
+    ARCH)                                                                   \
+  {                                                                         \
+    RECORD_FUNCTION_IMPL(                                                   \
+        F,                                                                  \
+        WG_M,                                                               \
+        WG_N,                                                               \
+        SG_M,                                                               \
+        SG_N,                                                               \
+        SG_K,                                                               \
+        GZ,                                                                 \
+        SLM_KS,                                                             \
+        L3_KS,                                                              \
+        SYNC_FREQ,                                                          \
+        STAGES,                                                             \
+        ARCH)                                                               \
+    F<sycl::half,                                                           \
+      WG_M,                                                                 \
+      WG_N,                                                                 \
+      SG_M,                                                                 \
+      SG_N,                                                                 \
+      SG_K,                                                                 \
+      GZ,                                                                   \
+      SLM_KS,                                                               \
+      L3_KS,                                                                \
+      SYNC_FREQ,                                                            \
+      STAGES,                                                               \
+      ARCH>(                                                                \
+        q,                                                                  \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
+        weight_->data_ptr<uint8_t>(),                                       \
+        weight_zp_->data_ptr<uint8_t>(),                                    \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
+        reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+        acc_tensor_->data_ptr<float>(),                                     \
+        reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
+        m_,                                                                 \
+        n_,                                                                 \
+        k_);                                                                \
   }
 
 #define HGEMM_INT4_RESMUL_DISPATCH(                                         \
-    F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
+    F,                                                                      \
+    WG_M,                                                                   \
+    WG_N,                                                                   \
+    SG_M,                                                                   \
+    SG_N,                                                                   \
+    SG_K,                                                                   \
+    GZ,                                                                     \
+    SLM_KS,                                                                 \
+    L3_KS,                                                                  \
+    SYNC_FREQ,                                                              \
+    STAGES,                                                                 \
+    ARCH)                                                                   \
   {                                                                         \
-    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
-    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                \
+    RECORD_FUNCTION_IMPL(                                                   \
+        F,                                                                  \
+        WG_M,                                                               \
+        WG_N,                                                               \
+        SG_M,                                                               \
+        SG_N,                                                               \
+        SG_K,                                                               \
+        GZ,                                                                 \
+        SLM_KS,                                                             \
+        L3_KS,                                                              \
+        SYNC_FREQ,                                                          \
+        STAGES,                                                             \
+        ARCH)                                                               \
+    F<sycl::half,                                                           \
+      WG_M,                                                                 \
+      WG_N,                                                                 \
+      SG_M,                                                                 \
+      SG_N,                                                                 \
+      SG_K,                                                                 \
+      GZ,                                                                   \
+      SLM_KS,                                                               \
+      L3_KS,                                                                \
+      SYNC_FREQ,                                                            \
+      STAGES,                                                               \
+      ARCH>(                                                                \
         q,                                                                  \
         reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
         reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
@@ -124,33 +357,106 @@ using namespace xpu::xetla;
         weight_zp_->data_ptr<uint8_t>(),                                    \
         reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
         reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+        acc_tensor_->data_ptr<float>(),                                     \
+        reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
         m_,                                                                 \
         n_,                                                                 \
         k_);                                                                \
   }
 
-#define HGEMM_INT4_QKV_DISPATCH(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
-  {                                                                          \
-    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)        \
-    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                 \
-        q,                                                                   \
-        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),    \
-        reinterpret_cast<sycl::half*>(outputs_[1]->data_ptr<scalar_t>()),    \
-        reinterpret_cast<sycl::half*>(outputs_[2]->data_ptr<scalar_t>()),    \
-        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),         \
-        weight_->data_ptr<uint8_t>(),                                        \
-        weight_zp_->data_ptr<uint8_t>(),                                     \
-        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),    \
-        m_,                                                                  \
-        n_,                                                                  \
-        k_);                                                                 \
+#define HGEMM_INT4_QKV_DISPATCH(                                          \
+    F,                                                                    \
+    WG_M,                                                                 \
+    WG_N,                                                                 \
+    SG_M,                                                                 \
+    SG_N,                                                                 \
+    SG_K,                                                                 \
+    GZ,                                                                   \
+    SLM_KS,                                                               \
+    L3_KS,                                                                \
+    SYNC_FREQ,                                                            \
+    STAGES,                                                               \
+    ARCH)                                                                 \
+  {                                                                       \
+    RECORD_FUNCTION_IMPL(                                                 \
+        F,                                                                \
+        WG_M,                                                             \
+        WG_N,                                                             \
+        SG_M,                                                             \
+        SG_N,                                                             \
+        SG_K,                                                             \
+        GZ,                                                               \
+        SLM_KS,                                                           \
+        L3_KS,                                                            \
+        SYNC_FREQ,                                                        \
+        STAGES,                                                           \
+        ARCH)                                                             \
+    F<sycl::half,                                                         \
+      WG_M,                                                               \
+      WG_N,                                                               \
+      SG_M,                                                               \
+      SG_N,                                                               \
+      SG_K,                                                               \
+      GZ,                                                                 \
+      SLM_KS,                                                             \
+      L3_KS,                                                              \
+      SYNC_FREQ,                                                          \
+      STAGES,                                                             \
+      ARCH>(                                                              \
+        q,                                                                \
+        reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()), \
+        reinterpret_cast<sycl::half*>(outputs_[1]->data_ptr<scalar_t>()), \
+        reinterpret_cast<sycl::half*>(outputs_[2]->data_ptr<scalar_t>()), \
+        reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),      \
+        weight_->data_ptr<uint8_t>(),                                     \
+        weight_zp_->data_ptr<uint8_t>(),                                  \
+        reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()), \
+        acc_tensor_->data_ptr<float>(),                                   \
+        reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),             \
+        m_,                                                               \
+        n_,                                                               \
+        k_);                                                              \
   }
 
 #define HGEMM_INT4_QKV_BIAS_DISPATCH(                                       \
-    F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)                            \
+    F,                                                                      \
+    WG_M,                                                                   \
+    WG_N,                                                                   \
+    SG_M,                                                                   \
+    SG_N,                                                                   \
+    SG_K,                                                                   \
+    GZ,                                                                     \
+    SLM_KS,                                                                 \
+    L3_KS,                                                                  \
+    SYNC_FREQ,                                                              \
+    STAGES,                                                                 \
+    ARCH)                                                                   \
   {                                                                         \
-    RECORD_FUNCTION_IMPL(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)       \
-    F<sycl::half, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS>(                \
+    RECORD_FUNCTION_IMPL(                                                   \
+        F,                                                                  \
+        WG_M,                                                               \
+        WG_N,                                                               \
+        SG_M,                                                               \
+        SG_N,                                                               \
+        SG_K,                                                               \
+        GZ,                                                                 \
+        SLM_KS,                                                             \
+        L3_KS,                                                              \
+        SYNC_FREQ,                                                          \
+        STAGES,                                                             \
+        ARCH)                                                               \
+    F<sycl::half,                                                           \
+      WG_M,                                                                 \
+      WG_N,                                                                 \
+      SG_M,                                                                 \
+      SG_N,                                                                 \
+      SG_K,                                                                 \
+      GZ,                                                                   \
+      SLM_KS,                                                               \
+      L3_KS,                                                                \
+      SYNC_FREQ,                                                            \
+      STAGES,                                                               \
+      ARCH>(                                                                \
         q,                                                                  \
         reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
         reinterpret_cast<sycl::half*>(outputs_[1]->data_ptr<scalar_t>()),   \
@@ -160,111 +466,170 @@ using namespace xpu::xetla;
         weight_zp_->data_ptr<uint8_t>(),                                    \
         reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
         reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+        acc_tensor_->data_ptr<float>(),                                     \
+        reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
         m_,                                                                 \
         n_,                                                                 \
         k_);                                                                \
   }
 
-#define HGEMM_INT4_COMMON_DISPATCH_IMPL(                     \
-    DISPATCHER, F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
-  DISPATCHER(F, WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS)
+#define HGEMM_INT4_COMMON_DISPATCH_IMPL( \
+    DISPATCHER,                          \
+    F,                                   \
+    WG_M,                                \
+    WG_N,                                \
+    SG_M,                                \
+    SG_N,                                \
+    SG_K,                                \
+    GZ,                                  \
+    SLM_KS,                              \
+    L3_KS,                               \
+    SYNC_FREQ,                           \
+    STAGES,                              \
+    ARCH)                                \
+  DISPATCHER(                            \
+      F,                                 \
+      WG_M,                              \
+      WG_N,                              \
+      SG_M,                              \
+      SG_N,                              \
+      SG_K,                              \
+      GZ,                                \
+      SLM_KS,                            \
+      L3_KS,                             \
+      SYNC_FREQ,                         \
+      STAGES,                            \
+      ARCH)
 
-#define HGEMM_INT4_COMMON_DISPATCH(WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS) \
-  {                                                                          \
-    if (num_epilogues_ == 0)                                                 \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_DISPATCH,                                               \
-          hgemm_wint4,                                                       \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS)               \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_BIAS_DISPATCH,                                          \
-          hgemm_bias_wint4,                                                  \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (                                                                \
-        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                  \
-        epilogue_type_[1] == RES_ADD && epilogue_type_[2] == RES_ADD)        \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_BIAS_RES_RES_DISPATCH,                                  \
-          hgemm_bias_res_res_wint4,                                          \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (                                                                \
-        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                  \
-        epilogue_type_[1] == GELU)                                           \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_BIAS_GELU_DISPATCH,                                     \
-          hgemm_bias_gelu_wint4,                                             \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD)            \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_RES_DISPATCH,                                           \
-          hgemm_res_wint4,                                                   \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL)            \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_RESMUL_DISPATCH,                                        \
-          hgemm_mul_wint4,                                                   \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == SPLIT3)             \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_QKV_DISPATCH,                                           \
-          hgemm_qkv_wint4,                                                   \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
-    else if (                                                                \
-        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                  \
-        epilogue_type_[1] == SPLIT3)                                         \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
-          HGEMM_INT4_QKV_BIAS_DISPATCH,                                      \
-          hgemm_qkv_bias_wint4,                                              \
-          WG_M,                                                              \
-          WG_N,                                                              \
-          SG_M,                                                              \
-          SG_N,                                                              \
-          SG_K,                                                              \
-          GZ,                                                                \
-          SLM_KS)                                                            \
+#define HGEMM_INT4_COMMON_DISPATCH(                                           \
+    WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS, L3_KS, SYNC_FREQ, STAGES, ARCH) \
+  {                                                                           \
+    if (num_epilogues_ == 0)                                                  \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
+          HGEMM_INT4_DISPATCH,                                                \
+          hgemm_wint4,                                                        \
+          WG_M,                                                               \
+          WG_N,                                                               \
+          SG_M,                                                               \
+          SG_N,                                                               \
+          SG_K,                                                               \
+          GZ,                                                                 \
+          SLM_KS,                                                             \
+          L3_KS,                                                              \
+          SYNC_FREQ,                                                          \
+          STAGES,                                                             \
+          ARCH)                                                               \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS)                \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
+          HGEMM_INT4_BIAS_DISPATCH,                                           \
+          hgemm_bias_wint4,                                                   \
+          WG_M,                                                               \
+          WG_N,                                                               \
+          SG_M,                                                               \
+          SG_N,                                                               \
+          SG_K,                                                               \
+          GZ,                                                                 \
+          SLM_KS,                                                             \
+          L3_KS,                                                              \
+          SYNC_FREQ,                                                          \
+          STAGES,                                                             \
+          ARCH)                                                               \
+    else if (                                                                 \
+        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                   \
+        epilogue_type_[1] == RES_ADD && epilogue_type_[2] == RES_ADD)         \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
+          HGEMM_INT4_BIAS_RES_RES_DISPATCH,                                   \
+          hgemm_bias_res_res_wint4,                                           \
+          WG_M,                                                               \
+          WG_N,                                                               \
+          SG_M,                                                               \
+          SG_N,                                                               \
+          SG_K,                                                               \
+          GZ,                                                                 \
+          SLM_KS,                                                             \
+          L3_KS,                                                              \
+          SYNC_FREQ,                                                          \
+          STAGES,                                                             \
+          ARCH)                                                               \
+    else if (                                                                 \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                   \
+        epilogue_type_[1] == GELU)                                            \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
+          HGEMM_INT4_BIAS_GELU_DISPATCH,                                      \
+          hgemm_bias_gelu_wint4,                                              \
+          WG_M,                                                               \
+          WG_N,                                                               \
+          SG_M,                                                               \
+          SG_N,                                                               \
+          SG_K,                                                               \
+          GZ,                                                                 \
+          SLM_KS,                                                             \
+          L3_KS,                                                              \
+          SYNC_FREQ,                                                          \
+          STAGES,                                                             \
+          ARCH)                                                               \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD)             \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
+          HGEMM_INT4_RES_DISPATCH,                                            \
+          hgemm_res_wint4,                                                    \
+          WG_M,                                                               \
+          WG_N,                                                               \
+          SG_M,                                                               \
+          SG_N,                                                               \
+          SG_K,                                                               \
+          GZ,                                                                 \
+          SLM_KS,                                                             \
+          L3_KS,                                                              \
+          SYNC_FREQ,                                                          \
+          STAGES,                                                             \
+          ARCH)                                                               \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL)             \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
+          HGEMM_INT4_RESMUL_DISPATCH,                                         \
+          hgemm_mul_wint4,                                                    \
+          WG_M,                                                               \
+          WG_N,                                                               \
+          SG_M,                                                               \
+          SG_N,                                                               \
+          SG_K,                                                               \
+          GZ,                                                                 \
+          SLM_KS,                                                             \
+          L3_KS,                                                              \
+          SYNC_FREQ,                                                          \
+          STAGES,                                                             \
+          ARCH)                                                               \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == SPLIT3)              \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
+          HGEMM_INT4_QKV_DISPATCH,                                            \
+          hgemm_qkv_wint4,                                                    \
+          WG_M,                                                               \
+          WG_N,                                                               \
+          SG_M,                                                               \
+          SG_N,                                                               \
+          SG_K,                                                               \
+          GZ,                                                                 \
+          SLM_KS,                                                             \
+          L3_KS,                                                              \
+          SYNC_FREQ,                                                          \
+          STAGES,                                                             \
+          ARCH)                                                               \
+    else if (                                                                 \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                   \
+        epilogue_type_[1] == SPLIT3)                                          \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
+          HGEMM_INT4_QKV_BIAS_DISPATCH,                                       \
+          hgemm_qkv_bias_wint4,                                               \
+          WG_M,                                                               \
+          WG_N,                                                               \
+          SG_M,                                                               \
+          SG_N,                                                               \
+          SG_K,                                                               \
+          GZ,                                                                 \
+          SLM_KS,                                                             \
+          L3_KS,                                                              \
+          SYNC_FREQ,                                                          \
+          STAGES,                                                             \
+          ARCH)                                                               \
   }
 
 template <
@@ -277,7 +642,11 @@ template <
     int slm_ks_,
     int max_m_,
     int max_n_,
-    int max_k_>
+    int max_k_,
+    int l3_ks_,
+    int sync_freq_,
+    int stages_,
+    int arch_>
 struct GemmWint4Config {
   static constexpr int wg_m = wg_m_;
   static constexpr int wg_n = wg_n_;
@@ -289,6 +658,10 @@ struct GemmWint4Config {
   static constexpr int max_m = max_m_;
   static constexpr int max_n = max_n_;
   static constexpr int max_k = max_k_;
+  static constexpr int l3_ks = l3_ks_;
+  static constexpr int sync_freq = sync_freq_;
+  static constexpr int stages = stages_;
+  static constexpr int arch = arch_;
 
   static bool less_than(int m, int n, int k, int group_size) {
     if (gz < group_size)
@@ -306,49 +679,49 @@ struct GemmWint4Config {
 #define MAX_INT std::numeric_limits<int>::max()
 
 // clang-format off
-#define ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ(gz)                        \
-  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, 4096>,               \
-  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, 4096>,            \
-  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, 4096>,            \
-  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, 4096>,           \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, 4096>,          \
-  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, 4096>,     \
-  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, 16384>,              \
-  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, 16384>,           \
-  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, 16384>,           \
-  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, 16384>,          \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, 16384>,         \
-  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, 16384>,    \
-  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, MAX_INT>,            \
-  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, MAX_INT>,         \
-  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, MAX_INT>,         \
-  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, MAX_INT>,        \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, MAX_INT>,       \
-  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, MAX_INT>,  \
-  GemmWint4Config<8, 256, 8, 16, 32, gz, 2, 8, 16384, 4096>,             \
-  GemmWint4Config<16, 256, 16, 16, 32, gz, 2, 16, 16384, 4096>,          \
-  GemmWint4Config<32, 256, 32, 16, 32, gz, 2, 32, 16384, 4096>,          \
-  GemmWint4Config<64, 256, 64, 16, 32, gz, 2, 64, 16384, 4096>,          \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 16384, 4096>,         \
-  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 16384, 4096>,    \
-  GemmWint4Config<8, 256, 8, 16, 32, gz, 2, 8, 16384, MAX_INT>,          \
-  GemmWint4Config<16, 256, 16, 16, 32, gz, 2, 16, 16384, MAX_INT>,       \
-  GemmWint4Config<32, 256, 32, 16, 32, gz, 2, 32, 16384, MAX_INT>,       \
-  GemmWint4Config<64, 256, 64, 16, 32, gz, 2, 64, 16384, MAX_INT>,       \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 16384, MAX_INT>,      \
-  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 16384, MAX_INT>, \
-  GemmWint4Config<8, 512, 8, 16, 32, gz, 1, 8, 50416, 4096>,             \
-  GemmWint4Config<16, 512, 16, 16, 32, gz, 1, 16, 50416, 4096>,          \
-  GemmWint4Config<32, 512, 32, 16, 32, gz, 1, 32, 50416, 4096>,          \
-  GemmWint4Config<64, 512, 64, 16, 32, gz, 1, 64, 50416, 4096>,          \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 50416, 4096>,         \
-  GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, 50416, 4096>,    \
-  GemmWint4Config<8, 512, 8, 16, 32, gz, 1, 8, MAX_INT, MAX_INT>,        \
-  GemmWint4Config<16, 512, 16, 16, 32, gz, 1, 16, MAX_INT, MAX_INT>,     \
-  GemmWint4Config<32, 512, 32, 16, 32, gz, 1, 32, MAX_INT, MAX_INT>,     \
-  GemmWint4Config<64, 512, 64, 16, 32, gz, 1, 64, MAX_INT, MAX_INT>,     \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, MAX_INT, MAX_INT>,    \
-  GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, MAX_INT, MAX_INT>
+#define ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ(gz)                       \
+  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, 4096, 1, 1, 3, 1>,               \
+  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, 4096, 1, 1, 3, 1>,            \
+  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, 4096, 1, 1, 3, 1>,            \
+  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, 4096, 1, 1, 3, 1>,           \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, 4096, 1, 1, 3, 1>,          \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, 4096, 1, 1, 3, 1>,     \
+  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, 16384, 1, 1, 3, 1>,              \
+  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, 16384, 1, 1, 3, 1>,           \
+  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, 16384, 1, 1, 3, 1>,           \
+  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, 16384, 1, 1, 3, 1>,          \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, 16384, 1, 1, 3, 1>,         \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, 16384, 1, 1, 3, 1>,    \
+  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, MAX_INT, 1, 1, 3, 1>,            \
+  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, MAX_INT, 1, 1, 3, 1>,         \
+  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, MAX_INT, 1, 1, 3, 1>,         \
+  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, MAX_INT, 1, 1, 3, 1>,        \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, MAX_INT, 1, 1, 3, 1>,       \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, MAX_INT, 1, 1, 3, 1>,  \
+  GemmWint4Config<8, 256, 8, 16, 32, gz, 2, 8, 16384, 4096, 1, 1, 3, 1>,             \
+  GemmWint4Config<16, 256, 16, 16, 32, gz, 2, 16, 16384, 4096, 1, 1, 3, 1>,          \
+  GemmWint4Config<32, 256, 32, 16, 32, gz, 2, 32, 16384, 4096, 1, 1, 3, 1>,          \
+  GemmWint4Config<64, 256, 64, 16, 32, gz, 2, 64, 16384, 4096, 1, 1, 3, 1>,          \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 16384, 4096, 1, 1, 3, 1>,         \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 16384, 4096, 1, 1, 3, 1>,    \
+  GemmWint4Config<8, 256, 8, 16, 32, gz, 2, 8, 16384, MAX_INT, 1, 1, 3, 1>,          \
+  GemmWint4Config<16, 256, 16, 16, 32, gz, 2, 16, 16384, MAX_INT, 1, 1, 3, 1>,       \
+  GemmWint4Config<32, 256, 32, 16, 32, gz, 2, 32, 16384, MAX_INT, 1, 1, 3, 1>,       \
+  GemmWint4Config<64, 256, 64, 16, 32, gz, 2, 64, 16384, MAX_INT, 1, 1, 3, 1>,       \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 16384, MAX_INT, 1, 1, 3, 1>,      \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 16384, MAX_INT, 1, 1, 3, 1>, \
+  GemmWint4Config<8, 512, 8, 16, 32, gz, 1, 8, 50416, 4096, 1, 1, 3, 1>,             \
+  GemmWint4Config<16, 512, 16, 16, 32, gz, 1, 16, 50416, 4096, 1, 1, 3, 1>,          \
+  GemmWint4Config<32, 512, 32, 16, 32, gz, 1, 32, 50416, 4096, 1, 1, 3, 1>,          \
+  GemmWint4Config<64, 512, 64, 16, 32, gz, 1, 64, 50416, 4096, 1, 1, 3, 1>,          \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 50416, 4096, 1, 1, 3, 1>,         \
+  GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, 50416, 4096, 1, 1, 3, 1>,    \
+  GemmWint4Config<8, 512, 8, 16, 32, gz, 1, 8, MAX_INT, MAX_INT, 1, 1, 3, 1>,        \
+  GemmWint4Config<16, 512, 16, 16, 32, gz, 1, 16, MAX_INT, MAX_INT, 1, 1, 3, 1>,     \
+  GemmWint4Config<32, 512, 32, 16, 32, gz, 1, 32, MAX_INT, MAX_INT, 1, 1, 3, 1>,     \
+  GemmWint4Config<64, 512, 64, 16, 32, gz, 1, 64, MAX_INT, MAX_INT, 1, 1, 3, 1>,     \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, MAX_INT, MAX_INT, 1, 1, 3, 1>,    \
+  GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, MAX_INT, MAX_INT, 1, 1, 3, 1>
 // clang-format on
 
 #define ORDERED_GEMM_WINT4_CONFIG_SET       \
@@ -379,7 +752,8 @@ class HGEMMXetla_INT4 final {
   enum {
     MAX_EPILOGUES = 4,
   };
-  Tensor *input_, *weight_, *weight_scl_, *weight_zp_;
+  Tensor *input_, *weight_, *weight_scl_, *weight_zp_, *acc_tensor_,
+      *cnt_tensor_;
   std::vector<Tensor*> outputs_;
   Tensor* epilogues_[MAX_EPILOGUES];
   EpilogueType epilogue_type_[MAX_EPILOGUES];
@@ -392,11 +766,57 @@ class HGEMMXetla_INT4 final {
   bool fallback_;
   int m_, n_, k_;
   int64_t calib_gz_;
+  int8_t arch_ = 1; // 0: ARC, 1: PVC
+
+  template <uint32_t a, uint32_t b>
+  struct gcd {
+    static constexpr uint32_t value = gcd<b, a % b>::value;
+  };
+  /// @brief
+  ///
+  /// @tparam a
+  template <uint32_t a>
+  struct gcd<a, 0> {
+    static constexpr uint32_t value = a;
+  };
+
+  static size_t get_acc_size(uint32_t matrix_m, uint32_t matrix_n) {
+    return matrix_m * matrix_n;
+  };
+
+  template <
+      uint32_t wg_m,
+      uint32_t wg_n,
+      uint32_t sg_m,
+      uint32_t sg_n,
+      uint32_t slm_kslicing>
+  static size_t get_cnt_size(uint32_t matrix_m, uint32_t matrix_n) {
+    size_t group_range_m = (matrix_m + wg_m - 1) / wg_m;
+    size_t group_range_n = (matrix_n + wg_n - 1) / wg_n;
+
+    static constexpr uint32_t wg_size_x = (wg_m + sg_m - 1) / sg_m;
+    static constexpr uint32_t wg_size_y = (wg_n + sg_n - 1) / sg_n;
+    static constexpr uint32_t ks_coop_num_y = gcd<slm_kslicing, sg_m>::value;
+    static constexpr uint32_t coop_remain_num_x = slm_kslicing / ks_coop_num_y;
+    static constexpr bool has_redundant_wg = (coop_remain_num_x * 16) > sg_n;
+    static constexpr uint32_t tile_size_y = sg_m / ks_coop_num_y;
+    static constexpr uint32_t tile_size_x =
+        has_redundant_wg ? 16 : sg_n / coop_remain_num_x;
+    static constexpr uint32_t ks_coop_num_x = sg_n / tile_size_x;
+
+    static constexpr uint32_t counter_size = 8;
+    return group_range_m * group_range_n * wg_size_x * wg_size_y *
+        ks_coop_num_y * ks_coop_num_x * counter_size;
+  };
 
  public:
   HGEMMXetla_INT4() = default;
   bool fallback() const {
     return fallback_;
+  }
+  HGEMMXetla_INT4& add_arch(int8_t arch) {
+    arch_ = arch;
+    return *this;
   }
   HGEMMXetla_INT4& add_matrix_out(const Tensor& output) {
     outputs_.emplace_back(const_cast<Tensor*>(&output));
@@ -518,7 +938,8 @@ class HGEMMXetla_INT4 final {
       begin,
       begin,
       std::tuple<FirstConfig, OtherConfigs...>> {
-    using type = std::tuple<FirstConfig>;
+    using type = std::tuple<
+        std::tuple_element_t<begin, std::tuple<FirstConfig, OtherConfigs...>>>;
   };
 
   template <int begin, int end, typename FirstConfig, typename... OtherConfigs>
@@ -554,7 +975,31 @@ class HGEMMXetla_INT4 final {
         static constexpr int sg_k = Config::sg_k;
         static constexpr int gz = Config::gz;
         static constexpr int slm_ks = Config::slm_ks;
-        HGEMM_INT4_COMMON_DISPATCH(wg_m, wg_n, sg_m, sg_n, sg_k, gz, slm_ks);
+        static constexpr int arch = Config::arch;
+        static constexpr int l3_ks = Config::l3_ks;
+        static constexpr int sync_freq = Config::sync_freq;
+        static constexpr int stages = Config::stages;
+        // allocate temp buffers for global split
+        size_t acc_size = get_acc_size(m_, n_);
+        size_t cnt_size = get_cnt_size<wg_m, wg_n, sg_m, sg_n, slm_ks>(m_, n_);
+        Tensor acc_tensor = at::AtenIpexTypeXPU::empty(
+            {acc_size}, input_->options().dtype(at::kFloat), c10::nullopt);
+        Tensor cnt_tensor = at::AtenIpexTypeXPU::empty(
+            {cnt_size}, input_->options().dtype(at::kByte), c10::nullopt);
+        acc_tensor_ = const_cast<Tensor*>(&acc_tensor);
+        cnt_tensor_ = const_cast<Tensor*>(&cnt_tensor);
+        HGEMM_INT4_COMMON_DISPATCH(
+            wg_m,
+            wg_n,
+            sg_m,
+            sg_n,
+            sg_k,
+            gz,
+            slm_ks,
+            l3_ks,
+            sync_freq,
+            stages,
+            arch);
       };
       return execute_function;
     } else {

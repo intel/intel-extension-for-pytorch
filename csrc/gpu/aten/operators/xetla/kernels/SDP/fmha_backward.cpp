@@ -204,9 +204,9 @@ class fmha_backward_t {
 
   static constexpr uint32_t nbarrier_cnt = wg_size_x + wg_size_y;
   // Define kernel to compute Sij = Qi x Kj.T
-  using brgemm_Sij_t = group::
-      brgemm_t<compute_policy, tile_shape_BrBc, mem_desc_Qi_t, mem_desc_Kj_T_t>;
-  using matAcc_Sij_t = typename brgemm_Sij_t::matAcc_t;
+  using gemm_Sij_t = group::
+      gemm_t<compute_policy, tile_shape_BrBc, mem_desc_Qi_t, mem_desc_Kj_T_t>;
+  using matAcc_Sij_t = typename gemm_Sij_t::matAcc_t;
   using dropout_t = dropout_fwd_t<matAcc_Sij_t::tile_elems>;
 
   // ======================== // Context // ======================= //
@@ -246,11 +246,9 @@ class fmha_backward_t {
     inline context_t() = default;
 
     /// @brief Initialize invariant variables in the flash mha loop
-    inline void init_context(
-        const xetla_exec_item<3>& ei,
-        const arguments_t& args) {
+    inline void init_context(const nd_item<3>& item, const arguments_t& args) {
       // thread id
-      uint32_t sg_id = ei.get_local_linear_id();
+      uint32_t sg_id = item.get_local_linear_id();
       g_brbc.init(sg_id);
       g_brhm.init(sg_id);
       g_bchm.init(sg_id);
@@ -265,13 +263,13 @@ class fmha_backward_t {
 
     /// @brief Initialize update for D variables in the flash mha loop
     inline void update_context_D(
-        const xetla_exec_item<3>& ei,
+        const nd_item<3>& item,
         const arguments_t& args,
         uint32_t startF) {
       // mem desc variables
-      uint32_t gid = ei.get_group(0);
-      uint32_t bid = ei.get_group(0) / args.uN;
-      uint32_t nid = ei.get_group(0) % args.uN;
+      uint32_t gid = item.get_group(0);
+      uint32_t bid = item.get_group(0) / args.uN;
+      uint32_t nid = item.get_group(0) % args.uN;
       int32_t start_x = nid * args.uH;
       uint32_t end_x = start_x + args.uH;
       int32_t start_y = bid * args.uF + startF;
@@ -301,14 +299,14 @@ class fmha_backward_t {
 
     /// @brief Initialize update for Q variables in the flash mha loop
     inline void update_context_Q(
-        const xetla_exec_item<3>& ei,
+        const nd_item<3>& item,
         const arguments_t& args,
         uint32_t startF,
         uint32_t startT) {
       // mem desc variables
-      uint32_t gid = ei.get_group(0);
-      uint32_t bid = ei.get_group(0) / args.uN;
-      uint32_t nid = ei.get_group(0) % args.uN;
+      uint32_t gid = item.get_group(0);
+      uint32_t bid = item.get_group(0) / args.uN;
+      uint32_t nid = item.get_group(0) % args.uN;
       int32_t start_x = nid * args.uH;
       uint32_t end_x = start_x + args.uH;
       int32_t start_y = bid * args.uF + startF;
@@ -377,10 +375,10 @@ class fmha_backward_t {
 
     /// @brief Update variables KV for each flash mha loop
     inline void update_context_KV(
-        const xetla_exec_item<3>& ei,
+        const nd_item<3>& item,
         const arguments_t& args,
         uint32_t startT) {
-      uint32_t gid = ei.get_group(0);
+      uint32_t gid = item.get_group(0);
       uint32_t bid = gid / args.uN;
       uint32_t nid = gid % args.uN;
 
@@ -409,16 +407,16 @@ class fmha_backward_t {
   /// @brief gemm_Sij is used to compute Sij = Qi x Kj.T
   /// # [Br,H] x [H,Bc] = [Br,Bc]
   inline void gemm_Sij(matAcc_Sij_t* matAcc_Sij, const arguments_t& args) {
-    using brgemm_args_t = typename brgemm_Sij_t::arguments_t;
+    using gemm_args_t = typename gemm_Sij_t::arguments_t;
 
     // Gemm to comput Sij
-    brgemm_Sij_t brgemm;
+    gemm_Sij_t gemm;
     uint32_t loop_count = (args.uH + accum_step - 1) / accum_step;
-    brgemm_args_t brgemm_args(ctx.mem_desc_Qi, ctx.mem_desc_Kj_T, loop_count);
-    brgemm(
+    gemm_args_t gemm_args(ctx.mem_desc_Qi, ctx.mem_desc_Kj_T, loop_count);
+    gemm(
         ctx.g_brbc,
         *matAcc_Sij,
-        brgemm_args,
+        gemm_args,
         0,
         /* nbarrier_base */ nbarrier_cnt);
 
@@ -486,11 +484,10 @@ class fmha_backward_t {
         subgroup::tile_desc_t<kSgBr, 1, kSgBr, 1, reg_layout::tiled>;
     using load_tile_t = subgroup::tile_t<accum_t, load_desc>;
     using load_payload_t = subgroup::mem_payload_t<
-        accum_t,
+        mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
         load_desc,
         msg_type::block_2d,
-        mem_layout::row_major,
-        mem_space::global>;
+        gpu_arch::Xe>;
 
     load_tile_t matL_load;
     load_payload_t load_payload(ctx.mem_desc_Li);
@@ -533,58 +530,54 @@ class fmha_backward_t {
 
   // ======================= // gemm_dVj // ======================= //
   // Define kernel to compute dVj = Pij_dropped_T x dOi
-  using brgemm_dVj_t = group::brgemm_t<
+  using gemm_dVj_t = group::gemm_t<
       compute_policy,
       tile_shape_BcHm,
       mem_desc_Pij_L_T_t,
       mem_desc_dOi_t>;
-  using matAcc_dVj_t = typename brgemm_dVj_t::matAcc_t;
+  using matAcc_dVj_t = typename gemm_dVj_t::matAcc_t;
   /// @brief gemm_dVj is used to compute dVj = P_dropped_ij_T x dOi
   /// # [Bc,Br] x [Br,H] = [Bc,H]
   inline void gemm_dVj(
       matAcc_dVj_t* matAcc_dVj,
       const arguments_t& args,
       uint32_t startF) {
-    using brgemm_args_t = typename brgemm_dVj_t::arguments_t;
+    using gemm_args_t = typename gemm_dVj_t::arguments_t;
 
     uint32_t remainF = args.uF - startF;
     uint32_t boundary_k = remainF > kBr ? kBr : remainF;
     uint32_t loop_count = (boundary_k + accum_step - 1) / accum_step;
 
     // Gemm to compute dVj
-    brgemm_dVj_t brgemm;
-    brgemm_args_t brgemm_args(
-        ctx.mem_desc_Pij_L_T, ctx.mem_desc_dOi, loop_count);
-    brgemm(
+    gemm_dVj_t gemm;
+    gemm_args_t gemm_args(ctx.mem_desc_Pij_L_T, ctx.mem_desc_dOi, loop_count);
+    gemm(
         ctx.g_bchm,
         *matAcc_dVj,
-        brgemm_args,
+        gemm_args,
         0,
         /* nbarrier_base */ nbarrier_cnt);
   }
 
   // ======================= // gemm_dPij // ======================= //
   // Define kernel to compute dPij = dOi x Vj_T
-  using brgemm_dPij_t = group::brgemm_t<
-      compute_policy,
-      tile_shape_BrBc,
-      mem_desc_dOi_t,
-      mem_desc_Vj_T_t>;
-  using matAcc_dPij_t = typename brgemm_dPij_t::matAcc_t;
+  using gemm_dPij_t = group::
+      gemm_t<compute_policy, tile_shape_BrBc, mem_desc_dOi_t, mem_desc_Vj_T_t>;
+  using matAcc_dPij_t = typename gemm_dPij_t::matAcc_t;
   /// @brief gemm_dPij is used to compute dPij = dOi x Vj_T
   /// # [Br,H] x [H,Bc] = [Br,Bc]
   inline void gemm_dPij(matAcc_dPij_t* matAcc_dPij, const arguments_t& args) {
-    using brgemm_args_t = typename brgemm_dPij_t::arguments_t;
+    using gemm_args_t = typename gemm_dPij_t::arguments_t;
 
     uint32_t loop_count = (args.uH + accum_step - 1) / accum_step;
 
     // Gemm to compute dPij
-    brgemm_dPij_t brgemm;
-    brgemm_args_t brgemm_args(ctx.mem_desc_dOi, ctx.mem_desc_Vj_T, loop_count);
-    brgemm(
+    gemm_dPij_t gemm;
+    gemm_args_t gemm_args(ctx.mem_desc_dOi, ctx.mem_desc_Vj_T, loop_count);
+    gemm(
         ctx.g_brbc,
         *matAcc_dPij,
-        brgemm_args,
+        gemm_args,
         0,
         /* nbarrier_base */ nbarrier_cnt);
 
@@ -606,11 +599,10 @@ class fmha_backward_t {
         subgroup::tile_desc_t<kSgBr, 1, kSgBr, 1, reg_layout::tiled>;
     using load_tile_t = subgroup::tile_t<accum_t, load_desc>;
     using load_payload_t = subgroup::mem_payload_t<
-        accum_t,
+        mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
         load_desc,
         msg_type::block_2d,
-        mem_layout::row_major,
-        mem_space::global>;
+        gpu_arch::Xe>;
 
     load_tile_t matD_load;
     load_payload_t load_payload(ctx.mem_desc_Di);
@@ -629,7 +621,7 @@ class fmha_backward_t {
 
     // store dSij to local
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
+        group::epilogue_policy_default<gpu_arch::Xe>,
         tile_shape_BrBc,
         mem_desc_dSij_L_t>;
     epilogue_t epilogue;
@@ -644,7 +636,7 @@ class fmha_backward_t {
     if constexpr (kUseBias) {
       // dSij = dBij
       using epilogue_t = group::epilogue_t<
-          group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
+          group::epilogue_policy_default<gpu_arch::Xe>,
           tile_shape_BrBc,
           mem_desc_dBij_t>;
       epilogue_t epilogue;
@@ -654,44 +646,40 @@ class fmha_backward_t {
 
   // ======================= // gemm_dQi // ======================= //
   // Define kernel to compute dQi = dQi + scale * (dSij x Kj)
-  using brgemm_dQi_t = group::brgemm_t<
-      compute_policy,
-      tile_shape_BrHm,
-      mem_desc_dSij_L_t,
-      mem_desc_Kj_t>;
-  using matAcc_dQi_t = typename brgemm_dQi_t::matAcc_t;
+  using gemm_dQi_t = group::
+      gemm_t<compute_policy, tile_shape_BrHm, mem_desc_dSij_L_t, mem_desc_Kj_t>;
+  using matAcc_dQi_t = typename gemm_dQi_t::matAcc_t;
   /// @brief gemm_dQi is used to compute dQi = dQi + scale * (dSij x Kj)
   /// # [Br,Bc] x [Bc,H] = [Br,H]
   inline void gemm_dQi(
       matAcc_dQi_t* matAcc_dQi,
       const arguments_t& args,
       uint32_t startT) {
-    using load_desc = brgemm_dQi_t::matAcc_tile_desc_t;
+    using load_desc = gemm_dQi_t::matAcc_tile_desc_t;
     using load_tile_t = subgroup::tile_t<scalar_t, load_desc>;
     using load_payload_t = subgroup::mem_payload_t<
-        scalar_t,
+        mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
         load_desc,
         msg_type::block_2d,
-        mem_layout::row_major,
-        mem_space::global>;
+        gpu_arch::Xe>;
 
     load_tile_t mat_dQ_load;
     load_payload_t load_payload(ctx.mem_desc_dQi_tile);
     subgroup::tile_load(mat_dQ_load, load_payload);
 
-    using brgemm_args_t = typename brgemm_dQi_t::arguments_t;
+    using gemm_args_t = typename gemm_dQi_t::arguments_t;
 
     uint32_t remainT = args.uT - startT;
     uint32_t boundary_k = remainT > kBc ? kBc : remainT;
     uint32_t loop_count = (boundary_k + accum_step - 1) / accum_step;
 
     // Gemm to compute dQi
-    brgemm_dQi_t brgemm;
-    brgemm_args_t brgemm_args(ctx.mem_desc_dSij_L, ctx.mem_desc_Kj, loop_count);
-    brgemm(
+    gemm_dQi_t gemm;
+    gemm_args_t gemm_args(ctx.mem_desc_dSij_L, ctx.mem_desc_Kj, loop_count);
+    gemm(
         ctx.g_brhm,
         *matAcc_dQi,
-        brgemm_args,
+        gemm_args,
         0,
         /* nbarrier_base */ nbarrier_cnt);
     matAcc_dQi->reg = args.sm_scale * matAcc_dQi->reg + mat_dQ_load.reg;
@@ -704,12 +692,12 @@ class fmha_backward_t {
 
   // ======================= // gemm_dKj // ======================= //
   // Define kernel to compute dKj = dKj + dSij_T x Qi
-  using brgemm_dKj_t = group::brgemm_t<
+  using gemm_dKj_t = group::gemm_t<
       compute_policy,
       tile_shape_BcHm,
       mem_desc_dSij_L_T_t,
       mem_desc_Qi_t>;
-  using matAcc_dKj_t = typename brgemm_dKj_t::matAcc_t;
+  using matAcc_dKj_t = typename gemm_dKj_t::matAcc_t;
   /// @brief gemm_dKj is used to compute dKj = dKj + dSij_T x Qi
   /// # [Bc,Br] x [Br,H] = [Bc,H]
   inline void gemm_dKj(
@@ -732,20 +720,19 @@ class fmha_backward_t {
       ctx.nbarrier.arrive_wait();
     ctx.nbarrier_y.arrive_wait();
 
-    using brgemm_args_t = typename brgemm_dKj_t::arguments_t;
+    using gemm_args_t = typename gemm_dKj_t::arguments_t;
 
     uint32_t remainF = args.uF - startF;
     uint32_t boundary_k = remainF > kBr ? kBr : remainF;
     uint32_t loop_count = (boundary_k + accum_step - 1) / accum_step;
 
     // Gemm to compute dKj
-    brgemm_dKj_t brgemm;
-    brgemm_args_t brgemm_args(
-        ctx.mem_desc_dSij_L_T, ctx.mem_desc_Qi, loop_count);
-    brgemm(
+    gemm_dKj_t gemm;
+    gemm_args_t gemm_args(ctx.mem_desc_dSij_L_T, ctx.mem_desc_Qi, loop_count);
+    gemm(
         ctx.g_bchm,
         *matAcc_dKj,
-        brgemm_args,
+        gemm_args,
         0,
         /* nbarrier_base */ nbarrier_cnt);
   }
@@ -753,11 +740,9 @@ class fmha_backward_t {
   // ==================== // store dQ, dK and dV // ====================== //
 
   /// @brief store raw dQi to global memory.
-  inline void store_dQi(
-      const matAcc_dQi_t& matAcc_dQi,
-      const arguments_t& args) {
+  inline void store_dQi(matAcc_dQi_t& matAcc_dQi, const arguments_t& args) {
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
+        group::epilogue_policy_default<gpu_arch::Xe>,
         tile_shape_BrHm,
         mem_desc_dQi_t>;
     epilogue_t epilogue;
@@ -765,11 +750,9 @@ class fmha_backward_t {
   }
 
   /// @brief store raw dKj to global memory.
-  inline void store_dKj(
-      const matAcc_dKj_t& matAcc_dKj,
-      const arguments_t& args) {
+  inline void store_dKj(matAcc_dKj_t& matAcc_dKj, const arguments_t& args) {
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
+        group::epilogue_policy_default<gpu_arch::Xe>,
         tile_shape_BcHm,
         mem_desc_dKj_t>;
     epilogue_t epilogue;
@@ -777,11 +760,9 @@ class fmha_backward_t {
   }
 
   /// @brief store raw dVj to global memory.
-  inline void store_dVj(
-      const matAcc_dVj_t& matAcc_dVj,
-      const arguments_t& args) {
+  inline void store_dVj(matAcc_dVj_t& matAcc_dVj, const arguments_t& args) {
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<result_overwrite, gpu_arch::Xe>,
+        group::epilogue_policy_default<gpu_arch::Xe>,
         tile_shape_BcHm,
         mem_desc_dVj_t>;
     epilogue_t epilogue;
@@ -802,23 +783,21 @@ class fmha_backward_t {
         subgroup::tile_desc_t<kSgBr, 1, kSgBr, 1, reg_layout::tiled>;
     using store_tile_t = subgroup::tile_t<accum_t, store_desc>;
     using store_payload_t = subgroup::mem_payload_t<
-        accum_t,
+        mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
         store_desc,
         msg_type::block_2d,
-        mem_layout::row_major,
-        mem_space::global>;
+        gpu_arch::Xe>;
 
     store_tile_t matD_store;
 
     // load matO and matdO
-    using load_desc_O = brgemm_dQi_t::matAcc_tile_desc_t;
+    using load_desc_O = gemm_dQi_t::matAcc_tile_desc_t;
     using load_tile_O_t = subgroup::tile_t<scalar_t, load_desc_O>;
     using load_payload_O_t = subgroup::mem_payload_t<
-        scalar_t,
+        mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
         load_desc_O,
         msg_type::block_2d,
-        mem_layout::row_major,
-        mem_space::global>;
+        gpu_arch::Xe>;
 
     load_tile_O_t matO_load;
     load_payload_O_t load_payload_O(ctx.mem_desc_Oi);
@@ -852,8 +831,8 @@ class fmha_backward_t {
   /// Users query and get a named_barrier id consumption count in compile time.
   /// @return The count of named barriers required.
   inline static constexpr uint32_t get_barrier_count() {
-    constexpr uint32_t barrier_count_Sij = brgemm_Sij_t::barrier_count;
-    constexpr uint32_t barrier_count_dVj = brgemm_dVj_t::barrier_count;
+    constexpr uint32_t barrier_count_Sij = gemm_Sij_t::barrier_count;
+    constexpr uint32_t barrier_count_dVj = gemm_dVj_t::barrier_count;
     constexpr uint32_t count =
         std::max(barrier_count_Sij, barrier_count_dVj) + nbarrier_cnt;
     static_assert(
@@ -885,19 +864,19 @@ class fmha_backward_t {
   // ================= // Entry of the functor // ================= //
 
   inline KERNEL_FUNC void operator()(
-      const xetla_exec_item<3>& ei,
+      const nd_item<3>& item,
       const arguments_t& args) {
     // allocate slm and nbarrier resource
     xetla_local_init<get_slm_size()>();
     xetla_nbarrier_init<get_barrier_count()>();
 
     // init context
-    ctx.init_context(ei, args);
+    ctx.init_context(item, args);
 
     // Calc D
     matAcc_dQi_t matAcc_O, matAcc_dO, matAcc_D;
     for (uint32_t startF = 0; startF < args.uF; startF += kBr) {
-      ctx.update_context_D(ei, args, startF);
+      ctx.update_context_D(item, args, startF);
       calc_D(&matAcc_O, &matAcc_dO, &matAcc_D, args);
     }
 
@@ -905,7 +884,7 @@ class fmha_backward_t {
     matAcc_dVj_t matAcc_dVj;
     for (uint32_t startT = 0; startT < args.uT; startT += kBc) {
       // update context for KV
-      ctx.update_context_KV(ei, args, startT);
+      ctx.update_context_KV(item, args, startT);
       // init dK dV
       matAcc_dKj.init(0);
       matAcc_dVj.init(0);
@@ -915,7 +894,7 @@ class fmha_backward_t {
             continue;
         }
         // update context for Q
-        ctx.update_context_Q(ei, args, startF, startT);
+        ctx.update_context_Q(item, args, startF, startT);
         // compute fwd Sij
         matAcc_Sij_t matAcc_Sij(0);
         gemm_Sij(&matAcc_Sij, args);
@@ -952,10 +931,7 @@ class fmha_backward_t {
 
 template <typename fmha_backward_op_t, typename T>
 struct FmhaBackwardKernelFunctor {
-  SYCL_ESIMD_KERNEL void operator()(sycl::nd_item<3> item) const {
-    // exec item
-    xetla_exec_item<3> ei(item);
-
+  KERNEL_MAIN void operator()(sycl::nd_item<3> item) const {
     // init fmha forward op and arguments
     fmha_backward_op_t fmha_bwd_op;
     using accscalar_t = fmha_backward_op_t::accum_t;
@@ -987,7 +963,7 @@ struct FmhaBackwardKernelFunctor {
         offset);
 
     // call the functor
-    fmha_bwd_op(ei, args);
+    fmha_bwd_op(item, args);
   }
   FmhaBackwardKernelFunctor(
       T* grad_out_,

@@ -448,6 +448,79 @@ Tensor matmul_gelu(
   return matmul_resize(input, output);
 }
 
+static size_t get_acc_size(uint32_t matrix_m, uint32_t matrix_n) {
+  return matrix_m * matrix_n;
+};
+
+static uint32_t find_ks_coop_num_y(uint32_t slm_kslicing, uint32_t sg_m) {
+  uint32_t ks_coop_num_y = sg_m;
+  while (slm_kslicing % sg_m != 0) {
+    ks_coop_num_y = slm_kslicing % sg_m;
+    slm_kslicing = sg_m;
+    sg_m = ks_coop_num_y;
+  }
+  return ks_coop_num_y;
+}
+
+static size_t get_cnt_size(
+    uint32_t matrix_m,
+    uint32_t matrix_n,
+    uint32_t wg_m,
+    uint32_t wg_n,
+    uint32_t sg_m,
+    uint32_t sg_n,
+    uint32_t slm_kslicing) {
+  // return matrix_m * matrix_n;
+  size_t group_range_m = (matrix_m + wg_m - 1) / wg_m;
+  size_t group_range_n = (matrix_n + wg_n - 1) / wg_n;
+
+  uint32_t wg_size_x = (wg_m + sg_m - 1) / sg_m;
+  uint32_t wg_size_y = (wg_n + sg_n - 1) / sg_n;
+  // uint32_t ks_coop_num_y = gcd<slm_kslicing, sg_m>::value;
+  uint32_t ks_coop_num_y = find_ks_coop_num_y(slm_kslicing, sg_m);
+  uint32_t coop_remain_num_x = slm_kslicing / ks_coop_num_y;
+  bool has_redundant_wg = (coop_remain_num_x * 16) > sg_n;
+  uint32_t tile_size_y = sg_m / ks_coop_num_y;
+  uint32_t tile_size_x = has_redundant_wg ? 16 : sg_n / coop_remain_num_x;
+  uint32_t ks_coop_num_x = sg_n / tile_size_x;
+
+  uint32_t counter_size = 8;
+  return group_range_m * group_range_n * wg_size_x * wg_size_y * ks_coop_num_y *
+      ks_coop_num_x * counter_size;
+}
+
+static void get_acc_and_cnt_tensor(
+    const Tensor& input_,
+    uint32_t m_,
+    uint32_t n_,
+    uint32_t k_,
+    bool is_b_row_major_,
+    Tensor& acc_tensor_,
+    Tensor& cnt_tensor_) {
+  int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
+  if (policy_id == -1) {
+    acc_tensor_ = at::AtenIpexTypeXPU::empty(
+        {0}, input_.options().dtype(at::kFloat), c10::nullopt);
+    cnt_tensor_ = at::AtenIpexTypeXPU::empty(
+        {0}, input_.options().dtype(at::kByte), c10::nullopt);
+    return;
+  }
+
+  auto policy_config = hgemm_policy_traits[policy_id];
+  int wg_m = policy_config.wg_m_;
+  int wg_n = policy_config.wg_n_;
+  int sg_m = policy_config.sg_m_;
+  int sg_n = policy_config.sg_n_;
+  int slm_ks = policy_config.slm_ks_;
+  size_t acc_size = get_acc_size(m_, n_);
+  size_t cnt_size = get_cnt_size(m_, n_, wg_m, wg_n, sg_m, sg_n, slm_ks);
+
+  acc_tensor_ = at::AtenIpexTypeXPU::empty(
+      {acc_size}, input_.options().dtype(at::kFloat), c10::nullopt);
+  cnt_tensor_ = at::AtenIpexTypeXPU::empty(
+      {cnt_size}, input_.options().dtype(at::kByte), c10::nullopt);
+}
+
 static void mm_qkv_out(
     const Tensor& input_,
     const Tensor& weight,
@@ -517,6 +590,9 @@ static void mm_qkv_out(
     if (!has_bias) {
       sprintf(str__, "hgemm_qkv(%d, %d, %d)", m, n, k);
       RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+      Tensor acc_tensor_, cnt_tensor_;
+      get_acc_and_cnt_tensor(
+          input_, m, n, k, is_b_row_major, acc_tensor_, cnt_tensor_);
       auto status = hgemm_qkv(
           q,
           reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
@@ -524,6 +600,8 @@ static void mm_qkv_out(
           reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
+          reinterpret_cast<float*>(acc_tensor_.data_ptr<float>()),
+          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
           m,
           n,
           k,
@@ -533,6 +611,9 @@ static void mm_qkv_out(
     } else {
       sprintf(str__, "hgemm_qkv_bias(%d, %d, %d)", m, n, k);
       RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+      Tensor acc_tensor_, cnt_tensor_;
+      get_acc_and_cnt_tensor(
+          input_, m, n, k, is_b_row_major, acc_tensor_, cnt_tensor_);
       auto status = hgemm_qkv_bias(
           q,
           reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
@@ -541,6 +622,8 @@ static void mm_qkv_out(
           reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()),
+          reinterpret_cast<float*>(acc_tensor_.data_ptr<float>()),
+          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
           m,
           n,
           k,
@@ -640,6 +723,9 @@ static void mm_qkv_group_out(
 
   if (xetla_valid) {
     char str__[100];
+    Tensor acc_tensor_, cnt_tensor_;
+    get_acc_and_cnt_tensor(
+        input_, m, n, k, is_b_row_major, acc_tensor_, cnt_tensor_);
     if (!has_bias) {
       sprintf(str__, "hgemm_qkv_group(%d, %d, %d, g=%d)", m, n, k, group);
       RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
@@ -650,7 +736,10 @@ static void mm_qkv_group_out(
           reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
+          reinterpret_cast<float*>(acc_tensor_.data_ptr<float>()),
+          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
           m,
+          n,
           k,
           num_kv_head,
           group,
@@ -669,7 +758,10 @@ static void mm_qkv_group_out(
           reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
           reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()),
+          reinterpret_cast<float*>(acc_tensor_.data_ptr<float>()),
+          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
           m,
+          n,
           k,
           num_kv_head,
           group,

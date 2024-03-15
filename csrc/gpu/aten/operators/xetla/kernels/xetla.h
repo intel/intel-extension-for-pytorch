@@ -3,6 +3,8 @@
 #include <sycl/sycl.hpp>
 #include <xetla.hpp>
 
+#define DEVICE_MEM_ALIGNMENT (64)
+
 using namespace sycl;
 using namespace gpu::xetla;
 using namespace gpu::xetla::group;

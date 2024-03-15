@@ -1,6 +1,6 @@
 #pragma once
 
-#include "xetla.hpp"
+#include "../xetla.h"
 
 namespace gpu::xetla {
 

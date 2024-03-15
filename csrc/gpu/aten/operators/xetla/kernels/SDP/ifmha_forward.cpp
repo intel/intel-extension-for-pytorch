@@ -13,10 +13,7 @@ class IfmhaForwardKernel;
 
 template <typename ifmha_forward_op_t, typename T>
 struct IfmhaForwardImplKernelFunctor {
-  SYCL_ESIMD_KERNEL void operator()(sycl::nd_item<2> item) const {
-    // exec item
-    xetla_exec_item<2> ei(item);
-
+  KERNEL_MAIN void operator()(sycl::nd_item<2> item) const {
     // init ifmha forward op and arguments
     ifmha_forward_op_t ifmha_fwd_op;
     typename ifmha_forward_op_t::arguments_t args(
@@ -42,7 +39,7 @@ struct IfmhaForwardImplKernelFunctor {
         attn_mask_padding);
 
     // call the functor
-    ifmha_fwd_op(ei, args);
+    ifmha_fwd_op(item, args);
   }
   IfmhaForwardImplKernelFunctor(
       T* query_,

@@ -201,22 +201,18 @@ struct group_reduce_t {
       subgroup::tile_desc_t<1, 1, 1, 1, reg_layout::tiled>;
   using local_st_tile_t = subgroup::tile_t<dtype, local_st_tile_desc>;
   using local_st_payload_t = subgroup::mem_payload_t<
-      dtype,
+      mem_desc_t<dtype, mem_layout::row_major, mem_space::local>,
       local_st_tile_desc,
       msg_type::block_1d,
-      mem_layout::row_major,
-      mem_space::local,
       gpu_arch::Xe>;
   // load all subgroup results together
   using local_ld_tile_desc =
       subgroup::tile_desc_t<wg_size, 1, wg_size, 1, reg_layout::tiled>;
   using local_ld_tile_t = subgroup::tile_t<dtype, local_ld_tile_desc>;
   using local_ld_payload_t = subgroup::mem_payload_t<
-      dtype,
+      mem_desc_t<dtype, mem_layout::row_major, mem_space::local>,
       local_ld_tile_desc,
       msg_type::block_1d,
-      mem_layout::row_major,
-      mem_space::local,
       gpu_arch::Xe>;
   // local variables
   xetla_nbarrier_t<wg_size, wg_size> nbarrier;

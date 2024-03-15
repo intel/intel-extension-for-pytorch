@@ -141,22 +141,18 @@ struct group_row_reduce_t {
       subgroup::tile_desc_t<kNum, 1, kNum, 1, reg_layout::tiled>;
   using store_tile_t = subgroup::tile_t<T, store_tile_desc>;
   using store_payload_t = subgroup::mem_payload_t<
-      T,
+      mem_desc_t<T, mem_layout::row_major, mem_space::local>,
       store_tile_desc,
       msg_type::block_1d,
-      mem_layout::row_major,
-      mem_space::local,
       gpu_arch::Xe>;
   // load all subgroup results together
   using load_tile_desc =
       subgroup::tile_desc_t<kTotal, 1, kTotal, 1, reg_layout::tiled>;
   using load_tile_t = subgroup::tile_t<T, load_tile_desc>;
   using load_payload_t = subgroup::mem_payload_t<
-      T,
+      mem_desc_t<T, mem_layout::row_major, mem_space::local>,
       load_tile_desc,
       subgroup::msg_type_v<load_tile_desc, mem_space::local>,
-      mem_layout::row_major,
-      mem_space::local,
       gpu_arch::Xe>;
 
   xetla_nbarrier_t<kNumSg, kNumSg> nbarrier;
@@ -276,11 +272,9 @@ struct dropout_t {
       reg_layout::tiled>;
   using mask_in_tile_t = subgroup::tile_t<dtype_mask, mask_in_tile_desc_t>;
   using mask_in_payload_t = subgroup::mem_payload_t<
-      dtype_mask,
+      mem_desc_t<dtype_mask, mem_desc_mask_t::layout, mem_desc_mask_t::space>,
       mask_in_tile_desc_t,
       subgroup::msg_type_v<mask_in_tile_desc_t, mem_desc_mask_t::space>,
-      mem_desc_mask_t::layout,
-      mem_desc_mask_t::space,
       gpu_arch::Xe>;
 
   inline KERNEL_FUNC void operator()(
@@ -362,11 +356,9 @@ struct bias_add_op_t<dtype_bias_, gpu_arch::Xe> {
         tile_desc_t<tile_size_x, 1, block_size_x, 1, reg_layout::tiled>;
     using bias_t = subgroup::tile_t<dtype_bias, bias_tile_desc_t>;
     using bias_payload_t = subgroup::mem_payload_t<
-        dtype_bias,
+        mem_desc_bias_t,
         bias_tile_desc_t,
         subgroup::msg_type_v<bias_tile_desc_t, mem_desc_bias_t::space>,
-        mem_desc_bias_t::layout,
-        mem_desc_bias_t::space,
         gpu_arch::Xe>;
     coord_t bias_coord(coord.x, coord.y);
     mem_desc_bias_t mem_desc_bias(args.base, args.shape, bias_coord);
@@ -492,11 +484,9 @@ class epilogue_transp_t<
 
     using matC_t = subgroup::tile_t<dtype_c, matC_tile_desc_t>;
     using matC_payload_t = subgroup::mem_payload_t<
-        dtype_c,
+        mem_desc_t<dtype_c, mem_layout_c, mem_space_c>,
         matC_tile_desc_t,
         msg_type_c,
-        mem_layout_c,
-        mem_space_c,
         arch_tag>;
 
     update_sg_tile_tdesc(g, mem_desc_c);

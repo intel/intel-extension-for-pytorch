@@ -23,19 +23,34 @@ template <
     uint32_t sg_k,
     uint32_t l3_kslicing,
     uint32_t slm_kslicing,
+    uint32_t arch,
     uint32_t dequant_s,
+    uint32_t periodic_sync_interval,
+    uint32_t prefetch_distance,
     typename post_ops>
 struct hgemm_wint4_func {
   using tile_shape = gpu::xetla::group::tile_shape_t<wg_n, wg_m, sg_n, sg_m>;
-  static constexpr uint32_t periodic_sync_interval = 1;
-  static constexpr uint32_t prefetch_distance = 3;
 
-  using mem_desc_a_t =
-      mem_desc_t<dtype_a, mem_layout::row_major, mem_space::global>;
-  using mem_desc_b_t =
-      mem_desc_t<dtype_b, mem_layout::row_major, mem_space::global>;
-  using mem_desc_c_t =
-      mem_desc_t<dtype_c, mem_layout::row_major, mem_space::global>;
+  using mem_desc_a_t = mem_desc_t<
+      dtype_a,
+      mem_layout::row_major,
+      mem_space::global,
+      DEVICE_MEM_ALIGNMENT / sizeof(dtype_a)>;
+  using mem_desc_b_t = mem_desc_t<
+      dtype_b,
+      mem_layout::row_major,
+      mem_space::global,
+      DEVICE_MEM_ALIGNMENT / sizeof(dtype_b)>;
+  using mem_desc_c_t = mem_desc_t<
+      dtype_c,
+      mem_layout::row_major,
+      mem_space::global,
+      DEVICE_MEM_ALIGNMENT / sizeof(dtype_c)>;
+  using mem_desc_scale_t = mem_desc_t<
+      dtype_scale,
+      mem_layout::row_major,
+      mem_space::global,
+      DEVICE_MEM_ALIGNMENT / sizeof(dtype_scale)>;
 
   using compute_attr = gpu::xetla::group::compute_attr_t<fp16, fp16, dtype_acc>;
   using perf_tuning_knob = gpu::xetla::group::
@@ -45,30 +60,27 @@ struct hgemm_wint4_func {
       compute_attr,
       perf_tuning_knob,
       dtype_scale,
-      dtype_zero_pt,
+      dtype_b,
       dequant_s == 0 ? 131072 : dequant_s,
-      gpu_arch::Xe>;
-  using brgemm_t = gpu::xetla::group::
-      brgemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
+      static_cast<gpu_arch>(arch),
+      gpu::xetla::group::quant_mode::S4_ASYM>;
+  using gemm_t = gpu::xetla::group::
+      gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
 
   using epilogue_t = gpu::xetla::group::epilogue_t<
-      gpu::xetla::group::epilogue_policy_tile_op<post_ops, gpu_arch::Xe>,
+      gpu::xetla::group::
+          epilogue_policy_tile_op<post_ops, static_cast<gpu_arch>(arch)>,
       tile_shape,
       mem_desc_c_t>;
 
-  static_assert(
-      l3_kslicing == 1 || std::is_same<remove_const_t<dtype_c>, float>::value ||
-          std::is_same<remove_const_t<dtype_c>, int>::value,
-      "for l3_kslicing > 1, current we only support float or "
-      "int for matC");
-
-  using gemm_op_t = gpu::xetla::kernel::gemm_t<
-      gpu::xetla::kernel::dispatch_policy_int4_dequantize_kslicing<
-          l3_kslicing,
-          slm_kslicing,
-          gpu_arch::Xe>,
-      brgemm_t,
-      epilogue_t>;
+  using group_swizzle =
+      gpu::xetla::kernel::group_swizzle_default<static_cast<gpu_arch>(arch)>;
+  using dispatch_policy = dispatch_policy_int4_dequantize_kslicing<
+      group_swizzle,
+      l3_kslicing,
+      slm_kslicing>;
+  using gemm_op_t =
+      gpu::xetla::kernel::gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
 
   static const char* func_name() {
     return "hgemm_wint4_func";
@@ -76,16 +88,19 @@ struct hgemm_wint4_func {
 
   template <typename gemm_op_t>
   struct RunKernelFunctor {
-    SYCL_ESIMD_KERNEL void operator()(nd_item<3> item) const {
-      xetla_exec_item<3> ei(item);
+    KERNEL_MAIN void operator()(nd_item<3> item) const {
       slm_barrier_init<gemm_op_t>();
       gemm_op_t gemm_op;
-      gemm_op(ei, gemm_arg);
+      gemm_op(item, gemm_arg);
     }
-    RunKernelFunctor(gemm_op_t::arguments_t gemm_arg_) : gemm_arg(gemm_arg_) {}
+    RunKernelFunctor(
+        typename gemm_op_t::template arguments_t<compute_policy::quant_type>
+            gemm_arg_)
+        : gemm_arg(gemm_arg_) {}
 
    private:
-    gemm_op_t::arguments_t gemm_arg;
+    typename gemm_op_t::template arguments_t<compute_policy::quant_type>
+        gemm_arg;
   };
 
   static inline void run(
@@ -93,27 +108,32 @@ struct hgemm_wint4_func {
       dtype_a* A,
       dtype_b* B,
       dtype_c* C,
+      dtype_acc* acc_ptr,
+      uint32_t* cnt_ptr,
       uint32_t mat_m,
       uint32_t mat_n,
       uint32_t mat_k,
       dtype_zero_pt* zero_pt_ptr,
       dtype_scale* scale_ptr,
       typename epilogue_t::arguments_t epilogue_args = {}) {
-    typename gemm_op_t::arguments_t gemm_arg(
-        mat_m,
-        mat_k,
-        mat_n,
-        A,
-        mat_k,
-        B,
-        mat_n,
-        C,
-        mat_n,
-        scale_ptr,
-        mat_n,
-        zero_pt_ptr,
-        mat_n,
-        epilogue_args);
+    typename gemm_op_t::template arguments_t<compute_policy::quant_type>
+        gemm_arg(
+            mat_m,
+            mat_k,
+            mat_n,
+            A,
+            mat_k,
+            B,
+            mat_n,
+            C,
+            mat_n,
+            scale_ptr,
+            mat_n,
+            zero_pt_ptr,
+            mat_n,
+            acc_ptr,
+            cnt_ptr,
+            epilogue_args);
 
     cl::sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
 
@@ -136,7 +156,8 @@ template <
     int SLM_KS,
     int L3_KS,
     int SYNC_FREQ,
-    int STAGES>
+    int STAGES,
+    int ARCH>
 inline void hgemm_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -144,6 +165,8 @@ inline void hgemm_wint4(
     const uint8_t* b,
     const uint8_t* b_zp,
     const scalar_t* b_scale,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
     const uint32_t m,
     const uint32_t n,
     const uint32_t k) {
@@ -168,7 +191,10 @@ inline void hgemm_wint4(
       SG_K,
       L3_KS,
       SLM_KS,
+      ARCH,
       DQUANT_S,
+      SYNC_FREQ,
+      STAGES,
       subgroup::chained_tile_op_t<>>;
 
   const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
@@ -178,6 +204,8 @@ inline void hgemm_wint4(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
+      acc_ptr,
+      cnt_ptr,
       m,
       n,
       k,
@@ -196,7 +224,8 @@ template <
     int SLM_KS,
     int L3_KS,
     int SYNC_FREQ,
-    int STAGES>
+    int STAGES,
+    int ARCH>
 inline void hgemm_bias_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -205,10 +234,11 @@ inline void hgemm_bias_wint4(
     const uint8_t* b_zp,
     const scalar_t* b_scale,
     const scalar_t* bias,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
     const uint32_t m,
     const uint32_t n,
     const uint32_t k) {
-  static_assert(L3_KS == 1, "for fused op, L3_KS should be 1");
   using data_type_a = scalar_t;
   using data_type_b = int4x2;
   using data_type_c = scalar_t;
@@ -216,8 +246,14 @@ inline void hgemm_bias_wint4(
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_bias = scalar_t;
-  using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<data_type_bias, gpu_arch::Xe>>;
+  using mem_desc_bias_t = mem_desc_t<
+      data_type_bias,
+      mem_layout::row_major,
+      mem_space::global,
+      DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>;
+  using bias_op_t =
+      subgroup::bias_add_op_t<mem_desc_bias_t, static_cast<gpu_arch>(ARCH)>;
+  using post_op = subgroup::chained_tile_op_t<bias_op_t>;
   using hgemm_wint4_functor = hgemm_wint4_func<
       data_type_a,
       data_type_b,
@@ -232,7 +268,10 @@ inline void hgemm_bias_wint4(
       SG_K,
       L3_KS,
       SLM_KS,
+      ARCH,
       DQUANT_S,
+      SYNC_FREQ,
+      STAGES,
       post_op>;
   const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
@@ -242,6 +281,8 @@ inline void hgemm_bias_wint4(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
+      acc_ptr,
+      cnt_ptr,
       m,
       n,
       k,
@@ -261,7 +302,8 @@ template <
     int SLM_KS,
     int L3_KS,
     int SYNC_FREQ,
-    int STAGES>
+    int STAGES,
+    int ARCH>
 inline void hgemm_bias_gelu_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -270,6 +312,8 @@ inline void hgemm_bias_gelu_wint4(
     const uint8_t* b_zp,
     const scalar_t* b_scale,
     const scalar_t* bias,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
     const uint32_t m,
     const uint32_t n,
     const uint32_t k) {
@@ -282,7 +326,13 @@ inline void hgemm_bias_gelu_wint4(
   using data_type_acc = float;
   using data_type_bias = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<data_type_bias, gpu_arch::Xe>,
+      subgroup::bias_add_op_t<
+          mem_desc_t<
+              data_type_bias,
+              mem_layout::row_major,
+              mem_space::global,
+              DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>,
+          static_cast<gpu_arch>(ARCH)>,
       subgroup::gelu_fwd_op_t>;
   using hgemm_wint4_functor = hgemm_wint4_func<
       data_type_a,
@@ -298,7 +348,10 @@ inline void hgemm_bias_gelu_wint4(
       SG_K,
       L3_KS,
       SLM_KS,
+      ARCH,
       DQUANT_S,
+      SYNC_FREQ,
+      STAGES,
       post_op>;
 
   const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
@@ -309,6 +362,8 @@ inline void hgemm_bias_gelu_wint4(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
+      acc_ptr,
+      cnt_ptr,
       m,
       n,
       k,
@@ -328,7 +383,8 @@ template <
     int SLM_KS,
     int L3_KS,
     int SYNC_FREQ,
-    int STAGES>
+    int STAGES,
+    int ARCH>
 inline void hgemm_res_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -337,6 +393,8 @@ inline void hgemm_res_wint4(
     const uint8_t* b_zp,
     const scalar_t* b_scale,
     const scalar_t* res,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
     const uint32_t m,
     const uint32_t n,
     const uint32_t k) {
@@ -349,9 +407,10 @@ inline void hgemm_res_wint4(
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_res = scalar_t;
-  using post_op = subgroup::chained_tile_op_t<
-      subgroup::
-          elemwise_reduce_op_t<reduce_op::sum, data_type_res, gpu_arch::Xe>>;
+  using post_op = subgroup::chained_tile_op_t<subgroup::elemwise_reduce_op_t<
+      reduce_op::sum,
+      data_type_res,
+      static_cast<gpu_arch>(ARCH)>>;
   using hgemm_wint4_functor = hgemm_wint4_func<
       data_type_a,
       data_type_b,
@@ -366,7 +425,10 @@ inline void hgemm_res_wint4(
       SG_K,
       L3_KS,
       SLM_KS,
+      ARCH,
       DQUANT_S,
+      SYNC_FREQ,
+      STAGES,
       post_op>;
 
   const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
@@ -377,6 +439,8 @@ inline void hgemm_res_wint4(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
+      acc_ptr,
+      cnt_ptr,
       m,
       n,
       k,
@@ -396,7 +460,8 @@ template <
     int SLM_KS,
     int L3_KS,
     int SYNC_FREQ,
-    int STAGES>
+    int STAGES,
+    int ARCH>
 inline void hgemm_mul_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -405,6 +470,8 @@ inline void hgemm_mul_wint4(
     const uint8_t* b_zp,
     const scalar_t* b_scale,
     const scalar_t* mul,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
     const uint32_t m,
     const uint32_t n,
     const uint32_t k) {
@@ -417,9 +484,10 @@ inline void hgemm_mul_wint4(
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_mul = scalar_t;
-  using post_op = subgroup::chained_tile_op_t<
-      subgroup::
-          elemwise_reduce_op_t<reduce_op::prod, data_type_mul, gpu_arch::Xe>>;
+  using post_op = subgroup::chained_tile_op_t<subgroup::elemwise_reduce_op_t<
+      reduce_op::prod,
+      data_type_mul,
+      static_cast<gpu_arch>(ARCH)>>;
   using hgemm_wint4_functor = hgemm_wint4_func<
       data_type_a,
       data_type_b,
@@ -434,7 +502,10 @@ inline void hgemm_mul_wint4(
       SG_K,
       L3_KS,
       SLM_KS,
+      ARCH,
       DQUANT_S,
+      SYNC_FREQ,
+      STAGES,
       post_op>;
 
   const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
@@ -445,6 +516,8 @@ inline void hgemm_mul_wint4(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
+      acc_ptr,
+      cnt_ptr,
       m,
       n,
       k,
@@ -464,7 +537,8 @@ template <
     int SLM_KS,
     int L3_KS,
     int SYNC_FREQ,
-    int STAGES>
+    int STAGES,
+    int ARCH>
 inline void hgemm_bias_res_res_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -475,6 +549,8 @@ inline void hgemm_bias_res_res_wint4(
     const scalar_t* bias,
     const scalar_t* res0,
     const scalar_t* res1,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
     const uint32_t m,
     const uint32_t n,
     const uint32_t k) {
@@ -488,11 +564,21 @@ inline void hgemm_bias_res_res_wint4(
   using data_type_bias = scalar_t;
   using data_type_res = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<data_type_bias, gpu_arch::Xe>,
-      subgroup::
-          elemwise_reduce_op_t<reduce_op::sum, data_type_res, gpu_arch::Xe>,
-      subgroup::
-          elemwise_reduce_op_t<reduce_op::sum, data_type_res, gpu_arch::Xe>>;
+      subgroup::bias_add_op_t<
+          mem_desc_t<
+              data_type_bias,
+              mem_layout::row_major,
+              mem_space::global,
+              DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>,
+          static_cast<gpu_arch>(ARCH)>,
+      subgroup::elemwise_reduce_op_t<
+          reduce_op::sum,
+          data_type_res,
+          static_cast<gpu_arch>(ARCH)>,
+      subgroup::elemwise_reduce_op_t<
+          reduce_op::sum,
+          data_type_res,
+          static_cast<gpu_arch>(ARCH)>>;
   using hgemm_wint4_functor = hgemm_wint4_func<
       data_type_a,
       data_type_b,
@@ -507,7 +593,10 @@ inline void hgemm_bias_res_res_wint4(
       SG_K,
       L3_KS,
       SLM_KS,
+      ARCH,
       DQUANT_S,
+      SYNC_FREQ,
+      STAGES,
       post_op>;
 
   const data_type_b* b_alias = reinterpret_cast<const int4x2*>(b);
@@ -518,6 +607,8 @@ inline void hgemm_bias_res_res_wint4(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
+      acc_ptr,
+      cnt_ptr,
       m,
       n,
       k,
@@ -539,7 +630,8 @@ template <
     int SLM_KS,
     int L3_KS,
     int SYNC_FREQ,
-    int STAGES>
+    int STAGES,
+    int ARCH>
 inline void hgemm_qkv_wint4(
     sycl::queue& queue,
     scalar_t* out0,
@@ -549,6 +641,8 @@ inline void hgemm_qkv_wint4(
     const uint8_t* b,
     const uint8_t* b_zp,
     const scalar_t* b_scale,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
     const uint32_t m,
     const uint32_t n,
     const uint32_t k) {
@@ -575,7 +669,10 @@ inline void hgemm_qkv_wint4(
       SG_K,
       L3_KS,
       SLM_KS,
+      ARCH,
       DQUANT_S,
+      SYNC_FREQ,
+      STAGES,
       post_op>;
 
   const data_type_b* b_alias = reinterpret_cast<const int4x2*>(b);
@@ -595,6 +692,8 @@ inline void hgemm_qkv_wint4(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out0,
+      acc_ptr,
+      cnt_ptr,
       m,
       n,
       k,
@@ -605,6 +704,8 @@ inline void hgemm_qkv_wint4(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias + weight_offset),
       out1,
+      acc_ptr,
+      cnt_ptr,
       m,
       n,
       k,
@@ -615,6 +716,8 @@ inline void hgemm_qkv_wint4(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias + 2 * weight_offset),
       out2,
+      acc_ptr,
+      cnt_ptr,
       m,
       n,
       k,
@@ -633,7 +736,8 @@ template <
     int SLM_KS,
     int L3_KS,
     int SYNC_FREQ,
-    int STAGES>
+    int STAGES,
+    int ARCH>
 inline void hgemm_qkv_bias_wint4(
     sycl::queue& queue,
     scalar_t* out0,
@@ -644,6 +748,8 @@ inline void hgemm_qkv_bias_wint4(
     const uint8_t* b_zp,
     const scalar_t* b_scale,
     const scalar_t* bias,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
     const uint32_t m,
     const uint32_t n,
     const uint32_t k) {
@@ -655,8 +761,13 @@ inline void hgemm_qkv_bias_wint4(
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_bias = scalar_t;
-  using post_op = subgroup::chained_tile_op_t<
-      subgroup::bias_add_op_t<data_type_bias, gpu_arch::Xe>>;
+  using post_op = subgroup::chained_tile_op_t<subgroup::bias_add_op_t<
+      mem_desc_t<
+          data_type_bias,
+          mem_layout::row_major,
+          mem_space::global,
+          DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>,
+      static_cast<gpu_arch>(ARCH)>>;
   using hgemm_wint4_functor = hgemm_wint4_func<
       data_type_a,
       data_type_b,
@@ -671,7 +782,10 @@ inline void hgemm_qkv_bias_wint4(
       SG_K,
       L3_KS,
       SLM_KS,
+      ARCH,
       DQUANT_S,
+      SYNC_FREQ,
+      STAGES,
       post_op>;
 
   const data_type_b* b_alias = reinterpret_cast<const int4x2*>(b);
@@ -692,6 +806,8 @@ inline void hgemm_qkv_bias_wint4(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out0,
+      acc_ptr,
+      cnt_ptr,
       m,
       n,
       k,
@@ -703,6 +819,8 @@ inline void hgemm_qkv_bias_wint4(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias + weight_offset),
       out1,
+      acc_ptr,
+      cnt_ptr,
       m,
       n,
       k,
@@ -714,6 +832,8 @@ inline void hgemm_qkv_bias_wint4(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias + 2 * weight_offset),
       out2,
+      acc_ptr,
+      cnt_ptr,
       m,
       n,
       k,

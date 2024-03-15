@@ -63,7 +63,7 @@ void launch_paged_attention_v2(
 
     auto cgh = DPCPP_Q_CGF(cgh) {
       cgh.parallel_for<paged_attention_kernel<policy, T, U>>(
-          nd_range, [=](sycl::nd_item<3> item) SYCL_ESIMD_KERNEL {
+          nd_range, [=](sycl::nd_item<3> item) KERNEL_MAIN {
             kernel kernel_fn;
             typename kernel::arguments_t args(
                 max_logits,
@@ -95,7 +95,7 @@ void launch_paged_attention_v2(
 
     auto cgh2 = DPCPP_Q_CGF(cgh) {
       cgh.parallel_for<paged_attention_reduce<policy, T, U>>(
-          nd_range, [=](sycl::nd_item<3> item) SYCL_ESIMD_KERNEL {
+          nd_range, [=](sycl::nd_item<3> item) KERNEL_MAIN {
             reduce_kernel reduce_kernel_fn;
             typename reduce_kernel::arguments_t args(
                 out,
