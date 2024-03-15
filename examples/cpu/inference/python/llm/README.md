@@ -30,6 +30,9 @@ ipex.llm provides dedicated optimization for running Large Language Models (LLM)
 |T5| google/flan-t5-xl | 🟩 | 🟩 | 🟨 |  🟩 |    |
 |Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 | 🟨 |  🟩 | 🟨 |
 |MPT| mosaicml/mpt-7b | 🟩 | 🟩 | 🟨 |  🟩 | 🟩 |
+|Mixtral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |  |  🟩 |  |
+|Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 |  |  🟨 |  |
+|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 |  |  🟩 |  |
 
 ## 2.2 Verified for distributed inference mode via DeepSpeed
 

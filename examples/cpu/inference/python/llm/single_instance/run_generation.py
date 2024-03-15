@@ -20,6 +20,10 @@ import sys
 
 sys.path.append(sys.path[0] + '/../../')
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # supported models
 MODEL_CLASSES = {
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
@@ -179,6 +183,9 @@ if args.torch_compile:
 
 
 if args.benchmark:
+    if args.token_latency and not args.ipex:
+        args.token_latency = False
+        logger.warning("--token-latency requires --ipex. Disabling --token-latency.")
     if args.token_latency:
         if not hasattr(model.config, "token_latency"):
             model.config.token_latency = True

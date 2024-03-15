@@ -29,6 +29,11 @@ import sys
 
 sys.path.append(sys.path[0] + '/../../')
 
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 # supported models now
 MODEL_CLASSES = {
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
@@ -456,6 +461,10 @@ else:
     streamer = None
 generate_kwargs = dict(do_sample=False, num_beams=num_beams, max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens, streamer=streamer)
 
+
+if args.token_latency and not args.ipex:
+    args.token_latency = False
+    logger.warning("--token-latency requires --ipex. Disabling --token-latency.")
 if args.token_latency:
     if not hasattr(model.config, "token_latency"):
         model.config.token_latency = True
