@@ -288,12 +288,12 @@ def attach_op_convert_info_to_model(
     if hasattr(module, "_auto_quant_state"):
         qstate: AutoQuantizationState = module._auto_quant_state  # type: ignore[assignment]
         for _, seen_q_op_info in qstate.idx_to_seen_q_op_infos.items():
-            qstate.idx_to_op_convert_info[
-                seen_q_op_info.idx
-            ] = qstate.calculate_op_convert_info(seen_q_op_info)
-            qstate.idx_to_op_weight_convert_info[
-                seen_q_op_info.idx
-            ] = qstate.calculate_op_weight_convert_info(seen_q_op_info)
+            qstate.idx_to_op_convert_info[seen_q_op_info.idx] = (
+                qstate.calculate_op_convert_info(seen_q_op_info)
+            )
+            qstate.idx_to_op_weight_convert_info[seen_q_op_info.idx] = (
+                qstate.calculate_op_weight_convert_info(seen_q_op_info)
+            )
         _map_smooth_quant_info_to_idx(module)
 
     for _, child in module.named_children():
@@ -514,9 +514,9 @@ def set_node_output_quantized(nodes):
                 if post_node.qconfig is not None:
                     for idx, tensor_info in enumerate(post_node.input_tensor_infos):
                         if tensor_info in node.output_tensor_infos:
-                            post_node.input_tensor_force_inf_dtype[
-                                idx
-                            ] = tensor_info.orig_dtype
+                            post_node.input_tensor_force_inf_dtype[idx] = (
+                                tensor_info.orig_dtype
+                            )
                 elif post_node.type == str(nn.Identity):
                     _reset_post_node_input_infos(post_node)
 
@@ -568,9 +568,9 @@ def set_node_output_quantized(nodes):
                         in [torch.qint8, torch.quint8]
                         and not post_node_are_quantized
                     ):
-                        node.output_tensor_infos[
-                            0
-                        ].inf_dtype = node.input_tensor_force_inf_dtype[0]
+                        node.output_tensor_infos[0].inf_dtype = (
+                            node.input_tensor_force_inf_dtype[0]
+                        )
                         node.insert_fake_quant_after_outputs[0] = True
                         _reset_post_node_input_infos(node)
 
@@ -706,11 +706,11 @@ def save_quant_state(quant_state_map, configure_file):
                             ]
                             is not None
                         ):
-                            cur_tensor_infos[
-                                "smooth_quant_scaling_factor"
-                            ] = v.tensor_id_to_smooth_quant_scaling_factor[
-                                str(tensor_info.id)
-                            ].tolist()
+                            cur_tensor_infos["smooth_quant_scaling_factor"] = (
+                                v.tensor_id_to_smooth_quant_scaling_factor[
+                                    str(tensor_info.id)
+                                ].tolist()
+                            )
                             smooth_quant_enabled = True
                     input_tensor_infos.append(cur_tensor_infos)
                 info["input_tensor_infos"] = input_tensor_infos
@@ -726,18 +726,18 @@ def save_quant_state(quant_state_map, configure_file):
                             cur_tensor_infos["scale"] = v.weight_tensor_id_to_scale_zp[
                                 weight_idx
                             ][0].tolist()
-                            cur_tensor_infos[
-                                "zero_point"
-                            ] = v.weight_tensor_id_to_scale_zp[weight_idx][1].tolist()
+                            cur_tensor_infos["zero_point"] = (
+                                v.weight_tensor_id_to_scale_zp[weight_idx][1].tolist()
+                            )
                         if (
                             weight_idx
                             in v.weight_tensor_id_to_smooth_quant_scaling_factor
                         ):
-                            cur_tensor_infos[
-                                "smooth_quant_scaling_factor"
-                            ] = v.weight_tensor_id_to_smooth_quant_scaling_factor[
-                                weight_idx
-                            ].tolist()
+                            cur_tensor_infos["smooth_quant_scaling_factor"] = (
+                                v.weight_tensor_id_to_smooth_quant_scaling_factor[
+                                    weight_idx
+                                ].tolist()
+                            )
                     weight_tensor_infos.append(cur_tensor_infos)
                 info["weight_tensor_infos"] = weight_tensor_infos
                 # output infos
@@ -756,11 +756,11 @@ def save_quant_state(quant_state_map, configure_file):
                                 tensor_info.id
                             ][1].tolist()
                         if tensor_info.id in v.tensor_id_to_smooth_quant_scaling_factor:
-                            cur_tensor_infos[
-                                "smooth_quant_scaling_factor"
-                            ] = v.tensor_id_to_smooth_quant_scaling_factor[
-                                tensor_info.id
-                            ].tolist()
+                            cur_tensor_infos["smooth_quant_scaling_factor"] = (
+                                v.tensor_id_to_smooth_quant_scaling_factor[
+                                    tensor_info.id
+                                ].tolist()
+                            )
                     output_tensor_infos.append(cur_tensor_infos)
                 info["output_tensor_infos"] = output_tensor_infos
                 # qconfig
@@ -776,9 +776,9 @@ def save_quant_state(quant_state_map, configure_file):
                     info["activation_observer"]["act_observer"] = _get_observer_setting(
                         op_info.qconfig.activation().act_obs
                     )
-                    info["activation_observer"][
-                        "act_ic_observer"
-                    ] = _get_observer_setting(op_info.qconfig.activation().ic_obs)
+                    info["activation_observer"]["act_ic_observer"] = (
+                        _get_observer_setting(op_info.qconfig.activation().ic_obs)
+                    )
                 info["weight_observer"] = _get_observer_setting(
                     op_info.qconfig.weight()
                 )
@@ -942,13 +942,13 @@ def load_qconf_summary_to_model(model, qconf_summary):
             )
             # overide the cur model's info
             v.idx_to_seen_q_op_infos[int(i)].input_tensor_infos = input_tensor_infos
-            v.idx_to_seen_q_op_infos[
-                int(i)
-            ].input_tensor_force_inf_dtype = input_force_dtype_infos
+            v.idx_to_seen_q_op_infos[int(i)].input_tensor_force_inf_dtype = (
+                input_force_dtype_infos
+            )
             v.idx_to_seen_q_op_infos[int(i)].output_tensor_infos = output_tensor_infos
-            v.idx_to_seen_q_op_infos[
-                int(i)
-            ].insert_fake_quant_after_outputs = insert_fake_quant_after_outputs
+            v.idx_to_seen_q_op_infos[int(i)].insert_fake_quant_after_outputs = (
+                insert_fake_quant_after_outputs
+            )
             v.idx_to_seen_q_op_infos[int(i)].weight_tensor_infos = weight_tensor_infos
             v.idx_to_seen_q_op_infos[int(i)].qconfig = qconfig
 
@@ -1255,9 +1255,9 @@ def _map_smooth_quant_info_to_idx(module):
             tensor_id = str(input_arg.id)
             if tensor_id in qstate.tensor_id_to_smooth_quant_scaling_factor:
                 key = str(seen_q_op_info.idx)
-                qstate.idx_to_smooth_quant_scaling_factor[
-                    key
-                ] = qstate.tensor_id_to_smooth_quant_scaling_factor[tensor_id]
+                qstate.idx_to_smooth_quant_scaling_factor[key] = (
+                    qstate.tensor_id_to_smooth_quant_scaling_factor[tensor_id]
+                )
         # Linear has only one weight. Key is not changed.
         for weight_arg in seen_q_op_info.weight_tensor_infos:
             if weight_arg is None:
@@ -1265,6 +1265,6 @@ def _map_smooth_quant_info_to_idx(module):
             tensor_id = str(seen_q_op_info.idx) + "_" + str(weight_arg.id)
             if tensor_id in qstate.weight_tensor_id_to_smooth_quant_scaling_factor:
                 key = str(seen_q_op_info.idx) + "_" + str(weight_arg.id)
-                qstate.idx_to_smooth_quant_scaling_factor[
-                    key
-                ] = qstate.weight_tensor_id_to_smooth_quant_scaling_factor[tensor_id]
+                qstate.idx_to_smooth_quant_scaling_factor[key] = (
+                    qstate.weight_tensor_id_to_smooth_quant_scaling_factor[tensor_id]
+                )

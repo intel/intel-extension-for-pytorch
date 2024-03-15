@@ -143,9 +143,9 @@ def _default_recipe_init(nodes):
                     for idx, tensor_info in enumerate(node.input_tensor_infos):
                         if tensor_info is not None:
                             tensor_info.inf_dtype = tensor_info.orig_dtype
-                            node.input_tensor_force_inf_dtype[
-                                idx
-                            ] = tensor_info.inf_dtype
+                            node.input_tensor_force_inf_dtype[idx] = (
+                                tensor_info.inf_dtype
+                            )
 
             # For LSTM, if it's input is a PackedSequence, we don't support ot now.
             # TODO: support PackedSequence input for quantization LSTM.

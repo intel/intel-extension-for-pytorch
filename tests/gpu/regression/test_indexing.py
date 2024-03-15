@@ -79,11 +79,11 @@ class TestTorchMethod(TestCase):
 
     def test_index_ind_dtype(self):
         torch.use_deterministic_algorithms(True)
-        
-        x = torch.randn(4, 4, device='xpu')
-        ind_long = torch.randint(4, (4,), dtype=torch.long, device='xpu')
+
+        x = torch.randn(4, 4, device="xpu")
+        ind_long = torch.randint(4, (4,), dtype=torch.long, device="xpu")
         ind_int = ind_long.int()
-        src = torch.randn(4, device='xpu')
+        src = torch.randn(4, device="xpu")
         ref = x[ind_long, ind_long]
         res = x[ind_int, ind_int]
         self.assertEqual(ref, res)
@@ -94,7 +94,7 @@ class TestTorchMethod(TestCase):
         res = x[:, ind_int]
         self.assertEqual(ref, res)
         # no repeating indices for index_put
-        ind_long = torch.arange(4, dtype=torch.long, device='xpu')
+        ind_long = torch.arange(4, dtype=torch.long, device="xpu")
         ind_int = ind_long.int()
         for accum in (True, False):
             inp_ref = x.clone()

@@ -32,8 +32,10 @@ if has_triton_package():
     try:
         from triton.compiler.compiler import ASTSource
     except ImportError:
-        warnings.warn("XPU: Import error on ASTSource, if this is not the case, \
-                      please comment out this")
+        warnings.warn(
+            "XPU: Import error on ASTSource, if this is not the case, \
+                      please comment out this"
+        )
         ASTSource = None
 else:
     Config = object
@@ -41,7 +43,6 @@ else:
     KernelInterface = object
     OutOfResources = object
     ASTSource = None
-
 
 
 if has_triton():
@@ -67,7 +68,6 @@ from torch._inductor.triton_heuristics import (
 
 
 class XPUCachingAutotuner(CachingAutotuner):
-
     """
     Simplified version of Triton autotuner that has no invalidation
     key and caches the best config to disk to improve cold start times.

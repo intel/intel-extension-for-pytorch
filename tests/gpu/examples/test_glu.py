@@ -167,9 +167,9 @@ class TestNNMethod(TestCase):
         tupled_grad_outputs = tuple(
             torch.testing.make_tensor(
                 x.shape,
-                dtype=x.dtype
-                if x.is_floating_point() or x.is_complex()
-                else torch.double,
+                dtype=(
+                    x.dtype if x.is_floating_point() or x.is_complex() else torch.double
+                ),
                 device="cpu",
                 low=-1,
                 high=1,

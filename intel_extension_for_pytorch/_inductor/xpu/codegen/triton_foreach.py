@@ -2,6 +2,7 @@ from torch._inductor.codegen.common import IndentedBuffer
 from torch._inductor.codegen.triton_foreach import ForeachKernel
 from torch._inductor.codegen.triton import TritonKernel
 
+
 class XPUForeachKernel(ForeachKernel):
     def __init__(self):
         super().__init__()

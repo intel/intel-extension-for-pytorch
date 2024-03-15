@@ -21,6 +21,7 @@ change. This file contains two types of randomized tests:
    to increment it more than once; otherwise something is probably actually
    wrong).
 """
+
 import math
 from collections import namedtuple
 

@@ -512,10 +512,10 @@ class MultiStreamModule(nn.Module):
             # For self._generate_outputs: here we put results_raw_future[stream_id].get() into a \
             # [results_raw_future[stream_id].get()]
             # to align the multi_stream_module_concat_hint structure.
-            self._generate_outputs(
-                [results_raw_future[stream_id].get()], stream_id
-            ) if self.concat_output else results_raw.append(
-                results_raw_future[stream_id].get()
+            (
+                self._generate_outputs([results_raw_future[stream_id].get()], stream_id)
+                if self.concat_output
+                else results_raw.append(results_raw_future[stream_id].get())
             )
         # If we need to concat the output, for each position, we will concat the result in the list \
         # (generate in self._generate_outputs).

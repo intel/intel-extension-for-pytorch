@@ -122,9 +122,9 @@ launcher_schema = Schema(
         ),
         Optional(
             "use_all_nodes",
-            default=[True, False]
-            if len(set([c.node for c in cpuinfo])) > 1
-            else [True],
+            default=(
+                [True, False] if len(set([c.node for c in cpuinfo])) > 1 else [True]
+            ),
         ): And(list, lambda s: all(isinstance(i, bool) for i in s)),
         Optional(
             "use_logical_core",
