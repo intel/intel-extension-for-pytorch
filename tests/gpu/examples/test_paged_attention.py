@@ -168,9 +168,6 @@ class TestPagedAttention(TestCase):
             num_queries_per_kv,
         )
         alibi_slopes = None
-        if use_alibi:
-            alibi_slopes = torch.randn(num_query_heads, dtype=torch.float, device="cpu")
-
         context_lens = [512 + i for i in range(num_seqs)]
 
         max_context_len = max(context_lens)
@@ -205,10 +202,8 @@ class TestPagedAttention(TestCase):
         head_mapping_xpu = head_mapping.to(xpu_device)
         block_tables_xpu = block_tables.to(xpu_device)
         context_lens_xpu = context_lens.to(xpu_device)
-        if use_alibi:
-            alibi_slopes_xpu = alibi_slopes.to(xpu_device)
-        else:
-            alibi_slopes_xpu = None
+
+        alibi_slopes_xpu = None
 
         if version == "v1":
             torch.xpu.paged_attention_v1(
